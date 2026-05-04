@@ -201,7 +201,7 @@ class HABC_Mesh():
         cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"
         print(cbnd_str.format(self.c_bnd_min, self.c_bnd_max), flush=True)
 
-    def properties_eik_mesh(self, p_usu=None, ele_type='CG', f_est=0.03):
+    def properties_eik_mesh(self, p_usu=None, ele_type='consistent', f_est=0.03):
         """
         Set the properties for the mesh used to solve the Eikonal equation
 
@@ -210,7 +210,8 @@ class HABC_Mesh():
         p_usu : `int`, optional
             Finite element order for the Eikonal equation. Default is None
         ele_type : `string`, optional
-            Finite element type. 'CG' or 'KMV'. Default is 'CG'
+            Finite element type. 'consistent' or 'underintegrated'.
+            Default is 'consistent'
         f_est : `float`, optional
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03
 
@@ -219,7 +220,7 @@ class HABC_Mesh():
         None
         """
 
-        allowed_ele_types = ['CG', 'KMV']
+        allowed_ele_types = ['consistent', 'underintegrated']
         if ele_type not in allowed_ele_types:
             value_parameter_error('ele_type', ele_type, allowed_ele_types)
 
@@ -228,29 +229,29 @@ class HABC_Mesh():
         self.p_eik = self.degree if p_usu is None else p_usu
 
         # Function space for the Eikonal modeling
-        if self.quadrilateral and self.ele_type_eik == 'KMV':
-            self.funct_space_eik = create_function_space(self.mesh,
-                                                         "spectral_quadrilateral",
-                                                         2 * self.p_eik)
+        if ele_type == 'consistent':
+            self.funct_space_eik = create_function_space(self.mesh, 'CG', self.p_eik)
 
-        else:
-            self.funct_space_eik = fire.FunctionSpace(self.mesh,
-                                                      self.ele_type_eik,
-                                                      self.p_eik)
+        if ele_type == 'underintegrated':
+            method = 'spectral_quadrilateral' if self.quadrilateral \
+                else 'mass_lumped_triangle'
+            degree = min(self.p_eik, 4 if self.dimension == 2 else 3)
+            self.funct_space_eik = create_function_space(self.mesh, method, degree)
 
         # Factor for the stabilizing term in Eikonal equation
         self.f_est = f_est
 
-    def preamble_mesh_operations(self, ele_type='CG', f_est=0.03):
+    def preamble_mesh_operations(self, ele_type='consistent', f_est=0.03):
         """
         Perform mesh operations previous to size an absorbing layer
 
         Parameters
         ----------
+        ele_type : `string`, optional
+            Finite element type. 'consistent' or 'underintegrated'.
+            Default is 'consistent'
         f_est : `float`, optional
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03
-        ele_type : `string`, optional
-            Finite element type. 'CG' or 'KMV'. Default is 'CG'
 
         Returns
         -------

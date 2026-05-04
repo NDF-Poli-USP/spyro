@@ -56,8 +56,8 @@ class Eikonal_Modeling():
     ----------
     dimension : `int`
         The spatial dimension of the problem
-    ele_type : `string`
-        Finite element type. 'CG' or 'KMV'. Default is 'CG'
+    ele_type : `string`, optional
+        Finite element type. 'consistent' or 'underintegrated'. Default is 'consistent'
     f_est : `float`
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03
     p_eik : `int`
@@ -89,7 +89,7 @@ class Eikonal_Modeling():
         Set the eikonal solver parameters
     '''
 
-    def __init__(self, dimension, source_locations, ele_type='CG',
+    def __init__(self, dimension, source_locations, ele_type='consistent',
                  p_eik=None, f_est=0.03, tol=1e-16):
         '''
         Initialize the Eikonal_Modeling class
@@ -101,7 +101,8 @@ class Eikonal_Modeling():
         source_locations: `list`of `tuples`
             List of tuples containing all source locations
         ele_type : `string`, optional
-            Finite element type. 'CG' or 'KMV'. Default is 'CG'
+            Finite element type. 'consistent' or 'underintegrated'.
+            Default is 'consistent'
         p_eik : `int`, optional
             Finite element order for the Eikonal analysis. Default is None
         f_est : `float`, optional
@@ -121,11 +122,15 @@ class Eikonal_Modeling():
         self.source_locations = source_locations
 
         # Finite element type.
-        self.ele_type = ele_type
+        allowed_ele_types = ['consistent', 'underintegrated']
+        if ele_type not in allowed_ele_types:
+            value_parameter_error('ele_type', ele_type, allowed_ele_types)
+        else:
+            self.ele_type = ele_type
 
         # Finite element order for the Eikonal analysis
-        self.p_eik = p_eik if p_eik is not None \
-            else (2 if self.dimension == 2 else 1)
+        self.p_eik = p_eik if p_eik is not None else (2 if self.dimension == 2 else 1) \
+            if self.ele_type == 'consistent' else (4 if self.dimension == 2 else 3)
 
         # Factor for the stabilizing term in Eikonal equation
         self.f_est = f_est
@@ -211,9 +216,10 @@ class Eikonal_Modeling():
             Integration domain for the Eikonal equation
         '''
 
-        if self.ele_type == 'CG':
-            dx = fire.dx  # At least: degree = 2 * p_eik
-        elif self.ele_type == 'KMV':
+        if self.ele_type == 'consistent':
+            dx = fire.dx
+
+        if self.ele_type == 'underintegrated':
             quad_rule = quadrature_rules(V)[0]
             dx = fire.dx(**quad_rule)
 

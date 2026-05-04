@@ -11,13 +11,15 @@ fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
-def wave_dict_2d(element_type):
+def wave_dict_2d(ele_geometry, degree_eikonal):
     """Create a dictionary with parameters for the 2D model.
 
     Parameters
     ----------
-    element_type : `str`
-        Type of finite element. 'T' for triangles or 'Q' for quadrilaterals
+    ele_geometry : `str`
+        Geometry of the finite element. 'T' for triangles or 'Q' for quadrilaterals
+    degree_eikonal : `int`
+        Finite element order for the Eikonal equation. Should be 1 or 2
 
     Returns
     -------
@@ -28,7 +30,7 @@ def wave_dict_2d(element_type):
     dictionary = {}
     dictionary["options"] = {
         # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
-        "cell_type": element_type,
+        "cell_type": ele_geometry,
         "variant": "lumped",  # Options: lumped, equispaced or DG.
         # Default is lumped "method":"MLT"
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
@@ -82,6 +84,7 @@ def wave_dict_2d(element_type):
     dictionary["absorving_boundary_conditions"] = {
         "status": True,  # Activate ABCs
         "damping_type": "hybrid",  # Activate HABC
+        "degree_eikonal": degree_eikonal,  # FEM order for the Eikonal analysis
     }
 
     # Define parameters for visualization
@@ -90,15 +93,15 @@ def wave_dict_2d(element_type):
     return dictionary
 
 
-def wave_dict_3d(element_type, degree_eikonal):
+def wave_dict_3d(ele_geometry, degree_eikonal):
     """Create a dictionary with parameters for the 3D model.
 
     Parameters
     ----------
-    element_type : `str`
-        Type of finite element. 'T' for triangles or 'Q' for quadrilaterals
+    ele_geometry : `str`
+        Geometry of the finite element. 'T' for triangles or 'Q' for quadrilaterals
     degree_eikonal : `int`
-        Finite element order for the Eikonal equation. Should be 1 or 2.
+        Finite element order for the Eikonal equation. Should be 1 or 2
 
     Returns
     -------
@@ -109,7 +112,7 @@ def wave_dict_3d(element_type, degree_eikonal):
     dictionary = {}
     dictionary["options"] = {
         # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
-        "cell_type": element_type,
+        "cell_type": ele_geometry,
         "variant": "lumped",  # Options: lumped, equispaced or DG.
         # Default is lumped "method":"MLT"
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
@@ -188,7 +191,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh):
     None added to the ones inherited from AcousticWave and HABC_Mesh
     """
 
-    def __init__(self, dictionary=None, comm=None):
+    def __init__(self, dictionary=None, ele_type='consistent', comm=None):
         """
         Initialize the HABC class
 
@@ -196,6 +199,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh):
         ----------
         dictionary : `dict`, optional
             A dictionary containing the input parameters for the HABC class
+        ele_type : `string`, optional
+            Finite element type. 'consistent' or 'underintegrated'.
+            Default is 'consistent'
         comm : `object`, optional
             An object representing the communication interface
             for parallel processing. Default is None
@@ -216,11 +222,15 @@ class HABC_Wave(AcousticWave, HABC_Mesh):
                    self.mesh_parameters.length_z)
 
         if self.dimension == 2:  # 2D
-            self.path_save += "2d/"
+            self.path_save += "2D_"
 
         if self.dimension == 3:  # 3D
-            self.path_save += "3d/"
-        dom_dim += (self.mesh_parameters.length_y,)
+            self.path_save += "3D_"
+            dom_dim += (self.mesh_parameters.length_y,)
+
+        geom_ele_str = "Q" if self.mesh_parameters.quadrilateral else "T"
+        ele_type_str = "C" if ele_type == 'consistent' else "U"
+        self.path_save += geom_ele_str + "_" + ele_type_str + "/"
 
         # Initializing the Mesh class
         HABC_Mesh.__init__(
@@ -264,7 +274,7 @@ def critical_boundary_points(Wave_obj):
     return eik_bnd
 
 
-def eikonal_analysis(dictionary, edge_length, f_est, ele_type='CG'):
+def eikonal_analysis(dictionary, edge_length, f_est, ele_type='consistent'):
     """Run the the Eikonal analysis.
 
     Parameters
@@ -276,7 +286,7 @@ def eikonal_analysis(dictionary, edge_length, f_est, ele_type='CG'):
     f_est : `float`
         Factor for the stabilizing term in Eikonal Eq.
     ele_type : `string`, optional
-        Finite element type. 'CG' or 'KMV'. Default is 'CG'
+        Finite element type. 'consistent' or 'underintegrated'. Default is 'consistent'
 
     Returns
     -------
@@ -290,7 +300,7 @@ def eikonal_analysis(dictionary, edge_length, f_est, ele_type='CG'):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = HABC_Wave(dictionary=dictionary)
+    Wave_obj = HABC_Wave(dictionary=dictionary, ele_type=ele_type)
 
     # Mesh
     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
@@ -321,9 +331,8 @@ def eikonal_analysis(dictionary, edge_length, f_est, ele_type='CG'):
     return min_eik
 
 
-@pytest.mark.slow
-def test_loop_eikonal_2d():
-    """Loop for testing eikonal solver in 2D with Fig. 8 of Salas et al (2022).
+def test_eik_consistent_ele_2d():
+    """Testing eikonal 2D with consitent elements in Fig. 8 of Salas et al (2022).
 
     eik_min = 83.333 ms (Theoretical value)
     f_est  T-ele   Q-ele
@@ -345,43 +354,48 @@ def test_loop_eikonal_2d():
     # edge_length = lba / cpw
     edge_length = 0.1
 
+    # Element geometry
+    ele_geometry_lst = ["T", "Q"]
+
+    # Eikonal degree
+    p_eik = 2
+
+    # Factor for the stabilizing term in Eikonal equation
+    f_est_lst = [0.06, 0.05]
+
     for case in range(0, 2):
 
-        # Element type
-        ele_type_lst = ["T", "Q"]
-
-        # Factor for the stabilizing term in Eikonal equation
-        f_est_lst = [0.06, 0.05]
-
         # Get simulation parameters
-        ele_type = ele_type_lst[case]
+        ele_geometry = ele_geometry_lst[case]
         f_est = f_est_lst[case]
         print("\nMesh Size: {:.4f} m".format(1e3 * edge_length), flush=True)
-        print("Element type: {}".format(ele_type), flush=True)
+        print("Element type: {}".format(ele_geometry), flush=True)
+        print("Eikonal Degree: {}".format(p_eik), flush=True)
         print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
 
         try:
             # ============ MESH AND EIKONAL ============
 
             # Create dictionary with parameters for the model
-            dict_2d = wave_dict_2d(ele_type)
+            dict_2d = wave_dict_2d(ele_geometry, p_eik)
 
             # Creating mesh and performing eikonal analysis
             min_eik = round(eikonal_analysis(dict_2d, edge_length, f_est), 3)
 
             thr_val = 83.333  # in ms
             assert isclose(min_eik / thr_val, 1., atol=5e-3), \
-                f"✗ Minimum Eikonal 2D Element-{ele_type}-CG " + \
+                f"✗ Minimum Eikonal 2D Element-{ele_geometry}-Consistent " + \
                 f"→ Expected value {thr_val}, got {min_eik:.3f}"
-            print(f"✓ Minimum Eikonal 2D Element-{ele_type}-CG Verified: "
+            print(f"✓ Minimum Eikonal 2D Element-{ele_geometry}-Consistent Verified: "
                   f"expected {thr_val}, got {min_eik:.3f}", flush=True)
 
         except fire.ConvergenceError as e:
-            pytest.fail(f"Checking Eikonal 2D-CG raised an exception: {str(e)}")
+            pytest.fail(f"Checking Eikonal 2D Element-{ele_type}"
+                        f"-Consistent raised an exception: {str(e)}")
 
 
-def test_loop_eikonal_3d():
-    """Loop for testing eikonal solver in 3D with Fig. 8 of Salas et al (2022).
+def test_eik_consistent_ele_3d():
+    """Testing eikonal 3D with consitent elements in Fig. 8 of Salas et al (2022).
 
     eik_min = 83.333 ms (Theoretical value)
     f_est  T-ele   Q-ele
@@ -402,23 +416,22 @@ def test_loop_eikonal_3d():
     # edge_length = lba / cpw
     edge_length = 0.15
 
-    for case in range(0, 1):
+    # Element geometry
+    ele_geometry_lst = ["T", "Q"]
 
-        # Element type
-        ele_type_lst = ["T", "Q"]
+    # Eikonal degree
+    p_eik = 2
 
-        # Eikonal degree
-        degree_eikonal_lst = [2, 2]
+    # Factor for the stabilizing term in Eikonal equation
+    f_est_lst = [0.05, 0.07]
 
-        # Factor for the stabilizing term in Eikonal equation
-        f_est_lst = [0.05, 0.07]
+    for case in range(0, 2):
 
         # Get simulation parameters
-        ele_type = ele_type_lst[case]
-        p_eik = degree_eikonal_lst[case]
+        ele_geometry = ele_geometry_lst[case]
         f_est = f_est_lst[case]
         print("\nMesh Size: {:.4f} m".format(1e3 * edge_length), flush=True)
-        print("Element type: {}".format(ele_type), flush=True)
+        print("Element type: {}".format(ele_geometry), flush=True)
         print("Eikonal Degree: {}".format(p_eik), flush=True)
         print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
 
@@ -426,29 +439,29 @@ def test_loop_eikonal_3d():
         try:
 
             # Create dictionary with parameters for the model
-            dict_3d = wave_dict_3d(ele_type, p_eik)
+            dict_3d = wave_dict_3d(ele_geometry, p_eik)
 
             # Creating mesh and performing eikonal analysis
             min_eik = round(eikonal_analysis(dict_3d, edge_length, f_est), 3)
 
             thr_val = 83.333  # in ms
             assert isclose(min_eik / thr_val, 1., atol=3e-2), \
-                f"✗ Minimum Eikonal 3D Element-{ele_type}-CG " + \
+                f"✗ Minimum Eikonal 3D Element-{ele_geometry}-Consistent " + \
                 f"→ Expected value {thr_val}, got {min_eik:.3f}"
-            print(f"✓ Minimum Eikonal 3D Element-{ele_type}-CG Verified: "
+            print(f"✓ Minimum Eikonal 3D Element-{ele_geometry}-Consistent Verified: "
                   f"Expected {thr_val}, got = {min_eik:.3f}", flush=True)
 
         except fire.ConvergenceError as e:
-            pytest.fail(f"Checking Eikonal 3D-CG raised an exception: {str(e)}")
+            pytest.fail(f"Checking Eikonal 3D Element-{ele_geometry}"
+                        f"-Consistent raised an exception: {str(e)}")
 
 
-@pytest.mark.slow
-def test_loop_eik_kmv_2d():
-    """ Loop for testing eikonal solver in 2D and KMV elements.
+def test_eik_underintegrated_ele_2d():
+    """Testing eikonal 2D with underintegrated elements in Fig. 8 of Salas et al (2022).
 
     eik_min = 83.333 ms (Theoretical value)
     f_est  T-ele  f_est  Q-ele
-     0.07 82.630*  0.03 84.245
+     0.07 82.630*  0.03 84.245 *
      0.08 84.272   0.04 85.593
      0.09 85.654   0.05 86.887
     """
@@ -461,37 +474,104 @@ def test_loop_eik_kmv_2d():
     # edge_length = lba / cpw
     edge_length = 0.1
 
+    # Element geometry
+    ele_geometry_lst = ["T", "Q"]
+
+    # Eikonal degree
+    degree_eikonal_lst = [2, 4]
+
+    # Factor for the stabilizing term in Eikonal equation
+    f_est_lst = [0.07, 0.03]
+
     for case in range(0, 2):
 
-        # Element type
-        ele_type_lst = ["T", "Q"]
-
-        # Factor for the stabilizing term in Eikonal equation
-        f_est_lst = [0.07, 0.03]
-
         # Get simulation parameters
-        ele_type = ele_type_lst[case]
+        ele_geometry = ele_geometry_lst[case]
+        p_eik = degree_eikonal_lst[case]
         f_est = f_est_lst[case]
         print("\nMesh Size: {:.4f} m".format(1e3 * edge_length), flush=True)
-        print("Element type: {}".format(ele_type), flush=True)
+        print("Element type: {}-Underintegrated".format(ele_geometry), flush=True)
+        print("Eikonal Degree: {}".format(p_eik), flush=True)
         print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
 
         try:
             # ============ MESH AND EIKONAL ============
 
             # Create dictionary with parameters for the model
-            dict_2d = wave_dict_2d(ele_type)
+            dict_2d = wave_dict_2d(ele_geometry, p_eik)
 
             # Creating mesh and performing eikonal analysis
             min_eik = round(eikonal_analysis(
-                dict_2d, edge_length, f_est, ele_type='KMV'), 3)
+                dict_2d, edge_length, f_est, ele_type='underintegrated'), 3)
 
             thr_val = 83.333  # in ms
             assert isclose(min_eik / thr_val, 1., atol=1.5e-2), \
-                f"✗ Minimum Eikonal 2D Element-{ele_type}-KMV " + \
+                f"✗ Minimum Eikonal 2D Element-{ele_geometry}-Underintegrated " + \
                 f"→ Expected value {thr_val}, got {min_eik:.3f}"
-            print(f"✓ Minimum Eikonal 2D Element-{ele_type}-KMV Verified: "
-                  f"Expected {thr_val}, got {min_eik:.3f}", flush=True)
+            print(f"✓ Minimum Eikonal 2D Element-{ele_geometry}-Underintegrated "
+                  f"Verified: Expected {thr_val}, got {min_eik:.3f}", flush=True)
 
         except fire.ConvergenceError as e:
-            pytest.fail(f"Checking Eikonal 2D-KMV raised an exception: {str(e)}")
+            pytest.fail(f"Checking Eikonal 2D Element-{ele_geometry}"
+                        f"-Underintegrated raised an exception: {str(e)}")
+
+
+def test_eik_underintegrated_ele_3d():
+    """Testing eikonal 3D with underintegrated elements in Fig. 8 of Salas et al (2022).
+
+    eik_min = 83.333 ms (Theoretical value)
+    f_est  T-ele  f_est   Q-ele
+     0.07 85.178*  0.03 78.838 
+     0.08 87.990   0.04 80.940
+     0.09 90.933   0.05 83.130*
+     0.10 93.988   0.06 85.408
+    """
+
+    # ============ SIMULATION PARAMETERS ============
+
+    # Mesh size (in km)
+    # cpw: cells per wavelength
+    # lba = minimum_velocity / source_frequency
+    # edge_length = lba / cpw
+    edge_length = 0.15
+
+    # Element geometry
+    ele_geometry_lst = ["T", "Q"]
+
+    # Eikonal degree
+    degree_eikonal_lst = [2, 3]
+
+    # Factor for the stabilizing term in Eikonal equation
+    f_est_lst = [0.07, 0.05]
+
+    for case in range(0, 2):
+
+        # Get simulation parameters
+        ele_geometry = ele_geometry_lst[case]
+        p_eik = degree_eikonal_lst[case]
+        f_est = f_est_lst[case]
+        print("\nMesh Size: {:.4f} m".format(1e3 * edge_length), flush=True)
+        print("Element type: {}-Underintegrated".format(ele_geometry), flush=True)
+        print("Eikonal Degree: {}".format(p_eik), flush=True)
+        print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
+
+        try:
+            # ============ MESH AND EIKONAL ============
+
+            # Create dictionary with parameters for the model
+            dict_3d = wave_dict_3d(ele_geometry, p_eik)
+
+            # Creating mesh and performing eikonal analysis
+            min_eik = round(eikonal_analysis(
+                dict_3d, edge_length, f_est, ele_type='underintegrated'), 3)
+
+            thr_val = 83.333  # in ms
+            assert isclose(min_eik / thr_val, 1., atol=2.5e-2), \
+                f"✗ Minimum Eikonal 3D Element-{ele_geometry}-Underintegrated " + \
+                f"→ Expected value {thr_val}, got {min_eik:.3f}"
+            print(f"✓ Minimum Eikonal 3D Element-{ele_geometry}-Underintegrated "
+                  f"Verified: Expected {thr_val}, got {min_eik:.3f}", flush=True)
+
+        except fire.ConvergenceError as e:
+            pytest.fail(f"Checking Eikonal 3D Element-{ele_geometry}"
+                        f"-Underintegrated raised an exception: {str(e)}")
