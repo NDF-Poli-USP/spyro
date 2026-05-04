@@ -245,7 +245,7 @@ class HABC_Damping():
                 alpha : `float`
                     Ratio between the representative mesh dimensions
                 ele_type : `string`
-                    Element type. 'consistent' or 'lumped'
+                    Finite element type. 'consistent' or 'lumped'
 
                 Returns
                 -------
