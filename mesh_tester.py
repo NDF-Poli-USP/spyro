@@ -32,7 +32,7 @@ dictionary["mesh"] = {
     "length_z": length_z,  # depth in km - always positive
     "length_x": length_x,  # width in km - always positive
     "length_y": 0.0,  # thickness in km - always positive
-    "mesh_file": "meshes/avenir.msh",
+    "mesh_type": mesh_type,
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
@@ -61,10 +61,10 @@ dictionary["visualization"] = {
 }
 
 wave_obj = spyro.AcousticWave(dictionary=dictionary)
-# wave_obj.set_mesh(input_mesh_parameters={
-#     "cells_per_wavelength": cells_per_wavelength,
-#     "velocity_model": velocity_model,
-# })
+wave_obj.set_mesh(input_mesh_parameters={
+    "cells_per_wavelength": cells_per_wavelength,
+    "velocity_model": velocity_model,
+})
 wave_obj.forward_solve()
 
 print("END")
