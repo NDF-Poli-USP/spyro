@@ -520,11 +520,24 @@ def test_eik_underintegrated_ele_3d():
     """Testing eikonal 3D with underintegrated elements in Fig. 8 of Salas et al (2022).
 
     eik_min = 83.333 ms (Theoretical value)
+    p = 2         p = 3
     f_est  T-ele  f_est   Q-ele
      0.07 85.178*  0.03 78.838
      0.08 87.990   0.04 80.940
      0.09 90.933   0.05 83.130*
      0.10 93.988   0.06 85.408
+
+    p = 1-T-full integration
+    f_est  T-ele
+     0.06 96.300
+     0.07 96.845
+     0.08 97.277
+
+    p = 3-T-full integration
+    f_est   T-ele
+     0.03  96.223
+     0.04 101.550
+     0.05 107.164
     """
 
     # ============ SIMULATION PARAMETERS ============
