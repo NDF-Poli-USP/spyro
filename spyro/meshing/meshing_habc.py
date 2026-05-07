@@ -181,10 +181,13 @@ class HABC_Mesh():
         all_bnd_nodes = np.unique(np.concatenate(all_bnd_nodes))
         coord_msh = self.mesh_original.coordinates.dat.data_with_halos
         coord_bnd = node_positions[all_bnd_nodes, :]
-        msh_view = coord_msh.view([('', coord_msh.dtype)] * coord_msh.shape[1])
-        bnd_view = coord_bnd.view([('', coord_bnd.dtype)] * coord_bnd.shape[1])
-        mask_boundary = np.where(np.isin(msh_view, bnd_view))[0]
         self.bnd_nodes = coord_bnd
+
+        # Identify the boundary nodes
+        tree = cKDTree(coord_msh)
+        indices = tree.query(
+            coord_bnd, k=1, distance_upper_bound=self.mesh_parameters.tol)[1]
+        mask_boundary = indices[indices < len(coord_msh)]
 
         # Create a point cloud to get the extreme velocity values on the boundary
         ptos_bnd = self.mesh_original.coordinates.dat.data_with_halos[mask_boundary, :]
