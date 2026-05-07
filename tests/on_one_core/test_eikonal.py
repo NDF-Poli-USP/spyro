@@ -394,6 +394,7 @@ def test_eik_consistent_ele_2d():
                         f"-Consistent raised an exception: {str(e)}")
 
 
+@pytest.mark.slow
 def test_eik_consistent_ele_3d():
     """Testing eikonal 3D with consitent elements in Fig. 8 of Salas et al (2022).
 
@@ -516,6 +517,7 @@ def test_eik_underintegrated_ele_2d():
                         f"-Underintegrated raised an exception: {str(e)}")
 
 
+@pytest.mark.slow
 def test_eik_underintegrated_ele_3d():
     """Testing eikonal 3D with underintegrated elements in Fig. 8 of Salas et al (2022).
 
