@@ -692,6 +692,23 @@ class AutomaticMesh:
                     pad_x_max=pad_x_max, pad_z_min=pad_z_min, a_val=a_val,
                     b_val=b_val, xc=xc, zc=zc, apply_winslow=apply_winslow
                 )
+            # Rotating mesh for axis (z,x,y)
+            if padding_type in ["rectangular", "hyperelliptical"]:
+                rotate_xz = [
+                    0.0, 1.0, 0.0, 0.0,
+                    -1.0, 0.0, 0.0, domain_xmax,
+                    0.0, 0.0, 1.0, 0.0,
+                    0.0, 0.0, 0.0, 1.0
+                ]
+            else:
+                rotate_xz = [
+                    0.0, 1.0, 0.0, -domain_zmin,
+                    -1.0, 0.0, 0.0, domain_xmax,
+                    0.0, 0.0, 1.0, 0.0,
+                    0.0, 0.0, 0.0, 1.0
+                ]
+
+            gmsh.model.mesh.affineTransform(rotate_xz)
             gmsh.write(output_file)
             parallel_print(f"Gmsh mesh written to {output_file}", comm=self.comm)
             gmsh.finalize()
