@@ -9,8 +9,7 @@ plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
 
 
 def create_folder(folder):
-    '''
-    Verify if a folder exists, if not, it creates the folder
+    """Verify if a folder exists, if not, it creates the folder.
 
     Parameters
     ----------
@@ -20,7 +19,7 @@ def create_folder(folder):
     Returns
     -------
     None
-    '''
+    """
 
     # Create the folder if it does not exist
     if not path.isdir(folder):
@@ -29,8 +28,7 @@ def create_folder(folder):
 
 def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
                              output_folder="output/", show=False):
-    '''
-    Plot the function of the layer size criterion for the HABC scheme
+    """Plot the function of the layer size criterion for the HABC scheme.
 
     Parameters
     ----------
@@ -62,7 +60,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
     Returns
     -------
     None
-    '''
+    """
 
     # Create the output folder if it does not exist
     create_folder(output_folder)
@@ -160,15 +158,14 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
     plt.close()
 
 
-def plot_hist_receivers(Wave_object, show=False):
-    '''
-    Plot the comparison of the time-domain response at the
-    receivers between the reference model and the HABC scheme.
+def plot_hist_receivers(wave_object, show=False):
+    """Plot receiver time-domain response comparing reference model and HABC scheme.
+
     The plots are saved in PDF and PNG formats.
 
     Parameters
     ----------
-    Wave_object: `wave`
+    wave_object: `wave`
         The Wave object containing the simulation results.
     show: `bool`, optional
         Whether to show the plot. Default is False.
@@ -176,13 +173,13 @@ def plot_hist_receivers(Wave_object, show=False):
     Returns
     -------
     None
-    '''
+    """
 
     print("\nPlotting Time Comparison", flush=True)
 
     # Time data
-    dt = Wave_object.dt
-    tf = Wave_object.final_time
+    dt = wave_object.dt
+    tf = wave_object.final_time
     nt = int(round(tf / dt)) + 1  # number of timesteps
     t_rec = np.linspace(0., tf, nt)
 
@@ -190,7 +187,7 @@ def plot_hist_receivers(Wave_object, show=False):
     plt.rcParams['font.size'] = 7
 
     # Setting subplots
-    num_recvs = Wave_object.number_of_receivers
+    num_recvs = wave_object.number_of_receivers
     plt.rcParams['axes.grid'] = True
     fig, axes = plt.subplots(nrows=num_recvs, ncols=1)
     fig.subplots_adjust(hspace=0.6)
@@ -202,8 +199,8 @@ def plot_hist_receivers(Wave_object, show=False):
     for rec in range(num_recvs):
 
         # Plot the receiver data
-        rc_dat = Wave_object.forward_solution_receivers[:, rec]
-        rf_dat = Wave_object.receivers_reference[:, rec]
+        rc_dat = wave_object.forward_solution_receivers[:, rec]
+        rf_dat = wave_object.receivers_reference[:, rec]
         axes[rec].plot(t_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
         axes[rec].plot(t_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
 
@@ -229,22 +226,21 @@ def plot_hist_receivers(Wave_object, show=False):
             axes[rec].set_xlabel(r'$t \; (s)$')
 
     # Saving the plot
-    time_str = Wave_object.path_case_habc + "time"
+    time_str = wave_object.path_case_habc + "time"
     plt.savefig(time_str + ".png", bbox_inches='tight')
     plt.savefig(time_str + ".pdf", bbox_inches='tight')
     plt.show() if show else None
     plt.close()
 
 
-def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
-    '''
-    Plot the comparison of the frequency-domain response at the
-    receivers between the reference model and the HABC scheme.
+def plot_rfft_receivers(wave_object, fxlim=4., show=False):
+    """Plot receiver frequency-domain response comparing reference model and HABC scheme.
+
     The plots are saved in PDF and PNG formats.
 
     Parameters
     ----------
-    Wave_object: `wave`
+    wave_object: `wave`
         Wave object containing the simulation results.
     fxlim: `float`, optional
         Factor to set the x-axis limits in the plots realtive to
@@ -255,14 +251,14 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
     Returns
     -------
     None
-    '''
+    """
 
     print("\nPlotting Frequency Comparison", flush=True)
 
     # Frequency data
-    f_Nyq = Wave_object.f_Nyq
-    f_sou = Wave_object.frequency
-    pfft = Wave_object.receivers_out_fft.shape[0] - 1
+    f_Nyq = wave_object.f_Nyq
+    f_sou = wave_object.frequency
+    pfft = wave_object.receivers_out_fft.shape[0] - 1
     df = f_Nyq / pfft
     limf = round(min(max(fxlim, 2.) * f_sou, f_Nyq), 1)
     idx_lim = int(limf / df) + 1
@@ -272,7 +268,7 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
     plt.rcParams['font.size'] = 7
 
     # Setting subplots
-    num_recvs = Wave_object.number_of_receivers
+    num_recvs = wave_object.number_of_receivers
     plt.rcParams['axes.grid'] = True
     fig, axes = plt.subplots(nrows=num_recvs, ncols=1)
     fig.subplots_adjust(hspace=0.6)
@@ -284,17 +280,17 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
     for rec in range(num_recvs):
 
         # Plot the receiver data
-        rc_dat = Wave_object.receivers_out_fft[:idx_lim, rec]
-        rf_dat = Wave_object.receivers_ref_fft[:idx_lim, rec]
+        rc_dat = wave_object.receivers_out_fft[:idx_lim, rec]
+        rf_dat = wave_object.receivers_ref_fft[:idx_lim, rec]
         axes[rec].plot(f_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
         axes[rec].plot(f_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
 
         # Add a vertical line at f_ref and f_sou
-        if f_sou == Wave_object.freq_ref:
+        if f_sou == wave_object.freq_ref:
             f_ref = f_sou
             f_str = r'$f_{ref} = f_{sou}$'
         else:
-            f_ref = Wave_object.freq_ref
+            f_ref = wave_object.freq_ref
             f_str = r'$f_{ref}$'
             axes[rec].axvline(
                 x=f_sou, color='black', linestyle='-', linewidth=1.25)
@@ -330,23 +326,22 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
             axes[rec].text(f_sou + limf / 500., axes[rec].get_ylim()[0] * 1.05,
                            r'$f_{sou}$', color='black', fontsize=8,
                            fontweight='bold', ha='left', va='bottom') \
-                if f_sou != Wave_object.freq_ref else None
+                if f_sou != wave_object.freq_ref else None
 
     # Saving the plot
-    time_str = Wave_object.path_case_habc + "freq"
+    time_str = wave_object.path_case_habc + "freq"
     plt.savefig(time_str + ".png", bbox_inches='tight')
     plt.savefig(time_str + ".pdf", bbox_inches='tight')
     plt.show() if show else None
     plt.close()
 
 
-def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
-    '''
-    Plot the regression curve for the optimal xCR value.
+def plot_xCR_opt(wave_object, data_regr_xCR, show=False):
+    """Plot the regression curve for the optimal xCR value.
 
     Parameters
     ----------
-    Wave_object: `wave`
+    wave_object: `wave`
         The Wave object containing the simulation results
     data_regr_xCR: `list`
         Data for the regression of the parameter xCR.
@@ -367,7 +362,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     Returns
     -------
     None
-    '''
+    """
 
     # Data for regression
     xCR, max_errIt, max_errPk, crit_opt = data_regr_xCR
@@ -399,7 +394,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
              label=r'Peak Error: ' + eq_str_eP)
 
     # xCR limits
-    xCR_inf, xCR_sup = Wave_object.xCR_lim
+    xCR_inf, xCR_sup = wave_object.xCR_lim
 
     # Regression curves
     xgraf = np.linspace(xCR_inf, xCR_sup, int((xCR_sup - xCR_inf) / 0.1))
@@ -438,7 +433,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     plt.ylabel(r'$e_I \; | \; e_P \; (\%)$')
 
     # Saving the plot
-    xcr_str = Wave_object.path_case_habc + "xCR"
+    xcr_str = wave_object.path_case_habc + "xCR"
     plt.savefig(xcr_str + '.png', bbox_inches='tight')
     plt.savefig(xcr_str + '.pdf', bbox_inches='tight')
     plt.show() if show else None
