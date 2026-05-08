@@ -4,9 +4,8 @@ import numpy as np
 from scipy.fft import fft
 
 
-def freq_response(signal, f_Nyq, fpad=4, get_max_freq=False):
-    '''
-    Calculate the response in frequency domain of a time signal via FFT
+def freq_response(signal, f_Nyq, fpad=4, get_dominant_freq=False):
+    """Calculate the response in frequency domain of a time signal via FFT.
 
     Parameters
     ----------
@@ -16,27 +15,25 @@ def freq_response(signal, f_Nyq, fpad=4, get_max_freq=False):
         Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
     fpad : `int`, optional
         Padding factor for FFT. Default is 4
-    get_max_freq : `bool`, optional
-        If True, return only the maximum frequency of the spectrum.
-        Default is False
+    get_dominant_freq : `bool`, optional
+        If True, return only the dominant frequency of the spectrum. Default is False
 
     Returns
     -------
     yf : `array`
         Normalized frequency spectrum with respect to the maximum magnitude
-    max_freq : `float`, optional
-        Maximum frequency of the spectrum
-    '''
+    dominant_freq : `float`, optional
+        Dominant frequency of the spectrum
+    """
 
     # Check if the signal is empty
     if signal.size == 0:
-        er = "Input signal is empty. Cannot compute frequency response."
-        raise ValueError(er)
+        raise ValueError("Input signal is empty. Cannot compute frequency response.")
 
     # Check if the Nyquist frequency is positive
     if f_Nyq <= 0:
-        er = "Nyquist frequency is invalid. Cannot compute frequency response."
-        raise ValueError(er)
+        raise ValueError("Nyquist frequency is invalid. "
+                         "Cannot compute frequency response.")
 
     # Zero padding for increasing smoothing in FFT
     yt = np.concatenate([np.zeros(fpad * len(signal)), signal])
@@ -54,13 +51,13 @@ def freq_response(signal, f_Nyq, fpad=4, get_max_freq=False):
     # Frequency vector
     xf = np.linspace(0.0, f_Nyq, pfft)
 
-    # Get the maximum frequency of the spectrum
-    max_freq = xf[yf.argmax()]
+    # Get the Dominant frequency of the spectrum
+    dominant_freq = xf[yf.argmax()]
 
-    if get_max_freq:
+    if get_dominant_freq:
 
-        # Return the maximum frequency only
-        return max_freq
+        # Return the Dominant frequency only
+        return dominant_freq
     else:
 
         # Normalized frequency spectrum
