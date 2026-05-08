@@ -332,7 +332,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
                 # Get the minimum frequency excited at each critical point
                 freq_ref = freq_response(histPcrit, self.f_Nyq,
-                                         fpad=fpad, get_max_freq=True)
+                                         fpad=fpad, get_dominant_freq=True)
                 print("Frequency at Critical Point {:>2.0f}: {:.5f}".format(
                     n_crit, freq_ref), flush=True)
 
