@@ -4,8 +4,7 @@ import numpy as np
 
 
 def value_parameter_error(par_name, par_value, valid_values):
-    '''
-    Raise a ValueError with a specific error message
+    """Raise a ValueError with a specific error message.
 
     Parameters
     ----------
@@ -20,7 +19,7 @@ def value_parameter_error(par_name, par_value, valid_values):
     ------
     ValueError
         If the parameter value is not in the list of valid values
-    '''
+    """
 
     # Error message about the invalid parameter
     err_str = f"Invalid {par_name}: '{par_value}'. Please use: "
@@ -33,9 +32,7 @@ def value_parameter_error(par_name, par_value, valid_values):
 
 
 def mutually_exclusive_parameter_error(par_name_lst, par_value_lst):
-    '''
-    Raise a ValueError with a specific error message for parameters
-    that are mutually exclusive.
+    """Raise a ValueError with specific message for mutually exclusive parameters.
 
     Parameters
     ----------
@@ -49,7 +46,7 @@ def mutually_exclusive_parameter_error(par_name_lst, par_value_lst):
     ValueError
         If two or more parameters have been provided by the user.
         That is, value of the parameters is not None.
-    '''
+    """
 
     par_defined = [par for par, val in zip(par_name_lst,
                                            par_value_lst)
@@ -69,9 +66,7 @@ def mutually_exclusive_parameter_error(par_name_lst, par_value_lst):
 
 
 def value_dimension_error(par_names, par_values, expected_dim):
-    '''
-    Raise a ValueError if the dimensions of the parameters
-    do not match the expected dimension.
+    """Raise a ValueError if parameter dimensions mismatch expected dimension.
 
     Parameters
     ----------
@@ -86,7 +81,7 @@ def value_dimension_error(par_names, par_values, expected_dim):
     ------
     ValueError
         If the dimensions of the parameters do not match the expected dimension
-    '''
+    """
 
     str_domd, str_habc = par_names
     chk_domd, chk_habc = par_values
@@ -99,8 +94,7 @@ def value_dimension_error(par_names, par_values, expected_dim):
 
 
 def clean_inst_num(data_arr):
-    ''''
-    Set NaNs and negative values to zero in an array
+    """Set NaNs and negative values to zero in an array.
 
     Parameters
     ----------
@@ -111,7 +105,7 @@ def clean_inst_num(data_arr):
     -------
     data_arr : `array`
         An array with null or positive components
-    '''
+    """
     data_arr[np.where(np.isnan(data_arr) | np.isinf(
         data_arr) | (data_arr < 0.0))] = 0.0
     return data_arr
