@@ -83,13 +83,13 @@ def value_dimension_error(par_names, par_values, expected_dim):
         If the dimensions of the parameters do not match the expected dimension
     """
 
-    str_domd, str_habc = par_names
-    chk_domd, chk_habc = par_values
+    str_reference, str_comparison = par_names
+    chk_reference, chk_comparison = par_values
 
     dim_err = (
         f"Mismatch in domain dimensions\n"
-        f"{str_domd} ({chk_domd}), {str_habc} ({chk_habc}) do "
-        f"not match expected model dimension ({expected_dim}D).")
+        f"{str_reference} ({chk_reference}), {str_comparison} ({chk_comparison}) "
+        f"do not match expected model dimension ({expected_dim}D).")
     raise ValueError(dim_err)
 
 
