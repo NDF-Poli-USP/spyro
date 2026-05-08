@@ -1,21 +1,4 @@
-# # Specify a 250-m PML on the three sides of the
-# # domain to damp outgoing waves.
-# default_dictionary["absorving_boundary_conditions"] = {
-#     "status": False,  # True or false
-# #  None or non-reflective (outer boundary condition)
-#     "outer_bc": "non-reflective",
-# # polynomial, hyperbolic, shifted_hyperbolic
-#     "damping_type": "polynomial",
-#     "exponent": 2,  # damping layer has a exponent variation
-#     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-#     "R": 1e-6,  # theoretical reflection coefficient
-# # thickness of the PML in the z-direction (km) - always positive
-#     "lz": 0.25,
-# # thickness of the PML in the x-direction (km) - always positive
-#     "lx": 0.25,
-# # thickness of the PML in the y-direction (km) - always positive
-#     "ly": 0.0,
-# }
+from spyro.utils.error_management import value_parameter_error
 
 
 class Read_boundary_layer:
@@ -24,40 +7,60 @@ class Read_boundary_layer:
 
     Attributes
     ----------
-    dictionary : dict
-        Dictionary containing the boundary layer information
-    abc_exponent : float
-        Exponent of the polynomial damping
-    abc_cmax : float
-        Maximum acoustic wave velocity in PML - km/s
-    abc_R : float
-        Theoretical reflection coefficient
-    abc_pad_length : float
-        Thickness of the PML in the z-direction (km) - always positive
-    damping_type : str
-        Type of the boundary layer
-    abc_boundary_layer_type : `str`
-        Type of the boundary layer. Option 'hybrid' is based on paper
-        of Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
     abc_boundary_layer_shape : str
         Shape type of pad layer. Options: 'rectangular' or 'hypershape'
-    abc_deg_layer : `int`
+    abc_boundary_layer_type : `str`
+        Type of the boundary layer. Options: 'hybrid' or 'PML'.
+        Option 'hybrid' is based on paper of Salas et al. (2022).
+        doi: https://doi.org/10.1016/j.apm.2022.09.014
+    abc_cmax : float
+        Maximum acoustic wave velocity in PML - km/s
+    abc_deg_eikonal : `int`
+        Finite element order for the Eikonal analysis
+    abc_deg_layer : `int` or `float`
         Hypershape degree
+    abc_degree_type : `str`
+        Type of the hypereshape degree. Options: 'real' or 'integer'
+    abc_exponent : float
+        Exponent of the polynomial damping
+    abc_extension_mode : `str`
+        Mode to extend the properties into the absorbing layer.
+        Options: 'abc_driven'  (performed by a specific method) or
+        'builtin' (automatic at field definition)
+    abc_get_ref_model : `bool`
+        If True, the infinite model is created
+    abc_pad_length : float
+        Thickness of the PML in the z-direction (km) - always positive
+    abc_R : float
+        Theoretical reflection coefficient
     abc_reference_freq : `str`
         Reference frequency for sizing the hybrid absorbing layer
         Options: 'source' or 'boundary'
-    abc_deg_eikonal : `int`
-        Finite element order for the Eikonal analysis
-    abc_get_ref_model : `bool`
-        If True, the infinite model is created
-
-    Methods
-    -------
-    read_PML_dictionary()
-        Read the PML dictionary for a perfectly matched layer
+    abc_user_pad_length : `bool`
+        If True, the pad length is provided by the user. If False,
+        the pad length is determined with the HABC criterion.
+    damping_type : str
+        Type of the boundary layer
+    dictionary : dict
+        Dictionary containing the boundary layer information
     """
 
     def __init__(self, comm=None):
+        '''
+        Initialize the Read_boundary_layer class
+
+        Parameters
+        ----------
+        comm : `object`, optional
+            An object representing the communication interface for parallel processing.
+            Default is None
+
+        Returns
+        -------
+        None
+        '''
+
+        # General parameters
         self.input_dictionary.setdefault("absorving_boundary_conditions", {})
         self.input_dictionary[
             "absorving_boundary_conditions"].setdefault("status", False)
@@ -72,6 +75,7 @@ class Read_boundary_layer:
         self.abc_pad_length = self.input_dictionary[
             "absorving_boundary_conditions"]["pad_length"]
 
+        # Absorbing boundaries
         self.absorb_top = self.input_dictionary[
             "absorving_boundary_conditions"].get("absorb_top", False)
         self.absorb_bottom = self.input_dictionary[
@@ -98,8 +102,12 @@ class Read_boundary_layer:
             "hybrid",
             None,
         ]
+
+        # Cheking damping type input
         if value not in accepted_damping_types:
-            raise ValueError(f"Damping type of {value} not recognized.")
+            value_parameter_error('damping_type', value,
+                                  accepted_damping_types)
+
         if value == "PML":
             abc_dictionary.setdefault("exponent", 2)
             self.abc_exponent = abc_dictionary["exponent"]
@@ -107,18 +115,23 @@ class Read_boundary_layer:
             self.abc_R = abc_dictionary["R"]
             abc_dictionary.setdefault("cmax", 4.7)
             self.abc_cmax = abc_dictionary["cmax"]
+            self.abc_boundary_layer_shape = "rectangular"
         if value == "hybrid":
-            self.abc_boundary_layer_shape = abc_dictionary.get("layer_shape", "rectangular")
+            self.abc_boundary_layer_shape = abc_dictionary.get("layer_shape",
+                                                               "rectangular")
             self.abc_degree_type = abc_dictionary.get("degree_type", "real")
-            self.abc_deg_layer = None \
-                if self.abc_boundary_layer_shape == "rectangular" \
+            self.abc_deg_layer = None if self.abc_boundary_layer_shape == "rectangular" \
                 else abc_dictionary.get("degree_layer", 2.)
             self.abc_reference_freq = abc_dictionary.get("habc_reference_freq",
                                                          "source")
-            self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", 2)
-            self.abc_get_ref_model = abc_dictionary.get("get_ref_model", False)
 
+        # Common parameters for both PML and hybrid
         self._abc_boundary_layer_type = value
+        self.abc_reference_freq = abc_dictionary.get("habc_reference_freq",
+                                                     "source")
+        self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", 2)
+        self.abc_get_ref_model = abc_dictionary.get("get_ref_model", False)
+        self.abc_extend_properties = abc_dictionary.get("extend_properties", "abc_driven")
 
     @property
     def abc_pad_length(self):
@@ -126,6 +139,27 @@ class Read_boundary_layer:
 
     @abc_pad_length.setter
     def abc_pad_length(self, value):
-        if (value is None or value == 0) and self.abc_boundary_layer_type == "PML":
-            raise ValueError("No pad not compatible with PML")
+        """Set the pad length for the absorbing boundary condition.
+
+        Parameters
+        ----------
+        value : float or None
+            The pad length in kilometers. If None, the pad length will be determined
+            using the HABC criterion.
+
+        Returns
+        -------
+        None
+        """
+
+        if isinstance(value, (int, float)) and value < 0:
+            raise ValueError("Pad length must be positive")
+
+        self.abc_user_pad_len = True
+        if value is None:
+            print("Pad length will be determined with HABC criterion", flush=True)
+            value = 0.
+            self.abc_user_pad_len = False
+
+        print(f"Pad length provided by user (km): {value:.4f}", flush=True)
         self._abc_pad_length = value
