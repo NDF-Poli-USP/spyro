@@ -159,20 +159,40 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 
 
 def plot_hist_receivers(wave_object, show=False):
-    """Plot receiver time-domain response comparing reference model and HABC scheme.
+    """Plot time-domain receiver response comparison.
 
-    The plots are saved in PDF and PNG formats.
+    Creates a multi-panel plot comparing the time-domain response at each
+    receiver between the computed solution and a reference solution. Each
+    receiver is plotted in its own subplot with the computed solution in
+    green and the reference solution in red dashed line.
 
     Parameters
     ----------
-    wave_object: `wave`
-        The Wave object containing the simulation results.
-    show: `bool`, optional
-        Whether to show the plot. Default is False.
+    Wave_object : `wave`
+        The Wave object containing the simulation results. Must have the
+        following attributes:
+        - forward_solution_receivers: Computed receiver data
+        - receivers_reference: Reference receiver data
+        - dt: Time step
+        - final_time: Final simulation time
+        - number_of_receivers: Number of receivers
+        - path_save: Directory path for saving plots
+        - case_abc: Case name for file naming
+    show : `bool`, optional
+        Whether to display the plot interactively. Default is False.
 
     Returns
     -------
     None
+
+    Notes
+    -----
+    The function saves two files:
+    - {path_save}/{case_abc}/time.png
+    - {path_save}/{case_abc}/time.pdf
+
+    The green solid line represents the computed solution (HABC scheme),
+    while the red dashed line represents the reference solution.
     """
 
     print("\nPlotting Time Comparison", flush=True)
@@ -226,7 +246,7 @@ def plot_hist_receivers(wave_object, show=False):
             axes[rec].set_xlabel(r'$t \; (s)$')
 
     # Saving the plot
-    time_str = wave_object.path_case_habc + "time"
+    time_str = wave_object.path_case_abc + "time"
     plt.savefig(time_str + ".png", bbox_inches='tight')
     plt.savefig(time_str + ".pdf", bbox_inches='tight')
     plt.show() if show else None
@@ -234,23 +254,48 @@ def plot_hist_receivers(wave_object, show=False):
 
 
 def plot_rfft_receivers(wave_object, fxlim=4., show=False):
-    """Plot receiver frequency-domain response comparing reference model and HABC scheme.
+    """Plot frequency-domain receiver response comparison.
 
-    The plots are saved in PDF and PNG formats.
+    Creates a multi-panel plot comparing the normalized frequency-domain
+    (FFT) response at each receiver between the computed solution and a
+    reference solution. Vertical lines indicate the source and reference
+    frequencies.
 
     Parameters
     ----------
-    wave_object: `wave`
-        Wave object containing the simulation results.
-    fxlim: `float`, optional
-        Factor to set the x-axis limits in the plots realtive to
-        the source frequency. Default is 4 and the minimum is 2.
-    show: `bool`, optional
-        Whether to show the plot. Default is False.
+    Wave_object : `wave`
+        Wave object containing the simulation results. Must have the
+        following attributes:
+        - receivers_out_fft: FFT of computed receiver data
+        - receivers_ref_fft: FFT of reference receiver data
+        - f_Nyq: Nyquist frequency
+        - frequency: Source frequency
+        - freq_ref: Reference frequency
+        - number_of_receivers: Number of receivers
+        - path_save: Directory path for saving plots
+        - case_abc: Case name for file naming
+    fxlim : `float`, optional
+        Factor to set the x-axis limits relative to the source frequency.
+        The plot will show frequencies up to fxlim * source_frequency,
+        capped at the Nyquist frequency. Minimum value is 2.
+        Default is 4.
+
+    show : `bool`, optional
+        Whether to display the plot interactively. Default is False.
 
     Returns
     -------
     None
+
+    Notes
+    -----
+    The function saves two files:
+    - {path_save}/{case_abc}/freq.png
+    - {path_save}/{case_abc}/freq.pdf
+
+    The green solid line represents the FFT of the computed solution,
+    while the red dashed line represents the FFT of the reference solution.
+    Black vertical lines mark the source and reference frequencies.
     """
 
     print("\nPlotting Frequency Comparison", flush=True)
@@ -260,7 +305,7 @@ def plot_rfft_receivers(wave_object, fxlim=4., show=False):
     f_sou = wave_object.frequency
     pfft = wave_object.receivers_out_fft.shape[0] - 1
     df = f_Nyq / pfft
-    limf = round(min(max(fxlim, 2.) * f_sou, f_Nyq), 1)
+    limf = round(np.clip(fxlim * f_sou, 2 * f_sou, f_Nyq), 1)
     idx_lim = int(limf / df) + 1
     f_rec = np.linspace(0, df * idx_lim, idx_lim)
 
@@ -329,7 +374,7 @@ def plot_rfft_receivers(wave_object, fxlim=4., show=False):
                 if f_sou != wave_object.freq_ref else None
 
     # Saving the plot
-    time_str = wave_object.path_case_habc + "freq"
+    time_str = wave_object.path_case_abc + "freq"
     plt.savefig(time_str + ".png", bbox_inches='tight')
     plt.savefig(time_str + ".pdf", bbox_inches='tight')
     plt.show() if show else None
@@ -337,27 +382,40 @@ def plot_rfft_receivers(wave_object, fxlim=4., show=False):
 
 
 def plot_xCR_opt(wave_object, data_regr_xCR, show=False):
-    """Plot the regression curve for the optimal xCR value.
+    """Plot the regression curve for the optimal xCR parameter.
+
+    Creates a plot showing the quadratic regression of integral and peak
+    errors as a function of the heuristic factor xCR, highlighting the
+    optimal value based on a specified criterion. The plot includes
+    regression equations, R² values, and the optimal xCR marker.
 
     Parameters
     ----------
     wave_object: `wave`
-        The Wave object containing the simulation results
+        The Wave object containing the simulation results and configuration.
+        Must have attributes:
+        - xCR_bounds: Bounds for the xCR parameter
+        - path_save: Directory path for saving plots
+        - case_abc: Case name for file naming
     data_regr_xCR: `list`
-        Data for the regression of the parameter xCR.
-        Structure: [xCR, max_errIt, max_errPK, crit_opt]
-        - xCR: Values of xCR used in the regression.
-          The last value IS the optimal xCR
-        - max_errIt: Values of the maximum integral error.
-          The last value corresponds to the optimal xCR
-        - max_errPK: Values of the maximum peak error.
-          The last value corresponds to the optimal xCR
-        - crit_opt : Criterion for the optimal heuristic factor.
-          * 'err_difference' : Difference between integral and peak errors
-          * 'err_integral' : Minimum integral error
-          * 'err_sum' : Sum of integral and peak errors
-    show: `bool`, optional
-        Whether to show the plot. Default is False.
+        Data for the regression of the parameter xCR with structure:
+        [xCR, max_errIt, max_errPk, crit_opt] where:
+        - xCR : array-like
+            Values of xCR used in the regression. The last value is the optimal xCR.
+        - max_errIt : array-like
+            Values of the maximum integral error at each xCR.
+            The last value corresponds to the optimal xCR.
+        - max_errPk : array-like
+            Values of the maximum peak error at each xCR.
+            The last value corresponds to the optimal xCR.
+        - crit_opt : `str`
+            Criterion used to determine the optimal xCR.
+            Options:
+            - 'err_difference' : Minimizes difference between integral and peak errors
+            - 'err_integral' : Minimizes integral error
+            - 'err_sum' : Minimizes the sum of integral and peak errors
+    show : bool, optional
+        Whether to display the plot interactively. Default is False.
 
     Returns
     -------
@@ -433,7 +491,7 @@ def plot_xCR_opt(wave_object, data_regr_xCR, show=False):
     plt.ylabel(r'$e_I \; | \; e_P \; (\%)$')
 
     # Saving the plot
-    xcr_str = wave_object.path_case_habc + "xCR"
+    xcr_str = wave_object.path_case_abc + "xCR"
     plt.savefig(xcr_str + '.png', bbox_inches='tight')
     plt.savefig(xcr_str + '.pdf', bbox_inches='tight')
     plt.show() if show else None
