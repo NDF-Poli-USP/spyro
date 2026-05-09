@@ -452,6 +452,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             self.a_par, self.FLpos = calc_size_lay(
                 self.freq_ref, z_par, self.mesh_parameters.lmin, self.lref,
                 n_root=n_root, layer_based_on_mesh=layer_based_on_mesh)
+        self.abc_pad_length = self.pad_len
 
         plot_function_layer_size([self.a_par, z_par],
                                  [self.freq_ref, self.frequency],
@@ -530,9 +531,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # New mesh with layer
         if layer_shape == 'rectangular':
-            # dom_lay = self.habc_domain_dimensions(only_habc_dom=True)
-            # mesh_habc = self.rectangular_mesh_habc(dom_lay, self.pad_len)
-            self.mesh_parameters.set_mesh(abc_pad_length=self.pad_len)
             self.set_mesh()
             print("Extended Rectangular Mesh Generated Successfully", flush=True)
 
