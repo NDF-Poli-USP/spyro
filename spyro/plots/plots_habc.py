@@ -191,8 +191,8 @@ def plot_hist_receivers(wave_object, show=False):
     - {path_save}/{case_abc}/time.png
     - {path_save}/{case_abc}/time.pdf
 
-    The green solid line represents the computed solution (HABC scheme),
-    while the red dashed line represents the reference solution.
+    The green solid line represents the computed transient solution,
+    while the red dashed line represents the reference transient solution.
     """
 
     print("\nPlotting Time Comparison", flush=True)
