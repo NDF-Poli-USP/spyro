@@ -247,7 +247,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         expression=None,
         new_file=None,
         output=False,
-        dg_velocity_model=True,
+        dg_velocity_model=False,
     ):
         """Method to define new user velocity model or file. It is optional.
 

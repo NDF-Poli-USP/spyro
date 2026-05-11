@@ -31,7 +31,7 @@ dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # Triangular elements (T) or quadrilaterals (Q)
     "variant": "lumped",  # lumped, equispaced or DG, default is lumped
-    "degree": 4,  # Polynomial order (higher degree = better accuracy)
+    "degree": 1,  # Polynomial order (higher degree = better accuracy)
     "dimension": 2,  # 2D problem
 }
 dictionary["parallelism"] = {
@@ -84,10 +84,11 @@ wave_obj.set_mesh(input_mesh_parameters={
     "mesh_type": "firedrake_mesh", 
     "edge_length": grid_spacing,
 })
+
 mesh_z = wave_obj.mesh_z  # Depth coordinate
 mesh_x = wave_obj.mesh_x  # Horizontal coordinate
 wave_obj.set_initial_velocity_model(conditional=make_minas_cheese_conditional(mesh_z, mesh_x))
-# Creading a grid velocity data dictionary, this can be used to7
+# Creading a grid velocity data dictionary, this can be used to
 # create a wave-adapted mesh later on and is similar to the data
 # read from a segy file
 z = spyro.io.write_function_to_grid(wave_obj.initial_velocity_model, wave_obj.function_space, grid_spacing, buffer=False)
