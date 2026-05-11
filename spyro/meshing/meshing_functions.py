@@ -149,6 +149,7 @@ class AutomaticMesh:
         mesh : Mesh
             Mesh
         """
+        self.mesh_parameters.check_completeness()
         if self.mesh_parameters.is_complete is False:
             parallel_print("Skipping mesh generation, since we don't have all the parameters", comm=self.comm)
             return None
