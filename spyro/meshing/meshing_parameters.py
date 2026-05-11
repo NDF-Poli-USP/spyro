@@ -7,8 +7,7 @@ generation based on wavelength constraints.
 
 import warnings
 import os
-from ..utils.error_management import value_parameter_error, \
-    mutually_exclusive_parameter_error
+from ..utils.error_management import value_parameter_error
 
 
 def cells_per_wavelength(method, degree, dimension):
@@ -438,8 +437,8 @@ class MeshingParameters():
         Only one of edge_length or cells_per_wavelength can be set at a time.
         Setting this property will automatically set cells_per_wavelength to None.
         """
+        # ToDo: A setter-getter that handles both edge_length and cells_per_wavelength
         if self.cells_per_wavelength is not None:
-            # ToDo: Warning or error??
             warnings.warn(
                 "Mutual exclusion: Both 'edge_length' and "
                 "'cells_per_wavelength' control mesh size, "
