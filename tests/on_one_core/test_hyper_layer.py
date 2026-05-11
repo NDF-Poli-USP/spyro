@@ -70,7 +70,7 @@ def test_init_n_type_raises_error():
 
 def test_init_dimension_raises_error():
     # Test that passing None raises a TypeError
-    with pytest.raises(ValueError, match=f"Invalid dimension: '10'."):
+    with pytest.raises(ValueError, match="Invalid dimension: '10'."):
         HyperLayer((1., 1.), dimension=10)
 
 
