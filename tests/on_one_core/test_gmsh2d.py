@@ -1,3 +1,6 @@
+import os
+os.environ["NUMBA_DISABLE_JIT"] = "1"
+
 import math
 from spyro.meshing.meshing_parameters import MeshingParameters
 from spyro.meshing.meshing_functions import AutomaticMesh
@@ -40,7 +43,7 @@ def test_gmsh2d_structured():
 
                 "output_filename": f"avenir_struct_{winslow_impl}_wat_{water_interface}_pad_{padding_type}.msh",
 
-                "velocity_model": "tests/inputfiles/velocity_models/avenir.segy",
+                "segy_velocity_model": "tests/inputfiles/velocity_models/avenir.segy",
                 "cells_per_wavelength": 2.0,
                 "source_frequency": 3.0,
 
@@ -65,7 +68,7 @@ def test_gmsh2d_structured():
                 "h_padding": 500.0
             }
 
-            mesh_params = MeshingParameters(input_mesh_dictionary=avenir_params, velocity_model=avenir_params["velocity_model"])
+            mesh_params = MeshingParameters(input_mesh_dictionary=avenir_params)
             mesh_generator = AutomaticMesh(mesh_parameters=mesh_params)
 
             firedrake_mesh = mesh_generator.create_mesh()
@@ -111,7 +114,7 @@ def test_gmsh2d_unstructured():
             "length_x": 32040.0,
             "output_filename": f"avenir_unstruct_ext_{extend_segy}_wat_{water_interface}_pad_{padding_type}.msh",
 
-            "velocity_model": "tests/inputfiles/velocity_models/avenir.segy",
+            "segy_velocity_model": "tests/inputfiles/velocity_models/avenir.segy",
             "cells_per_wavelength": 2.0,
             "source_frequency": 3.0,
 
@@ -137,7 +140,7 @@ def test_gmsh2d_unstructured():
             "h_padding": 500.0
         }
 
-        mesh_params = MeshingParameters(input_mesh_dictionary=avenir_params, velocity_model=avenir_params["velocity_model"])
+        mesh_params = MeshingParameters(input_mesh_dictionary=avenir_params)
         mesh_generator = AutomaticMesh(mesh_parameters=mesh_params)
 
         firedrake_mesh = mesh_generator.create_mesh()
@@ -177,7 +180,7 @@ def test_gmsh2d_structured_no_winslow():
             "length_x": 32040.0,
             "output_filename": f"avenir_struct_nowinslow_wat_{water_interface}_pad_{padding_type}.msh",
 
-            "velocity_model": "tests/inputfiles/velocity_models/avenir.segy",
+            "segy_velocity_model": "tests/inputfiles/velocity_models/avenir.segy",
             "cells_per_wavelength": 2.0,
             "source_frequency": 3.0,
 
@@ -204,7 +207,7 @@ def test_gmsh2d_structured_no_winslow():
             "h_padding": 500.0
         }
 
-        mesh_params = MeshingParameters(input_mesh_dictionary=avenir_params, velocity_model=avenir_params["velocity_model"])
+        mesh_params = MeshingParameters(input_mesh_dictionary=avenir_params)
         mesh_generator = AutomaticMesh(mesh_parameters=mesh_params)
 
         firedrake_mesh = mesh_generator.create_mesh()
