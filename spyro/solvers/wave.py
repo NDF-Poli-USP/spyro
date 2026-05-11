@@ -98,7 +98,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.tensor_function_space0 = None
         self.tensor_function_space1 = None
         self._forward_solution_receivers = None
-        self._store_forward_time_steps = True
+        self._store_forward_time_steps = False
         self.forward_solution = None
         self.adjoint_solution = None
         self.adjoint_type = AdjointType.NONE
@@ -528,8 +528,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.automated_adjoint = AutomatedAdjoint(controls)
 
     def enable_implemented_adjoint(self):
-        self.enable_compute_functional()
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
+        self.store_forward_time_steps = True
 
     @property
     def forward_solution_receivers(self):

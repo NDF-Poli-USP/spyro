@@ -8,7 +8,7 @@ import pytest
 
 
 def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
-    steps = [1e-3, 1e-4, 1e-5]  # step length
+    steps = [1e-4, 1e-5, 1e-6]  # step length
 
     errors = []
     remainders = []
