@@ -2,8 +2,7 @@ import numpy as np
 from scipy.integrate import dblquad, quad
 from scipy.special import beta, betainc, gamma
 from sys import float_info
-from spyro.utils.error_management import \
-    value_dimension_error, value_parameter_error
+from spyro.utils.error_management import value_dimension_error, value_parameter_error
 
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
