@@ -99,19 +99,15 @@ class AcousticWave(Wave):
                 )
 
             if riesz_map == RieszMapType.L2:
-                dJ = self.automated_adjoint.compute_gradient()
+                return self.automated_adjoint.compute_gradient()
             elif riesz_map == RieszMapType.l2:
-                dJ = self.automated_adjoint.compute_derivative()
+                return self.automated_adjoint.compute_derivative()
             else:
                 raise NotImplementedError(
                     f"Riesz map {riesz_map} not implemented for automated adjoint."
                 )
 
-            if isinstance(dJ, fire.Cofunction):
-                return fire.Function(self.function_space, val=dJ)
-            return dJ
-
-        if adjoint_type != AdjointType.IMPLEMENTED_ADJOINT:
+        if adjoint_type is AdjointType.IMPLEMENTED_ADJOINT:
             self.enable_implemented_adjoint()
 
         if misfit is not None:
