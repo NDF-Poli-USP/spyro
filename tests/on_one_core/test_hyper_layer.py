@@ -2,7 +2,7 @@ import math
 import numpy as np
 import pytest
 
-from spyro.habc.hyp_lay import HyperLayer
+from spyro.abc.hyp_lay import HyperLayer
 
 
 # ---------------------------------------------------------------------------

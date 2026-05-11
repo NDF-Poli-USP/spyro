@@ -7,7 +7,7 @@ from shutil import rmtree
 from sympy import divisors
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.meshing.meshing_habc import HABC_Mesh
-from spyro.habc.hyp_lay import HyperLayer
+from spyro.abc.hyp_lay import HyperLayer
 from spyro.abc.rec_lay import RectangLayer
 from spyro.habc.damp_profile import HABC_Damping
 from spyro.habc.nrbc import NRBC

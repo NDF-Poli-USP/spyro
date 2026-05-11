@@ -13,6 +13,7 @@ from spyro.abc.rec_lay import RectangLayer
 def layer_2d():
     """2D RectangLayer with a 1 km x 1 km domain and 0.25 km pad."""
     hl = RectangLayer((1., 1.), dimension=2)
+    hl.define_hyperaxes(0.25)
     return hl
 
 
@@ -20,6 +21,7 @@ def layer_2d():
 def layer_3d():
     """3D RectangLayer with a 1 km³ domain and 0.25 km pad."""
     hl = RectangLayer((1., 1., 1.), dimension=3)
+    hl.define_hyperaxes(0.25)
     return hl
 
 # ---------------------------------------------------------------------------
@@ -51,26 +53,50 @@ def test_init_dimension_raises_error():
         RectangLayer((1., 1.), dimension=10)
 
 # ---------------------------------------------------------------------------
-# rectangular_area  (docstring: calc_rec_geom_prop((1, 1), 0.5) == pi/2)
+# define_hyperaxes
 # ---------------------------------------------------------------------------
 
 
-# def test_half_hyp_area_unit_circle():
-#     result = HyperLayer.half_hyp_area(1.0, 1.0, 2)
-#     assert math.isclose(result, math.pi / 2, rel_tol=1e-9)
+def test_define_hyperaxes_2d_stores_domain_dim(layer_2d):
+    assert layer_2d.domain_dim == (1.0, 1.0)
 
 
-# def test_half_hyp_area_positive():
-#     assert HyperLayer.half_hyp_area(2.0, 3.0, 4) > 0
+def test_define_hyperaxes_2d_semi_axes(layer_2d):
+    # a_hyp = 0.5 * 1.5 = 0.75, b_hyp = 0.5 * 1.5 = 0.75
+    assert layer_2d.hyper_axes == (0.75, 0.75)
 
 
-# def test_half_hyp_area_scales_linearly_with_a():
-#     A1 = HyperLayer.half_hyp_area(1.0, 1.0, 4)
-#     A2 = HyperLayer.half_hyp_area(2.0, 1.0, 4)
-#     assert math.isclose(A2, 2.0 * A1, rel_tol=1e-9)
+def test_define_hyperaxes_3d_stores_domain_dim(layer_3d):
+    assert layer_3d.domain_dim == (1.0, 1.0, 1.0)
 
 
-# def test_half_hyp_area_scales_linearly_with_b():
-#     A1 = HyperLayer.half_hyp_area(1.0, 1.0, 4)
-#     A2 = HyperLayer.half_hyp_area(1.0, 3.0, 4)
-#     assert math.isclose(A2, 3.0 * A1, rel_tol=1e-9)
+def test_define_hyperaxes_3d_semi_axes(layer_3d):
+    assert layer_3d.hyper_axes == (0.75, 0.75, 0.75)
+
+# ---------------------------------------------------------------------------
+# calc_rec_geom_prop
+# ---------------------------------------------------------------------------
+
+
+def test_calc_rec_geom_prop_2d_area(layer_2d):
+    domain_lay = (1.5, 1.25)
+    pad_len = 0.25
+    layer_2d.calc_rec_geom_prop(domain_lay, pad_len)
+    assert layer_2d.area > 0.
+    assert layer_2d.area_ratio > 1.
+    assert layer_2d.f_Ah > 0.
+    assert math.isclose(layer_2d.area, 1.5 * 1.25, rel_tol=1e-9)
+    assert math.isclose(layer_2d.area_ratio, 1.5 * 1.25, rel_tol=1e-9)
+    assert math.isclose(layer_2d.f_Ah, 4., rel_tol=1e-9)
+
+
+def test_calc_rec_geom_prop_3d_area(layer_3d):
+    domain_lay = (1.5, 1.25, 1.5)
+    pad_len = 0.25
+    layer_3d.calc_rec_geom_prop(domain_lay, pad_len)
+    assert layer_3d.vol > 0
+    assert layer_3d.vol_ratio > 1.
+    assert layer_3d.f_Vh > 0
+    assert math.isclose(layer_3d.vol, 1.5 * 1.25 * 1.5, rel_tol=1e-9)
+    assert math.isclose(layer_3d.vol_ratio, 1.5 * 1.25 * 1.5, rel_tol=1e-9)
+    assert math.isclose(layer_3d.f_Vh, 8., rel_tol=1e-9)
