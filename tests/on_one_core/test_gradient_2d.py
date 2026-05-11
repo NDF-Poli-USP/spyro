@@ -135,7 +135,6 @@ def get_forward_model(load_true=False):
         spyro.plots.plot_model(Wave_obj_exact, abc_points=[(-1, 1), (-2, 1), (-2, 4), (-1, 2)])
         Wave_obj_exact.forward_solve()
         rec_out_exact = Wave_obj_exact.forward_solution_receivers
-
     else:
         rec_out_exact = np.load("rec_out_exact.npy")
 

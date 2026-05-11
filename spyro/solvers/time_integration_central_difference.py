@@ -150,6 +150,7 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
         # for use in the implemented adjoint.
         wave.forward_solution = usol
 
+    wave_obj.forward_solution = usol
     wave_obj.forward_solution_receivers = usol_recv
 
     if functional_mode is FunctionalEvaluationMode.AFTER_SOLVE:
