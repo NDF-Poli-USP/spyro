@@ -12,7 +12,7 @@ from spyro.abc.rec_lay import RectangLayer
 def layer_2d():
     """2D RectangLayer with a 1 km x 1 km domain and 0.25 km pad."""
     hl = RectangLayer((1., 1.), dimension=2)
-    hl.define_hyperaxes(0.25)
+    hl.define_rec_hyperaxes(0.25)
     return hl
 
 
@@ -20,7 +20,7 @@ def layer_2d():
 def layer_3d():
     """3D RectangLayer with a 1 km³ domain and 0.25 km pad."""
     hl = RectangLayer((1., 1., 1.), dimension=3)
-    hl.define_hyperaxes(0.25)
+    hl.define_rec_hyperaxes(0.25)
     return hl
 
 # ---------------------------------------------------------------------------
@@ -52,7 +52,7 @@ def test_init_dimension_raises_error():
         RectangLayer((1., 1.), dimension=10)
 
 # ---------------------------------------------------------------------------
-# define_hyperaxes
+# define_rec_hyperaxes
 # ---------------------------------------------------------------------------
 
 
