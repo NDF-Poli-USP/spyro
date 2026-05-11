@@ -53,11 +53,12 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
 
     usol_recv = []
     save_step = 0
-
+    observed_shot = None
     if compute_functional:
         J = 0.0
         # Reset misfit to None at the start of the solve to avoid
         # using stale misfit values from previous solves.
+        observed_shot = utils.get_real_shot_record(wave_obj)
         wave_obj.misfit = None
         wave_obj.misfit = []
 
@@ -101,23 +102,22 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
             helpers.display_progress(wave_obj.comm, t)
 
         if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
-            observed_step = utils.get_real_shot_step(wave_obj, step)
             if wave_obj.use_vertex_only_mesh:
-                if isinstance(observed_step, np.ndarray):
+                if isinstance(observed_shot[step], np.ndarray):
                     real_shot = fire.Function(
                         usol_recv[-1].function_space(),
-                        val=observed_step,
+                        val=observed_shot[step],
                     )
                     misfit_step = real_shot - usol_recv[-1]
-                elif isinstance(observed_step, fire.Function):
-                    misfit_step = observed_step - usol_recv[-1]
+                elif isinstance(observed_shot[step], fire.Function):
+                    misfit_step = observed_shot[step] - usol_recv[-1]
                 else:
                     raise ValueError(
                         "Unsupported type for real_shot_record. Must be "
                         "either a numpy array or a Firedrake Function."
                     )
             else:
-                misfit_step = observed_step - usol_recv[-1]
+                misfit_step = observed_shot[step] - usol_recv[-1]
             wave_obj.misfit.append(misfit_step)
             J += utils.compute_functional(
                 wave_obj, misfit_step, evaluation_mode=FunctionalEvaluationMode.PER_TIMESTEP,
@@ -146,11 +146,9 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
         # for use in the implemented adjoint.
         wave_obj.forward_solution = usol
 
-    wave_obj.forward_solution = usol
     wave_obj.forward_solution_receivers = usol_recv
 
     if functional_mode is FunctionalEvaluationMode.AFTER_SOLVE:
-        observed_shot = utils.get_real_shot_record(wave_obj)
         wave_obj.misfit = observed_shot - usol_recv
         J = utils.compute_functional(wave_obj, wave_obj.misfit)
 

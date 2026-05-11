@@ -70,7 +70,7 @@ class AcousticWave(Wave):
 
     @ensemble_gradient
     def gradient_solve(
-        self, guess=None, misfit=None, forward_solution=None,
+        self, misfit=None, forward_solution=None,
         adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
         riesz_map=RieszMapType.L2
     ):
@@ -78,16 +78,32 @@ class AcousticWave(Wave):
 
         Parameters:
         -----------
-        guess: Firedrake 'Function' (optional)
-            Initial guess for the velocity model. If not mentioned uses the
-            one currently in the wave object.
+        misfit: Firedrake 'Function' or numpy array (optional)
+            The misfit between the observed and predicted data. If not provided,
+            it will be computed as the difference between the real shot record and
+            the forward solution at the receivers. If the real shot record is not
+            available, the method will raise an error.
+        forward_solution: Firedrake 'Function' (optional)
+            The forward solution of the wave equation. If not provided, it will be
+            computed by calling the forward solver. Providing the forward solution
+            can save computational time if it has already been
+            computed for the current velocity model, as it avoids redundant forward solves.
+        adjoint_type: AdjointType enum (default: AdjointType.IMPLEMENTED_ADJOINT)
+            The type of adjoint to use for gradient computation. Options are:
+            - AdjointType.IMPLEMENTED_ADJOINT: Use the manually implemented adjoint solver.
+            - AdjointType.AUTOMATED_ADJOINT: Use the automated adjoint using 'firedrake.adjoint'.
+        riesz_map: RieszMapType enum (default: RieszMapType.L2)
+            The type of Riesz map to use for the gradient. More details in the documentation of the
+            :class:`RieszMapType` enum.
 
         Returns:
         --------
-        dJ: Firedrake 'Function'
-            Gradient of the cost functional.
+        dJ: Firedrake 'Function' or Firedrake 'Cofunction'
+            Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
+            depending on the chosen Riesz map.
         """
         if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+            self.enable_automated_adjoint()
             if self.automated_adjoint.reduced_functional is None:
                 self.forward_solve()
                 self.automated_adjoint.create_reduced_functional(
@@ -107,17 +123,20 @@ class AcousticWave(Wave):
                     f"Riesz map {riesz_map} not implemented for automated adjoint."
                 )
 
-        if adjoint_type is AdjointType.IMPLEMENTED_ADJOINT:
-            self.enable_implemented_adjoint()
-
+        if adjoint_type != AdjointType.IMPLEMENTED_ADJOINT:
+            raise ValueError(
+                "Invalid adjoint type. Must be either IMPLEMENTED_ADJOINT or AUTOMATED_ADJOINT."
+            )
+        self.enable_implemented_adjoint()
         if misfit is not None:
             self.misfit = misfit
         if forward_solution is not None:
             self.forward_solution = forward_solution
-        elif self.current_time == 0.0:
+        elif self.forward_solution is None:
+            # No stored forward solution — either never run, or run before
+            # enable_implemented_adjoint() was called (store_forward_time_steps
+            # was False at the time). Re-run now with storage enabled.
             self.forward_solve()
-        elif self.misfit is None:
-            raise ValueError("Please load or calculate a real shot record first")
 
         if self.misfit is None:
             self.misfit = self.real_shot_record - self.forward_solution_receivers
