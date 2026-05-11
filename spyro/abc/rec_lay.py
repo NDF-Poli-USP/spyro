@@ -1,4 +1,4 @@
-from spyro.utils.error_management import value_dimension_error
+from spyro.utils.error_management import value_dimension_error, value_parameter_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -10,15 +10,15 @@ from spyro.utils.error_management import value_dimension_error
 
 
 class RectangLayer():
-    '''
+    """
     Define a rectangular layer in 2D or parallelepided in 3D.
 
     Attributes
     ----------
     area : `float`
         Area of the domain with rectangular layer
-    a_rat : `float`
-        Area ratio to the area of the original domain. a_rat = area / a_orig
+    area_ratio : `float`
+        Area ratio to the area of the original domain. area_ratio = area / a_orig
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
     domain_dim : `tuple`
@@ -34,18 +34,19 @@ class RectangLayer():
         this attribute is not applicable to rectangular layers
     vol : `float`
         Volume of the domain with rectangular layer
-    v_rat : `float`
-        Volume ratio to the volume of the original domain. v_rat = vol / v_orig
+    vol_ratio : `float`
+        Volume ratio to the volume of the original domain. vol_ratio = vol / v_orig
 
     Methods
     -------
     calc_rec_geom_prop()
         Calculate the geometric properties for the rectangular layer
-    '''
+    define_hyperaxes()
+        Define the rectangular semi-axes
+    """
 
     def __init__(self, domain_dim, dimension=2):
-        '''
-        Initialize the HyperLayer class.
+        """Initialize the RectangLayer class.
 
         Parameters
         ----------
@@ -57,7 +58,15 @@ class RectangLayer():
         Returns
         -------
         None
-        '''
+        """
+
+        # Validate input arguments
+        if not isinstance(domain_dim, tuple):
+            raise TypeError("domain_dim must be a tuple, "
+                            f"got {type(domain_dim).__name__}.")
+
+        if dimension not in [2, 3]:
+            value_parameter_error('dimension', dimension, [2, 3])
 
         # Original domain dimensions
         self.domain_dim = domain_dim
@@ -68,13 +77,36 @@ class RectangLayer():
         # Hypershape degree (Not applicable in rectangular layers)
         self.n_hyp = None
 
-    def calc_rec_geom_prop(self, dom_lay, pad_len):
-        '''
-        Calculate the geometric properties for the rectangular layer.
+    def define_hyperaxes(self, pad_len):
+        """Define the rectangular semi-axes
 
         Parameters
         ----------
-        dom_lay : `tuple`
+        pad_len : `float`
+            Size of the absorbing layer
+
+        Returns
+        -------
+        None
+        """
+
+        # Rectangular semi-axes
+        Lx, Lz = self.domain_dim[:2]
+        a_hyp = 0.5 * Lx + pad_len
+        b_hyp = 0.5 * Lz + pad_len
+        self.hyper_axes = (a_hyp, b_hyp)
+
+        if self.dimension == 3:  # 3D
+            Ly = self.domain_dim[2]
+            c_hyp = 0.5 * Ly + pad_len
+            self.hyper_axes += (c_hyp,)
+
+    def calc_rec_geom_prop(self, domain_lay, pad_len):
+        """Calculate the geometric properties for the rectangular layer.
+
+        Parameters
+        ----------
+        domain_lay : `tuple`
             Domain dimensions with layer including truncation by free surface.
             - 2D : (Lx + 2 * pad_len, Lz + pad_len)
             - 3D : (Lx + 2 * pad_len, Lz + pad_len, Ly + 2 * pad_len)
@@ -84,37 +116,34 @@ class RectangLayer():
         Returns
         -------
         None
-        '''
+        """
 
-        # Domain dimensions w/o layer
+        # Checking inputs
         chk_domd = len(self.domain_dim)
-        chk_habc = len(dom_lay)
+        chk_habc = len(domain_lay)
         if self.dimension != chk_domd or self.dimension != chk_habc:
-            value_dimension_error(('domain_dim', 'dom_lay'),
+            value_dimension_error(('domain_dim', 'domain_lay'),
                                   (chk_domd, chk_habc),
                                   self.dimension)
 
+        # Domain dimensions w/o layer
         Lx, Lz = self.domain_dim[:2]
-        Lx_habc, Lz_habc = dom_lay[:2]
+        Lx_habc, Lz_habc = domain_lay[:2]
 
         # Rectangular semi-axes
-        a_hyp = 0.5 * Lx + pad_len
-        b_hyp = 0.5 * Lz + pad_len
-        self.hyper_axes = (a_hyp, b_hyp)
+        self.define_hyperaxes(pad_len)
 
         # Geometric properties of the rectangular layer
         if self.dimension == 2:  # 2D
             self.area = Lx_habc * Lz_habc
-            self.a_rat = self.area / (Lx * Lz)
+            self.area_ratio = self.area / (Lx * Lz)
             self.f_Ah = 4
-            print("Area Ratio: {:5.3f}".format(self.a_rat), flush=True)
+            print("Area Ratio: {:5.3f}".format(self.area_ratio), flush=True)
 
         if self.dimension == 3:  # 3D
             Ly = self.domain_dim[2]
-            Ly_habc = dom_lay[2]
-            c_hyp = 0.5 * Ly + pad_len
-            self.hyper_axes += (c_hyp,)
+            Ly_habc = domain_lay[2]
             self.vol = Lx_habc * Lz_habc * Ly_habc
-            self.v_rat = self.vol / (Lx * Lz * Ly)
+            self.vol_ratio = self.vol / (Lx * Lz * Ly)
             self.f_Vh = 8
-            print("Volume Ratio: {:5.3f}".format(self.v_rat), flush=True)
+            print("Volume Ratio: {:5.3f}".format(self.vol_ratio), flush=True)
