@@ -21,7 +21,7 @@ class RectangLayer():
         Area ratio to the area of the original domain. a_rat = area / a_orig
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
-    dom_dim : `tuple`
+    domain_dim : `tuple`
         Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
     f_Ah : `float`
         Hyperelliptical area factor. f_Ah = 4 (n_hyp is considered infinite)
@@ -43,13 +43,13 @@ class RectangLayer():
         Calculate the geometric properties for the rectangular layer
     '''
 
-    def __init__(self, dom_dim, dimension=2):
+    def __init__(self, domain_dim, dimension=2):
         '''
         Initialize the HyperLayer class.
 
         Parameters
         ----------
-        dom_dim : `tuple`
+        domain_dim : `tuple`
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
@@ -60,7 +60,7 @@ class RectangLayer():
         '''
 
         # Original domain dimensions
-        self.dom_dim = dom_dim
+        self.domain_dim = domain_dim
 
         # Model dimension
         self.dimension = dimension
@@ -87,14 +87,14 @@ class RectangLayer():
         '''
 
         # Domain dimensions w/o layer
-        chk_domd = len(self.dom_dim)
+        chk_domd = len(self.domain_dim)
         chk_habc = len(dom_lay)
         if self.dimension != chk_domd or self.dimension != chk_habc:
-            value_dimension_error(('dom_dim', 'dom_lay'),
+            value_dimension_error(('domain_dim', 'dom_lay'),
                                   (chk_domd, chk_habc),
                                   self.dimension)
 
-        Lx, Lz = self.dom_dim[:2]
+        Lx, Lz = self.domain_dim[:2]
         Lx_habc, Lz_habc = dom_lay[:2]
 
         # Rectangular semi-axes
@@ -110,7 +110,7 @@ class RectangLayer():
             print("Area Ratio: {:5.3f}".format(self.a_rat), flush=True)
 
         if self.dimension == 3:  # 3D
-            Ly = self.dom_dim[2]
+            Ly = self.domain_dim[2]
             Ly_habc = dom_lay[2]
             c_hyp = 0.5 * Ly + pad_len
             self.hyper_axes += (c_hyp,)
