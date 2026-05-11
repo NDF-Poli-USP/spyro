@@ -77,7 +77,7 @@ class RectangLayer():
         # Hypershape degree (Not applicable in rectangular layers)
         self.n_hyp = None
 
-    def define_hyperaxes(self, pad_len):
+    def define_rec_hyperaxes(self, pad_len):
         """Define the rectangular semi-axes
 
         Parameters
@@ -131,7 +131,7 @@ class RectangLayer():
         Lx_habc, Lz_habc = domain_lay[:2]
 
         # Rectangular semi-axes
-        self.define_hyperaxes(pad_len)
+        self.define_rec_hyperaxes(pad_len)
 
         # Geometric properties of the rectangular layer
         if self.dimension == 2:  # 2D
