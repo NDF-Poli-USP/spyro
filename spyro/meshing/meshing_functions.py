@@ -570,7 +570,7 @@ class AutomaticMesh:
         if gmsh is None:
             raise ImportError("gmsh is not available. Please install it.")
 
-        if self.mesh_parameters.segy_velocity_file is None:
+        if self.mesh_parameters.segy_velocity_model is None:
             raise ValueError("Gmsh mesher temporarily only works with segy files.")
 
         if self.comm is None or self.comm.ensemble_comm.rank == 0:
