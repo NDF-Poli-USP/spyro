@@ -1,8 +1,6 @@
 import firedrake as fire
 import numpy as np
 
-from spyro.solvers import wave
-
 from . import helpers
 from .. import utils
 from ..utils.typing import FunctionalEvaluationMode, AdjointType
@@ -25,10 +23,8 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
     if wave_obj.sources is not None:
         wave_obj.sources.current_sources = source_ids
         rhs_forcing = fire.Cofunction(wave_obj.function_space.dual())
-    try:
-        adjoint_type = wave_obj.adjoint_type
-    except AttributeError:
-        adjoint_type = AdjointType.NONE
+
+    adjoint_type = wave_obj.adjoint_type
 
     wave_obj.field_logger.start_logging(source_ids)
     wave_obj.comm.comm.barrier()
@@ -38,7 +34,7 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
 
     t = wave_obj.current_time
     nt = int(wave_obj.final_time / wave_obj.dt) + 1  # number of timesteps
-
+    usol = None
     if wave_obj.store_forward_time_steps:
         usol = [
             fire.Function(wave_obj.function_space, name=wave_obj.get_function_name())
@@ -63,10 +59,10 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
         # Reset misfit to None at the start of the solve to avoid
         # using stale misfit values from previous solves.
         wave_obj.misfit = None
-        wave.misfit = []
+        wave_obj.misfit = []
 
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-        wave.automated_adjoint.start_recording()
+        wave_obj.automated_adjoint.start_recording()
 
     for step in range(nt):
         # Basic way of applying sources
@@ -140,15 +136,15 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
     usol_recv = utils.utils.communicate(usol_recv, wave_obj.comm)
 
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-        wave.automated_adjoint.stop_recording()
+        wave_obj.automated_adjoint.stop_recording()
         # Will store only the final value of the functional.
         # Note: for the automated adjoint, the solutions are save in the pyadjoint tape,
         # so we don't need to store them here in the wave object.
-        wave.forward_solution = wave.vstate
+        wave_obj.forward_solution = wave_obj.vstate
     else:
         # Store the entire forward solution at receiver locations
         # for use in the implemented adjoint.
-        wave.forward_solution = usol
+        wave_obj.forward_solution = usol
 
     wave_obj.forward_solution = usol
     wave_obj.forward_solution_receivers = usol_recv

@@ -102,6 +102,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.forward_solution = None
         self.adjoint_solution = None
         self.adjoint_type = AdjointType.NONE
+        self.automated_adjoint = None
         self.current_time = 0.0
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
@@ -521,7 +522,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def enable_automated_adjoint(self):
         self.enable_compute_functional()
         self.store_forward_time_steps = False
-        self.automatic_adjoint = True
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
         controls = self.c if self.c is not None else self.initial_velocity_model
@@ -529,7 +529,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def enable_implemented_adjoint(self):
         self.enable_compute_functional()
-        self.automatic_adjoint = False
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
 
     @property
