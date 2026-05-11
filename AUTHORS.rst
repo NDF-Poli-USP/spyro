@@ -23,3 +23,5 @@ Team members
 * `Jéssica Sales <http://lattes.cnpq.br/>`_
 * `Thiago Dias dos Santos <http://lattes.cnpq.br/3618128074442916>`_
 * `Eduardo Moscatelli de Souza <https://scholar.google.com/citations?user=Z2hqFC8AAAAJ&hl=pt-BR>`_
+* `Usama Bin Qasim <https://scholar.google.com/citations?hl=en&user=7I-CD6QAAAAJ>`_
+
