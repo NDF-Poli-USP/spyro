@@ -8,7 +8,7 @@ import pytest
 
 
 def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
-    steps = [1e-4, 1e-5, 1e-6]  # step length
+    steps = [1e-3, 1e-4, 1e-5]  # step length
 
     errors = []
     remainders = []
@@ -17,6 +17,16 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     size, = np.shape(dm.dat.data[:])
     dm_data = np.random.default_rng(0).random(size)
     dm.dat.data[:] = dm_data
+    if Wave_obj_guess.abc_boundary_layer_type == "PML":
+        x = Wave_obj_guess.mesh_x
+        z = Wave_obj_guess.mesh_z
+        inside = fire.And(
+            fire.And(z >= -Wave_obj_guess.mesh_parameters.length_z, x >= 0.0),
+            x <= Wave_obj_guess.mesh_parameters.length_x,
+        )
+        indicator = fire.Function(V_c)
+        indicator.interpolate(fire.conditional(inside, 1.0, 0.0))
+        dm.dat.data[:] *= indicator.dat.data[:]
 
     for step in steps:
 
