@@ -36,27 +36,10 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     X_n = fire.Function(W)
     X_nm1 = fire.Function(W)
 
-    # Keep the Function-typed subfunction views available on the wave object
-    # for non-form operations (receiver interpolation, ``.dat`` access,
-    # ``.assign``, etc.). They share storage with ``X_n``/``X_nm1``, so writes
-    # to the mixed Functions are visible through these views.
-    u_n_func, pp_n_func = X_n.subfunctions
-    u_nm1_func, _ = X_nm1.subfunctions
+    u_n, pp_n = X_n.subfunctions
+    u_nm1, _ = X_nm1.subfunctions
 
-    # In the UFL forms below, however, use ``fire.split`` instead of the
-    # subfunction Functions. ``split`` produces UFL ``Indexed`` expressions
-    # of the parent mixed Function (``X_n``/``X_nm1``), so pyadjoint's
-    # annotation of ``X_n.assign(X_np1)`` during the time stepping is enough
-    # for the tape replay to see the updated values. With the Function-typed
-    # subfunctions the form coefficient is a separately-tracked Function that
-    # pyadjoint does not know is implicitly updated by writes to ``X_n``,
-    # which yields a constant baseline offset on tape replay and breaks the
-    # Taylor test for the PML case (the residuals stop converging, see the
-    # ``test_gradient_pml`` regression).
-    u_n, pp_n = fire.split(X_n)
-    u_nm1, _ = fire.split(X_nm1)
-
-    Wave_object.u_n = u_n_func
+    Wave_object.u_n = u_n
     Wave_object.X_np1 = X_np1
     Wave_object.X_n = X_n
     Wave_object.X_nm1 = X_nm1
@@ -134,17 +117,10 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     X_n = fire.Function(W)
     X_nm1 = fire.Function(W)
 
-    # See the 2D variant: keep subfunction Functions for non-form usage but
-    # build the UFL forms against ``fire.split`` of the mixed Function so the
-    # adjoint tape correctly tracks the time-stepping updates of ``X_n`` /
-    # ``X_nm1``.
-    u_n_func, psi_n_func, pp_n_func = X_n.subfunctions
-    u_nm1_func, psi_nm1_func, _ = X_nm1.subfunctions
+    u_n, psi_n, pp_n = X_n.subfunctions
+    u_nm1, psi_nm1, _ = X_nm1.subfunctions
 
-    u_n, psi_n, pp_n = fire.split(X_n)
-    u_nm1, psi_nm1, _ = fire.split(X_nm1)
-
-    Wave_object.u_n = u_n_func
+    Wave_object.u_n = u_n
     Wave_object.X_np1 = X_np1
     Wave_object.X_n = X_n
     Wave_object.X_nm1 = X_nm1
