@@ -2,6 +2,7 @@ from .meshing_functions import RectangleMesh  # noqa: F401
 from .meshing_functions import PeriodicRectangleMesh, BoxMesh  # noqa: F401
 from .meshing_functions import AutomaticMesh  # noqa: F401
 from .meshing_parameters import MeshingParameters  # noqa: F401
+from . meshing_operations import MeshOps as MeshOperations
 
 all = [
     "RectangleMesh",
@@ -9,4 +10,5 @@ all = [
     "BoxMesh",
     "AutomaticMesh",
     "MeshingParameters",
+    "MeshOperations"
 ]
