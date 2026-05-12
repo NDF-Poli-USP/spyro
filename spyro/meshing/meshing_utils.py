@@ -25,17 +25,17 @@ def check_gmsh(func):
 
 
 def create_sizing_function(
-        fname,
-        hmin=None,
-        bbox=None,
-        wl=3,
-        freq=5,
-        pad_type=None,
-        pad_size_x=-1.0,
-        pad_size_z=-1.0,
-        grade=None,
-        vp_water=None,
-    ):
+    fname,
+    hmin=None,
+    bbox=None,
+    wl=3,
+    freq=5,
+    pad_type=None,
+    pad_size_x=-1.0,
+    pad_size_z=-1.0,
+    grade=None,
+    vp_water=None,
+):
     """Create a mesh sizing function from a SEGY velocity model.
 
     This function reads a SEGY file, extracts the velocity model, applies

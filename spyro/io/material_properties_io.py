@@ -565,4 +565,3 @@ class VelocityModelFileIO:
         if self.input_dictionary is not None:
             synthetic_data = self.input_dictionary.get("synthetic_data", {})
             self.initial_velocity_model_file = synthetic_data.get("real_velocity_file")
-

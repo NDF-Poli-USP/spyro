@@ -151,12 +151,12 @@ def change_scalar_field_resolution(scalar_field, mesh_parameters, grid_spacing):
 
 
 def scalar_conditional_to_grid(
-        conditional,
-        domain_dimensions,
-        grid_spacing,
-        pad_dictionary=None,
-        output=False,
-    ):
+    conditional,
+    domain_dimensions,
+    grid_spacing,
+    pad_dictionary=None,
+    output=False,
+):
     """Convert a scalar conditional expression to a regular grid.
 
     The function builds a structured Firedrake mesh from the supplied domain
@@ -209,7 +209,7 @@ def scalar_conditional_to_grid(
         else:
             dimension = 2
     else:
-        raise ValueError("Domain dimension length not supported") 
+        raise ValueError("Domain dimension length not supported")
     dictionary = {
         "length_z": x1,  # Depth in km (always positive)
         "length_x": x2,  # Width in km (always positive)

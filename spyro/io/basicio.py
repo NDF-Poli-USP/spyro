@@ -346,14 +346,14 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
         v = function
 
     # target grid to interpolate to
-    num_grid_x = int(round((max_x - min_x ) / grid_spacing, 0)) + 1
-    num_grid_y = int(round((max_y - min_y ) / grid_spacing, 0)) + 1
+    num_grid_x = int(round((max_x - min_x) / grid_spacing, 0)) + 1
+    num_grid_y = int(round((max_y - min_y) / grid_spacing, 0)) + 1
     xi = np.linspace(min_x, max_x, num_grid_x)
     yi = np.linspace(min_y, max_y, num_grid_y)
     if dimension == 2:
         xi, yi = np.meshgrid(xi, yi)
     elif dimension == 3:
-        num_grid_z = int(round((max_z - min_z ) / grid_spacing, 0)) + 1
+        num_grid_z = int(round((max_z - min_z) / grid_spacing, 0)) + 1
         zi = np.linspace(min_z, max_z, num_grid_z)
         xi, yi, zi = np.meshgrid(xi, yi, zi)
 
