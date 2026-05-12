@@ -63,10 +63,29 @@ class AutomatedAdjoint:
             raise ValueError("Reduced functional not created.")
         return self.reduced_functional.derivative(apply_riesz=False)
 
-    def verify_gradient(self, variable, direction=None):
+    def verify_gradient(self, control_var, direction=None, dJdm=None):
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
         if direction is None:
-            direction = fire.Function(variable.function_space())
-            direction.dat.data[:] = 1.0
-        return taylor_test(self.reduced_functional, variable, direction)
+            direction = fire.Function(control_var.function_space())
+            direction.interpolate(0.01)
+        # pyadjoint's ``taylor_test`` expects ``dJdm`` to be the scalar
+        # directional derivative ``J'(m)(h)``, not the gradient itself. When a
+        # Firedrake ``Function`` (Riesz representer of the gradient) or a
+        # ``Cofunction`` (raw derivative) is supplied, reduce it to a scalar by
+        # pairing it with the perturbation ``direction``. Otherwise ``eps *
+        # dJdm`` inside pyadjoint becomes a UFL expression and the comparison
+        # ``min(residuals) < 1E-15`` raises ``UFL conditions cannot be
+        # evaluated as bool in a Python context``.
+        if dJdm is not None and not isinstance(dJdm, (int, float)):
+            if isinstance(dJdm, fire.Function):
+                dJdm = fire.assemble(
+                    fire.inner(dJdm, direction) * fire.dx
+                )
+            elif isinstance(dJdm, fire.Cofunction):
+                # Apply the cofunction to the direction (duality pairing).
+                dJdm = fire.assemble(fire.action(dJdm, direction))
+            else:
+                # Unknown type, fall back to pyadjoint's internal computation.
+                dJdm = None
+        return taylor_test(self.reduced_functional, control_var, direction, dJdm=dJdm)

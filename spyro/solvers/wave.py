@@ -103,6 +103,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.adjoint_solution = None
         self.adjoint_type = AdjointType.NONE
         self.automated_adjoint = None
+        self.functional_value = None
+        self.misfit = None
         self.current_time = 0.0
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
@@ -314,6 +316,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 "Please specify either a conditional, expression, "
                 "firedrake function or new file name (segy or hdf5)."
             )
+        self.c = self.initial_velocity_model
         if output:
             fire.VTKFile("initial_velocity_model.pvd").write(
                 self.initial_velocity_model, name="velocity"
@@ -520,12 +523,16 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._store_forward_time_steps = value
 
     def enable_automated_adjoint(self):
-        self.enable_compute_functional()
         self.store_forward_time_steps = False
+        self.enable_compute_functional(
+            mode=FunctionalEvaluationMode.PER_TIMESTEP
+        )
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
         controls = self.c if self.c is not None else self.initial_velocity_model
         self.automated_adjoint = AutomatedAdjoint(controls)
+        self.functional_value = None
+        self.misfit = None
 
     def enable_implemented_adjoint(self):
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
