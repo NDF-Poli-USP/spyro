@@ -194,8 +194,9 @@ def test_gradient(auto_adj, PML=False):
         misfit = None
     # compute the gradient of the control (to be verified)
     dJ = Wave_obj_guess.gradient_solve(
-    misfit=misfit, forward_solution=forward_solution_guess,
-    auto_adj=auto_adj,)
+        misfit=misfit, forward_solution=forward_solution_guess,
+        auto_adj=auto_adj,
+    )
     if not auto_adj:
         check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
     else:
@@ -205,19 +206,18 @@ def test_gradient(auto_adj, PML=False):
         direction = fire.Function(
             Wave_obj_guess.c.function_space(), val=np.random.default_rng(0).random(size))
         assert Wave_obj_guess.automated_adjoint.verify_gradient(
-            Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.95,\
+            Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.95, \
             "Automated adjoint gradient verification failed."
-        
+
         Wave_obj_guess.automated_adjoint.clear_tape()
         assert Wave_obj_guess.automated_adjoint._tape is None
-
 
 
 @pytest.mark.slow
 def test_gradient_pml():
     # TODO: Automated adjoint for PML case is not working yet.
     auto_adj = False
-    return test_gradient(auto_adj,PML=True)
+    return test_gradient(auto_adj, PML=True)
 
 
 if __name__ == "__main__":
