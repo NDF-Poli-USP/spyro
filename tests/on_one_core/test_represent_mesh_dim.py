@@ -1,7 +1,7 @@
 import pytest
 import warnings
 import firedrake as fire
-from numpy import isclose
+from numpy import allclose, isclose
 from spyro.habc.habc import HABC_Wave
 import spyro.meshing.meshing_operations as mshops
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
@@ -182,12 +182,14 @@ def test_boundary_ids(element_type, dimension):
     boundaries = [False, True, False, True]
     expected_map = [True, False, True, False]
     expected_ids = [1, 2, 3, 4]
+    expected_node_ids_key = ['Zmin', 'Zmax', 'Xmin', 'Xmax']
     if dimension == 3:
         # Boundaries3D = Boundaries2D + [front (ymin, 5), back(ymax, 6)]
         boundaries.extend([True, False])
         expected_map.extend([True, False])
         expected_ids.extend([5, 6]) if element_type == "T" \
             else expected_ids.extend(['bottom', 'top'])
+        expected_node_ids_key.extend(['Ymin', 'Ymax'])
 
     # Mesh parameters
     degree_ele = 4 if dimension == 2 else 3
@@ -208,17 +210,42 @@ def test_boundary_ids(element_type, dimension):
             else fire.UnitCubeMesh(10, 10, 10)
         V = fire.FunctionSpace(mesh, family, degree_ele)
 
-    # Build the boundary ID mapping
-    boundary_idx_map = mesh_ops.mapping_boundary_ids(mesh, V,
-                                                     boundaries,
-                                                     box_domain=True)
+    # Node coordinates
+    node_positions = mesh_ops.extract_node_positions(mesh, V, output_type="array")
+
+    # Build the boundary ID mapping and get boundary nodes
+    boundary_ids_map, boundary_nodes_ids = \
+        mesh_ops.mapping_boundary_ids(mesh, V, boundaries,
+                                      box_domain=True,
+                                      get_boundary_node_ids=True)
 
     # Checking the mapping
-    assert len(boundary_idx_map) == (4 if dimension == 2 else 6)
+    assert len(boundary_ids_map) == (4 if dimension == 2 else 6)
     for key, expected_value in zip(expected_ids, expected_map):
-        assert key in boundary_idx_map, f"✗ Boundary ID {key} not found in the map"
-        assert boundary_idx_map[key] == expected_value, \
+        assert key in boundary_ids_map, f"✗ Boundary ID {key} not found in the map."
+        assert boundary_ids_map[key] == expected_value, \
             f"✗ Boundary ID {key} expected to be {expected_value} " + \
-            f"but got {boundary_idx_map[key]}"
+            f"but got {boundary_ids_map[key]}."
     print(f"✓ Boundary ID mapping for {element_type} {dimension}D mesh is correct.",
           flush=True)
+
+    # Checking the boundary nodes
+    assert boundary_nodes_ids is not None, "✗ Boundary nodes should not be None."
+    assert isinstance(boundary_nodes_ids, dict), \
+        "✗ Boundary nodes should be a dictionary."
+    for key in expected_node_ids_key:
+        assert key in boundary_nodes_ids, \
+            f"✗ Boundary ID {key} not found in boundary node map."
+        if key.startswith('Z'):
+            idx = 0
+        elif key.startswith('X'):
+            idx = 1
+        elif key.startswith('Y'):
+            idx = 2
+        val_expected = 0. if key.endswith('min') else 1.
+        assert allclose(val_expected, node_positions[boundary_nodes_ids[key][0], idx],
+                        rtol=1e-8), \
+            f"{key} should be {val_expected} for all nodes, " + \
+            f"but got {boundary_nodes_ids[key][:, idx]}"
+    print(f"✓ Boundary nodes for {element_type} {dimension}D mesh are "
+          + "correctly identified.", flush=True)
