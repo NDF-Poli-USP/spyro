@@ -83,6 +83,13 @@ def create_sizing_function(
     # Set water velocity if value = 0
     if vp_water is not None:
         vp = np.where(vp == 0, vp_water, vp)
+    else:
+        # If no water velocity provided and model contains zeros, raise error
+        if np.any(vp == 0):
+            raise ValueError(
+                "Velocity model contains zero values (water). Provide 'vp_water' "
+                "to substitute water velocities or preprocess the SEGY file."
+            )
     # Calculate wavelength-based sizing
     cell_size = calculate_wavelength_sizing(vp, wl, freq)
     # Enforce minimum element size
