@@ -50,7 +50,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     remainders = np.array(remainders)
 
     if plot:
-        VTKFile("gradient.pvd").write(dJ)
+        fire.VTKFile("gradient.pvd").write(dJ)
         plt.close()
         plt.plot(steps, errors, label="Error")
         plt.legend()
@@ -172,8 +172,8 @@ def get_forward_model(dictionary=None, auto_adj=False):
 
 
 @pytest.mark.slow
-# @pytest.mark.parametrize("auto_adj", [True])
-def test_gradient(PML=False, adjoint_type=AdjointType.AUTOMATED_ADJOINT, auto_adj=True):
+@pytest.mark.parametrize("auto_adj", [True, False])
+def test_gradient(auto_adj, PML=False):
     if auto_adj:
         adjoint_type = AdjointType.AUTOMATED_ADJOINT
     else:
@@ -189,7 +189,6 @@ def test_gradient(PML=False, adjoint_type=AdjointType.AUTOMATED_ADJOINT, auto_ad
 
         Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
         print(f"Cost functional : {Jm}")
-        quit()
     else:
         forward_solution_guess = None
         misfit = None
@@ -202,7 +201,11 @@ def test_gradient(PML=False, adjoint_type=AdjointType.AUTOMATED_ADJOINT, auto_ad
     else:
         print(f"Cost functional : {Wave_obj_guess.functional_value}")
         Wave_obj_guess.automated_adjoint.create_reduced_functional(Wave_obj_guess.functional_value)
-        assert Wave_obj_guess.automated_adjoint.verify_gradient(Wave_obj_guess.c, direction=None, dJdm=dJ) > 1.95,\
+        size, = np.shape(Wave_obj_guess.c.dat.data[:])
+        direction = fire.Function(
+            Wave_obj_guess.c.function_space(), val=np.random.default_rng(0).random(size))
+        assert Wave_obj_guess.automated_adjoint.verify_gradient(
+            Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.95,\
             "Automated adjoint gradient verification failed."
         
         Wave_obj_guess.automated_adjoint.clear_tape()
@@ -211,9 +214,11 @@ def test_gradient(PML=False, adjoint_type=AdjointType.AUTOMATED_ADJOINT, auto_ad
 
 
 @pytest.mark.slow
-def test_gradient_pml(auto_adj=False):
-    return test_gradient(PML=True, auto_adj=auto_adj)
+def test_gradient_pml():
+    # TODO: Automated adjoint for PML case is not working yet.
+    auto_adj = False
+    return test_gradient(auto_adj,PML=True)
 
 
 if __name__ == "__main__":
-    test_gradient_pml(auto_adj=True)
+    test_gradient_pml()

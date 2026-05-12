@@ -15,7 +15,6 @@ from .backward_time_integration import (
 )
 from ..domains.space import create_function_space
 from ..utils.typing import (
-    FunctionalEvaluationMode,
     RieszMapType,
     override,
     WaveType,
@@ -140,8 +139,6 @@ class AcousticWave(Wave):
                 )
 
         self.enable_implemented_adjoint()
-        if self.real_shot_record is None and real_shot_record is not None:
-            self.real_shot_record = real_shot_record
         if misfit is not None:
             self.misfit = misfit
         if forward_solution is not None:
