@@ -25,38 +25,32 @@ def make_minas_cheese_conditional(mesh_z, mesh_x):
     return cond
 
 
+def create_grid_based_velocity_field(grid_spacing):
+    grid_spacing = 0.02
 
-# Let us first create a velocity grid based on the minas cheese model
-# First, create a simple mesh to generate a velocity grid
-grid_spacing = 0.02
-dictionary = {
-    "length_z": 2.0,  # Depth in km (always positive)
-    "length_x": 2.0,  # Width in km (always positive)
-    "length_y": 0.0,  # Thickness in km (0 for 2D)
-    "mesh_type": "firedrake_mesh",
-    "edge_length": grid_spacing,
-    "dimension": 2,
-}
+    dictionary = {
+        "length_z": 2.0,
+        "length_x": 2.0,
+        "length_y": 0.0,
+        "mesh_type": "firedrake_mesh",
+        "edge_length": grid_spacing,
+        "dimension": 2,
+    }
 
-# Creating mesh that is a regular grid as well
-mesh_params = spyro.meshing.MeshingParameters(input_mesh_dictionary=dictionary)
-mesh_generator = spyro.meshing.AutomaticMesh(mesh_parameters=mesh_params)
-mesh = mesh_generator.create_mesh()
+    mesh_params = spyro.meshing.MeshingParameters(input_mesh_dictionary=dictionary)
+    mesh_generator = spyro.meshing.AutomaticMesh(mesh_parameters=mesh_params)
+    mesh = mesh_generator.create_mesh()
 
-# Creating Minas Cheese velocity model
-# Getting spatialCoordinates 
-mesh_z, mesh_x = fire.SpatialCoordinate(mesh)
-cond = make_minas_cheese_conditional(mesh_z, mesh_x)
-V = fire.FunctionSpace(mesh, "CG", 1)
-vp = fire.Function(V).interpolate(cond)
+    mesh_z, mesh_x = fire.SpatialCoordinate(mesh)
+    cond = make_minas_cheese_conditional(mesh_z, mesh_x)
 
-# Creading a grid velocity data dictionary, this can be used to
-# create a wave-adapted mesh later on and is similar to the data
-# read from a segy file
-z = spyro.io.write_function_to_grid(vp, V, grid_spacing, buffer=False)
-grid_velocity_data = {
-    "vp_values": z,
-    "grid_spacing": grid_spacing,
-}
+    return spyro.utils.scalar_conditional_to_grid(
+        conditional=cond,
+        domain_dimensions=(2.0, 2.0),
+        grid_spacing=grid_spacing,
+    )
+
+vp_grid = create_grid_based_velocity_field(0.02)
+
 
 print("END")
