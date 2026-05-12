@@ -6,7 +6,10 @@ from firedrake.__future__ import interpolate
 from netgen.meshing import Element2D, \
     Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
+from spyro.domains.space import create_function_space
+from spyro.meshing.meshing_functions import AutomaticMesh
 from spyro.tools.habc_tools import point_cloud_field
+from spyro.utils.error_management import value_parameter_error
 fire.interpolate = interpolate
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -24,8 +27,8 @@ class HABC_Mesh():
 
     Attributes
     ----------
-    c : `Firedrake.Function`
-        Velocity model without absorbing layer
+    bnd_nodes : `array`
+        Mesh node coordinates on boundaries of the original domain.
     c_bnd_min : `float`
         Minimum velocity value on the boundary of the original domain
     c_bnd_max : `float`
@@ -41,8 +44,6 @@ class HABC_Mesh():
         Model dimension (2D or 3D). Default is 2D
     domain_dim : `tuple`
         Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
-    ele_type_c0 : `string`
-        Finite element type for the velocity model without absorbing layer
     ele_type_eik : `string`
         Finite element type for the Eikonal modeling. 'CG' or 'KMV'
     f_est : `float`
@@ -64,20 +65,10 @@ class HABC_Mesh():
         Maxmum mesh size
     mesh_parameters.tol : `float`
         Tolerance for searching nodes in the mesh
-    p_c0 : `int`
-        Finite element order for the velocity model without absorbing layer
     p_eik : `int`
         Finite element order for the Eikonal modeling
     quadrilateral : bool
         Flag to indicate whether to use quadrilateral/hexahedral elements
-
-    Migrate:
-    bnds : 'array'
-        Mesh node indices on boundaries of the original domain
-    bnd_nodes : `tuple`
-        Mesh node coordinates on boundaries of the origianl domain.
-        - (z_data[bnds], x_data[bnds]) for 2D
-        - (z_data[bnds], x_data[bnds], y_data[bnds]) for 3D
 
     Methods
     -------
@@ -95,6 +86,8 @@ class HABC_Mesh():
         Check if a point is inside a hyperellipsoid
     merge_mesh_2D()
         Merge the rectangular and the hyperelliptical meshes
+    original_boundary_data()
+        Generate the boundary data from the original domain mesh
     preamble_mesh_operations()
         Perform mesh operations previous to size an absorbing layer
     properties_eik_mesh()
@@ -109,15 +102,11 @@ class HABC_Mesh():
     trunc_hyp_bndpts_2D()
         Generate the boundary points for a truncated hyperellipse
 
-    # Migrate
+    # Migrate to meshing operations:
     get_spatial_coordinates_habc()
         Get the ufl coordinates of the mesh with absorbing layer.
     layer_boundary_data()
         Generate the boundary data from the domain with the absorbing layer
-    original_boundary_data()
-        Generate the boundary data from the original domain mesh
-    rectangular_mesh_habc()
-        Generate a rectangular mesh with an absorbing layer
     """
 
     def __init__(self, domain_dim, dimension=2, quadrilateral=False,
@@ -181,39 +170,41 @@ class HABC_Mesh():
 
         # Extract node positions
         node_positions = self.mesh_ops.extract_node_positions(self.mesh,
-                                                              self.function_space)
-
-        # Extract boundary node indices
-        bnds = self.mesh_ops.extract_bnd_node_indices(self.mesh,
-                                                      self.function_space,
-                                                      self.mesh_parameters)
-        self.bnds = np.unique(np.concatenate([idxs for idx_list in bnds
-                                              for idxs in idx_list]))
+                                                              self.function_space,
+                                                              output_type="array")
 
         # Extract boundary node positions
-        z_data, x_data = node_positions[0:2]
-        self.bnd_nodes = (z_data[self.bnds], x_data[self.bnds])
-        if self.dimension == 3:  # 3D
-            y_data = node_positions[2]
-            self.bnd_nodes += (y_data[self.bnds],)
+        all_bnd_nodes = []
+        for (bnd_ids, status) in self.mesh_parameters.boundary_nodes_ids.values():
+            if status:
+                all_bnd_nodes.append(bnd_ids)
+        all_bnd_nodes = np.unique(np.concatenate(all_bnd_nodes))
+        coord_msh = self.mesh_original.coordinates.dat.data_with_halos
+        coord_bnd = node_positions[all_bnd_nodes, :]
+        self.bnd_nodes = coord_bnd
 
-        # Get extreme values of the velocity model on the boundary
-        mask_boundary = np.isin(
-            np.asarray(self.bnd_nodes).T,
-            self.mesh_original.coordinates.dat.data_with_halos).all(axis=1)
-        vel_on_boundary = \
-            point_cloud_field(self.mesh_original,
-                              np.asarray(self.bnd_nodes).T[mask_boundary],
-                              self.initial_velocity_model,
-                              self.mesh_parameters.tol).dat.data_with_halos[:]
-        self.c_bnd_min = vel_on_boundary[vel_on_boundary > 0.].min()
-        self.c_bnd_max = vel_on_boundary[vel_on_boundary > 0.].max()
+        # Identify the boundary nodes
+        tree = cKDTree(coord_msh)
+        indices = tree.query(
+            coord_bnd, k=1, distance_upper_bound=self.mesh_parameters.tol)[1]
+        mask_boundary = indices[indices < len(coord_msh)]
+
+        # Create a point cloud to get the extreme velocity values on the boundary
+        ptos_bnd = self.mesh_original.coordinates.dat.data_with_halos[mask_boundary, :]
+        vel_on_boundary = point_cloud_field(
+            self.mesh_original, ptos_bnd, self.initial_velocity_model,
+            self.mesh_parameters.tol).dat.data_with_halos[:]
+
+        # Get extreme values of the velocity on the boundary excluding free surfaces
+        decimal = int(abs(np.log10(self.mesh_parameters.tol)))
+        self.c_bnd_min = round(vel_on_boundary[vel_on_boundary > 0.].min(), decimal)
+        self.c_bnd_max = round(vel_on_boundary[vel_on_boundary > 0.].max(), decimal)
 
         # Print on screen
         cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"
         print(cbnd_str.format(self.c_bnd_min, self.c_bnd_max), flush=True)
 
-    def properties_eik_mesh(self, p_usu=None, ele_type='CG', f_est=0.03):
+    def properties_eik_mesh(self, p_usu=None, ele_type='consistent', f_est=0.03):
         """
         Set the properties for the mesh used to solve the Eikonal equation
 
@@ -222,7 +213,8 @@ class HABC_Mesh():
         p_usu : `int`, optional
             Finite element order for the Eikonal equation. Default is None
         ele_type : `string`, optional
-            Finite element type. 'CG' or 'KMV'. Default is 'CG'
+            Finite element type. 'consistent' or 'underintegrated'.
+            Default is 'consistent'
         f_est : `float`, optional
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03
 
@@ -231,22 +223,36 @@ class HABC_Mesh():
         None
         """
 
+        allowed_ele_types = ['consistent', 'underintegrated']
+        if ele_type not in allowed_ele_types:
+            value_parameter_error('ele_type', ele_type, allowed_ele_types)
+
         # Setting the properties of the mesh used to solve the Eikonal equation
         self.ele_type_eik = ele_type
         self.p_eik = self.degree if p_usu is None else p_usu
-        self.funct_space_eik = fire.FunctionSpace(self.mesh,
-                                                  self.ele_type_eik,
-                                                  self.p_eik)
+
+        # Function space for the Eikonal modeling
+        if ele_type == 'consistent':
+            self.funct_space_eik = create_function_space(self.mesh, 'CG', self.p_eik)
+
+        if ele_type == 'underintegrated':
+            method = 'spectral_quadrilateral' if self.quadrilateral \
+                else 'mass_lumped_triangle'
+            degree = min(self.p_eik, 4 if self.dimension == 2 else 3)
+            self.funct_space_eik = create_function_space(self.mesh, method, degree)
 
         # Factor for the stabilizing term in Eikonal equation
         self.f_est = f_est
 
-    def preamble_mesh_operations(self, f_est=0.03):
+    def preamble_mesh_operations(self, ele_type='consistent', f_est=0.03):
         """
         Perform mesh operations previous to size an absorbing layer
 
         Parameters
         ----------
+        ele_type : `string`, optional
+            Finite element type. 'consistent' or 'underintegrated'.
+            Default is 'consistent'
         f_est : `float`, optional
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03
 
@@ -281,10 +287,6 @@ class HABC_Mesh():
         self.c.assign(fire.assemble(fire.interpolate(
             self.initial_velocity_model, self.function_space)))
 
-        # Get finite element data from the velocity model
-        self.ele_type_c0 = self.initial_velocity_model.ufl_element().family()
-        self.p_c0 = self.initial_velocity_model.ufl_element().degree()
-
         # Get extreme values of the velocity model
         self.c_min = self.initial_velocity_model.dat.data_with_halos.min()
         self.c_max = self.initial_velocity_model.dat.data_with_halos.max()
@@ -303,96 +305,8 @@ class HABC_Mesh():
 
         # Mesh properties for Eikonal
         print("Setting Mesh Properties for Eikonal Analysis", flush=True)
-        self.properties_eik_mesh(p_usu=self.abc_deg_eikonal, f_est=f_est)
-
-    def rectangular_mesh_habc(self, dom_lay, pad_len):
-        """
-        Generate a rectangular mesh with an absorbing layer
-
-        Parameters
-        ----------
-        dom_lay : `tuple`
-            Domain dimensions with layer including truncation by free surface.
-            - 2D : (Lx + 2 * pad_len, Lz + pad_len)
-            - 3D : (Lx + 2 * pad_len, Lz + pad_len, Ly + 2 * pad_len)
-        pad_len : `float`
-            Size of the absorbing layer
-
-        Returns
-        -------
-        mesh_habc : `firedrake mesh`
-            Rectangular mesh with an absorbing layer.
-        """
-
-        # Domain dimensions
-        Lx, Lz = self.domain_dim[:2]
-
-        # Number of elements
-        n_pad = round(pad_len / self.mesh_parameters.lmin)  # Elements in the layer
-        nz = int(round(Lz / self.mesh_parameters.lmin)) + int(n_pad)
-        nx = int(round(Lx / self.mesh_parameters.lmin)) + int(2 * n_pad)
-
-        # New geometry with layer
-        Lx_habc, Lz_habc = dom_lay[:2]
-
-        # Creating the rectangular mesh with layer
-        q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
-        if self.dimension == 2:  # 2D
-            mesh_habc = fire.RectangleMesh(nz, nx, Lz_habc, Lx_habc,
-                                           distribution_parameters=q,
-                                           quadrilateral=self.quadrilateral,
-                                           comm=self.comm.comm)
-            typ_ele_str = "Area Elements"
-
-        if self.dimension == 3:  # 3D
-
-            # Number of elements
-            Ly = self.domain_dim[2]
-            ny = int(round(Ly / self.mesh_parameters.lmin)) + int(2 * n_pad)
-
-            # New geometry with layer
-            Ly_habc = dom_lay[2]
-
-            # Mesh
-            if self.quadrilateral:
-                quad_habc = fire.RectangleMesh(
-                    nz, nx, Lz_habc, Lx_habc, distribution_parameters=q,
-                    quadrilateral=self.quadrilateral, comm=self.comm.comm)
-                # fire.VTKFile("output/quad_habc.pvd").write(quad_habc)
-
-                mesh_habc = fire.ExtrudedMesh(quad_habc, ny,
-                                              layer_height=Ly_habc / ny)
-                # fire.VTKFile("output/extr_habc.pvd").write(mesh_habc)
-            else:
-                mesh_habc = fire.BoxMesh(
-                    nz, nx, ny, Lz_habc, Lx_habc, Ly_habc,
-                    distribution_parameters=q, comm=self.comm.comm)
-            typ_ele_str = "Volume Elements"
-
-            # Adjusting coordinates
-            mesh_habc.coordinates.dat.data_with_halos[:, 2] -= pad_len
-            min_y = mesh_habc.coordinates.dat.data_with_halos[:, 2].min()
-            if abs(min_y / pad_len) != 1.:  # Forcing node at (0,0,0)
-                err_y = (1. - abs(min_y / pad_len)) * pad_len
-                err_y *= -np.sign(err_y)
-                mesh_habc.coordinates.dat.data_with_halos[:, 2] += err_y
-
-        # Adjusting coordinates
-        mesh_habc.coordinates.dat.data_with_halos[:, 0] *= -1.0
-        mesh_habc.coordinates.dat.data_with_halos[:, 1] -= pad_len
-        min_x = mesh_habc.coordinates.dat.data_with_halos[:, 1].min()
-        if abs(min_x / pad_len) != 1.:  # Forcing node at (0,0)
-            err_x = (1. - abs(min_x / pad_len)) * pad_len
-            err_x *= -np.sign(err_x)
-            mesh_habc.coordinates.dat.data_with_halos[:, 1] += err_x
-
-        # Mesh data
-        print(f"Mesh Created with {mesh_habc.num_vertices()} Nodes "
-              f"and {mesh_habc.num_cells()} " + typ_ele_str, flush=True)
-
-        print("Extended Rectangular Mesh Generated Successfully", flush=True)
-
-        return mesh_habc
+        self.properties_eik_mesh(p_usu=self.abc_deg_eikonal,
+                                 ele_type=ele_type, f_est=f_est)
 
     @staticmethod
     def bnd_pnts_hyp_2D(a, b, n, num_pts):
@@ -725,9 +639,7 @@ class HABC_Mesh():
         coord_rec = rec_mesh.coordinates.dat.data_with_halos
 
         # Create KDTree for efficient nearest neighbor search
-        boundary_coords = np.column_stack((self.bnd_nodes[0],
-                                           self.bnd_nodes[1]))
-        boundary_tree = cKDTree(boundary_coords)
+        boundary_tree = cKDTree(self.bnd_nodes)
 
         # Add all vertices from rectangular mesh and create mapping
         rec_map = {}
@@ -1114,9 +1026,9 @@ class HABC_Mesh():
         if self.dimension == 3:  # 3D
 
             # Base rectangular mesh
-            dom_lay_trunc = self.habc_domain_dimensions(only_habc_dom=True,
-                                                        full_hyp=False)
-            rec_mesh = self.rectangular_mesh_habc(dom_lay_trunc, self.pad_len)
+            self.mesh_parameters.abc_pad_length = self.pad_len
+            rec_mesh = AutomaticMesh(
+                mesh_parameters=self.mesh_parameters).create_firedrake_mesh()
             # fire.VTKFile("output/rectang_test.pvd").write(rec_mesh)
 
             # Merging the original mesh with a hyperellipsoid layer mesh

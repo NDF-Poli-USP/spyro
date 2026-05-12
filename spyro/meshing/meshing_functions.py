@@ -295,7 +295,7 @@ class AutomaticMesh:
             comm = None
 
         if self.periodic:
-            return PeriodicRectangleMesh(
+            return periodic_rectangle_mesh(
                 nz,
                 nx,
                 self.length_z,
@@ -305,7 +305,7 @@ class AutomaticMesh:
                 pad=self.abc_pad,
             )
         else:
-            return RectangleMesh(
+            return rectangle_mesh(
                 nz,
                 nx,
                 self.length_z,
@@ -333,7 +333,7 @@ class AutomaticMesh:
         # Define the discretization
         nz, nx, ny = self.define_discretization_for_mesh()
 
-        return BoxMesh(
+        return box_mesh(
             nz,
             nx,
             ny,
@@ -756,7 +756,7 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
     return edge_length
 
 
-def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False):
+def rectangle_mesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False):
     """Create a rectangle mesh based on the Firedrake mesh.
 
     First axis is negative, second axis is positive. If there is a pad, both
@@ -804,7 +804,7 @@ def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral
     return mesh
 
 
-def PeriodicRectangleMesh(
+def periodic_rectangle_mesh(
     nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False
 ):
     """Create a periodic rectangle mesh based on the Firedrake mesh.
@@ -854,8 +854,8 @@ def PeriodicRectangleMesh(
     return mesh
 
 
-def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None,
-            quadrilateral=False, comm=None):
+def box_mesh(nx, ny, nz, length_x, length_y, length_z, pad=None,
+             quadrilateral=False, comm=None):
     """
     Create a 3D box mesh based on Firedrake mesh utilities.
 
