@@ -1,7 +1,7 @@
 import firedrake as fire
 
 from .wave import Wave
-
+from pyadjoint import Tape, AdjFloat
 from ..io.basicio import ensemble_gradient
 from ..io import interpolate
 from .acoustic_solver_construction_no_pml import (
@@ -14,7 +14,12 @@ from .backward_time_integration import (
     backward_wave_propagator,
 )
 from ..domains.space import create_function_space
-from ..utils.typing import AdjointType, RieszMapType, override, WaveType
+from ..utils.typing import (
+    FunctionalEvaluationMode,
+    RieszMapType,
+    override,
+    WaveType,
+)
 from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
 
@@ -71,8 +76,8 @@ class AcousticWave(Wave):
     @ensemble_gradient
     def gradient_solve(
         self, misfit=None, forward_solution=None,
-        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
-        riesz_map=RieszMapType.L2
+        auto_adj=False,
+        riesz_map=RieszMapType.L2,
     ):
         """Compute the adjoint-based gradient.
 
@@ -88,10 +93,8 @@ class AcousticWave(Wave):
             computed by calling the forward solver. Providing the forward solution
             can save computational time if it has already been
             computed for the current velocity model, as it avoids redundant forward solves.
-        adjoint_type: AdjointType enum (default: AdjointType.IMPLEMENTED_ADJOINT)
-            The type of adjoint to use for gradient computation. Options are:
-            - AdjointType.IMPLEMENTED_ADJOINT: Use the manually implemented adjoint solver.
-            - AdjointType.AUTOMATED_ADJOINT: Use the automated adjoint using 'firedrake.adjoint'.
+        auto_adj: bool (default: False)
+            Whether to use automated adjoint differentiation.
         riesz_map: RieszMapType enum (default: RieszMapType.L2)
             The type of Riesz map to use for the gradient. More details in the documentation of the
             :class:`RieszMapType` enum.
@@ -102,16 +105,29 @@ class AcousticWave(Wave):
             Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
             depending on the chosen Riesz map.
         """
-        if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-            self.enable_automated_adjoint()
-            if self.automated_adjoint.reduced_functional is None:
+        if auto_adj:
+            if self.real_shot_record is None:
+                raise ValueError(
+                    "Real shot record must be provided for automated adjoint gradient computation."
+                )
+
+            if not self.automated_adjoint:
+                self.enable_automated_adjoint()
+                self.automated_adjoint.clear_tape()
                 self.forward_solve()
                 self.automated_adjoint.create_reduced_functional(
                     self.functional_value
                 )
-            else:
-                self.functional_value = self.automated_adjoint.recompute_functional(
-                    self.c
+            elif (
+                self.automated_adjoint.reduced_functional is None
+                and isinstance(self.automated_adjoint._tape, Tape)
+            ):
+                if not isinstance(self.functional_value, AdjFloat):
+                    raise ValueError(
+                        "Functional value must be an AdjFloat for automated adjoint gradient computation."
+                    )
+                self.automated_adjoint.create_reduced_functional(
+                    self.functional_value
                 )
 
             if riesz_map == RieszMapType.L2:
@@ -123,11 +139,9 @@ class AcousticWave(Wave):
                     f"Riesz map {riesz_map} not implemented for automated adjoint."
                 )
 
-        if adjoint_type != AdjointType.IMPLEMENTED_ADJOINT:
-            raise ValueError(
-                "Invalid adjoint type. Must be either IMPLEMENTED_ADJOINT or AUTOMATED_ADJOINT."
-            )
         self.enable_implemented_adjoint()
+        if self.real_shot_record is None and real_shot_record is not None:
+            self.real_shot_record = real_shot_record
         if misfit is not None:
             self.misfit = misfit
         if forward_solution is not None:
@@ -140,6 +154,10 @@ class AcousticWave(Wave):
 
         if self.misfit is None:
             self.misfit = self.real_shot_record - self.forward_solution_receivers
+        if riesz_map != RieszMapType.L2:
+            raise NotImplementedError(
+                f"Riesz map {riesz_map} not implemented for implemented adjoint."
+            )
         return backward_wave_propagator(self)
 
     def reset_pressure(self):

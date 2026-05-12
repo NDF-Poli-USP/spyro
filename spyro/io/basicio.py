@@ -221,6 +221,10 @@ def ensemble_functional(func):
 
     def wrapper(*args, **kwargs):
         comm = args[0].comm
+        if args[0].adjoint_type.name == "AUTOMATED_ADJOINT":
+            # pyadjoint needs the annotated Firedrake object, not a numpy scalar
+            # produced by the ensemble reduction path below.
+            return func(*args, **kwargs)
         if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
             J = func(*args, **kwargs)
             J_total = np.zeros((1))

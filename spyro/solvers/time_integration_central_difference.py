@@ -49,7 +49,7 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
         # being one at a point and zero elsewhere.
         source_cof = wave_obj.sources.source_cofunction()
         interpolate_receivers = wave_obj.receivers.receiver_interpolator(
-            wave_obj.vstate)
+            wave_obj.u_n)
 
     usol_recv = []
     save_step = 0
