@@ -3,6 +3,7 @@ import meshio
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from ..io import parallel_print
+from ..io.basicio import create_segy_from_grid
 from ..utils import run_in_one_core
 from .meshing_gmsh2d import build_gmsh_geometry_and_groups, apply_structured_winslow_smoothing2d
 from .meshing_utils import create_sizing_function
@@ -571,7 +572,14 @@ class AutomaticMesh:
             raise ImportError("gmsh is not available. Please install it.")
 
         if self.mesh_parameters.segy_velocity_model is None:
-            raise ValueError("Gmsh mesher temporarily only works with segy files.")
+            if self.mesh_parameters.velocity_model is not None:
+                filename = "tmp_velocity_model.segy"
+                vp = self.mesh_parameters.velocity_model["vp_values"]
+                create_segy_from_grid(vp, filename)
+                self.velocity_model = filename
+
+        # if self.mesh_parameters.segy_velocity_model is None:
+        #     raise ValueError("Gmsh mesher temporarily only works with segy files.")
 
         if self.comm is None or self.comm.ensemble_comm.rank == 0:
             parallel_print("Generating Gmsh mesh...", comm=self.comm)

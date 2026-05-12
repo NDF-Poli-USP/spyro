@@ -384,7 +384,12 @@ def create_segy(function, V, grid_spacing, filename):
     -------
     None
     """
-    velocity = write_function_to_grid(function, V, grid_spacing, buffer=True)
+    velocity_grid_data = write_function_to_grid(function, V, grid_spacing, buffer=True)
+
+    return create_segy_from_grid(velocity_grid_data, filename)
+
+
+def create_segy_from_grid(velocity, filename):
     spec = segyio.spec()
 
     velocity = np.flipud(velocity.T)
