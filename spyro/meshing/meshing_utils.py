@@ -24,7 +24,18 @@ def check_gmsh(func):
     return wrapper
 
 
-def create_sizing_function(fname, hmin=None, bbox=None, wl=10, freq=2, pad_type=None, pad_size_x=-1.0, pad_size_z=-1.0, grade=None, vp_water=None):
+def create_sizing_function(
+        fname,
+        hmin=None,
+        bbox=None,
+        wl=3,
+        freq=5,
+        pad_type=None,
+        pad_size_x=-1.0,
+        pad_size_z=-1.0,
+        grade=None,
+        vp_water=None,
+    ):
     """Create a mesh sizing function from a SEGY velocity model.
 
     This function reads a SEGY file, extracts the velocity model, applies
@@ -72,8 +83,6 @@ def create_sizing_function(fname, hmin=None, bbox=None, wl=10, freq=2, pad_type=
     # Set water velocity if value = 0
     if vp_water is not None:
         vp = np.where(vp == 0, vp_water, vp)
-    else:
-        vp = np.where(vp == 0, 1500.0, vp)
     # Calculate wavelength-based sizing
     cell_size = calculate_wavelength_sizing(vp, wl, freq)
     # Enforce minimum element size
@@ -86,8 +95,7 @@ def create_sizing_function(fname, hmin=None, bbox=None, wl=10, freq=2, pad_type=
         dx = (bbox[3] - bbox[2]) / n_samples
         nnz = int(pad_size_z / dz)
         nnx = int(pad_size_x / dx)
-        print(nnx, nnz, n_samples, n_traces)
-        print(pad_size_z, bbox[0], bbox[2])
+
         padding = ((0, nnz), (nnx, nnx))
         cell_size = np.pad(cell_size, padding, "edge")
         bbox = (
@@ -97,8 +105,6 @@ def create_sizing_function(fname, hmin=None, bbox=None, wl=10, freq=2, pad_type=
             bbox[3] + pad_size_x,
         )
 
-    print(cell_size.shape[0])
-    print(cell_size.shape[1])
     if grade is not None:
         window_length_z = int((1.0 - grade) * 0.1 * cell_size.shape[0])
         window_length_x = int((1.0 - grade) * 0.1 * cell_size.shape[1])
