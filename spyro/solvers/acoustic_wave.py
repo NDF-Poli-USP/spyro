@@ -15,9 +15,7 @@ from .backward_time_integration import (
 )
 from ..domains.space import create_function_space
 from ..utils.typing import (
-    RieszMapType,
-    override,
-    WaveType,
+    RieszMapType, override, WaveType,
 )
 from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
@@ -105,9 +103,9 @@ class AcousticWave(Wave):
             depending on the chosen Riesz map.
         """
         if auto_adj:
-            if self.real_shot_record is None:
+            if not isinstance(self.functional_value, AdjFloat):
                 raise ValueError(
-                    "Real shot record must be provided for automated adjoint gradient computation."
+                    "Functional value must be an AdjFloat for automated adjoint gradient computation."
                 )
 
             if not self.automated_adjoint:
@@ -121,10 +119,6 @@ class AcousticWave(Wave):
                 self.automated_adjoint.reduced_functional is None
                 and isinstance(self.automated_adjoint._tape, Tape)
             ):
-                if not isinstance(self.functional_value, AdjFloat):
-                    raise ValueError(
-                        "Functional value must be an AdjFloat for automated adjoint gradient computation."
-                    )
                 self.automated_adjoint.create_reduced_functional(
                     self.functional_value
                 )
@@ -139,6 +133,10 @@ class AcousticWave(Wave):
                 )
 
         self.enable_implemented_adjoint()
+        if self.real_shot_record is None:
+            raise ValueError(
+                "Real shot record must be provided for automated adjoint gradient computation."
+            )
         if misfit is not None:
             self.misfit = misfit
         if forward_solution is not None:
