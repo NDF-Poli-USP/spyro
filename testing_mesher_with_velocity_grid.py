@@ -53,7 +53,7 @@ def create_grid_based_velocity_field(grid_spacing):
         grid_spacing=grid_spacing,
     )
 
-vp_grid = create_grid_based_velocity_field(0.02)
+vp_grid = create_grid_based_velocity_field(0.01)
 
 mesh_dictionary = {
     "mesh_type": "gmsh_mesh", # Type of automatic mesh

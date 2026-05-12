@@ -253,7 +253,7 @@ class MeshingParameters():
         self.grade = self.input_mesh_dictionary.get("grade", 0.9)
         self.water_interface = self.input_mesh_dictionary.get("water_interface", False)
         self.water_search_value = self.input_mesh_dictionary.get("water_search_value", 0.0)
-        self.vp_water = self.input_mesh_dictionary.get("vp_water", 1500.0)
+        self.vp_water = self.input_mesh_dictionary.get("vp_water", None)
         self.structured_mesh = self.input_mesh_dictionary.get("structured_mesh", False)
         self.min_element_size = self.input_mesh_dictionary.get("min_element_size", 35.0)
         self.winslow_iterations = self.input_mesh_dictionary.get("winslow_iterations", 5000)
