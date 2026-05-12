@@ -19,9 +19,9 @@ from . import tools
 from . import examples
 from . import sources
 from .meshing import (
-    RectangleMesh,
-    PeriodicRectangleMesh,
-    BoxMesh,
+    rectangle_mesh,
+    periodic_rectangle_mesh,
+    box_mesh,
 )
 
 __all__ = [
@@ -47,8 +47,8 @@ __all__ = [
     "AcousticWave",
     "FullWaveformInversion",
     "AcousticWaveMMS",
-    "RectangleMesh",
-    "PeriodicRectangleMesh",
-    "BoxMesh",
+    "rectangle_mesh",
+    "periodic_rectangle_mesh",
+    "box_mesh",
     "IsotropicWave",
 ]
