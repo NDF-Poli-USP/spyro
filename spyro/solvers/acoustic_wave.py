@@ -133,22 +133,26 @@ class AcousticWave(Wave):
                 )
 
         self.enable_implemented_adjoint()
-        if self.real_shot_record is None:
-            raise ValueError(
-                "Real shot record must be provided for automated adjoint gradient computation."
-            )
         if misfit is not None:
             self.misfit = misfit
+
         if forward_solution is not None:
             self.forward_solution = forward_solution
-        elif self.forward_solution is None:
+        else:
             # No stored forward solution — either never run, or run before
             # enable_implemented_adjoint() was called (store_forward_time_steps
             # was False at the time). Re-run now with storage enabled.
             self.forward_solve()
 
         if self.misfit is None:
-            self.misfit = self.real_shot_record - self.forward_solution_receivers
+            if self.real_shot_record is None:
+                raise ValueError(
+                    "Please load or calculate a real shot record first"
+                )
+            self.misfit = (
+                self.real_shot_record - self.forward_solution_receivers
+            )
+
         if riesz_map != RieszMapType.L2:
             raise NotImplementedError(
                 f"Riesz map {riesz_map} not implemented for implemented adjoint."
