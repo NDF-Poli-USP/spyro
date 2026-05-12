@@ -99,10 +99,34 @@ def create_sizing_function(fname, hmin=None, bbox=None, wl=10, freq=2, pad_type=
 
     print(cell_size.shape[0])
     print(cell_size.shape[1])
-    if grade is not None:
-        window_length_z = int((1.0 - grade) * 0.1 * cell_size.shape[0])
-        window_length_x = int((1.0 - grade) * 0.1 * cell_size.shape[1])
-        cell_size = apply_savitzky_golay_filter_2d(cell_size, window_length_x, window_length_z)
+    if grade is not None and grade > 0.0:
+        polyorder = 3
+        min_valid = polyorder + 2 if (polyorder % 2 != 0) else polyorder + 1
+
+        def calculate_window(dim_size, grade_factor):
+            val = int(grade_factor * dim_size)
+            val = min(val, dim_size)
+
+            if val % 2 == 0:
+                val -= 1
+
+            val = max(min_valid, val)
+
+            if val > dim_size:
+                val = dim_size if dim_size % 2 != 0 else dim_size - 1
+
+            return val
+
+        window_length_z = calculate_window(cell_size.shape[0], grade)
+        window_length_x = calculate_window(cell_size.shape[1], grade)
+
+        # Apply the filter
+        cell_size = apply_savitzky_golay_filter_2d(
+            cell_size,
+            window_length_x=window_length_x,
+            window_length_z=window_length_z,
+            polyorder=polyorder
+        )
 
     print("Function Minimum and Maximum values:")
     print(cell_size.min(), cell_size.max())
@@ -269,15 +293,9 @@ def apply_savitzky_golay_filter_2d(grid_values, window_length_x=501, window_leng
     ValueError
         If window lengths are not odd, not positive, or if polyorder is too large.
     """
-
-    # Convert input to numpy array
     grid_values = np.asarray(grid_values)
-
-    rows, cols = grid_values.shape
-    print(window_length_z, window_length_x)
-    # First filter along axis 0 (columns), then along axis 1 (rows)
-    filtered_values = savgol_filter(grid_values, window_length_x, polyorder, axis=0)
-    filtered_values = savgol_filter(filtered_values, window_length_z, polyorder, axis=1)
+    filtered_values = savgol_filter(grid_values, window_length_z, polyorder, axis=0)
+    filtered_values = savgol_filter(filtered_values, window_length_x, polyorder, axis=1)
 
     return filtered_values
 
