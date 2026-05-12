@@ -13,7 +13,7 @@ except ImportError:
 def check_gmsh(func):
     """Decorator for gmsh check.
 
-    If gmsh isn't available returns ImportError
+    If gmsh isn't available raises ImportError
     """
     def wrapper(*args, **kwargs):
         if gmsh is None:
