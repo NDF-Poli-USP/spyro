@@ -243,7 +243,8 @@ class MeshingParameters():
         self.minimum_velocity = None
         self.gradient_mask = None
         self.negative_z = negative_z
-        self.velocity_model = velocity_model
+        if velocity_model is None:
+            self.velocity_model = self.input_mesh_dictionary.get("velocity_model", None)
         self.segy_velocity_model = self.input_mesh_dictionary.get("segy_velocity_model", None)
 
         self.minimum_velocity = self.input_mesh_dictionary.get("minimum_velocity", None)
@@ -1099,6 +1100,7 @@ class MeshingParameters():
     def segy_velocity_model(self, value):
         warnings.warn("Passing SEGY directly to the mesher is deprecated. Please use grid point velocity inputs.")
         self._segy_velocity_model = value
-        self.velocity_model = value
+        if value is not None:
+            self.velocity_model = value
         if hasattr(self, 'is_complete'):
             self.check_completeness()
