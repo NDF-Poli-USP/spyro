@@ -5,7 +5,6 @@ from mpi4py import MPI
 # debugpy.wait_for_client()
 import spyro
 import numpy as np
-import math
 
 
 def error_calc(p_numerical, p_analytical, nt):
