@@ -354,7 +354,7 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
         xi, yi = np.meshgrid(xi, yi)
     elif dimension == 3:
         num_grid_z = int(round((max_z - min_z ) / grid_spacing, 0)) + 1
-        zi = np.arange(min_z, max_z, num_grid_z)
+        zi = np.linspace(min_z, max_z, num_grid_z)
         xi, yi, zi = np.meshgrid(xi, yi, zi)
 
     # interpolate
