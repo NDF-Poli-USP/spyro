@@ -17,7 +17,7 @@ from spyro.utils.error_management import value_parameter_error
 # With additions by Alexandre Olender
 
 
-class HABC_Error():
+class HABCError():
     '''
     Class for the error calculation for the HABC scheme
 
@@ -74,7 +74,7 @@ class HABC_Error():
     def __init__(self, dt, f_Nyq, receiver_locations, forward_solution_receivers=None,
                  output_folder=None, output_case=None):
         '''
-        Initialize the HABC_Error class.
+        Initialize the HABCError class.
 
         Parameters
         ----------

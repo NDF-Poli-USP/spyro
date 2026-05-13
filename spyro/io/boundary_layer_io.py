@@ -105,7 +105,7 @@ class Read_boundary_layer:
 
         # Cheking damping type input
         if value not in accepted_damping_types:
-            value_parameter_error('damping_type', value,
+            value_parameter_error('abc_boundary_layer_type', value,
                                   accepted_damping_types)
 
         if value == "PML":

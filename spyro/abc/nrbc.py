@@ -26,7 +26,7 @@ class NRBC():
         Minimum value of the cosine of the incidence angle
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
-    dom_dim : `tuple`
+    domain_dim : `tuple`
         Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
     layer_shape : `string`
         Shape type of pad layer. Options: 'rectangular' or 'hypershape'
@@ -43,18 +43,16 @@ class NRBC():
         Compute the normal vector to a hypershape at a boundary point
     source_to_bnd_reference_vector()
         Compute a unitary reference vector from the source to a boundary point
-
-
     '''
 
-    def __init__(self, dom_dim, layer_shape, angle_max=np.pi/4.,
+    def __init__(self, domain_dim, layer_shape, angle_max=np.pi/4.,
                  dimension=2, output_folder=None):
         '''
         Initialize the NRBC class.
 
         Parameters
         ----------
-        dom_dim : `tuple`
+        domain_dim : `tuple`
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         layer_shape : `string`
             Shape type of pad layer. Options: 'rectangular' or 'hypershape'
@@ -71,7 +69,7 @@ class NRBC():
         '''
 
         # Original domain dimensions
-        self.dom_dim = dom_dim
+        self.domain_dim = domain_dim
 
         # Shape type of pad layer
         self.layer_shape = layer_shape
@@ -258,7 +256,7 @@ class NRBC():
             if self.layer_shape == 'hypershape':
 
                 # Original domain dimensions
-                Lx, Lz = self.dom_dim[:2]
+                Lx, Lz = self.domain_dim[:2]
 
                 # Hypershape degree and semi-axes
                 n_hyp, hyp_axes = hyp_par[0], hyp_par[1:]
@@ -267,7 +265,7 @@ class NRBC():
                 bnd_z, bnd_x = bnd_nodes_nfs[:2]  # Boundary node data
                 bnd_pnts = [bnd_x - Lx / 2, bnd_z + Lz / 2]
                 if self.dimension == 3:  # 3D
-                    Ly = self.dom_dim[2]
+                    Ly = self.domain_dim[2]
                     bnd_y = bnd_nodes_nfs[2]
                     bnd_pnts.append(bnd_y - Ly / 2)
 
@@ -286,8 +284,9 @@ class NRBC():
         self.cosHig.dat.data_with_halos[bnd_nfs] = cos_Hig
 
         # Save boundary profile of cosine of incidence angle
-        outfile = fire.VTKFile(self.path_save_nrbc + "cosHig.pvd")
-        outfile.write(self.cosHig)
+        if hasattr(self, 'path_save_nrbc'):
+            outfile = fire.VTKFile(self.path_save_nrbc + "cosHig.pvd")
+            outfile.write(self.cosHig)
 
 # dx = 0.1 km REC
 # W/O = 107.72% - 0.80%

@@ -8,9 +8,11 @@ from netgen.meshing import Element2D, \
 from scipy.spatial import cKDTree
 from spyro.domains.space import create_function_space
 from spyro.meshing.meshing_functions import AutomaticMesh
+from spyro.meshing.meshing_operations import MeshOps
 from spyro.tools.habc_tools import point_cloud_field
 from spyro.utils.error_management import value_parameter_error
 fire.interpolate = interpolate
+
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -21,7 +23,7 @@ fire.interpolate = interpolate
 # With additions by Alexandre Olender and Romildo Soares Jr
 
 
-class HABC_Mesh():
+class HABCMesh(MeshOps):
     """
     Class for HABC mesh generation
 
@@ -80,10 +82,14 @@ class HABC_Mesh():
         Generate the boundary segment curves for the hyperellipse boundary mesh
     create_hyp_trunc_mesh_2D()
         Generate the mesh for the hyperelliptical absorbing layer
+    get_spatial_coordinates_habc()
+        Get the ufl coordinates of the mesh with absorbing layer.
     hypershape_mesh_habc()
         Generate a mesh with a hypershape absorbing layer
     inside_hyp_3D()
         Check if a point is inside a hyperellipsoid
+    layer_boundary_data()
+        Generate the boundary data from the domain with the absorbing layer
     merge_mesh_2D()
         Merge the rectangular and the hyperelliptical meshes
     original_boundary_data()
@@ -101,23 +107,18 @@ class HABC_Mesh():
         Snap boundary nodes of a sharp mesh to the hyperellipsoid surface
     trunc_hyp_bndpts_2D()
         Generate the boundary points for a truncated hyperellipse
-
-    # Migrate to meshing operations:
-    get_spatial_coordinates_habc()
-        Get the ufl coordinates of the mesh with absorbing layer.
-    layer_boundary_data()
-        Generate the boundary data from the domain with the absorbing layer
     """
 
     def __init__(self, domain_dim, dimension=2, quadrilateral=False,
                  func_space_type=None, comm=None):
         """
-        Initialize the HABC_Mesh class
+        Initialize the HABCMesh class
 
         Parameters
         ----------
         domain_dim : `tuple`
-            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
+            Original domain dimensions: (length_z, length_x) for 2D
+            or (length_z, length_x, length_y) for 3D
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
         quadrilateral : bool, optional
@@ -134,26 +135,9 @@ class HABC_Mesh():
         None
         """
 
-        # Original domain dimensions
-        self.domain_dim = domain_dim
-
-        # Model dimension
-        self.dimension = dimension
-
-        # Quadrilateral/hexahedral elements
-        self.quadrilateral = quadrilateral
-
-        # Type of function space
-        self.func_space_type = func_space_type
-
-        # Communicator MPI
-        self.comm = comm
-
-        if not hasattr(self, "mesh_ops"):
-            self.mesh_ops = mshops.MeshOps(domain_dim, dimension=dimension,
-                                           quadrilateral=quadrilateral,
-                                           func_space_type=func_space_type,
-                                           comm=comm)
+        MeshOps.__init__(self, domain_dim, dimension=dimension,
+                         quadrilateral=quadrilateral,
+                         func_space_type=func_space_type, comm=comm)
 
     def original_boundary_data(self):
         """
@@ -169,9 +153,9 @@ class HABC_Mesh():
         """
 
         # Extract node positions
-        node_positions = self.mesh_ops.extract_node_positions(self.mesh,
-                                                              self.function_space,
-                                                              output_type="array")
+        node_positions = self.extract_node_positions(self.mesh,
+                                                     self.function_space,
+                                                     output_type="array")
 
         # Extract boundary node positions
         all_bnd_nodes = []
@@ -269,8 +253,8 @@ class HABC_Mesh():
 
         # Get mesh parameters from original mesh
         mesh_derived_parameters = \
-            self.mesh_ops.representative_mesh_dimensions(self.mesh,
-                                                         self.function_space)
+            self.representative_mesh_dimensions(self.mesh,
+                                                self.function_space)
         self.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
         self.mesh_parameters.lmin = mesh_derived_parameters[1]
         self.mesh_parameters.lmax = mesh_derived_parameters[2]
@@ -1060,7 +1044,7 @@ class HABC_Mesh():
         bnd_nod = fire.DirichletBC(V, 0., "on_boundary").nodes
 
         # Extract node positions
-        node_positions = self.mesh_ops.extract_node_positions(self.mesh, V)
+        node_positions = self.extract_node_positions(self.mesh, V)
 
         # Boundary node coordinates
         z_f, x_f = node_positions[:2]
@@ -1095,7 +1079,7 @@ class HABC_Mesh():
         """
 
         min_coordinates, max_coordinates = \
-            self.mesh_ops.extract_extreme_coordinates(self.mesh)
+            self.extract_extreme_coordinates(self.mesh)
         domain_habc = np.asarray([self.Lz_habc, self.Lx_habc]) if self.dimension == 2 \
             else np.asarray([self.Lz_habc, self.Lx_habc, self.Ly_habc])
         domain_to_check = abs(max_coordinates - min_coordinates)

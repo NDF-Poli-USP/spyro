@@ -5,7 +5,7 @@ import spyro.habc.eik as eik
 from numpy import isclose
 from os import getcwd
 from spyro.solvers.acoustic_wave import AcousticWave
-from spyro.meshing.meshing_habc import HABC_Mesh
+from spyro.meshing.meshing_habc import HABCMesh
 from spyro.utils.cost import comp_cost
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -178,7 +178,7 @@ def wave_dict_3d(ele_geometry, degree_eikonal):
     return dictionary
 
 
-class HABC_Wave(AcousticWave, HABC_Mesh):
+class HABCWave(AcousticWave, HABCMesh):
     """Class HABC that determines absorbing layer size and parameters to be used.
 
     Attributes
@@ -188,7 +188,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh):
 
     Methods
     -------
-    None added to the ones inherited from AcousticWave and HABC_Mesh
+    None added to the ones inherited from AcousticWave and HABCMesh
     """
 
     def __init__(self, dictionary=None, ele_type='consistent', comm=None):
@@ -218,23 +218,15 @@ class HABC_Wave(AcousticWave, HABC_Mesh):
         self.path_save = getcwd() + "/output/eikonal_test"
 
         # Original domain dimensions
-        dom_dim = (self.mesh_parameters.length_x,
-                   self.mesh_parameters.length_z)
-
-        if self.dimension == 2:  # 2D
-            self.path_save += "2D_"
-
-        if self.dimension == 3:  # 3D
-            self.path_save += "3D_"
-            dom_dim += (self.mesh_parameters.length_y,)
+        domain_dim = self.domain_dimensions()
 
         geom_ele_str = "Q" if self.mesh_parameters.quadrilateral else "T"
         ele_type_str = "C" if ele_type == 'consistent' else "U"
         self.path_save += geom_ele_str + "_" + ele_type_str + "/"
 
         # Initializing the Mesh class
-        HABC_Mesh.__init__(
-            self, dom_dim, dimension=self.dimension,
+        HABCMesh.__init__(
+            self, domain_dim, dimension=self.dimension,
             quadrilateral=self.mesh_parameters.quadrilateral,
             comm=self.comm)
 
@@ -247,8 +239,8 @@ def critical_boundary_points(Wave_obj):
 
     Parameters
     ----------
-    Wave_obj : `habc.HABC_Wave`
-        An instance of the HABC_Wave class
+    Wave_obj : `habc.HABCWave`
+        An instance of the HABCWave class
 
     Returns
     -------
@@ -300,7 +292,7 @@ def eikonal_analysis(dictionary, edge_length, f_est, ele_type='consistent'):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = HABC_Wave(dictionary=dictionary, ele_type=ele_type)
+    Wave_obj = HABCWave(dictionary=dictionary, ele_type=ele_type)
 
     # Mesh
     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})

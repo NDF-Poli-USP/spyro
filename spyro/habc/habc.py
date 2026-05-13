@@ -6,12 +6,12 @@ from os import getcwd, path, rename
 from shutil import rmtree
 from sympy import divisors
 from spyro.solvers.acoustic_wave import AcousticWave
-from spyro.meshing.meshing_habc import HABC_Mesh
+from spyro.meshing.meshing_habc import HABCMesh
 from spyro.abc.hyp_lay import HyperLayer
 from spyro.abc.rec_lay import RectangLayer
 from spyro.habc.damp_profile import HABC_Damping
-from spyro.habc.nrbc import NRBC
-from spyro.habc.error_measure import HABC_Error
+from spyro.abc.nrbc import NRBC
+from spyro.habc.error_measure import HABCError
 from spyro.domains.space import create_function_space
 from spyro.habc.lay_len import calc_size_lay
 from spyro.plots.plots_habc import plot_function_layer_size
@@ -29,8 +29,8 @@ from spyro.utils.freq_tools import freq_response
 # With additions by Alexandre Olender
 
 
-class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
-                HyperLayer, HABC_Damping, NRBC, HABC_Error):
+class HABC_Wave(AcousticWave, HABCMesh, RectangLayer,
+                HyperLayer, HABC_Damping, NRBC, HABCError):
     '''
     Class HABC that determines absorbing layer size and parameters to be used
 
@@ -182,9 +182,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         domain_dim = self.habc_domain_dimensions(only_orig_dom=True)
 
         # Initializing the Mesh class
-        HABC_Mesh.__init__(self, domain_dim, dimension=self.dimension,
-                           quadrilateral=self.mesh_parameters.quadrilateral,
-                           func_space_type='scalar', comm=self.comm)
+        HABCMesh.__init__(self, domain_dim, dimension=self.dimension,
+                          quadrilateral=self.mesh_parameters.quadrilateral,
+                          func_space_type='scalar', comm=self.comm)
 
         # Identifier for the current case study
         self.identify_habc_case(output_folder=output_folder)
@@ -257,10 +257,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.path_case_habc = self.path_save + self.case_habc + "/"
 
         # Initializing the error measure class
-        HABC_Error.__init__(self, self.dt, self.f_Nyq,
-                            self.receiver_locations,
-                            output_folder=self.path_save,
-                            output_case=self.path_case_habc)
+        HABCError.__init__(self, self.dt, self.f_Nyq,
+                           self.receiver_locations,
+                           output_folder=self.path_save,
+                           output_case=self.path_case_habc)
 
         # Initializing the NRBC class
         NRBC.__init__(self, domain_dim, self.layer_shape,
