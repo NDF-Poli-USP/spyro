@@ -138,10 +138,19 @@ class AcousticWave(Wave):
 
         if forward_solution is not None:
             self.forward_solution = forward_solution
-        else:
+        elif not self.forward_solution:
             # No stored forward solution — either never run, or run before
             # enable_implemented_adjoint() was called (store_forward_time_steps
             # was False at the time). Re-run now with storage enabled.
+            #
+            # IMPORTANT: only re-run when ``self.forward_solution`` is empty.
+            # For the multi-source FWI path, ``ensemble_gradient`` invokes this
+            # method once per source after calling ``switch_serial_shot`` to
+            # load that source's stored forward solution into
+            # ``self.forward_solution``; calling ``forward_solve()`` here
+            # would discard the per-source data and run a fresh (multi-source)
+            # ensemble forward solve, leaving the backward propagator with the
+            # wrong forward state and producing an incorrect gradient.
             self.forward_solve()
 
         if self.misfit is None:
