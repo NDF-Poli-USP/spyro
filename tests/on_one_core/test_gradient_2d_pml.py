@@ -214,9 +214,8 @@ def test_gradient(auto_adj, PML=False):
 
 
 @pytest.mark.slow
-def test_gradient_pml():
-    # TODO: Automated adjoint for PML case is not working yet.
-    auto_adj = False
+@pytest.mark.parametrize("auto_adj", [True, False])
+def test_gradient_pml(auto_adj):
     return test_gradient(auto_adj, PML=True)
 
 
