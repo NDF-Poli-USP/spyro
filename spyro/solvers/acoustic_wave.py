@@ -23,6 +23,12 @@ class AcousticWave(Wave):
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
         self.wave_type = WaveType.ISOTROPIC_ACOUSTIC
+
+        # In case sources and reeivers were initialized in super we have to pass the wave_type
+        if getattr(self, 'sources', None) is not None:
+            self.sources.wave_type = self.wave_type
+        if getattr(self, 'receivers', None) is not None:
+            self.receivers.wave_type = self.wave_type
         self.acoustic_energy = None
         self.field_logger.add_functional(
             "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))

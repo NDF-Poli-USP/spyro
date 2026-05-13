@@ -3,7 +3,7 @@ import spyro
 length_z = 7760.0
 length_x = 32040.0
 length_y = 0.0
-quadrilateral = True
+quadrilateral = False
 mesh_type = "gmsh_mesh"
 velocity_model = "tests/inputfiles/velocity_models/avenir.segy"
 cells_per_wavelength = 2.6
@@ -63,7 +63,8 @@ dictionary["visualization"] = {
 wave_obj = spyro.AcousticWave(dictionary=dictionary)
 wave_obj.set_mesh(input_mesh_parameters={
     "cells_per_wavelength": cells_per_wavelength,
-    "velocity_model": velocity_model,
+    "segy_velocity_model": velocity_model,
+    "vp_water": 1500.0,
 })
 wave_obj.forward_solve()
 
