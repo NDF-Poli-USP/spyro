@@ -51,7 +51,8 @@ class MeshOps():
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
         quadrilateral : bool, optional
-            Flag to indicate whether to use quadrilateral/hexahedral elements
+            Flag to indicate whether to use quadrilateral/hexahedral elements.
+            Default is False (triangular/tetrahedral elements)
         func_space_type, `str`, optional
             Type of function space for the state variable.
             Options: 'scalar' or 'vector'. Default is None

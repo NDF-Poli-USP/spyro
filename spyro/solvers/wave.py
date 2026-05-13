@@ -2,6 +2,8 @@ from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
 import spyro.meshing.meshing_operations as mshops
+import spyro.meshing.meshing_habc as mshabc
+
 
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
@@ -18,6 +20,7 @@ from ..utils.typing import FunctionalEvaluationMode, WaveType
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from .modal.modal_sol import Modal_Solver
+
 
 fire.set_log_level(fire.ERROR)
 
@@ -106,11 +109,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.c = None
         self.sources = None
 
-        # Creating mesh operations manager
-        self.mesh_ops = mshops.MeshOps(
-            self.domain_dimensions(), dimension=self.dimension,
-            quadrilateral=self.mesh_parameters.quadrilateral,
-            comm=self.mesh_parameters.comm)
+        if self.abc_active:
+            self.mesh_manager()
 
         # Getting parameters from the mesh
         if self.mesh is not None:
@@ -125,6 +125,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
         self.real_shot_record = None
+
+        # Creating absorbing layer manager if needed
+        if self.abc_active:
+            self.layer_manager()
 
         # Logger
         self.field_logger = FieldLogger(self.comm,
@@ -566,3 +570,37 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 f"Expected an instance of FunctionalEvaluationMode enum."
             )
         self._functional_evaluation_mode = mode
+
+    def mesh_manager(self):
+        """Create the mesh operations manager for the wave solver."""
+
+        if self.abc_active:  # If ABC scheme is used
+            self.mesh_ops = mshabc.HABCMesh(
+                self.domain_dimensions(), dimension=self.dimension,
+                quadrilateral=self.mesh_parameters.quadrilateral,
+                comm=self.mesh_parameters.comm)
+
+        else:  # If no ABC scheme is used
+            self.mesh_ops = mshops.MeshOps(
+                self.domain_dimensions(), dimension=self.dimension,
+                quadrilateral=self.mesh_parameters.quadrilateral,
+                comm=self.mesh_parameters.comm)
+
+    def layer_manager(self):
+        """Return the layer operations manager for the wave solver."""
+
+        # Domain dimensions
+        domain_dim = self.domain_dimensions()
+
+        # Nyquist frequency
+        f_Nyquist = 1. / (2. * self.dt)
+
+        if self.abc_boundary_layer_type == "PML":
+            import spyro.pml.pml_nsnc as pmlops
+            self.pml = pmlops.PML(domain_dim, f_Nyquist, dimension=self.dimension,
+                                  quadrilateral=self.mesh_parameters.quadrilateral,
+                                  func_space_type=self.mesh_ops.func_space_type,
+                                  comm=self.comm)
+
+        if self.abc_boundary_layer_type == "hybrid":
+            pass
