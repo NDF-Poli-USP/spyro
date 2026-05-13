@@ -175,6 +175,8 @@ class AutomaticMesh:
             else:
                 return fire.Mesh(self.output_file_name)
         elif self.mesh_type == "gmsh_mesh":
+            if self.quadrilateral is True:
+                raise ValueError("Gmsh meshes not yet implemented with quadrilaterals.")
             return self.create_gmsh_2D_mesh()
         else:
             raise ValueError("mesh_type is not supported")
