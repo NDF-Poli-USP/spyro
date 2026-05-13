@@ -3,7 +3,7 @@ from typing import Callable, Tuple
 
 try:
     from numba import njit, prange
-    NUMBA_AVAILABLE = True
+    NUMBA_AVAILABLE = True  # pragma: no cover
 except ImportError:
     NUMBA_AVAILABLE = False
 
@@ -229,7 +229,7 @@ def winslow_smooth_default(
     return np.column_stack((X, Z))
 
 
-if NUMBA_AVAILABLE:
+if NUMBA_AVAILABLE:  # pragma: no cover
     @njit(cache=True)
     def bilinear_interp_2d(x, z, grid_x, grid_z, grid_vals):
         """Perform 2D bilinear interpolation for a single point.
