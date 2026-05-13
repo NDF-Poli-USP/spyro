@@ -44,12 +44,26 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
 
     source_cof = None
     interpolate_receivers = None
+    master_source_W = None
     if wave_obj.sources is not None and wave_obj.use_vertex_only_mesh:
         # source_cof is a cofunction that represents a point source,
         # being one at a point and zero elsewhere.
         source_cof = wave_obj.sources.source_cofunction()
+
+        if wave_obj.abc_boundary_layer_type == "PML":
+            pressure_expr = fire.split(wave_obj.X_n)[0]
+        else:
+            pressure_expr = wave_obj.u_n
         interpolate_receivers = wave_obj.receivers.receiver_interpolator(
-            wave_obj.u_n)
+            pressure_expr)
+        if (
+            wave_obj.abc_boundary_layer_type == "PML"
+            and wave_obj.source_function is not None
+        ):
+            master_source_W = fire.Cofunction(
+                wave_obj.source_function.function_space()
+            )
+            master_source_W.sub(0).assign(source_cof)
 
     usol_recv = []
     save_step = 0
@@ -71,8 +85,13 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
 
         if wave_obj.sources is not None:
             if wave_obj.use_vertex_only_mesh:
-                wave_obj.rhs_no_pml_source().assign(fire.assemble(
-                    wave_obj.sources.wavelet[step] * source_cof))
+                if master_source_W is not None:
+                    wave_obj.source_function.assign(
+                        wave_obj.sources.wavelet[step] * master_source_W
+                    )
+                else:
+                    wave_obj.rhs_no_pml_source().assign(fire.assemble(
+                        wave_obj.sources.wavelet[step] * source_cof))
             else:
                 wave_obj.rhs_no_pml_source().assign(
                     wave_obj.sources.apply_source(rhs_forcing, step))

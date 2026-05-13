@@ -510,6 +510,7 @@ class FullWaveformInversion(AcousticWave):
             self.initial_velocity_model = self.guess_velocity_model
         if c is not None:
             self.initial_velocity_model.dat.data[:] = c
+        self.store_forward_time_steps = True
         self.forward_solve()
         output = fire.VTKFile("control_" + str(self.current_iteration)+".pvd")
         output.write(self.c)
@@ -567,6 +568,7 @@ class FullWaveformInversion(AcousticWave):
         if plot_model and Wave_obj_real_velocity.comm.comm.rank == 0 and Wave_obj_real_velocity.comm.ensemble_comm.rank == 0:
             spyro_plot_model(Wave_obj_real_velocity, filename=model_filename, abc_points=abc_points, high_resolution=high_resolution_model)
 
+        Wave_obj_real_velocity.store_forward_time_steps = True
         Wave_obj_real_velocity.forward_solve()
         if save_shot_record:
             save_shots(Wave_obj_real_velocity, file_name=shot_filename)
@@ -923,7 +925,7 @@ class FullWaveformInversion(AcousticWave):
 
         vmin = parameters["vmin"]
         vmax = parameters["vmax"]
-        vp_0 = self.initial_velocity_model.vector()
+        vp_0 = self.initial_velocity_model.dat.data_ro[:]
         bounds = [(vmin, vmax) for _ in range(len(vp_0))]
         options = parameters["scipy_options"]
 
