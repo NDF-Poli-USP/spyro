@@ -301,3 +301,19 @@ class AcousticWave(Wave):
             return self.source_function.sub(0)
         else:
             return self.source_function
+
+    def pressure_for_receivers(self):
+        """Return the expression to be interpolated at receiver locations.
+
+        For the PML formulation the pressure field is the first component of
+        the mixed Function ``X_n``. We deliberately return the UFL ``split``
+        expression rather than the subfunction ``Function`` view so that
+        pyadjoint's annotation of ``X_n.assign(X_np1)`` (the only operation
+        that updates state between time steps) is sufficient to make the
+        receiver interpolation reflect the time-stepping during tape replay.
+        For the non-mixed case ``self.u_n`` is already the form coefficient
+        Function, which is updated directly by ``u_n.assign(...)``.
+        """
+        if self.abc_boundary_layer_type == "PML":
+            return fire.split(self.X_n)[0]
+        return self.u_n
