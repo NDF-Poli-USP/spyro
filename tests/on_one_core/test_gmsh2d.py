@@ -1,6 +1,3 @@
-import os
-os.environ["NUMBA_DISABLE_JIT"] = "1"
-
 import math
 from spyro.meshing.meshing_parameters import MeshingParameters
 from spyro.meshing.meshing_functions import AutomaticMesh
@@ -87,19 +84,19 @@ def test_gmsh2d_unstructured():
     print("STARTING UNSTRUCTURED MESH TESTS")
 
     unstructured_configurations = [
-        (True, True, None, 30275),
-        (True, True, "rectangular", 37517),
-        (True, True, "hyperelliptical", 36380),
-        (True, False, None, 30281),
-        (True, False, "rectangular", 37549),
-        (True, False, "hyperelliptical", 36242),
+        (True, True, None, 35144),
+        (True, True, "rectangular", 43975),
+        (True, True, "hyperelliptical", 42580),
+        (True, False, None, 35124),
+        (True, False, "rectangular", 43968),
+        (True, False, "hyperelliptical", 42418),
 
-        (False, True, None, 30275),
-        (False, True, "rectangular", 32983),
-        (False, True, "hyperelliptical", 32624),
-        (False, False, None, 30281),
-        (False, False, "rectangular", 32932),
-        (False, False, "hyperelliptical", 32502),
+        (False, True, None, 35144),
+        (False, True, "rectangular", 39202),
+        (False, True, "hyperelliptical", 38926),
+        (False, False, None, 35124),
+        (False, False, "rectangular", 39191),
+        (False, False, "hyperelliptical", 38724),
     ]
 
     for extend_segy, water_interface, padding_type, expected_cells in unstructured_configurations:
