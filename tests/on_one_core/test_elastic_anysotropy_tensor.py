@@ -72,9 +72,6 @@ class TestAnisotropyTensor:
 
         C_vti = AnisotropyTensor.c_vti_tensor(iso_props, vti_props_zero)
 
-        # Extract values at a point
-        x = SpatialCoordinate(mesh)
-
         # Since C_vti is a UFL tensor, we need to interpolate to evaluate
         C11_expr = C_vti[0, 0]
         C33_expr = C_vti[2, 2]
@@ -112,15 +109,15 @@ class TestAnisotropyTensor:
         assert allclose(C12.dat.data, C12_computed, rtol=1e-10)
 
         # Test symmetry
-        C01 = Function(W).interpolate(C_vti[0, 1])
-        C10 = Function(W).interpolate(C_vti[1, 0])
-        assert allclose(C01.dat.data, C10.dat.data, rtol=1e-10)
-        C02 = Function(W).interpolate(C_vti[0, 2])
-        C20 = Function(W).interpolate(C_vti[2, 0])
-        assert allclose(C02.dat.data, C20.dat.data, rtol=1e-10)
-        C12 = Function(W).interpolate(C_vti[1, 2])
-        C21 = Function(W).interpolate(C_vti[2, 1])
+        C12 = Function(W).interpolate(C_vti[0, 1])
+        C21 = Function(W).interpolate(C_vti[1, 0])
         assert allclose(C12.dat.data, C21.dat.data, rtol=1e-10)
+        C13 = Function(W).interpolate(C_vti[0, 2])
+        C31 = Function(W).interpolate(C_vti[2, 0])
+        assert allclose(C13.dat.data, C31.dat.data, rtol=1e-10)
+        C23 = Function(W).interpolate(C_vti[1, 2])
+        C32 = Function(W).interpolate(C_vti[2, 1])
+        assert allclose(C23.dat.data, C32.dat.data, rtol=1e-10)
 
     @pytest.mark.parametrize("vti_props_type", ['vti_props_weak', 'vti_props_exact'])
     def test_c_vti_tensor_positive_definiteness(self, mesh, W, iso_props,
