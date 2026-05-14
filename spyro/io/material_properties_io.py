@@ -512,10 +512,10 @@ def set_tensor_function_space(wave, shape_func_space, is_dg):
         base_mesh = wave.mesh._base_mesh
         base_cell = base_mesh.ufl_cell()
         element = wave.function_space.ufl_element()
-        ele_zx = element.sub_elements[0].sub_elements[0]
-        ele_y = element.sub_elements[1].sub_elements[1]
-        zx_family = "DQ" if is_dg else ele_zx.family()
-        y_family = "DG" if is_dg else ele_y.family()
+        # ele_zx = element.sub_elements[0].sub_elements[0]
+        # ele_y = element.sub_elements[1].sub_elements[1]
+        zx_family = "DQ" if is_dg else "CG"
+        y_family = "DG" if is_dg else "CG"
         element_degree = (0, 0) if is_dg else element.degree()
         variant = element.variant()
         element_zx = fire.FiniteElement(
@@ -554,3 +554,4 @@ def set_tensor_function_space(wave, shape_func_space, is_dg):
             shape=shape_func_space,
         )
         return V
+
