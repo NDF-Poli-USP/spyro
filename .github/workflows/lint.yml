@@ -12,11 +12,10 @@ jobs:
     name: "Run linter"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - name: Setup python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.10
+          python-version: '3.11'
       - name: Setup flake8 annotations
         uses: rbialon/flake8-annotations@v1
       - name: Install linter
