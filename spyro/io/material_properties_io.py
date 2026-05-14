@@ -512,25 +512,20 @@ def set_tensor_function_space(wave, shape_func_space, is_dg):
         base_mesh = wave.mesh._base_mesh
         base_cell = base_mesh.ufl_cell()
         element = wave.function_space.ufl_element()
-        # ele_zx = element.sub_elements[0].sub_elements[0]
-        # ele_y = element.sub_elements[1].sub_elements[1]
-        zx_family = "DQ" if is_dg else "CG"
-        y_family = "DG" if is_dg else "CG"
-        element_degree = (0, 0) if is_dg else element.degree()
-        variant = element.variant()
-        element_zx = fire.FiniteElement(
-            zx_family,
-            base_cell,
-            element_degree[0],
-            variant=variant,
-        )
-        element_y = fire.FiniteElement(
-            y_family,
-            fire.interval,
-            element_degree[1],
-            variant=variant,
-        )
-        tensor_element = fire.TensorProductElement(element_zx, element_y)
+
+        if is_dg:
+            # DG case: build a degree-0 DQ ⊗ DG element from scratch.
+            element_zx = fire.FiniteElement("DQ", base_cell, 0)
+            element_y = fire.FiniteElement("DG", fire.interval, 0)
+            tensor_element = fire.TensorProductElement(element_zx, element_y)
+        else:
+            # Non-DG case: VectorElement.sub_elements[0] is the scalar
+            # TensorProductElement that was used to build this function space.
+            # In new Firedrake/UFL, TensorProductElement.sub_elements is empty
+            # so we can no longer reconstruct the element from its nested
+            # factor elements. Instead, reuse the element directly — it already
+            # has the correct family, degree and variant baked in.
+            tensor_element = element.sub_elements[0]
 
         # Function space for the property
         V = fire.TensorFunctionSpace(
@@ -554,4 +549,3 @@ def set_tensor_function_space(wave, shape_func_space, is_dg):
             shape=shape_func_space,
         )
         return V
-
