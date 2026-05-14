@@ -96,18 +96,6 @@ class TestAnisotropyTensor:
         vti_props_obj = request.getfixturevalue(vti_props_type)
         C_vti = AnisotropyTensor.c_vti_tensor(iso_props, vti_props_obj)
 
-        # Extract components
-        C11 = Function(W).interpolate(C_vti[0, 0])
-        C12 = Function(W).interpolate(C_vti[0, 1])
-        C13 = Function(W).interpolate(C_vti[0, 2])
-        C33 = Function(W).interpolate(C_vti[2, 2])
-        C44 = Function(W).interpolate(C_vti[3, 3])
-        C66 = Function(W).interpolate(C_vti[5, 5])
-
-        # Test C12 = C11 - 2*C66
-        C12_computed = C11.dat.data - 2 * C66.dat.data
-        assert allclose(C12.dat.data, C12_computed, rtol=1e-10)
-
         # Test symmetry
         C12 = Function(W).interpolate(C_vti[0, 1])
         C21 = Function(W).interpolate(C_vti[1, 0])
@@ -118,6 +106,12 @@ class TestAnisotropyTensor:
         C23 = Function(W).interpolate(C_vti[1, 2])
         C32 = Function(W).interpolate(C_vti[2, 1])
         assert allclose(C23.dat.data, C32.dat.data, rtol=1e-10)
+
+        # Test C12 = C11 - 2*C66
+        C11 = Function(W).interpolate(C_vti[0, 0])
+        C66 = Function(W).interpolate(C_vti[5, 5])
+        C12_computed = C11.dat.data - 2 * C66.dat.data
+        assert allclose(C12.dat.data, C12_computed, rtol=1e-10)
 
     @pytest.mark.parametrize("vti_props_type", ['vti_props_weak', 'vti_props_exact'])
     def test_c_vti_tensor_positive_definiteness(self, mesh, W, iso_props,
