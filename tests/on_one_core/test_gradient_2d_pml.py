@@ -154,7 +154,7 @@ def get_forward_model(dictionary=None):
 
 
 @pytest.mark.slow
-def test_gradient(PML=False):
+def test_gradient(PML=True):
     dictionary = set_dictionary(PML=PML)
     rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(dictionary=dictionary)
     forward_solution = Wave_obj_guess.forward_solution
@@ -169,12 +169,3 @@ def test_gradient(PML=False):
     dJ = Wave_obj_guess.gradient_solve(
         misfit=misfit, forward_solution=forward_solution_guess)
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
-
-
-@pytest.mark.slow
-def test_gradient_pml():
-    return test_gradient(PML=True)
-
-
-if __name__ == "__main__":
-    test_gradient_pml()
