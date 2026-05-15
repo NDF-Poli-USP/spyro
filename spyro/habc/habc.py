@@ -73,8 +73,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Size parameter of the absorbing layer
     FLpos : `list`
         Possible size parameters for the absorbing layer without rounding
-    f_Nyq : `float`
-        Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
+    freq_Nyq : `float`
+        Nyquist frequency according to the time step. freq_Nyq = 1 / (2 * dt)
     freq_ref : `float`
         Reference frequency of the wave at the boundary
     fundam_freq : `float`
@@ -176,7 +176,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
 
         # Nyquist frequency
-        self.f_Nyq = 1. / (2. * self.dt)
+        self.freq_Nyq = 1. / (2. * self.dt)
 
         # Original domain dimensions
         domain_dim = self.habc_domain_dimensions(only_orig_dom=True)
@@ -257,7 +257,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.path_case_habc = self.path_save + self.case_habc + "/"
 
         # Initializing the error measure class
-        HABC_Error.__init__(self, self.dt, self.f_Nyq,
+        HABC_Error.__init__(self, self.dt, self.freq_Nyq,
                             self.receiver_locations,
                             output_folder=self.path_save,
                             output_case=self.path_case_habc)
@@ -331,7 +331,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                 histPcrit = self.receivers_reference[:, n_crit]
 
                 # Get the minimum frequency excited at each critical point
-                freq_ref = freq_response(histPcrit, self.f_Nyq,
+                freq_ref = freq_response(histPcrit, self.freq_Nyq,
                                          fpad=fpad, get_dominant_freq=True)
                 print("Frequency at Critical Point {:>2.0f}: {:.5f}".format(
                     n_crit, freq_ref), flush=True)
@@ -998,7 +998,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                                                   p=mag_add)
 
         # Updating Nyquist frequency
-        self.f_Nyq = 1. / (2. * self.dt)
+        self.freq_Nyq = 1. / (2. * self.dt)
 
         print(str_dt, flush=True)
 

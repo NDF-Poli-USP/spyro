@@ -253,7 +253,7 @@ def plot_hist_receivers(wave_object, show=False):
     plt.close()
 
 
-def plot_rfft_receivers(wave_object, fxlim=4., show=False):
+def plot_rfft_receivers(wave_object, factor_xlim=4., show=False):
     """Plot frequency-domain receiver response comparison.
 
     Creates a multi-panel plot comparing the normalized frequency-domain
@@ -268,15 +268,15 @@ def plot_rfft_receivers(wave_object, fxlim=4., show=False):
         following attributes:
         - receivers_out_fft: FFT of computed receiver data
         - receivers_ref_fft: FFT of reference receiver data
-        - f_Nyq: Nyquist frequency
+        - freq_Nyq: Nyquist frequency
         - frequency: Source frequency
         - freq_ref: Reference frequency
         - number_of_receivers: Number of receivers
         - path_save: Directory path for saving plots
         - case_abc: Case name for file naming
-    fxlim : `float`, optional
+    factor_xlim : `float`, optional
         Factor to set the x-axis limits relative to the source frequency.
-        The plot will show frequencies up to fxlim * source_frequency,
+        The plot will show frequencies up to factor_xlim * source_frequency,
         capped at the Nyquist frequency. Minimum value is 2.
         Default is 4.
 
@@ -301,11 +301,11 @@ def plot_rfft_receivers(wave_object, fxlim=4., show=False):
     print("\nPlotting Frequency Comparison", flush=True)
 
     # Frequency data
-    f_Nyq = wave_object.f_Nyq
-    f_sou = wave_object.frequency
-    pfft = wave_object.receivers_out_fft.shape[0] - 1
-    df = f_Nyq / pfft
-    limf = round(np.clip(fxlim * f_sou, 2 * f_sou, f_Nyq), 1)
+    freq_Nyq = wave_object.freq_Nyq
+    freq_sou = wave_object.frequency
+    samples_fft = wave_object.receivers_out_fft.shape[0] - 1
+    df = freq_Nyq / samples_fft
+    limf = round(np.clip(factor_xlim * freq_sou, 2 * freq_sou, freq_Nyq), 1)
     idx_lim = int(limf / df) + 1
     f_rec = np.linspace(0, df * idx_lim, idx_lim)
 
@@ -330,15 +330,15 @@ def plot_rfft_receivers(wave_object, fxlim=4., show=False):
         axes[rec].plot(f_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
         axes[rec].plot(f_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
 
-        # Add a vertical line at f_ref and f_sou
-        if f_sou == wave_object.freq_ref:
-            f_ref = f_sou
+        # Add a vertical line at f_ref and freq_sou
+        if freq_sou == wave_object.freq_ref:
+            f_ref = freq_sou
             f_str = r'$f_{ref} = f_{sou}$'
         else:
             f_ref = wave_object.freq_ref
             f_str = r'$f_{ref}$'
             axes[rec].axvline(
-                x=f_sou, color='black', linestyle='-', linewidth=1.25)
+                x=freq_sou, color='black', linestyle='-', linewidth=1.25)
 
         axes[rec].axvline(
             x=f_ref, color='black', linestyle='-', linewidth=1.25)
@@ -368,10 +368,10 @@ def plot_rfft_receivers(wave_object, fxlim=4., show=False):
             axes[rec].text(f_ref - limf / 500., axes[rec].get_ylim()[0] * 1.05,
                            f_str, color='black', fontsize=8, fontweight='bold',
                            ha='right', va='bottom')
-            axes[rec].text(f_sou + limf / 500., axes[rec].get_ylim()[0] * 1.05,
+            axes[rec].text(freq_sou + limf / 500., axes[rec].get_ylim()[0] * 1.05,
                            r'$f_{sou}$', color='black', fontsize=8,
                            fontweight='bold', ha='left', va='bottom') \
-                if f_sou != wave_object.freq_ref else None
+                if freq_sou != wave_object.freq_ref else None
 
     # Saving the plot
     time_str = wave_object.path_case_abc + "freq"

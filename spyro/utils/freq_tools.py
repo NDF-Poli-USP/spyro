@@ -20,7 +20,7 @@ def freq_response(signal, f_Nyq, fpad=4, get_dominant_freq=False):
 
     Returns
     -------
-    yf : `array`
+    norm_magnitude : `array`
         Normalized frequency spectrum with respect to the maximum magnitude
     dominant_freq : `float`, optional
         Dominant frequency of the spectrum
@@ -36,23 +36,23 @@ def freq_response(signal, f_Nyq, fpad=4, get_dominant_freq=False):
                          "Cannot compute frequency response.")
 
     # Zero padding for increasing smoothing in FFT
-    yt = np.concatenate([np.zeros(fpad * len(signal)), signal])
+    signal_with_padding = np.concatenate([np.zeros(fpad * len(signal)), signal])
 
     # Number of sample points
-    N_samples = len(yt)
+    N_samples = len(signal_with_padding)
 
     # Determine the number of samples of the spectrum
-    pfft = N_samples // 2 + N_samples % 2
+    samples_fft = N_samples // 2 + N_samples % 2
 
     # Calculate the response in frequency domain of the signal (FFT)
-    yf = np.abs(fft(yt)[0:pfft])
-    del yt
+    norm_magnitude = np.abs(fft(signal_with_padding)[0:samples_fft])
+    del signal_with_padding
 
     # Frequency vector
-    xf = np.linspace(0.0, f_Nyq, pfft)
+    xf = np.linspace(0.0, f_Nyq, samples_fft)
 
     # Get the Dominant frequency of the spectrum
-    dominant_freq = xf[yf.argmax()]
+    dominant_freq = xf[norm_magnitude.argmax()]
 
     if get_dominant_freq:
 
@@ -61,7 +61,7 @@ def freq_response(signal, f_Nyq, fpad=4, get_dominant_freq=False):
     else:
 
         # Normalized frequency spectrum
-        yf *= (1 / yf.max())
+        norm_magnitude *= (1 / norm_magnitude.max())
 
         # Return the normalized spectrum
-        return yf
+        return norm_magnitude
