@@ -452,6 +452,3 @@ def test_calc_hyp_geom_prop_3d_volume_ratio_above_one(layer_3d):
     lmin = 0.01
     layer_3d.calc_hyp_geom_prop(domain_hyp, pad_len, lmin)
     assert layer_3d.vol_ratio > 1.0
-
-
-0
