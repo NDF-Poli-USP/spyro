@@ -85,7 +85,7 @@ jobs:
     # Only runs on PRs after fast tests pass - saves resources
 
     container:
-      image: firedrakeproject/firedrake:2025.4.1
+      image: firedrakeproject/firedrake:2026.4.0
       options: --user root  # Ensures it can install packages if needed
 
     steps:
