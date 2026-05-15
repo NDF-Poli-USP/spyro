@@ -357,6 +357,30 @@ def test_calc_degree_hyp3D_min_le_max(layer_3d):
 # ---------------------------------------------------------------------------
 
 
+def test_negative_pad_length_raises_error(layer_2d):
+    # Test that passing a negative pad length raises a ValueError
+    with pytest.raises(ValueError, match="'pad_len' must be greater than 0"):
+        layer_2d.define_hyperlayer(pad_len=-0.25, lmin=0.01)
+
+
+def test_none_pad_length_raises_error(layer_2d):
+    # Test that passing a None pad length raises a TypeError
+    with pytest.raises(TypeError, match="'pad_len' must be a float or a integer"):
+        layer_2d.define_hyperlayer(pad_len=None, lmin=0.01)
+
+
+def test_negative_lmin_raises_error(layer_2d):
+    # Test that passing a negative pad length raises a ValueError
+    with pytest.raises(ValueError, match="'lmin' must be greater than 0"):
+        layer_2d.define_hyperlayer(pad_len=0.25, lmin=-0.01)
+
+
+def test_none_lmin_raises_error(layer_2d):
+    # Test that passing a None pad length raises a TypeError
+    with pytest.raises(TypeError, match="'lmin' must be a float"):
+        layer_2d.define_hyperlayer(pad_len=0.25, lmin=None)
+
+
 def test_define_hyperlayer_stores_n_bounds(layer_2d):
     layer_2d.define_hyperlayer(pad_len=0.25, lmin=0.01)
     assert hasattr(layer_2d, 'n_bounds')
@@ -428,3 +452,6 @@ def test_calc_hyp_geom_prop_3d_volume_ratio_above_one(layer_3d):
     lmin = 0.01
     layer_3d.calc_hyp_geom_prop(domain_hyp, pad_len, lmin)
     assert layer_3d.vol_ratio > 1.0
+
+
+0
