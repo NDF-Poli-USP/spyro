@@ -130,7 +130,7 @@ class RectangLayer():
         chk_layer = len(domain_lay)
         if self.dimension != chk_domain or self.dimension != chk_layer:
             value_dimension_error(('domain_dim', 'domain_lay'),
-                                  (chk_domain, chk_abc),
+                                  (chk_domain, chk_layer),
                                   self.dimension)
 
         # Domain dimensions w/o layer
