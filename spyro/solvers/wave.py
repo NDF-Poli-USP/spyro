@@ -152,6 +152,37 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         if self.abc_boundary_layer_type != "hybrid":
             self._initialize_model_parameters()
+            if (
+                self.adjoint_type == AdjointType.AUTOMATED_ADJOINT
+                and self.automated_adjoint is not None
+                and self.automated_adjoint.controls is None
+            ):
+                if self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
+                    controls = (
+                        self.c if self.c is not None
+                        else self.initial_velocity_model
+                    )
+                elif self.wave_type == WaveType.ISOTROPIC_ELASTIC:
+                    if (
+                        self.rho is not None
+                        and self.lmbda is not None
+                        and self.mu is not None
+                    ):
+                        controls = [self.rho, self.lmbda, self.mu]
+                    else:
+                        raise ValueError(
+                            "For elastic wave, must provide "
+                            "{rho, lambda, mu} as scalars or Functions to "
+                            "use automated adjoint."
+                        )
+                else:
+                    raise ValueError(
+                        "Unsupported wave type for automated adjoint. "
+                        "Supported types are: "
+                        f"{WaveType.ISOTROPIC_ACOUSTIC} and "
+                        f"{WaveType.ISOTROPIC_ELASTIC}."
+                    )
+                self.automated_adjoint.controls = controls
         self.matrix_building()
         self.wave_propagator()
 

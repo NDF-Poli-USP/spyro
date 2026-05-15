@@ -53,7 +53,11 @@ class IsotropicWave(ElasticWave):
         def _get_value(key):
             value = synthetic_data_dict.get(key, None)
             if np.isscalar(value) or isinstance(value, Constant):
-                return Function(self.function_space.sub(0)).interpolate(value)
+                # Create scalar Function Space
+                V = create_function_space(
+                    self.mesh, self.method, self.degree, dim=1
+                )
+                return Function(V).interpolate(value)
             else:
                 return value
 
@@ -94,7 +98,6 @@ class IsotropicWave(ElasticWave):
 
     @override
     def _create_function_space(self):
-        print(self.method)
         return create_function_space(self.mesh, self.method, self.degree,
                                      dim=self.dimension)
 

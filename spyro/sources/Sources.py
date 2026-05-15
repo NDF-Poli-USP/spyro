@@ -140,8 +140,21 @@ class Sources(Delta_projector):
         else:
             raise ValueError("Invalid wave type")
 
-        ones = fire.Function(R_s, val=[1.0 for _ in range(V_s.value_size)])
-        source_form = fire.inner(fire.TestFunction(V_s), ones) * fire.dx
+        amplitude = np.asarray(self.amplitude, dtype=float).ravel()
+        if V_s.value_size == 1:
+            source_value = float(amplitude[0])
+        elif amplitude.size == 1:
+            source_value = [float(amplitude[0]) for _ in range(V_s.value_size)]
+        elif amplitude.size == V_s.value_size:
+            source_value = amplitude.tolist()
+        else:
+            raise ValueError(
+                "Source amplitude size must be scalar or match the wave "
+                f"dimension ({V_s.value_size})."
+            )
+
+        source_amplitude = fire.Function(R_s, val=source_value)
+        source_form = fire.inner(fire.TestFunction(V_s), source_amplitude) * fire.dx
 
         return fire.Cofunction(
             self.function_space.dual()).interpolate(

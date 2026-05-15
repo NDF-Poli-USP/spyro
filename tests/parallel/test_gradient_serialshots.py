@@ -66,7 +66,7 @@ dictionary["visualization"] = {
 def get_gradient(parallelism_type, points):
 
     dictionary["parallelism"]["type"] = parallelism_type
-    print(f"Calculating exact", flush=True)
+    print(f" Calculating exact", flush=True)
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
 

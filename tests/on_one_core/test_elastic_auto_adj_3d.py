@@ -1,10 +1,8 @@
-"""Taylor test for the 2D isotropic elastic wave automated adjoint.
+"""Taylor verification for the 3D isotropic elastic automated adjoint.
 
-Verifies that the gradient of the L2 misfit functional with respect to the
-three isotropic elastic material parameters (rho, lambda, mu) computed via
-pyadjoint is correct to second order.
-
-Based on notebook_tutorials/elastic_forward.ipynb.
+Verifies the automated-adjoint gradient of the L2 misfit functional with
+respect to the three isotropic elastic material parameters: rho, lambda, and
+mu.
 """
 
 import numpy as np
@@ -15,28 +13,13 @@ from pyadjoint import AdjFloat, Tape
 
 
 def make_dictionary(density, lmbda, mu):
-    """Build the model dictionary for the 2D isotropic elastic wave problem.
-
-    Parameters
-    ----------
-    density : float
-        Material density.
-    lmbda : float
-        First Lame parameter.
-    mu : float
-        Second Lame parameter.
-
-    Returns
-    -------
-    dict
-        Model configuration dictionary.
-    """
+    """Build the model dictionary for a small 3D isotropic elastic problem."""
     return {
         "options": {
             "cell_type": "T",
             "variant": "lumped",
-            "degree": 4,
-            "dimension": 2,
+            "degree": 3,
+            "dimension": 3,
         },
         "parallelism": {
             "type": "automatic",
@@ -44,25 +27,25 @@ def make_dictionary(density, lmbda, mu):
         "mesh": {
             "length_z": 1.0,
             "length_x": 1.0,
-            "length_y": 0.0,
+            "length_y": 1.0,
             "mesh_file": None,
             "mesh_type": "firedrake_mesh",
         },
         "acquisition": {
             "source_type": "ricker",
-            "source_locations": [(-0.1, 0.5)],
+            "source_locations": [(-0.1, 0.5, 0.5)],
             "frequency": 5.0,
             "delay": 1.5,
             "delay_type": "multiples_of_minimum",
-            # Force in the x-direction only (following the notebook).
-            "amplitude": np.array([0.0, 1.0]),
+            "amplitude": np.array([0.0, 1.0, 0.0]),
             "receiver_locations": spyro.create_transect(
-                (-0.8, 0.2), (-0.8, 0.8), 10),
+                (-0.8, 0.3, 0.5), (-0.8, 0.7, 0.5), 3
+            ),
         },
         "time_axis": {
             "initial_time": 0.0,
             "final_time": 1.0,
-            "dt": 0.001,
+            "dt": 0.0005,
             "output_frequency": 100,
             "gradient_sampling_frequency": 1,
         },
@@ -88,58 +71,26 @@ def make_dictionary(density, lmbda, mu):
 
 
 def get_exact_receiver_data():
-    """Run the 'exact' forward model and return the receiver data.
-
-    Parameters
-    ----------
-    edge_length : float
-        Mesh edge length for the exact model.
-
-    Returns
-    -------
-    numpy.ndarray
-        Receiver time series from the exact forward solve.
-    """
+    """Run the exact 3D forward model and return receiver data."""
     wave_exact = spyro.IsotropicWave(
         make_dictionary(density=0.1, lmbda=0.025, mu=0.1)
     )
-    wave_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1, "periodic": True})
+    wave_exact.set_mesh(input_mesh_parameters={"edge_length": 0.25, "periodic": True})
     wave_exact.forward_solve()
     return wave_exact.forward_solution_receivers
 
 
 @pytest.mark.slow
-def test_elastic_automated_adjoint_2d():
-    """Taylor test for the automated adjoint of the 2D isotropic elastic wave.
-
-    Runs the following workflow:
-
-    1. Solve the exact forward problem and store the
-       synthetic receiver data as the "observed" record.
-    2. Set up a guess model and enable the automated
-       adjoint so that pyadjoint records the computation on a tape.
-    3. Run the guess forward solve; the L2 misfit functional is accumulated
-       per time step as a pyadjoint-annotated AdjFloat.
-    4. Build the reduced functional J(rho, lambda, mu).
-    5. Verify the automated-adjoint gradient with a perturbation direction and
-       check that the convergence rate exceeds 1.95 (second-order accuracy).
-    """
+def test_elastic_automated_adjoint_3d():
+    """Check the 3D elastic automated adjoint for rho, lambda, and mu."""
     rec_out_exact = get_exact_receiver_data()
 
-    # --- Guess model ---
     wave_guess = spyro.IsotropicWave(
         make_dictionary(density=0.12, lmbda=0.20, mu=0.08)
     )
-    wave_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05, "periodic": True})
+    wave_guess.set_mesh(input_mesh_parameters={"edge_length": 0.25, "periodic": True})
     wave_guess.real_shot_record = rec_out_exact
-    # Enable automated adjoint: sets up the pyadjoint tape and registers c as
-    # the control. Also switches to vertex-only mesh for the source/receiver
-    # assembly so that pyadjoint can trace through the interpolation steps.
     wave_guess.enable_automated_adjoint()
-
-    # Forward solve: pyadjoint records every Firedrake operation on its tape.
-    # The L2 misfit functional is accumulated at each time step and stored in
-    # wave_guess.functional_value as an AdjFloat.
     wave_guess.forward_solve()
 
     assert isinstance(wave_guess.automated_adjoint._tape, Tape), (
@@ -159,12 +110,11 @@ def test_elastic_automated_adjoint_2d():
         wave_guess.functional_value
     )
 
-    # fixed random seed for reproducibility
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(43)
     direction = [
         fire.Function(
             control.function_space(),
-            val=0.01 * rng.random(control.function_space().dim()),
+            val=0.1 * rng.random(control.function_space().dim()),
         )
         for control in controls
     ]
@@ -174,13 +124,12 @@ def test_elastic_automated_adjoint_2d():
     )
     assert conv_rate > 1.95, (
         f"Taylor test convergence rate {conv_rate:.4f} < 1.95. "
-        "The automated adjoint gradient is likely incorrect."
+        "The 3D automated adjoint gradient is likely incorrect."
     )
 
-    # Clean up the pyadjoint tape.
     wave_guess.automated_adjoint.clear_tape()
     assert wave_guess.automated_adjoint._tape is None
 
 
 if __name__ == "__main__":
-    test_elastic_automated_adjoint_2d()
+    test_elastic_automated_adjoint_3d()

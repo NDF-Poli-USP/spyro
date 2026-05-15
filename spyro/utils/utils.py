@@ -8,7 +8,7 @@ import warnings
 
 from ..io import ensemble_functional
 from ..io import parallel_print
-from .typing import FunctionalEvaluationMode, FunctionalType
+from .typing import FunctionalEvaluationMode, FunctionalType, WaveType
 try:
     from SeismicMesh import write_velocity_model
     SEISMIC_MESH_AVAILABLE = True
@@ -804,6 +804,11 @@ def get_real_shot_record(wave_object):
 
     if isinstance(real_shot_record, np.ndarray):
         if real_shot_record.ndim == 3:
+            if (
+                wave_object.wave_type == WaveType.ISOTROPIC_ELASTIC
+                and real_shot_record.shape[-1] == wave_object.dimension
+            ):
+                return real_shot_record
             return real_shot_record[wave_object.current_sources[0]]
         if real_shot_record.ndim == 2:
             return real_shot_record

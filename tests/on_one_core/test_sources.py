@@ -279,5 +279,32 @@ def test_cofunction_values_elastic_3d(cell_type):
     _check_cofunction_values(wave, source_locations, test_exprs)
 
 
+def test_cofunction_values_elastic_3d_vector_amplitude():
+    """Elastic VertexOnlyMesh sources must respect vector amplitudes."""
+    source_location = (-0.25, 0.5, 0.5)
+    wave = _build_elastic_wave(
+        np.array([0.0, 1.0, 0.0]),
+        [source_location],
+        dimension=3,
+    )
+    V = wave.function_space
+
+    test_exprs = [
+        (
+            fire.Function(V).interpolate(fire.as_vector([1.0, 0.0, 0.0])),
+            lambda sl: 0.0,
+        ),
+        (
+            fire.Function(V).interpolate(fire.as_vector([0.0, 1.0, 0.0])),
+            lambda sl: 1.0,
+        ),
+        (
+            fire.Function(V).interpolate(fire.as_vector([0.0, 0.0, 1.0])),
+            lambda sl: 0.0,
+        ),
+    ]
+    _check_cofunction_values(wave, [source_location], test_exprs)
+
+
 if __name__ == "__main__":
     test_ricker_varies_in_time()
