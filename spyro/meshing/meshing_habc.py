@@ -2,7 +2,6 @@ import firedrake as fire
 import numpy as np
 import spyro.meshing.meshing_operations as mshops
 from netgen.geom2d import SplineGeometry
-from firedrake.__future__ import interpolate
 from netgen.meshing import Element2D, \
     Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
@@ -10,7 +9,6 @@ from spyro.domains.space import create_function_space
 from spyro.meshing.meshing_functions import AutomaticMesh
 from spyro.tools.habc_tools import point_cloud_field
 from spyro.utils.error_management import value_parameter_error
-fire.interpolate = interpolate
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.

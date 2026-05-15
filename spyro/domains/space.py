@@ -42,6 +42,8 @@ def create_function_space(mesh, method, degree, dim=1):
         element = FiniteElement(
             "DQ", mesh.ufl_cell(), degree=degree, variant="spectral"
         )
+    else:
+        raise ValueError(f"Finite element method {method} not supported")
 
     if dim > 1:
         element = VectorElement(element, dim=dim)

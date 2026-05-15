@@ -49,35 +49,32 @@ class IsotropicWave(ElasticWave):
         self.field_logger.add_functional("mechanical_energy",
                                          lambda: assemble(self.mechanical_energy))
 
-    @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
-        def constant_wrapper(value):
-            if np.isscalar(value):
-                return Constant(value)
+        def _get_value(key):
+            value = synthetic_data_dict.get(key, None)
+            if np.isscalar(value) or isinstance(value, Constant):
+                return Function(self.function_space.sub(0)).interpolate(value)
             else:
                 return value
 
-        def get_value(key, default=None):
-            return constant_wrapper(synthetic_data_dict.get(key, default))
-
-        self.rho = get_value("density")
-        self.lmbda = get_value("lambda", default=get_value("lame_first"))
-        self.mu = get_value("mu", get_value("lame_second"))
-        self.c = get_value("p_wave_velocity")
-        self.c_s = get_value("s_wave_velocity")
+        self.rho = _get_value("density")
+        self.lmbda = _get_value("lambda")
+        self.mu = _get_value("mu")
+        self.c = _get_value("p_wave_velocity")
+        self.c_s = _get_value("s_wave_velocity")
 
         # Check if {rho, lambda, mu} is set and {c, c_s} are not
-        option_1 = bool(self.rho) and \
-            bool(self.lmbda) and \
-            bool(self.mu) and \
-            not bool(self.c) and \
-            not bool(self.c_s)
+        option_1 = isinstance(self.rho, Function) and \
+            isinstance(self.lmbda, Function) and \
+            isinstance(self.mu, Function) and \
+            self.c is None and \
+            self.c_s is None
         # Check if {rho, c, c_s} is set and {lambda, mu} are not
-        option_2 = bool(self.rho) and \
-            bool(self.c) and \
-            bool(self.c_s) and \
-            not bool(self.lmbda) and \
-            not bool(self.mu)
+        option_2 = isinstance(self.rho, Function) and \
+            isinstance(self.c, Function) and \
+            isinstance(self.c_s, Function) and \
+            self.lmbda is None and \
+            self.mu is None
 
         if option_1:
             self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
@@ -86,14 +83,10 @@ class IsotropicWave(ElasticWave):
             self.mu = self.rho*self.c_s**2
             self.lmbda = self.rho*self.c**2 - 2*self.mu
         else:
-            raise Exception(f"Inconsistent selection of isotropic elastic wave parameters:\n"
-                            f"    Density        : {bool(self.rho)}\n"
-                            f"    Lame first     : {bool(self.lmbda)}\n"
-                            f"    Lame second    : {bool(self.mu)}\n"
-                            f"    P-wave velocity: {bool(self.c)}\n"
-                            f"    S-wave velocity: {bool(self.c_s)}\n"
-                            "The valid options are {Density, Lame first, Lame second} "
-                            "or (exclusive) {Density, P-wave velocity, S-wave velocity}")
+            raise ValueError(
+                "Invalid combination of model parameters. Must provide either "
+                "{rho, lambda, mu} or {rho, c, c_s} as scalars or Functions."
+            )
 
     @override
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
@@ -101,6 +94,7 @@ class IsotropicWave(ElasticWave):
 
     @override
     def _create_function_space(self):
+        print(self.method)
         return create_function_space(self.mesh, self.method, self.degree,
                                      dim=self.dimension)
 
