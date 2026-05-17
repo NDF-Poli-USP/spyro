@@ -24,4 +24,6 @@ Team members
 * `Thiago Dias dos Santos <http://lattes.cnpq.br/3618128074442916>`_
 * `Eduardo Moscatelli de Souza <https://scholar.google.com/citations?user=Z2hqFC8AAAAJ&hl=pt-BR>`_
 * `Usama Bin Qasim <https://scholar.google.com/citations?hl=en&user=7I-CD6QAAAAJ>`_
+* `Hassan Imran <https://scholar.google.com/citations?user=62_8TGAAAAAJ&hl=en>`_
+
 
