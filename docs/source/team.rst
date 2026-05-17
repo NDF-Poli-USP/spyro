@@ -66,6 +66,11 @@ Active team members
 |                           |                           |                           |                           |
 | `Jéssica Sales`_          | `Thiago Dias dos Santos`_ | `Bruno Souza Carmo`_      | |Usama Bin Qasim`_        |
 +---------------------------+---------------------------+---------------------------+---------------------------+
+| |Hassan Imran|_           |
+|                           |
+| `Hassan Imran`_           |
++---------------------------+
+
 
 Former team members
 -------------------
