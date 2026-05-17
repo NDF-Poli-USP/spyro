@@ -52,15 +52,19 @@ Active team members
 .. |Bruno Souza Carmo| image:: /images/brunosouzacarmo.*
    :width: 70%
 .. _Bruno Souza Carmo: http://lattes.cnpq.br/8129545750278083
+.. |Usama Bin Qasim| image:: /images/Usama Qasim.*
+   :width: 70%
+.. _Usama Bin Qasim: https://scholar.google.com/citations?user=7I-CD6QAAAAJ&hl=en&oi=sra
+
 
 +---------------------------+---------------------------+---------------------------+---------------------------+
 | |Alexandre Olender|_      | |Ruben Andres Salas|_     | |Daiane I. Dolci|_        | |Romildo Soares Jr|_      |
 |                           |                           |                           |                           |
 | `Alexandre Olender`_      | `Ruben Andres Salas`_     | `Daiane I. Dolci`_        | `Romildo Soares Jr`_      |
 +---------------------------+---------------------------+---------------------------+---------------------------+
-| |Jéssica Sales|_          | |Thiago Dias dos Santos|_ | |Bruno Souza Carmo|_      |                           |
+| |Jéssica Sales|_          | |Thiago Dias dos Santos|_ | |Bruno Souza Carmo|_      | |Usama Bin Qasim|         |
 |                           |                           |                           |                           |
-| `Jéssica Sales`_          | `Thiago Dias dos Santos`_ | `Bruno Souza Carmo`_      |                           |
+| `Jéssica Sales`_          | `Thiago Dias dos Santos`_ | `Bruno Souza Carmo`_      | |Usama Bin Qasim`_        |
 +---------------------------+---------------------------+---------------------------+---------------------------+
 
 Former team members
