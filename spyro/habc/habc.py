@@ -261,6 +261,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                             self.receiver_locations,
                             output_folder=self.path_save,
                             output_case=self.path_case_habc)
+# (self.freq_Nyq is set at line 171) checking the HABC_Error call,  This could be a source of bugs
 
         # Initializing the NRBC class
         NRBC.__init__(self, domain_dim, self.layer_shape,
