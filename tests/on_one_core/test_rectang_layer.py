@@ -47,13 +47,27 @@ def test_init_list_domain_dim_raises_error():
 
 
 def test_init_dimension_raises_error():
-    # Test that passing None raises a TypeError
+    # Test that passing 10. raises a ValueError
     with pytest.raises(ValueError, match="Invalid dimension: '10'."):
         RectangLayer((1., 1.), dimension=10)
 
 # ---------------------------------------------------------------------------
 # define_rec_hyperaxes
 # ---------------------------------------------------------------------------
+
+
+def test_negative_pad_length_raises_error():
+    # Test that passing a negative pad length raises a ValueError
+    hl = RectangLayer((1., 1.))
+    with pytest.raises(ValueError, match="'pad_len' must be greater than 0"):
+        hl.define_rec_hyperaxes(-0.25)
+
+
+def test_none_pad_length_raises_error():
+    # Test that passing a None pad length raises a TypeError
+    hl = RectangLayer((1., 1.))
+    with pytest.raises(TypeError, match="'pad_len' must be a float or a integer"):
+        hl.define_rec_hyperaxes(None)
 
 
 def test_define_hyperaxes_2d_stores_domain_dim(layer_2d):
@@ -89,7 +103,7 @@ def test_calc_rec_geom_prop_2d_area(layer_2d):
     assert math.isclose(layer_2d.f_Ah, 4., rel_tol=1e-9)
 
 
-def test_calc_rec_geom_prop_3d_area(layer_3d):
+def test_calc_rec_geom_prop_3d_volume(layer_3d):
     domain_lay = (1.5, 1.25, 1.5)
     pad_len = 0.25
     layer_3d.calc_rec_geom_prop(domain_lay, pad_len)
