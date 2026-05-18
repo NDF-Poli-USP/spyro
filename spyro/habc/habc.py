@@ -616,11 +616,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         method_element = "DQ" if self.quadrilateral else "DG"
         V = create_function_space(self.mesh, method_element, 0)
 
-        # Keep the HABC velocity coefficient in the discontinuous helper space.
-        # Reinterpolating a piecewise-constant extension into the high-order
-        # wave space distorts interface values in newer Firedrake versions.
-        self.c = fire.Function(V, name='c [km/s])').interpolate(
-            self.initial_velocity_model, allow_missing_dofs=True)
+        # Initialize velocity field and assigning the original velocity model
+        self.c = fire.Function(V).interpolate(self.initial_velocity_model,
+                                              allow_missing_dofs=True)
 
         # Clipping coordinates to the layer domain
         ufl_coordinates_habc = self.get_spatial_coordinates_habc()
