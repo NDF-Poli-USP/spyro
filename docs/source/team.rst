@@ -55,6 +55,10 @@ Active team members
 .. |Usama Bin Qasim| image:: /images/Usama Qasim.*
    :width: 70%
 .. _Usama Bin Qasim: https://scholar.google.com/citations?user=7I-CD6QAAAAJ&hl=en&oi=sra
+.. |Hassan Imran| image:: /images/Usama Qasim.*
+   :width: 70%
+.. _Hassan Imran: https://scholar.google.com/citations?user=62_8TGAAAAAJ&hl=en
+
 
 
 +---------------------------+---------------------------+---------------------------+---------------------------+
