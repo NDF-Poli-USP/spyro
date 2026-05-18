@@ -282,6 +282,7 @@ class HABC_Mesh():
         mesh_orig = fire.VTKFile(self.path_save + "preamble/mesh_orig.pvd")
         mesh_orig.write(self.mesh_original)
 
+        # Velocity profile model
         self.c = fire.Function(self.function_space, name='c_orig [km/s])')
         self.c.assign(fire.assemble(fire.interpolate(
             self.initial_velocity_model, self.function_space)))
@@ -294,7 +295,7 @@ class HABC_Mesh():
         cdom_str = "Domain Velocity Range (km/s): {:.3f} - {:.3f}"
         print(cdom_str.format(self.c_min, self.c_max), flush=True)
 
-        # Save initial velocity model.
+        # Save initial velocity model
         vel_c = fire.VTKFile(self.path_save + "preamble/c_vel.pvd")
         vel_c.write(self.c)
 
