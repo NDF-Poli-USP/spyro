@@ -1,12 +1,12 @@
+# This file containts methods to estimate the computational cost of a process in Spyro.
 from numpy import savetxt
 from os import getcwd
 from time import perf_counter  # For runtime
 from tracemalloc import get_traced_memory, start, stop  # For memory usage
 
 
-def comp_cost(flag, tRef=None, user_name=None):
-    '''
-    Estimate runtime and used memory and save them to a *.txt file.
+def comp_cost(flag, tRef=None, user_name=None, save_time=True):
+    """Estimate runtime and used memory and save them to a *.txt file.
 
     Parameters
     ----------
@@ -18,12 +18,15 @@ def comp_cost(flag, tRef=None, user_name=None):
         Reference time in seconds. Default is None
     user_name: `str`, optional
         User name or path to save the computational cost data
+    save_time: `bool`, optional
+        Option to save the computational cost data to a file.
+        Default is True
 
     Returns
     -------
     tRef : float
         Reference time in seconds. Only returned if flag is 'tini'
-    '''
+    """
 
     if flag == 'tini':
         # Start memory usage
@@ -60,3 +63,9 @@ def comp_cost(flag, tRef=None, user_name=None):
         path_file = getcwd() + "/" if user_name is None else user_name
         path_cost = path_file + file_name
         savetxt(path_cost, (*val_time, *val_memo), delimiter='\t')
+
+        if save_time:
+            file_name = 'cost.txt'
+            path_file = getcwd() + "/" if user_name is None else user_name
+            path_cost = path_file + file_name
+            savetxt(path_cost, (*val_time, *val_memo), delimiter='\t')
