@@ -1,4 +1,4 @@
-from firedrake import File
+from firedrake import VTKFile
 import numpy as np
 import pytest
 import spyro
@@ -42,7 +42,7 @@ def test_forward_3d(tf=0.6):
         "length_z": 5.175,  # depth in km - always positive
         "length_x": 7.50,  # width in km - always positive
         "length_y": 7.50,  # thickness in km - always positive
-        "meshfile": "meshes/overthrust_3D_true_model.msh",
+        "meshVTK": "meshes/overthrust_3D_true_model.msh",
         "initmodel": "velocity_models/overthrust_3D_guess_model.hdf5",
         "truemodel": "velocity_models/overthrust_3D_true_model.hdf5",
     }
