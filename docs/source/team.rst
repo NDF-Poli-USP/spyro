@@ -52,10 +52,10 @@ Active team members
 .. |Bruno Souza Carmo| image:: /images/brunosouzacarmo.*
    :width: 70%
 .. _Bruno Souza Carmo: http://lattes.cnpq.br/8129545750278083
-.. |Usama Bin Qasim| image:: /images/Usama Qasim.*
+.. |Usama Bin Qasim| image:: /images/UsamaQasim.*
    :width: 70%
 .. _Usama Bin Qasim: https://scholar.google.com/citations?user=7I-CD6QAAAAJ&hl=en&oi=sra
-.. |Hassan Imran| image:: /images/Usama Qasim.*
+.. |Hassan Imran| image:: /images/HassanImran.*
    :width: 70%
 .. _Hassan Imran: https://scholar.google.com/citations?user=62_8TGAAAAAJ&hl=en
 
