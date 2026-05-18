@@ -8,7 +8,7 @@
 
 project = 'spyro'
 copyright = '2026, Keith J. Roberts, Alexandre F. G. Olender, Ruben Andres Salas, Daiane I. Dolci, Eduardo Moscatelli de Souza, Thiago Dias dos Santos, Lucas Franceschini, Bruno S. Carmo'
-author = 'Keith J. Roberts, Alexandre F. G. Olender, Ruben Andres Salas, Daiane I. Dolci, Eduardo Moscatelli de Souza, Thiago Dias dos Santos, Lucas Franceschini, Bruno S. Carmo'
+author = 'Keith J. Roberts, Alexandre F. G. Olender, Ruben Andres Salas, Daiane I. Dolci, Eduardo Moscatelli de Souza, Thiago Dias dos Santos, Lucas Franceschini, Bruno S. Carmo, Usama Bin Qasim, Hassan Imran'
 release = '0.9.2'
 
 # -- General configuration ---------------------------------------------------
