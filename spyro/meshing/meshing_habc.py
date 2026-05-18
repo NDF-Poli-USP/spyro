@@ -282,10 +282,11 @@ class HABC_Mesh():
         mesh_orig = fire.VTKFile(self.path_save + "preamble/mesh_orig.pvd")
         mesh_orig.write(self.mesh_original)
 
-        # Velocity profile model
-        self.c = fire.Function(self.function_space, name='c_orig [km/s])')
-        self.c.assign(fire.assemble(fire.interpolate(
-            self.initial_velocity_model, self.function_space)))
+        # Keep the original material coefficient in its native space. The
+        # HABC/Eikonal pipeline samples this field at interfaces/boundaries,
+        # and reinterpolating it into a high-order wave space can introduce
+        # overshoot/undershoot for discontinuous velocity profiles.
+        self.c = self.initial_velocity_model
 
         # Get extreme values of the velocity model
         self.c_min = self.initial_velocity_model.dat.data_with_halos.min()
@@ -295,9 +296,12 @@ class HABC_Mesh():
         cdom_str = "Domain Velocity Range (km/s): {:.3f} - {:.3f}"
         print(cdom_str.format(self.c_min, self.c_max), flush=True)
 
-        # Save initial velocity model
+        # Save an interpolated copy only for visualization.
         vel_c = fire.VTKFile(self.path_save + "preamble/c_vel.pvd")
-        vel_c.write(self.c)
+        c_vis = fire.Function(self.function_space, name='c_orig [km/s])')
+        c_vis.assign(fire.assemble(fire.interpolate(
+            self.initial_velocity_model, self.function_space)))
+        vel_c.write(c_vis)
 
         # Generating boundary data from the original domain mesh
         print("Getting Boundary Mesh Data from Original Domain", flush=True)

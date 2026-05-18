@@ -616,9 +616,11 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         method_element = "DQ" if self.quadrilateral else "DG"
         V = create_function_space(self.mesh, method_element, 0)
 
-        # Initialize velocity field and assigning the original velocity model
-        self.c = fire.Function(V).interpolate(self.initial_velocity_model,
-                                              allow_missing_dofs=True)
+        # Keep the HABC velocity coefficient in the discontinuous helper space.
+        # Reinterpolating a piecewise-constant extension into the high-order
+        # wave space distorts interface values in newer Firedrake versions.
+        self.c = fire.Function(V, name='c [km/s])').interpolate(
+            self.initial_velocity_model, allow_missing_dofs=True)
 
         # Clipping coordinates to the layer domain
         ufl_coordinates_habc = self.get_spatial_coordinates_habc()
@@ -638,18 +640,16 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             1. - layer_mask) * self.c, allow_missing_dofs=True)
         del layer_mask, lay_field
 
-        # Interpolating in the space function of the problem
-        self.c = fire.Function(self.function_space,
-                               name='c [km/s])').interpolate(self.c)
-
-        # Save new velocity model
+        # Save an interpolated copy only for visualization.
         if inf_model:
             file_name = "preamble/c_inf.pvd"
         else:
             file_name = self.case_habc + "/c_habc.pvd"
 
         outfile = fire.VTKFile(self.path_save + file_name)
-        outfile.write(self.c)
+        c_vis = fire.Function(self.function_space, name='c [km/s])')
+        c_vis.interpolate(self.c)
+        outfile.write(c_vis)
 
     def fundamental_frequency(self, method=None, monitor=False,
                               fitting_c=(0., 0., 0., 0.)):
