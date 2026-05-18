@@ -2,7 +2,8 @@ import numpy as np
 from scipy.integrate import dblquad, quad
 from scipy.special import beta, betainc, gamma
 from sys import float_info
-from spyro.utils.error_management import value_dimension_error, value_parameter_error
+from spyro.utils.error_management import value_dimension_error, value_numerical_error, \
+    value_parameter_error
 
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -443,6 +444,13 @@ class HyperLayer():
         -------
         None
         '''
+
+        # Checking the pad length
+        value_numerical_error('pad_len', pad_len, float_num=True,
+                              integer_num=True, lower_bound=0.)
+
+        # Checking the minimum mesh size
+        value_numerical_error('lmin', lmin, float_num=True, lower_bound=0.)
 
         # Domain dimensions
         Lx, Lz = self.domain_dim[:2]

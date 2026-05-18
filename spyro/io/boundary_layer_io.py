@@ -46,7 +46,7 @@ class Read_boundary_layer:
     """
 
     def __init__(self, comm=None):
-        '''
+        """
         Initialize the Read_boundary_layer class
 
         Parameters
@@ -58,7 +58,7 @@ class Read_boundary_layer:
         Returns
         -------
         None
-        '''
+        """
 
         # General parameters
         self.input_dictionary.setdefault("absorving_boundary_conditions", {})
