@@ -3,7 +3,7 @@ import spyro
 length_z = 7760.0
 length_x = 32040.0
 length_y = 0.0
-quadrilateral = False
+quadrilateral = True
 mesh_type = "gmsh_mesh"
 velocity_model = "tests/inputfiles/velocity_models/avenir.segy"
 cells_per_wavelength = 2.6

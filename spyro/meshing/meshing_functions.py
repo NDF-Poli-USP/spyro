@@ -3,7 +3,7 @@ import meshio
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from ..io import parallel_print
-from ..io.basicio import create_segy_from_grid
+from ..io import create_segy_from_grid
 from ..utils import run_in_one_core
 from .meshing_gmsh2d import build_gmsh_geometry_and_groups, apply_structured_winslow_smoothing2d
 from .meshing_utils import create_sizing_function
@@ -175,8 +175,6 @@ class AutomaticMesh:
             else:
                 return fire.Mesh(self.output_file_name)
         elif self.mesh_type == "gmsh_mesh":
-            if self.quadrilateral is True:
-                raise ValueError("Gmsh meshes not yet implemented with quadrilaterals.")
             return self.create_gmsh_2D_mesh()
         else:
             raise ValueError("mesh_type is not supported")
@@ -577,7 +575,7 @@ class AutomaticMesh:
             if self.mesh_parameters.velocity_model is not None:
                 filename = "tmp_velocity_model.segy"
                 vp = self.mesh_parameters.velocity_model["vp_values"]
-                create_segy_from_grid(vp, filename)
+                create_segy_from_grid(vp, filename, rotate=True)
                 self.velocity_model = filename
 
         # if self.mesh_parameters.segy_velocity_model is None:
