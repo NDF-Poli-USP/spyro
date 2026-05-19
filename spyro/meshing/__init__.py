@@ -9,5 +9,5 @@ all = [
     "box_mesh",
     "AutomaticMesh",
     "MeshingParameters",
-    "MeshOperations"
+    "MeshOperations",
 ]

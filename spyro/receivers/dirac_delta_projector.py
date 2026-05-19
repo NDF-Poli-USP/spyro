@@ -330,7 +330,7 @@ class Delta_projector:
         else:
             end_vertex_id = 3
             cell_ends = [0, 1, 2]
-        
+
         if self.use_vertex_only_mesh is False:
             for receiver_id in range(num_recv):
                 cell_id = self.is_local[receiver_id]
