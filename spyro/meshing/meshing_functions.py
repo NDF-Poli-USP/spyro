@@ -427,7 +427,7 @@ class AutomaticMesh:
             if self.mesh_parameters.velocity_model is not None:
                 filename = "tmp_velocity_model.segy"
                 vp = self.mesh_parameters.velocity_model["vp_values"]
-                create_segy_from_grid(vp, filename, rotate=True)
+                create_segy_from_grid(vp, filename)
                 self.velocity_model = filename
 
         # if self.mesh_parameters.segy_velocity_model is None:
