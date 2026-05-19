@@ -242,7 +242,7 @@ def eikonal_analysis(dictionary, edge_length, f_est, ele_type='consistent'):
     comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "EIK_")
 
     # Extracting  minimum Eikonal
-    min_eik = 1e3 * Wave_obj.eik_bnd[0][2]
+    min_eik = 1e3 * Wave_obj.layer_ops.eik_bnd[0][2]
 
     return min_eik
 

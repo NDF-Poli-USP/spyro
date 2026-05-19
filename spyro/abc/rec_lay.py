@@ -23,8 +23,8 @@ class RectangLayer():
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
     domain_dim : `tuple`
-        Original domain dimensions: (length_x, length_z) for 2D or
-        (length_x, length_z, length_y) for 3D
+        Original domain dimensions: (length_z, length_x) for 2D
+        or (length_z, length_x, length_y) for 3D
     f_Ah : `float`
         Hyperelliptical area factor. f_Ah = 4 (n_hyp is considered infinite)
     f_Vh : `float`
@@ -98,7 +98,7 @@ class RectangLayer():
                               integer_num=True, lower_bound=0.)
 
         # Rectangular semi-axes
-        length_x, length_z = self.domain_dim[:2]
+        length_z, length_x = self.domain_dim[:2]
         a_hyp = 0.5 * length_x + pad_len
         b_hyp = 0.5 * length_z + pad_len
         self.hyper_axes = (a_hyp, b_hyp)
@@ -108,15 +108,15 @@ class RectangLayer():
             c_hyp = 0.5 * length_y + pad_len
             self.hyper_axes += (c_hyp,)
 
-    def calc_rec_geom_prop(self, domain_lay, pad_len):
+    def calc_rec_geom_prop(self, domain_layer, pad_len):
         """Calculate the geometric properties for the rectangular layer.
 
         Parameters
         ----------
-        domain_lay : `tuple`
-            Domain dimensions with layer including truncation by free surface.
-            - 2D : (length_x + 2 * pad_len, length_z + pad_len)
-            - 3D : (length_x + 2 * pad_len, length_z + pad_len, length_y + 2 * pad_len)
+        domain_layer : `tuple`
+            Domain dimensions with layer.
+            2D: (length_z + pad_len, length_x + 2 * pad_len)
+            3D: (length_z + pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len)
         pad_len : `float`
             Size of the absorbing layer
 
@@ -125,32 +125,34 @@ class RectangLayer():
         None
         """
 
+        print("Determining Rectangular Layer Parameters", flush=True)
+
         # Checking inputs
         chk_domain = len(self.domain_dim)
-        chk_layer = len(domain_lay)
+        chk_layer = len(domain_layer)
         if self.dimension != chk_domain or self.dimension != chk_layer:
-            value_dimension_error(('domain_dim', 'domain_lay'),
+            value_dimension_error(('domain_dim', 'domain_layer'),
                                   (chk_domain, chk_layer),
                                   self.dimension)
 
         # Domain dimensions w/o layer
-        length_x, length_z = self.domain_dim[:2]
-        length_x_abc, length_z_abc = domain_lay[:2]
+        length_z, length_x = self.domain_dim[:2]
+        length_zabc, length_xabc = domain_layer[:2]
 
         # Rectangular semi-axes
         self.define_rec_hyperaxes(pad_len)
 
         # Geometric properties of the rectangular layer
         if self.dimension == 2:  # 2D
-            self.area = length_x_abc * length_z_abc
+            self.area = length_xabc * length_zabc
             self.area_ratio = self.area / (length_x * length_z)
             self.f_Ah = 4
             print("Area Ratio: {:5.3f}".format(self.area_ratio), flush=True)
 
         if self.dimension == 3:  # 3D
             length_y = self.domain_dim[2]
-            length_y_abc = domain_lay[2]
-            self.vol = length_x_abc * length_z_abc * length_y_abc
+            length_yabc = domain_layer[2]
+            self.vol = length_xabc * length_zabc * length_yabc
             self.vol_ratio = self.vol / (length_x * length_z * length_y)
             self.f_Vh = 8
             print("Volume Ratio: {:5.3f}".format(self.vol_ratio), flush=True)

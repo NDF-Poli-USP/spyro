@@ -48,8 +48,8 @@ class PMLLayer(ABCLayer):
         Generate a damping profile for the PML
     """
 
-    def __init__(self, domain_dim, f_Nyquist, dimension=2, quadrilateral=False,
-                 func_space_type=None, bc_boundary_pml="Higdon",
+    def __init__(self, domain_dim, frequency, f_Nyquist, dimension=2,
+                 quadrilateral=False, func_space_type=None, bc_boundary_pml="Higdon",
                  abc_reference_freq="source", comm=None):
         """
         Initialize the PML class.
@@ -59,6 +59,8 @@ class PMLLayer(ABCLayer):
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
             or (length_z, length_x, length_y) for 3D
+        frequency: `float`
+            Frequency of the source.
         f_Nyquist : `float`
             Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt)
         dimension : `int`, optional
@@ -79,8 +81,6 @@ class PMLLayer(ABCLayer):
         comm : `object`, optional
             An object representing the communication interface
             for parallel processing. Default is None
-        output_folder : `str`, optional
-            The folder where output data will be saved. Default is None
 
         Returns
         -------
@@ -88,7 +88,7 @@ class PMLLayer(ABCLayer):
         """
 
         # Initializing the ABCLayer class
-        ABCLayer.__init__(self, domain_dim, f_Nyquist, dimension=dimension,
+        ABCLayer.__init__(self, domain_dim, frequency, f_Nyquist, dimension=dimension,
                           quadrilateral=quadrilateral, func_space_type=func_space_type,
                           abc_boundary_layer_shape='rectangular',
                           abc_boundary_layer_type="PML",
