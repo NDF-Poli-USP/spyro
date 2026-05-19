@@ -24,51 +24,22 @@ fire.interpolate = interpolate
 
 
 class HABCMesh(MeshOps):
-    """
-    Class for HABC mesh generation
+    """Class for HABC mesh generation.
 
     Attributes
     ----------
-    bnd_nodes : `array`
-        Mesh node coordinates on boundaries of the original domain.
-    c_bnd_min : `float`
-        Minimum velocity value on the boundary of the original domain
-    c_bnd_max : `float`
-        Maximum velocity value on the boundary of the original domain
-    c_min : `float`
-        Minimum velocity value in the model without absorbing layer
-    c_max : `float`
-        Maximum velocity value in the model without absorbing layer
     comm : object
         An object representing the communication interface
         for parallel processing. Default is None
+    coord_bnd_nodes : `array`
+        Mesh node coordinates on boundaries of the original domain.
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
     domain_dim : `tuple`
         Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
-    ele_type_eik : `string`
-        Finite element type for the Eikonal modeling. 'CG' or 'KMV'
-    f_est : `float`
-        Factor for the stabilizing term in Eikonal Eq. Default is 0.03
-    funct_space_eik: `Firedrake.FunctionSpace`
-        Function space for the Eikonal modeling
     func_space_type, `str`
         Type of function space for the state variable.
         Options: 'scalar' or 'vector'. Default is None
-    mesh_original : `firedrake mesh`
-        Original mesh without absorbing layer
-    mesh_parameters.alpha : `float`
-        Ratio between the representative mesh dimensions
-    mesh_parameters.diam_mesh : `ufl.geometry.CellDiameter`
-        Mesh cell diameters
-    mesh_parameters.lmin : `float`
-        Minimum mesh size
-    mesh_parameters.lmax : `float`
-        Maxmum mesh size
-    mesh_parameters.tol : `float`
-        Tolerance for searching nodes in the mesh
-    p_eik : `int`
-        Finite element order for the Eikonal modeling
     quadrilateral : bool
         Flag to indicate whether to use quadrilateral/hexahedral elements
 
@@ -111,8 +82,7 @@ class HABCMesh(MeshOps):
 
     def __init__(self, domain_dim, dimension=2, quadrilateral=False,
                  func_space_type=None, comm=None):
-        """
-        Initialize the HABCMesh class
+        """Initialize the HABCMesh class.
 
         Parameters
         ----------
@@ -139,101 +109,164 @@ class HABCMesh(MeshOps):
                          quadrilateral=quadrilateral,
                          func_space_type=func_space_type, comm=comm)
 
-    def original_boundary_data(self):
-        """
-        Generate the boundary data from the original domain mesh
+    def original_boundary_data(self, mesh, function_space, mesh_parameters,
+                               initial_velocity_model):
+        """Generate the boundary data from the original domain mesh.
 
         Parameters
         ----------
-        None
+        mesh : `Firedrake.Mesh`
+            Current mesh
+        function_space : `FiredrakeFunctionSpace`
+            Function space for the current mesh operations
+        mesh_parameters : `meshing_parameters.MeshingParameters`
+            Contains mesh parameters
+        initial_velocity_model : `Firedrake.Function`
+            Initial velocity model
 
         Returns
         -------
-        None
+        c_bnd_min : `float`
+            Minimum velocity value on the boundary of the original domain
+        c_bnd_max : `float`
+            Maximum velocity value on the boundary of the original domain
+        coord_bnd_nodes : `array`
+            Mesh node coordinates on boundaries of the original domain.
         """
 
+        print("Getting Boundary Mesh Data from Original Domain", flush=True)
+
         # Extract node positions
-        node_positions = self.extract_node_positions(self.mesh,
-                                                     self.function_space,
+        node_positions = self.extract_node_positions(mesh, function_space,
                                                      output_type="array")
 
         # Extract boundary node positions
         all_bnd_nodes = []
-        for (bnd_ids, status) in self.mesh_parameters.boundary_nodes_ids.values():
+        for (bnd_ids, status) in mesh_parameters.boundary_nodes_ids.values():
             if status:
                 all_bnd_nodes.append(bnd_ids)
         all_bnd_nodes = np.unique(np.concatenate(all_bnd_nodes))
-        coord_msh = self.mesh_original.coordinates.dat.data_with_halos
-        coord_bnd = node_positions[all_bnd_nodes, :]
-        self.bnd_nodes = coord_bnd
+        coord_msh = mesh.coordinates.dat.data_with_halos
+        coord_bnd_nodes = node_positions[all_bnd_nodes, :]
 
         # Identify the boundary nodes
         tree = cKDTree(coord_msh)
-        indices = tree.query(
-            coord_bnd, k=1, distance_upper_bound=self.mesh_parameters.tol)[1]
+        indices = tree.query(coord_bnd_nodes, k=1,
+                             distance_upper_bound=mesh_parameters.tol)[1]
         mask_boundary = indices[indices < len(coord_msh)]
 
         # Create a point cloud to get the extreme velocity values on the boundary
-        ptos_bnd = self.mesh_original.coordinates.dat.data_with_halos[mask_boundary, :]
-        vel_on_boundary = point_cloud_field(
-            self.mesh_original, ptos_bnd, self.initial_velocity_model,
-            self.mesh_parameters.tol).dat.data_with_halos[:]
+        ptos_bnd = mesh.coordinates.dat.data_with_halos[mask_boundary, :]
+        vel_on_boundary = point_cloud_field(mesh, ptos_bnd, initial_velocity_model,
+                                            mesh_parameters.tol).dat.data_with_halos[:]
 
         # Get extreme values of the velocity on the boundary excluding free surfaces
-        decimal = int(abs(np.log10(self.mesh_parameters.tol)))
-        self.c_bnd_min = round(vel_on_boundary[vel_on_boundary > 0.].min(), decimal)
-        self.c_bnd_max = round(vel_on_boundary[vel_on_boundary > 0.].max(), decimal)
+        decimal = int(abs(np.log10(mesh_parameters.tol)))
+        c_bnd_min = round(vel_on_boundary[vel_on_boundary > 0.].min(), decimal)
+        c_bnd_max = round(vel_on_boundary[vel_on_boundary > 0.].max(), decimal)
 
         # Print on screen
         cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"
-        print(cbnd_str.format(self.c_bnd_min, self.c_bnd_max), flush=True)
+        print(cbnd_str.format(c_bnd_min, c_bnd_max), flush=True)
 
-    def properties_eik_mesh(self, p_usu=None, ele_type='consistent', f_est=0.03):
-        """
-        Set the properties for the mesh used to solve the Eikonal equation
+        return c_bnd_min, c_bnd_max, coord_bnd_nodes
+
+    def creating_velocity_profile(self, function_space,
+                                  initial_velocity_model, path_save):
+        """Create the velocity profile for the original domain".
 
         Parameters
         ----------
-        p_usu : `int`, optional
-            Finite element order for the Eikonal equation. Default is None
-        ele_type : `string`, optional
-            Finite element type. 'consistent' or 'underintegrated'.
-            Default is 'consistent'
-        f_est : `float`, optional
-            Factor for the stabilizing term in Eikonal Eq. Default is 0.03
+        function_space : `FiredrakeFunctionSpace`
+            Function space for the current mesh operations
+        initial_velocity_model : `Firedrake.Function`
+            Initial velocity model
+        path_save : `str`
+            Path to save the velocity model
 
         Returns
         -------
-        None
+        c : `Firedrake.Function`
+            Velocity profile for the original domain
+        c_min : `float`
+            Minimum velocity value in the model without absorbing layer
+        c_max : `float`
+            Maximum velocity value in the model without absorbing layer
         """
+
+        # Velocity profile model
+        c = fire.Function(function_space, name='c_orig [km/s])')
+        c.assign(fire.assemble(fire.interpolate(initial_velocity_model,
+                                                function_space)))
+
+        # Get extreme values of the velocity model
+        c_min = initial_velocity_model.dat.data_with_halos.min()
+        c_max = initial_velocity_model.dat.data_with_halos.max()
+
+        # Print on screen
+        cdom_str = "Domain Velocity Range (km/s): {:.3f} - {:.3f}"
+        print(cdom_str.format(c_min, c_max), flush=True)
+
+        # Save initial velocity model
+        vel_c = fire.VTKFile(path_save + "preamble/c_vel.pvd")
+        vel_c.write(c)
+
+        return c, c_min, c_max
+
+    def create_function_space_eik(self, mesh, degree_eik, ele_type_eik='consistent'):
+        """Create the function space for the Eikonal equation modeling.
+
+        Parameters
+        ----------
+        mesh : `Firedrake.Mesh`
+            Current mesh
+        degree_eik : `int`
+            Finite element order for the Eikonal modeling
+        ele_type_eik : `string`, optional
+            Finite element type. 'consistent' or 'underintegrated'.
+            Default is 'consistent'
+
+        Returns
+        -------
+        funct_space_eik: `Firedrake.FunctionSpace`
+            Function space for the Eikonal modeling
+        """
+
+        print("Setting Mesh Properties for Eikonal Analysis", flush=True)
 
         allowed_ele_types = ['consistent', 'underintegrated']
-        if ele_type not in allowed_ele_types:
-            value_parameter_error('ele_type', ele_type, allowed_ele_types)
-
-        # Setting the properties of the mesh used to solve the Eikonal equation
-        self.ele_type_eik = ele_type
-        self.p_eik = self.degree if p_usu is None else p_usu
+        if ele_type_eik not in allowed_ele_types:
+            value_parameter_error('ele_type_eik', ele_type_eik, allowed_ele_types)
 
         # Function space for the Eikonal modeling
-        if ele_type == 'consistent':
-            self.funct_space_eik = create_function_space(self.mesh, 'CG', self.p_eik)
+        if ele_type_eik == 'consistent':
+            funct_space_eik = create_function_space(mesh, 'CG', degree_eik)
 
-        if ele_type == 'underintegrated':
+        if ele_type_eik == 'underintegrated':
             method = 'spectral_quadrilateral' if self.quadrilateral \
                 else 'mass_lumped_triangle'
-            degree = min(self.p_eik, 4 if self.dimension == 2 else 3)
-            self.funct_space_eik = create_function_space(self.mesh, method, degree)
+            degree = min(degree_eik, 4 if self.dimension == 2 else 3)
+            funct_space_eik = create_function_space(mesh, method, degree)
 
-        # Factor for the stabilizing term in Eikonal equation
-        self.f_est = f_est
+        return funct_space_eik
 
-    def preamble_mesh_operations(self, ele_type='consistent', f_est=0.03):
-        """
-        Perform mesh operations previous to size an absorbing layer
+    def preamble_mesh_operations(self, Wave, ele_type_eik='consistent', f_est=0.03):
+        """Perform mesh operations previous to size an absorbing layer.
 
         Parameters
         ----------
+        Wave : `wave.Wave`
+            An instance of the Wave class that must have the following attributes:
+            abc_deg_eikonal : `int`
+                Finite element order for the Eikonal analysis
+            function_space : `FiredrakeFunctionSpace`
+                Function space for the current mesh operations
+            initial_velocity_model: `Firedrake.Function`
+                Initial velocity model
+            mesh : `Firedrake.Mesh`
+                Current mesh
+            mesh_parameters : `meshing_parameters.MeshingParameters`
+                Contains mesh parameters
         ele_type : `string`, optional
             Finite element type. 'consistent' or 'underintegrated'.
             Default is 'consistent'
@@ -242,55 +275,77 @@ class HABCMesh(MeshOps):
 
         Returns
         -------
-        None
+        c_bnd_min : `float`
+            Minimum velocity value on the boundary of the original domain
+        c_bnd_max : `float`
+            Maximum velocity value on the boundary of the original domain
+
+        Notes
+        -----
+        New attributes added to the wave.mesh_parameters object:
+        mesh_original : `Firedrake.Mesh`
+            Original mesh without absorbing layer
+        mesh_parameters.alpha : `float`
+            Ratio between the representative mesh dimensions
+        mesh_parameters.degree_eik : `int`
+            Finite element order for the Eikonal modeling
+        mesh_parameters.diam_mesh : `ufl.geometry.CellDiameter`
+            Mesh cell diameters
+        mesh_parameters.ele_type_eik : `string`
+            Finite element type for the Eikonal modeling. 'CG' or 'KMV'
+        mesh_parameters.f_est : `float`
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.03
+        mesh_parameters.funct_space_eik: `Firedrake.FunctionSpace`
+            Function space for the Eikonal modeling
+        mesh_parameters.lmin : `float`
+            Minimum mesh size
+        mesh_parameters.lmax : `float`
+            Maxmum mesh size
+        mesh_parameters.tol : `float`
+            Tolerance for searching nodes in the mesh
         """
 
         print("\nCreating Mesh and Initial Velocity Model", flush=True)
 
         # Mesh data
-        print(f"Original Mesh with {self.mesh.num_vertices()} Nodes "
-              f"and {self.mesh.num_cells()} Volume Elements", flush=True)
+        print(f"Original Mesh with {Wave.mesh.num_vertices()} Nodes "
+              f"and {Wave.mesh.num_cells()} Volume Elements", flush=True)
 
         # Get mesh parameters from original mesh
-        mesh_derived_parameters = \
-            self.representative_mesh_dimensions(self.mesh,
-                                                self.function_space)
-        self.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
-        self.mesh_parameters.lmin = mesh_derived_parameters[1]
-        self.mesh_parameters.lmax = mesh_derived_parameters[2]
-        self.mesh_parameters.alpha = mesh_derived_parameters[3]
-        self.mesh_parameters.tol = mesh_derived_parameters[4]
+        mesh_derived_parameters = self.representative_mesh_dimensions(Wave.mesh,
+                                                                      Wave.function_space)
+        Wave.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
+        Wave.mesh_parameters.lmin = mesh_derived_parameters[1]
+        Wave.mesh_parameters.lmax = mesh_derived_parameters[2]
+        Wave.mesh_parameters.alpha = mesh_derived_parameters[3]
+        Wave.mesh_parameters.tol = mesh_derived_parameters[4]
 
         # Save a copy of the original mesh
-        self.mesh_original = self.mesh
-        mesh_orig = fire.VTKFile(self.path_save + "preamble/mesh_orig.pvd")
-        mesh_orig.write(self.mesh_original)
+        Wave.mesh_original = Wave.mesh
+        mesh_orig = fire.VTKFile(Wave.path_save + "preamble/mesh_orig.pvd")
+        mesh_orig.write(Wave.mesh_original)
 
         # Velocity profile model
-        self.c = fire.Function(self.function_space, name='c_orig [km/s])')
-        self.c.assign(fire.assemble(fire.interpolate(
-            self.initial_velocity_model, self.function_space)))
-
-        # Get extreme values of the velocity model
-        self.c_min = self.initial_velocity_model.dat.data_with_halos.min()
-        self.c_max = self.initial_velocity_model.dat.data_with_halos.max()
-
-        # Print on screen
-        cdom_str = "Domain Velocity Range (km/s): {:.3f} - {:.3f}"
-        print(cdom_str.format(self.c_min, self.c_max), flush=True)
-
-        # Save initial velocity model
-        vel_c = fire.VTKFile(self.path_save + "preamble/c_vel.pvd")
-        vel_c.write(self.c)
+        Wave.c, Wave.c_min, Wave.c_max = self.creating_velocity_profile(
+            Wave.function_space, Wave.initial_velocity_model, Wave.path_save)
 
         # Generating boundary data from the original domain mesh
-        print("Getting Boundary Mesh Data from Original Domain", flush=True)
-        self.original_boundary_data()
+        Wave.c_bnd_min, Wave.c_bnd_max, \
+            self.coord_bnd_nodes = self.original_boundary_data(
+                Wave.mesh, Wave.function_space,
+                Wave.mesh_parameters, Wave.initial_velocity_model)
 
-        # Mesh properties for Eikonal
-        print("Setting Mesh Properties for Eikonal Analysis", flush=True)
-        self.properties_eik_mesh(p_usu=self.abc_deg_eikonal,
-                                 ele_type=ele_type, f_est=f_est)
+        # Setting the properties of the mesh used to solve the Eikonal equation
+        Wave.mesh_parameters.degree_eik = Wave.degree if not hasattr(
+            Wave, 'abc_deg_eikonal') else Wave.abc_deg_eikonal
+        Wave.mesh_parameters.ele_type_eik = ele_type_eik
+
+        # Factor for the stabilizing term in Eikonal equation
+        Wave.mesh_parameters.f_est = f_est
+
+        # Function space for Eikonal modeling
+        Wave.mesh_parameters.funct_space_eik = self.create_function_space_eik(
+            Wave.mesh, Wave.mesh_parameters.degree_eik, ele_type_eik=ele_type_eik)
 
     @staticmethod
     def bnd_pnts_hyp_2D(a, b, n, num_pts):
@@ -623,7 +678,7 @@ class HABCMesh(MeshOps):
         coord_rec = rec_mesh.coordinates.dat.data_with_halos
 
         # Create KDTree for efficient nearest neighbor search
-        boundary_tree = cKDTree(self.bnd_nodes)
+        boundary_tree = cKDTree(self.coord_bnd_nodes)
 
         # Add all vertices from rectangular mesh and create mapping
         rec_map = {}

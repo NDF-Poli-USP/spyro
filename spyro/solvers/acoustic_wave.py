@@ -21,8 +21,21 @@ from .functionals import acoustic_energy
 
 class AcousticWave(Wave):
     def __init__(self, dictionary, comm=None):
-        super().__init__(dictionary, comm=comm)
-        self.wave_type = WaveType.ISOTROPIC_ACOUSTIC
+        """Wave Acoustic object solver.
+
+        Parameters
+        ----------
+        dictionary : `dict`, optional
+            A dictionary containing the input parameters for the Wave class.
+            Default is None
+        comm : `object`, optional
+            MPI communicator for parallel execution. Default is None
+
+        Returns
+        -------
+        None
+        """
+        super().__init__(dictionary, wave_type=WaveType.ISOTROPIC_ACOUSTIC, comm=comm)
         self.acoustic_energy = None
         self.field_logger.add_functional(
             "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))

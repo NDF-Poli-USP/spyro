@@ -35,7 +35,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         An object representing the communication interface
     boundary_idx_map: dict
         Mapping of boundary IDs for applying absorbing boundary conditions
-    initial_velocity_model: firedrake function
+    initial_velocity_model: `Firedrake.Function`
         Initial velocity model
     function_space: firedrake function space
         Function space for the wave equation
@@ -57,6 +57,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Contains information about sources
     receivers: Receivers object
         Contains information about receivers
+    path_case_abc : `string`
+        Path to save data for the abc case study
+    path_save : `string`
+        Path to save data
 
     Methods:
     --------
@@ -76,21 +80,33 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Sets new or default solver parameters
     """
 
-    def __init__(self, dictionary=None, comm=None):
+    def __init__(self, dictionary=None, wave_type=None, comm=None):
         """Wave object solver. Contains both the forward solver
         and gradient calculator methods.
 
-        Parameters:
-        -----------
-        comm: MPI communicator
+        Parameters
+        ----------
+        dictionary : `dict`, optional
+            A dictionary containing the input parameters for the Wave class.
+            Default is None
+        wave_type : `WaveType`, optional
+            The type of wave equation to solve. Default is None
+        comm : `object`, optional
+            MPI communicator for parallel execution. Default is None
 
-        model_parameters: Python object
+        Returns
+        -------
+        None
+
+        model_parameters : `Python object`
             Contains model parameters
         """
         super().__init__(dictionary=dictionary, comm=comm)
         self.initial_velocity_model = None
         self.gradient_mask_available = False
-        self.wave_type = WaveType.NONE
+
+        # Setting wave type or defaulting to None
+        self.wave_type = WaveType.NONE if wave_type is None else wave_type
 
         self.function_space = None
         self.dg0_scalar_function_space = None
@@ -191,14 +207,16 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._build_function_space()
         self._map_sources_and_receivers()
 
-        # TODO: Create a flag for other domains that are not of type box
-        if self.mesh_ops.func_space_type is None:
-            self.mesh_ops.func_space_type = 'scalar' \
-                if len(self.function_space.value_shape) == 0 else 'vector'
+        # Function space type for the mesh operations
+        self.mesh_ops.func_space_type = 'scalar' \
+            if self.wave_type == WaveType.ISOTROPIC_ACOUSTIC else 'vector'
+
+        # Get boundaries
+        boundaries = self.get_absorbing_boundaries()
 
         # Build the boundary ID mapping
         # TODO: Include the logic for hypershape layer from HABC
-        boundaries = self.get_absorbing_boundaries()
+        # TODO: Create a flag for other domains that are not of type box
         if not (hasattr(self, 'abc_boundary_layer_shape')
                 and hasattr(self.mesh_parameters, 'boundary_ids_map')
                 and self.abc_boundary_layer_shape == 'hypershape'):
@@ -363,7 +381,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def _build_function_space(self):
         self.function_space = self._create_function_space()
         function_space_type = check_function_space_type(self.function_space)
-        if function_space_type == "scalar":
+        if function_space_type == "scalar" or function_space_type == "vector":
             self.scalar_function_space = self.function_space
         elif function_space_type == "mixed":
             scalar_function_space_type = check_function_space_type(self.function_space.sub(0))
@@ -371,8 +389,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 raise ValueError("Do not change mixed space order, use scalar first!!! (ノಠ益ಠ)ノ彡┻━┻")
             self.scalar_function_space = self.function_space.sub(0)
             self.vector_function_space = self.function_space.sub(1)
-        elif function_space_type == "vector":
-            self.vector_function_space = self.function_space
 
         quad_rule, k_rule, s_rule = quadrature_rules(self.function_space)
         self.quadrature_rule = quad_rule
@@ -593,14 +609,26 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         domain_dim = self.domain_dimensions()
 
         # Nyquist frequency
-        f_Nyquist = 1. / (2. * self.dt)
+        freq_Nyquist = 1. / (2. * self.dt)
 
         if self.abc_boundary_layer_type == "PML":
             import spyro.pml.pml_nsnc as pmlops
-            self.pml = pmlops.PML(domain_dim, f_Nyquist, dimension=self.dimension,
-                                  quadrilateral=self.mesh_parameters.quadrilateral,
-                                  func_space_type=self.mesh_ops.func_space_type,
-                                  comm=self.comm)
+            self.layer_ops = pmlops.PMLLayer(
+                domain_dim, freq_Nyquist, dimension=self.dimension,
+                quadrilateral=self.mesh_parameters.quadrilateral,
+                func_space_type=self.mesh_ops.func_space_type,
+                abc_reference_freq=self.abc_reference_freq, comm=self.comm)
 
         if self.abc_boundary_layer_type == "hybrid":
-            pass
+            import spyro.habc.habc as habcops
+            self.layer_ops = habcops.HABCLayer(
+                domain_dim, freq_Nyquist, dimension=self.dimension,
+                quadrilateral=self.mesh_parameters.quadrilateral,
+                func_space_type=self.mesh_ops.func_space_type,
+                abc_boundary_layer_shape=self.abc_boundary_layer_shape,
+                abc_reference_freq=self.abc_reference_freq, comm=self.comm)
+
+        # Identifier for the current case study
+        if self.abc_boundary_layer_type in ["PML", "hybrid"]:
+            self.path_save, self.path_case_abc = \
+                self.layer_ops.identify_abc_layer_case(output_folder=self.output_folder)

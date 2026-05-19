@@ -125,8 +125,8 @@ def preamble_habc(dictionary, edge_length):
 
     Returns
     -------
-    Wave_obj : `habc.HABC_Wave`
-        An instance of the HABC_Wave class
+    Wave_obj : `habc.HABCLayer`
+        An instance of the HABCLayer class
     '''
 
     # ============ MESH FEATURES ============
@@ -134,7 +134,7 @@ def preamble_habc(dictionary, edge_length):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary,
+    Wave_obj = habc.HABCLayer(dictionary=dictionary,
                               output_folder="tests/inputfiles/")
 
     # Mesh
@@ -174,8 +174,8 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
 
     Parameters
     ----------
-    Wave_obj : `habc.HABC_Wave`
-        An instance of the HABC_Wave class
+    Wave_obj : `habc.HABCLayer`
+        An instance of the HABCLayer class
     data_regr_xCR: `list`
         Data for the regression of the parameter xCR.
         Structure: [xCR, max_errIt, max_errPK, crit_opt]
@@ -223,8 +223,8 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
 
     Parameters
     ----------
-    Wave_obj : `habc.HABC_Wave`
-        An instance of the HABC_Wave class
+    Wave_obj : `habc.HABCLayer`
+        An instance of the HABCLayer class
     data_regr_xCR: `list`
         Data for the regression of the parameter xCR.
         Structure: [xCR, max_errIt, max_errPK, crit_opt]

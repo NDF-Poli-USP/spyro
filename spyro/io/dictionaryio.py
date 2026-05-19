@@ -195,26 +195,40 @@ class Read_options:
 
 class Read_outputs:
     def __init__(self):
+        """"Read the 'visualization' section of the input dictionary."""
 
         v_str = "visualization"
         self.input_dictionary.setdefault(v_str, {})
+
+        # Forward output
         self.input_dictionary[v_str].setdefault("forward_output", False)
         self.forward_output = self.input_dictionary[v_str]["forward_output"]
+
         self.input_dictionary[v_str].setdefault("forward_output_filename",
                                                 "results/forward.pvd")
         self.forward_output_filename = self.input_dictionary[
             v_str]["forward_output_filename"]
+
+        # General output folder
+        self.input_dictionary[v_str].setdefault("output_folder", "output")
+        self.output_folder = self.input_dictionary[v_str]["output_folder"]
+
+        # Gradient output
         self.input_dictionary[v_str].setdefault("gradient_output", False)
         self.gradient_output = self.input_dictionary[v_str]["gradient_output"]
         self.input_dictionary[v_str].setdefault("gradient_filename",
                                                 "results/gradient.pvd")
         self.gradient_filename = self.input_dictionary[
             v_str]["gradient_filename"]
+
+        # Adjoint output
         self.input_dictionary[v_str].setdefault("adjoint_output", False)
         self.adjoint_output = self.input_dictionary[v_str]["adjoint_output"]
         self.input_dictionary[v_str].setdefault("adjoint_filename",
                                                 "results/adjoint.pvd")
         self.adjoint_filename = self.input_dictionary[
             v_str]["adjoint_filename"]
+
+        # Debug output
         self.input_dictionary[v_str].setdefault("debug_output", False)
         self.debug_output = self.input_dictionary[v_str]["debug_output"]

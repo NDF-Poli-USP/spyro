@@ -11,7 +11,7 @@ fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
-def wave_dict_2d(ele_geometry, degree_eikonal):
+def wave_dict_2d(ele_geometry, degree_eikonal, ele_type):
     """Create a dictionary with parameters for the 2D model.
 
     Parameters
@@ -20,6 +20,8 @@ def wave_dict_2d(ele_geometry, degree_eikonal):
         Geometry of the finite element. 'T' for triangles or 'Q' for quadrilaterals
     degree_eikonal : `int`
         Finite element order for the Eikonal equation. Should be 1 or 2
+    ele_type : `str`
+        Finite element type. 'consistent' or 'underintegrated'
 
     Returns
     -------
@@ -88,12 +90,15 @@ def wave_dict_2d(ele_geometry, degree_eikonal):
     }
 
     # Define parameters for visualization
-    dictionary["visualization"] = {}
+    str_ele = ele_geometry + "_" + ("C" if ele_type == 'consistent' else "U")
+    dictionary["visualization"] = {
+        "output_folder": "output/eikonal_test" + str_ele  # Output folder
+    }
 
     return dictionary
 
 
-def wave_dict_3d(ele_geometry, degree_eikonal):
+def wave_dict_3d(ele_geometry, degree_eikonal, ele_type):
     """Create a dictionary with parameters for the 3D model.
 
     Parameters
@@ -102,6 +107,8 @@ def wave_dict_3d(ele_geometry, degree_eikonal):
         Geometry of the finite element. 'T' for triangles or 'Q' for quadrilaterals
     degree_eikonal : `int`
         Finite element order for the Eikonal equation. Should be 1 or 2
+    ele_type : `str`
+        Finite element type. 'consistent' or 'underintegrated'
 
     Returns
     -------
@@ -173,97 +180,12 @@ def wave_dict_3d(ele_geometry, degree_eikonal):
     }
 
     # Define parameters for visualization
-    dictionary["visualization"] = {}
+    str_ele = ele_geometry + "_" + ("C" if ele_type == 'consistent' else "U")
+    dictionary["visualization"] = {
+        "output_folder": "output/eikonal_test" + str_ele  # Output folder
+    }
 
     return dictionary
-
-
-class HABCWave(AcousticWave, HABCMesh):
-    """Class HABC that determines absorbing layer size and parameters to be used.
-
-    Attributes
-    ----------
-    path_save : `string`
-        Path to save data
-
-    Methods
-    -------
-    None added to the ones inherited from AcousticWave and HABCMesh
-    """
-
-    def __init__(self, dictionary=None, ele_type='consistent', comm=None):
-        """
-        Initialize the HABC class
-
-        Parameters
-        ----------
-        dictionary : `dict`, optional
-            A dictionary containing the input parameters for the HABC class
-        ele_type : `string`, optional
-            Finite element type. 'consistent' or 'underintegrated'.
-            Default is 'consistent'
-        comm : `object`, optional
-            An object representing the communication interface
-            for parallel processing. Default is None
-
-        Returns
-        -------
-        None
-        """
-
-        # Initializing the Wave class
-        AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
-
-        # Path to save data
-        self.path_save = getcwd() + "/output/eikonal_test"
-
-        # Original domain dimensions
-        domain_dim = self.domain_dimensions()
-
-        geom_ele_str = "Q" if self.mesh_parameters.quadrilateral else "T"
-        ele_type_str = "C" if ele_type == 'consistent' else "U"
-        self.path_save += geom_ele_str + "_" + ele_type_str + "/"
-
-        # Initializing the Mesh class
-        HABCMesh.__init__(
-            self, domain_dim, dimension=self.dimension,
-            quadrilateral=self.mesh_parameters.quadrilateral,
-            comm=self.comm)
-
-
-def critical_boundary_points(Wave_obj):
-    """Determine the critical points on domain boundaries of the original model.
-
-    Information on critical points allows to size an absorbing layer using the
-    Eikonal criterion for HABCs. See Salas et al (2022) for details.
-
-    Parameters
-    ----------
-    Wave_obj : `habc.HABCWave`
-        An instance of the HABCWave class
-
-    Returns
-    -------
-    eik_bnd : `list`
-        Properties on boundaries according to minimum values of Eikonal
-        Structure sublist: [pt_cr, c_bnd, eikmin, z_par, lref, sou_cr]
-        - pt_cr : Critical point coordinates
-        - c_bnd : Propagation speed at critical point
-        - eikmin : Eikonal value in seconds
-        - z_par : Inverse of minimum Eikonal (Equivalent to c_bound / lref)
-        - lref : Distance to the closest source
-    """
-
-    # Initializing Eikonal object
-    Eikonal = eik.HABC_Eikonal(Wave_obj)
-
-    # Solving Eikonal
-    Eikonal.solve_eik()
-
-    # Identifying critical points
-    eik_bnd = Eikonal.ident_crit_eik()
-
-    return eik_bnd
 
 
 def eikonal_analysis(dictionary, edge_length, f_est, ele_type='consistent'):
@@ -292,7 +214,7 @@ def eikonal_analysis(dictionary, edge_length, f_est, ele_type='consistent'):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = HABCWave(dictionary=dictionary, ele_type=ele_type)
+    Wave_obj = AcousticWave(dictionary=dictionary)
 
     # Mesh
     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
@@ -302,7 +224,9 @@ def eikonal_analysis(dictionary, edge_length, f_est, ele_type='consistent'):
     Wave_obj.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
-    Wave_obj.preamble_mesh_operations(f_est=f_est, ele_type=ele_type)
+    Wave_obj.mesh_ops.preamble_mesh_operations(Wave_obj,
+                                               ele_type_eik=ele_type,
+                                               f_est=f_est)
 
     # Estimating computational resource usage
     comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "MSH_")
@@ -312,13 +236,13 @@ def eikonal_analysis(dictionary, edge_length, f_est, ele_type='consistent'):
     tRef = comp_cost("tini")
 
     # Finding critical points
-    eik_bnd = critical_boundary_points(Wave_obj)
+    Wave_obj.layer_ops.critical_boundary_points(Wave_obj)
 
     # Estimating computational resource usage
     comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "EIK_")
 
     # Extracting  minimum Eikonal
-    min_eik = 1e3 * eik_bnd[0][2]
+    min_eik = 1e3 * Wave_obj.eik_bnd[0][2]
 
     return min_eik
 
@@ -369,7 +293,7 @@ def test_eik_consistent_ele_2d():
             # ============ MESH AND EIKONAL ============
 
             # Create dictionary with parameters for the model
-            dict_2d = wave_dict_2d(ele_geometry, p_eik)
+            dict_2d = wave_dict_2d(ele_geometry, p_eik, 'consistent')
 
             # Creating mesh and performing eikonal analysis
             min_eik = round(eikonal_analysis(dict_2d, edge_length, f_est), 3)
@@ -432,7 +356,7 @@ def test_eik_consistent_ele_3d():
         try:
 
             # Create dictionary with parameters for the model
-            dict_3d = wave_dict_3d(ele_geometry, p_eik)
+            dict_3d = wave_dict_3d(ele_geometry, p_eik, 'consistent')
 
             # Creating mesh and performing eikonal analysis
             min_eik = round(eikonal_analysis(dict_3d, edge_length, f_est), 3)
@@ -491,7 +415,7 @@ def test_eik_underintegrated_ele_2d():
             # ============ MESH AND EIKONAL ============
 
             # Create dictionary with parameters for the model
-            dict_2d = wave_dict_2d(ele_geometry, p_eik)
+            dict_2d = wave_dict_2d(ele_geometry, p_eik, 'underintegrated')
 
             # Creating mesh and performing eikonal analysis
             min_eik = round(eikonal_analysis(
@@ -566,7 +490,7 @@ def test_eik_underintegrated_ele_3d():
             # ============ MESH AND EIKONAL ============
 
             # Create dictionary with parameters for the model
-            dict_3d = wave_dict_3d(ele_geometry, p_eik)
+            dict_3d = wave_dict_3d(ele_geometry, p_eik, 'underintegrated')
 
             # Creating mesh and performing eikonal analysis
             min_eik = round(eikonal_analysis(

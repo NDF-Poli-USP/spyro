@@ -34,7 +34,7 @@ class Read_boundary_layer:
     abc_R : float
         Theoretical reflection coefficient
     abc_reference_freq : `str`
-        Reference frequency for sizing the hybrid absorbing layer
+        Reference frequency for sizing the hybrid absorbing layer.
         Options: 'source' or 'boundary'
     abc_user_pad_length : `bool`
         If True, the pad length is provided by the user. If False,

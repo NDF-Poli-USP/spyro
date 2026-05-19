@@ -236,8 +236,8 @@ def preamble_modal(dictionary, edge_length, f_est,
 
     Returns
     -------
-    Wave_obj : `habc.HABC_Wave`
-        An instance of the HABC_Wave class
+    Wave_obj : `habc.HABCLayer`
+        An instance of the HABCLayer class
     '''
 
     # ============ MESH FEATURES ============
@@ -246,7 +246,7 @@ def preamble_modal(dictionary, edge_length, f_est,
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary,
+    Wave_obj = habc.HABCLayer(dictionary=dictionary,
                               output_folder=f"output/modal_test{dimension}d")
 
     # Mesh
@@ -287,8 +287,8 @@ def get_range_hyp(Wave_obj, n_root=1):
 
     Parameters
     ----------
-    Wave_obj : `habc.HABC_Wave`
-        An instance of the HABC_Wave class
+    Wave_obj : `habc.HABCLayer`
+        An instance of the HABCLayer class
     n_root : `int`, optional
         n-th Root selected as the size of the absorbing layer. Default is 1
 
@@ -311,8 +311,8 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
 
     Parameters
     ----------
-    Wave_obj : `habc.HABC_Wave`
-        An instance of the HABC_Wave class
+    Wave_obj : `habc.HABCLayer`
+        An instance of the HABCLayer class
     modal_solver_lst : `list`
         List of methods to be used to solve the eigenvalue problem.
         Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS',

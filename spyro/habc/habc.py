@@ -5,13 +5,8 @@ import spyro.solvers.modal.modal_sol as eigsol
 from os import getcwd, path, rename
 from shutil import rmtree
 from sympy import divisors
-from spyro.solvers.acoustic_wave import AcousticWave
-from spyro.meshing.meshing_habc import HABCMesh
-from spyro.abc.hyp_lay import HyperLayer
-from spyro.abc.rec_lay import RectangLayer
+from spyro.abc.abc_layer import ABCLayer
 from spyro.habc.damp_profile import HABC_Damping
-from spyro.abc.nrbc import NRBC
-from spyro.habc.error_measure import HABCError
 from spyro.domains.space import create_function_space
 from spyro.habc.lay_len import calc_size_lay
 from spyro.plots.plots_habc import plot_function_layer_size
@@ -29,8 +24,7 @@ from spyro.utils.freq_tools import freq_response
 # With additions by Alexandre Olender
 
 
-class HABC_Wave(AcousticWave, HABCMesh, RectangLayer,
-                HyperLayer, HABC_Damping, NRBC, HABCError):
+class HABCLayer(ABCLayer, HABC_Damping):
     '''
     Class HABC that determines absorbing layer size and parameters to be used
 
@@ -150,8 +144,10 @@ class HABC_Wave(AcousticWave, HABCMesh, RectangLayer,
         Set the velocity model for the model with absorbing layer
     '''
 
-    def __init__(self, dictionary=None, fwi_iter=0,
-                 comm=None, output_folder=None):
+    def __init__(self, domain_dim, f_Nyquist, dimension=2,
+                 quadrilateral=False, func_space_type=None,
+                 abc_boundary_layer_shape="rectangular",
+                 abc_reference_freq="source", comm=None):
         '''
         Initialize the HABC class
 
@@ -172,129 +168,12 @@ class HABC_Wave(AcousticWave, HABCMesh, RectangLayer,
         None
         '''
 
-        # Initializing the Wave class
-        AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
-
-        # Nyquist frequency
-        self.freq_Nyq = 1. / (2. * self.dt)
-
-        # Original domain dimensions
-        domain_dim = self.habc_domain_dimensions(only_orig_dom=True)
-
-        # Initializing the Mesh class
-        HABCMesh.__init__(self, domain_dim, dimension=self.dimension,
-                          quadrilateral=self.mesh_parameters.quadrilateral,
-                          func_space_type='scalar', comm=self.comm)
-
-        # Identifier for the current case study
-        self.identify_habc_case(output_folder=output_folder)
-
-        # Current iteration
-        self.fwi_iter = fwi_iter
-
-    def identify_habc_case(self, output_folder=None):
-        '''
-        Generate an identifier for the current case study of the HABC scheme
-
-        Parameters
-        ----------
-        output_folder : `str`, optional
-            The folder where output data will be saved. Default is None
-
-        Returns
-        -------
-        None
-        '''
-
-        # Original domain dimensions
-        domain_dim = self.habc_domain_dimensions(only_orig_dom=True)
-
-        # Layer shape
-        self.layer_shape = self.abc_boundary_layer_shape
-        lay_str = f"\nAbsorbing Layer Shape: {self.layer_shape.capitalize()}"
-
-        # Labeling for the layer shape
-        if self.layer_shape == 'rectangular':  # Rectangular layer
-
-            # Initializing the rectangular layer
-            RectangLayer.__init__(self, domain_dim, dimension=self.dimension)
-            self.case_habc = 'REC'  # Label
-
-        elif self.layer_shape == 'hypershape':  # Hypershape layer
-
-            # Initializing the hyperelliptical layer
-            HyperLayer.__init__(self, domain_dim, n_hyp=self.abc_deg_layer,
-                                n_type=self.abc_degree_type,
-                                dimension=self.dimension)
-
-            self.case_habc = 'HN' + f"{self.abc_deg_layer:.1f}"  # Label
-            deg_str = f" - Degree: {self.abc_deg_layer}"
-            lay_str += deg_str
-
-        else:
-            value_parameter_error('layer_shape', self.layer_shape,
-                                  ['rectangular', 'hypershape'])
-        print(lay_str, flush=True)
-
-        # Labeling for the reference frequency for the absorbing layer
-        if self.abc_reference_freq == 'boundary':
-            self.case_habc += "_BND"
-
-        elif self.abc_reference_freq == 'source':
-            self.case_habc += "_SOU"
-
-        else:
-            value_parameter_error('abc_reference_freq',
-                                  self.abc_reference_freq,
-                                  ['boundary', 'source'])
-
-        # Path to save data
-        if output_folder is None:
-            self.path_save = getcwd() + "/output/"
-        else:
-            self.path_save = getcwd() + "/" + output_folder + "/"
-
-        self.path_case_habc = self.path_save + self.case_habc + "/"
-
-        # Initializing the error measure class
-        HABC_Error.__init__(self, self.dt, self.freq_Nyq,
-                            self.receiver_locations,
-                            output_folder=self.path_save,
-                            output_case=self.path_case_habc)
-
-        # Initializing the NRBC class
-        NRBC.__init__(self, domain_dim, self.layer_shape,
-                      dimension=self.dimension,
-                      output_folder=self.path_case_habc)
-
-    def critical_boundary_points(self):
-        '''
-        Determine the critical points on domain boundaries of the original
-        model to size an absorbing layer using the Eikonal criterion for HABCs.
-        See Salas et al (2022) for details.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-        '''
-
-        # Initializing Eikonal object
-        Eikonal = eik.HABC_Eikonal(self)
-
-        # Solving Eikonal
-        Eikonal.solve_eik()
-
-        # Identifying critical points
-        self.eik_bnd = Eikonal.ident_crit_eik()
-
-        # Critical point coordinates as receivers
-        pcrit = [bnd[0] for bnd in self.eik_bnd]
-        self.receiver_locations = pcrit + self.receiver_locations
-        self.number_of_receivers = len(self.receiver_locations)
+        # Initializing the ABCLayer class
+        ABCLayer.__init__(self, domain_dim, f_Nyquist, dimension=dimension,
+                          quadrilateral=quadrilateral, func_space_type=func_space_type,
+                          abc_boundary_layer_shape=abc_boundary_layer_shape,
+                          abc_boundary_layer_type="hybrid",
+                          abc_reference_freq=abc_reference_freq, comm=comm)
 
     def det_reference_freq(self, fpad=4):
         '''
