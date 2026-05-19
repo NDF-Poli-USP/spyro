@@ -126,7 +126,7 @@ dictionary["visualization"] = {
 }
 
 wave_obj = spyro.AcousticWave(dictionary=dictionary)
-wave_obj.set_initial_velocity_model(new_file = "tmp_velocity_model.segy")
+wave_obj.set_initial_velocity_model(conditional=cond)
 spyro.plots.debug_pvd(wave_obj.initial_velocity_model)
 # wave_obj.forward_solve()
 
