@@ -500,8 +500,7 @@ class Model_parameters(Read_options, Read_boundary_layer,
             return None
 
     def domain_dimensions(self):
-        """
-        Return the dimensions of the domain as a tuple.
+        """Return the dimensions of the domain as a tuple.
 
         Parameters
         ----------

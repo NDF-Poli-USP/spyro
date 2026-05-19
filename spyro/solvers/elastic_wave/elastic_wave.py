@@ -27,7 +27,7 @@ class ElasticWave(Wave, metaclass=ABCMeta):
         """
 
         # Type of wave equation to solve
-        if anisotropy is None:
+        if anisotropy is "ISO":
             wave_type = WaveType.ISOTROPIC_ELASTIC
         elif anisotropy == "VTI":
             wave_type = WaveType.ANISOTROPIC_VTI_ELASTIC

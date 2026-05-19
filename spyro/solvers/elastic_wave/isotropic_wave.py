@@ -16,7 +16,6 @@ class IsotropicWave(ElasticWave):
 
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
-        self.wave_type = WaveType.ISOTROPIC_ELASTIC
         self.rho = None   # Density
         self.lmbda = None  # First Lame parameter
         self.mu = None    # Second Lame parameter

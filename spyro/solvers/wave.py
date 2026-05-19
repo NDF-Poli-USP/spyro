@@ -61,6 +61,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Path to save data for the abc case study
     path_save : `string`
         Path to save data
+    mesh_ops : `meshing_operations.MeshOps` or `meshing_HABC.HABCMesh`
+        Mesh operation manager
+    layer_ops : `habc.HABCLayer` or `pml_nsnc.PMLLayer`
+        ABC layer operation manager
 
     Methods:
     --------
@@ -125,8 +129,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.c = None
         self.sources = None
 
-        if self.abc_active:
-            self.mesh_manager()
+        # Mesh manager
+        self.mesh_manager()
 
         # Getting parameters from the mesh
         if self.mesh is not None:
@@ -225,6 +229,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
                                                    boundaries, box_domain=True,
                                                    get_boundary_node_ids=True)
+
+        # Get geometry parameters from mesh
+        data_mesh = self.mesh_ops.representative_mesh_dimensions(self.mesh,
+                                                                 self.function_space)
+        self.mesh_parameters.diam_mesh = data_mesh[0]
+        self.mesh_parameters.lmin = data_mesh[1]
+        self.mesh_parameters.lmax = data_mesh[2]
+        self.mesh_parameters.alpha = data_mesh[3]
+        self.mesh_parameters.tol = data_mesh[4]
 
     def set_mesh(
             self,
@@ -381,7 +394,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def _build_function_space(self):
         self.function_space = self._create_function_space()
         function_space_type = check_function_space_type(self.function_space)
-        if function_space_type == "scalar" or function_space_type == "vector":
+
+        if function_space_type == "scalar":
             self.scalar_function_space = self.function_space
         elif function_space_type == "mixed":
             scalar_function_space_type = check_function_space_type(self.function_space.sub(0))
@@ -389,6 +403,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 raise ValueError("Do not change mixed space order, use scalar first!!! (ノಠ益ಠ)ノ彡┻━┻")
             self.scalar_function_space = self.function_space.sub(0)
             self.vector_function_space = self.function_space.sub(1)
+        elif function_space_type == "vector":
+            self.vector_function_space = self.function_space
 
         quad_rule, k_rule, s_rule = quadrature_rules(self.function_space)
         self.quadrature_rule = quad_rule
@@ -614,7 +630,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.abc_boundary_layer_type == "PML":
             import spyro.pml.pml_nsnc as pmlops
             self.layer_ops = pmlops.PMLLayer(
-                domain_dim, freq_Nyquist, dimension=self.dimension,
+                domain_dim, self.frequency, freq_Nyquist, dimension=self.dimension,
                 quadrilateral=self.mesh_parameters.quadrilateral,
                 func_space_type=self.mesh_ops.func_space_type,
                 abc_reference_freq=self.abc_reference_freq, comm=self.comm)
@@ -622,13 +638,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.abc_boundary_layer_type == "hybrid":
             import spyro.habc.habc as habcops
             self.layer_ops = habcops.HABCLayer(
-                domain_dim, freq_Nyquist, dimension=self.dimension,
-                quadrilateral=self.mesh_parameters.quadrilateral,
+                domain_dim, self.frequency, freq_Nyquist, self.abc_deg_layer,
+                dimension=self.dimension, quadrilateral=self.mesh_parameters.quadrilateral,
                 func_space_type=self.mesh_ops.func_space_type,
                 abc_boundary_layer_shape=self.abc_boundary_layer_shape,
                 abc_reference_freq=self.abc_reference_freq, comm=self.comm)
 
         # Identifier for the current case study
         if self.abc_boundary_layer_type in ["PML", "hybrid"]:
-            self.path_save, self.path_case_abc = \
+            self.case_abc, self.path_save, self.path_case_abc = \
                 self.layer_ops.identify_abc_layer_case(output_folder=self.output_folder)

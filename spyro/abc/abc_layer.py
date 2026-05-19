@@ -8,10 +8,22 @@ from spyro.abc.rec_lay import RectangLayer
 from spyro.abc.nrbc import NRBC
 from spyro.habc.eik import HABC_Eikonal
 from spyro.habc.error_measure import HABCError
+from spyro.domains.space import create_function_space
 from spyro.habc.lay_len import calc_size_lay
 from spyro.plots.plots_habc import plot_function_layer_size
+from spyro.tools.habc_tools import (clipping_coordinates_lay_field,
+                                    extend_scalar_field_profile)
 from spyro.utils.error_management import value_parameter_error
 from spyro.utils.freq_tools import freq_response
+
+
+# Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
+# Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
+# Hybrid absorbing scheme based on hyperelliptical layers with
+# non-reflecting boundary conditions in scalar wave equations.
+# Applied Mathematical Modelling (2022)
+# doi: https://doi.org/10.1016/j.apm.2022.09.014
+# With additions by Alexandre Olender
 
 
 class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
@@ -34,9 +46,9 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
     a_par : `float`
         Adimensional propagation speed parameter (a = z / f).
         "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
-    case : `str`
+    case_abc : `str`
         Label for the output files that includes the layer shape
-        ('REC', only available) and the reference frequency
+        ('REC', HNX.X) and the reference frequency
         ('SOU' or 'BND'). Example: 'REC_SOU' or 'REC_BND'
     crit_source : `tuple`
        Critical source coordinates
@@ -57,17 +69,21 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         Size parameter of the absorbing layer
     FLpossible : `list`
         Possible size parameters for the absorbing layer without rounding
-    f_Nyquist : `float`
-        Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt)
+    frequency: `float`
+        Frequency of the source.
+    freq_Nyquist : `float`
+        Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt)
     freq_ref : `float`
         Reference frequency of the wave at the boundary
     fwi_iter : `int`
         The iteration number for the Full Waveform Inversion (FWI) algorithm
-    Lx_abc : `float`
+    lmin : `float`
+        Minimum mesh size
+    length_xabc : `float`
         Length of the domain in the x-direction with absorbing layer
-    Ly_abc : `float`
+    length_yabc : `float`
         Length of the domain in the y-direction with absorbing layer (3D)
-    Lz_abc : `float`
+    length_zabc : `float`
         Length of the domain in the z-direction with absorbing layer
     lref : `float`
         Reference length for the size of the absorbing layer
@@ -113,21 +129,22 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         Set the velocity model for the model with absorbing layer
     """
 
-    def __init__(self, domain_dim, f_Nyquist, dimension=2,
+    def __init__(self, domain_dim, frequency, freq_Nyquist, dimension=2,
                  quadrilateral=False, func_space_type=None,
                  abc_boundary_layer_shape="rectangular",
                  abc_boundary_layer_type="hybrid",
                  abc_reference_freq="source", comm=None):
-        """
-        Initialize the ABCLayer class
+        """Initialize the ABCLayer class.
 
         Parameters
         ----------
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
             or (length_z, length_x, length_y) for 3D
-        f_Nyquist : `float`
-            Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt)
+        frequency: `float`
+            Frequency of the source.
+        freq_Nyquist : `float`
+            Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt)
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
         quadrilateral : bool, optional
@@ -149,8 +166,6 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         comm : `object`, optional
             An object representing the communication interface
             for parallel processing. Default is None
-        output_folder : `str`, optional
-            The folder where output data will be saved. Default is None
 
         Returns
         -------
@@ -160,19 +175,31 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         # Original domain dimensions
         self.domain_dim = domain_dim
 
+        # Source frequency
+        self.frequency = frequency
+
+        # Nyquist frequency
+        self.freq_Nyquist = freq_Nyquist
+
         # Model dimension
         self.dimension = dimension
+
+        # Quadrilateral/hexahedral elements
+        self.quadrilateral = quadrilateral
+
+        # Type of function space
+        self.func_space_type = func_space_type
 
         # ABC layer parameters
         self.abc_boundary_layer_shape = abc_boundary_layer_shape
         self.abc_boundary_layer_type = abc_boundary_layer_type
         self.abc_reference_freq = abc_reference_freq
 
-        # Nyquist frequency
-        self.f_Nyquist = f_Nyquist
+        # Communicator MPI
+        self.comm = comm
 
         # # Initializing the error measure class
-        # HABCError.__init__(self, self.dt, self.f_Nyquist,
+        # HABCError.__init__(self, self.dt, self.freq_Nyquist,
         #                    self.receiver_locations,
         #                    output_folder=self.path_save,
         #                    output_case=self.path_case_abc)
@@ -184,8 +211,7 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         #               output_folder=self.path_case_abc)
 
     def formatting_abc_layer_type(self, str_to_format, for_prints=True):
-        """
-        Format a string for the ABC layer type.
+        """Format a string for the ABC layer type.
 
         Parameters
         ----------
@@ -225,6 +251,10 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
 
         Returns
         -------
+        case : `str`
+            Label for the output files that includes the layer shape
+            ('REC', HNX.X) and the reference frequency
+            ('SOU' or 'BND'). Example: 'REC_SOU' or 'REC_BND'
         path_case_abc : `string`
             Path to save data for the current case study
         path_save : `string`
@@ -240,7 +270,7 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
 
             # Initializing the rectangular layer
             RectangLayer.__init__(self, self.domain_dim, dimension=self.dimension)
-            self.case = 'REC'  # Label
+            self.case_abc = 'REC'  # Label
 
         elif self.abc_boundary_layer_shape == 'hypershape':  # Hypershape layer
 
@@ -248,7 +278,7 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
             HyperLayer.__init__(self, self.domain_dim, n_hyp=self.abc_deg_layer,
                                 n_type=self.abc_degree_type, dimension=self.dimension)
 
-            self.case = 'HN' + f"{self.abc_deg_layer:.1f}"  # Label
+            self.case_abc = 'HN' + f"{self.abc_deg_layer:.1f}"  # Label
             deg_str = f" - Degree: {self.abc_deg_layer}"
             lay_str += deg_str
 
@@ -260,10 +290,10 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
 
         # Labeling for the reference frequency for the absorbing layer
         if self.abc_reference_freq == 'boundary':
-            self.case += "_BND"
+            self.case_abc += "_BND"
 
         elif self.abc_reference_freq == 'source':
-            self.case += "_SOU"
+            self.case_abc += "_SOU"
 
         else:
             value_parameter_error('abc_reference_freq',
@@ -276,17 +306,17 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         else:
             path_save = getcwd() + "/" + output_folder + "/"
 
-        path_case_abc = path_save + self.case + "/"
+        path_case_abc = path_save + self.case_abc + "/"
 
         self.path_save = path_save
         self.path_case_abc = path_case_abc
 
-        return self.path_save, self.path_case_abc
+        return self.case_abc, self.path_save, self.path_case_abc
 
     def critical_boundary_points(self, Wave):
-        """
-        Determine the critical points on domain boundaries of the original
-        model to size an absorbing layer using the Eikonal criterion for HABCs.
+        """Determine critical boundary points using the Eikonal criterion.
+
+        Use original-domain boundaries to size the absorbing layer.
         See Salas et al (2022) for details.
 
         Parameters
@@ -306,16 +336,15 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         Eik.solve_eik()
 
         # Identifying critical points
-        Wave.eik_bnd = Eik.ident_crit_eik()
+        self.eik_bnd = Eik.ident_crit_eik()
 
         # Critical point coordinates as receivers
-        pcrit = [bnd[0] for bnd in Wave.eik_bnd]
+        pcrit = [bnd[0] for bnd in self.eik_bnd]
         Wave.receiver_locations = pcrit + Wave.receiver_locations
         Wave.number_of_receivers = len(Wave.receiver_locations)
 
     def det_reference_freq(self, fpad=4):
-        """
-        Determine the reference frequency for a new layer size
+        """Determine the reference frequency for a new layer size.
 
         Parameters
         ----------
@@ -328,9 +357,6 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         """
 
         print("\nDetermining Reference Frequency", flush=True)
-
-        abc_reference_freq = self.abc_reference_freq \
-            if hasattr(self, 'receivers_reference') else 'source'
 
         if self.abc_reference_freq == 'source':  # Initial guess
 
@@ -348,7 +374,7 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
                 histPcrit = self.receivers_reference[:, n_crit]
 
                 # Get the minimum frequency excited at each critical point
-                freq_ref = freq_response(histPcrit, self.f_Nyquist,
+                freq_ref = freq_response(histPcrit, self.freq_Nyquist,
                                          fpad=fpad, get_max_freq=True)
                 print("Frequency at Critical Point {:>2.0f}: {:.5f}".format(
                     n_crit, freq_ref), flush=True)
@@ -358,8 +384,7 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         print("Reference Frequency (Hz): {:.5f}".format(self.freq_ref))
 
     def abc_new_geometry(self):
-        """
-        Determine the new domain geometry with the absorbing layer
+        """Determine the new domain geometry with the absorbing layer.
 
         Parameters
         ----------
@@ -370,25 +395,22 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         None
         """
 
+        # Original domain dimensions
+        length_z, length_x = self.domain_dim[:2]
+
         # New geometry with layer
-        self.Lx_abc = self.mesh_parameters.length_x + 2 * self.abc_pad_length
-        self.Lz_abc = self.mesh_parameters.length_z + self.abc_pad_length
+        self.length_xabc = length_x + 2 * self.abc_pad_length
+        self.length_zabc = length_z + self.abc_pad_length
 
         if self.dimension == 3:  # 3D
-            self.Ly_abc = self.mesh_parameters.length_y \
-                + 2 * self.abc_pad_length
+            length_y = self.domain_dim[2]
+            self.length_yabc = length_y + 2 * self.abc_pad_length
 
-    def abc_domain_dimensions(self, only_orig_dom=False,
-                              only_abc_dom=False, full_hyp=True):
-        """
-        Determine the new dimensions of the domain with absorbing layer
+    def abc_domain_dimensions(self, full_hyp=True):
+        """Return the new dimensions of the domain with absorbing layer as a tuple.
 
         Parameters
         ----------
-        only_orig_dom : `bool`, optional
-            Return only the original domain dimensions. Default is False
-        only_abc_dom : `bool`, optional
-            Return only the domain dimensions with layer. Default is False
         full_hyp : `bool`, optional
             Option to get the domain dimensions in hypershape layers.
             If True, the domain dimensions with layer do not include truncation
@@ -397,50 +419,36 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
 
         Returns
         -------
-        domain_dim : `tuple`
-            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         domain_layer : `tuple`
             Domain dimensions with layer. For rectangular layers, truncation
             due to the free surface is included (n = 1). For hypershape layers,
             truncation by free surface is not included (n = 2) if 'full_hyp' is
             True; otherwise, it is included (n = 1). Dimensions are defined as:
-            - 2D : (Lx + 2 * pad_len, Lz + n * pad_len)
-            - 3D : (Lx + 2 * pad_len, Lz + n * pad_len, Ly + 2 * pad_len)
+            2D: (length_z + n * pad_len, length_x + 2 * pad_len)
+            3D: (length_z + n * pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len)
         """
 
-        # Original domain dimensions
-        domain_dim = (self.mesh_parameters.length_x,
-                      self.mesh_parameters.length_z)
-        if self.dimension == 3:  # 3D
-            domain_dim += (self.mesh_parameters.length_y,)
+        # Domain dimensions with layer and truncations
+        domain_layer = [self.length_zabc, self.length_xabc]
 
-        if only_orig_dom:
-            return domain_dim
-
-        # Domain dimension with layer w/ or w/o truncations
-        if self.abc_boundary_layer_shape == 'rectangular':  # Rectangular layer
-            domain_layer = (self.Lx_abc, self.Lz_abc)
-
-        elif self.abc_boundary_layer_shape == 'hypershape':  # Hypershape layer
-            domain_layer = (self.Lx_abc, self.mesh_parameters.length_z
-                            + 2 * self.abc_pad_length) \
-                if full_hyp else (self.Lx_abc, self.Lz_abc)
+        # Domain dimensions with layer without truncations only for hypershape layers
+        if self.abc_boundary_layer_shape == 'hypershape' and full_hyp:
+            domain_layer[0] += self.abc_pad_length
 
         if self.dimension == 3:  # 3D
-            domain_layer += (self.Ly_abc,)
+            domain_layer.append(self.length_yabc)
 
-        if only_abc_dom:
-            return domain_layer
+        return tuple(domain_layer)
 
-        return domain_dim, domain_layer
+    def layer_size_criterion(self, lmin, fpad=4, n_root=1, layer_based_on_mesh=True):
+        """Determine the absorbing layer size using the Eikonal criterion for HABCs.
 
-    def layer_size_criterion(self, fpad=4, n_root=1, layer_based_on_mesh=True):
-        """
-        Determine the size of the absorbing layer using the Eikonal
-        criterion for HABCs. See Salas et al (2022) for details.
+        See Salas et al (2022) for details.
 
         Parameters
         ----------
+        lmin : `float`
+            Minimum mesh size
         fpad : `int`, optional
             Padding factor for FFT. Default is 4
         n_root : `int`, optional
@@ -455,6 +463,9 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
 
         # Determining the reference frequency
         self.det_reference_freq(fpad=fpad)
+
+        # Minimum mesh size
+        self.lmin = lmin
 
         # Inverse of the minimum Eikonal
         z_par = self.eik_bnd[0][3]
@@ -485,29 +496,25 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         self.abc_new_geometry()
 
         # Domain dimensions without free surface truncation
-        domain_layer_full = self.abc_domain_dimensions(only_abc_dom=True)
+        domain_layer_full = self.abc_domain_dimensions()
 
         if self.abc_boundary_layer_shape == 'rectangular':
-
-            print("Determining Rectangular Layer Parameters", flush=True)
 
             # Geometric properties of the rectangular layer
             self.calc_rec_geom_prop(domain_layer_full, self.abc_pad_length)
 
         elif self.abc_boundary_layer_shape == 'hypershape':
 
-            print("Determining Hypershape Layer Parameters", flush=True)
-
             # Geometric properties of the hypershape layer
-            self.calc_hyp_geom_prop(
-                dom_lay_full, self.abc_pad_length, self.lmin)
+            self.calc_hyp_geom_prop(domain_layer_full, self.abc_pad_length, self.lmin)
 
-    def create_mesh_with_layer(self, inf_model=False, spln=True):
-        """
-        Create a mesh with absorbing layer based on the determined size.
+    def create_mesh_with_layer(self, Wave, inf_model=False, spln=True):
+        """Create a mesh with absorbing layer based on the determined size.
 
         Parameters
         ----------
+        Wave : `wave.Wave`
+            An instance of the Wave class
         inf_model : `bool`, optional
             If True, build a rectangular layer for the infinite or reference
             model (Model with "infinite" dimensions). Default is False
@@ -529,11 +536,13 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
             print("\nGenerating Mesh with Absorbing Layer", flush=True)
             layer_shape = self.abc_boundary_layer_shape
 
+        # Update the pad length in Wave object
+        Wave.abc_pad_length = self.abc_pad_length
+
         # New mesh with layer
         if layer_shape == 'rectangular':
-            domain_layer = self.abc_domain_dimensions(only_abc_dom=True)
-            mesh_abc = self.rectangular_mesh_habc(domain_layer,
-                                                  self.abc_pad_length)
+            Wave.set_mesh()
+            print("Extended Rectangular Mesh Generated Successfully", flush=True)
 
         elif layer_shape == 'hypershape':
 
@@ -547,8 +556,9 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
             hypershape_param = (self.n_hyp, geometry_param, *self.hyper_axes)
             mesh_abc = self.hypershape_mesh_habc(hypershape_param, spln=spln)
 
-        # Updating the mesh with the absorbing layer
-        self.set_mesh(user_mesh=mesh_abc)
+            # Updating the mesh with the absorbing layer
+            Wave.set_mesh(user_mesh=mesh_abc)
+
         print("Mesh Generated Successfully")
 
         if inf_model:
@@ -560,14 +570,15 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
 
         # Save new mesh
         outfile = fire.VTKFile(pth_mesh)
-        outfile.write(self.mesh)
+        outfile.write(Wave.mesh)
 
-    def velocity_abc(self, inf_model=False, method='point_cloud'):
-        """
-        Set the velocity model for the model with absorbing layer
+    def velocity_abc(self, Wave, inf_model=False, method='point_cloud'):
+        """Set the velocity model for the model with absorbing layer.
 
         Parameters
         ----------
+        Wave : `wave.Wave`
+            An instance of the Wave class
         inf_model : `bool`, optional
             If True, build a rectangular layer for the infinite or reference
             model (Model with "infinite" dimensions). Default is False
@@ -610,36 +621,37 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
 
         print("\nUpdating Velocity Profile", flush=True)
 
-        # Initialize velocity field and assigning the original velocity model
-        if self.quadrilateral:
-            base_mesh = self.mesh._base_mesh
-            base_cell = base_mesh.ufl_cell()
-            element_zx = fire.FiniteElement("DQ", base_cell, 0,
-                                            variant="spectral")
-            element_y = fire.FiniteElement("DG", fire.interval, 0,
-                                           variant="spectral")
-            tensor_element = fire.TensorProductElement(element_zx, element_y)
-            V = fire.FunctionSpace(self.mesh, tensor_element)
-        else:
-            V = fire.FunctionSpace(self.mesh, self.ele_type_c0, self.p_c0)
+        # Scalar space for auxiliar field of clipped coordinates
+        method_element = "DQ" if self.quadrilateral else "DG"
+        V = create_function_space(Wave.mesh, method_element, 0)
 
-        self.c = fire.Function(V).interpolate(self.initial_velocity_model,
+        # Initialize velocity field and assigning the original velocity model
+        Wave.c = fire.Function(V).interpolate(Wave.initial_velocity_model,
                                               allow_missing_dofs=True)
 
         # Clipping coordinates to the layer domain
-        lay_field, layer_mask = self.clipping_coordinates_lay_field(V)
+        domain_layer = self.abc_domain_dimensions(full_hyp=False)
+        ufl_coordinates_habc = Wave.mesh_ops.get_spatial_coordinates_abc(Wave.mesh,
+                                                                         domain_layer)
+        lay_field, layer_mask = \
+            clipping_coordinates_lay_field(self.domain_dim, Wave.mesh,
+                                           self.dimension, ufl_coordinates_habc,
+                                           V, quadrilateral=self.quadrilateral)
 
         # Extending velocity model within the absorbing layer
-        self.extend_velocity_profile(lay_field, layer_mask, method=method)
+        extended_velocity = \
+            extend_scalar_field_profile(Wave.mesh_original, Wave.initial_velocity_model,
+                                        lay_field, layer_mask, Wave.mesh_parameters.tol,
+                                        method=method, name_prop="Velocity")
 
         # Interpolating the velocity model in the layer
-        self.c.interpolate(lay_field.sub(0) * layer_mask + (
-            1. - layer_mask) * self.c, allow_missing_dofs=True)
+        Wave.c.interpolate(extended_velocity * layer_mask + (1. - layer_mask)
+                           * Wave.c, allow_missing_dofs=True)
         del layer_mask, lay_field
 
         # Interpolating in the space function of the problem
-        self.c = fire.Function(self.function_space,
-                               name='c [km/s])').interpolate(self.c)
+        Wave.c = fire.Function(Wave.function_space,
+                               name='c [km/s])').interpolate(Wave.c)
 
         # Save new velocity model
         if inf_model:
@@ -647,10 +659,10 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         else:
             c_file_name = self.formatting_abc_layer_type("/c_{}.pvd",
                                                          for_prints=False)
-            file_name = self.case + c_file_name
+            file_name = self.case_abc + c_file_name
 
         outfile = fire.VTKFile(self.path_save + file_name)
-        outfile.write(self.c)
+        outfile.write(Wave.c)
 
     def nrbc_on_boundary_layer(self, sommerfeld_bc=False):
         """
@@ -750,7 +762,7 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
                                                                   p=mag_add)
 
         # Updating Nyquist frequency
-        self.f_Nyquist = 1. / (2. * self.dt)
+        self.freq_Nyquist = 1. / (2. * self.dt)
 
         print(str_dt, flush=True)
 
@@ -897,9 +909,9 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         self.save_reference_signal()
 
         # Deleting variables to be computed for the ABC scheme
-        del self.Lx_abc, self.Lz_abc
+        del self.length_xabc, self.length_zabc
         if self.dimension == 3:
-            del self.Ly_abc
+            del self.length_yabc
         if self.abc_boundary_layer_type == "hybrid":
             del self.cosHig, self.eta_mask, self.eta_habc
         elif self.abc_boundary_layer_type == "PML":

@@ -311,14 +311,14 @@ class HABCMesh(MeshOps):
         print(f"Original Mesh with {Wave.mesh.num_vertices()} Nodes "
               f"and {Wave.mesh.num_cells()} Volume Elements", flush=True)
 
-        # Get mesh parameters from original mesh
-        mesh_derived_parameters = self.representative_mesh_dimensions(Wave.mesh,
-                                                                      Wave.function_space)
-        Wave.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
-        Wave.mesh_parameters.lmin = mesh_derived_parameters[1]
-        Wave.mesh_parameters.lmax = mesh_derived_parameters[2]
-        Wave.mesh_parameters.alpha = mesh_derived_parameters[3]
-        Wave.mesh_parameters.tol = mesh_derived_parameters[4]
+        # # Get mesh parameters from original mesh
+        # mesh_derived_parameters = self.representative_mesh_dimensions(Wave.mesh,
+        #                                                               Wave.function_space)
+        # Wave.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
+        # Wave.mesh_parameters.lmin = mesh_derived_parameters[1]
+        # Wave.mesh_parameters.lmax = mesh_derived_parameters[2]
+        # Wave.mesh_parameters.alpha = mesh_derived_parameters[3]
+        # Wave.mesh_parameters.tol = mesh_derived_parameters[4]
 
         # Save a copy of the original mesh
         Wave.mesh_original = Wave.mesh
@@ -1120,30 +1120,36 @@ class HABCMesh(MeshOps):
 
         return bnd_nfs, bnd_nodes_nfs
 
-    def get_spatial_coordinates_habc(self):
+    def get_spatial_coordinates_abc(self, mesh, domain_layer):
         """ Get the ufl coordinates of the mesh with absorbing layer.
 
         Parameters
         ----------
-        None
+        mesh : `Firedrake.Mesh`
+            Current mesh
+        domain_layer : `tuple`
+            Domain dimensions with layer. For rectangular layers, truncation
+            due to the free surface is included (n = 1). For hypershape layers,
+            truncation by free surface is not included (n = 2) if 'full_hyp' is
+            True; otherwise, it is included (n = 1). Dimensions are defined as:
+            2D: (length_z + n * pad_len, length_x + 2 * pad_len)
+            3D: (length_x + 2 * pad_len, length_z + n * pad_len, length_y + 2 * pad_len)
 
         Returns
         -------
-        ufl_coordinates_habc : `ufl.geometry.SpatialCoordinate`
+        ufl_coordinates_abc : `ufl.geometry.SpatialCoordinate`
             Domain Coordinates including the absorbing layer
         """
 
-        min_coordinates, max_coordinates = \
-            self.extract_extreme_coordinates(self.mesh)
-        domain_habc = np.asarray([self.Lz_habc, self.Lx_habc]) if self.dimension == 2 \
-            else np.asarray([self.Lz_habc, self.Lx_habc, self.Ly_habc])
+        min_coordinates, max_coordinates = self.extract_extreme_coordinates(mesh)
+        domain_abc = np.asarray(domain_layer)
         domain_to_check = abs(max_coordinates - min_coordinates)
 
-        assert np.allclose(domain_habc, domain_to_check, atol=0.01), \
+        assert np.allclose(domain_abc, domain_to_check, atol=0.01), \
             "Mesh dimensions do not match with expected dimensions of " \
-            f"domain with absorbing layer. Expected: {np.round(domain_habc, 3)}, " \
+            f"domain with absorbing layer. Expected: {np.round(domain_abc, 3)}, " \
             f"Got: {np.round(domain_to_check, 3)}."
 
-        ufl_coordinates_habc = fire.SpatialCoordinate(self.mesh)
+        ufl_coordinates_abc = fire.SpatialCoordinate(mesh)
 
-        return ufl_coordinates_habc
+        return ufl_coordinates_abc

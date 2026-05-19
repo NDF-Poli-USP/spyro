@@ -7,13 +7,7 @@ from shutil import rmtree
 from sympy import divisors
 from spyro.abc.abc_layer import ABCLayer
 from spyro.habc.damp_profile import HABC_Damping
-from spyro.domains.space import create_function_space
-from spyro.habc.lay_len import calc_size_lay
-from spyro.plots.plots_habc import plot_function_layer_size
-from spyro.tools.habc_tools import (clipping_coordinates_lay_field,
-                                    extend_scalar_field_profile)
 from spyro.utils.error_management import value_parameter_error
-from spyro.utils.freq_tools import freq_response
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -30,6 +24,8 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     Attributes
     ----------
+    abc_deg_layer : `int` or `float`
+        Hypershape degree
     abc_reference_freq : `str`
         Reference frequency for sizing the hybrid absorbing layer.
         Options: 'source' or 'boundary'
@@ -144,8 +140,8 @@ class HABCLayer(ABCLayer, HABC_Damping):
         Set the velocity model for the model with absorbing layer
     '''
 
-    def __init__(self, domain_dim, f_Nyquist, dimension=2,
-                 quadrilateral=False, func_space_type=None,
+    def __init__(self, domain_dim, frequency, f_Nyquist, abc_deg_layer,
+                 dimension=2, quadrilateral=False, func_space_type=None,
                  abc_boundary_layer_shape="rectangular",
                  abc_reference_freq="source", comm=None):
         '''
@@ -153,15 +149,32 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
         Parameters
         ----------
-        dictionary : `dict`, optional
-            A dictionary containing the input parameters for the HABC class
-        fwi_iter : int, optional
-            The iteration number for the FWI algorithm. Default is 0
+        domain_dim : `tuple`
+            Original domain dimensions: (length_z, length_x) for 2D
+            or (length_z, length_x, length_y) for 3D
+        frequency: `float`
+            Frequency of the source.
+        f_Nyquist : `float`
+            Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt)
+        abc_deg_layer : `int` or `float`
+            Hypershape degree
+        dimension : `int`, optional
+            Model dimension (2D or 3D). Default is 2D
+        quadrilateral : bool, optional
+            Flag to indicate whether to use quadrilateral/hexahedral elements.
+            Default is False (triangular/tetrahedral elements)
+        func_space_type, `str`, optional
+            Type of function space for the state variable.
+            Options: 'scalar' or 'vector'. Default is None
+        abc_boundary_layer_shape : `string`, optional
+            Shape type of pad layer. Options: 'rectangular' or 'hypershape'.
+            Default is 'rectangular'
+        abc_reference_freq : `str`, optional
+            Reference frequency for sizing the hybrid absorbing layer.
+            Options: 'source' or 'boundary'
         comm : `object`, optional
             An object representing the communication interface
             for parallel processing. Default is None
-        output_folder : `str`, optional
-            The folder where output data will be saved. Default is None
 
         Returns
         -------
@@ -169,364 +182,14 @@ class HABCLayer(ABCLayer, HABC_Damping):
         '''
 
         # Initializing the ABCLayer class
-        ABCLayer.__init__(self, domain_dim, f_Nyquist, dimension=dimension,
+        ABCLayer.__init__(self, domain_dim, frequency, f_Nyquist, dimension=dimension,
                           quadrilateral=quadrilateral, func_space_type=func_space_type,
                           abc_boundary_layer_shape=abc_boundary_layer_shape,
                           abc_boundary_layer_type="hybrid",
                           abc_reference_freq=abc_reference_freq, comm=comm)
 
-    def det_reference_freq(self, fpad=4):
-        '''
-        Determine the reference frequency for a new layer size
-
-        Parameters
-        ----------
-        fpad : `int`, optional
-            Padding factor for FFT. Default is 4
-
-        Returns
-        -------
-        None
-        '''
-
-        print("\nDetermining Reference Frequency", flush=True)
-
-        abc_reference_freq = self.abc_reference_freq \
-            if hasattr(self, 'receivers_reference') else 'source'
-
-        if self.abc_reference_freq == 'source':  # Initial guess
-
-            # Theorical central Ricker source frequency
-            self.freq_ref = self.frequency
-
-        elif abc_reference_freq == 'boundary':
-
-            # Reference frequency of the wave at the boundary
-            self.freq_ref = np.inf
-
-            for n_crit in range(self.number_of_receivers):
-
-                # Transient response at each critical Eikonal point
-                histPcrit = self.receivers_reference[:, n_crit]
-
-                # Get the minimum frequency excited at each critical point
-                freq_ref = freq_response(histPcrit, self.freq_Nyq,
-                                         fpad=fpad, get_dominant_freq=True)
-                print("Frequency at Critical Point {:>2.0f}: {:.5f}".format(
-                    n_crit, freq_ref), flush=True)
-
-                self.freq_ref = min(self.freq_ref, freq_ref)
-
-        print("Reference Frequency (Hz): {:.5f}".format(self.freq_ref))
-
-    def habc_new_geometry(self):
-        '''
-        Determine the new domain geometry with the absorbing layer
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-        '''
-
-        # New geometry with layer
-        self.Lx_habc = self.mesh_parameters.length_x + 2 * self.pad_len
-        self.Lz_habc = self.mesh_parameters.length_z + self.pad_len
-
-        if self.dimension == 3:  # 3D
-            self.Ly_habc = self.mesh_parameters.length_y + 2 * self.pad_len
-
-    def habc_domain_dimensions(self, only_orig_dom=False,
-                               only_habc_dom=False, full_hyp=True):
-        '''
-        Determine the new dimensions of the domain with absorbing layer
-
-        Parameters
-        ----------
-        only_orig_dom : `bool`, optional
-            Return only the original domain dimensions. Default is False
-        only_habc_dom : `bool`, optional
-            Return only the domain dimensions with layer. Default is False
-        full_hyp : `bool`, optional
-            Option to get the domain dimensions in hypershape layers.
-            If True, the domain dimensions with layer do not include truncation
-            due to the free surface. If False, the domain dimensions with layer
-            include truncation by free surface. Default is True.
-
-        Returns
-        -------
-        domain_dim : `tuple`
-            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
-        dom_lay : `tuple`
-            Domain dimensions with layer. For rectangular layers, truncation
-            due to the free surface is included (n = 1). For hypershape layers,
-            truncation by free surface is not included (n = 2) if 'full_hyp' is
-            True; otherwise, it is included (n = 1). Dimensions are defined as:
-            - 2D : (Lx + 2 * pad_len, Lz + n * pad_len)
-            - 3D : (Lx + 2 * pad_len, Lz + n * pad_len, Ly + 2 * pad_len)
-        '''
-
-        # Original domain dimensions
-        domain_dim = (self.mesh_parameters.length_x,
-                      self.mesh_parameters.length_z)
-        if self.dimension == 3:  # 3D
-            domain_dim += (self.mesh_parameters.length_y,)
-
-        if only_orig_dom:
-            return domain_dim
-
-        # Domain dimension with layer w/ or w/o truncations
-        if self.layer_shape == 'rectangular':  # Rectangular layer
-            dom_lay = (self.Lx_habc, self.Lz_habc)
-
-        elif self.layer_shape == 'hypershape':  # Hypershape layer
-            dom_lay = (self.Lx_habc, self.mesh_parameters.length_z
-                       + 2 * self.pad_len) \
-                if full_hyp else (self.Lx_habc, self.Lz_habc)
-
-        if self.dimension == 3:  # 3D
-            dom_lay += (self.Ly_habc,)
-
-        if only_habc_dom:
-            return dom_lay
-
-        return domain_dim, dom_lay
-
-    def size_habc_criterion(self, fpad=4, n_root=1, layer_based_on_mesh=True):
-        '''
-        Determine the size of the absorbing layer using the Eikonal
-        criterion for HABCs. See Salas et al (2022) for details.
-
-        Parameters
-        ----------
-        fpad : `int`, optional
-            Padding factor for FFT. Default is 4
-        n_root : `int`, optional
-            n-th Root selected as the size of the absorbing layer. Default is 1
-        layer_based_on_mesh : `bool`, optional
-            Adjust the layer size based on the element size. Default is True
-
-        Returns
-        -------
-        None
-        '''
-
-        # Determining the reference frequency
-        self.det_reference_freq(fpad=fpad)
-
-        # Inverse of the minimum Eikonal
-        z_par = self.eik_bnd[0][3]
-
-        # Reference length for the size of the absorbing layer
-        self.lref = self.eik_bnd[0][4]
-
-        # Critical source position
-        self.crit_source = self.eik_bnd[0][-1]
-
-        # Computing layer sizes
-        self.F_L, self.pad_len, self.ele_pad, self.d_norm, \
-            self.a_par, self.FLpos = calc_size_lay(
-                self.freq_ref, z_par, self.mesh_parameters.lmin, self.lref,
-                n_root=n_root, layer_based_on_mesh=layer_based_on_mesh)
-        self.abc_pad_length = self.pad_len
-
-        plot_function_layer_size([self.a_par, z_par],
-                                 [self.freq_ref, self.frequency],
-                                 [self.mesh_parameters.lmin, self.lref], self.FLpos,
-                                 output_folder=self.path_case_habc)
-
-        print("\nDetermining New Geometry with Absorbing Layer", flush=True)
-
-        # New geometry with layer
-        self.habc_new_geometry()
-
-        # Domain dimensions without free surface truncation
-        dom_lay_full = self.habc_domain_dimensions(only_habc_dom=True)
-
-        if self.layer_shape == 'rectangular':
-
-            print("Determining Rectangular Layer Parameters", flush=True)
-
-            # Geometric properties of the rectangular layer
-            self.calc_rec_geom_prop(dom_lay_full, self.pad_len)
-
-        elif self.layer_shape == 'hypershape':
-
-            print("Determining Hypershape Layer Parameters", flush=True)
-
-            # Geometric properties of the hypershape layer
-            self.calc_hyp_geom_prop(dom_lay_full, self.pad_len,
-                                    self.mesh_parameters.lmin)
-
-        # Domain dimensions with free surface truncation
-        dom_lay_trunc = self.habc_domain_dimensions(only_habc_dom=True,
-                                                    full_hyp=False)
-
-        # Layer parameters
-        layer_par = (self.F_L, self.a_par, self.d_norm)
-
-        # mesh parameters
-        mesh_par = (self.mesh_parameters.lmin, self.mesh_parameters.lmax,
-                    self.mesh_parameters.alpha, self.variant)
-
-        # wave parameters
-        c_ref = min([bnd[1] for bnd in self.eik_bnd])
-        c_bnd = self.eik_bnd[0][1]
-        wave_par = (self.freq_ref, c_ref, c_bnd)
-
-        # Initializing the parent class for damping
-        HABC_Damping.__init__(self, dom_lay_trunc, layer_par, mesh_par,
-                              wave_par, dimension=self.dimension, comm=self.comm)
-
-    def create_mesh_habc(self, inf_model=False, spln=True):
-        '''
-        Create a mesh with absorbing layer based on the determined size.
-
-        Parameters
-        ----------
-        inf_model : `bool`, optional
-            If True, build a rectangular layer for the infinite or reference
-            model (Model with "infinite" dimensions). Default is False
-        spln : `bool`, optional
-            Flag to indicate whether to use splines (True) or lines (False)
-            in hypershape layer generation. Default is True
-
-        Returns
-        -------
-        None
-        '''
-
-        # Checking if the mesh for infinite model is requested
-        if inf_model:
-            print("\nGenerating Mesh for Infinite Model", flush=True)
-            layer_shape = 'rectangular'
-
-        else:
-            print("\nGenerating Mesh with Absorbing Layer", flush=True)
-            layer_shape = self.layer_shape
-
-        # New mesh with layer
-        if layer_shape == 'rectangular':
-            self.set_mesh()
-            print("Extended Rectangular Mesh Generated Successfully", flush=True)
-
-        elif layer_shape == 'hypershape':
-
-            # Parameters for hypershape mesh
-            if self.dimension == 2:  # 2D
-                par_geom = self.perim_hyp
-
-            if self.dimension == 3:  # 3D
-                par_geom = self.surf_hyp
-
-            hyp_par = (self.n_hyp, par_geom, *self.hyper_axes)
-            mesh_habc = self.hypershape_mesh_habc(hyp_par, spln=spln)
-
-            # Updating the mesh with the absorbing layer
-            self.set_mesh(user_mesh=mesh_habc)
-
-        # # Updating the mesh with the absorbing layer
-        # self.set_mesh(user_mesh=mesh_habc)
-        print("Mesh Generated Successfully")
-
-        if inf_model:
-            pth_mesh = self.path_save + "preamble/mesh_inf.pvd"
-        else:
-            pth_mesh = self.path_case_habc + "mesh_habc.pvd"
-
-        # Save new mesh
-        outfile = fire.VTKFile(pth_mesh)
-        outfile.write(self.mesh)
-
-    def velocity_habc(self, inf_model=False, method='point_cloud'):
-        '''
-        Set the velocity model for the model with absorbing layer
-
-        Parameters
-        ----------
-        inf_model : `bool`, optional
-            If True, build a rectangular layer for the infinite or reference
-            model (Model with "infinite" dimensions). Default is False
-        method : `str`, optional
-            Method to extend the velocity profile. Options:
-            'point_cloud' or 'nearest_point'. Default is 'point_cloud'
-
-        Returns
-        -------
-        None
-
-        Improvements
-        ------------
-        dx = 0.05 km (2D)
-        Pts approach: 0.699 0.599 0.717 mean = 0.672
-        Lst approach: 0.914 0.769 0.830 mean = 0.847
-        New approach: 1.602 1.495 1.588 mean = 1.562
-        Old approach: 1.982 2.124 1.961 mean = 2.022
-
-        dx = 0.02 km
-        Pts approach: 2.290 2.844 2.133 mean = 2.422
-        Lst approach: 2.784 2.726 3.085 mean = 2.865
-        New approach: 5.276 5.214 6.275 mean = 5.588
-        Old approach: 12.232 12.372 12.078 = 12.227
-
-        dx = 0.05 km (3D)
-        Pts approach: 33.234 31.697 31.598 = 32.176
-        Lst approach: 60.101 60.919 50.918 = 57.313
-
-        'point_cloud' - dx = 0.05 km (2D)
-        Estimating Runtime and Used Memory
-        Runtime: (s):18.437, (m):0.307, (h):0.005
-        Used Memory: Current (MB):18.813, Peak (MB):25.102
-
-        'nearest_point' - dx = 0.05 km (2D)
-        Estimating Runtime and Used Memory
-        Runtime: (s):20.494, (m):0.342, (h):0.006
-        Used Memory: Current (MB):18.715, Peak (MB):25.298
-        '''
-
-        print("\nUpdating Velocity Profile", flush=True)
-
-        # Scalar space for auxiliar field of clipped coordinates
-        method_element = "DQ" if self.quadrilateral else "DG"
-        V = create_function_space(self.mesh, method_element, 0)
-
-        # Initialize velocity field and assigning the original velocity model
-        self.c = fire.Function(V).interpolate(self.initial_velocity_model,
-                                              allow_missing_dofs=True)
-
-        # Clipping coordinates to the layer domain
-        ufl_coordinates_habc = self.get_spatial_coordinates_habc()
-        lay_field, layer_mask = \
-            clipping_coordinates_lay_field(self.mesh_ops.domain_dim, self.mesh,
-                                           self.dimension, ufl_coordinates_habc,
-                                           V, quadrilateral=self.quadrilateral)
-
-        # Extending velocity model within the absorbing layer
-        extended_velocity = \
-            extend_scalar_field_profile(self.mesh_original, self.initial_velocity_model,
-                                        lay_field, layer_mask, self.mesh_parameters.tol,
-                                        method=method, name_prop="Velocity")
-
-        # Interpolating the velocity model in the layer
-        self.c.interpolate(extended_velocity * layer_mask + (
-            1. - layer_mask) * self.c, allow_missing_dofs=True)
-        del layer_mask, lay_field
-
-        # Interpolating in the space function of the problem
-        self.c = fire.Function(self.function_space,
-                               name='c [km/s])').interpolate(self.c)
-
-        # Save new velocity model
-        if inf_model:
-            file_name = "preamble/c_inf.pvd"
-        else:
-            file_name = self.case_habc + "/c_habc.pvd"
-
-        outfile = fire.VTKFile(self.path_save + file_name)
-        outfile.write(self.c)
+        self.abc_deg_layer = None if abc_boundary_layer_shape == "rectangular" \
+            else max(abc_deg_layer, 2.)
 
     def fundamental_frequency(self, method=None, monitor=False,
                               fitting_c=(0., 0., 0., 0.)):
@@ -744,6 +407,26 @@ class HABCLayer(ABCLayer, HABC_Damping):
         -------
         None
         '''
+
+        # Domain dimensions with free surface truncation
+        dom_lay_trunc = self.habc_domain_dimensions(only_habc_dom=True,
+                                                    full_hyp=False)
+
+        # Layer parameters
+        layer_par = (self.F_L, self.a_par, self.d_norm)
+
+        # mesh parameters
+        mesh_par = (self.mesh_parameters.lmin, self.mesh_parameters.lmax,
+                    self.mesh_parameters.alpha, self.variant)
+
+        # wave parameters
+        c_ref = min([bnd[1] for bnd in self.eik_bnd])
+        c_bnd = self.eik_bnd[0][1]
+        wave_par = (self.freq_ref, c_ref, c_bnd)
+
+        # Initializing the parent class for damping
+        HABC_Damping.__init__(self, dom_lay_trunc, layer_par, mesh_par,
+                              wave_par, dimension=self.dimension, comm=self.comm)
 
         # Estimating fundamental frequency
         self.fundamental_frequency(method=method, monitor=True,
