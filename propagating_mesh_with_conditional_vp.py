@@ -46,7 +46,7 @@ def create_grid_based_velocity_field(grid_spacing, length_z, length_x):
 
     return spyro.utils.scalar_conditional_to_grid(
         conditional=cond,
-        domain_dimensions=(2.0, 2.0),
+        domain_dimensions=(length_z, length_x),
         grid_spacing=grid_spacing,
     ), cond
 
@@ -82,11 +82,27 @@ dictionary["mesh"] = {
     "mesh_type": mesh_type,
     "velocity_model": vp_grid,
     "cells_per_wavelength": cells_per_wavelength,
+    "padding_type": None , # Padding types "rectangular" "hyperelliptical" None 
+    "hmin_segy": 0.0, # Minimum Element size for segy, will apply if higher than function minimum
+    "grade": 0.1, # function grading for smooth element transition, None = no smooth, 0.9 = small smooth, 0.1 = high smooth
+
+    # Water Interface
+    "water_interface": False, # If True detect and implement water interface
+
+    # Structured Mesh & Winslow Smoothing
+    "structured_mesh": False, # True if structured quad mesh, False if triangular unstructured mesh
+    "min_element_size": 0.01, # Element size for structured mesh
+    "apply_winslow": True, # If True apply winslow smoothing
+    "winslow_implementation": "fast", # Winslow version to use, default, fast and numba are options
+    "winslow_iterations": 3000, # Number of iterations for Winslow Smoothing
+    "winslow_omega": 0.5, # Winslow Smoothing node movement factor
+    "extend_segy": False, # Extend the segy function into the padding ( for unstructured mesh )
+    "h_padding": 0.5,  # If extend_segy = False, use this value of constant padding size
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
     "source_locations": [(-0.2, length_x/2.0)],
-    "frequency": 5.0,
+    "frequency": 20.0,
     "delay": 0.3,
     "receiver_locations": [(-0.5, length_x/2.0)],
     "delay_type": "time",
@@ -100,7 +116,6 @@ dictionary["time_axis"] = {
     "output_frequency": 100,  # how frequently to output solution to pvds
     "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
 }
-
 dictionary["visualization"] = {
     "forward_output": True,
     "forward_output_filename": "results/forward_output.pvd",
@@ -111,7 +126,8 @@ dictionary["visualization"] = {
 }
 
 wave_obj = spyro.AcousticWave(dictionary=dictionary)
-wave_obj.set_initial_velocity_model(conditional=make_minas_cheese_conditional(wave_obj.mesh_z, wave_obj.mesh_x))
-wave_obj.forward_solve()
+wave_obj.set_initial_velocity_model(new_file = "tmp_velocity_model.segy")
+spyro.plots.debug_pvd(wave_obj.initial_velocity_model)
+# wave_obj.forward_solve()
 
 print("END")

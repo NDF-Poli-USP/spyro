@@ -7,7 +7,6 @@ import h5py
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
-import segyio
 import glob
 import os
 import warnings
@@ -364,47 +363,6 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
         vi = griddata((x, y, z), v, (xi, yi, zi), method="linear")
 
     return vi
-
-
-def create_segy(function, V, grid_spacing, filename):
-    """Write the velocity data into a segy file named filename
-
-    Parameters
-    ----------
-    function : firedrake.Function
-        Function to interpolate
-    V : firedrake.FunctionSpace
-        Function space of function
-    grid_spacing : float
-        Spacing of grid points
-    filename: str
-        Name of the segy file to save
-
-    Returns
-    -------
-    None
-    """
-    velocity_grid_data = write_function_to_grid(function, V, grid_spacing, buffer=True)
-
-    return create_segy_from_grid(velocity_grid_data, filename)
-
-
-def create_segy_from_grid(velocity, filename):
-    spec = segyio.spec()
-
-    velocity = np.flipud(velocity.T)
-
-    spec.sorting = 2  # not sure what this means
-    spec.format = 1  # not sure what this means
-    spec.samples = range(velocity.shape[0])
-    spec.ilines = range(velocity.shape[1])
-    spec.xlines = range(velocity.shape[0])
-
-    assert np.sum(np.isnan(velocity[:])) == 0
-
-    with segyio.create(filename, spec) as f:
-        for tr, il in enumerate(spec.ilines):
-            f.trace[tr] = velocity[:, tr]
 
 
 @ensemble_save

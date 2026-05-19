@@ -99,7 +99,7 @@ def create_sizing_function(
     # Applying padding
     if pad_type == "rectangular" or pad_type == "hyperelliptical":
         dz = (bbox[1] - bbox[0]) / n_traces
-        dx = (bbox[3] - bbox[2]) / n_samples
+        dx = (bbox[3] - bbox[2]) / n_samples  # TODO: this is the error
         nnz = int(pad_size_z / dz)
         nnx = int(pad_size_x / dx)
 

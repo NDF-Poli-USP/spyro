@@ -3,7 +3,7 @@ import firedrake as fire
 import warnings
 import numpy as np
 from os import getcwd
-from spyro.io.basicio import create_segy
+from spyro.io import create_segy
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
