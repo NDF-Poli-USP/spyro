@@ -309,9 +309,9 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
         Interpolated values on grid points
     """
     # get DoF coordinates
-    m = V.ufl_domain()
-    W = fire.VectorFunctionSpace(m, V.ufl_element())
-    coords = fire.assemble(fire.interpolate(m.coordinates, W))
+    mesh = V.ufl_domain()
+    W = fire.VectorFunctionSpace(mesh, V.ufl_element())
+    coords = fire.assemble(fire.interpolate(mesh.coordinates, W))
     dimension, = coords.ufl_shape
     if dimension == 2:
         x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
@@ -452,16 +452,70 @@ def _check_units(c):
     return c
 
 
+def project_grid_velocity_data(grid_velocity_data, V):
+    """Project a structured grid dictionary onto a Firedrake function space."""
+    vp_values = np.asarray(grid_velocity_data["vp_values"])
+    length_z = grid_velocity_data["length_z"]
+    length_x = grid_velocity_data["length_x"]
+    length_y = grid_velocity_data.get("length_y")
+
+    mesh = V.ufl_domain()
+    W = fire.VectorFunctionSpace(mesh, V.ufl_element())
+    coords = fire.assemble(fire.interpolate(mesh.coordinates, W))
+    sd = coords.dat.data.shape[1]
+
+    if sd == 2:
+        z_axis = np.linspace(-length_z, 0.0, vp_values.shape[0])
+        x_axis = np.linspace(0.0, length_x, vp_values.shape[1])
+
+        qp_z = np.clip(coords.dat.data[:, 0], z_axis[0], z_axis[-1])
+        qp_x = np.clip(coords.dat.data[:, 1], x_axis[0], x_axis[-1])
+
+        interpolant = RegularGridInterpolator(
+            (z_axis, x_axis),
+            vp_values,
+            bounds_error=False,
+            fill_value=None,
+        )
+        tmp = interpolant((qp_z, qp_x))
+    elif sd == 3:
+        if length_y is None:
+            raise ValueError("3D grid velocity data requires 'length_y'.")
+
+        z_axis = np.linspace(-length_z, 0.0, vp_values.shape[0])
+        x_axis = np.linspace(0.0, length_x, vp_values.shape[1])
+        y_axis = np.linspace(0.0, length_y, vp_values.shape[2])
+
+        qp_z = np.clip(coords.dat.data[:, 0], z_axis[0], z_axis[-1])
+        qp_x = np.clip(coords.dat.data[:, 1], x_axis[0], x_axis[-1])
+        qp_y = np.clip(coords.dat.data[:, 2], y_axis[0], y_axis[-1])
+
+        interpolant = RegularGridInterpolator(
+            (z_axis, x_axis, y_axis),
+            vp_values,
+            bounds_error=False,
+            fill_value=None,
+        )
+        tmp = interpolant((qp_z, qp_x, qp_y))
+    else:
+        raise NotImplementedError
+
+    c = fire.Function(V)
+    c.dat.data[:] = tmp
+    return _check_units(c)
+
+
 def interpolate(Model, fname, V):
-    """Read and interpolate a seismic velocity model stored
-    in a HDF5 file onto the nodes of a finite element space.
+    """Read and interpolate a seismic velocity model onto a Firedrake space.
 
     Parameters
     ----------
     Model: spyro object
         Model options and parameters.
-    fname: str
-        The name of the HDF5 file containing the seismic velocity model.
+    fname: str or dict
+        The name of the HDF5 file containing the seismic velocity model, or
+        a grid dictionary with keys such as ``vp_values``, ``length_z`` and
+        ``length_x``.
     V: Firedrake.FunctionSpace object
         The space of the finite elements.
 
@@ -472,7 +526,8 @@ def interpolate(Model, fname, V):
         of the finite elements.
 
     """
-    m = V.ufl_domain()
+    if isinstance(fname, dict):
+        return _project_grid_velocity_data(fname, V)
 
     add_pad = False
     if Model.mesh_parameters.abc_pad_length is not None:
@@ -494,6 +549,7 @@ def interpolate(Model, fname, V):
         miny = 0.0
         maxy = Model.mesh_parameters.length_y
 
+    m = V.ufl_domain()
     W = fire.VectorFunctionSpace(m, V.ufl_element())
     coords = fire.assemble(fire.interpolate(m.coordinates, W))
     # (z,x) or (z,x,y)
