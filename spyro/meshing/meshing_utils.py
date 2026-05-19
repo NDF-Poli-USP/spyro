@@ -47,6 +47,71 @@ def check_gmsh(func):
     return wrapper
 
 
+def calculate_edge_length(cpw, minimum_velocity, frequency):
+    """
+    Calculate the edge length for mesh generation.
+
+    Parameters
+    ----------
+    cpw : float
+        Cells per wavelength.
+    minimum_velocity : float
+        Minimum velocity in the domain.
+    frequency : float
+        Source frequency.
+
+    Returns
+    -------
+    edge_length : float
+        Calculated edge length for mesh elements.
+    """
+    if cpw == 0.0 or cpw is None:
+        raise ValueError("cpw value of {cpw} invalid for edge length calculation.")
+    v_min = minimum_velocity
+
+    lbda_min = v_min / frequency
+
+    edge_length = lbda_min / cpw
+    return edge_length
+
+
+def vp_to_sizing(vp, cpw, frequency):
+    """
+    Convert velocity field to mesh sizing function.
+
+    Parameters
+    ----------
+    vp : numpy.ndarray
+        P-wave velocity field.
+    cpw : float
+        Cells per wavelength(must be positive).
+    frequency : float
+        Source frequency in Hz(must be positive).
+
+    Returns
+    -------
+    sizing : numpy.ndarray
+        Mesh element sizes corresponding to the velocity field.
+
+    Raises
+    ------
+    ValueError
+        If cpw or frequency is not positive.
+
+    Notes
+    -----
+    The mesh size is calculated as: `size = vp / (frequency * cpw)`
+    This ensures that the mesh has the specified number of cells per
+    wavelength throughout the domain.
+    """
+    if cpw < 0.0 or cpw == 0.0:
+        raise ValueError(f"Cells-per-wavelength value of {cpw} not supported.")
+    if frequency < 0.0 or frequency == 0.0:
+        raise ValueError(f"Frequency must be positive and non zero, not {frequency}")
+
+    return vp / (frequency * cpw)
+
+
 def create_sizing_function(
     fname,
     hmin=None,
