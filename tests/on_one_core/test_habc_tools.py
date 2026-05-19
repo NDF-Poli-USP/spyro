@@ -120,8 +120,8 @@ def preamble_tools(dictionary, edge_length, f_est, dimension):
 
     Returns
     -------
-    wave_obj : `habc.HABC_Wave`
-        An instance of the HABC_Wave class
+    wave_obj : `habc.HABCLayer`
+        An instance of the HABCLayer class
     """
 
     # ============ MESH FEATURES ============
@@ -130,7 +130,7 @@ def preamble_tools(dictionary, edge_length, f_est, dimension):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    wave_obj = habc.HABC_Wave(dictionary=dictionary,
+    wave_obj = habc.HABCLayer(dictionary=dictionary,
                               output_folder=f"output/test_habc_tools{dimension}d")
 
     # Mesh
@@ -164,8 +164,8 @@ def run_tools(wave_obj, method_extend, n_root=1):
 
     Parameters
     ----------
-    wave_obj : `habc.HABC_Wave`
-        An instance of the HABC_Wave class
+    wave_obj : `habc.HABCLayer`
+        An instance of the HABCLayer class
     method_extend : `str`
         Method to extend the velocity profile. Options: 'point_cloud' or 'nearest_point'
     n_root : `int`, optional

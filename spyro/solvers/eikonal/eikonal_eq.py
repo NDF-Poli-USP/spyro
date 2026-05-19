@@ -56,11 +56,11 @@ class Eikonal_Modeling():
     ----------
     dimension : `int`
         The spatial dimension of the problem
-    ele_type : `string`, optional
+    ele_type_eik : `string`, optional
         Finite element type. 'consistent' or 'underintegrated'. Default is 'consistent'
     f_est : `float`
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03
-    p_eik : `int`
+    degree_eik : `int`
         Finite element order
     source_locations: `list`of `tuples`
         Source locations as tuples of coordinates
@@ -89,8 +89,8 @@ class Eikonal_Modeling():
         Set the eikonal solver parameters
     '''
 
-    def __init__(self, dimension, source_locations, ele_type='consistent',
-                 p_eik=None, f_est=0.03, tol=1e-16):
+    def __init__(self, dimension, source_locations, ele_type_eik='consistent',
+                 degree_eik=None, f_est=0.03, tol=1e-16):
         '''
         Initialize the Eikonal_Modeling class
 
@@ -100,10 +100,10 @@ class Eikonal_Modeling():
             The spatial dimension of the problem
         source_locations: `list`of `tuples`
             List of tuples containing all source locations
-        ele_type : `string`, optional
+        ele_type_eik : `string`, optional
             Finite element type. 'consistent' or 'underintegrated'.
             Default is 'consistent'
-        p_eik : `int`, optional
+        degree_eik : `int`, optional
             Finite element order for the Eikonal analysis. Default is None
         f_est : `float`, optional
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03
@@ -123,14 +123,15 @@ class Eikonal_Modeling():
 
         # Finite element type.
         allowed_ele_types = ['consistent', 'underintegrated']
-        if ele_type not in allowed_ele_types:
-            value_parameter_error('ele_type', ele_type, allowed_ele_types)
+        if ele_type_eik not in allowed_ele_types:
+            value_parameter_error('ele_type_eik', ele_type_eik, allowed_ele_types)
         else:
-            self.ele_type = ele_type
+            self.ele_type_eik = ele_type_eik
 
         # Finite element order for the Eikonal analysis
-        self.p_eik = p_eik if p_eik is not None else (2 if self.dimension == 2 else 1) \
-            if self.ele_type == 'consistent' else (4 if self.dimension == 2 else 3)
+        self.degree_eik = degree_eik if degree_eik is not None else \
+            (2 if self.dimension == 2 else 1) if self.ele_type_eik == 'consistent' \
+            else (4 if self.dimension == 2 else 3)
 
         # Factor for the stabilizing term in Eikonal equation
         self.f_est = f_est
@@ -166,7 +167,7 @@ class Eikonal_Modeling():
 
         # Identify source indices in the mesh
         it = int(-1)
-        div_min = int(self.p_eik + 1)
+        div_min = int(self.degree_eik + 1)
         div_max = int(10 * div_min)
         while True:
             it += 1
@@ -216,10 +217,10 @@ class Eikonal_Modeling():
             Integration domain for the Eikonal equation
         '''
 
-        if self.ele_type == 'consistent':
+        if self.ele_type_eik == 'consistent':
             dx = fire.dx
 
-        if self.ele_type == 'underintegrated':
+        if self.ele_type_eik == 'underintegrated':
             quad_rule = quadrature_rules(V)[0]
             dx = fire.dx(**quad_rule)
 

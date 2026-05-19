@@ -3,7 +3,6 @@ import numpy as np
 import spyro.solvers.modal.modal_sol as eigsol
 from os import getcwd
 from sympy import divisors
-from spyro.meshing.meshing_habc import HABCMesh
 from spyro.abc.hyp_lay import HyperLayer
 from spyro.abc.rec_lay import RectangLayer
 from spyro.abc.nrbc import NRBC
@@ -15,18 +14,23 @@ from spyro.utils.error_management import value_parameter_error
 from spyro.utils.freq_tools import freq_response
 
 
-class ABCLayer(HABCMesh, RectangLayer, HyperLayer, NRBC, HABCError):
+class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
     """Class for ABCs based on absorbing layers.
 
     Attributes
     ----------
     abc_boundary_layer_shape : `string`
-        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
+        Shape type of pad layer. Options: 'rectangular' or 'hypershape'.
+        Default is 'rectangular'
+    abc_boundary_layer_type : `str`
+        Type of the boundary layer. Options: 'hybrid' or 'PML'.
+        Default is 'hybrid'. Option 'hybrid' is based on paper of Salas et al. (2022).
+        doi: https://doi.org/10.1016/j.apm.2022.09.014
     abc_pad_length : `float`
         Size of the absorbing layer
     abc_reference_freq : `str`
         Reference frequency for sizing the hybrid absorbing layer.
-        Options: 'source' or 'boundary'
+        Options: 'source' or 'boundary'. Default is 'source'
     a_par : `float`
         Adimensional propagation speed parameter (a = z / f).
         "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
@@ -109,8 +113,11 @@ class ABCLayer(HABCMesh, RectangLayer, HyperLayer, NRBC, HABCError):
         Set the velocity model for the model with absorbing layer
     """
 
-    def __init__(self, domain_dim, f_Nyquist, dimension=2, quadrilateral=False,
-                 func_space_type=None, comm=None, output_folder=None):
+    def __init__(self, domain_dim, f_Nyquist, dimension=2,
+                 quadrilateral=False, func_space_type=None,
+                 abc_boundary_layer_shape="rectangular",
+                 abc_boundary_layer_type="hybrid",
+                 abc_reference_freq="source", comm=None):
         """
         Initialize the ABCLayer class
 
@@ -129,6 +136,16 @@ class ABCLayer(HABCMesh, RectangLayer, HyperLayer, NRBC, HABCError):
         func_space_type, `str`, optional
             Type of function space for the state variable.
             Options: 'scalar' or 'vector'. Default is None
+        abc_boundary_layer_shape : `string`, optional
+            Shape type of pad layer. Options: 'rectangular' or 'hypershape'.
+            Default is 'rectangular'
+        abc_boundary_layer_type : `str`, optional
+            Type of the boundary layer. Options: 'hybrid' or 'PML'.
+            Default is 'hybrid'. Option 'hybrid' is based on paper of Salas et al. (2022).
+            doi: https://doi.org/10.1016/j.apm.2022.09.014
+        abc_reference_freq : `str`, optional
+            Reference frequency for sizing the hybrid absorbing layer.
+            Options: 'source' or 'boundary'. Default is 'source'
         comm : `object`, optional
             An object representing the communication interface
             for parallel processing. Default is None
@@ -143,11 +160,16 @@ class ABCLayer(HABCMesh, RectangLayer, HyperLayer, NRBC, HABCError):
         # Original domain dimensions
         self.domain_dim = domain_dim
 
+        # Model dimension
+        self.dimension = dimension
+
+        # ABC layer parameters
+        self.abc_boundary_layer_shape = abc_boundary_layer_shape
+        self.abc_boundary_layer_type = abc_boundary_layer_type
+        self.abc_reference_freq = abc_reference_freq
+
         # Nyquist frequency
         self.f_Nyquist = f_Nyquist
-
-        # # Identifier for the current case study
-        # self.identify_abc_layer_case(output_folder=output_folder)
 
         # # Initializing the error measure class
         # HABCError.__init__(self, self.dt, self.f_Nyquist,
@@ -194,9 +216,7 @@ class ABCLayer(HABCMesh, RectangLayer, HyperLayer, NRBC, HABCError):
         return formatted_str
 
     def identify_abc_layer_case(self, output_folder=None):
-        """
-        Generate an identifier for the current case study of
-        the ABC scheme (HABC or PML).
+        """Generate an identifier for the current case study of the ABC scheme.
 
         Parameters
         ----------
@@ -205,30 +225,28 @@ class ABCLayer(HABCMesh, RectangLayer, HyperLayer, NRBC, HABCError):
 
         Returns
         -------
-        None
+        path_case_abc : `string`
+            Path to save data for the current case study
+        path_save : `string`
+            Path to save data
         """
 
-        # Original domain dimensions
-        domain_dim = self.abc_domain_dimensions(only_orig_dom=True)
-
         # Layer type
-        lay_str = "\n{} Layer Shape: " + \
-            f"{self.abc_boundary_layer_shape.capitalize()}"
+        lay_str = "\n{} Layer Shape: " + f"{self.abc_boundary_layer_shape.capitalize()}"
         lay_str = self.formatting_abc_layer_type(lay_str)
 
         # Labeling for the layer shape
         if self.abc_boundary_layer_shape == 'rectangular':  # Rectangular layer
 
             # Initializing the rectangular layer
-            RectangLayer.__init__(self, domain_dim, dimension=self.dimension)
+            RectangLayer.__init__(self, self.domain_dim, dimension=self.dimension)
             self.case = 'REC'  # Label
 
         elif self.abc_boundary_layer_shape == 'hypershape':  # Hypershape layer
 
             # Initializing the hyperelliptical layer
-            HyperLayer.__init__(self, domain_dim, n_hyp=self.abc_deg_layer,
-                                n_type=self.abc_degree_type,
-                                dimension=self.dimension)
+            HyperLayer.__init__(self, self.domain_dim, n_hyp=self.abc_deg_layer,
+                                n_type=self.abc_degree_type, dimension=self.dimension)
 
             self.case = 'HN' + f"{self.abc_deg_layer:.1f}"  # Label
             deg_str = f" - Degree: {self.abc_deg_layer}"
@@ -254,13 +272,18 @@ class ABCLayer(HABCMesh, RectangLayer, HyperLayer, NRBC, HABCError):
 
         # Path to save data
         if output_folder is None:
-            self.path_save = getcwd() + "/output/"
+            path_save = getcwd() + "/output/"
         else:
-            self.path_save = getcwd() + "/" + output_folder + "/"
+            path_save = getcwd() + "/" + output_folder + "/"
 
-        self.path_case_abc = self.path_save + self.case + "/"
+        path_case_abc = path_save + self.case + "/"
 
-    def critical_boundary_points(self):
+        self.path_save = path_save
+        self.path_case_abc = path_case_abc
+
+        return self.path_save, self.path_case_abc
+
+    def critical_boundary_points(self, Wave):
         """
         Determine the critical points on domain boundaries of the original
         model to size an absorbing layer using the Eikonal criterion for HABCs.
@@ -268,7 +291,8 @@ class ABCLayer(HABCMesh, RectangLayer, HyperLayer, NRBC, HABCError):
 
         Parameters
         ----------
-        None
+        Wave : `wave.Wave`
+            An instance of the Wave class
 
         Returns
         -------
@@ -276,18 +300,18 @@ class ABCLayer(HABCMesh, RectangLayer, HyperLayer, NRBC, HABCError):
         """
 
         # Initializing Eikonal object
-        Eik = HABC_Eikonal(self)
+        Eik = HABC_Eikonal(Wave)
 
         # Solving Eikonal
         Eik.solve_eik()
 
         # Identifying critical points
-        self.eik_bnd = Eik.ident_crit_eik()
+        Wave.eik_bnd = Eik.ident_crit_eik()
 
         # Critical point coordinates as receivers
-        pcrit = [bnd[0] for bnd in self.eik_bnd]
-        self.receiver_locations = pcrit + self.receiver_locations
-        self.number_of_receivers = len(self.receiver_locations)
+        pcrit = [bnd[0] for bnd in Wave.eik_bnd]
+        Wave.receiver_locations = pcrit + Wave.receiver_locations
+        Wave.number_of_receivers = len(Wave.receiver_locations)
 
     def det_reference_freq(self, fpad=4):
         """
@@ -698,11 +722,10 @@ class ABCLayer(HABCMesh, RectangLayer, HyperLayer, NRBC, HABCError):
         usr_dt = self.get_dt()
 
         # Maximum timestep size
-        dt_sol = eigsol.Modal_Solver(
-            self.dimension, method=method, calc_max_dt=True)
-        max_dt = dt_sol.estimate_timestep(
-            self.c, self.function_space, self.final_time, shift=1e-8,
-            quad_rule=self.quadrature_rule, fraction=1.)
+        dt_sol = eigsol.Modal_Solver(self.dimension, method=method, calc_max_dt=True)
+        max_dt = dt_sol.estimate_timestep(self.c, self.function_space, self.final_time,
+                                          shift=1e-8, quad_rule=self.quadrature_rule,
+                                          fraction=1.)
 
         # Rounding power
         pot = int(abs(np.ceil(np.log10(max_dt))) + mag_add)
@@ -839,8 +862,8 @@ class ABCLayer(HABCMesh, RectangLayer, HyperLayer, NRBC, HABCError):
 
         # Check the timestep size
         if check_dt:
-            self.check_timestep_abc(
-                max_divisor_tf=max_divisor_tf, method=method, mag_add=mag_add)
+            self.check_timestep_abc(max_divisor_tf=max_divisor_tf,
+                                    method=method, mag_add=mag_add)
 
         print("\nBuilding Infinite Domain Model", flush=True)
 

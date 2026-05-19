@@ -79,9 +79,10 @@ class HABC_Eikonal(Eikonal_Modeling):
         None
         '''
 
-        Eikonal_Modeling.__init__(
-            self, Wave.dimension, Wave.sources.point_locations,
-            ele_type=Wave.ele_type_eik, p_eik=Wave.p_eik, f_est=Wave.f_est)
+        Eikonal_Modeling.__init__(self, Wave.dimension, Wave.sources.point_locations,
+                                  ele_type_eik=Wave.mesh_parameters.ele_type_eik,
+                                  degree_eik=Wave.mesh_parameters.degree_eik,
+                                  f_est=Wave.mesh_parameters.f_est)
 
         # Communicator MPI
         self.comm = Wave.comm
@@ -90,7 +91,7 @@ class HABC_Eikonal(Eikonal_Modeling):
         self.mesh = Wave.mesh_original
 
         # Function space for the Eikonal modeling
-        self.funct_space_eik = Wave.funct_space_eik
+        self.funct_space_eik = Wave.mesh_parameters.funct_space_eik
 
         # Mesh cell diameters
         self.diam_mesh = Wave.mesh_parameters.diam_mesh

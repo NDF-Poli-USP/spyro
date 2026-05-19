@@ -2,7 +2,7 @@ import pytest
 import warnings
 import firedrake as fire
 from numpy import allclose, isclose
-from spyro.habc.habc import HABC_Wave
+from spyro.habc.habc import HABCLayer
 import spyro.meshing.meshing_operations as mshops
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -109,7 +109,7 @@ def test_representative_mesh_dimensions(element_type, dimension):
     dictionary = wave_dict(element_type, dimension)
 
     # Create the acoustic wave object
-    Wave_obj = HABC_Wave(dictionary=dictionary)
+    Wave_obj = HABCLayer(dictionary=dictionary)
 
     # Mesh the domain with the specified edge length
     edge_length = 0.1

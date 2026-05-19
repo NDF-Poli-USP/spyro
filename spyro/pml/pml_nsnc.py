@@ -10,7 +10,7 @@ from spyro.utils.error_management import value_parameter_error
 #   "A Modified PML Acoustic Wave Equation". Kim (2019)
 
 
-class PML(ABCLayer):
+class PMLLayer(ABCLayer):
     """Class PML that determines PML size and parameters to be used.
 
     Attributes
@@ -48,9 +48,9 @@ class PML(ABCLayer):
         Generate a damping profile for the PML
     """
 
-    def __init__(self, domain_dim, f_Nyquist, dimension=2,
-                 quadrilateral=False, func_space_type=None,
-                 bc_boundary_pml="Higdon", comm=None, output_folder=None):
+    def __init__(self, domain_dim, f_Nyquist, dimension=2, quadrilateral=False,
+                 func_space_type=None, bc_boundary_pml="Higdon",
+                 abc_reference_freq="source", comm=None):
         """
         Initialize the PML class.
 
@@ -73,6 +73,9 @@ class PML(ABCLayer):
             Type of boundary condition to apply on the PML boundaries.
             Options are "Higdon" or "Sommerfeld" for Non-Reflecting BCs,
             or "Dirichlet" or "Neumann" for typical BCs. Default is "Higdon"
+        abc_reference_freq : `str`, optional
+            Reference frequency for sizing the hybrid absorbing layer.
+            Options: 'source' or 'boundary'
         comm : `object`, optional
             An object representing the communication interface
             for parallel processing. Default is None
@@ -84,10 +87,12 @@ class PML(ABCLayer):
         None
         """
 
-        # Initializing the Wave class
+        # Initializing the ABCLayer class
         ABCLayer.__init__(self, domain_dim, f_Nyquist, dimension=dimension,
                           quadrilateral=quadrilateral, func_space_type=func_space_type,
-                          comm=comm, output_folder=output_folder)
+                          abc_boundary_layer_shape='rectangular',
+                          abc_boundary_layer_type="PML",
+                          abc_reference_freq=abc_reference_freq, comm=comm)
 
         # Type of boundary condition to apply on the PML boundaries
         self.bc_boundary_pml = bc_boundary_pml
