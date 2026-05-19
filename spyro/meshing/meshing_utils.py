@@ -10,6 +10,29 @@ except ImportError:
     gmsh = None
 
 
+try:
+    import SeismicMesh
+except ImportError:
+    SeismicMesh = None
+
+
+def check_seismicmesh(func):
+    """Decorator for SeismicMesh check.
+
+    If SeismicMesh isn't available raises ImportError
+    """
+    def wrapper(*args, **kwargs):
+        if SeismicMesh is None:
+            raise ImportError(
+                "SeismicMesh is not available. Please "
+                + "install it to use this function."
+            )
+        else:
+            return func(*args, **kwargs)
+
+    return wrapper
+
+
 def check_gmsh(func):
     """Decorator for gmsh check.
 

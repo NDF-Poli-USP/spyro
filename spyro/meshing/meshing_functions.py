@@ -1,12 +1,14 @@
-import firedrake as fire
-import meshio
 import numpy as np
+from firedrake import Mesh as FireMeshReader
 from scipy.interpolate import RegularGridInterpolator
 from ..io import parallel_print
 from ..io import create_segy_from_grid
 from ..utils import run_in_one_core
 from .meshing_gmsh2d import build_gmsh_geometry_and_groups, apply_structured_winslow_smoothing2d
 from .meshing_utils import create_sizing_function
+from .firedrake_based_wrappers import rectangle_mesh, periodic_rectangle_mesh, box_mesh
+from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_with_velocity_model
+from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_homogeneous
 
 try:
     import gmsh
@@ -69,8 +71,6 @@ class AutomaticMesh:
         Creates a mesh based on SeismicMesh meshing utilities.
     create_seimicmesh_2d_mesh()
         Creates a 2D mesh based on SeismicMesh meshing utilities.
-    create_seismicmesh_2D_mesh_homogeneous()
-        Creates a 2D mesh homogeneous velocity mesh based on SeismicMesh meshing utilities.
     create_gmsh_2D_mesh()
         Creates a 2D mesh using Gmsh with padding and smoothing.
     """
@@ -171,9 +171,9 @@ class AutomaticMesh:
                     self.comm.ensemble_comm.barrier()
                 self.comm.comm.barrier()
                 parallel_print("Loading mesh.", comm=self.comm)
-                return fire.Mesh(self.output_file_name, comm=self.comm.comm)
+                return FireMeshReader(self.output_file_name, comm=self.comm.comm)
             else:
-                return fire.Mesh(self.output_file_name)
+                return FireMeshReader(self.output_file_name)
         elif self.mesh_type == "gmsh_mesh":
             return self.create_gmsh_2D_mesh()
         else:
@@ -378,156 +378,9 @@ class AutomaticMesh:
         """
         print(f"velocity_model{self.velocity_model}", flush=True)
         if self.velocity_model is None:
-            return self.create_seismicmesh_2D_mesh_homogeneous()
+            return create_seismicmesh_2D_mesh_homogeneous(self)
         else:
-            return self.create_seismicmesh_2D_mesh_with_velocity_model()
-
-    def create_seismicmesh_2D_mesh_with_velocity_model(self):
-        """
-        Creates a 2D mesh with velocity-based refinement using SeismicMesh.
-
-        Returns
-        -------
-        mesh : Firedrake Mesh
-            The generated 2D mesh with velocity-based sizing.
-
-        Notes
-        -----
-        This method uses the velocity model to determine the mesh element sizes,
-        ensuring appropriate resolution for wave propagation. The sizing function
-        is derived from the velocity model SEGY file. Only the ensemble rank 0
-        performs the mesh generation, and the mesh is then distributed across
-        all processes.
-        """
-        if self.comm.ensemble_comm.rank == 0:
-            v_min = self.minimum_velocity
-            frequency = self.source_frequency
-
-            C = self.cpw
-
-            length_z = self.length_z
-            length_x = self.length_x
-            domain_pad = self.abc_pad
-            lbda_min = v_min / frequency
-
-            bbox = (-length_z, 0.0, 0.0, length_x)
-            domain = SeismicMesh.Rectangle(bbox)
-
-            hmin = lbda_min / C
-            self.comm.comm.barrier()
-
-            ef = SeismicMesh.get_sizing_function_from_segy(
-                self.velocity_model,
-                bbox,
-                hmin=hmin,
-                wl=C,
-                freq=frequency,
-                grade=0.15,
-                domain_pad=domain_pad,
-                pad_style="edge",
-                units='km/s',
-                comm=self.comm.comm,
-            )
-            self.comm.comm.barrier()
-
-            # Creating rectangular mesh
-            points, cells = SeismicMesh.generate_mesh(
-                domain=domain,
-                edge_length=ef,
-                verbose=0,
-                mesh_improvement=False,
-                comm=self.comm.comm,
-            )
-            self.comm.comm.barrier()
-
-            print('entering spatial rank 0 after mesh generation')
-            if self.comm.comm.rank == 0:
-                meshio.write_points_cells(
-                    "automatic_mesh.msh",
-                    points,
-                    [("triangle", cells)],
-                    file_format="gmsh22",
-                    binary=False
-                )
-
-                meshio.write_points_cells(
-                    "automatic_mesh.vtk",
-                    points,
-                    [("triangle", cells)],
-                    file_format="vtk"
-                )
-
-        self.comm.comm.barrier()
-        mesh = fire.Mesh(
-            'automatic_mesh.msh',
-            distribution_parameters={
-                "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
-            },
-            comm=self.comm.comm,
-        )
-
-        return mesh
-
-    def create_seismicmesh_2D_mesh_homogeneous(self):
-        """
-        Creates a 2D mesh based on SeismicMesh meshing utilities, with homogeneous velocity model.
-
-        Returns
-        -------
-        mesh : `Firedrake.Mesh`
-            The generated 2D mesh with uniform element sizes.
-
-        Notes
-        -----
-        This method creates a rectangular mesh with uniform element sizing.
-        The edge length is either user-specified or calculated based on the
-        minimum velocity, source frequency, and cells per wavelength.
-        Boundary entities with low quality are removed to improve mesh quality.
-        """
-        length_z = self.length_z
-        length_x = self.length_x
-        pad = self.abc_pad
-
-        if pad is not None:
-            real_lz = length_z + pad
-            real_lx = length_x + 2 * pad
-        else:
-            real_lz = length_z
-            real_lx = length_x
-            pad = 0.0
-
-        edge_length = self.edge_length
-        if edge_length is None:
-            edge_length = self.minimum_velocity / (self.source_frequency * self.cpw)
-
-        bbox = (-real_lz, 0.0, -pad, real_lx - pad)
-        rectangle = SeismicMesh.Rectangle(bbox)
-
-        points, cells = SeismicMesh.generate_mesh(
-            domain=rectangle,
-            edge_length=edge_length,
-            verbose=0,
-        )
-
-        points, cells = SeismicMesh.geometry.delete_boundary_entities(
-            points, cells, min_qual=0.6
-        )
-
-        meshio.write_points_cells(
-            self.output_file_name,
-            points,
-            [("triangle", cells)],
-            file_format="gmsh22",
-            binary=False,
-        )
-        meshio.write_points_cells(
-            self.output_file_name + ".vtk",
-            points,
-            [("triangle", cells)],
-            file_format="vtk",
-        )
-
-        return fire.Mesh(self.output_file_name)
+            return create_seismicmesh_2D_mesh_with_velocity_model(self)
 
     def create_spyro_mesh(self):
         """
@@ -731,9 +584,9 @@ class AutomaticMesh:
                 self.comm.ensemble_comm.barrier()
             self.comm.comm.barrier()
             parallel_print("Loading mesh into Firedrake.", comm=self.comm)
-            return fire.Mesh(self.output_file_name, comm=self.comm.comm)
+            return FireMeshReader(self.output_file_name, comm=self.comm.comm)
         else:
-            return fire.Mesh(self.output_file_name)
+            return FireMeshReader(self.output_file_name)
 
 
 def calculate_edge_length(cpw, minimum_velocity, frequency):
@@ -762,182 +615,6 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
 
     edge_length = lbda_min / cpw
     return edge_length
-
-
-def rectangle_mesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False):
-    """Create a rectangle mesh based on the Firedrake mesh.
-
-    First axis is negative, second axis is positive. If there is a pad, both
-    axis are dislocated by the pad.
-
-    Parameters
-    ----------
-    length_x : float
-      Length of the domain in the x direction.
-    length_y : float
-      Length of the domain in the y direction.
-    nx : int
-      Number of elements in the x direction.
-    ny : int
-      Number of elements in the y direction.
-    pad : float, optional
-      Padding to be added to the domain. The default is None.
-    comm : MPI communicator, optional
-      MPI communicator. The default is None.
-    quadrilateral : bool, optional
-      If True, the mesh is quadrilateral. The default is False.
-
-    Returns
-    -------
-    mesh : Firedrake Mesh
-      Mesh
-    """
-    if pad is not None:
-        length_x += pad
-        length_y += 2 * pad
-    else:
-        pad = 0
-
-    if comm is None:
-        mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
-                                  quadrilateral=quadrilateral)
-    else:
-        mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
-                                  quadrilateral=quadrilateral, comm=comm)
-
-    # Adjusting to Spyro's reference system (z, x) with origin at (0, 0)
-    mesh.coordinates.dat.data[:, 0] *= -1.0
-    mesh.coordinates.dat.data[:, 1] -= pad
-
-    return mesh
-
-
-def periodic_rectangle_mesh(
-    nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False
-):
-    """Create a periodic rectangle mesh based on the Firedrake mesh.
-
-    First axis is negative, second axis is positive. If there is a pad, both
-    axis are dislocated by the pad.
-
-    Parameters
-    ----------
-    length_x : float
-        Length of the domain in the x direction.
-    length_y : float
-        Length of the domain in the y direction.
-    nx : int
-        Number of elements in the x direction.
-    ny : int
-        Number of elements in the y direction.
-    pad : float, optional
-        Padding to be added to the domain. The default is None.
-    comm : MPI communicator, optional
-        MPI communicator. The default is None.
-    quadrilateral: bool, optional
-        If True, the mesh is quadrilateral. The default is False.
-
-    Returns
-    -------
-    mesh : Firedrake Mesh
-        Mesh
-    """
-    if pad is not None:
-        length_x += pad
-        length_y += 2 * pad
-    else:
-        pad = 0
-
-    if comm is None:
-        mesh = fire.PeriodicRectangleMesh(nx, ny, length_x, length_y,
-                                          quadrilateral=quadrilateral)
-    else:
-        mesh = fire.PeriodicRectangleMesh(nx, ny, length_x, length_y,
-                                          quadrilateral=quadrilateral, comm=comm)
-
-    # Adjusting to Spyro's reference system (z, x) with origin at (0, 0)
-    mesh.coordinates.dat.data[:, 0] *= -1.0
-    mesh.coordinates.dat.data[:, 1] -= pad
-
-    return mesh
-
-
-def box_mesh(nx, ny, nz, length_x, length_y, length_z, pad=None,
-             quadrilateral=False, comm=None):
-    """
-    Create a 3D box mesh based on Firedrake mesh utilities.
-
-    Parameters
-    ----------
-    nx : int
-        Number of elements in the x direction.
-    ny : int
-        Number of elements in the y direction.
-    nz : int
-        Number of elements in the z direction.
-    length_x : float
-        Length of the domain in the x direction.
-    length_y : float
-        Length of the domain in the y direction.
-    length_z : float
-        Length of the domain in the z direction.
-    pad : float, optional
-        Padding to be added to the domain. The default is None.
-    quadrilateral : bool, optional
-        If True, the mesh is created by extruding a quadrilateral mesh.
-        The default is False.
-    comm : MPI communicator, optional
-      MPI communicator. The default is None.
-
-    Returns
-    -------
-    mesh : Firedrake Mesh
-        The generated 3D box mesh.
-
-    Notes
-    -----
-    The first coordinate is negated(multiplied by - 1) to match the expected
-    coordinate system. If quadrilateral is True, the mesh is created by
-    extruding a 2D quadrilateral mesh in the z direction.
-    """
-    if pad is not None:
-        length_x += pad
-        length_y += 2 * pad
-        length_z += 2 * pad
-    else:
-        pad = 0
-
-    if quadrilateral:
-
-        if comm is None:
-            quad_mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
-                                           quadrilateral=quadrilateral)
-
-        else:
-            quad_mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
-                                           quadrilateral=quadrilateral, comm=comm)
-
-        # Adjusting to Spyro's reference system (z, x, y) with origin at (0, 0, 0)
-        quad_mesh.coordinates.dat.data[:, 0] *= -1.0
-        quad_mesh.coordinates.dat.data[:, 1] -= pad
-        layer_height = length_z / nz
-        mesh = fire.ExtrudedMesh(quad_mesh, nz, layer_height=layer_height)
-    else:
-
-        if comm is None:
-            mesh = fire.BoxMesh(nx, ny, nz, length_x, length_y, length_z)
-
-        else:
-            mesh = fire.BoxMesh(nx, ny, nz, length_x, length_y, length_z, comm=comm)
-
-        # Adjusting to Spyro's reference system (z, x, y) with origin at (0, 0, 0)
-        mesh.coordinates.dat.data[:, 0] *= -1.0
-        mesh.coordinates.dat.data[:, 1] -= pad
-
-    # Offset to respect the origin of the domain
-    mesh.coordinates.dat.data_with_halos[:, 2] -= pad
-
-    return mesh
 
 
 def vp_to_sizing(vp, cpw, frequency):
