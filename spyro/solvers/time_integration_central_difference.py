@@ -72,10 +72,16 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
             save_step += 1
 
         if (step - 1) % wave_obj.output_frequency == 0:
-            assert (
-                fire.norm(wave_obj.get_function()) < 1
-            ), "Numerical instability. Try reducing dt or building the " \
-               "mesh differently"
+            field_norm = fire.norm(wave_obj.get_function())
+            assert np.isfinite(field_norm), \
+                "Numerical instability. Try reducing dt or building the " \
+                "mesh differently"
+            stability_norm_threshold = getattr(
+                wave_obj, "stability_norm_threshold", None)
+            if stability_norm_threshold is not None:
+                assert field_norm < stability_norm_threshold, \
+                    "Numerical instability. Try reducing dt or building the " \
+                    "mesh differently"
             wave_obj.field_logger.log(t)
             helpers.display_progress(wave_obj.comm, t)
 

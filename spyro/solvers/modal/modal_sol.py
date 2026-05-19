@@ -355,8 +355,8 @@ class Modal_Solver():
             opts.update({"eps_largest_magnitude": None})
             # subspace, arnoldi, krylovschur, lapack
         else:
-            # Smallest eigenvalues magnitude
-            opts.update({"eps_smallest_magnitude": None})
+            # Shift-and-invert requires a target selector in recent SLEPc.
+            opts.update({"eps_target": 0.0, "eps_target_magnitude": None})
 
         eigenproblem = fire.LinearEigenproblem(a, M=m)
         eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=k,

@@ -9,6 +9,8 @@ class Read_time_axis:
         self.final_time = self.input_dictionary["time_axis"]["final_time"]
         self.dt = self.input_dictionary["time_axis"]["dt"]
         self.input_dictionary["time_axis"].setdefault("gradient_sampling_frequency", 99999)
+        self.stability_norm_threshold = self.input_dictionary["time_axis"].get(
+            "stability_norm_threshold", None)
 
     @property
     def initial_time(self):

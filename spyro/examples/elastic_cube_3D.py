@@ -82,8 +82,7 @@ d["visualization"] = {
 }
 
 d["absorving_boundary_conditions"] = {
-    "status": True,
-    "damping_type": "local",
+    "status": False,
 }
 
 wave = spyro.IsotropicWave(d)
