@@ -25,3 +25,5 @@ Team members
 * `Thiago Dias dos Santos <http://lattes.cnpq.br/3618128074442916>`_
 * `Eduardo Moscatelli de Souza <https://scholar.google.com/citations?user=Z2hqFC8AAAAJ&hl=pt-BR>`_
 * `Bruno Mariz de Oliveira Teixeira <http://lattes.cnpq.br/0792618608675007>`_
+* `Hassan Imran <https://scholar.google.com/citations?user=62_8TGAAAAAJ&hl=en>`_
+
