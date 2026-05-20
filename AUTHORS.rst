@@ -13,6 +13,7 @@ Institutions
 Team members
 ------------
 
+* `Paula Neves de Araújo <http://lattes.cnpq.br/1029138492596274>`_
 * `Bruno Souza Carmo <http://lattes.cnpq.br/8129545750278083>`_
 * `Daiane I. Dolci <http://lattes.cnpq.br/1341115679564843>`_
 * `Lucas Franceschini <http://lattes.cnpq.br/4921110587510112>`_
@@ -20,8 +21,7 @@ Team members
 * `Alexandre Olender <http://lattes.cnpq.br/4631937820599808>`_
 * `Keith J. Roberts <https://www.keithroberts.site/>`_
 * `Ruben Andres Salas <http://lattes.cnpq.br/3294895625466892>`_
-* `Jéssica Sales <http://lattes.cnpq.br/>`_
+* `Jéssica Sales P. dos Santos <http://lattes.cnpq.br/7928058746144881>`_
 * `Thiago Dias dos Santos <http://lattes.cnpq.br/3618128074442916>`_
 * `Eduardo Moscatelli de Souza <https://scholar.google.com/citations?user=Z2hqFC8AAAAJ&hl=pt-BR>`_
-* `Usama Bin Qasim <https://scholar.google.com/citations?hl=en&user=7I-CD6QAAAAJ>`_
-
+* `Bruno Mariz de Oliveira Teixeira <http://lattes.cnpq.br/0792618608675007>`_

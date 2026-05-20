@@ -63,6 +63,26 @@ env = Environment(
     lstrip_blocks=True
 )
 
+fallback_portrait = "../_themes/firedrake/static/firedrake_bw.jpg"
+portrait_filenames = {
+    "Alexandre Olender": "alexandreolender.jpg",
+    "Ruben Andres Salas": "rubenandressalas.jpg",
+    "Daiane I. Dolci": "daianei.dolci.jpg",
+    "Romildo Soares Jr": "romildosoaresjr.jpg",
+    "Jéssica Sales P. dos Santos": "jessicasales.jpg",
+    "Paula Neves de Araújo": "paulanevesdearaujo.jpg",
+    "Thiago Dias dos Santos": "thiagodiasdossantos.jpg",
+    "Bruno Souza Carmo": "brunosouzacarmo.jpg",
+}
+
+
+def portrait(name):
+    filename = portrait_filenames.get(name)
+    if filename is None:
+        return fallback_portrait
+
+    return f"/_static/{filename}"
+
 # Collect names for the team page
 if team.has_section("contributing-individual"):
     extra = [*team["contributing-individual"].items()]
@@ -78,7 +98,8 @@ with open(base_dir / "team.rst", "w") as fh:
         team=team,
         atable=Table(team["active-team"].items(), 4),
         itable=Table(team["inactive-team"].items(), 4),
-        ctable=Table(extra, 3, transpose=True)
+        ctable=Table(extra, 3, transpose=True),
+        portrait=portrait,
     ))
 
 institution_set = set(chain(

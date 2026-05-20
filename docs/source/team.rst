@@ -31,49 +31,71 @@ spyro is brought to you by
 Active team members
 -------------------
 
-.. |Alexandre Olender| image:: /images/alexandreolender.*
-   :width: 70%
+.. |Alexandre Olender| image:: /_static/alexandreolender.jpg
+   :width: 150px
+   :height: 150px
 .. _Alexandre Olender: http://lattes.cnpq.br/4631937820599808
-.. |Ruben Andres Salas| image:: /images/rubenandressalas.*
-   :width: 70%
+.. |Ruben Andres Salas| image:: /_static/rubenandressalas.jpg
+   :width: 150px
+   :height: 150px
 .. _Ruben Andres Salas: http://lattes.cnpq.br/3294895625466892
-.. |Daiane I. Dolci| image:: /images/daianei.dolci.*
-   :width: 70%
+.. |Daiane I. Dolci| image:: /_static/daianei.dolci.jpg
+   :width: 150px
+   :height: 150px
 .. _Daiane I. Dolci: http://lattes.cnpq.br/1341115679564843
-.. |Romildo Soares Jr| image:: /images/romildosoaresjr.*
-   :width: 70%
+.. |Romildo Soares Jr| image:: /_static/romildosoaresjr.jpg
+   :width: 150px
+   :height: 150px
 .. _Romildo Soares Jr: http://lattes.cnpq.br/7845811382749340
-.. |Jéssica Sales| image:: /images/jssicasales-bbb.*
-   :width: 70%
-.. _Jéssica Sales: http://lattes.cnpq.br/
-.. |Thiago Dias dos Santos| image:: /images/thiagodiasdossantos.*
-   :width: 70%
+.. |Jéssica Sales P. dos Santos| image:: /_static/jessicasales.jpg
+   :width: 150px
+   :height: 150px
+.. _Jéssica Sales P. dos Santos: http://lattes.cnpq.br/7928058746144881
+.. |Paula Neves de Araújo| image:: /_static/paulanevesdearaujo.jpg
+   :width: 150px
+   :height: 150px
+.. _Paula Neves de Araújo: http://lattes.cnpq.br/1029138492596274
+.. |Thiago Dias dos Santos| image:: /_static/thiagodiasdossantos.jpg
+   :width: 150px
+   :height: 150px
 .. _Thiago Dias dos Santos: http://lattes.cnpq.br/3618128074442916
-.. |Bruno Souza Carmo| image:: /images/brunosouzacarmo.*
-   :width: 70%
+.. |Bruno Souza Carmo| image:: /_static/brunosouzacarmo.jpg
+   :width: 150px
+   :height: 150px
 .. _Bruno Souza Carmo: http://lattes.cnpq.br/8129545750278083
+.. |Bruno Mariz de Oliveira Teixeira| image:: ../_themes/firedrake/static/firedrake_bw.jpg
+   :width: 150px
+   :height: 150px
+.. _Bruno Mariz de Oliveira Teixeira: http://lattes.cnpq.br/0792618608675007
 
-+---------------------------+---------------------------+---------------------------+---------------------------+
-| |Alexandre Olender|_      | |Ruben Andres Salas|_     | |Daiane I. Dolci|_        | |Romildo Soares Jr|_      |
-|                           |                           |                           |                           |
-| `Alexandre Olender`_      | `Ruben Andres Salas`_     | `Daiane I. Dolci`_        | `Romildo Soares Jr`_      |
-+---------------------------+---------------------------+---------------------------+---------------------------+
-| |Jéssica Sales|_          | |Thiago Dias dos Santos|_ | |Bruno Souza Carmo|_      |                           |
-|                           |                           |                           |                           |
-| `Jéssica Sales`_          | `Thiago Dias dos Santos`_ | `Bruno Souza Carmo`_      |                           |
-+---------------------------+---------------------------+---------------------------+---------------------------+
++-------------------------------------+-------------------------------------+-------------------------------------+-------------------------------------+
+| |Alexandre Olender|_                | |Ruben Andres Salas|_               | |Daiane I. Dolci|_                  | |Romildo Soares Jr|_                |
+|                                     |                                     |                                     |                                     |
+| `Alexandre Olender`_                | `Ruben Andres Salas`_               | `Daiane I. Dolci`_                  | `Romildo Soares Jr`_                |
++-------------------------------------+-------------------------------------+-------------------------------------+-------------------------------------+
+| |Jéssica Sales P. dos Santos|_      | |Paula Neves de Araújo|_            | |Thiago Dias dos Santos|_           | |Bruno Souza Carmo|_                |
+|                                     |                                     |                                     |                                     |
+| `Jéssica Sales P. dos Santos`_      | `Paula Neves de Araújo`_            | `Thiago Dias dos Santos`_           | `Bruno Souza Carmo`_                |
++-------------------------------------+-------------------------------------+-------------------------------------+-------------------------------------+
+| |Bruno Mariz de Oliveira Teixeira|_ |                                     |                                     |                                     |
+|                                     |                                     |                                     |                                     |
+| `Bruno Mariz de Oliveira Teixeira`_ |                                     |                                     |                                     |
++-------------------------------------+-------------------------------------+-------------------------------------+-------------------------------------+
 
 Former team members
 -------------------
 
-.. |Keith J. Roberts| image:: /images/keithj.roberts.*
-   :width: 70%
+.. |Keith J. Roberts| image:: ../_themes/firedrake/static/firedrake_bw.jpg
+   :width: 150px
+   :height: 150px
 .. _Keith J. Roberts: https://www.keithroberts.site/
-.. |Lucas Franceschini| image:: /images/lucasfranceschini.*
-   :width: 70%
+.. |Lucas Franceschini| image:: ../_themes/firedrake/static/firedrake_bw.jpg
+   :width: 150px
+   :height: 150px
 .. _Lucas Franceschini: http://lattes.cnpq.br/4921110587510112
-.. |Eduardo Moscatelli de Souza| image:: /images/eduardomoscatellidesouza.*
-   :width: 70%
+.. |Eduardo Moscatelli de Souza| image:: ../_themes/firedrake/static/firedrake_bw.jpg
+   :width: 150px
+   :height: 150px
 .. _Eduardo Moscatelli de Souza: https://scholar.google.com/citations?user=Z2hqFC8AAAAJ&hl=pt-BR
 
 +--------------------------------+--------------------------------+--------------------------------+--------------------------------+
