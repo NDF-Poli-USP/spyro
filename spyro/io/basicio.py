@@ -463,6 +463,10 @@ def _grid_velocity_data_to_source_function(grid_velocity_data):
     length_z = grid_velocity_data["length_z"]
     length_x = grid_velocity_data["length_x"]
     length_y = grid_velocity_data.get("length_y")
+    grid_spacing = grid_velocity_data.get("grid_spacing")
+    grid_spacing_z = grid_velocity_data.get("grid_spacing_z", grid_spacing)
+    grid_spacing_x = grid_velocity_data.get("grid_spacing_x", grid_spacing)
+    grid_spacing_y = grid_velocity_data.get("grid_spacing_y", grid_spacing)
 
     source_mesh_parameters = {
         "dimension": vp_values.ndim,
@@ -470,7 +474,10 @@ def _grid_velocity_data_to_source_function(grid_velocity_data):
         "length_x": length_x,
         "length_y": length_y,
         "mesh_type": "firedrake_mesh",
-        "edge_length": grid_velocity_data["grid_spacing"],
+        "edge_length": grid_spacing,
+        "edge_length_z": grid_spacing_z,
+        "edge_length_x": grid_spacing_x,
+        "edge_length_y": grid_spacing_y,
         "abc_pad_length": grid_velocity_data.get("abc_pad_length"),
     }
     source_mesh = AutomaticMesh(
@@ -519,12 +526,7 @@ def _hdf5_velocity_model_to_grid_velocity_data(Model, fname):
         x_extent = Model.mesh_parameters.length_x + 2.0 * pad_length
         spacing_z = z_extent / float(vp_values.shape[0] - 1)
         spacing_x = x_extent / float(vp_values.shape[1] - 1)
-        if not np.isclose(spacing_z, spacing_x):
-            raise ValueError(
-                "HDF5 grid is not uniformly spaced in z and x; cannot "
-                "project it with a single Firedrake edge length."
-            )
-        grid_spacing = spacing_z
+        grid_spacing = spacing_z if np.isclose(spacing_z, spacing_x) else None
         length_y = None
     elif vp_values.ndim == 3:
         if Model.mesh_parameters.length_y is None:
@@ -536,24 +538,28 @@ def _hdf5_velocity_model_to_grid_velocity_data(Model, fname):
         spacing_z = z_extent / float(vp_values.shape[0] - 1)
         spacing_x = x_extent / float(vp_values.shape[1] - 1)
         spacing_y = y_extent / float(vp_values.shape[2] - 1)
-        if not (np.isclose(spacing_z, spacing_x) and np.isclose(spacing_z, spacing_y)):
-            raise ValueError(
-                "HDF5 grid is not uniformly spaced in z, x and y; cannot "
-                "project it with a single Firedrake edge length."
-            )
-        grid_spacing = spacing_z
+        grid_spacing = (
+            spacing_z
+            if np.isclose(spacing_z, spacing_x) and np.isclose(spacing_z, spacing_y)
+            else None
+        )
         length_y = Model.mesh_parameters.length_y
     else:
         raise NotImplementedError("Only 2D and 3D HDF5 velocity models are supported.")
 
-    return {
+    grid_velocity_data = {
         "vp_values": vp_values,
         "grid_spacing": grid_spacing,
+        "grid_spacing_z": spacing_z,
+        "grid_spacing_x": spacing_x,
         "length_z": Model.mesh_parameters.length_z,
         "length_x": Model.mesh_parameters.length_x,
         "length_y": length_y,
         "abc_pad_length": pad_length,
     }
+    if vp_values.ndim == 3:
+        grid_velocity_data["grid_spacing_y"] = spacing_y
+    return grid_velocity_data
 
 
 def interpolate(Model, fname, V):
