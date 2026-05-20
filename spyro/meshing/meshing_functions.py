@@ -125,6 +125,9 @@ class AutomaticMesh:
         self.comm = mesh_parameters.comm
         self.mesh_type = mesh_parameters.mesh_type
         self.edge_length = mesh_parameters.edge_length
+        self.edge_length_z = getattr(mesh_parameters, "edge_length_z", None)
+        self.edge_length_x = getattr(mesh_parameters, "edge_length_x", None)
+        self.edge_length_y = getattr(mesh_parameters, "edge_length_y", None)
         self.abc_pad = mesh_parameters.abc_pad_length
         self.mesh_parameters = mesh_parameters
 
@@ -139,6 +142,12 @@ class AutomaticMesh:
         self.lbda = None
         self.velocity_model = mesh_parameters.velocity_model
         self.output_file_name = mesh_parameters.output_filename
+
+    def _resolved_edge_length(self, axis):
+        axis_value = getattr(self, f"edge_length_{axis}", None)
+        if axis_value is not None:
+            return axis_value
+        return self.edge_length
 
     def create_mesh(self):
         """
@@ -255,18 +264,30 @@ class AutomaticMesh:
         """
 
         # Compute the edge length if there is no one
-        if self.edge_length is None and self.cpw is not None:
+        if (
+            self.edge_length is None
+            and self.edge_length_z is None
+            and self.edge_length_x is None
+            and self.edge_length_y is None
+            and self.cpw is not None
+        ):
             self.edge_length = calculate_edge_length(
                 self.cpw, self.minimum_velocity, self.source_frequency)
 
+        edge_length_z = self._resolved_edge_length("z")
+        edge_length_x = self._resolved_edge_length("x")
+        edge_length_y = self._resolved_edge_length("y")
+
         # Number of elements
         pad = 0. if self.abc_pad is None else self.abc_pad
-        n_pad = round(pad / self.edge_length, 0)  # Elements in the layer
-        nz = int(round(self.length_z / self.edge_length, 0)) + int(n_pad)
-        nx = int(round(self.length_x / self.edge_length, 0)) + int(2 * n_pad)
+        n_pad_z = round(pad / edge_length_z, 0) if edge_length_z is not None else 0
+        n_pad_x = round(pad / edge_length_x, 0) if edge_length_x is not None else 0
+        nz = int(round(self.length_z / edge_length_z, 0)) + int(n_pad_z)
+        nx = int(round(self.length_x / edge_length_x, 0)) + int(2 * n_pad_x)
         discretization = (nz, nx)
         if self.dimension == 3:
-            ny = int(round(self.length_y / self.edge_length, 0)) + int(2 * n_pad)
+            n_pad_y = round(pad / edge_length_y, 0) if edge_length_y is not None else 0
+            ny = int(round(self.length_y / edge_length_y, 0)) + int(2 * n_pad_y)
             discretization += (ny,)
 
         return discretization
@@ -333,6 +354,11 @@ class AutomaticMesh:
         # Define the discretization
         nz, nx, ny = self.define_discretization_for_mesh()
 
+        if self.comm is not None:
+            comm = self.comm.comm
+        else:
+            comm = None
+
         return box_mesh(
             nz,
             nx,
@@ -342,7 +368,7 @@ class AutomaticMesh:
             self.length_y,
             pad=self.abc_pad,
             quadrilateral=self.quadrilateral,
-            comm=self.comm.comm)
+            comm=comm)
 
     def create_seismicmesh_mesh(self):
         """

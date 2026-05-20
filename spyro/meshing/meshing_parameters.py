@@ -228,6 +228,9 @@ class MeshingParameters():
         self._unit = None
         self._output_filename = "automatic_mesh.msh"
         self._grid_velocity_data = None
+        self._edge_length_z = None
+        self._edge_length_x = None
+        self._edge_length_y = None
 
         # Initialize private attributes for gmsh mesh properties
         self._padding_x = None
@@ -275,6 +278,9 @@ class MeshingParameters():
         self.output_filename = self.input_mesh_dictionary.get("output_filename", "automatic_mesh.msh")
         self.cells_per_wavelength = self.input_mesh_dictionary.get("cells_per_wavelength")
         self.edge_length = self.input_mesh_dictionary.get("edge_length")
+        self.edge_length_z = self.input_mesh_dictionary.get("edge_length_z")
+        self.edge_length_x = self.input_mesh_dictionary.get("edge_length_x")
+        self.edge_length_y = self.input_mesh_dictionary.get("edge_length_y")
         self.gradient_mask = self.input_mesh_dictionary.get("gradient_mask")
 
         # Apply gmsh meshing properties
@@ -322,8 +328,14 @@ class MeshingParameters():
 
         if self.automatic_mesh:
             # For automatic meshes, need either edge_length or cells_per_wavelength
+            has_directional_size = (
+                self.edge_length_z is not None
+                or self.edge_length_x is not None
+                or self.edge_length_y is not None
+            )
             has_size_param = (
                 self.edge_length is not None
+                or has_directional_size
                 or self.cells_per_wavelength is not None
             )
             if not has_size_param:
@@ -451,14 +463,24 @@ class MeshingParameters():
         Raises
         ------
         ValueError
-            If value is not None and does not contain required keys
-            'vp_values' and 'grid_spacing'.
+            If value is not None and does not contain required keys for either
+            a scalar or directional grid spacing description.
         """
         if value is not None:
-            necessary_keys = ["vp_values", "grid_spacing"]
-            for necessary_key in necessary_keys:
-                if necessary_key not in value:
-                    raise ValueError(f"Grid velocity data needs {necessary_key} key.")
+            if "vp_values" not in value:
+                raise ValueError("Grid velocity data needs vp_values key.")
+            has_scalar_spacing = "grid_spacing" in value
+            has_directional_spacing = all(
+                key in value for key in ("grid_spacing_z", "grid_spacing_x")
+            )
+            if value.get("length_y") not in (None, 0.0):
+                has_directional_spacing = has_directional_spacing and (
+                    "grid_spacing_y" in value
+                )
+            if not has_scalar_spacing and not has_directional_spacing:
+                raise ValueError(
+                    "Grid velocity data needs either grid_spacing or directional grid_spacing_z/grid_spacing_x keys."
+                )
         self._grid_velocity_data = value
 
     @property
@@ -542,6 +564,42 @@ class MeshingParameters():
             self._cells_per_wavelength = None
 
         self._edge_length = value
+        if hasattr(self, 'is_complete'):
+            self.check_completeness()
+
+    def _resolved_edge_length(self, axis):
+        axis_value = getattr(self, f"edge_length_{axis}", None)
+        if axis_value is not None:
+            return axis_value
+        return self.edge_length
+
+    @property
+    def edge_length_z(self):
+        return self._edge_length_z
+
+    @edge_length_z.setter
+    def edge_length_z(self, value):
+        self._edge_length_z = value
+        if hasattr(self, 'is_complete'):
+            self.check_completeness()
+
+    @property
+    def edge_length_x(self):
+        return self._edge_length_x
+
+    @edge_length_x.setter
+    def edge_length_x(self, value):
+        self._edge_length_x = value
+        if hasattr(self, 'is_complete'):
+            self.check_completeness()
+
+    @property
+    def edge_length_y(self):
+        return self._edge_length_y
+
+    @edge_length_y.setter
+    def edge_length_y(self, value):
+        self._edge_length_y = value
         if hasattr(self, 'is_complete'):
             self.check_completeness()
 
