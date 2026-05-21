@@ -2,11 +2,9 @@
 
 import firedrake as fire
 from numpy import clip, where
-from firedrake.__future__ import interpolate
 from spyro.domains.space import create_function_space
 from spyro.utils.error_management import value_parameter_error
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
-fire.interpolate = interpolate
 
 
 def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
