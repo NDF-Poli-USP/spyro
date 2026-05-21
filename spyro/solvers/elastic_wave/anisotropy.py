@@ -8,7 +8,7 @@ class AnisotropyTensor():
     def c_vti_tensor(PropISO, PropVTI):
         """Constructs the elastic tensor for a material with VTI anisotropy.
 
-        Reference: Thomsen (1986). Geophysics 51, 10, 1954-1966
+        TODO References: Thomsen (1986). Geophysics 51, 10, 1954-1966
 
         Parameters
         ----------
