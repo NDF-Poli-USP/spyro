@@ -642,7 +642,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 dimension=self.dimension, quadrilateral=self.mesh_parameters.quadrilateral,
                 func_space_type=self.mesh_ops.func_space_type,
                 abc_boundary_layer_shape=self.abc_boundary_layer_shape,
-                abc_reference_freq=self.abc_reference_freq, comm=self.comm)
+                abc_reference_freq=self.abc_reference_freq,
+                abc_degree_type=self.abc_degree_type, comm=self.comm)
 
         # Identifier for the current case study
         if self.abc_boundary_layer_type in ["PML", "hybrid"]:

@@ -77,7 +77,7 @@ class PMLLayer(ABCLayer):
             or "Dirichlet" or "Neumann" for typical BCs. Default is "Higdon"
         abc_reference_freq : `str`, optional
             Reference frequency for sizing the hybrid absorbing layer.
-            Options: 'source' or 'boundary'
+            Options: 'source' or 'boundary'. Default is 'source'
         comm : `object`, optional
             An object representing the communication interface
             for parallel processing. Default is None

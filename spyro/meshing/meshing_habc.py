@@ -40,6 +40,8 @@ class HABCMesh(MeshOps):
     func_space_type, `str`
         Type of function space for the state variable.
         Options: 'scalar' or 'vector'. Default is None
+    lmin : `float`
+        Minimum mesh size
     quadrilateral : bool
         Flag to indicate whether to use quadrilateral/hexahedral elements
 
@@ -282,7 +284,7 @@ class HABCMesh(MeshOps):
 
         Notes
         -----
-        New attributes added to the wave.mesh_parameters object:
+        New attributes added to the wave object:
         mesh_original : `Firedrake.Mesh`
             Original mesh without absorbing layer
         mesh_parameters.alpha : `float`
@@ -310,15 +312,6 @@ class HABCMesh(MeshOps):
         # Mesh data
         print(f"Original Mesh with {Wave.mesh.num_vertices()} Nodes "
               f"and {Wave.mesh.num_cells()} Volume Elements", flush=True)
-
-        # # Get mesh parameters from original mesh
-        # mesh_derived_parameters = self.representative_mesh_dimensions(Wave.mesh,
-        #                                                               Wave.function_space)
-        # Wave.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
-        # Wave.mesh_parameters.lmin = mesh_derived_parameters[1]
-        # Wave.mesh_parameters.lmax = mesh_derived_parameters[2]
-        # Wave.mesh_parameters.alpha = mesh_derived_parameters[3]
-        # Wave.mesh_parameters.tol = mesh_derived_parameters[4]
 
         # Save a copy of the original mesh
         Wave.mesh_original = Wave.mesh
@@ -435,8 +428,7 @@ class HABCMesh(MeshOps):
         n_hyp, perimeter, a_hyp, b_hyp = hyp_par
 
         # Boundary points: Use 16 or 24 as a minimum
-        lmin = self.mesh_parameters.lmin
-        num_bnd_pts = int(max(np.ceil(perimeter / lmin), 16)) - 1
+        num_bnd_pts = int(max(np.ceil(perimeter / self.lmin), 16)) - 1
 
         # Generate the hyperellipse boundary points
         pnt_bef_trunc = 0
@@ -538,7 +530,7 @@ class HABCMesh(MeshOps):
                 if idp == ini_trunc or idp == end_trunc - 1:
                     curves.append(["line", p1, p2, ltrunc])
                 else:
-                    curves.append(["line", p1, p2, self.mesh_parameters.lmin])
+                    curves.append(["line", p1, p2, self.lmin])
 
             for idp in range(end_trunc, num_bnd_pts - 1, 2):
                 p1 = geo.PointData()[2][idp]
@@ -555,7 +547,7 @@ class HABCMesh(MeshOps):
                 # print(p1, p2)
 
                 if ini_trunc + 1 <= idp <= end_trunc - 2:
-                    curves.append(["line", p1, p2, self.mesh_parameters.lmin])
+                    curves.append(["line", p1, p2, self.lmin])
                 else:
                     curves.append(["line", p1, p2, ltrunc])
 
@@ -608,7 +600,7 @@ class HABCMesh(MeshOps):
                             rightdomain=0) for c in curves]
 
                 # Generate the mesh using netgen library
-                hyp_mesh = geo.GenerateMesh(maxh=self.mesh_parameters.lmin,
+                hyp_mesh = geo.GenerateMesh(maxh=self.lmin,
                                             quad_dominated=self.quadrilateral,
                                             optsteps2d=10,  # Optimize mesh
                                             )
@@ -690,8 +682,8 @@ class HABCMesh(MeshOps):
 
             # Check if the point is on the original boundary
             if boundary_tree.query(
-                coord, distance_upper_bound=self.mesh_parameters.tol,
-                    workers=-1)[0] <= self.mesh_parameters.tol:
+                coord, distance_upper_bound=self.tol,
+                    workers=-1)[0] <= self.tol:
                 boundary_coords.append(coord)
                 boundary_points.append(rec_map[i])
 
@@ -718,9 +710,9 @@ class HABCMesh(MeshOps):
 
             # Check if the point is on the original boundary
             dist, idx = boundary_tree.query(
-                coord, distance_upper_bound=self.mesh_parameters.tol, workers=-1)
+                coord, distance_upper_bound=self.tol, workers=-1)
 
-            if dist <= self.mesh_parameters.tol:
+            if dist <= self.tol:
                 # Reuse the existing point
                 hyp_map[i] = boundary_points[idx]
             else:
@@ -1020,7 +1012,7 @@ class HABCMesh(MeshOps):
 
         return final_mesh
 
-    def hypershape_mesh_habc(self, hyp_par, spln=True):
+    def hypershape_mesh_habc(self, hyp_par, mesh_original, mesh_parameters, spln=True):
         """
         Generate a mesh with a hypershape absorbing layer
 
@@ -1042,6 +1034,14 @@ class HABCMesh(MeshOps):
                 Hypershape semi-axis in direction z
             - c_hyp : `float`
                 Hypershape semi-axis in direction y (3D only)
+        mesh_original : `Firedrake.Mesh`
+            Original mesh without absorbing layer
+        mesh_parameters : `meshing_parameters.MeshingParameters`
+            Contains mesh parameters:
+            lmin : `float`
+                Minimum mesh size
+            tol : `float`
+                Tolerance for searching nodes in the mesh
         spln : `bool`, optional
             Flag to indicate whether to use splines (True) or lines (False)
             in hypershape layer generation. Default is True
@@ -1052,6 +1052,10 @@ class HABCMesh(MeshOps):
             Mesh with a hypershape absorbing layer
         """
 
+        # Get the mesh parameters for use in hypershape mesh generation
+        self.lmin = mesh_parameters.lmin
+        self.tol = mesh_parameters.tol
+
         if self.dimension == 2:  # 2D
 
             # Creating the hyperellipse layer mesh
@@ -1059,15 +1063,14 @@ class HABCMesh(MeshOps):
             # fire.VTKFile("output/trunc_hyp_test.pvd").write(hyp_mesh)
 
             # Merging the original mesh with the hyperellipse layer mesh
-            mesh_habc = self.merge_mesh_2D(self.mesh_original, hyp_mesh)
+            mesh_habc = self.merge_mesh_2D(mesh_original, hyp_mesh)
             # fire.VTKFile("output/trunc_merged_test.pvd").write(mesh_habc)
 
         if self.dimension == 3:  # 3D
 
             # Base rectangular mesh
-            self.mesh_parameters.abc_pad_length = self.pad_len
             rec_mesh = AutomaticMesh(
-                mesh_parameters=self.mesh_parameters).create_firedrake_mesh()
+                mesh_parameters=mesh_parameters).create_firedrake_mesh()
             # fire.VTKFile("output/rectang_test.pvd").write(rec_mesh)
 
             # Merging the original mesh with a hyperellipsoid layer mesh

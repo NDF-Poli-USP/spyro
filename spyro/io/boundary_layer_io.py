@@ -121,7 +121,7 @@ class Read_boundary_layer:
                                                                "rectangular")
             self.abc_degree_type = abc_dictionary.get("degree_type", "real")
             self.abc_deg_layer = None if self.abc_boundary_layer_shape == "rectangular" \
-                else abc_dictionary.get("degree_layer", 2.)
+                else max(abc_dictionary.get("degree_layer", 2.), 2.)
             self.abc_reference_freq = abc_dictionary.get("habc_reference_freq",
                                                          "source")
 
