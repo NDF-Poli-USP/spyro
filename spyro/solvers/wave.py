@@ -231,7 +231,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                                    get_boundary_node_ids=True)
 
         # Get geometry parameters from mesh
-        if self.mesh_ops.func_space_type == 'scalar':
+        if self.mesh_ops.func_space_type == 'scalar' \
+                and not hasattr(self.mesh_parameters, 'diam_mesh'):
             data_mesh = self.mesh_ops.representative_mesh_dimensions(self.mesh,
                                                                      self.function_space)
             self.mesh_parameters.diam_mesh = data_mesh[0]
@@ -626,7 +627,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         domain_dim = self.domain_dimensions()
 
         # Nyquist frequency
-        freq_Nyquist = 1. / (2. * self.dt)
+        freq_Nyquist = None if self.analysis != "transient" else 1. / (2. * self.dt)
 
         if self.abc_boundary_layer_type == "PML":
             import spyro.pml.pml_nsnc as pmlops

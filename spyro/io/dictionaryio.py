@@ -1,3 +1,4 @@
+from ..utils.error_management import value_parameter_error
 
 
 class Read_options:
@@ -6,20 +7,22 @@ class Read_options:
 
     Attributes
     ----------
-    options_dictionary : dict
+    options_dictionary : `dict`
         Dictionary containing the options information.
-    cell_type : str
+    cell_type : `str`
         The cell type to be used.
-    method : str
+    method : `str`
         The FEM method to be used.
-    variant : str
+    variant : `str`
         The quadrature variant to be used.
-    degree : int
+    degree : `int`
         The polynomial degree of the FEM method.
-    dimension : int
+    dimension : `int`
         The spatial dimension of the problem.
     automatic_adjoint : bool
         Whether to automatically compute the adjoint.
+    analysis : `str`
+        The type of analysis to be performed. Can be 'transient', 'modal' or 'eikonal'.
 
     Methods
     -------
@@ -43,6 +46,7 @@ class Read_options:
         options_dictionary.setdefault("degree", None)
         options_dictionary.setdefault("dimension", None)
         options_dictionary.setdefault("automatic_adjoint", False)
+        options_dictionary.setdefault("analysis", "transient")
         self.options_dictionary = options_dictionary
 
         self.variant = options_dictionary["variant"]
@@ -51,6 +55,7 @@ class Read_options:
             self.cell_type = options_dictionary["cell_type"]
         self.degree = options_dictionary["degree"]
         self.dimension = options_dictionary["dimension"]
+        self.analysis = options_dictionary["analysis"]
 
     @property
     def variant(self):
@@ -191,6 +196,17 @@ class Read_options:
         if value not in {2, 3}:
             raise ValueError(f"Dimension of {value} not 2 or 3.")
         self._dimension = value
+
+    @property
+    def analysis(self):
+        return self._analysis
+
+    @analysis.setter
+    def analysis(self, value):
+        allowed_analyses = ["transient", "modal", "eikonal"]
+        if value not in allowed_analyses:
+            raise value_parameter_error('analysis', analysis, allowed_analyses)
+        self._analysis = value
 
 
 class Read_outputs:
