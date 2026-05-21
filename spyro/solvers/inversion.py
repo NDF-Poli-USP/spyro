@@ -923,7 +923,7 @@ class FullWaveformInversion(AcousticWave):
 
         vmin = parameters["vmin"]
         vmax = parameters["vmax"]
-        vp_0 = self.initial_velocity_model.vector()
+        vp_0 = self.initial_velocity_model.dat.data_ro[:]
         bounds = [(vmin, vmax) for _ in range(len(vp_0))]
         options = parameters["scipy_options"]
 
@@ -1022,16 +1022,16 @@ class FullWaveformInversion(AcousticWave):
         obj = Objective(inner_product, self)
 
         u = fire.Function(self.function_space, name="velocity").assign(self.guess_velocity_model)
-        opt = FireVector(u.vector(), inner_product)
+        opt = FireVector(u.dat.data_ro[:], inner_product)
 
         # Add control bounds to the problem (uses more RAM)
         xlo = fire.Function(self.function_space)
         xlo.interpolate(fire.Constant(vmin))
-        x_lo = FireVector(xlo.vector(), inner_product)
+        x_lo = FireVector(xlo.dat.data_ro[:], inner_product)
 
         xup = fire.Function(self.function_space)
         xup.interpolate(fire.Constant(vmax))
-        x_up = FireVector(xup.vector(), inner_product)
+        x_up = FireVector(xup.dat.data_ro[:], inner_product)
 
         bnd = ROL.Bounds(x_lo, x_up, 1.0)
 
