@@ -7,8 +7,8 @@ from shutil import rmtree
 from sympy import divisors
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.meshing.meshing_habc import HABC_Mesh
-from spyro.habc.hyp_lay import HyperLayer
-from spyro.habc.rec_lay import RectangLayer
+from spyro.abc.hyp_lay import HyperLayer
+from spyro.abc.rec_lay import RectangLayer
 from spyro.habc.damp_profile import HABC_Damping
 from spyro.habc.nrbc import NRBC
 from spyro.habc.error_measure import HABC_Error
@@ -73,8 +73,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Size parameter of the absorbing layer
     FLpos : `list`
         Possible size parameters for the absorbing layer without rounding
-    f_Nyq : `float`
-        Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
+    freq_Nyq : `float`
+        Nyquist frequency according to the time step. freq_Nyq = 1 / (2 * dt)
     freq_ref : `float`
         Reference frequency of the wave at the boundary
     fundam_freq : `float`
@@ -176,7 +176,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
 
         # Nyquist frequency
-        self.f_Nyq = 1. / (2. * self.dt)
+        self.freq_Nyq = 1. / (2. * self.dt)
 
         # Original domain dimensions
         domain_dim = self.habc_domain_dimensions(only_orig_dom=True)
@@ -257,7 +257,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.path_case_habc = self.path_save + self.case_habc + "/"
 
         # Initializing the error measure class
-        HABC_Error.__init__(self, self.dt, self.f_Nyq,
+        HABC_Error.__init__(self, self.dt, self.freq_Nyq,
                             self.receiver_locations,
                             output_folder=self.path_save,
                             output_case=self.path_case_habc)
@@ -331,8 +331,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                 histPcrit = self.receivers_reference[:, n_crit]
 
                 # Get the minimum frequency excited at each critical point
-                freq_ref = freq_response(histPcrit, self.f_Nyq,
-                                         fpad=fpad, get_max_freq=True)
+                freq_ref = freq_response(histPcrit, self.freq_Nyq,
+                                         fpad=fpad, get_dominant_freq=True)
                 print("Frequency at Critical Point {:>2.0f}: {:.5f}".format(
                     n_crit, freq_ref), flush=True)
 
@@ -452,6 +452,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             self.a_par, self.FLpos = calc_size_lay(
                 self.freq_ref, z_par, self.mesh_parameters.lmin, self.lref,
                 n_root=n_root, layer_based_on_mesh=layer_based_on_mesh)
+        self.abc_pad_length = self.pad_len
 
         plot_function_layer_size([self.a_par, z_par],
                                  [self.freq_ref, self.frequency],
@@ -530,9 +531,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # New mesh with layer
         if layer_shape == 'rectangular':
-            # dom_lay = self.habc_domain_dimensions(only_habc_dom=True)
-            # mesh_habc = self.rectangular_mesh_habc(dom_lay, self.pad_len)
-            self.mesh_parameters.set_mesh(abc_pad_length=self.pad_len)
             self.set_mesh()
             print("Extended Rectangular Mesh Generated Successfully", flush=True)
 
@@ -1000,7 +998,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                                                   p=mag_add)
 
         # Updating Nyquist frequency
-        self.f_Nyq = 1. / (2. * self.dt)
+        self.freq_Nyq = 1. / (2. * self.dt)
 
         print(str_dt, flush=True)
 
