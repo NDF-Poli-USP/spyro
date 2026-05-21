@@ -139,8 +139,7 @@ class MeshOps():
             fdim = 3**0.5
 
         # Minimum and maximum mesh size for habc parameters
-        diam = fire.assemble(fire.interpolate(diam_mesh,
-                                              function_space))
+        diam = fire.assemble(fire.interpolate(diam_mesh, function_space))
         lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
         lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
 
