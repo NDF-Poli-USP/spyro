@@ -3,7 +3,7 @@ import numpy as np
 
 
 class AnisotropyTensor():
-    """docstring for ClassName"""
+    """Class for the Elastic tensor VTI and TTI anisotropy materials."""
 
     def c_vti_tensor(PropISO, PropVTI):
         """Constructs the elastic tensor for a material with VTI anisotropy.
