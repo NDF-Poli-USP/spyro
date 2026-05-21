@@ -1,14 +1,10 @@
-import pytest
-import warnings
-import numpy as np
-import firedrake as fire
+from pytest import fail, mark, param
+from firedrake import conditional, ConvergenceError
+from numpy import isclose, where
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.domains.space import create_function_space
 from spyro.tools.habc_tools import layer_mask_field, point_cloud_field
 from spyro.utils.cost import comp_cost
-fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
-warnings.filterwarnings("ignore", category=RuntimeWarning)
-warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 def wave_dict(element_geometry, dimension, layer_shape, degree_layer):
@@ -126,7 +122,7 @@ def preamble_tools(dictionary, edge_length, f_est, dimension):
     wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
-    cond = fire.conditional(wave_obj.mesh_x < 0.5, 3.0, 1.5)
+    cond = conditional(wave_obj.mesh_x < 0.5, 3.0, 1.5)
     wave_obj.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
@@ -202,11 +198,11 @@ def run_tools(wave_obj, method_extend, n_root=1):
     # Extracting nodes from the layer field
     mask_nodes = wave_obj.mesh_ops.extract_node_positions(wave_obj.mesh, V,
                                                           output_type="array")
-    indlay_nodes = np.where(layer_mask.dat.data_with_halos == 1.)[0]
+    indlay_nodes = where(layer_mask.dat.data_with_halos == 1.)[0]
     pts_layer = mask_nodes[indlay_nodes]  # Inside layer
     pts_layer_xlt = pts_layer[pts_layer[:, 1] < 0.5]
     pts_layer_xge = pts_layer[pts_layer[:, 1] >= 0.5]
-    original_nodes = np.where(layer_mask.dat.data_with_halos == 0.)[0]
+    original_nodes = where(layer_mask.dat.data_with_halos == 0.)[0]
     pts_original = mask_nodes[original_nodes]  # Inside original domain
     pts_original_xlt = pts_original[pts_original[:, 1] < 0.5]
     pts_original_xge = pts_original[pts_original[:, 1] >= 0.5]
@@ -233,7 +229,7 @@ def run_tools(wave_obj, method_extend, n_root=1):
 
     for region, exp_value, mean_val in zip(region_names, expected_values, mean_val):
         cmp_str = f"{region}: Expected {exp_value:.5f}, got = {mean_val:.5f}"
-        assert np.isclose(mean_val / exp_value, 1., atol=tolerance), \
+        assert isclose(mean_val / exp_value, 1., atol=tolerance), \
             "✗ " + met_str + "  → " + cmp_str
         print("✓ " + met_str + "Verified: " + cmp_str, flush=True)
 
@@ -241,11 +237,11 @@ def run_tools(wave_obj, method_extend, n_root=1):
     wave_obj.layer_ops.rename_folder_habc()
 
 
-@pytest.mark.parametrize("element_geometry, dimension", [
-    ("T", 2),
-    ("Q", 2),
-    ("T", 3),
-    ("Q", 3)])
+@mark.parametrize("element_geometry, dimension",
+                  [("T", 2),
+                   ("Q", 2),
+                   param("T", 3, marks=mark.slow),
+                   param("Q", 3, marks=mark.slow)])
 def test_habc_tools(element_geometry, dimension):
     """Test of HABC tools for 2D and 3D case.
 
@@ -345,5 +341,5 @@ def test_habc_tools(element_geometry, dimension):
             # Running the HABC tools
             run_tools(wave_obj, method_extend)
 
-    except fire.ConvergenceError as e:
-        pytest.fail(f"Checking HABC tools {dimension}D raised an exception: {str(e)}")
+    except ConvergenceError as e:
+        fail(f"Checking HABC tools {dimension}D raised an exception: {str(e)}")
