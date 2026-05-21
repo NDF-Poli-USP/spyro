@@ -152,9 +152,9 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
                    ("Q", 2, "consistent"),
                    ("Q", 2, "underintegrated"),
                    ("T", 3, "consistent"),
-                   ("T", 3, "underintegrated"),
                    ("Q", 3, "consistent"),
-                   ("Q", 3, "underintegrated")])
+                   param("T", 3, "underintegrated", marks=mark.slow),
+                   param("Q", 3, "underintegrated", marks=mark.slow)])
 def test_eikonal(element_geometry, dimension, element_type):
     """Testing of eikonal for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
