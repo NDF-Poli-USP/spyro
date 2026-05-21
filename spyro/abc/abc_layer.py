@@ -536,15 +536,20 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
             print("\nGenerating Mesh with Absorbing Layer", flush=True)
             layer_shape = self.abc_boundary_layer_shape
 
-        # Update the pad length in Wave object
-        Wave.abc_pad_length = self.abc_pad_length
-
         # New mesh with layer
         if layer_shape == 'rectangular':
+
+            # Update the pad length in Wave object
+            Wave.abc_pad_length = self.abc_pad_length
+
+            # Create the mesh
             Wave.set_mesh()
             print("Extended Rectangular Mesh Generated Successfully", flush=True)
 
         elif layer_shape == 'hypershape':
+
+            # Update the pad length in Wave.mesh_parameters object
+            Wave.mesh_parameters.abc_pad_length = self.abc_pad_length
 
             # Parameters for hypershape mesh
             if self.dimension == 2:  # 2D
@@ -554,7 +559,10 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
                 geometry_param = self.surf_hyp
 
             hypershape_param = (self.n_hyp, geometry_param, *self.hyper_axes)
-            mesh_abc = self.hypershape_mesh_habc(hypershape_param, spln=spln)
+
+            # Creating the mesh with the absorbing layer based on the hypershape geometry
+            mesh_abc = Wave.mesh_ops.hypershape_mesh_habc(
+                hypershape_param, Wave.mesh_original, Wave.mesh_parameters, spln=spln)
 
             # Updating the mesh with the absorbing layer
             Wave.set_mesh(user_mesh=mesh_abc)

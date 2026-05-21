@@ -24,8 +24,12 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     Attributes
     ----------
+    abc_boundary_layer_shape : `string`, optional
+        Shape type of pad layer. Options: 'rectangular' or 'hypershape'.
     abc_deg_layer : `int` or `float`
         Hypershape degree
+    abc_degree_type : `str`, optional
+        Type of the hypereshape degree. Options: 'real' or 'integer'.
     abc_reference_freq : `str`
         Reference frequency for sizing the hybrid absorbing layer.
         Options: 'source' or 'boundary'
@@ -77,8 +81,6 @@ class HABCLayer(ABCLayer, HABC_Damping):
         Length of the domain in the y-direction with absorbing layer (3D)
     Lz_habc : `float`
         Length of the domain in the z-direction with absorbing layer
-    layer_shape : `string`
-        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
     lref : `float`
         Reference length for the size of the absorbing layer
     mesh: `firedrake mesh`
@@ -143,7 +145,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     def __init__(self, domain_dim, frequency, f_Nyquist, abc_deg_layer,
                  dimension=2, quadrilateral=False, func_space_type=None,
                  abc_boundary_layer_shape="rectangular",
-                 abc_reference_freq="source", comm=None):
+                 abc_reference_freq="source", abc_degree_type="real", comm=None):
         '''
         Initialize the HABC class
 
@@ -171,7 +173,10 @@ class HABCLayer(ABCLayer, HABC_Damping):
             Default is 'rectangular'
         abc_reference_freq : `str`, optional
             Reference frequency for sizing the hybrid absorbing layer.
-            Options: 'source' or 'boundary'
+            Options: 'source' or 'boundary'. Default is 'source'
+        abc_degree_type : `str`, optional
+            Type of the hypereshape degree. Options: 'real' or 'integer'.
+            Default is 'real'
         comm : `object`, optional
             An object representing the communication interface
             for parallel processing. Default is None
@@ -190,6 +195,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
         self.abc_deg_layer = None if abc_boundary_layer_shape == "rectangular" \
             else max(abc_deg_layer, 2.)
+        self.abc_degree_type = abc_degree_type
 
     def fundamental_frequency(self, method=None, monitor=False,
                               fitting_c=(0., 0., 0., 0.)):
@@ -483,10 +489,8 @@ class HABCLayer(ABCLayer, HABC_Damping):
         bnd_nfs, bnd_nodes_nfs = self.layer_boundary_data(self.function_space)
 
         # Hypershape parameters
-        if self.layer_shape == 'hypershape':
-            hyp_par = (self.n_hyp, *self.hyper_axes)
-        else:
-            hyp_par = None
+        hyp_par = None if self.abc_boundary_layer_shape == 'hypershape' \
+            else (self.n_hyp, *self.hyper_axes)
 
         # Applying Higdon ABCs
         self.cos_ang_HigdonBC(self.function_space, self.crit_source,
@@ -721,14 +725,13 @@ class HABCLayer(ABCLayer, HABC_Damping):
         '''
 
         if self.n_hyp != self.abc_deg_layer and \
-                self.layer_shape == 'hypershape':
+                self.abc_boundary_layer_shape == 'hypershape':
 
             print("Output Folder for Results Will Be Renamed.", flush=True)
 
             # Define the current and new folder names
-            old = self.path_case_habc
-            new = self.path_case_habc[:-8] + f"{self.n_hyp:.1f}" + \
-                self.path_case_habc[-5:]
+            old = self.path_case_abc
+            new = self.path_case_abc[:-8] + f"{self.n_hyp:.1f}" + self.path_case_abc[-5:]
 
             try:
                 if path.isdir(new):

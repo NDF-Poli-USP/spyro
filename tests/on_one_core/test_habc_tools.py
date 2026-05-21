@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
-def wave_dict(element_type, dimension, degree_layer):
+def wave_dict(element_type, dimension, layer_shape, degree_layer, method_extend):
     """Create a dictionary with parameters for the model.
 
     Parameters
@@ -20,8 +20,12 @@ def wave_dict(element_type, dimension, degree_layer):
         Type of finite element. 'T' for triangles or 'Q' for quadrilaterals
     dimension : `int`
         Dimension of the problem. 2 for 2D and 3 for 3D
+    layer_shape : `str`
+        Shape of the absorbing layer, either 'rectangular' or 'hypershape'
     degree_layer : `int` or `None`
         Degree of the hypershape layer, if applicable. If None, it is not used
+    method_extend : `str`
+        Method to extend the velocity profile. Options: 'point_cloud' or 'nearest_point'
 
     Returns
     -------
@@ -66,11 +70,9 @@ def wave_dict(element_type, dimension, degree_layer):
     # point of the mesh. We also specify to record the solution at the corners
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
-        "source_type": "ricker",
-        "source_locations": ([(-0.5, 0.25)] if dimension == 2
-                             else [(-0.5, 0.25, 0.5)]),
+        "source_locations": ([(-0.5, 0.25)] if dimension == 2  # (0.5 * Lz, 0.25 * Lx)
+                             else [(-0.5, 0.25, 0.5)]),  # (0.5 * Lz, 0.25 * Lx, 0.5 * Ly)
         "frequency": 5.,  # in Hz
-        "delay": 1.5,
         "receiver_locations": ([(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)]
                                if dimension == 2
                                else [(-Lz, 0., 0.), (-Lz, Lx, 0.),
@@ -81,29 +83,22 @@ def wave_dict(element_type, dimension, degree_layer):
 
     # Simulate for 1. seconds.
     dictionary["time_axis"] = {
-        "initial_time": 0.,  # Initial time for event
-        "final_time": 2.,    # Final time for event
+        "final_time": 1.,    # Final time for event
         "dt": 0.001,  # timestep size in seconds
-        "amplitude": 1.,  # The Ricker has an amplitude of 1.
-        "output_frequency": 100,  # How frequently to output solution to pvds
-        "gradient_sampling_frequency": 100,  # How frequently to save to RAM
     }
 
     # Define Parameters for absorbing boundary conditions
     dictionary["absorving_boundary_conditions"] = {
         "status": True,  # Activate ABCs
         "damping_type": "hybrid",  # Activate HABC
-        "layer_shape": "rectangular",  # Options: rectangular or hypershape
+        "layer_shape": layer_shape,  # Options: rectangular or hypershape
         "degree_layer": degree_layer,  # Float >= 2 (hyp) or None (rec)
-        "degree_type": "real",  # Options: real or integer
-        "habc_reference_freq": "source",  # Options: source or boundary
-        "degree_eikonal": 2,  # Finite element order for the Eikonal analysis
-        "get_ref_model": False,  # If True, the infinite model is created
     }
 
     # Define parameters for visualization
-    dictionary["visualization"] = {
-        "output_folder": f"output/test_habc_tools{dimension}d"  # Output folder
+    str_id = element_type + ("CL" if method_extend == "point_cloud" else "NP")
+    dictionary["visualization"] = {  # Output folder
+        "output_folder": f"output/habc_tools_test{dimension}d/ht_test{dimension}d{str_id}"
     }
 
     return dictionary
@@ -252,18 +247,19 @@ def run_tools(wave_obj, method_extend, n_root=1):
             "✗ " + met_str + "  → " + cmp_str
         print("✓ " + met_str + "Verified: " + cmp_str, flush=True)
 
+    # Renaming the folder if degree_layer is modified
+    wave_obj.layer_ops.rename_folder_habc()
 
-# @pytest.mark.parametrize("element_type, dimension, method_extend", [
-#     ("T", 2, "point_cloud"),
-#     ("T", 2, "nearest_point"),
-#     ("Q", 2, "point_cloud"),
-#     ("Q", 2, "nearest_point"),
-#     pytest.param("T", 3, "point_cloud", marks=pytest.mark.slow),
-#     pytest.param("T", 3, "nearest_point", marks=pytest.mark.slow),
-#     pytest.param("Q", 3, "point_cloud", marks=pytest.mark.slow),
-#     pytest.param("Q", 3, "nearest_point", marks=pytest.mark.slow)])
-@pytest.mark.parametrize("element_type, dimension, method_extend",
-                         [("T", 2, "point_cloud")])
+
+@pytest.mark.parametrize("element_type, dimension, method_extend", [
+    ("T", 2, "point_cloud"),
+    ("T", 2, "nearest_point"),
+    ("Q", 2, "point_cloud"),
+    ("Q", 2, "nearest_point"),
+    pytest.param("T", 3, "point_cloud", marks=pytest.mark.slow),
+    pytest.param("T", 3, "nearest_point", marks=pytest.mark.slow),
+    pytest.param("Q", 3, "point_cloud", marks=pytest.mark.slow),
+    pytest.param("Q", 3, "nearest_point", marks=pytest.mark.slow)])
 def test_habc_tools(element_type, dimension, method_extend):
     """Test of HABC tools for 2D and 3D case.
 
@@ -279,6 +275,31 @@ def test_habc_tools(element_type, dimension, method_extend):
     Returns
     -------
     None
+
+    Eikonal for 2D model Δx = 100m
+    ------------------------------
+    eik_min = 83.333 ms (Theoretical value)
+    f_est  T-ele   Q-ele
+     0.01 66.836  65.002
+     0.02 73.308  75.811
+     0.03 77.178  79.845
+     0.04 79.680  82.101
+     0.05 81.498  83.744*
+     0.06 82.942* 85.118
+     0.07 84.160  86.345
+     0.08 85.233  87.480
+
+    Eikonal for 3D model Δx = 150m
+    ------------------------------
+    eik_min = 83.333 ms (Theoretical value)
+    f_est  T-ele   Q-ele
+     0.02  --/--  69.442
+     0.03 76.777  70.974
+     0.04 79.409  73.179
+     0.05 82.273* 75.766
+     0.06 85.347  78.548
+     0.07 88.562  81.431*
+     0.08 91.876  84.377
     """
 
     print("\n" + 85 * "=" + f"\nTesting HABC Tools with {element_type} "
@@ -293,7 +314,10 @@ def test_habc_tools(element_type, dimension, method_extend):
     edge_length = 0.1 if dimension == 2 else 0.15
 
     # Factor for the stabilizing term in Eikonal equation
-    f_est = 0.06 if dimension == 2 else 0.08
+    if element_type == "T":
+        f_est = 0.06 if dimension == 2 else 0.05
+    else:
+        f_est = 0.05 if dimension == 2 else 0.07
 
     # Get simulation parameters
     print(f"\nMesh Size: {1e3 * edge_length:.3f} m", flush=True)
@@ -302,12 +326,18 @@ def test_habc_tools(element_type, dimension, method_extend):
     # ============ HABC PARAMETERS ============
 
     # Hyperellipse degrees
-    degree_layer = 3. if element_type == "T" else None
+    if element_type == "T":
+        layer_shape = "hypershape"
+        degree_layer = 2.
+    else:
+        layer_shape = "rectangular"
+        degree_layer = None
 
     # ============ MESH AND EIKONAL ============
 
     # Create dictionary with parameters for the model
-    dictionary = wave_dict(element_type, dimension, degree_layer)
+    dictionary = wave_dict(element_type, dimension, layer_shape,
+                           degree_layer, method_extend)
 
     # ============ MESH AND EIKONAL ============
 
@@ -320,43 +350,5 @@ def test_habc_tools(element_type, dimension, method_extend):
         # Testing tools for the HABC implementation
         run_tools(wave_obj, method_extend)
 
-        # Renaming the folder if degree_layer is modified
-        wave_obj.layer_ops.rename_folder_habc()
-
     except fire.ConvergenceError as e:
         pytest.fail(f"Checking HABC tools {dimension}D raised an exception: {str(e)}")
-
-
-'''
-=================================================================
-DATA FOR 2D MODEL Δx = 100m
----------------------------
-
-*EIKONAL
-eik_min = 83.333 ms
-f_est  eik[ms]
- 0.01  66.836
- 0.02  73.308
- 0.03  77.178
- 0.04  79.680
- 0.05  81.498
- 0.06  82.942*
- 0.07  84.160
- 0.08  85.233
-
-=================================================================
-DATA FOR 3D MODEL Δx = 150m
----------------------------
-
-*EIKONAL
-eik_min = 83.333 ms
-f_est  eik[ms]
- 0.02  69.442
- 0.03  70.974
- 0.04  73.179
- 0.05  75.766
- 0.06  78.548
- 0.07  81.431
- 0.08  84.377*
- 0.09  87.376
-'''
