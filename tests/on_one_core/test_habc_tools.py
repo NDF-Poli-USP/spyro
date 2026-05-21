@@ -46,7 +46,8 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer):
         "type": "automatic",
     }
 
-    # Define the domain size without the PML or AL.
+    # Define the domain size without the PML or AL. Here we'll assume a domain
+    # with a width and depth of 1 km, and a thickness of 1 km for the 3D case.
     if dimension == 2:
         Lz, Lx, Ly = [1., 1., 0.]
     elif dimension == 3:
