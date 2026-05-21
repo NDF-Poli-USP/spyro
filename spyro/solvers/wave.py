@@ -231,13 +231,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                                    get_boundary_node_ids=True)
 
         # Get geometry parameters from mesh
-        data_mesh = self.mesh_ops.representative_mesh_dimensions(self.mesh,
-                                                                 self.function_space)
-        self.mesh_parameters.diam_mesh = data_mesh[0]
-        self.mesh_parameters.lmin = data_mesh[1]
-        self.mesh_parameters.lmax = data_mesh[2]
-        self.mesh_parameters.alpha = data_mesh[3]
-        self.mesh_parameters.tol = data_mesh[4]
+        if self.mesh_ops.func_space_type == 'scalar':
+            data_mesh = self.mesh_ops.representative_mesh_dimensions(self.mesh,
+                                                                     self.function_space)
+            self.mesh_parameters.diam_mesh = data_mesh[0]
+            self.mesh_parameters.lmin = data_mesh[1]
+            self.mesh_parameters.lmax = data_mesh[2]
+            self.mesh_parameters.alpha = data_mesh[3]
+            self.mesh_parameters.tol = data_mesh[4]
 
     def set_mesh(
             self,
