@@ -4,8 +4,15 @@ from firedrake import *  # noqa:F403
 
 
 def quadrature_rules(V):
-    """Quadrature rule - Gauss-Lobatto-Legendre, Gauss-Legendre and Equi
-    spaced, KMV
+    """Return quadrature rules for mass, stiffness, and boundary terms.
+
+    KMV elements use a colocated quadrature rule for mass-lumping. That rule is
+    deliberately inexact and is only intended to diagonalize the mass matrix.
+    Stiffness terms contain derivatives of the basis functions; using the KMV
+    lumped rule there can change the discrete operator and the explicit CFL
+    limit substantially, especially for tetrahedral KMV elements. Keep the
+    stiffness rule separate so stiffness integrals can use Firedrake's standard
+    quadrature unless a method has an established stiffness rule of its own.
 
     Parameters:
     -----------
