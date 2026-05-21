@@ -76,7 +76,7 @@ class AnisotropyTensor():
     def c_tti_tensor(C_vti, PropTTI):
         """Constructs the elastic tensor for a material with TTI anisotropy.
 
-        References: Yang et al (2020). Survey in Geophysics 41, 805-833
+        TODO References: Yang et al (2020). Survey in Geophysics 41, 805-833
 
         Parameters
         ----------
