@@ -28,7 +28,6 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     W = V * Z
     Wave_object.mixed_function_space = W
     dxlump = dx(**Wave_object.quadrature_rule)
-    dxstiff = dx(**Wave_object.stiffness_quadrature_rule)
 
     u, pp = fire.TrialFunctions(W)
     v, qq = fire.TestFunctions(W)
@@ -68,9 +67,7 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
 
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dxlump
-    # The lumped KMV rule belongs to mass-like terms. Derivative terms use the
-    # stiffness rule to avoid altering the spatial operator and CFL limit.
-    a = c * c * dot(grad(u_n), grad(v)) * dxstiff  # explicit
+    a = c * c * dot(grad(u_n), grad(v)) * dxlump  # explicit
 
     # First-order ABC on outer PML boundaries only (not the free surface).
     # Firedrake documents the base facet labels in
@@ -92,12 +89,12 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     FF = m1 + a + nf
 
     pml2 = sigma_x * sigma_z * u_n * v * dxlump
-    pml3 = inner(pp_n, grad(v)) * dxstiff
+    pml3 = inner(pp_n, grad(v)) * dxlump
     FF += pml1 + pml2 + pml3
     # -------------------------------------------------------
     mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dxlump
     mm2 = inner(dot(Gamma_1, pp_n), qq) * dxlump
-    dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dxstiff
+    dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dxlump
     FF += mm1 + mm2 + dd
 
     Wave_object.lhs = fire.lhs(FF)
@@ -127,7 +124,6 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     W = V * V * Z
     Wave_object.mixed_function_space = W
     dxlump = dx(**Wave_object.quadrature_rule)
-    dxstiff = dx(**Wave_object.stiffness_quadrature_rule)
 
     u, psi, pp = fire.TrialFunctions(W)
     v, phi, qq = fire.TestFunctions(W)
@@ -168,15 +164,13 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     )
 
     pml3 = (sigma_x * sigma_y * sigma_z) * psi_n * v * dxlump
-    pml4 = inner(pp_n, grad(v)) * dxstiff
+    pml4 = inner(pp_n, grad(v)) * dxlump
 
     # typical CG FEM in 2d/3d
 
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dxlump
-    # The lumped KMV rule belongs to mass-like terms. Derivative terms use the
-    # stiffness rule to avoid altering the spatial operator and CFL limit.
-    a = c * c * dot(grad(u_n), grad(v)) * dxstiff  # explicit
+    a = c * c * dot(grad(u_n), grad(v)) * dxlump  # explicit
 
     # First-order ABC on outer PML boundaries only (not the free surface).
     # Firedrake documents the base facet labels in
@@ -205,8 +199,8 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     # -------------------------------------------------------
     mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dxlump
     mm2 = inner(dot(Gamma_1, pp_n), qq) * dxlump
-    dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dxstiff
-    dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dxstiff
+    dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dxlump
+    dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dxlump
     FF += mm1 + mm2 + dd1 + dd2
 
     mmm1 = (dot((psi - psi_n), phi) / Constant(dt)) * dxlump
