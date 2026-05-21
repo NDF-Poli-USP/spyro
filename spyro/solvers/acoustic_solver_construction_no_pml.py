@@ -13,7 +13,6 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     """
     V = Wave_object.function_space
     quad_rule = Wave_object.quadrature_rule
-    stiffness_quad_rule = Wave_object.stiffness_quadrature_rule
 
     # typical CG FEM in 2d/3d
     u = fire.TrialFunction(V)
@@ -36,9 +35,7 @@ def construct_solver_or_matrix_no_pml(Wave_object):
         * v
         * dx(**quad_rule)
     )
-    # KMV quadrature is for mass lumping only. Use the dedicated stiffness
-    # rule so derivative terms are integrated with the standard quadrature.
-    a = dot(grad(u_n), grad(v)) * dx(**stiffness_quad_rule)  # explicit
+    a = dot(grad(u_n), grad(v)) * dx(**quad_rule)  # explicit
 
     le = 0.0
     q = Wave_object.source_expression

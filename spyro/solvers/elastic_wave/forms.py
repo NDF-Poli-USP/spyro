@@ -8,7 +8,6 @@ from .local_abc import local_abc_form
 def isotropic_elastic_without_pml(wave):
     V = wave.function_space
     quad_rule = wave.quadrature_rule
-    stiffness_quad_rule = wave.stiffness_quadrature_rule
 
     u = TrialFunction(V)
     v = TestFunction(V)
@@ -24,11 +23,8 @@ def isotropic_elastic_without_pml(wave):
     F_m = (rho/(dt**2))*dot(u - 2*u_n + u_nm1, v)*dx(**quad_rule)
 
     eps = lambda v: 0.5*(grad(v) + grad(v).T)
-    # KMV quadrature is colocated with the nodes to diagonalize the mass
-    # matrix. Stiffness terms use derivatives, so keep them on the stiffness
-    # quadrature rule instead of the lumped mass rule.
-    F_k = lmbda*div(u_n)*div(v)*dx(**stiffness_quad_rule) \
-        + 2*mu*inner(eps(u_n), eps(v))*dx(**stiffness_quad_rule)
+    F_k = lmbda*div(u_n)*div(v)*dx(**quad_rule) \
+        + 2*mu*inner(eps(u_n), eps(v))*dx(**quad_rule)
 
     F_s = 0
     b = wave.body_forces
