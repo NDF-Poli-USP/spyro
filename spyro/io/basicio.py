@@ -11,8 +11,6 @@ import segyio
 import glob
 import os
 import warnings
-from firedrake.__future__ import interpolate
-fire.interpolate = interpolate
 
 
 def delete_tmp_files(wave):
