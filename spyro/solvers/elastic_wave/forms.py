@@ -105,7 +105,7 @@ def anisotropic_elastic_without_pml(wave):
     rho = wave.PropISO.rho
 
     # Strain tensor
-    eps_tensor = strain_tensor(u)
+    eps_tensor = strain_tensor(u_n)
 
     # Virtual strain tensor
     eps_tensor_v = strain_tensor(v)

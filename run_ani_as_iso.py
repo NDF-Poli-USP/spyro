@@ -1,7 +1,7 @@
 import numpy as np
 import spyro
 from numpy import abs, array, max, sqrt
-from spyro.solvers.elastic_wave.elastic_wave import (PropISO, PropVTI, PropTTI)
+from spyro.utils.cost import comp_cost
 
 
 def resolve_source_delay(source_delay, frequency, source_delay_mode):
@@ -84,13 +84,24 @@ phi = 0.
 tti_constants = (theta, phi)
 
 print("Running Isotropic Wave Propagation", flush=True)
+
+# Reference to resource usage
+tRef = comp_cost("tini")
+
 wave_iso = spyro.IsotropicWave(dictionary)
 wave_iso.set_mesh(input_mesh_parameters={"edge_length": edge_length, "periodic": False})
 wave_iso.forward_solve()
 last_displacement_iso = wave_iso.u_n.dat.data_ro.copy()
 u_max_iso = max(abs(last_displacement_iso), axis=0)
 
+# Estimating computational resource usage
+comp_cost("tfin", tRef=tRef, save_time=False)
+
 print("Running VTI Wave Propagation", flush=True)
+
+# Reference to resource usage
+tRef = comp_cost("tini")
+
 wave_vti = spyro.ElasticWave(dictionary, anisotropy="VTI")
 wave_vti.set_mesh(input_mesh_parameters={"edge_length": edge_length, "periodic": False})
 wave_vti.get_anisotropy_properties(iso_constants, vti_constants=vti_constants)
@@ -98,7 +109,14 @@ wave_vti.forward_solve()
 last_displacement_vti = wave_vti.u_n.dat.data_ro.copy()
 u_max_vti = max(abs(last_displacement_vti), axis=0)
 
+# Estimating computational resource usage
+comp_cost("tfin", tRef=tRef, save_time=False)
+
 print("Running TTI Wave Propagation", flush=True)
+
+# Reference to resource usage
+tRef = comp_cost("tini")
+
 wave_tti = spyro.ElasticWave(dictionary, anisotropy="TTI")
 wave_tti.set_mesh(input_mesh_parameters={"edge_length": edge_length, "periodic": False})
 wave_tti.get_anisotropy_properties(iso_constants, vti_constants=vti_constants,
@@ -106,3 +124,10 @@ wave_tti.get_anisotropy_properties(iso_constants, vti_constants=vti_constants,
 wave_tti.forward_solve()
 last_displacement_tti = wave_tti.u_n.dat.data_ro.copy()
 u_max_tti = max(abs(last_displacement_tti), axis=0)
+
+# Estimating computational resource usage
+comp_cost("tfin", tRef=tRef, save_time=False)
+
+print("Isotropic wave max displacement:", u_max_iso)
+print("VTI wave max displacement:", u_max_vti)
+print("TTI wave max displacement:", u_max_tti)

@@ -1,0 +1,171 @@
+Running Isotropic Wave Propagation
+Parallelism type: automatic
+Skipping mesh generation, since we don't have all the parameters
+Creating firedrake_mesh type mesh.
+Mesh Created with 169 Nodes and 144 Volume Elements
+cnm size : (1728, 125)
+layer : 0 of 12
+layer : 1 of 12
+layer : 2 of 12
+layer : 3 of 12
+layer : 4 of 12
+layer : 5 of 12
+layer : 6 of 12
+layer : 7 of 12
+layer : 8 of 12
+layer : 9 of 12
+layer : 10 of 12
+layer : 11 of 12
+cnm size : (1728, 125)
+layer : 0 of 12
+layer : 1 of 12
+layer : 2 of 12
+layer : 3 of 12
+layer : 4 of 12
+layer : 5 of 12
+layer : 6 of 12
+layer : 7 of 12
+layer : 8 of 12
+layer : 9 of 12
+layer : 10 of 12
+layer : 11 of 12
+
+Solving Forward Problem
+Simulation time is:        0.0 seconds
+Simulation time is:        0.1 seconds
+Simulation time is:        0.2 seconds
+Simulation time is:        0.3 seconds
+Simulation time is:        0.4 seconds
+Simulation time is:        0.5 seconds
+Simulation time is:        0.6 seconds
+Simulation time is:        0.7 seconds
+Simulation time is:        0.8 seconds
+Simulation time is:        0.9 seconds
+Simulation time is:        1.0 seconds
+Simulation time is:        1.1 seconds
+Simulation time is:        1.2 seconds
+Simulation time is:        1.3 seconds
+Simulation time is:        1.4 seconds
+Simulation time is:        1.5 seconds
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):53.117, (m):0.885, (h):0.015
+Used Memory: Current (MB):54.391, Peak (MB):70.391
+--------------------------------------------------------------
+
+Running VTI Wave Propagation
+Parallelism type: automatic
+Skipping mesh generation, since we don't have all the parameters
+Creating firedrake_mesh type mesh.
+Mesh Created with 169 Nodes and 144 Volume Elements
+cnm size : (1728, 125)
+layer : 0 of 12
+layer : 1 of 12
+layer : 2 of 12
+layer : 3 of 12
+layer : 4 of 12
+layer : 5 of 12
+layer : 6 of 12
+layer : 7 of 12
+layer : 8 of 12
+layer : 9 of 12
+layer : 10 of 12
+layer : 11 of 12
+cnm size : (1728, 125)
+layer : 0 of 12
+layer : 1 of 12
+layer : 2 of 12
+layer : 3 of 12
+layer : 4 of 12
+layer : 5 of 12
+layer : 6 of 12
+layer : 7 of 12
+layer : 8 of 12
+layer : 9 of 12
+layer : 10 of 12
+layer : 11 of 12
+
+Solving Forward Problem
+Simulation time is:        0.0 seconds
+Simulation time is:        0.1 seconds
+Simulation time is:        0.2 seconds
+Simulation time is:        0.3 seconds
+Simulation time is:        0.4 seconds
+Simulation time is:        0.5 seconds
+Simulation time is:        0.6 seconds
+Simulation time is:        0.7 seconds
+Simulation time is:        0.8 seconds
+Simulation time is:        0.9 seconds
+Simulation time is:        1.0 seconds
+Simulation time is:        1.1 seconds
+Simulation time is:        1.2 seconds
+Simulation time is:        1.3 seconds
+Simulation time is:        1.4 seconds
+Simulation time is:        1.5 seconds
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):58.990, (m):0.983, (h):0.016
+Used Memory: Current (MB):51.856, Peak (MB):67.818
+--------------------------------------------------------------
+
+Running TTI Wave Propagation
+Parallelism type: automatic
+Skipping mesh generation, since we don't have all the parameters
+Creating firedrake_mesh type mesh.
+Mesh Created with 169 Nodes and 144 Volume Elements
+cnm size : (1728, 125)
+layer : 0 of 12
+layer : 1 of 12
+layer : 2 of 12
+layer : 3 of 12
+layer : 4 of 12
+layer : 5 of 12
+layer : 6 of 12
+layer : 7 of 12
+layer : 8 of 12
+layer : 9 of 12
+layer : 10 of 12
+layer : 11 of 12
+cnm size : (1728, 125)
+layer : 0 of 12
+layer : 1 of 12
+layer : 2 of 12
+layer : 3 of 12
+layer : 4 of 12
+layer : 5 of 12
+layer : 6 of 12
+layer : 7 of 12
+layer : 8 of 12
+layer : 9 of 12
+layer : 10 of 12
+layer : 11 of 12
+
+Solving Forward Problem
+Simulation time is:        0.0 seconds
+Simulation time is:        0.1 seconds
+Simulation time is:        0.2 seconds
+Simulation time is:        0.3 seconds
+Simulation time is:        0.4 seconds
+Simulation time is:        0.5 seconds
+Simulation time is:        0.6 seconds
+Simulation time is:        0.7 seconds
+Simulation time is:        0.8 seconds
+Simulation time is:        0.9 seconds
+Simulation time is:        1.0 seconds
+Simulation time is:        1.1 seconds
+Simulation time is:        1.2 seconds
+Simulation time is:        1.3 seconds
+Simulation time is:        1.4 seconds
+Simulation time is:        1.5 seconds
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):116.477, (m):1.941, (h):0.032
+Used Memory: Current (MB):64.176, Peak (MB):80.182
+--------------------------------------------------------------
+
+Isotropic wave max displacement: [1.7460097  1.38821887 1.38821887]
+VTI wave max displacement: [1.7460097  1.38821887 1.38821887]
+TTI wave max displacement: [1.7460097  1.38821887 1.38821887]
