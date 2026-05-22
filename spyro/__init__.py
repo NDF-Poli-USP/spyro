@@ -6,6 +6,7 @@ from .sources.Sources import Sources, ricker_wavelet, full_ricker_wavelet
 from .solvers.wave import Wave
 from .solvers.acoustic_wave import AcousticWave
 from .solvers.elastic_wave.isotropic_wave import IsotropicWave
+from .solvers.elastic_wave.elastic_wave import ElasticWave
 from .solvers.inversion import FullWaveformInversion
 
 # from .solvers.dg_wave import DG_Wave
@@ -51,4 +52,5 @@ __all__ = [
     "PeriodicRectangleMesh",
     "BoxMesh",
     "IsotropicWave",
+    "ElasticWave",
 ]

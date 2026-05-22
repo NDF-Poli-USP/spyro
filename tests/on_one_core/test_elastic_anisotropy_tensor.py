@@ -8,7 +8,7 @@ from spyro.solvers.elastic_wave.anisotropy import AnisotropyTensor
 class MockPropISO:
     """Mock isotropic properties for testing."""
 
-    def __init__(self, mesh, W, vP_value=2500.0, vS_value=1200.0, rho_value=2200.0):
+    def __init__(self, W, vP_value=2500.0, vS_value=1200.0, rho_value=2200.0):
         self.vP = Function(W).assign(Constant(vP_value))
         self.vS = Function(W).assign(Constant(vS_value))
         self.rho = Function(W).assign(Constant(rho_value))
@@ -17,7 +17,7 @@ class MockPropISO:
 class MockPropVTI:
     """Mock VTI properties for testing."""
 
-    def __init__(self, mesh, W, epsilon=0.2, gamma=0.1, delta=0.15, anisotropy='weak'):
+    def __init__(self, W, epsilon=0.2, gamma=0.1, delta=0.15, anisotropy='weak'):
         self.epsilon = Function(W).assign(Constant(epsilon))
         self.gamma = Function(W).assign(Constant(gamma))
         self.delta = Function(W).assign(Constant(delta))
@@ -27,7 +27,7 @@ class MockPropVTI:
 class MockPropTTI:
     """Mock TTI properties for testing."""
 
-    def __init__(self, mesh, W, theta=30.0, phi=0.0):
+    def __init__(self, W, theta=30.0, phi=0.0):
         self.theta = Function(W).assign(Constant(theta))
         self.phi = Function(W).assign(Constant(phi))
 
@@ -45,30 +45,30 @@ def W(mesh):
 
 
 @pytest.fixture
-def iso_props(mesh, W):
+def iso_props(W):
     """Fixture for isotropic properties"""
-    return MockPropISO(mesh, W)
+    return MockPropISO(W)
 
 
 @pytest.fixture
-def vti_props_exact(mesh, W):
+def vti_props_exact(W):
     """Fixture for VTI properties with exact formulation"""
-    return MockPropVTI(mesh, W, epsilon=0.2, gamma=0.1, delta=0.15, anisotropy='exact')
+    return MockPropVTI(W, epsilon=0.2, gamma=0.1, delta=0.15, anisotropy='exact')
 
 
 @pytest.fixture
-def vti_props_weak(mesh, W):
+def vti_props_weak(W):
     """Fixture for VTI properties with weak formulation"""
-    return MockPropVTI(mesh, W, epsilon=0.1, gamma=0.05, delta=0.08, anisotropy='weak')
+    return MockPropVTI(W, epsilon=0.1, gamma=0.05, delta=0.08, anisotropy='weak')
 
 
 class TestAnisotropyTensor:
     """Test battery for AnisotropyTensor class."""
     @pytest.mark.parametrize("anisotropy_type", ['weak', 'exact'])
-    def test_c_vti_tensor_isotropic_limit(self, mesh, W, iso_props, anisotropy_type):
+    def test_c_vti_tensor_isotropic_limit(self, W, iso_props, anisotropy_type):
         """Test that VTI tensor reduces to isotropic when parameters are zero."""
-        vti_props_zero = MockPropVTI(mesh, W, epsilon=0.0, gamma=0.0,
-                                     delta=0.0, anisotropy=anisotropy_type)
+        vti_props_zero = MockPropVTI(W, epsilon=0.0, gamma=0.0, delta=0.0,
+                                     anisotropy=anisotropy_type)
 
         C_vti = AnisotropyTensor.c_vti_tensor(iso_props, vti_props_zero)
 
@@ -90,7 +90,7 @@ class TestAnisotropyTensor:
         assert allclose(C44_func.dat.data, C66_func.dat.data, rtol=1e-10)
 
     @pytest.mark.parametrize("vti_props_type", ['vti_props_weak', 'vti_props_exact'])
-    def test_c_vti_tensor_component_relationships(self, mesh, W, iso_props,
+    def test_c_vti_tensor_component_relationships(self, W, iso_props,
                                                   vti_props_type, request):
         """Test relationships between elastic tensor components for VTI."""
         vti_props_obj = request.getfixturevalue(vti_props_type)
@@ -114,7 +114,7 @@ class TestAnisotropyTensor:
         assert allclose(C12.dat.data, C12_computed, rtol=1e-10)
 
     @pytest.mark.parametrize("vti_props_type", ['vti_props_weak', 'vti_props_exact'])
-    def test_c_vti_tensor_positive_definiteness(self, mesh, W, iso_props,
+    def test_c_vti_tensor_positive_definiteness(self, W, iso_props,
                                                 vti_props_type, request):
         """Test that the elastic tensor is positive definite."""
         vti_props_obj = request.getfixturevalue(vti_props_type)
@@ -140,10 +140,10 @@ class TestAnisotropyTensor:
                                                        (0.3, 0.15, 0.2),
                                                        (0.5, 0.25, 0.4)])
     @pytest.mark.parametrize("anisotropy_type", ['weak', 'exact'])
-    def test_c_vti_tensor_different_anisotropy_values(self, mesh, W, iso_props, epsilon,
+    def test_c_vti_tensor_different_anisotropy_values(self, W, iso_props, epsilon,
                                                       gamma, delta, anisotropy_type):
         """Test VTI tensor with different anisotropy parameter values."""
-        vti_props = MockPropVTI(mesh, W, epsilon=epsilon, gamma=gamma,
+        vti_props = MockPropVTI(W, epsilon=epsilon, gamma=gamma,
                                 delta=delta, anisotropy=anisotropy_type)
         C_vti = AnisotropyTensor.c_vti_tensor(iso_props, vti_props)
 
@@ -165,10 +165,9 @@ class TestAnisotropyTensor:
                         expected_C66_ratio, rtol=1e-10)
 
     @pytest.mark.parametrize("anisotropy_type", ['weak', 'exact'])
-    def test_c_vti_tensor_anisotropy_formulations(self, mesh, W,
-                                                  iso_props, anisotropy_type):
+    def test_c_vti_tensor_anisotropy_formulations(self, W, iso_props, anisotropy_type):
         """Test both weak and exact anisotropy formulations."""
-        vti_props = MockPropVTI(mesh, W, epsilon=0.2, gamma=0.1,
+        vti_props = MockPropVTI(W, epsilon=0.2, gamma=0.1,
                                 delta=0.15, anisotropy=anisotropy_type)
         C_vti = AnisotropyTensor.c_vti_tensor(iso_props, vti_props)
 
@@ -181,12 +180,12 @@ class TestAnisotropyTensor:
         assert not any(isinf(C13_func.dat.data))
 
     @pytest.mark.parametrize("vti_props_type", ['vti_props_weak', 'vti_props_exact'])
-    def test_c_tti_tensor_rotation_identity(self, mesh, W, iso_props,
+    def test_c_tti_tensor_rotation_identity(self, W, iso_props,
                                             vti_props_type, request):
         """Test that TTI tensor equals VTI tensor when rotation angles are zero."""
         vti_props_obj = request.getfixturevalue(vti_props_type)
         C_vti = AnisotropyTensor.c_vti_tensor(iso_props, vti_props_obj)
-        tti_props_zero = MockPropTTI(mesh, W, theta=0.0, phi=0.0)
+        tti_props_zero = MockPropTTI(W, theta=0.0, phi=0.0)
         C_tti = AnisotropyTensor.c_tti_tensor(C_vti, tti_props_zero)
 
         # Compare component by component
@@ -198,12 +197,12 @@ class TestAnisotropyTensor:
 
     @pytest.mark.parametrize("theta", [0, 30, 45, 60, 90])
     @pytest.mark.parametrize("vti_props_type", ['vti_props_weak', 'vti_props_exact'])
-    def test_c_tti_tensor_rotation_angles(self, mesh, W, iso_props,
+    def test_c_tti_tensor_rotation_angles(self, W, iso_props,
                                           vti_props_type, theta, request):
         """Test TTI tensor with different tilt angles."""
         vti_props_obj = request.getfixturevalue(vti_props_type)
         C_vti = AnisotropyTensor.c_vti_tensor(iso_props, vti_props_obj)
-        tti_props = MockPropTTI(mesh, W, theta=theta, phi=0.0)
+        tti_props = MockPropTTI(W, theta=theta, phi=0.0)
         C_tti = AnisotropyTensor.c_tti_tensor(C_vti, tti_props)
 
         if theta == 0:
@@ -222,16 +221,16 @@ class TestAnisotropyTensor:
 
     @pytest.mark.parametrize("phi", [0, 45, 90, 135])
     @pytest.mark.parametrize("vti_props_type", ['vti_props_weak', 'vti_props_exact'])
-    def test_c_tti_tensor_azimuth_angles(self, mesh, W, iso_props,
+    def test_c_tti_tensor_azimuth_angles(self, W, iso_props,
                                          vti_props_type, phi, request):
         """Test TTI tensor with different azimuth angles."""
         vti_props_obj = request.getfixturevalue(vti_props_type)
         C_vti = AnisotropyTensor.c_vti_tensor(iso_props, vti_props_obj)
-        tti_props = MockPropTTI(mesh, W, theta=45.0, phi=phi)
+        tti_props = MockPropTTI(W, theta=45.0, phi=phi)
         C_tti = AnisotropyTensor.c_tti_tensor(C_vti, tti_props)
 
         # Reference at phi=0
-        tti_props_ref = MockPropTTI(mesh, W, theta=45.0, phi=0)
+        tti_props_ref = MockPropTTI(W, theta=45.0, phi=0)
         C_tti_ref = AnisotropyTensor.c_tti_tensor(C_vti, tti_props_ref)
 
         C11 = Function(W).interpolate(C_tti[0, 0]).dat.data
@@ -244,12 +243,12 @@ class TestAnisotropyTensor:
             assert not allclose(C11, C11_ref, rtol=1e-6)
 
     @pytest.mark.parametrize("vti_props_type", ['vti_props_weak', 'vti_props_exact'])
-    def test_c_tti_tensor_transformation_matrix_properties(self, mesh, W, iso_props,
+    def test_c_tti_tensor_transformation_matrix_properties(self, W, iso_props,
                                                            vti_props_type, request):
         """Test properties of the transformation matrix."""
         vti_props_obj = request.getfixturevalue(vti_props_type)
         C_vti = AnisotropyTensor.c_vti_tensor(iso_props, vti_props_obj)
-        tti_props = MockPropTTI(mesh, W, theta=30.0, phi=45.0)
+        tti_props = MockPropTTI(W, theta=30.0, phi=45.0)
         C_tti = AnisotropyTensor.c_tti_tensor(C_vti, tti_props)
 
         # Check symmetry of resulting tensor
@@ -260,20 +259,20 @@ class TestAnisotropyTensor:
                 assert allclose(C_tti_ij.dat.data, C_tti_ji.dat.data, rtol=1e-10)
 
     @pytest.mark.parametrize("anisotropy_type", ['weak', 'exact'])
-    def test_c_vti_tensor_edge_cases(self, mesh, W, anisotropy_type):
+    def test_c_vti_tensor_edge_cases(self, W, anisotropy_type):
         """Test edge cases for VTI tensor"""
         # Zero density case
-        iso_props_zero_rho = MockPropISO(mesh, W, vP_value=2500.0,
+        iso_props_zero_rho = MockPropISO(W, vP_value=2500.0,
                                          vS_value=1200.0, rho_value=0.0)
-        vti_props = MockPropVTI(mesh, W, epsilon=0.2, gamma=0.1,
-                                delta=0.15, anisotropy=anisotropy_type)
+        vti_props = MockPropVTI(W, epsilon=0.2, gamma=0.1, delta=0.15,
+                                anisotropy=anisotropy_type)
 
         # Physically meaningless
         C_vti = AnisotropyTensor.c_vti_tensor(iso_props_zero_rho, vti_props)
         assert isinstance(C_vti, fire.ufl.tensors.ListTensor)
 
         # Zero velocity case
-        iso_props_zero_v = MockPropISO(mesh, W, vP_value=0.0,
+        iso_props_zero_v = MockPropISO(W, vP_value=0.0,
                                        vS_value=0.0, rho_value=2200.0)
         C_vti_zero = AnisotropyTensor.c_vti_tensor(iso_props_zero_v, vti_props)
 

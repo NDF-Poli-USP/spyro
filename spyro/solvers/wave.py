@@ -73,21 +73,32 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Sets new or default solver parameters
     """
 
-    def __init__(self, dictionary=None, comm=None):
-        """Wave object solver. Contains both the forward solver
-        and gradient calculator methods.
+    def __init__(self, dictionary=None, wave_type=None, comm=None):
+        """Wave object containing both forward solver and gradient calculator methods.
 
-        Parameters:
-        -----------
-        comm: MPI communicator
+        Parameters
+        ----------
+        dictionary : `dict`, optional
+            A dictionary containing the input parameters for the Wave class.
+            Default is None
+        wave_type : `WaveType`, optional
+            The type of wave equation to solve. Default is None
+        comm : `object`, optional
+            MPI communicator for parallel execution. Default is None
 
-        model_parameters: Python object
+        Returns
+        -------
+        None
+
+        model_parameters : `Python object`
             Contains model parameters
         """
         super().__init__(dictionary=dictionary, comm=comm)
         self.initial_velocity_model = None
         self.gradient_mask_available = False
-        self.wave_type = WaveType.NONE
+
+        # Setting wave type or defaulting to None
+        self.wave_type = WaveType.NONE if wave_type is None else wave_type
 
         self.function_space = None
         self.dg0_scalar_function_space = None

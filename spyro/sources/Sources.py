@@ -131,12 +131,12 @@ class Sources(Delta_projector):
             self.point_locations[source_id] for source_id in self.current_sources
         ]
         source_mesh = fire.VertexOnlyMesh(self.mesh, source_locations)
-        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
-            V_s = fire.VectorFunctionSpace(source_mesh, "DG", 0)
-            R_s = fire.VectorFunctionSpace(source_mesh, "R", 0)
-        elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
+        if self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
             V_s = fire.FunctionSpace(source_mesh, "DG", 0)
             R_s = fire.FunctionSpace(source_mesh, "R", 0)
+        elif 2 <= self.wave_type.value <= 4:
+            V_s = fire.VectorFunctionSpace(source_mesh, "DG", 0)
+            R_s = fire.VectorFunctionSpace(source_mesh, "R", 0)
         else:
             raise ValueError("Invalid wave type")
 

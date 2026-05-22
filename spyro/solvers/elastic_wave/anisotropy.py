@@ -12,7 +12,7 @@ class AnisotropyTensor():
 
         Parameters
         ----------
-        PropISO: `object`
+        PropISO : `object`
             An instance of the isotropic properties class. Attributes:
             - vP: `Firedrake.Function`
                 P-wave velocity [m/s]
@@ -20,7 +20,7 @@ class AnisotropyTensor():
                 S-wave velocity [m/s]
             - rho: `Firedrake.Function`
                 Density [kg/m³]
-        PropVTI: `object`
+        PropVTI : `object`
             An instance of the VTI anisotropy properties class. Attributes:
             - epsilon: `Firedrake.Function`
                 Thomsen parameter epsilon
@@ -33,7 +33,7 @@ class AnisotropyTensor():
 
         Returns
         -------
-        C_vti: `ufl.tensors.ListTensor`
+        C_vti : `ufl.tensors.ListTensor`
             Elastic tensor
         """
 
@@ -80,7 +80,7 @@ class AnisotropyTensor():
 
         Parameters
         ----------
-        C_vti: `ufl.tensors.ListTensor`
+        C_vti : `ufl.tensors.ListTensor`
             Elastic tensor for VTI anisotropy
         PropTTI: `object`
             An instance of the TTI anisotropy properties class. Attributes:
@@ -91,7 +91,7 @@ class AnisotropyTensor():
 
         Returns
         -------
-        C_tti: `ufl.tensors.ListTensor`
+        C_tti : `ufl.tensors.ListTensor`
             Elastic tensor for TTI anisotropy
         """
 
