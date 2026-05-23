@@ -5,10 +5,10 @@ import numpy as np
 import firedrake
 import copy
 from ..io import ensemble_save
-from spyro.utils.stats_tools import coeff_of_determination
+from ..utils import change_scalar_field_resolution
 plt.rcParams.update({"font.family": "serif"})
 plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
-__all__ = ["plot_shots", "plot_hist_receivers"]
+__all__ = ["plot_shots"]
 
 
 @ensemble_save
@@ -26,36 +26,58 @@ def plot_shots(
     out_index=None,
 ):
     """
-    Plot a shot record and save the image to disk. Note that
-    this automatically will rename shots when ensmeble paralleism is
-    activated.
+    Plot shot records and save to disk.
+
+    Creates a contour plot of seismic shot records showing receiver responses
+    over time. The plot is automatically saved with a filename that includes
+    the shot IDs, and the @ensemble_save decorator handles naming when using
+    ensemble parallelism.
 
     Parameters
     ----------
-    model: `dictionary`
-        Contains model parameters and options.
-    comm:A Firedrake commmunicator
-        The communicator you get from calling spyro.utils.mpi_init()
-    arr: array-like
-        An array in which rows are intervals in time and columns are receivers
-    show: `boolean`, optional
-        Should the images appear on screen?
-    file_name: string, optional
-        The name of the saved image
-    vmin: float, optional
-        The minimum value to plot on the colorscale
-    vmax: float, optional
-        The maximum value to plot on the colorscale
-    file_format: string, optional
-        File format, pdf or png
-    start_index: integer, optional
-        The index of the first receiver to plot
-    end_index: integer, optional
-        The index of the last receiver to plot
+    Wave_object : Wave
+        Wave simulation object containing the shot record data in the
+        forward_solution_receivers attribute, along with timing and receiver information.
+    show : bool, optional
+        If True, display the plot interactively. Default is False.
+    file_name : str, optional
+        Base name for the saved image file (without extension).
+        Default is "plot_of_shot".
+    shot_ids : list of int, optional
+        List of shot IDs to include in the filename. Default is [0].
+    vmin : float, optional
+        Minimum value for the colorscale. Default is -1e-5.
+    vmax : float, optional
+        Maximum value for the colorscale. Default is 1e-5.
+    contour_lines : int, optional
+        Number of contour lines to plot. Default is 700.
+    file_format : str, optional
+        Output file format, either "pdf" or "png". Default is "pdf".
+    start_index : int, optional
+        Index of the first receiver to plot. Default is 0.
+    end_index : int, optional
+        Index of the last receiver to plot. If 0, uses all receivers.
+        Default is 0.
+    out_index : int, optional
+        Index for selecting a specific output dimension from forward_solution_receivers.
+        If None, uses the entire array. Default is None.
 
     Returns
     -------
     None
+        The function saves the plot to disk and returns None.
+
+    Notes
+    -----
+    The plot uses a grayscale colormap with time on the y-axis (inverted,
+    with 0 at top) and receiver number on the x-axis. The @ensemble_save
+    decorator automatically modifies the filename when running with ensemble
+    parallelism.
+
+    Examples
+    --------
+    >>> plot_shots(wave_obj, show=True, file_name="my_shot", shot_ids=[0, 1])
+    >>> plot_shots(wave_obj, vmin=-1e-3, vmax=1e-3, file_format="png")
     """
     file_name = file_name + str(shot_ids) + "." + file_format
     num_recvs = Wave_object.number_of_receivers
@@ -64,9 +86,9 @@ def plot_shots(
     tf = Wave_object.final_time
 
     if out_index is None:
-        arr = Wave_object.receivers_output
+        arr = Wave_object.forward_solution_receivers
     else:
-        arr = Wave_object.receivers_output[:, :, out_index]
+        arr = Wave_object.forward_solution_receivers[:, :, out_index]
 
     nt = int(tf / dt) + 1  # number of timesteps
 
@@ -103,6 +125,43 @@ def plot_mesh_sizes(
     show=False,
     show_size_contour=True,
 ):
+    """
+    Plot mesh cell sizes with optional contour visualization.
+
+    Visualizes the mesh structure by plotting cell sizes (circumcircle radii)
+    either as a filled contour plot or as a triangular mesh plot. Coordinates
+    are swapped (z, x) for proper visualization.
+
+    Parameters
+    ----------
+    mesh_filename : str, optional
+        Path to the mesh file to load. If None, firedrake_mesh must be provided.
+    firedrake_mesh : firedrake.Mesh, optional
+        A Firedrake mesh object. If None, mesh_filename must be provided.
+    title_str : str, optional
+        Title for the plot. Default is None.
+    output_filename : str, optional
+        Path to save the plot. If None, plot is not saved.
+    show : bool, optional
+        Whether to display the plot. Default is False.
+    show_size_contour : bool, optional
+        If True, show filled contour of cell sizes. If False, show triangular
+        mesh plot. Default is True.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If neither mesh_filename nor firedrake_mesh is specified.
+
+    Notes
+    -----
+    The function temporarily swaps mesh coordinates for visualization and
+    restores them afterwards to avoid side effects.
+    """
     # plt.rcParams['font.family'] = "Times New Roman"
     plt.rcParams['font.size'] = 12
 
@@ -148,26 +207,68 @@ def plot_mesh_sizes(
     mesh.coordinates.dat.data[:, 1] = coordinates[:, 0]
 
 
-def plot_model(Wave_object, filename="model.png",
-               abc_points=None, show=False, flip_axis=True):
+def plot_model(
+    Wave_object,
+    filename="model.png",
+    abc_points=None,
+    show=False,
+    flip_axis=True,
+    high_resolution=False,
+    high_resolution_grid_value=0.01,
+):
     """
-    Plot the model with source and receiver locations.
+    Plot the velocity model with source and receiver locations.
+
+    Creates a visualization of the velocity model using tripcolor plotting,
+    overlaying source locations (green) and receiver locations (red). Optionally
+    plots absorbing boundary condition (ABC) lines and supports high-resolution
+    rendering.
 
     Parameters
-    -----------
-    Wave_object:
-        The Wave object containing the model and locations.
-    filename (optional):
-        The filename to save the plot (default: "model.png").
-    abc_points (optional):
-        List of points to plot an ABC line (default: None).
+    ----------
+    Wave_object : Wave
+        The Wave object containing the velocity model, source locations,
+        and receiver locations.
+    filename : str, optional
+        The filename to save the plot. Default is "model.png".
+    abc_points : list of tuple, optional
+        List of (z, x) coordinate tuples defining the ABC boundary line.
+        If provided, a dashed line connecting these points is plotted.
+        Default is None.
+    show : bool, optional
+        Whether to display the plot interactively. Default is False.
+    flip_axis : bool, optional
+        If True, inverts the y-axis and rotates the saved image by 90 degrees
+        for conventional seismic visualization. Default is True.
+    high_resolution : bool, optional
+        If True, interpolates the velocity model to a finer resolution (0.01 km)
+        before plotting. Default is False.
+    high_resolution_grid_value: float, optional
+        High resolution visualization value. Default is 0.01 km.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    The plot includes:
+    - Velocity model as a filled contour
+    - Green markers for source locations
+    - Red markers for receiver locations
+    - Dashed line for ABC boundary (if abc_points provided)
+    - Colorbar indicating velocity in km/s
     """
     plt.close()
     fig = plt.figure(figsize=(9, 9))
     axes = fig.add_subplot(111)
     fig.set_figwidth = 9.0
     fig.set_figheight = 9.0
-    vp_object = Wave_object.initial_velocity_model
+    if high_resolution:
+        vp_object, _ = change_scalar_field_resolution(Wave_object, high_resolution_grid_value)
+
+    else:
+        vp_object = Wave_object.initial_velocity_model
     vp_image = firedrake.tripcolor(vp_object, axes=axes)
     for source in Wave_object.source_locations:
         z, x = source
@@ -227,6 +328,25 @@ def plot_model(Wave_object, filename="model.png",
 
 
 def plot_function(function):
+    """
+    Plot a Firedrake function using filled contour visualization.
+
+    Creates a filled contour plot of a Firedrake function with equal aspect ratio.
+
+    Parameters
+    ----------
+    function : firedrake.Function
+        The Firedrake function to visualize.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    The plot is created but not saved or displayed. Use plt.savefig() or
+    plt.show() after calling this function to save or display the result.
+    """
     plt.close()
     fig = plt.figure(figsize=(9, 9))
     axes = fig.add_subplot(111)
@@ -237,322 +357,109 @@ def plot_function(function):
 
 
 def debug_plot(function, filename="debug.png"):
+    """
+    Quick debug plot of a Firedrake function saved to a file.
+
+    Convenience function that plots a Firedrake function and immediately
+    saves it to a PNG file for debugging purposes.
+
+    Parameters
+    ----------
+    function : firedrake.Function
+        The Firedrake function to visualize.
+    filename : str, optional
+        The filename to save the debug plot. Default is "debug.png".
+
+    Returns
+    -------
+    None
+
+    See Also
+    --------
+    plot_function : The underlying plotting function.
+    debug_pvd : Alternative debug output using VTK format.
+    """
     plot_function(function)
     plt.savefig(filename)
 
 
 def debug_pvd(function, filename="debug.pvd"):
+    """
+    Save a Firedrake function to a VTK file for visualization.
+
+    Exports a Firedrake function in ParaView VTK format (.pvd) for
+    detailed visualization and analysis in external tools like ParaView.
+
+    Parameters
+    ----------
+    function : firedrake.Function
+        The Firedrake function to export.
+    filename : str, optional
+        The filename for the VTK output. Default is "debug.pvd".
+
+    Returns
+    -------
+    None
+
+    See Also
+    --------
+    debug_plot : Alternative debug output as PNG image.
+
+    Notes
+    -----
+    The .pvd format can be opened directly in ParaView for 3D visualization
+    and advanced post-processing.
+    """
     out = firedrake.VTKFile(filename)
     out.write(function)
 
 
-def plot_hist_receivers(Wave_object, show=False):
-    '''
-    Plot the comparison of the time-domain response at the
-    receivers between the reference model and the HABC scheme.
-    The plots are saved in PDF and PNG formats.
-
-    Parameters
-    ----------
-    Wave_object: `wave`
-        The Wave object containing the simulation results.
-    show: `bool`, optional
-        Whether to show the plot. Default is False.
-
-    Returns
-    -------
-    None
-    '''
-
-    print("\nPlotting Time Comparison")
-
-    # Time data
-    dt = Wave_object.dt
-    tf = Wave_object.final_time
-    nt = int(tf / dt) + 1  # number of timesteps
-    t_rec = np.linspace(0.0, tf, nt)
-
-    # Setting fonts
-    plt.rcParams['font.size'] = 7
-
-    # Setting subplots
-    num_recvs = Wave_object.number_of_receivers
-    plt.rcParams['axes.grid'] = True
-    fig, axes = plt.subplots(nrows=num_recvs, ncols=1)
-    fig.subplots_adjust(hspace=0.6)
-
-    # Setting colormap
-    cl_rc = (0., 1., 0., 1.)  # RGB-alpha (Green)
-    cl_rf = (1., 0., 0., 1.)  # RGB-alpha (Red)
-
-    for rec in range(num_recvs):
-
-        # Plot the receiver data
-        rc_dat = Wave_object.receivers_output[:, rec]
-        rf_dat = Wave_object.receivers_reference[:, rec]
-        axes[rec].plot(t_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
-        axes[rec].plot(t_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
-
-        # Adding the receiver number label
-        axes[rec].text(0.995, 0.9, "R" + str(rec + 1), fontsize=8.5,
-                       transform=axes[rec].transAxes, fontweight='bold',
-                       verticalalignment='top', horizontalalignment='right',
-                       bbox=dict(facecolor='none', edgecolor='none'))
-
-        # Centered title
-        if rec == num_recvs // 2:
-            axes[rec].set_ylabel(r'$sol \; recs$')
-
-        # Hide all the xticks for receiver different of the last one
-        hide_xticks = False if rec < num_recvs - 1 else True
-        plt.setp(axes[rec].get_xticklabels(), visible=hide_xticks)
-
-        # Axis format
-        axes[rec].set_xlim(0, tf)
-        axes[rec].ticklabel_format(
-            axis='y', style='scientific', scilimits=(-2, 2))
-        if rec == num_recvs - 1:
-            axes[rec].set_xlabel(r'$t \; (s)$')
-
-    # Saving the plot
-    time_str = Wave_object.path_save + Wave_object.case_habc + "/time"
-    plt.savefig(time_str + ".png", bbox_inches='tight')
-    plt.savefig(time_str + ".pdf", bbox_inches='tight')
-    plt.show() if show else None
-    plt.close()
-
-
-def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
-    '''
-    Plot the comparison of the frequency-domain response at the
-    receivers between the reference model and the HABC scheme.
-    The plots are saved in PDF and PNG formats.
-
-    Parameters
-    ----------
-    Wave_object: `wave`
-        Wave object containing the simulation results.
-    fxlim: `float`, optional
-        Factor to set the x-axis limits in the plots realtive to
-        the source frequency. Default is 4 and the minimum is 2.
-    show: `bool`, optional
-        Whether to show the plot. Default is False.
-
-    Returns
-    -------
-    None
-    '''
-
-    print("\nPlotting Frequency Comparison")
-
-    # Frequency data
-    f_Nyq = Wave_object.f_Nyq
-    f_sou = Wave_object.frequency
-    pfft = Wave_object.receivers_out_fft.shape[0] - 1
-    df = f_Nyq / pfft
-    limf = round(min(max(fxlim, 2.) * f_sou, f_Nyq), 1)
-    idx_lim = int(limf / df) + 1
-    f_rec = np.linspace(0, df * idx_lim, idx_lim)
-
-    # Setting fonts
-    plt.rcParams['font.size'] = 7
-
-    # Setting subplots
-    num_recvs = Wave_object.number_of_receivers
-    plt.rcParams['axes.grid'] = True
-    fig, axes = plt.subplots(nrows=num_recvs, ncols=1)
-    fig.subplots_adjust(hspace=0.6)
-
-    # Setting colormap
-    cl_rc = (0., 1., 0., 1.)  # RGB-alpha (Green)
-    cl_rf = (1., 0., 0., 1.)  # RGB-alpha (Red)
-
-    for rec in range(num_recvs):
-
-        # Plot the receiver data
-        rc_dat = Wave_object.receivers_out_fft[:idx_lim, rec]
-        rf_dat = Wave_object.receivers_ref_fft[:idx_lim, rec]
-        axes[rec].plot(f_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
-        axes[rec].plot(f_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
-
-        # Add a vertical line at f_ref and f_sou
-        if f_sou == Wave_object.freq_ref:
-            f_ref = f_sou
-            f_str = r'$f_{ref} = f_{sou}$'
-        else:
-            f_ref = Wave_object.freq_ref
-            f_str = r'$f_{ref}$'
-            axes[rec].axvline(
-                x=f_sou, color='black', linestyle='-', linewidth=1.25)
-
-        axes[rec].axvline(
-            x=f_ref, color='black', linestyle='-', linewidth=1.25)
-
-        # Adding the receiver number label
-        axes[rec].text(0.995, 0.9, "R" + str(rec + 1), fontsize=8.5,
-                       transform=axes[rec].transAxes, fontweight='bold',
-                       verticalalignment='top', horizontalalignment='right',
-                       bbox=dict(facecolor='none', edgecolor='none'))
-
-        # Centered title
-        if rec == num_recvs // 2:
-            axes[rec].set_ylabel(r'$FFT \; recs_{norm}$')
-
-        # Hide all the xticks for receiver different of the last one
-        hide_xticks = False if rec < num_recvs - 1 else True
-        plt.setp(axes[rec].get_xticklabels(), visible=hide_xticks)
-
-        # Axis format
-        axes[rec].set_xlim(0, limf)
-        axes[rec].ticklabel_format(
-            axis='y', style='scientific', scilimits=(-2, 2))
-        if rec == num_recvs - 1:
-            axes[rec].set_xlabel(r'$f \; (Hz)$')
-
-            # Adding the frequency labels
-            axes[rec].text(f_ref - limf / 500., axes[rec].get_ylim()[0] * 1.05,
-                           f_str, color='black', fontsize=8, fontweight='bold',
-                           ha='right', va='bottom')
-            axes[rec].text(f_sou + limf / 500., axes[rec].get_ylim()[0] * 1.05,
-                           r'$f_{sou}$', color='black', fontsize=8,
-                           fontweight='bold', ha='left', va='bottom') \
-                if f_sou != Wave_object.freq_ref else None
-
-    # Saving the plot
-    time_str = Wave_object.path_save + Wave_object.case_habc + "/freq"
-    plt.savefig(time_str + ".png", bbox_inches='tight')
-    plt.savefig(time_str + ".pdf", bbox_inches='tight')
-    plt.show() if show else None
-    plt.close()
-
-
-def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
-    '''
-    Plot the regression curve for the optimal xCR value.
-
-    Parameters
-    ----------
-    Wave_object: `wave`
-        The Wave object containing the simulation results
-    data_regr_xCR: `list`
-        Data for the regression of the parameter xCR.
-        Structure: [xCR, max_errIt, max_errPK, crit_opt]
-        - xCR: Values of xCR used in the regression.
-          The last value IS the optimal xCR
-        - max_errIt: Values of the maximum integral error.
-          The last value corresponds to the optimal xCR
-        - max_errPK: Values of the maximum peak error.
-          The last value corresponds to the optimal xCR
-        - crit_opt : Criterion for the optimal heuristic factor.
-          * 'error_difference' : Difference between integral and peak errors
-          * 'error_integral' : Minimum integral error
-    show: `bool`, optional
-        Whether to show the plot. Default is False.
-
-    Returns
-    -------
-    None
-    '''
-
-    # Data for regression
-    xCR, max_errIt, max_errPk, crit_opt = data_regr_xCR
-    xCR_opt = xCR[-1]
-    err_opt = max_errIt[-1]
-    eq_eI = np.polyfit(xCR[:-1], max_errIt[:-1], 2)
-    eq_eP = np.polyfit(xCR[:-1], max_errPk[:-1], 2)
-
-    # Compute R^2 values
-    y_eI_true = max_errIt[:-1]
-    y_eI_pred = np.polyval(eq_eI, xCR[:-1])
-    y_eP_true = max_errPk[:-1]
-    y_eP_pred = np.polyval(eq_eP, xCR[:-1])
-    p = 2  # Quadratic model (Predictors: x and x^2)
-    r2_eI = coeff_of_determination(y_eI_true, y_eI_pred, p)
-    r2_eP = coeff_of_determination(y_eP_true, y_eP_pred, p)
-
-    # Format equations
-    qua_reg = r'${:.3e} x^{{2}} + {:.3e} x + {:.3e}, R^{{2}} = {:.3f}$'
-    eq_str_eI = (
-        r'$e_I = $' + qua_reg).format(*eq_eI, r2_eI).replace("+ -", "- ")
-    eq_str_eP = (
-        r'$e_P = $' + qua_reg).format(*eq_eP, r2_eP).replace("+ -", "- ")
-
-    # Regression points
-    plt.plot(xCR[:-1], 100 * np.asarray(max_errIt[:-1]), 'ro',
-             label=r'Integral Error: ' + eq_str_eI)
-    plt.plot(xCR[:-1], 100 * np.asarray(max_errPk[:-1]), 'bo',
-             label=r'Peak Error: ' + eq_str_eP)
-
-    # xCR limits
-    xCR_inf, xCR_sup = Wave_object.xCR_bounds[0]
-
-    # Regression curves
-    xgraf = np.linspace(xCR_inf, xCR_sup, int((xCR_sup - xCR_inf) / 0.1))
-    y_eI = np.polyval(eq_eI, xgraf)
-    y_eP = np.polyval(eq_eP, xgraf)
-    plt.plot(xgraf, 100 * y_eI, color='r', linestyle='--')
-    plt.plot(xgraf, 100 * y_eP, color='b', linestyle='--')
-
-    # Locating the optimal value
-    plt.plot([xCR_opt, xCR_opt], [0., 100 * err_opt], 'k-')
-    xopt_str = r'Optimized Heuristic Factor: $X^{{*}}_{{C_{{R}}}} = {:.3f}$'
-    if round(100 * np.polyval(eq_eI, xCR_opt), 2) == round(
-            100 * np.polyval(eq_eP, xCR_opt), 2):
-        xopt_str += r' | $e_{{I}} = e_{{P}} = {:.2f}\%$'
-        label = xopt_str.format(xCR_opt, 100 * err_opt)
-    else:
-        xopt_str += r' | $e_{{I}} = {:.2f}\%$ | $e_{{P}} = {:.2f}\%$'
-        label = xopt_str.format(xCR_opt, 100 * err_opt, 100 * max_errPk[-1])
-    plt.plot(xCR_opt, 100 * err_opt, marker=r'$\ast$', color='k',
-             markersize=10, label=label)
-    plt.legend(loc="best", fontsize=8.5)
-
-    # Formatting the plot
-    max_err = max(max(max_errIt[:-1]), max(max_errPk[:-1]))
-    plt.xlim(0, round(xCR_sup, 1) + 0.1)
-    plt.ylim(0, round(100 * max_err, 1) + 0.1)
-    if crit_opt == 'error_difference':
-        str_crt = r' (Criterion: Min $(e_I - e_P)$)'
-    elif crit_opt == 'error_integral':
-        str_crt = r' (Criterion: Min $e_I$)'
-
-    plt.xlabel(r'$X_{C_{R}}$' + str_crt)
-    plt.tight_layout(pad=2)
-    plt.ylabel(r'$e_I \; | \; e_P \; (\%)$')
-
-    # Saving the plot
-    xcr_str = Wave_object.path_save + Wave_object.case_habc + "/xCR"
-    plt.savefig(xcr_str + '.png', bbox_inches='tight')
-    plt.savefig(xcr_str + '.pdf', bbox_inches='tight')
-    plt.show() if show else None
-    plt.close()
-
-
 def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png", abc_points=None, show=False, flip_axis=True):
     """
-    Plots the velocity model of a given wave_object projected into a P1 (linear) finite element discretization.
-    This function creates a deep copy of the input Wave_object's configuration, modifies it to use
-    a P1 (degree 1) continuous Galerkin, and then generates a plot of the resulting velocity model.
-    The plot can be saved to a file and optionally displayed.
+    Plot velocity model with P1 finite element projection.
+
+    Creates a visualization of the velocity model by first projecting it onto
+    a P1 (piecewise linear) continuous Galerkin finite element space. This is
+    useful for visualizing higher-order velocity models in a simpler, linear
+    representation.
 
     Parameters
-    -----------
-    Wave_object:
-        An instance of a wave simulation object containing the velocity model and configuration.
-    dx (float, optional):
-        The mesh spacing to use for the new model. Defaults to 0.01.
-    filename (str, optional):
-        The filename to save the plot image. Defaults to "model.png".
-    abc_points (list or None, optional):
-        Points for absorbing boundary conditions to be marked on the plot. Defaults to None.
-    show (bool, optional):
-        Whether to display the plot interactively. Defaults to False.
-    flip_axis (bool, optional):
-        Whether to flip the plot axes for visualization. Defaults to True.
+    ----------
+    Wave_object : Wave
+        An instance of a wave simulation object containing the velocity model
+        and configuration dictionary.
+    dx : float, optional
+        The mesh spacing (edge length) to use for the P1 discretization.
+        Default is 0.01.
+    filename : str, optional
+        The filename to save the plot image. Default is "model.png".
+    abc_points : list of tuple, optional
+        List of (z, x) coordinate tuples for absorbing boundary condition
+        markers to be plotted. Default is None.
+    show : bool, optional
+        Whether to display the plot interactively. Default is False.
+    flip_axis : bool, optional
+        Whether to flip the plot axes for conventional seismic visualization.
+        Default is True.
 
     Returns
     -------
-    The result of the plot_model function.
+    result
+        The return value from the plot_model function.
+
+    Notes
+    -----
+    This function:
+    1. Deep copies the Wave_object's input dictionary
+    2. Modifies it to use CG (Continuous Galerkin) method with degree 1
+    3. Creates a new AcousticWave object with the modified configuration
+    4. Sets up a new mesh with the specified edge length
+    5. Projects the original velocity model onto the new P1 space
+    6. Calls plot_model to generate the visualization
+
+    See Also
+    --------
+    plot_model : The underlying plotting function.
     """
 
     # Local import to avoid circular import

@@ -24,11 +24,11 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         c_guess = fire.Constant(2.0) + step*dm
         Wave_obj_guess.initial_velocity_model = c_guess
         Wave_obj_guess.forward_solve()
-        misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
+        misfit_plusdm = rec_out_exact - Wave_obj_guess.forward_solution_receivers
         J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
 
         grad_fd = (J_plusdm - Jm) / (step)
-        projnorm = fire.assemble(dJ * dm * fire.dx(scheme=Wave_obj_guess.quadrature_rule))
+        projnorm = fire.assemble(dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule))
 
         error = 100 * ((grad_fd - projnorm) / projnorm)
 
@@ -79,9 +79,9 @@ dictionary["parallelism"] = {
 }
 
 dictionary["mesh"] = {
-    "Lz": 3.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
-    "Lx": 3.0,  # width in km - always positive
-    "Ly": 0.0,  # thickness in km - always positive
+    "length_z": 3.0,  # depth in km - always positive
+    "length_x": 3.0,  # width in km - always positive
+    "length_y": 0.0,  # thickness in km - always positive
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
 }
@@ -91,7 +91,7 @@ dictionary["acquisition"] = {
     "source_locations": [(-1.1, 1.3), (-1.1, 1.7)],
     "frequency": 5.0,
     "delay": 1.5,
-    "delay_type": "multiples_of_minimun",
+    "delay_type": "multiples_of_minimum",
     "receiver_locations": spyro.create_transect((-1.8, 1.2), (-1.8, 1.8), 10),
 }
 
@@ -100,8 +100,8 @@ dictionary["time_axis"] = {
     "final_time": final_time,  # Final time for event
     "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
-    "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
+    "output_frequency": 100,  # how frequently to output solution to pvds
+    "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
 }
 
 dictionary["visualization"] = {
@@ -130,7 +130,7 @@ def get_forward_model(load_true=False):
         # spyro.plots.plot_model(Wave_obj_exact, abc_points=[(-1, 1), (-2, 1), (-2, 4), (-1, 2)])
         Wave_obj_exact.forward_solve()
         # forward_solution_exact = Wave_obj_exact.forward_solution
-        rec_out_exact = Wave_obj_exact.receivers_output
+        rec_out_exact = Wave_obj_exact.forward_solution_receivers
         # np.save("rec_out_exact", rec_out_exact)
 
     else:
@@ -140,7 +140,7 @@ def get_forward_model(load_true=False):
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     Wave_obj_guess.forward_solve()
-    rec_out_guess = Wave_obj_guess.receivers_output
+    rec_out_guess = Wave_obj_guess.forward_solution_receivers
 
     return rec_out_exact, rec_out_guess, Wave_obj_guess
 

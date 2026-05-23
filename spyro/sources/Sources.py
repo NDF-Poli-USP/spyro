@@ -2,6 +2,8 @@ import math
 import numpy as np
 from scipy.signal import butter, filtfilt
 from spyro.receivers.dirac_delta_projector import Delta_projector
+from ..utils.typing import WaveType
+import firedrake as fire
 
 
 class Sources(Delta_projector):
@@ -115,6 +117,39 @@ class Sources(Delta_projector):
 
         return rhs_forcing
 
+    def source_cofunction(self):
+        """Return a cofunction with the source applied into the domain.
+
+        Returns
+        -------
+        source_cofunction: Firedrake.Cofunction
+            A cofunction with the source applied into the domain.
+        """
+        if self.current_sources is None or len(self.current_sources) == 0:
+            raise ValueError(
+                "VertexOnlyMesh source assembly requires at least one active source."
+            )
+
+        source_locations = [
+            self.point_locations[source_id] for source_id in self.current_sources
+        ]
+        source_mesh = fire.VertexOnlyMesh(self.mesh, source_locations)
+        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
+            V_s = fire.VectorFunctionSpace(source_mesh, "DG", 0)
+            R_s = fire.VectorFunctionSpace(source_mesh, "R", 0)
+        elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
+            V_s = fire.FunctionSpace(source_mesh, "DG", 0)
+            R_s = fire.FunctionSpace(source_mesh, "R", 0)
+        else:
+            raise ValueError("Invalid wave type")
+
+        ones = fire.Function(R_s, val=[1.0 for _ in range(V_s.value_size)])
+        source_form = fire.inner(fire.TestFunction(V_s), ones) * fire.dx
+
+        return fire.Cofunction(
+            self.function_space.dual()).interpolate(
+                fire.assemble(source_form))
+
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
     if model["acquisition"]["source_type"] == "Ricker":
@@ -146,7 +181,7 @@ def ricker_wavelet(
         between the minimums.
     delay_type: string
         Type of delay. Options are:
-        - multiples_of_minimun
+        - multiples_of_minimum
         - time
 
     Returns
@@ -154,7 +189,7 @@ def ricker_wavelet(
     float
         Value of the wavelet at time t
     """
-    if delay_type == "multiples_of_minimun":
+    if delay_type == "multiples_of_minimum":
         time_delay = delay * math.sqrt(6.0) / (math.pi * freq)
     elif delay_type == "time":
         time_delay = delay
@@ -194,7 +229,7 @@ def full_ricker_wavelet(
         between the minimums.
     delay_type: string
         Type of delay. Options are:
-        - multiples_of_minimun
+        - multiples_of_minimum
         - time
 
     Returns

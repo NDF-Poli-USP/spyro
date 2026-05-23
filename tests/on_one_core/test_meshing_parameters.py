@@ -18,9 +18,9 @@ def test_initialize_mesh_pam():
         "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
     }
     dictionary["mesh"] = {
-        "Lz": 3.0,  # depth in km - always positive
-        "Lx": 3.0,  # width in km - always positive
-        "Ly": 0.0,  # thickness in km - always positive
+        "length_z": 3.0,  # depth in km - always positive
+        "length_x": 3.0,  # width in km - always positive
+        "length_y": 0.0,  # thickness in km - always positive
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
     }
@@ -58,11 +58,12 @@ def test_initialize_mesh_pam():
 
     # Testing correct values:
     test_unit = (meshing_pam._unit == "km")
-    test_length_z = (meshing_pam.length_z == dictionary["mesh"]["Lz"])
-    test_length_x = (meshing_pam.length_z == dictionary["mesh"]["Lx"])
-    test_length_y = (meshing_pam.length_y == dictionary["mesh"]["Ly"])
+    test_length_z = (meshing_pam.length_z == dictionary["mesh"]["length_z"])
+    test_length_x = (meshing_pam.length_z == dictionary["mesh"]["length_x"])
+    test_length_y = (meshing_pam.length_y == dictionary["mesh"]["length_y"])
     test_degree = (meshing_pam.degree == dictionary["options"]["degree"])
-    test_source_frequency = (meshing_pam.source_frequency == dictionary["acquisition"]["frequency"])
+    test_source_frequency = (meshing_pam.source_frequency == dictionary[
+        "acquisition"]["frequency"])
     test_mesh_type = (meshing_pam.mesh_type == "firedrake_mesh")
     test_method = (meshing_pam.method == "mass_lumped_triangle")
 
@@ -81,9 +82,9 @@ def test_initialize_mesh_pam():
 def test_negative_length_z_raises():
     dictionary = {
         "mesh": {
-            "Lz": -1.0,
-            "Lx": 3.0,
-            "Ly": 0.0,
+            "length_z": -1.0,
+            "length_x": 3.0,
+            "length_y": 0.0,
             "mesh_file": None,
             "mesh_type": "firedrake_mesh",
         }
@@ -101,9 +102,9 @@ def test_negative_length_z_raises():
 def test_negative_length_x_raises():
     dictionary = {
         "mesh": {
-            "Lz": 3.0,
-            "Lx": -2.0,
-            "Ly": 0.0,
+            "length_z": 3.0,
+            "length_x": -2.0,
+            "length_y": 0.0,
             "mesh_file": None,
             "mesh_type": "firedrake_mesh",
         }
@@ -121,9 +122,9 @@ def test_negative_length_x_raises():
 def test_negative_length_y_raises():
     dictionary = {
         "mesh": {
-            "Lz": 3.0,
-            "Lx": 3.0,
-            "Ly": -0.5,
+            "length_z": 3.0,
+            "length_x": 3.0,
+            "length_y": -0.5,
             "mesh_file": None,
             "mesh_type": "firedrake_mesh",
         }
@@ -141,14 +142,14 @@ def test_negative_length_y_raises():
 def test_invalid_mesh_type_raises():
     dictionary = {
         "mesh": {
-            "Lz": 3.0,
-            "Lx": 3.0,
-            "Ly": 0.0,
+            "length_z": 3.0,
+            "length_x": 3.0,
+            "length_y": 0.0,
             "mesh_file": None,
             "mesh_type": "invalid_mesh_type",
         }
     }
-    with pytest.raises(ValueError, match="mesh_type must be one of"):
+    with pytest.raises(ValueError, match="Invalid mesh_type"):
         spyro.meshing.MeshingParameters(
             input_mesh_dictionary=dictionary["mesh"],
             dimension=2,
@@ -161,14 +162,14 @@ def test_invalid_mesh_type_raises():
 def test_invalid_method_raises():
     dictionary = {
         "mesh": {
-            "Lz": 3.0,
-            "Lx": 3.0,
-            "Ly": 0.0,
+            "length_z": 3.0,
+            "length_x": 3.0,
+            "length_y": 0.0,
             "mesh_file": None,
             "mesh_type": "firedrake_mesh",
         }
     }
-    with pytest.raises(ValueError, match="method must be one of"):
+    with pytest.raises(ValueError, match="Invalid method: 'invalid_method'."):
         spyro.meshing.MeshingParameters(
             input_mesh_dictionary=dictionary["mesh"],
             dimension=2,

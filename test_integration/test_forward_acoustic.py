@@ -28,9 +28,9 @@ def test_forward_3_shots():
         "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
     }
     dictionary["mesh"] = {
-        "Lz": 3.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
-        "Lx": 3.0,  # width in km - always positive
-        "Ly": 0.0,  # thickness in km - always positive
+        "length_z": 3.0,  # depth in km - always positive
+        "length_x": 3.0,  # width in km - always positive
+        "length_y": 0.0,  # thickness in km - always positive
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",
     }
@@ -47,7 +47,7 @@ def test_forward_3_shots():
         "final_time": final_time,  # Final time for event
         "dt": 0.001,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
-        "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
+        "output_frequency": 100,  # how frequently to output solution to pvds
         "gradient_sampling_frequency": 1,
     }
     dictionary["visualization"] = {
@@ -70,7 +70,7 @@ def test_forward_3_shots():
 
     comm = Wave_obj.comm
 
-    arr = Wave_obj.receivers_output
+    arr = Wave_obj.forward_solution_receivers
 
     if comm.ensemble_comm.rank == 0:
         analytical_p = spyro.utils.nodal_homogeneous_analytical(

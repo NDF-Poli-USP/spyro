@@ -39,9 +39,9 @@ def test_forward_supershot():
     # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
     # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "Lz": 2.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
-        "Lx": 2.0,  # width in km - always positive
-        "Ly": 0.0,  # thickness in km - always positive
+        "length_z": 2.0,  # depth in km - always positive
+        "length_x": 2.0,  # width in km - always positive
+        "length_y": 0.0,  # thickness in km - always positive
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",
     }
@@ -80,7 +80,7 @@ def test_forward_supershot():
     Wave_obj.forward_solve()
     comm = Wave_obj.comm
 
-    rec_out = Wave_obj.receivers_output
+    rec_out = Wave_obj.forward_solution_receivers
     if comm.comm.rank == 0:
         analytical_p = spyro.utils.nodal_homogeneous_analytical(Wave_obj, 0.2, 1.5, n_extra=100)
     else:

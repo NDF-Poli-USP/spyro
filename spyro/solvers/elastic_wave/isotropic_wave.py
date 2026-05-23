@@ -7,8 +7,8 @@ from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
-from ...domains.space import FE_method
-from ...utils.typing import override
+from ...utils.typing import override, WaveType
+from ...domains.space import create_function_space
 
 
 class IsotropicWave(ElasticWave):
@@ -16,7 +16,7 @@ class IsotropicWave(ElasticWave):
 
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
-
+        self.wave_type = WaveType.ISOTROPIC_ELASTIC
         self.rho = None   # Density
         self.lmbda = None  # First Lame parameter
         self.mu = None    # Second Lame parameter
@@ -27,7 +27,7 @@ class IsotropicWave(ElasticWave):
         self.u_nm2 = None  # Displacement field at iteration n-2
         self.u_np1 = None  # Displacement field in next iteration
 
-        # Volumetric sourcers (defined through UFL)
+        # Volumetric sources (defined through UFL)
         self.body_forces = None
 
         # Boundary conditions
@@ -101,8 +101,8 @@ class IsotropicWave(ElasticWave):
 
     @override
     def _create_function_space(self):
-        return FE_method(self.mesh, self.method, self.degree,
-                         dim=self.dimension)
+        return create_function_space(self.mesh, self.method, self.degree,
+                                     dim=self.dimension)
 
     @override
     def _set_vstate(self, vstate):
@@ -131,7 +131,7 @@ class IsotropicWave(ElasticWave):
         return self.u_np1
 
     @override
-    def get_receivers_output(self):
+    def get_forward_solution_receivers(self):
         if self.abc_boundary_layer_type == "PML":
             raise NotImplementedError
         else:
@@ -172,7 +172,8 @@ class IsotropicWave(ElasticWave):
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
 
-        if self.abc_boundary_layer_type is None:
+        if self.abc_boundary_layer_type is None or \
+                self.abc_boundary_layer_type == "local":
             isotropic_elastic_without_pml(self)
         elif self.abc_boundary_layer_type == "PML":
             isotropic_elastic_with_pml(self)
@@ -184,6 +185,12 @@ class IsotropicWave(ElasticWave):
         else:
             return self.B
 
+    def rhs_no_pml_source(self):
+        if self.abc_boundary_layer_type == "PML":
+            raise NotImplementedError
+        else:
+            return self.source_function
+
     def parse_initial_conditions(self):
         time_dict = self.input_dictionary["time_axis"]
         initial_condition = time_dict.get("initial_condition", None)
@@ -194,7 +201,7 @@ class IsotropicWave(ElasticWave):
 
     def parse_boundary_conditions(self):
         bc_list = self.input_dictionary.get("boundary_conditions", [])
-        for tag, id, value in bc_list:
+        for tag, idbc, value in bc_list:
             if tag == "u":
                 subspace = self.function_space
             elif tag == "uz":
@@ -204,8 +211,9 @@ class IsotropicWave(ElasticWave):
             elif tag == "uy":
                 subspace = self.function_space.sub(2)
             else:
-                raise Exception(f"Unsupported boundary condition with tag: {tag}")
-            self.bcs.append(DirichletBC(subspace, value, id))
+                raise Exception(
+                    f"Unsupported boundary condition with tag: {tag}")
+            self.bcs.append(DirichletBC(subspace, value, idbc))
 
     def parse_volumetric_forces(self):
         acquisition_dict = self.input_dictionary["acquisition"]

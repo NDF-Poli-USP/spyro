@@ -160,11 +160,11 @@ dictionary["parallelism"] = {
 # Define the domain size without the PML. Here we'll assume a 0.75 x 1.50 km
 dictionary["mesh"] = {
     # depth in km - always positive
-    "Lz": 0.75,
+    "length_z": 0.75,
     # width in km - always positive
-    "Lx": 1.50,
+    "length_x": 1.50,
     # thickness in km - always positive
-    "Ly": 0.0,
+    "length_y": 0.0,
     # If we are loading and external .msh mesh file
     "mesh_file": None,
     # options: None (default), firedrake_mesh, user_mesh, or SeismicMesh

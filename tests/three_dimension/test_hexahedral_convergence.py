@@ -38,11 +38,11 @@ def run_forward_hexahedral(dt, final_time, offset):
     # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
     dictionary["mesh"] = {
         # depth in km - always positive
-        "Lz": 0.8,
+        "length_z": 0.8,
         # width in km - always positive
-        "Lx": 0.8,
+        "length_x": 0.8,
         # thickness in km - always positive
-        "Ly": 0.8,
+        "length_y": 0.8,
         "mesh_file": None,
         # options: firedrake_mesh or user_mesh
         "mesh_type": "firedrake_mesh",
@@ -90,7 +90,7 @@ def run_forward_hexahedral(dt, final_time, offset):
     Wave_obj.forward_solve()
     # time_vector = np.linspace(0.0, final_time, int(final_time/dt)+1)
 
-    rec_out = Wave_obj.receivers_output
+    rec_out = Wave_obj.forward_solution_receivers
     output = rec_out.flatten()
     my_ensemble = Wave_obj.comm
     if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:

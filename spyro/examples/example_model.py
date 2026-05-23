@@ -15,7 +15,8 @@ def recursive_dictionary_substitution(dictionary, default):
     keys = get_list(default)
     for key in keys:
         if key not in dictionary:
-            dictionary[key] = default[key]
+            # For safety to avoid mutation
+            dictionary[key] = deepcopy(default[key])
         elif isinstance(default[key], dict):
             recursive_dictionary_substitution(dictionary[key], default[key])
 

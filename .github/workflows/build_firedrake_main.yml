@@ -11,13 +11,17 @@ on:
     - cron: '0 0 * * 0'
 # on: [push, pull_request]
 
+concurrency:
+  group: build-firedrake-main-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    name: Install and test Firedrake (Linux)
+    name: build
     runs-on: self-hosted
 
     container:
-      image: ubuntu:latest
+      image: ubuntu:24.04
     env:
       OMPI_ALLOW_RUN_AS_ROOT: 1
       OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
@@ -76,17 +80,16 @@ jobs:
           . venv/bin/activate
 
           : # Hotfix for petsc4py build, see https://gitlab.com/petsc/petsc/-/issues/1759
-          echo 'Cython<3.1' > constraints.txt
+          echo 'setuptools<81' > constraints.txt
           export PIP_CONSTRAINT=constraints.txt
 
           : # Force a rebuild of petsc4py as the cached one will not link to the fresh
           : # install of PETSc.
-          pip cache remove petsc4py
-          pip cache remove slepc4py
+          pip cache purge
           pip install --verbose "$PETSC_DIR"/src/binding/petsc4py
           pip install --verbose -r ./firedrake-repo/requirements-build.txt
-          pip install --verbose --no-build-isolation --no-deps \
-              "$PETSC_DIR"/"$PETSC_ARCH"/externalpackages/git.slepc/src/binding/slepc4py
+          pip install --verbose --no-build-isolation \
+              "$SLEPC_DIR"/externalpackages/git.slepc/src/binding/slepc4py
             pip install --no-deps ngsPETSc netgen-mesher netgen-occt
           pip install --verbose --no-build-isolation --no-binary h5py --editable './firedrake-repo[check,slepc,vtk]'
           firedrake-clean
@@ -103,9 +106,13 @@ jobs:
       - name: Run spyro smoke tests
         run: |
           . venv/bin/activate
-          git clone --depth 1 https://github.com/NDF-Poli-USP/spyro.git spyro-repo
-          pip install --verbose ./spyro-repo
-          mpiexec -n 6 python -m pytest  spyro-repo/test_integration/
+
+          : # Use the checked-out repository (the code under test) instead of
+          : # cloning and installing Spyro from GitHub. This ensures CI runs
+          : # tests against the code in the PR.
+          cd "$GITHUB_WORKSPACE" || true
+          python -m pip install --verbose -e .
+          mpiexec -n 6 python -m pytest test_integration/
 
       - name: Post-run cleanup
         if: always()

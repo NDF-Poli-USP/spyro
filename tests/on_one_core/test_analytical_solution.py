@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import spyro
 
 # import matplotlib.pyplot as plt
@@ -11,17 +12,23 @@ def error_calc(p_numerical, p_analytical, nt):
     return div_error_time
 
 
-def test_analytical_solution():
+@pytest.mark.parametrize("use_vertex_only_mesh", [False, True])
+def test_analytical_solution(use_vertex_only_mesh):
     frequency = 5.0
     offset = 0.5
     c_value = 1.5
     dictionary = {}
     dictionary["absorving_boundary_conditions"] = {
         "status": False,
+        "damping_type": None,
+        "exponent": None,
+        "cmax": None,
+        "R": None,
+        "pad_length": None,
     }
     dictionary["mesh"] = {
-        "Lz": 3.0,  # depth in km - always positive
-        "Lx": 3.0,  # width in km - always positive
+        "length_z": 3.0,  # depth in km - always positive
+        "length_x": 3.0,  # width in km - always positive
     }
     dictionary["acquisition"] = {
         "delay_type": "time",
@@ -29,6 +36,7 @@ def test_analytical_solution():
         "delay": c_value / frequency,
         "source_locations": [(-1.5, 1.5)],
         "receiver_locations": [(-1.5 - offset, 1.5)],
+        "use_vertex_only_mesh": use_vertex_only_mesh,
     }
     Wave_obj = spyro.examples.Rectangle_acoustic(
         dictionary=dictionary, periodic=True
@@ -40,12 +48,13 @@ def test_analytical_solution():
 
     time_vector = np.linspace(0.0, 1.0, int(1.0 / Wave_obj.dt) + 1)
     Wave_obj.forward_solve()
-    numerical_p = Wave_obj.receivers_output
+    numerical_p = Wave_obj.forward_solution_receivers
     numerical_p = numerical_p.flatten()
 
     nt = len(time_vector)
     error = error_calc(numerical_p, analytical_p, nt)
-    print("Error = {:.4e}".format(error))
+    vom_label = "VOM" if use_vertex_only_mesh else "NO VOM"
+    print("Error ({}) = {:.4e}".format(vom_label, error))
 
     # plt.plot(time_vector, analytical_p, label="Analytical", color="black", linestyle="--")
     # plt.plot(time_vector, numerical_p, label="Numerical", color="red")
@@ -59,4 +68,5 @@ def test_analytical_solution():
 
 
 if __name__ == "__main__":
-    test_analytical_solution()
+    test_analytical_solution(False)
+    test_analytical_solution(True)

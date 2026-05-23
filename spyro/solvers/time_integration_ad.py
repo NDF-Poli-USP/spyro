@@ -27,13 +27,13 @@ def central_difference_acoustic(forwardsolver, c, source_function):
 
     qr_x, qr_s, _ = quadrature.quadrature_rules(V)
     time_term = (1 / (c * c)) * (u - 2.0 * u_n + u_nm1) / \
-        fire.Constant(dt**2) * v * fire.dx(scheme=qr_x)
+        fire.Constant(dt**2) * v * fire.dx(**qr_x)
 
     nf = 0
     if forwardsolver.model["absorving_boundary_conditions"]["status"] is True:
-        nf = (1/c) * ((u_n - u_nm1) / dt) * v * fire.ds(scheme=qr_s)
+        nf = (1/c) * ((u_n - u_nm1) / dt) * v * fire.ds(**qr_s)
 
-    a = fire.dot(fire.grad(u_n), fire.grad(v)) * fire.dx(scheme=qr_x)
+    a = fire.dot(fire.grad(u_n), fire.grad(v)) * fire.dx(**qr_x)
     F = time_term + a + nf
     lin_var = fire.LinearVariationalProblem(
         fire.lhs(F), fire.rhs(F) + source_function, u_np1)

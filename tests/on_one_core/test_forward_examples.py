@@ -5,14 +5,14 @@ import pytest
 
 def test_camembert_forward():
     dictionary = {}
-    dictionary["absorving_boundary_conditions"] = {
-        "status": True,
-        "damping_type": "PML",
-        "exponent": 2,
-        "cmax": 4.5,
-        "R": 1e-6,
-        "pad_length": 0.25,
-    }
+    # dictionary["absorving_boundary_conditions"] = {
+    #     "status": True,
+    #     "damping_type": "PML",
+    #     "exponent": 2,
+    #     "cmax": 4.5,
+    #     "R": 1e-6,
+    #     "pad_length": 0.25,
+    # }
     Wave_obj = spyro.examples.Camembert_acoustic(dictionary=dictionary)
 
     # Check if velocity model is correct
@@ -30,6 +30,12 @@ def test_camembert_forward():
 
 
 def test_rectangle_forward():
+    dictionary = {}
+    dictionary["absorving_boundary_conditions"] = {
+        "status": False,
+        "damping_type": None,
+        "pad_length": 0.,
+    }
     Wave_obj = spyro.examples.Rectangle_acoustic()
 
     # Check if velocity model is correct
@@ -89,8 +95,12 @@ def test_immersed_polygon_forward():
     assert all([test1, test2, test3])
 
 
-def test_camembert_elastic():
+@pytest.mark.slow
+@pytest.mark.parametrize("use_vertex_only_mesh", [False, True])
+def test_camembert_elastic(use_vertex_only_mesh):
     from spyro.examples.camembert_elastic import wave
+    # use vertex-only mesh
+    wave.use_vertex_only_mesh = use_vertex_only_mesh
     wave.forward_solve()
 
 

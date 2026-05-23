@@ -1,6 +1,4 @@
 import firedrake as fire
-import warnings
-import os
 
 from .wave import Wave
 
@@ -15,21 +13,16 @@ from .acoustic_solver_construction_with_pml import (
 from .backward_time_integration import (
     backward_wave_propagator,
 )
-from ..domains.space import FE_method
-from ..utils.typing import override
+from ..domains.space import create_function_space
+from ..utils.typing import override, WaveType
+from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
-
-try:
-    from SeismicMesh import write_velocity_model
-    SEISMIC_MESH_AVAILABLE = True
-except ImportError:
-    SEISMIC_MESH_AVAILABLE = False
 
 
 class AcousticWave(Wave):
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
-
+        self.wave_type = WaveType.ISOTROPIC_ACOUSTIC
         self.acoustic_energy = None
         self.field_logger.add_functional(
             "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))
@@ -62,16 +55,15 @@ class AcousticWave(Wave):
         self.solver = None
         self.rhs = None
         self.B = None
-        if abc_type is None or abc_type == "hybrid":
+        if abc_type is None or abc_type == "local" or abc_type == "hybrid":
             construct_solver_or_matrix_no_pml(self)
         elif abc_type == "PML":
             V = self.function_space
             Z = fire.VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
             self.vector_function_space = Z
-            self.X = None
+            self.X_np1 = None
             self.X_n = None
             self.X_nm1 = None
-            self.X_np1 = fire.Function(V * Z)
             construct_solver_or_matrix_with_pml(self)
 
         self.acoustic_energy = acoustic_energy(self)
@@ -93,19 +85,20 @@ class AcousticWave(Wave):
         """
         if misfit is not None:
             self.misfit = misfit
-        if self.real_shot_record is None:
-            warnings.warn("Please load or calculate a real shot record first")
-        if self.current_time == 0.0:
+        elif self.current_time == 0.0:
             self.forward_solve()
             self.misfit = self.real_shot_record - self.forward_solution_receivers
+        else:
+            raise ValueError("Please load or calculate a real shot record first")
         return backward_wave_propagator(self)
 
     def reset_pressure(self):
-        try:
+        if self.abc_boundary_layer_type == "PML":
+            self.X_n.assign(0.0)
+            self.X_nm1.assign(0.0)
+        else:
             self.u_nm1.assign(0.0)
             self.u_n.assign(0.0)
-        except Exception:
-            warnings.warn("No pressure to reset")
 
     @override
     def _initialize_model_parameters(self):
@@ -114,16 +107,7 @@ class AcousticWave(Wave):
                 raise ValueError("No velocity model or velocity file to load.")
 
             if self.initial_velocity_model_file.endswith(".segy"):
-                if not SEISMIC_MESH_AVAILABLE:
-                    raise ImportError("SeismicMesh is required to convert segy files.")
-                vp_filename, vp_filetype = os.path.splitext(
-                    self.initial_velocity_model_file
-                )
-                warnings.warn("Converting segy file to hdf5")
-                write_velocity_model(
-                    self.initial_velocity_model_file, ofname=vp_filename
-                )
-                self.initial_velocity_model_file = vp_filename + ".hdf5"
+                self.initial_velocity_model_file = write_hdf5_velocity_model(self, self.initial_velocity_model_file)
 
             if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
                 self.initial_velocity_model = interpolate(
@@ -182,7 +166,7 @@ class AcousticWave(Wave):
             return self.u_np1
 
     @override
-    def get_receivers_output(self):
+    def get_forward_solution_receivers(self):
         if self.abc_boundary_layer_type == "PML":
             data_with_halos = self.X_n.dat.data_ro_with_halos[0][:]
         else:
@@ -190,11 +174,42 @@ class AcousticWave(Wave):
         return self.receivers.interpolate(data_with_halos)
 
     @override
-    def get_function(self):
-        if self.abc_boundary_layer_type == "PML":
-            return self.X_n.sub(0)
+    def get_function(self, state: fire.Function = None) -> fire.Function:
+        """Return the wave equation solution.
+
+        If `state` is provided, return the wave field corresponding to that
+        state (e.g., for PML, the first component of the state vector). If `state`
+        is `None`, return the wave field corresponding to the time step ``n``.
+        For PML, this corresponds to the first component of X_n.
+
+        Parameters:
+        -----------
+        state : Firedrake 'Function' (optional)
+            The state for which to return the wave field. If None, returns the
+            wave field corresponding to the time step ``n``.
+
+        Returns:
+        --------
+        Firedrake 'Function'
+            The scalar wave field corresponding to the specified `state` or the time step ``n``.
+        """
+        if state is None:
+            if self.abc_boundary_layer_type == "PML":
+                return self.X_n.sub(0)
+            else:
+                return self.u_n
         else:
-            return self.u_n
+            if self.abc_boundary_layer_type == "PML":
+                return state.sub(0)
+            else:
+                return state
+
+    def get_scalar_function_space(self) -> fire.FunctionSpace:
+        """Return the scalar space where the pressure equation is solved."""
+        if self.scalar_function_space is not None:
+            return self.scalar_function_space
+        else:
+            raise ValueError("Scalar function space not found in wave object.")
 
     @override
     def get_function_name(self):
@@ -202,7 +217,7 @@ class AcousticWave(Wave):
 
     @override
     def _create_function_space(self):
-        return FE_method(self.mesh, self.method, self.degree)
+        return create_function_space(self.mesh, self.method, self.degree)
 
     @override
     def rhs_no_pml(self):
@@ -214,6 +229,15 @@ class AcousticWave(Wave):
     @override
     def check_stability(self):
         assert (
-            fire.norm(wave.get_function()) < 1
+            fire.norm(self.get_function()) < 1
         ), "Numerical instability. Try reducing dt or building the " \
            "mesh differently"
+
+    def rhs_no_pml_source(self):
+        """Return the source cofunction added to the variational right-hand
+        side.
+        """
+        if self.abc_boundary_layer_type == "PML":
+            return self.source_function.sub(0)
+        else:
+            return self.source_function

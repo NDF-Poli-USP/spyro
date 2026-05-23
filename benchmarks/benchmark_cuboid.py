@@ -22,9 +22,9 @@ model["parallelism"] = {
 }
 
 model["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive
-    "Lx": 1.0,  # width in km - always positive
-    "Ly": 1.0,  # thickness in km - always positive
+    "length_z": 1.0,  # depth in km - always positive
+    "length_x": 1.0,  # width in km - always positive
+    "length_y": 1.0,  # thickness in km - always positive
     "meshfile": "not_used.msh",
     "initmodel": "not_used.hdf5",
     "truemodel": "not_used.hdf5",
@@ -76,10 +76,9 @@ mesh.coordinates.dat.data[:, 2] -= 1.0
 
 comm = spyro.utils.mpi_init(model)
 
-element = spyro.domains.space.FE_method(
+V = spyro.domains.space.create_function_space(
     mesh, model["opts"]["method"], model["opts"]["degree"]
 )
-V = FunctionSpace(mesh, element)
 
 if comm.comm.rank == 0:
     print("There are " + str(V.dim()) + " degrees of freedom", flush=True)

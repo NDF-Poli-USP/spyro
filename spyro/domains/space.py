@@ -1,8 +1,9 @@
 from firedrake import (FiniteElement, FunctionSpace, VectorElement)
 
 
-def FE_method(mesh, method, degree, dim=1):
-    """Define the finite element space:
+def create_function_space(mesh, method, degree, dim=1):
+    """Create a Firedrake function space based on the specified
+    finite element method.
 
     Parameters:
     -----------
@@ -29,17 +30,37 @@ def FE_method(mesh, method, degree, dim=1):
         element = FiniteElement(
             "CG", mesh.ufl_cell(), degree=degree, variant="spectral"
         )
-    elif method == "DG_triangle" or "DG_quadrilateral" or "DG":
+    elif method in ["DG_triangle", "DG_quadrilateral", "DG"]:
         element = FiniteElement(
             "DG", mesh.ufl_cell(), degree=degree
         )
-    elif method == "CG_triangle" or "CG_quadrilateral" or "CG":
+    elif method in ["CG_triangle", "CG_quadrilateral", "CG"]:
         element = FiniteElement(
             "CG", mesh.ufl_cell(), degree=degree
+        )
+    elif method in ["DQ_quadrilateral", "DQ"]:
+        element = FiniteElement(
+            "DQ", mesh.ufl_cell(), degree=degree, variant="spectral"
         )
 
     if dim > 1:
         element = VectorElement(element, dim=dim)
 
-    function_space = FunctionSpace(mesh, element)
-    return function_space
+    return FunctionSpace(mesh, element)
+
+
+def check_function_space_type(function_space):
+    # Check if wave.function_space is a generates vector os scalar fields:
+    if function_space.value_size == 1:
+        return "scalar"
+    elif function_space.value_size > 1:
+        if len(function_space.topological.subspaces) == 1:
+            return "vector"
+        elif len(function_space.topological.subspaces) > 1:
+            return "mixed"
+        else:
+            raise ValueError(
+                f"Function space topology of {function_space.topological} not supported",
+            )
+    else:
+        raise ValueError(f"Function space size of {function_space.value_size} not supported")
