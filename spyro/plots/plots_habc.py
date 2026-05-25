@@ -1,7 +1,7 @@
 # This file contains methods for plotting results from the HABC scheme
-from matplotlib.pyplot import (close, figure, gca, grid, legend, plot, rcParams, savefig,
-                               scatter, setp, subplots, tight_layout
-                               xlabel, xlim, xticks, ylabel, ylim)
+from matplotlib.pyplot import (close, figure, gca, grid, legend, plot,
+                               rcParams, savefig, scatter, setp, subplots,
+                               tight_layout, xlabel, xlim, xticks, ylabel, ylim)
 from matplotlib.pyplot import show as plt_show
 from numpy import arange, asarray, ceil, clip, linspace, inf, polyfit, polyval, zeros
 from os import makedirs, path
