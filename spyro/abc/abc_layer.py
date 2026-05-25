@@ -1,4 +1,4 @@
-import firedrake as fire
+from firedrake import Constant, Function, VTKFile
 from numpy import abs, array, ceil, inf, log10, minimum
 from os import getcwd
 from sympy import divisors
@@ -575,7 +575,7 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
             pth_mesh = self.path_case_abc + mesh_file_name
 
         # Save new mesh
-        outfile = fire.VTKFile(pth_mesh)
+        outfile = VTKFile(pth_mesh)
         outfile.write(Wave.mesh)
 
     def velocity_abc(self, Wave, inf_model=False, method='point_cloud'):
@@ -632,8 +632,8 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         V = create_function_space(Wave.mesh, method_element, 0)
 
         # Initialize velocity field and assigning the original velocity model
-        Wave.c = fire.Function(V).interpolate(Wave.initial_velocity_model,
-                                              allow_missing_dofs=True)
+        Wave.c = Function(V).interpolate(Wave.initial_velocity_model,
+                                         allow_missing_dofs=True)
 
         # Clipping coordinates to the layer domain
         domain_layer = self.abc_domain_dimensions(full_hyp=False)
@@ -656,8 +656,8 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         del layer_mask, lay_field
 
         # Interpolating in the space function of the problem
-        Wave.c = fire.Function(Wave.function_space,
-                               name='c [km/s])').interpolate(Wave.c)
+        Wave.c = Function(Wave.function_space,
+                          name='c [km/s])').interpolate(Wave.c)
 
         # Save new velocity model
         if inf_model:
@@ -667,7 +667,7 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
                                                          for_prints=False)
             file_name = self.case_abc + c_file_name
 
-        outfile = fire.VTKFile(self.path_save + file_name)
+        outfile = VTKFile(self.path_save + file_name)
         outfile.write(Wave.c)
 
     def nrbc_on_boundary_layer(self, sommerfeld_bc=False):
@@ -896,15 +896,15 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
 
         # Setting no damping
         if self.abc_boundary_layer_type == "hybrid":
-            self.cosHig = fire.Constant(0.)
-            self.eta_mask = fire.Constant(0.)
-            self.eta_habc = fire.Constant(0.)
+            self.cosHig = Constant(0.)
+            self.eta_mask = Constant(0.)
+            self.eta_habc = Constant(0.)
 
         elif self.abc_boundary_layer_type == "PML":
-            self.sigma_z = fire.Constant(0.)
-            self.sigma_x = fire.Constant(0.)
+            self.sigma_z = Constant(0.)
+            self.sigma_x = Constant(0.)
             if self.dimension == 3:
-                self.sigma_y = fire.Constant(0.)
+                self.sigma_y = Constant(0.)
 
         print("\nSolving Infinite Model", flush=True)
 

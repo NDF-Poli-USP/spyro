@@ -1,5 +1,5 @@
-from spyro.utils.error_management import value_dimension_error, value_numerical_error, \
-    value_parameter_error
+from spyro.utils.error_management import (value_dimension_error, value_numerical_error,
+                                          value_parameter_error)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.

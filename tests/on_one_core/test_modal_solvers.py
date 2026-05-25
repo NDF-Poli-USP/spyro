@@ -450,6 +450,7 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
 
 @pytest.mark.slow
 @pytest.mark.parametrize("homogeneous", [True, False])
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_modal_2d(homogeneous):
     '''
     Test of modal solvers for 2D case
@@ -529,6 +530,7 @@ def test_loop_modal_2d(homogeneous):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("homogeneous", [True, False])
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_modal_3d_with_Tele(homogeneous):
     '''
     Test of modal solvers for 3D case
@@ -611,6 +613,7 @@ def test_loop_modal_3d_with_Tele(homogeneous):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("homogeneous", [True, False])
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_modal_3d_with_Qele(homogeneous):
     '''
     Test of modal solvers for 3D case

@@ -1,12 +1,12 @@
-import pytest
-import firedrake as fire
-import warnings
-import numpy as np
+from firedrake import (as_tensor, assemble, conditional,
+                       ConvergenceError, dx, Function)
+from firedrake import exp as fire_exp
+from numpy import (abs, acos, all, allclose, atan2, cos, exp,
+                   isclose, isin, log, pi, sqrt, sin, where)
+from pytest import fail, fixture, mark, raises
 from os import getcwd
 from spyro.io.basicio import create_segy
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
-fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
-warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 def wave_dict(cell_type, domain_dimensions, final_time, dt):
@@ -69,8 +69,9 @@ def wave_dict(cell_type, domain_dimensions, final_time, dt):
     dictionary["acquisition"] = {
         "source_locations": [(-length_z / 2., length_x / 2., length_y / 2.)],
         "frequency": 5.0,  # in Hz
-        "receiver_locations": [(-length_z, 0., 0.), (-length_z, length_x, 0.), (0., 0., 0),
-                               (0., length_x, 0.), (-length_z, 0., length_y), (-length_z, length_x, length_y),
+        "receiver_locations": [(-length_z, 0., 0.), (-length_z, length_x, 0.),
+                               (0., 0., 0), (0., length_x, 0.),
+                               (-length_z, 0., length_y), (-length_z, length_x, length_y),
                                (0., 0., length_y), (0., length_x, length_y)]
     }
 
@@ -84,7 +85,7 @@ def wave_dict(cell_type, domain_dimensions, final_time, dt):
     return dictionary
 
 
-@pytest.fixture(scope="function")
+@fixture(scope="function")
 def wave_instance(cell_type):
     '''
     Create an instance of the isotropic wave solver.
@@ -128,7 +129,7 @@ def wave_instance(cell_type):
     return wave_obj
 
 
-@pytest.mark.parametrize("cell_type", ["T", "Q"])
+@mark.parametrize("cell_type", ["T", "Q"])
 def test_constant_mat_prop(wave_instance, cell_type):
     '''
     Test to assign constant material properties to an instance of Wave.
@@ -172,23 +173,21 @@ def test_constant_mat_prop(wave_instance, cell_type):
             assert mat_property is not None, f"Failed to set {property_name}"
 
             # Get the mean value function to verify
-            dx = fire.dx(**wave_obj.quadrature_rule)
-            dummy_vol = wave_obj.set_material_property('dummy_vol',
-                                                       'scalar',
-                                                       constant=1.)
-            volume = fire.assemble(dummy_vol * dx)
-            mean_val = fire.assemble(mat_property * dx) / volume
+            dv = dx(**wave_obj.quadrature_rule)
+            dummy_vol = wave_obj.set_material_property('dummy_vol', 'scalar', constant=1.)
+            volume = assemble(dummy_vol * dv)
+            mean_val = assemble(mat_property * dv) / volume
 
-            assert np.isclose(mean_val, constant, rtol=1e-8), \
+            assert isclose(mean_val, constant, rtol=1e-8), \
                 f"{property_name}: Expected value {constant}, got {mean_val}"
             print(f"{property_name} Verified: expected "
                   f"{constant}, got = {round(mean_val, 10)}", flush=True)
 
-        except fire.ConvergenceError as e:
-            pytest.fail(f"Setting {property_name} raised an exception: {str(e)}")
+        except ConvergenceError as e:
+            fail(f"Setting {property_name} raised an exception: {str(e)}")
 
 
-@pytest.mark.parametrize("cell_type", ["T", "Q"])
+@mark.parametrize("cell_type", ["T", "Q"])
 def test_random_mat_prop(wave_instance, cell_type):
     '''
     Test to assign random material properties to an instance of Wave.
@@ -228,17 +227,17 @@ def test_random_mat_prop(wave_instance, cell_type):
             min_val = random[0]
             max_val = random[1]
 
-            assert np.all(mat_property_data >= min_val - 1e-8), \
+            assert all(mat_property_data >= min_val - 1e-8), \
                 f"Values below minimum {min_val} for {property_name}"
             print(f"{property_name} Verified: Values "
                   f">= minimum {min_val}", flush=True)
-            assert np.all(mat_property_data <= max_val + 1e-8), \
+            assert all(mat_property_data <= max_val + 1e-8), \
                 f"Values above maximum {max_val} for {property_name}"
             print(f"{property_name} Verified: Values "
                   f"<= maximum {max_val}", flush=True)
 
-        except fire.ConvergenceError as e:
-            pytest.fail(f"Setting {property_name} raised an exception: {str(e)}")
+        except ConvergenceError as e:
+            fail(f"Setting {property_name} raised an exception: {str(e)}")
 
 
 def numerical_values_cond(property_name, coords, below_thrs, above_thrs):
@@ -278,14 +277,14 @@ def numerical_values_cond(property_name, coords, below_thrs, above_thrs):
         exp_below = 1.7e3 + 3e3 * abs(z[below_thrs]) ** 2
         exp_above = 1e3
     elif property_name == 'epsilonTh':
-        exp_below = np.exp(x[below_thrs]) / 10.
-        exp_above = 0.15 * np.exp(x[above_thrs])
+        exp_below = exp(x[below_thrs]) / 10.
+        exp_above = 0.15 * exp(x[above_thrs])
     elif property_name == 'gammaTh':
-        exp_below = 2.5 * np.exp(x[below_thrs]) / 10.
-        exp_above = np.exp(x[above_thrs]) / 10.
+        exp_below = 2.5 * exp(x[below_thrs]) / 10.
+        exp_above = exp(x[above_thrs]) / 10.
     elif property_name == 'deltaTh':
-        exp_below = -np.exp(x[below_thrs]) / 20.
-        exp_above = np.exp(x[above_thrs]) / 10.
+        exp_below = -exp(x[below_thrs]) / 20.
+        exp_above = exp(x[above_thrs]) / 10.
     elif property_name == 'thetaTTI':
         exp_below = 1e4 * (y[below_thrs] - 0.08)**2 / 2. - 2.
         exp_above = -(1e4 * (y[above_thrs] - 0.08)**2 / 2. - 2.)
@@ -314,16 +313,14 @@ def get_only_mesh_vertices(wave_obj):
         Array of indices in the function corresponding to the mesh vertices
     '''
 
-    mesh_f = fire.Function(
-        wave_obj.function_space).interpolate(wave_obj.mesh.coordinates)
+    mesh_f = Function(wave_obj.function_space).interpolate(wave_obj.mesh.coordinates)
     coords = wave_obj.mesh.coordinates.dat.data_with_halos
-    mask_pnt = np.where(np.isin(
-        mesh_f.dat.data_with_halos, coords).all(axis=1))[0]
+    mask_pnt = where(isin(mesh_f.dat.data_with_halos, coords).all(axis=1))[0]
 
     return coords, mask_pnt
 
 
-@pytest.mark.parametrize("cell_type", ["T", "Q"])
+@mark.parametrize("cell_type", ["T", "Q"])
 def test_conditional_mat_prop(wave_instance, cell_type):
     '''
     Test to assign conditional material properties to an instance of Wave.
@@ -347,17 +344,17 @@ def test_conditional_mat_prop(wave_instance, cell_type):
 
     # Conditional initial distribution
     f_vel = 2. + abs(wave_obj.mesh_z)
-    cond_Vp = fire.conditional(wave_obj.mesh_z < -0.06, f_vel, 1.5)
-    cond_Vs = fire.conditional(wave_obj.mesh_z < -0.06, f_vel / 2.5, 0.75)
+    cond_Vp = conditional(wave_obj.mesh_z < -0.06, f_vel, 1.5)
+    cond_Vs = conditional(wave_obj.mesh_z < -0.06, f_vel / 2.5, 0.75)
     f_rho = 1.7e3 + 3e3 * abs(wave_obj.mesh_z) ** 2
-    cond_rho = fire.conditional(wave_obj.mesh_z < -0.06, f_rho, 1e3)
-    f_TH = fire.exp(wave_obj.mesh_x) / 10.
-    cond_eps = fire.conditional(wave_obj.mesh_x < 0.28, f_TH, 1.5 * f_TH)
-    cond_gam = fire.conditional(wave_obj.mesh_x < 0.28, 2.5 * f_TH, f_TH)
-    cond_del = fire.conditional(wave_obj.mesh_x < 0.28, -f_TH / 2., f_TH)
+    cond_rho = conditional(wave_obj.mesh_z < -0.06, f_rho, 1e3)
+    f_TH = fire_exp(wave_obj.mesh_x) / 10.
+    cond_eps = conditional(wave_obj.mesh_x < 0.28, f_TH, 1.5 * f_TH)
+    cond_gam = conditional(wave_obj.mesh_x < 0.28, 2.5 * f_TH, f_TH)
+    cond_del = conditional(wave_obj.mesh_x < 0.28, -f_TH / 2., f_TH)
     f_TTI = 1e4 * (wave_obj.mesh_y - 0.08)**2 / 2. - 2.
-    cond_the = fire.conditional(wave_obj.mesh_y < 0.08, f_TTI, -f_TTI)
-    cond_phi = fire.conditional(wave_obj.mesh_y < 0.08, -f_TTI, f_TTI)
+    cond_the = conditional(wave_obj.mesh_y < 0.08, f_TTI, -f_TTI)
+    cond_phi = conditional(wave_obj.mesh_y < 0.08, -f_TTI, f_TTI)
     cond_lst = [cond_Vp, cond_Vs, cond_rho, cond_eps,
                 cond_gam, cond_del, cond_the, cond_phi]
 
@@ -405,19 +402,19 @@ def test_conditional_mat_prop(wave_instance, cell_type):
             cnd_below = mat_property.dat.data_with_halos[mask_pnt][below_thrs]
             cnd_above = mat_property.dat.data_with_halos[mask_pnt][above_thrs]
 
-            assert np.allclose(exp_below, cnd_below, rtol=1e-8), \
+            assert allclose(exp_below, cnd_below, rtol=1e-8), \
                 f"Values does not match for {property_name}" + \
                 f" for {coord_thrs} < {threshold}"
             print(f"{property_name} Verified: Conditional values "
                   f"{coord_thrs} < {threshold}", flush=True)
-            assert np.allclose(exp_above, cnd_above, rtol=1e-8), \
+            assert allclose(exp_above, cnd_above, rtol=1e-8), \
                 f"Values does not match for {property_name}" + \
                 f" for {coord_thrs} >= {threshold}"
             print(f"{property_name} Verified: Conditional values "
                   f"{coord_thrs} >= {threshold}", flush=True)
 
-        except fire.ConvergenceError as e:
-            pytest.fail(f"Setting {property_name} raised an exception: {str(e)}")
+        except ConvergenceError as e:
+            fail(f"Setting {property_name} raised an exception: {str(e)}")
 
 
 def numerical_values_expr(property_name, coords):
@@ -442,28 +439,28 @@ def numerical_values_expr(property_name, coords):
     y = coords[:, 2]
 
     if property_name == 'vel_P':
-        exp_num = 1.5e3 * (1 + np.sqrt(x**2 + y**2 + z**2))
+        exp_num = 1.5e3 * (1 + sqrt(x**2 + y**2 + z**2))
     elif property_name == 'vel_S':
-        exp_num = 1e3 * (0.7 + np.sqrt(x**2 + y**2 + z**2))
+        exp_num = 1e3 * (0.7 + sqrt(x**2 + y**2 + z**2))
     elif property_name == 'mass_rho':
-        exp_num = 1e3 * (1 + 5 * np.log(1 + x**2 + y**2 + z**2))
+        exp_num = 1e3 * (1 + 5 * log(1 + x**2 + y**2 + z**2))
     elif property_name == 'epsilonTh':
-        exp_num = np.sin(x) * np.cos(y) / 4 + np.sin(y) * np.cos(z) / 3 + 0.1
+        exp_num = sin(x) * cos(y) / 4 + sin(y) * cos(z) / 3 + 0.1
     elif property_name == 'gammaTh':
-        exp_num = np.sin(y) * np.cos(z) / 4 + np.sin(z) * np.cos(x) / 3 + 0.3
+        exp_num = sin(y) * cos(z) / 4 + sin(z) * cos(x) / 3 + 0.3
     elif property_name == 'deltaTh':
-        exp_num = np.sin(z) * np.cos(x) / 2 + np.sin(x) * np.cos(y) / 3 + 0.02
+        exp_num = sin(z) * cos(x) / 2 + sin(x) * cos(y) / 3 + 0.02
     elif property_name == 'thetaTTI':
-        exp_num = np.atan2(np.abs(z), x) * 180 / np.pi - 45
+        exp_num = atan2(abs(z), x) * 180 / pi - 45
     elif property_name == 'phiTTI':
         d = 1e-16  # Small constant to avoid division by zero
-        f = 180 / np.pi
-        exp_num = f * np.acos(y / (np.sqrt(x**2 + y**2 + z**2) + d)) - 45
+        f = 180 / pi
+        exp_num = f * acos(y / (sqrt(x**2 + y**2 + z**2) + d)) - 45
 
     return exp_num
 
 
-@pytest.mark.parametrize("cell_type", ["T", "Q"])
+@mark.parametrize("cell_type", ["T", "Q"])
 def test_expression_mat_prop(wave_instance, cell_type):
     '''
     Test to assign expressions as material properties to an instance of Wave.
@@ -510,12 +507,12 @@ def test_expression_mat_prop(wave_instance, cell_type):
             exp_exp = numerical_values_expr(property_name, coords)
             val_exp = mat_property.dat.data_with_halos[mask_pnt]
 
-            assert np.allclose(val_exp, exp_exp, rtol=1e-8), \
+            assert allclose(val_exp, exp_exp, rtol=1e-8), \
                 f"Values of the expression does not match for {property_name}"
             print(f"{property_name} Verified: Expression values", flush=True)
 
-        except fire.ConvergenceError as e:
-            pytest.fail(f"Setting {property_name} raised an exception: {str(e)}")
+        except ConvergenceError as e:
+            fail(f"Setting {property_name} raised an exception: {str(e)}")
 
 
 def get_coords_DG0(wave_obj, coords):
@@ -545,7 +542,7 @@ def get_coords_DG0(wave_obj, coords):
     return coords_DG0
 
 
-@pytest.mark.parametrize("cell_type", ["T", "Q"])
+@mark.parametrize("cell_type", ["T", "Q"])
 def test_function_mat_prop(wave_instance, cell_type):
     '''
     Test to assign firedrake functione as material
@@ -576,7 +573,7 @@ def test_function_mat_prop(wave_instance, cell_type):
     exp_fun = dummy.dat.data_with_halos[mask_pnt]
     val_fun = vel_S.dat.data_with_halos[mask_pnt]
 
-    assert np.allclose(val_fun, exp_fun, rtol=1e-8), \
+    assert allclose(val_fun, exp_fun, rtol=1e-8), \
         "Values of the firedrake function does not match for vel_S"
     print("vel_S Verified: Firedrake function values", flush=True)
 
@@ -593,12 +590,12 @@ def test_function_mat_prop(wave_instance, cell_type):
     exp_fun = dummy.at(coords_DG0, dont_raise=True)
     val_fun = vel_S.at(coords_DG0, dont_raise=True)
 
-    assert np.allclose(val_fun, exp_fun, rtol=1e-8), \
+    assert allclose(val_fun, exp_fun, rtol=1e-8), \
         "Values of the scalar function does not match for vel_S_DG0"
     print("vel_S_DG0 Verified: Scalar function values", flush=True)
 
 
-@pytest.mark.parametrize("cell_type", ["T", "Q"])
+@mark.parametrize("cell_type", ["T", "Q"])
 def test_fromfile_mat_prop(wave_instance, cell_type):
     '''
     Test to assign firedrake functione as material
@@ -623,7 +620,7 @@ def test_fromfile_mat_prop(wave_instance, cell_type):
     create_segy(dummy, wave_obj.function_space.sub(0),
                 wave_obj.mesh_parameters.edge_length, from_file_segy)
 
-    with pytest.raises(NotImplementedError) as exc_info:
+    with raises(NotImplementedError) as exc_info:
         vel_S = wave_obj.set_material_property(   # noqa: F841
             'vel_S', 'scalar', from_file=from_file_segy, output=True,
             foldername='/property_fields/from_file/')
@@ -637,7 +634,7 @@ def test_fromfile_mat_prop(wave_instance, cell_type):
           f"NotImplementedError: {exc_info.value}", flush=True)
 
 
-@pytest.mark.parametrize("cell_type", ["T", "Q"])
+@mark.parametrize("cell_type", ["T", "Q"])
 def test_vector_mat_prop(wave_instance, cell_type):
     '''
     Test to assign vector material properties to an instance of Wave.
@@ -675,28 +672,26 @@ def test_vector_mat_prop(wave_instance, cell_type):
     assert alphaT_dg0 is not None, "Failed to set alphaT_dg0"
 
     # Get the mean value vectorial component to verify
-    dx = fire.dx(**wave_obj.quadrature_rule)
-    dummy_vol = wave_obj.set_material_property('dummy_vol',
-                                               'scalar',
-                                               constant=1.)
-    volume = fire.assemble(dummy_vol * dx)
+    dv = dx(**wave_obj.quadrature_rule)
+    dummy_vol = wave_obj.set_material_property('dummy_vol', 'scalar', constant=1.)
+    volume = assemble(dummy_vol * dv)
 
-    exp_v0 = fire.assemble(dummy.sub(0) * dx) / volume
-    val_v0 = fire.assemble(alphaT_dg0.sub(0) * dx) / volume
-    exp_v1 = fire.assemble(dummy.sub(1) * dx) / volume
-    val_v1 = fire.assemble(alphaT_dg0.sub(1) * dx) / volume
-    exp_v2 = fire.assemble(dummy.sub(2) * dx) / volume
-    val_v2 = fire.assemble(alphaT_dg0.sub(2) * dx) / volume
-    cond0 = np.isclose(exp_v0, val_v0, rtol=1e-8)
-    cond1 = np.isclose(exp_v1, val_v1, rtol=1e-8)
-    cond2 = np.isclose(exp_v2, val_v2, rtol=1e-8)
+    exp_v0 = assemble(dummy.sub(0) * dv) / volume
+    val_v0 = assemble(alphaT_dg0.sub(0) * dv) / volume
+    exp_v1 = assemble(dummy.sub(1) * dv) / volume
+    val_v1 = assemble(alphaT_dg0.sub(1) * dv) / volume
+    exp_v2 = assemble(dummy.sub(2) * dv) / volume
+    val_v2 = assemble(alphaT_dg0.sub(2) * dv) / volume
+    cond0 = isclose(exp_v0, val_v0, rtol=1e-8)
+    cond1 = isclose(exp_v1, val_v1, rtol=1e-8)
+    cond2 = isclose(exp_v2, val_v2, rtol=1e-8)
 
     assert cond0 and cond1 and cond2, \
         "Values of the vectorial function does not match for alphaT_dg0"
     print("alphaT_dg0 Verified: Vectorial function values", flush=True)
 
 
-@pytest.mark.parametrize("cell_type", ["T", "Q"])
+@mark.parametrize("cell_type", ["T", "Q"])
 def test_tensor_mat_prop(wave_instance, cell_type):
     '''
     Test to assign tensor material properties to an instance of Wave.
@@ -716,12 +711,12 @@ def test_tensor_mat_prop(wave_instance, cell_type):
     C12 = 1.35
     C13 = 1.4656
 
-    C_elast = fire.as_tensor(((C11, C12, C13, 0, 0, 0),
-                              (C12, C11, C13, 0, 0, 0),
-                              (C13, C13, C33, 0, 0, 0),
-                              (0, 0, 0, C44, 0, 0),
-                              (0, 0, 0, 0, C44, 0),
-                              (0, 0, 0, 0, 0, C66)))
+    C_elast = as_tensor(((C11, C12, C13, 0, 0, 0),
+                         (C12, C11, C13, 0, 0, 0),
+                         (C13, C13, C33, 0, 0, 0),
+                         (0, 0, 0, C44, 0, 0),
+                         (0, 0, 0, 0, C44, 0),
+                         (0, 0, 0, 0, 0, C66)))
 
     shape_func_space = C_elast.ufl_shape
 
@@ -743,15 +738,14 @@ def test_tensor_mat_prop(wave_instance, cell_type):
                 # Keep an explicit zero so the tensor shape stays consistent
                 row.append(0.0)
         entries.append(row)
-    tensor_expr = fire.as_tensor(entries)
+    tensor_expr = as_tensor(entries)
 
     # Interpolate into dummy
     dummy.interpolate(tensor_expr)
 
     # Same function space
-    Celast = wave_obj.set_material_property(
-        'Celast', 'tensor', fire_function=dummy,
-        shape_func_space=shape_func_space)
+    Celast = wave_obj.set_material_property('Celast', 'tensor', fire_function=dummy,
+                                            shape_func_space=shape_func_space)
 
     assert Celast is not None, "Failed to set Celast"
     print("Celast Verified: Tensorial function assign", flush=True)
@@ -762,19 +756,18 @@ def test_tensor_mat_prop(wave_instance, cell_type):
                                            constant=0.)
 
     compC_name = ['C11', 'C33', 'C44', 'C66', 'C12', 'C13']
-    compC_val = fire.as_tensor(((C11, C33, C44),
-                                (C66, C12, C13)))
+    compC_val = as_tensor(((C11, C33, C44),
+                           (C66, C12, C13)))
 
     entries = []
     for i in range(2):
         row = []
         for j in range(3):
             val = float(compC_val[i, j])
-            row.append(wave_obj.set_material_property(
-                compC_name[3 * i + j], 'scalar',
-                constant=val))
+            row.append(wave_obj.set_material_property(compC_name[3 * i + j],
+                                                      'scalar', constant=val))
         entries.append(row)
-    tensor_expr = fire.as_tensor(entries)
+    tensor_expr = as_tensor(entries)
 
     # Interpolate into dummy
     dummy.interpolate(tensor_expr)
