@@ -1,12 +1,13 @@
 """Methods to extend the material property in an absorbing layer."""
 
-import firedrake as fire
-from numpy import clip, where
+from firedrake import (assemble, conditional, Constant, Function,
+                       FunctionSpace, VertexOnlyMesh)
+from firedrake import sqrt as fire_sqrt
 from firedrake.__future__ import interpolate
+from numpy import clip, where
 from spyro.domains.space import create_function_space
 from spyro.utils.error_management import value_parameter_error
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
-fire.interpolate = interpolate
 
 
 def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
@@ -58,8 +59,8 @@ def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
     valx2 = generate_ufl_functions(mesh, exprx2, dimension)
 
     # Conditional expressions for the mask
-    z_pd = fire.conditional(condz, valz, 0.)
-    x_pd = fire.conditional(condx1, valx1, 0.) + fire.conditional(condx2, valx2, 0.)
+    z_pd = conditional(condz, valz, 0.)
+    x_pd = conditional(condx1, valx1, 0.) + conditional(condx2, valx2, 0.)
     ref_conditional = z_pd + x_pd
 
     if dimension == 3:  # 3D
@@ -78,7 +79,7 @@ def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
         valy2 = generate_ufl_functions(mesh, expry2, dimension)
 
         # Conditional expressions for the mask
-        y_pd = fire.conditional(condy1, valy1, 0.) + fire.conditional(condy2, valy2, 0.)
+        y_pd = conditional(condy1, valy1, 0.) + conditional(condy2, valy2, 0.)
         ref_conditional += y_pd
 
     return ref_conditional
@@ -157,24 +158,24 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
                              "when 'type_marker' is 'damping'.")
 
         # Reference distance to the original boundary
-        ref_funct = fire.sqrt(ref_funct) / fire.Constant(pad_len)
+        ref_funct = fire_sqrt(ref_funct) / Constant(pad_len)
 
         # Quadratic damping profile
         if bq == 0.:
-            ref_funct = fire.Constant(eta_crt) * fire.Constant(aq) * ref_funct**2
+            ref_funct = Constant(eta_crt) * Constant(aq) * ref_funct**2
         else:
-            ref_funct = fire.Constant(eta_crt) * (fire.Constant(aq) * ref_funct**2
-                                                  + fire.Constant(bq) * ref_funct)
+            ref_funct = Constant(eta_crt) * (Constant(aq) * ref_funct**2
+                                             + Constant(bq) * ref_funct)
 
     elif type_marker == 'mask':  # Mask filter for layer boundary domain
 
-        ref_funct = fire.conditional(ref_funct > 0, 1., 0.)
+        ref_funct = conditional(ref_funct > 0, 1., 0.)
 
     else:
         value_parameter_error('type_marker', type_marker, ['damping', 'mask'])
 
-    layer_mask = fire.Function(V, name=name_mask)
-    layer_mask.assign(fire.assemble(fire.interpolate(ref_funct, V)))
+    layer_mask = Function(V, name=name_mask)
+    layer_mask.assign(assemble(interpolate(ref_funct, V)))
 
     return layer_mask
 
@@ -217,8 +218,8 @@ def clipping_coordinates_lay_field(domain_dim, mesh, dimension,
     W = create_function_space(mesh, method_element, 0, dim=dimension)
 
     # Clipping coordinates
-    lay_field = fire.Function(W)
-    lay_field.assign(fire.assemble(fire.interpolate(ufl_coordinates_habc, W)))
+    lay_field = Function(W)
+    lay_field.assign(assemble(interpolate(ufl_coordinates_habc, W)))
     lay_arr = lay_field.dat.data_with_halos[:]
     lay_arr[:, 0] = clip(lay_arr[:, 0], -Lz, 0.)
     lay_arr[:, 1] = clip(lay_arr[:, 1], 0., Lx)
@@ -236,7 +237,7 @@ def clipping_coordinates_lay_field(domain_dim, mesh, dimension,
                                   ufl_coordinates_habc, V, type_marker='mask')
 
     # Field with clipped coordinates only in the absorbing layer
-    lay_field.assign(fire.assemble(fire.interpolate(lay_field * layer_mask, W)))
+    lay_field.assign(assemble(interpolate(lay_field * layer_mask, W)))
 
     return lay_field, layer_mask
 
@@ -263,20 +264,19 @@ def point_cloud_field(parent_mesh, pts_cloud, parent_field, tolerance):
     """
 
     # Creating a point cloud field from the parent mesh
-    pts_mesh = fire.VertexOnlyMesh(
-        parent_mesh, pts_cloud, reorder=True, tolerance=tolerance,
-        missing_points_behaviour='error', redundant=False)
+    pts_mesh = VertexOnlyMesh(parent_mesh, pts_cloud, reorder=True, tolerance=tolerance,
+                              missing_points_behaviour='error', redundant=False)
     del pts_cloud
 
     # Cloud field
-    V0 = fire.FunctionSpace(pts_mesh, "DG", 0)
-    f_pts = fire.assemble(fire.interpolate(parent_field, V0))
+    V0 = FunctionSpace(pts_mesh, "DG", 0)
+    f_pts = assemble(interpolate(parent_field, V0))
 
     # Ensuring correct assemble
-    V1 = fire.FunctionSpace(pts_mesh.input_ordering, "DG", 0)
+    V1 = FunctionSpace(pts_mesh.input_ordering, "DG", 0)
     del pts_mesh
-    cloud_field = fire.Function(V1)
-    cloud_field.assign(fire.assemble(fire.interpolate(f_pts, V1)))
+    cloud_field = Function(V1)
+    cloud_field.assign(assemble(interpolate(f_pts, V1)))
     del f_pts
 
     return cloud_field

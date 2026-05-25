@@ -1,4 +1,4 @@
-import numpy as np
+from numy import linspace, meshgrid, vstack,
 
 
 def create_transect(start, end, num):
@@ -19,7 +19,7 @@ def create_transect(start, end, num):
     receiver_locations: array-like
 
     """
-    return np.linspace(start, end, num)
+    return linspace(start, end, num)
 
 
 def create_2d_grid(start1, end1, start2, end2, num):
@@ -44,10 +44,10 @@ def create_2d_grid(start1, end1, start2, end2, num):
     receiver_locations: a list of tuples
 
     """
-    x = np.linspace(start1, end1, num)
-    y = np.linspace(start2, end2, num)
-    X, Y = np.meshgrid(x, y)
-    points = np.vstack((X.flatten(), Y.flatten())).T
+    x = linspace(start1, end1, num)
+    y = linspace(start2, end2, num)
+    X, Y = meshgrid(x, y)
+    points = vstack((X.flatten(), Y.flatten())).T
     return [tuple(point) for point in points]
 
 
@@ -71,11 +71,11 @@ def create_3d_grid(start, end, num):
     """
     (start1, start2, start3) = start
     (end1, end2, end3) = end
-    x = np.linspace(start1, end1, num)
-    y = np.linspace(start2, end2, num)
-    z = np.linspace(start3, end3, num)
-    X, Y, Z = np.meshgrid(x, y, z)
-    points = np.vstack((X.flatten(), Y.flatten(), Z.flatten())).T
+    x = linspace(start1, end1, num)
+    y = linspace(start2, end2, num)
+    z = linspace(start3, end3, num)
+    X, Y, Z = meshgrid(x, y, z)
+    points = vstack((X.flatten(), Y.flatten(), Z.flatten())).T
     return [tuple(point) for point in points]
 
 

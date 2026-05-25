@@ -1,4 +1,6 @@
-import numpy as np
+"""Compute the coefficient of determination (R^2) for regression models."""
+
+from numpy import asarray, mean, sum
 
 
 def coeff_of_determination(y_true, y_pred, p):
@@ -26,12 +28,12 @@ def coeff_of_determination(y_true, y_pred, p):
     n = len(y_true)
 
     # Convert list to array
-    y_true = np.asarray(y_true)
-    y_pred = np.asarray(y_pred)
+    y_true = asarray(y_true)
+    y_pred = asarray(y_pred)
 
     # R^2 calculation
-    ss_res = np.sum((y_true - y_pred) ** 2)
-    ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
+    ss_res = sum((y_true - y_pred) ** 2)
+    ss_tot = sum((y_true - mean(y_true)) ** 2)
     r2 = 1 - (ss_res / ss_tot)
 
     # Adjusted R^2 calculation (if applicable)
