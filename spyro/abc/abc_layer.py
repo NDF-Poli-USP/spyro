@@ -1,21 +1,19 @@
 import firedrake as fire
 import numpy as np
-import spyro.solvers.modal.modal_sol as eigsol
 from os import getcwd
 from sympy import divisors
-from spyro.abc.hyp_lay import HyperLayer
-from spyro.abc.rec_lay import RectangLayer
-from spyro.abc.nrbc import NRBC
-from spyro.habc.eik import HABC_Eikonal
-from spyro.habc.error_measure import HABCError
-from spyro.domains.space import create_function_space
-from spyro.habc.lay_len import calc_size_lay
-from spyro.plots.plots_habc import plot_function_layer_size
-from spyro.tools.habc_tools import (clipping_coordinates_lay_field,
-                                    extend_scalar_field_profile)
-from spyro.utils.error_management import value_parameter_error
-from spyro.utils.freq_tools import freq_response
-
+from .hyp_lay import HyperLayer
+from .abc.rec_lay import RectangLayer
+from .abc.nrbc import NRBC
+from ..habc.eik import HABC_Eikonal
+from ..habc.error_measure import HABCError
+from ..solvers.modal.modal_sol import Modal_Solver
+from ..domains.space import create_function_space
+from ..habc.lay_len import calc_size_lay
+from ..plots.plots_habc import plot_function_layer_size
+from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
+from ..utils.error_management import value_parameter_error
+from ..utils.freq_tools import freq_response
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -742,7 +740,7 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         usr_dt = self.get_dt()
 
         # Maximum timestep size
-        dt_sol = eigsol.Modal_Solver(self.dimension, method=method, calc_max_dt=True)
+        dt_sol = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
         max_dt = dt_sol.estimate_timestep(self.c, self.function_space, self.final_time,
                                           shift=1e-8, quad_rule=self.quadrature_rule,
                                           fraction=1.)
