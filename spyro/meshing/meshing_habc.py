@@ -1,6 +1,5 @@
 import firedrake as fire
 import numpy as np
-import spyro.meshing.meshing_operations as mshops
 from netgen.geom2d import SplineGeometry
 from firedrake.__future__ import interpolate
 from netgen.meshing import Element2D, \

@@ -17,7 +17,7 @@ class ElasticWave(Wave, metaclass=ABCMeta):
             A dictionary containing the input parameters for the Wave class.
             Default is None
         anisotropy : `str`, optional
-            The type of anisotropy in the medium. Oprions: "ISO, "VTI" or "TTI"  
+            The type of anisotropy in the medium. Oprions: "ISO, "VTI" or "TTI"
         comm : `object`, optional
             MPI communicator for parallel execution. Default is None
 

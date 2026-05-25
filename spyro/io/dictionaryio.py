@@ -205,7 +205,7 @@ class Read_options:
     def analysis(self, value):
         allowed_analyses = ["transient", "modal", "eikonal"]
         if value not in allowed_analyses:
-            raise value_parameter_error('analysis', analysis, allowed_analyses)
+            raise value_parameter_error('analysis', value, allowed_analyses)
         self._analysis = value
 
 
