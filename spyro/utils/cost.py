@@ -59,11 +59,6 @@ def comp_cost(flag, tRef=None, user_name=None, save_time=True):
         stop()
 
         # Save file for resource usage
-        file_name = 'cost.txt'
-        path_file = getcwd() + "/" if user_name is None else user_name
-        path_cost = path_file + file_name
-        savetxt(path_cost, (*val_time, *val_memo), delimiter='\t')
-
         if save_time:
             file_name = 'cost.txt'
             path_file = getcwd() + "/" if user_name is None else user_name
