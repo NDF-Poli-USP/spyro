@@ -361,7 +361,7 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
             # Theorical central Ricker source frequency
             self.freq_ref = self.frequency
 
-        elif abc_reference_freq == 'boundary':
+        elif self.abc_reference_freq == 'boundary':
 
             # Reference frequency of the wave at the boundary
             self.freq_ref = inf
@@ -670,257 +670,257 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         outfile = VTKFile(self.path_save + file_name)
         outfile.write(Wave.c)
 
-    def nrbc_on_boundary_layer(self, sommerfeld_bc=False):
-        """
-        Apply the Higdon ABCs on the outer boundary of the absorbing layer
+    # def nrbc_on_boundary_layer(self, sommerfeld_bc=False):
+    #     """
+    #     Apply the Higdon ABCs on the outer boundary of the absorbing layer
 
-        Parameters
-        ----------
-        sommerfeld_bc : `bool`, optional
-            If True, use Sommerfeld BC instead of Higdon BC. Default is False
+    #     Parameters
+    #     ----------
+    #     sommerfeld_bc : `bool`, optional
+    #         If True, use Sommerfeld BC instead of Higdon BC. Default is False
 
-        Returns
-        -------
-        None
-        """
+    #     Returns
+    #     -------
+    #     None
+    #     """
 
-        print("\nApplying Non-Reflecting Boundary Conditions", flush=True)
+    #     print("\nApplying Non-Reflecting Boundary Conditions", flush=True)
 
-        # Getting boundary data from the layer boundaries
-        bnd_nfs, bnd_nodes_nfs = self.layer_boundary_data(self.function_space)
+    #     # Getting boundary data from the layer boundaries
+    #     bnd_nfs, bnd_nodes_nfs = self.layer_boundary_data(self.function_space)
 
-        # Hypershape parameters
-        layer_shape = self.abc_boundary_layer_shape
-        if layer_shape == 'hypershape':
-            hyp_par = (self.n_hyp, *self.hyper_axes)
-        else:
-            hyp_par = None
+    #     # Hypershape parameters
+    #     layer_shape = self.abc_boundary_layer_shape
+    #     if layer_shape == 'hypershape':
+    #         hyp_par = (self.n_hyp, *self.hyper_axes)
+    #     else:
+    #         hyp_par = None
 
-        # Applying Higdon ABCs
-        self.cos_ang_HigdonBC(self.function_space, self.crit_source, bnd_nfs,
-                              bnd_nodes_nfs, hyp_par=hyp_par,
-                              sommerfeld_bc=sommerfeld_bc)
+    #     # Applying Higdon ABCs
+    #     self.cos_ang_HigdonBC(self.function_space, self.crit_source, bnd_nfs,
+    #                           bnd_nodes_nfs, hyp_par=hyp_par,
+    #                           sommerfeld_bc=sommerfeld_bc)
 
-    def check_timestep_abc(self, max_divisor_tf=1, set_max_dt=True,
-                           method='ANALYTICAL', mag_add=3):
-        """
-        Check if the timestep size is appropriate for the transient response
+    # def check_timestep_abc(self, max_divisor_tf=1, set_max_dt=True,
+    #                        method='ANALYTICAL', mag_add=3):
+    #     """
+    #     Check if the timestep size is appropriate for the transient response
 
-        Parameters
-        ----------
-        max_divisor_tf : `int`, optional
-            Index to select the maximum divisor of the final time, converted
-            to an integer according to the order of magnitude of the timestep
-            size. The timestep size is set to the divisor, given by the index
-            in descending order, less than or equal to the user's timestep
-            size. If the value is 1, the timestep size is set as the maximum
-            divisor. Default is 1
-        set_max_dt : `bool`, optional
-            If True, set the timestep size to the selected divisor.
-            Default is True
-        method : `str`, optional
-            Method to use for solving the eigenvalue problem. Default
-            is 'ANALYTICAL' method that estimates the maximum eigenvalue
-            using the Gershgorin Circle Theorem.
-            Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS' or 'LOBPCG'
-        mag_add : `int`, optional
-            Additional magnitude order to adjust the rounding of the timestep
+    #     Parameters
+    #     ----------
+    #     max_divisor_tf : `int`, optional
+    #         Index to select the maximum divisor of the final time, converted
+    #         to an integer according to the order of magnitude of the timestep
+    #         size. The timestep size is set to the divisor, given by the index
+    #         in descending order, less than or equal to the user's timestep
+    #         size. If the value is 1, the timestep size is set as the maximum
+    #         divisor. Default is 1
+    #     set_max_dt : `bool`, optional
+    #         If True, set the timestep size to the selected divisor.
+    #         Default is True
+    #     method : `str`, optional
+    #         Method to use for solving the eigenvalue problem. Default
+    #         is 'ANALYTICAL' method that estimates the maximum eigenvalue
+    #         using the Gershgorin Circle Theorem.
+    #         Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS' or 'LOBPCG'
+    #     mag_add : `int`, optional
+    #         Additional magnitude order to adjust the rounding of the timestep
 
-        Returns
-        -------
-        None
+    #     Returns
+    #     -------
+    #     None
 
-        # Estimation: 2.770 (Old), 2.768 (New) (Scipy-sparse)
-        # Exact: 1.842 (Old), 1.842 (New) (Scipy)
-        """
+    #     # Estimation: 2.770 (Old), 2.768 (New) (Scipy-sparse)
+    #     # Exact: 1.842 (Old), 1.842 (New) (Scipy)
+    #     """
 
-        print("\nChecking Timestep Size", flush=True)
+    #     print("\nChecking Timestep Size", flush=True)
 
-        # User timestep
-        usr_dt = self.get_dt()
+    #     # User timestep
+    #     usr_dt = self.get_dt()
 
-        # Maximum timestep size
-        dt_sol = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
-        max_dt = dt_sol.estimate_timestep(self.c, self.function_space, self.final_time,
-                                          shift=1e-8, quad_rule=self.quadrature_rule,
-                                          fraction=1.)
+    #     # Maximum timestep size
+    #     dt_sol = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
+    #     max_dt = dt_sol.estimate_timestep(self.c, self.function_space, self.final_time,
+    #                                       shift=1e-8, quad_rule=self.quadrature_rule,
+    #                                       fraction=1.)
 
-        # Rounding power
-        pot = int(abs(ceil(log10(max_dt))) + mag_add)
+    #     # Rounding power
+    #     pot = int(abs(ceil(log10(max_dt))) + mag_add)
 
-        # Maximum timestep size according to divisors of the final time
-        val_int_tf = int(10**pot * self.final_time)
-        val_int_dt = int(10**pot * max_dt)
-        max_div = [d for d in divisors(val_int_tf) if d < val_int_dt]
-        n_div = len(max_div)
-        index_div = min(max_divisor_tf, n_div)
-        max_dt = round(10**(-pot) * max_div[-index_div], pot)
+    #     # Maximum timestep size according to divisors of the final time
+    #     val_int_tf = int(10**pot * self.final_time)
+    #     val_int_dt = int(10**pot * max_dt)
+    #     max_div = [d for d in divisors(val_int_tf) if d < val_int_dt]
+    #     n_div = len(max_div)
+    #     index_div = min(max_divisor_tf, n_div)
+    #     max_dt = round(10**(-pot) * max_div[-index_div], pot)
 
-        # Set the timestep size
-        dt = max_dt if set_max_dt else min(usr_dt, max_dt)
-        self.set_dt(dt)
-        dt_ms = 1e3 * self.dt
-        if set_max_dt:
-            str_dt = "Selected Timestep Size ({} of {}): {:.{p}f} ms".format(
-                min(max_divisor_tf, n_div), n_div, dt_ms, p=mag_add)
-        else:
-            str_dt = "Selected Timestep Size: {:.{p}f} ms".format(dt_ms,
-                                                                  p=mag_add)
+    #     # Set the timestep size
+    #     dt = max_dt if set_max_dt else min(usr_dt, max_dt)
+    #     self.set_dt(dt)
+    #     dt_ms = 1e3 * self.dt
+    #     if set_max_dt:
+    #         str_dt = "Selected Timestep Size ({} of {}): {:.{p}f} ms".format(
+    #             min(max_divisor_tf, n_div), n_div, dt_ms, p=mag_add)
+    #     else:
+    #         str_dt = "Selected Timestep Size: {:.{p}f} ms".format(dt_ms,
+    #                                                               p=mag_add)
 
-        # Updating Nyquist frequency
-        self.freq_Nyquist = 1. / (2. * self.dt)
+    #     # Updating Nyquist frequency
+    #     self.freq_Nyquist = 1. / (2. * self.dt)
 
-        print(str_dt, flush=True)
+    #     print(str_dt, flush=True)
 
-    def layer_infinite_model(self):
-        """
-        Determine the domain extension size for the infinite domain model
+    # def layer_infinite_model(self):
+    #     """
+    #     Determine the domain extension size for the infinite domain model
 
-        Parameters
-        ----------
-        None
+    #     Parameters
+    #     ----------
+    #     None
 
-        Returns
-        -------
-        infinite_pad_len : `float`
-            Size of the domain extension for the infinite domain model
-        """
+    #     Returns
+    #     -------
+    #     infinite_pad_len : `float`
+    #         Size of the domain extension for the infinite domain model
+    #     """
 
-        # Size of the domain extension
-        add_dom = self.c_bnd_max * self.final_time / 2.
+    #     # Size of the domain extension
+    #     add_dom = self.c_bnd_max * self.final_time / 2.
 
-        # Distance already travelled by the wave
-        if hasattr(self, 'eik_bnd'):
+    #     # Distance already travelled by the wave
+    #     if hasattr(self, 'eik_bnd'):
 
-            # If Eikonal analysis was performed
-            eikmin = self.eik_bnd[0][2]
+    #         # If Eikonal analysis was performed
+    #         eikmin = self.eik_bnd[0][2]
 
-            # Minimum distance to the nearest boundary
-            dist_to_bnd = self.c_bnd_max * eikmin / 2.
-        else:
+    #         # Minimum distance to the nearest boundary
+    #         dist_to_bnd = self.c_bnd_max * eikmin / 2.
+    #     else:
 
-            # If Eikonal analysis was not performed
-            sources_loc = array(self.source_locations)
+    #         # If Eikonal analysis was not performed
+    #         sources_loc = array(self.source_locations)
 
-            # Candidate to minimum distance to the boundaries
-            delta_z = abs(sources_loc[:, 0] - self.mesh_parameters.length_z)
-            delta_x = minimum(abs(sources_loc[:, 1]),
-                              abs(sources_loc[:, 1]
-                                  - self.mesh_parameters.length_x))
-            cand_dist = (delta_z, delta_x)
+    #         # Candidate to minimum distance to the boundaries
+    #         delta_z = abs(sources_loc[:, 0] - self.mesh_parameters.length_z)
+    #         delta_x = minimum(abs(sources_loc[:, 1]),
+    #                           abs(sources_loc[:, 1]
+    #                               - self.mesh_parameters.length_x))
+    #         cand_dist = (delta_z, delta_x)
 
-            if self.dimension == 3:  # 3D
-                delta_y = minimum(abs(sources_loc[:, 2]),
-                                  abs(sources_loc[:, 2]
-                                      - self.mesh_parameters.length_y))
-                cand_dist += (delta_y,)
+    #         if self.dimension == 3:  # 3D
+    #             delta_y = minimum(abs(sources_loc[:, 2]),
+    #                               abs(sources_loc[:, 2]
+    #                                   - self.mesh_parameters.length_y))
+    #             cand_dist += (delta_y,)
 
-            # Minimum distance to the nearest boundary
-            dist_to_bnd = min(cand_dist)
+    #         # Minimum distance to the nearest boundary
+    #         dist_to_bnd = min(cand_dist)
 
-        # Subtracting the distance already travelled by the wave
-        add_dom -= dist_to_bnd
+    #     # Subtracting the distance already travelled by the wave
+    #     add_dom -= dist_to_bnd
 
-        # Pad length for the infinite domain extension
-        infinite_pad_len = self.lmin * ceil(add_dom / self.lmin)
+    #     # Pad length for the infinite domain extension
+    #     infinite_pad_len = self.lmin * ceil(add_dom / self.lmin)
 
-        return infinite_pad_len
+    #     return infinite_pad_len
 
-    def geometry_infinite_model(self):
-        """
-        Determine the geometry for the infinite domain model.
+    # def geometry_infinite_model(self):
+    #     """
+    #     Determine the geometry for the infinite domain model.
 
-        Parameters
-        ----------
-        None
+    #     Parameters
+    #     ----------
+    #     None
 
-        Returns
-        -------
-        None
-        """
+    #     Returns
+    #     -------
+    #     None
+    #     """
 
-        # Size of the domain extension
-        self.abc_pad_length = self.layer_infinite_model()
+    #     # Size of the domain extension
+    #     self.abc_pad_length = self.layer_infinite_model()
 
-        inf_str = "Infinite Domain Extension (km): {:.4f}"
-        print(inf_str.format(self.abc_pad_length), flush=True)
+    #     inf_str = "Infinite Domain Extension (km): {:.4f}"
+    #     print(inf_str.format(self.abc_pad_length), flush=True)
 
-        # New dimensions
-        self.abc_new_geometry()
+    #     # New dimensions
+    #     self.abc_new_geometry()
 
-    def infinite_model(self, check_dt=False, max_divisor_tf=1,
-                       method='ANALYTICAL', mag_add=3):
-        """
-        Create a reference model for the HABC scheme for comparative purposes
+    # def infinite_model(self, check_dt=False, max_divisor_tf=1,
+    #                    method='ANALYTICAL', mag_add=3):
+    #     """
+    #     Create a reference model for the HABC scheme for comparative purposes
 
-        Parameters
-        ----------
-        check_dt : `bool`, optional
-            If True, check if the timestep size is appropriate for the
-            transient response. Default is False
-        max_divisor_tf : `int`, optional
-            Index to select the maximum divisor of the final time, converted
-            to an integer according to the order of magnitude of the timestep
-            size. The timestep size is set to the divisor, given by the index
-            in descending order, less than or equal to the user's timestep
-            size. If the value is 1, the timestep size is set as the maximum
-            divisor. Default is 1
-        method : `str`, optional
-            Method to use for solving the eigenvalue problem. Default
-            is 'ANALYTICAL' method that estimates the maximum eigenvalue
-            using the Gershgorin Circle Theorem.
-            Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS' or 'LOBPCG'
-        mag_add : `int`, optional
-            Additional magnitude order to adjust the rounding of the timestep
+    #     Parameters
+    #     ----------
+    #     check_dt : `bool`, optional
+    #         If True, check if the timestep size is appropriate for the
+    #         transient response. Default is False
+    #     max_divisor_tf : `int`, optional
+    #         Index to select the maximum divisor of the final time, converted
+    #         to an integer according to the order of magnitude of the timestep
+    #         size. The timestep size is set to the divisor, given by the index
+    #         in descending order, less than or equal to the user's timestep
+    #         size. If the value is 1, the timestep size is set as the maximum
+    #         divisor. Default is 1
+    #     method : `str`, optional
+    #         Method to use for solving the eigenvalue problem. Default
+    #         is 'ANALYTICAL' method that estimates the maximum eigenvalue
+    #         using the Gershgorin Circle Theorem.
+    #         Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS' or 'LOBPCG'
+    #     mag_add : `int`, optional
+    #         Additional magnitude order to adjust the rounding of the timestep
 
-        Returns
-        -------
-        None
-        """
+    #     Returns
+    #     -------
+    #     None
+    #     """
 
-        # Check the timestep size
-        if check_dt:
-            self.check_timestep_abc(max_divisor_tf=max_divisor_tf,
-                                    method=method, mag_add=mag_add)
+    #     # Check the timestep size
+    #     if check_dt:
+    #         self.check_timestep_abc(max_divisor_tf=max_divisor_tf,
+    #                                 method=method, mag_add=mag_add)
 
-        print("\nBuilding Infinite Domain Model", flush=True)
+    #     print("\nBuilding Infinite Domain Model", flush=True)
 
-        # Defining geometry for infinite domain
-        self.geometry_infinite_model()
+    #     # Defining geometry for infinite domain
+    #     self.geometry_infinite_model()
 
-        # Creating mesh for infinite domain
-        self.create_mesh_with_layer(inf_model=True)
+    #     # Creating mesh for infinite domain
+    #     self.create_mesh_with_layer(inf_model=True)
 
-        # Updating velocity model
-        self.velocity_abc(inf_model=True)
+    #     # Updating velocity model
+    #     self.velocity_abc(inf_model=True)
 
-        # Setting no damping
-        if self.abc_boundary_layer_type == "hybrid":
-            self.cosHig = Constant(0.)
-            self.eta_mask = Constant(0.)
-            self.eta_habc = Constant(0.)
+    #     # Setting no damping
+    #     if self.abc_boundary_layer_type == "hybrid":
+    #         self.cosHig = Constant(0.)
+    #         self.eta_mask = Constant(0.)
+    #         self.eta_habc = Constant(0.)
 
-        elif self.abc_boundary_layer_type == "PML":
-            self.sigma_z = Constant(0.)
-            self.sigma_x = Constant(0.)
-            if self.dimension == 3:
-                self.sigma_y = Constant(0.)
+    #     elif self.abc_boundary_layer_type == "PML":
+    #         self.sigma_z = Constant(0.)
+    #         self.sigma_x = Constant(0.)
+    #         if self.dimension == 3:
+    #             self.sigma_y = Constant(0.)
 
-        print("\nSolving Infinite Model", flush=True)
+    #     print("\nSolving Infinite Model", flush=True)
 
-        # Solving the forward problem
-        self.forward_solve()
+    #     # Solving the forward problem
+    #     self.forward_solve()
 
-        # Saving reference signal
-        self.save_reference_signal()
+    #     # Saving reference signal
+    #     self.save_reference_signal()
 
-        # Deleting variables to be computed for the ABC scheme
-        del self.length_xabc, self.length_zabc
-        if self.dimension == 3:
-            del self.length_yabc
-        if self.abc_boundary_layer_type == "hybrid":
-            del self.cosHig, self.eta_mask, self.eta_habc
-        elif self.abc_boundary_layer_type == "PML":
-            del self.sigma_z, self.sigma_x
-            if self.dimension == 3:
-                del self.sigma_y
+    #     # Deleting variables to be computed for the ABC scheme
+    #     del self.length_xabc, self.length_zabc
+    #     if self.dimension == 3:
+    #         del self.length_yabc
+    #     if self.abc_boundary_layer_type == "hybrid":
+    #         del self.cosHig, self.eta_mask, self.eta_habc
+    #     elif self.abc_boundary_layer_type == "PML":
+    #         del self.sigma_z, self.sigma_x
+    #         if self.dimension == 3:
+    #             del self.sigma_y

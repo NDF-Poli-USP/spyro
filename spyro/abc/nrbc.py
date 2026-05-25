@@ -89,204 +89,204 @@ class NRBC():
         else:
             self.path_save_nrbc = output_folder
 
-    def source_to_bnd_reference_vector(self, source_coord, bnd_nodes_nfs):
-        '''
-        Compute a unitary reference vector from the source to a boundary point
+    # def source_to_bnd_reference_vector(self, source_coord, bnd_nodes_nfs):
+    #     '''
+    #     Compute a unitary reference vector from the source to a boundary point
 
-        Parameters
-        ----------
-        source_coord : `tuple`
-            Source coordinates
-        bnd_nodes_nfs : `tuple`
-            Mesh node coordinates on non-free surfaces.
-            - (z_data[nfs_idx], x_data[nfs_idx]) for 2D
-            - (z_data[nfs_idx], x_data[nfs_idx], y_data[nfs_idx]) for 3D
+    #     Parameters
+    #     ----------
+    #     source_coord : `tuple`
+    #         Source coordinates
+    #     bnd_nodes_nfs : `tuple`
+    #         Mesh node coordinates on non-free surfaces.
+    #         - (z_data[nfs_idx], x_data[nfs_idx]) for 2D
+    #         - (z_data[nfs_idx], x_data[nfs_idx], y_data[nfs_idx]) for 3D
 
-        Returns
-        -------
-        unit_ref_vct : `array`
-            Unit reference vector from the source to a boundary point
-        '''
+    #     Returns
+    #     -------
+    #     unit_ref_vct : `array`
+    #         Unit reference vector from the source to a boundary point
+    #     '''
 
-        # Boundary node data
-        bnd_z, bnd_x = bnd_nodes_nfs[:2]
+    #     # Boundary node data
+    #     bnd_z, bnd_x = bnd_nodes_nfs[:2]
 
-        # Source coordinates
-        psouz = source_coord[0]
-        psoux = source_coord[1]
+    #     # Source coordinates
+    #     psouz = source_coord[0]
+    #     psoux = source_coord[1]
 
-        # Components of the vector pointing to the boundary point
-        ref_x = bnd_x - psoux
-        ref_z = bnd_z - psouz
-        ref_vct = [ref_x, ref_z]
+    #     # Components of the vector pointing to the boundary point
+    #     ref_x = bnd_x - psoux
+    #     ref_z = bnd_z - psouz
+    #     ref_vct = [ref_x, ref_z]
 
-        if self.dimension == 3:  # 3D
+    #     if self.dimension == 3:  # 3D
 
-            # Third component of the vector pointing to the boundary point
-            bnd_y = bnd_nodes_nfs[2]
-            psouy = source_coord[2]
-            ref_y = bnd_y - psouy
-            ref_vct.append(ref_y)
+    #         # Third component of the vector pointing to the boundary point
+    #         bnd_y = bnd_nodes_nfs[2]
+    #         psouy = source_coord[2]
+    #         ref_y = bnd_y - psouy
+    #         ref_vct.append(ref_y)
 
-        # Unitary vector pointing to the boundary point
-        unit_ref_vct = np.asarray(ref_vct) / np.linalg.norm(ref_vct, axis=0)
+    #     # Unitary vector pointing to the boundary point
+    #     unit_ref_vct = np.asarray(ref_vct) / np.linalg.norm(ref_vct, axis=0)
 
-        return unit_ref_vct
+    #     return unit_ref_vct
 
-    def hypershape_normal_vector(self, bnd_pnts, hyper_axes, n):
-        '''
-        Compute the normal vector to a hyperellipse (|x/a|^n + |y/b|^n = 1)
-        or a hyperellipsoid (|x/a|^n + |y/b|^n + |z/c|^n = 1) at a boundary
-        point. The hypershape must have the center at the origin.
+    # def hypershape_normal_vector(self, bnd_pnts, hyper_axes, n):
+    #     '''
+    #     Compute the normal vector to a hyperellipse (|x/a|^n + |y/b|^n = 1)
+    #     or a hyperellipsoid (|x/a|^n + |y/b|^n + |z/c|^n = 1) at a boundary
+    #     point. The hypershape must have the center at the origin.
 
-        Observations:
-        Let f(x, y) = |x/a|^n - |y/b|^n -1 = 0 a level curve (level set for
-        two variables) for f(x, y, z) at z = 0. The gradient of the function
-        f given by ∇f(x,y) = [∂f/∂x, ∂f/∂y] is a normal vector to the curve.
-        The normal vector is given by the partial derivatives of the function
+    #     Observations:
+    #     Let f(x, y) = |x/a|^n - |y/b|^n -1 = 0 a level curve (level set for
+    #     two variables) for f(x, y, z) at z = 0. The gradient of the function
+    #     f given by ∇f(x,y) = [∂f/∂x, ∂f/∂y] is a normal vector to the curve.
+    #     The normal vector is given by the partial derivatives of the function
 
-        Parameters
-        ----------
-        bnd_pnts : `list`
-            Boundary hypershape points where the normal vector is computed.
-            Structure: [x, y] for 2D and [x, y, z] for 3D
-        hyper_axes : `list`
-            Semi-axes of the hyperellipse [a, b] or hyperellipsoid [a, b, c]
-        n : `float`
-            Degree of the hyperellipse
+    #     Parameters
+    #     ----------
+    #     bnd_pnts : `list`
+    #         Boundary hypershape points where the normal vector is computed.
+    #         Structure: [x, y] for 2D and [x, y, z] for 3D
+    #     hyper_axes : `list`
+    #         Semi-axes of the hyperellipse [a, b] or hyperellipsoid [a, b, c]
+    #     n : `float`
+    #         Degree of the hyperellipse
 
-        Returns
-        -------
-        unit_nrm_vct : `array`
-            Unitary normal vector to the hypershape at the boundary point
-        '''
+    #     Returns
+    #     -------
+    #     unit_nrm_vct : `array`
+    #         Unitary normal vector to the hypershape at the boundary point
+    #     '''
 
-        # Point coordinates
-        x, y = bnd_pnts[:2]
+    #     # Point coordinates
+    #     x, y = bnd_pnts[:2]
 
-        # Hypershape semi-axes
-        a, b = hyper_axes[:2]
+    #     # Hypershape semi-axes
+    #     a, b = hyper_axes[:2]
 
-        # Compute partial derivatives
-        df_dx = (n / (a**n)) * np.sign(x) * abs(x)**(n - 1)
-        df_dy = (n / (b**n)) * np.sign(y) * abs(y)**(n - 1)
+    #     # Compute partial derivatives
+    #     df_dx = (n / (a**n)) * np.sign(x) * abs(x)**(n - 1)
+    #     df_dy = (n / (b**n)) * np.sign(y) * abs(y)**(n - 1)
 
-        nrm_vct = [df_dx, df_dy]
+    #     nrm_vct = [df_dx, df_dy]
 
-        if self.dimension == 3:  # 3D
+    #     if self.dimension == 3:  # 3D
 
-            # Third coordinate
-            z = bnd_pnts[2]
+    #         # Third coordinate
+    #         z = bnd_pnts[2]
 
-            # Third hypershape semi-axis
-            c = hyper_axes[2]
+    #         # Third hypershape semi-axis
+    #         c = hyper_axes[2]
 
-            # Partial derivative with respect to third coordinate
-            df_dz = (n / (c**n)) * np.sign(z) * abs(z)**(n - 1)
+    #         # Partial derivative with respect to third coordinate
+    #         df_dz = (n / (c**n)) * np.sign(z) * abs(z)**(n - 1)
 
-            nrm_vct.append(df_dz)
+    #         nrm_vct.append(df_dz)
 
-        # Unitary hypershape normal vector
-        unit_nrm_vct = np.asarray(nrm_vct) / np.linalg.norm(nrm_vct, axis=0)
+    #     # Unitary hypershape normal vector
+    #     unit_nrm_vct = np.asarray(nrm_vct) / np.linalg.norm(nrm_vct, axis=0)
 
-        return unit_nrm_vct
+    #     return unit_nrm_vct
 
-    def cos_ang_HigdonBC(self, V, source_coord, bnd_nfs, bnd_nodes_nfs,
-                         hyp_par=None, sommerfeld_bc=False):
-        '''
-        Compute the cosine of the incidence angle for first-order Higdon BC.
+    # def cos_ang_HigdonBC(self, V, source_coord, bnd_nfs, bnd_nodes_nfs,
+    #                      hyp_par=None, sommerfeld_bc=False):
+    #     '''
+    #     Compute the cosine of the incidence angle for first-order Higdon BC.
 
-        Parameters
-        ----------
-        V : `firedrake function space`
-            Function space where the cosine of the incidence angle is defined
-        source_coord : `tuple`
-            Source coordinates
-        bnd_nfs : 'array'
-            Mesh node indices on non-free surfaces
-        bnd_nodes_nfs : `tuple`
-            Mesh node coordinates on non-free surfaces.
-            - (z_data[nfs_idx], x_data[nfs_idx]) for 2D
-            - (z_data[nfs_idx], x_data[nfs_idx], y_data[nfs_idx]) for 3D
-        hyp_par : `tuple`, optional
-            Hyperellipse parameters. Structure:
-            (n_hyp, a_hyp, b_hyp) for 2D or (n_hyp, a_hyp, b_hyp, b_hyp) for 3D
-            - n_hyp : `float`
-                Degree of the hyperellipse
-            - a_hyp : `float`
-                Hyperellipse semi-axis in direction x
-            - b_hyp : `float`
-                Hyperellipse semi-axis in direction z
-            - c_hyp : `float`
-                Hyperellipse semi-axis in direction y (3D only)
-        sommerfeld_bc : `bool`, optional
-            If True, use Sommerfeld BC instead of Higdon BC. Default is False
+    #     Parameters
+    #     ----------
+    #     V : `firedrake function space`
+    #         Function space where the cosine of the incidence angle is defined
+    #     source_coord : `tuple`
+    #         Source coordinates
+    #     bnd_nfs : 'array'
+    #         Mesh node indices on non-free surfaces
+    #     bnd_nodes_nfs : `tuple`
+    #         Mesh node coordinates on non-free surfaces.
+    #         - (z_data[nfs_idx], x_data[nfs_idx]) for 2D
+    #         - (z_data[nfs_idx], x_data[nfs_idx], y_data[nfs_idx]) for 3D
+    #     hyp_par : `tuple`, optional
+    #         Hyperellipse parameters. Structure:
+    #         (n_hyp, a_hyp, b_hyp) for 2D or (n_hyp, a_hyp, b_hyp, b_hyp) for 3D
+    #         - n_hyp : `float`
+    #             Degree of the hyperellipse
+    #         - a_hyp : `float`
+    #             Hyperellipse semi-axis in direction x
+    #         - b_hyp : `float`
+    #             Hyperellipse semi-axis in direction z
+    #         - c_hyp : `float`
+    #             Hyperellipse semi-axis in direction y (3D only)
+    #     sommerfeld_bc : `bool`, optional
+    #         If True, use Sommerfeld BC instead of Higdon BC. Default is False
 
-        Returns
-        -------
-        None
-        '''
+    #     Returns
+    #     -------
+    #     None
+    #     '''
 
-        nrbc_str = "Sommerfeld" if sommerfeld_bc else "Higdon"
-        print("Creating Field for NRBC:", nrbc_str, flush=True)
+    #     nrbc_str = "Sommerfeld" if sommerfeld_bc else "Higdon"
+    #     print("Creating Field for NRBC:", nrbc_str, flush=True)
 
-        # Initialize field for the cosine of the incidence angle
-        self.cosHig = fire.Function(V, name='cosHig')
+    #     # Initialize field for the cosine of the incidence angle
+    #     self.cosHig = fire.Function(V, name='cosHig')
 
-        if sommerfeld_bc:  # Sommerfeld BC
-            self.nrbc = "Sommerfeld"
-            cos_Hig = 1.
+    #     if sommerfeld_bc:  # Sommerfeld BC
+    #         self.nrbc = "Sommerfeld"
+    #         cos_Hig = 1.
 
-        else:  # Higdon BC
+    #     else:  # Higdon BC
 
-            self.nrbc = "Higdon"
+    #         self.nrbc = "Higdon"
 
-            # Unitary reference vector pointing to the boundary point
-            unit_ref_vct = self.source_to_bnd_reference_vector(source_coord,
-                                                               bnd_nodes_nfs)
+    #         # Unitary reference vector pointing to the boundary point
+    #         unit_ref_vct = self.source_to_bnd_reference_vector(source_coord,
+    #                                                            bnd_nodes_nfs)
 
-            # Normal vector to the boundary
-            if self.layer_shape == 'rectangular':
-                # Normal vector to the boundary is a orthonormal vector, then
-                # cosine on incidence angle can be estimated from a projection
-                # of the reference vector to boundary onto the orthonormal
-                # vectors ([1, 0, 0] (2D), [0, 1, 0] (2D), [0, 0, 1] (3D))
-                cos_Hig = np.maximum.reduce(abs(unit_ref_vct))
+    #         # Normal vector to the boundary
+    #         if self.layer_shape == 'rectangular':
+    #             # Normal vector to the boundary is a orthonormal vector, then
+    #             # cosine on incidence angle can be estimated from a projection
+    #             # of the reference vector to boundary onto the orthonormal
+    #             # vectors ([1, 0, 0] (2D), [0, 1, 0] (2D), [0, 0, 1] (3D))
+    #             cos_Hig = np.maximum.reduce(abs(unit_ref_vct))
 
-            if self.layer_shape == 'hypershape':
+    #         if self.layer_shape == 'hypershape':
 
-                # Original domain dimensions
-                Lx, Lz = self.domain_dim[:2]
+    #             # Original domain dimensions
+    #             Lx, Lz = self.domain_dim[:2]
 
-                # Hypershape degree and semi-axes
-                n_hyp, hyp_axes = hyp_par[0], hyp_par[1:]
+    #             # Hypershape degree and semi-axes
+    #             n_hyp, hyp_axes = hyp_par[0], hyp_par[1:]
 
-                # Boundary points of the hypershape centered at the origin
-                bnd_z, bnd_x = bnd_nodes_nfs[:2]  # Boundary node data
-                bnd_pnts = [bnd_x - Lx / 2, bnd_z + Lz / 2]
-                if self.dimension == 3:  # 3D
-                    Ly = self.domain_dim[2]
-                    bnd_y = bnd_nodes_nfs[2]
-                    bnd_pnts.append(bnd_y - Ly / 2)
+    #             # Boundary points of the hypershape centered at the origin
+    #             bnd_z, bnd_x = bnd_nodes_nfs[:2]  # Boundary node data
+    #             bnd_pnts = [bnd_x - Lx / 2, bnd_z + Lz / 2]
+    #             if self.dimension == 3:  # 3D
+    #                 Ly = self.domain_dim[2]
+    #                 bnd_y = bnd_nodes_nfs[2]
+    #                 bnd_pnts.append(bnd_y - Ly / 2)
 
-                # Normal vector to the boundary
-                unit_nrm_vct = self.hypershape_normal_vector(bnd_pnts,
-                                                             hyp_axes,
-                                                             n_hyp)
+    #             # Normal vector to the boundary
+    #             unit_nrm_vct = self.hypershape_normal_vector(bnd_pnts,
+    #                                                          hyp_axes,
+    #                                                          n_hyp)
 
-                # Cosine of the incidence angle
-                cos_Hig = np.sum(unit_ref_vct * unit_nrm_vct, axis=0)
+    #             # Cosine of the incidence angle
+    #             cos_Hig = np.sum(unit_ref_vct * unit_nrm_vct, axis=0)
 
-            # Adjust values to minimum cosine of incidence angle
-            cos_Hig[cos_Hig < self.cos_min] = (
-                1. - cos_Hig[cos_Hig < self.cos_min]**2)**0.5
+    #         # Adjust values to minimum cosine of incidence angle
+    #         cos_Hig[cos_Hig < self.cos_min] = (
+    #             1. - cos_Hig[cos_Hig < self.cos_min]**2)**0.5
 
-        self.cosHig.dat.data_with_halos[bnd_nfs] = cos_Hig
+    #     self.cosHig.dat.data_with_halos[bnd_nfs] = cos_Hig
 
-        # Save boundary profile of cosine of incidence angle
-        if hasattr(self, 'path_save_nrbc'):
-            outfile = fire.VTKFile(self.path_save_nrbc + "cosHig.pvd")
-            outfile.write(self.cosHig)
+    #     # Save boundary profile of cosine of incidence angle
+    #     if hasattr(self, 'path_save_nrbc'):
+    #         outfile = fire.VTKFile(self.path_save_nrbc + "cosHig.pvd")
+    #         outfile.write(self.cosHig)
 
 # dx = 0.1 km REC
 # W/O = 107.72% - 0.80%
