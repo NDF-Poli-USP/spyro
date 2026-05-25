@@ -1,4 +1,5 @@
-# This file containts methods to estimate the computational cost of a process in Spyro.
+"""Computational cost calculators."""
+
 from numpy import savetxt
 from os import getcwd
 from time import perf_counter  # For runtime

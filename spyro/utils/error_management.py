@@ -1,6 +1,9 @@
-# This file contains methods for handling errors in Spyro, either to send
-# messages to the user or to prevent numerical instability in objects.
-import numpy as np
+"""Error management utilities.
+
+This file contains methods for handling errors in Spyro, either to send
+messages to the user or to prevent numerical instability in objects."""
+
+from numpy import inf, isinf, isnan, where
 
 
 def value_parameter_error(par_name, par_value, valid_values):
@@ -106,8 +109,7 @@ def clean_inst_num(data_arr):
     data_arr : `array`
         An array with null or positive components
     """
-    data_arr[np.where(np.isnan(data_arr) | np.isinf(
-        data_arr) | (data_arr < 0.0))] = 0.0
+    data_arr[where(isnan(data_arr) | isinf(data_arr) | (data_arr < 0.0))] = 0.0
     return data_arr
 
 
@@ -156,8 +158,8 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
                         f"got {type(par_value).__name__}.")
 
     # Set default bounds
-    upper_bound = np.inf if upper_bound is None else upper_bound
-    lower_bound = -np.inf if lower_bound is None else lower_bound
+    upper_bound = inf if upper_bound is None else upper_bound
+    lower_bound = -inf if lower_bound is None else lower_bound
 
     # Validate bounds
     if upper_bound <= lower_bound:
@@ -166,7 +168,7 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
 
     # Check if value is within bounds
     if par_value < lower_bound or par_value > upper_bound:
-        if lower_bound > -np.inf and upper_bound < np.inf:  # Both bounds are finite
+        if lower_bound > -inf and upper_bound < inf:  # Both bounds are finite
             bound_str = f"between {lower_bound} and {upper_bound}"
             if include_lower_bound and include_upper_bound:
                 bound_str += " (both bounds inclusive)"
@@ -174,10 +176,10 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
                 bound_str += " (lower bound inclusive)"
             elif include_upper_bound:
                 bound_str += " (upper bound inclusive)"
-        elif lower_bound > -np.inf:  # Only lower bound is finite
+        elif lower_bound > -inf:  # Only lower bound is finite
             bound_str = (f"greater than or equal to {lower_bound}"
                          if include_lower_bound else f"greater than {lower_bound}")
-        elif upper_bound < np.inf:  # Only upper bound is finite
+        elif upper_bound < inf:  # Only upper bound is finite
             bound_str = (f"less than or equal to {upper_bound}"
                          if include_upper_bound else f"less than {upper_bound}")
 

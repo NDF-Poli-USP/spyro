@@ -1,9 +1,6 @@
 from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
-import spyro.meshing.meshing_operations as mshops
-import spyro.meshing.meshing_habc as mshabc
-
 
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
@@ -608,17 +605,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def mesh_manager(self):
         """Create the mesh operations manager for the wave solver."""
 
+        # Domain dimensions
+        domain_dim = self.domain_dimensions()
+
         if self.abc_active:  # If ABC scheme is used
-            self.mesh_ops = mshabc.HABCMesh(
-                self.domain_dimensions(), dimension=self.dimension,
-                quadrilateral=self.mesh_parameters.quadrilateral,
-                comm=self.mesh_parameters.comm)
+            from ..meshing.meshing_habc import HABCMesh
+            self.mesh_ops = HABCMesh(domain_dim, dimension=self.dimension,
+                                     quadrilateral=self.mesh_parameters.quadrilateral,
+                                     comm=self.mesh_parameters.comm)
 
         else:  # If no ABC scheme is used
-            self.mesh_ops = mshops.MeshOps(
-                self.domain_dimensions(), dimension=self.dimension,
-                quadrilateral=self.mesh_parameters.quadrilateral,
-                comm=self.mesh_parameters.comm)
+            from ..meshing.meshing_operations import MeshOps
+            self.mesh_ops = MeshOps(domain_dim, dimension=self.dimension,
+                                    quadrilateral=self.mesh_parameters.quadrilateral,
+                                    comm=self.mesh_parameters.comm)
 
     def layer_manager(self):
         """Return the layer operations manager for the wave solver."""
@@ -630,22 +630,23 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         freq_Nyquist = None if self.analysis != "transient" else 1. / (2. * self.dt)
 
         if self.abc_boundary_layer_type == "PML":
-            import spyro.pml.pml_nsnc as pmlops
-            self.layer_ops = pmlops.PMLLayer(
-                domain_dim, self.frequency, freq_Nyquist, dimension=self.dimension,
-                quadrilateral=self.mesh_parameters.quadrilateral,
-                func_space_type=self.mesh_ops.func_space_type,
-                abc_reference_freq=self.abc_reference_freq, comm=self.comm)
+            from ..pml.pml_nsnc import PMLLayer
+            self.layer_ops = PMLLayer(domain_dim, self.frequency, freq_Nyquist,
+                                      dimension=self.dimension,
+                                      quadrilateral=self.mesh_parameters.quadrilateral,
+                                      func_space_type=self.mesh_ops.func_space_type,
+                                      abc_reference_freq=self.abc_reference_freq,
+                                      comm=self.comm)
 
         if self.abc_boundary_layer_type == "hybrid":
-            import spyro.habc.habc as habcops
-            self.layer_ops = habcops.HABCLayer(
-                domain_dim, self.frequency, freq_Nyquist, self.abc_deg_layer,
-                dimension=self.dimension, quadrilateral=self.mesh_parameters.quadrilateral,
-                func_space_type=self.mesh_ops.func_space_type,
-                abc_boundary_layer_shape=self.abc_boundary_layer_shape,
-                abc_reference_freq=self.abc_reference_freq,
-                abc_degree_type=self.abc_degree_type, comm=self.comm)
+            from ..habc.habc import HABCLayer
+            self.layer_ops = HABCLayer(domain_dim, self.frequency, freq_Nyquist,
+                                       self.abc_deg_layer, dimension=self.dimension,
+                                       quadrilateral=self.mesh_parameters.quadrilateral,
+                                       func_space_type=self.mesh_ops.func_space_type,
+                                       abc_boundary_layer_shape=self.abc_boundary_layer_shape,
+                                       abc_reference_freq=self.abc_reference_freq,
+                                       abc_degree_type=self.abc_degree_type, comm=self.comm)
 
         # Identifier for the current case study
         if self.abc_boundary_layer_type in ["PML", "hybrid"]:
