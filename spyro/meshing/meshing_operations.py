@@ -146,7 +146,7 @@ class MeshOps():
         alpha = lmax / lmin
 
         # Tolerance for searching nodes in the mesh
-        tol = 10**(min(int(log10(lmin / 10)), -6))
+        tol = 10 ** min([int(np.log10(lmin / 10)), -6])
 
         return (diam, lmin, lmax, alpha, tol)
 
