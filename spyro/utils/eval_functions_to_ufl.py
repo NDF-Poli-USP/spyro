@@ -6,7 +6,7 @@ functions, constants, and spatial coordinates.
 """
 
 from ast import parse, walk, Add, BinOp, Call, Constant, Div, \
-    Expression, Load, Name, Mult, Pow, Sub, UnaryOp, UAdd, USub,
+    Expression, Load, Name, Mult, Pow, Sub, UnaryOp, UAdd, USub
 from firedrake import SpatialCoordinate, acos, asin, atan, atan2, \
     cos, cosh, e, erf, exp, ln, pi, sin, sinh, sqrt, tan, tanh
 from spyro.utils.error_management import value_parameter_error
