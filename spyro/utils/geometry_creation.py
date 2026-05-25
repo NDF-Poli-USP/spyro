@@ -1,4 +1,4 @@
-from numy import linspace, meshgrid, vstack,
+from numy import linspace, meshgrid, vstack
 
 
 def create_transect(start, end, num):
