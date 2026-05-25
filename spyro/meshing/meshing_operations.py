@@ -1,9 +1,9 @@
-import firedrake as fire
+from firedrake import (allclose, as_vector, assemble, CellDiameter,
+                       column_stack, DirichletBC, SpatialCoordinate)
 from firedrake.__future__ import interpolate
-import numpy as np
-fire.interpolate = interpolate
-from spyro.utils.error_management import value_parameter_error
-from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
+from numpy import linspace, log10, min, max
+from ..utils.error_management import value_parameter_error
+from ..utils.eval_functions_to_ufl import generate_ufl_functions
 
 
 class MeshOps():
@@ -98,11 +98,11 @@ class MeshOps():
             Symbolic coordinate y of the mesh object
         """
         if self.dimension == 2:
-            mesh_z, mesh_x = fire.SpatialCoordinate(mesh)
+            mesh_z, mesh_x = SpatialCoordinate(mesh)
             return mesh_z, mesh_x
 
         elif self.dimension == 3:
-            mesh_z, mesh_x, mesh_y = fire.SpatialCoordinate(mesh)
+            mesh_z, mesh_x, mesh_y = SpatialCoordinate(mesh)
             return mesh_z, mesh_x, mesh_y
 
     def representative_mesh_dimensions(self, mesh, function_space):
@@ -130,7 +130,7 @@ class MeshOps():
         """
 
         # Mesh cell diameters
-        diam_mesh = fire.CellDiameter(mesh)
+        diam_mesh = CellDiameter(mesh)
 
         if self.dimension == 2:  # 2D
             fdim = 2**0.5
@@ -139,7 +139,7 @@ class MeshOps():
             fdim = 3**0.5
 
         # Minimum and maximum mesh size for habc parameters
-        diam = fire.assemble(fire.interpolate(diam_mesh, function_space))
+        diam = assemble(interpolate(diam_mesh, function_space))
         lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
         lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
 
@@ -147,7 +147,7 @@ class MeshOps():
         alpha = lmax / lmin
 
         # Tolerance for searching nodes in the mesh
-        tol = 10**(min(int(np.log10(lmin / 10)), -6))
+        tol = 10**(min(int(log10(lmin / 10)), -6))
 
         return (diam, lmin, lmax, alpha, tol)
 
@@ -169,8 +169,8 @@ class MeshOps():
         """
 
         coords = mesh.coordinates.dat.data_with_halos
-        min_coordinates = np.min(coords, axis=0)
-        max_coordinates = np.max(coords, axis=0)
+        min_coordinates = min(coords, axis=0)
+        max_coordinates = max(coords, axis=0)
 
         return min_coordinates, max_coordinates
 
@@ -212,7 +212,7 @@ class MeshOps():
             if self.func_space_type == 'vector':
                 V = function_space.sub(i)
 
-            coords.append(fire.assemble(fire.interpolate(ufl_input, V)))
+            coords.append(assemble(interpolate(ufl_input, V)))
 
         # Get the node positions
         if output_type == "tuple":
@@ -224,8 +224,8 @@ class MeshOps():
                 node_positions += (y_data,)
 
         elif output_type == "array":
-            node_positions = np.column_stack([comp.dat.data_with_halos[:]
-                                              for comp in coords])
+            node_positions = column_stack([comp.dat.data_with_halos[:]
+                                           for comp in coords])
 
         else:
             value_parameter_error('output_type', output_type, ["tuple", "array"])
@@ -274,7 +274,7 @@ class MeshOps():
             if self.func_space_type == "scalar":
                 bc_val = 0.
             else:
-                bc_val = fire.as_vector((0.,) * self.dimension)
+                bc_val = as_vector((0.,) * self.dimension)
 
             num_boundaries = 4
             min_coordinates, max_coordinates = self.extract_extreme_coordinates(mesh)
@@ -315,38 +315,38 @@ class MeshOps():
                     idx_bdn = "top" if idx_bdn == 6 else idx_bdn
 
                 # Applying a dummy Dirichlet BC
-                bnd_node_ids = fire.DirichletBC(function_space, bc_val, idx_bdn).nodes
+                bnd_node_ids = DirichletBC(function_space, bc_val, idx_bdn).nodes
 
                 if len(bnd_node_ids) == 0:
                     # For DG spaces, DirichletBC doesn't work
                     boundary_ids_map[idx_bdn] = None
                     continue
 
-                idx_test = np.linspace(0, len(bnd_node_ids) - 1, 10, dtype=int)
+                idx_test = linspace(0, len(bnd_node_ids) - 1, 10, dtype=int)
                 sample_nodes = bnd_node_ids[idx_test]
 
                 # Data for checking
                 z_data = node_positions[0][sample_nodes]
                 x_data = node_positions[1][sample_nodes]
-                if np.allclose(z_data, min_z):
+                if allclose(z_data, min_z):
                     boundary_ids_map[idx_bdn] = absorb_bottom  # Bottom boundary
                     key_bnd = "Zmin"
-                elif np.allclose(z_data, max_z):
+                elif allclose(z_data, max_z):
                     boundary_ids_map[idx_bdn] = absorb_top  # Top boundary
                     key_bnd = "Zmax"
-                elif np.allclose(x_data, min_x):
+                elif allclose(x_data, min_x):
                     boundary_ids_map[idx_bdn] = absorb_left  # Left boundary
                     key_bnd = "Xmin"
-                elif np.allclose(x_data, max_x):
+                elif allclose(x_data, max_x):
                     boundary_ids_map[idx_bdn] = absorb_right  # Right boundary
                     key_bnd = "Xmax"
 
                 if self.dimension == 3:
                     y_data = node_positions[2][sample_nodes]
-                    if np.allclose(y_data, min_y):
+                    if allclose(y_data, min_y):
                         boundary_ids_map[idx_bdn] = absorb_front  # Front boundary
                         key_bnd = "Ymin"
-                    elif np.allclose(y_data, max_y):
+                    elif allclose(y_data, max_y):
                         boundary_ids_map[idx_bdn] = absorb_back  # Back boundary
                         key_bnd = "Ymax"
 

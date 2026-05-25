@@ -6,7 +6,7 @@ functions, constants, and spatial coordinates.
 """
 
 from ast import parse, walk, Add, BinOp, Call, Constant, Div, \
-    Expression, Load, Name, Mult, Pow, Sub, UnaryOp, UAdd, USub
+    Expression, Load, Mult, Name, Pow, Sub, UnaryOp, UAdd, USub
 from firedrake import SpatialCoordinate, acos, asin, atan, atan2, \
     cos, cosh, e, erf, exp, ln, pi, sin, sinh, sqrt, tan, tanh
 from spyro.utils.error_management import value_parameter_error
@@ -100,13 +100,13 @@ def generate_ufl_functions(mesh, expression, dimension):
 
         # Validate function calls
         if isinstance(node, Call):
-            if not isinstance(node.func, ast.Name):
+            if not isinstance(node.func, Name):
                 raise ValueError("Only simple function calls allowed")
             if node.func.id not in namespace:
                 raise ValueError(f"Unknown function: {node.func.id}")
 
         # Validate names
-        if isinstance(node, ast.Name):
+        if isinstance(node, Name):
             if node.id not in namespace:
                 raise ValueError(f"Unknown variable: {node.id}")
 
