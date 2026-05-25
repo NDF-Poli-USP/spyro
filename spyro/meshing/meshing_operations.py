@@ -1,7 +1,7 @@
-from firedrake import (allclose, as_vector, assemble, CellDiameter,
+from firedrake import (as_vector, assemble, CellDiameter,
                        column_stack, DirichletBC, SpatialCoordinate)
 from firedrake.__future__ import interpolate
-from numpy import linspace, log10, min, max
+from numpy import allclose, linspace, log10, min, max
 from ..utils.error_management import value_parameter_error
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 
