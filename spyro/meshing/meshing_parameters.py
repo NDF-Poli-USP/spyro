@@ -5,8 +5,8 @@ including mesh type selection, dimension handling, and automatic mesh
 generation based on wavelength constraints.
 """
 
-import warnings
-import os
+from os import path
+from warnings import warn
 from ..utils.error_management import value_parameter_error
 
 
@@ -324,7 +324,7 @@ class MeshingParameters():
         if not hasattr(self, "_unit") or self._unit is None:
             self._unit = new_unit
         elif new_unit != self._unit and value is not None:
-            warnings.warn(
+            warn(
                 f"{attr_name} value ({value}) appears to be "
                 f"in {new_unit}, but the current unit is "
                 f"{self._unit}. Please check for consistency."
@@ -402,7 +402,7 @@ class MeshingParameters():
         """
         if value is not None:
             if isinstance(value, str) and value.endswith('.vtk'):
-                warnings.warn("VTK meshes for visualization only, will not run a simulation.")
+                warn("VTK meshes for visualization only, will not run a simulation.")
             elif not (isinstance(value, str) and value.endswith('.msh')):
                 raise ValueError(f"mesh_file '{value}' must be a .msh file")
         self._output_filename = value
@@ -439,7 +439,7 @@ class MeshingParameters():
         """
         # ToDo: A setter-getter that handles both edge_length and cells_per_wavelength
         if self.cells_per_wavelength is not None:
-            warnings.warn(
+            warn(
                 "Mutual exclusion: Both 'edge_length' and "
                 "'cells_per_wavelength' control mesh size, "
                 "but only one can be set at a time. Setting "
@@ -484,8 +484,8 @@ class MeshingParameters():
         Setting this property will automatically set edge_length to None.
         """
         if self.edge_length is not None:
-            warnings.warn("Setting cells_per_wavelength"
-                          "removes edge_length parameter")
+            warn("Setting cells_per_wavelength"
+                 "removes edge_length parameter")
             self.edge_length = None
         self._cells_per_wavelength = value
         if hasattr(self, 'is_complete'):
@@ -562,7 +562,7 @@ class MeshingParameters():
         if value is not None:
             if not (isinstance(value, str) and value.endswith('.msh')):
                 raise ValueError(f"mesh_file '{value}' must be a .msh file")
-            if not os.path.exists(value):
+            if not path.exists(value):
                 raise FileNotFoundError(f"mesh_file '{value}' does not exist")
         self._mesh_file = value
         if hasattr(self, 'is_complete'):
@@ -644,11 +644,11 @@ class MeshingParameters():
                             f", got {type(value).__name__}")
         else:
             if value < 1.5:
-                warnings.warn(f"Source frequency of {value} "
-                              "too low for realistic FWI case")
+                warn(f"Source frequency of {value} "
+                     "too low for realistic FWI case")
             elif value > 50:
-                warnings.warn(f"Source frequency of {value} too high for "
-                              "realistic FWI case, please low-pass filter")
+                warn(f"Source frequency of {value} too high for "
+                     "realistic FWI case, please low-pass filter")
             self._source_frequency = value
         if hasattr(self, 'is_complete'):
             self.check_completeness()
