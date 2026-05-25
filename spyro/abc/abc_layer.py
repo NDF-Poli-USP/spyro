@@ -1,10 +1,10 @@
 import firedrake as fire
-import numpy as np
+from numpy import abs, array, ceil, inf, log10, minimum
 from os import getcwd
 from sympy import divisors
 from .hyp_lay import HyperLayer
-from .abc.rec_lay import RectangLayer
-from .abc.nrbc import NRBC
+from .rec_lay import RectangLayer
+from .nrbc import NRBC
 from ..habc.eik import HABC_Eikonal
 from ..habc.error_measure import HABCError
 from ..solvers.modal.modal_sol import Modal_Solver
@@ -364,7 +364,7 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         elif abc_reference_freq == 'boundary':
 
             # Reference frequency of the wave at the boundary
-            self.freq_ref = np.inf
+            self.freq_ref = inf
 
             for n_crit in range(self.number_of_receivers):
 
@@ -746,7 +746,7 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
                                           fraction=1.)
 
         # Rounding power
-        pot = int(abs(np.ceil(np.log10(max_dt))) + mag_add)
+        pot = int(abs(ceil(log10(max_dt))) + mag_add)
 
         # Maximum timestep size according to divisors of the final time
         val_int_tf = int(10**pot * self.final_time)
@@ -800,19 +800,19 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         else:
 
             # If Eikonal analysis was not performed
-            sources_loc = np.array(self.source_locations)
+            sources_loc = array(self.source_locations)
 
             # Candidate to minimum distance to the boundaries
-            delta_z = np.abs(sources_loc[:, 0] - self.mesh_parameters.length_z)
-            delta_x = np.minimum(np.abs(sources_loc[:, 1]),
-                                 np.abs(sources_loc[:, 1]
-                                        - self.mesh_parameters.length_x))
+            delta_z = abs(sources_loc[:, 0] - self.mesh_parameters.length_z)
+            delta_x = minimum(abs(sources_loc[:, 1]),
+                              abs(sources_loc[:, 1]
+                                  - self.mesh_parameters.length_x))
             cand_dist = (delta_z, delta_x)
 
             if self.dimension == 3:  # 3D
-                delta_y = np.minimum(np.abs(sources_loc[:, 2]),
-                                     np.abs(sources_loc[:, 2]
-                                            - self.mesh_parameters.length_y))
+                delta_y = minimum(abs(sources_loc[:, 2]),
+                                  abs(sources_loc[:, 2]
+                                      - self.mesh_parameters.length_y))
                 cand_dist += (delta_y,)
 
             # Minimum distance to the nearest boundary
@@ -822,7 +822,7 @@ class ABCLayer(RectangLayer, HyperLayer, NRBC, HABCError):
         add_dom -= dist_to_bnd
 
         # Pad length for the infinite domain extension
-        infinite_pad_len = self.lmin * np.ceil(add_dom / self.lmin)
+        infinite_pad_len = self.lmin * ceil(add_dom / self.lmin)
 
         return infinite_pad_len
 
