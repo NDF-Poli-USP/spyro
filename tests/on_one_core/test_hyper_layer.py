@@ -1,7 +1,6 @@
-import math
-import numpy as np
-import pytest
-
+from math import isclose
+from numpy import cos, floating, pi, sin, sqrt
+from pytest import fixture, raises
 from spyro.abc.hyp_lay import HyperLayer
 
 
@@ -9,7 +8,7 @@ from spyro.abc.hyp_lay import HyperLayer
 # Fixtures
 # ---------------------------------------------------------------------------
 
-@pytest.fixture
+@fixture
 def layer_2d():
     """2D HyperLayer with a 1 km x 1 km domain and 0.25 km pad."""
     hl = HyperLayer((1., 1.), n_hyp=2, dimension=2)
@@ -18,7 +17,7 @@ def layer_2d():
     return hl
 
 
-@pytest.fixture
+@fixture
 def layer_3d():
     """3D HyperLayer with a 1 km³ domain and 0.25 km pad."""
     hl = HyperLayer((1., 1., 1.), n_hyp=2, dimension=3)
@@ -46,31 +45,31 @@ def test_init_defaults_3d():
 
 def test_init_domain_dim_raises_error():
     # Test that passing None raises a TypeError
-    with pytest.raises(TypeError, match="domain_dim must be a tuple"):
+    with raises(TypeError, match="domain_dim must be a tuple"):
         HyperLayer([1., 1.])
 
 
 def test_init_none_n_hyp_raises_error():
     # Test that passing None raises a TypeError
-    with pytest.raises(TypeError, match="n_hyp must be a number"):
+    with raises(TypeError, match="n_hyp must be a number"):
         HyperLayer((1., 1.), n_hyp=None)
 
 
 def test_init_1_n_hyp_raises_error():
     # Test that passing None raises a TypeError
-    with pytest.raises(ValueError, match="n_hyp must be >= 2"):
+    with raises(ValueError, match="n_hyp must be >= 2"):
         HyperLayer((1., 1.), n_hyp=1.)
 
 
 def test_init_n_type_raises_error():
     # Test that passing None raises a TypeError
-    with pytest.raises(ValueError, match=f"Invalid n_type: '{None}'."):
+    with raises(ValueError, match=f"Invalid n_type: '{None}'."):
         HyperLayer((1., 1.), n_type=None)
 
 
 def test_init_dimension_raises_error():
     # Test that passing None raises a TypeError
-    with pytest.raises(ValueError, match="Invalid dimension: '10'."):
+    with raises(ValueError, match="Invalid dimension: '10'."):
         HyperLayer((1., 1.), dimension=10)
 
 
@@ -105,10 +104,10 @@ def test_radial_parameter_2d(layer_2d):
     # Point on the boundary should give r = 1
     a, b = layer_2d.hyper_axes
     # For a circle (n=2), point at (a*cos(45°), b*sin(45°)) should be on boundary
-    x = a * np.cos(np.pi/4)
-    y = b * np.sin(np.pi/4)
+    x = a * cos(pi/4)
+    y = b * sin(pi/4)
     r = layer_2d.radial_parameter((x, y), 2)
-    assert math.isclose(r, 1.0, rel_tol=1e-10)
+    assert isclose(r, 1.0, rel_tol=1e-10)
 
     # Point inside should give r < 1
     r_inside = layer_2d.radial_parameter((x/2, y/2), 2)
@@ -123,11 +122,11 @@ def test_radial_parameter_3d(layer_3d):
     """Test radial parameter calculation for 3D"""
     a, b, c = layer_3d.hyper_axes
     # Point on the boundary should give r = 1
-    x = a / np.sqrt(3)
-    y = b / np.sqrt(3)
-    z = c / np.sqrt(3)
+    x = a / sqrt(3)
+    y = b / sqrt(3)
+    z = c / sqrt(3)
     r = layer_3d.radial_parameter((x, y, z), 2)
-    assert math.isclose(r, 1.0, rel_tol=1e-10)
+    assert isclose(r, 1.0, rel_tol=1e-10)
 
     # Point inside should give r < 1
     r_inside = layer_3d.radial_parameter((x/2, y/2, z/2), 2)
@@ -153,7 +152,7 @@ def test_central_tendency_criteria_2d(layer_2d):
     if crit_tend is not None:
         assert isinstance(crit_tend, list)
         for val in crit_tend:
-            assert isinstance(val, (float, np.floating))
+            assert isinstance(val, (float, floating))
 
 
 def test_central_tendency_criteria_3d(layer_3d):
@@ -168,7 +167,7 @@ def test_central_tendency_criteria_3d(layer_3d):
     if crit_tend is not None:
         assert isinstance(crit_tend, list)
         for val in crit_tend:
-            assert isinstance(val, (float, np.floating))
+            assert isinstance(val, (float, floating))
 
 # ---------------------------------------------------------------------------
 # loop_criteria
@@ -180,7 +179,7 @@ def test_loop_criteria_2d(layer_2d):
     a, b = layer_2d.hyper_axes
     spness = (a * 0.8, b * 0.8)
     n, n_min, n_max = layer_2d.loop_criteria(spness, n_min=2, n_max=20)
-    assert isinstance(n, (float, np.floating))
+    assert isinstance(n, (float, floating))
     assert n_min <= n <= n_max
 
 
@@ -189,7 +188,7 @@ def test_loop_criteria_3d(layer_3d):
     a, b, c = layer_3d.hyper_axes
     spness = (a * 0.8, b * 0.8, c * 0.8)
     n, n_min, n_max = layer_3d.loop_criteria(spness, n_min=2, n_max=20)
-    assert isinstance(n, (float, np.floating))
+    assert isinstance(n, (float, floating))
     assert n_min <= n <= n_max
 
 # ---------------------------------------------------------------------------
@@ -199,7 +198,7 @@ def test_loop_criteria_3d(layer_3d):
 
 def test_half_hyp_area_unit_circle():
     result = HyperLayer.half_hyp_area(1.0, 1.0, 2)
-    assert math.isclose(result, math.pi / 2, rel_tol=1e-9)
+    assert isclose(result, pi / 2, rel_tol=1e-9)
 
 
 def test_half_hyp_area_positive():
@@ -209,13 +208,13 @@ def test_half_hyp_area_positive():
 def test_half_hyp_area_scales_linearly_with_a():
     A1 = HyperLayer.half_hyp_area(1.0, 1.0, 4)
     A2 = HyperLayer.half_hyp_area(2.0, 1.0, 4)
-    assert math.isclose(A2, 2.0 * A1, rel_tol=1e-9)
+    assert isclose(A2, 2.0 * A1, rel_tol=1e-9)
 
 
 def test_half_hyp_area_scales_linearly_with_b():
     A1 = HyperLayer.half_hyp_area(1.0, 1.0, 4)
     A2 = HyperLayer.half_hyp_area(1.0, 3.0, 4)
-    assert math.isclose(A2, 3.0 * A1, rel_tol=1e-9)
+    assert isclose(A2, 3.0 * A1, rel_tol=1e-9)
 
 # ---------------------------------------------------------------------------
 # trunc_half_hyp_area  (docstring: trunc_half_hyp_area(1, 1, 2, 1) == pi/2)
@@ -225,13 +224,13 @@ def test_half_hyp_area_scales_linearly_with_b():
 def test_trunc_half_hyp_area_no_truncation():
     # z0 == b means no truncation; result should equal half_hyp_area
     result = HyperLayer.trunc_half_hyp_area(1.0, 1.0, 2, 1.0)
-    assert math.isclose(result, math.pi / 2, rel_tol=1e-6)
+    assert isclose(result, pi / 2, rel_tol=1e-6)
 
 
 def test_trunc_half_hyp_area_zero_plane():
     # z0 == 0 means full truncation; result should be 0
     result = HyperLayer.trunc_half_hyp_area(1.0, 1.0, 2, 0.0)
-    assert math.isclose(result, 0.0, abs_tol=1e-12)
+    assert isclose(result, 0.0, abs_tol=1e-12)
 
 
 def test_trunc_half_hyp_area_less_than_half():
@@ -247,7 +246,7 @@ def test_trunc_half_hyp_area_less_than_half():
 
 def test_half_hyp_volume_unit_sphere():
     result = HyperLayer.half_hyp_volume(1.0, 1.0, 1.0, 2)
-    assert math.isclose(result, 2 * math.pi / 3, rel_tol=1e-9)
+    assert isclose(result, 2 * pi / 3, rel_tol=1e-9)
 
 
 def test_half_hyp_volume_positive():
@@ -257,7 +256,7 @@ def test_half_hyp_volume_positive():
 def test_half_hyp_volume_scales_linearly_with_c():
     V1 = HyperLayer.half_hyp_volume(1.0, 1.0, 1.0, 4)
     V2 = HyperLayer.half_hyp_volume(1.0, 1.0, 2.0, 4)
-    assert math.isclose(V2, 2.0 * V1, rel_tol=1e-9)
+    assert isclose(V2, 2.0 * V1, rel_tol=1e-9)
 
 # ---------------------------------------------------------------------------
 # trunc_half_hyp_volume  (docstring: trunc_half_hyp_volume(1,1,1,2,1) == 2*pi/3)
@@ -266,12 +265,12 @@ def test_half_hyp_volume_scales_linearly_with_c():
 
 def test_trunc_half_hyp_volume_no_truncation():
     result = HyperLayer.trunc_half_hyp_volume(1.0, 1.0, 1.0, 2, 1.0)
-    assert math.isclose(result, 2 * math.pi / 3, rel_tol=1e-6)
+    assert isclose(result, 2 * pi / 3, rel_tol=1e-6)
 
 
 def test_trunc_half_hyp_volume_zero_plane():
     result = HyperLayer.trunc_half_hyp_volume(1.0, 1.0, 1.0, 2, 0.0)
-    assert math.isclose(result, 0.0, abs_tol=1e-12)
+    assert isclose(result, 0.0, abs_tol=1e-12)
 
 
 def test_trunc_half_hyp_volume_less_than_half():
@@ -287,7 +286,7 @@ def test_trunc_half_hyp_volume_less_than_half():
 def test_hyp_full_perimeter_unit_circle():
     # n=2, a=b=1 gives a unit circle with perimeter 2*pi
     result = HyperLayer.hyp_full_perimeter(1.0, 1.0, 2)
-    assert math.isclose(result, 2 * math.pi, rel_tol=1e-6)
+    assert isclose(result, 2 * pi, rel_tol=1e-6)
 
 
 def test_hyp_full_perimeter_positive():
@@ -326,7 +325,7 @@ def test_calc_degree_hyp2D_min_le_max(layer_2d):
 
 def test_calc_degree_hyp2D_returns_float(layer_2d):
     n = layer_2d.calc_degree_hypershape((0.51, 0.51), 'MIN')
-    assert isinstance(n, (float, np.floating))
+    assert isinstance(n, (float, floating))
 
 # ---------------------------------------------------------------------------
 # calc_degree_hypershape (3D)
@@ -359,25 +358,25 @@ def test_calc_degree_hyp3D_min_le_max(layer_3d):
 
 def test_negative_pad_length_raises_error(layer_2d):
     # Test that passing a negative pad length raises a ValueError
-    with pytest.raises(ValueError, match="'pad_len' must be greater than 0"):
+    with raises(ValueError, match="'pad_len' must be greater than 0"):
         layer_2d.define_hyperlayer(pad_len=-0.25, lmin=0.01)
 
 
 def test_none_pad_length_raises_error(layer_2d):
     # Test that passing a None pad length raises a TypeError
-    with pytest.raises(TypeError, match="'pad_len' must be a float or a integer"):
+    with raises(TypeError, match="'pad_len' must be a float or a integer"):
         layer_2d.define_hyperlayer(pad_len=None, lmin=0.01)
 
 
 def test_negative_lmin_raises_error(layer_2d):
     # Test that passing a negative pad length raises a ValueError
-    with pytest.raises(ValueError, match="'lmin' must be greater than 0"):
+    with raises(ValueError, match="'lmin' must be greater than 0"):
         layer_2d.define_hyperlayer(pad_len=0.25, lmin=-0.01)
 
 
 def test_none_lmin_raises_error(layer_2d):
     # Test that passing a None pad length raises a TypeError
-    with pytest.raises(TypeError, match="'lmin' must be a float"):
+    with raises(TypeError, match="'lmin' must be a float"):
         layer_2d.define_hyperlayer(pad_len=0.25, lmin=None)
 
 
