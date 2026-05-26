@@ -1,4 +1,4 @@
-import firedrake as fire
+# import firedrake as fire
 import numpy as np
 from os import getcwd
 

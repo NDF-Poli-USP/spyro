@@ -1,5 +1,5 @@
-import firedrake as fire
-import numpy as np
+# import firedrake as fire
+# import numpy as np
 from spyro.abc.abc_layer import ABCLayer
 from spyro.utils.error_management import value_parameter_error
 

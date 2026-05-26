@@ -1,13 +1,15 @@
-from firedrake import Constant, Function, VTKFile
-from numpy import abs, array, ceil, inf, log10, minimum
+# from firedrake import Constant, Function, VTKFile
+from firedrake import Function, VTKFile
+# from numpy import abs, array, ceil, inf, log10, minimum
+from numpy import inf
 from os import getcwd
-from sympy import divisors
+# from sympy import divisors
 from .hyp_lay import HyperLayer
 from .rec_lay import RectangLayer
 from .nrbc import NRBC
 from ..habc.eik import HABC_Eikonal
 from ..habc.error_measure import HABCError
-from ..solvers.modal.modal_sol import Modal_Solver
+# from ..solvers.modal.modal_sol import Modal_Solver
 from ..domains.space import create_function_space
 from ..habc.lay_len import calc_size_lay
 from ..plots.plots_habc import plot_function_layer_size

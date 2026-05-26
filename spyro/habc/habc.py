@@ -1,9 +1,9 @@
-import firedrake as fire
-import numpy as np
-import spyro.solvers.modal.modal_sol as eigsol
+# import firedrake as fire
+# import numpy as np
+# import spyro.solvers.modal.modal_sol as eigsol
 from os import path, rename
 from shutil import rmtree
-from sympy import divisors
+# from sympy import divisors
 from spyro.abc.abc_layer import ABCLayer
 from spyro.habc.damp_profile import HABC_Damping
 # from spyro.utils.error_management import value_parameter_error
