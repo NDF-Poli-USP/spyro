@@ -2,8 +2,8 @@ import numpy as np
 from os import getcwd
 from firedrake import assemble
 from scipy.signal import find_peaks
-from spyro.plots.plots_habc import plot_hist_receivers, \
-    plot_rfft_receivers, plot_xCR_opt
+# from spyro.plots.plots_habc import plot_hist_receivers, \
+#     plot_rfft_receivers, plot_xCR_opt
 from spyro.utils.freq_tools import freq_response
 from spyro.utils.error_management import value_parameter_error
 
