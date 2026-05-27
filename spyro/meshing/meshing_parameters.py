@@ -437,6 +437,7 @@ class MeshingParameters():
         Only one of edge_length or cells_per_wavelength can be set at a time.
         Setting this property will automatically set cells_per_wavelength to None.
         """
+        # ToDo: A setter-getter that handles both edge_length and cells_per_wavelength
         if self.cells_per_wavelength is not None:
             warnings.warn(
                 "Mutual exclusion: Both 'edge_length' and "
