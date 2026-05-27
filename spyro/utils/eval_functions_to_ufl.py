@@ -1,10 +1,23 @@
 import ast
 from firedrake import SpatialCoordinate, acos, asin, atan, atan2, \
     cos, cosh, e, erf, exp, ln, pi, sin, sinh, sqrt, tan, tanh
+from spyro.utils.error_management import value_parameter_error
 
 
 def available_functions_to_eval(mesh, dimension):
+    """Return a dictionary of available functions and variables for eval.
 
+    This function creates a namespace dictionary that includes mathematical functions
+    from Firedrake and the spatial coordinates of the mesh. The namespace is used to
+    safely evaluate user-provided expressions as UFL functions.
+
+    Parameters
+    ----------
+    mesh : `Firedrake.Mesh`
+        The mesh on which the UFL function will be defined.
+    dimension : `int`
+        The spatial dimension of the mesh. It should be 2 or 3
+    """
     namespace = {"acos": acos,
                  "asin": asin,
                  "atan": atan,
@@ -34,9 +47,24 @@ def available_functions_to_eval(mesh, dimension):
 
 
 def generate_ufl_functions(mesh, expression, dimension):
-    '''
-    Use AST to validate expression structure before eval.
-    '''
+    """Use AST to validate expression structure before eval.
+
+    This function takes a string expression, validates its syntax using the Abstract
+    Syntax Tree (AST) module, and safely evaluates it to produce a UFL function.
+
+    Parameters
+    ----------
+    mesh : `Firedrake.Mesh`
+        The mesh on which the UFL function will be defined.
+    expression : `str`
+        The string expression to be evaluated as a UFL function.
+    dimension : `int`
+        The spatial dimension of the mesh. It should be 2 or 3
+    """
+
+    # Check model dimension
+    if dimension not in [2, 3]:
+        value_parameter_error('dimension', dimension, [2, 3])
 
     # Get available functions and variables
     namespace = available_functions_to_eval(mesh, dimension)
