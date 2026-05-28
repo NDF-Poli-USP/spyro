@@ -73,6 +73,30 @@ class IsotropicWave(ElasticWave):
 
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
+        """Initialize isotropic elastic material parameters from a dictionary.
+
+        The dictionary must define exactly one supported material
+        parameterization: either density with Lame parameters, or density with
+        P- and S-wave velocities. The missing derived parameters are computed
+        from the provided set, and the active control parameterization is stored
+        for FWI.
+
+        Parameters
+        ----------
+        synthetic_data_dict : dict
+            Material parameter dictionary using the public Spyro model schema.
+            Valid combinations are ``density``, ``lambda`` (or ``lame_first``),
+            and ``mu`` (or ``lame_second``); or ``density``,
+            ``p_wave_velocity``, and ``s_wave_velocity``. Values may be
+            scalars, Firedrake ``Constant`` objects, Firedrake ``Function``
+            objects, or UFL expressions.
+
+        Returns
+        -------
+        None
+            The method assigns ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s``, and
+            the active control parameterization on ``self``.
+        """
         def material_parameter(value):
             if np.isscalar(value) or isinstance(value, Constant):
                 if self.mesh is None:
@@ -215,6 +239,19 @@ class IsotropicWave(ElasticWave):
         values, or UFL expressions. Functions already in the target space are
         copied with ``assign``; all other values are interpolated into a new
         named scalar ``Function``.
+
+        Parameters
+        ----------
+        value : firedrake.Function, firedrake.Constant, scalar, or UFL expression
+            Material control value to represent in the scalar control space.
+        name : str
+            Name assigned to the returned Firedrake ``Function``.
+
+        Returns
+        -------
+        firedrake.Function or None
+            Scalar control field in the material-parameter function space. If
+            ``value`` is ``None``, returns ``None``.
         """
         if value is None:
             return None
