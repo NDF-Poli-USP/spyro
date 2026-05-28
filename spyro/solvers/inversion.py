@@ -246,16 +246,16 @@ class Objective(RObjective):
 class FullWaveformInversion:
     """FWI driver composed around a wave solver.
 
-    By default, the inversion driver uses :class:`AcousticWave`, but any wave
-    solver that implements ``forward_solve()``, ``get_control_parameters()``
-    and ``set_control_parameters()`` can be used for data misfit evaluation.
-    Gradient-based optimization additionally requires ``gradient_solve()``.
+    By default, the inversion driver uses :class:`AcousticWave`. The driver is
+    composed around a wave solver so other wave equations can be integrated in
+    the future, but FWI is currently supported only for acoustic waves because
+    the adjoint solver is implemented only for :class:`AcousticWave`.
 
     Notes
     -----
     The inversion driver composes a wave solver instead of inheriting from one.
-    Pass ``wave_class`` to construct a compatible solver, or pass ``wave`` to
-    reuse an already initialized solver instance.
+    Pass ``wave_class`` to construct a compatible acoustic solver, or pass
+    ``wave`` to reuse an already initialized acoustic solver instance.
 
     The inversion can be run using either ``scipy.optimize.minimize`` (L-BFGS-B)
     via ``run_fwi()`` or the deprecated ROL library via ``run_fwi_rol()``.
@@ -268,6 +268,8 @@ class FullWaveformInversion:
     >>> fwi.load_real_shot_record("shots/observed_")
     >>> fwi.run_fwi(maxiter=50, vmin=1.5, vmax=4.5)
     """
+
+    supported_wave_classes = (AcousticWave,)
 
     def __init__(
         self,
@@ -288,12 +290,12 @@ class FullWaveformInversion:
             solver.
         wave_class : type, optional
             Wave solver class used when ``wave`` is not provided. The class
-            must accept ``dictionary`` and ``comm`` and implement the methods
-            required by the inversion driver.
+            must be :class:`AcousticWave` or an acoustic subclass while FWI
+            support is limited to acoustic adjoint solves.
         wave : object, optional
             Preconstructed wave solver instance. When provided, the inversion
             driver uses this instance directly and infers ``wave_class`` from
-            its type.
+            its type. The instance must be an acoustic wave solver.
         """
         if wave is not None:
             self.wave = wave
@@ -301,6 +303,7 @@ class FullWaveformInversion:
         else:
             self.wave_class = AcousticWave if wave_class is None else wave_class
             self.wave = self.wave_class(dictionary=dictionary, comm=comm)
+        self._validate_supported_wave()
 
         self.input_dictionary = self.wave.input_dictionary
         self.comm = self.wave.comm
@@ -364,20 +367,24 @@ class FullWaveformInversion:
         self.gradient_mask_available = False
         self.functional_history = []
 
-    def __getattr__(self, name):
-        wave = self.__dict__.get("wave")
-        if wave is not None and hasattr(wave, name):
-            return getattr(wave, name)
-        raise AttributeError(f"{type(self).__name__} has no attribute '{name}'")
+    def _validate_supported_wave(self):
+        if isinstance(self.wave, self.supported_wave_classes):
+            return
+        supported_names = ", ".join(
+            wave_class.__name__
+            for wave_class in self.supported_wave_classes
+        )
+        raise NotImplementedError(
+            "FullWaveformInversion currently supports only acoustic wave "
+            "solvers because adjoint-based gradients are implemented only for "
+            f"{supported_names}. Received {type(self.wave).__name__}.",
+        )
 
     def _create_wave_solver(self):
         return self.wave_class(dictionary=self.input_dictionary, comm=self.comm)
 
     def _receiver_data(self, wave):
-        try:
-            return wave.forward_solution_receivers
-        except AttributeError:
-            return wave.receivers_output
+        return wave.forward_solution_receivers
 
     def _control_items(self, control):
         if isinstance(control, dict):
@@ -615,10 +622,10 @@ class FullWaveformInversion:
             self._flatten_control(current_control),
         )
 
-        if self.parallelism_type == "spatial" and self.number_of_sources > 1:
+        if self.wave.parallelism_type == "spatial" and self.wave.number_of_sources > 1:
             misfit_list = []
             guess_shot_record_list = []
-            for snum in range(self.number_of_sources):
+            for snum in range(self.wave.number_of_sources):
                 switch_serial_shot(self.wave, snum)
                 guess_shot_record_list.append(self.wave.forward_solution_receivers)
                 misfit_list.append(
@@ -902,14 +909,17 @@ class FullWaveformInversion:
 
         obj = Objective(inner_product, self)
 
-        u = fire.Function(self.function_space, name="velocity").assign(self.guess_velocity_model)
+        u = fire.Function(
+            self.wave.function_space,
+            name="velocity",
+        ).assign(self.guess_velocity_model)
         opt = FireVector(u.vector(), inner_product)
 
-        xlo = fire.Function(self.function_space)
+        xlo = fire.Function(self.wave.function_space)
         xlo.interpolate(fire.Constant(vmin))
         x_lo = FireVector(xlo.vector(), inner_product)
 
-        xup = fire.Function(self.function_space)
+        xup = fire.Function(self.wave.function_space)
         xup.interpolate(fire.Constant(vmax))
         x_up = FireVector(xup.vector(), inner_product)
 
@@ -959,15 +969,15 @@ class FullWaveformInversion:
         """
         self.has_gradient_mask = True
 
-        if self.abc_active is False and boundaries is None:
+        if self.wave.abc_active is False and boundaries is None:
             raise ValueError("If no abc boundary please define boundaries for the mask")
-        elif self.abc_active and boundaries is None:
-            mask_obj = Gradient_mask_for_pml(self)
-        elif self.abc_active and boundaries is not None:
+        elif self.wave.abc_active and boundaries is None:
+            mask_obj = Gradient_mask_for_pml(self.wave)
+        elif self.wave.abc_active and boundaries is not None:
             warnings.warn("Boundaries overuling PML boundaries for mask")
-            mask_obj = Mask(boundaries, self)
-        elif self.abc_active is False and boundaries is not None:
-            mask_obj = Mask(boundaries, self)
+            mask_obj = Mask(boundaries, self.wave)
+        elif self.wave.abc_active is False and boundaries is not None:
+            mask_obj = Mask(boundaries, self.wave)
         else:
             raise ValueError("Mask options do not make sense")
 
@@ -1008,9 +1018,9 @@ class FullWaveformInversion:
         After loading, the forward_solution_receivers attribute is cleared to
         save memory.
         """
-        load_shots(self, file_name=file_name)
-        self.real_shot_record = self.forward_solution_receivers
-        self.forward_solution_receivers = None
+        load_shots(self.wave, file_name=file_name)
+        self.real_shot_record = self.wave.forward_solution_receivers
+        self.wave.forward_solution_receivers = None
 
     @run_in_one_core
     def save_result_as_segy(self, file_name="final_vp.segy", grid_spacing=0.01):

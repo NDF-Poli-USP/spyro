@@ -94,13 +94,13 @@ def build_elastic_dictionary():
     }
 
 
-def make_elastic_controls(fwi):
-    V = fwi.get_control_parameter_function_space()
+def make_elastic_controls(wave):
+    V = wave.get_control_parameter_function_space()
     rho = fire.Function(V, name="density").assign(1.0)
     lmbda = fire.Function(V, name="lambda")
     mu = fire.Function(V, name="mu").assign(1.0)
-    z = fwi.mesh_z
-    x = fwi.mesh_x
+    z = wave.mesh_z
+    x = wave.mesh_x
     lmbda.interpolate(
         fire.conditional(
             (z + 0.5) ** 2 + (x - 0.5) ** 2 < 0.12 ** 2,
@@ -122,47 +122,44 @@ def test_full_waveform_inversion_uses_composition():
     assert isinstance(fwi.wave, spyro.AcousticWave)
 
 
-def test_elastic_controls_roundtrip_with_zero_functional():
-    fwi = spyro.FullWaveformInversion(
-        dictionary=build_elastic_dictionary(),
-        wave_class=spyro.IsotropicWave,
-    )
+def test_full_waveform_inversion_rejects_non_acoustic_wave_class():
+    with pytest.raises(NotImplementedError, match="supports only acoustic"):
+        spyro.FullWaveformInversion(
+            dictionary=build_elastic_dictionary(),
+            wave_class=spyro.IsotropicWave,
+        )
 
-    fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.25})
-    fwi.set_real_control(make_elastic_controls(fwi))
-    fwi.generate_real_shot_record(save_shot_record=False)
 
-    fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
-    fwi.set_guess_control(make_elastic_controls(fwi))
+def test_full_waveform_inversion_rejects_non_acoustic_wave_instance():
+    wave = spyro.IsotropicWave(dictionary=build_elastic_dictionary())
 
-    control_vector = fwi.get_control_vector()
-    assert control_vector.size == sum(
-        control.dat.data.size for control in fwi.guess_control.values()
-    )
+    with pytest.raises(NotImplementedError, match="supports only acoustic"):
+        spyro.FullWaveformInversion(wave=wave)
 
-    misfit = fwi.calculate_misfit(c=control_vector)
-    functional = fwi.get_functional(c=control_vector)
 
-    assert set(fwi.wave.get_control_parameters()) == {
+def test_elastic_controls_roundtrip_on_isotropic_wave():
+    wave = spyro.IsotropicWave(dictionary=build_elastic_dictionary())
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.25})
+    controls = make_elastic_controls(wave)
+
+    wave.set_control_parameters(controls)
+
+    assert set(wave.get_control_parameters()) == {
         spyro.ElasticMaterialParameter.DENSITY,
         spyro.ElasticMaterialParameter.LAMBDA,
         spyro.ElasticMaterialParameter.MU,
     }
-    assert np.allclose(misfit, 0.0, atol=1e-12)
-    assert np.isclose(functional, 0.0, atol=1e-12)
+    assert wave.get_control_parameters() is not controls
 
 
 def test_elastic_controls_reject_string_keys():
-    fwi = spyro.FullWaveformInversion(
-        dictionary=build_elastic_dictionary(),
-        wave_class=spyro.IsotropicWave,
-    )
+    wave = spyro.IsotropicWave(dictionary=build_elastic_dictionary())
 
-    fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
-    controls = make_elastic_controls(fwi)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.25})
+    controls = make_elastic_controls(wave)
 
     with pytest.raises(TypeError):
-        fwi.set_guess_control(
+        wave.set_control_parameters(
             {
                 parameter.value: control
                 for parameter, control in controls.items()
