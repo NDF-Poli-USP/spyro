@@ -185,7 +185,6 @@ class IsotropicWave(ElasticWave):
     def get_function_name(self):
         return "Displacement"
 
-    @override
     def get_control_parameter_function_space(self):
         """Return the scalar space used for elastic material controls."""
         if self.mesh is None:
@@ -200,6 +199,20 @@ class IsotropicWave(ElasticWave):
         return self._material_parameter_function_space
 
     def _coerce_material_parameter(self, value, name):
+        """Return a material parameter as a scalar Firedrake Function.
+
+        Elastic material parameters are scalar fields, while the elastic
+        displacement solution lives in a vector function space. This helper
+        keeps the inversion controls in the scalar space returned by
+        ``get_control_parameter_function_space()`` so density, Lame
+        parameters, and velocity controls can be flattened, rebuilt, written,
+        and reassigned consistently during FWI.
+
+        Accepted values are Firedrake ``Function`` objects, constants, scalar
+        values, or UFL expressions. Functions already in the target space are
+        copied with ``assign``; all other values are interpolated into a new
+        named scalar ``Function``.
+        """
         if value is None:
             return None
 
@@ -242,7 +255,6 @@ class IsotropicWave(ElasticWave):
             normalized[parameter] = value
         return normalized
 
-    @override
     def get_control_parameters(self):
         """Return the active isotropic elastic material controls."""
         names = self._control_parameter_names
@@ -269,7 +281,6 @@ class IsotropicWave(ElasticWave):
                 )
         return parameters
 
-    @override
     def set_control_parameters(self, controls):
         """Assign isotropic elastic material controls.
 
