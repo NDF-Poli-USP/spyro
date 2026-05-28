@@ -250,6 +250,23 @@ class FullWaveformInversion:
     solver that implements ``forward_solve()``, ``get_control_parameters()``
     and ``set_control_parameters()`` can be used for data misfit evaluation.
     Gradient-based optimization additionally requires ``gradient_solve()``.
+
+    Notes
+    -----
+    The inversion driver composes a wave solver instead of inheriting from one.
+    Pass ``wave_class`` to construct a compatible solver, or pass ``wave`` to
+    reuse an already initialized solver instance.
+
+    The inversion can be run using either ``scipy.optimize.minimize`` (L-BFGS-B)
+    via ``run_fwi()`` or the deprecated ROL library via ``run_fwi_rol()``.
+
+    Examples
+    --------
+    >>> fwi = FullWaveformInversion(dictionary=config_dict, comm=comm)
+    >>> fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.1})
+    >>> fwi.set_guess_velocity_model(constant=2.0)
+    >>> fwi.load_real_shot_record("shots/observed_")
+    >>> fwi.run_fwi(maxiter=50, vmin=1.5, vmax=4.5)
     """
 
     def __init__(
@@ -259,6 +276,25 @@ class FullWaveformInversion:
         wave_class=AcousticWave,
         wave=None,
     ):
+        """Initialize the full waveform inversion driver.
+
+        Parameters
+        ----------
+        dictionary : dict, optional
+            Model and inversion configuration used to construct ``wave_class``
+            when ``wave`` is not provided.
+        comm : object, optional
+            Communicator passed to ``wave_class`` when constructing the wave
+            solver.
+        wave_class : type, optional
+            Wave solver class used when ``wave`` is not provided. The class
+            must accept ``dictionary`` and ``comm`` and implement the methods
+            required by the inversion driver.
+        wave : object, optional
+            Preconstructed wave solver instance. When provided, the inversion
+            driver uses this instance directly and infers ``wave_class`` from
+            its type.
+        """
         if wave is not None:
             self.wave = wave
             self.wave_class = type(wave)
