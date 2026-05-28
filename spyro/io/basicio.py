@@ -206,14 +206,14 @@ def switch_serial_shot(wave, propagation_id, file_name=None, just_for_dat_manage
         None
     """
     if file_name is None:
-        if wave.forward_solution:
-            # There are cases where forward_solution is empty, e.g. when running
-            # forward_solve for the true model. In that case, we skip saving the
-            # solution on the entire domain, which is not needed.
-            stacked_shot_arrays = np.load(_shot_filename(propagation_id, wave, prefix='tmp_shot'))
-            if len(wave.forward_solution) == 0:
-                n_dts, n_dofs = np.shape(stacked_shot_arrays)
-                rebuild_empty_forward_solution(wave, n_dts)
+        forward_solution_filename = _shot_filename(propagation_id, wave, prefix='tmp_shot')
+        if os.path.exists(forward_solution_filename) or wave.forward_solution:
+            # The adjoint propagator consumes forward_solution with pop(). When
+            # switching to the next shot, reload saved snapshots even if the
+            # in-memory list has been emptied.
+            stacked_shot_arrays = np.load(forward_solution_filename)
+            if not wave.forward_solution:
+                rebuild_empty_forward_solution(wave, len(stacked_shot_arrays))
             for array_i, array in enumerate(stacked_shot_arrays):
                 wave.forward_solution[array_i].dat.data[:] = array
         receiver_solution_filename = _shot_filename(propagation_id, wave, prefix='tmp_rec')

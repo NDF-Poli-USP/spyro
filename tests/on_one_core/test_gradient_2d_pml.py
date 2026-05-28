@@ -149,7 +149,6 @@ def get_forward_model(dictionary=None, auto_adj=False):
         conditional=cond,
         dg_velocity_model=False,
     )
-    spyro.plots.plot_model(Wave_obj_exact, filename="pml_grad_test_model.png", abc_points=[(-0, 0), (-1, 0), (-1, 1), (-0, 1)])
     Wave_obj_exact.forward_solve()
     rec_out_exact = Wave_obj_exact.forward_solution_receivers
 
