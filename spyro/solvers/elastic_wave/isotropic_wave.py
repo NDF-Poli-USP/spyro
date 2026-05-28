@@ -191,8 +191,8 @@ class IsotropicWave(ElasticWave):
         )
         return self._material_parameter_function_space
 
-    def _coerce_material_parameter(self, value, name):
-        """Return a material parameter as a scalar Firedrake Function.
+    def _as_control_field(self, value, name):
+        """Return a material control as a scalar Firedrake Function.
 
         Elastic material parameters are scalar fields, while the elastic
         displacement solution lives in a vector function space. This helper
@@ -273,7 +273,7 @@ class IsotropicWave(ElasticWave):
                 "{density, p_wave_velocity, s_wave_velocity}.",
             )
 
-        self.rho = self._coerce_material_parameter(
+        self.rho = self._as_control_field(
             controls[ElasticMaterialParameter.DENSITY],
             ElasticMaterialParameter.DENSITY.value,
         )
@@ -284,11 +284,11 @@ class IsotropicWave(ElasticWave):
             "real_velocity_file": None,
         }
         if option_1:
-            self.lmbda = self._coerce_material_parameter(
+            self.lmbda = self._as_control_field(
                 controls[ElasticMaterialParameter.LAMBDA],
                 ElasticMaterialParameter.LAMBDA.value,
             )
-            self.mu = self._coerce_material_parameter(
+            self.mu = self._as_control_field(
                 controls[ElasticMaterialParameter.MU],
                 ElasticMaterialParameter.MU.value,
             )
@@ -298,11 +298,11 @@ class IsotropicWave(ElasticWave):
             synthetic_data["lambda"] = self.lmbda
             synthetic_data["mu"] = self.mu
         else:
-            self.c = self._coerce_material_parameter(
+            self.c = self._as_control_field(
                 controls[ElasticMaterialParameter.P_WAVE_VELOCITY],
                 ElasticMaterialParameter.P_WAVE_VELOCITY.value,
             )
-            self.c_s = self._coerce_material_parameter(
+            self.c_s = self._as_control_field(
                 controls[ElasticMaterialParameter.S_WAVE_VELOCITY],
                 ElasticMaterialParameter.S_WAVE_VELOCITY.value,
             )
