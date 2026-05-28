@@ -184,9 +184,13 @@ def save_serial_data(wave, propagation_id):
     Returns:
         None
     """
-    arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
-    stacked_arrays = np.stack(arrays_list, axis=0)
-    np.save(_shot_filename(propagation_id, wave, prefix='tmp_shot'), stacked_arrays)
+    if wave.forward_solution:
+        # There are cases where forward_solution is empty, e.g. when running
+        # forward_solve for the true model. In that case, we skip saving the
+        # solution on the entire domain, which is not needed.
+        arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
+        stacked_arrays = np.stack(arrays_list, axis=0)
+        np.save(_shot_filename(propagation_id, wave, prefix='tmp_shot'), stacked_arrays)
     np.save(_shot_filename(propagation_id, wave, prefix='tmp_rec'), wave.forward_solution_receivers)
 
 
@@ -202,12 +206,16 @@ def switch_serial_shot(wave, propagation_id, file_name=None, just_for_dat_manage
         None
     """
     if file_name is None:
-        stacked_shot_arrays = np.load(_shot_filename(propagation_id, wave, prefix='tmp_shot'))
-        if len(wave.forward_solution) == 0:
-            n_dts, n_dofs = np.shape(stacked_shot_arrays)
-            rebuild_empty_forward_solution(wave, n_dts)
-        for array_i, array in enumerate(stacked_shot_arrays):
-            wave.forward_solution[array_i].dat.data[:] = array
+        if wave.forward_solution:
+            # There are cases where forward_solution is empty, e.g. when running
+            # forward_solve for the true model. In that case, we skip saving the
+            # solution on the entire domain, which is not needed.
+            stacked_shot_arrays = np.load(_shot_filename(propagation_id, wave, prefix='tmp_shot'))
+            if len(wave.forward_solution) == 0:
+                n_dts, n_dofs = np.shape(stacked_shot_arrays)
+                rebuild_empty_forward_solution(wave, n_dts)
+            for array_i, array in enumerate(stacked_shot_arrays):
+                wave.forward_solution[array_i].dat.data[:] = array
         receiver_solution_filename = _shot_filename(propagation_id, wave, prefix='tmp_rec')
     else:
         receiver_solution_filename = _shot_filename(propagation_id, wave, prefix=file_name, random_str_in_use=False)
