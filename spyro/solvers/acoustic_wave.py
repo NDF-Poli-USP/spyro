@@ -235,11 +235,9 @@ class AcousticWave(Wave):
         else:
             return self.source_function
 
-    @override
     def get_control_parameters(self):
         return self.initial_velocity_model
 
-    @override
     def set_control_parameters(self, controls):
         if self.function_space is None:
             self.force_rebuild_function_space()
@@ -259,7 +257,6 @@ class AcousticWave(Wave):
         self.initial_velocity_model_file = None
         self.c = self.initial_velocity_model
 
-    @override
     def get_control_parameter_function_space(self):
         if self.function_space is None:
             self.force_rebuild_function_space()
