@@ -21,13 +21,6 @@ VELOCITY_CONTROL_PARAMETERS = (
     ElasticMaterialParameter.P_WAVE_VELOCITY,
     ElasticMaterialParameter.S_WAVE_VELOCITY,
 )
-ELASTIC_PARAMETER_ALIASES = {
-    "lmbda": ElasticMaterialParameter.LAMBDA,
-    "lame_first": ElasticMaterialParameter.LAMBDA,
-    "lame_second": ElasticMaterialParameter.MU,
-}
-
-
 class IsotropicWave(ElasticWave):
     '''Isotropic elastic wave propagator'''
 
@@ -227,34 +220,6 @@ class IsotropicWave(ElasticWave):
             field.interpolate(value)
         return field
 
-    def _normalize_control_parameter(self, key):
-        if isinstance(key, ElasticMaterialParameter):
-            return key
-        if isinstance(key, str):
-            if key in ELASTIC_PARAMETER_ALIASES:
-                return ELASTIC_PARAMETER_ALIASES[key]
-            try:
-                return ElasticMaterialParameter(key)
-            except ValueError as exc:
-                raise ValueError(
-                    f"Unsupported elastic control parameter '{key}'.",
-                ) from exc
-        raise TypeError(
-            "Elastic control parameter keys must be ElasticMaterialParameter "
-            "instances or strings.",
-        )
-
-    def _normalize_control_parameters(self, controls):
-        normalized = {}
-        for key, value in controls.items():
-            parameter = self._normalize_control_parameter(key)
-            if parameter in normalized:
-                raise ValueError(
-                    f"Duplicated elastic control parameter '{parameter.value}'.",
-                )
-            normalized[parameter] = value
-        return normalized
-
     def get_control_parameters(self):
         """Return the active isotropic elastic material controls."""
         names = self._control_parameter_names
@@ -284,17 +249,23 @@ class IsotropicWave(ElasticWave):
     def set_control_parameters(self, controls):
         """Assign isotropic elastic material controls.
 
-        The preferred keys are :class:`ElasticMaterialParameter` values. Legacy
-        strings from model dictionaries are still accepted for compatibility.
+        Control dictionaries must use :class:`ElasticMaterialParameter` keys.
+        Model input dictionaries still use the public Spyro string schema, but
+        the FWI control API is intentionally enum-only.
         """
         if not isinstance(controls, dict):
             raise TypeError(
                 "IsotropicWave controls must be provided as a dictionary.",
             )
 
-        normalized = self._normalize_control_parameters(controls)
-        option_1 = set(normalized) == set(LAME_CONTROL_PARAMETERS)
-        option_2 = set(normalized) == set(VELOCITY_CONTROL_PARAMETERS)
+        if not all(isinstance(key, ElasticMaterialParameter) for key in controls):
+            raise TypeError(
+                "IsotropicWave control keys must be ElasticMaterialParameter "
+                "enum values.",
+            )
+
+        option_1 = set(controls) == set(LAME_CONTROL_PARAMETERS)
+        option_2 = set(controls) == set(VELOCITY_CONTROL_PARAMETERS)
         if not (option_1 or option_2):
             raise ValueError(
                 "Elastic controls must define either "
@@ -303,7 +274,7 @@ class IsotropicWave(ElasticWave):
             )
 
         self.rho = self._coerce_material_parameter(
-            normalized[ElasticMaterialParameter.DENSITY],
+            controls[ElasticMaterialParameter.DENSITY],
             ElasticMaterialParameter.DENSITY.value,
         )
 
@@ -314,11 +285,11 @@ class IsotropicWave(ElasticWave):
         }
         if option_1:
             self.lmbda = self._coerce_material_parameter(
-                normalized[ElasticMaterialParameter.LAMBDA],
+                controls[ElasticMaterialParameter.LAMBDA],
                 ElasticMaterialParameter.LAMBDA.value,
             )
             self.mu = self._coerce_material_parameter(
-                normalized[ElasticMaterialParameter.MU],
+                controls[ElasticMaterialParameter.MU],
                 ElasticMaterialParameter.MU.value,
             )
             self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
@@ -328,11 +299,11 @@ class IsotropicWave(ElasticWave):
             synthetic_data["mu"] = self.mu
         else:
             self.c = self._coerce_material_parameter(
-                normalized[ElasticMaterialParameter.P_WAVE_VELOCITY],
+                controls[ElasticMaterialParameter.P_WAVE_VELOCITY],
                 ElasticMaterialParameter.P_WAVE_VELOCITY.value,
             )
             self.c_s = self._coerce_material_parameter(
-                normalized[ElasticMaterialParameter.S_WAVE_VELOCITY],
+                controls[ElasticMaterialParameter.S_WAVE_VELOCITY],
                 ElasticMaterialParameter.S_WAVE_VELOCITY.value,
             )
             self.mu = self.rho*self.c_s**2

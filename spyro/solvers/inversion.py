@@ -478,12 +478,9 @@ class FullWaveformInversion:
 
     def _extract_bound(self, bound, key, template_value):
         if isinstance(bound, dict):
-            bound_key = key
-            if bound_key not in bound and hasattr(key, "value"):
-                bound_key = key.value
-            if bound_key not in bound:
+            if key not in bound:
                 raise KeyError(f"Missing bound for control '{key}'.")
-            return self._expand_bound(bound[bound_key], template_value)
+            return self._expand_bound(bound[key], template_value)
         return self._expand_bound(bound, template_value)
 
     def _build_bounds(self, vmin, vmax, template):
