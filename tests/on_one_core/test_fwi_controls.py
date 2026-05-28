@@ -1,5 +1,6 @@
 import numpy as np
 import firedrake as fire
+import pytest
 
 import spyro
 
@@ -151,7 +152,7 @@ def test_elastic_controls_roundtrip_with_zero_functional():
     assert np.isclose(functional, 0.0, atol=1e-12)
 
 
-def test_elastic_controls_accept_legacy_string_keys():
+def test_elastic_controls_reject_string_keys():
     fwi = spyro.FullWaveformInversion(
         dictionary=build_elastic_dictionary(),
         wave_class=spyro.IsotropicWave,
@@ -159,11 +160,11 @@ def test_elastic_controls_accept_legacy_string_keys():
 
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
     controls = make_elastic_controls(fwi)
-    fwi.set_guess_control(
-        {
-            parameter.value: control
-            for parameter, control in controls.items()
-        },
-    )
 
-    assert set(fwi.wave.get_control_parameters()) == set(controls)
+    with pytest.raises(TypeError):
+        fwi.set_guess_control(
+            {
+                parameter.value: control
+                for parameter, control in controls.items()
+            },
+        )
