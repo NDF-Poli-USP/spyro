@@ -7,20 +7,30 @@ from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
-from ...utils.typing import ElasticMaterialParameter, override, WaveType
+from ...utils.typing import (ElasticMaterialParameter,
+                             ElasticMaterialParameterization, override,
+                             WaveType)
 from ...domains.space import create_function_space
 
 
-LAME_CONTROL_PARAMETERS = (
-    ElasticMaterialParameter.DENSITY,
-    ElasticMaterialParameter.LAMBDA,
-    ElasticMaterialParameter.MU,
-)
-VELOCITY_CONTROL_PARAMETERS = (
-    ElasticMaterialParameter.DENSITY,
-    ElasticMaterialParameter.P_WAVE_VELOCITY,
-    ElasticMaterialParameter.S_WAVE_VELOCITY,
-)
+CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
+    ElasticMaterialParameterization.LAME: (
+        ElasticMaterialParameter.DENSITY,
+        ElasticMaterialParameter.LAMBDA,
+        ElasticMaterialParameter.MU,
+    ),
+    ElasticMaterialParameterization.VELOCITY: (
+        ElasticMaterialParameter.DENSITY,
+        ElasticMaterialParameter.P_WAVE_VELOCITY,
+        ElasticMaterialParameter.S_WAVE_VELOCITY,
+    ),
+}
+
+
+def _format_control_parameters(parameters):
+    return "{" + ", ".join(parameter.value for parameter in parameters) + "}"
+
+
 class IsotropicWave(ElasticWave):
     '''Isotropic elastic wave propagator'''
 
@@ -31,7 +41,7 @@ class IsotropicWave(ElasticWave):
         self.lmbda = None  # First Lame parameter
         self.mu = None    # Second Lame parameter
         self.c_s = None   # Secondary wave velocity
-        self._control_parameter_names = None
+        self._control_parameterization = None
         self._material_parameter_function_space = None
 
         self.u_n = None   # Current displacement field
@@ -108,11 +118,11 @@ class IsotropicWave(ElasticWave):
             not bool(self.mu)
 
         if option_1:
-            self._control_parameter_names = LAME_CONTROL_PARAMETERS
+            self._control_parameterization = ElasticMaterialParameterization.LAME
             self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
             self.c_s = (self.mu/self.rho)**0.5
         elif option_2:
-            self._control_parameter_names = VELOCITY_CONTROL_PARAMETERS
+            self._control_parameterization = ElasticMaterialParameterization.VELOCITY
             self.mu = self.rho*self.c_s**2
             self.lmbda = self.rho*self.c**2 - 2*self.mu
         else:
@@ -222,27 +232,27 @@ class IsotropicWave(ElasticWave):
 
     def get_control_parameters(self):
         """Return the active isotropic elastic material controls."""
-        names = self._control_parameter_names
-        if names is None:
+        parameterization = self._control_parameterization
+        if parameterization is None:
             if self.rho is None:
                 return None
-            names = LAME_CONTROL_PARAMETERS
+            parameterization = ElasticMaterialParameterization.LAME
 
         parameters = {}
-        for name in names:
-            if name is ElasticMaterialParameter.DENSITY:
-                parameters[name] = self.rho
-            elif name is ElasticMaterialParameter.LAMBDA:
-                parameters[name] = self.lmbda
-            elif name is ElasticMaterialParameter.MU:
-                parameters[name] = self.mu
-            elif name is ElasticMaterialParameter.P_WAVE_VELOCITY:
-                parameters[name] = self.c
-            elif name is ElasticMaterialParameter.S_WAVE_VELOCITY:
-                parameters[name] = self.c_s
+        for parameter in CONTROL_PARAMETERS_BY_PARAMETERIZATION[parameterization]:
+            if parameter is ElasticMaterialParameter.DENSITY:
+                parameters[parameter] = self.rho
+            elif parameter is ElasticMaterialParameter.LAMBDA:
+                parameters[parameter] = self.lmbda
+            elif parameter is ElasticMaterialParameter.MU:
+                parameters[parameter] = self.mu
+            elif parameter is ElasticMaterialParameter.P_WAVE_VELOCITY:
+                parameters[parameter] = self.c
+            elif parameter is ElasticMaterialParameter.S_WAVE_VELOCITY:
+                parameters[parameter] = self.c_s
             else:
                 raise ValueError(
-                    f"Unsupported elastic control parameter '{name.value}'.",
+                    f"Unsupported elastic control parameter '{parameter.value}'.",
                 )
         return parameters
 
@@ -264,13 +274,20 @@ class IsotropicWave(ElasticWave):
                 "enum values.",
             )
 
-        option_1 = set(controls) == set(LAME_CONTROL_PARAMETERS)
-        option_2 = set(controls) == set(VELOCITY_CONTROL_PARAMETERS)
+        lame_controls = CONTROL_PARAMETERS_BY_PARAMETERIZATION[
+            ElasticMaterialParameterization.LAME
+        ]
+        velocity_controls = CONTROL_PARAMETERS_BY_PARAMETERIZATION[
+            ElasticMaterialParameterization.VELOCITY
+        ]
+        option_1 = set(controls) == set(lame_controls)
+        option_2 = set(controls) == set(velocity_controls)
         if not (option_1 or option_2):
+            lame_names = _format_control_parameters(lame_controls)
+            velocity_names = _format_control_parameters(velocity_controls)
             raise ValueError(
                 "Elastic controls must define either "
-                "{density, lambda, mu} or "
-                "{density, p_wave_velocity, s_wave_velocity}.",
+                f"{lame_names} or {velocity_names}.",
             )
 
         self.rho = self._as_control_field(
@@ -294,7 +311,7 @@ class IsotropicWave(ElasticWave):
             )
             self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
             self.c_s = (self.mu/self.rho)**0.5
-            self._control_parameter_names = LAME_CONTROL_PARAMETERS
+            self._control_parameterization = ElasticMaterialParameterization.LAME
             synthetic_data["lambda"] = self.lmbda
             synthetic_data["mu"] = self.mu
         else:
@@ -308,7 +325,7 @@ class IsotropicWave(ElasticWave):
             )
             self.mu = self.rho*self.c_s**2
             self.lmbda = self.rho*self.c**2 - 2*self.mu
-            self._control_parameter_names = VELOCITY_CONTROL_PARAMETERS
+            self._control_parameterization = ElasticMaterialParameterization.VELOCITY
             synthetic_data["p_wave_velocity"] = self.c
             synthetic_data["s_wave_velocity"] = self.c_s
 

@@ -25,6 +25,13 @@ class ElasticMaterialParameter(Enum):
     S_WAVE_VELOCITY = "s_wave_velocity"
 
 
+class ElasticMaterialParameterization(Enum):
+    """Supported isotropic elastic inversion control parameterizations."""
+
+    LAME = "lame"
+    VELOCITY = "velocity"
+
+
 class FunctionalType(Enum):
     """Enum for different types of functionals that can be computed.
 
