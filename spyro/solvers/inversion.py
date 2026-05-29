@@ -412,30 +412,42 @@ class FullWaveformInversion:
         except AttributeError:
             return np.asarray(value, dtype=float)
 
-    def _copy_control_value(self, value):
+    def _copy_control_value(self, value, name=None):
         if isinstance(value, fire.Function):
             copied = fire.Function(value.function_space(), name=value.name())
             copied.assign(value)
             return copied
         if isinstance(value, fire.Constant):
-            constant_data = self._constant_array(value)
-            if constant_data.shape == ():
-                return fire.Constant(float(constant_data))
-            return fire.Constant(constant_data)
+            control = fire.Function(
+                self.wave.get_control_parameter_function_space(),
+                name=name or "control",
+            )
+            control.interpolate(value)
+            return control
         return copy.deepcopy(value)
 
     def _copy_control_structure(self, control):
         if control is None:
             return None
         if isinstance(control, dict):
-            return {
-                key: self._copy_control_value(value)
-                for key, value in control.items()
-            }
+            copied = {}
+            for key, value in control.items():
+                try:
+                    name = key.value
+                except AttributeError:
+                    name = str(key)
+                copied[key] = self._copy_control_value(value, name=name)
+            return copied
         if isinstance(control, list):
-            return [self._copy_control_value(value) for value in control]
+            return [
+                self._copy_control_value(value, name=f"control_{index}")
+                for index, value in enumerate(control)
+            ]
         if isinstance(control, tuple):
-            return tuple(self._copy_control_value(value) for value in control)
+            return tuple(
+                self._copy_control_value(value, name=f"control_{index}")
+                for index, value in enumerate(control)
+            )
         return self._copy_control_value(control)
 
     def _flatten_control_value(self, value):
@@ -453,9 +465,9 @@ class FullWaveformInversion:
             rebuilt.dat.data[:] = flat_values.reshape(template_shape)
             return rebuilt
         if isinstance(template, fire.Constant):
-            if flat_values.size == 1:
-                return fire.Constant(float(flat_values[0]))
-            return fire.Constant(flat_values)
+            if flat_values.size != 1:
+                raise ValueError("Constant controls must rebuild from one value.")
+            return self._copy_control_value(fire.Constant(float(flat_values[0])))
         if np.isscalar(template):
             if flat_values.size != 1:
                 raise ValueError("Scalar controls must rebuild from one value.")
@@ -764,10 +776,13 @@ class FullWaveformInversion:
 
         if self.real_control is not None:
             real_wave.set_control_parameters(self._copy_control_structure(self.real_control))
-        elif (
-            hasattr(real_wave, "initial_velocity_model_file")
-            and self.real_velocity_model_file is not None
-        ):
+        elif self.real_velocity_model_file is not None:
+            try:
+                real_wave.initial_velocity_model_file
+            except AttributeError:
+                raise ValueError(
+                    "No real control parameter has been configured.",
+                ) from None
             real_wave.initial_velocity_model_file = self.real_velocity_model_file
         else:
             raise ValueError("No real control parameter has been configured.")
@@ -1072,7 +1087,9 @@ class FullWaveformInversion:
         gradient mask that has been set. The gradient is computed using the
         adjoint-state method implemented in gradient_solve().
         """
-        if not hasattr(self.wave, "gradient_solve"):
+        try:
+            gradient_solve = self.wave.gradient_solve
+        except AttributeError:
             raise NotImplementedError(
                 f"{type(self.wave).__name__} does not implement gradient_solve().",
             )
@@ -1088,7 +1105,7 @@ class FullWaveformInversion:
             self.set_guess_control(updated_control)
 
         comm.comm.barrier()
-        self.gradient = self.wave.gradient_solve(
+        self.gradient = gradient_solve(
             misfit=self.misfit,
             forward_solution=self.guess_forward_solution,
         )

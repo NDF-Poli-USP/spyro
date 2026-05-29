@@ -151,6 +151,17 @@ def test_full_waveform_inversion_rejects_non_acoustic_wave_instance():
         spyro.FullWaveformInversion(wave=wave)
 
 
+def test_acoustic_constant_control_is_converted_to_function():
+    fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
+    fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
+
+    fwi.set_guess_control(fire.Constant(2.0))
+
+    assert isinstance(fwi.guess_control, fire.Function)
+    assert isinstance(fwi.wave.get_control_parameters(), fire.Function)
+    assert np.allclose(fwi.guess_control.dat.data_ro, 2.0)
+
+
 def test_elastic_controls_roundtrip_on_isotropic_wave():
     wave = spyro.IsotropicWave(dictionary=build_elastic_dictionary())
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.25})
@@ -164,6 +175,26 @@ def test_elastic_controls_roundtrip_on_isotropic_wave():
         spyro.ElasticMaterialParameter.MU,
     }
     assert wave.get_control_parameters() is not controls
+
+
+def test_elastic_constant_controls_are_converted_to_functions():
+    wave = spyro.IsotropicWave(dictionary=build_elastic_dictionary())
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.25})
+
+    wave.set_control_parameters(
+        {
+            spyro.ElasticMaterialParameter.DENSITY: fire.Constant(1.0),
+            spyro.ElasticMaterialParameter.LAMBDA: fire.Constant(4.0),
+            spyro.ElasticMaterialParameter.MU: fire.Constant(1.0),
+        },
+    )
+
+    controls = wave.get_control_parameters()
+    assert all(isinstance(control, fire.Function) for control in controls.values())
+    assert all(
+        not isinstance(control, fire.Constant)
+        for control in controls.values()
+    )
 
 
 def test_elastic_controls_reject_string_keys():
