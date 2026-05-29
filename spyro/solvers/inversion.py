@@ -3,7 +3,6 @@ import warnings
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI  # noqa: F401
 import numpy as np
-import copy
 import resource
 import glob
 import os
@@ -380,6 +379,26 @@ class FullWaveformInversion:
         self.functional_history = []
 
     def _validate_supported_wave(self):
+        """Validate that the composed wave solver can be used for FWI.
+
+        Full waveform inversion requires an adjoint/gradient solve. At the
+        moment, Spyro only provides that workflow for acoustic waves, so the
+        driver checks the solver ``wave_type`` before any inversion state is
+        used.
+
+        Raises
+        ------
+        NotImplementedError
+            If the internal wave solver is not one of
+            ``supported_wave_types``.
+
+        Examples
+        --------
+        ``AcousticWave`` sets ``wave_type`` to
+        ``WaveType.ISOTROPIC_ACOUSTIC`` and is accepted. ``IsotropicWave`` sets
+        ``wave_type`` to ``WaveType.ISOTROPIC_ELASTIC`` and raises here because
+        the elastic adjoint is not implemented yet.
+        """
         if self.wave_type in self.supported_wave_types:
             return
         supported_names = ", ".join(
@@ -393,48 +412,45 @@ class FullWaveformInversion:
         )
 
     def _sync_wave_real_shot_record(self):
-        if self.real_shot_record is not None:
-            self.wave.real_shot_record = self.real_shot_record
+        """Copy observed data from the FWI driver to the wave solver.
 
-    def _control_items(self, control):
-        """Return control values as ``(key, value)`` pairs.
-
-        FWI currently supports acoustic inversion, where the control is usually
-        a single velocity ``Function``. The control helpers also operate on
-        dictionaries, lists, and tuples so the same flattening, rebuilding,
-        copying, bounds, and output code can handle future multiparameter
-        controls without duplicating container-specific logic in each method.
+        The FWI object owns ``real_shot_record`` as inversion state, while the
+        acoustic forward solver expects the same data on ``wave.real_shot_record``
+        when functional evaluation happens during a forward solve. This helper
+        keeps both objects synchronized before calling solver routines.
 
         Examples
         --------
-        A dictionary control keeps the parameter keys:
-
-        ``{ElasticMaterialParameter.DENSITY: rho,
-        ElasticMaterialParameter.LAMBDA: lmbda}``
-        becomes ``[(ElasticMaterialParameter.DENSITY, rho),
-        (ElasticMaterialParameter.LAMBDA, lmbda)]``.
-
-        A list control receives integer positions:
-
-        ``[rho, lmbda, mu]`` becomes ``[(0, rho), (1, lmbda), (2, mu)]``.
-
-        A tuple control is handled like a list:
-
-        ``(rho, lmbda, mu)`` becomes ``[(0, rho), (1, lmbda), (2, mu)]``.
-
-        A single control receives the synthetic key ``"control"``:
-
-        ``velocity`` becomes ``[("control", velocity)]``.
+        After ``generate_real_shot_record()``, ``self.real_shot_record`` is set
+        on the driver. Calling this method makes the same array available as
+        ``self.wave.real_shot_record``.
         """
-        if isinstance(control, dict):
-            return list(control.items())
-        if isinstance(control, list):
-            return list(enumerate(control))
-        if isinstance(control, tuple):
-            return list(enumerate(control))
-        return [("control", control)]
+        if self.real_shot_record is not None:
+            self.wave.real_shot_record = self.real_shot_record
 
     def _copy_control_value(self, value, name=None):
+        """Copy and normalize the acoustic velocity control.
+
+        Parameters
+        ----------
+        value : firedrake.Function or firedrake.Constant
+            Velocity control to copy.  ``Function`` values are duplicated into
+            a new ``Function``; ``Constant`` values are interpolated into the
+            solver function space and returned as a ``Function``.
+        name : str, optional
+            Name for the ``Function`` created from a ``Constant``.  Defaults
+            to ``"control"``.
+
+        Returns
+        -------
+        firedrake.Function
+            Independent copy of the velocity control.
+
+        Raises
+        ------
+        TypeError
+            If ``value`` is neither a ``Function`` nor a ``Constant``.
+        """
         if isinstance(value, fire.Function):
             copied = fire.Function(value.function_space(), name=value.name())
             copied.assign(value)
@@ -446,103 +462,162 @@ class FullWaveformInversion:
             )
             control.interpolate(value)
             return control
-        return copy.deepcopy(value)
+        raise TypeError(
+            "Acoustic FWI control must be a firedrake Function or Constant. "
+            f"Received {type(value).__name__}.",
+        )
 
     def _copy_control_structure(self, control):
+        """Return an independent copy of the velocity control.
+
+        Parameters
+        ----------
+        control : firedrake.Function, firedrake.Constant, or None
+            Velocity control to copy.
+
+        Returns
+        -------
+        firedrake.Function or None
+        """
         if control is None:
             return None
-        if isinstance(control, dict):
-            copied = {}
-            for key, value in control.items():
-                try:
-                    name = key.value
-                except AttributeError:
-                    name = str(key)
-                copied[key] = self._copy_control_value(value, name=name)
-            return copied
-        if isinstance(control, list):
-            return [
-                self._copy_control_value(value, name=f"control_{index}")
-                for index, value in enumerate(control)
-            ]
-        if isinstance(control, tuple):
-            return tuple(
-                self._copy_control_value(value, name=f"control_{index}")
-                for index, value in enumerate(control)
-            )
         return self._copy_control_value(control)
 
     def _flatten_control_value(self, value):
+        """Flatten the velocity ``Function`` into a one-dimensional array.
+
+        Parameters
+        ----------
+        value : firedrake.Function
+            Velocity control to flatten.
+
+        Returns
+        -------
+        numpy.ndarray
+            One-dimensional array of degrees of freedom.
+
+        Raises
+        ------
+        TypeError
+            If ``value`` is not a Firedrake ``Function``.
+        """
         if isinstance(value, fire.Function):
             return np.asarray(value.dat.data_ro, dtype=float).reshape(-1)
-        if isinstance(value, fire.Constant):
-            raise TypeError("Control constants must be converted to Functions.")
-        return np.atleast_1d(np.asarray(value, dtype=float)).reshape(-1)
+        raise TypeError(
+            "Acoustic FWI control must be a firedrake Function. "
+            f"Received {type(value).__name__}.",
+        )
 
     def _rebuild_control_value(self, template, flat_values):
+        """Rebuild a velocity ``Function`` from optimizer vector entries.
+
+        Parameters
+        ----------
+        template : firedrake.Function
+            Existing velocity function whose function space and shape guide
+            reconstruction.
+        flat_values : array_like
+            One-dimensional values from the optimizer.
+
+        Returns
+        -------
+        firedrake.Function
+            New velocity function with data filled from ``flat_values``.
+
+        Raises
+        ------
+        TypeError
+            If ``template`` is not a Firedrake ``Function``.
+        """
+        if not isinstance(template, fire.Function):
+            raise TypeError(
+                "Acoustic FWI control template must be a firedrake Function. "
+                f"Received {type(template).__name__}.",
+            )
         flat_values = np.asarray(flat_values, dtype=float).reshape(-1)
-        if isinstance(template, fire.Function):
-            rebuilt = self._copy_control_value(template)
-            template_shape = np.asarray(template.dat.data_ro).shape
-            rebuilt.dat.data[:] = flat_values.reshape(template_shape)
-            return rebuilt
-        if isinstance(template, fire.Constant):
-            raise TypeError("Control constants must be converted to Functions.")
-        if np.isscalar(template):
-            if flat_values.size != 1:
-                raise ValueError("Scalar controls must rebuild from one value.")
-            return float(flat_values[0])
-        template_array = np.asarray(template)
-        return flat_values.reshape(template_array.shape)
+        rebuilt = self._copy_control_value(template)
+        template_shape = np.asarray(template.dat.data_ro).shape
+        rebuilt.dat.data[:] = flat_values.reshape(template_shape)
+        return rebuilt
 
     def _flatten_control(self, control):
+        """Flatten the velocity ``Function`` into a one-dimensional optimizer vector.
+
+        Parameters
+        ----------
+        control : firedrake.Function
+            Velocity control to flatten.
+
+        Returns
+        -------
+        numpy.ndarray
+            One-dimensional array of velocity degrees of freedom.
+
+        Raises
+        ------
+        ValueError
+            If ``control`` is ``None``.
+        """
         if control is None:
             raise ValueError("No control parameter has been configured.")
-        flattened = [
-            self._flatten_control_value(value)
-            for _, value in self._control_items(control)
-        ]
-        return np.concatenate(flattened) if flattened else np.zeros((0,), dtype=float)
+        return self._flatten_control_value(control)
 
     def _rebuild_control_from_vector(self, template, flat_vector):
+        """Rebuild a velocity ``Function`` from an optimizer vector.
+
+        Inverse of :meth:`_flatten_control`.
+
+        Parameters
+        ----------
+        template : firedrake.Function
+            Velocity function used as the reconstruction template.
+        flat_vector : array_like
+            Optimizer vector.
+
+        Returns
+        -------
+        firedrake.Function
+            Rebuilt velocity function.
+
+        Raises
+        ------
+        ValueError
+            If the vector size does not match the template.
+        """
         flat_vector = np.asarray(flat_vector, dtype=float).reshape(-1)
-        offset = 0
-        rebuilt_items = []
-        for key, template_value in self._control_items(template):
-            size = self._flatten_control_value(template_value).size
-            rebuilt_value = self._rebuild_control_value(
-                template_value,
-                flat_vector[offset:offset + size],
-            )
-            rebuilt_items.append((key, rebuilt_value))
-            offset += size
-
-        if offset != flat_vector.size:
+        expected = self._flatten_control_value(template).size
+        if flat_vector.size != expected:
             raise ValueError("Control vector size does not match the configured control.")
-
-        if isinstance(template, dict):
-            return {key: value for key, value in rebuilt_items}
-        if isinstance(template, list):
-            return [value for _, value in rebuilt_items]
-        if isinstance(template, tuple):
-            return tuple(value for _, value in rebuilt_items)
-        return rebuilt_items[0][1]
-
-    def _control_functions(self, control):
-        return [
-            value
-            for _, value in self._control_items(control)
-            if isinstance(value, fire.Function)
-        ]
+        return self._rebuild_control_value(template, flat_vector)
 
     def _write_control_snapshot(self, control, filename):
-        if control is None:
-            return
-        functions = self._control_functions(control)
-        if functions:
-            fire.VTKFile(filename).write(*functions)
+        """Write the velocity ``Function`` to a VTK file.
+
+        Parameters
+        ----------
+        control : firedrake.Function or None
+            Velocity control to write.  Nothing is written when ``None`` or
+            not a ``Function``.
+        filename : str
+            Output VTK filename.
+        """
+        if isinstance(control, fire.Function):
+            fire.VTKFile(filename).write(control)
 
     def _guess_control_template(self):
+        """Return the current guess velocity ``Function`` used as optimizer template.
+
+        Returns
+        -------
+        firedrake.Function
+            Active guess velocity control.
+
+        Raises
+        ------
+        ValueError
+            If neither the FWI driver nor the wave solver has a configured
+            guess control.
+        """
         template = self.guess_control
         if template is None:
             template = self.wave.get_control_parameters()
@@ -551,6 +626,34 @@ class FullWaveformInversion:
         return template
 
     def _expand_bound(self, bound, template_value):
+        """Expand one bound specification to match a control component.
+
+        Bounds may be scalar, one-element arrays, or arrays with one entry per
+        control degree of freedom. This helper converts any supported form to a
+        vector with the same size as ``template_value``.
+
+        Parameters
+        ----------
+        bound : scalar or array_like
+            Bound value for one control component.
+        template_value : object
+            Control component whose flattened size determines the output size.
+
+        Returns
+        -------
+        numpy.ndarray
+            Bound vector matching the flattened control size.
+
+        Raises
+        ------
+        ValueError
+            If an array bound does not match the control size.
+
+        Examples
+        --------
+        ``vmin=1.5`` for a velocity function with ``n`` degrees of freedom
+        becomes an array of length ``n`` filled with ``1.5``.
+        """
         size = self._flatten_control_value(template_value).size
         if np.isscalar(bound):
             return np.full(size, float(bound))
@@ -562,29 +665,80 @@ class FullWaveformInversion:
             raise ValueError("Control bounds do not match the control size.")
         return bound_array
 
-    def _extract_bound(self, bound, key, template_value):
-        if isinstance(bound, dict):
-            if key not in bound:
-                raise KeyError(f"Missing bound for control '{key}'.")
-            return self._expand_bound(bound[key], template_value)
-        return self._expand_bound(bound, template_value)
-
     def _build_bounds(self, vmin, vmax, template):
-        lower = []
-        upper = []
-        for key, value in self._control_items(template):
-            lower.append(self._extract_bound(vmin, key, value))
-            upper.append(self._extract_bound(vmax, key, value))
-        return list(zip(np.concatenate(lower), np.concatenate(upper)))
+        """Build scipy L-BFGS-B bounds for the velocity control.
+
+        Parameters
+        ----------
+        vmin : scalar or array_like
+            Lower velocity bound.
+        vmax : scalar or array_like
+            Upper velocity bound.
+        template : firedrake.Function
+            Velocity control used to determine the number of degrees of
+            freedom.
+
+        Returns
+        -------
+        list of tuple
+            Bounds in the format expected by ``scipy.optimize.minimize`` with
+            method ``"L-BFGS-B"``.
+
+        Examples
+        --------
+        ``vmin=1.5, vmax=4.5`` expands to ``[(1.5, 4.5), ...]`` with one pair
+        per degree of freedom.
+        """
+        lower = self._expand_bound(vmin, template)
+        upper = self._expand_bound(vmax, template)
+        return list(zip(lower, upper))
 
     def get_control_vector(self, control=None):
-        """Flatten the current or provided control structure for optimizers."""
+        """Flatten the acoustic velocity control into an optimizer vector.
+
+        Parameters
+        ----------
+        control : firedrake.Function, optional
+            Velocity model to flatten.  If omitted, the current guess velocity
+            model is used.
+
+        Returns
+        -------
+        numpy.ndarray
+            One-dimensional array of velocity degrees of freedom, suitable as
+            input to ``scipy.optimize.minimize``.
+
+        Examples
+        --------
+        ``get_control_vector()`` returns the current guess velocity model
+        degrees of freedom as a single flat vector.
+        """
         if control is None:
             control = self._guess_control_template()
         return self._flatten_control(control)
 
     def set_real_control(self, control):
-        """Set the control parameters used to generate synthetic observations."""
+        """Set the true velocity model used to generate synthetic observations.
+
+        Parameters
+        ----------
+        control : firedrake.Function or firedrake.Constant
+            Acoustic velocity model for the "real" (observed-data) model.
+            ``Constant`` inputs are converted to a ``Function`` before being
+            stored.  FWI currently inverts only for acoustic velocity, so
+            only a scalar velocity field is accepted here.
+
+        Returns
+        -------
+        None
+            Updates ``real_control``, ``real_mesh``, and ``real_velocity_model``.
+
+        Examples
+        --------
+        ``set_real_control(fire.Constant(2.5))`` stores a uniform velocity
+        ``Function`` filled with ``2.5 km/s`` and uses it to generate
+        synthetic observed data.
+        """
         self.wave.set_control_parameters(self._copy_control_structure(control))
         self.real_mesh = self.wave.get_mesh()
         self.real_control = self._copy_control_structure(
@@ -597,7 +751,28 @@ class FullWaveformInversion:
         )
 
     def set_guess_control(self, control):
-        """Set the inversion starting control parameters."""
+        """Set the initial guess velocity model for inversion.
+
+        Parameters
+        ----------
+        control : firedrake.Function or firedrake.Constant
+            Starting acoustic velocity model for the FWI optimization.
+            ``Constant`` inputs are converted to a ``Function`` before being
+            stored.  FWI currently inverts only for acoustic velocity, so
+            only a scalar velocity field is accepted here.
+
+        Returns
+        -------
+        None
+            Updates ``guess_control``, ``guess_mesh``, and
+            ``guess_velocity_model``.  The cached misfit is reset.
+
+        Examples
+        --------
+        ``set_guess_control(velocity)`` stores a defensive copy of the
+        velocity ``Function``.  ``set_guess_control(fire.Constant(2.0))``
+        creates a uniform velocity ``Function`` filled with ``2.0 km/s``.
+        """
         self.wave.set_control_parameters(self._copy_control_structure(control))
         self.guess_mesh = self.wave.get_mesh()
         self.guess_control = self._copy_control_structure(
