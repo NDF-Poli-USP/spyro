@@ -430,7 +430,7 @@ class FullWaveformInversion:
             self.wave.real_shot_record = self.real_shot_record
 
     def _copy_control_value(self, value, name=None):
-        """Copy and normalize the acoustic velocity control.
+        """Copy  the acoustic velocity control.
 
         Parameters
         ----------
@@ -514,14 +514,14 @@ class FullWaveformInversion:
         return np.asarray(control.dat.data_ro, dtype=float).reshape(-1)
 
     def _rebuild_control_from_vector(self, template, flat_vector):
-        """Rebuild a velocity ``Function`` from an optimizer vector.
+        """Rebuild a control ``Function`` from an optimizer vector.
 
         Inverse of :meth:`_flatten_control`.
 
         Parameters
         ----------
         template : firedrake.Function
-            Velocity function used as the reconstruction template.
+            control function used as the reconstruction template.
         flat_vector : array_like
             Optimizer vector.
 
@@ -547,9 +547,9 @@ class FullWaveformInversion:
         expected = int(np.prod(template_shape))
         if flat_vector.size != expected:
             raise ValueError("Control vector size does not match the configured control.")
-        rebuilt = self._copy_control_value(template)
-        rebuilt.dat.data[:] = flat_vector.reshape(template_shape)
-        return rebuilt
+        return fire.Function(
+            template.function_space(), name=template.name(),
+            val=flat_vector.reshape(template_shape))
 
     def _write_control_snapshot(self, control, filename):
         """Write the velocity ``Function`` to a VTK file.
@@ -625,34 +625,6 @@ class FullWaveformInversion:
         if bound_array.size != size:
             raise ValueError("Control bounds do not match the control size.")
         return bound_array
-
-    def _build_bounds(self, vmin, vmax, template):
-        """Build scipy L-BFGS-B bounds for the velocity control.
-
-        Parameters
-        ----------
-        vmin : scalar or array_like
-            Lower velocity bound.
-        vmax : scalar or array_like
-            Upper velocity bound.
-        template : firedrake.Function
-            Velocity control used to determine the number of degrees of
-            freedom.
-
-        Returns
-        -------
-        list of tuple
-            Bounds in the format expected by ``scipy.optimize.minimize`` with
-            method ``"L-BFGS-B"``.
-
-        Examples
-        --------
-        ``vmin=1.5, vmax=4.5`` expands to ``[(1.5, 4.5), ...]`` with one pair
-        per degree of freedom.
-        """
-        lower = self._expand_bound(vmin, template)
-        upper = self._expand_bound(vmax, template)
-        return list(zip(lower, upper))
 
     def set_guess_control(self, control):
         """Set the initial guess velocity model for inversion.
@@ -1289,7 +1261,9 @@ class FullWaveformInversion:
         parameters.update(kwargs)
 
         template = self._guess_control_template()
-        bounds = self._build_bounds(parameters["vmin"], parameters["vmax"], template)
+        lower = self._expand_bound(parameters["vmin"], template)
+        upper = self._expand_bound(parameters["vmax"], template)
+        bounds = list(zip(lower, upper))
         control_0 = self._flatten_control(template)
         options = parameters["scipy_options"]
 
