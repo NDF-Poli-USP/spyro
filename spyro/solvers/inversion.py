@@ -8,10 +8,11 @@ import resource
 import glob
 import os
 
+from .wave import Wave
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
-from ..utils.typing import FunctionalEvaluationMode
+from ..utils.typing import FunctionalEvaluationMode, WaveType
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import switch_serial_shot
 from ..io.basicio import load_shots, save_shots, create_segy
@@ -270,7 +271,7 @@ class FullWaveformInversion:
     >>> fwi.run_fwi(maxiter=50, vmin=1.5, vmax=4.5)
     """
 
-    supported_wave_classes = (AcousticWave,)
+    supported_wave_types = (WaveType.ISOTROPIC_ACOUSTIC,)
 
     def __init__(
         self,
@@ -291,19 +292,35 @@ class FullWaveformInversion:
             solver.
         wave_class : type, optional
             Wave solver class used when ``wave`` is not provided. The class
-            must be :class:`AcousticWave` or an acoustic subclass while FWI
-            support is limited to acoustic adjoint solves.
+            must construct a :class:`Wave` with
+            :attr:`WaveType.ISOTROPIC_ACOUSTIC` while FWI support is limited
+            to acoustic adjoint solves.
         wave : object, optional
             Preconstructed wave solver instance. When provided, the inversion
             driver uses this instance directly and infers ``wave_class`` from
-            its type. The instance must be an acoustic wave solver.
+            its type. The instance must be a :class:`Wave` with
+            :attr:`WaveType.ISOTROPIC_ACOUSTIC`.
         """
         if wave is not None:
+            if not isinstance(wave, Wave):
+                raise TypeError(
+                    "wave must be an instance of Wave. "
+                    f"Received {type(wave).__name__}.",
+                )
             self.wave = wave
             self.wave_class = type(wave)
         else:
             self.wave_class = AcousticWave if wave_class is None else wave_class
+            if (
+                not isinstance(self.wave_class, type)
+                or not issubclass(self.wave_class, Wave)
+            ):
+                raise TypeError(
+                    "wave_class must be a Wave subclass. "
+                    f"Received {self.wave_class}.",
+                )
             self.wave = self.wave_class(dictionary=dictionary, comm=comm)
+        self.wave_type = self.wave.wave_type
         self._validate_supported_wave()
 
         self.input_dictionary = self.wave.input_dictionary
@@ -369,16 +386,16 @@ class FullWaveformInversion:
         self.functional_history = []
 
     def _validate_supported_wave(self):
-        if isinstance(self.wave, self.supported_wave_classes):
+        if self.wave_type in self.supported_wave_types:
             return
         supported_names = ", ".join(
-            wave_class.__name__
-            for wave_class in self.supported_wave_classes
+            wave_type.name
+            for wave_type in self.supported_wave_types
         )
         raise NotImplementedError(
             "FullWaveformInversion currently supports only acoustic wave "
             "solvers because adjoint-based gradients are implemented only for "
-            f"{supported_names}. Received {type(self.wave).__name__}.",
+            f"{supported_names}. Received {self.wave_type.name}.",
         )
 
     def _create_wave_solver(self):
