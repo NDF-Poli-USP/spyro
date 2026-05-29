@@ -117,7 +117,7 @@ def compute_functional(
 
     J = 0
     for rn in range(num_receivers):
-        J += np.trapezoid(squared_residual, dx=dt)
+        J += np.trapezoid(misfit[:, rn] ** 2, dx=dt)
 
     J *= 0.5
 
