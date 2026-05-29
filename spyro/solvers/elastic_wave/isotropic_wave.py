@@ -28,6 +28,23 @@ CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
 
 
 def _format_control_parameters(parameters):
+    """Format material-parameter enum values for error messages.
+
+    Parameters
+    ----------
+    parameters : iterable of ElasticMaterialParameter
+        Material-parameter enum values to display.
+
+    Returns
+    -------
+    str
+        Human-readable set-like representation using public parameter names.
+
+    Examples
+    --------
+    ``(ElasticMaterialParameter.DENSITY, ElasticMaterialParameter.MU)``
+    becomes ``"{density, mu}"``.
+    """
     return "{" + ", ".join(parameter.value for parameter in parameters) + "}"
 
 
@@ -98,6 +115,27 @@ class IsotropicWave(ElasticWave):
             the active control parameterization on ``self``.
         """
         def material_parameter(value):
+            """Normalize model-dictionary values for elastic parameters.
+
+            Parameters
+            ----------
+            value : scalar, firedrake.Constant, firedrake.Function, or UFL expression
+                Material parameter read from ``synthetic_data_dict``.
+
+            Returns
+            -------
+            firedrake.Constant, firedrake.Function, or object
+                Scalars and ``Constant`` values are converted to scalar
+                material ``Function`` objects once a mesh exists. Before mesh
+                creation, scalar values remain as ``Constant`` values so the
+                regular model initialization flow can continue.
+
+            Examples
+            --------
+            ``density=1.0`` becomes ``Constant(1.0)`` before the mesh exists,
+            and becomes a scalar material ``Function`` after the mesh has been
+            created.
+            """
             if np.isscalar(value) or isinstance(value, Constant):
                 if self.mesh is None:
                     return Constant(value) if np.isscalar(value) else value
@@ -213,7 +251,28 @@ class IsotropicWave(ElasticWave):
         return "Displacement"
 
     def get_control_parameter_function_space(self):
-        """Return the scalar space used for elastic material controls."""
+        """Return the scalar space used for elastic material controls.
+
+        Elastic displacement is vector-valued, but density, Lame parameters,
+        and wave speeds are scalar material fields. This method creates and
+        returns the scalar space used for those controls.
+
+        Returns
+        -------
+        firedrake.FunctionSpace
+            Scalar material-parameter function space.
+
+        Raises
+        ------
+        ValueError
+            If the mesh has not been created yet.
+
+        Examples
+        --------
+        ``Function(wave.get_control_parameter_function_space())`` creates a
+        scalar density or Lame-parameter control compatible with
+        ``set_control_parameters``.
+        """
         if self.mesh is None:
             raise ValueError(
                 "Mesh must be set before creating elastic control parameter spaces.",
@@ -268,7 +327,26 @@ class IsotropicWave(ElasticWave):
         return field
 
     def get_control_parameters(self):
-        """Return the active isotropic elastic material controls."""
+        """Return the active isotropic elastic material controls.
+
+        The returned dictionary is keyed by
+        :class:`ElasticMaterialParameter`. Its contents depend on the active
+        parameterization: density/Lame parameters or density/P- and S-wave
+        velocities.
+
+        Returns
+        -------
+        dict or None
+            Dictionary mapping material-parameter enum values to scalar
+            Firedrake ``Function`` controls. Returns ``None`` if material
+            parameters have not been initialized.
+
+        Examples
+        --------
+        Lame parameterization returns ``{DENSITY: rho, LAMBDA: lmbda, MU: mu}``.
+        Velocity parameterization returns
+        ``{DENSITY: rho, P_WAVE_VELOCITY: c, S_WAVE_VELOCITY: c_s}``.
+        """
         parameterization = self._control_parameterization
         if parameterization is None:
             if self.rho is None:
@@ -299,6 +377,47 @@ class IsotropicWave(ElasticWave):
         Control dictionaries must use :class:`ElasticMaterialParameter` keys.
         Model input dictionaries still use the public Spyro string schema, but
         the FWI control API is intentionally enum-only.
+
+        Parameters
+        ----------
+        controls : dict
+            Dictionary containing either density/Lame controls or density/P-
+            and S-wave velocity controls. Values may be Firedrake ``Function``
+            objects, Firedrake ``Constant`` objects, scalars, or UFL
+            expressions; all stored controls are scalar ``Function`` objects.
+
+        Returns
+        -------
+        None
+            The method updates ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s`` and
+            the active material parameterization.
+
+        Raises
+        ------
+        TypeError
+            If ``controls`` is not a dictionary or if any key is not an
+            ``ElasticMaterialParameter``.
+        ValueError
+            If the dictionary does not define one complete supported
+            parameterization.
+
+        Examples
+        --------
+        Lame controls are passed as::
+
+            {
+                ElasticMaterialParameter.DENSITY: rho,
+                ElasticMaterialParameter.LAMBDA: lmbda,
+                ElasticMaterialParameter.MU: mu,
+            }
+
+        Velocity controls are passed as::
+
+            {
+                ElasticMaterialParameter.DENSITY: rho,
+                ElasticMaterialParameter.P_WAVE_VELOCITY: c,
+                ElasticMaterialParameter.S_WAVE_VELOCITY: c_s,
+            }
         """
         if not isinstance(controls, dict):
             raise TypeError(

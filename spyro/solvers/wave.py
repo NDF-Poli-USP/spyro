@@ -568,16 +568,80 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._functional_evaluation_mode = mode
 
     def get_control_parameters(self):
+        """Return inversion controls exposed by a concrete wave solver.
+
+        Subclasses override this method when they can participate in inversion
+        workflows. The base class raises because a generic ``Wave`` does not
+        know which physical parameters should be optimized.
+
+        Returns
+        -------
+        object
+            Solver-specific control structure.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+
+        Examples
+        --------
+        ``AcousticWave.get_control_parameters()`` returns the velocity model;
+        an elastic solver may return a dictionary of material parameters.
+        """
         raise NotImplementedError(
             f"{type(self).__name__} does not expose inversion control parameters.",
         )
 
     def set_control_parameters(self, controls):
+        """Assign inversion controls on a concrete wave solver.
+
+        Parameters
+        ----------
+        controls : object
+            Solver-specific control structure.
+
+        Returns
+        -------
+        None
+            Concrete subclasses assign the controls in-place.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+
+        Examples
+        --------
+        ``AcousticWave.set_control_parameters(vp)`` assigns a velocity model;
+        elastic solvers expect a dictionary keyed by material-parameter enums.
+        """
         raise NotImplementedError(
             f"{type(self).__name__} cannot assign inversion control parameters.",
         )
 
     def get_control_parameter_function_space(self):
+        """Return the function space used by inversion controls.
+
+        Subclasses override this method to tell the FWI driver where scalar
+        controls should live when constants or expressions need to be converted
+        to Firedrake ``Function`` objects.
+
+        Returns
+        -------
+        firedrake.FunctionSpace
+            Solver-specific control function space.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+
+        Examples
+        --------
+        Acoustic controls use the acoustic pressure/velocity function space;
+        elastic material controls use a scalar material-parameter space.
+        """
         raise NotImplementedError(
             f"{type(self).__name__} does not define a control parameter function space.",
         )
