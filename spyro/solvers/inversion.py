@@ -14,7 +14,7 @@ from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..utils.typing import WaveType
 from ..plots import plot_model as spyro_plot_model
-from ..io.basicio import switch_serial_shot
+from ..io.basicio import parallel_print, switch_serial_shot
 from ..io.basicio import load_shots, save_shots, create_segy
 from ..utils import run_in_one_core
 
@@ -84,7 +84,6 @@ class L2Inner(object):
             Wave object containing the function space and quadrature rule.
         """
         V = Wave_obj.function_space
-        # print(f"Dir {dir(Wave_obj)}", flush=True)
         dxlump = fire.dx(**Wave_obj.quadrature_rule)
         self.A = fire.assemble(
             fire.TrialFunction(V) * fire.TestFunction(V) * dxlump,
@@ -398,6 +397,35 @@ class FullWaveformInversion:
             self.wave.real_shot_record = self.real_shot_record
 
     def _control_items(self, control):
+        """Return control values as ``(key, value)`` pairs.
+
+        FWI currently supports acoustic inversion, where the control is usually
+        a single velocity ``Function``. The control helpers also operate on
+        dictionaries, lists, and tuples so the same flattening, rebuilding,
+        copying, bounds, and output code can handle future multiparameter
+        controls without duplicating container-specific logic in each method.
+
+        Examples
+        --------
+        A dictionary control keeps the parameter keys:
+
+        ``{ElasticMaterialParameter.DENSITY: rho,
+        ElasticMaterialParameter.LAMBDA: lmbda}``
+        becomes ``[(ElasticMaterialParameter.DENSITY, rho),
+        (ElasticMaterialParameter.LAMBDA, lmbda)]``.
+
+        A list control receives integer positions:
+
+        ``[rho, lmbda, mu]`` becomes ``[(0, rho), (1, lmbda), (2, mu)]``.
+
+        A tuple control is handled like a list:
+
+        ``(rho, lmbda, mu)`` becomes ``[(0, rho), (1, lmbda), (2, mu)]``.
+
+        A single control receives the synthetic key ``"control"``:
+
+        ``velocity`` becomes ``[("control", velocity)]``.
+        """
         if isinstance(control, dict):
             return list(control.items())
         if isinstance(control, list):
@@ -405,12 +433,6 @@ class FullWaveformInversion:
         if isinstance(control, tuple):
             return list(enumerate(control))
         return [("control", control)]
-
-    def _constant_array(self, value):
-        try:
-            return np.asarray(value.values(), dtype=float)
-        except AttributeError:
-            return np.asarray(value, dtype=float)
 
     def _copy_control_value(self, value, name=None):
         if isinstance(value, fire.Function):
@@ -454,7 +476,7 @@ class FullWaveformInversion:
         if isinstance(value, fire.Function):
             return np.asarray(value.dat.data_ro, dtype=float).reshape(-1)
         if isinstance(value, fire.Constant):
-            return self._constant_array(value).reshape(-1)
+            raise TypeError("Control constants must be converted to Functions.")
         return np.atleast_1d(np.asarray(value, dtype=float)).reshape(-1)
 
     def _rebuild_control_value(self, template, flat_values):
@@ -465,9 +487,7 @@ class FullWaveformInversion:
             rebuilt.dat.data[:] = flat_values.reshape(template_shape)
             return rebuilt
         if isinstance(template, fire.Constant):
-            if flat_values.size != 1:
-                raise ValueError("Constant controls must rebuild from one value.")
-            return self._copy_control_value(fire.Constant(float(flat_values[0])))
+            raise TypeError("Control constants must be converted to Functions.")
         if np.isscalar(template):
             if flat_values.size != 1:
                 raise ValueError("Scalar controls must rebuild from one value.")
@@ -1045,11 +1065,11 @@ class FullWaveformInversion:
         self.functional_history.append(Jm)
         self.functional = Jm
         peak_memory_mb = get_peak_memory()
+        parallel_print(
+            f"Functional: {Jm} at iteration: {self.current_iteration}",
+            self.comm,
+        )
         if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
-            print(
-                f"Functional: {Jm} at iteration: {self.current_iteration}",
-                flush=True,
-            )
             with open("functional_values.txt", "a") as file:
                 file.write(
                     f"Iteration: {self.current_iteration}, Functional: {Jm}\n",
