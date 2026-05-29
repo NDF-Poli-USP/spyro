@@ -1532,10 +1532,7 @@ class FullWaveformInversion:
                 "SEG-Y export requires a single scalar inversion control result.",
             )
         create_segy(
-            self.vp_result,
-            self.vp_result.function_space(),
-            grid_spacing,
-            file_name,
+            self.vp_result, self.vp_result.function_space(), grid_spacing, file_name,
         )
 
 
