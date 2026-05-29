@@ -620,6 +620,38 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             f"{type(self).__name__} cannot assign inversion control parameters.",
         )
 
+    def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
+        """Compute an adjoint gradient for inversion.
+
+        Concrete wave solvers override this method when they provide the
+        adjoint-state machinery required by FWI. The base implementation raises
+        because a generic ``Wave`` does not define the physical model-specific
+        gradient equation.
+
+        Parameters
+        ----------
+        guess : firedrake.Function, optional
+            Control value used by solvers that accept an explicit guess.
+        misfit : array_like, optional
+            Difference between observed and simulated receiver data.
+        forward_solution : firedrake.Function, optional
+            Forward wavefield used by adjoint solvers that need it explicitly.
+
+        Returns
+        -------
+        firedrake.Function
+            Gradient of the objective functional with respect to the active
+            control.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement gradient_solve().",
+        )
+
     def get_control_parameter_function_space(self):
         """Return the function space used by inversion controls.
 
