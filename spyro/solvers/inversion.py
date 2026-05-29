@@ -1160,13 +1160,6 @@ class FullWaveformInversion:
         gradient mask that has been set. The gradient is computed using the
         adjoint-state method implemented in gradient_solve().
         """
-        try:
-            gradient_solve = self.wave.gradient_solve
-        except AttributeError:
-            raise NotImplementedError(
-                f"{type(self.wave).__name__} does not implement gradient_solve().",
-            )
-
         comm = self.comm
         if calculate_functional:
             self.get_functional(c=c)
@@ -1178,7 +1171,7 @@ class FullWaveformInversion:
             self.set_guess_control(updated_control)
 
         comm.comm.barrier()
-        self.gradient = gradient_solve(
+        self.gradient = self.wave.gradient_solve(
             misfit=self.misfit,
             forward_solution=self.guess_forward_solution,
         )
