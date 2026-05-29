@@ -117,11 +117,6 @@ def compute_functional(
 
     J = 0
     for rn in range(num_receivers):
-        receiver_residual = np.asarray(misfit[:, rn])
-        if receiver_residual.ndim == 1:
-            squared_residual = receiver_residual ** 2
-        else:
-            squared_residual = np.sum(receiver_residual ** 2, axis=-1)
         J += np.trapezoid(squared_residual, dx=dt)
 
     J *= 0.5
