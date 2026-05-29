@@ -1,1 +1,0 @@
-Iteration: 0, Functional: 0.0178428233870304
