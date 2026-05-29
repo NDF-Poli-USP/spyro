@@ -274,12 +274,7 @@ class FullWaveformInversion:
     supported_wave_types = (WaveType.ISOTROPIC_ACOUSTIC,)
 
     def __init__(
-        self,
-        dictionary=None,
-        comm=None,
-        wave_class=AcousticWave,
-        wave=None,
-    ):
+        self, dictionary=None, comm=None, wave_class=AcousticWave, wave=None):
         """Initialize the full waveform inversion driver.
 
         Parameters
