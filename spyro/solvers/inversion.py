@@ -843,7 +843,7 @@ class FullWaveformInversion:
         """
         Generate synthetic shot records from the true velocity model.
 
-        Creates a wave solver with the true velocity model, solves the forward
+        Create a wave solver with the true velocity model, and solve the forward
         problem, and optionally saves the shot records and plots the model.
         This is used only for synthetic test cases.
 
