@@ -12,7 +12,7 @@ from .wave import Wave
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
-from ..utils.typing import FunctionalEvaluationMode, WaveType
+from ..utils.typing import WaveType
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import switch_serial_shot
 from ..io.basicio import load_shots, save_shots, create_segy
@@ -396,24 +396,6 @@ class FullWaveformInversion:
     def _sync_wave_real_shot_record(self):
         if self.real_shot_record is not None:
             self.wave.real_shot_record = self.real_shot_record
-
-    @property
-    def functional_value(self):
-        """Return the functional value accumulated by the acoustic solver."""
-        try:
-            return self.wave.functional_value
-        except AttributeError:
-            return None
-
-    def enable_compute_functional(self, mode=FunctionalEvaluationMode.AFTER_SOLVE):
-        """Enable functional evaluation in the internal acoustic solver."""
-        self._sync_wave_real_shot_record()
-        return self.wave.enable_compute_functional(mode=mode)
-
-    def forward_solve(self):
-        """Run a forward solve with the internal acoustic solver."""
-        self._sync_wave_real_shot_record()
-        return self.wave.forward_solve()
 
     def _control_items(self, control):
         if isinstance(control, dict):
