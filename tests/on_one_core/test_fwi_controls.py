@@ -120,6 +120,20 @@ def test_full_waveform_inversion_uses_composition():
 
     assert not isinstance(fwi, spyro.Wave)
     assert isinstance(fwi.wave, spyro.AcousticWave)
+    assert fwi.wave_type is spyro.WaveType.ISOTROPIC_ACOUSTIC
+
+
+def test_full_waveform_inversion_rejects_non_wave_instance():
+    with pytest.raises(TypeError, match="wave must be an instance of Wave"):
+        spyro.FullWaveformInversion(wave=object())
+
+
+def test_full_waveform_inversion_rejects_non_wave_class():
+    with pytest.raises(TypeError, match="wave_class must be a Wave subclass"):
+        spyro.FullWaveformInversion(
+            dictionary=build_acoustic_dictionary(),
+            wave_class=object,
+        )
 
 
 def test_full_waveform_inversion_rejects_non_acoustic_wave_class():
