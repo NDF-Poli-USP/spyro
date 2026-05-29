@@ -483,63 +483,6 @@ class FullWaveformInversion:
             return None
         return self._copy_control_value(control)
 
-    def _flatten_control_value(self, value):
-        """Flatten the velocity ``Function`` into a one-dimensional array.
-
-        Parameters
-        ----------
-        value : firedrake.Function
-            Velocity control to flatten.
-
-        Returns
-        -------
-        numpy.ndarray
-            One-dimensional array of degrees of freedom.
-
-        Raises
-        ------
-        TypeError
-            If ``value`` is not a Firedrake ``Function``.
-        """
-        if isinstance(value, fire.Function):
-            return np.asarray(value.dat.data_ro, dtype=float).reshape(-1)
-        raise TypeError(
-            "Acoustic FWI control must be a firedrake Function. "
-            f"Received {type(value).__name__}.",
-        )
-
-    def _rebuild_control_value(self, template, flat_values):
-        """Rebuild a velocity ``Function`` from optimizer vector entries.
-
-        Parameters
-        ----------
-        template : firedrake.Function
-            Existing velocity function whose function space and shape guide
-            reconstruction.
-        flat_values : array_like
-            One-dimensional values from the optimizer.
-
-        Returns
-        -------
-        firedrake.Function
-            New velocity function with data filled from ``flat_values``.
-
-        Raises
-        ------
-        TypeError
-            If ``template`` is not a Firedrake ``Function``.
-        """
-        if not isinstance(template, fire.Function):
-            raise TypeError(
-                "Acoustic FWI control template must be a firedrake Function. "
-                f"Received {type(template).__name__}.",
-            )
-        flat_values = np.asarray(flat_values, dtype=float).reshape(-1)
-        rebuilt = self._copy_control_value(template)
-        template_shape = np.asarray(template.dat.data_ro).shape
-        rebuilt.dat.data[:] = flat_values.reshape(template_shape)
-        return rebuilt
-
     def _flatten_control(self, control):
         """Flatten the velocity ``Function`` into a one-dimensional optimizer vector.
 
@@ -557,10 +500,17 @@ class FullWaveformInversion:
         ------
         ValueError
             If ``control`` is ``None``.
+        TypeError
+            If ``control`` is not a Firedrake ``Function``.
         """
         if control is None:
             raise ValueError("No control parameter has been configured.")
-        return self._flatten_control_value(control)
+        if not isinstance(control, fire.Function):
+            raise TypeError(
+                "Acoustic FWI control must be a firedrake Function. "
+                f"Received {type(control).__name__}.",
+            )
+        return np.asarray(control.dat.data_ro, dtype=float).reshape(-1)
 
     def _rebuild_control_from_vector(self, template, flat_vector):
         """Rebuild a velocity ``Function`` from an optimizer vector.
@@ -581,14 +531,24 @@ class FullWaveformInversion:
 
         Raises
         ------
+        TypeError
+            If ``template`` is not a Firedrake ``Function``.
         ValueError
             If the vector size does not match the template.
         """
+        if not isinstance(template, fire.Function):
+            raise TypeError(
+                "Acoustic FWI control template must be a firedrake Function. "
+                f"Received {type(template).__name__}.",
+            )
         flat_vector = np.asarray(flat_vector, dtype=float).reshape(-1)
-        expected = self._flatten_control_value(template).size
+        template_shape = np.asarray(template.dat.data_ro).shape
+        expected = int(np.prod(template_shape))
         if flat_vector.size != expected:
             raise ValueError("Control vector size does not match the configured control.")
-        return self._rebuild_control_value(template, flat_vector)
+        rebuilt = self._copy_control_value(template)
+        rebuilt.dat.data[:] = flat_vector.reshape(template_shape)
+        return rebuilt
 
     def _write_control_snapshot(self, control, filename):
         """Write the velocity ``Function`` to a VTK file.
@@ -654,7 +614,7 @@ class FullWaveformInversion:
         ``vmin=1.5`` for a velocity function with ``n`` degrees of freedom
         becomes an array of length ``n`` filled with ``1.5``.
         """
-        size = self._flatten_control_value(template_value).size
+        size = self._flatten_control(template_value).size
         if np.isscalar(bound):
             return np.full(size, float(bound))
 
@@ -692,63 +652,6 @@ class FullWaveformInversion:
         lower = self._expand_bound(vmin, template)
         upper = self._expand_bound(vmax, template)
         return list(zip(lower, upper))
-
-    def get_control_vector(self, control=None):
-        """Flatten the acoustic velocity control into an optimizer vector.
-
-        Parameters
-        ----------
-        control : firedrake.Function, optional
-            Velocity model to flatten.  If omitted, the current guess velocity
-            model is used.
-
-        Returns
-        -------
-        numpy.ndarray
-            One-dimensional array of velocity degrees of freedom, suitable as
-            input to ``scipy.optimize.minimize``.
-
-        Examples
-        --------
-        ``get_control_vector()`` returns the current guess velocity model
-        degrees of freedom as a single flat vector.
-        """
-        if control is None:
-            control = self._guess_control_template()
-        return self._flatten_control(control)
-
-    def set_real_control(self, control):
-        """Set the true velocity model used to generate synthetic observations.
-
-        Parameters
-        ----------
-        control : firedrake.Function or firedrake.Constant
-            Acoustic velocity model for the "real" (observed-data) model.
-            ``Constant`` inputs are converted to a ``Function`` before being
-            stored.  FWI currently inverts only for acoustic velocity, so
-            only a scalar velocity field is accepted here.
-
-        Returns
-        -------
-        None
-            Updates ``real_control``, ``real_mesh``, and ``real_velocity_model``.
-
-        Examples
-        --------
-        ``set_real_control(fire.Constant(2.5))`` stores a uniform velocity
-        ``Function`` filled with ``2.5 km/s`` and uses it to generate
-        synthetic observed data.
-        """
-        self.wave.set_control_parameters(self._copy_control_structure(control))
-        self.real_mesh = self.wave.get_mesh()
-        self.real_control = self._copy_control_structure(
-            self.wave.get_control_parameters(),
-        )
-        self.real_velocity_model = (
-            self._copy_control_structure(self.real_control)
-            if isinstance(self.real_control, fire.Function)
-            else None
-        )
 
     def set_guess_control(self, control):
         """Set the initial guess velocity model for inversion.
@@ -1023,7 +926,7 @@ class FullWaveformInversion:
 
         Notes
         -----
-        TODOThis method currently does not implement the smoothing operation and
+        TODO: this method currently does not implement the smoothing operation and
         may need to be completed for actual use.
         """
         if real_velocity_model_file is not None:
@@ -1386,7 +1289,7 @@ class FullWaveformInversion:
 
         template = self._guess_control_template()
         bounds = self._build_bounds(parameters["vmin"], parameters["vmax"], template)
-        control_0 = self.get_control_vector(template)
+        control_0 = self._flatten_control(template)
         options = parameters["scipy_options"]
 
         result = scipy_minimize(
@@ -1516,8 +1419,8 @@ class FullWaveformInversion:
         the model domain, which is useful for excluding absorbing boundary
         layers or other regions where the velocity model should not be updated.
 
-        This method is deprecated since we prefer tu use mesh based tags for now. In
-        the future we will use the new submesh functionality in FIredrake
+        This method is deprecated since we prefer to use mesh based tags for now. In
+        the future we will use the new submesh functionality in Firedrake.
 
         Parameters
         ----------
@@ -1564,7 +1467,7 @@ class FullWaveformInversion:
 
     def _apply_gradient_mask(self):
         """
-        DEPRECATED Apply the gradient mask to the computed gradient.
+        DEPRECATED: apply the gradient mask to the computed gradient.
 
         If a gradient mask has been set via set_gradient_mask(), this method
         applies the mask to zero out gradient values outside the defined region.
@@ -1572,8 +1475,8 @@ class FullWaveformInversion:
 
         Notes
         -----
-        This method is deprecated since we prefer tu use mesh based tags for now. In
-        the future we will use the new submesh functionality in FIredrake
+        This method is deprecated since we prefer to use mesh based tags for now. In
+        the future we will use the new submesh functionality in Firedrake.
         """
         if self.has_gradient_mask:
             self.gradient = self.mask_obj.apply_mask(self.gradient)
