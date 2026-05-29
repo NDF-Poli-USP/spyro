@@ -11,6 +11,7 @@ import os
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
+from ..utils.typing import FunctionalEvaluationMode
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import switch_serial_shot
 from ..io.basicio import load_shots, save_shots, create_segy
@@ -386,6 +387,28 @@ class FullWaveformInversion:
     def _receiver_data(self, wave):
         return wave.forward_solution_receivers
 
+    def _sync_wave_real_shot_record(self):
+        if self.real_shot_record is not None:
+            self.wave.real_shot_record = self.real_shot_record
+
+    @property
+    def functional_value(self):
+        """Return the functional value accumulated by the acoustic solver."""
+        return getattr(self.wave, "functional_value", None)
+
+    def enable_compute_functional(
+        self,
+        mode=FunctionalEvaluationMode.AFTER_SOLVE,
+    ):
+        """Enable functional evaluation in the internal acoustic solver."""
+        self._sync_wave_real_shot_record()
+        return self.wave.enable_compute_functional(mode=mode)
+
+    def forward_solve(self):
+        """Run a forward solve with the internal acoustic solver."""
+        self._sync_wave_real_shot_record()
+        return self.wave.forward_solve()
+
     def _control_items(self, control):
         if isinstance(control, dict):
             return list(control.items())
@@ -611,6 +634,7 @@ class FullWaveformInversion:
         elif self.wave.get_control_parameters() is None:
             raise ValueError("No guess control parameter has been configured.")
 
+        self._sync_wave_real_shot_record()
         self.wave.forward_solve()
         current_control = self.wave.get_control_parameters()
         self._write_control_snapshot(
@@ -686,6 +710,7 @@ class FullWaveformInversion:
             self.real_shot_record = real_shot_record_list
         else:
             self.real_shot_record = self._receiver_data(real_wave)
+        self._sync_wave_real_shot_record()
 
     def set_smooth_guess_velocity_model(self, real_velocity_model_file=None):
         if real_velocity_model_file is not None:
@@ -1020,6 +1045,7 @@ class FullWaveformInversion:
         """
         load_shots(self.wave, file_name=file_name)
         self.real_shot_record = self.wave.forward_solution_receivers
+        self.wave.real_shot_record = self.real_shot_record
         self.wave.forward_solution_receivers = None
 
     @run_in_one_core
