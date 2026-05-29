@@ -398,12 +398,6 @@ class FullWaveformInversion:
             f"{supported_names}. Received {self.wave_type.name}.",
         )
 
-    def _create_wave_solver(self):
-        return self.wave_class(dictionary=self.input_dictionary, comm=self.comm)
-
-    def _receiver_data(self, wave):
-        return wave.forward_solution_receivers
-
     def _sync_wave_real_shot_record(self):
         if self.real_shot_record is not None:
             self.wave.real_shot_record = self.real_shot_record
@@ -411,12 +405,12 @@ class FullWaveformInversion:
     @property
     def functional_value(self):
         """Return the functional value accumulated by the acoustic solver."""
-        return getattr(self.wave, "functional_value", None)
+        try:
+            return self.wave.functional_value
+        except AttributeError:
+            return None
 
-    def enable_compute_functional(
-        self,
-        mode=FunctionalEvaluationMode.AFTER_SOLVE,
-    ):
+    def enable_compute_functional(self, mode=FunctionalEvaluationMode.AFTER_SOLVE):
         """Enable functional evaluation in the internal acoustic solver."""
         self._sync_wave_real_shot_record()
         return self.wave.enable_compute_functional(mode=mode)
@@ -689,7 +683,7 @@ class FullWaveformInversion:
         shot_filename="shots/shot_record_",
         high_resolution_model=False,
     ):
-        real_wave = self._create_wave_solver()
+        real_wave = self.wave_class(dictionary=self.input_dictionary, comm=self.comm)
         if self.real_mesh is not None:
             real_wave.set_mesh(user_mesh=self.real_mesh, input_mesh_parameters={})
 
@@ -723,10 +717,10 @@ class FullWaveformInversion:
             real_shot_record_list = []
             for snum in range(real_wave.number_of_sources):
                 switch_serial_shot(real_wave, snum)
-                real_shot_record_list.append(self._receiver_data(real_wave))
+                real_shot_record_list.append(real_wave.forward_solution_receivers)
             self.real_shot_record = real_shot_record_list
         else:
-            self.real_shot_record = self._receiver_data(real_wave)
+            self.real_shot_record = real_wave.forward_solution_receivers
         self._sync_wave_real_shot_record()
 
     def set_smooth_guess_velocity_model(self, real_velocity_model_file=None):
