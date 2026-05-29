@@ -513,15 +513,17 @@ class FullWaveformInversion:
             )
         return np.asarray(control.dat.data_ro, dtype=float).reshape(-1)
 
-    def _rebuild_control_from_vector(self, template, flat_vector):
+    def _rebuild_control_from_vector(self, control_reference, flat_vector):
         """Rebuild a control ``Function`` from an optimizer vector.
 
         Inverse of :meth:`_flatten_control`.
 
         Parameters
         ----------
-        template : firedrake.Function
-            control function used as the reconstruction template.
+        control_reference : firedrake.Function
+            Control function used as the reconstruction reference. Its function
+            space, name, and data shape define how the optimizer vector is
+            converted back into a Firedrake ``Function``.
         flat_vector : array_like
             Optimizer vector.
 
@@ -533,23 +535,23 @@ class FullWaveformInversion:
         Raises
         ------
         TypeError
-            If ``template`` is not a Firedrake ``Function``.
+            If ``control_reference`` is not a Firedrake ``Function``.
         ValueError
-            If the vector size does not match the template.
+            If the vector size does not match the control reference.
         """
-        if not isinstance(template, fire.Function):
+        if not isinstance(control_reference, fire.Function):
             raise TypeError(
-                "Acoustic FWI control template must be a firedrake Function. "
-                f"Received {type(template).__name__}.",
+                "Acoustic FWI control reference must be a firedrake Function. "
+                f"Received {type(control_reference).__name__}.",
             )
         flat_vector = np.asarray(flat_vector, dtype=float).reshape(-1)
-        template_shape = np.asarray(template.dat.data_ro).shape
-        expected = int(np.prod(template_shape))
+        reference_shape = np.asarray(control_reference.dat.data_ro).shape
+        expected = int(np.prod(reference_shape))
         if flat_vector.size != expected:
             raise ValueError("Control vector size does not match the configured control.")
         return fire.Function(
-            template.function_space(), name=template.name(),
-            val=flat_vector.reshape(template_shape))
+            control_reference.function_space(), name=control_reference.name(),
+            val=flat_vector.reshape(reference_shape))
 
     def _write_control_snapshot(self, control, filename):
         """Write the velocity ``Function`` to a VTK file.
@@ -565,8 +567,8 @@ class FullWaveformInversion:
         if isinstance(control, fire.Function):
             fire.VTKFile(filename).write(control)
 
-    def _guess_control_template(self):
-        """Return the current guess velocity ``Function`` used as optimizer template.
+    def _guess_control_reference(self):
+        """Return the current guess velocity ``Function`` used as optimizer reference.
 
         Returns
         -------
@@ -579,25 +581,25 @@ class FullWaveformInversion:
             If neither the FWI driver nor the wave solver has a configured
             guess control.
         """
-        template = self.guess_control
-        if template is None:
-            template = self.wave.get_control_parameters()
-        if template is None:
+        control_reference = self.guess_control
+        if control_reference is None:
+            control_reference = self.wave.get_control_parameters()
+        if control_reference is None:
             raise ValueError("No guess control parameter has been configured.")
-        return template
+        return control_reference
 
-    def _expand_bound(self, bound, template_value):
+    def _expand_bound(self, bound, control_reference):
         """Expand one bound specification to match a control component.
 
         Bounds may be scalar, one-element arrays, or arrays with one entry per
         control degree of freedom. This helper converts any supported form to a
-        vector with the same size as ``template_value``.
+        vector with the same size as ``control_reference``.
 
         Parameters
         ----------
         bound : scalar or array_like
             Bound value for one control component.
-        template_value : object
+        control_reference : object
             Control component whose flattened size determines the output size.
 
         Returns
@@ -615,7 +617,7 @@ class FullWaveformInversion:
         ``vmin=1.5`` for a velocity function with ``n`` degrees of freedom
         becomes an array of length ``n`` filled with ``1.5``.
         """
-        size = self._flatten_control(template_value).size
+        size = self._flatten_control(control_reference).size
         if np.isscalar(bound):
             return np.full(size, float(bound))
 
@@ -764,7 +766,7 @@ class FullWaveformInversion:
 
         if c is not None:
             updated_control = self._rebuild_control_from_vector(
-                self._guess_control_template(),
+                self._guess_control_reference(),
                 c,
             )
             self.set_guess_control(updated_control)
@@ -1170,7 +1172,7 @@ class FullWaveformInversion:
             self.get_functional(c=c)
         elif c is not None:
             updated_control = self._rebuild_control_from_vector(
-                self._guess_control_template(),
+                self._guess_control_reference(),
                 c,
             )
             self.set_guess_control(updated_control)
@@ -1260,11 +1262,11 @@ class FullWaveformInversion:
         }
         parameters.update(kwargs)
 
-        template = self._guess_control_template()
-        lower = self._expand_bound(parameters["vmin"], template)
-        upper = self._expand_bound(parameters["vmax"], template)
+        control_reference = self._guess_control_reference()
+        lower = self._expand_bound(parameters["vmin"], control_reference)
+        upper = self._expand_bound(parameters["vmax"], control_reference)
         bounds = list(zip(lower, upper))
-        control_0 = self._flatten_control(template)
+        control_0 = self._flatten_control(control_reference)
         options = parameters["scipy_options"]
 
         result = scipy_minimize(
@@ -1277,7 +1279,10 @@ class FullWaveformInversion:
             options=options,
         )
 
-        self.control_result = self._rebuild_control_from_vector(template, result.x)
+        self.control_result = self._rebuild_control_from_vector(
+            control_reference,
+            result.x,
+        )
         self.set_guess_control(self.control_result)
 
         if isinstance(self.control_result, fire.Function):
@@ -1328,9 +1333,11 @@ class FullWaveformInversion:
         """
         if ROL is None:
             raise ImportError("The ROL module is not available.")
-        if not isinstance(self._guess_control_template(), fire.Function):
+        control_reference = self._guess_control_reference()
+        if not isinstance(control_reference, fire.Function):
             raise NotImplementedError(
-                "ROL inversion only supports a single Firedrake Function control.",
+                "The deprecated ROL inversion path only supports a single "
+                "Firedrake Function control.",
             )
 
         parameters = {
@@ -1367,9 +1374,9 @@ class FullWaveformInversion:
         obj = Objective(inner_product, self)
 
         u = fire.Function(
-            self.wave.function_space,
-            name="velocity",
-        ).assign(self.guess_velocity_model)
+            control_reference.function_space(),
+            name=control_reference.name(),
+        ).assign(control_reference)
         opt = FireVector(u.vector(), inner_product)
 
         xlo = fire.Function(self.wave.function_space)
