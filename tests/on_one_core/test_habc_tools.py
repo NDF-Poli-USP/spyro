@@ -249,9 +249,15 @@ def run_tools(wave_obj, method_extend, n_root=1):
         print("✓ " + met_str + "Verified: " + cmp_str, flush=True)
 
 
-@pytest.mark.parametrize("element_type", ["T", "Q"])
-@pytest.mark.parametrize("dimension", [2, 3])
-@pytest.mark.parametrize("method_extend", ['point_cloud', 'nearest_point'])
+@pytest.mark.parametrize("element_type, dimension, method_extend", [
+    ("T", 2, "point_cloud"),
+    ("T", 2, "nearest_point"),
+    ("Q", 2, "point_cloud"),
+    ("Q", 2, "nearest_point"),
+    pytest.param("T", 3, "point_cloud", marks=pytest.mark.slow),
+    pytest.param("T", 3, "nearest_point", marks=pytest.mark.slow),
+    pytest.param("Q", 3, "point_cloud", marks=pytest.mark.slow),
+    pytest.param("Q", 3, "nearest_point", marks=pytest.mark.slow)])
 def test_habc_tools(element_type, dimension, method_extend):
     """Test of HABC tools for 2D and 3D case.
 

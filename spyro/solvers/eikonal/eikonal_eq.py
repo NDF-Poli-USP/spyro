@@ -1,8 +1,8 @@
 import firedrake as fire
-import finat
 import numpy as np
 from sys import float_info, exit
 from spyro.utils.error_management import clean_inst_num, value_parameter_error
+from spyro.domains.quadrature import quadrature_rules
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -56,8 +56,8 @@ class Eikonal_Modeling():
     ----------
     dimension : `int`
         The spatial dimension of the problem
-    ele_type : `string`
-        Finite element type. 'CG' or 'KMV'. Default is 'CG'
+    ele_type : `string`, optional
+        Finite element type. 'consistent' or 'underintegrated'. Default is 'consistent'
     f_est : `float`
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03
     p_eik : `int`
@@ -89,7 +89,7 @@ class Eikonal_Modeling():
         Set the eikonal solver parameters
     '''
 
-    def __init__(self, dimension, source_locations, ele_type='CG',
+    def __init__(self, dimension, source_locations, ele_type='consistent',
                  p_eik=None, f_est=0.03, tol=1e-16):
         '''
         Initialize the Eikonal_Modeling class
@@ -101,7 +101,8 @@ class Eikonal_Modeling():
         source_locations: `list`of `tuples`
             List of tuples containing all source locations
         ele_type : `string`, optional
-            Finite element type. 'CG' or 'KMV'. Default is 'CG'
+            Finite element type. 'consistent' or 'underintegrated'.
+            Default is 'consistent'
         p_eik : `int`, optional
             Finite element order for the Eikonal analysis. Default is None
         f_est : `float`, optional
@@ -121,11 +122,15 @@ class Eikonal_Modeling():
         self.source_locations = source_locations
 
         # Finite element type.
-        self.ele_type = ele_type
+        allowed_ele_types = ['consistent', 'underintegrated']
+        if ele_type not in allowed_ele_types:
+            value_parameter_error('ele_type', ele_type, allowed_ele_types)
+        else:
+            self.ele_type = ele_type
 
         # Finite element order for the Eikonal analysis
-        self.p_eik = p_eik if p_eik is not None \
-            else (2 if self.dimension == 2 else 1)
+        self.p_eik = p_eik if p_eik is not None else (2 if self.dimension == 2 else 1) \
+            if self.ele_type == 'consistent' else (4 if self.dimension == 2 else 3)
 
         # Factor for the stabilizing term in Eikonal equation
         self.f_est = f_est
@@ -157,7 +162,7 @@ class Eikonal_Modeling():
         '''
 
         # Extract node positions
-        z_data, x_data = node_positions[:2]
+        z_data, x_data = node_positions[:, 0], node_positions[:, 1]
 
         # Identify source indices in the mesh
         it = int(-1)
@@ -174,7 +179,7 @@ class Eikonal_Modeling():
                                     )[0] for z_s, x_s in self.source_locations]
 
             if self.dimension == 3:  # 3D
-                y_data = node_positions[2]
+                y_data = node_positions[:, 2]
                 sou_ids = [np.where(np.isclose(
                     z_data, z_s, atol=tol_node)
                     & np.isclose(x_data, x_s, atol=tol_node)
@@ -211,11 +216,11 @@ class Eikonal_Modeling():
             Integration domain for the Eikonal equation
         '''
 
-        if self.ele_type == 'CG':
-            dx = fire.dx  # At least: degree=2*self.p_eik
-        elif self.ele_type == 'KMV':  # ToDo - Can I use quadrature.py?
-            quad_rule = finat.quadrature.make_quadrature(
-                V.finat_element.cell, self.p_eik, self.ele_type)
+        if self.ele_type == 'consistent':
+            dx = fire.dx
+
+        if self.ele_type == 'underintegrated':
+            quad_rule = quadrature_rules(V)[0]
             dx = fire.dx(**quad_rule)
 
         return dx

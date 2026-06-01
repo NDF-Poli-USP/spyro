@@ -42,6 +42,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
     a_par : `float`
         Adimensional propagation speed parameter (a = z / f).
         "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
+    c : `Firedrake.Function`
+        Velocity model without absorbing layer
     case_habc : `str`
         Label for the output files that includes the layer shape
         ('REC' or 'HNI', I for the degree) and the reference frequency

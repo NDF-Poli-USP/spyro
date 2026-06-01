@@ -101,6 +101,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.current_time = 0.0
         self.set_solver_parameters()
 
+        # Create or get the mesh
         self.mesh = self.get_mesh()
         self.c = None
         self.sources = None
@@ -111,6 +112,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             quadrilateral=self.mesh_parameters.quadrilateral,
             comm=self.mesh_parameters.comm)
 
+        # Getting parameters from the mesh
         if self.mesh is not None:
             self.building_mesh_derived_paramenters()
         elif self.mesh_parameters.mesh_type == "firedrake_mesh":
@@ -119,10 +121,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             )
         else:
             warnings.warn("No mesh found. Please define a mesh.")
+
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
         self.real_shot_record = None
 
+        # Logger
         self.field_logger = FieldLogger(self.comm,
                                         self.input_dictionary["visualization"])
         self.field_logger.add_field("forward", self.get_function_name(),
@@ -151,6 +155,29 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Builds the matrix for the forward problem."""
         pass
 
+    def get_absorbing_boundaries(self):
+        """Get the absorbing boundaries for the problem.
+
+        Parameters:
+        -----------
+        None
+
+        Returns:
+        --------
+        boundaries : `tuple`
+            Tuple containing the boundary boolean labels for applying absorbing BCs.
+            - (absorb_top, absorb_bottom, absorb_right, absorb_left) for 2D
+            - (absorb_top, absorb_bottom, absorb_right,
+                absorb_left, absorb_front, absorb_back) for 3D
+        """
+        boundaries = (self.absorb_top, self.absorb_bottom,
+                      self.absorb_right, self.absorb_left)
+
+        if self.dimension == 3:
+            boundaries += (self.absorb_front, self.absorb_back,)
+
+        return boundaries
+
     def building_mesh_derived_paramenters(self):
         """Build parameters that are derived from the mesh."""
         coordinates = self.mesh_ops._set_spatial_coordinates(self.mesh)
@@ -164,16 +191,18 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.mesh_ops.func_space_type is None:
             self.mesh_ops.func_space_type = 'scalar' \
                 if len(self.function_space.value_shape) == 0 else 'vector'
-        boundaries = [self.absorb_top, self.absorb_bottom,
-                      self.absorb_right, self.absorb_left]
-        if self.dimension == 3:
-            boundaries.extend([self.absorb_front,
-                               self.absorb_back])
 
         # Build the boundary ID mapping
-        self.mesh_parameters.boundary_idx_map = \
-            self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
-                                               boundaries, box_domain=True)
+        # TODO: Include the logic for hypershape layer from HABC
+        boundaries = self.get_absorbing_boundaries()
+        if not (hasattr(self, 'abc_boundary_layer_shape')
+                and hasattr(self.mesh_parameters, 'boundary_ids_map')
+                and self.abc_boundary_layer_shape == 'hypershape'):
+            self.mesh_parameters.boundary_ids_map, \
+                self.mesh_parameters.boundary_nodes_ids = \
+                self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
+                                                   boundaries, box_domain=True,
+                                                   get_boundary_node_ids=True)
 
     def set_mesh(
             self,
