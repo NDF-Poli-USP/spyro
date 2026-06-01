@@ -567,6 +567,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             )
         self._functional_evaluation_mode = mode
 
+    @abstractmethod
     def get_control_parameters(self):
         """Return inversion controls exposed by a concrete wave solver.
 
@@ -593,6 +594,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             f"{type(self).__name__} does not expose inversion control parameters.",
         )
 
+    @abstractmethod
     def set_control_parameters(self, controls):
         """Assign inversion controls on a concrete wave solver.
 
@@ -620,6 +622,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             f"{type(self).__name__} cannot assign inversion control parameters.",
         )
 
+    @abstractmethod
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
         """Compute an adjoint gradient for inversion.
 
@@ -652,6 +655,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             f"{type(self).__name__} does not implement gradient_solve().",
         )
 
+    @abstractmethod
     def get_control_parameter_function_space(self):
         """Return the function space used by inversion controls.
 

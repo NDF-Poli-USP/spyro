@@ -120,7 +120,7 @@ class Objective(RObjective):
     This class wraps the full waveform inversion objective function for use
     with the ROL (Rapid Optimization Library) optimization framework. It
     provides methods to compute the functional value, gradient, and update
-    the velocity model during optimization.
+    the inversion control during optimization.
 
     Parameters
     ----------
@@ -151,7 +151,7 @@ class Objective(RObjective):
     gradient(g, x, tol)
         Compute the gradient of the objective functional.
     update(x, flag, iteration)
-        Update the velocity model with new optimization iterate.
+        Update the inversion control with a new optimization iterate.
     """
     def __init__(self, inner_product, FWI_obj):
         """
@@ -186,7 +186,7 @@ class Objective(RObjective):
         Parameters
         ----------
         x : FiredrakeVector
-            Current velocity model iterate.
+            Current control iterate.
         tol : float
             Tolerance for the computation (unused).
 
@@ -197,7 +197,7 @@ class Objective(RObjective):
         """
         J_total = np.zeros((1))
         self.inversion_obj.misfit = None
-        self.inversion_obj.reset_pressure()
+        self.inversion_obj.wave.reset_pressure()
         Jm = self.inversion_obj.get_functional()
         self.misfit = self.inversion_obj.misfit
         J_total[0] += Jm
@@ -213,7 +213,7 @@ class Objective(RObjective):
         g : FiredrakeVector
             Vector to store the gradient (modified in-place).
         x : FiredrakeVector
-            Current velocity model iterate.
+            Current control iterate.
         tol : float
             Tolerance for the computation (unused).
         """
@@ -224,23 +224,24 @@ class Objective(RObjective):
 
     def update(self, x, flag, iteration):
         """
-        Update the velocity model with new optimization iterate.
+        Update the inversion control with a new optimization iterate.
 
         Parameters
         ----------
         x : FiredrakeVector
-            New velocity model iterate.
+            New control iterate.
         flag : int
             Update flag from ROL.
         iteration : int
             Current iteration number.
         """
-        vp = self.inversion_obj.initial_velocity_model
-        vp.assign(fire.Function(
-            self.inversion_obj.function_space,
+        control_reference = self.inversion_obj._guess_control_reference()
+        updated_control = fire.Function(
+            control_reference.function_space(),
             x.vec,
-            name="velocity")
+            name=control_reference.name(),
         )
+        self.inversion_obj.set_guess_control(updated_control)
 
 
 class FullWaveformInversion:
@@ -259,6 +260,31 @@ class FullWaveformInversion:
 
     The inversion can be run using either ``scipy.optimize.minimize`` (L-BFGS-B)
     via ``run_fwi()`` or the deprecated ROL library via ``run_fwi_rol()``.
+
+    Methods
+    -------
+    calculate_misfit(c=None)
+        Calculate the receiver-data residual for the current guess model.
+    generate_real_shot_record(plot_model=False, ...)
+        Generate synthetic observed data from the configured real model.
+    set_real_velocity_model(constant=None, ...)
+        Configure the acoustic model used to generate synthetic observations.
+    set_guess_velocity_model(constant=None, ...)
+        Configure the acoustic model used as the inversion starting point.
+    set_real_mesh(user_mesh=None, input_mesh_parameters=None)
+        Set the mesh used by the real model.
+    set_guess_mesh(user_mesh=None, input_mesh_parameters=None)
+        Set the mesh used by the inversion guess model.
+    get_functional(c=None)
+        Compute the objective functional.
+    get_gradient(c=None, save=True, calculate_functional=True)
+        Compute the acoustic adjoint gradient.
+    return_functional_and_gradient(c)
+        Return the functional and flattened gradient for scipy optimizers.
+    run_fwi(**kwargs)
+        Run full waveform inversion with scipy L-BFGS-B.
+    run_fwi_rol(**kwargs)
+        Run the deprecated ROL-based inversion path.
 
     Examples
     --------
@@ -355,8 +381,6 @@ class FullWaveformInversion:
         self.guess_mesh = None
         self.real_control = None
         self.guess_control = None
-        self.real_velocity_model = None
-        self.guess_velocity_model = None
 
         self.control_out = fire.VTKFile(inversion_dictionary["control_output_file"])
         self.gradient_out = fire.VTKFile(inversion_dictionary["gradient_output_file"])
@@ -367,7 +391,7 @@ class FullWaveformInversion:
         self.guess_shot_record = None
         self.gradient = None
         self.control_result = None
-        self.vp_result = None
+        self.control_parameter_result = None
         self.current_iteration = 0
         self.mesh_iteration = 0
         self.iteration_limit = 100
@@ -430,14 +454,14 @@ class FullWaveformInversion:
             self.wave.real_shot_record = self.real_shot_record
 
     def _copy_control_value(self, value, name=None):
-        """Copy  the acoustic velocity control.
+        """Copy one FWI control parameter.
 
         Parameters
         ----------
         value : firedrake.Function or firedrake.Constant
-            Velocity control to copy.  ``Function`` values are duplicated into
+            Control parameter to copy. ``Function`` values are duplicated into
             a new ``Function``; ``Constant`` values are interpolated into the
-            solver function space and returned as a ``Function``.
+            solver control function space and returned as a ``Function``.
         name : str, optional
             Name for the ``Function`` created from a ``Constant``.  Defaults
             to ``"control"``.
@@ -445,7 +469,7 @@ class FullWaveformInversion:
         Returns
         -------
         firedrake.Function
-            Independent copy of the velocity control.
+            Independent copy of the control parameter.
 
         Raises
         ------
@@ -464,17 +488,17 @@ class FullWaveformInversion:
             control.interpolate(value)
             return control
         raise TypeError(
-            "Acoustic FWI control must be a firedrake Function or Constant. "
+            "FWI control must be a firedrake Function or Constant. "
             f"Received {type(value).__name__}.",
         )
 
     def _copy_control_structure(self, control):
-        """Return an independent copy of the velocity control.
+        """Return an independent copy of the current control structure.
 
         Parameters
         ----------
         control : firedrake.Function, firedrake.Constant, or None
-            Velocity control to copy.
+            Control parameter to copy.
 
         Returns
         -------
@@ -485,17 +509,17 @@ class FullWaveformInversion:
         return self._copy_control_value(control)
 
     def _flatten_control(self, control):
-        """Flatten the velocity ``Function`` into a one-dimensional optimizer vector.
+        """Flatten a control ``Function`` into an optimizer vector.
 
         Parameters
         ----------
         control : firedrake.Function
-            Velocity control to flatten.
+            Control parameter to flatten.
 
         Returns
         -------
         numpy.ndarray
-            One-dimensional array of velocity degrees of freedom.
+            One-dimensional array of control degrees of freedom.
 
         Raises
         ------
@@ -508,7 +532,7 @@ class FullWaveformInversion:
             raise ValueError("No control parameter has been configured.")
         if not isinstance(control, fire.Function):
             raise TypeError(
-                "Acoustic FWI control must be a firedrake Function. "
+                "FWI control must be a firedrake Function. "
                 f"Received {type(control).__name__}.",
             )
         return np.asarray(control.dat.data_ro, dtype=float).reshape(-1)
@@ -530,7 +554,7 @@ class FullWaveformInversion:
         Returns
         -------
         firedrake.Function
-            Rebuilt velocity function.
+            Rebuilt control function.
 
         Raises
         ------
@@ -541,7 +565,7 @@ class FullWaveformInversion:
         """
         if not isinstance(control_reference, fire.Function):
             raise TypeError(
-                "Acoustic FWI control reference must be a firedrake Function. "
+                "FWI control reference must be a firedrake Function. "
                 f"Received {type(control_reference).__name__}.",
             )
         flat_vector = np.asarray(flat_vector, dtype=float).reshape(-1)
@@ -553,27 +577,13 @@ class FullWaveformInversion:
             control_reference.function_space(), name=control_reference.name(),
             val=flat_vector.reshape(reference_shape))
 
-    def _write_control_snapshot(self, control, filename):
-        """Write the velocity ``Function`` to a VTK file.
-
-        Parameters
-        ----------
-        control : firedrake.Function or None
-            Velocity control to write.  Nothing is written when ``None`` or
-            not a ``Function``.
-        filename : str
-            Output VTK filename.
-        """
-        if isinstance(control, fire.Function):
-            fire.VTKFile(filename).write(control)
-
     def _guess_control_reference(self):
-        """Return the current guess velocity ``Function`` used as optimizer reference.
+        """Return the current guess control used as optimizer reference.
 
         Returns
         -------
         firedrake.Function
-            Active guess velocity control.
+            Active guess control parameter.
 
         Raises
         ------
@@ -614,7 +624,7 @@ class FullWaveformInversion:
 
         Examples
         --------
-        ``vmin=1.5`` for a velocity function with ``n`` degrees of freedom
+        ``vmin=1.5`` for a control with ``n`` degrees of freedom
         becomes an array of length ``n`` filled with ``1.5``.
         """
         size = self._flatten_control(control_reference).size
@@ -629,37 +639,31 @@ class FullWaveformInversion:
         return bound_array
 
     def set_guess_control(self, control):
-        """Set the initial guess velocity model for inversion.
+        """Set the initial guess control parameter for inversion.
 
         Parameters
         ----------
         control : firedrake.Function or firedrake.Constant
-            Starting acoustic velocity model for the FWI optimization.
+            Starting control parameter for the FWI optimization.
             ``Constant`` inputs are converted to a ``Function`` before being
-            stored.  FWI currently inverts only for acoustic velocity, so
-            only a scalar velocity field is accepted here.
+            stored. FWI currently accepts a single scalar ``Function`` control.
 
         Returns
         -------
         None
-            Updates ``guess_control``, ``guess_mesh``, and
-            ``guess_velocity_model``.  The cached misfit is reset.
+            Updates ``guess_control`` and ``guess_mesh``. The cached misfit is
+            reset.
 
         Examples
         --------
-        ``set_guess_control(velocity)`` stores a defensive copy of the
-        velocity ``Function``.  ``set_guess_control(fire.Constant(2.0))``
-        creates a uniform velocity ``Function`` filled with ``2.0 km/s``.
+        ``set_guess_control(control)`` stores a defensive copy of the control
+        ``Function``. ``set_guess_control(fire.Constant(2.0))`` creates a
+        uniform control ``Function`` filled with ``2.0``.
         """
         self.wave.set_control_parameters(self._copy_control_structure(control))
         self.guess_mesh = self.wave.get_mesh()
         self.guess_control = self._copy_control_structure(
             self.wave.get_control_parameters(),
-        )
-        self.guess_velocity_model = (
-            self._copy_control_structure(self.guess_control)
-            if isinstance(self.guess_control, fire.Function)
-            else None
         )
         self.misfit = None
 
@@ -738,10 +742,10 @@ class FullWaveformInversion:
         """
         Calculate the misfit between observed and simulated data.
 
-        Runs the forward model with the current velocity model and computes
+        Runs the forward model with the current control parameter and computes
         the difference between the simulated shot records and the real/observed
-        shot records. If the forward model has already been solved, uses the
-        existing solution.
+        shot records. The forward solve is executed every time this method is
+        called so the misfit always corresponds to the current control.
 
         Parameters
         ----------
@@ -780,10 +784,7 @@ class FullWaveformInversion:
         self._sync_wave_real_shot_record()
         self.wave.forward_solve()
         current_control = self.wave.get_control_parameters()
-        self._write_control_snapshot(
-            current_control,
-            f"control_{self.current_iteration}.pvd",
-        )
+        fire.VTKFile(f"control_{self.current_iteration}.pvd").write(current_control)
         np.save(
             f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
             self._flatten_control(current_control),
@@ -816,16 +817,17 @@ class FullWaveformInversion:
         high_resolution_model=False,
     ):
         """
-        Generate synthetic shot records from the true velocity model.
+        Generate synthetic shot records from the configured real control.
 
-        Create a wave solver with the true velocity model, and solve the forward
+        Create a wave solver with the real control, and solve the forward
         problem, and optionally saves the shot records and plots the model.
         This is used only for synthetic test cases.
 
         Parameters
         ----------
         plot_model : bool, optional
-            If True, plot and save the velocity model. Default is False.
+            If True, plot and save the configured acoustic model. Default is
+            False.
         model_filename : str, optional
             Filename for the model plot. Default is "model.png".
         abc_points : list of tuple, optional
@@ -962,7 +964,6 @@ class FullWaveformInversion:
             dg_velocity_model=dg_velocity_model,
         )
         self.real_mesh = self.wave.get_mesh()
-        self.real_velocity_model = self.wave.initial_velocity_model
         self.real_control = self._copy_control_structure(
             self.wave.get_control_parameters(),
         )
@@ -1023,7 +1024,6 @@ class FullWaveformInversion:
             dg_velocity_model=dg_velocity_model,
         )
         self.guess_mesh = self.wave.get_mesh()
-        self.guess_velocity_model = self.wave.initial_velocity_model
         self.guess_control = self._copy_control_structure(
             self.wave.get_control_parameters(),
         )
@@ -1093,8 +1093,9 @@ class FullWaveformInversion:
         """
         Calculate and return the objective functional value.
 
-        Computes the misfit if needed, then evaluates the objective functional.
-        Also tracks the functional history and peak memory usage.
+        Computes a fresh misfit for the current control, then evaluates the
+        objective functional. Also tracks the functional history and peak
+        memory usage.
 
         Parameters
         ----------
@@ -1137,7 +1138,7 @@ class FullWaveformInversion:
         """
         Calculate the gradient of the objective functional.
 
-        Computes the gradient with respect to the velocity model using the
+        Computes the gradient with respect to the control parameter using the
         adjoint method. Optionally calculates the functional value first and
         saves the gradient to a VTK file.
 
@@ -1177,10 +1178,7 @@ class FullWaveformInversion:
         )
         self._apply_gradient_mask()
         if save:
-            self._write_control_snapshot(
-                self.gradient,
-                f"gradient_{self.current_iteration}.pvd",
-            )
+            fire.VTKFile(f"gradient_{self.current_iteration}.pvd").write(self.gradient)
         self.current_iteration += 1
         comm.comm.barrier()
 
@@ -1214,7 +1212,8 @@ class FullWaveformInversion:
 
         Performs the complete FWI optimization using scipy.optimize.minimize
         with the L-BFGS-B method. The optimization minimizes the misfit between
-        observed and simulated data by updating the velocity model.
+        observed and simulated data by updating the configured control
+        parameter.
 
         Parameters
         ----------
@@ -1222,9 +1221,9 @@ class FullWaveformInversion:
             Keyword arguments for customizing the optimization:
 
             vmin : float, optional
-                Minimum velocity bound. Default is 1.429 km/s.
+                Lower bound for the control parameter. Default is 1.429.
             vmax : float, optional
-                Maximum velocity bound. Default is 6.0 km/s.
+                Upper bound for the control parameter. Default is 6.0.
             maxiter : int, optional
                 Maximum number of iterations. Default is 20.
             scipy_options : dict, optional
@@ -1233,8 +1232,9 @@ class FullWaveformInversion:
 
         Notes
         -----
-        The final inverted velocity model is stored in self.vp_result and saved
-        to "vp_end.pvd". The raw result array is also saved to "result.npy".
+        The final control parameter is stored in ``control_parameter_result``
+        and saved to ``control_end.pvd``. The raw optimizer vector is also
+        saved to ``result.npy``.
 
         This method uses the L-BFGS-B algorithm which is well-suited for
         large-scale bound-constrained optimization problems.
@@ -1278,12 +1278,10 @@ class FullWaveformInversion:
         )
         self.set_guess_control(self.control_result)
 
-        if isinstance(self.control_result, fire.Function):
-            self.vp_result = self._copy_control_structure(self.control_result)
-            fire.VTKFile("vp_end.pvd").write(self.vp_result)
-        else:
-            self.vp_result = None
-            self._write_control_snapshot(self.control_result, "vp_end.pvd")
+        self.control_parameter_result = self._copy_control_structure(
+            self.control_result,
+        )
+        fire.VTKFile("control_end.pvd").write(self.control_parameter_result)
 
         np.save("result", result.x)
         return result
@@ -1301,9 +1299,9 @@ class FullWaveformInversion:
             Keyword arguments for customizing the optimization:
 
             vmin : float, optional
-                Minimum velocity bound. Default is 1.429 km/s.
+                Lower bound for the control parameter. Default is 1.429.
             vmax : float, optional
-                Maximum velocity bound. Default is 6.0 km/s.
+                Upper bound for the control parameter. Default is 6.0.
             maxiter : int, optional
                 Maximum number of iterations. Default is 20.
             ROL_options : dict, optional
@@ -1372,13 +1370,13 @@ class FullWaveformInversion:
         ).assign(control_reference)
         opt = FireVector(u.vector(), inner_product)
 
-        xlo = fire.Function(self.wave.function_space)
-        xlo.interpolate(fire.Constant(vmin))
-        x_lo = FireVector(xlo.vector(), inner_product)
+        lower_bound = fire.Function(control_reference.function_space())
+        lower_bound.interpolate(fire.Constant(vmin))
+        x_lo = FireVector(lower_bound.vector(), inner_product)
 
-        xup = fire.Function(self.wave.function_space)
-        xup.interpolate(fire.Constant(vmax))
-        x_up = FireVector(xup.vector(), inner_product)
+        upper_bound = fire.Function(control_reference.function_space())
+        upper_bound.interpolate(fire.Constant(vmax))
+        x_up = FireVector(upper_bound.vector(), inner_product)
 
         bnd = ROL.Bounds(x_lo, x_up, 1.0)
 
@@ -1392,7 +1390,8 @@ class FullWaveformInversion:
 
         The gradient mask is used to restrict updates to certain regions of
         the model domain, which is useful for excluding absorbing boundary
-        layers or other regions where the velocity model should not be updated.
+        layers or other regions where the control parameter should not be
+        updated.
 
         This method is deprecated since we prefer to use mesh based tags for now. In
         the future we will use the new submesh functionality in Firedrake.
@@ -1483,9 +1482,9 @@ class FullWaveformInversion:
     @run_in_one_core
     def save_result_as_segy(self, file_name="final_vp.segy", grid_spacing=0.01):
         """
-        Save the final velocity model result as a SEG-Y file.
+        Save the final scalar control result as a SEG-Y file.
 
-        This method exports the final inverted velocity model to SEG-Y format,
+        This method exports the final scalar inversion control to SEG-Y format,
         which is a standard format for seismic data. The operation is performed
         on a single core.
 
@@ -1502,12 +1501,15 @@ class FullWaveformInversion:
         The @run_in_one_core decorator ensures this operation runs on a single
         MPI rank to avoid conflicts.
         """
-        if self.vp_result is None:
+        if self.control_parameter_result is None:
             raise ValueError(
                 "SEG-Y export requires a single scalar inversion control result.",
             )
         create_segy(
-            self.vp_result, self.vp_result.function_space(), grid_spacing, file_name,
+            self.control_parameter_result,
+            self.control_parameter_result.function_space(),
+            grid_spacing,
+            file_name,
         )
 
 

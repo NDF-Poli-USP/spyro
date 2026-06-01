@@ -140,10 +140,7 @@ class IsotropicWave(ElasticWave):
                 if self.mesh is None:
                     return Constant(value) if np.isscalar(value) else value
                 V = create_function_space(
-                    self.mesh,
-                    self.method,
-                    self.degree,
-                    dim=1,
+                    self.mesh, self.method, self.degree, dim=1,
                 )
                 return Function(V).interpolate(value)
             return value
@@ -278,9 +275,7 @@ class IsotropicWave(ElasticWave):
                 "Mesh must be set before creating elastic control parameter spaces.",
             )
         self._material_parameter_function_space = create_function_space(
-            self.mesh,
-            self.method,
-            self.degree,
+            self.mesh, self.method, self.degree,
         )
         return self._material_parameter_function_space
 
