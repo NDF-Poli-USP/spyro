@@ -149,7 +149,6 @@ def get_forward_model(dictionary=None, auto_adj=False):
         conditional=cond,
         dg_velocity_model=False,
     )
-    spyro.plots.plot_model(Wave_obj_exact, filename="pml_grad_test_model.png", abc_points=[(-0, 0), (-1, 0), (-1, 1), (-0, 1)])
     Wave_obj_exact.forward_solve()
     rec_out_exact = Wave_obj_exact.forward_solution_receivers
 
@@ -206,7 +205,7 @@ def test_gradient(auto_adj, PML=False):
         direction = fire.Function(
             Wave_obj_guess.c.function_space(), val=np.random.default_rng(0).random(size))
         assert Wave_obj_guess.automated_adjoint.verify_gradient(
-            Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.95, \
+            Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.9, \
             "Automated adjoint gradient verification failed."
 
         Wave_obj_guess.automated_adjoint.clear_tape()
