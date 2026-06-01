@@ -6,6 +6,88 @@ from .. import utils
 from ..utils.typing import FunctionalEvaluationMode, AdjointType
 
 
+def _receiver_function_from_array(wave_obj, receiver_space, receiver_values):
+    """Build a receiver-space Function from global or local receiver values."""
+    real_shot = fire.Function(receiver_space)
+    receiver_values = np.asarray(receiver_values)
+    local_shape = real_shot.dat.data.shape
+
+    if receiver_values.shape == local_shape:
+        real_shot.dat.data[:] = receiver_values
+        return real_shot
+
+    if receiver_values.size == real_shot.dat.data.size:
+        real_shot.dat.data[:] = receiver_values.reshape(local_shape)
+        return real_shot
+
+    if receiver_values.shape[0] != wave_obj.receivers.number_of_points:
+        raise ValueError(
+            "Observed receiver data has incompatible shape "
+            f"{receiver_values.shape}; expected either local shape "
+            f"{local_shape} or global receiver count "
+            f"{wave_obj.receivers.number_of_points}."
+        )
+
+    receiver_locations = np.asarray(wave_obj.receivers.point_locations)
+    local_coordinates = receiver_space.mesh().coordinates.dat.data_ro
+    local_receiver_ids = []
+    for coordinate in local_coordinates:
+        distances = np.linalg.norm(receiver_locations - coordinate, axis=1)
+        receiver_id = int(np.argmin(distances))
+        if distances[receiver_id] > 1.0e-10:
+            raise ValueError(
+                "Could not map local VertexOnlyMesh coordinate "
+                f"{coordinate} to a receiver location."
+            )
+        local_receiver_ids.append(receiver_id)
+
+    local_values = np.ascontiguousarray(receiver_values[local_receiver_ids])
+    if local_values.shape != local_shape:
+        raise ValueError(
+            "Localized observed receiver data has incompatible shape "
+            f"{local_values.shape}; expected {local_shape}."
+        )
+
+    real_shot.dat.data[:] = local_values
+    return real_shot
+
+
+def _receiver_functions_to_array(wave_obj, receiver_functions):
+    """Convert local receiver Functions to a global receiver array."""
+    if len(receiver_functions) == 0:
+        return np.asarray(receiver_functions)
+
+    receiver_space = receiver_functions[0].function_space()
+    receiver_locations = np.asarray(wave_obj.receivers.point_locations)
+    local_coordinates = receiver_space.mesh().coordinates.dat.data_ro
+    local_receiver_ids = []
+    for coordinate in local_coordinates:
+        distances = np.linalg.norm(receiver_locations - coordinate, axis=1)
+        receiver_id = int(np.argmin(distances))
+        if distances[receiver_id] > 1.0e-10:
+            raise ValueError(
+                "Could not map local VertexOnlyMesh coordinate "
+                f"{coordinate} to a receiver location."
+            )
+        local_receiver_ids.append(receiver_id)
+
+    local_shape = receiver_functions[0].dat.data_ro.shape
+    value_shape = local_shape[1:]
+    receiver_shape = (len(receiver_functions), wave_obj.receivers.number_of_points)
+    receiver_shape += value_shape
+    receiver_array = np.full(receiver_shape, -99999.0)
+    for step, receiver_function in enumerate(receiver_functions):
+        local_values = receiver_function.dat.data_ro
+        if local_values.shape != local_shape:
+            raise ValueError(
+                "Inconsistent local receiver Function shape "
+                f"{local_values.shape}; expected {local_shape}."
+            )
+        receiver_array[step, local_receiver_ids] = local_values
+
+    return utils.utils.communicate(receiver_array, wave_obj.comm)
+
+
 def _propagate_forward_central_difference(wave_obj, source_ids):
     """Advance the forward solve with the central-difference scheme.
 
@@ -123,9 +205,10 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
         if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
             if wave_obj.use_vertex_only_mesh:
                 if isinstance(real_shot_record[step], np.ndarray):
-                    real_shot = fire.Function(
+                    real_shot = _receiver_function_from_array(
+                        wave_obj,
                         usol_recv[-1].function_space(),
-                        val=real_shot_record[step],
+                        real_shot_record[step],
                     )
                     misfit_step = real_shot - usol_recv[-1]
                 elif isinstance(real_shot_record[step], fire.Function):
@@ -148,11 +231,13 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
     wave_obj.current_time = t
 
     helpers.display_progress(wave_obj.comm, t)
-    usol_recv = helpers.fill(
-        usol_recv, wave_obj.receivers.is_local, nt, wave_obj.receivers.number_of_points
-    )
-
-    usol_recv = utils.utils.communicate(usol_recv, wave_obj.comm)
+    if adjoint_type == AdjointType.AUTOMATED_ADJOINT and wave_obj.use_vertex_only_mesh:
+        usol_recv = _receiver_functions_to_array(wave_obj, usol_recv)
+    else:
+        usol_recv = helpers.fill(
+            usol_recv, wave_obj.receivers.is_local, nt, wave_obj.receivers.number_of_points
+        )
+        usol_recv = utils.utils.communicate(usol_recv, wave_obj.comm)
 
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         wave_obj.automated_adjoint.stop_recording()

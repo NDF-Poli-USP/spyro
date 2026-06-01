@@ -98,15 +98,10 @@ def compute_functional(
             f"Functional form {functional_form} not implemented. Only L2Norm"
             " is currently supported.")
     if evaluation_mode == FunctionalEvaluationMode.PER_TIMESTEP:
-        weight = 0.5 if step == 0 or step == nsteps - 1 else 1.0
-
         if wave_object.use_vertex_only_mesh:
-            return assemble(
-                0.5 * wave_object.dt * weight
-                * inner(misfit, misfit) * dx
-            )
+            return assemble(inner(misfit, misfit) * dx)
         elif isinstance(misfit, np.ndarray):
-            return np.sum(misfit**2) * (0.5 * wave_object.dt * weight)
+            return np.sum(misfit**2)
         else:
             raise ValueError(
                 "Expected misfit to be a numpy array when not using vertex-only mesh."
