@@ -105,8 +105,8 @@ def test_misfit_2d():
 
     FWI_obj.set_guess_mesh(input_mesh_parameters={"edge_length": 0.05})
     FWI_obj.set_guess_velocity_model(constant=4.0)
-    misfit = FWI_obj.calculate_misfit()
     functional_fwi = FWI_obj.get_functional()
+    misfit = FWI_obj.misfit
 
     # Using only wave objects
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
