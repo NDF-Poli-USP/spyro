@@ -1,7 +1,7 @@
 import firedrake as fire
 import glob
 import spyro.habc.habc as habc
-import spyro.habc.eik as eik
+import spyro.abc.eik as eik_min
 from spyro.utils.cost import comp_cost
 import pytest
 import os

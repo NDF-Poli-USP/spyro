@@ -1,5 +1,6 @@
-from spyro.utils.error_management import (value_dimension_error, value_numerical_error,
-                                          value_parameter_error)
+from ..io.basicio import parallel_print as pprint
+from ..utils.error_management import (value_dimension_error, value_numerical_error,
+                                      value_parameter_error)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -11,52 +12,76 @@ from spyro.utils.error_management import (value_dimension_error, value_numerical
 
 
 class RectangLayer():
-    """
-    Define a rectangular layer in 2D or parallelepided in 3D.
+    """Define a rectangular layer in 2D or parallelepided in 3D.
 
     Attributes
     ----------
     area : `float`
-        Area of the domain with rectangular layer
+        Area of the domain with rectangular layer.
     area_ratio : `float`
         Area ratio to the area of the original domain. area_ratio = area / a_orig
+    case_abc : `str`
+        Label for the output files that includes the layer shape ('REC' for
+        rectangular layers) and the reference frequency for sizing the absorbing
+        layer ('SOU': source frequency or 'BND': boundary frequency).
+        Examples: 'REC_SOU' or 'REC_BND'
     dimension : `int`
-        Model dimension (2D or 3D). Default is 2D
+        Model dimension (2D or 3D). Default is 2D.
     domain_dim : `tuple`
         Original domain dimensions: (length_z, length_x) for 2D
-        or (length_z, length_x, length_y) for 3D
+        or (length_z, length_x, length_y) for 3D.
     f_Ah : `float`
-        Hyperelliptical area factor. f_Ah = 4 (n_hyp is considered infinite)
+        Hyperelliptical area factor. f_Ah = 4 (n_hyp is considered infinite).
     f_Vh : `float`
-        Hyperellipsoidal volume factor. f_Vh = 8 (n_hyp is considered infinite)
+        Hyperellipsoidal volume factor. f_Vh = 8 (n_hyp is considered infinite).
     hyper_axes : `tuple`
-        Semi-axes of the rectangular layer (a, b) (2D) or (a, b, c) (3D)
+        Semi-axes of the rectangular layer (a, b) (2D) or (a, b, c) (3D).
     n_hyp: `float`
         Degree of the hyperelliptical pad layer. n_hyp is set to None because
-        this attribute is not applicable to rectangular layers
+        this attribute is not applicable to rectangular layers.
     vol : `float`
-        Volume of the domain with rectangular layer
+        Volume of the domain with rectangular layer.
     vol_ratio : `float`
         Volume ratio to the volume of the original domain. vol_ratio = vol / v_orig
 
     Methods
     -------
     calc_rec_geom_prop()
-        Calculate the geometric properties for the rectangular layer
+        Calculate the geometric properties for the rectangular layer.
     define_hyperaxes()
-        Define the rectangular semi-axes
+        Define the rectangular semi-axes.
     """
 
-    def __init__(self, domain_dim, dimension=2):
+    def __init__(self, domain_dim, dimension=2, comm=None):
         """Initialize the RectangLayer class.
 
         Parameters
         ----------
         domain_dim : `tuple`
-            Original domain dimensions: (length_x, length_z) for 2D or
-            (length_x, length_z, length_y) for 3D
+            Original domain dimensions: (length_z, length_x) for 2D
+            or (length_z, length_x, length_y) for 3D.
+        frequency: `float`
+            Frequency of the source.
+        f_Nyquist : `float`
+            Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt)
         dimension : `int`, optional
-            Model dimension (2D or 3D). Default is 2D
+            Model dimension (2D or 3D). Default is 2D.
+        quadrilateral : bool, optional
+            Flag to indicate whether to use quadrilateral/hexahedral elements.
+            Default is False (triangular/tetrahedral elements).
+        func_space_type, `str`, optional
+            Type of function space for the state variable.
+            Options: 'scalar' or 'vector'. Default is None.
+        abc_reference_freq : `str`, optional
+            Reference frequency for sizing the hybrid absorbing layer.
+            Options: 'source' or 'boundary'. Default is 'source'.
+        abc_boundary_layer_type : `str`, optional
+            Type of the boundary layer. Options: 'hybrid' or 'PML'.
+            Default is 'hybrid'. Option 'hybrid' is based on paper of Salas et al. (2022).
+            doi: https://doi.org/10.1016/j.apm.2022.09.014
+        comm : `object`, optional
+            An object representing the communication interface for parallel processing.
+            Default is None.
 
         Returns
         -------
@@ -79,6 +104,9 @@ class RectangLayer():
 
         # Hypershape degree (Not applicable in rectangular layers)
         self.n_hyp = None
+
+        # Communicator MPI
+        self.comm = comm
 
     def define_rec_hyperaxes(self, pad_len):
         """Define the rectangular semi-axes
@@ -125,7 +153,7 @@ class RectangLayer():
         None
         """
 
-        print("Determining Rectangular Layer Parameters", flush=True)
+        pprint("Determining Rectangular Layer Parameters", comm=self.comm)
 
         # Checking inputs
         chk_domain = len(self.domain_dim)
@@ -147,7 +175,7 @@ class RectangLayer():
             self.area = length_xabc * length_zabc
             self.area_ratio = self.area / (length_x * length_z)
             self.f_Ah = 4
-            print("Area Ratio: {:5.3f}".format(self.area_ratio), flush=True)
+            pprint("Area Ratio: {:5.3f}".format(self.area_ratio), comm=self.comm)
 
         if self.dimension == 3:  # 3D
             length_y = self.domain_dim[2]
@@ -155,4 +183,4 @@ class RectangLayer():
             self.vol = length_xabc * length_zabc * length_yabc
             self.vol_ratio = self.vol / (length_x * length_z * length_y)
             self.f_Vh = 8
-            print("Volume Ratio: {:5.3f}".format(self.vol_ratio), flush=True)
+            pprint("Volume Ratio: {:5.3f}".format(self.vol_ratio), comm=self.comm)

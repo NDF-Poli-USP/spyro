@@ -335,9 +335,11 @@ def test_habc_tools(element_geometry, dimension):
 
             # Determining the case for the folder name
             str_id = element_geometry + ("CL" if method_extend == "point_cloud" else "NP")
-            wave_obj.case_abc, wave_obj.path_save, wave_obj.path_case_abc = \
-                wave_obj.layer_ops.identify_abc_layer_case(
-                    output_folder=wave_obj.output_folder+f"/ht_test{dimension}d{str_id}")
+            wave_obj.layer_ops.path_to_save_abc_layer_case(
+                output_folder=wave_obj.output_folder+f"/ht_test{dimension}d{str_id}")
+            wave_obj.case_abc = wave_obj.layer_ops.case_abc
+            wave_obj.path_save = wave_obj.layer_ops.path_save
+            wave_obj.path_case_abc = wave_obj.layer_ops.path_case_abc
 
             # Running the HABC tools
             run_tools(wave_obj, method_extend)

@@ -9,8 +9,8 @@ from matplotlib.pyplot import show as plt_show
 # from numpy import arange, asarray, ceil, clip, linspace, inf, polyfit, polyval, zeros
 from numpy import arange, ceil, linspace, inf, zeros
 from os import makedirs, path
-from spyro.habc.lay_len import f_layer, loop_roots
-# from spyro.utils.stats_tools import coeff_of_determination
+from ..abc.lay_len import f_layer, loop_roots
+# from ..utils.stats_tools import coeff_of_determination
 rcParams.update({"font.family": "serif"})
 rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
 
