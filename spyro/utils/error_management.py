@@ -227,6 +227,6 @@ def enum_parameter_error(par_name, par_value, valid_enum):
             value_parameter_error(par_name, par_value, valid_values)
         return valid_enum(par_value)
 
-   # Invalid type - neither enum instance nor string
+    # Invalid type - neither enum instance nor string
     raise TypeError(f"'{par_name}' must be {valid_enum.__name__} or str"
                     f", got {type(par_value).__name__}")
