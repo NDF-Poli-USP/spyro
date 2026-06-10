@@ -209,7 +209,8 @@ class ABCLayer(NRBC):
             raise ValueError(f"abc_deg_layer must be >= 2, got {abc_deg_layer}.")
 
         if abc_degree_type not in ['real', 'integer']:
-            value_parameter_error('abc_degree_type', abc_degree_type, ['real', 'integer'])
+            value_parameter_error(
+                'abc_degree_type', abc_degree_type, ['real', 'integer'])
 
         if output_folder is not None and not isinstance(output_folder, str):
             raise TypeError("output_folder must be a string, "
@@ -346,7 +347,7 @@ class ABCLayer(NRBC):
         Returns
         -------
         case_abc : `str`
-            Label for the output files that includes the layer shape and degree for 
+            Label for the output files that includes the layer shape and degree for
             hypershape layers ('REC', HNX.Y with X.Y as the hypershape degree with one
             decimal place precision) and the reference frequency ('SOU' or 'BND').
             Examples: 'REC_SOU', 'REC_BND', 'HN2.4_SOU' or 'HN2.4_BND'.
@@ -507,7 +508,7 @@ class ABCLayer(NRBC):
             Domain dimensions with layer. For rectangular layers, truncation
             due to the free surface is included (n = 1). For hypershape layers,
             truncation by free surface is not included (n = 2) if 'full_hyp' is
-            `True`; otherwise, it is included (n = 1). (See Notes below)  
+            `True`; otherwise, it is included (n = 1). (See Notes below)
 
         Notes
         -----
@@ -591,7 +592,8 @@ class ABCLayer(NRBC):
         if self.abc_boundary_layer_shape == 'rectangular':
 
             # Geometric properties of the rectangular layer
-            self.layer_geometry.calc_rec_geom_prop(domain_layer_full, self.abc_pad_length)
+            self.layer_geometry.calc_rec_geom_prop(
+                domain_layer_full, self.abc_pad_length)
 
         elif self.abc_boundary_layer_shape == 'hypershape':
 
@@ -688,7 +690,7 @@ class ABCLayer(NRBC):
         method : `str`, optional
             Method to extend the velocity profile. Options:
             'point_cloud' or 'nearest_point'. Default is 'point_cloud'.
-        save_file : `bool`, optional    
+        save_file : `bool`, optional
             If `True`, save the velocity model with absorbing layer in a .pvd file.
             Default is `True`.
 

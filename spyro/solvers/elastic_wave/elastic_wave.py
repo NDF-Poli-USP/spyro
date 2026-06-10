@@ -29,7 +29,7 @@ class ElasticWave(Wave, metaclass=ABCMeta):
         None
         """
 
-        super().__init__(dictionary, wave_type=wave_type, comm=comm)
+        super().__init__(dictionary, wave_type=anisotropy, comm=comm)
         self.time = Constant(0)  # Time variable
 
     @override

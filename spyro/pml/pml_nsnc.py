@@ -50,7 +50,7 @@ class PMLLayer(ABCLayer):
 
     def __init__(self, domain_dim, frequency, f_Nyquist, dimension=2,
                  quadrilateral=False, func_space_type=None, bc_boundary_pml="Higdon",
-                 abc_reference_freq="source", comm=None):
+                 abc_reference_freq="source", output_folder=None, comm=None):
         """
         Initialize the PML class.
 
@@ -58,29 +58,31 @@ class PMLLayer(ABCLayer):
         ----------
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
-            or (length_z, length_x, length_y) for 3D
+            or (length_z, length_x, length_y) for 3D.
         frequency: `float`
             Frequency of the source.
         f_Nyquist : `float`
-            Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt)
+            Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt).
         dimension : `int`, optional
-            Model dimension (2D or 3D). Default is 2D
+            Model dimension (2D or 3D). Default is 2D.
         quadrilateral : bool, optional
             Flag to indicate whether to use quadrilateral/hexahedral elements.
-            Default is False (triangular/tetrahedral elements)
+            Default is False (triangular/tetrahedral elements).
         func_space_type, `str`, optional
             Type of function space for the state variable.
-            Options: 'scalar' or 'vector'. Default is None
+            Options: 'scalar' or 'vector'. Default is `None`.
         bc_boundary_pml : `str`, optional
             Type of boundary condition to apply on the PML boundaries.
-            Options are "Higdon" or "Sommerfeld" for Non-Reflecting BCs,
-            or "Dirichlet" or "Neumann" for typical BCs. Default is "Higdon"
+            Options are 'Higdon' or 'Sommerfeld for Non-Reflecting BCs,
+            or "Dirichlet" or "Neumann" for typical BCs. Default is 'Higdon'.
         abc_reference_freq : `str`, optional
             Reference frequency for sizing the hybrid absorbing layer.
-            Options: 'source' or 'boundary'. Default is 'source'
+            Options: 'source' or 'boundary'. Default is 'source'.
+        output_folder : `str`, optional
+            The folder where output data will be saved. Default is None.
         comm : `object`, optional
             An object representing the communication interface
-            for parallel processing. Default is None
+            for parallel processing. Default is None.
 
         Returns
         -------
@@ -92,7 +94,8 @@ class PMLLayer(ABCLayer):
                           quadrilateral=quadrilateral, func_space_type=func_space_type,
                           abc_boundary_layer_shape='rectangular',
                           abc_boundary_layer_type="PML",
-                          abc_reference_freq=abc_reference_freq, comm=comm)
+                          abc_reference_freq=abc_reference_freq,
+                          output_folder=output_folder, comm=comm)
 
         # Type of boundary condition to apply on the PML boundaries
         self.bc_boundary_pml = bc_boundary_pml

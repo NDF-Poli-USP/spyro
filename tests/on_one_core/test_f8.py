@@ -1,7 +1,7 @@
 import firedrake as fire
 import glob
 import spyro.habc.habc as habc
-import spyro.abc.eik as eik_min
+import spyro.abc.eik_min as eik_min
 from spyro.utils.cost import comp_cost
 import pytest
 import os
@@ -156,7 +156,7 @@ def preamble_habc(dictionary, edge_length):
     tRef = comp_cost("tini")
 
     # Initializing Eikonal object
-    Eik_obj = eik.HABC_Eikonal(Wave_obj)
+    Eik_obj = eik_min.HABC_Eikonal(Wave_obj)
 
     # Finding critical points
     Wave_obj.critical_boundary_points(Eik_obj)
