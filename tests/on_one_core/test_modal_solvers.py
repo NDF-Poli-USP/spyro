@@ -5,6 +5,7 @@ import firedrake as fire
 import spyro.habc.habc as habc
 from os import makedirs, path
 from spyro.utils.cost import comp_cost
+from spyro.utils.typing import LayerShapeType
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
