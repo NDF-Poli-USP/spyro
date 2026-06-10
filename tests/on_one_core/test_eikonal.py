@@ -1,8 +1,10 @@
 from pytest import fail, mark, param
 from firedrake import conditional, ConvergenceError
+from firedrake import COMM_WORLD as comm
 from numpy import isclose
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
+from spyro.io.basicio import parallel_print as pprint
 
 
 def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
@@ -46,13 +48,13 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
     # Define the domain size without the PML or AL. Here we'll assume a domain
     # with a width and depth of 1 km, and a thickness of 1 km for the 3D case.
     if dimension == 2:
-        Lz, Lx, Ly = [1., 1., 0.]
+        length_z, length_x, length_y = [1., 1., 0.]
     elif dimension == 3:
-        Lz, Lx, Ly = [1., 1., 1.]  # in km
+        length_z, length_x, length_y = [1., 1., 1.]  # in km
     dictionary["mesh"] = {
-        "length_z": Lz,  # depth in km - always positive
-        "length_x": Lx,  # width in km - always positive
-        "length_y": Ly,  # thickness in km - always positive
+        "length_z": length_z,  # depth in km - always positive
+        "length_x": length_x,  # width in km - always positive
+        "length_y": length_y,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -64,12 +66,18 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
         "source_locations": ([(-0.5, 0.25)] if dimension == 2  # (0.5 * Lz, 0.25 * Lx)
                              else [(-0.5, 0.25, 0.5)]),  # (0.5 * Lz, 0.25 * Lx, 0.5 * Ly)
         "frequency": 5.,  # in Hz
-        "receiver_locations": ([(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)]
+        "receiver_locations": ([(-length_z, 0.),
+                                (-length_z, length_x),
+                                (0., 0.), (0., length_x)]
                                if dimension == 2
-                               else [(-Lz, 0., 0.), (-Lz, Lx, 0.),
-                                     (0., 0., 0), (0., Lx, 0.),
-                                     (-Lz, 0., Ly), (-Lz, Lx, Ly),
-                                     (0., 0., Ly), (0., Lx, Ly)])
+                               else [(-length_z, 0., 0.),
+                                     (-length_z, length_x, 0.),
+                                     (0., 0., 0),
+                                     (0., length_x, 0.),
+                                     (-length_z, 0., length_y),
+                                     (-length_z, length_x, length_y),
+                                     (0., 0., length_y),
+                                     (0., length_x, length_y)])
     }
 
     # Define Parameters for absorbing boundary conditions
@@ -94,13 +102,13 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
     Parameters
     ----------
     dictionary : `dict`
-        Dictionary containing the parameters for the model
+        Dictionary containing the parameters for the model.
     edge_length : `float`
-        Mesh size in km
+        Mesh size in km.
     f_est : `float`
-        Factor for the stabilizing term in Eikonal Eq
+        Factor for the stabilizing term in Eikonal Eq.
     element_type : `string`
-        Finite element type. 'consistent' or 'underintegrated'
+        Finite element type. 'consistent' or 'underintegrated'.
 
     Returns
     -------
@@ -234,8 +242,8 @@ def test_eikonal(element_geometry, dimension, element_type):
      0.05 107.164
     """
 
-    print("\n" + 60 * "=" + f"\nTesting Eikonal with {element_geometry}-{element_type} "
-          + f"elements for {dimension}D case\n" + 60 * "=", flush=True)
+    pprint("\n" + 60 * "=" + f"\nTesting Eikonal with {element_geometry}-{element_type} "
+           + f"elements for {dimension}D case\n" + 60 * "=", comm=comm)
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -266,11 +274,11 @@ def test_eikonal(element_geometry, dimension, element_type):
             f_est = 0.07 if element_type == 'consistent' else 0.05
 
     # Get simulation parameters
-    print(f"\nMesh Size: {1e3 * edge_length:.4f} m", flush=True)
-    print(f"Element Geometry: {element_geometry}", flush=True)
-    print(f"Element Type: {element_type}", flush=True)
-    print(f"Eikonal Degree: {p_eik}", flush=True)
-    print(f"Eikonal Stabilizing Factor: {f_est:.2f}", flush=True)
+    pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
+    pprint(f"Element Geometry: {element_geometry}", comm=comm)
+    pprint(f"Element Type: {element_type}", comm=comm)
+    pprint(f"Eikonal Degree: {p_eik}", comm=comm)
+    pprint(f"Eikonal Stabilizing Factor: {f_est:.2f}", comm=comm)
 
     try:
 
@@ -286,8 +294,8 @@ def test_eikonal(element_geometry, dimension, element_type):
         assert isclose(min_eik / thr_val, 1., atol=atol), \
             f"✗ Minimum Eikonal {dimension}D Element-{element_geometry}-" + \
             f"{element_type} → Expected value {thr_val}, got {min_eik:.3f}"
-        print(f"✓ Minimum Eikonal {dimension}D Element-{element_geometry}-{element_type} "
-              f" Verified: expected {thr_val}, got {min_eik:.3f}", flush=True)
+        pprint(f"✓ Minimum Eikonal {dimension}D Element-{element_geometry}-{element_type}"
+               f" Verified: expected {thr_val}, got {min_eik:.3f}", comm=comm)
 
     except ConvergenceError as e:
         fail(f"Checking Eikonal {dimension}D Element-{element_geometry}-"

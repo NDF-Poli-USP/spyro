@@ -29,59 +29,59 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     Attributes:
     -----------
     comm : `object`
-        An object representing the communication interface
+        An object representing the communication interface.
     boundary_idx_map: dict
-        Mapping of boundary IDs for applying absorbing boundary conditions
+        Mapping of boundary IDs for applying absorbing boundary conditions.
     initial_velocity_model: `Firedrake.Function`
-        Initial velocity model
+        Initial velocity model.
     function_space: firedrake function space
-        Function space for the wave equation
+        Function space for the wave equation.
     current_time: float
-        Current time of the simulation
+        Current time of the simulation.
     solver_parameters: Python object
-        Contains solver parameters
-    real_shot_record: firedrake function
-        Real shot record
-    mesh: firedrake mesh
-        Mesh used in the simulation (2D or 3D)
+        Contains solver parameters.
+    real_shot_record: `Firedrake.Function`
+        Real shot record.
+    mesh: `Firedrake.Mesh`
+        Mesh used in the simulation (2D or 3D).
     mesh_x: `ufl.geometry.SpatialCoordinate`
-        Symbolic coordinate x of the mesh object
+        Symbolic coordinate x of the mesh object.
     mesh_y: `ufl.geometry.SpatialCoordinate`
-        Symbolic coordinate y of the mesh object
+        Symbolic coordinate y of the mesh object.
     mesh_z : `ufl.geometry.SpatialCoordinate`
-        Symbolic coordinate z of the mesh object
+        Symbolic coordinate z of the mesh object.
     sources: Sources object
-        Contains information about sources
+        Contains information about sources.
     receivers: Receivers object
-        Contains information about receivers
+        Contains information about receivers.
     path_case_abc : `string`
-        Path to save data for the abc case study
+        Path to save data for the abc case study.
     path_save : `string`
         Path to save data
-    mesh_ops : `meshing_operations.MeshOps` or `meshing_HABC.HABCMesh`
+    mesh_ops : `meshing_operations.MeshOps` or `meshing_HABC.HABCMesh`.
         Mesh operation manager
     layer_ops : `habc.HABCLayer` or `pml_nsnc.PMLLayer`
-        ABC layer operation manager
+        ABC layer operation manager.
 
     Methods:
     --------
     get_and_set_maximum_dt()
-        Calculates and/or sets maximum dt
+        Calculates and/or sets maximum dt.
     get_mass_matrix_diagonal()
-        Returns diagonal of mass matrix
+        Returns diagonal of mass matrix.
     get_spatial_coordinates()
         Get the coordinates of the mesh.
     set_mesh()
-        Sets or calculates new mesh
+        Sets or calculates new mesh.
     set_initial_velocity_model()
-        Sets initial velocity model
+        Sets initial velocity model.
     set_last_solve_as_real_shot_record()
-        Sets last solve as real shot record
+        Sets last solve as real shot record.
     set_solver_parameters()
-        Sets new or default solver parameters
+        Sets new or default solver parameters.
     """
 
-    def __init__(self, dictionary=None, wave_type=None, comm=None):
+    def __init__(self, dictionary=None, wave_type=WaveType.NONE, comm=None):
         """Wave object solver. Contains both the forward solver
         and gradient calculator methods.
 
@@ -91,23 +91,23 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             A dictionary containing the input parameters for the Wave class.
             Default is None
         wave_type : `WaveType`, optional
-            The type of wave equation to solve. Default is None
+            The type of wave equation to solve. Default is `WaveType.NONE`
         comm : `object`, optional
-            MPI communicator for parallel execution. Default is None
+            MPI communicator for parallel execution. Default is `None`.
 
         Returns
         -------
         None
 
         model_parameters : `Python object`
-            Contains model parameters
+            Contains model parameters.
         """
         super().__init__(dictionary=dictionary, comm=comm)
         self.initial_velocity_model = None
         self.gradient_mask_available = False
 
-        # Setting wave type or defaulting to None
-        self.wave_type = WaveType.NONE if wave_type is None else wave_type
+        # Setting wave type
+        self.wave_type = wave_type
 
         self.function_space = None
         self.dg0_scalar_function_space = None
@@ -636,7 +636,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                       quadrilateral=self.mesh_parameters.quadrilateral,
                                       func_space_type=self.mesh_ops.func_space_type,
                                       abc_reference_freq=self.abc_reference_freq,
-                                      comm=self.comm)
+                                      output_folder=self.output_folder, comm=self.comm)
 
         if self.abc_boundary_layer_type == "hybrid":
             from ..habc.habc import HABCLayer
@@ -646,9 +646,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                        func_space_type=self.mesh_ops.func_space_type,
                                        abc_boundary_layer_shape=self.abc_boundary_layer_shape,
                                        abc_reference_freq=self.abc_reference_freq,
-                                       abc_degree_type=self.abc_degree_type, comm=self.comm)
+                                       abc_degree_type=self.abc_degree_type,
+                                       output_folder=self.output_folder, comm=self.comm)
 
         # Identifier for the current case study
         if self.abc_boundary_layer_type in ["PML", "hybrid"]:
-            self.case_abc, self.path_save, self.path_case_abc = \
-                self.layer_ops.identify_abc_layer_case(output_folder=self.output_folder)
+            self.case_abc = self.layer_ops.case_abc
+            self.path_save = self.layer_ops.path_save
+            self.path_case_abc = self.layer_ops.path_case_abc

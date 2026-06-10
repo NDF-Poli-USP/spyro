@@ -1,7 +1,9 @@
-import firedrake as fire
-import numpy as np
+from firedrake import VTKFile
+from numpy import asarray, float64
+from numpy.linalg import norm
 from ..solvers.eikonal.eikonal_eq import Eikonal_Modeling
-from spyro.tools.habc_tools import point_cloud_field
+from ..tools.habc_tools import point_cloud_field
+from ..io.basicio import parallel_print as pprint
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -12,9 +14,8 @@ from spyro.tools.habc_tools import point_cloud_field
 # With additions by Alexandre Olender
 
 
-class HABC_Eikonal(Eikonal_Modeling):
-    '''
-    Class for the Nonlinear Eikonal used for HABC.
+class Minimum_Eikonal(Eikonal_Modeling):
+    '''Class to determine the minimum Eikonal value used for sizing absorbing layers.
 
     Attributes
     ----------
@@ -79,10 +80,10 @@ class HABC_Eikonal(Eikonal_Modeling):
         None
         '''
 
-        Eikonal_Modeling.__init__(self, Wave.dimension, Wave.sources.point_locations,
-                                  ele_type_eik=Wave.mesh_parameters.ele_type_eik,
-                                  degree_eik=Wave.mesh_parameters.degree_eik,
-                                  f_est=Wave.mesh_parameters.f_est)
+        super().__init__(Wave.dimension, Wave.sources.point_locations,
+                         ele_type_eik=Wave.mesh_parameters.ele_type_eik,
+                         degree_eik=Wave.mesh_parameters.degree_eik,
+                         f_est=Wave.mesh_parameters.f_est)
 
         # Communicator MPI
         self.comm = Wave.comm
@@ -138,7 +139,7 @@ class HABC_Eikonal(Eikonal_Modeling):
         None
         '''
 
-        print("\nDefining Eikonal BCs")
+        pprint("\nDefining Eikonal BCs", comm=self.comm)
 
         # Define Eikonal BCs and source marker
         self.bcs_eik, sou_marker = self.eikonal_bcs(self.node_positions,
@@ -146,7 +147,7 @@ class HABC_Eikonal(Eikonal_Modeling):
                                                     self.lmin)
 
         # Save source marker
-        outfile = fire.VTKFile(self.path_save + "souEik.pvd")
+        outfile = VTKFile(self.path_save + "souEik.pvd")
         outfile.write(sou_marker)
 
     def solve_eik(self):
@@ -163,12 +164,11 @@ class HABC_Eikonal(Eikonal_Modeling):
         '''
 
         # Eikonal solution
-        self.yp = self.eikonal_solver(self.c, self.c_min,
-                                      self.funct_space_eik,
-                                      self.diam_mesh)
+        self.yp = self.eikonal_solver(
+            self.c, self.c_min, self.funct_space_eik, self.diam_mesh)
 
         # Save Eikonal results
-        eikonal_file = fire.VTKFile(self.path_save + "Eik.pvd")
+        eikonal_file = VTKFile(self.path_save + "Eik.pvd")
         eikonal_file.write(self.yp)
 
     def ident_eik_on_bnd(self, bnd_ids):
@@ -227,7 +227,7 @@ class HABC_Eikonal(Eikonal_Modeling):
             self.mesh, self.funct_space_eik, self.boundaries,
             box_domain=True, get_boundary_node_ids=True)[1]
 
-        print("\nIdentifying Critical Points on Boundaries")
+        pprint("\nIdentifying Critical Points on Boundaries", comm=self.comm)
 
         # Loop over boundaries
         eik_bnd = []
@@ -240,17 +240,16 @@ class HABC_Eikonal(Eikonal_Modeling):
             eikmin, pnt_crit = self.ident_eik_on_bnd(bnd_ids)
 
             # Identifying propagation speed at critical point
-            c_bnd = np.float64(self.c.at(pnt_crit).item())
+            c_bnd = float64(self.c.at(pnt_crit).item())
 
             # Print critical point coordinates
             pnt_str = "at (in km): ({2:3.3f}, {3:3.3f})"
             if self.dimension == 3:  # 3D
                 pnt_str = pnt_str[:-1] + ", {4:3.3f})"
-            print((eik_str + pnt_str).format(bnd_str, 1e3 * eikmin, *pnt_crit))
+            pprint((eik_str + pnt_str).format(bnd_str, 1e3 * eikmin, *pnt_crit), comm=self.comm)
 
             # Identify closest source
-            lref_allsou = np.linalg.norm(
-                np.asarray(pnt_crit) - np.asarray(self.source_locations), axis=1)
+            lref_allsou = norm(asarray(pnt_crit) - asarray(self.source_locations), axis=1)
             idxsou = lref_allsou.argmin()
             lref = lref_allsou[idxsou]
             sou_crit = self.source_locations[idxsou]

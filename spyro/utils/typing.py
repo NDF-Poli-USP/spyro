@@ -12,11 +12,11 @@ def override(func):
 class WaveType(Enum):
     """Enum for different types of wave equations that can be solved.
 
-    NONE: No wave equation
-    ISOTROPIC_ACOUSTIC: Isotropic acoustic wave equation
-    ISOTROPIC_ELASTIC: Isotropic elastic wave equation for Isotropic media
-    ANISOTROPIC_VTI_ELASTIC: Anisotropic elastic wave equation for VTI media
-    ANISOTROPIC_TTI_ELASTIC: Anisotropic elastic wave equation for TTI media
+    NONE: No wave equation.
+    ISOTROPIC_ACOUSTIC: Isotropic acoustic wave equation.
+    ISOTROPIC_ELASTIC: Isotropic elastic wave equation for Isotropic media.
+    ANISOTROPIC_VTI_ELASTIC: Anisotropic elastic wave equation for VTI media.
+    ANISOTROPIC_TTI_ELASTIC: Anisotropic elastic wave equation for TTI media.
     """
     NONE = 0
     ISOTROPIC_ACOUSTIC = 1
