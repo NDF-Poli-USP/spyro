@@ -13,7 +13,7 @@ from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
-from ..utils.typing import FunctionalEvaluationMode, WaveType
+from ..utils.typing import FunctionalEvaluationMode, LayerShapeType, WaveType
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from .modal.modal_sol import Modal_Solver
@@ -220,7 +220,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # TODO: Create a flag for other domains that are not of type box
         if not (hasattr(self, 'abc_boundary_layer_shape')
                 and hasattr(self.mesh_parameters, 'boundary_ids_map')
-                and self.abc_boundary_layer_shape == 'hypershape'):
+                and self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE):
             self.mesh_parameters.boundary_ids_map, \
                 self.mesh_parameters.boundary_nodes_ids = \
                 self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,

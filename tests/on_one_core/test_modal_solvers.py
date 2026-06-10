@@ -432,8 +432,8 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
     for degree_layer, exp_value in zip(degree_layer_lst, expect_values_lst):
 
         # Update the layer shape and its degree
-        Wave_obj.abc_boundary_layer_shape = "hypershape" \
-            if degree_layer is not None else "rectangular"
+        Wave_obj.abc_boundary_layer_shape = LayerShapeType.HYPERSHAPE \
+            if degree_layer is not None else LayerShapeType.RECTANGULAR
         Wave_obj.abc_deg_layer = degree_layer
 
         try:

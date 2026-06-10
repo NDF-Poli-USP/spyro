@@ -1,7 +1,8 @@
 # import firedrake as fire
 # import numpy as np
-from spyro.abc.abc_layer import ABCLayer
-from spyro.utils.error_management import value_parameter_error
+from ..abc.abc_layer import ABCLayer
+from ..utils.error_management import value_parameter_error
+from ..utils.typing import LayerShapeType
 
 # Work from Ruben Andres Salas and Alexandre Olender
 # non-split non-convolutional PML formulation
@@ -92,7 +93,7 @@ class PMLLayer(ABCLayer):
         # Initializing the ABCLayer class
         ABCLayer.__init__(self, domain_dim, frequency, f_Nyquist, dimension=dimension,
                           quadrilateral=quadrilateral, func_space_type=func_space_type,
-                          abc_boundary_layer_shape='rectangular',
+                          abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
                           abc_boundary_layer_type="PML",
                           abc_reference_freq=abc_reference_freq,
                           output_folder=output_folder, comm=comm)

@@ -184,3 +184,49 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
                          if include_upper_bound else f"less than {upper_bound}")
 
         raise ValueError(f"'{par_name}' must be {bound_str}, got {par_value}.")
+
+
+def enum_parameter_error(par_name, par_value, valid_enum):
+    """Validate and convert an enum parameter, returning the enum instance.
+
+    This method validates that the provided parameter value is either an
+    instance of the specified enum class or a string that maps to a valid
+    enum value. If valid, it returns the corresponding enum instance.
+    Otherwise, it raises an appropriate exception.
+
+    Parameters
+    ----------
+    par_name : `str`
+        Name of the parameter being validated (used in error messages).
+    par_value : `object`
+        Value of the parameter to validate. Can be an `enum.EnumMeta` or a `str`.
+    valid_enum : `enum.EnumMeta`
+        Enum class containing the valid values for the parameter.
+
+    Returns
+    -------
+    `enum.Enum`
+        The validated enum instance corresponding to the input value.
+
+    Raises
+    ------
+    TypeError
+        If the parameter value is neither an instance of the valid enum class nor a `str`.
+    ValueError
+        If the parameter value is a `str` that does not match any valid enum value.
+    """
+
+    # Check if already a valid enum instance
+    if isinstance(par_value, valid_enum):
+        return par_value
+
+    # Check if string maps to valid enum value
+    if isinstance(par_value, str):
+        valid_values = [enum.value for enum in valid_enum]
+        if par_value not in valid_values:
+            value_parameter_error(par_name, par_value, valid_values)
+        return valid_enum(par_value)
+
+   # Invalid type - neither enum instance nor string
+    raise TypeError(f"'{par_name}' must be {valid_enum.__name__} or str"
+                    f", got {type(par_value).__name__}")
