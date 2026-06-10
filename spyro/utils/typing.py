@@ -37,8 +37,20 @@ class FunctionalType(Enum):
 class FunctionalEvaluationMode(Enum):
     """The mode in which to evaluate the functional.
 
-        PER_TIMESTEP: Evaluate the functional at every time step during the time integration.
-        AFTER_SOLVE: Evaluate the functional after the time integration is complete.
+    PER_TIMESTEP: Evaluate the functional at every time step during the time integration.
+    AFTER_SOLVE: Evaluate the functional after the time integration is complete.
     """
     PER_TIMESTEP = "per_timestep"
     AFTER_SOLVE = "after_solve"
+
+
+class LayerShapeType(Enum):
+    """Enum for different types of absorbing layer shapes for ABCs.
+
+    NOLAYER: No absorbing layer, i.e., no ABCs applied.
+    RECTANGULAR: Rectangular absorbing layer`around the computational domain.
+    HYPERSHAPE: Hypershape absorbing layer around the computational domain
+    """
+    NOLAYER = "no_layer"
+    RECTANGULAR = "rectangular"
+    HYPERSHAPE = "hypershape"

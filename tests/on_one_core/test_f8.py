@@ -3,6 +3,7 @@ import glob
 import spyro.habc.habc as habc
 import spyro.abc.eik_min as eik_min
 from spyro.utils.cost import comp_cost
+from spyro.utils.typing import LayerShapeType
 import pytest
 import os
 
@@ -405,8 +406,8 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst,
             for degree_layer in degree_layer_lst:
 
                 # Update the layer shape and its degree
-                Wave_obj.abc_boundary_layer_shape = "hypershape" \
-                    if degree_layer is not None else "rectangular"
+                Wave_obj.abc_boundary_layer_shape = LayerShapeType.HYPERSHAPE \
+                    if degree_layer is not None else LayerShapeType.RECTANGULAR
                 Wave_obj.abc_deg_layer = degree_layer
 
                 # Data for regression of xCR parameter

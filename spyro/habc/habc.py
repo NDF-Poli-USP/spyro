@@ -6,6 +6,7 @@ from shutil import rmtree
 # from sympy import divisors
 from ..abc.abc_layer import ABCLayer
 from .damp_profile import HABC_Damping
+from ..utils.typing import LayerShapeType
 # from spyro.utils.error_management import value_parameter_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -143,8 +144,9 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     def __init__(self, domain_dim, frequency, f_Nyquist, abc_deg_layer,
                  dimension=2, quadrilateral=False, func_space_type=None,
-                 abc_boundary_layer_shape="rectangular", abc_reference_freq="source",
-                 abc_degree_type="real", output_folder=None, comm=None):
+                 abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
+                 abc_reference_freq="source", abc_degree_type="real",
+                 output_folder=None, comm=None):
         '''
         Initialize the HABC class
 
@@ -489,7 +491,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     bnd_nfs, bnd_nodes_nfs = self.layer_boundary_data(self.function_space)
 
     #     # Hypershape parameters
-    #     hyp_par = None if self.abc_boundary_layer_shape == 'hypershape' \
+    #     hyp_par = None if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE \
     #         else (self.n_hyp, *self.hyper_axes)
 
     #     # Applying Higdon ABCs
@@ -725,7 +727,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
         '''
 
         if self.layer_geometry.n_hyp != self.abc_deg_layer and \
-                self.abc_boundary_layer_shape == 'hypershape':
+                self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
 
             print("Output Folder for Results Will Be Renamed.", flush=True)
 

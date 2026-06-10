@@ -1,4 +1,5 @@
-from spyro.utils.error_management import value_parameter_error
+from ..utils.error_management import enum_parameter_error, value_parameter_error
+from ..utils.typing import LayerShapeType
 
 
 class Read_boundary_layer:
@@ -23,7 +24,7 @@ class Read_boundary_layer:
         Type of the hypereshape degree. Options: 'real' or 'integer'
     abc_exponent : float
         Exponent of the polynomial damping
-    abc_extension_mode : `str`
+    abc_extend_properties : `str`
         Mode to extend the properties into the absorbing layer.
         Options: 'abc_driven'  (performed by a specific method) or
         'builtin' (automatic at field definition)
@@ -90,11 +91,29 @@ class Read_boundary_layer:
             "absorving_boundary_conditions"].get("absorb_back", True)
 
     @property
+    def abc_boundary_layer_shape(self):
+        if not hasattr(self, '_abc_boundary_layer_shape'):
+            self._abc_boundary_layer_shape = LayerShapeType.NOLAYER
+        return self._abc_boundary_layer_shape
+
+    @abc_boundary_layer_shape.setter
+    def abc_boundary_layer_shape(self, value):
+        """Set boundary layer shape with enum validation."""
+        shape_enum = enum_parameter_error('abc_boundary_layer_shape',
+                                          value, LayerShapeType)
+
+        if shape_enum == LayerShapeType.NOLAYER:
+            raise ValueError("NOLAYER not allowed for active ABC.")
+
+        self._abc_boundary_layer_shape = shape_enum
+
+    @property
     def abc_boundary_layer_type(self):
         return self._abc_boundary_layer_type
 
     @abc_boundary_layer_type.setter
     def abc_boundary_layer_type(self, value):
+        """Set the type of absorbing boundary layer with validation."""
         abc_dictionary = self.input_dictionary['absorving_boundary_conditions']
         accepted_damping_types = [
             "PML",
@@ -109,19 +128,28 @@ class Read_boundary_layer:
                                   accepted_damping_types)
 
         if value == "PML":
+            # PML forces rectangular shape
+            self.abc_boundary_layer_shape = LayerShapeType.RECTANGULAR
             abc_dictionary.setdefault("exponent", 2)
             self.abc_exponent = abc_dictionary["exponent"]
             abc_dictionary.setdefault("R", 1e-6)
             self.abc_R = abc_dictionary["R"]
             abc_dictionary.setdefault("cmax", 4.7)
             self.abc_cmax = abc_dictionary["cmax"]
-            self.abc_boundary_layer_shape = "rectangular"
         if value == "hybrid":
+            # Get shape from dictionary, default to rectangular
             self.abc_boundary_layer_shape = abc_dictionary.get("layer_shape",
                                                                "rectangular")
+
+            # Hypershape-specific validation
+            self.abc_deg_layer = None
+            if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
+                self.abc_deg_layer = max(abc_dictionary.get("degree_layer", 2.), 2.)
+                if self.abc_deg_layer is not None and self.abc_deg_layer < 2.:
+                    raise ValueError(f"Hypershape degree must be >= 2"
+                                     f", got {self.abc_deg_layer}.")
+
             self.abc_degree_type = abc_dictionary.get("degree_type", "real")
-            self.abc_deg_layer = None if self.abc_boundary_layer_shape == "rectangular" \
-                else max(abc_dictionary.get("degree_layer", 2.), 2.)
             self.abc_reference_freq = abc_dictionary.get("habc_reference_freq",
                                                          "source")
 

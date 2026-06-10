@@ -13,8 +13,9 @@ from ..io.basicio import parallel_print as pprint
 from ..domains.space import create_function_space
 from ..plots.plots_habc import plot_function_layer_size
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
-from ..utils.error_management import value_parameter_error
+from ..utils.error_management import enum_parameter_error, value_parameter_error
 from ..utils.freq_tools import freq_response
+from ..utils.typing import LayerShapeType
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -130,7 +131,7 @@ class ABCLayer(NRBC):
 
     def __init__(self, domain_dim, frequency, freq_Nyquist, dimension=2,
                  quadrilateral=False, func_space_type=None,
-                 abc_boundary_layer_shape="rectangular",
+                 abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
                  abc_boundary_layer_type="hybrid",
                  abc_reference_freq="source", abc_degree_type="real",
                  abc_deg_layer=None, output_folder=None, comm=None):
@@ -192,11 +193,6 @@ class ABCLayer(NRBC):
         if dimension not in [2, 3]:
             value_parameter_error('dimension', dimension, [2, 3])
 
-        if abc_boundary_layer_shape not in ['rectangular', 'hypershape']:
-            value_parameter_error('abc_boundary_layer_shape',
-                                  abc_boundary_layer_shape,
-                                  ['rectangular', 'hypershape'])
-
         if abc_boundary_layer_type not in ["hybrid", "PML"]:
             value_parameter_error(
                 'abc_boundary_layer_type', abc_boundary_layer_type, ["hybrid", "PML"])
@@ -235,12 +231,18 @@ class ABCLayer(NRBC):
         self.func_space_type = func_space_type
 
         # ABC layer parameters
-        self.abc_boundary_layer_shape = abc_boundary_layer_shape
+        self.abc_boundary_layer_shape = enum_parameter_error('abc_boundary_layer_shape',
+                                                             abc_boundary_layer_shape,
+                                                             LayerShapeType)
         self.abc_boundary_layer_type = abc_boundary_layer_type
         self.abc_reference_freq = abc_reference_freq
         self.abc_degree_type = abc_degree_type
-        self.abc_deg_layer = abc_deg_layer = None \
-            if abc_boundary_layer_shape == "rectangular" else max(abc_deg_layer, 2.)
+
+        # Layer degree
+        if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
+            self.abc_deg_layer = None
+        elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
+            self.abc_deg_layer = max(abc_deg_layer, 2.)
 
         # Communicator MPI
         self.comm = comm
@@ -279,7 +281,7 @@ class ABCLayer(NRBC):
         """
 
         # Initializating the layer
-        if self.abc_boundary_layer_shape == 'rectangular':  # Rectangular layer
+        if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
 
             # Initializing the rectangular layer
             from .rec_lay import RectangLayer
@@ -287,7 +289,7 @@ class ABCLayer(NRBC):
 
             return Rectangle_layer
 
-        elif self.abc_boundary_layer_shape == 'hypershape':  # Hypershape layer
+        elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
 
             # Initializing the hyperelliptical layer
             from .hyp_lay import HyperLayer
@@ -295,11 +297,6 @@ class ABCLayer(NRBC):
                                           n_type=self.abc_degree_type,
                                           dimension=self.dimension)
             return Hypershape_layer
-
-        else:
-            value_parameter_error('abc_boundary_layer_shape',
-                                  self.abc_boundary_layer_shape,
-                                  ['rectangular', 'hypershape'])
 
     def formatting_abc_layer_type(self, str_to_format, for_prints=True):
         """Format a string for the ABC layer type.
@@ -354,17 +351,20 @@ class ABCLayer(NRBC):
         """
 
         # Labeling for the layer shape
-        case_abc = 'REC' if self.abc_boundary_layer_shape == 'rectangular' else \
-            'HN' + f"{self.abc_deg_layer:.1f}"
+        if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
+            case_abc = 'REC'
+
+        elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
+            case_abc = 'HN' + f"{self.abc_deg_layer:.1f}"
 
         # Labeling for the reference frequency for the absorbing layer
         case_abc += "_SOU" if self.abc_reference_freq == 'source' else "_BND"
 
         # Printing layer info on screen
         layer_str = self.formatting_abc_layer_type("\n{} Layer Shape: ") + \
-            f"{self.abc_boundary_layer_shape.capitalize()}" + \
+            f"{self.abc_boundary_layer_shape.value.capitalize()}" + \
             (f" - Degree: {self.abc_deg_layer}"
-             if self.abc_boundary_layer_shape == 'hypershape' else "")
+             if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else "")
         pprint(layer_str, comm=self.comm)
 
         return case_abc
@@ -521,7 +521,7 @@ class ABCLayer(NRBC):
         domain_layer = [self.length_zabc, self.length_xabc]
 
         # Domain dimensions with layer without truncations only for hypershape layers
-        if self.abc_boundary_layer_shape == 'hypershape' and full_hyp:
+        if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE and full_hyp:
             domain_layer[0] += self.abc_pad_length
 
         if self.dimension == 3:  # 3D
@@ -589,13 +589,13 @@ class ABCLayer(NRBC):
         # Domain dimensions without free surface truncation
         domain_layer_full = self.abc_domain_dimensions()
 
-        if self.abc_boundary_layer_shape == 'rectangular':
+        if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
 
             # Geometric properties of the rectangular layer
             self.layer_geometry.calc_rec_geom_prop(
                 domain_layer_full, self.abc_pad_length)
 
-        elif self.abc_boundary_layer_shape == 'hypershape':
+        elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
 
             # Geometric properties of the hypershape layer
             self.layer_geometry.calc_hyp_geom_prop(
@@ -625,14 +625,14 @@ class ABCLayer(NRBC):
         # Checking if the mesh for infinite model is requested
         if inf_model:
             pprint("\nGenerating Mesh for Infinite Model", comm=self.comm)
-            layer_shape = 'rectangular'
+            layer_shape = LayerShapeType.RECTANGULAR
 
         else:
             pprint("\nGenerating Mesh with Absorbing Layer", comm=self.comm)
             layer_shape = self.abc_boundary_layer_shape
 
         # New mesh with layer
-        if layer_shape == 'rectangular':
+        if layer_shape == LayerShapeType.RECTANGULAR:
 
             # Update the pad length in Wave object
             Wave.abc_pad_length = self.abc_pad_length
@@ -641,7 +641,7 @@ class ABCLayer(NRBC):
             Wave.set_mesh()
             pprint("Extended Rectangular Mesh Generated Successfully", comm=self.comm)
 
-        elif layer_shape == 'hypershape':
+        elif layer_shape == LayerShapeType.HYPERSHAPE:
 
             # Update the pad length in Wave.mesh_parameters object
             Wave.mesh_parameters.abc_pad_length = self.abc_pad_length
@@ -794,7 +794,7 @@ class ABCLayer(NRBC):
 
     #     # Hypershape parameters
     #     layer_shape = self.abc_boundary_layer_shape
-    #     if layer_shape == 'hypershape':
+    #     if layer_shape == LayerShapeType.HYPERSHAPE:
     #         hyp_par = (self.n_hyp, *self.hyper_axes)
     #     else:
     #         hyp_par = None
