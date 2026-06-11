@@ -1,8 +1,8 @@
 import firedrake as fire
 import numpy as np
 from sys import float_info, exit
-from spyro.utils.error_management import clean_inst_num, value_parameter_error
-from spyro.domains.quadrature import quadrature_rules
+from ..utils.error_management import clean_inst_num, value_parameter_error
+from ..domains.quadrature import quadrature_rules
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -20,7 +20,7 @@ class Dir_Point_BC(fire.DirichletBC):
     Attributes
     ----------
     nodes : `array`
-        Points where the boundary condition is to be applied
+        Points where the boundary condition is to be applied.
     '''
 
     def __init__(self, V, value, nodes):
@@ -29,12 +29,12 @@ class Dir_Point_BC(fire.DirichletBC):
 
         Parameters
         ----------
-        V : `firedrake function space`
-            Function space where the boundary condition is applied
-        value : `firedrake constant`
-            Value of the boundary condition
+        V : `Firedrake.FunctionSpace`
+            Function space where the boundary condition is applied.
+        value : `FiredrakeConstant`
+            Value of the boundary condition.
         nodes : `array`
-            Points where the boundary condition is to be applied
+            Points where the boundary condition is to be applied.
 
         Returns
         -------
@@ -50,7 +50,7 @@ class Dir_Point_BC(fire.DirichletBC):
 
 class Eikonal_Modeling():
     '''
-    Class for the Eikonal equation for Linear and Nonlinear analysis
+    Class for the Eikonal equation for Linear and Nonlinear analysis.
 
     Attributes
     ----------
@@ -59,56 +59,56 @@ class Eikonal_Modeling():
     ele_type_eik : `string`, optional
         Finite element type. 'consistent' or 'underintegrated'. Default is 'consistent'
     f_est : `float`
-            Factor for the stabilizing term in Eikonal Eq. Default is 0.03
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.03.
     degree_eik : `int`
-        Finite element order
+        Finite element order.
     source_locations: `list`of `tuples`
-        Source locations as tuples of coordinates
+        Source locations as tuples of coordinates.
     tol : `float`, optional
-        User solver tolerance. Default is 1e-16
+        User solver tolerance. Default is 1e-16.
 
     Methods
     -------
     nonlinear_eik()
-        Assemble the Nonlinear Eikonal with stabilizing term
+        Assemble the Nonlinear Eikonal with stabilizing term.
     define_int_dom()
-        Define the integration domain for the Eikonal equation
+        Define the integration domain for the Eikonal equation.
     eikonal_bcs()
-        Impose Dirichlet BCs for eikonal equation
+        Impose Dirichlet BCs for eikonal equation.
     eikonal_solver()
-        Solve the Eikonal equation for model without absorbing layer
+        Solve the Eikonal equation for model without absorbing layer.
     initial_guess()
-        Provide an initial guess for the Eikonal solver
+        Provide an initial guess for the Eikonal solver.
     linear_eik()
-        Assemble the linear Eikonal
+        Assemble the linear Eikonal.
     linear_solution()
-        Solve the linear Eikonal equation
+        Solve the linear Eikonal equation.
     nonlinear_solution()
-        Solve the nonlinear Eikonal equation
+        Solve the nonlinear Eikonal equation.
     solver_opts()
-        Set the eikonal solver parameters
+        Set the eikonal solver parameters.
     '''
 
     def __init__(self, dimension, source_locations, ele_type_eik='consistent',
                  degree_eik=None, f_est=0.03, tol=1e-16):
         '''
-        Initialize the Eikonal_Modeling class
+        Initialize the Eikonal_Modeling class.
 
         Parameters
         ----------
         dimension : `int`
-            The spatial dimension of the problem
+            The spatial dimension of the problem.
         source_locations: `list`of `tuples`
-            List of tuples containing all source locations
+            List of tuples containing all source locations.
         ele_type_eik : `string`, optional
             Finite element type. 'consistent' or 'underintegrated'.
-            Default is 'consistent'
+            Default is 'consistent'.
         degree_eik : `int`, optional
-            Finite element order for the Eikonal analysis. Default is None
+            Finite element order for the Eikonal analysis. Default is None.
         f_est : `float`, optional
-            Factor for the stabilizing term in Eikonal Eq. Default is 0.03
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.03.
         tol : `float`, optional
-            User solver tolerance. Default is 1e-16
+            User solver tolerance. Default is 1e-16.
 
         Returns
         -------
@@ -141,7 +141,7 @@ class Eikonal_Modeling():
 
     def eikonal_bcs(self, node_positions, V, lmin):
         '''
-        Impose Dirichlet BCs for eikonal equation
+        Impose Dirichlet BCs for eikonal equation.
 
         Parameters
         ----------
@@ -149,17 +149,17 @@ class Eikonal_Modeling():
             Tuple containing the node positions in the mesh.
             - (z_data, x_data) for 2D
             - (z_data, x_data, y_data) for 3D
-        V : `firedrake function space`
-            Function space where the boundary condition is applied
+        V : `Firedrake.FunctionSpace`
+            Function space where the boundary condition is applied.
         lmin : `float`
-            Minimum mesh size
+            Minimum mesh size.
 
         Returns
         -------
         bcs_eik : `list`
-            Dirichlet BCs for eikonal
-        sou_marker : `firedrake function`
-            Function marking the source locations in the mesh
+            Dirichlet BCs for eikonal.
+        sou_marker : `Firedrake.Function`
+            Function marking the source locations in the mesh.
         '''
 
         # Extract node positions
@@ -204,17 +204,17 @@ class Eikonal_Modeling():
 
     def define_int_dom(self, V):
         '''
-        Define the integration domain for the Eikonal equation
+        Define the integration domain for the Eikonal equation.
 
         Parameters
         ----------
-        V : `firedrake function space`
-            Function space for the Eikonal modeling
+        V : `Firedrake.FunctionSpace`
+            Function space for the Eikonal modeling.
 
         Returns
         -------
-        dx : `firedrake measure`
-            Integration domain for the Eikonal equation
+        dx : `FiredrakeMeasure`
+            Integration domain for the Eikonal equation.
         '''
 
         if self.ele_type_eik == 'consistent':
@@ -232,19 +232,19 @@ class Eikonal_Modeling():
 
         Parameters
         ----------
-        u : `firedrake trial function`
-            Trial function
-        vy : `firedrake test function`
-            Test function
-        c : `firedrake function`
-            Velocity model without absorbing layer
-        V : `firedrake function space`
-            Function space for the Eikonal modeling
+        u : `Firedrake.TrialFunction`
+            Trial function.
+        vy : `Firedrake.TestFunction`
+            Test function.
+        c : `Firedrake.Function`
+            Velocity model without absorbing layer.
+        V : `Firedrake.FunctionSpace`
+            Function space for the Eikonal modeling.
 
         Returns
         -------
-        FL : `firedrake form`
-            Linear Eikonal equation
+        FL : `Firedrake.Form`
+            Linear Eikonal equation.
         '''
 
         # Parameters
@@ -264,24 +264,23 @@ class Eikonal_Modeling():
 
         Parameters
         ----------
-        u : `firedrake trial function`
-            Trial function
-        vy : `firedrake test function`
-            Test function
-        c : `firedrake function`
-            Velocity model without absorbing layer
-        V : `firedrake function space`
-            Function space for the Eikonal modeling
+        u : `Firedrake.TrialFunction`
+            Trial function.
+        vy : `Firedrake.TestFunction`
+            Test function.
+        c : `Firedrake.Function`
+            Velocity model without absorbing layer.
+        V : `Firedrake.FunctionSpace`
+            Function space for the Eikonal modeling.
         diam_mesh : `ufl.geometry.CellDiameter`
-            Mesh cell diameters
+            Mesh cell diameters.
         f_est : `float`, optional
-            Factor for the stabilizing term in Eikonal equation.
-            Default is 1.0
+            Factor for the stabilizing term in Eikonal equation. Default is 1.0.
 
         Returns
         -------
-        FNL: `firedrake form`
-            Nonlinear Eikonal equation
+        FNL: `Firedrake.Form`
+            Nonlinear Eikonal equation.
         '''
 
         # Parameters
@@ -425,22 +424,21 @@ class Eikonal_Modeling():
 
         Parameters
         ----------
-        c : `firedrake function`
-            Velocity model without absorbing layer
+        c : `Firedrake.Function`
+            Velocity model without absorbing layer.
         c_min : `float`
-            Minimum velocity value in the model without absorbing layer
-        V : `firedrake function space`
-            Function space for the Eikonal modeling
+            Minimum velocity value in the model without absorbing layer.
+        V : `Firedrake.FunctionSpace`
+            Function space for the Eikonal modeling.
         diam_mesh : `ufl.geometry.CellDiameter`
-            Mesh cell diameters
+            Mesh cell diameters.
         typ_igs : `str`, optional
-            Type of initial guess. 'constant' or 'variable'.
-            Default is 'constant'.
+            Type of initial guess. 'constant' or 'variable'. Default is 'constant'.
 
         Returns
         -------
         init_guess : `float` or `ufl.algebra.Division`
-            Initial guess for the Eikonal solver
+            Initial guess for the Eikonal solver.
         '''
 
         # Mesh cell diameters
@@ -470,18 +468,18 @@ class Eikonal_Modeling():
         wf_parameters : `list`
             List containing the weak form parameters.
             Structure: [u, vy, c, c_min, V, diam_mesh]
-            - u : `firedrake trial function`
-                Trial function
-            - vy : `firedrake test function`
-                Test function
-            - c : `firedrake function`
-                Velocity model without absorbing layer
+            - u : `Firedrake.TrialFunction`
+                Trial function.
+            - vy : `Firedrake.TestFunction`
+                Test function.
+            - c : `Firedrake.Function`
+                Velocity model without absorbing layer.
             - c_min : `float`
-                Minimum velocity value in the model without absorbing layer
-            - V : `firedrake function space`
-                Function space for the Eikonal modeling
+                Minimum velocity value in the model without absorbing layer.
+            - V : `Firedrake.FunctionSpace`
+                Function space for the Eikonal modeling.
             - diam_mesh : `ufl.geometry.CellDiameter`
-                Mesh cell diameters
+                Mesh cell diameters.
         nl_solver : `str`, optional
             Nonlinear solver type. Default is 'vinewtonssls'.
             Options: 'vinewtonssls', 'vinewtonrsls', 'newtonls', 'newtontr',
@@ -491,12 +489,12 @@ class Eikonal_Modeling():
             Options: 'preonly', 'bcgs', 'gmres' (See PETSC documentation).
             (See PETSC documentation)
         user_iter : `int`, optional
-            Maximum user iterations. Default is 50
+            Maximum user iterations. Default is 50.
 
         Returns
         -------
-        yp : `firedrake function`
-            Linear Eikonal field
+        yp : `Firedrake.Function`
+            Linear Eikonal field.
 
         PETSC Documentation
         -------------------
@@ -556,16 +554,16 @@ class Eikonal_Modeling():
         wf_parameters : `list`
             List containing the weak form parameters.
             Structure: [vy, c, c_min, V, diam_mesh]
-            - vy : `firedrake test function`
+            - vy : `Firedrake.TestFunction`
                 Test function
-            - c : `firedrake function`
-                Velocity model without absorbing layer
+            - c : `Firedrake.Function`
+                Velocity model without absorbing layer.
             - c_min : `float`
-                Minimum velocity value in the model without absorbing layer
-            - V : `firedrake function space`
-                Function space for the Eikonal modeling
+                Minimum velocity value in the model without absorbing layer.
+            - V : `Firedrake.FunctionSpace`
+                Function space for the Eikonal modeling.
             - diam_mesh : `ufl.geometry.CellDiameter`
-                Mesh cell diameters
+                Mesh cell diameters.
         nl_solver : `str`, optional
             Nonlinear solver type. Default is 'vinewtonssls'.
             Options: 'vinewtonssls', 'vinewtonrsls', 'newtonls', 'newtontr',
@@ -574,14 +572,14 @@ class Eikonal_Modeling():
             Linear solver type. Default is 'preonly'.
             Options: 'preonly', 'bcgs', 'gmres' (See PETSC documentation).
         user_iter : `int`, optional
-            Maximum user iterations. Default is 50
-        lin_sol : `firedrake function`, optional
-            Linear Eikonal solution. Default is None.
-            If None, an initial guess will be computed.
+            Maximum user iterations. Default is 50.
+        lin_sol : `Firedrake.Function`, optional
+            Linear Eikonal solution. Default is `None`.
+            If `None`, an initial guess will be computed.
 
         Returns
         -------
-        yp : `firedrake function`
+        yp : `Firedrake.Function`
             Nonlinear Eikonal field
 
         PETSC Documentation
@@ -656,19 +654,19 @@ class Eikonal_Modeling():
 
         Parameters
         ----------
-        c : `firedrake function`
-            Velocity model without absorbing layer
+        c : `Firedrake.Function`
+            Velocity model without absorbing layer.
         c_min : `float`
-            Minimum velocity value in the model without absorbing layer
-        V : `firedrake function space`
-            Function space for the Eikonal modeling
+            Minimum velocity value in the model without absorbing layer.
+        V : `Firedrake.FunctionSpace`
+            Function space for the Eikonal modeling.
         diam_mesh : `ufl.geometry.CellDiameter`
-            Mesh cell diameters
+            Mesh cell diameters.
 
         Returns
         -------
-        yp : `firedrake function`
-            Eikonal field
+        yp : `Firedrake.Function`
+            Eikonal field.
         '''
 
         # Functions

@@ -118,7 +118,7 @@ class HABCMesh(MeshOps):
         ----------
         mesh : `Firedrake.Mesh`
             Current mesh
-        function_space : `FiredrakeFunctionSpace`
+        function_space : `Firedrake.FunctionSpace`
             Function space for the current mesh operations
         mesh_parameters : `meshing_parameters.MeshingParameters`
             Contains mesh parameters
@@ -178,7 +178,7 @@ class HABCMesh(MeshOps):
 
         Parameters
         ----------
-        function_space : `FiredrakeFunctionSpace`
+        function_space : `Firedrake.FunctionSpace`
             Function space for the current mesh operations
         initial_velocity_model : `Firedrake.Function`
             Initial velocity model
@@ -260,7 +260,7 @@ class HABCMesh(MeshOps):
             An instance of the Wave class that must have the following attributes:
             abc_deg_eikonal : `int`
                 Finite element order for the Eikonal analysis
-            function_space : `FiredrakeFunctionSpace`
+            function_space : `Firedrake.FunctionSpace`
                 Function space for the current mesh operations
             initial_velocity_model: `Firedrake.Function`
                 Initial velocity model
