@@ -699,3 +699,407 @@ def saving_source_and_receiver_location_in_csv(model, folder_name=None):
     file_obj.close()
 
     return None
+
+
+def read_segy_velocity_model(fname):
+    """Read a velocity model from a SEG-Y file.
+
+    Parameters
+    ----------
+    fname : str
+        Filename of the SEG-Y velocity model.
+
+    Returns
+    -------
+    vp : numpy.ndarray
+        Velocity model array in ``(z, x)`` order.
+    nx : int
+        Number of traces in the SEG-Y file, corresponding to the x direction.
+    nz : int
+        Number of samples per trace, corresponding to the z direction.
+
+    Raises
+    ------
+    ImportError
+        If ``segyio`` is not installed.
+    """
+    with segyio.open(fname, "r", ignore_geometry=True) as segy:
+        nx = len(segy.trace)
+        nz = len(segy.samples)
+        vp = np.zeros((nz, nx), dtype=np.float32)
+
+        for i in range(nx):
+            vp[:, i] = segy.trace[i]
+
+    vp = np.flipud(vp)
+
+    return vp, nx, nz
+
+
+def _parse_axes_order(axes_order):
+    """Convert an axis-order specification to axis names.
+
+    Parameters
+    ----------
+    axes_order : str, tuple, or list
+        Order of the axes in the raw binary file. Axis names may be provided as
+        strings, such as ``"z x y"`` or ``"zxy"``. Numeric permutations may also
+        be used, such as ``(0, 1, 2)``, ``(1, 0, 2)``, ``"1 0 2"``, or ``"201"``.
+
+    Returns
+    -------
+    tuple of str
+        Axis names in the order found in the raw binary file.
+
+    Raises
+    ------
+    TypeError
+        If ``axes_order`` is not a supported type or if a tuple/list mixes
+        strings and integers.
+    ValueError
+        If the supplied axis order does not contain each axis exactly once.
+
+    Examples
+    --------
+    >>> _parse_axes_order("z x y")
+    ('z', 'x', 'y')
+    >>> _parse_axes_order((1, 0, 2))
+    ('x', 'z', 'y')
+    >>> _parse_axes_order("201")
+    ('y', 'z', 'x')
+    """
+    axis_from_int = {0: "z", 1: "x", 2: "y"}
+
+    if isinstance(axes_order, str):
+        clean = axes_order.lower().replace(",", " ").strip()
+        parts = clean.split()
+
+        if len(parts) == 1 and len(parts[0]) == 3:
+            parts = list(parts[0])
+
+        if all(part in ("0", "1", "2") for part in parts):
+            ints = [int(part) for part in parts]
+            if sorted(ints) != [0, 1, 2]:
+                raise ValueError(
+                    "numeric axes_order must contain 0, 1, 2 exactly once. "
+                    "Use 0=z, 1=x, 2=y. Examples: '1 0 2', '201'."
+                )
+            return tuple(axis_from_int[i] for i in ints)
+
+        if sorted(parts) != ["x", "y", "z"]:
+            raise ValueError(
+                "axes_order must contain x, y, z exactly once or 0, 1, 2 exactly once. "
+                "Examples: 'z x y', 'zxy', (1, 0, 2), '1 0 2', '201'."
+            )
+
+        return tuple(parts)
+
+    if isinstance(axes_order, (tuple, list)):
+        if len(axes_order) != 3:
+            raise ValueError("axes_order tuple/list must have length 3.")
+
+        if all(isinstance(axis, (int, np.integer)) for axis in axes_order):
+            ints = [int(axis) for axis in axes_order]
+            if sorted(ints) != [0, 1, 2]:
+                raise ValueError(
+                    "numeric axes_order tuple/list must contain 0, 1, 2 exactly once. "
+                    "Use 0=z, 1=x, 2=y. Example: (2, 0, 1)."
+                )
+            return tuple(axis_from_int[i] for i in ints)
+
+        if all(isinstance(axis, str) for axis in axes_order):
+            parts = [axis.lower().strip() for axis in axes_order]
+            if sorted(parts) != ["x", "y", "z"]:
+                raise ValueError(
+                    "axis-name axes_order tuple/list must contain x, y, z exactly once. "
+                    "Example: ('x', 'z', 'y')."
+                )
+            return tuple(parts)
+
+        raise TypeError(
+            "axes_order tuple/list must contain either all integers or all strings."
+        )
+
+    raise TypeError(
+        "axes_order must be a string like 'z x y'/'zxy'/'1 0 2'/'102' "
+        "or a tuple/list like (2, 0, 1)."
+    )
+
+
+def read_bin_velocity_model(
+    filename,
+    nz,
+    nx,
+    ny,
+    byte_order="little",
+    axes_order="z x y",
+    axes_order_sort="C",
+    dtype=np.float32,
+):
+    """Read a velocity model from a binary file.
+
+    Parameters
+    ----------
+    filename : str
+        Filename of the raw binary velocity model.
+    nz : int
+        Number of grid points in the z direction.
+    nx : int
+        Number of grid points in the x direction.
+    ny : int
+        Number of grid points in the y direction.
+    byte_order : {'little', 'big'}, optional
+        Byte order of the binary file. If the selected value
+        produces NaN or Inf values, the other byte order is changed.
+    axes_order : str, tuple, or list, optional
+        Axis order in the raw binary file. It may be given as axis names, such
+        as ``"z x y"`` or ``"x z y"``, or as numeric permutations using the
+        convention ``0 = z``, ``1 = x``, and ``2 = y``.
+    axes_order_sort : {'C', 'F'}, optional
+        Memory layout used to reshape the raw binary values. Use ``'C'`` for
+        C-order files and ``'F'`` for Fortran-order files.
+    dtype : str or numpy.dtype, optional
+        Floating-point dtype of the binary file. If the selected dtype does not
+        match the expected file size, ``float32`` and ``float64`` are tested and
+        the matching dtype is used.
+
+    Returns
+    -------
+    vp : numpy.ndarray
+        Velocity model in canonical ``(z, x, y)`` order.
+    nz : int
+        Number of grid points in the z direction.
+    nx : int
+        Number of grid points in the x direction.
+    ny : int
+        Number of grid points in the y direction.
+
+    Raises
+    ------
+    ValueError
+        If dimensions are missing, if ``byte_order`` or ``axes_order_sort`` is
+        invalid, or if the file size does not match any supported dtype.
+    """
+    if None in (nz, nx, ny):
+        raise ValueError(
+            "Please specify the number of grid points in each dimension (nz, nx, ny)."
+        )
+
+    byte_order = str(byte_order).lower()
+    if byte_order not in ("little", "big"):
+        raise ValueError("byte_order must be 'little' or 'big'.")
+
+    axes_order_sort = axes_order_sort.upper()
+    if axes_order_sort not in ("C", "F"):
+        raise ValueError("axes_order_sort must be 'C' or 'F'.")
+
+    expected_elements = int(nz) * int(nx) * int(ny)
+    actual_bytes = os.path.getsize(filename)
+
+    dtype = np.dtype(dtype)
+    expected_bytes = expected_elements * dtype.itemsize
+
+    if actual_bytes != expected_bytes:
+        dtype_candidates = [np.dtype("float32"), np.dtype("float64")]
+        matched_dtype = None
+
+        for candidate in dtype_candidates:
+            candidate_bytes = expected_elements * candidate.itemsize
+            if actual_bytes == candidate_bytes:
+                matched_dtype = candidate
+                break
+
+        if matched_dtype is None:
+            raise ValueError(
+                f"File size mismatch: {filename}\n"
+                f"Actual file size: {actual_bytes} bytes.\n"
+                f"Expected elements: {expected_elements}.\n"
+                f"Selected dtype={dtype} expects {expected_bytes} bytes.\n"
+                "No supported dtype matched the file size. "
+                "Supported dtype candidates: float32, float64."
+            )
+
+        warnings.warn(
+            f"Selected dtype={dtype} does not match the file size. "
+            f"Using dtype={matched_dtype} instead."
+        )
+        dtype = matched_dtype
+
+    if byte_order == "little":
+        dt = dtype.newbyteorder("<")
+        other_byte_order = "big"
+        other_dt = dtype.newbyteorder(">")
+    else:
+        dt = dtype.newbyteorder(">")
+        other_byte_order = "little"
+        other_dt = dtype.newbyteorder("<")
+
+    print(f"Reading binary file: {filename}")
+    print(f"Selected byte_order: {byte_order}")
+    print(f"Selected/resolved dtype: {dtype}")
+
+    vp = np.fromfile(filename, dtype=dt)
+
+    if vp.size != expected_elements:
+        raise ValueError(
+            f"Unexpected number of values read from {filename}.\n"
+            f"Expected {expected_elements}, got {vp.size}."
+        )
+
+    invalid_count = int(np.sum(~np.isfinite(vp)))
+
+    if invalid_count > 0:
+        vp_other = np.fromfile(filename, dtype=other_dt)
+        other_invalid_count = int(np.sum(~np.isfinite(vp_other)))
+
+        if other_invalid_count < invalid_count:
+            warnings.warn(
+                f"Selected byte_order='{byte_order}' produced {invalid_count} "
+                f"NaN/Inf values. Using byte_order='{other_byte_order}' instead, "
+                f"which produced {other_invalid_count} NaN/Inf values."
+            )
+            byte_order = other_byte_order
+            vp = vp_other
+        else:
+            warnings.warn(
+                f"Selected byte_order='{byte_order}' produced {invalid_count} "
+                f"NaN/Inf values, but byte_order='{other_byte_order}' produced "
+                f"{other_invalid_count}. Keeping byte_order='{byte_order}'."
+            )
+
+    raw_axes = _parse_axes_order(axes_order)
+    sizes = {"z": nz, "x": nx, "y": ny}
+    raw_shape = [sizes[axis] for axis in raw_axes]
+
+    vp = vp.reshape(*raw_shape, order=axes_order_sort)
+
+    final_axes = ("z", "x", "y")
+    transpose_order = [raw_axes.index(axis) for axis in final_axes]
+
+    vp = np.flipud(vp.transpose(transpose_order))
+
+    return vp, nz, nx, ny
+
+
+def write_velocity_model(
+    filename: str,
+    ofname: str = None,
+    model_type: str = "bin",
+    nz: int = None,
+    nx: int = None,
+    ny: int = None,
+    byte_order: str = "little",
+    axes_order: str = "z x y",
+    axes_order_sort: str = "C",
+    dtype: str = "float32",
+):
+    """Read and write a velocity model as an HDF5 file.
+
+    Parameters
+    ----------
+    filename : str
+        Filename of the velocity model. Supported model types are raw binary
+        files and SEG-Y files.
+    ofname : str, optional
+        Output HDF5 filename. If the name does not end with ``.hdf5``, the
+        extension is appended automatically. If omitted, ``filename`` is used.
+    model_type : {'bin', 'segy'}, optional
+        Type of input velocity model. Use ``'bin'`` for raw binary files and
+        ``'segy'`` for SEG-Y files.
+    nz : int, optional
+        Required for binary velocity models. Number of grid points in the
+        z direction.
+    ny : int, optional
+        Required for binary velocity models. Number of grid points in the
+        y direction.
+    nx : int, optional
+        Required for binary velocity models. Number of grid points in the
+        x direction.
+    byte_order : {'little', 'big'}, optional
+        Byte order of a binary velocity model. If the selected order produces
+        NaN or Inf values, the opposite byte order is tested and used when it
+        produces fewer invalid values.
+    axes_order : str, tuple, or list, optional
+        Axis order of a binary velocity model. Axis names such as ``'z x y'``
+        and numeric permutations such as ``(0, 1, 2)`` are accepted. The numeric
+        convention is ``0 = z``, ``1 = x``, and ``2 = y``.
+    axes_order_sort : {'F', 'C'}, optional
+        Sort style of the binary data. Use ``'F'`` for Fortran-style ordering
+        and ``'C'`` for C-style ordering.
+    dtype : str or numpy.dtype, optional
+        Data type of a binary velocity model. Supported automatic size-match
+        corrections are ``float32`` and ``float64``.
+
+    Returns
+    -------
+    str
+        Path to the written HDF5 file.
+
+    Raises
+    ------
+    ValueError
+        If ``model_type`` is not ``'bin'`` or ``'segy'``.
+
+    Examples
+    --------
+    >>> write_velocity_model(
+    ...     "avenir.segy",
+    ...     ofname="avenir",
+    ...     model_type="segy",
+    ... )
+    'avenir.hdf5'
+
+    >>> write_velocity_model(
+    ...     "avenir3d.bin",
+    ...     ofname="avenir3d",
+    ...     model_type="bin",
+    ...     nz=401,
+    ...     nx=201,
+    ...     ny=201,
+    ...     byte_order="little",
+    ...     axes_order=(0, 1, 2),
+    ...     axes_order_sort="F",
+    ...     dtype="float32",
+    ... )
+    'avenir3d.hdf5'
+    """
+
+    model_type = model_type.lower()
+
+    if ofname is None:
+        warnings.warn("No output filename specified, name will be `filename`")
+        ofname = filename
+
+    if model_type == "bin":
+        vp, nz, nx, ny = read_bin_velocity_model(
+            filename=filename,
+            nz=nz,
+            nx=nx,
+            ny=ny,
+            byte_order=byte_order,
+            axes_order=axes_order,
+            axes_order_sort=axes_order_sort,
+            dtype=dtype,
+        )
+
+    elif model_type == "segy":
+        vp, nx, nz = read_segy_velocity_model(filename)
+        ny = 0
+
+    else:
+        raise ValueError(
+            "model_type must be either 'bin' or 'segy'. "
+            f"Got model_type={model_type!r}."
+        )
+
+    if not str(ofname).endswith(".hdf5"):
+        ofname = str(ofname) + ".hdf5"
+
+    print(f"Writing velocity model: {ofname}", flush=True)
+
+    with h5py.File(ofname, "w") as f:
+        f.create_dataset("velocity_model", data=vp, dtype="f")
+        f.attrs["shape"] = vp.shape
+        f.attrs["units"] = "m/s"
+
+    return ofname
