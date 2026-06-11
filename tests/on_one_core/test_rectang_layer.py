@@ -41,7 +41,7 @@ def test_init_defaults_3d():
 
 def test_init_list_domain_dim_raises_error():
     # Test that passing None raises a TypeError
-    with raises(TypeError, match="domain_dim must be a tuple"):
+    with raises(TypeError, match="'domain_dim' must be a tuple"):
         RectangLayer([1., 1.])
 
 

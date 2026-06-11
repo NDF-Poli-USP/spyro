@@ -1,3 +1,5 @@
+"""This module defines the enums and decorators used for typing in Spyro."""
+
 from enum import Enum
 
 

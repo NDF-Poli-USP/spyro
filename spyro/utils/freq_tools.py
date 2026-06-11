@@ -1,4 +1,4 @@
-"""Contains methods for calculating the frequency response of a signal."""
+"""Utilities for calculating the frequency response of a signal."""
 
 from numpy import abs, concatenate, linspace, zeros
 from scipy.fft import fft

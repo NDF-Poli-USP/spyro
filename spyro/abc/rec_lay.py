@@ -20,11 +20,9 @@ class RectangLayer():
         Area of the domain with rectangular layer.
     area_ratio : `float`
         Area ratio to the area of the original domain. area_ratio = area / a_orig
-    case_abc : `str`
-        Label for the output files that includes the layer shape ('REC' for
-        rectangular layers) and the reference frequency for sizing the absorbing
-        layer ('SOU': source frequency or 'BND': boundary frequency).
-        Examples: 'REC_SOU' or 'REC_BND'
+    comm : `object`, optional
+        An object representing the communication interface for parallel processing.
+        Default is `None`.
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D.
     domain_dim : `tuple`
@@ -32,12 +30,14 @@ class RectangLayer():
         or (length_z, length_x, length_y) for 3D.
     f_Ah : `float`
         Hyperelliptical area factor. f_Ah = 4 (n_hyp is considered infinite).
+        Area can be calculated as A = f_Ah * a * b.
     f_Vh : `float`
         Hyperellipsoidal volume factor. f_Vh = 8 (n_hyp is considered infinite).
+        Volume can be calculated as V = f_Vh * a * b * c.
     hyper_axes : `tuple`
         Semi-axes of the rectangular layer (a, b) (2D) or (a, b, c) (3D).
     n_hyp: `float`
-        Degree of the hyperelliptical pad layer. n_hyp is set to None because
+        Degree of the hyperelliptical pad layer. n_hyp is set to `None` because
         this attribute is not applicable to rectangular layers.
     vol : `float`
         Volume of the domain with rectangular layer.
@@ -60,28 +60,11 @@ class RectangLayer():
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
             or (length_z, length_x, length_y) for 3D.
-        frequency: `float`
-            Frequency of the source.
-        f_Nyquist : `float`
-            Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt)
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
-        quadrilateral : bool, optional
-            Flag to indicate whether to use quadrilateral/hexahedral elements.
-            Default is False (triangular/tetrahedral elements).
-        func_space_type, `str`, optional
-            Type of function space for the state variable.
-            Options: 'scalar' or 'vector'. Default is None.
-        abc_reference_freq : `str`, optional
-            Reference frequency for sizing the hybrid absorbing layer.
-            Options: 'source' or 'boundary'. Default is 'source'.
-        abc_boundary_layer_type : `str`, optional
-            Type of the boundary layer. Options: 'hybrid' or 'PML'.
-            Default is 'hybrid'. Option 'hybrid' is based on paper of Salas et al. (2022).
-            doi: https://doi.org/10.1016/j.apm.2022.09.014
         comm : `object`, optional
             An object representing the communication interface for parallel processing.
-            Default is None.
+            Default is `None`.
 
         Returns
         -------
@@ -90,7 +73,7 @@ class RectangLayer():
 
         # Validate input arguments
         if not isinstance(domain_dim, tuple):
-            raise TypeError("domain_dim must be a tuple, "
+            raise TypeError("'domain_dim' must be a tuple, "
                             f"got {type(domain_dim).__name__}.")
 
         if dimension not in [2, 3]:
@@ -109,12 +92,12 @@ class RectangLayer():
         self.comm = comm
 
     def define_rec_hyperaxes(self, pad_len):
-        """Define the rectangular semi-axes
+        """Define the rectangular semi-axes.
 
         Parameters
         ----------
         pad_len : `float`
-            Size of the absorbing layer
+            Size of the absorbing layer.
 
         Returns
         -------
@@ -142,11 +125,11 @@ class RectangLayer():
         Parameters
         ----------
         domain_layer : `tuple`
-            Domain dimensions with layer.
+            Domain dimensions with layer including the truncatiion by the free surface.
             2D: (length_z + pad_len, length_x + 2 * pad_len)
             3D: (length_z + pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len)
         pad_len : `float`
-            Size of the absorbing layer
+            Size of the absorbing layer.
 
         Returns
         -------
@@ -175,7 +158,7 @@ class RectangLayer():
             self.area = length_xabc * length_zabc
             self.area_ratio = self.area / (length_x * length_z)
             self.f_Ah = 4
-            pprint("Area Ratio: {:5.3f}".format(self.area_ratio), comm=self.comm)
+            pprint(f"Area Ratio: {self.area_ratio:5.3f}", comm=self.comm)
 
         if self.dimension == 3:  # 3D
             length_y = self.domain_dim[2]
@@ -183,4 +166,4 @@ class RectangLayer():
             self.vol = length_xabc * length_zabc * length_yabc
             self.vol_ratio = self.vol / (length_x * length_z * length_y)
             self.f_Vh = 8
-            pprint("Volume Ratio: {:5.3f}".format(self.vol_ratio), comm=self.comm)
+            pprint(f"Volume Ratio: {self.vol_ratio:5.3f}", comm=self.comm)
