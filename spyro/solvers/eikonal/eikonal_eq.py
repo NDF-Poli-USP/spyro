@@ -1,8 +1,8 @@
 import firedrake as fire
 import numpy as np
 from sys import float_info, exit
-from ..utils.error_management import clean_inst_num, value_parameter_error
-from ..domains.quadrature import quadrature_rules
+from ...utils.error_management import clean_inst_num, value_parameter_error
+from ...domains.quadrature import quadrature_rules
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
