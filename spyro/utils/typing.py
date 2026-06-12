@@ -56,3 +56,23 @@ class LayerShapeType(Enum):
     NOLAYER = "no_layer"
     RECTANGULAR = "rectangular"
     HYPERSHAPE = "hypershape"
+
+
+class LayerSizeRefFrequency(Enum):
+    """Enum for different reference frequencies for sizing the hybrid absorbing layer.
+
+    SOURCE: Size based on dominant source frequency.
+    BOUNDARY: Size based on wave frequency at the critical boundary point (Eikonal min.)
+    """
+    SOURCE = "source"
+    BOUNDARY = "boundary"
+
+
+class HyperLayerDegreeType(Enum):
+    """Enum for different types of hypershape degrees for HABCs.
+
+    REAL: Hypershape degree can take real values >= 2.0 with one decimal place precision.
+    INTEGER: Hypershape degree is restricted to integer values >= 2
+    """
+    REAL = "real"
+    INTEGER = "integer"
