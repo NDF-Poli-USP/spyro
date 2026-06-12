@@ -15,14 +15,14 @@ class ElasticWave(Wave, metaclass=ABCMeta):
         ----------
         dictionary : `dict`, optional
             A dictionary containing the input parameters for the Wave class.
-            Default is None.
+            Default is `None`.
         anisotropy : `WaveType`, optional
             The type of anisotropy in the medium. Options:
             - ISOTROPIC_ELASTIC: Isotropic elastic wave equation for Isotropic media.
             - ANISOTROPIC_VTI_ELASTIC: Anisotropic elastic wave equation for VTI media.
             - ANISOTROPIC_TTI_ELASTIC: Anisotropic elastic wave equation for TTI media.
         comm : `object`, optional
-            MPI communicator for parallel execution. Default is None.
+            MPI communicator for parallel execution. Default is `None`.
 
         Returns
         -------

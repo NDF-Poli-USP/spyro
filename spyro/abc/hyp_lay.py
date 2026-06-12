@@ -17,8 +17,8 @@ from ..utils.error_management import (value_dimension_error, value_numerical_err
 
 
 class HyperLayer():
-    """
-    Define a hyperlliptical layer in 2D or hyperellipsoidal in 3D.
+    """Define a hyperlliptical layer in 2D or hyperellipsoidal in 3D.
+
     Hyperellipse Eq. (2D): |x/a|^n + |y/b|^n = 1.
     Hyperellipsoid Eq. (3D): |x/a|^n + |y/b|^n + |z/c|^n = 1.
         - a, b, c: semi-axes of the hypershape
@@ -28,11 +28,11 @@ class HyperLayer():
     Attributes
     ----------
     area : `float`
-        Area of the domain with hyperelliptical layer
+        Area of the domain with hyperelliptical layer.
     area_ratio : `float`
         Area ratio to the area of the original domain. area_ratio = area / a_orig
     dimension : `int`
-        Model dimension (2D or 3D). Default is 2D
+        Model dimension (2D or 3D). Default is 2D.
     domain_dim : `tuple`
         Original domain dimensions: (length_z, length_x) for 2D
         or (length_z, length_x, length_y) for 3D.
@@ -46,9 +46,9 @@ class HyperLayer():
         Degree of the hypershape pad layer (n >= 2.). Default is 2.
     n_bounds: `tuple`
         Bounds for the hypershape layer degree. (n_min, n_max).
-        - n_min ensures to add lmin in the domain diagonal direction
-        - n_max ensures to add pad_len in the domain diagonal direction
-        lmin is the minimum mesh size and pad_len is the layer size.
+        - n_min ensures to add lmin in the domain diagonal direction.
+        - n_max ensures to add pad_len in the domain diagonal direction.
+        Where `lmin` is the minimum mesh size and pad_len is the layer size.
     n_type : `str`
         Type of the hypereshape degree ('real' or 'integer'). Default is 'real'.
     perim_hyp : `float`
@@ -63,7 +63,7 @@ class HyperLayer():
     Methods
     -------
     calc_degree_hypershape()
-        Define the limits for the hypershape degree. See Salas et al (2022).
+        Define the limits for the hypershape degree.
     calc_hyp_geom_prop()
         Calculate the geometric properties for the hypershape layer.
     central_tendency_criteria()
@@ -71,7 +71,7 @@ class HyperLayer():
     define_hyperaxes()
         Define the hyperlayer semi-axes.
     define_hyperlayer()
-        Define the hyperlayer degree and its limit.s
+        Define the hyperlayer degree and its limits.
     half_hyp_area()
         Compute half the area of the hyperellipse.
     half_hyp_volume()
@@ -87,8 +87,7 @@ class HyperLayer():
     """
 
     def __init__(self, domain_dim, n_hyp=2., n_type='real', dimension=2, comm=None):
-        """
-        Initialize the HyperLayer class
+        """Initialize the HyperLayer class.
 
         Parameters
         ----------
@@ -104,7 +103,7 @@ class HyperLayer():
             Model dimension (2D or 3D). Default is 2D.
         comm : `object`, optional
             An object representing the communication interface for parallel processing.
-            Default is None.
+            Default is `None`.
 
         Returns
         -------
@@ -151,8 +150,8 @@ class HyperLayer():
         ----------
         domain_hyp : `tuple`
             Domain dimensions with layer without truncation by free surface.
-            2D : (length_z + 2 * pad_len, length_x + 2 * pad_len)
-            3D : (length_x + 2 * pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len)
+            2D : (length_z + 2 * pad_len, length_x + 2 * pad_len).
+            3D : (length_x + 2 * pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len).
 
         Returns
         -------
@@ -183,7 +182,7 @@ class HyperLayer():
         Returns
         -------
         r : `float`
-            Radial parameter
+            Radial parameter.
         """
 
         # Hyperellipse semi-axes
@@ -216,7 +215,7 @@ class HyperLayer():
             - 2D : (xs, ys)
             - 3D : (xs, ys, zs)
         monitor : `bool`, optional
-            Print the process on the screen. Default is False.
+            Print the process on the screen. Default is `False`.
 
         Returns
         -------
@@ -318,7 +317,7 @@ class HyperLayer():
         n_max : `float`, optional
             Maximum allowed degree. Default is 20.
         monitor : `bool`, optional
-            Print the process on the screen. Default is False.
+            Print the process on the screen. Default is `False`.
 
         Returns
         -------
@@ -384,12 +383,12 @@ class HyperLayer():
         n_max : `float`, optional
             Maximum allowed degree. Default is 20.
         monitor : `bool`, optional
-            Print the process on the screen. Default is False.
+            Print the process on the screen. Default is `False`.
 
         Returns
         -------
         n : `float`
-            Hypereshape degree
+            Hypereshape degree.
         """
 
         # Loop criterion to find the hyperellipse degree
@@ -442,7 +441,7 @@ class HyperLayer():
         lmin : `float`
             Minimum mesh size.
         monitor : `bool`, optional
-            Print the process on the screen. Default is False.
+            Print the process on the screen. Default is `False`.
 
         Returns
         -------
@@ -530,7 +529,7 @@ class HyperLayer():
         Returns
         -------
         A_tr : `float`
-            Truncated area of the hyperellipse
+            Truncated area of the hyperellipse.
 
         Examples
         --------
@@ -591,12 +590,12 @@ class HyperLayer():
         n : `float`
             Degree of the hyperellipsoid.
         z0 : `float`
-            Truncation plane
+            Truncation plane.
 
         Returns
         -------
         A_tr : `float`
-            Truncated volume of the hyperellipsoid
+            Truncated volume of the hyperellipsoid.
 
         Examples
         --------
@@ -694,8 +693,7 @@ class HyperLayer():
 
     @staticmethod
     def hyp_full_surf_area(a, b, c, n):
-        """
-        Compute the surface area of a hyperellipsoid.
+        """Compute the surface area of a hyperellipsoid.
 
         Parameters
         ----------
@@ -773,8 +771,8 @@ class HyperLayer():
         ----------
         domain_hyp : `tuple`
             Domain dimensions with layer without truncation by free surface.
-            2D : (length_z + 2 * pad_len, length_x + 2 * pad_len)
-            3D : (length_z + 2 * pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len)
+            2D : (length_z + 2 * pad_len, length_x + 2 * pad_len).
+            3D : (length_z + 2 * pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len).
 
         pad_len : `float`
             Size of the absorbing layer.

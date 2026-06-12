@@ -1,3 +1,5 @@
+"""Unit tests for the Modal solvers implemented in spyro.solvers.modal.modal_sol"""
+
 import pytest
 import warnings
 import numpy as np
@@ -12,23 +14,23 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 def wave_dict_2d(layer_shape, degree_layer, degree_type, habc_ref_freq):
     '''
-    Create a dictionary with parameters for the 2D model
+    Create a dictionary with parameters for the 2D model.
 
     Parameters
     ----------
     layer_shape : `str`
-        Shape of the absorbing layer, either 'rectangular' or 'hypershape'
+        Shape of the absorbing layer, either 'rectangular' or 'hypershape'.
     degree_layer : `int` or `None`
-        Degree of the hypershape layer, if applicable. If None, it is not used
+        Degree of the hypershape layer, if applicable. If None, it is not used.
     degree_type : `str`
-        Type of the hypereshape degree. Options: 'real' or 'integer'
+        Type of the hypereshape degree. Options: 'real' or 'integer'.
     habc_ref_freq : `str`
-        Reference frequency for the layer size. Options: 'source' or 'boundary'
+        Reference frequency for the layer size. Options: 'source' or 'boundary'.
 
     Returns
     -------
     dictionary : `dict`
-        Dictionary containing the parameters for the model
+        Dictionary containing the parameters for the model.
     '''
 
     dictionary = {}
@@ -105,25 +107,25 @@ def wave_dict_2d(layer_shape, degree_layer, degree_type, habc_ref_freq):
 def wave_dict_3d(layer_shape, degree_layer, degree_type,
                  habc_ref_freq, degree_eikonal):
     '''
-    Create a dictionary with parameters for the 3D model
+    Create a dictionary with parameters for the 3D model.
 
     Parameters
     ----------
-    layer_shape : `str`
-        Shape of the absorbing layer, either 'rectangular' or 'hypershape'
+    layer_shape : `str`.
+        Shape of the absorbing layer, either 'rectangular' or 'hypershape'.
     degree_layer : `int` or `None`
-        Degree of the hypershape layer, if applicable. If None, it is not used
+        Degree of the hypershape layer, if applicable. If None, it is not used.
     degree_type : `str`
-        Type of the hypereshape degree. Options: 'real' or 'integer'
+        Type of the hypereshape degree. Options: 'real' or 'integer'.
     habc_ref_freq : `str`
-        Reference frequency for the layer size. Options: 'source' or 'boundary'
+        Reference frequency for the layer size. Options: 'source' or 'boundary'.
     degree_eikonal : `int`
         Finite element order for the Eikonal equation. Should be 1 or 2.
 
     Returns
     -------
     dictionary : `dict`
-        Dictionary containing the parameters for the model
+        Dictionary containing the parameters for the model.
     '''
 
     dictionary = {}
@@ -202,12 +204,12 @@ def wave_dict_3d(layer_shape, degree_layer, degree_type,
 
 def create_folder(folder):
     '''
-    Verify if a folder exists, if not, it creates the folder
+    Verify if a folder exists, if not, it creates the folder.
 
     Parameters
     ----------
     folder: `str`
-        Path to the folder to be created
+        Path to the folder to be created.
 
     Returns
     -------
@@ -222,12 +224,12 @@ def create_folder(folder):
 def preamble_modal(dictionary, edge_length, f_est,
                    dimension, homogeneous=True):
     '''
-    Run the infinite model and the Eikonal analysis
+    Run the infinite model and the Eikonal analysis.
 
     Parameters
     ----------
     dictionary : `dict`
-        Dictionary containing the parameters for the model
+        Dictionary containing the parameters for the model.
     edge_length : `float`
         Mesh size in km
     f_est : `float`, optional
@@ -238,7 +240,7 @@ def preamble_modal(dictionary, edge_length, f_est,
     Returns
     -------
     Wave_obj : `habc.HABCLayer`
-        An instance of the HABCLayer class
+        An instance of the HABCLayer class.
     '''
 
     # ============ MESH FEATURES ============
@@ -289,9 +291,9 @@ def get_range_hyp(Wave_obj, n_root=1):
     Parameters
     ----------
     Wave_obj : `habc.HABCLayer`
-        An instance of the HABCLayer class
+        An instance of the HABCLayer class.
     n_root : `int`, optional
-        n-th Root selected as the size of the absorbing layer. Default is 1
+        n-th Root selected as the size of the absorbing layer. Default is 1.
 
     Returns
     -------
@@ -313,12 +315,12 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
     Parameters
     ----------
     Wave_obj : `habc.HABCLayer`
-        An instance of the HABCLayer class
+        An instance of the HABCLayer class.
     modal_solver_lst : `list`
         List of methods to be used to solve the eigenvalue problem.
         Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS',
         'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-        'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'
+        'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
     fitting_c : `tuple
         Parameters for fitting equivalent velocity regression.
         Structure: (fc1, fc2, fp1, fp2):
@@ -329,7 +331,7 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
     exp_value : `float`
         Expected value for the fundamental frequency
     n_root : `int`, optional
-        n-th Root selected as the size of the absorbing layer. Default is 1
+        n-th Root selected as the size of the absorbing layer. Default is 1.
 
     Returns
     -------
@@ -397,23 +399,22 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
         - f_est : `float`, optional
             Factor for the stabilizing term in Eikonal Eq.
         - fitting_c : `tuple`
-            Parameters for fitting equivalent velocity regression
+            Parameters for fitting equivalent velocity regression.
     dictionary : `dict`
-        Dictionary containing the parameters for the model
+        Dictionary containing the parameters for the model.
     degree_layer_lst : `list`
-        List of hypershape degrees for the absorbing layer
+        List of hypershape degrees for the absorbing layer.
     expect_values_lst : `list`
-        List of expected values for the fundamental frequency
+        List of expected values for the fundamental frequency.
     dimension : `int`
         Dimension of the model (2 or 3)
     homogeneous : `bool`
-        If True, the velocity model is homogeneous.
-        If False, it is heterogeneous.
+        If `True`, the velocity model is homogeneous. If `False`, it is heterogeneous.
     modal_solver_lst : `list`
         List of methods to be used to solve the eigenvalue problem.
         Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS',
         'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-        'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'
+        'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
 
     Returns
     -------
@@ -454,13 +455,12 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
 @pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_modal_2d(homogeneous):
     '''
-    Test of modal solvers for 2D case
+    Test of modal solvers for 2D case.
 
     Parameters
     ----------
     homogeneous : `bool`
-        If True, the velocity model is homogeneous.
-        If False, it is heterogeneous.
+        If `True`, the velocity model is homogeneous. If `False`, it is heterogeneous.
 
     Returns
     -------
@@ -534,13 +534,12 @@ def test_loop_modal_2d(homogeneous):
 @pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_modal_3d_with_Tele(homogeneous):
     '''
-    Test of modal solvers for 3D case
+    Test of modal solvers for 3D case.
 
     Parameters
     ----------
     homogeneous : `bool`
-        If True, the velocity model is homogeneous.
-        If False, it is heterogeneous.
+        If `True`, the velocity model is homogeneous. If `False`, it is heterogeneous.
 
     Returns
     -------
@@ -617,13 +616,12 @@ def test_loop_modal_3d_with_Tele(homogeneous):
 @pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_modal_3d_with_Qele(homogeneous):
     '''
-    Test of modal solvers for 3D case
+    Test of modal solvers for 3D case.
 
     Parameters
     ----------
     homogeneous : `bool`
-        If True, the velocity model is homogeneous.
-        If False, it is heterogeneous.
+        If `True`, the velocity model is homogeneous. If `False`, it is heterogeneous.
 
     Returns
     -------

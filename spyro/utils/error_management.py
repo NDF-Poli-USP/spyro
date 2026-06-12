@@ -12,16 +12,16 @@ def value_parameter_error(par_name, par_value, valid_values):
     Parameters
     ----------
     par_name : `str`
-        Name of the parameter that has an invalid value
+        Name of the parameter that has an invalid value.
     par_value : `str`, `int` or `float`
-        Value of the parameter that is invalid
+        Value of the parameter that is invalid.
     valid_values : `list`
-        List of valid values for the parameter
+        List of valid values for the parameter.
 
     Raises
     ------
     ValueError
-        If the parameter value is not in the list of valid values
+        If the parameter value is not in the list of valid values.
     """
 
     # Error message about the invalid parameter
@@ -40,15 +40,15 @@ def mutually_exclusive_parameter_error(par_name_lst, par_value_lst):
     Parameters
     ----------
     par_name_Lst : `list` of `str`
-        List of names of the parameters that are mutually exclusive
+        List of names of the parameters that are mutually exclusive.
     par_value_lst : `list`
-        List of values of the parameters that are mutually exclusive
+        List of values of the parameters that are mutually exclusive.
 
     Raises
     ------
     ValueError
         If two or more parameters have been provided by the user.
-        That is, value of the parameters is not None.
+        That is, value of the parameters is not `None`.
     """
 
     par_defined = [par for par, val in zip(par_name_lst,
@@ -74,16 +74,16 @@ def value_dimension_error(par_names, par_values, expected_dim):
     Parameters
     ----------
     par_names : `tuple`
-        Names of the parameters to check dimensions
+        Names of the parameters to check dimensions.
     par_values : `tuple`
-        Values of the parameters to check dimensions
+        Values of the parameters to check dimensions.
     expected_dim : `int`
-        Expected dimension of the parameters (2 or 3)
+        Expected dimension of the parameters (2 or 3).
 
     Raises
     ------
     ValueError
-        If the dimensions of the parameters do not match the expected dimension
+        If the dimensions of the parameters do not match the expected dimension.
     """
 
     str_reference, str_comparison = par_names
@@ -102,12 +102,12 @@ def clean_inst_num(data_arr):
     Parameters
     ----------
     data_arr : `array`
-        An array with possible with possible NaN or negative components
+        An array with possible with possible NaN or negative components.
 
     Returns
     -------
     data_arr : `array`
-        An array with null or positive components
+        An array with null or positive components.
     """
     data_arr[where(isnan(data_arr) | isinf(data_arr) | (data_arr < 0.0))] = 0.0
     return data_arr
@@ -121,28 +121,28 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
     Parameters
     ----------
     par_name : `str`
-        Name of the parameter that has an invalid value
+        Name of the parameter that has an invalid value.
     par_value : `int` or `float`
-        Value of the parameter that is invalid
+        Value of the parameter that is invalid.
     float_num : `bool`, optional
-        If True, the parameter can be a float. Default is True
+        If `True`, the parameter can be a float. Default is `True`.
     integer_num : `bool`, optional
-        If True, the parameter can be an integer. Default is False
+        If `True`, the parameter can be an integer. Default is `False`.
     lower_bound : `int` or `float`, optional
-        Lower bound for the parameter value. Default is None (no lower bound)
+        Lower bound for the parameter value. Default is `None` (no lower bound).
     upper_bound : `int` or `float`, optional
-        Upper bound for the parameter value. Default is None (no upper bound)
+        Upper bound for the parameter value. Default is `None` (no upper bound).
     include_lower_bound : `bool`, optional
-        If True, the lower bound is included in the valid range. Default is False
+        If `True`, the lower bound is included in the valid range. Default is `False`.
     include_upper_bound : `bool`, optional
-        If True, the upper bound is included in the valid range. Default is False
+        If `True`, the upper bound is included in the valid range. Default is `False`.
 
     Raises
     ------
     TypeError
-        If the parameter value is not of the expected type (float or integer)
+        If the parameter value is not of the expected type (float or integer).
     ValueError
-        If the parameter value is outside the specified bounds or the bounds are invalid
+        If the parameter value is outside the specified bounds or the bounds are invalid.
     """
 
     # Checking the parameter type

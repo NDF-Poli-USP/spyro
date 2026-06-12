@@ -19,7 +19,7 @@ class RectangLayer():
     area : `float`
         Area of the domain with rectangular layer.
     area_ratio : `float`
-        Area ratio to the area of the original domain. area_ratio = area / a_orig
+        Area ratio to the area of the original domain. area_ratio = area / a_orig.
     comm : `object`, optional
         An object representing the communication interface for parallel processing.
         Default is `None`.
@@ -42,7 +42,7 @@ class RectangLayer():
     vol : `float`
         Volume of the domain with rectangular layer.
     vol_ratio : `float`
-        Volume ratio to the volume of the original domain. vol_ratio = vol / v_orig
+        Volume ratio to the volume of the original domain. vol_ratio = vol / v_orig.
 
     Methods
     -------
@@ -126,8 +126,8 @@ class RectangLayer():
         ----------
         domain_layer : `tuple`
             Domain dimensions with layer including the truncatiion by the free surface.
-            2D: (length_z + pad_len, length_x + 2 * pad_len)
-            3D: (length_z + pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len)
+            2D: (length_z + pad_len, length_x + 2 * pad_len).
+            3D: (length_z + pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len).
         pad_len : `float`
             Size of the absorbing layer.
 

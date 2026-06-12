@@ -1,3 +1,5 @@
+"""Unit tests for the RectangLayer class implemented in spyro.abc.rec_lay."""
+
 from math import isclose
 from pytest import fixture, raises
 from spyro.abc.rec_lay import RectangLayer

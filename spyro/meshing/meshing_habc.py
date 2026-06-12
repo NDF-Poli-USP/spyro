@@ -28,17 +28,17 @@ class HABCMesh(MeshOps):
     Attributes
     ----------
     comm : object
-        An object representing the communication interface
-        for parallel processing. Default is None
+        An object representing the communication interface for parallel processing.
+        Default is `None`.
     coord_bnd_nodes : `array`
         Mesh node coordinates on boundaries of the original domain.
     dimension : `int`
-        Model dimension (2D or 3D). Default is 2D
+        Model dimension (2D or 3D). Default is 2D.
     domain_dim : `tuple`
-        Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
+        Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D.
     func_space_type, `str`
         Type of function space for the state variable.
-        Options: 'scalar' or 'vector'. Default is None
+        Options: 'scalar' or 'vector'. Default is `None`.
     lmin : `float`
         Minimum mesh size
     quadrilateral : bool
@@ -47,38 +47,38 @@ class HABCMesh(MeshOps):
     Methods
     -------
     bnd_pnts_hyp_2D()
-        Generate points on the boundary of a hyperellipse
+        Generate points on the boundary of a hyperellipse.
     build_hyp_mesh_3D()
-        Build a hyperellipsoidal mesh from a box mesh by snapping the boundary
+        Build a hyperellipsoidal mesh from a box mesh by snapping the boundary.
     create_bnd_mesh_2D()
-        Generate the boundary segment curves for the hyperellipse boundary mesh
+        Generate the boundary segment curves for the hyperellipse boundary mesh.
     create_hyp_trunc_mesh_2D()
-        Generate the mesh for the hyperelliptical absorbing layer
+        Generate the mesh for the hyperelliptical absorbing layer.
     get_spatial_coordinates_habc()
         Get the ufl coordinates of the mesh with absorbing layer.
     hypershape_mesh_habc()
-        Generate a mesh with a hypershape absorbing layer
+        Generate a mesh with a hypershape absorbing layer.
     inside_hyp_3D()
-        Check if a point is inside a hyperellipsoid
+        Check if a point is inside a hyperellipsoid.
     layer_boundary_data()
-        Generate the boundary data from the domain with the absorbing layer
+        Generate the boundary data from the domain with the absorbing layer.
     merge_mesh_2D()
-        Merge the rectangular and the hyperelliptical meshes
+        Merge the rectangular and the hyperelliptical meshes.
     original_boundary_data()
-        Generate the boundary data from the original domain mesh
+        Generate the boundary data from the original domain mesh.
     preamble_mesh_operations()
-        Perform mesh operations previous to size an absorbing layer
+        Perform mesh operations previous to size an absorbing layer.
     properties_eik_mesh()
-        Set the properties for the mesh used to solve the Eikonal equation
+        Set the properties for the mesh used to solve the Eikonal equation.
     radial_project_on_hyp_3D()
-        Project a point radially onto the hyperellipsoid surface
+        Project a point radially onto the hyperellipsoid surface.
     sharp_mesh_3D()
-        Generate a sharp mesh by cutting the rectangular mesh
+        Generate a sharp mesh by cutting the rectangular mesh.
         with the hyperellipsoid surface
     snap_nodes_to_hyp()
-        Snap boundary nodes of a sharp mesh to the hyperellipsoid surface
+        Snap boundary nodes of a sharp mesh to the hyperellipsoid surface.
     trunc_hyp_bndpts_2D()
-        Generate the boundary points for a truncated hyperellipse
+        Generate the boundary points for a truncated hyperellipse.
     """
 
     def __init__(self, domain_dim, dimension=2, quadrilateral=False,
@@ -89,17 +89,17 @@ class HABCMesh(MeshOps):
         ----------
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
-            or (length_z, length_x, length_y) for 3D
+            or (length_z, length_x, length_y) for 3D.
         dimension : `int`, optional
-            Model dimension (2D or 3D). Default is 2D
+            Model dimension (2D or 3D). Default is 2D.
         quadrilateral : bool, optional
-            Flag to indicate whether to use quadrilateral/hexahedral elements
+            Flag to indicate whether to use quadrilateral/hexahedral elements.
         func_space_type, `str`, optional
             Type of function space for the state variable.
-            Options: 'scalar' or 'vector'. Default is None
+            Options: 'scalar' or 'vector'. Default is `None`
         comm : `object`, optional
             An object representing the communication interface
-            for parallel processing. Default is None
+            for parallel processing. Default is `None`
 
         Returns
         -------
@@ -117,20 +117,20 @@ class HABCMesh(MeshOps):
         Parameters
         ----------
         mesh : `Firedrake.Mesh`
-            Current mesh
+            Current mesh.
         function_space : `Firedrake.FunctionSpace`
-            Function space for the current mesh operations
+            Function space for the current mesh operations.
         mesh_parameters : `meshing_parameters.MeshingParameters`
             Contains mesh parameters
         initial_velocity_model : `Firedrake.Function`
-            Initial velocity model
+            Initial velocity model.
 
         Returns
         -------
         c_bnd_min : `float`
-            Minimum velocity value on the boundary of the original domain
+            Minimum velocity value on the boundary of the original domain.
         c_bnd_max : `float`
-            Maximum velocity value on the boundary of the original domain
+            Maximum velocity value on the boundary of the original domain.
         coord_bnd_nodes : `array`
             Mesh node coordinates on boundaries of the original domain.
         """
@@ -174,25 +174,25 @@ class HABCMesh(MeshOps):
 
     def creating_velocity_profile(self, function_space,
                                   initial_velocity_model, path_save):
-        """Create the velocity profile for the original domain".
+        """Create the velocity profile for the original domain.
 
         Parameters
         ----------
         function_space : `Firedrake.FunctionSpace`
-            Function space for the current mesh operations
+            Function space for the current mesh operations.
         initial_velocity_model : `Firedrake.Function`
-            Initial velocity model
+            Initial velocity model.
         path_save : `str`
-            Path to save the velocity model
+            Path to save the velocity model.
 
         Returns
         -------
         c : `Firedrake.Function`
-            Velocity profile for the original domain
+            Velocity profile for the original domain.
         c_min : `float`
-            Minimum velocity value in the model without absorbing layer
+            Minimum velocity value in the model without absorbing layer.
         c_max : `float`
-            Maximum velocity value in the model without absorbing layer
+            Maximum velocity value in the model without absorbing layer.
         """
 
         # Velocity profile model
@@ -220,9 +220,9 @@ class HABCMesh(MeshOps):
         Parameters
         ----------
         mesh : `Firedrake.Mesh`
-            Current mesh
+            Current mesh.
         degree_eik : `int`
-            Finite element order for the Eikonal modeling
+            Finite element order for the Eikonal modeling.
         ele_type_eik : `string`, optional
             Finite element type. 'consistent' or 'underintegrated'.
             Default is 'consistent'
@@ -230,7 +230,7 @@ class HABCMesh(MeshOps):
         Returns
         -------
         funct_space_eik: `Firedrake.FunctionSpace`
-            Function space for the Eikonal modeling
+            Function space for the Eikonal modeling.
         """
 
         print("Setting Mesh Properties for Eikonal Analysis", flush=True)
@@ -257,53 +257,43 @@ class HABCMesh(MeshOps):
         Parameters
         ----------
         Wave : `wave.Wave`
-            An instance of the Wave class that must have the following attributes:
+            An instance of the :class:`~spyro.solvers.wave.Wave` with attributes:
             abc_deg_eikonal : `int`
-                Finite element order for the Eikonal analysis
+                Finite element order for the Eikonal analysis.
             function_space : `Firedrake.FunctionSpace`
-                Function space for the current mesh operations
+                Function space for the current mesh operations.
             initial_velocity_model: `Firedrake.Function`
-                Initial velocity model
+                Initial velocity model.
             mesh : `Firedrake.Mesh`
-                Current mesh
+                Current mesh.
             mesh_parameters : `meshing_parameters.MeshingParameters`
-                Contains mesh parameters
+                Contains mesh parameters.
         ele_type : `string`, optional
             Finite element type. 'consistent' or 'underintegrated'.
-            Default is 'consistent'
+            Default is 'consistent'.
         f_est : `float`, optional
-            Factor for the stabilizing term in Eikonal Eq. Default is 0.03
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.03.
 
         Returns
         -------
         c_bnd_min : `float`
-            Minimum velocity value on the boundary of the original domain
+            Minimum velocity value on the boundary of the original domain.
         c_bnd_max : `float`
-            Maximum velocity value on the boundary of the original domain
+            Maximum velocity value on the boundary of the original domain.
 
         Notes
         -----
-        New attributes added to the wave object:
+        New attributes added to the wave object in mesh_parameters:
         mesh_original : `Firedrake.Mesh`
-            Original mesh without absorbing layer
-        mesh_parameters.alpha : `float`
-            Ratio between the representative mesh dimensions
+            Original mesh without absorbing layer.
         mesh_parameters.degree_eik : `int`
-            Finite element order for the Eikonal modeling
-        mesh_parameters.diam_mesh : `ufl.geometry.CellDiameter`
-            Mesh cell diameters
+            Finite element order for the Eikonal modeling.
         mesh_parameters.ele_type_eik : `string`
-            Finite element type for the Eikonal modeling. 'CG' or 'KMV'
+            Finite element type for the Eikonal modeling. 'CG' or 'KMV'.
         mesh_parameters.f_est : `float`
-            Factor for the stabilizing term in Eikonal Eq. Default is 0.03
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.03.
         mesh_parameters.funct_space_eik: `Firedrake.FunctionSpace`
-            Function space for the Eikonal modeling
-        mesh_parameters.lmin : `float`
-            Minimum mesh size
-        mesh_parameters.lmax : `float`
-            Maxmum mesh size
-        mesh_parameters.tol : `float`
-            Tolerance for searching nodes in the mesh
+            Function space for the Eikonal modeling.
         """
 
         print("\nCreating Mesh and Initial Velocity Model", flush=True)
@@ -341,25 +331,24 @@ class HABCMesh(MeshOps):
 
     @staticmethod
     def bnd_pnts_hyp_2D(a, b, n, num_pts):
-        """
-        Generate points on the boundary of a hyperellipse.
+        """Generate points on the boundary of a hyperellipse.
 
-        'Parameters
+        Parameters
         ----------
         a : `float`
-            Hyperellipse semi-axis in direction 1
+            Hyperellipse semi-axis in direction 1.
         b : `float`
-            Hyperellipse semi-axis in direction 2
+            Hyperellipse semi-axis in direction 2.
         n : `int`
-            Degree of the hyperellipse
+            Degree of the hyperellipse.
         num_pts : `int`
-            Number of points to generate on the hyperellipse boundary
+            Number of points to generate on the hyperellipse boundary.
 
         Returns
         -------
         bnd_pnts : `array`
             Array of shape (num_pts, 2) containing the coordinates
-            of the hyperellipse boundary points
+            of the hyperellipse boundary points.
         """
 
         # Generate angle values for the parametric equations
@@ -384,8 +373,7 @@ class HABCMesh(MeshOps):
         return bnd_pnts
 
     def trunc_hyp_bndpts_2D(self, hyp_par, xdom, z0):
-        """
-        Generate the boundary points for a truncated hyperellipse
+        """Generate the boundary points for a truncated hyperellipse.
 
         Parameters
         ----------
@@ -393,34 +381,34 @@ class HABCMesh(MeshOps):
             Hyperellipse parameters.
             Structure: (n_hyp, perimeter, a_hyp, b_hyp)
             - n_hyp : `float`
-                Degree of the hyperellipse
+                Degree of the hyperellipse.
             - perimeter : `float`
-                Perimeter of the full hyperellipse (2D)
+                Perimeter of the full hyperellipse (2D).
             - a_hyp : `float`
-                Hyperellipse semi-axis in direction x
+                Hyperellipse semi-axis in direction x.
             - b_hyp : `float`
-                Hyperellipse semi-axis in direction z
+                Hyperellipse semi-axis in direction z.
         xdom : `float`
-            Maximum coordinate in normal to the truncation plane
+            Maximum coordinate in normal to the truncation plane.
         z0 : `float`
-            Truncation plane
+            Truncation plane.
 
         Returns
         -------
         filt_bnd_pts : `array`
             Array of shape (num_bnd_pts, 2) containing the coordinates
-            of the truncated hyperellipse boundary points
+            of the truncated hyperellipse boundary points.
         trunc_feat : `tuple`
             Truncation features.
             Structure: [ini_trunc, end_trunc, num_filt_bnd_pts, ltrunc]
             - ini_trunc : `int`
-                Index of the first point after the truncation plane
+                Index of the first point after the truncation plane.
             - end_trunc : `int`
-                Index of the last point before the truncation plane
+                Index of the last point before the truncation plane.
             - num_filt_bnd_pts : `int`
-                Number of filtered boundary points
+                Number of filtered boundary points.
             - ltrunc : `float`
-                Mesh size for arc length due to the truncation operation
+                Mesh size for arc length due to the truncation operation.
         """
 
         # Hyperellipse parameters
@@ -478,27 +466,26 @@ class HABCMesh(MeshOps):
         return filt_bnd_pts, trunc_feat
 
     def create_bnd_mesh_2D(self, geo, bnd_pts, trunc_feat, spln):
-        """
-        Generate the boundary segments for the hyperellipse boundary mesh
+        """Generate the boundary segments for the hyperellipse boundary mesh.
 
         Parameters
         ----------
         geo : `SplineGeometry`
-            Geometry object with the data to generate the mesh
+            Geometry object with the data to generate the mesh.
         bnd_pts : `array`
             Array of shape (num_bnd_pts, 2) containing the coordinates
-            of the hyperellipse boundary points
+            of the hyperellipse boundary points.
         trunc_feat : `tuple`
             Truncation features.
             Structure: [ini_trunc, end_trunc, num_filt_bnd_pts, ltrunc]
             - ini_trunc : `int`
-                Index of the first point after the truncation plane
+                Index of the first point after the truncation plane.
             - end_trunc : `int`
-                Index of the last point before the truncation plane
+                Index of the last point before the truncation plane.
             - num_filt_bnd_pts : `int`
-                Number of filtered boundary points
+                Number of filtered boundary points.
             - ltrunc : `float`
-                Mesh size for arc length due to the truncation operation
+                Mesh size for arc length due to the truncation operation.
         spln : `bool`
             Flag to indicate whether to use splines (True) or lines (False)
 
@@ -562,20 +549,21 @@ class HABCMesh(MeshOps):
             Hyperellipse parameters.
             Structure: (n_hyp, perimeter, a_hyp, b_hyp)
             - n_hyp : `float`
-                Degree of the hyperellipse
+                Degree of the hyperellipse.
             - perimeter : `float`
-                Perimeter of the full hyperellipse (2D)
+                Perimeter of the full hyperellipse (2D).
             - a_hyp : `float`
-                Hyperellipse semi-axis in direction x
+                Hyperellipse semi-axis in direction x.
             - b_hyp : `float`
-                Hyperellipse semi-axis in direction z
+                Hyperellipse semi-axis in direction z.
         spln : `bool`, optional
-            Flag to indicate whether to use splines (True) or lines (False)
+            Flag to indicate whether to use splines (`True`) or lines (`False`).
+            Default is `True`.
 
         Returns
         -------
         hyp_mesh : `netgen mesh`
-            Generated mesh for the hyperelliptical layer
+            Generated mesh for the hyperelliptical layer.
         """
 
         # Domain dimensions
@@ -645,20 +633,19 @@ class HABCMesh(MeshOps):
         return hyp_mesh
 
     def merge_mesh_2D(self, rec_mesh, hyp_mesh):
-        """
-        Merge the rectangular and the hyperelliptical meshes
+        """Merge the rectangular and the hyperelliptical meshes.
 
         Parameters
         ----------
-        rec_mesh : `firedrake mesh`
-            Rectangular mesh representing the original domain
-        hyp_mesh : `firedrake mesh`
-            Hyperelliptical annular mesh representing the absorbing layer
+        rec_mesh : `Firedrake.Mesh`
+            Rectangular mesh representing the original domain.
+        hyp_mesh : `Firedrake.Mesh`
+            Hyperelliptical annular mesh representing the absorbing layer.
 
         Returns
         -------
-        final_mesh : `firedrake mesh`
-            Merged final mesh
+        final_mesh : `Firedrake.Mesh`
+            Merged final mesh.
         """
 
         # Create the final mesh that will contain both
@@ -749,26 +736,25 @@ class HABCMesh(MeshOps):
 
     @staticmethod
     def inside_hyp_3D(pnt, a, b, c, n):
-        """
-        Check if a point is inside a hyperellipsoid
+        """Check if a point is inside a hyperellipsoid.
 
         Parameters
         ----------
         pnt : `array`
-            Point to be checked (x, y, z)
+            Point to be checked (x, y, z).
         a : `float`
-            Hyperellipsoid semi-axis in direction 1
+            Hyperellipsoid semi-axis in direction 1.
         b : `float`
-            Hyperellipsoid semi-axis in direction 2
+            Hyperellipsoid semi-axis in direction 2.
         c : `float`
-            Hyperellipsoid semi-axis in direction 3
+            Hyperellipsoid semi-axis in direction 3.
         n : `float`
-            Degree of the hyperellipsoid
+            Degree of the hyperellipsoid.
 
         Returns
         -------
         in_hyp : `bool`
-            True if the point is inside the hyperellipsoid, False otherwise
+            `True` if the point is inside the hyperellipsoid, `False` otherwise
         """
 
         # Evaluate hyperellipsoid equation
@@ -778,34 +764,34 @@ class HABCMesh(MeshOps):
         return in_hyp
 
     def sharp_mesh_3D(self, rec_mesh, hyp_par, centroid):
-        """
-        Generate a sharp mesh by cutting the rectangular mesh
-        with the hyperellipsoid surface
+        """Generate a sharp mesh by cutting with a hyperellipsoid surface.
+
+        The rectangular mesh is cut with the hyperellipsoid surface.
 
         Parameters
         ----------
-        rec_mesh : `firedrake mesh`
-            Rectangular mesh with an absorbing layer'
+        rec_mesh : `Firedrake.Mesh`
+            Rectangular mesh with an absorbing layer.
         hyp_par : `tuple`
             Hyperellipsoid parameters.
             Structure: (n_hyp, surface, a_hyp, b_hyp, c_hyp)
             - n_hyp : `float`
-                Degree of the hyperellipsoid
+                Degree of the hyperellipsoid.
             - surface : `float`
-                Surface area of the full hyperellipsoid (3D)
+                Surface area of the full hyperellipsoid (3D).
             - a_hyp : `float`
-                Hyperellipsoid semi-axis in direction x
+                Hyperellipsoid semi-axis in direction x.
             - b_hyp : `float`
-                Hyperellipsoid semi-axis in direction z
+                Hyperellipsoid semi-axis in direction z.
             - c_hyp : `float`
-                Hyperellipsoid semi-axis in direction y
+                Hyperellipsoid semi-axis in direction y.
         centroid : `array`
-            Centroid of the full hyperellipsoid (z0, x0, y0)
+            Centroid of the full hyperellipsoid (z0, x0, y0).
 
         Returns
         -------
-        sharp_mesh : `firedrake mesh`
-            Generated sharp mesh
+        sharp_mesh : `Firedrake.Mesh`
+            Generated sharp mesh.
         """
 
         # Hyperellipsoid parameters
@@ -860,28 +846,27 @@ class HABCMesh(MeshOps):
 
     @staticmethod
     def radial_project_on_hyp_3D(p_to_snap, centroid, a, b, c, n):
-        """
-        Project a point radially onto the hyperellipsoid surface
+        """Project a point radially onto the hyperellipsoid surface.
 
         Parameters
         ----------
         p_to_snap : `array`
-            Point to be projected (x, y, z)
+            Point to be projected (x, y, z).
         centroid : `array`
-            Centroid of the full hyperellipsoid (x0, y0, z0)
+            Centroid of the full hyperellipsoid (x0, y0, z0).
         a : `float`
-            Hyperellipsoid semi-axis in direction 1
+            Hyperellipsoid semi-axis in direction 1.
         b : `float`
-            Hyperellipsoid semi-axis in direction 2
+            Hyperellipsoid semi-axis in direction 2.
         c : `float`
-            Hyperellipsoid semi-axis in direction 3
+            Hyperellipsoid semi-axis in direction 3.
         n : `float`
-            Degree of the hyperellipsoid
+            Degree of the hyperellipsoid.
 
         Returns
         -------
         q_snapped : `array`
-            Projected point (x', y', z')
+            Projected point (x', y', z').
         """
 
         # Vector from centroid to the point
@@ -901,35 +886,34 @@ class HABCMesh(MeshOps):
         return q_snapped
 
     def snap_nodes_to_hyp(self, mesh, hyp_par, centroid, plane_tol=1e-5):
-        """
-        Snap boundary nodes of a sharp mesh to the hyperellipsoid surface
+        """Snap boundary nodes of a sharp mesh to the hyperellipsoid surface.
 
         Parameters
         ----------
-        mesh : `firedrake mesh`
-            Mesh to be modified
+        mesh : `Firedrake.Mesh`
+            Mesh to be modified.
         hyp_par : `tuple`
             Hyperellipsoid parameters.
             Structure: (n_hyp, surface, a_hyp, b_hyp, c_hyp)
             - n_hyp : `float`
                 Degree of the hyperellipsoid
             - surface : `float`
-                Surface area of the full hyperellipsoid (3D)
+                Surface area of the full hyperellipsoid (3D).
             - a_hyp : `float`
-                Hyperellipsoid semi-axis in direction x
+                Hyperellipsoid semi-axis in direction x.
             - b_hyp : `float`
-                Hyperellipsoid semi-axis in direction z
+                Hyperellipsoid semi-axis in direction z.
             - c_hyp : `float`
-                Hyperellipsoid semi-axis in direction y
+                Hyperellipsoid semi-axis in direction y.
         centroid : `array`
-            Centroid of the full hyperellipsoid (z0, x0, y0)
+            Centroid of the full hyperellipsoid (z0, x0, y0).
         plane_tol : `float`, optional
-            Tolerance to identify boundary planes. Default is 1e-5
+            Tolerance to identify boundary planes. Default is 1e-5.
 
         Returns
         -------
-        mesh : `firedrake mesh`
-            Modified mesh with snapped boundary nodes
+        mesh : `Firedrake.Mesh`
+            Modified mesh with snapped boundary nodes.
         """
 
         # Hyperellipsoid parameters
@@ -967,32 +951,31 @@ class HABCMesh(MeshOps):
         return mesh
 
     def build_hyp_mesh_3D(self, rec_mesh, hyp_par, plane_tol=1e-5):
-        """
-        Build a hyperellipsoidal mesh from a box mesh by snapping the boundary
+        """Build a hyperellipsoidal mesh from a box mesh by snapping the boundary.
 
         Parameters
         ----------
-        rec_mesh : `firedrake mesh`
-            Rectangular mesh with an absorbing layer
+        rec_mesh : `Firedrake.Mesh`
+            Rectangular mesh with an absorbing layer.
         hyp_par : `tuple`
             Hyperellipsoid parameters.
             Structure: (n_hyp, surface, a_hyp, b_hyp, c_hyp)
             - n_hyp : `float`
                 Degree of the hyperellipsoid
             - surface : `float`
-                Surface area of the full hyperellipsoid (3D)
+                Surface area of the full hyperellipsoid (3D).
             - a_hyp : `float`
-                Hyperellipsoid semi-axis in direction x
+                Hyperellipsoid semi-axis in direction x.
             - b_hyp : `float`
-                Hyperellipsoid semi-axis in direction z
+                Hyperellipsoid semi-axis in direction z.
             - c_hyp : `float`
-                Hyperellipsoid semi-axis in direction y
+                Hyperellipsoid semi-axis in direction y.
         plane_tol : `float`, optional
-            Tolerance to identify boundary planes. Default is 1e-5
+            Tolerance to identify boundary planes. Default is 1e-5.
 
         Returns
         -------
-        final_mesh : `firedrake mesh`
+        final_mesh : `Firedrake.Mesh`
             Merged final mesh
         """
 
@@ -1012,43 +995,42 @@ class HABCMesh(MeshOps):
         return final_mesh
 
     def hypershape_mesh_habc(self, hyp_par, mesh_original, mesh_parameters, spln=True):
-        """
-        Generate a mesh with a hypershape absorbing layer
+        """Generate a mesh with a hypershape absorbing layer.
 
         Parameters
         ----------
         hyp_par : `tuple`
             Hyperellipshape parameters.
-            Structure 2D: (n_hyp, perimeter, a_hyp, b_hyp)
-            Structure 3D: (n_hyp, surface, a_hyp, b_hyp, c_hyp)
+            Structure 2D: (n_hyp, perimeter, a_hyp, b_hyp).
+            Structure 3D: (n_hyp, surface, a_hyp, b_hyp, c_hyp).
             - n_hyp : `float`
-                Degree of the hypershape
+                Degree of the hypershape.
             - perimeter : `float`
-                Perimeter of the full hyperellipse (2D)
+                Perimeter of the full hyperellipse (2D).
             - surface : `float`
-                Surface area of the full hyperellipsoid (3D)
+                Surface area of the full hyperellipsoid (3D).
             - a_hyp : `float`
-                Hypershape semi-axis in direction x
+                Hypershape semi-axis in direction x.
             - b_hyp : `float`
-                Hypershape semi-axis in direction z
+                Hypershape semi-axis in direction z.
             - c_hyp : `float`
-                Hypershape semi-axis in direction y (3D only)
+                Hypershape semi-axis in direction y (3D only).
         mesh_original : `Firedrake.Mesh`
-            Original mesh without absorbing layer
+            Original mesh without absorbing layer.
         mesh_parameters : `meshing_parameters.MeshingParameters`
             Contains mesh parameters:
             lmin : `float`
-                Minimum mesh size
+                Minimum mesh size.
             tol : `float`
-                Tolerance for searching nodes in the mesh
+                Tolerance for searching nodes in the mesh.
         spln : `bool`, optional
-            Flag to indicate whether to use splines (True) or lines (False)
-            in hypershape layer generation. Default is True
+            Flag to indicate whether to use splines (`True`) or lines (`False`)
+            in hypershape layer generation. Default is `True`.
 
         Returns
         -------
-        mesh_habc : `firedrake mesh`
-            Mesh with a hypershape absorbing layer
+        mesh_habc : `Firedrake.Mesh`
+            Mesh with a hypershape absorbing layer.
         """
 
         # Get the mesh parameters for use in hypershape mesh generation
@@ -1079,22 +1061,21 @@ class HABCMesh(MeshOps):
         return mesh_habc
 
     def layer_boundary_data(self, V):
-        """
-        Generate the boundary data from the domain with the absorbing layer
+        """Generate the boundary data from the domain with the absorbing layer.
 
         Parameters
         ----------
         V : `Firedrake.FunctionSpace`
-            Function space for the boundary of the domain with absorbing layer
+            Function space for the boundary of the domain with absorbing layer.
 
         Returns
         -------
         bnd_nfs : 'array'
-            Mesh node indices on non-free surfaces
+            Mesh node indices on non-free surfaces.
         bnd_nodes_nfs : `tuple`
             Mesh node coordinates on non-free surfaces.
-            - (z_data[nfs_idx], x_data[nfs_idx]) for 2D
-            - (z_data[nfs_idx], x_data[nfs_idx], y_data[nfs_idx]) for 3D
+            - (z_data[nfs_idx], x_data[nfs_idx]) for 2D.
+            - (z_data[nfs_idx], x_data[nfs_idx], y_data[nfs_idx]) for 3D.
         """
 
         # Boundary nodes indices
@@ -1123,24 +1104,24 @@ class HABCMesh(MeshOps):
         return bnd_nfs, bnd_nodes_nfs
 
     def get_spatial_coordinates_abc(self, mesh, domain_layer):
-        """ Get the ufl coordinates of the mesh with absorbing layer.
+        """Get the ufl coordinates of the mesh with absorbing layer.
 
         Parameters
         ----------
         mesh : `Firedrake.Mesh`
-            Current mesh
+            Current mesh.
         domain_layer : `tuple`
             Domain dimensions with layer. For rectangular layers, truncation
             due to the free surface is included (n = 1). For hypershape layers,
             truncation by free surface is not included (n = 2) if 'full_hyp' is
             True; otherwise, it is included (n = 1). Dimensions are defined as:
-            2D: (length_z + n * pad_len, length_x + 2 * pad_len)
-            3D: (length_x + 2 * pad_len, length_z + n * pad_len, length_y + 2 * pad_len)
+            2D: (length_z + n * pad_len, length_x + 2 * pad_len).
+            3D: (length_x + 2 * pad_len, length_z + n * pad_len, length_y + 2 * pad_len).
 
         Returns
         -------
         ufl_coordinates_abc : `ufl.geometry.SpatialCoordinate`
-            Domain Coordinates including the absorbing layer
+            Domain Coordinates including the absorbing layer.
         """
 
         min_coordinates, max_coordinates = self.extract_extreme_coordinates(mesh)

@@ -19,7 +19,7 @@ from ..utils.typing import LayerShapeType
 
 
 class HABCLayer(ABCLayer, HABC_Damping):
-    '''
+    """
     Class HABC that determines absorbing layer size and parameters to be used
 
     Attributes
@@ -140,55 +140,55 @@ class HABCLayer(ABCLayer, HABC_Damping):
         Determine the size of the absorbing layer using the Eikonal criterion.
     velocity_habc()
         Set the velocity model for the model with absorbing layer.
-    '''
+    """
 
     def __init__(self, domain_dim, frequency, f_Nyquist, abc_deg_layer,
                  dimension=2, quadrilateral=False, func_space_type=None,
                  abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
                  abc_reference_freq="source", abc_degree_type="real",
                  output_folder=None, comm=None):
-        '''
+        """
         Initialize the HABC class
 
         Parameters
         ----------
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
-            or (length_z, length_x, length_y) for 3D
+            or (length_z, length_x, length_y) for 3D.
         frequency: `float`
             Frequency of the source.
         f_Nyquist : `float`
-            Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt)
+            Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt).
         abc_deg_layer : `int` or `float` or `None`
             Hypershape degree. For hypershape layers, the degree must be greater than or
             equal to 2. `None` is used only for rectangular layers.
         dimension : `int`, optional
-            Model dimension (2D or 3D). Default is 2D
+            Model dimension (2D or 3D). Default is 2D.
         quadrilateral : bool, optional
             Flag to indicate whether to use quadrilateral/hexahedral elements.
-            Default is False (triangular/tetrahedral elements)
+            Default is `False` (triangular/tetrahedral elements).
         func_space_type, `str`, optional
             Type of function space for the state variable.
-            Options: 'scalar' or 'vector'. Default is None
-        abc_boundary_layer_shape : `string`, optional
-            Shape type of pad layer. Options: 'rectangular' or 'hypershape'.
-            Default is 'rectangular'
+            Options: 'scalar' or 'vector'. Default is `None`.
+        abc_boundary_layer_shape : `typing.LayerShapeType`, optional
+            Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
+            `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
         abc_reference_freq : `str`, optional
             Reference frequency for sizing the hybrid absorbing layer.
-            Options: 'source' or 'boundary'. Default is 'source'
+            Options: 'source' or 'boundary'. Default is 'source'.
         abc_degree_type : `str`, optional
             Type of the hypereshape degree. Options: 'real' or 'integer'.
-            Default is 'real'
+            Default is 'real'.
         output_folder : `str`, optional
-            The folder where output data will be saved. Default is None.
+            The folder where output data will be saved. Default is `None`.
         comm : `object`, optional
-            An object representing the communication interface
-            for parallel processing. Default is None
+            An object representing the communication interface for parallel processing.
+            Default is `None`.
 
         Returns
         -------
         None
-        '''
+        """
 
         # Initializing the ABCLayer class
         ABCLayer.__init__(self, domain_dim, frequency, f_Nyquist, dimension=dimension,
@@ -201,7 +201,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     # def fundamental_frequency(self, method=None, monitor=False,
     #                           fitting_c=(0., 0., 0., 0.)):
-    #     '''
+    #     """
     #     Compute the fundamental frequency in Hz via modal analysis
     #     considering the numerical model with Neumann BCs.
 
@@ -303,7 +303,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     #        dx=0.01-L    %Diff-Q     %Diff-T
     #        0.47525      13.47       13.47
-    #     '''
+    #     """
 
     #     print("\nSolving Eigenvalue Problem", flush=True)
     #     mod_sol = eigsol.Modal_Solver(self.dimension, method=method)
@@ -374,7 +374,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     # def damping_layer(self, xCR_usu=None, method=None,
     #                   fitting_c=(0., 0., 0., 0.)):
-    #     '''
+    #     """
     #     Set the damping profile within the absorbing layer.
     #     Minimum damping ratio is computed as psi_min = xCR * d
     #     where xCR is the heuristic factor for the minimum damping
@@ -414,7 +414,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     Returns
     #     -------
     #     None
-    #     '''
+    #     """
 
     #     # Domain dimensions with free surface truncation
     #     dom_lay_trunc = self.habc_domain_dimensions(only_habc_dom=True,
@@ -473,7 +473,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     outfile.write(self.eta_habc)
 
     # def nrbc_on_boundary_layer(self):
-    #     '''
+    #     """
     #     Apply the Higdon ABCs on the outer boundary of the absorbing layer
 
     #     Parameters
@@ -483,7 +483,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     Returns
     #     -------
     #     None
-    #     '''
+    #     """
 
     #     print("\nApplying Non-Reflecting Boundary Conditions", flush=True)
 
@@ -500,7 +500,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     # def check_timestep_habc(self, max_divisor_tf=1, set_max_dt=True,
     #                         method='ANALYTICAL', mag_add=3):
-    #     '''
+    #     """
     #     Check if the timestep size is appropriate for the transient response
 
     #     Parameters
@@ -529,7 +529,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     #     # Estimation: 2.770 (Old), 2.768 (New) (Scipy-sparse)
     #     # Exact: 1.842 (Old), 1.842 (New) (Scipy)
-    #     '''
+    #     """
 
     #     print("\nChecking Timestep Size", flush=True)
 
@@ -571,7 +571,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     print(str_dt, flush=True)
 
     # def layer_infinite_model(self):
-    #     '''
+    #     """
     #     Determine the domain extension size for the infinite domain model
 
     #     Parameters
@@ -582,7 +582,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     -------
     #     infinite_pad_len : `float`
     #         Size of the domain extension for the infinite domain model
-    #     '''
+    #     """
 
     #     # Size of the domain extension
     #     add_dom = self.c_bnd_max * self.final_time / 2.
@@ -626,7 +626,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     return infinite_pad_len
 
     # def geometry_infinite_model(self):
-    #     '''
+    #     """
     #     Determine the geometry for the infinite domain model.
 
     #     Parameters
@@ -636,7 +636,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     Returns
     #     -------
     #     None
-    #     '''
+    #     """
 
     #     # Size of the domain extension
     #     self.pad_len = self.layer_infinite_model()
@@ -649,7 +649,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     # def infinite_model(self, check_dt=False, max_divisor_tf=1,
     #                    method='ANALYTICAL', mag_add=3):
-    #     '''
+    #     """
     #     Create a reference model for the HABC scheme for comparative purposes
 
     #     Parameters
@@ -675,7 +675,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     Returns
     #     -------
     #     None
-    #     '''
+    #     """
 
     #     # Check the timestep size
     #     if check_dt:
@@ -713,7 +713,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #         del self.Ly_habc
 
     def rename_folder_habc(self):
-        '''
+        """
         Rename the folder of results if the degree for the
         hypershape layer is out of the criterion limits
 
@@ -724,7 +724,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
         Returns
         -------
         None
-        '''
+        """
 
         if self.layer_geometry.n_hyp != self.abc_deg_layer and \
                 self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:

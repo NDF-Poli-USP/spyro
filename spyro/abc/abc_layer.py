@@ -154,9 +154,9 @@ class ABCLayer(NRBC):
         func_space_type, `str`, optional
             Type of function space for the state variable.
             Options: 'scalar' or 'vector'. Default is None.
-        abc_boundary_layer_shape : `string`, optional
-            Shape type of pad layer. Options: 'rectangular' or 'hypershape'.
-            Default is 'rectangular'.
+        abc_boundary_layer_shape : `typing.LayerShapeType`, optional
+            Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
+            `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
         abc_boundary_layer_type : `str`, optional
             Type of the boundary layer. Options: 'hybrid' or 'PML'.
             Default is 'hybrid'. Option 'hybrid' is based on paper of Salas et al. (2022).
@@ -174,7 +174,7 @@ class ABCLayer(NRBC):
             The folder where output data will be saved. Default is None.
         comm : `object`, optional
             An object representing the communication interface for parallel processing.
-            Default is None.
+            Default is `None`.
 
         Returns
         -------
@@ -375,7 +375,7 @@ class ABCLayer(NRBC):
         Parameters
         ----------
         output_folder : `str`, optional
-            The folder where output data will be saved. Default is None.
+            The folder where output data will be saved. Default is `None`.
 
         Returns
         -------
@@ -513,8 +513,8 @@ class ABCLayer(NRBC):
         Notes
         -----
         Model dimensions are defined as:
-            2D: (length_z + n * pad_len, length_x + 2 * pad_len)
-            3D: (length_z + n * pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len)
+            2D: (length_z + n * pad_len, length_x + 2 * pad_len).
+            3D: (length_z + n * pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len).
         """
 
         # Domain dimensions with layer and truncations
@@ -607,7 +607,7 @@ class ABCLayer(NRBC):
         Parameters
         ----------
         Wave : `wave.Wave`
-            An instance of the Wave class.
+            An instance of the :class:`~spyro.solvers.wave.Wave`.
         inf_model : `bool`, optional
             If `True`, build a rectangular layer for the infinite or reference.
             model (Model with "infinite" dimensions). Default is `False`.
@@ -615,7 +615,8 @@ class ABCLayer(NRBC):
             Flag to indicate whether to use splines (`True`) or lines (`False`).
             in hypershape layer generation. Default is `True`.
         save_file : `bool`, optional
-            If `True`, save the mesh with absorbing layer in a .pvd file. Default is `True`.
+            If `True`, save the mesh with absorbing layer in a .pvd file.
+            Default is `True`.
 
         Returns
         -------
@@ -683,7 +684,7 @@ class ABCLayer(NRBC):
         Parameters
         ----------
         Wave : `wave.Wave`
-            An instance of the Wave class.
+            An instance of the :class:`~spyro.solvers.wave.Wave`.
         inf_model : `bool`, optional
             If `True`, build a rectangular layer for the infinite or reference
             model (Model with "infinite" dimensions). Default is `False`.

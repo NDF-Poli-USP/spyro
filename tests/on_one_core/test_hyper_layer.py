@@ -1,3 +1,6 @@
+"""Unit tests for the HyperLayer class implemented in spyro.abc.hyp_lay."""
+
+
 from math import isclose
 from numpy import cos, floating, pi, sin, sqrt
 from pytest import fixture, raises
