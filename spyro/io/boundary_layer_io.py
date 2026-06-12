@@ -8,8 +8,9 @@ class Read_boundary_layer:
 
     Attributes
     ----------
-    abc_boundary_layer_shape : str
-        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
+    abc_boundary_layer_shape : `typing.LayerShapeType`, optional
+        Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
+        `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
     abc_boundary_layer_type : `str`
         Type of the boundary layer. Options: 'hybrid' or 'PML'.
         Option 'hybrid' is based on paper of Salas et al. (2022).
@@ -22,7 +23,7 @@ class Read_boundary_layer:
         Hypershape degree
     abc_degree_type : `str`
         Type of the hypereshape degree. Options: 'real' or 'integer'
-    abc_exponent : float
+    abc_exponent : `float`
         Exponent of the polynomial damping
     abc_extend_properties : `str`
         Mode to extend the properties into the absorbing layer.
@@ -30,9 +31,9 @@ class Read_boundary_layer:
         'builtin' (automatic at field definition)
     abc_get_ref_model : `bool`
         If True, the infinite model is created
-    abc_pad_length : float
+    abc_pad_length : `float`
         Thickness of the PML in the z-direction (km) - always positive
-    abc_R : float
+    abc_R : `float`
         Theoretical reflection coefficient
     abc_reference_freq : `str`
         Reference frequency for sizing the hybrid absorbing layer.
@@ -40,9 +41,9 @@ class Read_boundary_layer:
     abc_user_pad_length : `bool`
         If True, the pad length is provided by the user. If False,
         the pad length is determined with the HABC criterion.
-    damping_type : str
+    damping_type : `str`
         Type of the boundary layer
-    dictionary : dict
+    dictionary : `dict`
         Dictionary containing the boundary layer information
     """
 
@@ -54,7 +55,7 @@ class Read_boundary_layer:
         ----------
         comm : `object`, optional
             An object representing the communication interface for parallel processing.
-            Default is None
+            Default is `None`.
 
         Returns
         -------
@@ -171,8 +172,8 @@ class Read_boundary_layer:
 
         Parameters
         ----------
-        value : float or None
-            The pad length in kilometers. If None, the pad length will be determined
+        value : `float` or `None`
+            The pad length in kilometers. If `None`, the pad length will be determined
             using the HABC criterion.
 
         Returns

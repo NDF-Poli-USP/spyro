@@ -1,3 +1,5 @@
+"""Test for the application of the HABC scheme implemented in spyro.habc.habc."""
+
 import firedrake as fire
 import glob
 import spyro.habc.habc as habc
@@ -237,7 +239,7 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
           The last value corresponds to the optimal xCR
     xCR_usu : `float`, optional
         User-defined heuristic factor for the minimum damping ratio.
-        Default is None, which defines an estimated value
+        Default is `None`, which defines an estimated value
     plot_comparison : `bool`, optional
         If True, the solution (time and frequency) at receivers
         and the error measures are plotted. Default is True.

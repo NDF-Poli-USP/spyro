@@ -1,3 +1,5 @@
+"""Unit tests for coeff_of_determination function in spyro.utils.stats_tools."""
+
 from pytest import approx, raises
 from numpy import array, random
 from spyro.utils.stats_tools import coeff_of_determination

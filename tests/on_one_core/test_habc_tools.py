@@ -1,3 +1,13 @@
+"""Unit tests for the tools used in the HABC scheme implemented in spyro.tools.habc_tools.
+
+This test verifies the correct functioning of the tools used in the implementation
+of the HABC in spyro. It checks that the absorbing layer is correctly created and
+that the velocity profile is correctly extended in the layer using both the point
+cloud and nearest point methods. The test is performed for both 2D and 3D cases,
+and for both triangular and quadrilateral elements. The expected values are based on
+the theoretical velocity model and the geometry of the absorbing layer. The test also
+measures the computational cost of the operations.
+"""
 from pytest import fail, mark, param
 from firedrake import conditional, ConvergenceError
 from numpy import isclose, where
@@ -14,18 +24,18 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer):
     ----------
     element_geometry : `str`
         Geometry of the finite element. Options: 'T' for triangles/tetrahedra or
-        'Q' for quadrilaterals/hexahedra
+        'Q' for quadrilaterals/hexahedra.
     dimension : `int`
-        Dimension of the problem. 2 for 2D and 3 for 3D
+        Dimension of the problem. 2 for 2D and 3 for 3D.
     layer_shape : `str`
-        Shape of the absorbing layer, either 'rectangular' or 'hypershape'
+        Shape of the absorbing layer, either 'rectangular' or 'hypershape'.
     degree_layer : `int` or `None`
-        Degree of the hypershape layer, if applicable. If None, it is not used
+        Degree of the hypershape layer, if applicable. If None, it is not used.
 
     Returns
     -------
     dictionary : `dict`
-        Dictionary containing the parameters for the model
+        Dictionary containing the parameters for the model.
     """
 
     dictionary = {}
@@ -49,13 +59,13 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer):
     # Define the domain size without the PML or AL. Here we'll assume a domain
     # with a width and depth of 1 km, and a thickness of 1 km for the 3D case.
     if dimension == 2:
-        Lz, Lx, Ly = [1., 1., 0.]
+        length_z, length_x, length_y = [1., 1., 0.]
     elif dimension == 3:
-        Lz, Lx, Ly = [1., 1., 1.]  # in km
+        length_z, length_x, length_y = [1., 1., 1.]  # in km
     dictionary["mesh"] = {
-        "length_z": Lz,  # depth in km - always positive
-        "length_x": Lx,  # width in km - always positive
-        "length_y": Ly,  # thickness in km - always positive
+        "length_z": length_z,  # depth in km - always positive
+        "length_x": length_x,  # width in km - always positive
+        "length_y": length_y,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -64,15 +74,21 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer):
     # point of the mesh. We also specify to record the solution at the corners
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
-        "source_locations": ([(-0.5, 0.25)] if dimension == 2  # (0.5 * Lz, 0.25 * Lx)
-                             else [(-0.5, 0.25, 0.5)]),  # (0.5 * Lz, 0.25 * Lx, 0.5 * Ly)
+        "source_locations": ([(-length_z / 2., length_x / 4.)] if dimension == 2
+                             else [(-length_z / 2., length_x / 4., length_y / 2.)]),
         "frequency": 5.,  # in Hz
-        "receiver_locations": ([(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)]
+        "receiver_locations": ([(-length_z, 0.),
+                                (-length_z, length_x),
+                                (0., 0.), (0., length_x)]
                                if dimension == 2
-                               else [(-Lz, 0., 0.), (-Lz, Lx, 0.),
-                                     (0., 0., 0), (0., Lx, 0.),
-                                     (-Lz, 0., Ly), (-Lz, Lx, Ly),
-                                     (0., 0., Ly), (0., Lx, Ly)])
+                               else [(-length_z, 0., 0.),
+                                     (-length_z, length_x, 0.),
+                                     (0., 0., 0),
+                                     (0., length_x, 0.),
+                                     (-length_z, 0., length_y),
+                                     (-length_z, length_x, length_y),
+                                     (0., 0., length_y),
+                                     (0., length_x, length_y)])
     }
 
     # Define Parameters for absorbing boundary conditions
@@ -97,18 +113,18 @@ def preamble_tools(dictionary, edge_length, f_est, dimension):
     Parameters
     ----------
     dictionary : `dict`
-        Dictionary containing the parameters for the model
+        Dictionary containing the parameters for the model.
     edge_length : `float`
-        Mesh size in km
+        Mesh size in km.
     f_est : `float`, optional
         Factor for the stabilizing term in Eikonal Eq.
     dimension : `int`
-        Dimension of the model (2 or 3)
+        Dimension of the model (2 or 3).
 
     Returns
     -------
     wave_obj : `habc.HABCLayer`
-        An instance of the HABCLayer class
+        An instance of the :class:`~spyro.habc.HABCLayer`.
     """
 
     # ============ MESH FEATURES ============
@@ -151,11 +167,11 @@ def run_tools(wave_obj, method_extend, n_root=1):
     Parameters
     ----------
     wave_obj : `habc.HABCLayer`
-        An instance of the HABCLayer class
+        An instance of the :class:`~spyro.habc.HABCLayer`.
     method_extend : `str`
-        Method to extend the velocity profile. Options: 'point_cloud' or 'nearest_point'
+        Method to extend the velocity profile. Options: 'point_cloud' or 'nearest_point'.
     n_root : `int`, optional
-        n-th Root selected as the size of the absorbing layer. Default is 1
+        n-th Root selected as the size of the absorbing layer. Default is 1.
 
     Returns
     -------
@@ -249,9 +265,9 @@ def test_habc_tools(element_geometry, dimension):
     Parameters
     ----------
     element_geometry : `str`
-        Type of finite element. 'T' for triangles or 'Q' for quadrilaterals
+        Type of finite element. 'T' for triangles or 'Q' for quadrilaterals.
     dimension : `int`
-        Dimension of the model (2 or 3)
+        Dimension of the model (2 or 3).
 
     Returns
     -------

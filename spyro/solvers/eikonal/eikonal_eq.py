@@ -14,17 +14,16 @@ from ...domains.quadrature import quadrature_rules
 
 
 class Dir_Point_BC(fire.DirichletBC):
-    '''
-    Class for Eikonal boundary conditions at a point
+    """Class for Eikonal boundary conditions at a point.
 
     Attributes
     ----------
     nodes : `array`
         Points where the boundary condition is to be applied.
-    '''
+    """
 
     def __init__(self, V, value, nodes):
-        '''
+        """
         Initialize the Dir_Point_BC class
 
         Parameters
@@ -39,7 +38,7 @@ class Dir_Point_BC(fire.DirichletBC):
         Returns
         -------
         None
-        '''
+        """
 
         # Calling superclass init and providing a dummy subdomain id
         super(Dir_Point_BC, self).__init__(V, value, 0)
@@ -49,15 +48,14 @@ class Dir_Point_BC(fire.DirichletBC):
 
 
 class Eikonal_Modeling():
-    '''
-    Class for the Eikonal equation for Linear and Nonlinear analysis.
+    """Class for the Eikonal equation for Linear and Nonlinear analysis.
 
     Attributes
     ----------
     dimension : `int`
-        The spatial dimension of the problem
+        The spatial dimension of the problem.
     ele_type_eik : `string`, optional
-        Finite element type. 'consistent' or 'underintegrated'. Default is 'consistent'
+        Finite element type. 'consistent' or 'underintegrated'. Default is 'consistent'.
     f_est : `float`
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03.
     degree_eik : `int`
@@ -87,12 +85,11 @@ class Eikonal_Modeling():
         Solve the nonlinear Eikonal equation.
     solver_opts()
         Set the eikonal solver parameters.
-    '''
+    """
 
     def __init__(self, dimension, source_locations, ele_type_eik='consistent',
                  degree_eik=None, f_est=0.03, tol=1e-16):
-        '''
-        Initialize the Eikonal_Modeling class.
+        """Initialize the Eikonal_Modeling class.
 
         Parameters
         ----------
@@ -101,7 +98,7 @@ class Eikonal_Modeling():
         source_locations: `list`of `tuples`
             List of tuples containing all source locations.
         ele_type_eik : `string`, optional
-            Finite element type. 'consistent' or 'underintegrated'.
+            Finite element type. Options: 'consistent' or 'underintegrated'.
             Default is 'consistent'.
         degree_eik : `int`, optional
             Finite element order for the Eikonal analysis. Default is None.
@@ -113,7 +110,7 @@ class Eikonal_Modeling():
         Returns
         -------
         None
-        '''
+        """
 
         # Dimension of the problem
         self.dimension = dimension
@@ -140,8 +137,7 @@ class Eikonal_Modeling():
         self.tol = tol
 
     def eikonal_bcs(self, node_positions, V, lmin):
-        '''
-        Impose Dirichlet BCs for eikonal equation.
+        """Impose Dirichlet BCs for eikonal equation.
 
         Parameters
         ----------
@@ -160,7 +156,7 @@ class Eikonal_Modeling():
             Dirichlet BCs for eikonal.
         sou_marker : `Firedrake.Function`
             Function marking the source locations in the mesh.
-        '''
+        """
 
         # Extract node positions
         z_data, x_data = node_positions[:, 0], node_positions[:, 1]
@@ -203,8 +199,7 @@ class Eikonal_Modeling():
         return bcs_eik, sou_marker
 
     def define_int_dom(self, V):
-        '''
-        Define the integration domain for the Eikonal equation.
+        """Define the integration domain for the Eikonal equation.
 
         Parameters
         ----------
@@ -215,7 +210,7 @@ class Eikonal_Modeling():
         -------
         dx : `FiredrakeMeasure`
             Integration domain for the Eikonal equation.
-        '''
+        """
 
         if self.ele_type_eik == 'consistent':
             dx = fire.dx
@@ -227,8 +222,7 @@ class Eikonal_Modeling():
         return dx
 
     def linear_eik(self, u, vy, c, V):
-        '''
-        Assemble the linear Eikonal
+        """Assemble the linear Eikonal.
 
         Parameters
         ----------
@@ -245,7 +239,7 @@ class Eikonal_Modeling():
         -------
         FL : `Firedrake.Form`
             Linear Eikonal equation.
-        '''
+        """
 
         # Parameters
         f = fire.Constant(1.0)
@@ -259,8 +253,7 @@ class Eikonal_Modeling():
         return FL
 
     def nonlinear_eik(self, u, vy, c, V, diam_mesh, f_est=1.0):
-        '''
-        Assemble the Nonlinear Eikonal with stabilizing term
+        """Assemble the Nonlinear Eikonal with stabilizing term.
 
         Parameters
         ----------
@@ -281,7 +274,7 @@ class Eikonal_Modeling():
         -------
         FNL: `Firedrake.Form`
             Nonlinear Eikonal equation.
-        '''
+        """
 
         # Parameters
         f = fire.Constant(1.0)
@@ -301,21 +294,20 @@ class Eikonal_Modeling():
     @staticmethod
     def solver_opts(nl_solver='newtonls', l_solver='preonly',
                     user_atol=1e-16, user_iter=50, monitor=False):
-        '''
-        Set the solver parameters
+        """Set the solver parameters.
 
         Parameters
         ----------
         nl_solver : `str`, optional
-            Nonlinear solver type (See PETSC documentation)
+            Nonlinear solver type (See PETSC documentation).
         l_solver : `str`, optional
-            Linear solver type
+            Linear solver type.
         user_atol : `float`, optional
-            Absolute user tolerance
+            Absolute user tolerance.
         user_iter : `float`, optional
-            Maximum user iterations
+            Maximum user iterations.
         monitor : 'bool', optional
-            Prints the solver progress
+            Prints the solver progress.
 
         Returns
         -------
@@ -335,7 +327,7 @@ class Eikonal_Modeling():
         stol: || delta x || < stol*|| x ||
         haptol: lhs - rhs < haptol
         haptol < atol < rtol < stol
-        '''
+        """
 
         # Tolerances and iterations
         user_rtol = user_atol * 1e2
@@ -419,8 +411,7 @@ class Eikonal_Modeling():
 
     @staticmethod
     def initial_guess(c, c_min, V, diam_mesh, typ_igs='constant'):
-        '''
-        Provide an initial guess for the Eikonal solver
+        """Provide an initial guess for the Eikonal solver.
 
         Parameters
         ----------
@@ -439,7 +430,7 @@ class Eikonal_Modeling():
         -------
         init_guess : `float` or `ufl.algebra.Division`
             Initial guess for the Eikonal solver.
-        '''
+        """
 
         # Mesh cell diameters
         cell_diameter_function = fire.Function(V)
@@ -460,8 +451,7 @@ class Eikonal_Modeling():
 
     def linear_solution(self, wf_parameters, nl_solver='vinewtonssls',
                         l_solver='preonly', user_iter=50):
-        '''
-        Solve the linear Eikonal equation
+        """Solve the linear Eikonal equation.
 
         Parameters
         ----------
@@ -487,7 +477,6 @@ class Eikonal_Modeling():
         l_solver : `str`, optional.
             Linear solver type. Default is 'preonly'.
             Options: 'preonly', 'bcgs', 'gmres' (See PETSC documentation).
-            (See PETSC documentation)
         user_iter : `int`, optional
             Maximum user iterations. Default is 50.
 
@@ -501,7 +490,7 @@ class Eikonal_Modeling():
         https://petsc.org/release/manualpages/SNES/SNESType/
         https://petsc.org/release/manualpages/KSP/KSPType/
         https://petsc.org/release/manualpages/PC/PCType/
-        '''
+        """
 
         # Weak form parameters
         u, vy, c, c_min, V, diam_mesh = wf_parameters
@@ -546,8 +535,7 @@ class Eikonal_Modeling():
 
     def nonlinear_solution(self, wf_parameters, nl_solver='vinewtonssls',
                            l_solver='preonly', user_iter=50, lin_sol=None):
-        '''
-        Solve the nonlinear Eikonal equation
+        """Solve the nonlinear Eikonal equation.
 
         Parameters
         ----------
@@ -555,7 +543,7 @@ class Eikonal_Modeling():
             List containing the weak form parameters.
             Structure: [vy, c, c_min, V, diam_mesh]
             - vy : `Firedrake.TestFunction`
-                Test function
+                Test function.
             - c : `Firedrake.Function`
                 Velocity model without absorbing layer.
             - c_min : `float`
@@ -580,14 +568,14 @@ class Eikonal_Modeling():
         Returns
         -------
         yp : `Firedrake.Function`
-            Nonlinear Eikonal field
+            Nonlinear Eikonal field.
 
         PETSC Documentation
         -------------------
         https://petsc.org/release/manualpages/SNES/SNESType/
         https://petsc.org/release/manualpages/KSP/KSPType/
         https://petsc.org/release/manualpages/PC/PCType/
-        '''
+        """
 
         # Weak form parameters
         vy, c, c_min, V, diam_mesh = wf_parameters
@@ -649,8 +637,7 @@ class Eikonal_Modeling():
                         exit("No Results for Eikonal Equation")
 
     def eikonal_solver(self, c, c_min, V, diam_mesh):
-        '''
-        Solve the Eikonal equation for model without absorbing layer
+        """Solve the Eikonal equation for model without absorbing layer.
 
         Parameters
         ----------
@@ -667,7 +654,7 @@ class Eikonal_Modeling():
         -------
         yp : `Firedrake.Function`
             Eikonal field.
-        '''
+        """
 
         # Functions
         u = fire.TrialFunction(V)

@@ -42,27 +42,27 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
     lay_par: `list`
         Parameters of the layer:
         - a : `float`
-            Adimensional propagation speed parameter (a = z / f, z = c / l)
+            Adimensional propagation speed parameter (a = z / f, z = c / l).
         - z_par : `float`
-            Inverse of min. Eikonal (1 / phi_min, equivalent to c_bound/lref)
+            Inverse of min. Eikonal (1 / phi_min, equivalent to c_bound/lref).
     freq_par: `list`
         Parameters of the frequency:
         - reference_frequency : `float`
-            Reference frequency of the wave
+            Reference frequency of the wave.
         - source_frequency : `float`
-            Source frequency
+            Source frequency.
     geom_par: `list`
         Parameters of the domain geometry:
         - lmin : `float`
-            Minimal dimension of finite element in mesh
+            Minimal dimension of finite element in mesh.
         - lref : `float`
-            Reference length for the size of the absorbing layer
+            Reference length for the size of the absorbing layer.
     FLpos: `list`
-        List of size parameters for the reference frequency
+        List of size parameters for the reference frequency.
     output_folder: `str`, optional
         Folder to save the output plots. Default is "output/".
     show: `bool`, optional
-        Whether to show the plot. Default is False.
+        Whether to show the plot. Default is `False`.
 
     Returns
     -------
@@ -184,7 +184,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 #         - path_save: Directory path for saving plots
 #         - case_abc: Case name for file naming
 #     show : `bool`, optional
-#         Whether to display the plot interactively. Default is False.
+#         Whether to display the plot interactively. Default is `False`.
 
 #     Returns
 #     -------
@@ -286,7 +286,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 #         Default is 4.
 
 #     show : `bool`, optional
-#         Whether to display the plot interactively. Default is False.
+#         Whether to display the plot interactively. Default is `False`.
 
 #     Returns
 #     -------
@@ -417,7 +417,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 #             - 'err_integral' : Minimizes integral error
 #             - 'err_sum' : Minimizes the sum of integral and peak errors
 #     show : bool, optional
-#         Whether to display the plot interactively. Default is False.
+#         Whether to display the plot interactively. Default is `False`.
 
 #     Returns
 #     -------

@@ -19,34 +19,34 @@ class PMLLayer(ABCLayer):
     bc_boundary_pml : `str`
         Type of boundary condition to apply on the PML boundaries.
         Options are "Higdon" or "Sommerfeld" for Non-Reflecting BCs,
-        or "Dirichlet" or "Neumann" for typical BCs. Default is "Higdon"
-    pml_mask : `firedrake function`
-        Mask function to identify the PML domain
+        or "Dirichlet" or "Neumann" for typical BCs. Default is "Higdon".
+    pml_mask : `Firedrake.Function`
+        Mask function to identify the PML domain.
     sigma_max : `float`
-        Maximum damping coefficient within the PML layer
-    sigma_x : `firedrake function`
-        Damping profile in the x direction within the PML layer
-    sigma_y : `firedrake function`
-        Damping profile in the y direction within the PML layer (3D)
-    sigma_z : `firedrake function`
-        Damping profile in the z direction within the PML layer
+        Maximum damping coefficient within the PML layer.
+    sigma_x : `Firedrake.Function`
+        Damping profile in the x direction within the PML layer.
+    sigma_y : `Firedrake.Function`
+        Damping profile in the y direction within the PML layer (3D).
+    sigma_z : `Firedrake.Function`
+        Damping profile in the z direction within the PML layer.
     where_to_absorb : `tuple`
-        Boundary ids where absorption is applied
+        Boundary ids where absorption is applied.
 
     Methods
     -------
     calc_pml_damping()
-        Calculate the maximum damping coefficient for the PML layer
+        Calculate the maximum damping coefficient for the PML layer.
     damping_pml_2d()
-        Build damping matrices for a two-dimensional problem using PML
+        Build damping matrices for a two-dimensional problem using PML.
     damping_pml_3d()
-        Build  Damping matrices for a three-dimensional problem using PML
+        Build  Damping matrices for a three-dimensional problem using PML.
     pml_layer()
-        Set the damping profile within the PML layer
+        Set the damping profile within the PML layer.
     pml_parameters_boundary_conditions()
-        Set the boundary conditions for the PML layer
+        Set the boundary conditions for the PML layer.
     pml_sigma_field()
-        Generate a damping profile for the PML
+        Generate a damping profile for the PML.
     """
 
     def __init__(self, domain_dim, frequency, f_Nyquist, dimension=2,
@@ -68,22 +68,22 @@ class PMLLayer(ABCLayer):
             Model dimension (2D or 3D). Default is 2D.
         quadrilateral : bool, optional
             Flag to indicate whether to use quadrilateral/hexahedral elements.
-            Default is False (triangular/tetrahedral elements).
+            Default is `False` (triangular/tetrahedral elements).
         func_space_type, `str`, optional
             Type of function space for the state variable.
             Options: 'scalar' or 'vector'. Default is `None`.
         bc_boundary_pml : `str`, optional
             Type of boundary condition to apply on the PML boundaries.
             Options are 'Higdon' or 'Sommerfeld for Non-Reflecting BCs,
-            or "Dirichlet" or "Neumann" for typical BCs. Default is 'Higdon'.
+            or "Dirichlet" or "Neumann" for typical BCs. Default is "Higdon".
         abc_reference_freq : `str`, optional
             Reference frequency for sizing the hybrid absorbing layer.
-            Options: 'source' or 'boundary'. Default is 'source'.
+            Options: "source" or "boundary". Default is "source'.
         output_folder : `str`, optional
-            The folder where output data will be saved. Default is None.
+            The folder where output data will be saved. Default is `None`.
         comm : `object`, optional
-            An object representing the communication interface
-            for parallel processing. Default is None.
+            An object representing the communication interface for parallel processing.
+            Default is `None`.
 
         Returns
         -------

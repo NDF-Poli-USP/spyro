@@ -44,6 +44,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Real shot record.
     mesh: `Firedrake.Mesh`
         Mesh used in the simulation (2D or 3D).
+    mesh_parameters : `Python object`
+        Contains mesh parameters.
     mesh_x: `ufl.geometry.SpatialCoordinate`
         Symbolic coordinate x of the mesh object.
     mesh_y: `ufl.geometry.SpatialCoordinate`
@@ -79,6 +81,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Sets last solve as real shot record.
     set_solver_parameters()
         Sets new or default solver parameters.
+
+    Notes
+    -----
+    New attributes added to the wave object in mesh_parameters:
+    mesh_parameters.alpha : `float`
+        Ratio between the representative mesh dimensions.
+    mesh_parameters.diam_mesh : `ufl.geometry.CellDiameter`
+        Mesh cell diameters.
+    mesh_parameters.lmin : `float`
+        Minimum mesh size.
+    mesh_parameters.lmax : `float`
+        Maxmum mesh size.
+    mesh_parameters.tol : `float`
+        Tolerance for searching nodes in the mesh.
     """
 
     def __init__(self, dictionary=None, wave_type=WaveType.NONE, comm=None):
@@ -90,7 +106,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         dictionary : `dict`, optional
             A dictionary containing the input parameters for the Wave class.
             Default is None
-        wave_type : `WaveType`, optional
+        wave_type : `typing.WaveType`, optional
             The type of wave equation to solve. Default is `WaveType.NONE`
         comm : `object`, optional
             MPI communicator for parallel execution. Default is `None`.

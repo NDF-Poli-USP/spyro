@@ -1,3 +1,13 @@
+"""Unit tests for setting material properties in an Elastic Wave object.
+
+Tests includes the following types of material properties:
+    - Constant: A single constant value for the entire domain.
+    - Random: Random values within a specified range for the entire domain.
+    - Conditional: Values that depend on a condition based on the coordinates.
+    - Expression: Values defined by a mathematical expression based on the coordinates.
+    - Function: Values defined by a Firedrake function.
+"""
+
 from firedrake import (as_tensor, assemble, conditional,
                        ConvergenceError, dx, Function)
 from firedrake import exp as fire_exp
@@ -10,8 +20,7 @@ from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 
 
 def wave_dict(cell_type, domain_dimensions, final_time, dt):
-    '''
-    Create a dictionary with parameters for the model.
+    """Create a dictionary with parameters for the model.
 
     Parameters
     ----------
@@ -19,29 +28,26 @@ def wave_dict(cell_type, domain_dimensions, final_time, dt):
         Type of cell for the mesh. Options: "T" for triangle or tetrahedra,
         "Q" for quadrilateral or hexahedra.
     domain_dimensions : `list`
-        List containing the domain dimensions [length_z, length_x, length_y] in km
+        List containing the domain dimensions [length_z, length_x, length_y] in km.
     final_time : `float`
-        Final time of the simulation
+        Final time of the simulation.
     dt: `float`
-        Time step of the simulation
+        Time step of the simulation.
 
     Returns
     -------
     dictionary : `dict`
         Dictionary containing the parameters for the model.
-    '''
+    """
 
     dictionary = {}
     dictionary["options"] = {
         # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
         "cell_type": cell_type,
         "variant": "lumped",  # Options: lumped, equispaced or DG.
-        # Default is lumped "method":"MLT"
-        # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
-        # You can either specify a cell_type+variant or a method
-        # accepted_variants = ["lumped", "equispaced", "DG"]
         "degree": 3,  # p order p<=3 for 3D
         "dimension": 3,  # dimension
+        "analysis": "eikonal",  # Options: transient, modal or eikonal
     }
 
     # Number of cores for the shot. For simplicity, we keep things serial.
@@ -69,17 +75,14 @@ def wave_dict(cell_type, domain_dimensions, final_time, dt):
     dictionary["acquisition"] = {
         "source_locations": [(-length_z / 2., length_x / 2., length_y / 2.)],
         "frequency": 5.0,  # in Hz
-        "receiver_locations": [(-length_z, 0., 0.), (-length_z, length_x, 0.),
-                               (0., 0., 0), (0., length_x, 0.),
-                               (-length_z, 0., length_y), (-length_z, length_x, length_y),
-                               (0., 0., length_y), (0., length_x, length_y)]
-    }
-
-    # Simulate for 1.5 seconds.
-    dictionary["time_axis"] = {
-        "initial_time": 0.,  # Initial time for event
-        "final_time": final_time,    # Final time for event
-        "dt": dt,  # timestep size in seconds
+        "receiver_locations": [(-length_z, 0., 0.),
+                               (-length_z, length_x, 0.),
+                               (0., 0., 0),
+                               (0., length_x, 0.),
+                               (-length_z, 0., length_y),
+                               (-length_z, length_x, length_y),
+                               (0., 0., length_y),
+                               (0., length_x, length_y)]
     }
 
     return dictionary
@@ -87,8 +90,7 @@ def wave_dict(cell_type, domain_dimensions, final_time, dt):
 
 @fixture(scope="function")
 def wave_instance(cell_type):
-    '''
-    Create an instance of the isotropic wave solver.
+    """Create an instance of the isotropic wave solver.
 
     Parameters
     ----------
@@ -98,9 +100,9 @@ def wave_instance(cell_type):
 
     Returns
     -------
-    wave_obj : `wave.IsotropicWave`
-        An instance of the IsotropicWave class
-    '''
+    wave_obj : `elastic_wave.IsotropicWave`
+        An instance of the :class:`~spyro.solvers.elastic_wave.IsotropicWave`.
+    """
 
     # Domain dimensions
     domain_dimensions = [0.24, 0.56, 0.16]  # in km
@@ -131,8 +133,7 @@ def wave_instance(cell_type):
 
 @mark.parametrize("cell_type", ["T", "Q"])
 def test_constant_mat_prop(wave_instance, cell_type):
-    '''
-    Test to assign constant material properties to an instance of Wave.
+    """Test to assign constant material properties to an instance of Wave.
 
     Material properties:
         - vel_P: P-wave velocity [m/s]
@@ -143,7 +144,19 @@ def test_constant_mat_prop(wave_instance, cell_type):
         - deltaTh: Thomsen parameter delta
         - thetaTTI: Tilt angle in degrees
         - phiTTI: Azimuth angle in degrees (phi = 0: 2D case)
-    '''
+
+    Parameters
+    ----------
+    wave_instance : `elastic_wave.IsotropicWave`
+        An instance of the :class:`~spyro.solvers.elastic_wave.IsotropicWave`.
+    cell_type : `str`
+        Type of cell for the mesh. Options: "T" for triangle or tetrahedra,
+        "Q" for quadrilateral or hexahedra.
+
+    Returns
+    -------
+    None
+    """
 
     wave_obj = wave_instance
 
@@ -189,8 +202,7 @@ def test_constant_mat_prop(wave_instance, cell_type):
 
 @mark.parametrize("cell_type", ["T", "Q"])
 def test_random_mat_prop(wave_instance, cell_type):
-    '''
-    Test to assign random material properties to an instance of Wave.
+    """Test to assign random material properties to an instance of Wave.
 
     Material properties:
         - vel_P: P-wave velocity [m/s]
@@ -201,7 +213,19 @@ def test_random_mat_prop(wave_instance, cell_type):
         - deltaTh: Thomsen parameter delta
         - thetaTTI: Tilt angle in degrees
         - phiTTI: Azimuth angle in degrees (phi = 0: 2D case)
-    '''
+
+    Parameters
+    ----------
+    wave_instance : `elastic_wave.IsotropicWave`
+        An instance of the :class:`~spyro.solvers.elastic_wave.IsotropicWave`.
+    cell_type : `str`
+        Type of cell for the mesh. Options: "T" for triangle or tetrahedra,
+        "Q" for quadrilateral or hexahedra.
+
+    Returns
+    -------
+    None
+    """
 
     wave_obj = wave_instance
 
@@ -241,14 +265,12 @@ def test_random_mat_prop(wave_instance, cell_type):
 
 
 def numerical_values_cond(property_name, coords, below_thrs, above_thrs):
-    '''
-    Compute the expected numerical values for the conditional material
-    property based on the provided coordinates and property name.
+    """Compute expected numerical values for conditional material property.
 
     Parameters
     ----------
     property_name: `str`
-            Name of the material property to be se
+        Name of the material property to be set
     coords : `numpy.ndarray`
         Array of coordinates (z, x, y) for the mesh points
     below_thrs : `numpy.ndarray`
@@ -262,7 +284,7 @@ def numerical_values_cond(property_name, coords, below_thrs, above_thrs):
         Expected values for points below the threshold condition
     exp_above : `numpy.ndarray`
         Expected values for points above the threshold condition
-    '''
+    """
     z = coords[:, 0]
     x = coords[:, 1]
     y = coords[:, 2]
@@ -296,22 +318,20 @@ def numerical_values_cond(property_name, coords, below_thrs, above_thrs):
 
 
 def get_only_mesh_vertices(wave_obj):
-    '''
-    Get the coordinates of the mesh vertices and
-    the indices for the points in the mesh function.
+    """Get the mesh vertex coordinates and the point indices from the mesh function.
 
     Parameters
     ----------
-    wave_obj : `wave.IsotropicWave`
-        An instance of the IsotropicWave class
+    wave_obj : `elastic_wave.IsotropicWave`
+        An instance of the :class:`~spyro.solvers.elastic_wave.IsotropicWave`.
 
     Returns
     -------
     coords : `numpy.ndarray`
-        Array of coordinates (z, x, y) for the mesh vertices
+        Array of coordinates (z, x, y) for the mesh vertices.
     mask_pnt : `numpy.ndarray`
-        Array of indices in the function corresponding to the mesh vertices
-    '''
+        Array of indices in the function corresponding to the mesh vertices.
+    """
 
     mesh_f = Function(wave_obj.function_space).interpolate(wave_obj.mesh.coordinates)
     coords = wave_obj.mesh.coordinates.dat.data_with_halos
@@ -322,8 +342,7 @@ def get_only_mesh_vertices(wave_obj):
 
 @mark.parametrize("cell_type", ["T", "Q"])
 def test_conditional_mat_prop(wave_instance, cell_type):
-    '''
-    Test to assign conditional material properties to an instance of Wave.
+    """Test to assign conditional material properties to an instance of Wave.
 
     Material properties:
         - vel_P: P-wave velocity[m/s]
@@ -334,7 +353,19 @@ def test_conditional_mat_prop(wave_instance, cell_type):
         - deltaTh: Thomsen parameter delta
         - thetaTTI: Tilt angle in degrees
         - phiTTI: Azimuth angle in degrees(phi=0: 2D case)
-    '''
+
+    Parameters
+    ----------
+    wave_instance : `elastic_wave.IsotropicWave`
+        An instance of the :class:`~spyro.solvers.elastic_wave.IsotropicWave`.
+    cell_type : `str`
+        Type of cell for the mesh. Options: "T" for triangle or tetrahedra,
+        "Q" for quadrilateral or hexahedra.
+
+    Returns
+    -------
+    None
+    """
 
     wave_obj = wave_instance
 
@@ -418,22 +449,20 @@ def test_conditional_mat_prop(wave_instance, cell_type):
 
 
 def numerical_values_expr(property_name, coords):
-    '''
-    Compute the expected numerical values for the expression material
-    property based on the provided coordinates and property name.
+    """Compute expected numerical values for expression material property.
 
     Parameters
     ----------
     property_name: `str`
-            Name of the material property to be se
+        Name of the material property to be set.
     coords : `numpy.ndarray`
-        Array of coordinates (z, x, y) for the mesh vertices
+        Array of coordinates (z, x, y) for the mesh vertices.
 
     Returns
     -------
     exp_num : `numpy.ndarray`
-        Expected values for the expression material property
-    '''
+        Expected values for the expression material property.
+    """
     z = coords[:, 0]
     x = coords[:, 1]
     y = coords[:, 2]
@@ -462,8 +491,7 @@ def numerical_values_expr(property_name, coords):
 
 @mark.parametrize("cell_type", ["T", "Q"])
 def test_expression_mat_prop(wave_instance, cell_type):
-    '''
-    Test to assign expressions as material properties to an instance of Wave.
+    """Test to assign expressions as material properties to an instance of Wave.
 
     Material properties:
         - vel_P: P-wave velocity[m/s]
@@ -474,7 +502,19 @@ def test_expression_mat_prop(wave_instance, cell_type):
         - deltaTh: Thomsen parameter delta
         - thetaTTI: Tilt angle in degrees
         - phiTTI: Azimuth angle in degrees(phi=0: 2D case)
-    '''
+
+    Parameters
+    ----------
+    wave_instance : `elastic_wave.IsotropicWave`
+        An instance of the :class:`~spyro.solvers.elastic_wave.IsotropicWave`.
+    cell_type : `str`
+        Type of cell for the mesh. Options: "T" for triangle or tetrahedra,
+        "Q" for quadrilateral or hexahedra.
+
+    Returns
+    -------
+    None
+    """
 
     wave_obj = wave_instance
 
@@ -516,22 +556,20 @@ def test_expression_mat_prop(wave_instance, cell_type):
 
 
 def get_coords_DG0(wave_obj, coords):
-    '''
-    Compute the coordinates of the cell centroids for DG0 interpolation.
+    """ Compute the coordinates of the cell centroids for DG0 interpolation.
 
     Parameters
     ----------
-    wave_obj : `wave.IsotropicWave`
-        An instance of the IsotropicWave class
+    wave_obj : `elastic_wave.IsotropicWave`
+        An instance of the :class:`~spyro.solvers.elastic_wave.IsotropicWave`.
     coords : `numpy.ndarray`
-        Array of coordinates (z, x, y) for the mesh vertices
+        Array of coordinates (z, x, y) for the mesh vertices.
 
     Returns
     -------
     coords_DG0 : `numpy.ndarray`
-        Array of coordinates (z, x, y) for the cell centroids
-        for DG0 interpolation
-    '''
+        Array of coordinates (z, x, y) for the cell centroids for DG0 interpolation.
+    """
 
     coords_DG0 = coords[:]
     coords_DG0[:, 0] -= wave_obj.mesh_parameters.edge_length / 2.
@@ -544,14 +582,24 @@ def get_coords_DG0(wave_obj, coords):
 
 @mark.parametrize("cell_type", ["T", "Q"])
 def test_function_mat_prop(wave_instance, cell_type):
-    '''
-    Test to assign firedrake functione as material
-    properties to an instance of Wave.
+    """Test to assign firedrake functions as material properties to an instance of Wave.
 
     Material properties:
         - vel_P: P-wave velocity [m/s]
         - vel_S: S-wave velocity [m/s]
-    '''
+
+    Parameters
+    ----------
+    wave_instance : `elastic_wave.IsotropicWave`
+        An instance of the :class:`~spyro.solvers.elastic_wave.IsotropicWave`.
+    cell_type : `str`
+        Type of cell for the mesh. Options: "T" for triangle or tetrahedra,
+        "Q" for quadrilateral or hexahedra.
+
+    Returns
+    -------
+    None
+    """
 
     wave_obj = wave_instance
 
@@ -597,18 +645,28 @@ def test_function_mat_prop(wave_instance, cell_type):
 
 @mark.parametrize("cell_type", ["T", "Q"])
 def test_fromfile_mat_prop(wave_instance, cell_type):
-    '''
-    Test to assign firedrake functione as material
-    properties to an instance of Wave.
+    """Test to assign input files as material properties to an instance of Wave.
 
     Material properties:
         - vel_P: P-wave velocity [m/s]
         - vel_S: S-wave velocity [m/s]
-    '''
+
+    Parameters
+    ----------
+    wave_instance : `elastic_wave.IsotropicWave`
+        An instance of the :class:`~spyro.solvers.elastic_wave.IsotropicWave`.
+    cell_type : `str`
+        Type of cell for the mesh. Options: "T" for triangle or tetrahedra,
+        "Q" for quadrilateral or hexahedra.
+
+    Returns
+    -------
+    None
+    """
 
     wave_obj = wave_instance
 
-    print("\nTesting File Inputs as Material Properties", flush=True)
+    print("\nTesting Input Files as Material Properties", flush=True)
     vel_P = wave_obj.set_material_property(
         'vel_P', 'scalar', constant=1., output=True,
         foldername='/property_fields/from_file/')
@@ -636,12 +694,23 @@ def test_fromfile_mat_prop(wave_instance, cell_type):
 
 @mark.parametrize("cell_type", ["T", "Q"])
 def test_vector_mat_prop(wave_instance, cell_type):
-    '''
-    Test to assign vector material properties to an instance of Wave.
+    """Test to assign vector material properties to an instance of Wave.
 
     Material properties:
         - alphaT: Thermal expansion vector [ppm/°C]
-    '''
+
+    Parameters
+    ----------
+    wave_instance : `elastic_wave.IsotropicWave`
+        An instance of the :class:`~spyro.solvers.elastic_wave.IsotropicWave`.
+    cell_type : `str`
+        Type of cell for the mesh. Options: "T" for triangle or tetrahedra,
+        "Q" for quadrilateral or hexahedra.
+
+    Returns
+    -------
+    None
+    """
 
     wave_obj = wave_instance
     print("\nTesting Vector Material Properties", flush=True)
@@ -693,12 +762,23 @@ def test_vector_mat_prop(wave_instance, cell_type):
 
 @mark.parametrize("cell_type", ["T", "Q"])
 def test_tensor_mat_prop(wave_instance, cell_type):
-    '''
-    Test to assign tensor material properties to an instance of Wave.
+    """Test to assign tensor material properties to an instance of Wave.
 
     Material properties:
         - C: Elastic Tensor [GPa]
-    '''
+
+    Parameters
+    ----------
+    wave_instance : `elastic_wave.IsotropicWave`
+        An instance of the :class:`~spyro.solvers.elastic_wave.IsotropicWave`.
+    cell_type : `str`
+        Type of cell for the mesh. Options: "T" for triangle or tetrahedra,
+        "Q" for quadrilateral or hexahedra.
+
+    Returns
+    -------
+    None
+    """
 
     wave_obj = wave_instance
     print("\nTesting Tensor Material Properties", flush=True)

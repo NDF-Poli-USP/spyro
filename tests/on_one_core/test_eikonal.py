@@ -1,3 +1,9 @@
+"""Unit tests for the Nonlinear Eikonal analysis for 2D and 3D cases.
+
+The test compares the minimum Eikonal value obtained from the simulation with the
+theoretical value for different mesh sizes, element geometries, and finite element types.
+The results are expected to be within a specified tolerance of the theoretical value.
+"""
 from pytest import fail, mark, param
 from firedrake import conditional, ConvergenceError
 from firedrake import COMM_WORLD as comm
@@ -13,18 +19,18 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
     Parameters
     ----------
     element_geometry : `str`
-        Geometry of the finite element. 'T' for triangles or 'Q' for quadrilaterals
+        Geometry of the finite element. 'T' for triangles or 'Q' for quadrilaterals.
     dimension : `int`
-        Dimension of the problem. 2 for 2D and 3 for 3D
+        Dimension of the problem. 2 for 2D and 3 for 3D.
     degree_eikonal : `int`
-        Finite element order for the Eikonal equation. Should be 1 or 2
+        Finite element order for the Eikonal equation. Should be 1 or 2.
     element_type : `str`
-        Finite element type. 'consistent' or 'underintegrated'
+        Finite element type. 'consistent' or 'underintegrated'.
 
     Returns
     -------
     dictionary : `dict`
-        Dictionary containing the parameters for the model
+        Dictionary containing the parameters for the model.
     """
 
     dictionary = {}
@@ -63,8 +69,8 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
     # point of the mesh. We also specify to record the solution at the corners
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
-        "source_locations": ([(-0.5, 0.25)] if dimension == 2  # (0.5 * Lz, 0.25 * Lx)
-                             else [(-0.5, 0.25, 0.5)]),  # (0.5 * Lz, 0.25 * Lx, 0.5 * Ly)
+        "source_locations": ([(-length_z / 2., length_x / 4.)] if dimension == 2
+                             else [(-length_z / 2., length_x / 4., length_y / 2.)]),
         "frequency": 5.,  # in Hz
         "receiver_locations": ([(-length_z, 0.),
                                 (-length_z, length_x),
@@ -113,7 +119,7 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
     Returns
     -------
     min_eik : `float`
-        Minimum Eikonal value in miliseconds
+        Minimum Eikonal value in miliseconds.
     """
 
     # ============ MESH FEATURES ============
@@ -166,14 +172,18 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
 def test_eikonal(element_geometry, dimension, element_type):
     """Testing of eikonal for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
+    See Salas et al (2022): Hybrid absorbing scheme based on hyperelliptical
+    layers with non-reflecting boundary conditions in scalar wave equations.
+    doi: https://doi.org/10.1016/j.apm.2022.09.014
+
     Parameters
     ----------
     element_geometry : `str`
-        Type of finite element. 'T' for triangles or 'Q' for quadrilaterals
+        Type of finite element. 'T' for triangles or 'Q' for quadrilaterals.
     dimension : `int`
-        Dimension of the model (2 or 3)
+        Dimension of the model (2 or 3).
     element_type : `str`
-        Finite element type. 'consistent' or 'underintegrated'
+        Finite element type. 'consistent' or 'underintegrated'.
 
     Returns
     -------

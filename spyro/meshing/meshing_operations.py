@@ -11,18 +11,18 @@ class MeshOps():
     Attributes
     ----------
     comm : `object`
-        An object representing the communication interface
-        for parallel processing. Default is None
+        An object representing the communication interface for parallel processing.
+        Default is `None`
     dimension : `int`
-        Model dimension (2D or 3D). Default is 2D
+        Model dimension (2D or 3D). Default is 2D.
     domain_dim : `tuple`
         Domain dimensions: (length_z, length_x) for 2D
-        or (length_z, length_x, length_y) for 3D
+        or (length_z, length_x, length_y) for 3D.
     func_space_type, `str`
         Type of function space for the state variable.
-        Options: 'scalar' or 'vector'. Default is None
+        Options: 'scalar' or 'vector'. Default is `None`
     quadrilateral : bool
-        Flag to indicate whether to use quadrilateral/hexahedral elements
+        Flag to indicate whether to use quadrilateral/hexahedral elements.
 
     Methods
     -------
@@ -48,16 +48,16 @@ class MeshOps():
             Domain dimensions: (length_z, length_x) for 2D
             or (length_z, length_x, length_y) for 3D
         dimension : `int`, optional
-            Model dimension (2D or 3D). Default is 2D
+            Model dimension (2D or 3D). Default is 2D.
         quadrilateral : bool, optional
             Flag to indicate whether to use quadrilateral/hexahedral elements.
-            Default is False (triangular/tetrahedral elements)
+            Default is `False` (triangular/tetrahedral elements).
         func_space_type, `str`, optional
             Type of function space for the state variable.
-            Options: 'scalar' or 'vector'. Default is None
+            Options: 'scalar' or 'vector'. Default is `None`.
         comm : `object`, optional
-            An object representing the communication interface
-            for parallel processing. Default is None
+            An object representing the communication interface for parallel processing.
+            Default is `None`.
 
         Returns
         -------
@@ -85,16 +85,16 @@ class MeshOps():
         Parameters
         ----------
         mesh : `Firedrake.Mesh`
-            Current mesh
+            Current mesh.
 
         Returns
         -------
         mesh_z : `ufl.geometry.SpatialCoordinate`
-            Symbolic coordinate z of the mesh object
+            Symbolic coordinate z of the mesh object.
         mesh_x: `ufl.geometry.SpatialCoordinate`
-            Symbolic coordinate x of the mesh object
+            Symbolic coordinate x of the mesh object.
         mesh_y: `ufl.geometry.SpatialCoordinate`
-            Symbolic coordinate y of the mesh object
+            Symbolic coordinate y of the mesh object.
         """
         if self.dimension == 2:
             mesh_z, mesh_x = SpatialCoordinate(mesh)
@@ -110,22 +110,22 @@ class MeshOps():
         Parameters
         ----------
         mesh : `Firedrake.Mesh`
-            Current mesh
+            Current mesh.
         function_space : `FiredrakeFunctionSpace`
-            Function space for the projection of the mesh cell diameters
+            Function space for the projection of the mesh cell diameters.
 
         Returns
         -------
         alpha : `float`
-            Ratio between the representative mesh dimensions
+            Ratio between the representative mesh dimensions.
         diam_mesh : `ufl.geometry.CellDiameter`
-            Mesh cell diameters
+            Mesh cell diameters.
         lmin : `float`
-            Minimum mesh size
+            Minimum mesh size.
         lmax : `float`
-            Maxmum mesh size
+            Maxmum mesh size.
         tol : `float`
-            Tolerance for searching nodes in the mesh
+            Tolerance for searching nodes in the mesh.
         """
 
         # Mesh cell diameters
@@ -157,14 +157,14 @@ class MeshOps():
         Parameters
         ----------
         mesh : `Firedrake.Mesh`
-            Current mesh
+            Current mesh.
 
         Returns
         -------
         min_coordinates : `array`
-            Array containing the minimum coordinates in each dimension (z, x, y)
+            Array containing the minimum coordinates in each dimension (z, x, y).
         max_coordinates : `array`
-            Array containing the maximum coordinates in each dimension (z, x, y)
+            Array containing the maximum coordinates in each dimension (z, x, y).
         """
 
         coords = mesh.coordinates.dat.data_with_halos
@@ -179,9 +179,9 @@ class MeshOps():
         Parameters
         ----------
         mesh : `Firedrake.Mesh`
-            Current mesh
+            Current mesh.
         function_space : `FiredrakeFunctionSpace`
-            Function space to extract node positions
+            Function space to extract node positions.
         output_type : `str`, optional
             Output type for node positions. Options are "tuple" or "array".
             Default is "tuple".
@@ -189,13 +189,13 @@ class MeshOps():
         Returns
         -------
         node_positions : `tuple` or `array`
-            Node positions of the mesh
+            Node positions of the mesh.
             If output_type is "tuple":
-                - (z_data, x_data) for 2D
-                - (z_data, x_data, y_data) for 3D
+                - (z_data, x_data) for 2D.
+                - (z_data, x_data, y_data) for 3D.
             If output_type is "array":
-                - array of shape (num_nodes, 2) and coordinates (z, x) for 2D
-                - array of shape (num_nodes, 3) and coordinates (z, x, y) for 3D
+                - array of shape (num_nodes, 2) and coordinates (z, x) for 2D.
+                - array of shape (num_nodes, 3) and coordinates (z, x, y) for 3D.
         """
 
         # Interpolate the coordinates according to the function space
@@ -241,25 +241,25 @@ class MeshOps():
         Parameters
         ----------
         mesh : `Firedrake.Mesh`
-            Current mesh
+            Current mesh.
         function_space : `Firedrake.FunctionSpace`
-            Function space for the state variable
+            Function space for the state variable.
         boundaries : `tuple`
             Tuple containing the boundary boolean labels for applying absorbing BCs.
-            - (absorb_top, absorb_bottom, absorb_right, absorb_left) for 2D
+            - (absorb_top, absorb_bottom, absorb_right, absorb_left) for 2D.
             - (absorb_top, absorb_bottom, absorb_right,
-                absorb_left, absorb_front, absorb_back) for 3D
+                absorb_left, absorb_front, absorb_back) for 3D.
         box_domain : `bool`, optional
             Flag to indicate whether the domain is a box (Rectangle or Parallelepiped).
-            Default is True
+            Default is `True`.
         get_boundary_node_ids : `bool`, optional
             if True, return the boundary node ids according to the boundary map.
-            Default is True
+            Default is `True`.
 
         Returns
         -------
         boundary_ids_map: `dict`
-            Mapping of boundary IDs for applying absorbing boundary conditions
+            Mapping of boundary IDs for applying absorbing boundary conditions.
         boundary_nodes_ids: `dict`
             IDs of the boundary nodes according to the function space provide and their
             status to apply absorbing boundary conditions. Structure is a `tuple`:
