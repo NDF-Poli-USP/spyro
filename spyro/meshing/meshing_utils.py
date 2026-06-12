@@ -731,3 +731,42 @@ def align_water_columns_to_interface_x(points_2d, water_surface_nodes, interface
                     points_2d[idx, 0] = spline_x
                     snapped += 1
     return points_2d, snapped, n_cols
+
+
+def intersect(x0, z0, dx, dz, xc, zc, a_val, b_val, hyper_n):
+    def f(s):
+        x, z = x0 + s * dx, z0 + s * dz
+        return (abs(x - xc) / a_val)**hyper_n + (abs(z - zc) / b_val)**hyper_n - 1.0
+    s_low, s_high = 0.0, 1.0
+    while f(s_high) < 0:
+        s_high *= 2.0
+    for _ in range(100):
+        s_mid = (s_low + s_high) / 2.0
+        if f(s_mid) > 0:
+            s_high = s_mid
+        else:
+            s_low = s_mid
+    return x0 + s_mid * dx, z0 + s_mid * dz
+
+
+def get_theta(x, z, xc, zc, a_val, b_val, hyper_n):
+    vx, vz = (x - xc) / a_val, (z - zc) / b_val
+    vx = vx if abs(vx) > 1e-12 else 0.0
+    vz = vz if abs(vz) > 1e-12 else 0.0
+    return np.arctan2(np.sign(vz) * np.abs(vz)**(hyper_n / 2.0), np.sign(vx) * np.abs(vx)**(hyper_n / 2.0))
+
+
+def make_arc(p1_tag, p2_tag, x1, z1, x2, z2, xc, zc, a_val, b_val, hyper_n, num_pts=25):
+    t1, t2 = get_theta(x1, z1, xc, zc, a_val, b_val, hyper_n), get_theta(x2, z2, xc, zc, a_val, b_val, hyper_n)
+    if t2 - t1 > np.pi:
+        t1 += 2 * np.pi
+    elif t1 - t2 > np.pi:
+        t2 += 2 * np.pi
+    pts = [p1_tag]
+    for t in np.linspace(t1, t2, num_pts)[1:-1]:
+        cos_t, sin_t = np.cos(t), np.sin(t)
+        x = xc + a_val * np.sign(cos_t) * np.abs(cos_t)**(2.0 / hyper_n)
+        z = zc + b_val * np.sign(sin_t) * np.abs(sin_t)**(2.0 / hyper_n)
+        pts.append(gmsh.model.occ.addPoint(x, z, 0.0))
+    pts.append(p2_tag)
+    return gmsh.model.occ.addSpline(pts)

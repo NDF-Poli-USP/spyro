@@ -2,7 +2,7 @@ import numpy as np
 from .meshing_winslow2d import winslow_smooth_numba, winslow_smooth_vectorized, winslow_smooth_default
 from .meshing_utils import (
     generate_water_profile_from_segy, get_surface_entities_by_physical_name, get_nodes_on_surface_entities,
-    get_water_interface_node_indices, align_water_columns_to_interface_x
+    get_water_interface_node_indices, align_water_columns_to_interface_x, intersect, make_arc
 )
 
 
@@ -113,20 +113,6 @@ def build_gmsh_geometry_and_groups(
             gmsh.model.addPhysicalGroup(2, [surf_pad_tr, surf_pad_mr, surf_pad_tl, surf_pad_ml, surf_pad_bl, surf_pad_bc, surf_pad_br], name="Padding")
 
         if padding_type == "hyperelliptical":
-            def intersect(x0, z0, dx, dz):
-                def f(s):
-                    x, z = x0 + s * dx, z0 + s * dz
-                    return (abs(x - xc) / a_val)**hyper_n + (abs(z - zc) / b_val)**hyper_n - 1.0
-                s_low, s_high = 0.0, 1.0
-                while f(s_high) < 0:
-                    s_high *= 2.0
-                for _ in range(100):
-                    s_mid = (s_low + s_high) / 2.0
-                    if f(s_mid) > 0:
-                        s_high = s_mid
-                    else:
-                        s_low = s_mid
-                return x0 + s_mid * dx, z0 + s_mid * dz
 
             pt_rock_bl = gmsh.model.occ.addPoint(0.0, depth_z, 0.0)
             pt_rock_br = gmsh.model.occ.addPoint(length_x, depth_z, 0.0)
@@ -138,16 +124,16 @@ def build_gmsh_geometry_and_groups(
             pt_bot_midL = gmsh.model.occ.addPoint(x_mid_L, depth_z, 0.0)
             pt_bot_midR = gmsh.model.occ.addPoint(x_mid_R, depth_z, 0.0)
 
-            x_O_TL, z_O_TL = intersect(0.0, 0.0, -1, 0)
-            x_O_WL, z_O_WL = intersect(0.0, z_water_L, -1, 0)
-            x_O_ML, z_O_ML = intersect(0.0, z_mid_L, -1, 0)
-            x_O_BL_45, z_O_BL_45 = intersect(0.0, depth_z, -1, -1)
-            x_O_BML, z_O_BML = intersect(x_mid_L, depth_z, 0, -1)
-            x_O_BMR, z_O_BMR = intersect(x_mid_R, depth_z, 0, -1)
-            x_O_BR_45, z_O_BR_45 = intersect(length_x, depth_z, 1, -1)
-            x_O_MR, z_O_MR = intersect(length_x, z_mid_R, 1, 0)
-            x_O_WR, z_O_WR = intersect(length_x, z_water_R, 1, 0)
-            x_O_TR, z_O_TR = intersect(length_x, 0.0, 1, 0)
+            x_O_TL, z_O_TL = intersect(0.0, 0.0, -1, 0, xc, zc, a_val, b_val, hyper_n)
+            x_O_WL, z_O_WL = intersect(0.0, z_water_L, -1, 0, xc, zc, a_val, b_val, hyper_n)
+            x_O_ML, z_O_ML = intersect(0.0, z_mid_L, -1, 0, xc, zc, a_val, b_val, hyper_n)
+            x_O_BL_45, z_O_BL_45 = intersect(0.0, depth_z, -1, -1, xc, zc, a_val, b_val, hyper_n)
+            x_O_BML, z_O_BML = intersect(x_mid_L, depth_z, 0, -1, xc, zc, a_val, b_val, hyper_n)
+            x_O_BMR, z_O_BMR = intersect(x_mid_R, depth_z, 0, -1, xc, zc, a_val, b_val, hyper_n)
+            x_O_BR_45, z_O_BR_45 = intersect(length_x, depth_z, 1, -1, xc, zc, a_val, b_val, hyper_n)
+            x_O_MR, z_O_MR = intersect(length_x, z_mid_R, 1, 0, xc, zc, a_val, b_val, hyper_n)
+            x_O_WR, z_O_WR = intersect(length_x, z_water_R, 1, 0, xc, zc, a_val, b_val, hyper_n)
+            x_O_TR, z_O_TR = intersect(length_x, 0.0, 1, 0, xc, zc, a_val, b_val, hyper_n)
 
             pt_O_TL = gmsh.model.occ.addPoint(x_O_TL, z_O_TL, 0.0)
             pt_O_WL = gmsh.model.occ.addPoint(x_O_WL, z_O_WL, 0.0)
@@ -179,36 +165,15 @@ def build_gmsh_geometry_and_groups(
             ray_WR = gmsh.model.occ.addLine(pB[-1], pt_O_WR)
             ray_TR = gmsh.model.occ.addLine(pt_top_right, pt_O_TR)
 
-            def make_arc(p1_tag, p2_tag, x1, z1, x2, z2, num_pts=25):
-                def get_theta(x, z):
-                    vx, vz = (x - xc) / a_val, (z - zc) / b_val
-                    vx = vx if abs(vx) > 1e-12 else 0.0
-                    vz = vz if abs(vz) > 1e-12 else 0.0
-                    return np.arctan2(np.sign(vz) * np.abs(vz)**(hyper_n / 2.0),
-                                      np.sign(vx) * np.abs(vx)**(hyper_n / 2.0))
-                t1, t2 = get_theta(x1, z1), get_theta(x2, z2)
-                if t2 - t1 > np.pi:
-                    t1 += 2 * np.pi
-                elif t1 - t2 > np.pi:
-                    t2 += 2 * np.pi
-                pts = [p1_tag]
-                for t in np.linspace(t1, t2, num_pts)[1:-1]:
-                    cos_t, sin_t = np.cos(t), np.sin(t)
-                    x = xc + a_val * np.sign(cos_t) * np.abs(cos_t)**(2.0 / hyper_n)
-                    z = zc + b_val * np.sign(sin_t) * np.abs(sin_t)**(2.0 / hyper_n)
-                    pts.append(gmsh.model.occ.addPoint(x, z, 0.0))
-                pts.append(p2_tag)
-                return gmsh.model.occ.addSpline(pts)
-
-            arc_TL_WL = make_arc(pt_O_TL, pt_O_WL, x_O_TL, z_O_TL, x_O_WL, z_O_WL)
-            arc_WL_ML = make_arc(pt_O_WL, pt_O_ML, x_O_WL, z_O_WL, x_O_ML, z_O_ML)
-            arc_ML_BL45 = make_arc(pt_O_ML, pt_O_BL_45, x_O_ML, z_O_ML, x_O_BL_45, z_O_BL_45)
-            arc_BL45_BML = make_arc(pt_O_BL_45, pt_O_BML, x_O_BL_45, z_O_BL_45, x_O_BML, z_O_BML)
-            arc_BML_BMR = make_arc(pt_O_BML, pt_O_BMR, x_O_BML, z_O_BML, x_O_BMR, z_O_BMR)
-            arc_BMR_BR45 = make_arc(pt_O_BMR, pt_O_BR_45, x_O_BMR, z_O_BMR, x_O_BR_45, z_O_BR_45)
-            arc_BR45_MR = make_arc(pt_O_BR_45, pt_O_MR, x_O_BR_45, z_O_BR_45, x_O_MR, z_O_MR)
-            arc_MR_WR = make_arc(pt_O_MR, pt_O_WR, x_O_MR, z_O_MR, x_O_WR, z_O_WR)
-            arc_WR_TR = make_arc(pt_O_WR, pt_O_TR, x_O_WR, z_O_WR, x_O_TR, z_O_TR)
+            arc_TL_WL = make_arc(pt_O_TL, pt_O_WL, x_O_TL, z_O_TL, x_O_WL, z_O_WL, xc, zc, a_val, b_val, hyper_n)
+            arc_WL_ML = make_arc(pt_O_WL, pt_O_ML, x_O_WL, z_O_WL, x_O_ML, z_O_ML, xc, zc, a_val, b_val, hyper_n)
+            arc_ML_BL45 = make_arc(pt_O_ML, pt_O_BL_45, x_O_ML, z_O_ML, x_O_BL_45, z_O_BL_45, xc, zc, a_val, b_val, hyper_n)
+            arc_BL45_BML = make_arc(pt_O_BL_45, pt_O_BML, x_O_BL_45, z_O_BL_45, x_O_BML, z_O_BML, xc, zc, a_val, b_val, hyper_n)
+            arc_BML_BMR = make_arc(pt_O_BML, pt_O_BMR, x_O_BML, z_O_BML, x_O_BMR, z_O_BMR, xc, zc, a_val, b_val, hyper_n)
+            arc_BMR_BR45 = make_arc(pt_O_BMR, pt_O_BR_45, x_O_BMR, z_O_BMR, x_O_BR_45, z_O_BR_45, xc, zc, a_val, b_val, hyper_n)
+            arc_BR45_MR = make_arc(pt_O_BR_45, pt_O_MR, x_O_BR_45, z_O_BR_45, x_O_MR, z_O_MR, xc, zc, a_val, b_val, hyper_n)
+            arc_MR_WR = make_arc(pt_O_MR, pt_O_WR, x_O_MR, z_O_MR, x_O_WR, z_O_WR, xc, zc, a_val, b_val, hyper_n)
+            arc_WR_TR = make_arc(pt_O_WR, pt_O_TR, x_O_WR, z_O_WR, x_O_TR, z_O_TR, xc, zc, a_val, b_val, hyper_n)
 
             surf_rock = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([bottom_curve, rock_R_upper, rock_R_lower, rock_B_right, rock_B_mid, rock_B_left, rock_L_lower, rock_L_upper])])
             surf_pad_TL = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([line_left, ray_WL, -arc_TL_WL, -ray_TL])])
@@ -336,20 +301,6 @@ def build_gmsh_geometry_and_groups(
             gmsh.model.addPhysicalGroup(2, [surf_pad_left, surf_pad_bl, surf_pad_bot, surf_pad_br, surf_pad_right], name="Padding")
 
         if padding_type == "hyperelliptical":
-            def intersect(x0, z0, dx, dz):
-                def f(s):
-                    x, z = x0 + s * dx, z0 + s * dz
-                    return (abs(x - xc) / a_val)**hyper_n + (abs(z - zc) / b_val)**hyper_n - 1.0
-                s_low, s_high = 0.0, 1.0
-                while f(s_high) < 0:
-                    s_high *= 2.0
-                for _ in range(100):
-                    s_mid = (s_low + s_high) / 2.0
-                    if f(s_mid) > 0:
-                        s_high = s_mid
-                    else:
-                        s_low = s_mid
-                return x0 + s_mid * dx, z0 + s_mid * dz
 
             pt_tl = gmsh.model.occ.addPoint(0.0, 0.0, 0.0)
             pt_tr = gmsh.model.occ.addPoint(length_x, 0.0, 0.0)
@@ -360,12 +311,12 @@ def build_gmsh_geometry_and_groups(
             pt_bot_midL = gmsh.model.occ.addPoint(x_mid_L, depth_z, 0.0)
             pt_bot_midR = gmsh.model.occ.addPoint(x_mid_R, depth_z, 0.0)
 
-            x_O_TL, z_O_TL = intersect(0.0, 0.0, -1, 0)
-            x_O_BL, z_O_BL = intersect(0.0, depth_z, -1, -1)
-            x_O_BML, z_O_BML = intersect(x_mid_L, depth_z, 0, -1)
-            x_O_BMR, z_O_BMR = intersect(x_mid_R, depth_z, 0, -1)
-            x_O_BR, z_O_BR = intersect(length_x, depth_z, 1, -1)
-            x_O_TR, z_O_TR = intersect(length_x, 0.0, 1, 0)
+            x_O_TL, z_O_TL = intersect(0.0, 0.0, -1, 0, xc, zc, a_val, b_val, hyper_n)
+            x_O_BL, z_O_BL = intersect(0.0, depth_z, -1, -1, xc, zc, a_val, b_val, hyper_n)
+            x_O_BML, z_O_BML = intersect(x_mid_L, depth_z, 0, -1, xc, zc, a_val, b_val, hyper_n)
+            x_O_BMR, z_O_BMR = intersect(x_mid_R, depth_z, 0, -1, xc, zc, a_val, b_val, hyper_n)
+            x_O_BR, z_O_BR = intersect(length_x, depth_z, 1, -1, xc, zc, a_val, b_val, hyper_n)
+            x_O_TR, z_O_TR = intersect(length_x, 0.0, 1, 0, xc, zc, a_val, b_val, hyper_n)
 
             pt_O_TL = gmsh.model.occ.addPoint(x_O_TL, z_O_TL, 0.0)
             pt_O_BL = gmsh.model.occ.addPoint(x_O_BL, z_O_BL, 0.0)
@@ -388,32 +339,11 @@ def build_gmsh_geometry_and_groups(
             ray_BR = gmsh.model.occ.addLine(pt_br, pt_O_BR)
             ray_TR = gmsh.model.occ.addLine(pt_tr, pt_O_TR)
 
-            def make_arc(p1_tag, p2_tag, x1, z1, x2, z2, num_pts=25):
-                def get_theta(x, z):
-                    vx, vz = (x - xc) / a_val, (z - zc) / b_val
-                    vx = vx if abs(vx) > 1e-12 else 0.0
-                    vz = vz if abs(vz) > 1e-12 else 0.0
-                    return np.arctan2(np.sign(vz) * np.abs(vz)**(hyper_n / 2.0),
-                                      np.sign(vx) * np.abs(vx)**(hyper_n / 2.0))
-                t1, t2 = get_theta(x1, z1), get_theta(x2, z2)
-                if t2 - t1 > np.pi:
-                    t1 += 2 * np.pi
-                elif t1 - t2 > np.pi:
-                    t2 += 2 * np.pi
-                pts = [p1_tag]
-                for t in np.linspace(t1, t2, num_pts)[1:-1]:
-                    cos_t, sin_t = np.cos(t), np.sin(t)
-                    x = xc + a_val * np.sign(cos_t) * np.abs(cos_t)**(2.0 / hyper_n)
-                    z = zc + b_val * np.sign(sin_t) * np.abs(sin_t)**(2.0 / hyper_n)
-                    pts.append(gmsh.model.occ.addPoint(x, z, 0.0))
-                pts.append(p2_tag)
-                return gmsh.model.occ.addSpline(pts)
-
-            arc_TL_BL = make_arc(pt_O_TL, pt_O_BL, x_O_TL, z_O_TL, x_O_BL, z_O_BL)
-            arc_BL_BML = make_arc(pt_O_BL, pt_O_BML, x_O_BL, z_O_BL, x_O_BML, z_O_BML)
-            arc_BML_BMR = make_arc(pt_O_BML, pt_O_BMR, x_O_BML, z_O_BML, x_O_BMR, z_O_BMR)
-            arc_BMR_BR = make_arc(pt_O_BMR, pt_O_BR, x_O_BMR, z_O_BMR, x_O_BR, z_O_BR)
-            arc_BR_TR = make_arc(pt_O_BR, pt_O_TR, x_O_BR, z_O_BR, x_O_TR, z_O_TR)
+            arc_TL_BL = make_arc(pt_O_TL, pt_O_BL, x_O_TL, z_O_TL, x_O_BL, z_O_BL, xc, zc, a_val, b_val, hyper_n)
+            arc_BL_BML = make_arc(pt_O_BL, pt_O_BML, x_O_BL, z_O_BL, x_O_BML, z_O_BML, xc, zc, a_val, b_val, hyper_n)
+            arc_BML_BMR = make_arc(pt_O_BML, pt_O_BMR, x_O_BML, z_O_BML, x_O_BMR, z_O_BMR, xc, zc, a_val, b_val, hyper_n)
+            arc_BMR_BR = make_arc(pt_O_BMR, pt_O_BR, x_O_BMR, z_O_BMR, x_O_BR, z_O_BR, xc, zc, a_val, b_val, hyper_n)
+            arc_BR_TR = make_arc(pt_O_BR, pt_O_TR, x_O_BR, z_O_BR, x_O_TR, z_O_TR, xc, zc, a_val, b_val, hyper_n)
 
             surf_rock = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([line_top, line_right, line_bot_right, line_bot_mid, line_bot_left, line_left])])
             surf_pad_left = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([ray_BL, -arc_TL_BL, -ray_TL, -line_left])])

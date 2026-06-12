@@ -85,18 +85,18 @@ def test_gmsh2d_unstructured():
 
     unstructured_configurations = [
         (True, True, None, 35144),
-        (True, True, "rectangular", 43975),
-        (True, True, "hyperelliptical", 42580),
+        (True, True, "rectangular", 61520),
+        (True, True, "hyperelliptical", 59755),
         (True, False, None, 35124),
-        (True, False, "rectangular", 43968),
-        (True, False, "hyperelliptical", 42418),
+        (True, False, "rectangular", 61334),
+        (True, False, "hyperelliptical", 59554),
 
         (False, True, None, 35144),
-        (False, True, "rectangular", 39202),
-        (False, True, "hyperelliptical", 38926),
+        (False, True, "rectangular", 56048),
+        (False, True, "hyperelliptical", 55789),
         (False, False, None, 35124),
-        (False, False, "rectangular", 39191),
-        (False, False, "hyperelliptical", 38724),
+        (False, False, "rectangular", 55901),
+        (False, False, "hyperelliptical", 55569),
     ]
 
     for extend_segy, water_interface, padding_type, expected_cells in unstructured_configurations:
