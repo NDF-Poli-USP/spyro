@@ -445,7 +445,7 @@ class ABCLayer(NRBC):
 
         if self.abc_reference_freq == 'source':  # Initial guess
 
-            # Theorical central Ricker source frequency
+            # Theoretical central Ricker source frequency
             self.freq_ref = self.frequency
 
         elif self.abc_reference_freq == 'boundary':
