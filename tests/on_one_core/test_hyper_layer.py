@@ -66,7 +66,7 @@ def test_init_1_n_hyp_raises_error():
 
 def test_init_n_type_raises_error():
     # Test that passing None raises a TypeError
-    with raises(ValueError, match=f"Invalid n_type: '{None}'."):
+    with raises(TypeError, match=f"'n_type' must be HyperLayerDegreeType or str."):
         HyperLayer((1., 1.), n_type=None)
 
 
