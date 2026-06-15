@@ -2,7 +2,7 @@
 # import numpy as np
 from ..abc.abc_layer import ABCLayer
 from ..utils.error_management import value_parameter_error
-from ..utils.typing import LayerShapeType
+from ..utils.typing import LayerShapeType, LayerSizeRefFrequency
 
 # Work from Ruben Andres Salas and Alexandre Olender
 # non-split non-convolutional PML formulation
@@ -51,7 +51,8 @@ class PMLLayer(ABCLayer):
 
     def __init__(self, domain_dim, frequency, f_Nyquist, dimension=2,
                  quadrilateral=False, func_space_type=None, bc_boundary_pml="Higdon",
-                 abc_reference_freq="source", output_folder=None, comm=None):
+                 abc_reference_freq=LayerSizeRefFrequency.SOURCE,
+                 output_folder=None, comm=None):
         """
         Initialize the PML class.
 
@@ -76,9 +77,10 @@ class PMLLayer(ABCLayer):
             Type of boundary condition to apply on the PML boundaries.
             Options are 'Higdon' or 'Sommerfeld for Non-Reflecting BCs,
             or "Dirichlet" or "Neumann" for typical BCs. Default is "Higdon".
-        abc_reference_freq : `str`, optional
-            Reference frequency for sizing the hybrid absorbing layer.
-            Options: "source" or "boundary". Default is "source'.
+        abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
+            Reference frequency for sizing the absorbing layer.
+            Options: 'LayerSizeRefFrequency.SOURCE' or 'LayerSizeRefFrequency.BOUNDARY'.
+            Default is 'LayerSizeRefFrequency.SOURCE'.
         output_folder : `str`, optional
             The folder where output data will be saved. Default is `None`.
         comm : `object`, optional

@@ -15,7 +15,7 @@ from ..plots.plots_habc import plot_function_layer_size
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
 from ..utils.error_management import enum_parameter_error, value_parameter_error
 from ..utils.freq_tools import freq_response
-from ..utils.typing import LayerShapeType
+from ..utils.typing import HyperLayerDegreeType, LayerShapeType, LayerSizeRefFrequency
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -31,25 +31,26 @@ class ABCLayer(NRBC):
 
     Attributes
     ----------
-    abc_boundary_layer_shape : `string`
-        Shape type of pad layer. Options: 'rectangular' or 'hypershape'.
-        Default is 'rectangular'
+    abc_boundary_layer_shape : `typing.LayerShapeType`, optional
+        Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
+        `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
     abc_boundary_layer_type : `str`
         Type of the boundary layer. Options: 'hybrid' or 'PML'.
         Default is 'hybrid'. Option 'hybrid' is based on paper of Salas et al. (2022).
         doi: https://doi.org/10.1016/j.apm.2022.09.014
     abc_pad_length : `float`
         Size of the absorbing layer
-    abc_reference_freq : `str`
-        Reference frequency for sizing the hybrid absorbing layer.
-        Options: 'source' or 'boundary'. Default is 'source'
+    abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
+        Reference frequency for sizing the absorbing layer.
+        Options: 'LayerSizeRefFrequency.SOURCE' or 'LayerSizeRefFrequency.BOUNDARY'.
+        Default is 'LayerSizeRefFrequency.SOURCE'.
     a_par : `float`
         Adimensional propagation speed parameter (a = z / f).
         "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
     case_abc : `str`
         Label for the output files that includes the layer shape
-        ('REC', HNX.X) and the reference frequency
-        ('SOU' or 'BND'). Example: 'REC_SOU' or 'REC_BND'
+        ("REC", HNX.X) and the reference frequency
+        ('SOU' or 'BND'). Example: "REC_SOU" or "REC_BND"
     crit_source : `tuple`
        Critical source coordinates
     d_norm : `float`
@@ -133,8 +134,9 @@ class ABCLayer(NRBC):
                  quadrilateral=False, func_space_type=None,
                  abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
                  abc_boundary_layer_type="hybrid",
-                 abc_reference_freq="source", abc_degree_type="real",
-                 abc_deg_layer=None, output_folder=None, comm=None):
+                 abc_reference_freq=LayerSizeRefFrequency.SOURCE,
+                 abc_degree_type=HyperLayerDegreeType.REAL, abc_deg_layer=None,
+                 output_folder=None, comm=None):
         """Initialize the ABCLayer class.
 
         Parameters
@@ -161,12 +163,13 @@ class ABCLayer(NRBC):
             Type of the boundary layer. Options: 'hybrid' or 'PML'.
             Default is 'hybrid'. Option 'hybrid' is based on paper of Salas et al. (2022).
             doi: https://doi.org/10.1016/j.apm.2022.09.014
-        abc_reference_freq : `str`, optional
-            Reference frequency for sizing the hybrid absorbing layer.
-            Options: 'source' or 'boundary'. Default is 'source'.
-        abc_degree_type : `str`, optional
-            Type of the hypereshape degree. Options: 'real' or 'integer'.
-            Default is 'real'
+        abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
+            Reference frequency for sizing the absorbing layer.
+            Options: 'LayerSizeRefFrequency.SOURCE' or 'LayerSizeRefFrequency.BOUNDARY'.
+            Default is 'LayerSizeRefFrequency.SOURCE'.
+        abc_degree_type : `typing.HyperLayerDegreeType`, optional
+            Type of the hypereshape degree. Options: 'HyperLayerDegreeType.REAL' or
+            'HyperLayerDegreeType.INTEGER'. Default is 'HyperLayerDegreeType.REAL'.
         abc_deg_layer : `int` or `float` or `None`, optional
             Hypershape degree. For hypershape layers, the degree must be greater than or
             equal to 2. `None` is used only for rectangular layers. Default is `None`.
@@ -197,16 +200,8 @@ class ABCLayer(NRBC):
             value_parameter_error(
                 'abc_boundary_layer_type', abc_boundary_layer_type, ["hybrid", "PML"])
 
-        if abc_reference_freq not in ['boundary', 'source']:
-            value_parameter_error(
-                'abc_reference_freq', abc_reference_freq, ['boundary', 'source'])
-
         if abc_deg_layer is not None and abc_deg_layer < 2.:
             raise ValueError(f"abc_deg_layer must be >= 2, got {abc_deg_layer}.")
-
-        if abc_degree_type not in ['real', 'integer']:
-            value_parameter_error(
-                'abc_degree_type', abc_degree_type, ['real', 'integer'])
 
         if output_folder is not None and not isinstance(output_folder, str):
             raise TypeError("output_folder must be a string, "
@@ -231,12 +226,15 @@ class ABCLayer(NRBC):
         self.func_space_type = func_space_type
 
         # ABC layer parameters
+        self.abc_boundary_layer_type = abc_boundary_layer_type
         self.abc_boundary_layer_shape = enum_parameter_error('abc_boundary_layer_shape',
                                                              abc_boundary_layer_shape,
                                                              LayerShapeType)
-        self.abc_boundary_layer_type = abc_boundary_layer_type
-        self.abc_reference_freq = abc_reference_freq
-        self.abc_degree_type = abc_degree_type
+        self.abc_reference_freq = enum_parameter_error('abc_reference_freq',
+                                                       abc_reference_freq,
+                                                       LayerSizeRefFrequency)
+        self.abc_degree_type = enum_parameter_error('abc_degree_type', abc_degree_type,
+                                                    HyperLayerDegreeType)
 
         # Layer degree
         if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
@@ -332,10 +330,10 @@ class ABCLayer(NRBC):
     def identify_abc_layer_case(self):
         """Generate an identifier for the current case study of the ABC scheme.
 
-        The identifier includes the layer shape ('REC' for rectangular layers or 'HN'
+        The identifier includes the layer shape ("REC" for rectangular layers or "HN"
         followed by the degree for hypershape layers) and the reference frequency for
         sizing the absorbing layer ('SOU': source frequency or 'BND': boundary frequency).
-        Examples: 'REC_SOU', 'REC_BND', 'HN2.4_SOU' or 'HN2.4_BND'.
+        Examples: "REC_SOU", "REC_BND", "HN2.4_SOU" or "HN2.4_BND".
 
         Parameters
         ----------
@@ -345,20 +343,23 @@ class ABCLayer(NRBC):
         -------
         case_abc : `str`
             Label for the output files that includes the layer shape and degree for
-            hypershape layers ('REC', HNX.Y with X.Y as the hypershape degree with one
+            hypershape layers ("REC", "HNX.Y" with X.Y as the hypershape degree with one
             decimal place precision) and the reference frequency ('SOU' or 'BND').
-            Examples: 'REC_SOU', 'REC_BND', 'HN2.4_SOU' or 'HN2.4_BND'.
+            Examples: "REC_SOU", "REC_BND", "HN2.4_SOU" or "HN2.4_BND".
         """
 
         # Labeling for the layer shape
         if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
-            case_abc = 'REC'
+            case_abc = "REC"
 
         elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-            case_abc = 'HN' + f"{self.abc_deg_layer:.1f}"
+            case_abc = "HN" + f"{self.abc_deg_layer:.1f}"
 
         # Labeling for the reference frequency for the absorbing layer
-        case_abc += "_SOU" if self.abc_reference_freq == 'source' else "_BND"
+        if self.abc_reference_freq == LayerSizeRefFrequency.SOURCE:
+            case_abc += "_SOU"
+        elif self.abc_reference_freq == LayerSizeRefFrequency.BOUNDARY:
+            case_abc += "_BND"
 
         # Printing layer info on screen
         layer_str = self.formatting_abc_layer_type("\n{} Layer Shape: ") + \
@@ -443,12 +444,12 @@ class ABCLayer(NRBC):
 
         pprint("\nDetermining Reference Frequency", comm=self.comm)
 
-        if self.abc_reference_freq == 'source':  # Initial guess
+        if self.abc_reference_freq == LayerSizeRefFrequency.SOURCE:
 
-            # Theoretical central Ricker source frequency
+            # Theoretical central Ricker source frequency (it can be a initial guess)
             self.freq_ref = self.frequency
 
-        elif self.abc_reference_freq == 'boundary':
+        elif self.abc_reference_freq == LayerSizeRefFrequency.BOUNDARY:
 
             # Reference frequency of the wave at the boundary
             self.freq_ref = inf
@@ -678,7 +679,7 @@ class ABCLayer(NRBC):
             outfile = VTKFile(pth_mesh)
             outfile.write(Wave.mesh)
 
-    def velocity_abc(self, Wave, inf_model=False, method='point_cloud', save_file=True):
+    def velocity_abc(self, Wave, inf_model=False, method="point_cloud", save_file=True):
         """Set the velocity profile for the model with absorbing layer.
 
         Parameters
@@ -690,7 +691,7 @@ class ABCLayer(NRBC):
             model (Model with "infinite" dimensions). Default is `False`.
         method : `str`, optional
             Method to extend the velocity profile. Options:
-            'point_cloud' or 'nearest_point'. Default is 'point_cloud'.
+            "point_cloud" or "nearest_point". Default is "point_cloud".
         save_file : `bool`, optional
             If `True`, save the velocity model with absorbing layer in a .pvd file.
             Default is `True`.
@@ -717,12 +718,12 @@ class ABCLayer(NRBC):
         Pts approach: 33.234 31.697 31.598 = 32.176
         Lst approach: 60.101 60.919 50.918 = 57.313
 
-        'point_cloud' - dx = 0.05 km (2D)
+        "point_cloud" - dx = 0.05 km (2D)
         Estimating Runtime and Used Memory
         Runtime: (s):18.437, (m):0.307, (h):0.005
         Used Memory: Current (MB):18.813, Peak (MB):25.102
 
-        'nearest_point' - dx = 0.05 km (2D)
+        "nearest_point" - dx = 0.05 km (2D)
         Estimating Runtime and Used Memory
         Runtime: (s):20.494, (m):0.342, (h):0.006
         Used Memory: Current (MB):18.715, Peak (MB):25.298
@@ -760,7 +761,7 @@ class ABCLayer(NRBC):
 
         # Interpolating in the space function of the problem
         Wave.c = Function(Wave.function_space,
-                          name='c [km/s])').interpolate(Wave.c)
+                          name="c [km/s])").interpolate(Wave.c)
 
         # Save new velocity model
         if save_file:
