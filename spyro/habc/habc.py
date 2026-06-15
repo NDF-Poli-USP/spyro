@@ -1,12 +1,14 @@
 # import firedrake as fire
 # import numpy as np
-# import spyro.solvers.modal.modal_sol as eigsol
 from os import path, rename
 from shutil import rmtree
-# from sympy import divisors
 from ..abc.abc_layer import ABCLayer
 from .damp_profile import HABC_Damping
+from ..solvers.modal.modal_sol import Modal_Solver
 from ..utils.typing import LayerShapeType
+from ..io.basicio import parallel_print as pprint
+from ..utils.typing import HyperLayerDegreeType, LayerShapeType, LayerSizeRefFrequency
+# from sympy import divisors
 # from spyro.utils.error_management import value_parameter_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -24,15 +26,18 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     Attributes
     ----------
-    abc_boundary_layer_shape : `string`, optional
-        Shape type of pad layer. Options: 'rectangular' or 'hypershape'.
-    abc_deg_layer : `int` or `float`
-        Hypershape degree.
-    abc_degree_type : `str`, optional
-        Type of the hypereshape degree. Options: 'real' or 'integer'.
-    abc_reference_freq : `str`
-        Reference frequency for sizing the hybrid absorbing layer.
-        Options: 'source' or 'boundary'.
+    abc_boundary_layer_shape : `typing.LayerShapeType`, optional
+        Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
+        `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
+    abc_deg_layer : `int` or `float` or `None`, optional
+        Hypershape degree. For hypershape layers, the degree must be greater than or
+        equal to 2. `None` is used only for rectangular layers. Default is `None`.
+    abc_degree_type : `typing.HyperLayerDegreeType`, optional
+        Type of the hypereshape degree. Options: 'HyperLayerDegreeType.REAL' or
+        'HyperLayerDegreeType.INTEGER'. Default is 'HyperLayerDegreeType.REAL'.
+    abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
+        Reference frequency for sizing the absorbing layer.
+        Options: 'LayerSizeRefFrequency.SOURCE' or 'LayerSizeRefFrequency.BOUNDARY'.
     a_par : `float`
         Adimensional propagation speed parameter (a = z / f).
         "z" parameter is the inverse of the minimum Eikonal (1 / phi_min).
@@ -145,7 +150,8 @@ class HABCLayer(ABCLayer, HABC_Damping):
     def __init__(self, domain_dim, frequency, f_Nyquist, abc_deg_layer,
                  dimension=2, quadrilateral=False, func_space_type=None,
                  abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
-                 abc_reference_freq="source", abc_degree_type="real",
+                 abc_reference_freq=LayerSizeRefFrequency.SOURCE,
+                 abc_degree_type=HyperLayerDegreeType.REAL,
                  output_folder=None, comm=None):
         """
         Initialize the HABC class
@@ -159,9 +165,9 @@ class HABCLayer(ABCLayer, HABC_Damping):
             Frequency of the source.
         f_Nyquist : `float`
             Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt).
-        abc_deg_layer : `int` or `float` or `None`
+        abc_deg_layer : `int` or `float` or `None`, optional
             Hypershape degree. For hypershape layers, the degree must be greater than or
-            equal to 2. `None` is used only for rectangular layers.
+            equal to 2. `None` is used only for rectangular layers. Default is `None`.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
         quadrilateral : bool, optional
@@ -173,12 +179,12 @@ class HABCLayer(ABCLayer, HABC_Damping):
         abc_boundary_layer_shape : `typing.LayerShapeType`, optional
             Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
             `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
-        abc_reference_freq : `str`, optional
-            Reference frequency for sizing the hybrid absorbing layer.
-            Options: 'source' or 'boundary'. Default is 'source'.
-        abc_degree_type : `str`, optional
-            Type of the hypereshape degree. Options: 'real' or 'integer'.
-            Default is 'real'.
+        abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
+            Reference frequency for sizing the absorbing layer.
+            Options: 'LayerSizeRefFrequency.SOURCE' or 'LayerSizeRefFrequency.BOUNDARY'.
+        abc_degree_type : `typing.HyperLayerDegreeType`, optional
+            Type of the hypereshape degree. Options: 'HyperLayerDegreeType.REAL' or
+            'HyperLayerDegreeType.INTEGER'. Default is 'HyperLayerDegreeType.REAL'.
         output_folder : `str`, optional
             The folder where output data will be saved. Default is `None`.
         comm : `object`, optional
@@ -199,178 +205,170 @@ class HABCLayer(ABCLayer, HABC_Damping):
                           abc_degree_type=abc_degree_type, abc_deg_layer=abc_deg_layer,
                           output_folder=output_folder, comm=comm)
 
-    # def fundamental_frequency(self, method=None, monitor=False,
-    #                           fitting_c=(0., 0., 0., 0.)):
-    #     """
-    #     Compute the fundamental frequency in Hz via modal analysis
-    #     considering the numerical model with Neumann BCs.
+    def fundamental_frequency(self, method=None, fitting_c=(0., 0., 0., 0.)):
+        """Compute the fundamental frequency in Hz via modal analysis.
 
-    #     Parameters
-    #     ----------
-    #     method : `str`, optional
-    #         Method to use for solving the eigenvalue problem.
-    #         Default is None, which uses the 'KRYLOVSCH_CH' method.
-    #         Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
-    #         'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
-    #         'ANALYTICAL' method is only available for isotropic hypershapes.
-    #         'RAYLEIGH' method is an approximation by Rayleigh quotient.
-    #         In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
-    #         use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
-    #         Residual (gmres). (P) indicates the preconditioner to use: 'H' for
-    #         Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
-    #         example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
-    #     monitor : `bool`, optional
-    #         Print on screen the computed natural frequencies. Default is False
-    #     fitting_c : `tuple`, optional
-    #         Parameters for fitting equivalent velocity regression.
-    #         Structure: (fc1, fc2, fp1, fp2). Default is (1., 1., 0.5, 0.5)
-    #         - fc1 : `float`
-    #             Exponent factor for the minimum reference velocity
-    #         - fc2 : `float`
-    #             Exponent factor for the maximum reference velocity
-    #         - fp1 : `float`
-    #             Exponent factor for the minimum equivalent velocity
-    #         - fp2 : `float`
-    #             Exponent factor for the maximum equivalent velocity
+        Considering the numerical model with Neumann BCs.
 
-    #     Returns
-    #     ----
-    #     None
+        Parameters
+        ----------
+        method : `str`, optional
+            Method to use for solving the eigenvalue problem.
+            Default is None, which uses the 'KRYLOVSCH_CH' method.
+            Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
+            'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
+            'ANALYTICAL' method is only available for isotropic hypershapes.
+            'RAYLEIGH' method is an approximation by Rayleigh quotient.
+            In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
+            use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
+            Residual (gmres). (P) indicates the preconditioner to use: 'H' for
+            Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
+            example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
+        fitting_c : `tuple`, optional
+            Parameters for fitting equivalent velocity regression.
+            Structure: (fc1, fc2, fp1, fp2). Default is (0., 0., 0., 0.).
+            - fc1 : `float`
+                Exponent factor for the minimum reference velocity.
+            - fc2 : `float`
+                Exponent factor for the maximum reference velocity.
+            - fp1 : `float`
+                Exponent factor for the minimum equivalent velocity.
+            - fp2 : `float`
+                Exponent factor for the maximum equivalent velocity.
 
-    #     Verification
-    #     ------------
-    #     f in Hz, dx in km
+        Returns
+        ----
+        None
 
-    #     * Homogeneous domain (Comsol)
-    #         - Dirichlet:
-    #         m  n   Theory       dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
-    #         1  1   0.62500      0.62524     0.62531     0.62501     0.62501
-    #         2  1   0.90139      0.90216     0.90226     0.90142     0.90142
-    #         1  2   1.06800      1.0697      1.06960     1.06810     1.06810
-    #         3  1   1.23111      1.2336      1.23330     1.23120     1.23120
-    #         2  2   1.25000      1.2519      1.25240     1.25010     1.25010
-    #         3  2   1.50520      1.5084      1.50940     1.50530     1.50540
+        Notes
+        -----
+        f in Hz, dx in km
 
-    #         - Neumann:
-    #         dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
-    #         3.5236E-8   2.9779E-8i  2.2652E-7   7.7750E-8
-    #         0.37510     0.37507     0.37500     0.37500
-    #         0.50023     0.50016     0.50001     0.50001
-    #         0.62524     0.62530     0.62501     0.62501
-    #         0.75077     0.75052     0.75003     0.75002
-    #         0.90216     0.90227     0.90142     0.90142
+        * Homogeneous domain (Comsol)
+            - Dirichlet:
+            m  n   Theory       dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
+            1  1   0.62500      0.62524     0.62531     0.62501     0.62501
+            2  1   0.90139      0.90216     0.90226     0.90142     0.90142
+            1  2   1.06800      1.0697      1.06960     1.06810     1.06810
+            3  1   1.23111      1.2336      1.23330     1.23120     1.23120
+            2  2   1.25000      1.2519      1.25240     1.25010     1.25010
+            3  2   1.50520      1.5084      1.50940     1.50530     1.50540
 
-    #         - Sommerfeld:
-    #         dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
-    #         2.3348E-8   2.8175E-8i  2.2097E-7   7.7112E-8
-    #         0.37513     0.37508     0.37500     0.37500
-    #         0.50032     0.50021     0.50001     0.50001
-    #         0.62533     0.62533     0.62501     0.62501
-    #         0.75100     0.75065     0.75003     0.75002
-    #         0.90240     0.90234     0.90142     0.90142
+            - Neumann:
+            dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
+            3.5236E-8   2.9779E-8i  2.2652E-7   7.7750E-8
+            0.37510     0.37507     0.37500     0.37500
+            0.50023     0.50016     0.50001     0.50001
+            0.62524     0.62530     0.62501     0.62501
+            0.75077     0.75052     0.75003     0.75002
+            0.90216     0.90227     0.90142     0.90142
 
-    #     * Bimaterial domain (Comsol)
-    #         - Dirichlet:
-    #         dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
-    #         0.72599     0.72606     0.72562     0.72563
-    #         1.16740     1.16750     1.16560     1.16560
-    #         1.23700     1.23680     1.23490     1.23490
-    #         1.59320     1.59400     1.58940     1.58950
-    #         1.63620     1.63560     1.63030     1.63030
-    #         1.70870     1.70800     1.70480     1.70480
+            - Sommerfeld:
+            dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
+            2.3348E-8   2.8175E-8i  2.2097E-7   7.7112E-8
+            0.37513     0.37508     0.37500     0.37500
+            0.50032     0.50021     0.50001     0.50001
+            0.62533     0.62533     0.62501     0.62501
+            0.75100     0.75065     0.75003     0.75002
+            0.90240     0.90234     0.90142     0.90142
 
-    #         - Neumann:
-    #         dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
-    #         4.5197E-8   3.8054E-8i  2.8719E-7   1.0084E-7
-    #         0.54939*    0.54933*    0.54922*    0.54921*
-    #         0.55593     0.55590     0.55570     0.55570
-    #         0.93184     0.93186     0.93110     0.93110
-    #         0.95198     0.95159     0.95084     0.95082
-    #         1.04450     1.04420     1.04280     1.04280
+        * Bimaterial domain (Comsol)
+            - Dirichlet:
+            dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
+            0.72599     0.72606     0.72562     0.72563
+            1.16740     1.16750     1.16560     1.16560
+            1.23700     1.23680     1.23490     1.23490
+            1.59320     1.59400     1.58940     1.58950
+            1.63620     1.63560     1.63030     1.63030
+            1.70870     1.70800     1.70480     1.70480
 
-    #         - Sommerfeld:
-    #         dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
-    #         2.9482E-8   3.5721E-8i  2.7911E-7   9.8406E-8
-    #         0.54946     0.54937     0.54922     0.54921
-    #         0.55603     0.55594     0.55570     0.55570
-    #         0.93209     0.93195     0.93110     0.93110
-    #         0.95230     0.95177     0.95084     0.95082
-    #         1.04520     1.04460     1.04280     1.04280
+            - Neumann:
+            dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
+            4.5197E-8   3.8054E-8i  2.8719E-7   1.0084E-7
+            0.54939*    0.54933*    0.54922*    0.54921*
+            0.55593     0.55590     0.55570     0.55570
+            0.93184     0.93186     0.93110     0.93110
+            0.95198     0.95159     0.95084     0.95082
+            1.04450     1.04420     1.04280     1.04280
 
-    #     * Spyro Bimaterial Neumann:
-    #        dx=0.05-L    %Diff-Q     %Diff-T
-    #        0.45593      17.01       17.00
+            - Sommerfeld:
+            dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
+            2.9482E-8   3.5721E-8i  2.7911E-7   9.8406E-8
+            0.54946     0.54937     0.54922     0.54921
+            0.55603     0.55594     0.55570     0.55570
+            0.93209     0.93195     0.93110     0.93110
+            0.95230     0.95177     0.95084     0.95082
+            1.04520     1.04460     1.04280     1.04280
 
-    #        dx=0.01-L    %Diff-Q     %Diff-T
-    #        0.47525      13.47       13.47
-    #     """
+        * Spyro Bimaterial Neumann:
+           dx=0.05-L    %Diff-Q     %Diff-T
+           0.45593      17.01       17.00
 
-    #     print("\nSolving Eigenvalue Problem", flush=True)
-    #     mod_sol = eigsol.Modal_Solver(self.dimension, method=method)
+           dx=0.01-L    %Diff-Q     %Diff-T
+           0.47525      13.47       13.47
+        """
 
-    #     if method == 'ANALYTICAL':
+        pprint("\nSolving Eigenvalue Problem", comm=self.comm)
+        mod_sol = Modal_Solver(self.dimension, method=method)
 
-    #         # Hypershape parameters
-    #         hyp_par = (self.n_hyp, *self.hyper_axes)
+        if method == 'ANALYTICAL':
 
-    #         # Cut plane at free surface
-    #         Lz = self.domain_dim[1]
-    #         z_cut = Lz / 2.
+            # Hypershape parameters
+            hyp_par = (self.n_hyp, *self.layer_geometry.hyper_axes)
 
-    #         # Cut plane percentage
-    #         cut_plane_perc = z_cut / self.hyper_axes[1]
+            # Cut plane at free surface
+            length_z = self.domain_dim[0]
+            z_cut = length_z / 2.
 
-    #         # Define the load for the energy-equivalent homogenization
-    #         # Static load for HABC model
-    #         q_lay = self.set_material_property("q_lay", 'scalar',
-    #                                            constant=0.)
-    #         q_lay.dat.data_with_halos[
-    #             self.sources.cellNodeMaps.flatten().astype(int)] = \
-    #             self.sources.cell_tabulations.flatten()
+            # Cut plane percentage
+            cut_plane_perc = z_cut / self.layer_geometry.hyper_axes[1]
 
-    #         # Static load for Reference model
-    #         q_ref = fire.Function(self.funct_space_eik)
-    #         q_ref.interpolate(q_lay, allow_missing_dofs=True)
+            # Define the load for the energy-equivalent homogenization
+            # Static load for HABC model
+            q_lay = self.set_material_property("q_lay", 'scalar', constant=0.)
+            q_lay.dat.data_with_halos[self.sources.cellNodeMaps.flatten().astype(int)] = \
+                self.sources.cell_tabulations.flatten()
 
-    #         # Equivalent velocity for the original model
-    #         c_eqref = mod_sol.c_equivalent(self.initial_velocity_model,
-    #                                        V=self.funct_space_eik,
-    #                                        quad_rule=self.quadrature_rule,
-    #                                        static_load_for_ceq=q_ref)
+            # Static load for Reference model
+            q_ref = fire.Function(self.mesh_parameters.funct_space_eik)
+            q_ref.interpolate(q_lay, allow_missing_dofs=True)
 
-    #         Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
-    #                                          quad_rule=self.quadrature_rule,
-    #                                          hyp_par=hyp_par, c_eqref=c_eqref,
-    #                                          fitting_c=fitting_c,
-    #                                          cut_plane_percent=cut_plane_perc,
-    #                                          static_load_for_ceq=q_lay)
+            # Equivalent velocity for the original model
+            c_eqref = mod_sol.c_equivalent(self.initial_velocity_model,
+                                           V=self.mesh_parameters.funct_space_eik,
+                                           quad_rule=self.quadrature_rule,
+                                           static_load_for_ceq=q_ref)
 
-    #     elif method == 'RAYLEIGH':
+            Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
+                                             quad_rule=self.quadrature_rule,
+                                             hyp_par=hyp_par, c_eqref=c_eqref,
+                                             fitting_c=fitting_c,
+                                             cut_plane_percent=cut_plane_perc,
+                                             static_load_for_ceq=q_lay)
 
-    #         # Normalized coordinates
-    #         coord_norm = mod_sol.generate_norm_coords(self.mesh,
-    #                                                   self.domain_dim,
-    #                                                   self.hyper_axes)
+        elif method == 'RAYLEIGH':
 
-    #         Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
-    #                                          quad_rule=self.quadrature_rule,
-    #                                          coord_norm=coord_norm)
+            # Normalized coordinates
+            coord_norm = mod_sol.generate_norm_coords(self.mesh,
+                                                      self.domain_dim,
+                                                      self.hyper_axes)
 
-    #     else:
-    #         Lsp = mod_sol.solve_eigenproblem(self.c,
-    #                                          V=self.function_space, shift=1e-8,
-    #                                          quad_rule=self.quadrature_rule)
+            Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
+                                             quad_rule=self.quadrature_rule,
+                                             coord_norm=coord_norm)
 
-    #     if monitor:
-    #         for n_eig, eigval in enumerate(np.unique(Lsp)):
-    #             f_eig = np.sqrt(abs(eigval)) / (2 * np.pi)
-    #             print(f"Frequency {n_eig} (Hz): {f_eig:.5f}", flush=True)
+        else:
+            Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space, shift=1e-8,
+                                             quad_rule=self.quadrature_rule)
 
-    #     # Fundamental frequency (eig = 0 is a rigid body motion)
-    #     min_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
-    #     self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
-    #     print("Fundamental Frequency (Hz): {0:.5f}".format(self.fundam_freq),
-    #           flush=True)
+        for n_eig, eigval in enumerate(np.unique(Lsp)):
+            f_eig = np.sqrt(abs(eigval)) / (2 * np.pi)
+            pprint(f"Frequency {n_eig} (Hz): {f_eig:.5f}", comm=self.comm)
+
+        # Fundamental frequency (eig = 0 is a rigid body motion)
+        min_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
+        self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
+        pprint(f"Fundamental Frequency (Hz): {self.fundam_freq:.5f}", comm=self.comm)
 
     # def damping_layer(self, xCR_usu=None, method=None,
     #                   fitting_c=(0., 0., 0., 0.)):
@@ -537,7 +535,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     usr_dt = self.get_dt()
 
     #     # Maximum timestep size
-    #     dt_sol = eigsol.Modal_Solver(
+    #     dt_sol = Modal_Solver(
     #         self.dimension, method=method, calc_max_dt=True)
     #     max_dt = dt_sol.estimate_timestep(
     #         self.c, self.function_space, self.final_time, shift=1e-8,
