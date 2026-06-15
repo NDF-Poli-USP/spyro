@@ -299,13 +299,17 @@ class ABCLayer(NRBC):
     def formatting_abc_layer_type(self, str_to_format, for_prints=True):
         """Format a string for the ABC layer type.
 
+        The formatted string can be used for printing on screen or to generate paths for
+        output files. The `for_prints` parameter determines whether the formatted string
+        is intended for printing or for labeling purposes.
+
         Parameters
         ----------
         str_to_format : `str`
             The string to format.
         for_prints : `bool`, optional
             Flag to indicate whether the formatted string is for
-            printing (True) or for labeling (False). Default is `True`.
+            printing (`True`) or for labeling (`False`). Default is `True`.
 
         Returns
         -------

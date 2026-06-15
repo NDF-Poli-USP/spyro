@@ -1,13 +1,13 @@
-# import firedrake as fire
-# import numpy as np
+from firedrake import Function  # , Constant, FunctionSpace, SpatialCoordinate, VTKFile
+from numpy import abs, imag, pi, real, sqrt, unique
+# from numpy import array, ceil, log10, minimum
 from os import path, rename
 from shutil import rmtree
 from ..abc.abc_layer import ABCLayer
 from .damp_profile import HABC_Damping
 from ..solvers.modal.modal_sol import Modal_Solver
-from ..utils.typing import LayerShapeType
-from ..io.basicio import parallel_print as pprint
 from ..utils.typing import HyperLayerDegreeType, LayerShapeType, LayerSizeRefFrequency
+from ..io.basicio import parallel_print as pprint
 # from sympy import divisors
 # from spyro.utils.error_management import value_parameter_error
 
@@ -330,7 +330,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
                 self.sources.cell_tabulations.flatten()
 
             # Static load for Reference model
-            q_ref = fire.Function(self.mesh_parameters.funct_space_eik)
+            q_ref = Function(self.mesh_parameters.funct_space_eik)
             q_ref.interpolate(q_lay, allow_missing_dofs=True)
 
             # Equivalent velocity for the original model
@@ -361,13 +361,13 @@ class HABCLayer(ABCLayer, HABC_Damping):
             Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space, shift=1e-8,
                                              quad_rule=self.quadrature_rule)
 
-        for n_eig, eigval in enumerate(np.unique(Lsp)):
-            f_eig = np.sqrt(abs(eigval)) / (2 * np.pi)
+        for n_eig, eigval in enumerate(unique(Lsp)):
+            f_eig = sqrt(abs(eigval)) / (2 * pi)
             pprint(f"Frequency {n_eig} (Hz): {f_eig:.5f}", comm=self.comm)
 
         # Fundamental frequency (eig = 0 is a rigid body motion)
-        min_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
-        self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
+        min_eigval = max(unique(Lsp[(Lsp > 0.) & (imag(Lsp) == 0.)]))
+        self.fundam_freq = real(sqrt(min_eigval) / (2 * pi))
         pprint(f"Fundamental Frequency (Hz): {self.fundam_freq:.5f}", comm=self.comm)
 
     # def damping_layer(self, xCR_usu=None, method=None,
@@ -445,16 +445,16 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #         = self.calc_damping_properties(self.fundam_freq, xCR_usu=xCR_usu)
 
     #     # Mesh coordinates
-    #     coords = fire.SpatialCoordinate(self.mesh)
+    #     coords = SpatialCoordinate(self.mesh)
 
     #     # Damping mask
-    #     V_mask = fire.FunctionSpace(self.mesh, 'DG', 0)
+    #     V_mask = FunctionSpace(self.mesh, 'DG', 0)
     #     self.eta_mask = self.layer_mask_field(coords, V_mask,
     #                                           type_marker='mask',
     #                                           name_mask='eta_mask')
 
     #     # Save damping mask
-    #     outfile = fire.VTKFile(self.path_case_habc + "eta_mask.pvd")
+    #     outfile = VTKFile(self.path_case_habc + "eta_mask.pvd")
     #     outfile.write(self.eta_mask)
 
     #     # Compute the coefficients for quadratic damping function
@@ -467,7 +467,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #         type_marker='damping', name_mask='eta [1/s])')
 
     #     # Save damping profile
-    #     outfile = fire.VTKFile(self.path_case_habc + "eta_habc.pvd")
+    #     outfile = VTKFile(self.path_case_habc + "eta_habc.pvd")
     #     outfile.write(self.eta_habc)
 
     # def nrbc_on_boundary_layer(self):
@@ -542,7 +542,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #         quad_rule=self.quadrature_rule, fraction=1.)
 
     #     # Rounding power
-    #     pot = int(abs(np.ceil(np.log10(max_dt))) + mag_add)
+    #     pot = int(abs(ceil(log10(max_dt))) + mag_add)
 
     #     # Maximum timestep size according to divisors of the final time
     #     val_int_tf = int(10**pot * self.final_time)
@@ -596,18 +596,18 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     else:
 
     #         # If Eikonal analysis was not performed
-    #         sources_loc = np.array(self.source_locations)
+    #         sources_loc = array(self.source_locations)
 
     #         # Candidate to minimum distance to the boundaries
-    #         delta_z = np.abs(sources_loc[:, 0] - self.mesh_parameters.length_z)
-    #         delta_x = np.minimum(np.abs(sources_loc[:, 1]),
-    #                              np.abs(sources_loc[:, 1]
+    #         delta_z = abs(sources_loc[:, 0] - self.mesh_parameters.length_z)
+    #         delta_x = minimum(abs(sources_loc[:, 1]),
+    #                              abs(sources_loc[:, 1]
     #                                     - self.mesh_parameters.length_x))
     #         cand_dist = (delta_z, delta_x)
 
     #         if self.dimension == 3:  # 3D
-    #             delta_y = np.minimum(np.abs(sources_loc[:, 2]),
-    #                                  np.abs(sources_loc[:, 2]
+    #             delta_y = minimum(abs(sources_loc[:, 2]),
+    #                                  abs(sources_loc[:, 2]
     #                                         - self.mesh_parameters.length_y))
     #             cand_dist += (delta_y,)
 
@@ -619,7 +619,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     #     # Pad length for the infinite domain extension
     #     infinite_pad_len = self.mesh_parameters.lmin * \
-    #         np.ceil(add_dom / self.mesh_parameters.lmin)
+    #         ceil(add_dom / self.mesh_parameters.lmin)
 
     #     return infinite_pad_len
 
@@ -692,9 +692,9 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     self.velocity_habc(inf_model=True)
 
     #     # Setting no damping
-    #     self.cosHig = fire.Constant(0.)
-    #     self.eta_mask = fire.Constant(0.)
-    #     self.eta_habc = fire.Constant(0.)
+    #     self.cosHig = Constant(0.)
+    #     self.eta_mask = Constant(0.)
+    #     self.eta_habc = Constant(0.)
 
     #     print("\nSolving Infinite Model", flush=True)
 

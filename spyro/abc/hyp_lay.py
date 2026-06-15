@@ -3,8 +3,9 @@ from scipy.integrate import dblquad, quad
 from scipy.special import beta, betainc, gamma
 from sys import float_info
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import (value_dimension_error, value_numerical_error,
-                                      value_parameter_error)
+from ..utils.error_management import (enum_parameter_error, value_dimension_error,
+                                      value_numerical_error, value_parameter_error)
+from ..utils.typing import HyperLayerDegreeType
 
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -49,8 +50,9 @@ class HyperLayer():
         - n_min ensures to add lmin in the domain diagonal direction.
         - n_max ensures to add pad_len in the domain diagonal direction.
         Where `lmin` is the minimum mesh size and pad_len is the layer size.
-    n_type : `str`
-        Type of the hypereshape degree ('real' or 'integer'). Default is 'real'.
+    n_type : `typing.HyperLayerDegreeType`, optional
+        Type of the hypereshape degree. Options: 'HyperLayerDegreeType.REAL' or
+        'HyperLayerDegreeType.INTEGER'. Default is 'HyperLayerDegreeType.REAL'.
     perim_hyp : `float`
         Perimeter of the full hyperellipse (only 2D).
     surf_hyp : `float`
@@ -86,7 +88,8 @@ class HyperLayer():
         Compute the truncated volume of hyperellipsoid for 0 <= z0 / b <= 1.
     """
 
-    def __init__(self, domain_dim, n_hyp=2., n_type='real', dimension=2, comm=None):
+    def __init__(self, domain_dim, n_hyp=2., n_type=HyperLayerDegreeType.REAL,
+                 dimension=2, comm=None):
         """Initialize the HyperLayer class.
 
         Parameters
@@ -96,9 +99,9 @@ class HyperLayer():
             or (length_z, length_x, length_y) for 3D.
         n_hyp : `float`, optional
             Hypershape degree. Default is 2.
-        n_type : `str`, optional
-            Type of the hypereshape degree ('real' or 'integer').
-            Default is 'real'
+        n_type : `typing.HyperLayerDegreeType`, optional
+            Type of the hypereshape degree. Options: 'HyperLayerDegreeType.REAL' or
+            'HyperLayerDegreeType.INTEGER'. Default is 'HyperLayerDegreeType.REAL'.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
         comm : `object`, optional
@@ -122,9 +125,6 @@ class HyperLayer():
         if n_hyp < 2.:
             raise ValueError(f"n_hyp must be >= 2, got {n_hyp}.")
 
-        if n_type not in ['real', 'integer']:
-            value_parameter_error('n_type', n_type, ['real', 'integer'])
-
         if dimension not in [2, 3]:
             value_parameter_error('dimension', dimension, [2, 3])
 
@@ -138,7 +138,7 @@ class HyperLayer():
         self.dimension = dimension
 
         # Type of the hypereshape degree
-        self.n_type = n_type
+        self.n_type = enum_parameter_error('n_type', n_type, HyperLayerDegreeType)
 
         # Communicator MPI
         self.comm = comm
