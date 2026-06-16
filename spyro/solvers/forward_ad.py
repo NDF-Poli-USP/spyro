@@ -1,6 +1,12 @@
 import firedrake as fire
 import firedrake.adjoint as fire_ad
 from .time_integration_ad import central_difference_acoustic
+from ..tools.version_control import is_firedrake_new
+
+
+if is_firedrake_new() is False:
+    from firedrake.__future__ import interpolate
+
 # Note this turns off non-fatal warnings
 fire.set_log_level(fire.ERROR)
 
