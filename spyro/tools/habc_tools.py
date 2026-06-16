@@ -9,7 +9,7 @@ from ..tools.version_control import is_firedrake_new
 
 
 if is_firedrake_new() is False:
-    from firedrake.__future__ import interpolate
+    from firedrake.__future__ import interpolate  # noqa: F401
 
 
 def generate_conditional_value_for_layer(domain_dim, mesh, dimension,

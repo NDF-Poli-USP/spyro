@@ -5,7 +5,7 @@ from ..tools.version_control import is_firedrake_new
 
 
 if is_firedrake_new() is False:
-    from firedrake.__future__ import interpolate
+    from firedrake.__future__ import interpolate  # noqa: F401
 
 # Note this turns off non-fatal warnings
 fire.set_log_level(fire.ERROR)

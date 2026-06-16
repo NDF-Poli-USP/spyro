@@ -1,6 +1,6 @@
 from packaging.version import Version
 from importlib.metadata import version
-import firedrake
+import firedrake  # noqa: F401
 
 
 def is_firedrake_new(print_version=False, comm=None):
