@@ -5,6 +5,8 @@ from mpi4py import MPI
 import os
 from scipy.signal import butter, filtfilt
 import warnings
+from packaging.version import Version
+from importlib.metadata import version
 
 from ..io import ensemble_functional
 from ..io import parallel_print
@@ -769,6 +771,24 @@ def write_hdf5_velocity_model(obj_with_comm, segy_filename):
     return output_filename
 
 
+def is_firedrake_new(print_version=False, comm=None):
+    """Check whether the installed Firedrake version is recent enough.
+
+    Parameters
+    ----------
+    print_version : bool, optional
+        If True, print the installed Firedrake version before returning.
+        Default is False.
+
+    Returns
+    -------
+    bool
+        True when the installed Firedrake version is greater than or equal
+        to ``2026.4``.
+    """
+    if print_version:
+        parallel_print(version("firedrake"), comm=comm)
+    return Version(version("firedrake")) >= Version("2026.4")
 # def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
 #     degree = model["opts"]["degree"]
 #     V = FunctionSpace(mesh, "CG", degree)  # noqa: F405
