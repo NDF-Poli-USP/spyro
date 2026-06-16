@@ -15,6 +15,12 @@ def pytest_addoption(parser):
         "--only-high-memory", action="store_true", default=False, help="run only tests marked as high_memory"
     )
     parser.addoption(
+        "--skip-older-firedrake",
+        action="store_true",
+        default=False,
+        help="run only tests marked as older_firedrake",
+    )
+    parser.addoption(
         "--only-older-firedrake",
         action="store_true",
         default=False,
@@ -35,6 +41,7 @@ def pytest_collection_modifyitems(config, items):
     only_slow = config.getoption("--only-slow")
     skip_high_memory = config.getoption("--skip-high-memory")
     only_high_memory = config.getoption("--only-high-memory")
+    skip_older_firedrake = config.getoption("--skip-older-firedrake")
     only_older_firedrake = config.getoption("--only-older-firedrake")
 
     if skip_slow and only_slow:
@@ -42,6 +49,9 @@ def pytest_collection_modifyitems(config, items):
     
     if skip_high_memory and only_slow:
         raise pytest.UsageError("Cannot run both --skip and only options for high memory")
+
+    if skip_older_firedrake and older_firedrake:
+        raise pytest.UsageError("Cannot run both --skip and only options for older firedrake")
 
     selected_items = []
     deselected = []
@@ -60,7 +70,7 @@ def pytest_collection_modifyitems(config, items):
             deselected.append(item)
         elif only_older_firedrake and not is_older_firedrake:
             deselected.append(item)
-        elif not only_older_firedrake and is_older_firedrake:
+        elif skip_only_older_firedrake and is_older_firedrake:
             deselected.append(item)
         else:
             selected_items.append(item)
