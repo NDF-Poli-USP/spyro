@@ -14,11 +14,20 @@ def pytest_addoption(parser):
     parser.addoption(
         "--only-high-memory", action="store_true", default=False, help="run only tests marked as high_memory"
     )
+    parser.addoption(
+        "--only-older-firedrake",
+        action="store_true",
+        default=False,
+        help="run only tests marked as older_firedrake",
+    )
 
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "slow: mark test as slow")
     config.addinivalue_line("markers", "high_memory: mark test as requiring high memory")
+    config.addinivalue_line(
+        "markers", "older_firedrake: mark test as only compatible with older firedrake versions"
+    )
 
 
 def pytest_collection_modifyitems(config, items):
@@ -26,6 +35,7 @@ def pytest_collection_modifyitems(config, items):
     only_slow = config.getoption("--only-slow")
     skip_high_memory = config.getoption("--skip-high-memory")
     only_high_memory = config.getoption("--only-high-memory")
+    only_older_firedrake = config.getoption("--only-older-firedrake")
 
     if skip_slow and only_slow:
         raise pytest.UsageError("Cannot use both --skip-slow and --only-slow")
@@ -39,6 +49,7 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         is_slow = "slow" in item.keywords
         is_high_memory = "high_memory" in item.keywords
+        is_older_firedrake = "older_firedrake" in item.keywords
         if only_slow and not is_slow:
             deselected.append(item)
         elif skip_slow and is_slow:
@@ -46,6 +57,10 @@ def pytest_collection_modifyitems(config, items):
         elif skip_high_memory and is_high_memory:
             deselected.append(item)
         elif only_high_memory and not is_high_memory:
+            deselected.append(item)
+        elif only_older_firedrake and not is_older_firedrake:
+            deselected.append(item)
+        elif not only_older_firedrake and is_older_firedrake:
             deselected.append(item)
         else:
             selected_items.append(item)
