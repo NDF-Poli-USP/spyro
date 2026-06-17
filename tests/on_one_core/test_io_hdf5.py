@@ -1,6 +1,5 @@
 from pathlib import Path
 import warnings
-
 import h5py
 import numpy as np
 import pytest
@@ -329,7 +328,7 @@ def test_write_velocity_model_avenir3d_binary_hdf5(tmp_path):
 def test_read_avenir_segy_velocity_model():
     segy_file = _require_file(AVENIR_SEGY)
 
-    vp, nx, nz = read_segy_velocity_model(str(segy_file))
+    vp, nz, nx = read_segy_velocity_model(str(segy_file))
     expected = _expected_segy_model(segy_file)
 
     assert vp.shape == expected.shape
