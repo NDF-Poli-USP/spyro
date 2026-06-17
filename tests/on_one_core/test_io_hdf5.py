@@ -1,5 +1,4 @@
 from pathlib import Path
-import importlib.util
 import warnings
 
 import h5py
@@ -327,7 +326,6 @@ def test_write_velocity_model_avenir3d_binary_hdf5(tmp_path):
     _assert_hdf5_matches_expected(hdf5_file, expected)
 
 
-@pytest.mark.skipif(not HAS_SEGYIO, reason="segyio is not installed")
 def test_read_avenir_segy_velocity_model():
     segy_file = _require_file(AVENIR_SEGY)
 
