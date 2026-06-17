@@ -713,10 +713,10 @@ def read_segy_velocity_model(fname):
     -------
     vp : numpy.ndarray
         Velocity model array in ``(z, x)`` order.
-    nx : int
-        Number of traces in the SEG-Y file, corresponding to the x direction.
     nz : int
         Number of samples per trace, corresponding to the z direction.
+    nx : int
+        Number of traces in the SEG-Y file, corresponding to the x direction.
 
     Raises
     ------
@@ -733,7 +733,7 @@ def read_segy_velocity_model(fname):
 
     vp = np.flipud(vp)
 
-    return vp, nx, nz
+    return vp, nz, nx
 
 
 def _parse_axes_order(axes_order):
