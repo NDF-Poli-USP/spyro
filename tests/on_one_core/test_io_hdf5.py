@@ -13,7 +13,6 @@ from spyro.io.basicio import (
     _parse_axes_order,
 )
 
-HAS_SEGYIO = importlib.util.find_spec("segyio") is not None
 
 AVENIR_SEGY = "tests/inputfiles/velocity_models/avenir.segy"
 AVENIR3D_BIN = "tests/inputfiles/velocity_models/avenir3d.bin"
@@ -341,7 +340,6 @@ def test_read_avenir_segy_velocity_model():
     assert np.array_equal(vp, expected)
 
 
-@pytest.mark.skipif(not HAS_SEGYIO, reason="segyio is not installed")
 def test_write_velocity_model_avenir_segy_hdf5(tmp_path):
     segy_file = _require_file(AVENIR_SEGY)
     output_stem = tmp_path / "avenir"
