@@ -41,8 +41,8 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
             for t in range(nt)
             if t % wave_obj.gradient_sampling_frequency == 0
         ]
-
     source_cof = None
+    source_values = None
     interpolate_receivers = None
     master_source_W = None
     if wave_obj.sources is not None and wave_obj.use_vertex_only_mesh:
@@ -66,6 +66,8 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
             master_source_W.sub(0).assign(source_cof)
 
     usol_recv = []
+    receiver_array = None
+    receiver_buffer = None
     save_step = 0
     real_shot_record = None
     if compute_functional:
@@ -101,7 +103,15 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
         wave_obj.vstate = wave_obj.next_vstate
 
         if wave_obj.use_vertex_only_mesh:
-            usol_recv.append(fire.assemble(interpolate_receivers))
+            if receiver_buffer is None:
+                receiver_buffer = fire.assemble(interpolate_receivers)
+                receiver_shape = receiver_buffer.dat.data_ro.shape
+                receiver_array = np.empty((nt,) + receiver_shape, dtype=float)
+            else:
+                fire.assemble(interpolate_receivers, tensor=receiver_buffer)
+            receiver_array[step] = receiver_buffer.dat.data_ro
+            if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
+                usol_recv.append(receiver_buffer.copy(deepcopy=True))
         else:
             usol_recv.append(wave_obj.get_forward_solution_receivers())
 
@@ -148,6 +158,8 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
     wave_obj.current_time = t
 
     helpers.display_progress(wave_obj.comm, t)
+    if receiver_array is not None and functional_mode is not FunctionalEvaluationMode.PER_TIMESTEP:
+        usol_recv = receiver_array
     usol_recv = helpers.fill(
         usol_recv, wave_obj.receivers.is_local, nt, wave_obj.receivers.number_of_points
     )
