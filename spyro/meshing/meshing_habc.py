@@ -9,6 +9,12 @@ from spyro.domains.space import create_function_space
 from spyro.meshing.meshing_functions import AutomaticMesh
 from spyro.tools.habc_tools import point_cloud_field
 from spyro.utils.error_management import value_parameter_error
+from ..tools.version_control import is_firedrake_new
+
+
+if is_firedrake_new() is False:
+    from firedrake.__future__ import interpolate
+    fire.interpolate = interpolate
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
