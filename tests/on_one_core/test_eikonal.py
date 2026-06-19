@@ -19,13 +19,14 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
     Parameters
     ----------
     element_geometry : `str`
-        Geometry of the finite element. 'T' for triangles or 'Q' for quadrilaterals.
+        Geometry of the finite element. Options: "T" for triangles/tetrahedra or
+        "Q" for quadrilaterals/hexahedra.
     dimension : `int`
         Dimension of the problem. 2 for 2D and 3 for 3D.
     degree_eikonal : `int`
-        Finite element order for the Eikonal equation. Should be 1 or 2.
+        Finite element order for the Eikonal equation.
     element_type : `str`
-        Finite element type. 'consistent' or 'underintegrated'.
+        Finite element type. Options: "consistent" or "underintegrated".
 
     Returns
     -------
@@ -114,7 +115,7 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
     f_est : `float`
         Factor for the stabilizing term in Eikonal Eq.
     element_type : `string`
-        Finite element type. 'consistent' or 'underintegrated'.
+        Finite element type. Options: "consistent" or "underintegrated".
 
     Returns
     -------
@@ -179,11 +180,12 @@ def test_eikonal(element_geometry, dimension, element_type):
     Parameters
     ----------
     element_geometry : `str`
-        Type of finite element. 'T' for triangles or 'Q' for quadrilaterals.
+        Geometry of the finite element. Options: "T" for triangles/tetrahedra or
+        "Q" for quadrilaterals/hexahedra.
     dimension : `int`
-        Dimension of the model (2 or 3).
+        Dimension of the problem. 2 for 2D and 3 for 3D.
     element_type : `str`
-        Finite element type. 'consistent' or 'underintegrated'.
+        Finite element type. Options: "consistent" or "underintegrated".
 
     Returns
     -------

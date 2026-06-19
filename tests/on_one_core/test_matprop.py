@@ -100,7 +100,7 @@ def wave_instance(cell_type):
 
     Returns
     -------
-    wave_obj : `elastic_wave.IsotropicWave`
+    Wave_obj : `elastic_wave.IsotropicWave`
         An instance of the :class:`~spyro.solvers.elastic_wave.IsotropicWave`.
     """
 
@@ -123,12 +123,12 @@ def wave_instance(cell_type):
     dictionary = wave_dict(cell_type, domain_dimensions, final_time, dt)
 
     # Create a wave object
-    wave_obj = IsotropicWave(dictionary)
+    Wave_obj = IsotropicWave(dictionary)
 
     # Mesh
-    wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
-    return wave_obj
+    return Wave_obj
 
 
 @mark.parametrize("cell_type", ["T", "Q"])
@@ -158,7 +158,7 @@ def test_constant_mat_prop(wave_instance, cell_type):
     None
     """
 
-    wave_obj = wave_instance
+    Wave_obj = wave_instance
 
     # Material properties for testing
     scalar_mat_prop = ['vel_P', 'vel_S', 'mass_rho', 'epsilonTh',
@@ -179,15 +179,15 @@ def test_constant_mat_prop(wave_instance, cell_type):
     print("\nTesting Constant Material Properties", flush=True)
     for property_name, constant in zip(scalar_mat_prop, constant_lst):
         try:
-            mat_property = wave_obj.set_material_property(
+            mat_property = Wave_obj.set_material_property(
                 property_name, 'scalar', constant=constant,
                 output=True, foldername='/property_fields/constant/')
 
             assert mat_property is not None, f"Failed to set {property_name}"
 
             # Get the mean value function to verify
-            dv = dx(**wave_obj.quadrature_rule)
-            dummy_vol = wave_obj.set_material_property('dummy_vol', 'scalar', constant=1.)
+            dv = dx(**Wave_obj.quadrature_rule)
+            dummy_vol = Wave_obj.set_material_property('dummy_vol', 'scalar', constant=1.)
             volume = assemble(dummy_vol * dv)
             mean_val = assemble(mat_property * dv) / volume
 
@@ -227,7 +227,7 @@ def test_random_mat_prop(wave_instance, cell_type):
     None
     """
 
-    wave_obj = wave_instance
+    Wave_obj = wave_instance
 
     # Material properties for testing
     scalar_mat_prop = ['vel_P', 'vel_S', 'mass_rho', 'epsilonTh',
@@ -240,7 +240,7 @@ def test_random_mat_prop(wave_instance, cell_type):
     print("\nTesting Random Material Properties", flush=True)
     for property_name, random in zip(scalar_mat_prop, random_lst):
         try:
-            mat_property = wave_obj.set_material_property(
+            mat_property = Wave_obj.set_material_property(
                 property_name, 'scalar', random=random,
                 output=True, foldername='/property_fields/random/')
 
@@ -317,12 +317,12 @@ def numerical_values_cond(property_name, coords, below_thrs, above_thrs):
     return exp_below, exp_above
 
 
-def get_only_mesh_vertices(wave_obj):
+def get_only_mesh_vertices(Wave_obj):
     """Get the mesh vertex coordinates and the point indices from the mesh function.
 
     Parameters
     ----------
-    wave_obj : `elastic_wave.IsotropicWave`
+    Wave_obj : `elastic_wave.IsotropicWave`
         An instance of the :class:`~spyro.solvers.elastic_wave.IsotropicWave`.
 
     Returns
@@ -333,8 +333,8 @@ def get_only_mesh_vertices(wave_obj):
         Array of indices in the function corresponding to the mesh vertices.
     """
 
-    mesh_f = Function(wave_obj.function_space).interpolate(wave_obj.mesh.coordinates)
-    coords = wave_obj.mesh.coordinates.dat.data_with_halos
+    mesh_f = Function(Wave_obj.function_space).interpolate(Wave_obj.mesh.coordinates)
+    coords = Wave_obj.mesh.coordinates.dat.data_with_halos
     mask_pnt = where(isin(mesh_f.dat.data_with_halos, coords).all(axis=1))[0]
 
     return coords, mask_pnt
@@ -367,25 +367,25 @@ def test_conditional_mat_prop(wave_instance, cell_type):
     None
     """
 
-    wave_obj = wave_instance
+    Wave_obj = wave_instance
 
     # Material properties for testing
     scalar_mat_prop = ['vel_P', 'vel_S', 'mass_rho', 'epsilonTh',
                        'gammaTh', 'deltaTh', 'thetaTTI', 'phiTTI']
 
     # Conditional initial distribution
-    f_vel = 2. + abs(wave_obj.mesh_z)
-    cond_Vp = conditional(wave_obj.mesh_z < -0.06, f_vel, 1.5)
-    cond_Vs = conditional(wave_obj.mesh_z < -0.06, f_vel / 2.5, 0.75)
-    f_rho = 1.7e3 + 3e3 * abs(wave_obj.mesh_z) ** 2
-    cond_rho = conditional(wave_obj.mesh_z < -0.06, f_rho, 1e3)
-    f_TH = fire_exp(wave_obj.mesh_x) / 10.
-    cond_eps = conditional(wave_obj.mesh_x < 0.28, f_TH, 1.5 * f_TH)
-    cond_gam = conditional(wave_obj.mesh_x < 0.28, 2.5 * f_TH, f_TH)
-    cond_del = conditional(wave_obj.mesh_x < 0.28, -f_TH / 2., f_TH)
-    f_TTI = 1e4 * (wave_obj.mesh_y - 0.08)**2 / 2. - 2.
-    cond_the = conditional(wave_obj.mesh_y < 0.08, f_TTI, -f_TTI)
-    cond_phi = conditional(wave_obj.mesh_y < 0.08, -f_TTI, f_TTI)
+    f_vel = 2. + abs(Wave_obj.mesh_z)
+    cond_Vp = conditional(Wave_obj.mesh_z < -0.06, f_vel, 1.5)
+    cond_Vs = conditional(Wave_obj.mesh_z < -0.06, f_vel / 2.5, 0.75)
+    f_rho = 1.7e3 + 3e3 * abs(Wave_obj.mesh_z) ** 2
+    cond_rho = conditional(Wave_obj.mesh_z < -0.06, f_rho, 1e3)
+    f_TH = fire_exp(Wave_obj.mesh_x) / 10.
+    cond_eps = conditional(Wave_obj.mesh_x < 0.28, f_TH, 1.5 * f_TH)
+    cond_gam = conditional(Wave_obj.mesh_x < 0.28, 2.5 * f_TH, f_TH)
+    cond_del = conditional(Wave_obj.mesh_x < 0.28, -f_TH / 2., f_TH)
+    f_TTI = 1e4 * (Wave_obj.mesh_y - 0.08)**2 / 2. - 2.
+    cond_the = conditional(Wave_obj.mesh_y < 0.08, f_TTI, -f_TTI)
+    cond_phi = conditional(Wave_obj.mesh_y < 0.08, -f_TTI, f_TTI)
     cond_lst = [cond_Vp, cond_Vs, cond_rho, cond_eps,
                 cond_gam, cond_del, cond_the, cond_phi]
 
@@ -400,12 +400,12 @@ def test_conditional_mat_prop(wave_instance, cell_type):
                       'phiTTI': 0.08}
 
     # Get mesh vertices
-    coords, mask_pnt = get_only_mesh_vertices(wave_obj)
+    coords, mask_pnt = get_only_mesh_vertices(Wave_obj)
 
     print("\nTesting Conditional Material Properties", flush=True)
     for property_name, cond_field in zip(scalar_mat_prop, cond_lst):
         try:
-            mat_property = wave_obj.set_material_property(
+            mat_property = Wave_obj.set_material_property(
                 property_name, 'scalar', conditional=cond_field,
                 output=True, foldername='/property_fields/conditional/')
 
@@ -516,7 +516,7 @@ def test_expression_mat_prop(wave_instance, cell_type):
     None
     """
 
-    wave_obj = wave_instance
+    Wave_obj = wave_instance
 
     # Material properties for testing
     scalar_mat_prop = ['vel_P', 'vel_S', 'mass_rho', 'epsilonTh',  #
@@ -533,12 +533,12 @@ def test_expression_mat_prop(wave_instance, cell_type):
                 "180 / pi * acos(y / (sqrt(x**2 + y**2 + z**2) + 1e-16)) - 45"]
 
     # Get mesh vertices
-    coords, mask_pnt = get_only_mesh_vertices(wave_obj)
+    coords, mask_pnt = get_only_mesh_vertices(Wave_obj)
 
     print("\nTesting Expression as Material Properties", flush=True)
     for property_name, expr_field in zip(scalar_mat_prop, expr_lst):
         try:
-            mat_property = wave_obj.set_material_property(
+            mat_property = Wave_obj.set_material_property(
                 property_name, 'scalar', expression=expr_field,
                 output=True, foldername='/property_fields/expression/')
 
@@ -555,12 +555,12 @@ def test_expression_mat_prop(wave_instance, cell_type):
             fail(f"Setting {property_name} raised an exception: {str(e)}")
 
 
-def get_coords_DG0(wave_obj, coords):
+def get_coords_DG0(Wave_obj, coords):
     """ Compute the coordinates of the cell centroids for DG0 interpolation.
 
     Parameters
     ----------
-    wave_obj : `elastic_wave.IsotropicWave`
+    Wave_obj : `elastic_wave.IsotropicWave`
         An instance of the :class:`~spyro.solvers.elastic_wave.IsotropicWave`.
     coords : `numpy.ndarray`
         Array of coordinates (z, x, y) for the mesh vertices.
@@ -572,9 +572,9 @@ def get_coords_DG0(wave_obj, coords):
     """
 
     coords_DG0 = coords[:]
-    coords_DG0[:, 0] -= wave_obj.mesh_parameters.edge_length / 2.
-    coords_DG0[:, 1] += wave_obj.mesh_parameters.edge_length / 2.
-    coords_DG0[:, 2] += wave_obj.mesh_parameters.edge_length / 2.
+    coords_DG0[:, 0] -= Wave_obj.mesh_parameters.edge_length / 2.
+    coords_DG0[:, 1] += Wave_obj.mesh_parameters.edge_length / 2.
+    coords_DG0[:, 2] += Wave_obj.mesh_parameters.edge_length / 2.
     coords_DG0.round(2)
 
     return coords_DG0
@@ -601,22 +601,22 @@ def test_function_mat_prop(wave_instance, cell_type):
     None
     """
 
-    wave_obj = wave_instance
+    Wave_obj = wave_instance
 
     print("\nTesting Firedrake Functions as Material Properties", flush=True)
     dummy_expr = "7.5e2 * (1 + sqrt(x**2 + y**2 + z**2))"
-    dummy = wave_obj.set_material_property(
+    dummy = Wave_obj.set_material_property(
         'dummy', 'scalar', expression=dummy_expr, output=False)
 
     # Same function space
-    vel_S = wave_obj.set_material_property(
+    vel_S = Wave_obj.set_material_property(
         'vel_S', 'scalar', fire_function=dummy, output=True,
         foldername='/property_fields/function/')
 
     assert vel_S is not None, "Failed to set vel_S"
 
     # Get mesh vertices from original mesh
-    coords, mask_pnt = get_only_mesh_vertices(wave_obj)
+    coords, mask_pnt = get_only_mesh_vertices(Wave_obj)
 
     exp_fun = dummy.dat.data_with_halos[mask_pnt]
     val_fun = vel_S.dat.data_with_halos[mask_pnt]
@@ -626,14 +626,14 @@ def test_function_mat_prop(wave_instance, cell_type):
     print("vel_S Verified: Firedrake function values", flush=True)
 
     # Different function space (DG0)
-    vel_S_dg0 = wave_obj.set_material_property(
+    vel_S_dg0 = Wave_obj.set_material_property(
         'vel_S_DG0', 'scalar', fire_function=vel_S, dg_property=True,
         output=True, foldername='/property_fields/function/')
 
     assert vel_S_dg0 is not None, "Failed to set vel_S_DG0"
 
     # Coordinates of the cell centroids for DG0 interpolation
-    coords_DG0 = get_coords_DG0(wave_obj, coords)
+    coords_DG0 = get_coords_DG0(Wave_obj, coords)
 
     exp_fun = dummy.at(coords_DG0, dont_raise=True)
     val_fun = vel_S.at(coords_DG0, dont_raise=True)
@@ -664,22 +664,22 @@ def test_fromfile_mat_prop(wave_instance, cell_type):
     None
     """
 
-    wave_obj = wave_instance
+    Wave_obj = wave_instance
 
     print("\nTesting Input Files as Material Properties", flush=True)
-    vel_P = wave_obj.set_material_property(
+    vel_P = Wave_obj.set_material_property(
         'vel_P', 'scalar', constant=1., output=True,
         foldername='/property_fields/from_file/')
 
-    dummy = wave_obj.set_material_property('dummy', 'scalar', constant=1.)
+    dummy = Wave_obj.set_material_property('dummy', 'scalar', constant=1.)
     dummy.dat.data_with_halos[:] = vel_P.dat.data_with_halos[:] / 2.
 
     from_file_segy = getcwd() + '/property_fields/from_file/vel_S.segy'
-    create_segy(dummy, wave_obj.function_space.sub(0),
-                wave_obj.mesh_parameters.edge_length, from_file_segy)
+    create_segy(dummy, Wave_obj.function_space.sub(0),
+                Wave_obj.mesh_parameters.edge_length, from_file_segy)
 
     with raises(NotImplementedError) as exc_info:
-        vel_S = wave_obj.set_material_property(   # noqa: F841
+        vel_S = Wave_obj.set_material_property(   # noqa: F841
             'vel_S', 'scalar', from_file=from_file_segy, output=True,
             foldername='/property_fields/from_file/')
 
@@ -712,37 +712,37 @@ def test_vector_mat_prop(wave_instance, cell_type):
     None
     """
 
-    wave_obj = wave_instance
+    Wave_obj = wave_instance
     print("\nTesting Vector Material Properties", flush=True)
     print("Vector: Thermal Expansion Field", flush=True)
 
     # Same function space
     alphaT_o = 1e-5
     print("\nTesting Constant Material Properties", flush=True)
-    alphaT_cte = wave_obj.set_material_property(
+    alphaT_cte = Wave_obj.set_material_property(
         "alphaT", 'vector', constant=alphaT_o, output=True,
         foldername='/property_fields/vector_tensor/')
 
     assert alphaT_cte is not None, "Failed to set alphaT_cte"
 
-    dummy = wave_obj.set_material_property('dummy', 'vector', constant=0.)
-    dummy.sub(0).assign(wave_obj.set_material_property('dummy_z', 'scalar',
+    dummy = Wave_obj.set_material_property('dummy', 'vector', constant=0.)
+    dummy.sub(0).assign(Wave_obj.set_material_property('dummy_z', 'scalar',
                                                        constant=alphaT_o))
-    dummy.sub(1).assign(wave_obj.set_material_property('dummy_x', 'scalar',
+    dummy.sub(1).assign(Wave_obj.set_material_property('dummy_x', 'scalar',
                                                        constant=2*alphaT_o))
-    dummy.sub(2).assign(wave_obj.set_material_property('dummy_y', 'scalar',
+    dummy.sub(2).assign(Wave_obj.set_material_property('dummy_y', 'scalar',
                                                        constant=3*alphaT_o))
 
     # Different function space (DG0)
-    alphaT_dg0 = wave_obj.set_material_property(
+    alphaT_dg0 = Wave_obj.set_material_property(
         'alphaT_DG0', 'vector', fire_function=dummy, dg_property=True,
         output=True, foldername='/property_fields/vector_tensor/')
 
     assert alphaT_dg0 is not None, "Failed to set alphaT_dg0"
 
     # Get the mean value vectorial component to verify
-    dv = dx(**wave_obj.quadrature_rule)
-    dummy_vol = wave_obj.set_material_property('dummy_vol', 'scalar', constant=1.)
+    dv = dx(**Wave_obj.quadrature_rule)
+    dummy_vol = Wave_obj.set_material_property('dummy_vol', 'scalar', constant=1.)
     volume = assemble(dummy_vol * dv)
 
     exp_v0 = assemble(dummy.sub(0) * dv) / volume
@@ -780,7 +780,7 @@ def test_tensor_mat_prop(wave_instance, cell_type):
     None
     """
 
-    wave_obj = wave_instance
+    Wave_obj = wave_instance
     print("\nTesting Tensor Material Properties", flush=True)
     print("Vector: Elastic Anisotropic Tensor", flush=True)
 
@@ -801,7 +801,7 @@ def test_tensor_mat_prop(wave_instance, cell_type):
     shape_func_space = C_elast.ufl_shape
 
     # Tensor 6x6
-    dummy = wave_obj.set_material_property('dummy', 'tensor',
+    dummy = Wave_obj.set_material_property('dummy', 'tensor',
                                            shape_func_space=shape_func_space,
                                            constant=0.)
 
@@ -812,7 +812,7 @@ def test_tensor_mat_prop(wave_instance, cell_type):
             val = float(C_elast[i, j])
             if val != 0.0:
                 # Only create a scalar property if the entry is nonzero
-                row.append(wave_obj.set_material_property(
+                row.append(Wave_obj.set_material_property(
                     f'dummy_{i+1}{j+1}', 'scalar', constant=val))
             else:
                 # Keep an explicit zero so the tensor shape stays consistent
@@ -824,14 +824,14 @@ def test_tensor_mat_prop(wave_instance, cell_type):
     dummy.interpolate(tensor_expr)
 
     # Same function space
-    Celast = wave_obj.set_material_property('Celast', 'tensor', fire_function=dummy,
+    Celast = Wave_obj.set_material_property('Celast', 'tensor', fire_function=dummy,
                                             shape_func_space=shape_func_space)
 
     assert Celast is not None, "Failed to set Celast"
     print("Celast Verified: Tensorial function assign", flush=True)
 
     # Tensor 2x3
-    dummy = wave_obj.set_material_property('dummy', 'tensor',
+    dummy = Wave_obj.set_material_property('dummy', 'tensor',
                                            shape_func_space=(2, 3),
                                            constant=0.)
 
@@ -844,7 +844,7 @@ def test_tensor_mat_prop(wave_instance, cell_type):
         row = []
         for j in range(3):
             val = float(compC_val[i, j])
-            row.append(wave_obj.set_material_property(compC_name[3 * i + j],
+            row.append(Wave_obj.set_material_property(compC_name[3 * i + j],
                                                       'scalar', constant=val))
         entries.append(row)
     tensor_expr = as_tensor(entries)
@@ -853,7 +853,7 @@ def test_tensor_mat_prop(wave_instance, cell_type):
     dummy.interpolate(tensor_expr)
 
     # Same function space
-    Celast_2x3 = wave_obj.set_material_property(
+    Celast_2x3 = Wave_obj.set_material_property(
         'Celast_2x3', 'tensor', shape_func_space=(2, 3),
         fire_function=dummy, output=True,
         foldername='/property_fields/vector_tensor/')
@@ -862,7 +862,7 @@ def test_tensor_mat_prop(wave_instance, cell_type):
     print("Celast_2x3 Verified: Tensorial function saving", flush=True)
 
     # Different function space (DG0)
-    Celast_dg0 = wave_obj.set_material_property(
+    Celast_dg0 = Wave_obj.set_material_property(
         'Celast_DG0', 'tensor', shape_func_space=(2, 3),
         fire_function=dummy, dg_property=True, output=True,
         foldername='/property_fields/vector_tensor/')

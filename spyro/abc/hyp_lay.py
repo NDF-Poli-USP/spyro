@@ -274,17 +274,17 @@ class HyperLayer():
 
         # Harmonic mean
         h = max(np.log(f_har) / np.log(sum_invhaxs / sum_invsnss), 2)
-        h = np.ceil(h * 10.) / 10. if self.n_type == 'real' else np.ceil(h)
+        h = np.ceil(h * 10.) / 10. if self.n_type == HyperLayerDegreeType.REAL else np.ceil(h)
         rh = self.radial_parameter(spness, h)
 
         # Geometric mean
         g = max(np.log(f_geo) / np.log(prod_snss / prod_haxs), 2)
-        g = np.ceil(g * 10.) / 10. if self.n_type == 'real' else np.ceil(g)
+        g = np.ceil(g * 10.) / 10. if self.n_type == HyperLayerDegreeType.REAL else np.ceil(g)
         rg = self.radial_parameter(spness, g)
 
         # Arithmetic mean
         z = max(np.log(f_ari) / np.log(sum_snss / sum_haxs), 2)
-        z = np.ceil(z * 10.) / 10. if self.n_type == 'real' else np.ceil(z)
+        z = np.ceil(z * 10.) / 10. if self.n_type == HyperLayerDegreeType.REAL else np.ceil(z)
         rz = self.radial_parameter(spness, z)
 
         if monitor:
@@ -347,7 +347,7 @@ class HyperLayer():
         n_max = max(round(float(n_max), 1), n_min + 1., 20.)
 
         # Real loop
-        if self.n_type == 'real' and 2 < n < 20:
+        if self.n_type == HyperLayerDegreeType.REAL and 2 < n < 20:
             r = np.inf
             n_maxreal = n
             n -= 1
@@ -502,7 +502,7 @@ class HyperLayer():
         if n_min <= n_hyp <= n_max:
             pprint(f"Current Hypershape Degree n_hyp: {n_hyp:>.1f}")
         else:
-            hyp_str = "Degree for Hypershape Layer. Setting to"
+            hyp_str = "Degree for Hypershape Layer. Setting to "
             if n_hyp < n_min:
                 pprint("Low " + hyp_str + f"n_min: {n_min:>.1f}")
             elif n_hyp > n_max:
