@@ -205,13 +205,15 @@ class HABCLayer(ABCLayer, HABC_Damping):
                           abc_degree_type=abc_degree_type, abc_deg_layer=abc_deg_layer,
                           output_folder=output_folder, comm=comm)
 
-    def fundamental_frequency(self, method=None, fitting_c=(0., 0., 0., 0.)):
+    def fundamental_frequency(self, Wave_obj, method=None, fitting_c=(0., 0., 0., 0.)):
         """Compute the fundamental frequency in Hz via modal analysis.
 
         Considering the numerical model with Neumann BCs.
 
         Parameters
         ----------
+        Wave_obj : `wave.Wave`
+            An instance of the :class:`~spyro.solvers.wave.Wave`.
         method : `str`, optional
             Method to use for solving the eigenvalue problem.
             Default is None, which uses the 'KRYLOVSCH_CH' method.
@@ -314,7 +316,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
         if method == 'ANALYTICAL':
 
             # Hypershape parameters
-            hyp_par = (self.n_hyp, *self.layer_geometry.hyper_axes)
+            hyp_par = (self.layer_geometry.n_hyp, *self.layer_geometry.hyper_axes)
 
             # Cut plane at free surface
             length_z = self.domain_dim[0]
@@ -325,22 +327,22 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
             # Define the load for the energy-equivalent homogenization
             # Static load for HABC model
-            q_lay = self.set_material_property("q_lay", 'scalar', constant=0.)
-            q_lay.dat.data_with_halos[self.sources.cellNodeMaps.flatten().astype(int)] = \
-                self.sources.cell_tabulations.flatten()
+            q_lay = Wave_obj.set_material_property("q_lay", 'scalar', constant=0.)
+            q_lay.dat.data_with_halos[Wave_obj.sources.cellNodeMaps.flatten().astype(
+                int)] = Wave_obj.sources.cell_tabulations.flatten()
 
             # Static load for Reference model
-            q_ref = Function(self.mesh_parameters.funct_space_eik)
+            q_ref = Function(Wave_obj.mesh_parameters.funct_space_eik)
             q_ref.interpolate(q_lay, allow_missing_dofs=True)
 
             # Equivalent velocity for the original model
-            c_eqref = mod_sol.c_equivalent(self.initial_velocity_model,
-                                           V=self.mesh_parameters.funct_space_eik,
-                                           quad_rule=self.quadrature_rule,
+            c_eqref = mod_sol.c_equivalent(Wave_obj.initial_velocity_model,
+                                           V=Wave_obj.mesh_parameters.funct_space_eik,
+                                           quad_rule=Wave_obj.quadrature_rule,
                                            static_load_for_ceq=q_ref)
 
-            Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
-                                             quad_rule=self.quadrature_rule,
+            Lsp = mod_sol.solve_eigenproblem(Wave_obj.c, V=Wave_obj.function_space,
+                                             quad_rule=Wave_obj.quadrature_rule,
                                              hyp_par=hyp_par, c_eqref=c_eqref,
                                              fitting_c=fitting_c,
                                              cut_plane_percent=cut_plane_perc,
@@ -349,17 +351,18 @@ class HABCLayer(ABCLayer, HABC_Damping):
         elif method == 'RAYLEIGH':
 
             # Normalized coordinates
-            coord_norm = mod_sol.generate_norm_coords(self.mesh,
+            coord_norm = mod_sol.generate_norm_coords(Wave_obj.mesh,
                                                       self.domain_dim,
-                                                      self.hyper_axes)
+                                                      self.layer_geometry.hyper_axes)
 
-            Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
-                                             quad_rule=self.quadrature_rule,
+            Lsp = mod_sol.solve_eigenproblem(Wave_obj.c, V=Wave_obj.function_space,
+                                             quad_rule=Wave_obj.quadrature_rule,
                                              coord_norm=coord_norm)
 
         else:
-            Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space, shift=1e-8,
-                                             quad_rule=self.quadrature_rule)
+            Lsp = mod_sol.solve_eigenproblem(
+                Wave_obj.c, V=Wave_obj.function_space,
+                shift=1e-8, quad_rule=Wave_obj.quadrature_rule)
 
         for n_eig, eigval in enumerate(unique(Lsp)):
             f_eig = sqrt(abs(eigval)) / (2 * pi)
@@ -367,8 +370,8 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
         # Fundamental frequency (eig = 0 is a rigid body motion)
         min_eigval = max(unique(Lsp[(Lsp > 0.) & (imag(Lsp) == 0.)]))
-        self.fundam_freq = real(sqrt(min_eigval) / (2 * pi))
-        pprint(f"Fundamental Frequency (Hz): {self.fundam_freq:.5f}", comm=self.comm)
+        Wave_obj.fundam_freq = real(sqrt(min_eigval) / (2 * pi))
+        pprint(f"Fundamental Frequency (Hz): {Wave_obj.fundam_freq:.5f}", comm=self.comm)
 
     # def damping_layer(self, xCR_usu=None, method=None,
     #                   fitting_c=(0., 0., 0., 0.)):
@@ -727,11 +730,14 @@ class HABCLayer(ABCLayer, HABC_Damping):
         if self.layer_geometry.n_hyp != self.abc_deg_layer and \
                 self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
 
-            print("Output Folder for Results Will Be Renamed.", flush=True)
+            pprint(f"\nHypershape Degree Changes from {self.abc_deg_layer} "
+                   f"to {self.layer_geometry.n_hyp}. "
+                   "Output Folder for Results Will Be Renamed.", comm=self.comm)
 
             # Define the current and new folder names
             old = self.path_case_abc
-            new = self.path_case_abc[:-8] + f"{self.layer_geometry.n_hyp:.1f}" + self.path_case_abc[-5:]
+            new = f"{self.path_case_abc[:-8]}{self.layer_geometry.n_hyp:.1f}" + \
+                f"{self.path_case_abc[-5:]}"
 
             try:
                 if path.isdir(new):
@@ -739,8 +745,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
                     rmtree(new)
 
                 rename(old, new)  # Rename the directory
-                print(f"Folder '{old}' Successfully"
-                      f" Renamed to '{new}'\n", flush=True)
+                pprint(f"Folder '{old}' Successfully Renamed to '{new}'\n", comm=self.comm)
 
             except OSError as e:
-                print(f"Error Renaming Folder: {e}", flush=True)
+                pprint(f"Error Renaming Folder: {e}", comm=self.comm)

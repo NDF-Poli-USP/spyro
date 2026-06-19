@@ -785,6 +785,3 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         raise NotImplementedError(
             f"{type(self).__name__} does not define a control parameter function space.",
         )
-
-
->>>>>> > main
