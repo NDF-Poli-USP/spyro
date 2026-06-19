@@ -139,7 +139,7 @@ def set_dictionary(PML=False):
     return dictionary
 
 
-def get_forward_model(dictionary=None, auto_adj=False):
+def get_forward_model(dictionary=None, adjoint_type=AdjointType.NONE):
 
     # Exact model
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
@@ -158,11 +158,11 @@ def get_forward_model(dictionary=None, auto_adj=False):
 
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
-    if auto_adj:
+    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         assert isinstance(Wave_obj_guess.c, fire.Function)
         Wave_obj_guess.enable_automated_adjoint()
     Wave_obj_guess.forward_solve()
-    if auto_adj:
+    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         assert Wave_obj_guess.automated_adjoint._tape is not None
         Wave_obj_guess.automated_adjoint.stop_recording()
     rec_out_guess = Wave_obj_guess.forward_solution_receivers
@@ -174,7 +174,7 @@ def get_forward_model(dictionary=None, auto_adj=False):
 def test_gradient_auto_adjoint(PML=False):
     dictionary = set_dictionary(PML=PML)
     _, _, Wave_obj_guess = get_forward_model(
-        dictionary=dictionary, auto_adj=AdjointType.AUTOMATED_ADJOINT)
+        dictionary=dictionary, adjoint_type=AdjointType.AUTOMATED_ADJOINT)
     forward_solution_guess = None
     misfit = None
     # compute the gradient of the control (to be verified)
@@ -197,11 +197,9 @@ def test_gradient_auto_adjoint(PML=False):
 
 @pytest.mark.slow
 def test_gradient_implemented_adjoint(PML=False):
-    adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
-
     dictionary = set_dictionary(PML=PML)
     rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(
-        dictionary=dictionary, auto_adj=False)
+        dictionary=dictionary, adjoint_type=AdjointType.IMPLEMENTED_ADJOINT)
 
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
@@ -209,7 +207,7 @@ def test_gradient_implemented_adjoint(PML=False):
     misfit = rec_out_exact - rec_out_guess
 
     Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
-    
+
     # compute the gradient of the control (to be verified)
     dJ = Wave_obj_guess.gradient_solve(
         misfit=misfit, forward_solution=forward_solution_guess,
@@ -229,4 +227,4 @@ def test_gradient_pml_implemented_adjoint():
 
 
 if __name__ == "__main__":
-    test_gradient_pml()
+    test_gradient_pml_implemented_adjoint()
