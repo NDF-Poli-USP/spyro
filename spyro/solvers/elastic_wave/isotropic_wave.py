@@ -8,8 +8,7 @@ from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
 from ...utils.typing import (ElasticMaterialParameter,
-                             ElasticMaterialParameterization, override,
-                             WaveType)
+                             ElasticMaterialParameterization, override)
 from ...domains.space import create_function_space
 
 

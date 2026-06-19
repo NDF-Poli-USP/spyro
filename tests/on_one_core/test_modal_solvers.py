@@ -1,4 +1,9 @@
-"""Unit tests for the Modal solvers implemented in spyro.solvers.modal.modal_sol"""
+"""Unit tests for the Modal solvers implemented in spyro.solvers.modal.modal_sol.
+
+These tests verify the implemented modal solvers by comparing the computed fundamental
+frequency with expected values for different domain configurations. The tests cover
+both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
+"""
 
 from pytest import fail, fixture, mark, param
 from firedrake import conditional, ConvergenceError
@@ -6,7 +11,6 @@ from firedrake import COMM_WORLD as comm
 from numpy import isclose
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
-from spyro.utils.typing import LayerShapeType
 from spyro.io.basicio import parallel_print as pprint
 
 
@@ -146,10 +150,6 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
             f_est = 0.01 if homogeneous else 0.06
             fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.5, 0.3, -2.2, -1.3)
 
-        else:  # Test vakues
-            f_est = 0.01 if homogeneous else 0.06
-            fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.5, 0.3, -2.2, -1.3)
-
     if dimension == 3:
         if element_geometry == "T":
             f_est = 0.02 if homogeneous else 0.05
@@ -285,18 +285,17 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
         pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
 
 
-# @mark.slow
 @mark.parametrize("element_geometry, dimension, degree_layer, homogeneous",
                   [("T", 2, 2.5, True),
                    ("T", 2, None, True),
                    ("T", 2, 2.0, False),
                    ("T", 2, None, False),
-                   ("T", 3, 6.0, True),
                    ("T", 3, None, True),
-                   ("T", 3, 2.4, False),
-                   ("T", 3, None, False),
-                   ("Q", 3, None, True),
-                   ("Q", 3, None, False)])
+                   param("T", 3, 6.0, True, marks=mark.slow),
+                   param("T", 3, 2.4, False, marks=mark.slow),
+                   param("T", 3, None, False, marks=mark.slow),
+                   param("Q", 3, None, True, marks=mark.slow),
+                   param("Q", 3, None, False, marks=mark.slow)])
 def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogeneous):
     """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).
 

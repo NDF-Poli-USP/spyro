@@ -166,8 +166,8 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
                    ("T", 2, "underintegrated"),
                    ("Q", 2, "consistent"),
                    ("Q", 2, "underintegrated"),
-                   ("T", 3, "consistent"),
                    ("Q", 3, "consistent"),
+                   param("T", 3, "consistent", marks=mark.slow),
                    param("T", 3, "underintegrated", marks=mark.slow),
                    param("Q", 3, "underintegrated", marks=mark.slow)])
 def test_eikonal(element_geometry, dimension, element_type):
