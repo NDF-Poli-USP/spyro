@@ -15,7 +15,7 @@ from .backward_time_integration import (
 )
 from ..domains.space import create_function_space
 from ..utils.typing import (
-    RieszMapType, override, WaveType,
+    AdjointType, RieszMapType, override, WaveType,
 )
 from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
@@ -73,7 +73,7 @@ class AcousticWave(Wave):
     @ensemble_gradient
     def gradient_solve(
         self, misfit=None, forward_solution=None,
-        auto_adj=False,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
         riesz_map=RieszMapType.L2,
     ):
         """Compute the adjoint-based gradient.
@@ -90,7 +90,7 @@ class AcousticWave(Wave):
             computed by calling the forward solver. Providing the forward solution
             can save computational time if it has already been
             computed for the current velocity model, as it avoids redundant forward solves.
-        auto_adj: bool (default: False)
+        adjoint_type: AdjointType enum (default: AdjointType.IMPLEMENTED_ADJOINT)
             Whether to use automated adjoint differentiation.
         riesz_map: RieszMapType enum (default: RieszMapType.L2)
             The type of Riesz map to use for the gradient. More details in the documentation of the
@@ -102,7 +102,7 @@ class AcousticWave(Wave):
             Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
             depending on the chosen Riesz map.
         """
-        if auto_adj:
+        if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
             if not isinstance(self.functional_value, AdjFloat):
                 raise ValueError(
                     "Functional value must be an AdjFloat for automated adjoint gradient computation."
