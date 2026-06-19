@@ -1,0 +1,32 @@
+name: Automatically Create Backup Tags
+
+on:
+  push:
+    branches:
+      - main
+
+# This is required to push the tags from the workflow
+permissions:
+  contents: write
+
+jobs:
+  create_tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create tag
+        run: |
+          TAG="backup-$(git rev-parse --short HEAD)-$(date +%4Y_%m_%d_z%Z_%H_%M_%S)"
+
+          echo "Creating tag: $TAG"
+
+          git tag "$TAG"
+          git push origin "$TAG"
