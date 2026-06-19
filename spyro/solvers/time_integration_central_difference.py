@@ -42,7 +42,6 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
             if t % wave_obj.gradient_sampling_frequency == 0
         ]
     source_cof = None
-    source_values = None
     interpolate_receivers = None
     master_source_W = None
     if wave_obj.sources is not None and wave_obj.use_vertex_only_mesh:
