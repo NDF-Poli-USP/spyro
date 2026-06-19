@@ -16,7 +16,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     dm = fire.Function(V_c)
     size, = np.shape(dm.dat.data[:])
     dm_data = np.random.default_rng(0).random(size)
-    dm.dat.data[:] = dm_data
+    dm.dat.data_wo[:] = dm_data
     if Wave_obj_guess.abc_boundary_layer_type == "PML":
         x = Wave_obj_guess.mesh_x
         z = Wave_obj_guess.mesh_z
@@ -26,7 +26,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
         )
         indicator = fire.Function(V_c)
         indicator.interpolate(fire.conditional(inside, 1.0, 0.0))
-        dm.dat.data[:] *= indicator.dat.data[:]
+        dm.dat.data_wo[:] *= indicator.dat.data_ro[:]
 
     for step in steps:
 
