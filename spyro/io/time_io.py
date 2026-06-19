@@ -9,7 +9,6 @@ class Read_time_axis:
         self.final_time = self.input_dictionary["time_axis"]["final_time"]
         self.dt = self.input_dictionary["time_axis"]["dt"]
         self.input_dictionary["time_axis"].setdefault("gradient_sampling_frequency", 99999)
-        self.input_dictionary["time_axis"].setdefault("save_forward_solution", True)
 
     @property
     def initial_time(self):
