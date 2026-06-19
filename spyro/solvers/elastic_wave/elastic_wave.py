@@ -34,5 +34,11 @@ class ElasticWave(Wave, metaclass=ABCMeta):
         pass
 
     @override
+    def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
+        raise NotImplementedError(
+            "Elastic adjoint gradients are not implemented yet.",
+        )
+
+    @override
     def update_source_expression(self, t):
         self.time.assign(t)

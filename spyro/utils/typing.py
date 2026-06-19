@@ -73,6 +73,23 @@ class RieszMapType(Enum):
     l2 = 2
 
 
+class ElasticMaterialParameter(Enum):
+    """Supported isotropic elastic material parameter names."""
+
+    DENSITY = "density"
+    LAMBDA = "lambda"
+    MU = "mu"
+    P_WAVE_VELOCITY = "p_wave_velocity"
+    S_WAVE_VELOCITY = "s_wave_velocity"
+
+
+class ElasticMaterialParameterization(Enum):
+    """Supported isotropic elastic inversion control parameterizations."""
+
+    LAME = "lame"
+    VELOCITY = "velocity"
+
+
 class FunctionalType(Enum):
     """Enum for different types of functionals that can be computed.
 
