@@ -290,7 +290,7 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
                    ("T", 2, None, True),
                    ("T", 2, 2.0, False),
                    ("T", 2, None, False),
-                   ("T", 3, None, True),
+                   param("T", 3, None, True, marks=mark.slow),
                    param("T", 3, 6.0, True, marks=mark.slow),
                    param("T", 3, 2.4, False, marks=mark.slow),
                    param("T", 3, None, False, marks=mark.slow),
