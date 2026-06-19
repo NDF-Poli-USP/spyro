@@ -22,7 +22,7 @@ jobs:
     # Runs on all pushes and pull requests for quick feedback
 
     container:
-      image: firedrakeproject/firedrake:2025.4.1
+      image: firedrakeproject/firedrake:2025.10.2
       options: --user root  # Ensures it can install packages if needed
 
     steps:
