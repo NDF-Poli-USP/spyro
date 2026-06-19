@@ -105,8 +105,9 @@ def test_misfit_2d():
 
     FWI_obj.set_guess_mesh(input_mesh_parameters={"edge_length": 0.05})
     FWI_obj.set_guess_velocity_model(constant=4.0)
-    functional_fwi = FWI_obj.get_functional()
-    misfit = FWI_obj.misfit
+    FWI_obj.enable_compute_functional()
+    FWI_obj.forward_solve()
+    misfit = FWI_obj.calculate_misfit()
 
     # Using only wave objects
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
@@ -139,7 +140,7 @@ def test_misfit_2d():
         functional_second_calc,
     )
     functional_matches_fwi = np.isclose(
-        functional_fwi,
+        FWI_obj.functional_value,
         functional_second_calc,
     )
 
@@ -152,7 +153,7 @@ def test_misfit_2d():
     assert test
     assert functional_matches_wave
     assert functional_matches_fwi
-    print("functional value from FWI object:", functional_fwi)
+    print("functional value from FWI object:", FWI_obj.functional_value)
     print("functional value from wave object:", Wave_obj_guess.functional_value)
     print("functional value from manual calculation:", functional_second_calc)
 

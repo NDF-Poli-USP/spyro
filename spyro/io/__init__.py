@@ -17,10 +17,7 @@ from .basicio import (
     ensemble_load,
     delete_tmp_files,
     ensemble_shot_record,
-    ensemble_functional,
-    read_segy_velocity_model,
-    read_bin_velocity_model,
-    write_velocity_model
+    ensemble_functional
 )
 from .model_parameters import Model_parameters
 from .backwards_compatibility_io import Dictionary_conversion
@@ -55,7 +52,4 @@ __all__ = [
     "ensemble_shot_record",
     "ensemble_functional",
     "time_io",
-    "read_segy_velocity_model",
-    "read_bin_velocity_model",
-    "write_velocity_model",
 ]
