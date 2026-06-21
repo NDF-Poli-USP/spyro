@@ -6,9 +6,15 @@ import firedrake
 import copy
 from ..io import ensemble_save
 from ..utils import change_scalar_field_resolution
+from ..tools.version_control import is_firedrake_new
 plt.rcParams.update({"font.family": "serif"})
 plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
 __all__ = ["plot_shots"]
+
+
+if is_firedrake_new() is False:
+    from firedrake.__future__ import interpolate
+    firedrake.interpolate = interpolate
 
 
 @ensemble_save
@@ -178,7 +184,7 @@ def plot_mesh_sizes(
     mesh.coordinates.dat.data[:, 1] = coordinates[:, 0]
 
     DG0 = firedrake.FunctionSpace(mesh, "DG", 0)
-    f = firedrake.interpolate(firedrake.CellSize(mesh), DG0)
+    f = firedrake.assemble(interpolate(firedrake.CellSize(mesh), DG0))
 
     fig, axes = plt.subplots()
     if show_size_contour:

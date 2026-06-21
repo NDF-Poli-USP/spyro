@@ -2,7 +2,6 @@ import firedrake as fire
 import numpy as np
 import spyro.meshing.meshing_operations as mshops
 from netgen.geom2d import SplineGeometry
-from firedrake.__future__ import interpolate
 from netgen.meshing import Element2D, \
     Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
@@ -10,7 +9,12 @@ from spyro.domains.space import create_function_space
 from spyro.meshing.meshing_functions import AutomaticMesh
 from spyro.tools.habc_tools import point_cloud_field
 from spyro.utils.error_management import value_parameter_error
-fire.interpolate = interpolate
+from ..tools.version_control import is_firedrake_new
+
+
+if is_firedrake_new() is False:
+    from firedrake.__future__ import interpolate
+    fire.interpolate = interpolate
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -282,10 +286,21 @@ class HABC_Mesh():
         mesh_orig = fire.VTKFile(self.path_save + "preamble/mesh_orig.pvd")
         mesh_orig.write(self.mesh_original)
 
-        # Velocity profile model
-        self.c = fire.Function(self.function_space, name='c_orig [km/s])')
-        self.c.assign(fire.assemble(fire.interpolate(
-            self.initial_velocity_model, self.function_space)))
+        # Keep the physical 3D velocity on a discontinuous cell-wise space.
+        # Interpolating the bimaterial profile to the high-order wave space can
+        # smear the interface on current Firedrake, which destabilizes the
+        # tetrahedral Eikonal sizing step. We still write a high-order copy for
+        # visualization below.
+        if self.dimension == 3:
+            method_element = "DQ" if self.quadrilateral else "DG"
+            velocity_space = create_function_space(self.mesh, method_element, 0)
+            self.c = fire.Function(velocity_space, name='c_orig [km/s])')
+            self.c.interpolate(self.initial_velocity_model,
+                               allow_missing_dofs=True)
+        else:
+            self.c = fire.Function(self.function_space, name='c_orig [km/s])')
+            self.c.assign(fire.assemble(fire.interpolate(
+                self.initial_velocity_model, self.function_space)))
 
         # Get extreme values of the velocity model
         self.c_min = self.initial_velocity_model.dat.data_with_halos.min()
@@ -297,7 +312,12 @@ class HABC_Mesh():
 
         # Save initial velocity model
         vel_c = fire.VTKFile(self.path_save + "preamble/c_vel.pvd")
-        vel_c.write(self.c)
+        if self.dimension == 3:
+            c_vis = fire.Function(self.function_space, name='c_orig [km/s])')
+            c_vis.interpolate(self.c)
+            vel_c.write(c_vis)
+        else:
+            vel_c.write(self.c)
 
         # Generating boundary data from the original domain mesh
         print("Getting Boundary Mesh Data from Original Domain", flush=True)
