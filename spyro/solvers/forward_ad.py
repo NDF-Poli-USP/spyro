@@ -1,7 +1,12 @@
 import firedrake as fire
 import firedrake.adjoint as fire_ad
 from .time_integration_ad import central_difference_acoustic
-from firedrake.__future__ import interpolate
+from ..tools.version_control import is_firedrake_new
+
+
+if is_firedrake_new() is False:
+    from firedrake.__future__ import interpolate  # noqa: F401
+
 # Note this turns off non-fatal warnings
 fire.set_log_level(fire.ERROR)
 
@@ -83,7 +88,7 @@ class ForwardSolver:
         # Receivers
         V_r = fire.FunctionSpace(self.receiver_mesh, "DG", 0)
         # Interpolate object.
-        interpolate_receivers = interpolate(u_np1, V_r)
+        interpolate_receivers = fire.interpolate(u_np1, V_r)
 
         # Time execution.
         J_val = 0.0
