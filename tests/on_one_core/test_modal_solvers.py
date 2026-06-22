@@ -285,6 +285,7 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
         pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
 
 
+@mark.older_firedrake
 @mark.parametrize("element_geometry, dimension, degree_layer, homogeneous",
                   [("T", 2, 2.5, True),
                    ("T", 2, None, True),
@@ -427,7 +428,6 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     freq[Hz]  0.65356 0.54617 0.53122
     texe[s]     0.799  34.327 373.401
     mem[MB]     6.730  47.889 154.636
-
 
     ===================================================
     Natural Frequency for 3D model Δx = 150m - Ele = Q

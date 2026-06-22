@@ -3,11 +3,14 @@
 from firedrake import (assemble, conditional, Constant,
                        Function, FunctionSpace, VertexOnlyMesh)
 from firedrake import sqrt as fire_sqrt
-from firedrake.__future__ import interpolate
 from numpy import clip, where
 from ..domains.space import create_function_space
 from ..utils.error_management import value_parameter_error
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
+from ..tools.version_control import is_firedrake_new
+
+if is_firedrake_new() is False:
+    from firedrake.__future__ import interpolate
 
 
 def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
