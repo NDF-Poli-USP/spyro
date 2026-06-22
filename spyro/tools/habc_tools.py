@@ -9,7 +9,9 @@ from ..utils.error_management import value_parameter_error
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..tools.version_control import is_firedrake_new
 
-if is_firedrake_new() is False:
+if is_firedrake_new():
+    from firedrake import interpolate
+else:
     from firedrake.__future__ import interpolate
 
 

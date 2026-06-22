@@ -24,6 +24,7 @@ from ..utils.typing import HyperLayerDegreeType, LayerShapeType, LayerSizeRefFre
 # Applied Mathematical Modelling (2022)
 # doi: https://doi.org/10.1016/j.apm.2022.09.014
 # With additions by Alexandre Olender
+# TODO: Add reference
 
 
 class ABCLayer(NRBC):
