@@ -1,4 +1,5 @@
 import math
+import pytest
 from spyro.meshing.meshing_parameters import MeshingParameters
 from spyro.meshing.meshing_functions import AutomaticMesh
 import importlib.util
@@ -6,6 +7,7 @@ import importlib.util
 HAS_NUMBA = importlib.util.find_spec("numba") is not None
 
 
+@pytest.mark.slow
 def test_gmsh2d_structured():
     print("STARTING STRUCTURED MESH TESTS")
 
@@ -80,6 +82,7 @@ def test_gmsh2d_structured():
                 f"FAILED: Struct | Winslow: {winslow_impl} | Wat: {water_interface} | Pad: {padding_type}. Got {actual_cells}, expected {expected_cells}"
 
 
+@pytest.mark.slow
 def test_gmsh2d_unstructured():
     print("STARTING UNSTRUCTURED MESH TESTS")
 
@@ -152,6 +155,7 @@ def test_gmsh2d_unstructured():
             f"FAILED: Unstruct | Ext: {extend_segy} | Wat: {water_interface} | Pad: {padding_type}. Got {actual_cells}, expected {expected_cells}"
 
 
+@pytest.mark.slow
 def test_gmsh2d_structured_no_winslow():
     print("STARTING STRUCTURED MESH (NO WINSLOW) TESTS")
 
