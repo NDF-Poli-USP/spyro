@@ -11,8 +11,12 @@ import segyio
 import glob
 import os
 import warnings
-from firedrake.__future__ import interpolate
-fire.interpolate = interpolate
+from ..tools.version_control import is_firedrake_new
+
+
+if is_firedrake_new() is False:
+    from firedrake.__future__ import interpolate
+    fire.interpolate = interpolate
 
 
 def delete_tmp_files(wave):
