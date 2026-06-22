@@ -754,6 +754,10 @@ class MeshingParameters():
         if value == "SeismicMesh" and self.quadrilateral:
             raise ValueError("SeismicMesh does not work with quads.")
         self._mesh_type = value
+
+        if value in ["firedrake_mesh", "SeismicMesh", "spyro_mesh"]:
+            self.automatic_mesh = True
+
         if hasattr(self, 'is_complete'):
             self.check_completeness()
 

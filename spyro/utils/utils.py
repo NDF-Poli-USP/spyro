@@ -8,17 +8,12 @@ import warnings
 
 from ..io import ensemble_functional
 from ..io import parallel_print
+from ..io import write_velocity_model
 from .typing import FunctionalEvaluationMode, FunctionalType
-try:
-    from SeismicMesh import write_velocity_model
-    SEISMIC_MESH_AVAILABLE = True
-except ImportError:
-    SEISMIC_MESH_AVAILABLE = False
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
-    """Low-pass filter the shot record with sampling-rate fs Hz
-    and cutoff freq. Hz
+    """Low-pass filter the shot record using fs and cutoff freq in Hz.
 
     Parameters
     ----------
@@ -713,16 +708,16 @@ def run_in_one_core_and_broadcast(func):
 
 @run_in_one_core_and_broadcast
 def write_hdf5_velocity_model(obj_with_comm, segy_filename):
-    """Convert SEG-Y velocity model to HDF5 format.
+    """Convert a SEG-Y velocity model to HDF5 format.
 
-    Converts a SEG-Y format velocity model file to HDF5 format using
-    SeismicMesh. The conversion is performed on rank 0 and the output
-    filename is broadcast to all processes.
+    Converts a SEG-Y velocity model file to HDF5 using the native
+    ``write_velocity_model`` function. The conversion is performed on rank 0
+    and the output filename is broadcast to all processes.
 
     Parameters
     ----------
     obj_with_comm : object
-        Object with a 'comm' attribute containing an MPI communicator.
+        Object with a ``comm`` attribute containing an MPI communicator.
         Used by the decorator to determine which process performs the
         conversion.
     segy_filename : str
@@ -731,42 +726,29 @@ def write_hdf5_velocity_model(obj_with_comm, segy_filename):
     Returns
     -------
     str
-        Path to the output HDF5 file (input basename with .hdf5 extension).
-
-    Raises
-    ------
-    ValueError
-        If SeismicMesh is not installed.
+        Path to the output HDF5 file, using the input basename with
+        ``.hdf5`` extension.
 
     Notes
     -----
-    This is just a wrapper for the equivelant SeismicMesh method. We
-    need to substitute this with our own method, since it is not related
-    to mesh generation.
-
-    This function requires the SeismicMesh package to be installed.
-    The output filename is constructed by replacing the input file
-    extension with '.hdf5'.
-
-    Due to the @run_in_one_core_and_broadcast decorator, only rank 0
-    performs the actual file conversion, but all processes receive
-    the output filename.
+    Due to the ``@run_in_one_core_and_broadcast`` decorator, only rank 0
+    performs the actual file conversion, but all processes receive the
+    output filename.
 
     Examples
     --------
-    >>> output_file = write_hdf5_velocity_model(wave_obj, 'velocity.segy')
+    >>> output_file = write_hdf5_velocity_model(wave_obj, "velocity.segy")
     >>> print(output_file)
     'velocity.hdf5'
     """
-    if SEISMIC_MESH_AVAILABLE is False:
-        raise ValueError("Segy to HDF5 not yet implemented natively. Please install SeismicMesh")
-    vp_filename, vp_filetype = os.path.splitext(
-        segy_filename
+    vp_filename, _ = os.path.splitext(segy_filename)
+
+    output_filename = write_velocity_model(
+        filename=segy_filename,
+        ofname=vp_filename,
+        model_type="segy",
     )
-    write_velocity_model(
-        segy_filename, ofname=vp_filename
-    )
-    output_filename = vp_filename + ".hdf5"
+
     return output_filename
 
 

@@ -17,7 +17,10 @@ from .basicio import (
     ensemble_load,
     delete_tmp_files,
     ensemble_shot_record,
-    ensemble_functional
+    ensemble_functional,
+    read_segy_velocity_model,
+    read_bin_velocity_model,
+    write_velocity_model
 )
 from .segy_io import create_segy, create_segy_from_grid
 from .model_parameters import Model_parameters
@@ -57,4 +60,7 @@ __all__ = [
     "ensemble_functional",
     "time_io",
     "material_properties_io",
+    "read_segy_velocity_model",
+    "read_bin_velocity_model",
+    "write_velocity_model",
 ]
