@@ -171,7 +171,7 @@ def get_forward_model(dictionary=None, adjoint_type=AdjointType.NONE):
 
 
 @pytest.mark.slow
-def test_gradient_auto_adjoint(PML=False):
+def test_gradient_auto_adjoint(PML=True):
     dictionary = set_dictionary(PML=PML)
     _, _, Wave_obj_guess = get_forward_model(
         dictionary=dictionary, adjoint_type=AdjointType.AUTOMATED_ADJOINT)

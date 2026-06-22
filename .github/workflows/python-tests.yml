@@ -189,3 +189,71 @@ jobs:
     - name: Post-run cleanup
       if: always()
       run: find . -delete
+  
+  new-firedrake-tests:
+    name: Updated Firedrake tests
+    runs-on: self-hosted
+    needs: slow-tests
+    if: github.event_name == 'pull_request'
+    # Only runs on PRs after fast tests pass - saves resources
+
+    container:
+      image: firedrakeproject/firedrake:2026.4.0
+      options: --user root  # Ensures it can install packages if needed
+
+    steps:
+
+    - name: Pre-run cleanup
+        # Make sure the current directory is empty
+      run: find . -delete
+
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        apt-get update \
+        && apt-get -y install git python3 \
+        && apt-get -y install gmsh patchelf \
+        && pip3 install segyio \
+        && apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk \
+        && pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
+        && pip3 install pyamg \
+        && pip3 install meshio \
+        && pip3 install -U memory_profiler \
+        && pip3 install pytest pytest-cov \
+        && pip3 install pytest-sugar \
+        && pip3 install gmsh
+
+    - name: Clear all firedrake-related caches
+      run: |
+        rm -rf ~/.cache/loopy \
+               ~/.loopy_kernel_cache \
+               ~/.cache/pyop2 \
+               ~/.cache/tsfc \
+               .pytest_cache
+        find . -name '*.pkl' -delete || true
+
+    - name: Running serial tests
+      run: |
+        make clean
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/  --skip-older-firedrake
+
+    - name: Running parallel tests for forward problem only
+      run: |
+          make clean
+          mpiexec -n 6 pytest tests/three_dimension/test_hexahedral_convergence.py
+          mpiexec -n 6 pytest tests/parallel/test_forward.py
+          mpiexec -n 6 pytest tests/parallel/test_forward_supershot.py
+          mpiexec -n 2 pytest tests/parallel/test_parallel_io.py
+          mpiexec -n 2 pytest tests/parallel/test_forward_multiple_serial_shots.py
+    
+    - name: Running parallel tests for inversion
+      run: |
+          make clean
+          mpiexec -n 6 pytest tests/parallel/test_fwi.py
+          mpiexec -n 3 pytest tests/parallel/test_supershot_grad.py
+          mpiexec -n 2 pytest tests/parallel/test_gradient_serialshots.py
+
+    - name: Post-run cleanup
+      if: always()
+      run: find . -delete
