@@ -1,13 +1,18 @@
 """Methods to extend the material property in an absorbing layer."""
 
-from firedrake import (assemble, conditional, Constant, Function,
-                       FunctionSpace, VertexOnlyMesh)
+from firedrake import (assemble, conditional, Constant,
+                       Function, FunctionSpace, VertexOnlyMesh)
 from firedrake import sqrt as fire_sqrt
-from firedrake.__future__ import interpolate
 from numpy import clip, where
-from spyro.domains.space import create_function_space
-from spyro.utils.error_management import value_parameter_error
-from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
+from ..domains.space import create_function_space
+from ..utils.error_management import value_parameter_error
+from ..utils.eval_functions_to_ufl import generate_ufl_functions
+from ..tools.version_control import is_firedrake_new
+
+if is_firedrake_new():
+    from firedrake import interpolate
+else:
+    from firedrake.__future__ import interpolate
 
 
 def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
@@ -18,27 +23,27 @@ def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
     ----------
     domain_dim : `tuple`
         Domain dimensions: (length_z, length_x) for 2
-        or (length_z, length_x, length_y) for 3D
+        or (length_z, length_x, length_y) for 3D.
     mesh : `Firedrake.Mesh`
-        Current mesh
+        Current mesh.
     dimension : `int`
-        Model dimension (2D or 3D)
+        Model dimension (2D or 3D).
     ufl_coordinates_habc : `ufl.geometry.SpatialCoordinate`
-        Domain Coordinates including the absorbing layer
+        Domain Coordinates including the absorbing layer.
     type_marker : `string`, optional
         Type of marker for the absorbing layer. Default is 'mask'.
-        - 'damping' : Get the reference distance to the original boundary
-        - 'mask' : Define a mask to filter the layer boundary domain
+        - 'damping' : Get the reference distance to the original boundary.
+        - 'mask' : Define a mask to filter the layer boundary domain.
 
     Returns
     -------
     ref_conditional : `ufl.conditional.Conditional`
         Conditional expression to identify the layer domain or reference
-        distance for the damping function inside the layer
+        distance for the damping function inside the layer.
     """
 
     # Domain dimensions
-    Lz, Lx = domain_dim[:2]
+    length_z, length_x = domain_dim[:2]
 
     # UFL coordinates
     z, x = ufl_coordinates_habc[0], ufl_coordinates_habc[1]
@@ -46,14 +51,14 @@ def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
         y = ufl_coordinates_habc[2]
 
     # Conditional expression
-    condz = z < -Lz
+    condz = z < -length_z
     condx1 = x < 0.
-    condx2 = x > Lx
+    condx2 = x > length_x
 
     # Conditional value
-    exprz = f"(z + {Lz})**2" if type_marker == 'damping' else "1"
+    exprz = f"(z + {length_z})**2" if type_marker == 'damping' else "1"
     exprx1 = "x**2" if type_marker == 'damping' else "1"
-    exprx2 = f"(x - {Lx})**2" if type_marker == 'damping' else "1"
+    exprx2 = f"(x - {length_x})**2" if type_marker == 'damping' else "1"
     valz = generate_ufl_functions(mesh, exprz, dimension)
     valx1 = generate_ufl_functions(mesh, exprx1, dimension)
     valx2 = generate_ufl_functions(mesh, exprx2, dimension)
@@ -66,15 +71,15 @@ def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
     if dimension == 3:  # 3D
 
         # 3D dimension
-        Ly = domain_dim[2]
+        length_y = domain_dim[2]
 
         # Conditional expression
         condy1 = y < 0.
-        condy2 = y > Ly
+        condy2 = y > length_y
 
         # Conditional value
         expry1 = "y**2" if type_marker == 'damping' else "1"
-        expry2 = f"(y - {Ly})**2" if type_marker == 'damping' else "1"
+        expry2 = f"(y - {length_y})**2" if type_marker == 'damping' else "1"
         valy1 = generate_ufl_functions(mesh, expry1, dimension)
         valy2 = generate_ufl_functions(mesh, expry2, dimension)
 
@@ -97,41 +102,41 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
     ----------
     domain_dim : `tuple`
         Domain dimensions: (length_z, length_x) for 2
-        or (length_z, length_x, length_y) for 3D
+        or (length_z, length_x, length_y) for 3D.
     mesh : `Firedrake.Mesh`
-        Current mesh
+        Current mesh.
     dimension : `int`, optional
-        Model dimension (2D or 3D)
+        Model dimension (2D or 3D).
     ufl_coordinates_habc : `ufl.geometry.SpatialCoordinate`
-        Domain Coordinates including the absorbing layer
+        Domain Coordinates including the absorbing layer.
     V : `Firedrake.FunctionSpace`
-        Function space for the mask field
+        Function space for the mask field.
     damp_par : `tuple`, optional
         Damping parameters for the absorbing layer.
-        Structure: (pad_len, eta_crt, aq, bq)
+        Structure: (pad_len, eta_crt, aq, bq).
         - pad_len : `float`
-            Size of the absorbing layer
+            Size of the absorbing layer.
         - eta_crt : `float`
-            Critical damping coefficient (1/s)
+            Critical damping coefficient (1/s).
         - aq : `float`
-            Coefficient for quadratic term in the damping function
+            Coefficient for quadratic term in the damping function.
         - bq : `float`
-            Coefficient bq for linear term in the damping function
+            Coefficient bq for linear term in the damping function.
     type_marker : `string`, optional
         Type of marker. Default is 'mask'.
-        - 'damping' : Get the reference distance to the original boundary
-        - 'mask' : Define a mask to filter the layer boundary domain
+        - 'damping' : Get the reference distance to the original boundary.
+        - 'mask' : Define a mask to filter the layer boundary domain.
     name_mask : `string`, optional
-        Name for the mask field. Default is None
+        Name for the mask field. Default is None.
 
     Returns
     -------
     layer_mask : `Firedrake.Function`
-        Mask for the absorbing layer
+        Mask for the absorbing layer.
         - 'damping' : `ufl.conditional.Conditional`
-            Reference distance to the original boundary
+            Reference distance to the original boundary.
         - 'mask' : `ufl.algebra.Division`
-            Conditional expression to identify the layer domain
+            Conditional expression to identify the layer domain.
     """
 
     # Reference function for the layer mask
@@ -188,24 +193,24 @@ def clipping_coordinates_lay_field(domain_dim, mesh, dimension,
     ----------
     domain_dim : `tuple`
         Domain dimensions: (length_z, length_x) for 2
-        or (length_z, length_x, length_y) for 3D
+        or (length_z, length_x, length_y) for 3D.
     mesh : `Firedrake.Mesh`
-        Current mesh
+        Current mesh.
     dimension : `int`
-        Model dimension (2D or 3D)
+        Model dimension (2D or 3D).
     ufl_coordinates_habc : `ufl.geometry.SpatialCoordinate`
-        Domain Coordinates including the absorbing layer
+        Domain Coordinates including the absorbing layer.
     V : `Firedrake.FunctionSpace`
-        Function space for the mask field
+        Function space for the mask field.
     quadrilateral : bool, optional
-        Flag to indicate whether to use quadrilateral/hexahedral elements
+        Flag to indicate whether to use quadrilateral/hexahedral elements.
 
     Returns
     -------
     lay_field : `Firedrake.Function`
-        Field with clipped coordinates only in the absorbing layer
+        Field with clipped coordinates only in the absorbing layer.
     layer_mask : `Firedrake.Function`
-        Mask for the absorbing layer
+        Mask for the absorbing layer.
     """
 
     print("Clipping Coordinates Inside Layer", flush=True)
@@ -248,19 +253,19 @@ def point_cloud_field(parent_mesh, pts_cloud, parent_field, tolerance):
     Parameters
     ----------
     parent_mesh : `firedrake mesh`
-        Parent mesh containing the original field
+        Parent mesh containing the original field.
     pts_cloud : `array`
-        Array of shape (num_pts, dim) containing the coordinates
+        Array of shape (num_pts, dim) containing the coordinates.
         of the point cloud
     parent_field : `Firedrake.Function`
-        Parent field defined on the parent mesh
+        Parent field defined on the parent mesh.
     tolerance : `float`
-        Tolerance for searching nodes in the mesh
+        Tolerance for searching nodes in the mesh.
 
     Returns
     -------
     cloud_field : `Firedrake.Function`
-        Field defined on the point cloud
+        Field defined on the point cloud.
     """
 
     # Creating a point cloud field from the parent mesh
@@ -289,20 +294,20 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
     Parameters
     ----------
     mesh_original : `Firedrake.Mesh`
-        Original mesh without absorbing layer
+        Original mesh without absorbing layer.
     field_to_extend : `Firedrake.Function`
-        Scalar field defined on the original mesh to be extended inside the layer
+        Scalar field defined on the original mesh to be extended inside the layer.
     lay_field : `Firedrake.Function`
-        Field with clipped coordinates only in the absorbing layer
+        Field with clipped coordinates only in the absorbing layer.
     layer_mask : `Firedrake.Function`
-        Mask for the absorbing layer
+        Mask for the absorbing layer.
     tolerance : `float`
-        Tolerance for searching nodes in the mesh
+        Tolerance for searching nodes in the mesh.
     method : `str`, optional
         Method to extend the velocity profile. Options:
-        'point_cloud' or 'nearest_point'. Default is 'point_cloud'
+        'point_cloud' or 'nearest_point'. Default is 'point_cloud'.
     name_prop : `str`, optional
-        Name for the property field. Default is "Property"
+        Name for the property field. Default is "Property".
 
     Returns
     -------

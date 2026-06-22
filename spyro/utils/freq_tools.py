@@ -1,4 +1,4 @@
-"""Contains methods for calculating the frequency response of a signal."""
+"""Utilities for calculating the frequency response of a signal."""
 
 from numpy import abs, concatenate, linspace, zeros
 from scipy.fft import fft
@@ -10,20 +10,20 @@ def freq_response(signal, f_Nyq, fpad=4, get_dominant_freq=False):
     Parameters
     ----------
     signal : `array`
-        Signal data
+        Signal data.
     f_Nyq : `float`
-        Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
+        Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt).
     fpad : `int`, optional
-        Padding factor for FFT. Default is 4
+        Padding factor for FFT. Default is 4.
     get_dominant_freq : `bool`, optional
-        If True, return only the dominant frequency of the spectrum. Default is False
+        If `True`, return only the dominant frequency of the spectrum. Default is `False`.
 
     Returns
     -------
     norm_magnitude : `array`
-        Normalized frequency spectrum with respect to the maximum magnitude
+        Normalized frequency spectrum with respect to the maximum magnitude.
     dominant_freq : `float`, optional
-        Dominant frequency of the spectrum
+        Dominant frequency of the spectrum.
     """
 
     # Check if the signal is empty
