@@ -1,10 +1,12 @@
 from firedrake import as_vector, assemble, CellDiameter, DirichletBC, SpatialCoordinate
-from numpy import allclose, column_stack, linspace, log10, min, max
+from numpy import allclose, clip, column_stack, linspace, log10, min, max
 from ..utils.error_management import value_parameter_error
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..tools.version_control import is_firedrake_new
 
-if is_firedrake_new() is False:
+if is_firedrake_new():
+    from firedrake import interpolate
+else:
     from firedrake.__future__ import interpolate
 
 
@@ -324,7 +326,8 @@ class MeshOps():
                     boundary_ids_map[idx_bdn] = None
                     continue
 
-                idx_test = linspace(0, len(bnd_node_ids) - 1, 10, dtype=int)
+                idx_test = linspace(0, len(bnd_node_ids) - 1,
+                                    clip(len(bnd_node_ids), 2, 10), dtype=int)
                 sample_nodes = bnd_node_ids[idx_test]
 
                 # Data for checking
