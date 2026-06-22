@@ -161,6 +161,7 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
     return min_eik
 
 
+@mark.older_firedrake
 @mark.parametrize("element_geometry, dimension, element_type",
                   [("T", 2, "consistent"),
                    ("T", 2, "underintegrated"),
