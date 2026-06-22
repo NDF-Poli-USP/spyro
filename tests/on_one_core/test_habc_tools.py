@@ -253,17 +253,13 @@ def run_tools(Wave_obj, method_extend, n_root=1):
     Wave_obj.layer_ops.rename_folder_habc()
 
 
-@pytest.mark.older_firedrake
-@pytest.mark.parametrize("element_type, dimension, method_extend", [
-    ("T", 2, "point_cloud"),
-    ("T", 2, "nearest_point"),
-    ("Q", 2, "point_cloud"),
-    ("Q", 2, "nearest_point"),
-    pytest.param("T", 3, "point_cloud", marks=pytest.mark.slow),
-    pytest.param("T", 3, "nearest_point", marks=pytest.mark.slow),
-    pytest.param("Q", 3, "point_cloud", marks=pytest.mark.slow),
-    pytest.param("Q", 3, "nearest_point", marks=pytest.mark.slow)])
-def test_habc_tools(element_type, dimension, method_extend):
+@mark.older_firedrake
+@mark.parametrize("element_geometry, dimension",
+                  [("T", 2),
+                   ("Q", 2),
+                   param("T", 3, marks=mark.slow),
+                   param("Q", 3, marks=mark.slow)])
+def test_habc_tools(element_geometry, dimension):
     """Test of HABC tools for 2D and 3D case.
 
     Parameters
