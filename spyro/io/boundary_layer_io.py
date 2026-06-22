@@ -1,4 +1,5 @@
-from spyro.utils.error_management import value_parameter_error
+from ..utils.error_management import enum_parameter_error, value_parameter_error
+from ..utils.typing import HyperLayerDegreeType, LayerShapeType, LayerSizeRefFrequency
 
 
 class Read_boundary_layer:
@@ -7,8 +8,9 @@ class Read_boundary_layer:
 
     Attributes
     ----------
-    abc_boundary_layer_shape : str
-        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
+    abc_boundary_layer_shape : `typing.LayerShapeType`, optional
+        Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
+        `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
     abc_boundary_layer_type : `str`
         Type of the boundary layer. Options: 'hybrid' or 'PML'.
         Option 'hybrid' is based on paper of Salas et al. (2022).
@@ -19,29 +21,31 @@ class Read_boundary_layer:
         Finite element order for the Eikonal analysis
     abc_deg_layer : `int` or `float`
         Hypershape degree
-    abc_degree_type : `str`
-        Type of the hypereshape degree. Options: 'real' or 'integer'
-    abc_exponent : float
+    abc_degree_type : `typing.HyperLayerDegreeType`, optional
+        Type of the hypereshape degree. Options: 'HyperLayerDegreeType.REAL' or
+        'HyperLayerDegreeType.INTEGER'. Default is 'HyperLayerDegreeType.REAL'
+    abc_exponent : `float`
         Exponent of the polynomial damping
-    abc_extension_mode : `str`
+    abc_extend_properties : `str`
         Mode to extend the properties into the absorbing layer.
         Options: 'abc_driven'  (performed by a specific method) or
         'builtin' (automatic at field definition)
     abc_get_ref_model : `bool`
         If True, the infinite model is created
-    abc_pad_length : float
+    abc_pad_length : `float`
         Thickness of the PML in the z-direction (km) - always positive
-    abc_R : float
+    abc_R : `float`
         Theoretical reflection coefficient
-    abc_reference_freq : `str`
-        Reference frequency for sizing the hybrid absorbing layer.
-        Options: 'source' or 'boundary'
+    abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
+        Reference frequency for sizing the absorbing layer.
+        Options: 'LayerSizeRefFrequency.SOURCE' or 'LayerSizeRefFrequency.BOUNDARY'.
+        Default is 'LayerSizeRefFrequency.SOURCE'.
     abc_user_pad_length : `bool`
         If True, the pad length is provided by the user. If False,
         the pad length is determined with the HABC criterion.
-    damping_type : str
+    damping_type : `str`
         Type of the boundary layer
-    dictionary : dict
+    dictionary : `dict`
         Dictionary containing the boundary layer information
     """
 
@@ -53,7 +57,7 @@ class Read_boundary_layer:
         ----------
         comm : `object`, optional
             An object representing the communication interface for parallel processing.
-            Default is None
+            Default is `None`.
 
         Returns
         -------
@@ -90,11 +94,51 @@ class Read_boundary_layer:
             "absorving_boundary_conditions"].get("absorb_back", True)
 
     @property
+    def abc_boundary_layer_shape(self):
+        if not hasattr(self, '_abc_boundary_layer_shape'):
+            self._abc_boundary_layer_shape = LayerShapeType.NOLAYER
+        return self._abc_boundary_layer_shape
+
+    @abc_boundary_layer_shape.setter
+    def abc_boundary_layer_shape(self, value):
+        """Set boundary layer shape with enum validation."""
+        shape_enum = enum_parameter_error('abc_boundary_layer_shape',
+                                          value, LayerShapeType)
+
+        if shape_enum == LayerShapeType.NOLAYER:
+            raise ValueError("NOLAYER not allowed for active ABC.")
+
+        self._abc_boundary_layer_shape = shape_enum
+
+    @property
+    def abc_reference_freq(self):
+        return self._abc_reference_freq
+
+    @abc_reference_freq.setter
+    def abc_reference_freq(self, value):
+        """Set reference frequency for sizing the absorbing layer with enum validation."""
+        reference_freq_enum = enum_parameter_error('abc_reference_freq', value,
+                                                   LayerSizeRefFrequency)
+        self._abc_reference_freq = reference_freq_enum
+
+    @property
+    def abc_degree_type(self):
+        return self._abc_degree_type
+
+    @abc_degree_type.setter
+    def abc_degree_type(self, value):
+        """Set hypershape degree type for hypershape layers with enum validation."""
+        degree_type_enum = enum_parameter_error('abc_degree_type', value,
+                                                HyperLayerDegreeType)
+        self._abc_degree_type = degree_type_enum
+
+    @property
     def abc_boundary_layer_type(self):
         return self._abc_boundary_layer_type
 
     @abc_boundary_layer_type.setter
     def abc_boundary_layer_type(self, value):
+        """Set the type of absorbing boundary layer with validation."""
         abc_dictionary = self.input_dictionary['absorving_boundary_conditions']
         accepted_damping_types = [
             "PML",
@@ -109,26 +153,31 @@ class Read_boundary_layer:
                                   accepted_damping_types)
 
         if value == "PML":
+            # PML forces rectangular shape
+            self.abc_boundary_layer_shape = LayerShapeType.RECTANGULAR
             abc_dictionary.setdefault("exponent", 2)
             self.abc_exponent = abc_dictionary["exponent"]
             abc_dictionary.setdefault("R", 1e-6)
             self.abc_R = abc_dictionary["R"]
             abc_dictionary.setdefault("cmax", 4.7)
             self.abc_cmax = abc_dictionary["cmax"]
-            self.abc_boundary_layer_shape = "rectangular"
         if value == "hybrid":
-            self.abc_boundary_layer_shape = abc_dictionary.get("layer_shape",
-                                                               "rectangular")
+            # Get shape from dictionary, default to rectangular
+            self.abc_boundary_layer_shape = abc_dictionary.get("layer_shape", "rectangular")
+
+            # Hypershape-specific validation
+            self.abc_deg_layer = None
+            if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
+                self.abc_deg_layer = max(abc_dictionary.get("degree_layer", 2.), 2.)
+                if self.abc_deg_layer is not None and self.abc_deg_layer < 2.:
+                    raise ValueError(f"Hypershape degree must be >= 2"
+                                     f", got {self.abc_deg_layer}.")
+
             self.abc_degree_type = abc_dictionary.get("degree_type", "real")
-            self.abc_deg_layer = None if self.abc_boundary_layer_shape == "rectangular" \
-                else max(abc_dictionary.get("degree_layer", 2.), 2.)
-            self.abc_reference_freq = abc_dictionary.get("habc_reference_freq",
-                                                         "source")
 
         # Common parameters for both PML and hybrid
         self._abc_boundary_layer_type = value
-        self.abc_reference_freq = abc_dictionary.get("habc_reference_freq",
-                                                     "source")
+        self.abc_reference_freq = abc_dictionary.get("abc_reference_freq", "source")
         self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", 2)
         self.abc_get_ref_model = abc_dictionary.get("get_ref_model", False)
         self.abc_extend_properties = abc_dictionary.get("extend_properties", "abc_driven")
@@ -143,8 +192,8 @@ class Read_boundary_layer:
 
         Parameters
         ----------
-        value : float or None
-            The pad length in kilometers. If None, the pad length will be determined
+        value : `float` or `None`
+            The pad length in kilometers. If `None`, the pad length will be determined
             using the HABC criterion.
 
         Returns

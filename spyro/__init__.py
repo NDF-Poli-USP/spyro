@@ -7,6 +7,8 @@ from .solvers.wave import Wave
 from .solvers.acoustic_wave import AcousticWave
 from .solvers.elastic_wave.isotropic_wave import IsotropicWave
 from .solvers.inversion import FullWaveformInversion
+from .utils.typing import (ElasticMaterialParameter,
+                           ElasticMaterialParameterization, WaveType)
 
 # from .solvers.dg_wave import DG_Wave
 from .solvers.mms_acoustic import AcousticWaveMMS
@@ -46,6 +48,9 @@ __all__ = [
     "sources",
     "AcousticWave",
     "FullWaveformInversion",
+    "ElasticMaterialParameter",
+    "ElasticMaterialParameterization",
+    "WaveType",
     "AcousticWaveMMS",
     "rectangle_mesh",
     "periodic_rectangle_mesh",

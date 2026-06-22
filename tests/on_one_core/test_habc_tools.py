@@ -1,3 +1,13 @@
+"""Unit tests for the tools used in the HABC scheme implemented in spyro.tools.habc_tools.
+
+This test verifies the correct functioning of the tools used in the implementation
+of the HABC in spyro. It checks that the absorbing layer is correctly created and
+that the velocity profile is correctly extended in the layer using both the point
+cloud and nearest point methods. The test is performed for both 2D and 3D cases,
+and for both triangular and quadrilateral elements. The expected values are based on
+the theoretical velocity model and the geometry of the absorbing layer. The test also
+measures the computational cost of the operations.
+"""
 from pytest import fail, mark, param
 from firedrake import conditional, ConvergenceError
 from numpy import isclose, where
@@ -13,19 +23,18 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer):
     Parameters
     ----------
     element_geometry : `str`
-        Geometry of the finite element. Options: 'T' for triangles/tetrahedra or
-        'Q' for quadrilaterals/hexahedra
+        Geometry of the finite element. Options: "T" for triangles/tetrahedra or
+        "Q" for quadrilaterals/hexahedra.
     dimension : `int`
-        Dimension of the problem. 2 for 2D and 3 for 3D
-    layer_shape : `str`
-        Shape of the absorbing layer, either 'rectangular' or 'hypershape'
-    degree_layer : `int` or `None`
-        Degree of the hypershape layer, if applicable. If None, it is not used
-
+        Dimension of the problem. 2 for 2D and 3 for 3D.
+    layer_shape : `str`.
+        Shape of the absorbing layer, either "rectangular or "hypershape".
+    degree_layer : `int` or `float` or `None`
+        Degree of the hypershape layer, if applicable. If `None`, it is not used.
     Returns
     -------
     dictionary : `dict`
-        Dictionary containing the parameters for the model
+        Dictionary containing the parameters for the model.
     """
 
     dictionary = {}
@@ -49,13 +58,13 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer):
     # Define the domain size without the PML or AL. Here we'll assume a domain
     # with a width and depth of 1 km, and a thickness of 1 km for the 3D case.
     if dimension == 2:
-        Lz, Lx, Ly = [1., 1., 0.]
+        length_z, length_x, length_y = [1., 1., 0.]
     elif dimension == 3:
-        Lz, Lx, Ly = [1., 1., 1.]  # in km
+        length_z, length_x, length_y = [1., 1., 1.]  # in km
     dictionary["mesh"] = {
-        "length_z": Lz,  # depth in km - always positive
-        "length_x": Lx,  # width in km - always positive
-        "length_y": Ly,  # thickness in km - always positive
+        "length_z": length_z,  # depth in km - always positive
+        "length_x": length_x,  # width in km - always positive
+        "length_y": length_y,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -64,15 +73,21 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer):
     # point of the mesh. We also specify to record the solution at the corners
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
-        "source_locations": ([(-0.5, 0.25)] if dimension == 2  # (0.5 * Lz, 0.25 * Lx)
-                             else [(-0.5, 0.25, 0.5)]),  # (0.5 * Lz, 0.25 * Lx, 0.5 * Ly)
+        "source_locations": ([(-length_z / 2., length_x / 4.)] if dimension == 2
+                             else [(-length_z / 2., length_x / 4., length_y / 2.)]),
         "frequency": 5.,  # in Hz
-        "receiver_locations": ([(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)]
+        "receiver_locations": ([(-length_z, 0.),
+                                (-length_z, length_x),
+                                (0., 0.), (0., length_x)]
                                if dimension == 2
-                               else [(-Lz, 0., 0.), (-Lz, Lx, 0.),
-                                     (0., 0., 0), (0., Lx, 0.),
-                                     (-Lz, 0., Ly), (-Lz, Lx, Ly),
-                                     (0., 0., Ly), (0., Lx, Ly)])
+                               else [(-length_z, 0., 0.),
+                                     (-length_z, length_x, 0.),
+                                     (0., 0., 0),
+                                     (0., length_x, 0.),
+                                     (-length_z, 0., length_y),
+                                     (-length_z, length_x, length_y),
+                                     (0., 0., length_y),
+                                     (0., length_x, length_y)])
     }
 
     # Define Parameters for absorbing boundary conditions
@@ -97,18 +112,18 @@ def preamble_tools(dictionary, edge_length, f_est, dimension):
     Parameters
     ----------
     dictionary : `dict`
-        Dictionary containing the parameters for the model
+        Dictionary containing the parameters for the model.
     edge_length : `float`
-        Mesh size in km
+        Mesh size in km.
     f_est : `float`, optional
         Factor for the stabilizing term in Eikonal Eq.
     dimension : `int`
-        Dimension of the model (2 or 3)
+        Dimension of the model (2 or 3).
 
     Returns
     -------
-    wave_obj : `habc.HABCLayer`
-        An instance of the HABCLayer class
+    Wave_obj : `acoustic_wave.AcousticWave`
+        An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
     """
 
     # ============ MESH FEATURES ============
@@ -117,45 +132,45 @@ def preamble_tools(dictionary, edge_length, f_est, dimension):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    wave_obj = AcousticWave(dictionary=dictionary)
+    Wave_obj = AcousticWave(dictionary=dictionary)
 
     # Mesh
-    wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
-    cond = conditional(wave_obj.mesh_x < 0.5, 3.0, 1.5)
-    wave_obj.set_initial_velocity_model(conditional=cond)
+    cond = conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
+    Wave_obj.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
-    wave_obj.mesh_ops.preamble_mesh_operations(wave_obj, f_est=f_est)
+    Wave_obj.mesh_ops.preamble_mesh_operations(Wave_obj, f_est=f_est)
 
     # Estimating computational resource usage
-    comp_cost("tfin", tRef=tRef, user_name=wave_obj.path_save + "preamble/MSH_")
+    comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "preamble/MSH_")
 
     # ============ EIKONAL ANALYSIS ============
     # Reference to resource usage
     tRef = comp_cost("tini")
 
     # Finding critical points
-    wave_obj.layer_ops.critical_boundary_points(wave_obj)
+    Wave_obj.layer_ops.critical_boundary_points(Wave_obj)
 
     # Estimating computational resource usage
-    comp_cost("tfin", tRef=tRef, user_name=wave_obj.path_save + "preamble/EIK_")
+    comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "preamble/EIK_")
 
-    return wave_obj
+    return Wave_obj
 
 
-def run_tools(wave_obj, method_extend, n_root=1):
+def run_tools(Wave_obj, method_extend, n_root=1):
     """Test the HABC tools in a bi-material model.
 
     Parameters
     ----------
-    wave_obj : `habc.HABCLayer`
-        An instance of the HABCLayer class
+    Wave_obj : `acoustic_wave.AcousticWave`
+        An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
     method_extend : `str`
-        Method to extend the velocity profile. Options: 'point_cloud' or 'nearest_point'
+        Method to extend the velocity profile. Options: "point_cloud" or "nearest_point".
     n_root : `int`, optional
-        n-th Root selected as the size of the absorbing layer. Default is 1
+        n-th Root selected as the size of the absorbing layer. Default is 1.
 
     Returns
     -------
@@ -163,21 +178,21 @@ def run_tools(wave_obj, method_extend, n_root=1):
     """
 
     # Determining layer size
-    wave_obj.layer_ops.layer_size_criterion(wave_obj.mesh_parameters.lmin, n_root=n_root)
+    Wave_obj.layer_ops.layer_size_criterion(Wave_obj.mesh_parameters.lmin, n_root=n_root)
 
     # Reference to resource usage
     tRef = comp_cost("tini")
 
     # Creating mesh with absorbing layer
-    wave_obj.layer_ops.create_mesh_with_layer(wave_obj)
+    Wave_obj.layer_ops.create_mesh_with_layer(Wave_obj)
 
     # Updating velocity model
-    wave_obj.layer_ops.velocity_abc(wave_obj, method=method_extend)
+    Wave_obj.layer_ops.velocity_abc(Wave_obj, method=method_extend)
 
     # Estimating computational resource usage
-    ele_str = "Q" if wave_obj.mesh_ops.quadrilateral else "T"
+    ele_str = "Q" if Wave_obj.mesh_ops.quadrilateral else "T"
     ext_str = "CLOUD" if method_extend == "point_cloud" else "NEARP"
-    name_cost = wave_obj.layer_ops.path_case_abc + ele_str + "_" + ext_str + "_"
+    name_cost = Wave_obj.layer_ops.path_case_abc + ele_str + "_" + ext_str + "_"
     comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
     # Expected values
@@ -186,18 +201,18 @@ def run_tools(wave_obj, method_extend, n_root=1):
     tolerance = 0.03  # 3% tolerance
 
     # Create layer mask
-    method_element = "DQ" if wave_obj.mesh_ops.quadrilateral else "DG"
-    V = create_function_space(wave_obj.mesh, method_element, 0)
+    method_element = "DQ" if Wave_obj.mesh_ops.quadrilateral else "DG"
+    V = create_function_space(Wave_obj.mesh, method_element, 0)
 
     # Clipping coordinates to the layer domain
-    domain_layer = wave_obj.layer_ops.abc_domain_dimensions(full_hyp=False)
+    domain_layer = Wave_obj.layer_ops.abc_domain_dimensions(full_hyp=False)
     layer_mask = layer_mask_field(
-        wave_obj.mesh_ops.domain_dim, wave_obj.mesh, wave_obj.dimension,
-        wave_obj.mesh_ops.get_spatial_coordinates_abc(wave_obj.mesh, domain_layer),
+        Wave_obj.mesh_ops.domain_dim, Wave_obj.mesh, Wave_obj.dimension,
+        Wave_obj.mesh_ops.get_spatial_coordinates_abc(Wave_obj.mesh, domain_layer),
         V, type_marker='mask', name_mask='test_mask')
 
     # Extracting nodes from the layer field
-    mask_nodes = wave_obj.mesh_ops.extract_node_positions(wave_obj.mesh, V,
+    mask_nodes = Wave_obj.mesh_ops.extract_node_positions(Wave_obj.mesh, V,
                                                           output_type="array")
     indlay_nodes = where(layer_mask.dat.data_with_halos == 1.)[0]
     pts_layer = mask_nodes[indlay_nodes]  # Inside layer
@@ -209,18 +224,18 @@ def run_tools(wave_obj, method_extend, n_root=1):
     pts_original_xge = pts_original[pts_original[:, 1] >= 0.5]
 
     # Cloud fields
-    layer_cloud_xlt = point_cloud_field(wave_obj.mesh, pts_layer_xlt, wave_obj.c,
-                                        wave_obj.mesh_parameters.tol)
+    layer_cloud_xlt = point_cloud_field(Wave_obj.mesh, pts_layer_xlt, Wave_obj.c,
+                                        Wave_obj.mesh_parameters.tol)
 
-    layer_cloud_xge = point_cloud_field(wave_obj.mesh, pts_layer_xge, wave_obj.c,
-                                        wave_obj.mesh_parameters.tol)
-    original_cloud_xlt = point_cloud_field(wave_obj.mesh, pts_original_xlt, wave_obj.c,
-                                           wave_obj.mesh_parameters.tol)
-    original_cloud_xge = point_cloud_field(wave_obj.mesh, pts_original_xge, wave_obj.c,
-                                           wave_obj.mesh_parameters.tol)
+    layer_cloud_xge = point_cloud_field(Wave_obj.mesh, pts_layer_xge, Wave_obj.c,
+                                        Wave_obj.mesh_parameters.tol)
+    original_cloud_xlt = point_cloud_field(Wave_obj.mesh, pts_original_xlt, Wave_obj.c,
+                                           Wave_obj.mesh_parameters.tol)
+    original_cloud_xge = point_cloud_field(Wave_obj.mesh, pts_original_xge, Wave_obj.c,
+                                           Wave_obj.mesh_parameters.tol)
     # Verify cloud values
     met_str = f"HABC Tools {ele_str}-{ext_str}" + \
-        f" {wave_obj.layer_ops.case_abc[:-4]} {wave_obj.dimension}D. "
+        f" {Wave_obj.layer_ops.case_abc[:-4]} {Wave_obj.dimension}D. "
     expected_values = [expect_xmhalf, expect_xphalf, expect_xmhalf, expect_xphalf]
     mean_val = [layer_cloud_xlt.dat.data_with_halos.mean(),
                 layer_cloud_xge.dat.data_with_halos.mean(),
@@ -235,9 +250,10 @@ def run_tools(wave_obj, method_extend, n_root=1):
         print("✓ " + met_str + "Verified: " + cmp_str, flush=True)
 
     # Renaming the folder if degree_layer is modified
-    wave_obj.layer_ops.rename_folder_habc()
+    Wave_obj.layer_ops.rename_folder_habc()
 
 
+@mark.older_firedrake
 @mark.parametrize("element_geometry, dimension",
                   [("T", 2),
                    ("Q", 2),
@@ -249,9 +265,10 @@ def test_habc_tools(element_geometry, dimension):
     Parameters
     ----------
     element_geometry : `str`
-        Type of finite element. 'T' for triangles or 'Q' for quadrilaterals
+        Geometry of the finite element. Options: "T" for triangles/tetrahedra or
+        "Q" for quadrilaterals/hexahedra.
     dimension : `int`
-        Dimension of the model (2 or 3)
+        Dimension of the model (2 or 3).
 
     Returns
     -------
@@ -322,7 +339,7 @@ def test_habc_tools(element_geometry, dimension):
     # ============ MESH AND EIKONAL ============
 
     # Creating mesh and performing eikonal analysis
-    wave_obj = preamble_tools(dictionary, edge_length, f_est, dimension)
+    Wave_obj = preamble_tools(dictionary, edge_length, f_est, dimension)
 
     # ============ HABC TOOLS ============
 
@@ -335,12 +352,14 @@ def test_habc_tools(element_geometry, dimension):
 
             # Determining the case for the folder name
             str_id = element_geometry + ("CL" if method_extend == "point_cloud" else "NP")
-            wave_obj.case_abc, wave_obj.path_save, wave_obj.path_case_abc = \
-                wave_obj.layer_ops.identify_abc_layer_case(
-                    output_folder=wave_obj.output_folder+f"/ht_test{dimension}d{str_id}")
+            Wave_obj.layer_ops.path_to_save_abc_layer_case(
+                output_folder=Wave_obj.output_folder+f"/ht_test{dimension}d{str_id}")
+            Wave_obj.case_abc = Wave_obj.layer_ops.case_abc
+            Wave_obj.path_save = Wave_obj.layer_ops.path_save
+            Wave_obj.path_case_abc = Wave_obj.layer_ops.path_case_abc
 
             # Running the HABC tools
-            run_tools(wave_obj, method_extend)
+            run_tools(Wave_obj, method_extend)
 
     except ConvergenceError as e:
         fail(f"Checking HABC tools {dimension}D raised an exception: {str(e)}")

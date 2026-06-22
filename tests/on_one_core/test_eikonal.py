@@ -1,8 +1,16 @@
+"""Unit tests for the Nonlinear Eikonal analysis for 2D and 3D cases.
+
+The test compares the minimum Eikonal value obtained from the simulation with the
+theoretical value for different mesh sizes, element geometries, and finite element types.
+The results are expected to be within a specified tolerance of the theoretical value.
+"""
 from pytest import fail, mark, param
 from firedrake import conditional, ConvergenceError
+from firedrake import COMM_WORLD as comm
 from numpy import isclose
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
+from spyro.io.basicio import parallel_print as pprint
 
 
 def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
@@ -11,18 +19,19 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
     Parameters
     ----------
     element_geometry : `str`
-        Geometry of the finite element. 'T' for triangles or 'Q' for quadrilaterals
+        Geometry of the finite element. Options: "T" for triangles/tetrahedra or
+        "Q" for quadrilaterals/hexahedra.
     dimension : `int`
-        Dimension of the problem. 2 for 2D and 3 for 3D
+        Dimension of the problem. 2 for 2D and 3 for 3D.
     degree_eikonal : `int`
-        Finite element order for the Eikonal equation. Should be 1 or 2
+        Finite element order for the Eikonal equation.
     element_type : `str`
-        Finite element type. 'consistent' or 'underintegrated'
+        Finite element type. Options: "consistent" or "underintegrated".
 
     Returns
     -------
     dictionary : `dict`
-        Dictionary containing the parameters for the model
+        Dictionary containing the parameters for the model.
     """
 
     dictionary = {}
@@ -46,13 +55,13 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
     # Define the domain size without the PML or AL. Here we'll assume a domain
     # with a width and depth of 1 km, and a thickness of 1 km for the 3D case.
     if dimension == 2:
-        Lz, Lx, Ly = [1., 1., 0.]
+        length_z, length_x, length_y = [1., 1., 0.]
     elif dimension == 3:
-        Lz, Lx, Ly = [1., 1., 1.]  # in km
+        length_z, length_x, length_y = [1., 1., 1.]  # in km
     dictionary["mesh"] = {
-        "length_z": Lz,  # depth in km - always positive
-        "length_x": Lx,  # width in km - always positive
-        "length_y": Ly,  # thickness in km - always positive
+        "length_z": length_z,  # depth in km - always positive
+        "length_x": length_x,  # width in km - always positive
+        "length_y": length_y,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -61,15 +70,21 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
     # point of the mesh. We also specify to record the solution at the corners
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
-        "source_locations": ([(-0.5, 0.25)] if dimension == 2  # (0.5 * Lz, 0.25 * Lx)
-                             else [(-0.5, 0.25, 0.5)]),  # (0.5 * Lz, 0.25 * Lx, 0.5 * Ly)
+        "source_locations": ([(-length_z / 2., length_x / 4.)] if dimension == 2
+                             else [(-length_z / 2., length_x / 4., length_y / 2.)]),
         "frequency": 5.,  # in Hz
-        "receiver_locations": ([(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)]
+        "receiver_locations": ([(-length_z, 0.),
+                                (-length_z, length_x),
+                                (0., 0.), (0., length_x)]
                                if dimension == 2
-                               else [(-Lz, 0., 0.), (-Lz, Lx, 0.),
-                                     (0., 0., 0), (0., Lx, 0.),
-                                     (-Lz, 0., Ly), (-Lz, Lx, Ly),
-                                     (0., 0., Ly), (0., Lx, Ly)])
+                               else [(-length_z, 0., 0.),
+                                     (-length_z, length_x, 0.),
+                                     (0., 0., 0),
+                                     (0., length_x, 0.),
+                                     (-length_z, 0., length_y),
+                                     (-length_z, length_x, length_y),
+                                     (0., 0., length_y),
+                                     (0., length_x, length_y)])
     }
 
     # Define Parameters for absorbing boundary conditions
@@ -94,18 +109,18 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
     Parameters
     ----------
     dictionary : `dict`
-        Dictionary containing the parameters for the model
+        Dictionary containing the parameters for the model.
     edge_length : `float`
-        Mesh size in km
+        Mesh size in km.
     f_est : `float`
-        Factor for the stabilizing term in Eikonal Eq
+        Factor for the stabilizing term in Eikonal Eq.
     element_type : `string`
-        Finite element type. 'consistent' or 'underintegrated'
+        Finite element type. Options: "consistent" or "underintegrated".
 
     Returns
     -------
     min_eik : `float`
-        Minimum Eikonal value in miliseconds
+        Minimum Eikonal value in miliseconds.
     """
 
     # ============ MESH FEATURES ============
@@ -146,26 +161,32 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
     return min_eik
 
 
+@mark.older_firedrake
 @mark.parametrize("element_geometry, dimension, element_type",
                   [("T", 2, "consistent"),
                    ("T", 2, "underintegrated"),
                    ("Q", 2, "consistent"),
                    ("Q", 2, "underintegrated"),
-                   ("T", 3, "consistent"),
-                   ("Q", 3, "consistent"),
+                   param("T", 3, "consistent", marks=mark.slow),
                    param("T", 3, "underintegrated", marks=mark.slow),
+                   param("Q", 3, "consistent", marks=mark.slow),
                    param("Q", 3, "underintegrated", marks=mark.slow)])
 def test_eikonal(element_geometry, dimension, element_type):
     """Testing of eikonal for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
+    See Salas et al (2022): Hybrid absorbing scheme based on hyperelliptical
+    layers with non-reflecting boundary conditions in scalar wave equations.
+    doi: https://doi.org/10.1016/j.apm.2022.09.014
+
     Parameters
     ----------
     element_geometry : `str`
-        Type of finite element. 'T' for triangles or 'Q' for quadrilaterals
+        Geometry of the finite element. Options: "T" for triangles/tetrahedra or
+        "Q" for quadrilaterals/hexahedra.
     dimension : `int`
-        Dimension of the model (2 or 3)
+        Dimension of the problem. 2 for 2D and 3 for 3D.
     element_type : `str`
-        Finite element type. 'consistent' or 'underintegrated'
+        Finite element type. Options: "consistent" or "underintegrated".
 
     Returns
     -------
@@ -234,8 +255,8 @@ def test_eikonal(element_geometry, dimension, element_type):
      0.05 107.164
     """
 
-    print("\n" + 60 * "=" + f"\nTesting Eikonal with {element_geometry}-{element_type} "
-          + f"elements for {dimension}D case\n" + 60 * "=", flush=True)
+    pprint("\n" + 60 * "=" + f"\nTesting Eikonal with {element_geometry}-{element_type} "
+           + f"elements for {dimension}D case\n" + 60 * "=", comm=comm)
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -266,11 +287,11 @@ def test_eikonal(element_geometry, dimension, element_type):
             f_est = 0.07 if element_type == 'consistent' else 0.05
 
     # Get simulation parameters
-    print(f"\nMesh Size: {1e3 * edge_length:.4f} m", flush=True)
-    print(f"Element Geometry: {element_geometry}", flush=True)
-    print(f"Element Type: {element_type}", flush=True)
-    print(f"Eikonal Degree: {p_eik}", flush=True)
-    print(f"Eikonal Stabilizing Factor: {f_est:.2f}", flush=True)
+    pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
+    pprint(f"Element Geometry: {element_geometry}", comm=comm)
+    pprint(f"Element Type: {element_type}", comm=comm)
+    pprint(f"Eikonal Degree: {p_eik}", comm=comm)
+    pprint(f"Eikonal Stabilizing Factor: {f_est:.2f}", comm=comm)
 
     try:
 
@@ -286,8 +307,8 @@ def test_eikonal(element_geometry, dimension, element_type):
         assert isclose(min_eik / thr_val, 1., atol=atol), \
             f"✗ Minimum Eikonal {dimension}D Element-{element_geometry}-" + \
             f"{element_type} → Expected value {thr_val}, got {min_eik:.3f}"
-        print(f"✓ Minimum Eikonal {dimension}D Element-{element_geometry}-{element_type} "
-              f" Verified: expected {thr_val}, got {min_eik:.3f}", flush=True)
+        pprint(f"✓ Minimum Eikonal {dimension}D Element-{element_geometry}-{element_type}"
+               f" Verified: expected {thr_val}, got {min_eik:.3f}", comm=comm)
 
     except ConvergenceError as e:
         fail(f"Checking Eikonal {dimension}D Element-{element_geometry}-"

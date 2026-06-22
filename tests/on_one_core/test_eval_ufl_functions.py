@@ -1,3 +1,12 @@
+"""Unit tests for the evaluation of UFL expressions with `generate_ufl_functions` utility.
+
+The utility `generate_ufl_functions` is implemented in `spyro.utils.eval_functions_to_ufl`
+and is responsible for safely converting user-provided mathematical expressions into UFL
+expressions that can be evaluated within the Firedrake framework.
+The test suite ensures that the utility correctly handles a wide variety of mathematical
+expressions in both 2D and 3D contexts including edge cases, and that it properly blocks
+any potentially dangerous operations that could compromise the security of the system.
+"""
 from firedrake import Function, FunctionSpace, UnitSquareMesh, UnitCubeMesh
 from numpy import all, isfinite
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions

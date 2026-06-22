@@ -1,3 +1,6 @@
+"""Unit tests for the HyperLayer class implemented in spyro.abc.hyp_lay."""
+
+
 from math import isclose
 from numpy import cos, floating, pi, sin, sqrt
 from pytest import fixture, raises
@@ -63,7 +66,7 @@ def test_init_1_n_hyp_raises_error():
 
 def test_init_n_type_raises_error():
     # Test that passing None raises a TypeError
-    with raises(ValueError, match=f"Invalid n_type: '{None}'."):
+    with raises(TypeError, match="'n_type' must be HyperLayerDegreeType or str."):
         HyperLayer((1., 1.), n_type=None)
 
 

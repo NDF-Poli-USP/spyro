@@ -12,61 +12,62 @@ from os import getcwd
 
 
 class NRBC():
-    '''
-    class for NRBCs applied to outer boundary absorbing layer in HABC scheme.
+    """Class for Non-Reflective BCs applied to the outer boundary of an absorbing layer.
 
     Attributes
     ----------
     angle_max : `float`
-        Maximum incidence angle considered. Default is pi/4 (45°)
+        Maximum incidence angle considered. Default is `numpy.pi/4`.
     cos_Hig : `firedrake function`
         Profile of the cosine of incidence angle for 1^st-order Higdon BC.
-        Free surfaces and interior nodes are set to 0
+        Free surfaces and interior nodes are set to 0.
     cos_min : `float`
-        Minimum value of the cosine of the incidence angle
+        Minimum value of the cosine of the incidence angle.
     dimension : `int`
-        Model dimension (2D or 3D). Default is 2D
+        Model dimension (2D or 3D). Default is 2D.
     domain_dim : `tuple`
-        Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
+        Original domain dimensions: (length_z, length_x) for 2D
+        or (length_z, length_x, length_y) for 3D.
     layer_shape : `string`
-        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
+        Shape type of pad layer. Options: 'rectangular' or 'hypershape'.
     nrbc : `str`
-        Type of NRBC used. Either "Higdon" or "Sommerfeld"
+        Type of NRBC used. Either "Higdon" or "Sommerfeld".
     path_save_nrbc : `str`
-        Path to save field for the NRBC
+        Path to save field for the NRBC.
 
     Methods
     -------
     cos_ang_HigdonBC()
-        Compute the cosine of the incidence angle for first-order Higdon BC
+        Compute the cosine of the incidence angle for first-order Higdon BC.
     hypershape_normal_vector()
-        Compute the normal vector to a hypershape at a boundary point
+        Compute the normal vector to a hypershape at a boundary point.
     source_to_bnd_reference_vector()
-        Compute a unitary reference vector from the source to a boundary point
-    '''
+        Compute a unitary reference vector from the source to a boundary point.
+    """
 
     def __init__(self, domain_dim, layer_shape, angle_max=np.pi/4.,
                  dimension=2, output_folder=None):
-        '''
+        """
         Initialize the NRBC class.
 
         Parameters
         ----------
         domain_dim : `tuple`
-            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
+            Original domain dimensions: (length_z, length_x) for 2D
+            or (length_z, length_x, length_y) for 3D.
         layer_shape : `string`
-            Shape type of pad layer. Options: 'rectangular' or 'hypershape'
+            Shape type of pad layer. Options: 'rectangular' or 'hypershape'.
         angle_max : `float`, optional
-            Maximum incidence angle considered. Default is pi/4 (45°)
+            Maximum incidence angle considered. Default is `numpy.pi/4` (45°).
         dimension : `int`, optional
-            Model dimension (2D or 3D). Default is 2D
+            Model dimension (2D or 3D). Default is 2D.
         output_folder : str, optional
-            The folder where output data will be saved. Default is None
+            The folder where output data will be saved. Default is `None`.
 
         Returns
         -------
         None
-        '''
+        """
 
         # Original domain dimensions
         self.domain_dim = domain_dim
@@ -90,7 +91,7 @@ class NRBC():
             self.path_save_nrbc = output_folder
 
     # def source_to_bnd_reference_vector(self, source_coord, bnd_nodes_nfs):
-    #     '''
+    #     """
     #     Compute a unitary reference vector from the source to a boundary point
 
     #     Parameters
@@ -106,7 +107,7 @@ class NRBC():
     #     -------
     #     unit_ref_vct : `array`
     #         Unit reference vector from the source to a boundary point
-    #     '''
+    #     """
 
     #     # Boundary node data
     #     bnd_z, bnd_x = bnd_nodes_nfs[:2]
@@ -134,7 +135,7 @@ class NRBC():
     #     return unit_ref_vct
 
     # def hypershape_normal_vector(self, bnd_pnts, hyper_axes, n):
-    #     '''
+    #     """
     #     Compute the normal vector to a hyperellipse (|x/a|^n + |y/b|^n = 1)
     #     or a hyperellipsoid (|x/a|^n + |y/b|^n + |z/c|^n = 1) at a boundary
     #     point. The hypershape must have the center at the origin.
@@ -159,7 +160,7 @@ class NRBC():
     #     -------
     #     unit_nrm_vct : `array`
     #         Unitary normal vector to the hypershape at the boundary point
-    #     '''
+    #     """
 
     #     # Point coordinates
     #     x, y = bnd_pnts[:2]
@@ -193,7 +194,7 @@ class NRBC():
 
     # def cos_ang_HigdonBC(self, V, source_coord, bnd_nfs, bnd_nodes_nfs,
     #                      hyp_par=None, sommerfeld_bc=False):
-    #     '''
+    #     """
     #     Compute the cosine of the incidence angle for first-order Higdon BC.
 
     #     Parameters
@@ -225,7 +226,7 @@ class NRBC():
     #     Returns
     #     -------
     #     None
-    #     '''
+    #     """
 
     #     nrbc_str = "Sommerfeld" if sommerfeld_bc else "Higdon"
     #     print("Creating Field for NRBC:", nrbc_str, flush=True)

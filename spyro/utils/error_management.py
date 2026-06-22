@@ -12,16 +12,16 @@ def value_parameter_error(par_name, par_value, valid_values):
     Parameters
     ----------
     par_name : `str`
-        Name of the parameter that has an invalid value
+        Name of the parameter that has an invalid value.
     par_value : `str`, `int` or `float`
-        Value of the parameter that is invalid
+        Value of the parameter that is invalid.
     valid_values : `list`
-        List of valid values for the parameter
+        List of valid values for the parameter.
 
     Raises
     ------
     ValueError
-        If the parameter value is not in the list of valid values
+        If the parameter value is not in the list of valid values.
     """
 
     # Error message about the invalid parameter
@@ -40,15 +40,15 @@ def mutually_exclusive_parameter_error(par_name_lst, par_value_lst):
     Parameters
     ----------
     par_name_Lst : `list` of `str`
-        List of names of the parameters that are mutually exclusive
+        List of names of the parameters that are mutually exclusive.
     par_value_lst : `list`
-        List of values of the parameters that are mutually exclusive
+        List of values of the parameters that are mutually exclusive.
 
     Raises
     ------
     ValueError
         If two or more parameters have been provided by the user.
-        That is, value of the parameters is not None.
+        That is, value of the parameters is not `None`.
     """
 
     par_defined = [par for par, val in zip(par_name_lst,
@@ -74,16 +74,16 @@ def value_dimension_error(par_names, par_values, expected_dim):
     Parameters
     ----------
     par_names : `tuple`
-        Names of the parameters to check dimensions
+        Names of the parameters to check dimensions.
     par_values : `tuple`
-        Values of the parameters to check dimensions
+        Values of the parameters to check dimensions.
     expected_dim : `int`
-        Expected dimension of the parameters (2 or 3)
+        Expected dimension of the parameters (2 or 3).
 
     Raises
     ------
     ValueError
-        If the dimensions of the parameters do not match the expected dimension
+        If the dimensions of the parameters do not match the expected dimension.
     """
 
     str_reference, str_comparison = par_names
@@ -102,12 +102,12 @@ def clean_inst_num(data_arr):
     Parameters
     ----------
     data_arr : `array`
-        An array with possible with possible NaN or negative components
+        An array with possible with possible NaN or negative components.
 
     Returns
     -------
     data_arr : `array`
-        An array with null or positive components
+        An array with null or positive components.
     """
     data_arr[where(isnan(data_arr) | isinf(data_arr) | (data_arr < 0.0))] = 0.0
     return data_arr
@@ -121,28 +121,28 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
     Parameters
     ----------
     par_name : `str`
-        Name of the parameter that has an invalid value
+        Name of the parameter that has an invalid value.
     par_value : `int` or `float`
-        Value of the parameter that is invalid
+        Value of the parameter that is invalid.
     float_num : `bool`, optional
-        If True, the parameter can be a float. Default is True
+        If `True`, the parameter can be a float. Default is `True`.
     integer_num : `bool`, optional
-        If True, the parameter can be an integer. Default is False
+        If `True`, the parameter can be an integer. Default is `False`.
     lower_bound : `int` or `float`, optional
-        Lower bound for the parameter value. Default is None (no lower bound)
+        Lower bound for the parameter value. Default is `None` (no lower bound).
     upper_bound : `int` or `float`, optional
-        Upper bound for the parameter value. Default is None (no upper bound)
+        Upper bound for the parameter value. Default is `None` (no upper bound).
     include_lower_bound : `bool`, optional
-        If True, the lower bound is included in the valid range. Default is False
+        If `True`, the lower bound is included in the valid range. Default is `False`.
     include_upper_bound : `bool`, optional
-        If True, the upper bound is included in the valid range. Default is False
+        If `True`, the upper bound is included in the valid range. Default is `False`.
 
     Raises
     ------
     TypeError
-        If the parameter value is not of the expected type (float or integer)
+        If the parameter value is not of the expected type (float or integer).
     ValueError
-        If the parameter value is outside the specified bounds or the bounds are invalid
+        If the parameter value is outside the specified bounds or the bounds are invalid.
     """
 
     # Checking the parameter type
@@ -184,3 +184,49 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
                          if include_upper_bound else f"less than {upper_bound}")
 
         raise ValueError(f"'{par_name}' must be {bound_str}, got {par_value}.")
+
+
+def enum_parameter_error(par_name, par_value, valid_enum):
+    """Validate and convert an enum parameter, returning the enum instance.
+
+    This method validates that the provided parameter value is either an
+    instance of the specified enum class or a string that maps to a valid
+    enum value. If valid, it returns the corresponding enum instance.
+    Otherwise, it raises an appropriate exception.
+
+    Parameters
+    ----------
+    par_name : `str`
+        Name of the parameter being validated (used in error messages).
+    par_value : `object`
+        Value of the parameter to validate. Can be an `enum.EnumMeta` or a `str`.
+    valid_enum : `enum.EnumMeta`
+        Enum class containing the valid values for the parameter.
+
+    Returns
+    -------
+    `enum.Enum`
+        The validated enum instance corresponding to the input value.
+
+    Raises
+    ------
+    TypeError
+        If the parameter value is neither an instance of the valid enum class nor a `str`.
+    ValueError
+        If the parameter value is a `str` that does not match any valid enum value.
+    """
+
+    # Check if already a valid enum instance
+    if isinstance(par_value, valid_enum):
+        return par_value
+
+    # Check if string maps to valid enum value
+    if isinstance(par_value, str):
+        valid_values = [enum.value for enum in valid_enum]
+        if par_value not in valid_values:
+            value_parameter_error(par_name, par_value, valid_values)
+        return valid_enum(par_value)
+
+    # Invalid type - neither enum instance nor string
+    raise TypeError(f"'{par_name}' must be {valid_enum.__name__} or str"
+                    f", got {type(par_value).__name__}")
