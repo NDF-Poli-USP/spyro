@@ -9,8 +9,7 @@ plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
 
 
 def create_folder(folder):
-    '''
-    Verify if a folder exists, if not, it creates the folder
+    """Verify if a folder exists, if not, it creates the folder.
 
     Parameters
     ----------
@@ -20,7 +19,7 @@ def create_folder(folder):
     Returns
     -------
     None
-    '''
+    """
 
     # Create the folder if it does not exist
     if not path.isdir(folder):
@@ -29,8 +28,7 @@ def create_folder(folder):
 
 def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
                              output_folder="output/", show=False):
-    '''
-    Plot the function of the layer size criterion for the HABC scheme
+    """Plot the function of the layer size criterion for the HABC scheme.
 
     Parameters
     ----------
@@ -62,7 +60,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
     Returns
     -------
     None
-    '''
+    """
 
     # Create the output folder if it does not exist
     create_folder(output_folder)
@@ -160,29 +158,48 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
     plt.close()
 
 
-def plot_hist_receivers(Wave_object, show=False):
-    '''
-    Plot the comparison of the time-domain response at the
-    receivers between the reference model and the HABC scheme.
-    The plots are saved in PDF and PNG formats.
+def plot_hist_receivers(wave_object, show=False):
+    """Plot time-domain receiver response comparison.
+
+    Creates a multi-panel plot comparing the time-domain response at each
+    receiver between the computed solution and a reference solution. Each
+    receiver is plotted in its own subplot with the computed solution in
+    green and the reference solution in red dashed line.
 
     Parameters
     ----------
-    Wave_object: `wave`
-        The Wave object containing the simulation results.
-    show: `bool`, optional
-        Whether to show the plot. Default is False.
+    Wave_object : `wave`
+        The Wave object containing the simulation results. Must have the
+        following attributes:
+        - forward_solution_receivers: Computed receiver data
+        - receivers_reference: Reference receiver data
+        - dt: Time step
+        - final_time: Final simulation time
+        - number_of_receivers: Number of receivers
+        - path_save: Directory path for saving plots
+        - case_abc: Case name for file naming
+    show : `bool`, optional
+        Whether to display the plot interactively. Default is False.
 
     Returns
     -------
     None
-    '''
+
+    Notes
+    -----
+    The function saves two files:
+    - {path_save}/{case_abc}/time.png
+    - {path_save}/{case_abc}/time.pdf
+
+    The green solid line represents the computed transient solution,
+    while the red dashed line represents the reference transient solution.
+    """
 
     print("\nPlotting Time Comparison", flush=True)
 
     # Time data
-    dt = Wave_object.dt
-    tf = Wave_object.final_time
+    dt = wave_object.dt
+    tf = wave_object.final_time
     nt = int(round(tf / dt)) + 1  # number of timesteps
     t_rec = np.linspace(0., tf, nt)
 
@@ -190,7 +207,7 @@ def plot_hist_receivers(Wave_object, show=False):
     plt.rcParams['font.size'] = 7
 
     # Setting subplots
-    num_recvs = Wave_object.number_of_receivers
+    num_recvs = wave_object.number_of_receivers
     plt.rcParams['axes.grid'] = True
     fig, axes = plt.subplots(nrows=num_recvs, ncols=1)
     fig.subplots_adjust(hspace=0.6)
@@ -202,8 +219,8 @@ def plot_hist_receivers(Wave_object, show=False):
     for rec in range(num_recvs):
 
         # Plot the receiver data
-        rc_dat = Wave_object.forward_solution_receivers[:, rec]
-        rf_dat = Wave_object.receivers_reference[:, rec]
+        rc_dat = wave_object.forward_solution_receivers[:, rec]
+        rf_dat = wave_object.receivers_reference[:, rec]
         axes[rec].plot(t_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
         axes[rec].plot(t_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
 
@@ -229,42 +246,66 @@ def plot_hist_receivers(Wave_object, show=False):
             axes[rec].set_xlabel(r'$t \; (s)$')
 
     # Saving the plot
-    time_str = Wave_object.path_case_habc + "time"
+    time_str = wave_object.path_case_abc + "time"
     plt.savefig(time_str + ".png", bbox_inches='tight')
     plt.savefig(time_str + ".pdf", bbox_inches='tight')
     plt.show() if show else None
     plt.close()
 
 
-def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
-    '''
-    Plot the comparison of the frequency-domain response at the
-    receivers between the reference model and the HABC scheme.
-    The plots are saved in PDF and PNG formats.
+def plot_rfft_receivers(wave_object, factor_xlim=4., show=False):
+    """Plot frequency-domain receiver response comparison.
+
+    Creates a multi-panel plot comparing the normalized frequency-domain
+    (FFT) response at each receiver between the computed solution and a
+    reference solution. Vertical lines indicate the source and reference
+    frequencies.
 
     Parameters
     ----------
-    Wave_object: `wave`
-        Wave object containing the simulation results.
-    fxlim: `float`, optional
-        Factor to set the x-axis limits in the plots realtive to
-        the source frequency. Default is 4 and the minimum is 2.
-    show: `bool`, optional
-        Whether to show the plot. Default is False.
+    Wave_object : `wave`
+        Wave object containing the simulation results. Must have the
+        following attributes:
+        - receivers_out_fft: FFT of computed receiver data
+        - receivers_ref_fft: FFT of reference receiver data
+        - freq_Nyq: Nyquist frequency
+        - frequency: Source frequency
+        - freq_ref: Reference frequency
+        - number_of_receivers: Number of receivers
+        - path_save: Directory path for saving plots
+        - case_abc: Case name for file naming
+    factor_xlim : `float`, optional
+        Factor to set the x-axis limits relative to the source frequency.
+        The plot will show frequencies up to factor_xlim * source_frequency,
+        capped at the Nyquist frequency. Minimum value is 2.
+        Default is 4.
+
+    show : `bool`, optional
+        Whether to display the plot interactively. Default is False.
 
     Returns
     -------
     None
-    '''
+
+    Notes
+    -----
+    The function saves two files:
+    - {path_save}/{case_abc}/freq.png
+    - {path_save}/{case_abc}/freq.pdf
+
+    The green solid line represents the FFT of the computed solution,
+    while the red dashed line represents the FFT of the reference solution.
+    Black vertical lines mark the source and reference frequencies.
+    """
 
     print("\nPlotting Frequency Comparison", flush=True)
 
     # Frequency data
-    f_Nyq = Wave_object.f_Nyq
-    f_sou = Wave_object.frequency
-    pfft = Wave_object.receivers_out_fft.shape[0] - 1
-    df = f_Nyq / pfft
-    limf = round(min(max(fxlim, 2.) * f_sou, f_Nyq), 1)
+    freq_Nyq = wave_object.freq_Nyq
+    freq_sou = wave_object.frequency
+    samples_fft = wave_object.receivers_out_fft.shape[0] - 1
+    df = freq_Nyq / samples_fft
+    limf = round(np.clip(factor_xlim * freq_sou, 2 * freq_sou, freq_Nyq), 1)
     idx_lim = int(limf / df) + 1
     f_rec = np.linspace(0, df * idx_lim, idx_lim)
 
@@ -272,7 +313,7 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
     plt.rcParams['font.size'] = 7
 
     # Setting subplots
-    num_recvs = Wave_object.number_of_receivers
+    num_recvs = wave_object.number_of_receivers
     plt.rcParams['axes.grid'] = True
     fig, axes = plt.subplots(nrows=num_recvs, ncols=1)
     fig.subplots_adjust(hspace=0.6)
@@ -284,20 +325,20 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
     for rec in range(num_recvs):
 
         # Plot the receiver data
-        rc_dat = Wave_object.receivers_out_fft[:idx_lim, rec]
-        rf_dat = Wave_object.receivers_ref_fft[:idx_lim, rec]
+        rc_dat = wave_object.receivers_out_fft[:idx_lim, rec]
+        rf_dat = wave_object.receivers_ref_fft[:idx_lim, rec]
         axes[rec].plot(f_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
         axes[rec].plot(f_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
 
-        # Add a vertical line at f_ref and f_sou
-        if f_sou == Wave_object.freq_ref:
-            f_ref = f_sou
+        # Add a vertical line at f_ref and freq_sou
+        if freq_sou == wave_object.freq_ref:
+            f_ref = freq_sou
             f_str = r'$f_{ref} = f_{sou}$'
         else:
-            f_ref = Wave_object.freq_ref
+            f_ref = wave_object.freq_ref
             f_str = r'$f_{ref}$'
             axes[rec].axvline(
-                x=f_sou, color='black', linestyle='-', linewidth=1.25)
+                x=freq_sou, color='black', linestyle='-', linewidth=1.25)
 
         axes[rec].axvline(
             x=f_ref, color='black', linestyle='-', linewidth=1.25)
@@ -327,47 +368,59 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
             axes[rec].text(f_ref - limf / 500., axes[rec].get_ylim()[0] * 1.05,
                            f_str, color='black', fontsize=8, fontweight='bold',
                            ha='right', va='bottom')
-            axes[rec].text(f_sou + limf / 500., axes[rec].get_ylim()[0] * 1.05,
+            axes[rec].text(freq_sou + limf / 500., axes[rec].get_ylim()[0] * 1.05,
                            r'$f_{sou}$', color='black', fontsize=8,
                            fontweight='bold', ha='left', va='bottom') \
-                if f_sou != Wave_object.freq_ref else None
+                if freq_sou != wave_object.freq_ref else None
 
     # Saving the plot
-    time_str = Wave_object.path_case_habc + "freq"
+    time_str = wave_object.path_case_abc + "freq"
     plt.savefig(time_str + ".png", bbox_inches='tight')
     plt.savefig(time_str + ".pdf", bbox_inches='tight')
     plt.show() if show else None
     plt.close()
 
 
-def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
-    '''
-    Plot the regression curve for the optimal xCR value.
+def plot_xCR_opt(wave_object, data_regr_xCR, show=False):
+    """Plot the regression curve for the optimal xCR parameter.
+
+    Creates a plot showing the quadratic regression of integral and peak
+    errors as a function of the heuristic factor xCR, highlighting the
+    optimal value based on a specified criterion. The plot includes
+    regression equations, R² values, and the optimal xCR marker.
 
     Parameters
     ----------
-    Wave_object: `wave`
-        The Wave object containing the simulation results
+    wave_object: `wave`
+        The Wave object containing the simulation results and configuration.
+        Must have attributes:
+        - xCR_bounds: Bounds for the xCR parameter
+        - path_save: Directory path for saving plots
+        - case_abc: Case name for file naming
     data_regr_xCR: `list`
-        Data for the regression of the parameter xCR.
-        Structure: [xCR, max_errIt, max_errPK, crit_opt]
-        - xCR: Values of xCR used in the regression.
-          The last value IS the optimal xCR
-        - max_errIt: Values of the maximum integral error.
-          The last value corresponds to the optimal xCR
-        - max_errPK: Values of the maximum peak error.
-          The last value corresponds to the optimal xCR
-        - crit_opt : Criterion for the optimal heuristic factor.
-          * 'err_difference' : Difference between integral and peak errors
-          * 'err_integral' : Minimum integral error
-          * 'err_sum' : Sum of integral and peak errors
-    show: `bool`, optional
-        Whether to show the plot. Default is False.
+        Data for the regression of the parameter xCR with structure:
+        [xCR, max_errIt, max_errPk, crit_opt] where:
+        - xCR : array-like
+            Values of xCR used in the regression. The last value is the optimal xCR.
+        - max_errIt : array-like
+            Values of the maximum integral error at each xCR.
+            The last value corresponds to the optimal xCR.
+        - max_errPk : array-like
+            Values of the maximum peak error at each xCR.
+            The last value corresponds to the optimal xCR.
+        - crit_opt : `str`
+            Criterion used to determine the optimal xCR.
+            Options:
+            - 'err_difference' : Minimizes difference between integral and peak errors
+            - 'err_integral' : Minimizes integral error
+            - 'err_sum' : Minimizes the sum of integral and peak errors
+    show : bool, optional
+        Whether to display the plot interactively. Default is False.
 
     Returns
     -------
     None
-    '''
+    """
 
     # Data for regression
     xCR, max_errIt, max_errPk, crit_opt = data_regr_xCR
@@ -399,7 +452,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
              label=r'Peak Error: ' + eq_str_eP)
 
     # xCR limits
-    xCR_inf, xCR_sup = Wave_object.xCR_lim
+    xCR_inf, xCR_sup = wave_object.xCR_lim
 
     # Regression curves
     xgraf = np.linspace(xCR_inf, xCR_sup, int((xCR_sup - xCR_inf) / 0.1))
@@ -438,7 +491,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     plt.ylabel(r'$e_I \; | \; e_P \; (\%)$')
 
     # Saving the plot
-    xcr_str = Wave_object.path_case_habc + "xCR"
+    xcr_str = wave_object.path_case_abc + "xCR"
     plt.savefig(xcr_str + '.png', bbox_inches='tight')
     plt.savefig(xcr_str + '.pdf', bbox_inches='tight')
     plt.show() if show else None
