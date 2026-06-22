@@ -9,6 +9,7 @@ from scipy.interpolate import griddata
 import glob
 import os
 import warnings
+import segyio
 from ..tools.version_control import is_firedrake_new
 
 
