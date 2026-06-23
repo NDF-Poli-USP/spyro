@@ -5,7 +5,7 @@ from ..io import write_function_to_grid
 import matplotlib.pyplot as plt
 
 
-def segy_to_png(segy_filename, output_file='debug.png', cmap='seismic', vmin=None, vmax=None, dpi=150, flip=True):
+def segy_to_png(segy_filename, output_file='debug.png', cmap='seismic', vmin=None, vmax=None, dpi=150, flip=True, show=False):
     """Read a SEGY file and return a PNG image (bytes) or save to disk.
 
     Parameters
@@ -23,6 +23,8 @@ def segy_to_png(segy_filename, output_file='debug.png', cmap='seismic', vmin=Non
         DPI for saving the PNG.
     flip : bool
         If True, flip the data vertically for common display orientation.
+    show : bool
+        If True shows the image
 
     Returns
     -------
@@ -43,6 +45,9 @@ def segy_to_png(segy_filename, output_file='debug.png', cmap='seismic', vmin=Non
     fig, ax = plt.subplots()
     ax.imshow(data, cmap=cmap, aspect='auto', origin='lower', vmin=vmin, vmax=vmax)
     ax.set_axis_off()
+
+    if show:
+        plt.show()
 
     if output_file is not None:
         fig.savefig(output_file, bbox_inches='tight', dpi=dpi)
