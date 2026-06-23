@@ -62,6 +62,31 @@ def segy_to_png(segy_filename, output_file='debug.png', cmap='seismic', vmin=Non
 
 
 def create_segy_from_grid(velocity, filename, rotate=False):
+    """
+    Create a SEG-Y file from a velocity grid.
+
+    Parameters
+    ----------
+    velocity : numpy.ndarray
+        A 2D array representing the velocity grid. The shape of the array
+        determines the number of samples and traces.
+    filename : str
+        The name of the output SEG-Y file.
+    rotate : bool, optional
+        If True, the velocity grid is rotated before being written to the file.
+        Defaults to False.
+
+    Raises
+    ------
+    AssertionError
+        If the velocity grid contains NaN values.
+
+    Notes
+    -----
+    - The `spec.format` parameter is set to 1, which corresponds to IBM float format.
+    - The `spec.samples`, `spec.ilines`, and `spec.xlines` are configured based
+      on the shape of the velocity grid.
+    """
     spec = segyio.spec()
 
     if rotate is False:
