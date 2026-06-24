@@ -171,6 +171,7 @@ def get_forward_model(dictionary=None, adjoint_type=AdjointType.NONE):
 
 
 @pytest.mark.slow
+@pytest.mark.newer_firedrake
 def test_gradient_auto_adjoint(PML=True):
     dictionary = set_dictionary(PML=PML)
     _, _, Wave_obj_guess = get_forward_model(
@@ -217,6 +218,7 @@ def test_gradient_implemented_adjoint(PML=False):
 
 
 @pytest.mark.slow
+@pytest.mark.newer_firedrake
 def test_gradient_pml_auto_adjoint():
     test_gradient_auto_adjoint(PML=True)
 

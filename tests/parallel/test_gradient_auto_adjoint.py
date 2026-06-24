@@ -169,6 +169,7 @@ def get_forward_model():
     return Wave_obj_guess
 
 
+@pytest.mark.newer_firedrake
 @pytest.mark.parallel(4)
 def test_gradient_auto_adjoint_parallel():
     """Taylor-test the ensemble automated-adjoint gradient.
