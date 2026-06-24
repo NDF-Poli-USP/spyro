@@ -103,34 +103,7 @@ class AcousticWave(Wave):
             depending on the chosen Riesz map.
         """
         if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-            if not isinstance(self.functional_value, AdjFloat):
-                raise ValueError(
-                    "Functional value must be an AdjFloat for automated adjoint gradient computation."
-                )
-
-            if not self.automated_adjoint:
-                self.enable_automated_adjoint()
-                self.automated_adjoint.clear_tape()
-                self.forward_solve()
-                self.automated_adjoint.create_reduced_functional(
-                    self.functional_value
-                )
-            elif (
-                self.automated_adjoint.reduced_functional is None
-                and isinstance(self.automated_adjoint._tape, Tape)
-            ):
-                self.automated_adjoint.create_reduced_functional(
-                    self.functional_value
-                )
-
-            if riesz_map == RieszMapType.L2:
-                return self.automated_adjoint.compute_gradient()
-            elif riesz_map == RieszMapType.l2:
-                return self.automated_adjoint.compute_derivative()
-            else:
-                raise NotImplementedError(
-                    f"Riesz map {riesz_map} not implemented for automated adjoint."
-                )
+            return self._automated_adjoint_gradient(riesz_map=riesz_map)
 
         self.enable_implemented_adjoint()
         if misfit is not None:
@@ -167,6 +140,50 @@ class AcousticWave(Wave):
                 f"Riesz map {riesz_map} not implemented for implemented adjoint."
             )
         return backward_wave_propagator(self)
+
+    def _automated_adjoint_gradient(self, riesz_map=RieszMapType.L2):
+        """Compute the gradient using the automated adjoint.
+
+        Parameters:
+        -----------
+        riesz_map: RieszMapType enum (default: RieszMapType.L2)
+            The type of Riesz map to use for the gradient. More details in the documentation of the
+            :class:`RieszMapType` enum.
+
+        Returns:
+        --------
+        dJ: Firedrake 'Function' or Firedrake 'Cofunction'
+            Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
+            depending on the chosen Riesz map.
+        """
+        if not isinstance(self.functional_value, AdjFloat):
+            raise ValueError(
+                "Functional value must be an AdjFloat for automated adjoint gradient computation."
+            )
+
+        if not self.automated_adjoint:
+            self.enable_automated_adjoint()
+            self.automated_adjoint.clear_tape()
+            self.forward_solve()
+            self.automated_adjoint.create_reduced_functional(
+                self.functional_value
+            )
+        elif (
+            self.automated_adjoint.reduced_functional is None
+            and isinstance(self.automated_adjoint._tape, Tape)
+        ):
+            self.automated_adjoint.create_reduced_functional(
+                self.functional_value
+            )
+
+        if riesz_map == RieszMapType.L2:
+            return self.automated_adjoint.compute_gradient()
+        elif riesz_map == RieszMapType.l2:
+            return self.automated_adjoint.compute_derivative()
+        else:
+            raise NotImplementedError(
+                f"Riesz map {riesz_map} not implemented for automated adjoint."
+            )
 
     def reset_pressure(self):
         if self.abc_boundary_layer_type == "PML":
