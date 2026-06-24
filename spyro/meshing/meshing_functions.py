@@ -449,15 +449,43 @@ class AutomaticMesh:
         if gmsh is None:
             raise ImportError("gmsh is not available. Please install it.")
 
-        if self.mesh_parameters.segy_velocity_model is None:
-            if self.mesh_parameters.velocity_model is not None:
-                filename = "tmp_velocity_model.segy"
-                vp = self.mesh_parameters.velocity_model["vp_values"]
-                create_segy_from_grid(vp, filename)
-                self.velocity_model = filename
+        if self.mesh_parameters.segy_velocity_model is not None:
+            self.velocity_model = self.mesh_parameters.segy_velocity_model
 
-        # if self.mesh_parameters.segy_velocity_model is None:
-        #     raise ValueError("Gmsh mesher temporarily only works with segy files.")
+        elif self.mesh_parameters.velocity_model is not None:
+            velocity_model = self.mesh_parameters.velocity_model
+
+            if not isinstance(velocity_model, dict):
+                raise TypeError(
+                    "velocity_model must be a grid dictionary when "
+                    "segy_velocity_model is not provided."
+                )
+
+            if "vp_values" not in velocity_model:
+                raise ValueError(
+                    "Grid velocity_model must contain the key 'vp_values'."
+                )
+
+            vp = np.asarray(velocity_model["vp_values"])
+
+            if vp.ndim != 2:
+                raise ValueError(
+                    "Grid velocity_model['vp_values'] must be a 2-D array, "
+                    f"but received shape {vp.shape}."
+                )
+
+            vp_for_gmsh = np.ascontiguousarray(vp[::-1, :])
+
+            filename = "tmp_velocity_model.segy"
+            create_segy_from_grid(vp_for_gmsh, filename)
+
+            self.velocity_model = filename
+
+        else:
+            raise ValueError(
+                "Gmsh meshing requires either 'segy_velocity_model' "
+                "or a grid 'velocity_model'."
+            )
 
         if self.comm is None or self.comm.ensemble_comm.rank == 0:
             parallel_print("Generating Gmsh mesh...", comm=self.comm)
