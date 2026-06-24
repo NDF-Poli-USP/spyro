@@ -162,8 +162,8 @@ def create_sizing_function(
         - sizing_function (callable): A function f(x, y) returning element size.
         - min_val (float): Minimum element size in the domain.
         - max_val (float): Maximum element size in the domain.
-        - n_samples (int): Number of depth samples.
-        - n_traces (int): Number of lateral traces.
+        - n_samples (int): Number of depth samples per trace (rows).
+        - n_traces (int): Number of lateral traces (columns).
     """
 
     # Read velocity model with provided bbox
@@ -186,8 +186,14 @@ def create_sizing_function(
 
     # Applying padding
     if pad_type == "rectangular" or pad_type == "hyperelliptical":
-        dz = (bbox[1] - bbox[0]) / n_samples
-        dx = (bbox[3] - bbox[2]) / n_traces  # TODO: this is the error
+        if n_samples < 2 or n_traces < 2:
+            raise ValueError(
+                f"SEGY model must have at least 2 samples and 2 traces; "
+                f"got n_samples={n_samples}, n_traces={n_traces}."
+            )
+
+        dz = (bbox[1] - bbox[0]) / (n_samples - 1)
+        dx = (bbox[3] - bbox[2]) / (n_traces - 1)
         nnz = int(pad_size_z / dz)
         nnx = int(pad_size_x / dx)
 
@@ -204,21 +210,50 @@ def create_sizing_function(
     print(cell_size.shape[1])
     if grade is not None and grade > 0.0:
         polyorder = 3
-        min_valid = polyorder + 2 if (polyorder % 2 != 0) else polyorder + 1
 
-        def calculate_window(dim_size, grade_factor):
-            val = int(grade_factor * dim_size)
-            val = min(val, dim_size)
+        def calculate_window(dim_size, grade_factor, polyorder=3):
+            """
+            Return a valid odd Savitzky-Golay window length.
 
-            if val % 2 == 0:
-                val -= 1
+            grade_factor:
+                0.1 -> small/local smoothing
+                0.9 -> high smoothing
 
-            val = max(min_valid, val)
+            Safety rule:
+                The window may not exceed 90% of the corresponding axis size.
+            """
+            if not 0.0 < grade_factor <= 1.0:
+                raise ValueError(
+                    f"grade must be in the interval (0, 1], got {grade_factor}."
+                )
 
-            if val > dim_size:
-                val = dim_size if dim_size % 2 != 0 else dim_size - 1
+            # Savitzky-Golay requires window_length > polyorder.
+            min_valid = polyorder + 2 if polyorder % 2 != 0 else polyorder + 1
 
-            return val
+            if dim_size < min_valid:
+                return None
+
+            requested_window = int(round(grade_factor * dim_size))
+
+            # Maximum window size
+            max_window = int(np.floor(0.90 * dim_size))
+
+            # Savitzky-Golay requires an odd window.
+            if max_window % 2 == 0:
+                max_window -= 1
+
+            # For very small dimensions, do not violate the 90% safety rule.
+            if max_window < min_valid:
+                return None
+
+            # Keep the window inside the valid range.
+            window = max(min_valid, min(requested_window, max_window))
+
+            # Force odd.
+            if window % 2 == 0:
+                window -= 1
+
+            return window
 
         window_length_z = calculate_window(cell_size.shape[0], grade)
         window_length_x = calculate_window(cell_size.shape[1], grade)
@@ -283,7 +318,7 @@ def read_segy_velocity_model(fname):
         for i in range(n_traces):
             vp[:, i] = segy.trace[i]
     print(f"Final velocity range: {vp.min():.1f} - {vp.max():.1f}")
-    return vp, n_traces, n_samples
+    return vp, n_samples, n_traces
 
 
 def calculate_wavelength_sizing(vp, wl, freq):
@@ -365,40 +400,131 @@ def interpolate_size(x, y, cell_size, bbox):
         return result.reshape(x.shape)
 
 
-def apply_savitzky_golay_filter_2d(grid_values, window_length_x=501, window_length_z=501, polyorder=3):
-    """Apply a 2D Savitzky-Golay filter to a grid of values.
-
-    Smooths a 2D array by applying 1D Savitzky-Golay filters sequentially
-    along the columns and rows to grade element sizes and prevent abrupt
-    transitions.
+def apply_savitzky_golay_filter_2d(
+    grid_values,
+    window_length_x=501,
+    window_length_z=501,
+    polyorder=3,
+):
+    """Apply a two-dimensional Savitzky-Golay grading filter.
 
     Parameters
     ----------
     grid_values : array-like
-        Input 2D array of grid values to be filtered.
+        Two-dimensional array containing mesh element sizes.
     window_length_x : int, optional
-        The length of the filter window along the x-axis. Must be odd and positive.
-        Default is 501.
+        Odd Savitzky-Golay window length along the lateral x direction
     window_length_z : int, optional
-        The length of the filter window along the z-axis. Must be odd and positive.
-        Default is 501.
+        Odd Savitzky-Golay window length along the depth z direction
     polyorder : int, optional
-        The order of the polynomial used to fit the samples. Must be less
-        than the window lengths. Default is 3.
+        Polynomial order used by the Savitzky-Golay filter. Default is 3.
 
     Returns
     -------
-    ndarray
-        Filtered 2D array with the same shape as the input.
+    numpy.ndarray
+        Filtered sizing field. If any negative value is created by the
+        filter, all values below the original minimum positive element size
+        are replaced by that minimum size.
 
     Raises
     ------
     ValueError
-        If window lengths are not odd, not positive, or if polyorder is too large.
+        If the input is invalid, contains NaN/Inf, has no positive values,
+        or uses incompatible Savitzky-Golay window parameters.
     """
-    grid_values = np.asarray(grid_values)
-    filtered_values = savgol_filter(grid_values, window_length_z, polyorder, axis=0)
-    filtered_values = savgol_filter(filtered_values, window_length_x, polyorder, axis=1)
+    grid_values = np.asarray(grid_values, dtype=np.float64)
+
+    if grid_values.ndim != 2:
+        raise ValueError(
+            f"grid_values must be a 2D array, received shape "
+            f"{grid_values.shape}."
+        )
+
+    if not np.all(np.isfinite(grid_values)):
+        raise ValueError(
+            "Sizing field contains NaN or Inf values before filtering."
+        )
+
+    if window_length_z is None or window_length_x is None:
+        return grid_values.copy()
+
+    if window_length_z <= 0 or window_length_x <= 0:
+        raise ValueError(
+            "Savitzky-Golay window lengths must be positive. "
+            f"Got z={window_length_z}, x={window_length_x}."
+        )
+
+    if window_length_z % 2 == 0 or window_length_x % 2 == 0:
+        raise ValueError(
+            "Savitzky-Golay window lengths must be odd. "
+            f"Got z={window_length_z}, x={window_length_x}."
+        )
+
+    if window_length_z > grid_values.shape[0]:
+        raise ValueError(
+            f"window_length_z={window_length_z} exceeds z-axis size "
+            f"{grid_values.shape[0]}."
+        )
+
+    if window_length_x > grid_values.shape[1]:
+        raise ValueError(
+            f"window_length_x={window_length_x} exceeds x-axis size "
+            f"{grid_values.shape[1]}."
+        )
+
+    if window_length_z <= polyorder or window_length_x <= polyorder:
+        raise ValueError(
+            "Savitzky-Golay window lengths must be greater than polyorder. "
+            f"Got z={window_length_z}, x={window_length_x}, "
+            f"polyorder={polyorder}."
+        )
+
+    positive_values = grid_values[grid_values > 0.0]
+
+    if positive_values.size == 0:
+        raise ValueError(
+            "Sizing field contains no positive values, so the minimum "
+            "element size cannot be determined."
+        )
+
+    min_element_size = float(np.min(positive_values))
+
+    filtered_values = savgol_filter(
+        grid_values,
+        window_length_z,
+        polyorder,
+        axis=0,
+        mode="nearest",
+    )
+
+    filtered_values = savgol_filter(
+        filtered_values,
+        window_length_x,
+        polyorder,
+        axis=1,
+        mode="nearest",
+    )
+
+    if not np.all(np.isfinite(filtered_values)):
+        raise ValueError(
+            "Sizing field contains NaN or Inf values after filtering."
+        )
+
+    negative_mask = filtered_values < 0.0
+    n_negative = int(np.count_nonzero(negative_mask))
+
+    if n_negative > 0:
+        below_min_mask = filtered_values < min_element_size
+        n_replaced = int(np.count_nonzero(below_min_mask))
+
+        print(
+            f"Warning: Savitzky-Golay grading produced {n_negative} negative "
+            f"sizing values. Replacing all {n_replaced} values below "
+            f"min_element_size={min_element_size:.6f} with the minimum "
+            "element size."
+        )
+
+        filtered_values[below_min_mask] = min_element_size
 
     return filtered_values
 
