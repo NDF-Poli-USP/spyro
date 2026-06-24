@@ -60,7 +60,7 @@ jobs:
     - name: Running serial fast tests
       run: |
         make clean
-        python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/on_one_core/ --skip-slow --durations=10
+        python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/on_one_core/ --skip-slow --skip-newer-firedrake --durations=10
 
     - name: Rename coverage file
       # This is necessary because upload-artifact doesnt recognize hidden files
@@ -133,7 +133,7 @@ jobs:
     - name: Running serial slow tests
       run: |
         make clean
-        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/  --only-slow
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/  --only-slow --skip-newer-firedrake
 
     - name: Running parallel tests for forward problem only
       run: |

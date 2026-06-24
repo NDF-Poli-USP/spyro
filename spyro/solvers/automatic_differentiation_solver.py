@@ -240,8 +240,9 @@ pyadjoint.ReducedFunctional or None
         Similar to :meth:`compute_gradient` but without the Riesz map
         (``apply_riesz=False``), so the result lives in the dual space as a
         :class:`firedrake.Cofunction`. The derivative is useful when the
-        Full-Waveform Inversion inversion employes scipy optimization routines
-        that require derivatives.
+        Full-Waveform Inversion employs scipy optimization routines that require
+        derivatives. As with :meth:`compute_gradient`, ``apply_riesz`` requires
+        Firedrake ``>= 2026.4``.
 
         Returns
         -------
