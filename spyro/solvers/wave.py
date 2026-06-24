@@ -562,7 +562,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
         controls = self.c if self.c is not None else self.initial_velocity_model
-        self.automated_adjoint = AutomatedAdjoint(controls)
+        # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
+        # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
+        # that the reduced functional is built as an
+        # ``EnsembleReducedFunctional``, summing the per-shot functionals and
+        # gradients over the ensemble communicator.
+        self.automated_adjoint = AutomatedAdjoint(controls, ensemble=self.comm)
         self.functional_value = None
         self.misfit = None
 
