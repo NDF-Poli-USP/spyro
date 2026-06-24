@@ -237,6 +237,7 @@ def test_gmsh_adaptation():
     lbda_centre = 3.0/20.0  # vp/freq
     h_centre = lbda_centre/cells_per_wavelength
     cell_diam_centre = float(f.at(-1.0, 1.0))
+    print(f"Cell diameter should be {h_centre}, and is measured at {cell_diam_centre}")
     assert math.isclose(h_centre, cell_diam_centre, rel_tol=1e-1)
 
     # at circle of minas cheese (meia cura cheesy goodness):
