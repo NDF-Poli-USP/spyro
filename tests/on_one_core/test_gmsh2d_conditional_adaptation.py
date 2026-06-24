@@ -1,6 +1,5 @@
 import firedrake as fire
 import math
-from importlib.metadata import version
 import spyro
 
 
@@ -114,7 +113,6 @@ def create_grid_based_velocity_field(grid_spacing, length_z, length_x):
 
 
 def test_gmsh_adaptation():
-    import gmsh
     """Test Gmsh mesh adaptation with conditional velocity field.
 
     Validates that Gmsh mesh adaptation correctly adjusts element sizes
@@ -239,7 +237,6 @@ def test_gmsh_adaptation():
     lbda_centre = 3.0/20.0  # vp/freq
     h_centre = lbda_centre/cells_per_wavelength
     cell_diam_centre = float(f.at(-1.0, 1.0))
-    print(f"Using gmsh version {version("gmsh")}")
     print(f"Cell diameter should be {h_centre}, and is measured at {cell_diam_centre}")
     assert math.isclose(h_centre, cell_diam_centre, rel_tol=1e-1)
 
