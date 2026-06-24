@@ -150,6 +150,7 @@ jobs:
           mpiexec -n 6 pytest tests/parallel/test_fwi.py
           mpiexec -n 3 pytest tests/parallel/test_supershot_grad.py
           mpiexec -n 2 pytest tests/parallel/test_gradient_serialshots.py
+          mpiexec -n 4 pytest tests/parallel/test_gradient_auto_adjoint.py
 
     - name: Covering parallel 3D forward test
       continue-on-error: true
@@ -253,6 +254,7 @@ jobs:
           mpiexec -n 6 pytest tests/parallel/test_fwi.py
           mpiexec -n 3 pytest tests/parallel/test_supershot_grad.py
           mpiexec -n 2 pytest tests/parallel/test_gradient_serialshots.py
+          mpiexec -n 4 pytest tests/parallel/test_gradient_auto_adjoint.py
 
     - name: Post-run cleanup
       if: always()
