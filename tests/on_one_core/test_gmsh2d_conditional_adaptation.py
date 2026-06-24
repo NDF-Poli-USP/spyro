@@ -182,21 +182,21 @@ def test_gmsh_adaptation():
         "mesh_type": mesh_type,
         "velocity_model": vp_grid,
         "cells_per_wavelength": cells_per_wavelength,
-        "padding_type": None , # Padding types "rectangular" "hyperelliptical" None 
-        "hmin_segy": 0.0, # Minimum Element size for segy, will apply if higher than function minimum
-        "grade": 0.1, # function grading for smooth element transition, None = no smooth, 0.9 = small smooth, 0.1 = high smooth
+        "padding_type": None,  # Padding types "rectangular" "hyperelliptical" None
+        "hmin_segy": 0.0,  # Minimum Element size for segy, will apply if higher than function minimum
+        "grade": 0.1,  # function grading for smooth element transition, None = no smooth, 0.9 = small smooth, 0.1 = high smooth
 
         # Water Interface
-        "water_interface": False, # If True detect and implement water interface
+        "water_interface": False,  # If True detect and implement water interface
 
         # Structured Mesh & Winslow Smoothing
-        "structured_mesh": False, # True if structured quad mesh, False if triangular unstructured mesh
-        "min_element_size": 0.01, # Element size for structured mesh
-        "apply_winslow": True, # If True apply winslow smoothing
-        "winslow_implementation": "fast", # Winslow version to use, default, fast and numba are options
-        "winslow_iterations": 3000, # Number of iterations for Winslow Smoothing
-        "winslow_omega": 0.5, # Winslow Smoothing node movement factor
-        "extend_segy": False, # Extend the segy function into the padding ( for unstructured mesh )
+        "structured_mesh": False,  # True if structured quad mesh, False if triangular unstructured mesh
+        "min_element_size": 0.01,  # Element size for structured mesh
+        "apply_winslow": True,  # If True apply winslow smoothing
+        "winslow_implementation": "fast",  # Winslow version to use, default, fast and numba are options
+        "winslow_iterations": 3000,  # Number of iterations for Winslow Smoothing
+        "winslow_omega": 0.5,  # Winslow Smoothing node movement factor
+        "extend_segy": False,  # Extend the segy function into the padding ( for unstructured mesh )
         "h_padding": 0.5,  # If extend_segy = False, use this value of constant padding size
     }
     dictionary["acquisition"] = {
