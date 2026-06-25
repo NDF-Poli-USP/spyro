@@ -186,7 +186,7 @@ def test_gmsh_adaptation():
         "cells_per_wavelength": cells_per_wavelength,
         "padding_type": None,  # Padding types "rectangular" "hyperelliptical" None
         "hmin_segy": 0.0,  # Minimum Element size for segy, will apply if higher than function minimum
-        "grade": 0.1,  # function grading for smooth element transition, None = no smooth, 0.9 = high smooth, 0.1 = low smooth
+        "grade": None,  # function grading for smooth element transition, None = no smooth, 0.9 = high smooth, 0.1 = low smooth
 
         # Water Interface
         "water_interface": False,  # If True detect and implement water interface
