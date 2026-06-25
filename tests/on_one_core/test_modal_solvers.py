@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 import firedrake as fire
 import spyro.habc.habc as habc
-from os import makedirs, path
+from os import makedirs, path, environ
 from spyro.utils.cost import comp_cost
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -218,6 +218,35 @@ def create_folder(folder):
         makedirs(folder)
 
 
+def modal_output_folder(dimension):
+    '''
+    Return a per-xdist-worker output folder for the modal tests.
+
+    The parametrized modal tests (``homogeneous`` True/False, 2D/3D, and T/Q
+    elements) all write their results under ``output/modal_test{dimension}d``.
+    Under ``pytest -n`` (xdist) several of these items run concurrently in
+    separate worker processes and would otherwise share that single directory.
+    ``rename_folder_habc`` then ``rmtree``/``rename``s a per-case folder that
+    another worker is still writing into, which raises ``FileNotFoundError``
+    (e.g. on ``RAYLEIGH_cost.txt``). Scoping the folder by the xdist worker id
+    gives concurrent items distinct directories, so they can no longer collide.
+    Falls back to ``main`` when not running under xdist.
+
+    Parameters
+    ----------
+    dimension: `int`
+        Dimension of the model (2 or 3)
+
+    Returns
+    -------
+    `str`
+        Worker-scoped output folder path.
+    '''
+
+    worker = environ.get("PYTEST_XDIST_WORKER", "main")
+    return f"output/modal_test{dimension}d_{worker}"
+
+
 def preamble_modal(dictionary, edge_length, f_est,
                    dimension, homogeneous=True):
     '''
@@ -247,7 +276,7 @@ def preamble_modal(dictionary, edge_length, f_est,
 
     # Create the acoustic wave object with HABCs
     Wave_obj = habc.HABC_Wave(dictionary=dictionary,
-                              output_folder=f"output/modal_test{dimension}d")
+                              output_folder=modal_output_folder(dimension))
 
     # Mesh
     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
@@ -299,7 +328,7 @@ def get_range_hyp(Wave_obj, n_root=1):
 
     # Identifier for the current case study
     Wave_obj.identify_habc_case(
-        output_folder=f"output/modal_test{Wave_obj.dimension}d")
+        output_folder=modal_output_folder(Wave_obj.dimension))
 
     # Determining layer size
     Wave_obj.size_habc_criterion(n_root=n_root)
@@ -427,7 +456,7 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
                               homogeneous=homogeneous)
 
     # Create the output folder if it does not exist
-    create_folder(f"output/modal_test{dimension}d")
+    create_folder(modal_output_folder(dimension))
 
     for degree_layer, exp_value in zip(degree_layer_lst, expect_values_lst):
 
