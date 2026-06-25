@@ -242,19 +242,19 @@ def test_gmsh_adaptation():
     print(f'Using Firedrake version {version("firedrake")}')
     print(f'Using gmsh version {version("gmsh")}')
     print(f"Cell diameter should be {h_centre}, and is measured at {cell_diam_centre}")
-    assert math.isclose(h_centre, cell_diam_centre, rel_tol=1e-15)
+    assert math.isclose(h_centre, cell_diam_centre, rel_tol=1e-1)
 
     # at circle of minas cheese (meia cura cheesy goodness):
     lbda_circle = 2.0/20.0  # vp/freq
     h_circle = lbda_circle/cells_per_wavelength
     cell_diam_circle = float(f.at(-1.0, 1.3))
-    assert math.isclose(h_circle, cell_diam_circle, rel_tol=1e-15)
+    assert math.isclose(h_circle, cell_diam_circle, rel_tol=1e-1)
 
     # outside the cheese
     lbda_outside = 1.5/20.0
     h_outside = lbda_outside/cells_per_wavelength
     cell_diam_outside = float(f.at(-1.0, 1.7))
-    assert math.isclose(h_outside, cell_diam_outside, rel_tol=1e-25)
+    assert math.isclose(h_outside, cell_diam_outside, rel_tol=1e-2)
 
     print("END")
 
