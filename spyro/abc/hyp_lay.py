@@ -207,6 +207,7 @@ class HyperLayer():
         See Salas et al (2022): Hybrid absorbing scheme based on hyperelliptical
         layers with non-reflecting boundary conditions in scalar wave equations.
         doi: https://doi.org/10.1016/j.apm.2022.09.014
+        TODO: Add citation
 
         Parameters
         ----------
@@ -369,6 +370,7 @@ class HyperLayer():
         See Salas et al (2022): Hybrid absorbing scheme based on hyperelliptical
         layers with non-reflecting boundary conditions in scalar wave equations.
         doi: https://doi.org/10.1016/j.apm.2022.09.014
+        TODO: Add citation
 
         Parameters
         ----------

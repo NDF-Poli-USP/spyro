@@ -333,7 +333,7 @@ class ABCLayer(NRBC):
         return formatted_str
 
     def identify_abc_layer_case(self):
-        """Generate an identifier for the current case study of the ABC scheme.
+        """Generate an identifier for the current layer geometry of the ABC.
 
         The identifier includes the layer shape ("REC" for rectangular layers or "HN"
         followed by the degree for hypershape layers) and the reference frequency for
