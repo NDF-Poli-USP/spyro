@@ -68,9 +68,6 @@ class Read_boundary_layer:
         None
         """
 
-        # Communicator MPI
-        self.comm = comm
-
         # General parameters
         self.input_dictionary.setdefault("absorving_boundary_conditions", {})
         self.input_dictionary[
