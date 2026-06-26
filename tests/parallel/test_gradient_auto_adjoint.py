@@ -1,33 +1,34 @@
 """Parallel automated-adjoint gradient verification.
 
 This test exercises spyro's *automated adjoint* (algorithmic differentiation via
-pyadjoint) under **combined ensemble (shot) and spatial (mesh) parallelism**. It
-is meant to be run with four MPI ranks::
+pyadjoint) under **ensemble (shot) parallelism**. It is meant to be run with two
+MPI ranks::
 
-    mpiexec -n 4 pytest tests/parallel/test_gradient_auto_adjoint.py
+    mpiexec -n 2 pytest tests/parallel/test_gradient_auto_adjoint.py
 
-With ``parallelism = "automatic"`` and two sources, spyro splits the four cores
-as ``num_cores_per_propagation = available_cores / number_of_sources = 4 / 2 =
-2`` and builds an ``Ensemble(COMM_WORLD, 2)``. This yields:
-
-* **two ensemble members** (``ensemble_comm`` of size 2), one per source -- the
-  *source* parallelisation; and
-* **two spatial cores per member** (``comm`` of size 2), over which each shot's
-  mesh is distributed -- the *mesh* parallelisation.
+With ``parallelism = "automatic"`` and two sources, spyro sets
+``num_cores_per_propagation = available_cores / number_of_sources = 2 / 2 = 1``
+and builds an ``Ensemble(COMM_WORLD, 1)``. This yields **two ensemble members**
+(``ensemble_comm`` of size 2), one per source, each integrating its shot on a
+single spatial core (``comm`` of size 1).
 
 Each ensemble member records the forward solve for its own source on its own
-pyadjoint tape and accumulates that shot's functional ``J_i`` (assembled over the
-distributed mesh). The reduced functional created by
-:meth:`AutomatedAdjoint.create_reduced_functional` is a
+pyadjoint tape and accumulates that shot's functional ``J_i``. The reduced
+functional created by :meth:`AutomatedAdjoint.create_reduced_functional` is a
 :class:`firedrake.adjoint.EnsembleReducedFunctional` whose ``ensemble`` argument
-is ``wave.comm``; differentiating it ``allreduce``-sums ``dJ/dm = sum_i dJ_i/dm``
-over the ensemble communicator while the per-member assembly handles the spatial
-reduction over the mesh. The gradient is then validated with a Taylor test.
+is ``wave.comm``; differentiating it ``allreduce``-sums
+``dJ/dm = sum_i dJ_i/dm`` over the ensemble communicator. The gradient is then
+validated with a Taylor test.
 
-The perturbation direction is built from a deterministic function of the mesh
-coordinates so that it is identical on every ensemble member and independent of
-how the mesh is partitioned across the spatial cores -- a requirement for the
-ensemble Taylor test to converge at second order.
+Note
+----
+The automated adjoint evaluates the per-timestep misfit on a vertex-only mesh of
+the receivers. That path parallelises over *shots* (one core per shot), exactly
+like spyro's ensemble FWI tests; it does not split the receivers across spatial
+cores. This test therefore uses one spatial core per shot. The perturbation
+direction is built from a deterministic function of the mesh coordinates so that
+it is identical on every ensemble member -- a requirement for the ensemble Taylor
+test to converge at second order.
 """
 import firedrake as fire
 import firedrake.adjoint as fire_ad
@@ -45,9 +46,8 @@ dictionary["options"] = {
     "dimension": 2,  # dimension
 }
 
-# "automatic" ensemble parallelism: with two sources and four MPI ranks each
-# ensemble member integrates one shot (source parallelism) over a mesh that is
-# itself distributed across two spatial cores (mesh parallelism).
+# "automatic" ensemble parallelism: with two sources and two MPI ranks each
+# ensemble member integrates one shot (source parallelism) on a single core.
 dictionary["parallelism"] = {
     "type": "automatic",
 }
@@ -93,15 +93,14 @@ dictionary["visualization"] = {
 
 
 def build_direction(Wave_obj):
-    """Build a deterministic, partition-independent perturbation direction.
+    """Build a deterministic perturbation direction shared across the ensemble.
 
     The direction is interpolated from a smooth function of the mesh
-    coordinates, so it represents the *same* field on every ensemble member
-    regardless of how each member partitions its mesh across the spatial cores.
+    coordinates, so it represents the *same* field on every ensemble member.
     This consistency across the ensemble is required for the ensemble Taylor
-    test to converge at second order (the ``EnsembleReducedFunctional`` evaluates
+    test to converge at second order: the ``EnsembleReducedFunctional`` evaluates
     each ``J_i`` at the control value it is handed, so a direction that differed
-    between members would corrupt the directional derivative).
+    between members would corrupt the summed directional derivative.
 
     Parameters
     ----------
@@ -127,7 +126,7 @@ def get_forward_model():
     The exact model uses a two-layer velocity contrast; the guess model is a
     constant background. Under ensemble parallelism each member only solves and
     records the shot it owns, so ``rec_out_exact`` already corresponds to that
-    member's source, while the spatial communicator distributes that shot's mesh.
+    member's source.
 
     Returns
     -------
@@ -156,8 +155,7 @@ def get_forward_model():
     assert isinstance(Wave_obj_guess.c, fire.Function)
     Wave_obj_guess.enable_automated_adjoint()
 
-    # The ensemble passed to the EnsembleReducedFunctional is wave.comm, which
-    # carries both the ensemble (source) and spatial (mesh) communicators.
+    # The ensemble passed to the EnsembleReducedFunctional is wave.comm.
     assert Wave_obj_guess.automated_adjoint.ensemble is Wave_obj_guess.comm
 
     Wave_obj_guess.forward_solve()
@@ -170,19 +168,18 @@ def get_forward_model():
 
 
 @pytest.mark.newer_firedrake
-@pytest.mark.parallel(4)
+@pytest.mark.parallel(2)
 def test_gradient_auto_adjoint_parallel():
     """Taylor-test the ensemble automated-adjoint gradient.
 
-    Runs on four cores: two sources (ensemble parallelism) each solved on a mesh
-    distributed over two spatial cores (mesh parallelism).
+    Runs on two cores: two sources (ensemble parallelism), one core per shot.
     """
     Wave_obj_guess = get_forward_model()
 
-    # Sanity check that both levels of parallelism are actually active.
+    # Sanity check the ensemble (shot) parallelism is active, one core per shot.
     comm = Wave_obj_guess.comm
     assert comm.ensemble_comm.size == 2, "Expected 2 ensemble members (sources)."
-    assert comm.comm.size == 2, "Expected 2 spatial cores per shot (mesh)."
+    assert comm.comm.size == 1, "Expected 1 spatial core per shot."
 
     # Build the reduced functional. With wave.comm as the ensemble this is an
     # EnsembleReducedFunctional summing the per-shot functionals/gradients.
@@ -193,14 +190,12 @@ def test_gradient_auto_adjoint_parallel():
         reduced_functional, fire_ad.EnsembleReducedFunctional
     ), "Reduced functional must be an EnsembleReducedFunctional."
 
-    # The ensemble-summed gradient is a Function with the same number of local
-    # degrees of freedom as the control on this spatial partition.
+    # The ensemble-summed gradient is a Function in the control space.
     dJ = Wave_obj_guess.automated_adjoint.compute_gradient()
     assert isinstance(dJ, fire.Function)
     assert dJ.dat.data.shape == Wave_obj_guess.c.dat.data.shape
 
-    # Deterministic perturbation direction, identical on both ensemble members
-    # and independent of the spatial partitioning.
+    # Deterministic perturbation direction, identical on both ensemble members.
     direction = build_direction(Wave_obj_guess)
 
     # Let taylor_test compute the directional derivative from the
