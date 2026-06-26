@@ -43,7 +43,7 @@ class AutomatedAdjoint:
     ----------------
     .. code-block:: python
 
-        wave.enable_automated_adjoint()   # builds AutomatedAdjoint(ensemble=wave.comm)
+        wave.enable_automated_adjoint()   # builds AutomatedAdjoint(wave.comm)
         with wave.automated_adjoint.fresh_tape():
             wave.forward_solve()          # forward run recorded on the tape
         wave.automated_adjoint.create_reduced_functional(wave.functional_value)
@@ -74,7 +74,7 @@ pyadjoint.ReducedFunctional or None
         :meth:`create_reduced_functional`.
     """
 
-    def __init__(self, controls=None, ensemble=None):
+    def __init__(self, ensemble, controls=None):
         self.controls = controls
         self.ensemble = ensemble
         self.reduced_functional = None
@@ -165,28 +165,15 @@ pyadjoint.ReducedFunctional or None
             The reduced functional, also stored on
             :attr:`reduced_functional`.
         """
-        if ensemble is None:
-            ensemble = self.ensemble
         control = fire_ad.Control(self.controls)
-        if ensemble is not None:
-            # wave.comm provides the ensemble used to allreduce the per-shot
-            # functionals J_i and their gradients dJ_i/dm across ensemble
-            # members. scatter_control=True broadcasts the single control over
-            # the ensemble communicator so that every member evaluates J_i at
-            # the same velocity model.
-            self.reduced_functional = fire_ad.EnsembleReducedFunctional(
-                functional,
-                control,
-                ensemble,
-                scatter_control=True,
-                tape=self._tape,
-            )
-        else:
-            self.reduced_functional = fire_ad.ReducedFunctional(
-                functional,
-                control,
-                tape=self._tape,
-            )
+
+        self.reduced_functional = fire_ad.EnsembleReducedFunctional(
+            functional,
+            control,
+            self.ensemble,
+            scatter_control=True,
+            tape=self._tape,
+        )
         return self.reduced_functional
 
     def recompute_functional(self, control_value):
