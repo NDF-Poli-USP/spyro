@@ -1,10 +1,10 @@
 """Methods to extend the material property in an absorbing layer."""
 
-from firedrake import (assemble, conditional, Constant,
-                       Function, FunctionSpace, VertexOnlyMesh)
+from firedrake import assemble, conditional, Function, FunctionSpace, VertexOnlyMesh
 from firedrake import sqrt as fire_sqrt
 from numpy import clip, where
 from ..domains.space import create_function_space
+from ..io.basicio import parallel_print as pprint
 from ..utils.error_management import value_parameter_error
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..tools.version_control import is_firedrake_new
@@ -163,14 +163,13 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
                              "when 'type_marker' is 'damping'.")
 
         # Reference distance to the original boundary
-        ref_funct = fire_sqrt(ref_funct) / Constant(pad_len)
+        ref_funct = fire_sqrt(ref_funct) / pad_len
 
         # Quadratic damping profile
         if bq == 0.:
-            ref_funct = Constant(eta_crt) * Constant(aq) * ref_funct**2
+            ref_funct = eta_crt * aq * ref_funct**2
         else:
-            ref_funct = Constant(eta_crt) * (Constant(aq) * ref_funct**2
-                                             + Constant(bq) * ref_funct)
+            ref_funct = eta_crt * (aq * ref_funct**2 + bq * ref_funct)
 
     elif type_marker == 'mask':  # Mask filter for layer boundary domain
 
@@ -213,10 +212,10 @@ def clipping_coordinates_lay_field(domain_dim, mesh, dimension,
         Mask for the absorbing layer.
     """
 
-    print("Clipping Coordinates Inside Layer", flush=True)
+    pprint("Clipping Coordinates Inside Layer")
 
     # Domain dimensions
-    Lz, Lx = domain_dim[:2]
+    length_z, length_x = domain_dim[:2]
 
     # Vectorial space for auxiliar field of clipped coordinates
     method_element = "DQ" if quadrilateral else "DG"
@@ -226,16 +225,16 @@ def clipping_coordinates_lay_field(domain_dim, mesh, dimension,
     lay_field = Function(W)
     lay_field.assign(assemble(interpolate(ufl_coordinates_habc, W)))
     lay_arr = lay_field.dat.data_with_halos[:]
-    lay_arr[:, 0] = clip(lay_arr[:, 0], -Lz, 0.)
-    lay_arr[:, 1] = clip(lay_arr[:, 1], 0., Lx)
+    lay_arr[:, 0] = clip(lay_arr[:, 0], -length_z, 0.)
+    lay_arr[:, 1] = clip(lay_arr[:, 1], 0., length_x)
 
     if dimension == 3:  # 3D
 
         # 3D dimension
-        Ly = domain_dim[2]
+        length_y = domain_dim[2]
 
         # Clipping coordinates
-        lay_arr[:, 2] = clip(lay_arr[:, 2], 0., Ly)
+        lay_arr[:, 2] = clip(lay_arr[:, 2], 0., length_y)
 
     # Mask function to identify the absorbing layer domain
     layer_mask = layer_mask_field(domain_dim, mesh, dimension,
@@ -315,7 +314,7 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
         Extended scalar field defined on the same function space as `lay_field`.
     """
 
-    print("Extending Profile Inside Layer", flush=True)
+    pprint("Extending Profile Inside Layer")
 
     # Extracting the nodes from the layer field
     lay_nodes = lay_field.dat.data_with_halos[:]
@@ -326,7 +325,7 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
 
     if method == 'point_cloud':
 
-        print(f"Using Cloud Points Method to Extend {name_prop} Profile", flush=True)
+        pprint(f"Using Cloud Points Method to Extend {name_prop} Profile")
 
         # Set the property of the nearest point on the original boundary
         vel_to_extend = \
@@ -335,7 +334,7 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
 
     elif method == 'nearest_point':
 
-        print(f"Using Nearest Point Method to Extend {name_prop} Profile", flush=True)
+        pprint(f"Using Nearest Point Method to Extend {name_prop} Profile")
 
         # Set the property of the nearest point on the original boundary
         vel_to_extend = field_to_extend.at(pts_to_extend, dont_raise=True)

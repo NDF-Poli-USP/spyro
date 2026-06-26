@@ -93,3 +93,18 @@ class HyperLayerDegreeType(Enum):
     """
     REAL = "real"
     INTEGER = "integer"
+
+
+class BoundaryConditionsType(Enum):
+    """Enum for different types of boundary conditions including Non-Reflecting BCs.
+
+    DIRICHLET: Dirichlet boundary condition
+    NEUMANN: Neumann boundary condition
+    HIGDON: 1-st order Higdon boundary condition (NRBC type)
+    SOMMERFELD: Sommerfeld (Radiation) boundary condition (NRBC type)
+
+    """
+    DIRICHLET = "Dirichlet"
+    NEUMANN = "Neumann"
+    HIGDON = "Higdon"
+    SOMMERFELD = "Sommerfeld"

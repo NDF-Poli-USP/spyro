@@ -78,13 +78,12 @@ class Model_parameters(Read_options, Read_boundary_layer,
         Firedrake mesh.
     abc_active: bool
         Whether or not the absorbing boundary conditions are used.
-    abc_exponent: int
-        Exponent of the absorbing boundary conditions.
-    abc_cmax: float
-        Maximum acoustic wave velocity in the absorbing boundary conditions.
-    abc_R: float
-        Theoretical reflection coefficient of the absorbing boundary
-        conditions.
+    abc_pml_exponent: int
+        Exponent for the polynomial damping profile of the PML layer.
+    abc_pml_cmax: float
+        Maximum propagation speed (km/s) in the PML layer.
+    abc_pml_R: float
+        Theoretical reflection coefficient of the PML layer.
     abc_pad_length: float
         Thickness of the absorbing boundary conditions.
     abc_boundary_layer_type : `str`

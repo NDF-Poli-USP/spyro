@@ -116,7 +116,7 @@ def clean_inst_num(data_arr):
 def value_numerical_error(par_name, par_value, float_num=True, integer_num=False,
                           lower_bound=None, upper_bound=None,
                           include_lower_bound=False, include_upper_bound=False):
-    """Raise a ValueError with a specific error message for numerical parameters.
+    """Validate numerical parameters and raise a ValueError if invalid.
 
     Parameters
     ----------
@@ -136,6 +136,11 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
         If `True`, the lower bound is included in the valid range. Default is `False`.
     include_upper_bound : `bool`, optional
         If `True`, the upper bound is included in the valid range. Default is `False`.
+
+    Returns
+    -------
+    par_value : `int` or `float`
+        The validated parameter value.
 
     Raises
     ------
@@ -184,6 +189,8 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
                          if include_upper_bound else f"less than {upper_bound}")
 
         raise ValueError(f"'{par_name}' must be {bound_str}, got {par_value}.")
+
+    return par_value
 
 
 def enum_parameter_error(par_name, par_value, valid_enum):

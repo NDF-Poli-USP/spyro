@@ -190,19 +190,12 @@ class ABCLayer(NRBC):
             raise TypeError("domain_dim must be a tuple, "
                             f"got {type(domain_dim).__name__}.")
 
-        if not isinstance(frequency, (float)):
-            raise TypeError("frequency must be a float number, "
-                            f"got {type(frequency).__name__}.")
-
         if dimension not in [2, 3]:
             value_parameter_error('dimension', dimension, [2, 3])
 
         if abc_boundary_layer_type not in ["hybrid", "PML"]:
             value_parameter_error(
                 'abc_boundary_layer_type', abc_boundary_layer_type, ["hybrid", "PML"])
-
-        if abc_deg_layer is not None and abc_deg_layer < 2.:
-            raise ValueError(f"abc_deg_layer must be >= 2, got {abc_deg_layer}.")
 
         if output_folder is not None and not isinstance(output_folder, str):
             raise TypeError("output_folder must be a string, "
@@ -212,7 +205,8 @@ class ABCLayer(NRBC):
         self.domain_dim = domain_dim
 
         # Source frequency
-        self.frequency = frequency
+        self.frequency = value_numerical_error('frequency', frequency, float_num=True,
+                                               integer_num=True, lower_bound=0.)
 
         # Nyquist frequency
         self.freq_Nyquist = freq_Nyquist
@@ -241,7 +235,9 @@ class ABCLayer(NRBC):
         if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
             self.abc_deg_layer = None
         elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-            self.abc_deg_layer = max(abc_deg_layer, 2.)
+            self.abc_deg_layer = value_numerical_error(
+                'abc_deg_layer', abc_deg_layer, float_num=True,
+                integer_num=True, lower_bound=2., include_lower_bound=True)
 
         # Communicator MPI
         self.comm = comm
@@ -409,6 +405,7 @@ class ABCLayer(NRBC):
         See Salas et al (2022): Hybrid absorbing scheme based on hyperelliptical
         layers with non-reflecting boundary conditions in scalar wave equations.
         doi: https://doi.org/10.1016/j.apm.2022.09.014
+        TODO: Add citation
 
         Parameters
         ----------

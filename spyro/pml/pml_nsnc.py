@@ -1,8 +1,9 @@
-# import firedrake as fire
-# import numpy as np
+# from firedrake import (as_tensor, conditional, Function, FunctionSpace,
+#                        SpatialCoordinate, VTKFile)
+from numpy import clip, log  # , where
 from ..abc.abc_layer import ABCLayer
-from ..utils.error_management import value_parameter_error
-from ..utils.typing import LayerShapeType, LayerSizeRefFrequency
+from ..utils.error_management import enum_parameter_error  # , value_parameter_error
+from ..utils.typing import BoundaryConditionsType, LayerShapeType, LayerSizeRefFrequency
 
 # Work from Ruben Andres Salas and Alexandre Olender
 # non-split non-convolutional PML formulation
@@ -16,10 +17,19 @@ class PMLLayer(ABCLayer):
 
     Attributes
     ----------
-    bc_boundary_pml : `str`
+    abc_pml_cmax: float
+        Maximum propagation speed (km/s) in the PML layer. Default is 4.7 km/s.
+    abc_pml_exponent: int
+        Exponent for the polynomial damping profile of the PML layer. Default is 2.
+    abc_pml_R: float
+        Theoretical reflection coefficient of the PML layer. Default is 1e-6.
+    bc_boundary_pml : `typing.BoundaryConditionsType`, optional
         Type of boundary condition to apply on the PML boundaries.
-        Options are "Higdon" or "Sommerfeld" for Non-Reflecting BCs,
-        or "Dirichlet" or "Neumann" for typical BCs. Default is "Higdon".
+        - Options for Non-Reflecting BCs:
+            'BoundaryConditionsType.HIGDON' or  'BoundaryConditionsType.SOMMERFELD'.
+        - Options for typical BCs:
+            'BoundaryConditionsType.DIRICHLET' or 'BoundaryConditionsType.NEUMANN'
+        Default is 'BoundaryConditionsType.HIGDON'.
     pml_mask : `Firedrake.Function`
         Mask function to identify the PML domain.
     sigma_max : `float`
@@ -50,7 +60,8 @@ class PMLLayer(ABCLayer):
     """
 
     def __init__(self, domain_dim, frequency, f_Nyquist, dimension=2,
-                 quadrilateral=False, func_space_type=None, bc_boundary_pml="Higdon",
+                 quadrilateral=False, func_space_type=None,
+                 bc_boundary_pml=BoundaryConditionsType.HIGDON,
                  abc_reference_freq=LayerSizeRefFrequency.SOURCE,
                  output_folder=None, comm=None):
         """
@@ -73,10 +84,13 @@ class PMLLayer(ABCLayer):
         func_space_type, `str`, optional
             Type of function space for the state variable.
             Options: 'scalar' or 'vector'. Default is `None`.
-        bc_boundary_pml : `str`, optional
+        bc_boundary_pml : `typing.BoundaryConditionsType`, optional
             Type of boundary condition to apply on the PML boundaries.
-            Options are 'Higdon' or 'Sommerfeld for Non-Reflecting BCs,
-            or "Dirichlet" or "Neumann" for typical BCs. Default is "Higdon".
+            - Options for Non-Reflecting BCs:
+                'BoundaryConditionsType.HIGDON' or  'BoundaryConditionsType.SOMMERFELD'.
+            - Options for typical BCs:
+                'BoundaryConditionsType.DIRICHLET' or 'BoundaryConditionsType.NEUMANN'
+            Default is 'BoundaryConditionsType.HIGDON'.
         abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
             Reference frequency for sizing the absorbing layer.
             Options: 'LayerSizeRefFrequency.SOURCE' or 'LayerSizeRefFrequency.BOUNDARY'.
@@ -101,40 +115,37 @@ class PMLLayer(ABCLayer):
                           output_folder=output_folder, comm=comm)
 
         # Type of boundary condition to apply on the PML boundaries
-        self.bc_boundary_pml = bc_boundary_pml
+        self.bc_boundary_pml = enum_parameter_error('bc_boundary_pml', bc_boundary_pml,
+                                                    BoundaryConditionsType)
 
-        allowed_bcs = ["Higdon", "Sommerfeld", "Dirichlet", "Neumann"]
-        if self.bc_boundary_pml not in allowed_bcs:
-            value_parameter_error('bc_boundary_pml', self.bc_boundary_pml, allowed_bcs)
+    def calc_pml_damping(self, dgr_prof=2, CR_min=1e-8, CR_max=1e-3):
+        """Calculate the maximum damping coefficient for the PML layer.
 
-    # def calc_pml_damping(self, dgr_prof=2, CR_min=1e-8, CR_max=1e-3):
-    #     """Calculate the maximum damping coefficient for the PML layer.
+        Parameters
+        ----------
+        dgr_prof : `int`, optional
+            Degree of the damping profile within the PML layer
+        CR_min : `float`, optional
+            Minimum value for the desired reflection coefficient at outer
+            boundary of PML layer. Default is 1e-8
+        CR_max : `float`, optional
+            Maximum value for the desired reflection coefficient at outer
+            boundary of PML layer. Default is 1e-3
 
-    #     Parameters
-    #     ----------
-    #     dgr_prof : `int`, optional
-    #         Degree of the damping profile within the PML layer
-    #     CR_min : `float`, optional
-    #         Minimum value for the desired reflection coefficient at outer
-    #         boundary of PML layer. Default is 1e-8
-    #     CR_max : `float`, optional
-    #         Maximum value for the desired reflection coefficient at outer
-    #         boundary of PML layer. Default is 1e-3
+        Returns
+        -------
+        None
+        """
 
-    #     Returns
-    #     -------
-    #     None
-    #     """
+        # Desired reflection coefficient at outer boundary of PML layer.
+        CR = clip(self.abc_pml_R, CR_min, CR_max)
 
-    #     # Desired reflection coefficient at outer boundary of PML layer.
-    #     CR = np.clip(self.abc_R, CR_min, CR_max)
+        # Degree of the damping profile within the PML layer.
+        dgr_prof = max(1, dgr_prof)
 
-    #     # Degree of the damping profile within the PML layer.
-    #     dgr_prof = max(1, dgr_prof)
-
-    #     # Maximum damping coefficient within the PML layer
-    #     self.sigma_max = 0. if self.abc_get_ref_model else \
-    #         self.c_max * (dgr_prof + 1.) / (2. * self.abc_pad_length) * np.log(1. / CR)
+        # Maximum damping coefficient within the PML layer
+        self.sigma_max = 0. if self.abc_get_ref_model else \
+            self.c_max * (dgr_prof + 1.) / (2. * self.abc_pad_length) * log(1. / CR)
 
     # def pml_sigma_field(self, coords, V):
     #     """Generate a damping profile for the PML.
@@ -152,51 +163,51 @@ class PMLLayer(ABCLayer):
     #     """
 
     #     # Domain dimensions
-    #     Lx, Lz = self.domain_dim[:2]
+    #     length_z, length_x = self.domain_dim[:2]
 
     #     # Domain coordinates
     #     z, x = coords[0], coords[1]
 
     #     # Conditional value
-    #     val_condz = (z + Lz)**2
-    #     val_condx1 = x**2
-    #     val_condx2 = (x - Lx)**2
+    #     val_condz = (z + length_z) ** 2
+    #     val_condx1 = x ** 2
+    #     val_condx2 = (x - length_x) ** 2
 
     #     # Conditional expressions for the profile
-    #     z_sqr = fire.conditional(z < -Lz, val_condz, 0.)
-    #     x_sqr = fire.conditional(x < 0., val_condx1, 0.) + \
-    #         fire.conditional(x > Lx, val_condx2, 0.)
+    #     z_sqr = conditional(z < -length_z, val_condz, 0.)
+    #     x_sqr = conditional(x < 0., val_condx1, 0.) + \
+    #         conditional(x > length_x, val_condx2, 0.)
 
     #     # Quadratic damping profiles
-    #     ref_z = z_sqr / fire.Constant(self.abc_pad_length ** 2)
-    #     ref_x = x_sqr / fire.Constant(self.abc_pad_length ** 2)
-    #     self.sigma_z = fire.Function(V, name='sigma_z [1/s]')
+    #     ref_z = z_sqr / self.abc_pad_length ** 2
+    #     ref_x = x_sqr / self.abc_pad_length ** 2
+    #     self.sigma_z = Function(V, name='sigma_z [1/s]')
     #     self.sigma_z.interpolate(self.pml_mask * self.sigma_max * ref_z)
-    #     self.sigma_x = fire.Function(V, name='sigma_x [1/s]')
+    #     self.sigma_x = Function(V, name='sigma_x [1/s]')
     #     self.sigma_x.interpolate(self.pml_mask * self.sigma_max * ref_x)
 
     #     if self.dimension == 3:  # 3D
 
     #         # 3D dimension
-    #         Ly = self.domain_dim[2]
+    #         length_y = self.domain_dim[2]
     #         y = coords[2]
 
     #         # Conditional value
     #         val_condy1 = y**2
-    #         val_condy2 = (y - Ly)**2
+    #         val_condy2 = (y - length_y)**2
 
     #         # Conditional expressions for the profile
-    #         y_sqr = fire.conditional(y < 0., val_condy1, 0.) + \
-    #             fire.conditional(y > Ly, val_condy2, 0.)
+    #         y_sqr = conditional(y < 0., val_condy1, 0.) + \
+    #             conditional(y > length_y, val_condy2, 0.)
 
     #         # Quadratic damping profile
-    #         ref_y = y_sqr / fire.Constant(self.abc_pad_length ** 2)
-    #         self.sigma_y = fire.Function(V, name='sigma_y [1/s]')
+    #         ref_y = y_sqr / self.abc_pad_length ** 2
+    #         self.sigma_y = Function(V, name='sigma_y [1/s]')
     #         self.sigma_y.interpolate(self.pml_mask * self.sigma_max * ref_y)
 
     #     # Save damping profile
     #     if hasattr(self, 'path_case_abc'):
-    #         outfile = fire.VTKFile(self.path_case_abc + "sigma_pml.pvd")
+    #         outfile = VTKFile(self.path_case_abc + "sigma_pml.pvd")
     #         if self.dimension == 2:  # 2D
     #             outfile.write(self.sigma_z, self.sigma_x)
     #         if self.dimension == 3:  # 3D
@@ -221,7 +232,7 @@ class PMLLayer(ABCLayer):
     #     if self.dimension == 3:
     #         bnds.extend([self.absorb_front, self.absorb_back])
 
-    #     self.where_to_absorb = tuple(np.where(bnds)[0] + 1)  # ds starts at 1
+    #     self.where_to_absorb = tuple(where(bnds)[0] + 1)  # ds starts at 1
 
     #     # Apply boundary conditions to the PML boundaries.
     #     type_bc = self.bc_boundary_pml
@@ -252,17 +263,17 @@ class PMLLayer(ABCLayer):
     #     self.calc_pml_damping()
 
     #     # Mesh coordinates
-    #     coords = fire.SpatialCoordinate(self.mesh)
+    #     coords = SpatialCoordinate(self.mesh)
 
     #     # Damping mask
-    #     V_mask = fire.FunctionSpace(self.mesh, 'DG', 0)
+    #     V_mask = FunctionSpace(self.mesh, 'DG', 0)
     #     self.pml_mask = self.layer_mask_field(coords, V_mask,
     #                                           type_marker='mask',
     #                                           name_mask='pml_mask')
 
     #     # Save damping mask
     #     if hasattr(self, 'path_case_abc'):
-    #         outfile = fire.VTKFile(self.path_case_abc + "pml_mask.pvd")
+    #         outfile = VTKFile(self.path_case_abc + "pml_mask.pvd")
     #         outfile.write(self.pml_mask)
 
     #     # Damping fields
@@ -288,8 +299,8 @@ class PMLLayer(ABCLayer):
     #     Gamma_2: Firedrake 'TensorFunction'
     #         Second damping matrix
     #     """
-    #     Gamma_1 = fire.as_tensor([[self.sigma_z, 0.], [0., self.sigma_x]])
-    #     Gamma_2 = fire.as_tensor([[self.sigma_z - self.sigma_x, 0.],
+    #     Gamma_1 = as_tensor([[self.sigma_z, 0.], [0., self.sigma_x]])
+    #     Gamma_2 = as_tensor([[self.sigma_z - self.sigma_x, 0.],
     #                               [0., self.sigma_x - self.sigma_z]])
 
     #     return Gamma_1, Gamma_2
@@ -310,13 +321,13 @@ class PMLLayer(ABCLayer):
     #     Gamma_3: Firedrake 'TensorFunction'
     #         Third damping matrix
     #     """
-    #     Gamma_1 = fire.as_tensor([[self.sigma_z, 0., 0.],
+    #     Gamma_1 = as_tensor([[self.sigma_z, 0., 0.],
     #                               [0., self.sigma_x, 0.],
     #                               [0., 0., self.sigma_y]])
-    #     Gamma_2 = fire.as_tensor([[self.sigma_z - self.sigma_x - self.sigma_y, 0., 0.],
+    #     Gamma_2 = as_tensor([[self.sigma_z - self.sigma_x - self.sigma_y, 0., 0.],
     #                               [0., self.sigma_x - self.sigma_z - self.sigma_y, 0.],
     #                               [0., 0., self.sigma_y - self.sigma_x - self.sigma_z]])
-    #     Gamma_3 = fire.as_tensor([[self.sigma_x * self.sigma_y, 0., 0.],
+    #     Gamma_3 = as_tensor([[self.sigma_x * self.sigma_y, 0., 0.],
     #                               [0., self.sigma_z * self.sigma_y, 0.],
     #                               [0., 0., self.sigma_z * self.sigma_x]])
 

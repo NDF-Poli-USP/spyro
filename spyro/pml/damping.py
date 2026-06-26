@@ -22,9 +22,9 @@ def functions(Wave_obj):
 
     """
 
-    ps = Wave_obj.abc_exponent
-    cmax = Wave_obj.abc_cmax  # maximum acoustic wave velocity
-    R = Wave_obj.abc_R  # theoretical reclection coefficient
+    ps = Wave_obj.abc_pml_exponent
+    cmax = Wave_obj.abc_pml_cmax  # maximum acoustic wave velocity
+    R = Wave_obj.abc_pml_R  # theoretical reclection coefficient
     pad_length = Wave_obj.mesh_parameters.abc_pad_length  # length of the padding
     V = Wave_obj.function_space
     dimension = Wave_obj.dimension
