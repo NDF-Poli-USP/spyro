@@ -19,16 +19,6 @@ functional created by :meth:`AutomatedAdjoint.create_reduced_functional` is a
 is ``wave.comm``; differentiating it ``allreduce``-sums
 ``dJ/dm = sum_i dJ_i/dm`` over the ensemble communicator. The gradient is then
 validated with a Taylor test.
-
-Note
-----
-The automated adjoint evaluates the per-timestep misfit on a vertex-only mesh of
-the receivers. That path parallelises over *shots* (one core per shot), exactly
-like spyro's ensemble FWI tests; it does not split the receivers across spatial
-cores. This test therefore uses one spatial core per shot. The perturbation
-direction is built from a deterministic function of the mesh coordinates so that
-it is identical on every ensemble member -- a requirement for the ensemble Taylor
-test to converge at second order.
 """
 import firedrake as fire
 import firedrake.adjoint as fire_ad

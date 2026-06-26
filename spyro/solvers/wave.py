@@ -567,7 +567,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # that the reduced functional is built as an
         # ``EnsembleReducedFunctional``, summing the per-shot functionals and
         # gradients over the ensemble communicator.
-        self.automated_adjoint = AutomatedAdjoint(controls, ensemble=self.comm)
+        self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
         self.functional_value = None
         self.misfit = None
 
