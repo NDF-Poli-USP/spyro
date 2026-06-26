@@ -13,7 +13,8 @@ from ..io.basicio import parallel_print as pprint
 from ..domains.space import create_function_space
 from ..plots.plots_habc import plot_function_layer_size
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
-from ..utils.error_management import enum_parameter_error, value_parameter_error
+from ..utils.error_management import (enum_parameter_error, value_numerical_error,
+                                      value_parameter_error)
 from ..utils.freq_tools import freq_response
 from ..utils.typing import HyperLayerDegreeType, LayerShapeType, LayerSizeRefFrequency
 
