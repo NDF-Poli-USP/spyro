@@ -4,6 +4,7 @@ from pyadjoint import Tape, continue_annotation, pause_annotation, taylor_test
 
 import firedrake as fire
 import firedrake.adjoint as fire_ad
+from ..tools.checkpointing import SpyroCheckpointManager
 
 
 class AutomatedAdjoint:
@@ -74,11 +75,13 @@ pyadjoint.ReducedFunctional or None
         :meth:`create_reduced_functional`.
     """
 
-    def __init__(self, ensemble, controls=None):
+    def __init__(self, ensemble, controls=None, apply_checkpointing=False, checkpoint_manager=None):
         self.controls = controls
         self.ensemble = ensemble
         self.reduced_functional = None
         self._tape = None
+        self.checkpoint_manager = checkpoint_manager
+        self.apply_checkpointing = apply_checkpointing
 
     @contextmanager
     def fresh_tape(self):
@@ -120,6 +123,10 @@ pyadjoint.ReducedFunctional or None
             self._tape = Tape()
             fire_ad.set_working_tape(self._tape)
         continue_annotation()
+        if self.apply_checkpointing:
+            fire_ad.enable_checkpointing()
+            if isinstance(self.checkpoint_manager, SpyroCheckpointManager):
+                self._tape.checkpoint_manager = self.checkpoint_manager
         return self._tape
 
     def stop_recording(self):
