@@ -62,6 +62,14 @@ class AutomatedAdjoint:
         functionals and gradients across ensemble members. In practice this is
         ``wave.comm``. If ``None``, a non-ensemble
         :class:`pyadjoint.ReducedFunctional` is used instead.
+    checkpointing : bool, optional
+        If ``True``, enable Spyro checkpointing on each fresh tape before
+        any forward blocks are recorded.
+    checkpoint_schedule : checkpoint_schedules.schedule, optional
+        Checkpoint schedule instance to pass to
+        :class:`spyro.tools.checkpointing.SpyroCheckpointManager`.
+    checkpoint_form : object, optional
+        Metadata reserved for future form-aware checkpoint validation.
 
     Attributes
     ----------
@@ -75,13 +83,40 @@ pyadjoint.ReducedFunctional or None
         :meth:`create_reduced_functional`.
     """
 
-    def __init__(self, ensemble, controls=None, apply_checkpointing=False, checkpoint_manager=None):
+    def __init__(
+        self,
+        controls=None,
+        ensemble=None,
+        checkpointing=False,
+        checkpoint_schedule=None,
+        checkpoint_form=None,
+    ):
+        if checkpointing and checkpoint_schedule is None:
+            raise ValueError(
+                "checkpoint_schedule must be provided when checkpointing=True."
+            )
         self.controls = controls
         self.ensemble = ensemble
         self.reduced_functional = None
         self._tape = None
-        self.checkpoint_manager = checkpoint_manager
-        self.apply_checkpointing = apply_checkpointing
+        self.checkpointing = checkpointing
+        self.checkpoint_schedule = checkpoint_schedule
+        self.checkpoint_form = checkpoint_form
+
+    def _new_tape(self):
+        """Create a tape and install checkpointing before recording blocks."""
+        if self.checkpointing and self.checkpoint_schedule is None:
+            raise ValueError(
+                "checkpoint_schedule must be provided when checkpointing=True."
+            )
+        tape = Tape()
+        if self.checkpointing:
+            tape._checkpoint_manager = SpyroCheckpointManager(
+                self.checkpoint_schedule,
+                tape,
+            )
+        fire_ad.set_working_tape(tape)
+        return tape
 
     @contextmanager
     def fresh_tape(self):
@@ -99,8 +134,7 @@ pyadjoint.ReducedFunctional or None
             The freshly created working tape.
         """
         self.clear_tape()
-        self._tape = Tape()
-        fire_ad.set_working_tape(self._tape)
+        self._tape = self._new_tape()
         continue_annotation()
         try:
             yield self._tape
@@ -120,13 +154,8 @@ pyadjoint.ReducedFunctional or None
             The active working tape.
         """
         if self._tape is None:
-            self._tape = Tape()
-            fire_ad.set_working_tape(self._tape)
+            self._tape = self._new_tape()
         continue_annotation()
-        if self.apply_checkpointing:
-            fire_ad.enable_checkpointing()
-            if isinstance(self.checkpoint_manager, SpyroCheckpointManager):
-                self._tape.checkpoint_manager = self.checkpoint_manager
         return self._tape
 
     def stop_recording(self):
@@ -172,15 +201,23 @@ pyadjoint.ReducedFunctional or None
             The reduced functional, also stored on
             :attr:`reduced_functional`.
         """
+        if ensemble is None:
+            ensemble = self.ensemble
         control = fire_ad.Control(self.controls)
-
-        self.reduced_functional = fire_ad.EnsembleReducedFunctional(
-            functional,
-            control,
-            self.ensemble,
-            scatter_control=True,
-            tape=self._tape,
-        )
+        if ensemble is not None:
+            self.reduced_functional = fire_ad.EnsembleReducedFunctional(
+                functional,
+                control,
+                ensemble,
+                scatter_control=True,
+                tape=self._tape,
+            )
+        else:
+            self.reduced_functional = fire_ad.ReducedFunctional(
+                functional,
+                control,
+                tape=self._tape,
+            )
         return self.reduced_functional
 
     def recompute_functional(self, control_value):

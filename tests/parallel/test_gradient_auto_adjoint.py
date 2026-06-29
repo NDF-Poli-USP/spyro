@@ -20,10 +20,14 @@ is ``wave.comm``; differentiating it ``allreduce``-sums
 ``dJ/dm = sum_i dJ_i/dm`` over the ensemble communicator. The gradient is then
 validated with a Taylor test.
 """
+from copy import deepcopy
+
 import firedrake as fire
 import firedrake.adjoint as fire_ad
 import spyro
 import pytest
+from checkpoint_schedules import Revolve
+from spyro.tools.checkpointing import SpyroCheckpointManager
 
 
 final_time = 0.6
@@ -80,6 +84,15 @@ dictionary["visualization"] = {
     "adjoint_filename": None,
     "debug_output": False,
 }
+
+
+def get_serial_dictionary():
+    """Return a copy suitable for lightweight non-MPI API tests."""
+    serial_dictionary = deepcopy(dictionary)
+    serial_dictionary["parallelism"] = {
+        "type": "spatial",
+    }
+    return serial_dictionary
 
 
 def build_direction(Wave_obj):
@@ -155,6 +168,35 @@ def get_forward_model():
     Wave_obj_guess.automated_adjoint.stop_recording()
 
     return Wave_obj_guess
+
+
+@pytest.mark.newer_firedrake
+def test_enable_automated_adjoint_checkpointing_requires_schedule():
+    Wave_obj_guess = spyro.AcousticWave(dictionary=get_serial_dictionary())
+    with pytest.raises(ValueError, match="checkpoint_schedule"):
+        Wave_obj_guess.enable_automated_adjoint(checkpointing=True)
+
+
+@pytest.mark.newer_firedrake
+def test_checkpointing_start_recording_installs_checkpoint_manager():
+    Wave_obj_guess = spyro.AcousticWave(dictionary=get_serial_dictionary())
+    minimal_schedule = Revolve(2, 1)
+    Wave_obj_guess.enable_automated_adjoint(
+        checkpointing=True,
+        # This is only the smallest finite schedule needed to initialize the
+        # manager; production FWI tests should pass a schedule built from nt.
+        checkpoint_schedule=minimal_schedule,
+    )
+
+    tape = Wave_obj_guess.automated_adjoint.start_recording()
+    try:
+        assert tape is Wave_obj_guess.automated_adjoint._tape
+        assert isinstance(
+            getattr(tape, "_checkpoint_manager", None),
+            SpyroCheckpointManager,
+        )
+    finally:
+        Wave_obj_guess.automated_adjoint.clear_tape()
 
 
 @pytest.mark.newer_firedrake

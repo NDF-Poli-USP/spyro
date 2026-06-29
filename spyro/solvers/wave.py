@@ -554,7 +554,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def store_forward_time_steps(self, value):
         self._store_forward_time_steps = value
 
-    def enable_automated_adjoint(self):
+    def enable_automated_adjoint(
+        self,
+        checkpointing=False,
+        checkpoint_schedule=None,
+        checkpoint_form=None,
+    ):
         self.store_forward_time_steps = False
         self.enable_compute_functional(
             mode=FunctionalEvaluationMode.PER_TIMESTEP
@@ -567,7 +572,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # that the reduced functional is built as an
         # ``EnsembleReducedFunctional``, summing the per-shot functionals and
         # gradients over the ensemble communicator.
-        self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
+        self.automated_adjoint = AutomatedAdjoint(
+            controls,
+            ensemble=self.comm,
+            checkpointing=checkpointing,
+            checkpoint_schedule=checkpoint_schedule,
+            checkpoint_form=checkpoint_form,
+        )
         self.functional_value = None
         self.misfit = None
 
