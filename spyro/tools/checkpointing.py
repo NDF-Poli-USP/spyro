@@ -386,6 +386,11 @@ class SpyroCheckpointManager:
                 next_step = self.tape.timesteps[step + 1]
                 # The checkpointable state set of the current step.
                 to_keep = next_step.checkpointable_state
+            if cp_action.write_adj_deps and cp_action.storage == StorageType.WORK:
+                # The reverse sweep of this same step needs the state as it was
+                # at the start of the step. This matters for schemes that
+                # overwrite state variables later in the same timestep.
+                to_keep = to_keep.union(current_step.checkpointable_state)
             if functional:
                 to_keep = to_keep.union([functional.block_variable])
 

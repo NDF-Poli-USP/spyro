@@ -9,6 +9,7 @@ from .solvers.elastic_wave.isotropic_wave import IsotropicWave
 from .solvers.inversion import FullWaveformInversion
 from .utils.typing import (ElasticMaterialParameter,
                            ElasticMaterialParameterization, WaveType)
+from .tools.checkpointing import SpyroCheckpointManager
 
 # from .solvers.dg_wave import DG_Wave
 from .solvers.mms_acoustic import AcousticWaveMMS
@@ -56,4 +57,5 @@ __all__ = [
     "periodic_rectangle_mesh",
     "box_mesh",
     "IsotropicWave",
+    "SpyroCheckpointManager",
 ]
