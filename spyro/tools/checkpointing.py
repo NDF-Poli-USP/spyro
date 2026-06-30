@@ -58,8 +58,72 @@ class ExactRecompute(RecomputeStrategy):
 
 
 class DecimatedRecompute(RecomputeStrategy):
+    """Approximate replay by holding checkpoints between periodic recomputes.
+
+    This strategy is intended to be used with a schedule such as
+    ``PeriodicDiskRevolve`` configured to avoid disk through high read/write
+    costs. The schedule still governs the replay order; this strategy only
+    decides whether a timestep is recomputed exactly or populated from the last
+    decimated checkpoint values.
+    """
+
+    def __init__(self, period, exact_functional=True):
+        if not isinstance(period, int) or period < 1:
+            raise ValueError("period must be a positive integer.")
+        self.period = period
+        self.exact_functional = exact_functional
+        self._checkpoints = {}
+
+    def _remember(self, current_step):
+        for var in current_step.checkpointable_state:
+            if var.checkpoint is not None:
+                self._checkpoints[var] = var.checkpoint
+        for var in current_step.adjoint_dependencies:
+            if var.checkpoint is not None:
+                self._checkpoints[var] = var.checkpoint
+        for block in current_step:
+            for var in block.get_outputs():
+                if var.checkpoint is not None:
+                    self._checkpoints[var] = var.checkpoint
+
+    def _restore_dependencies(self, block):
+        for var in block.get_dependencies():
+            if var in self._checkpoints:
+                var.checkpoint = self._checkpoints[var]
+
+    def _restore_outputs(self, block):
+        outputs = block.get_outputs()
+        if not outputs:
+            return False
+        if not all(var in self._checkpoints for var in outputs):
+            return False
+        for var in outputs:
+            var.checkpoint = self._checkpoints[var]
+        return True
+
+    def _exact_recompute(self, current_step):
+        for block in current_step:
+            block.recompute()
+        self._remember(current_step)
+
+    def _decimated_recompute(self, current_step):
+        for var in current_step.checkpointable_state:
+            if var in self._checkpoints:
+                var.checkpoint = self._checkpoints[var]
+
+        for block in current_step:
+            self._restore_dependencies(block)
+            if not self._restore_outputs(block):
+                block.recompute()
+                self._remember(current_step)
+
     def Recompute_step(self, manager, step, current_step, cp_action, functional=None):
-        raise NotImplementedError("Decimated recomputation strategy is not implemented yet.")
+        if self.exact_functional and manager.mode == Mode.RECOMPUTE:
+            self._exact_recompute(current_step)
+        elif step % self.period == 0:
+            self._exact_recompute(current_step)
+        else:
+            self._decimated_recompute(current_step)
 
 
 class SpyroCheckpointManager:
@@ -96,7 +160,7 @@ class SpyroCheckpointManager:
             recompute_strategy=None
     ):
         if (
-            schedule.uses_storage_type(StorageType.DISK)
+            self._uses_disk_storage(schedule)
             and not tape._package_data
         ):
             raise CheckpointError(
@@ -130,6 +194,24 @@ class SpyroCheckpointManager:
         # and recreation of its checkpoint data.
         self._global_deps = set()
         self.end_timestep(-1)
+
+    @staticmethod
+    def _uses_disk_storage(schedule):
+        try:
+            return schedule.uses_storage_type(StorageType.DISK)
+        except TypeError:
+            pass
+
+        try:
+            from checkpoint_schedules.hrevolve import _convert_action
+        except ImportError:
+            raise
+
+        for action in getattr(schedule, "_schedule", ()):
+            _, (_, _, storage) = _convert_action(action)
+            if storage == StorageType.DISK:
+                return True
+        return False
 
     def end_timestep(self, timestep):
         """Mark the end of one timestep when taping the forward model.
@@ -278,7 +360,7 @@ class SpyroCheckpointManager:
         if self.mode == Mode.RECORD:
             # Finalise the taping process.
             self.end_taping()
-        if self._schedule.uses_storage_type(StorageType.DISK):
+        if self._uses_disk_storage(self._schedule):
             # Clear the data of the current state before recomputing.
             for package in self.tape._package_data.values():
                 package.reset()
@@ -359,11 +441,11 @@ class SpyroCheckpointManager:
                 progress_bar.next()
             # Get the blocks of the current step.
             current_step = self.tape.timesteps[step]
-            if isinstance(self.recompute_strategy, ExactRecompute):
+            if isinstance(self.recompute_strategy, RecomputeStrategy):
                 self.recompute_strategy.Recompute_step(
                     self, step, current_step, cp_action, functional=functional)
             else:
-                raise NotImplementedError("Only ExactRecompute strategy is implemented.")
+                raise TypeError("recompute_strategy must be a RecomputeStrategy.")
 
             _store_checkpointable_state = False
             _store_adj_dependencies = False

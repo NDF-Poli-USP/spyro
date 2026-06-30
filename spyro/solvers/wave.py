@@ -559,6 +559,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         checkpointing=False,
         checkpoint_schedule=None,
         checkpoint_form=None,
+        checkpoint_recompute_strategy=None,
     ):
         self.store_forward_time_steps = False
         self.enable_compute_functional(
@@ -578,6 +579,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             checkpointing=checkpointing,
             checkpoint_schedule=checkpoint_schedule,
             checkpoint_form=checkpoint_form,
+            checkpoint_recompute_strategy=checkpoint_recompute_strategy,
         )
         self.functional_value = None
         self.misfit = None

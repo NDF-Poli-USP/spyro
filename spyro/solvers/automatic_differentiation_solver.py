@@ -70,6 +70,9 @@ class AutomatedAdjoint:
         :class:`spyro.tools.checkpointing.SpyroCheckpointManager`.
     checkpoint_form : object, optional
         Metadata reserved for future form-aware checkpoint validation.
+    checkpoint_recompute_strategy : spyro.tools.checkpointing.RecomputeStrategy, optional
+        Strategy used by :class:`spyro.tools.checkpointing.SpyroCheckpointManager`
+        during checkpoint replay.
 
     Attributes
     ----------
@@ -90,6 +93,7 @@ pyadjoint.ReducedFunctional or None
         checkpointing=False,
         checkpoint_schedule=None,
         checkpoint_form=None,
+        checkpoint_recompute_strategy=None,
     ):
         if checkpointing and checkpoint_schedule is None:
             raise ValueError(
@@ -102,6 +106,7 @@ pyadjoint.ReducedFunctional or None
         self.checkpointing = checkpointing
         self.checkpoint_schedule = checkpoint_schedule
         self.checkpoint_form = checkpoint_form
+        self.checkpoint_recompute_strategy = checkpoint_recompute_strategy
 
     def _new_tape(self):
         """Create a tape and install checkpointing before recording blocks."""
@@ -114,6 +119,7 @@ pyadjoint.ReducedFunctional or None
             tape._checkpoint_manager = SpyroCheckpointManager(
                 self.checkpoint_schedule,
                 tape,
+                recompute_strategy=self.checkpoint_recompute_strategy,
             )
         fire_ad.set_working_tape(tape)
         return tape
