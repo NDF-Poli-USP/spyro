@@ -348,7 +348,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 "Please specify either a conditional, expression, "
                 "firedrake function or new file name (segy or hdf5)."
             )
-        self.c = self.initial_velocity_model
         if output:
             fire.VTKFile("initial_velocity_model.pvd").write(
                 self.initial_velocity_model, name="velocity"
