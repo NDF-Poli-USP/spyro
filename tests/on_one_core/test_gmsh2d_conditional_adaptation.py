@@ -1,6 +1,7 @@
 import firedrake as fire
 import math
 from importlib.metadata import version
+import pytest
 import spyro
 
 
@@ -113,6 +114,7 @@ def create_grid_based_velocity_field(grid_spacing, length_z, length_x):
     ), cond
 
 
+@pytest.mark.older_firedrake
 def test_gmsh_adaptation():
     import gmsh  # noqa: F401
     """Test Gmsh mesh adaptation with conditional velocity field.
