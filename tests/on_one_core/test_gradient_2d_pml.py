@@ -159,8 +159,8 @@ def get_forward_model(dictionary=None, adjoint_type=AdjointType.NONE):
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-        assert isinstance(Wave_obj_guess.c, fire.Function)
         Wave_obj_guess.enable_automated_adjoint()
+        assert isinstance(Wave_obj_guess.c, fire.Function)
     Wave_obj_guess.forward_solve()
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         assert Wave_obj_guess.automated_adjoint._tape is not None
