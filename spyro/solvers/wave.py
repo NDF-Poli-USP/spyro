@@ -115,8 +115,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.c = None
         self.sources = None
         self.real_shot_record = None
-        self.c = None
-        self.mesh = self.get_mesh()
 
         self.set_solver_parameters()
 
