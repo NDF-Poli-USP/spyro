@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from copy import deepcopy
-from firedrake import VTKFile
 import firedrake as fire
 import spyro
+from spyro.utils.typing import AdjointType
 import pytest
 
 
@@ -16,7 +16,17 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     dm = fire.Function(V_c)
     size, = np.shape(dm.dat.data[:])
     dm_data = np.random.default_rng(0).random(size)
-    dm.dat.data[:] = dm_data
+    dm.dat.data_wo[:] = dm_data
+    if Wave_obj_guess.abc_boundary_layer_type == "PML":
+        x = Wave_obj_guess.mesh_x
+        z = Wave_obj_guess.mesh_z
+        inside = fire.And(
+            fire.And(z >= -Wave_obj_guess.mesh_parameters.length_z, x >= 0.0),
+            x <= Wave_obj_guess.mesh_parameters.length_x,
+        )
+        indicator = fire.Function(V_c)
+        indicator.interpolate(fire.conditional(inside, 1.0, 0.0))
+        dm.dat.data_wo[:] *= indicator.dat.data_ro[:]
 
     for step in steps:
 
@@ -40,7 +50,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     remainders = np.array(remainders)
 
     if plot:
-        VTKFile("gradient.pvd").write(dJ)
+        fire.VTKFile("gradient.pvd").write(dJ)
         plt.close()
         plt.plot(steps, errors, label="Error")
         plt.legend()
@@ -129,7 +139,7 @@ def set_dictionary(PML=False):
     return dictionary
 
 
-def get_forward_model(dictionary=None):
+def get_forward_model(dictionary=None, adjoint_type=AdjointType.NONE):
 
     # Exact model
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
@@ -139,37 +149,84 @@ def get_forward_model(dictionary=None):
         conditional=cond,
         dg_velocity_model=False,
     )
-    spyro.plots.plot_model(Wave_obj_exact, filename="pml_grad_test_model.png", abc_points=[(-0, 0), (-1, 0), (-1, 1), (-0, 1)])
     Wave_obj_exact.forward_solve()
     rec_out_exact = Wave_obj_exact.forward_solution_receivers
 
     # Guess model
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
+    Wave_obj_guess.real_shot_record = rec_out_exact
+
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
+    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+        Wave_obj_guess.enable_automated_adjoint()
+        assert isinstance(Wave_obj_guess.c, fire.Function)
     Wave_obj_guess.forward_solve()
+    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+        assert Wave_obj_guess.automated_adjoint._tape is not None
+        Wave_obj_guess.automated_adjoint.stop_recording()
     rec_out_guess = Wave_obj_guess.forward_solution_receivers
 
     return rec_out_exact, rec_out_guess, Wave_obj_guess
 
 
 @pytest.mark.slow
-def test_gradient(PML=True):
+@pytest.mark.newer_firedrake
+def test_gradient_auto_adjoint(PML=True):
     dictionary = set_dictionary(PML=PML)
-    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(dictionary=dictionary)
+    _, _, Wave_obj_guess = get_forward_model(
+        dictionary=dictionary, adjoint_type=AdjointType.AUTOMATED_ADJOINT)
+    forward_solution_guess = None
+    misfit = None
+    # compute the gradient of the control (to be verified)
+    dJ = Wave_obj_guess.gradient_solve(
+        misfit=misfit, forward_solution=forward_solution_guess,
+        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+    )
+
+    Wave_obj_guess.automated_adjoint.create_reduced_functional(Wave_obj_guess.functional_value)
+    size, = np.shape(Wave_obj_guess.c.dat.data[:])
+    direction = fire.Function(
+        Wave_obj_guess.c.function_space(), val=np.random.default_rng(0).random(size))
+    assert Wave_obj_guess.automated_adjoint.verify_gradient(
+        Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.9, \
+        "Automated adjoint gradient verification failed."
+
+    Wave_obj_guess.automated_adjoint.clear_tape()
+    assert Wave_obj_guess.automated_adjoint._tape is None
+
+
+@pytest.mark.slow
+def test_gradient_implemented_adjoint(PML=False):
+    dictionary = set_dictionary(PML=PML)
+    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(
+        dictionary=dictionary, adjoint_type=AdjointType.IMPLEMENTED_ADJOINT)
+
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
 
     misfit = rec_out_exact - rec_out_guess
 
     Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
-    print(f"Cost functional : {Jm}")
 
     # compute the gradient of the control (to be verified)
     dJ = Wave_obj_guess.gradient_solve(
-        misfit=misfit, forward_solution=forward_solution_guess)
+        misfit=misfit, forward_solution=forward_solution_guess,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+    )
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
 
 
+@pytest.mark.slow
+@pytest.mark.newer_firedrake
+def test_gradient_pml_auto_adjoint():
+    test_gradient_auto_adjoint(PML=True)
+
+
+@pytest.mark.slow
+def test_gradient_pml_implemented_adjoint():
+    test_gradient_implemented_adjoint(PML=True)
+
+
 if __name__ == "__main__":
-    test_gradient()
+    test_gradient_pml_implemented_adjoint()
