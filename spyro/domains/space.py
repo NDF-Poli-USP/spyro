@@ -33,7 +33,7 @@ def create_function_space(mesh, method, degree, dim=1, shape=None):
 
     if not isinstance(method, str):
         element = method
-    elif method == "mass_lumped_triangle":
+    elif method in ["mass_lumped_triangle", "KMV", "Kong-Mulder-Veldhuizen"]:
         element = FiniteElement(
             "KMV", mesh.ufl_cell(), degree=degree,
         )
