@@ -249,6 +249,7 @@ def run_tools(wave_obj, method_extend, n_root=1):
         print("✓ " + met_str + "Verified: " + cmp_str, flush=True)
 
 
+@pytest.mark.older_firedrake
 @pytest.mark.parametrize("element_type, dimension, method_extend", [
     ("T", 2, "point_cloud"),
     ("T", 2, "nearest_point"),

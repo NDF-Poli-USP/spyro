@@ -14,10 +14,11 @@ from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
-from ..utils.typing import FunctionalEvaluationMode, WaveType
+from ..utils.typing import AdjointType, WaveType, FunctionalEvaluationMode
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from .modal.modal_sol import Modal_Solver
+from .automatic_differentiation_solver import AutomatedAdjoint
 
 fire.set_log_level(fire.ERROR)
 
@@ -96,15 +97,26 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.vector_function_space = None
         self.tensor_function_space0 = None
         self.tensor_function_space1 = None
-        self.forward_solution_receivers = None
+        self._forward_solution_receivers = None
+        self._store_forward_time_steps = False
+        self.forward_solution = None
         self.adjoint_solution = None
+        self.adjoint_type = AdjointType.NONE
+        self.automated_adjoint = None
+        self.functional_value = None
+        self.misfit = None
         self.current_time = 0.0
+        # Expression to define sources through UFL (less efficient)
+        self.source_expression = None
         self.set_solver_parameters()
 
         # Create or get the mesh
         self.mesh = self.get_mesh()
         self.c = None
         self.sources = None
+        self.real_shot_record = None
+
+        self.set_solver_parameters()
 
         # Creating mesh operations manager
         self.mesh_ops = mshops.MeshOps(
@@ -121,10 +133,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             )
         else:
             warnings.warn("No mesh found. Please define a mesh.")
-
-        # Expression to define sources through UFL (less efficient)
-        self.source_expression = None
-        self.real_shot_record = None
 
         # Logger
         self.field_logger = FieldLogger(self.comm,
@@ -535,6 +543,50 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Backward-compatible alias for set_material_properties."""
         return self.set_material_properties(*args, **kwargs)
 
+    @property
+    def store_forward_time_steps(self):
+        return self._store_forward_time_steps
+
+    @store_forward_time_steps.setter
+    def store_forward_time_steps(self, value):
+        self._store_forward_time_steps = value
+
+    def enable_automated_adjoint(self):
+        self.store_forward_time_steps = False
+        self.enable_compute_functional(
+            mode=FunctionalEvaluationMode.PER_TIMESTEP
+        )
+        self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
+        self.use_vertex_only_mesh = True
+        self._initialize_model_parameters()
+        if self.c is None:
+            raise ValueError(
+                "self.c must be set before enabling automated adjoint."
+                "Please set the velocity model using set_initial_velocity_model()"
+                "or set c directly."
+            )
+        controls = self.c
+        # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
+        # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
+        # that the reduced functional is built as an
+        # ``EnsembleReducedFunctional``, summing the per-shot functionals and
+        # gradients over the ensemble communicator.
+        self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
+        self.functional_value = None
+        self.misfit = None
+
+    def enable_implemented_adjoint(self):
+        self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
+        self.store_forward_time_steps = True
+
+    @property
+    def forward_solution_receivers(self):
+        return self._forward_solution_receivers
+
+    @forward_solution_receivers.setter
+    def forward_solution_receivers(self, value):
+        self._forward_solution_receivers = value
+
     def enable_compute_functional(
         self, mode=FunctionalEvaluationMode.AFTER_SOLVE
     ):
@@ -548,7 +600,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         # Create the Wave attributes required to compute functional.
         self.functional_evaluation_mode = mode
-        self.functional_value = None
 
     @property
     def functional_evaluation_mode(self):
@@ -566,3 +617,120 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 f"Expected an instance of FunctionalEvaluationMode enum."
             )
         self._functional_evaluation_mode = mode
+        self.functional_value = None
+        self.misfit = None
+
+    @abstractmethod
+    def get_control_parameters(self):
+        """Return inversion controls exposed by a concrete wave solver.
+
+        Subclasses override this method when they can participate in inversion
+        workflows. The base class raises because a generic ``Wave`` does not
+        know which physical parameters should be optimized.
+
+        Returns
+        -------
+        object
+            Solver-specific control structure.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+
+        Examples
+        --------
+        ``AcousticWave.get_control_parameters()`` returns the velocity model;
+        an elastic solver may return a dictionary of material parameters.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not expose inversion control parameters.",
+        )
+
+    @abstractmethod
+    def set_control_parameters(self, controls):
+        """Assign inversion controls on a concrete wave solver.
+
+        Parameters
+        ----------
+        controls : object
+            Solver-specific control structure.
+
+        Returns
+        -------
+        None
+            Concrete subclasses assign the controls in-place.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+
+        Examples
+        --------
+        ``AcousticWave.set_control_parameters(vp)`` assigns a velocity model;
+        elastic solvers expect a dictionary keyed by material-parameter enums.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot assign inversion control parameters.",
+        )
+
+    @abstractmethod
+    def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
+        """Compute an adjoint gradient for inversion.
+
+        Concrete wave solvers override this method when they provide the
+        adjoint-state machinery required by FWI. The base implementation raises
+        because a generic ``Wave`` does not define the physical model-specific
+        gradient equation.
+
+        Parameters
+        ----------
+        guess : firedrake.Function, optional
+            Control value used by solvers that accept an explicit guess.
+        misfit : array_like, optional
+            Difference between observed and simulated receiver data.
+        forward_solution : firedrake.Function, optional
+            Forward wavefield used by adjoint solvers that need it explicitly.
+
+        Returns
+        -------
+        firedrake.Function
+            Gradient of the objective functional with respect to the active
+            control.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement gradient_solve().",
+        )
+
+    @abstractmethod
+    def get_control_parameter_function_space(self):
+        """Return the function space used by inversion controls.
+
+        Subclasses override this method to tell the FWI driver where scalar
+        controls should live when constants or expressions need to be converted
+        to Firedrake ``Function`` objects.
+
+        Returns
+        -------
+        firedrake.FunctionSpace
+            Solver-specific control function space.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+
+        Examples
+        --------
+        Acoustic controls use the acoustic pressure/velocity function space;
+        elastic material controls use a scalar material-parameter space.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not define a control parameter function space.",
+        )

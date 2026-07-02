@@ -66,7 +66,6 @@ dictionary["visualization"] = {
 def get_gradient(parallelism_type, points):
 
     dictionary["parallelism"]["type"] = parallelism_type
-    print(f"Calculating exact", flush=True)
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
 
@@ -76,8 +75,6 @@ def get_gradient(parallelism_type, points):
     )
 
     Wave_obj_exact.forward_solve()
-
-    print(f"Calculating guess", flush=True)
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)

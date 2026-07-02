@@ -32,8 +32,8 @@ class HABC_Error():
         - errPk : Peak error
         - pkMax : Maximum reference peak
         - final_energy : Dissipated energy in the HABC scheme
-    f_Nyq : `float`
-        Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
+    freq_Nyq : `float`
+        Nyquist frequency according to the time step. freq_Nyq = 1 / (2 * dt)
     max_errIt : `float`
         Maximum integral error at the receivers for the HABC scheme
     max_errPK : `float`
@@ -71,7 +71,7 @@ class HABC_Error():
         Save the reference signal for the HABC scheme
     '''
 
-    def __init__(self, dt, f_Nyq, receiver_locations, forward_solution_receivers=None,
+    def __init__(self, dt, freq_Nyq, receiver_locations, forward_solution_receivers=None,
                  output_folder=None, output_case=None):
         '''
         Initialize the HABC_Error class.
@@ -80,8 +80,8 @@ class HABC_Error():
         ----------
         dt : `float`
             Time step used in the simulation
-        f_Nyq : `float`
-            Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
+        freq_Nyq : `float`
+            Nyquist frequency according to the time step. freq_Nyq = 1 / (2 * dt)
         receiver_locations: `list`
             List of receiver locations
         forward_solution_receivers : `array`, optional
@@ -100,7 +100,7 @@ class HABC_Error():
         self.dt = dt
 
         # Nyquist frequency
-        self.f_Nyq = f_Nyq
+        self.freq_Nyq = freq_Nyq
 
         # Receivers data and initialization
         self.receiver_locations = receiver_locations
@@ -145,7 +145,7 @@ class HABC_Error():
         self.receivers_ref_fft = []
         for rec in range(self.number_of_receivers):
             signal = self.receivers_reference[:, rec]
-            yf = freq_response(signal, self.f_Nyq)
+            yf = freq_response(signal, self.freq_Nyq)
             self.receivers_ref_fft.append(yf)
         np.save(pth_str + "habc_fft.npy", self.receivers_ref_fft)
 
@@ -282,7 +282,7 @@ class HABC_Error():
         self.receivers_out_fft = []
         for rec in range(self.number_of_receivers):
             signal = self.forward_solution_receivers[:, rec]
-            yf = freq_response(signal, self.f_Nyq)
+            yf = freq_response(signal, self.freq_Nyq)
             self.receivers_out_fft.append(yf)
         self.receivers_out_fft = np.asarray(self.receivers_out_fft).T
 

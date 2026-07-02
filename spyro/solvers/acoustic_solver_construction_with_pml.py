@@ -36,10 +36,25 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     X_n = fire.Function(W)
     X_nm1 = fire.Function(W)
 
-    u_n, pp_n = X_n.subfunctions
-    u_nm1, _ = X_nm1.subfunctions
+    # Keep Function-typed subfunction views for non-form usage (in-place
+    # ``.assign``, ``.dat`` access for receiver output, etc.). They share
+    # storage with ``X_n``/``X_nm1`` so writes to the mixed Functions are
+    # visible through these views.
+    u_n_func, pp_n_func = X_n.subfunctions
+    u_nm1_func, _ = X_nm1.subfunctions
 
-    Wave_object.u_n = u_n
+    # In the UFL forms, however, reference ``X_n``/``X_nm1`` directly via
+    # ``fire.split``. The pyadjoint tape tracks ``X_n.assign(X_np1)`` between
+    # time steps; the subfunction Functions are separately-tracked tape
+    # variables that are never explicitly written to in the tape, so on
+    # replay their tape values stay at the initial (zero) state, making
+    # ``J`` constant w.r.t. the control. Using ``fire.split(X_n)`` keeps the
+    # form dependent on ``X_n`` itself, which is updated correctly on
+    # replay. This is what makes the PML Taylor test converge.
+    u_n, pp_n = fire.split(X_n)
+    u_nm1, _ = fire.split(X_nm1)
+
+    Wave_object.u_n = u_n_func
     Wave_object.X_np1 = X_np1
     Wave_object.X_n = X_n
     Wave_object.X_nm1 = X_nm1
@@ -117,10 +132,16 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     X_n = fire.Function(W)
     X_nm1 = fire.Function(W)
 
-    u_n, psi_n, pp_n = X_n.subfunctions
-    u_nm1, psi_nm1, _ = X_nm1.subfunctions
+    # See 2D variant: keep subfunction Functions for non-form usage but build
+    # the UFL forms against ``fire.split`` so the adjoint tape tracks the
+    # time-stepping updates of ``X_n`` / ``X_nm1`` correctly.
+    u_n_func, psi_n_func, pp_n_func = X_n.subfunctions
+    u_nm1_func, psi_nm1_func, _ = X_nm1.subfunctions
 
-    Wave_object.u_n = u_n
+    u_n, psi_n, pp_n = fire.split(X_n)
+    u_nm1, psi_nm1, _ = fire.split(X_nm1)
+
+    Wave_object.u_n = u_n_func
     Wave_object.X_np1 = X_np1
     Wave_object.X_n = X_n
     Wave_object.X_nm1 = X_nm1

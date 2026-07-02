@@ -1,4 +1,4 @@
-from firedrake import File
+from firedrake import VTKFile
 import numpy as np
 import pytest
 import spyro

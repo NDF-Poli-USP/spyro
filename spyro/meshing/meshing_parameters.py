@@ -437,6 +437,7 @@ class MeshingParameters():
         Only one of edge_length or cells_per_wavelength can be set at a time.
         Setting this property will automatically set cells_per_wavelength to None.
         """
+        # ToDo: A setter-getter that handles both edge_length and cells_per_wavelength
         if self.cells_per_wavelength is not None:
             warnings.warn(
                 "Mutual exclusion: Both 'edge_length' and "
@@ -602,6 +603,10 @@ class MeshingParameters():
         if value == "SeismicMesh" and self.quadrilateral:
             raise ValueError("SeismicMesh does not work with quads.")
         self._mesh_type = value
+
+        if value in ["firedrake_mesh", "SeismicMesh", "spyro_mesh"]:
+            self.automatic_mesh = True
+
         if hasattr(self, 'is_complete'):
             self.check_completeness()
 
