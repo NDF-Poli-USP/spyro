@@ -1,7 +1,7 @@
 import firedrake as fire
 
 from .wave import Wave
-
+from pyadjoint import Tape, AdjFloat
 from ..io.basicio import ensemble_gradient
 from ..io import interpolate
 from .acoustic_solver_construction_no_pml import (
@@ -14,7 +14,9 @@ from .backward_time_integration import (
     backward_wave_propagator,
 )
 from ..domains.space import create_function_space
-from ..utils.typing import override, WaveType
+from ..utils.typing import (
+    AdjointType, RieszMapType, override, WaveType,
+)
 from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
 
@@ -69,28 +71,119 @@ class AcousticWave(Wave):
         self.acoustic_energy = acoustic_energy(self)
 
     @ensemble_gradient
-    def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
-        """Solves the adjoint problem to calculate de gradient.
+    def gradient_solve(
+        self, misfit=None, forward_solution=None,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+        riesz_map=RieszMapType.L2,
+    ):
+        """Compute the adjoint-based gradient.
 
         Parameters:
         -----------
-        guess: Firedrake 'Function' (optional)
-            Initial guess for the velocity model. If not mentioned uses the
-            one currently in the wave object.
+        misfit: Firedrake 'Function' or numpy array (optional)
+            The misfit between the observed and predicted data. If not provided,
+            it will be computed as the difference between the real shot record and
+            the forward solution at the receivers. If the real shot record is not
+            available, the method will raise an error.
+        forward_solution: Firedrake 'Function' (optional)
+            The forward solution of the wave equation. If not provided, it will be
+            computed by calling the forward solver. Providing the forward solution
+            can save computational time if it has already been
+            computed for the current velocity model, as it avoids redundant forward solves.
+        adjoint_type: AdjointType enum (default: AdjointType.IMPLEMENTED_ADJOINT)
+            Whether to use automated adjoint differentiation.
+        riesz_map: RieszMapType enum (default: RieszMapType.L2)
+            The type of Riesz map to use for the gradient. More details in the documentation of the
+            :class:`RieszMapType` enum.
 
         Returns:
         --------
-        dJ: Firedrake 'Function'
-            Gradient of the cost functional.
+        dJ: Firedrake 'Function' or Firedrake 'Cofunction'
+            Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
+            depending on the chosen Riesz map.
         """
+        if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+            return self._automated_adjoint_gradient(riesz_map=riesz_map)
+
+        self.enable_implemented_adjoint()
         if misfit is not None:
             self.misfit = misfit
-        elif self.current_time == 0.0:
+
+        if forward_solution is not None:
+            self.forward_solution = forward_solution
+        elif not self.forward_solution:
+            # No stored forward solution — either never run, or run before
+            # enable_implemented_adjoint() was called (store_forward_time_steps
+            # was False at the time). Re-run now with storage enabled.
+            #
+            # IMPORTANT: only re-run when ``self.forward_solution`` is empty.
+            # For the multi-source FWI path, ``ensemble_gradient`` invokes this
+            # method once per source after calling ``switch_serial_shot`` to
+            # load that source's stored forward solution into
+            # ``self.forward_solution``; calling ``forward_solve()`` here
+            # would discard the per-source data and run a fresh (multi-source)
+            # ensemble forward solve, leaving the backward propagator with the
+            # wrong forward state and producing an incorrect gradient.
             self.forward_solve()
-            self.misfit = self.real_shot_record - self.forward_solution_receivers
-        else:
-            raise ValueError("Please load or calculate a real shot record first")
+
+        if self.misfit is None:
+            if self.real_shot_record is None:
+                raise ValueError(
+                    "Please load or calculate a real shot record first"
+                )
+            self.misfit = (
+                self.real_shot_record - self.forward_solution_receivers
+            )
+
+        if riesz_map != RieszMapType.L2:
+            raise NotImplementedError(
+                f"Riesz map {riesz_map} not implemented for implemented adjoint."
+            )
         return backward_wave_propagator(self)
+
+    def _automated_adjoint_gradient(self, riesz_map=RieszMapType.L2):
+        """Compute the gradient using the automated adjoint.
+
+        Parameters:
+        -----------
+        riesz_map: RieszMapType enum (default: RieszMapType.L2)
+            The type of Riesz map to use for the gradient. More details in the documentation of the
+            :class:`RieszMapType` enum.
+
+        Returns:
+        --------
+        dJ: Firedrake 'Function' or Firedrake 'Cofunction'
+            Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
+            depending on the chosen Riesz map.
+        """
+        if not isinstance(self.functional_value, AdjFloat):
+            raise ValueError(
+                "Functional value must be an AdjFloat for automated adjoint gradient computation."
+            )
+
+        if not self.automated_adjoint:
+            self.enable_automated_adjoint()
+            self.automated_adjoint.clear_tape()
+            self.forward_solve()
+            self.automated_adjoint.create_reduced_functional(
+                self.functional_value
+            )
+        elif (
+            self.automated_adjoint.reduced_functional is None
+            and isinstance(self.automated_adjoint._tape, Tape)
+        ):
+            self.automated_adjoint.create_reduced_functional(
+                self.functional_value
+            )
+
+        if riesz_map == RieszMapType.L2:
+            return self.automated_adjoint.compute_gradient()
+        elif riesz_map == RieszMapType.l2:
+            return self.automated_adjoint.compute_derivative()
+        else:
+            raise NotImplementedError(
+                f"Riesz map {riesz_map} not implemented for automated adjoint."
+            )
 
     def reset_pressure(self):
         if self.abc_boundary_layer_type == "PML":
@@ -234,6 +327,22 @@ class AcousticWave(Wave):
             return self.source_function.sub(0)
         else:
             return self.source_function
+
+    def pressure_for_receivers(self):
+        """Return the expression to be interpolated at receiver locations.
+
+        For the PML formulation the pressure field is the first component of
+        the mixed Function ``X_n``. We deliberately return the UFL ``split``
+        expression rather than the subfunction ``Function`` view so that
+        pyadjoint's annotation of ``X_n.assign(X_np1)`` (the only operation
+        that updates state between time steps) is sufficient to make the
+        receiver interpolation reflect the time-stepping during tape replay.
+        For the non-mixed case ``self.u_n`` is already the form coefficient
+        Function, which is updated directly by ``u_n.assign(...)``.
+        """
+        if self.abc_boundary_layer_type == "PML":
+            return fire.split(self.X_n)[0]
+        return self.u_n
 
     def get_control_parameters(self):
         """Return the acoustic inversion control.

@@ -190,9 +190,13 @@ def save_serial_data(wave, propagation_id):
     Returns:
         None
     """
-    arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
-    stacked_arrays = np.stack(arrays_list, axis=0)
-    np.save(_shot_filename(propagation_id, wave, prefix='tmp_shot'), stacked_arrays)
+    if wave.forward_solution:
+        # There are cases where forward_solution is empty, e.g. when running
+        # forward_solve for the true model. In that case, we skip saving the
+        # solution on the entire domain, which is not needed.
+        arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
+        stacked_arrays = np.stack(arrays_list, axis=0)
+        np.save(_shot_filename(propagation_id, wave, prefix='tmp_shot'), stacked_arrays)
     np.save(_shot_filename(propagation_id, wave, prefix='tmp_rec'), wave.forward_solution_receivers)
 
 
@@ -208,12 +212,16 @@ def switch_serial_shot(wave, propagation_id, file_name=None, just_for_dat_manage
         None
     """
     if file_name is None:
-        stacked_shot_arrays = np.load(_shot_filename(propagation_id, wave, prefix='tmp_shot'))
-        if len(wave.forward_solution) == 0:
-            n_dts, n_dofs = np.shape(stacked_shot_arrays)
-            rebuild_empty_forward_solution(wave, n_dts)
-        for array_i, array in enumerate(stacked_shot_arrays):
-            wave.forward_solution[array_i].dat.data[:] = array
+        forward_solution_filename = _shot_filename(propagation_id, wave, prefix='tmp_shot')
+        if os.path.exists(forward_solution_filename) or wave.forward_solution:
+            # The adjoint propagator consumes forward_solution with pop(). When
+            # switching to the next shot, reload saved snapshots even if the
+            # in-memory list has been emptied.
+            stacked_shot_arrays = np.load(forward_solution_filename)
+            if not wave.forward_solution:
+                rebuild_empty_forward_solution(wave, len(stacked_shot_arrays))
+            for array_i, array in enumerate(stacked_shot_arrays):
+                wave.forward_solution[array_i].dat.data[:] = array
         receiver_solution_filename = _shot_filename(propagation_id, wave, prefix='tmp_rec')
     else:
         receiver_solution_filename = _shot_filename(propagation_id, wave, prefix=file_name, random_str_in_use=False)
@@ -225,6 +233,10 @@ def ensemble_functional(func):
 
     def wrapper(*args, **kwargs):
         comm = args[0].comm
+        if args[0].adjoint_type.name == "AUTOMATED_ADJOINT":
+            # pyadjoint needs the annotated Firedrake object, not a numpy scalar
+            # produced by the ensemble reduction path below.
+            return func(*args, **kwargs)
         if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
             J = func(*args, **kwargs)
             J_total = np.zeros((1))
