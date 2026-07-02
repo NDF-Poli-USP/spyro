@@ -792,16 +792,11 @@ def get_real_shot_record(wave_object):
 
     if isinstance(real_shot_record, (list, tuple)):
         if (
-            self.current_sources is not None
-            and len(real_shot_record) > self.current_sources[0]
+            wave_object.current_sources is not None
+            and len(real_shot_record) > wave_object.current_sources[0]
         ):
-            source_record = real_shot_record[self.current_sources[0]]
+            source_record = real_shot_record[wave_object.current_sources[0]]
             if isinstance(source_record, np.ndarray) and source_record.ndim == 2:
                 return source_record
 
     return real_shot_record
-
-
-def get_real_shot_step(wave_object, step):
-    """Get one time step from the real shot record for the active sources."""
-    return get_real_shot_record(wave_object)[step]
