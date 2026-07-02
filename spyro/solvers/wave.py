@@ -15,8 +15,8 @@ from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
-from ..utils.typing import (FunctionalEvaluationMode, LayerShapeType,
-                            WaveType, AdjointType, WaveType)
+from ..utils.typing import (AdjointType, FunctionalEvaluationMode,
+                            LayerShapeType, WaveType)
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
 
