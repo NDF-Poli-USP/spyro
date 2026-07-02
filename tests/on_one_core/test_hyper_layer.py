@@ -107,13 +107,13 @@ def test_radial_parameter_2d(layer_2d):
     # Point on the boundary should give r = 1
     a, b = layer_2d.hyper_axes
     # For a circle (n=2), point at (a*cos(45°), b*sin(45°)) should be on boundary
-    x = a * cos(pi/4)
-    y = b * sin(pi/4)
+    x = a * cos(pi / 4.)
+    y = b * sin(pi / 4.)
     r = layer_2d.radial_parameter((x, y), 2)
     assert isclose(r, 1.0, rel_tol=1e-10)
 
     # Point inside should give r < 1
-    r_inside = layer_2d.radial_parameter((x/2, y/2), 2)
+    r_inside = layer_2d.radial_parameter((x / 2., y / 2.), 2)
     assert r_inside < 1.0
 
     # Point outside should give r > 1
@@ -125,14 +125,14 @@ def test_radial_parameter_3d(layer_3d):
     """Test radial parameter calculation for 3D"""
     a, b, c = layer_3d.hyper_axes
     # Point on the boundary should give r = 1
-    x = a / sqrt(3)
-    y = b / sqrt(3)
-    z = c / sqrt(3)
+    x = a / sqrt(3.)
+    y = b / sqrt(3.)
+    z = c / sqrt(3.)
     r = layer_3d.radial_parameter((x, y, z), 2)
     assert isclose(r, 1.0, rel_tol=1e-10)
 
     # Point inside should give r < 1
-    r_inside = layer_3d.radial_parameter((x/2, y/2, z/2), 2)
+    r_inside = layer_3d.radial_parameter((x / 2., y / 2., z / 2.), 2)
     assert r_inside < 1.0
 
     # Point outside should give r > 1
@@ -201,7 +201,7 @@ def test_loop_criteria_3d(layer_3d):
 
 def test_half_hyp_area_unit_circle():
     result = HyperLayer.half_hyp_area(1.0, 1.0, 2)
-    assert isclose(result, pi / 2, rel_tol=1e-9)
+    assert isclose(result, pi / 2., rel_tol=1e-9)
 
 
 def test_half_hyp_area_positive():
@@ -227,7 +227,7 @@ def test_half_hyp_area_scales_linearly_with_b():
 def test_trunc_half_hyp_area_no_truncation():
     # z0 == b means no truncation; result should equal half_hyp_area
     result = HyperLayer.trunc_half_hyp_area(1.0, 1.0, 2, 1.0)
-    assert isclose(result, pi / 2, rel_tol=1e-6)
+    assert isclose(result, pi / 2., rel_tol=1e-6)
 
 
 def test_trunc_half_hyp_area_zero_plane():
@@ -249,7 +249,7 @@ def test_trunc_half_hyp_area_less_than_half():
 
 def test_half_hyp_volume_unit_sphere():
     result = HyperLayer.half_hyp_volume(1.0, 1.0, 1.0, 2)
-    assert isclose(result, 2 * pi / 3, rel_tol=1e-9)
+    assert isclose(result, 2. * pi / 3., rel_tol=1e-9)
 
 
 def test_half_hyp_volume_positive():

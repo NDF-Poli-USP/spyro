@@ -13,7 +13,8 @@ from ..io.basicio import parallel_print as pprint
 from ..domains.space import create_function_space
 from ..plots.plots_habc import plot_function_layer_size
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
-from ..utils.error_management import enum_parameter_error, value_parameter_error
+from ..utils.error_management import (enum_parameter_error, value_numerical_error,
+                                      value_parameter_error)
 from ..utils.freq_tools import freq_response
 from ..utils.typing import HyperLayerDegreeType, LayerShapeType, LayerSizeRefFrequency
 
@@ -39,6 +40,7 @@ class ABCLayer(NRBC):
         Type of the boundary layer. Options: 'hybrid' or 'PML'.
         Default is 'hybrid'. Option 'hybrid' is based on paper of Salas et al. (2022).
         doi: https://doi.org/10.1016/j.apm.2022.09.014
+        TODO: Add reference
     abc_pad_length : `float`
         Size of the absorbing layer
     abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
@@ -241,7 +243,10 @@ class ABCLayer(NRBC):
         if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
             self.abc_deg_layer = None
         elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-            self.abc_deg_layer = max(abc_deg_layer, 2.)
+            self.abc_deg_layer = abc_deg_layer
+            value_numerical_error(
+                'abc_deg_layer', self.abc_deg_layer, float_num=True,
+                integer_num=True, lower_bound=2., include_lower_bound=True)
 
         # Communicator MPI
         self.comm = comm
@@ -696,7 +701,11 @@ class ABCLayer(NRBC):
             model (Model with "infinite" dimensions). Default is `False`.
         method : `str`, optional
             Method to extend the velocity profile. Options:
-            "point_cloud" or "nearest_point". Default is "point_cloud".
+            - "point_cloud" : Interpolate the field based on a point
+                              cloud from the original boundary
+            - "nearest_point" : Use the nearest point on the original
+                                boundary to extend the field.
+            Default is "point_cloud".
         save_file : `bool`, optional
             If `True`, save the velocity model with absorbing layer in a .pvd file.
             Default is `True`.
@@ -766,7 +775,7 @@ class ABCLayer(NRBC):
 
         # Interpolating in the space function of the problem
         Wave.c = Function(Wave.function_space,
-                          name="c [km/s])").interpolate(Wave.c)
+                          name="c[km/s])").interpolate(Wave.c)
 
         # Save new velocity model
         if save_file:
