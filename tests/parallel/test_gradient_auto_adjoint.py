@@ -150,9 +150,9 @@ def get_forward_model(checkpointing=False, schedule=None):
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
 
     # The control must be a Function for pyadjoint to differentiate it.
-    assert isinstance(Wave_obj_guess.c, fire.Function)
     Wave_obj_guess.enable_automated_adjoint(
         checkpointing=checkpointing, checkpoint_schedule=schedule)
+    assert isinstance(Wave_obj_guess.c, fire.Function)
 
     # The ensemble passed to the EnsembleReducedFunctional is wave.comm.
     assert Wave_obj_guess.automated_adjoint.ensemble is Wave_obj_guess.comm

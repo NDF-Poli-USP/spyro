@@ -207,8 +207,6 @@ pyadjoint.ReducedFunctional or None
             The reduced functional, also stored on
             :attr:`reduced_functional`.
         """
-        if ensemble is None:
-            ensemble = self.ensemble
         control = fire_ad.Control(self.controls)
         if ensemble is not None:
             self.reduced_functional = fire_ad.EnsembleReducedFunctional(
