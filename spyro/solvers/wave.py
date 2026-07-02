@@ -13,10 +13,12 @@ from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
-from ..utils.typing import FunctionalEvaluationMode, LayerShapeType, WaveType
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
+from ..utils.typing import (AdjointType, FunctionalEvaluationMode,
+                            LayerShapeType, WaveType)
 from .modal.modal_sol import Modal_Solver
+from .automatic_differentiation_solver import AutomatedAdjoint
 
 
 fire.set_log_level(fire.ERROR)
@@ -132,15 +134,25 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.vector_function_space = None
         self.tensor_function_space0 = None
         self.tensor_function_space1 = None
-        self.forward_solution_receivers = None
+        self._forward_solution_receivers = None
+        self._store_forward_time_steps = False
+        self.forward_solution = None
         self.adjoint_solution = None
+        self.adjoint_type = AdjointType.NONE
+        self.automated_adjoint = None
+        self.functional_value = None
+        self.misfit = None
         self.current_time = 0.0
+        self.source_expression = None  # Expression for sources using UFL (less efficient)
         self.set_solver_parameters()
 
         # Create or get the mesh
         self.mesh = self.get_mesh()
         self.c = None
         self.sources = None
+        self.real_shot_record = None
+
+        self.set_solver_parameters()
 
         # Mesh manager
         self.mesh_manager()
@@ -154,10 +166,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             )
         else:
             warnings.warn("No mesh found. Please define a mesh.")
-
-        # Expression to define sources through UFL (less efficient)
-        self.source_expression = None
-        self.real_shot_record = None
 
         # Creating absorbing layer manager if needed
         if self.abc_active:
@@ -586,6 +594,50 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Backward-compatible alias for set_material_properties."""
         return self.set_material_properties(*args, **kwargs)
 
+    @property
+    def store_forward_time_steps(self):
+        return self._store_forward_time_steps
+
+    @store_forward_time_steps.setter
+    def store_forward_time_steps(self, value):
+        self._store_forward_time_steps = value
+
+    def enable_automated_adjoint(self):
+        self.store_forward_time_steps = False
+        self.enable_compute_functional(
+            mode=FunctionalEvaluationMode.PER_TIMESTEP
+        )
+        self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
+        self.use_vertex_only_mesh = True
+        self._initialize_model_parameters()
+        if self.c is None:
+            raise ValueError(
+                "self.c must be set before enabling automated adjoint."
+                "Please set the velocity model using set_initial_velocity_model()"
+                "or set c directly."
+            )
+        controls = self.c
+        # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
+        # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
+        # that the reduced functional is built as an
+        # ``EnsembleReducedFunctional``, summing the per-shot functionals and
+        # gradients over the ensemble communicator.
+        self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
+        self.functional_value = None
+        self.misfit = None
+
+    def enable_implemented_adjoint(self):
+        self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
+        self.store_forward_time_steps = True
+
+    @property
+    def forward_solution_receivers(self):
+        return self._forward_solution_receivers
+
+    @forward_solution_receivers.setter
+    def forward_solution_receivers(self, value):
+        self._forward_solution_receivers = value
+
     def enable_compute_functional(
         self, mode=FunctionalEvaluationMode.AFTER_SOLVE
     ):
@@ -599,7 +651,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         # Create the Wave attributes required to compute functional.
         self.functional_evaluation_mode = mode
-        self.functional_value = None
 
     @property
     def functional_evaluation_mode(self):
@@ -617,6 +668,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 f"Expected an instance of FunctionalEvaluationMode enum."
             )
         self._functional_evaluation_mode = mode
+        self.functional_value = None
+        self.misfit = None
 
     def mesh_manager(self):
         """Create the mesh operations manager for the wave solver."""

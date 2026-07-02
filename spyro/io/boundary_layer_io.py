@@ -212,10 +212,10 @@ class Read_boundary_layer:
             # Hypershape-specific validation
             self.abc_deg_layer = None
             if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-                self.abc_deg_layer = max(abc_dictionary.get("degree_layer", 2.), 2.)
-                if self.abc_deg_layer is not None and self.abc_deg_layer < 2.:
-                    raise ValueError(f"Hypershape degree must be >= 2"
-                                     f", got {self.abc_deg_layer}.")
+                self.abc_deg_layer = abc_dictionary.get("degree_layer", 2.)
+                value_numerical_error(
+                    'abc_deg_layer', self.abc_deg_layer, float_num=True,
+                    integer_num=True, lower_bound=2., include_lower_bound=True)
 
             self.abc_degree_type = abc_dictionary.get("degree_type", "real")
 

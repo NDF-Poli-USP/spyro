@@ -40,6 +40,7 @@ class ABCLayer(NRBC):
         Type of the boundary layer. Options: 'hybrid' or 'PML'.
         Default is 'hybrid'. Option 'hybrid' is based on paper of Salas et al. (2022).
         doi: https://doi.org/10.1016/j.apm.2022.09.014
+        TODO: Add reference
     abc_pad_length : `float`
         Size of the absorbing layer
     abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
@@ -694,7 +695,11 @@ class ABCLayer(NRBC):
             model (Model with "infinite" dimensions). Default is `False`.
         method : `str`, optional
             Method to extend the velocity profile. Options:
-            "point_cloud" or "nearest_point". Default is "point_cloud".
+            - "point_cloud" : Interpolate the field based on a point
+                              cloud from the original boundary
+            - "nearest_point" : Use the nearest point on the original
+                                boundary to extend the field.
+            Default is "point_cloud".
         save_file : `bool`, optional
             If `True`, save the velocity model with absorbing layer in a .pvd file.
             Default is `True`.
@@ -764,7 +769,7 @@ class ABCLayer(NRBC):
 
         # Interpolating in the space function of the problem
         Wave.c = Function(Wave.function_space,
-                          name="c [km/s])").interpolate(Wave.c)
+                          name="c[km/s])").interpolate(Wave.c)
 
         # Save new velocity model
         if save_file:

@@ -1,5 +1,4 @@
 import spyro
-import debugpy
 # from mpi4py.MPI import COMM_WORLD
 # debugpy.listen(3000 + COMM_WORLD.rank)
 # debugpy.wait_for_client()
