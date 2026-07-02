@@ -86,8 +86,8 @@ def test_fwi(load_real_shot=False, use_rol=False):
         FWI_obj.set_real_mesh(input_mesh_parameters={"edge_length": 0.1})
         center_z = -1.0
         center_x = 1.0
-        mesh_z = FWI_obj.mesh_z
-        mesh_x = FWI_obj.mesh_x
+        mesh_z = FWI_obj.wave.mesh_z
+        mesh_x = FWI_obj.wave.mesh_x
         cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
 
         FWI_obj.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)

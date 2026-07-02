@@ -15,7 +15,7 @@ from .backward_time_integration import (
 )
 from ..domains.space import create_function_space
 from ..utils.typing import (
-    RieszMapType, override, WaveType,
+    AdjointType, RieszMapType, override, WaveType,
 )
 from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
@@ -73,7 +73,7 @@ class AcousticWave(Wave):
     @ensemble_gradient
     def gradient_solve(
         self, misfit=None, forward_solution=None,
-        auto_adj=False,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
         riesz_map=RieszMapType.L2,
     ):
         """Compute the adjoint-based gradient.
@@ -90,7 +90,7 @@ class AcousticWave(Wave):
             computed by calling the forward solver. Providing the forward solution
             can save computational time if it has already been
             computed for the current velocity model, as it avoids redundant forward solves.
-        auto_adj: bool (default: False)
+        adjoint_type: AdjointType enum (default: AdjointType.IMPLEMENTED_ADJOINT)
             Whether to use automated adjoint differentiation.
         riesz_map: RieszMapType enum (default: RieszMapType.L2)
             The type of Riesz map to use for the gradient. More details in the documentation of the
@@ -102,35 +102,8 @@ class AcousticWave(Wave):
             Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
             depending on the chosen Riesz map.
         """
-        if auto_adj:
-            if not isinstance(self.functional_value, AdjFloat):
-                raise ValueError(
-                    "Functional value must be an AdjFloat for automated adjoint gradient computation."
-                )
-
-            if not self.automated_adjoint:
-                self.enable_automated_adjoint()
-                self.automated_adjoint.clear_tape()
-                self.forward_solve()
-                self.automated_adjoint.create_reduced_functional(
-                    self.functional_value
-                )
-            elif (
-                self.automated_adjoint.reduced_functional is None
-                and isinstance(self.automated_adjoint._tape, Tape)
-            ):
-                self.automated_adjoint.create_reduced_functional(
-                    self.functional_value
-                )
-
-            if riesz_map == RieszMapType.L2:
-                return self.automated_adjoint.compute_gradient()
-            elif riesz_map == RieszMapType.l2:
-                return self.automated_adjoint.compute_derivative()
-            else:
-                raise NotImplementedError(
-                    f"Riesz map {riesz_map} not implemented for automated adjoint."
-                )
+        if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+            return self._automated_adjoint_gradient(riesz_map=riesz_map)
 
         self.enable_implemented_adjoint()
         if misfit is not None:
@@ -167,6 +140,50 @@ class AcousticWave(Wave):
                 f"Riesz map {riesz_map} not implemented for implemented adjoint."
             )
         return backward_wave_propagator(self)
+
+    def _automated_adjoint_gradient(self, riesz_map=RieszMapType.L2):
+        """Compute the gradient using the automated adjoint.
+
+        Parameters:
+        -----------
+        riesz_map: RieszMapType enum (default: RieszMapType.L2)
+            The type of Riesz map to use for the gradient. More details in the documentation of the
+            :class:`RieszMapType` enum.
+
+        Returns:
+        --------
+        dJ: Firedrake 'Function' or Firedrake 'Cofunction'
+            Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
+            depending on the chosen Riesz map.
+        """
+        if not isinstance(self.functional_value, AdjFloat):
+            raise ValueError(
+                "Functional value must be an AdjFloat for automated adjoint gradient computation."
+            )
+
+        if not self.automated_adjoint:
+            self.enable_automated_adjoint()
+            self.automated_adjoint.clear_tape()
+            self.forward_solve()
+            self.automated_adjoint.create_reduced_functional(
+                self.functional_value
+            )
+        elif (
+            self.automated_adjoint.reduced_functional is None
+            and isinstance(self.automated_adjoint._tape, Tape)
+        ):
+            self.automated_adjoint.create_reduced_functional(
+                self.functional_value
+            )
+
+        if riesz_map == RieszMapType.L2:
+            return self.automated_adjoint.compute_gradient()
+        elif riesz_map == RieszMapType.l2:
+            return self.automated_adjoint.compute_derivative()
+        else:
+            raise NotImplementedError(
+                f"Riesz map {riesz_map} not implemented for automated adjoint."
+            )
 
     def reset_pressure(self):
         if self.abc_boundary_layer_type == "PML":
@@ -326,3 +343,77 @@ class AcousticWave(Wave):
         if self.abc_boundary_layer_type == "PML":
             return fire.split(self.X_n)[0]
         return self.u_n
+
+    def get_control_parameters(self):
+        """Return the acoustic inversion control.
+
+        For acoustic FWI the control is the velocity model stored in
+        ``initial_velocity_model``.
+
+        Returns
+        -------
+        firedrake.Function or None
+            Current acoustic velocity model.
+
+        Examples
+        --------
+        After ``set_initial_velocity_model(constant=2.0)``, this method returns
+        the velocity ``Function`` filled with ``2.0``.
+        """
+        return self.initial_velocity_model
+
+    def set_control_parameters(self, controls):
+        """Assign the acoustic inversion control.
+
+        Parameters
+        ----------
+        controls : firedrake.Function, firedrake.Constant, scalar, or UFL expression
+            Velocity model control. Non-``Function`` values are interpolated
+            into the acoustic function space.
+
+        Returns
+        -------
+        None
+            The method updates ``initial_velocity_model`` and ``c`` and clears
+            ``initial_velocity_model_file``.
+
+        Examples
+        --------
+        ``set_control_parameters(fire.Constant(2.0))`` creates a velocity
+        ``Function`` in the acoustic function space and fills it with ``2.0``.
+        """
+        if self.function_space is None:
+            self.force_rebuild_function_space()
+
+        if isinstance(controls, fire.Function):
+            name = controls.name()
+            velocity = fire.Function(self.function_space, name=name)
+            if controls.function_space() == self.function_space:
+                velocity.assign(controls)
+            else:
+                velocity.interpolate(controls)
+        else:
+            velocity = fire.Function(self.function_space, name="velocity")
+            velocity.interpolate(controls)
+
+        self.initial_velocity_model = velocity
+        self.initial_velocity_model_file = None
+        self.c = self.initial_velocity_model
+
+    def get_control_parameter_function_space(self):
+        """Return the function space used by acoustic controls.
+
+        Returns
+        -------
+        firedrake.FunctionSpace
+            Acoustic solver function space. If it has not been built yet, it is
+            created before being returned.
+
+        Examples
+        --------
+        ``fire.Function(wave.get_control_parameter_function_space())`` creates
+        a velocity control compatible with ``set_control_parameters``.
+        """
+        if self.function_space is None:
+            self.force_rebuild_function_space()
+        return self.function_space

@@ -16,7 +16,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     dm = fire.Function(V_c)
     size, = np.shape(dm.dat.data[:])
     dm_data = np.random.default_rng(0).random(size)
-    dm.dat.data[:] = dm_data
+    dm.dat.data_wo[:] = dm_data
     if Wave_obj_guess.abc_boundary_layer_type == "PML":
         x = Wave_obj_guess.mesh_x
         z = Wave_obj_guess.mesh_z
@@ -26,7 +26,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
         )
         indicator = fire.Function(V_c)
         indicator.interpolate(fire.conditional(inside, 1.0, 0.0))
-        dm.dat.data[:] *= indicator.dat.data[:]
+        dm.dat.data_wo[:] *= indicator.dat.data_ro[:]
 
     for step in steps:
 
@@ -139,7 +139,7 @@ def set_dictionary(PML=False):
     return dictionary
 
 
-def get_forward_model(dictionary=None, auto_adj=False):
+def get_forward_model(dictionary=None, adjoint_type=AdjointType.NONE):
 
     # Exact model
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
@@ -158,11 +158,11 @@ def get_forward_model(dictionary=None, auto_adj=False):
 
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
-    if auto_adj:
-        assert isinstance(Wave_obj_guess.c, fire.Function)
+    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         Wave_obj_guess.enable_automated_adjoint()
+        assert isinstance(Wave_obj_guess.c, fire.Function)
     Wave_obj_guess.forward_solve()
-    if auto_adj:
+    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         assert Wave_obj_guess.automated_adjoint._tape is not None
         Wave_obj_guess.automated_adjoint.stop_recording()
     rec_out_guess = Wave_obj_guess.forward_solution_receivers
@@ -171,52 +171,62 @@ def get_forward_model(dictionary=None, auto_adj=False):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("auto_adj", [True, False])
-def test_gradient(auto_adj, PML=False):
-    if auto_adj:
-        adjoint_type = AdjointType.AUTOMATED_ADJOINT
-    else:
-        adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
-
+@pytest.mark.newer_firedrake
+def test_gradient_auto_adjoint(PML=True):
     dictionary = set_dictionary(PML=PML)
-    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(dictionary=dictionary, auto_adj=auto_adj)
-    if adjoint_type == AdjointType.IMPLEMENTED_ADJOINT:
-        forward_solution = Wave_obj_guess.forward_solution
-        forward_solution_guess = deepcopy(forward_solution)
-
-        misfit = rec_out_exact - rec_out_guess
-
-        Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
-        print(f"Cost functional : {Jm}")
-    else:
-        forward_solution_guess = None
-        misfit = None
+    _, _, Wave_obj_guess = get_forward_model(
+        dictionary=dictionary, adjoint_type=AdjointType.AUTOMATED_ADJOINT)
+    forward_solution_guess = None
+    misfit = None
     # compute the gradient of the control (to be verified)
     dJ = Wave_obj_guess.gradient_solve(
         misfit=misfit, forward_solution=forward_solution_guess,
-        auto_adj=auto_adj,
+        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
     )
-    if not auto_adj:
-        check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
-    else:
-        print(f"Cost functional : {Wave_obj_guess.functional_value}")
-        Wave_obj_guess.automated_adjoint.create_reduced_functional(Wave_obj_guess.functional_value)
-        size, = np.shape(Wave_obj_guess.c.dat.data[:])
-        direction = fire.Function(
-            Wave_obj_guess.c.function_space(), val=np.random.default_rng(0).random(size))
-        assert Wave_obj_guess.automated_adjoint.verify_gradient(
-            Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.9, \
-            "Automated adjoint gradient verification failed."
 
-        Wave_obj_guess.automated_adjoint.clear_tape()
-        assert Wave_obj_guess.automated_adjoint._tape is None
+    Wave_obj_guess.automated_adjoint.create_reduced_functional(Wave_obj_guess.functional_value)
+    size, = np.shape(Wave_obj_guess.c.dat.data[:])
+    direction = fire.Function(
+        Wave_obj_guess.c.function_space(), val=np.random.default_rng(0).random(size))
+    assert Wave_obj_guess.automated_adjoint.verify_gradient(
+        Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.9, \
+        "Automated adjoint gradient verification failed."
+
+    Wave_obj_guess.automated_adjoint.clear_tape()
+    assert Wave_obj_guess.automated_adjoint._tape is None
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("auto_adj", [True, False])
-def test_gradient_pml(auto_adj):
-    return test_gradient(auto_adj, PML=True)
+def test_gradient_implemented_adjoint(PML=False):
+    dictionary = set_dictionary(PML=PML)
+    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(
+        dictionary=dictionary, adjoint_type=AdjointType.IMPLEMENTED_ADJOINT)
+
+    forward_solution = Wave_obj_guess.forward_solution
+    forward_solution_guess = deepcopy(forward_solution)
+
+    misfit = rec_out_exact - rec_out_guess
+
+    Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
+
+    # compute the gradient of the control (to be verified)
+    dJ = Wave_obj_guess.gradient_solve(
+        misfit=misfit, forward_solution=forward_solution_guess,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+    )
+    check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
+
+
+@pytest.mark.slow
+@pytest.mark.newer_firedrake
+def test_gradient_pml_auto_adjoint():
+    test_gradient_auto_adjoint(PML=True)
+
+
+@pytest.mark.slow
+def test_gradient_pml_implemented_adjoint():
+    test_gradient_implemented_adjoint(PML=True)
 
 
 if __name__ == "__main__":
-    test_gradient_pml()
+    test_gradient_pml_implemented_adjoint()

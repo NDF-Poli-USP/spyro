@@ -115,8 +115,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.c = None
         self.sources = None
         self.real_shot_record = None
-        self.c = None
-        self.mesh = self.get_mesh()
 
         self.set_solver_parameters()
 
@@ -379,7 +377,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 "Please specify either a conditional, expression, "
                 "firedrake function or new file name (segy or hdf5)."
             )
-        self.c = self.initial_velocity_model
         if output:
             fire.VTKFile("initial_velocity_model.pvd").write(
                 self.initial_velocity_model, name="velocity"
@@ -592,8 +589,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         )
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
-        controls = self.c if self.c is not None else self.initial_velocity_model
-        self.automated_adjoint = AutomatedAdjoint(controls)
+        self._initialize_model_parameters()
+        if self.c is None:
+            raise ValueError(
+                "self.c must be set before enabling automated adjoint."
+                "Please set the velocity model using set_initial_velocity_model()"
+                "or set c directly."
+            )
+        controls = self.c
+        # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
+        # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
+        # that the reduced functional is built as an
+        # ``EnsembleReducedFunctional``, summing the per-shot functionals and
+        # gradients over the ensemble communicator.
+        self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
         self.functional_value = None
         self.misfit = None
 
@@ -641,3 +650,118 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._functional_evaluation_mode = mode
         self.functional_value = None
         self.misfit = None
+
+    @abstractmethod
+    def get_control_parameters(self):
+        """Return inversion controls exposed by a concrete wave solver.
+
+        Subclasses override this method when they can participate in inversion
+        workflows. The base class raises because a generic ``Wave`` does not
+        know which physical parameters should be optimized.
+
+        Returns
+        -------
+        object
+            Solver-specific control structure.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+
+        Examples
+        --------
+        ``AcousticWave.get_control_parameters()`` returns the velocity model;
+        an elastic solver may return a dictionary of material parameters.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not expose inversion control parameters.",
+        )
+
+    @abstractmethod
+    def set_control_parameters(self, controls):
+        """Assign inversion controls on a concrete wave solver.
+
+        Parameters
+        ----------
+        controls : object
+            Solver-specific control structure.
+
+        Returns
+        -------
+        None
+            Concrete subclasses assign the controls in-place.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+
+        Examples
+        --------
+        ``AcousticWave.set_control_parameters(vp)`` assigns a velocity model;
+        elastic solvers expect a dictionary keyed by material-parameter enums.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot assign inversion control parameters.",
+        )
+
+    @abstractmethod
+    def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
+        """Compute an adjoint gradient for inversion.
+
+        Concrete wave solvers override this method when they provide the
+        adjoint-state machinery required by FWI. The base implementation raises
+        because a generic ``Wave`` does not define the physical model-specific
+        gradient equation.
+
+        Parameters
+        ----------
+        guess : firedrake.Function, optional
+            Control value used by solvers that accept an explicit guess.
+        misfit : array_like, optional
+            Difference between observed and simulated receiver data.
+        forward_solution : firedrake.Function, optional
+            Forward wavefield used by adjoint solvers that need it explicitly.
+
+        Returns
+        -------
+        firedrake.Function
+            Gradient of the objective functional with respect to the active
+            control.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement gradient_solve().",
+        )
+
+    @abstractmethod
+    def get_control_parameter_function_space(self):
+        """Return the function space used by inversion controls.
+
+        Subclasses override this method to tell the FWI driver where scalar
+        controls should live when constants or expressions need to be converted
+        to Firedrake ``Function`` objects.
+
+        Returns
+        -------
+        firedrake.FunctionSpace
+            Solver-specific control function space.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+
+        Examples
+        --------
+        Acoustic controls use the acoustic pressure/velocity function space;
+        elastic material controls use a scalar material-parameter space.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not define a control parameter function space.",
+        )
