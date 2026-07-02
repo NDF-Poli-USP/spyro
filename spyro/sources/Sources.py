@@ -2,6 +2,7 @@ import math
 import numpy as np
 from scipy.signal import butter, filtfilt
 from spyro.receivers.dirac_delta_projector import Delta_projector
+from ..domains.space import create_function_space
 from ..utils.typing import WaveType
 import firedrake as fire
 
@@ -132,13 +133,13 @@ class Sources(Delta_projector):
         ]
         source_mesh = fire.VertexOnlyMesh(self.mesh, source_locations)
         if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
-            V_s = fire.VectorFunctionSpace(source_mesh, "DG", 0)
+            V_s = create_function_space(source_mesh, "DG0", 0, dim=self.dimension)
             source_value = fire.Function(V_s)
             if source_value.dat.data.shape[0] > 0:
                 source_value.dat.data[:] = self.amplitude
             source_form = fire.inner(source_value, fire.TestFunction(V_s)) * fire.dx
         elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
-            V_s = fire.FunctionSpace(source_mesh, "DG", 0)
+            V_s = create_function_space(source_mesh, "DG0", 0)
             source_value = fire.Function(V_s)
             source_value.assign(float(self.amplitude))
             source_form = source_value * fire.TestFunction(V_s) * fire.dx

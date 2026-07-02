@@ -1,7 +1,13 @@
-from firedrake import (FiniteElement, FunctionSpace, VectorElement)
+from firedrake import (
+    FiniteElement,
+    FunctionSpace,
+    TensorFunctionSpace,
+    VectorElement,
+    VectorFunctionSpace,
+)
 
 
-def create_function_space(mesh, method, degree, dim=1):
+def create_function_space(mesh, method, degree, dim=1, shape=None):
     """Create a Firedrake function space based on the specified
     finite element method.
 
@@ -13,8 +19,11 @@ def create_function_space(mesh, method, degree, dim=1):
         Method to be used for the finite element space.
     degree: int
         Degree of the finite element space.
-    dim: int
+    dim: int or None
         Number of degrees of freedom per node.
+    shape: tuple, optional
+        Shape of a tensor function space. If provided, a tensor function
+        space is created from the selected element.
 
     Returns:
     --------
@@ -22,13 +31,21 @@ def create_function_space(mesh, method, degree, dim=1):
         Function space.
     """
 
-    if method == "mass_lumped_triangle":
+    if not isinstance(method, str):
+        element = method
+    elif method == "mass_lumped_triangle":
         element = FiniteElement(
             "KMV", mesh.ufl_cell(), degree=degree,
         )
     elif method == "spectral_quadrilateral":
         element = FiniteElement(
             "CG", mesh.ufl_cell(), degree=degree, variant="spectral"
+        )
+    elif method == "DG0":
+        if degree != 0:
+            raise ValueError("Finite element method DG0 requires degree 0")
+        element = FiniteElement(
+            "DG", mesh.ufl_cell(), degree=0
         )
     elif method in ["DG_triangle", "DG_quadrilateral", "DG"]:
         element = FiniteElement(
@@ -42,6 +59,14 @@ def create_function_space(mesh, method, degree, dim=1):
         element = FiniteElement(
             "DQ", mesh.ufl_cell(), degree=degree, variant="spectral"
         )
+    else:
+        raise ValueError(f"Finite element method {method} not supported")
+
+    if shape is not None:
+        return TensorFunctionSpace(mesh, element, shape=shape)
+
+    if dim is None:
+        return VectorFunctionSpace(mesh, element)
 
     if dim > 1:
         element = VectorElement(element, dim=dim)

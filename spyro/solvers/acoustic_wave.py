@@ -61,7 +61,8 @@ class AcousticWave(Wave):
             construct_solver_or_matrix_no_pml(self)
         elif abc_type == "PML":
             V = self.function_space
-            Z = fire.VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
+            Z = create_function_space(V.ufl_domain(), V.ufl_element(), None,
+                                      dim=None)
             self.vector_function_space = Z
             self.X_np1 = None
             self.X_n = None

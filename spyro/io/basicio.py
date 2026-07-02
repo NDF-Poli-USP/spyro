@@ -11,6 +11,7 @@ import segyio
 import glob
 import os
 import warnings
+from ..domains.space import create_function_space
 from ..tools.version_control import is_firedrake_new
 
 
@@ -327,7 +328,7 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
     """
     # get DoF coordinates
     m = V.ufl_domain()
-    W = fire.VectorFunctionSpace(m, V.ufl_element())
+    W = create_function_space(m, V.ufl_element(), None, dim=None)
     coords = fire.assemble(fire.interpolate(m.coordinates, W))
     dimension, = coords.ufl_shape
     if dimension == 2:
@@ -544,7 +545,7 @@ def interpolate(Model, fname, V):
         miny = 0.0
         maxy = Model.mesh_parameters.length_y
 
-    W = fire.VectorFunctionSpace(m, V.ufl_element())
+    W = create_function_space(m, V.ufl_element(), None, dim=None)
     coords = fire.assemble(fire.interpolate(m.coordinates, W))
     # (z,x) or (z,x,y)
     sd = coords.dat.data.shape[1]
