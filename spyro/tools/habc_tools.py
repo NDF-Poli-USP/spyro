@@ -287,7 +287,7 @@ def point_cloud_field(parent_mesh, pts_cloud, parent_field, tolerance):
 
 
 def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer_mask,
-                                tolerance, method='point_cloud', name_prop="Property"):
+                                tolerance, method="point_cloud", name_prop="Property"):
     """Extend the profile of a scalar field inside the absorbing layer.
 
     Parameters
@@ -304,7 +304,11 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
         Tolerance for searching nodes in the mesh.
     method : `str`, optional
         Method to extend the velocity profile. Options:
-        'point_cloud' or 'nearest_point'. Default is 'point_cloud'.
+        - "point_cloud" : Interpolate the field based on a point
+                          cloud from the original boundary
+        - "nearest_point" : Use the nearest point on the original
+                            boundary to extend the field.
+        Default is "point_cloud".
     name_prop : `str`, optional
         Name for the property field. Default is "Property".
 
@@ -323,25 +327,24 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
     ind_nodes = where(layer_mask.dat.data_with_halos)[0]
     pts_to_extend = lay_nodes[ind_nodes]
 
-    if method == 'point_cloud':
+    # Set the property of the nearest point on the original boundary
+    if method == "point_cloud":
 
         pprint(f"Using Cloud Points Method to Extend {name_prop} Profile")
 
-        # Set the property of the nearest point on the original boundary
         vel_to_extend = \
             point_cloud_field(mesh_original, pts_to_extend,
                               field_to_extend, tolerance).dat.data_with_halos[:]
 
-    elif method == 'nearest_point':
+    elif method == "nearest_point":
 
         pprint(f"Using Nearest Point Method to Extend {name_prop} Profile")
 
-        # Set the property of the nearest point on the original boundary
         vel_to_extend = field_to_extend.at(pts_to_extend, dont_raise=True)
         del pts_to_extend
 
     else:
-        value_parameter_error('method', method, ['point_cloud', 'nearest_point'])
+        value_parameter_error('method', method, ["point_cloud", "nearest_point"])
 
     # Velocity profile inside the layer
     lay_field.dat.data_with_halos[ind_nodes, 0] = vel_to_extend

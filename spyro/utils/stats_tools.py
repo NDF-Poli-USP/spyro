@@ -61,6 +61,6 @@ def coeff_of_determination(y_true, y_pred, p):
         r2 -= (ss_res / ss_tot)
 
     # Adjusted R^2 calculation (if applicable)
-    r2_adj = r2 if (n - p - 1) <= 0 else 1. - (1. - r2) * (n - 1) / (n - p - 1)
+    r2_adj = r2 if (n - p - 1) <= 0 else 1. - (1. - r2) * (n - 1.) / (n - p - 1.)
 
     return r2_adj
