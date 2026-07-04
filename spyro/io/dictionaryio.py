@@ -201,7 +201,7 @@ class Read_options:
     @analysis.setter
     def analysis(self, value):
         allowed_analyses = ["transient", "modal", "eikonal"]
-        self._analysis = raise value_parameter_error('analysis', value, allowed_analyses)
+        self._analysis = value_parameter_error('analysis', value, allowed_analyses)
 
 
 class Read_outputs:
