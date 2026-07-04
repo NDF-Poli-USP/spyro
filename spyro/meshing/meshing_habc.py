@@ -239,8 +239,7 @@ class HABCMesh(MeshOps):
         print("Setting Mesh Properties for Eikonal Analysis", flush=True)
 
         allowed_ele_types = ['consistent', 'underintegrated']
-        if ele_type_eik not in allowed_ele_types:
-            value_parameter_error('ele_type_eik', ele_type_eik, allowed_ele_types)
+        value_parameter_error('ele_type_eik', ele_type_eik, allowed_ele_types)
 
         # Function space for the Eikonal modeling
         if ele_type_eik == 'consistent':

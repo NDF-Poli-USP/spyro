@@ -213,7 +213,8 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     source_function = fire.Cofunction(W.dual())
     Wave_object.source_function = source_function
 
-    lin_var = fire.LinearVariationalProblem(lhs_, rhs_ + source_function, X_np1, constant_jacobian=True)
+    lin_var = fire.LinearVariationalProblem(
+        lhs_, rhs_ + source_function, X_np1, constant_jacobian=True)
     solver_parameters = dict(Wave_object.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
     solver = fire.LinearVariationalSolver(

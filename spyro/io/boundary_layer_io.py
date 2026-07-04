@@ -190,9 +190,8 @@ class Read_boundary_layer:
         ]
 
         # Cheking damping type input
-        if value not in accepted_damping_types:
-            value_parameter_error('abc_boundary_layer_type', value,
-                                  accepted_damping_types)
+        self._abc_boundary_layer_type = value_parameter_error(
+            'abc_boundary_layer_type', value, accepted_damping_types)
 
         if value == "PML":
             # PML forces rectangular shape
@@ -220,7 +219,6 @@ class Read_boundary_layer:
             self.abc_degree_type = abc_dictionary.get("degree_type", "real")
 
         # Common parameters for both PML and hybrid
-        self._abc_boundary_layer_type = value
         self.abc_reference_freq = abc_dictionary.get("abc_reference_freq", "source")
         self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", 2)
         self.abc_get_ref_model = abc_dictionary.get("get_ref_model", False)
@@ -250,7 +248,6 @@ class Read_boundary_layer:
         hyperelliptical layers with non-reflecting boundary conditions in scalar wave
         equations. doi: https://doi.org/10.1016/j.apm.2022.09.014
         TODO: Add citation
-
         """
 
         self.abc_user_pad_len = True

@@ -1,5 +1,5 @@
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import (value_dimension_error, value_numerical_error,
+from ..utils.error_management import (value_model_dimension_error, value_numerical_error,
                                       value_parameter_error)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -76,8 +76,7 @@ class RectangLayer():
             raise TypeError("'domain_dim' must be a tuple, "
                             f"got {type(domain_dim).__name__}.")
 
-        if dimension not in [2, 3]:
-            value_parameter_error('dimension', dimension, [2, 3])
+        value_parameter_error('dimension', dimension, [2, 3])
 
         # Original domain dimensions
         self.domain_dim = domain_dim
@@ -139,12 +138,8 @@ class RectangLayer():
         pprint("Determining Rectangular Layer Parameters", comm=self.comm)
 
         # Checking inputs
-        chk_domain = len(self.domain_dim)
-        chk_layer = len(domain_layer)
-        if self.dimension != chk_domain or self.dimension != chk_layer:
-            value_dimension_error(('domain_dim', 'domain_layer'),
-                                  (chk_domain, chk_layer),
-                                  self.dimension)
+        value_model_dimension_error(('domain_dim', 'domain_layer'),
+                                    (self.domain_dim, domain_layer), self.dimension)
 
         # Domain dimensions w/o layer
         length_z, length_x = self.domain_dim[:2]

@@ -144,8 +144,11 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
                                                      dimension, ufl_coordinates_habc,
                                                      type_marker=type_marker)
 
-    if type_marker == 'damping':  # Damping profile for the absorbing layer
+    value_parameter_error('type_marker', type_marker, ['damping', 'mask'])
 
+    if type_marker == 'damping':
+
+        # Damping profile for the absorbing layer
         if damp_par is None:
             raise ValueError("Damping parameters must be provided "
                              "when 'type_marker' is 'damping'.")
@@ -171,12 +174,10 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
         else:
             ref_funct = eta_crt * (aq * ref_funct**2 + bq * ref_funct)
 
-    elif type_marker == 'mask':  # Mask filter for layer boundary domain
+    elif type_marker == 'mask':
 
+        # Mask filter for layer boundary domain
         ref_funct = conditional(ref_funct > 0, 1., 0.)
-
-    else:
-        value_parameter_error('type_marker', type_marker, ['damping', 'mask'])
 
     layer_mask = Function(V, name=name_mask)
     layer_mask.assign(assemble(interpolate(ref_funct, V)))
@@ -328,6 +329,7 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
     pts_to_extend = lay_nodes[ind_nodes]
 
     # Set the property of the nearest point on the original boundary
+    value_parameter_error('method', method, ["point_cloud", "nearest_point"])
     if method == "point_cloud":
 
         pprint(f"Using Cloud Points Method to Extend {name_prop} Profile")
@@ -342,9 +344,6 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
 
         vel_to_extend = field_to_extend.at(pts_to_extend, dont_raise=True)
         del pts_to_extend
-
-    else:
-        value_parameter_error('method', method, ["point_cloud", "nearest_point"])
 
     # Velocity profile inside the layer
     lay_field.dat.data_with_halos[ind_nodes, 0] = vel_to_extend
