@@ -14,7 +14,8 @@ from ..utils import Gradient_mask_for_pml, Mask
 from ..utils.typing import WaveType
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import parallel_print, switch_serial_shot
-from ..io.basicio import load_shots, save_shots, create_segy
+from ..io.basicio import load_shots, save_shots
+from ..io import create_segy
 from ..utils import run_in_one_core
 
 
