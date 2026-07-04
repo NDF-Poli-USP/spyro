@@ -61,8 +61,13 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
 
     for step in range(nt - 1, -1, -1):
         rhs_forcing.assign(0.0)
+        receiver_source = receivers.apply_receivers_as_source(
+            rhs_forcing, wave_obj.misfit, step,
+        )
+        if step == 0 or step == nt - 1:
+            receiver_source.assign(0.5 * receiver_source)
         wave_obj.rhs_no_pml_source().assign(
-            receivers.apply_receivers_as_source(rhs_forcing, wave_obj.misfit, step)
+            receiver_source
         )
         wave_obj.solver.solve()
 
