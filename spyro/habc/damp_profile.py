@@ -217,9 +217,7 @@ class HABC_Damping():
             Heuristic factor for the minimum damping ratio
         '''
 
-        if typ_CR not in ['CR_PSI', 'CR_FEM', 'CR_ERR']:
-            value_parameter_error('typ_CR', typ_CR,
-                                  ['CR_PSI', 'CR_FEM', 'CR_ERR'])
+        value_parameter_error('typ_CR', typ_CR, ['CR_PSI', 'CR_FEM', 'CR_ERR'])
 
         if typ_CR == 'CR_PSI':
             # Minimum coefficient reflection
@@ -252,15 +250,14 @@ class HABC_Damping():
                 Z_fem : `float`
                     Parameter for the spurious reflection coefficient in FEM
                 '''
+                value_parameter_error('ele_type', ele_type, ['lumped', 'consistent'])
+
                 if ele_type == 'lumped':
                     m1 = 1 / 2
                     m2 = 0.
                 elif ele_type == 'consistent':
                     m1 = 1 / 3
                     m2 = 1 / 6
-                else:
-                    value_parameter_error('ele_type', ele_type,
-                                          ['lumped', 'consistent'])
 
                 Z_fem = m2 * (np.cos(alpha * p) - 1) / (
                     m1 * (np.cos(alpha * p) + 1))

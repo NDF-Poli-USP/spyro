@@ -51,8 +51,7 @@ class Read_options:
 
         self.variant = options_dictionary["variant"]
         self.method = options_dictionary["method"]
-        if options_dictionary["cell_type"] is not None:
-            self.cell_type = options_dictionary["cell_type"]
+        self.cell_type = options_dictionary["cell_type"]
         self.degree = options_dictionary["degree"]
         self.dimension = options_dictionary["dimension"]
         self.analysis = options_dictionary["analysis"]
@@ -64,9 +63,7 @@ class Read_options:
     @variant.setter
     def variant(self, value):
         accepted_variants = ["lumped", "equispaced", "DG", None]
-        if value not in accepted_variants:
-            raise ValueError(f"Variant of {value} is not valid.")
-        self._variant = value
+        self._variant = value_parameter_error("variant", value, accepted_variants)
 
     @property
     def method(self):
@@ -204,9 +201,7 @@ class Read_options:
     @analysis.setter
     def analysis(self, value):
         allowed_analyses = ["transient", "modal", "eikonal"]
-        if value not in allowed_analyses:
-            raise value_parameter_error('analysis', value, allowed_analyses)
-        self._analysis = value
+        self._analysis = raise value_parameter_error('analysis', value, allowed_analyses)
 
 
 class Read_outputs:

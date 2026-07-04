@@ -192,13 +192,6 @@ class ABCLayer(NRBC):
             raise TypeError("domain_dim must be a tuple, "
                             f"got {type(domain_dim).__name__}.")
 
-        if dimension not in [2, 3]:
-            value_parameter_error('dimension', dimension, [2, 3])
-
-        if abc_boundary_layer_type not in ["hybrid", "PML"]:
-            value_parameter_error(
-                'abc_boundary_layer_type', abc_boundary_layer_type, ["hybrid", "PML"])
-
         if output_folder is not None and not isinstance(output_folder, str):
             raise TypeError("output_folder must be a string, "
                             f"got {type(output_folder).__name__}.")
@@ -214,7 +207,7 @@ class ABCLayer(NRBC):
         self.freq_Nyquist = freq_Nyquist
 
         # Model dimension
-        self.dimension = dimension
+        self.dimension = value_parameter_error('dimension', dimension, [2, 3])
 
         # Quadrilateral/hexahedral elements
         self.quadrilateral = quadrilateral
@@ -223,7 +216,9 @@ class ABCLayer(NRBC):
         self.func_space_type = func_space_type
 
         # ABC layer parameters
-        self.abc_boundary_layer_type = abc_boundary_layer_type
+        self.abc_boundary_layer_type = value_parameter_error('abc_boundary_layer_type',
+                                                             abc_boundary_layer_type,
+                                                             ["hybrid", "PML"])
         self.abc_boundary_layer_shape = enum_parameter_error('abc_boundary_layer_shape',
                                                              abc_boundary_layer_shape,
                                                              LayerShapeType)
@@ -321,10 +316,6 @@ class ABCLayer(NRBC):
             abc_layer_str = "Absorbing" if for_prints else "habc"
         elif self.abc_boundary_layer_type == "PML":
             abc_layer_str = "PML" if for_prints else "pml"
-        else:
-            value_parameter_error('abc_boundary_layer_type',
-                                  self.abc_boundary_layer_type,
-                                  ["hybrid", "PML"])
 
         formatted_str = str_to_format.format(abc_layer_str)
 
