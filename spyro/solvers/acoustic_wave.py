@@ -38,6 +38,7 @@ class AcousticWave(Wave):
         None
         """
         super().__init__(dictionary, wave_type=WaveType.ISOTROPIC_ACOUSTIC, comm=comm)
+
         self.acoustic_energy = None
         self.field_logger.add_functional(
             "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))
@@ -210,6 +211,18 @@ class AcousticWave(Wave):
     def _initialize_model_parameters(self):
         if self.initial_velocity_model is None:
             if self.initial_velocity_model_file is None:
+                if getattr(self.mesh_parameters, "grid_velocity_data", None) is not None:
+                    self.initial_velocity_model = interpolate(
+                        self,
+                        self.mesh_parameters.grid_velocity_data,
+                        self.function_space.sub(0),
+                    )
+                    if self.debug_output:
+                        fire.VTKFile("initial_velocity_model.pvd").write(
+                            self.initial_velocity_model, name="velocity"
+                        )
+                    self.c = self.initial_velocity_model
+                    return
                 raise ValueError("No velocity model or velocity file to load.")
 
             if self.initial_velocity_model_file.endswith(".segy"):

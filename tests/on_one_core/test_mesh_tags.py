@@ -14,7 +14,7 @@ import os
 import tempfile
 import firedrake as fire
 from spyro.meshing.meshing_parameters import MeshingParameters
-from spyro.meshing.meshing_functions import build_big_rect_with_inner_element_group
+from spyro.meshing.gmsh_based_methods import build_big_rect_with_inner_element_group
 
 
 @pytest.fixture
