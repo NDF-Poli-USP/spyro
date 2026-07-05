@@ -404,7 +404,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def _map_sources_and_receivers(self):
         if self.source_type == "ricker":
             self.sources = Sources(self)
+            self.sources.wave_type = self.wave_type
         self.receivers = Receivers(self)
+        self.receivers.wave_type = self.wave_type
 
     @abstractmethod
     def _initialize_model_parameters(self):
