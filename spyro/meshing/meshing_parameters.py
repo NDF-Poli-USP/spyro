@@ -552,7 +552,7 @@ class MeshingParameters():
         Setting this property will automatically set cells_per_wavelength to None.
         """
         if value is not None and self.cells_per_wavelength is not None:
-            warnings.warn(
+            warn(
                 "Mutual exclusion: Both 'edge_length' and "
                 "'cells_per_wavelength' control mesh size, "
                 "but only one can be set at a time. Setting "
@@ -634,8 +634,8 @@ class MeshingParameters():
         Setting this property will automatically set edge_length to None.
         """
         if value is not None and self.edge_length is not None:
-            warnings.warn("Setting cells_per_wavelength "
-                          "removes edge_length parameter")
+            warn("Setting cells_per_wavelength "
+                 "removes edge_length parameter")
             self._edge_length = None
 
         self._cells_per_wavelength = value
@@ -1160,7 +1160,7 @@ class MeshingParameters():
 
     @segy_velocity_model.setter
     def segy_velocity_model(self, value):
-        warnings.warn("Passing SEGY directly to the mesher is deprecated. Please use grid point velocity inputs.")
+        warn("Passing SEGY directly to the mesher is deprecated. Please use grid point velocity inputs.")
         self._segy_velocity_model = value
         if value is not None:
             self.velocity_model = value
