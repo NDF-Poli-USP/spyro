@@ -1,11 +1,11 @@
 from .basicio import (
     write_function_to_grid,
-    create_segy,
     is_owner,
     save_shots,
     load_shots,
     read_mesh,
     interpolate,
+    project_grid_velocity_data,
     # ensemble_forward_ad,
     # ensemble_forward_elastic_waves,
     ensemble_gradient,
@@ -22,20 +22,24 @@ from .basicio import (
     read_bin_velocity_model,
     write_velocity_model
 )
+from .segy_io import create_segy, create_segy_from_grid
 from .model_parameters import Model_parameters
 from .backwards_compatibility_io import Dictionary_conversion
 from . import dictionaryio
 from . import boundary_layer_io
 from . import time_io
+from . import material_properties_io
 
 __all__ = [
     "write_function_to_grid",
     "create_segy",
+    "create_segy_from_grid",
     "is_owner",
     "save_shots",
     "load_shots",
     "read_mesh",
     "interpolate",
+    "project_grid_velocity_data",
     # "ensemble_forward_ad",
     # "ensemble_forward_elastic_waves",
     "ensemble_gradient",
@@ -55,6 +59,7 @@ __all__ = [
     "ensemble_shot_record",
     "ensemble_functional",
     "time_io",
+    "material_properties_io",
     "read_segy_velocity_model",
     "read_bin_velocity_model",
     "write_velocity_model",
