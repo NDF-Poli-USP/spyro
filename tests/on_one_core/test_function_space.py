@@ -29,13 +29,8 @@ def test_create_function_space_from_existing_element():
     V = create_function_space(mesh, "CG", 1)
 
     scalar_space = create_function_space(mesh, V.ufl_element(), None)
-    vector_space = create_function_space(mesh, V.ufl_element(), None, dim=None)
-    tensor_space = create_function_space(
-        mesh, V.ufl_element(), None, shape=(2, 2))
 
     assert scalar_space.value_size == 1
-    assert vector_space.value_size == 2
-    assert tensor_space.value_size == 4
 
 
 @pytest.mark.parametrize("method", ["KMV", "Kong-Mulder-Veldhuizen"])

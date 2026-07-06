@@ -464,9 +464,8 @@ def point_to_vector_wave_function_space(wave):
     if wave.vector_function_space is not None:
         return wave.vector_function_space
     elif original_function_space_type == "scalar":
-        wave.vector_function_space = create_function_space(
-            wave.function_space.mesh(), wave.function_space.ufl_element(), None,
-            dim=None)
+        wave.vector_function_space = fire.VectorFunctionSpace(
+            wave.function_space.mesh(), wave.function_space.ufl_element())
         return wave.vector_function_space
     else:
         raise ValueError(f"Should not create a new VectorFunctionSpace from {original_function_space_type}")
@@ -486,7 +485,7 @@ def point_to_dg_vector_wave_function_space(wave):
         return wave.dg0_vector_function_space
     else:
         wave.dg0_vector_function_space = create_function_space(
-            wave.function_space.mesh(), "DG0", 0, dim=None)
+            wave.function_space.mesh(), "DG0", 0, dim=wave.dimension)
         return wave.dg0_vector_function_space
 
 
@@ -533,8 +532,11 @@ def set_tensor_function_space(wave, shape_func_space, is_dg):
             tensor_element = element.sub_elements[0]
 
         # Function space for the property
-        V = create_function_space(
-            wave.mesh, tensor_element, None, shape=shape_func_space)
+        V = fire.TensorFunctionSpace(
+            wave.mesh,
+            tensor_element,
+            shape=shape_func_space,
+        )
         return V
 
     else:  # T_Elements
@@ -544,7 +546,10 @@ def set_tensor_function_space(wave, shape_func_space, is_dg):
             wave.function_space.ufl_element().degree()
 
         # Function space for the property
-        V = create_function_space(
-            wave.mesh, element_family, element_degree,
-            shape=shape_func_space)
+        V = fire.TensorFunctionSpace(
+            wave.mesh,
+            element_family,
+            element_degree,
+            shape=shape_func_space,
+        )
         return V
