@@ -452,7 +452,7 @@ def point_to_scalar_wave_function_space(wave):
         vector_element = wave.function_space.ufl_element()
         element = vector_element.sub_elements[0]
         wave.scalar_function_space = create_function_space(
-            wave.function_space.mesh(), element, None)
+            wave.function_space.mesh(), element)
         return wave.scalar_function_space
     else:
         raise ValueError(f"Should not create a new FunctionSpace from {original_function_space_type}")
@@ -484,8 +484,8 @@ def point_to_dg_vector_wave_function_space(wave):
     if wave.dg0_vector_function_space is not None:
         return wave.dg0_vector_function_space
     else:
-        wave.dg0_vector_function_space = create_function_space(
-            wave.function_space.mesh(), "DG0", 0, dim=wave.dimension)
+        wave.dg0_vector_function_space = fire.VectorFunctionSpace(
+            wave.function_space.mesh(), "DG", 0)
         return wave.dg0_vector_function_space
 
 
