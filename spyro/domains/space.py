@@ -1,9 +1,7 @@
 from numbers import Integral
 
 from firedrake import (
-    FiniteElement,
-    FunctionSpace,
-    VectorElement,
+    FiniteElement, FunctionSpace, VectorElement,
 )
 from ufl.finiteelement import AbstractFiniteElement
 
