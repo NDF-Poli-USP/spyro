@@ -25,6 +25,27 @@ def solve_central_difference_step(wave_obj, solver=None):
     advance_central_difference_state(wave_obj)
 
 
+def _forward_state_storage_space(wave_obj):
+    """Return the space needed by the implemented-adjoint forward replay."""
+    if (
+        wave_obj.abc_boundary_layer_type == "PML"
+        and hasattr(wave_obj, "forward_residual_form")
+    ):
+        return wave_obj.mixed_function_space
+    return wave_obj.function_space
+
+
+def _store_forward_state(wave_obj, target):
+    """Store the forward state needed by the implemented adjoint."""
+    if (
+        wave_obj.abc_boundary_layer_type == "PML"
+        and target.function_space() == wave_obj.mixed_function_space
+    ):
+        target.assign(wave_obj.vstate)
+    else:
+        target.assign(wave_obj.get_function())
+
+
 def _propagate_forward_central_difference(wave_obj, source_ids):
     """Advance the forward solve with the central-difference scheme.
 
@@ -55,8 +76,9 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
     nt = int(wave_obj.final_time / wave_obj.dt) + 1  # number of timesteps
     usol = None
     if wave_obj.store_forward_time_steps:
+        state_space = _forward_state_storage_space(wave_obj)
         usol = [
-            fire.Function(wave_obj.function_space, name=wave_obj.get_function_name())
+            fire.Function(state_space, name=wave_obj.get_function_name())
             for t in range(nt)
             if t % wave_obj.gradient_sampling_frequency == 0
         ]
@@ -135,7 +157,7 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
             wave_obj.store_forward_time_steps
             and step % wave_obj.gradient_sampling_frequency == 0
         ):
-            usol[save_step].assign(wave_obj.get_function())
+            _store_forward_state(wave_obj, usol[save_step])
             save_step += 1
 
         if (step - 1) % wave_obj.output_frequency == 0:

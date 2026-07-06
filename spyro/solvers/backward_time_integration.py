@@ -27,10 +27,10 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
     Notes:
     ------
     This is an unified backward wave propagation for both PML and no-PML cases.
-    The PML path uses the mixed-space gradient form ``2c * ∇u_adj · ∇u_fwd``
-    while the no-PML path uses ``-2/c³ * ü_fwd * u_adj``.
-    Source injection uses ``wave_obj.rhs_no_pml_source()`` and the prebuilt
-    variational solver is advanced with ``wave_obj.solver.solve()``.
+    When a forward residual form is available, the adjoint equation and
+    gradient are derived by UFL differentiation of that residual. Legacy
+    hard-coded gradient forms remain as fallbacks for solvers that do not expose
+    ``forward_residual_form``.
     """
     wave_obj.reset_pressure()
     mask_available = wave_obj.gradient_mask_available
@@ -168,9 +168,22 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
     forward_field = fire.Function(V)
     mgrad = m_u * m_v * dx
     if _uses_form_derived_gradient(wave_obj):
+        control = _get_single_form_control(wave_obj)
+        adjoint_field = _get_form_adjoint_field(wave_obj, uadj)
+        # Gradient contribution from the discrete Lagrangian:
+        #
+        #   g_c[m_v] =
+        #       d/dc <R(y^{n+1}, y^n, y^{n-1}; c), lambda^{n+1}> [m_v]
+        #
+        # where y is the forward time-stepping state: pressure for non-PML and
+        # the full mixed PML state for PML.
+        # The action pairs the forward residual R with the adjoint field
+        # lambda. Differentiating that scalar form with respect to c in the
+        # direction m_v gives the variational gradient contribution for the
+        # current time step.
         dRdc = fire.derivative(
-            fire.action(wave_obj.forward_residual_form, uadj),
-            wave_obj.c,
+            fire.action(wave_obj.forward_residual_form, adjoint_field),
+            control,
             m_v,
         )
         ffG = dRdc
@@ -219,9 +232,9 @@ def _build_adjoint_solver(wave_obj: Wave) -> fire.LinearVariationalSolver:
     if not _uses_form_derived_gradient(wave_obj):
         return wave_obj.solver
 
-    V = wave_obj.get_scalar_function_space()
     residual_np1, residual_n, residual_nm1 = wave_obj.forward_residual_states
-    direction = fire.TrialFunction(V)
+    state_space = residual_np1.function_space()
+    direction = fire.TrialFunction(state_space)
 
     dR_dnp1 = fire.derivative(
         wave_obj.forward_residual_form, residual_np1, direction,
@@ -235,13 +248,18 @@ def _build_adjoint_solver(wave_obj: Wave) -> fire.LinearVariationalSolver:
 
     adjoint_lhs = fire.adjoint(dR_dnp1)
     adjoint_rhs = (
-        -fire.action(fire.adjoint(dR_dn), wave_obj.u_n)
-        - fire.action(fire.adjoint(dR_dnm1), wave_obj.u_nm1)
+        -fire.action(fire.adjoint(dR_dn), wave_obj.vstate)
+        - fire.action(fire.adjoint(dR_dnm1), wave_obj.prev_vstate)
+    )
+    source = (
+        wave_obj.source_function
+        if wave_obj.abc_boundary_layer_type == "PML"
+        else wave_obj.rhs_no_pml_source()
     )
     problem = fire.LinearVariationalProblem(
         adjoint_lhs,
-        adjoint_rhs + wave_obj.rhs_no_pml_source(),
-        wave_obj.u_np1,
+        adjoint_rhs + source,
+        wave_obj.next_vstate,
         constant_jacobian=True,
     )
     solver_parameters = dict(wave_obj.solver_parameters)
@@ -254,11 +272,37 @@ def _build_adjoint_solver(wave_obj: Wave) -> fire.LinearVariationalSolver:
 
 def _uses_form_derived_gradient(wave_obj: Wave) -> bool:
     return (
-        wave_obj.abc_boundary_layer_type != "PML"
-        and hasattr(wave_obj, "forward_residual_form")
+        hasattr(wave_obj, "forward_residual_form")
         and hasattr(wave_obj, "forward_residual_states")
-        and isinstance(wave_obj.c, fire.Function)
+        and isinstance(_get_single_form_control(wave_obj), fire.Function)
     )
+
+
+def _get_form_adjoint_field(wave_obj: Wave, scalar_adjoint: fire.Function):
+    """Return the adjoint state used to pair with the forward residual."""
+    if wave_obj.abc_boundary_layer_type == "PML":
+        return wave_obj.next_vstate
+    return scalar_adjoint
+
+
+def _get_single_form_control(wave_obj: Wave):
+    """Return the single control used by the current UFL residual backend.
+
+    ``Wave.get_control_parameters()`` is the solver-level API for inversion
+    controls.  Acoustic waves currently expose one control, the velocity model,
+    as a Firedrake ``Function``.  More general solvers may return structured
+    controls, such as a dictionary of elastic material parameters; those need a
+    multi-control gradient assembly path and are intentionally not selected by
+    ``_uses_form_derived_gradient`` yet.
+    """
+    try:
+        controls = wave_obj.get_control_parameters()
+    except NotImplementedError:
+        return None
+
+    if isinstance(controls, fire.Function):
+        return controls
+    return None
 
 
 def _assign_forward_residual_states(wave_obj: Wave, forward_solution: list) -> None:

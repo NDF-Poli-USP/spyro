@@ -79,12 +79,26 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     form = m1 + a + le
     Wave_object.rhs = fire.rhs(form)
     Wave_object.lhs = fire.lhs(form)
+    # These are formal forward-residual states, separate from
+    # Wave_object.u_np1/u_n/u_nm1.  The Wave_object.u_* fields are live
+    # time-stepping registers and are later reused by the adjoint solve.  Keeping
+    # this residual form in terms of independent Function objects lets UFL
+    # differentiate R(u^{n+1}, u^n, u^{n-1}; c) with respect to each forward
+    # state without binding the symbolic derivatives to the mutable integration
+    # state.  During gradient assembly, these residual states are assigned from
+    # the saved forward replay.
     residual_u_np1 = fire.Function(V, name="residual pressure t+dt")
     residual_u_n = fire.Function(V, name="residual pressure")
     residual_u_nm1 = fire.Function(V, name="residual pressure t-dt")
     Wave_object.forward_residual_states = (
         residual_u_np1, residual_u_n, residual_u_nm1,
     )
+    # Wave_object.rhs was extracted from the original forward form, so it still
+    # depends on the live forward states u_n and u_nm1.  Replacing them here
+    # rewrites the known-time part of the step in terms of the formal residual
+    # states above.  Without this replace, derivatives with respect to
+    # residual_u_n or residual_u_nm1 would miss the RHS contribution because UFL
+    # would still see the original u_n/u_nm1 objects there.
     residual_rhs = fire.replace(
         Wave_object.rhs,
         {u_n: residual_u_n, u_nm1: residual_u_nm1},
