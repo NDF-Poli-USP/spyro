@@ -55,6 +55,7 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
     grad_solver, forward_field, uadj, gradi = _build_gradient_solver(
         wave_obj, mask_available,
     )
+    adjoint_solver = _build_adjoint_solver(wave_obj)
 
     forward_solution = wave_obj.forward_solution
     receivers = wave_obj.receivers
@@ -66,16 +67,19 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
         )
         if step == 0 or step == nt - 1:
             receiver_source.assign(0.5 * receiver_source)
+        wave_obj.misfit_form = receiver_source
         wave_obj.rhs_no_pml_source().assign(
             receiver_source
         )
-        wave_obj.solver.solve()
+        adjoint_solver.solve()
 
         if step % wave_obj.gradient_sampling_frequency == 0:
             # Assign the adjoint solution at the step `np1` to `uadj`.
             uadj.assign(wave_obj.get_function(state=wave_obj.next_vstate))
 
-            if wave_obj.abc_boundary_layer_type == "PML":
+            if _uses_form_derived_gradient(wave_obj):
+                _assign_forward_residual_states(wave_obj, forward_solution)
+            elif wave_obj.abc_boundary_layer_type == "PML":
                 # Pop to keep the list in sync, but use the element one
                 # step behind so that u_fwd and u_adj are at the same
                 # physical time (usol[k] = u^{k+1}; we need u^k).
@@ -164,11 +168,22 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
         dx = fire.dx(**qr)
         mask_available = False
 
-    mgrad = m_u * m_v * dx
-    forward_field = fire.Function(V)
     uadj = fire.Function(V)
+    forward_field = fire.Function(V)
+    mgrad = m_u * m_v * dx
+    if _uses_form_derived_gradient(wave_obj):
+        dRdc = fire.derivative(
+            fire.action(wave_obj.forward_residual_form, uadj),
+            wave_obj.c,
+            m_v,
+        )
+        ffG = dRdc
+        parallel_print(
+            "Using UFL-derived gradient from forward residual form",
+            wave_obj.comm,
+        )
 
-    if wave_obj.abc_boundary_layer_type == "PML":
+    elif wave_obj.abc_boundary_layer_type == "PML":
         # Always exclude PML region from gradient.
         # This is necessary once the gradient expression is not considering
         # the PML auxiliary variables. In addition, we are not interested
@@ -201,6 +216,66 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
     )
 
     return grad_solver, forward_field, uadj, gradi
+
+
+def _build_adjoint_solver(wave_obj: Wave) -> fire.LinearVariationalSolver:
+    """Build the adjoint time-step solver from the forward residual form."""
+    if not _uses_form_derived_gradient(wave_obj):
+        return wave_obj.solver
+
+    V = wave_obj.get_scalar_function_space()
+    residual_np1, residual_n, residual_nm1 = wave_obj.forward_residual_states
+    direction = fire.TrialFunction(V)
+
+    dR_dnp1 = fire.derivative(
+        wave_obj.forward_residual_form, residual_np1, direction,
+    )
+    dR_dn = fire.derivative(
+        wave_obj.forward_residual_form, residual_n, direction,
+    )
+    dR_dnm1 = fire.derivative(
+        wave_obj.forward_residual_form, residual_nm1, direction,
+    )
+
+    adjoint_lhs = fire.adjoint(dR_dnp1)
+    adjoint_rhs = (
+        -fire.action(fire.adjoint(dR_dn), wave_obj.u_n)
+        - fire.action(fire.adjoint(dR_dnm1), wave_obj.u_nm1)
+    )
+    problem = fire.LinearVariationalProblem(
+        adjoint_lhs,
+        adjoint_rhs + wave_obj.rhs_no_pml_source(),
+        wave_obj.u_np1,
+        constant_jacobian=True,
+    )
+    solver_parameters = dict(wave_obj.solver_parameters)
+    solver_parameters["mat_type"] = "matfree"
+    return fire.LinearVariationalSolver(
+        problem,
+        solver_parameters=solver_parameters,
+    )
+
+
+def _uses_form_derived_gradient(wave_obj: Wave) -> bool:
+    return (
+        wave_obj.abc_boundary_layer_type != "PML"
+        and hasattr(wave_obj, "forward_residual_form")
+        and hasattr(wave_obj, "forward_residual_states")
+        and isinstance(wave_obj.c, fire.Function)
+    )
+
+
+def _assign_forward_residual_states(wave_obj: Wave, forward_solution: list) -> None:
+    """Assign replay states used by the UFL-derived residual gradient."""
+    u_np1, u_n, u_nm1 = wave_obj.forward_residual_states
+    if len(forward_solution) > 2:
+        u_np1.assign(forward_solution.pop())
+        u_n.assign(forward_solution[-1])
+        u_nm1.assign(forward_solution[-2])
+    else:
+        u_np1.assign(forward_solution.pop())
+        u_n.assign(0.0)
+        u_nm1.assign(0.0)
 
 
 def _compute_dufordt2(forward_solution: list, dt: float) -> fire.Function:

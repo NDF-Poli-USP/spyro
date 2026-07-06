@@ -79,8 +79,22 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     form = m1 + a + le
     Wave_object.rhs = fire.rhs(form)
     Wave_object.lhs = fire.lhs(form)
+    residual_u_np1 = fire.Function(V, name="residual pressure t+dt")
+    residual_u_n = fire.Function(V, name="residual pressure")
+    residual_u_nm1 = fire.Function(V, name="residual pressure t-dt")
+    Wave_object.forward_residual_states = (
+        residual_u_np1, residual_u_n, residual_u_nm1,
+    )
+    residual_rhs = fire.replace(
+        Wave_object.rhs,
+        {u_n: residual_u_n, u_nm1: residual_u_nm1},
+    )
+    Wave_object.forward_residual_form = (
+        fire.action(Wave_object.lhs, residual_u_np1) - residual_rhs
+    )
 
     Wave_object.source_function = fire.Cofunction(V.dual())
+    Wave_object.misfit_form = fire.Cofunction(V.dual())
 
     lin_var = fire.LinearVariationalProblem(
         Wave_object.lhs,

@@ -105,6 +105,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.automated_adjoint = None
         self.functional_value = None
         self.misfit = None
+        self.misfit_form = None
         self.current_time = 0.0
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
