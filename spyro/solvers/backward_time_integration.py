@@ -1,5 +1,6 @@
 import firedrake as fire
 from . import helpers
+from .time_integration_central_difference import advance_central_difference_state
 from .wave import Wave
 from ..io.basicio import parallel_print
 from ..receivers.Receivers import Receivers
@@ -93,12 +94,7 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
             grad_solver.solve()
             _trapezoidal_gradient_integration(dJ, gradi, step, nt)
 
-        if wave_obj.abc_boundary_layer_type == "PML":
-            wave_obj.X_nm1.assign(wave_obj.X_n)
-            wave_obj.X_n.assign(wave_obj.X_np1)
-        else:
-            wave_obj.u_nm1.assign(wave_obj.u_n)
-            wave_obj.u_n.assign(wave_obj.u_np1)
+        advance_central_difference_state(wave_obj)
         t = step * float(dt)
 
     wave_obj.adjoint_solution = uadj

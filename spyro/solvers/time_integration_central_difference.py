@@ -6,6 +6,25 @@ from .. import utils
 from ..utils.typing import FunctionalEvaluationMode, AdjointType
 
 
+def advance_central_difference_state(wave_obj):
+    """Advance central-difference state registers by one solver step.
+
+    The ``vstate`` accessors hide the concrete state layout: acoustic PML
+    advances ``X_nm1 <- X_n <- X_np1``, while non-PML advances
+    ``u_nm1 <- u_n <- u_np1``.
+    """
+    wave_obj.prev_vstate = wave_obj.vstate
+    wave_obj.vstate = wave_obj.next_vstate
+
+
+def solve_central_difference_step(wave_obj, solver=None):
+    """Solve one central-difference step and advance state registers."""
+    if solver is None:
+        solver = wave_obj.solver
+    solver.solve()
+    advance_central_difference_state(wave_obj)
+
+
 def _propagate_forward_central_difference(wave_obj, source_ids):
     """Advance the forward solve with the central-difference scheme.
 
@@ -97,9 +116,7 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
                 wave_obj.rhs_no_pml_source().assign(
                     wave_obj.sources.apply_source(rhs_forcing, step))
 
-        wave_obj.solver.solve()
-        wave_obj.prev_vstate = wave_obj.vstate
-        wave_obj.vstate = wave_obj.next_vstate
+        solve_central_difference_step(wave_obj)
 
         if wave_obj.use_vertex_only_mesh:
             if receiver_buffer is None:
