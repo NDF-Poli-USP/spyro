@@ -2,6 +2,7 @@ import firedrake as fire
 from . import helpers
 from .wave import Wave
 from ..io.basicio import parallel_print
+from ..receivers.Receivers import Receivers
 
 
 def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
@@ -144,6 +145,12 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
     --------
     grad_solver, forward_field, uadj, gradi
     """
+    if wave_obj.use_vertex_only_mesh and wave_obj.automatic_adjoint is False:
+        # WARNING: Mega ultra gambiarra
+        # TODO: open issue and fix this in another PR
+        wave_obj.use_vertex_only_mesh = False
+        wave_obj.receivers = Receivers(wave_obj)
+        wave_obj.use_vertex_only_mesh = True
     V = wave_obj.get_scalar_function_space()
     qr = wave_obj.quadrature_rule
 

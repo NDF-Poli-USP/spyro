@@ -87,6 +87,7 @@ class Delta_projector:
         else:
             self.quadrilateral = False
         self.is_local = None
+        self.use_vertex_only_mesh = wave_object.use_vertex_only_mesh
 
     def build_maps(self, order=0):
         """Calculates and stores tabulations for interpolation
@@ -117,7 +118,10 @@ class Delta_projector:
             self.cellVertices,
             self.cellNodeMaps,
         ) = self.__point_locator()
-        self.cell_tabulations = self.__func_build_cell_tabulations(order)
+        if self.use_vertex_only_mesh is False:
+            self.cell_tabulations = self.__func_build_cell_tabulations(order)
+        else:
+            self.cell_tabulations = None
 
         self.number_of_points = len(self.point_locations)
 
@@ -327,23 +331,24 @@ class Delta_projector:
             end_vertex_id = 3
             cell_ends = [0, 1, 2]
 
-        for receiver_id in range(num_recv):
-            cell_id = self.is_local[receiver_id]
+        if self.use_vertex_only_mesh is False:
+            for receiver_id in range(num_recv):
+                cell_id = self.is_local[receiver_id]
 
-            cellVertices.append([])
+                cellVertices.append([])
 
-            if cell_id is not None:
-                cellId_maps[receiver_id] = cell_id
-                cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
-                for vertex_number in range(0, end_vertex_id):
-                    cellVertices[receiver_id].append([])
-                    z = node_locations[
-                        cell_node_map[cell_id, cell_ends[vertex_number]], 0
-                    ]
-                    x = node_locations[
-                        cell_node_map[cell_id, cell_ends[vertex_number]], 1
-                    ]
-                    cellVertices[receiver_id][vertex_number] = (z, x)
+                if cell_id is not None:
+                    cellId_maps[receiver_id] = cell_id
+                    cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
+                    for vertex_number in range(0, end_vertex_id):
+                        cellVertices[receiver_id].append([])
+                        z = node_locations[
+                            cell_node_map[cell_id, cell_ends[vertex_number]], 0
+                        ]
+                        x = node_locations[
+                            cell_node_map[cell_id, cell_ends[vertex_number]], 1
+                        ]
+                        cellVertices[receiver_id][vertex_number] = (z, x)
 
         return cellId_maps, cellVertices, cellNodeMaps
 
