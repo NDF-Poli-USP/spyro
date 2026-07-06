@@ -64,3 +64,11 @@ def test_create_function_space_rejects_degree_with_existing_element():
 
     with pytest.raises(ValueError, match="degree must be None"):
         create_function_space(mesh, V.ufl_element(), 1)
+
+
+@pytest.mark.parametrize("method", ["not_a_method", ["CG"]])
+def test_create_function_space_rejects_unsupported_method(method):
+    mesh = fire.UnitSquareMesh(1, 1)
+
+    with pytest.raises(ValueError, match="not supported"):
+        create_function_space(mesh, method, 1)

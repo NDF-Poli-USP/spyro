@@ -30,6 +30,10 @@ _ELEMENT_SPECS = {
 }
 
 
+def _is_integer(value):
+    return isinstance(value, Integral) and not isinstance(value, bool)
+
+
 def create_function_space(mesh, method, degree=None, dim=1):
     """Create a Firedrake function space from a mesh and finite element.
 
@@ -55,7 +59,7 @@ def create_function_space(mesh, method, degree=None, dim=1):
         Function space.
     """
 
-    if not isinstance(dim, Integral) or isinstance(dim, bool) or dim < 1:
+    if not _is_integer(dim) or dim < 1:
         raise ValueError("Function space dimension must be a positive integer")
     dim = int(dim)
 
@@ -67,14 +71,9 @@ def create_function_space(mesh, method, degree=None, dim=1):
             )
         element = method
     else:
-        if not isinstance(method, str):
-            raise TypeError(
-                "method must be a supported method name or a finite element"
-            )
-
         try:
             family, variant, fixed_degree = _ELEMENT_SPECS[method]
-        except KeyError as exc:
+        except (KeyError, TypeError) as exc:
             raise ValueError(
                 f"Finite element method {method} not supported"
             ) from exc
@@ -85,11 +84,7 @@ def create_function_space(mesh, method, degree=None, dim=1):
                     f"Finite element method {method} requires degree {fixed_degree}"
                 )
             degree = fixed_degree
-        elif (
-            not isinstance(degree, Integral)
-            or isinstance(degree, bool)
-            or degree < 0
-        ):
+        elif not _is_integer(degree) or degree < 0:
             raise ValueError(
                 f"Finite element method {method} requires a non-negative integer degree"
             )
