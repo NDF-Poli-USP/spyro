@@ -231,10 +231,15 @@ def _initialize_material_property_from_file(wave, property_name, from_file, V):
     element_family = V.ufl_element().family()
     element_degree = V.ufl_element().degree()
 
-    print(f"Assigning {property_name} from file {from_file}",
+    source_label = from_file if isinstance(from_file, str) else "grid velocity data"
+    print(f"Assigning {property_name} from {source_label}",
           ("in the same" if element_family == original_family
            and element_degree == original_degree else "in another"),
           f"function space: {element_family} {element_degree}.", flush=True)
+
+    if isinstance(from_file, dict):
+        mat_property = interpolate(wave, from_file, V)
+        return mat_property
 
     if from_file.endswith(".segy"):
         if not SEISMIC_MESH_AVAILABLE:
@@ -547,3 +552,14 @@ def set_tensor_function_space(wave, shape_func_space, is_dg):
             shape=shape_func_space,
         )
         return V
+
+
+class VelocityModelFileIO:
+    def __init__(self):
+        """
+        Initialize VelocityModelFileIO.
+        """
+        self.velocity_model_file = None
+        if self.input_dictionary is not None:
+            synthetic_data = self.input_dictionary.get("synthetic_data", {})
+            self.initial_velocity_model_file = synthetic_data.get("real_velocity_file")

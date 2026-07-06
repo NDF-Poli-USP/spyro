@@ -15,7 +15,7 @@ from numpy import (abs, acos, all, allclose, atan2, cos, exp,
                    isclose, isin, log, pi, sqrt, sin, where)
 from pytest import fail, fixture, mark, raises
 from os import getcwd
-from spyro.io.basicio import create_segy
+from spyro.io import create_segy
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 
 

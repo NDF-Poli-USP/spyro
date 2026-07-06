@@ -5,12 +5,11 @@ from mpi4py import MPI
 import firedrake as fire
 import h5py
 import numpy as np
-from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
-import segyio
 import glob
 import os
 import warnings
+import segyio
 from ..tools.version_control import is_firedrake_new
 
 
@@ -326,9 +325,9 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
         Interpolated values on grid points
     """
     # get DoF coordinates
-    m = V.ufl_domain()
-    W = fire.VectorFunctionSpace(m, V.ufl_element())
-    coords = fire.assemble(fire.interpolate(m.coordinates, W))
+    mesh = V.ufl_domain()
+    W = fire.VectorFunctionSpace(mesh, V.ufl_element())
+    coords = fire.assemble(fire.interpolate(mesh.coordinates, W))
     dimension, = coords.ufl_shape
     if dimension == 2:
         x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
@@ -362,12 +361,15 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
         v = function
 
     # target grid to interpolate to
-    xi = np.arange(min_x, max_x, grid_spacing)
-    yi = np.arange(min_y, max_y, grid_spacing)
+    num_grid_x = int(round((max_x - min_x) / grid_spacing, 0)) + 1
+    num_grid_y = int(round((max_y - min_y) / grid_spacing, 0)) + 1
+    xi = np.linspace(min_x, max_x, num_grid_x)
+    yi = np.linspace(min_y, max_y, num_grid_y)
     if dimension == 2:
         xi, yi = np.meshgrid(xi, yi)
     elif dimension == 3:
-        zi = np.arange(min_z, max_z, grid_spacing)
+        num_grid_z = int(round((max_z - min_z) / grid_spacing, 0)) + 1
+        zi = np.linspace(min_z, max_z, num_grid_z)
         xi, yi, zi = np.meshgrid(xi, yi, zi)
 
     # interpolate
@@ -377,42 +379,6 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
         vi = griddata((x, y, z), v, (xi, yi, zi), method="linear")
 
     return vi
-
-
-def create_segy(function, V, grid_spacing, filename):
-    """Write the velocity data into a segy file named filename
-
-    Parameters
-    ----------
-    function : firedrake.Function
-        Function to interpolate
-    V : firedrake.FunctionSpace
-        Function space of function
-    grid_spacing : float
-        Spacing of grid points
-    filename: str
-        Name of the segy file to save
-
-    Returns
-    -------
-    None
-    """
-    velocity = write_function_to_grid(function, V, grid_spacing, buffer=True)
-    spec = segyio.spec()
-
-    velocity = np.flipud(velocity.T)
-
-    spec.sorting = 2  # not sure what this means
-    spec.format = 1  # not sure what this means
-    spec.samples = range(velocity.shape[0])
-    spec.ilines = range(velocity.shape[1])
-    spec.xlines = range(velocity.shape[0])
-
-    assert np.sum(np.isnan(velocity[:])) == 0
-
-    with segyio.create(filename, spec) as f:
-        for tr, il in enumerate(spec.ilines):
-            f.trace[tr] = velocity[:, tr]
 
 
 @ensemble_save
@@ -502,16 +468,127 @@ def _check_units(c):
     return c
 
 
+def _grid_velocity_data_to_source_function(grid_velocity_data):
+    """Build a CG1 Firedrake function on a structured mesh from grid data."""
+
+    # Adding imports here to avoid circular imports
+    from ..meshing.meshing_parameters import MeshingParameters
+    from ..meshing.meshing_functions import AutomaticMesh
+
+    vp_values = np.asarray(grid_velocity_data["vp_values"])
+    length_z = grid_velocity_data["length_z"]
+    length_x = grid_velocity_data["length_x"]
+    length_y = grid_velocity_data.get("length_y")
+    grid_spacing = grid_velocity_data.get("grid_spacing")
+    grid_spacing_z = grid_velocity_data.get("grid_spacing_z", grid_spacing)
+    grid_spacing_x = grid_velocity_data.get("grid_spacing_x", grid_spacing)
+    grid_spacing_y = grid_velocity_data.get("grid_spacing_y", grid_spacing)
+
+    source_mesh_parameters = {
+        "dimension": vp_values.ndim,
+        "length_z": length_z,
+        "length_x": length_x,
+        "length_y": length_y,
+        "mesh_type": "firedrake_mesh",
+        "edge_length": grid_spacing,
+        "edge_length_z": grid_spacing_z,
+        "edge_length_x": grid_spacing_x,
+        "edge_length_y": grid_spacing_y,
+        "abc_pad_length": grid_velocity_data.get("abc_pad_length"),
+    }
+    source_mesh = AutomaticMesh(
+        MeshingParameters(input_mesh_dictionary=source_mesh_parameters)
+    ).create_mesh()
+
+    source_space = fire.FunctionSpace(source_mesh, "CG", 1)
+    source = fire.Function(source_space)
+    source_coords = source_mesh.coordinates.dat.data
+
+    if vp_values.ndim == 2:
+        z_nodes = np.unique(source_coords[:, 0])
+        x_nodes = np.unique(source_coords[:, 1])
+        z_index = np.searchsorted(z_nodes, source_coords[:, 0])
+        x_index = np.searchsorted(x_nodes, source_coords[:, 1])
+        source.dat.data[:] = vp_values[z_index, x_index]
+    else:
+        z_nodes = np.unique(source_coords[:, 0])
+        x_nodes = np.unique(source_coords[:, 1])
+        y_nodes = np.unique(source_coords[:, 2])
+        z_index = np.searchsorted(z_nodes, source_coords[:, 0])
+        x_index = np.searchsorted(x_nodes, source_coords[:, 1])
+        y_index = np.searchsorted(y_nodes, source_coords[:, 2])
+        source.dat.data[:] = vp_values[z_index, x_index, y_index]
+
+    return source
+
+
+def project_grid_velocity_data(grid_velocity_data, V):
+    """Project a structured grid dictionary onto a Firedrake function space."""
+    source = _grid_velocity_data_to_source_function(grid_velocity_data)
+    c = fire.Function(V).interpolate(source, allow_missing_dofs=True)
+    return _check_units(c)
+
+
+def _hdf5_velocity_model_to_grid_velocity_data(Model, fname):
+    """Convert an HDF5 velocity model into a grid velocity dictionary."""
+    with h5py.File(fname, "r") as f:
+        vp_values = np.asarray(f.get("velocity_model")[()])
+
+    pad_length = Model.mesh_parameters.abc_pad_length
+    pad_length = 0.0 if pad_length is None else pad_length
+
+    if vp_values.ndim == 2:
+        z_extent = Model.mesh_parameters.length_z + pad_length
+        x_extent = Model.mesh_parameters.length_x + 2.0 * pad_length
+        spacing_z = z_extent / float(vp_values.shape[0] - 1)
+        spacing_x = x_extent / float(vp_values.shape[1] - 1)
+        grid_spacing = spacing_z if np.isclose(spacing_z, spacing_x) else None
+        length_y = None
+    elif vp_values.ndim == 3:
+        if Model.mesh_parameters.length_y is None:
+            raise ValueError("3D HDF5 velocity model requires length_y.")
+
+        z_extent = Model.mesh_parameters.length_z + pad_length
+        x_extent = Model.mesh_parameters.length_x + 2.0 * pad_length
+        y_extent = Model.mesh_parameters.length_y + 2.0 * pad_length
+        spacing_z = z_extent / float(vp_values.shape[0] - 1)
+        spacing_x = x_extent / float(vp_values.shape[1] - 1)
+        spacing_y = y_extent / float(vp_values.shape[2] - 1)
+        grid_spacing = (
+            spacing_z
+            if np.isclose(spacing_z, spacing_x) and np.isclose(spacing_z, spacing_y)
+            else None
+        )
+        length_y = Model.mesh_parameters.length_y
+    else:
+        raise NotImplementedError("Only 2D and 3D HDF5 velocity models are supported.")
+
+    grid_velocity_data = {
+        "vp_values": vp_values,
+        "grid_spacing": grid_spacing,
+        "grid_spacing_z": spacing_z,
+        "grid_spacing_x": spacing_x,
+        "length_z": Model.mesh_parameters.length_z,
+        "length_x": Model.mesh_parameters.length_x,
+        "length_y": length_y,
+        "abc_pad_length": pad_length,
+    }
+    if vp_values.ndim == 3:
+        grid_velocity_data["grid_spacing_y"] = spacing_y
+    return grid_velocity_data
+
+
 def interpolate(Model, fname, V):
-    """Read and interpolate a seismic velocity model stored
-    in a HDF5 file onto the nodes of a finite element space.
+    """Read and interpolate a seismic velocity model onto a Firedrake space.
 
     Parameters
     ----------
     Model: spyro object
         Model options and parameters.
-    fname: str
-        The name of the HDF5 file containing the seismic velocity model.
+    fname: str or dict
+        The name of the HDF5 file containing the seismic velocity model, or
+        a grid dictionary with keys such as ``vp_values``, ``length_z`` and
+        ``length_x``.
     V: Firedrake.FunctionSpace object
         The space of the finite elements.
 
@@ -522,85 +599,13 @@ def interpolate(Model, fname, V):
         of the finite elements.
 
     """
-    m = V.ufl_domain()
-
-    add_pad = False
-    if Model.mesh_parameters.abc_pad_length is not None:
-        if Model.mesh_parameters.abc_pad_length > 1e-15:
-            add_pad = True
-    if add_pad:
-        abc_pad_length = Model.mesh_parameters.abc_pad_length
-        minz = -Model.mesh_parameters.length_z - abc_pad_length
-        maxz = 0.0
-        minx = 0.0 - abc_pad_length
-        maxx = Model.mesh_parameters.length_x + abc_pad_length
-        miny = 0.0 - abc_pad_length
-        maxy = Model.mesh_parameters.length_y + abc_pad_length
-    else:
-        minz = -Model.mesh_parameters.length_z
-        maxz = 0.0
-        minx = 0.0
-        maxx = Model.mesh_parameters.length_x
-        miny = 0.0
-        maxy = Model.mesh_parameters.length_y
-
-    W = fire.VectorFunctionSpace(m, V.ufl_element())
-    coords = fire.assemble(fire.interpolate(m.coordinates, W))
-    # (z,x) or (z,x,y)
-    sd = coords.dat.data.shape[1]
-    if sd == 2:
-        qp_z, qp_x = coords.dat.data[:, 0], coords.dat.data[:, 1]
-    elif sd == 3:
-        qp_z, qp_x, qp_y = (
-            coords.dat.data[:, 0],
-            coords.dat.data[:, 1],
-            coords.dat.data[:, 2],
-        )
+    if isinstance(fname, dict):
+        return project_grid_velocity_data(fname, V)
+    elif isinstance(fname, str) and fname.endswith((".hdf5", ".h5")):
+        grid_velocity_data = _hdf5_velocity_model_to_grid_velocity_data(Model, fname)
+        return project_grid_velocity_data(grid_velocity_data, V)
     else:
         raise NotImplementedError
-
-    with h5py.File(fname, "r") as f:
-        Z = np.asarray(f.get("velocity_model")[()])
-
-        if sd == 2:
-            nrow, ncol = Z.shape
-            z = np.linspace(minz, maxz, nrow)
-            x = np.linspace(minx, maxx, ncol)
-
-            # make sure no out-of-bounds
-            qp_z2 = [
-                minz if z < minz else maxz if z > maxz else z for z in qp_z
-            ]
-            qp_x2 = [
-                minx if x < minx else maxx if x > maxx else x for x in qp_x
-            ]
-
-            interpolant = RegularGridInterpolator((z, x), Z)
-            tmp = interpolant((qp_z2, qp_x2))
-        elif sd == 3:
-            nrow, ncol, ncol2 = Z.shape
-            z = np.linspace(minz, maxz, nrow)
-            x = np.linspace(minx, maxx, ncol)
-            y = np.linspace(miny, maxy, ncol2)
-
-            # make sure no out-of-bounds
-            qp_z2 = [
-                minz if z < minz else maxz if z > maxz else z for z in qp_z
-            ]
-            qp_x2 = [
-                minx if x < minx else maxx if x > maxx else x for x in qp_x
-            ]
-            qp_y2 = [
-                miny if y < miny else maxy if y > maxy else y for y in qp_y
-            ]
-
-            interpolant = RegularGridInterpolator((z, x, y), Z)
-            tmp = interpolant((qp_z2, qp_x2, qp_y2))
-
-    c = fire.Function(V)
-    c.dat.data[:] = tmp
-    c = _check_units(c)
-    return c
 
 
 def read_mesh(mesh_parameters):
