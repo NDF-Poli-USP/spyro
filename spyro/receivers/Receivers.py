@@ -120,6 +120,37 @@ class Receivers(Delta_projector):
 
         return rhs_forcing
 
+    def apply_receivers_as_source_vertex_only_mesh(
+        self, residual, IT, target_space,
+    ):
+        """Return receiver misfit injection as a VOM-built cofunction.
+
+        This is the adjoint of the receiver interpolation used by the
+        form-derived implemented adjoint.  It deliberately avoids the legacy
+        cell-tabulation path in :meth:`apply_receivers_as_source`.
+        """
+        receiver_mesh = VertexOnlyMesh(self.mesh, self.point_locations)
+        receiver_values = np.asarray(residual[IT])
+
+        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
+            V_r = VectorFunctionSpace(receiver_mesh, "DG", 0)
+            value = Function(V_r)
+            if value.dat.data.shape[0] > 0:
+                value.dat.data[:] = receiver_values[:value.dat.data.shape[0]]
+            receiver_form = inner(value, TestFunction(V_r)) * dx
+        elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
+            V_r = FunctionSpace(receiver_mesh, "DG", 0)
+            value = Function(V_r)
+            if value.dat.data.shape[0] > 0:
+                value.dat.data[:] = receiver_values[:value.dat.data.shape[0]]
+            receiver_form = value * TestFunction(V_r) * dx
+        else:
+            raise ValueError("Invalid wave type")
+
+        return Cofunction(target_space.dual()).interpolate(
+            assemble(receiver_form),
+        )
+
     def receiver_interpolator(self, f, reorder=True, vom_tolerance=None,
                               vom_missing_points_behaviour='error',
                               vom_redundant=True, vom_name=None):

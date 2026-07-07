@@ -55,7 +55,9 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
     use_form_derived_gradient = _uses_form_derived_gradient(wave_obj)
     dJ = _new_gradient_accumulator(wave_obj, use_form_derived_gradient)
     receiver_source_space = _receiver_source_function_space(wave_obj)
-    rhs_forcing = fire.Cofunction(receiver_source_space.dual())
+    rhs_forcing = None
+    if not use_form_derived_gradient:
+        rhs_forcing = fire.Cofunction(receiver_source_space.dual())
     grad_solver, forward_field, uadj, gradi = _build_gradient_solver(
         wave_obj, mask_available,
     )
@@ -65,10 +67,15 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
     receivers = wave_obj.receivers
 
     for step in range(nt - 1, -1, -1):
-        rhs_forcing.assign(0.0)
-        misfit_form = receivers.apply_receivers_as_source(
-            rhs_forcing, wave_obj.misfit, step,
-        )
+        if use_form_derived_gradient:
+            misfit_form = receivers.apply_receivers_as_source_vertex_only_mesh(
+                wave_obj.misfit, step, receiver_source_space,
+            )
+        else:
+            rhs_forcing.assign(0.0)
+            misfit_form = receivers.apply_receivers_as_source(
+                rhs_forcing, wave_obj.misfit, step,
+            )
         if step == 0 or step == nt - 1:
             misfit_form.assign(0.5 * misfit_form)
         wave_obj.set_adjoint_source(misfit_form)
@@ -167,7 +174,11 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
     --------
     grad_solver, forward_field, uadj, gradi
     """
-    if wave_obj.use_vertex_only_mesh and wave_obj.automatic_adjoint is False:
+    if (
+        wave_obj.use_vertex_only_mesh
+        and wave_obj.automatic_adjoint is False
+        and not _uses_form_derived_gradient(wave_obj)
+    ):
         # WARNING: Mega ultra gambiarra
         # TODO: open issue and fix this in another PR
         wave_obj.use_vertex_only_mesh = False

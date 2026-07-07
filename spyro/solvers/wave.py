@@ -608,6 +608,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def enable_implemented_adjoint(self):
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
         self.store_forward_time_steps = True
+        self.use_vertex_only_mesh = True
 
     @property
     def forward_solution_receivers(self):

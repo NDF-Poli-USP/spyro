@@ -154,6 +154,8 @@ def test_acoustic_implemented_adjoint_uses_forward_residual_form():
     guess.enable_implemented_adjoint()
     guess.forward_solve()
 
+    assert guess.use_vertex_only_mesh
+
     misfit = exact.forward_solution_receivers - guess.forward_solution_receivers
     gradient = guess.gradient_solve(
         misfit=misfit,
@@ -172,6 +174,8 @@ def test_elastic_implemented_adjoint_uses_forward_residual_form():
 
     exact = _solve_elastic(exact_model)
     guess = _solve_elastic(model, implemented_adjoint=True)
+
+    assert guess.use_vertex_only_mesh
 
     misfit = exact.forward_solution_receivers - guess.forward_solution_receivers
     functional = spyro.utils.compute_functional(guess, misfit)
