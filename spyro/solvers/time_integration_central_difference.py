@@ -6,46 +6,6 @@ from .. import utils
 from ..utils.typing import FunctionalEvaluationMode, AdjointType
 
 
-def advance_central_difference_state(wave_obj):
-    """Advance central-difference state registers by one solver step.
-
-    The ``vstate`` accessors hide the concrete state layout: acoustic PML
-    advances ``X_nm1 <- X_n <- X_np1``, while non-PML advances
-    ``u_nm1 <- u_n <- u_np1``.
-    """
-    wave_obj.prev_vstate = wave_obj.vstate
-    wave_obj.vstate = wave_obj.next_vstate
-
-
-def solve_central_difference_step(wave_obj, solver=None):
-    """Solve one central-difference step and advance state registers."""
-    if solver is None:
-        solver = wave_obj.solver
-    solver.solve()
-    advance_central_difference_state(wave_obj)
-
-
-def _forward_state_storage_space(wave_obj):
-    """Return the space needed by the implemented-adjoint forward replay."""
-    if (
-        wave_obj.abc_boundary_layer_type == "PML"
-        and wave_obj.forward_residual_form is not None
-    ):
-        return wave_obj.mixed_function_space
-    return wave_obj.function_space
-
-
-def _store_forward_state(wave_obj, target):
-    """Store the forward state needed by the implemented adjoint."""
-    if (
-        wave_obj.abc_boundary_layer_type == "PML"
-        and target.function_space() == wave_obj.mixed_function_space
-    ):
-        target.assign(wave_obj.vstate)
-    else:
-        target.assign(wave_obj.get_function())
-
-
 def _propagate_forward_central_difference(wave_obj, source_ids):
     """Advance the forward solve with the central-difference scheme.
 
@@ -75,8 +35,15 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
     t = wave_obj.current_time
     nt = int(wave_obj.final_time / wave_obj.dt) + 1  # number of timesteps
     usol = None
+    store_mixed_forward_state = False
     if wave_obj.store_forward_time_steps:
-        state_space = _forward_state_storage_space(wave_obj)
+        state_space = wave_obj.function_space
+        if (
+            wave_obj.abc_boundary_layer_type == "PML"
+            and wave_obj.forward_residual_form is not None
+        ):
+            state_space = wave_obj.mixed_function_space
+            store_mixed_forward_state = True
         usol = [
             fire.Function(state_space, name=wave_obj.get_function_name())
             for t in range(nt)
@@ -138,7 +105,9 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
                 wave_obj.rhs_no_pml_source().assign(
                     wave_obj.sources.apply_source(rhs_forcing, step))
 
-        solve_central_difference_step(wave_obj)
+        wave_obj.solver.solve()
+        wave_obj.prev_vstate = wave_obj.vstate
+        wave_obj.vstate = wave_obj.next_vstate
 
         if wave_obj.use_vertex_only_mesh:
             if receiver_buffer is None:
@@ -157,7 +126,10 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
             wave_obj.store_forward_time_steps
             and step % wave_obj.gradient_sampling_frequency == 0
         ):
-            _store_forward_state(wave_obj, usol[save_step])
+            if store_mixed_forward_state:
+                usol[save_step].assign(wave_obj.vstate)
+            else:
+                usol[save_step].assign(wave_obj.get_function())
             save_step += 1
 
         if (step - 1) % wave_obj.output_frequency == 0:

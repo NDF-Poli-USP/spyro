@@ -1,6 +1,5 @@
 import firedrake as fire
 from . import helpers
-from .time_integration_central_difference import advance_central_difference_state
 from .wave import Wave
 from ..io.basicio import parallel_print
 from ..receivers.Receivers import Receivers
@@ -58,13 +57,33 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
     wave_obj.comm.comm.barrier()
 
     use_form_derived_gradient = _uses_form_derived_gradient(wave_obj)
+    # Initialize the reduced gradient accumulator with zero in the control
+    # space(s).  During the backward time loop each step adds a contribution
+    #
+    #     dJ/dm <- dJ/dm + dJ_step/dm,
+    #
+    # where, for the UFL-derived path,
+    #
+    #     dJ_step/dm [dm] =
+    #         d/dm <R(y^{n+1}, y^n, y^{n-1}; m), lambda^{n+1}> [dm].
+    #
+    # Acoustic has a single control and is wrapped internally under
+    # ``_SINGLE_CONTROL_KEY``; elastic exposes one accumulator per material
+    # parameter. The public return value is unwrapped back to a single Function
+    # for acoustic at the end of the routine.
+    if use_form_derived_gradient:
+        dJ = {
+            parameter: fire.Function(control.function_space())
+            for parameter, control in _form_control_map(wave_obj).items()
+        }
+    else:
+        dJ = fire.Function(wave_obj.get_scalar_function_space())
     # The form-derived path works internally with a control-keyed dict, even for
     # single-control solvers. ``controls_are_dict`` records whether the public
     # API should return that dict (elastic) or a single Function (acoustic).
     controls_are_dict = use_form_derived_gradient and isinstance(
         _get_form_controls(wave_obj), dict,
     )
-    dJ = _new_gradient_accumulator(wave_obj, use_form_derived_gradient)
     receiver_source_space = _receiver_source_function_space(wave_obj)
     rhs_forcing = None
     if not use_form_derived_gradient:
@@ -72,7 +91,18 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
     grad_solver, forward_field, uadj, gradi = _build_gradient_solver(
         wave_obj, mask_available,
     )
-    adjoint_solver = _build_adjoint_solver(wave_obj)
+    if use_form_derived_gradient:
+        adjoint_solver = build_adjoint_solver(
+            wave_obj.forward_residual_form,
+            wave_obj.forward_residual_states,
+            wave_obj.vstate,
+            wave_obj.prev_vstate,
+            wave_obj.next_vstate,
+            wave_obj.get_adjoint_source(),
+            wave_obj.solver_parameters,
+        )
+    else:
+        adjoint_solver = wave_obj.solver
 
     forward_solution = wave_obj.forward_solution
     receivers = wave_obj.receivers
@@ -97,7 +127,18 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
             uadj.assign(wave_obj.get_function(state=wave_obj.next_vstate))
 
             if use_form_derived_gradient:
-                _assign_forward_residual_states(wave_obj, forward_solution)
+                residual_np1, residual_n, residual_nm1 = (
+                    wave_obj.forward_residual_states
+                )
+                residual_np1.assign(forward_solution.pop())
+                if len(forward_solution) > 0:
+                    residual_n.assign(forward_solution[-1])
+                else:
+                    residual_n.assign(0.0)
+                if len(forward_solution) > 1:
+                    residual_nm1.assign(forward_solution[-2])
+                else:
+                    residual_nm1.assign(0.0)
             elif wave_obj.abc_boundary_layer_type == "PML":
                 # Pop to keep the list in sync, but use the element one
                 # step behind so that u_fwd and u_adj are at the same
@@ -118,7 +159,8 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
                 grad_solver.solve()
                 _trapezoidal_gradient_integration(dJ, gradi, step, nt)
 
-        advance_central_difference_state(wave_obj)
+        wave_obj.prev_vstate = wave_obj.vstate
+        wave_obj.vstate = wave_obj.next_vstate
         t = step * float(dt)
 
     wave_obj.adjoint_solution = uadj
@@ -128,11 +170,11 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
 
     if use_form_derived_gradient:
         for gradient in dJ.values():
-            gradient.dat.data_with_halos[:] *= dt
+            gradient.dat.data_wo[:] *= dt
         if not controls_are_dict:
             dJ = dJ[_SINGLE_CONTROL_KEY]
     else:
-        dJ.dat.data_with_halos[:] *= dt / 2
+        dJ.dat.data_wo[:] *= dt / 2
     return dJ
 
 
@@ -189,8 +231,8 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
         # only when the flag is False. Rebuild the receivers with the flag off
         # to get those maps, then restore it so the rest of the object still
         # sees ``use_vertex_only_mesh = True``.
-        # TODO: track in an issue and make the receiver-source path independent
-        # of this flag so this rebuild-and-restore becomes unnecessary.
+        # TODO: Use VertexOnlyMesh consistently across Spyro receiver-source
+        # paths so this rebuild-and-restore becomes unnecessary.
         wave_obj.use_vertex_only_mesh = False
         wave_obj.receivers = Receivers(wave_obj)
         wave_obj.use_vertex_only_mesh = True
@@ -199,7 +241,13 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
         state_space = _receiver_source_function_space(wave_obj)
         uadj = fire.Function(state_space)
         forward_field = fire.Function(state_space)
-        adjoint_field = _get_form_adjoint_field(wave_obj, uadj)
+        # For PML the residual lives on the mixed state space, so it must be
+        # paired with the full mixed adjoint. Without PML the residual is scalar
+        # and pairs with the scalar adjoint field.
+        if wave_obj.abc_boundary_layer_type == "PML":
+            adjoint_field = wave_obj.next_vstate
+        else:
+            adjoint_field = uadj
 
         grad_solver = {}
         gradi = {}
@@ -397,42 +445,12 @@ def build_adjoint_solver(
     )
 
 
-def _build_adjoint_solver(wave_obj: Wave) -> fire.LinearVariationalSolver:
-    """Build the adjoint time-step solver from the forward residual form."""
-    if not _uses_form_derived_gradient(wave_obj):
-        return wave_obj.solver
-
-    return build_adjoint_solver(
-        wave_obj.forward_residual_form,
-        wave_obj.forward_residual_states,
-        wave_obj.vstate,
-        wave_obj.prev_vstate,
-        wave_obj.next_vstate,
-        wave_obj.get_adjoint_source(),
-        wave_obj.solver_parameters,
-    )
-
-
 def _uses_form_derived_gradient(wave_obj: Wave) -> bool:
     return (
         wave_obj.forward_residual_form is not None
         and wave_obj.forward_residual_states is not None
         and _get_form_controls(wave_obj) is not None
     )
-
-
-def _get_form_adjoint_field(wave_obj: Wave, scalar_adjoint: fire.Function):
-    """Return the adjoint state paired with the forward residual.
-
-    For PML the residual lives on the mixed state space, so it must be paired
-    with the full mixed adjoint (``next_vstate``). Without PML the residual is
-    scalar and pairs with the scalar adjoint field. This ``"PML"`` branch is
-    the "scalar vs mixed state" special case discussed in
-    ``docs/GENERALIZED_UFL_ADJOINT_NOTES.md`` (section 2).
-    """
-    if wave_obj.abc_boundary_layer_type == "PML":
-        return wave_obj.next_vstate
-    return scalar_adjoint
 
 
 def _get_form_controls(wave_obj: Wave):
@@ -473,31 +491,6 @@ def _form_control_map(wave_obj: Wave) -> dict:
 def _receiver_source_function_space(wave_obj: Wave):
     """Return the space used by receiver-injected adjoint sources."""
     return wave_obj.get_adjoint_receiver_source_space()
-
-
-def _new_gradient_accumulator(wave_obj: Wave, use_form_derived_gradient: bool):
-    """Create the gradient accumulator matching the active control structure."""
-    if not use_form_derived_gradient:
-        return fire.Function(wave_obj.get_scalar_function_space())
-
-    return {
-        parameter: fire.Function(control.function_space())
-        for parameter, control in _form_control_map(wave_obj).items()
-    }
-
-
-def _assign_forward_residual_states(wave_obj: Wave, forward_solution: list) -> None:
-    """Assign replay states used by the UFL-derived residual gradient."""
-    u_np1, u_n, u_nm1 = wave_obj.forward_residual_states
-    u_np1.assign(forward_solution.pop())
-    if len(forward_solution) > 0:
-        u_n.assign(forward_solution[-1])
-    else:
-        u_n.assign(0.0)
-    if len(forward_solution) > 1:
-        u_nm1.assign(forward_solution[-2])
-    else:
-        u_nm1.assign(0.0)
 
 
 def _compute_dufordt2(forward_solution: list, dt: float) -> fire.Function:
