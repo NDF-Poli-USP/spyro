@@ -880,7 +880,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         coords = fire.SpatialCoordinate(self.mesh)
 
         # Damping mask
-        V_mask = fire.FunctionSpace(self.mesh, 'DG', 0)
+        V_mask = create_function_space(self.mesh, "DG0", 0)
         self.eta_mask = self.layer_mask_field(coords, V_mask,
                                               type_marker='mask',
                                               name_mask='eta_mask')

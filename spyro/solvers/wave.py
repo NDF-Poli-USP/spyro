@@ -6,7 +6,7 @@ import spyro.meshing.meshing_operations as mshops
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
 from ..domains.quadrature import quadrature_rules
-from ..domains.space import check_function_space_type
+from ..domains.space import check_function_space_type, create_function_space
 from ..io import Model_parameters
 from ..io import material_properties_io
 from ..io.basicio import ensemble_propagator
@@ -321,7 +321,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         if conditional is not None:
             if dg_velocity_model:
-                V = fire.FunctionSpace(self.mesh, "DG", 0)
+                V = create_function_space(self.mesh, "DG0", 0)
             else:
                 V = self.function_space
             vp = fire.Function(V, name="velocity")

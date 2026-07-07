@@ -1,7 +1,7 @@
 import numpy as np
 
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
-                       FunctionSpace, project, VectorFunctionSpace)
+                       project)
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
@@ -562,7 +562,7 @@ class IsotropicWave(ElasticWave):
 
     def update_p_wave(self):
         if self.p_wave is None:
-            self.D_h = FunctionSpace(self.mesh, "DG", 0)
+            self.D_h = create_function_space(self.mesh, "DG0", 0)
             self.p_wave = Function(self.D_h)
 
         self.p_wave.assign(project(div(self.get_function()), self.D_h))
@@ -572,9 +572,10 @@ class IsotropicWave(ElasticWave):
     def update_s_wave(self):
         if self.s_wave is None:
             if self.dimension == 2:
-                self.C_h = FunctionSpace(self.mesh, "DG", 0)
+                self.C_h = create_function_space(self.mesh, "DG0", 0)
             else:
-                self.C_h = VectorFunctionSpace(self.mesh, "DG", 0)
+                self.C_h = create_function_space(self.mesh, "DG0", 0,
+                                                 dim=self.dimension)
             self.s_wave = Function(self.C_h)
 
         self.s_wave.assign(project(curl(self.get_function()), self.C_h))

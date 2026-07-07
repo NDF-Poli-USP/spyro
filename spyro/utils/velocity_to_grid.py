@@ -1,6 +1,7 @@
 from copy import deepcopy
 import firedrake as fire
 from ..meshing import MeshingParameters, AutomaticMesh
+from ..domains.space import create_function_space
 from ..io import write_function_to_grid
 
 
@@ -144,7 +145,7 @@ def change_scalar_field_resolution(scalar_field, mesh_parameters, grid_spacing):
     )
     meshing_obj = AutomaticMesh(meshing_parameters_cg1)
     mesh = meshing_obj.create_mesh()
-    V = fire.FunctionSpace(mesh, "CG", 1)
+    V = create_function_space(mesh, "CG", 1)
     u = fire.Function(V).interpolate(scalar_field, allow_missing_dofs=True)
 
     return (u, V)
