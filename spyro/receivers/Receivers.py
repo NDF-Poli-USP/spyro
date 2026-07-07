@@ -115,6 +115,17 @@ class Receivers(Delta_projector):
 
         return rhs_forcing
 
+    def _receiver_function_space(self, receiver_mesh):
+        """Return the VOM function space matching this receiver field."""
+        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
+            return create_function_space(
+                receiver_mesh, "DG", 0, dim=self.dimension,
+            )
+        elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
+            return create_function_space(receiver_mesh, "DG", 0)
+        else:
+            raise ValueError("Invalid wave type")
+
     def apply_receivers_as_source_vertex_only_mesh(self, misfit_form, target_space):
         """Return receiver misfit injection as a VOM-built cofunction.
 
@@ -144,24 +155,14 @@ class Receivers(Delta_projector):
         except AttributeError:
             receiver_mesh = VertexOnlyMesh(self.mesh, self.point_locations)
             receiver_values = np.asarray(misfit_form)
-
-            if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
-                V_r = create_function_space(
-                    receiver_mesh, "DG", 0, dim=self.dimension,
-                )
-            elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
-                V_r = create_function_space(receiver_mesh, "DG", 0)
-            else:
-                raise ValueError("Invalid wave type")
+            V_r = self._receiver_function_space(receiver_mesh)
 
             value = Function(V_r)
             local_value_count = value.dat.data_ro.shape[0]
             if local_value_count > 0:
                 value.dat.data_wo[:] = receiver_values[:local_value_count]
-        receiver_form = inner(value, TestFunction(V_r)) * dx
-
         return Cofunction(target_space.dual()).interpolate(
-            assemble(receiver_form),
+            assemble(inner(value, TestFunction(V_r)) * dx),
         )
 
     def receiver_interpolator(self, f, reorder=True, vom_tolerance=None,
@@ -211,12 +212,7 @@ class Receivers(Delta_projector):
             missing_points_behaviour=vom_missing_points_behaviour,
             redundant=vom_redundant,
             name=vom_name)
-        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
-            V_r = VectorFunctionSpace(vom, "DG", 0)
-        elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
-            V_r = FunctionSpace(vom, "DG", 0)
-        else:
-            raise ValueError("Invalid wave type")
+        V_r = self._receiver_function_space(vom)
         return interpolate(f, V_r)
 
     def new_at(self, udat, receiver_id):

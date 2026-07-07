@@ -534,6 +534,78 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         pass
 
+    def reset_adjoint_state(self):
+        """Reset the time-stepping registers used by the adjoint solve."""
+        self.prev_vstate.assign(0.0)
+        self.vstate.assign(0.0)
+        self.next_vstate.assign(0.0)
+
+        try:
+            older_state = self.u_nm2
+        except AttributeError:
+            return
+
+        if older_state is not None:
+            older_state.assign(0.0)
+
+    def get_adjoint_receiver_source_space(self):
+        """Return the state-space component where receiver misfit is injected."""
+        try:
+            return self.get_scalar_function_space()
+        except (AttributeError, ValueError):
+            return self.function_space
+
+    def set_forward_residual_form(
+        self, residual_form, live_states, state_space=None,
+        state_name="residual state",
+    ):
+        """Expose a forward residual for UFL adjoint differentiation.
+
+        The residual is rewritten with formal state ``Function`` objects that
+        are independent of the live time-stepping registers.  During adjoint
+        replay these formal states are assigned from the stored forward
+        solution before differentiating
+
+            R(u^{n+1}, u^n, u^{n-1}; m)
+
+        with respect to the state and control parameters.
+
+        Parameters
+        ----------
+        residual_form : ufl.Form
+            Forward time-step residual form.
+        live_states : tuple
+            Objects representing ``u^{n+1}``, ``u^n`` and ``u^{n-1}`` in
+            ``residual_form``.
+        state_space : firedrake.FunctionSpace, optional
+            Space for the formal residual states.  If omitted, the space is
+            inferred from the first live state.
+        state_name : str, optional
+            Base name used for the formal residual state functions.
+        """
+        if len(live_states) != 3:
+            raise ValueError("Expected live states (np1, n, nm1).")
+
+        if state_space is None:
+            try:
+                state_space = live_states[0].function_space()
+            except AttributeError as exc:
+                raise ValueError(
+                    "state_space is required when it cannot be inferred from "
+                    "the first live state."
+                ) from exc
+
+        residual_states = (
+            fire.Function(state_space, name=f"{state_name} t+dt"),
+            fire.Function(state_space, name=state_name),
+            fire.Function(state_space, name=f"{state_name} t-dt"),
+        )
+        self.forward_residual_states = residual_states
+        self.forward_residual_form = fire.replace(
+            residual_form,
+            dict(zip(live_states, residual_states)),
+        )
+
     def get_adjoint_source(self):
         """Return the cofunction used as the adjoint equation source.
 

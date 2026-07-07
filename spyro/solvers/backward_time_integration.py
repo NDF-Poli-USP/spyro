@@ -4,7 +4,6 @@ from .time_integration_central_difference import advance_central_difference_stat
 from .wave import Wave
 from ..io.basicio import parallel_print
 from ..receivers.Receivers import Receivers
-from ..utils.typing import WaveType
 
 
 def backward_wave_propagator(wave_obj: Wave, dt: float = None):
@@ -35,7 +34,7 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
     hard-coded gradient forms remain as fallbacks for solvers that do not expose
     ``forward_residual_form``.
     """
-    _reset_adjoint_state(wave_obj)
+    wave_obj.reset_adjoint_state()
     mask_available = wave_obj.gradient_mask_available
     if dt is not None:
         wave_obj.dt = dt
@@ -137,22 +136,6 @@ def _pml_interior_indicator(wave_obj: Wave) -> fire.conditional:
         inside = fire.And(inside, fire.And(y >= y_min, y <= y_max))
 
     return fire.conditional(inside, 1.0, 0.0)
-
-
-def _reset_adjoint_state(wave_obj: Wave) -> None:
-    """Reset time-stepping registers before the backward propagation."""
-    if wave_obj.wave_type is WaveType.ISOTROPIC_ACOUSTIC:
-        wave_obj.reset_pressure()
-    elif wave_obj.wave_type is WaveType.ISOTROPIC_ELASTIC:
-        wave_obj.u_n.assign(0.0)
-        wave_obj.u_nm1.assign(0.0)
-        wave_obj.u_np1.assign(0.0)
-        if wave_obj.u_nm2 is not None:
-            wave_obj.u_nm2.assign(0.0)
-    else:
-        raise NotImplementedError(
-            f"Implemented adjoint state reset is not defined for {wave_obj.wave_type}.",
-        )
 
 
 def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
@@ -425,9 +408,7 @@ def _get_form_controls(wave_obj: Wave):
 
 def _receiver_source_function_space(wave_obj: Wave):
     """Return the space used by receiver-injected adjoint sources."""
-    if wave_obj.wave_type is WaveType.ISOTROPIC_ELASTIC:
-        return wave_obj.function_space
-    return wave_obj.get_scalar_function_space()
+    return wave_obj.get_adjoint_receiver_source_space()
 
 
 def _new_gradient_accumulator(wave_obj: Wave, use_form_derived_gradient: bool):

@@ -4,40 +4,6 @@ from firedrake import dx, ds, Constant, dot, grad, inner
 from ..pml import damping
 
 
-def _set_forward_residual_form(Wave_object, W, X_n, X_nm1):
-    """Expose the PML forward residual for UFL adjoint differentiation.
-
-    The PML state is mixed: ``X = (u, pp)`` in 2D and ``X = (u, psi, pp)`` in
-    3D.  As in the non-PML acoustic residual, we keep formal residual states
-    separate from the live time-stepping registers ``X_np1/X_n/X_nm1``.  This
-    lets UFL differentiate the discrete residual
-
-        R(X^{n+1}, X^n, X^{n-1}; c) = 0
-
-    with respect to each time state and to the acoustic control without binding
-    those symbolic derivatives to the mutable integration state used by the
-    forward and adjoint solvers.
-    """
-    residual_X_np1 = fire.Function(W, name="residual PML state t+dt")
-    residual_X_n = fire.Function(W, name="residual PML state")
-    residual_X_nm1 = fire.Function(W, name="residual PML state t-dt")
-    Wave_object.forward_residual_states = (
-        residual_X_np1, residual_X_n, residual_X_nm1,
-    )
-
-    # Wave_object.rhs was extracted from forms written in terms of the live
-    # mixed states X_n/X_nm1.  Replacing those coefficients rewrites the known
-    # part of the step in terms of the formal residual states, so derivatives
-    # with respect to residual_X_n and residual_X_nm1 include the full PML RHS.
-    residual_rhs = fire.replace(
-        Wave_object.rhs,
-        {X_n: residual_X_n, X_nm1: residual_X_nm1},
-    )
-    Wave_object.forward_residual_form = (
-        fire.action(Wave_object.lhs, residual_X_np1) - residual_rhs
-    )
-
-
 def construct_solver_or_matrix_with_pml(Wave_object):
     """
     Builds solver operators for wave propagator with a PML. Doesn't create mass matrices if
@@ -133,7 +99,12 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
 
     Wave_object.lhs = fire.lhs(FF)
     Wave_object.rhs = fire.rhs(FF)
-    _set_forward_residual_form(Wave_object, W, X_n, X_nm1)
+    Wave_object.set_forward_residual_form(
+        fire.action(Wave_object.lhs, X_np1) - Wave_object.rhs,
+        (X_np1, X_n, X_nm1),
+        state_space=W,
+        state_name="residual PML state",
+    )
     Wave_object.source_function = fire.Cofunction(W.dual())
 
     lin_var = fire.LinearVariationalProblem(
@@ -246,7 +217,12 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     rhs_ = fire.rhs(FF)
     Wave_object.lhs = lhs_
     Wave_object.rhs = rhs_
-    _set_forward_residual_form(Wave_object, W, X_n, X_nm1)
+    Wave_object.set_forward_residual_form(
+        fire.action(Wave_object.lhs, X_np1) - Wave_object.rhs,
+        (X_np1, X_n, X_nm1),
+        state_space=W,
+        state_name="residual PML state",
+    )
 
     source_function = fire.Cofunction(W.dual())
     Wave_object.source_function = source_function
