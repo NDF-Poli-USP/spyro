@@ -58,29 +58,14 @@ class ElasticWave(Wave, metaclass=ABCMeta):
             raise NotImplementedError(
                 f"Riesz map {riesz_map} not implemented for elastic gradients.",
             )
-
-        self.enable_implemented_adjoint()
-        if misfit is not None:
-            self.misfit = misfit
-
-        if forward_solution is not None:
-            self.forward_solution = forward_solution
-        elif not self.forward_solution:
-            self.forward_solve()
-
-        if self.misfit is None:
-            if self.real_shot_record is None:
-                raise ValueError(
-                    "Please load or calculate a real shot record first"
-                )
-            self.misfit = (
-                self.real_shot_record - self.forward_solution_receivers
-            )
-
         if self.abc_boundary_layer_type == "PML":
             raise NotImplementedError(
                 "Elastic implemented adjoint does not support PML yet.",
             )
+
+        self._prepare_implemented_adjoint(
+            misfit=misfit, forward_solution=forward_solution,
+        )
         return backward_wave_propagator(self)
 
     @override

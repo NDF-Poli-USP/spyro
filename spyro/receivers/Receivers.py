@@ -1,4 +1,12 @@
-from firedrake import *  # noqa: F403
+from firedrake import (
+    Cofunction,
+    Function,
+    TestFunction,
+    VertexOnlyMesh,
+    assemble,
+    dx,
+    inner,
+)
 from spyro.receivers.dirac_delta_projector import Delta_projector
 from ..domains.space import create_function_space
 from ..utils.typing import WaveType
@@ -8,6 +16,8 @@ from ..tools.version_control import is_firedrake_new
 
 if is_firedrake_new() is False:
     from firedrake.__future__ import interpolate
+else:
+    from firedrake import interpolate
 
 
 class Receivers(Delta_projector):

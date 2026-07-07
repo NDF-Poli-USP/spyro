@@ -244,6 +244,15 @@ def ensemble_functional(func):
             J_total[0] /= comm.comm.size
 
         elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
+            evaluation_mode = kwargs.get("evaluation_mode")
+            if getattr(evaluation_mode, "name", None) == "PER_TIMESTEP":
+                # PER_TIMESTEP accumulation runs inside a single source's
+                # forward solve; the serial-shot loop switches sources outside
+                # this call, so ``misfit`` (args[1]) already belongs to the
+                # current source. Evaluate it directly instead of indexing a
+                # per-source residual list (which is a single-step residual
+                # here and would raise IndexError).
+                return func(*args, **kwargs)
             residual_list = args[1]
             J_total = np.zeros((1))
 

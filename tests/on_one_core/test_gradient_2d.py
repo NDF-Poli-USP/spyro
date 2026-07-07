@@ -7,6 +7,12 @@ import spyro
 
 
 def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
+    # gradient_solve() enables the implemented adjoint, which puts the wave in
+    # PER_TIMESTEP functional mode. The finite-difference forward solves below
+    # therefore accumulate the functional during the solve and need the
+    # observed data available as real_shot_record.
+    Wave_obj_guess.real_shot_record = rec_out_exact
+
     steps = [1e-2, 1e-3, 1e-4]  # step length
 
     errors = []

@@ -549,10 +549,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             older_state.assign(0.0)
 
     def get_adjoint_receiver_source_space(self):
-        """Return the state-space component where receiver misfit is injected."""
+        """Return the state-space component where receiver misfit is injected.
+
+        Acoustic solvers inject the misfit into their scalar (pressure) space.
+        Solvers without a dedicated scalar space (e.g. elastic) fall back to
+        the full solution space.
+        """
+        get_scalar_space = getattr(self, "get_scalar_function_space", None)
+        if get_scalar_space is None:
+            # Solver does not expose a scalar space (e.g. elastic).
+            return self.function_space
         try:
-            return self.get_scalar_function_space()
-        except (AttributeError, ValueError):
+            return get_scalar_space()
+        except ValueError:
+            # Acoustic solver whose scalar space has not been created yet.
             return self.function_space
 
     def set_forward_residual_form(
@@ -582,6 +592,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             inferred from the first live state.
         state_name : str, optional
             Base name used for the formal residual state functions.
+
+        Notes
+        -----
+        This currently assumes a three-level central-difference residual,
+        ``R(u^{n+1}, u^n, u^{n-1}; m)``, hence exactly three ``live_states``.
+        Other integrators (Newmark, Runge-Kutta, staggered leapfrog, schemes
+        with memory) would need a different number of formal states and a
+        matching adjoint advance; see ``docs/GENERALIZED_UFL_ADJOINT_NOTES.md``
+        (section 7).
         """
         if len(live_states) != 3:
             raise ValueError("Expected live states (np1, n, nm1).")
@@ -633,6 +652,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             adjoint_source.assign(misfit_form)
             return
 
+        # ``sub(0)`` only makes sense on a mixed (e.g. PML) adjoint source.
+        # On a non-mixed source it fails in a backend-dependent way, so the
+        # broad catch is intentional: translate any such failure into a single
+        # clear "incompatible spaces" error.
         try:
             adjoint_source_component = adjoint_source.sub(0)
         except (AttributeError, IndexError, ValueError) as exc:
@@ -695,12 +718,81 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.misfit = None
 
     def enable_implemented_adjoint(self):
+        """Switch the solver into implemented-adjoint (UFL-derived) mode.
+
+        Side effects, required before a backward/gradient solve:
+
+        - selects :attr:`AdjointType.IMPLEMENTED_ADJOINT`;
+        - stores the forward field at every gradient-sampling step
+          (``store_forward_time_steps``) so the adjoint replay can reassign it;
+        - enables the vertex-only-mesh receiver path used to inject the misfit
+          into the adjoint source;
+        - forces functional evaluation to ``PER_TIMESTEP`` so the functional is
+          accumulated during the forward solve.
+        """
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
         self.store_forward_time_steps = True
         self.use_vertex_only_mesh = True
         if self.functional_evaluation_mode is not FunctionalEvaluationMode.PER_TIMESTEP:
             self.enable_compute_functional(
                 mode=FunctionalEvaluationMode.PER_TIMESTEP
+            )
+
+    def _prepare_implemented_adjoint(self, misfit=None, forward_solution=None):
+        """Enable the implemented adjoint and ensure misfit + forward solution.
+
+        Shared ``gradient_solve`` preamble for the acoustic and elastic
+        solvers. It turns on the implemented-adjoint bookkeeping, stores the
+        supplied ``misfit``, makes sure a stored forward solution is available,
+        and, when no misfit was given, falls back to
+        ``real_shot_record - forward_solution_receivers``.
+
+        Parameters
+        ----------
+        misfit : optional
+            Precomputed receiver misfit. If ``None`` it is derived from the
+            stored real shot record.
+        forward_solution : optional
+            Stored forward solution to reuse. If ``None`` and none is stored,
+            a fresh forward solve is run.
+        """
+        self.enable_implemented_adjoint()
+        if misfit is not None:
+            self.misfit = misfit
+
+        if forward_solution is not None:
+            self.forward_solution = forward_solution
+        elif not self.forward_solution:
+            # Only re-run when ``self.forward_solution`` is empty — either it
+            # was never run, or it ran before ``enable_implemented_adjoint()``
+            # (so ``store_forward_time_steps`` was False and nothing was
+            # stored).
+            #
+            # IMPORTANT: for the multi-source FWI path, ``ensemble_gradient``
+            # invokes ``gradient_solve`` once per source after
+            # ``switch_serial_shot`` loads that source's stored forward
+            # solution into ``self.forward_solution``. Calling
+            # ``forward_solve()`` here would discard the per-source data and
+            # run a fresh (multi-source) ensemble forward solve, leaving the
+            # backward propagator with the wrong forward state and producing an
+            # incorrect gradient.
+            if misfit is None:
+                self.forward_solve()
+            else:
+                functional_mode = self.functional_evaluation_mode
+                self._functional_evaluation_mode = None
+                try:
+                    self.forward_solve()
+                finally:
+                    self._functional_evaluation_mode = functional_mode
+
+        if self.misfit is None:
+            if self.real_shot_record is None:
+                raise ValueError(
+                    "Please load or calculate a real shot record first"
+                )
+            self.misfit = (
+                self.real_shot_record - self.forward_solution_receivers
             )
 
     @property
