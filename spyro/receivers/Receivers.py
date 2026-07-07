@@ -223,6 +223,7 @@ class Receivers(Delta_projector):
             redundant=vom_redundant,
             name=vom_name)
         V_r = self._receiver_function_space(vom)
+
         return interpolate(f, V_r)
 
     def new_at(self, udat, receiver_id):
