@@ -4,9 +4,10 @@ from .time_integration_central_difference import advance_central_difference_stat
 from .wave import Wave
 from ..io.basicio import parallel_print
 from ..receivers.Receivers import Receivers
+from ..utils.typing import WaveType
 
 
-def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
+def backward_wave_propagator(wave_obj: Wave, dt: float = None):
     """Propagates the adjoint wave backwards in time.
 
     Currently uses central differences.
@@ -21,8 +22,10 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
 
     Returns:
     --------
-    dJ : Firedrake 'Function'
-        Calculated gradient
+    dJ : firedrake.Function or dict
+        Calculated gradient. Acoustic controls return one ``Function``.
+        Isotropic elastic controls return a dictionary of ``Function`` objects
+        keyed by material parameter.
 
     Notes:
     ------
@@ -32,7 +35,7 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
     hard-coded gradient forms remain as fallbacks for solvers that do not expose
     ``forward_residual_form``.
     """
-    wave_obj.reset_pressure()
+    _reset_adjoint_state(wave_obj)
     mask_available = wave_obj.gradient_mask_available
     if dt is not None:
         wave_obj.dt = dt
@@ -49,11 +52,10 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
 
     wave_obj.comm.comm.barrier()
 
-    gradient_space = wave_obj.get_scalar_function_space()
-    dJ = fire.Function(gradient_space)
-    rhs_forcing = fire.Cofunction(gradient_space.dual())
-
     use_form_derived_gradient = _uses_form_derived_gradient(wave_obj)
+    dJ = _new_gradient_accumulator(wave_obj, use_form_derived_gradient)
+    receiver_source_space = _receiver_source_function_space(wave_obj)
+    rhs_forcing = fire.Cofunction(receiver_source_space.dual())
     grad_solver, forward_field, uadj, gradi = _build_gradient_solver(
         wave_obj, mask_available,
     )
@@ -89,13 +91,9 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
                     forward_field.assign(0.0)
             else:
                 forward_field.assign(_compute_dufordt2(forward_solution, dt))
-            grad_solver.solve()
+            _solve_gradient(grad_solver)
             if use_form_derived_gradient:
-                # The residual-derived contribution is a discrete sum over
-                # time-step residuals. Endpoint weights enter through the
-                # objective source term, so applying trapezoidal weights here
-                # would underweight the endpoint residual gradients twice.
-                dJ += gradi
+                _add_gradient(dJ, gradi)
             else:
                 _trapezoidal_gradient_integration(dJ, gradi, step, nt)
 
@@ -108,7 +106,7 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
     helpers.display_progress(wave_obj.comm, t)
 
     if use_form_derived_gradient:
-        dJ.dat.data_with_halos[:] *= dt
+        _scale_gradient(dJ, dt)
     else:
         dJ.dat.data_with_halos[:] *= dt / 2
     return dJ
@@ -132,6 +130,22 @@ def _pml_interior_indicator(wave_obj: Wave) -> fire.conditional:
         inside = fire.And(inside, fire.And(y >= y_min, y <= y_max))
 
     return fire.conditional(inside, 1.0, 0.0)
+
+
+def _reset_adjoint_state(wave_obj: Wave) -> None:
+    """Reset time-stepping registers before the backward propagation."""
+    if wave_obj.wave_type is WaveType.ISOTROPIC_ACOUSTIC:
+        wave_obj.reset_pressure()
+    elif wave_obj.wave_type is WaveType.ISOTROPIC_ELASTIC:
+        wave_obj.u_n.assign(0.0)
+        wave_obj.u_nm1.assign(0.0)
+        wave_obj.u_np1.assign(0.0)
+        if wave_obj.u_nm2 is not None:
+            wave_obj.u_nm2.assign(0.0)
+    else:
+        raise NotImplementedError(
+            f"Implemented adjoint state reset is not defined for {wave_obj.wave_type}.",
+        )
 
 
 def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
@@ -159,6 +173,62 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
         wave_obj.use_vertex_only_mesh = False
         wave_obj.receivers = Receivers(wave_obj)
         wave_obj.use_vertex_only_mesh = True
+    if _uses_form_derived_gradient(wave_obj):
+        controls = _get_form_controls(wave_obj)
+        qr = wave_obj.quadrature_rule
+        dx = fire.dx(**qr)
+        state_space = _receiver_source_function_space(wave_obj)
+        uadj = fire.Function(state_space)
+        forward_field = fire.Function(state_space)
+        adjoint_field = _get_form_adjoint_field(wave_obj, uadj)
+
+        def build_control_gradient(control):
+            V_control = control.function_space()
+            m_u = fire.TrialFunction(V_control)
+            m_v = fire.TestFunction(V_control)
+            mgrad = m_u * m_v * dx
+            # Gradient contribution from the discrete Lagrangian:
+            #
+            #   g_m[v_m] =
+            #       d/dm <R(y^{n+1}, y^n, y^{n-1}; m), lambda^{n+1}> [v_m]
+            #
+            # where y is the forward time-stepping state.  The action pairs the
+            # forward residual R with the adjoint field lambda. Differentiating
+            # that scalar form with respect to the control m in direction v_m
+            # gives the variational gradient contribution for the current time
+            # step.
+            dRdm = fire.derivative(
+                fire.action(wave_obj.forward_residual_form, adjoint_field),
+                control,
+                m_v,
+            )
+            gradi = fire.Function(V_control)
+            grad_prob = fire.LinearVariationalProblem(mgrad, dRdm, gradi)
+            grad_solver = fire.LinearVariationalSolver(
+                grad_prob,
+                solver_parameters={
+                    "ksp_type": "preonly",
+                    "pc_type": "jacobi",
+                    "mat_type": "matfree",
+                },
+            )
+            return grad_solver, gradi
+
+        if isinstance(controls, dict):
+            grad_solver = {}
+            gradi = {}
+            for parameter, control in controls.items():
+                grad_solver[parameter], gradi[parameter] = (
+                    build_control_gradient(control)
+                )
+        else:
+            grad_solver, gradi = build_control_gradient(controls)
+        parallel_print(
+            "Using UFL-derived gradient from forward residual form",
+            wave_obj.comm,
+        )
+        return grad_solver, forward_field, uadj, gradi
+
     V = wave_obj.get_scalar_function_space()
     qr = wave_obj.quadrature_rule
 
@@ -175,32 +245,8 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
     uadj = fire.Function(V)
     forward_field = fire.Function(V)
     mgrad = m_u * m_v * dx
-    if _uses_form_derived_gradient(wave_obj):
-        control = _get_single_form_control(wave_obj)
-        adjoint_field = _get_form_adjoint_field(wave_obj, uadj)
-        # Gradient contribution from the discrete Lagrangian:
-        #
-        #   g_c[m_v] =
-        #       d/dc <R(y^{n+1}, y^n, y^{n-1}; c), lambda^{n+1}> [m_v]
-        #
-        # where y is the forward time-stepping state: pressure for non-PML and
-        # the full mixed PML state for PML.
-        # The action pairs the forward residual R with the adjoint field
-        # lambda. Differentiating that scalar form with respect to c in the
-        # direction m_v gives the variational gradient contribution for the
-        # current time step.
-        dRdc = fire.derivative(
-            fire.action(wave_obj.forward_residual_form, adjoint_field),
-            control,
-            m_v,
-        )
-        ffG = dRdc
-        parallel_print(
-            "Using UFL-derived gradient from forward residual form",
-            wave_obj.comm,
-        )
 
-    elif wave_obj.abc_boundary_layer_type == "PML":
+    if wave_obj.abc_boundary_layer_type == "PML":
         # Always exclude PML region from gradient.
         # This is necessary once the gradient expression is not considering
         # the PML auxiliary variables. In addition, we are not interested
@@ -333,7 +379,7 @@ def _uses_form_derived_gradient(wave_obj: Wave) -> bool:
     return (
         wave_obj.forward_residual_form is not None
         and wave_obj.forward_residual_states is not None
-        and isinstance(_get_single_form_control(wave_obj), fire.Function)
+        and _get_form_controls(wave_obj) is not None
     )
 
 
@@ -344,15 +390,13 @@ def _get_form_adjoint_field(wave_obj: Wave, scalar_adjoint: fire.Function):
     return scalar_adjoint
 
 
-def _get_single_form_control(wave_obj: Wave):
-    """Return the single control used by the current UFL residual backend.
+def _get_form_controls(wave_obj: Wave):
+    """Return controls supported by the UFL residual backend.
 
     ``Wave.get_control_parameters()`` is the solver-level API for inversion
-    controls.  Acoustic waves currently expose one control, the velocity model,
-    as a Firedrake ``Function``.  More general solvers may return structured
-    controls, such as a dictionary of elastic material parameters; those need a
-    multi-control gradient assembly path and are intentionally not selected by
-    ``_uses_form_derived_gradient`` yet.
+    controls. Acoustic waves expose one control, the velocity model, as a
+    Firedrake ``Function``. Isotropic elastic waves expose a dictionary of
+    scalar material controls, so each entry gets its own Riesz solve.
     """
     try:
         controls = wave_obj.get_control_parameters()
@@ -361,7 +405,59 @@ def _get_single_form_control(wave_obj: Wave):
 
     if isinstance(controls, fire.Function):
         return controls
+    if isinstance(controls, dict) and all(
+        isinstance(control, fire.Function) for control in controls.values()
+    ):
+        return controls
     return None
+
+
+def _receiver_source_function_space(wave_obj: Wave):
+    """Return the space used by receiver-injected adjoint sources."""
+    if wave_obj.wave_type is WaveType.ISOTROPIC_ELASTIC:
+        return wave_obj.function_space
+    return wave_obj.get_scalar_function_space()
+
+
+def _new_gradient_accumulator(wave_obj: Wave, use_form_derived_gradient: bool):
+    """Create the gradient accumulator matching the active control structure."""
+    if not use_form_derived_gradient:
+        return fire.Function(wave_obj.get_scalar_function_space())
+
+    controls = _get_form_controls(wave_obj)
+    if isinstance(controls, dict):
+        return {
+            parameter: fire.Function(control.function_space())
+            for parameter, control in controls.items()
+        }
+    return fire.Function(controls.function_space())
+
+
+def _solve_gradient(grad_solver):
+    """Solve one or more per-control gradient projection problems."""
+    if isinstance(grad_solver, dict):
+        for solver in grad_solver.values():
+            solver.solve()
+    else:
+        grad_solver.solve()
+
+
+def _add_gradient(dJ, gradi):
+    """Accumulate one gradient contribution into a matching structure."""
+    if isinstance(dJ, dict):
+        for parameter in dJ:
+            dJ[parameter] += gradi[parameter]
+    else:
+        dJ += gradi
+
+
+def _scale_gradient(dJ, scale):
+    """Scale a gradient Function or dictionary of gradient Functions."""
+    if isinstance(dJ, dict):
+        for gradient in dJ.values():
+            gradient.dat.data_with_halos[:] *= scale
+    else:
+        dJ.dat.data_with_halos[:] *= scale
 
 
 def _assign_forward_residual_states(wave_obj: Wave, forward_solution: list) -> None:

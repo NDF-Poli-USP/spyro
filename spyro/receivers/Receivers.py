@@ -103,11 +103,17 @@ class Receivers(Delta_projector):
         """
         for rid in range(self.number_of_points):
             value = residual[IT][rid]
-            if self.is_local[rid]:
+            # Cell id 0 is a valid local cell, so this must be an explicit
+            # None check rather than a truth-value check.
+            if self.is_local[rid] is not None:
                 idx = np.int_(self.cellNodeMaps[rid])
                 phis = self.cell_tabulations[rid]
 
-                tmp = np.dot(phis, value)
+                value = np.asarray(value)
+                if value.ndim == 0:
+                    tmp = phis * value
+                else:
+                    tmp = phis[:, None] * value
                 rhs_forcing.dat.data_with_halos[idx] += tmp
             else:
                 tmp = rhs_forcing.dat.data_with_halos[0]

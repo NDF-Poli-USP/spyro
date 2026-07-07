@@ -113,7 +113,11 @@ def compute_functional(
 
     J = 0
     for rn in range(num_receivers):
-        J += np.trapezoid(misfit[:, rn] ** 2, dx=dt)
+        receiver_misfit = misfit[:, rn]
+        receiver_integrand = receiver_misfit**2
+        if receiver_integrand.ndim > 1:
+            receiver_integrand = np.sum(receiver_integrand, axis=-1)
+        J += np.trapezoid(receiver_integrand, dx=dt)
 
     J *= 0.5
 

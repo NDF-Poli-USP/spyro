@@ -240,8 +240,10 @@ class IsotropicWave(ElasticWave):
         return self.receivers.interpolate(data_with_halos)
 
     @override
-    def get_function(self):
-        return self.u_n
+    def get_function(self, state=None):
+        if state is None:
+            return self.u_n
+        return state
 
     @override
     def get_function_name(self):

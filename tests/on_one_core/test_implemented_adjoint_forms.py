@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import firedrake as fire
 import numpy as np
+import pytest
 import spyro
 
 from spyro.utils.typing import AdjointType
@@ -69,6 +70,54 @@ def _small_acoustic_pml_model():
     return model
 
 
+def _small_elastic_model():
+    return {
+        "options": {
+            "cell_type": "T",
+            "variant": "lumped",
+            "degree": 1,
+            "dimension": 2,
+        },
+        "parallelism": {"type": "automatic"},
+        "mesh": {
+            "length_z": 1.0,
+            "length_x": 1.0,
+            "length_y": 0.0,
+            "mesh_file": None,
+            "mesh_type": "firedrake_mesh",
+        },
+        "acquisition": {
+            "source_type": "ricker",
+            "source_locations": [(-0.1, 0.5)],
+            "frequency": 4.0,
+            "delay": 0.0,
+            "delay_type": "time",
+            "amplitude": np.array([0.0, 1.0]),
+            "receiver_locations": [(-0.2, 0.25), (-0.2, 0.75)],
+        },
+        "synthetic_data": {
+            "type": "object",
+            "density": 1.0,
+            "lambda": 4.0,
+            "mu": 1.0,
+            "real_velocity_file": None,
+        },
+        "time_axis": {
+            "initial_time": 0.0,
+            "final_time": 0.02,
+            "dt": 0.002,
+            "output_frequency": 100,
+            "gradient_sampling_frequency": 1,
+        },
+        "visualization": {
+            "forward_output": False,
+            "gradient_output": False,
+            "adjoint_output": False,
+            "debug_output": False,
+        },
+    }
+
+
 def _solve_acoustic(model, velocity, edge_length=0.5, implemented_adjoint=False):
     wave = spyro.AcousticWave(dictionary=deepcopy(model))
     wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
@@ -76,6 +125,15 @@ def _solve_acoustic(model, velocity, edge_length=0.5, implemented_adjoint=False)
         wave.set_initial_velocity_model(constant=velocity)
     else:
         wave.set_control_parameters(velocity)
+    if implemented_adjoint:
+        wave.enable_implemented_adjoint()
+    wave.forward_solve()
+    return wave
+
+
+def _solve_elastic(model, edge_length=0.5, implemented_adjoint=False):
+    wave = spyro.IsotropicWave(dictionary=deepcopy(model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
     if implemented_adjoint:
         wave.enable_implemented_adjoint()
     wave.forward_solve()
@@ -105,6 +163,122 @@ def test_acoustic_implemented_adjoint_uses_forward_residual_form():
     assert guess.forward_residual_form is not None
     assert isinstance(gradient, fire.Function)
     assert np.isfinite(fire.norm(gradient))
+
+
+def test_elastic_implemented_adjoint_uses_forward_residual_form():
+    model = _small_elastic_model()
+    exact_model = deepcopy(model)
+    exact_model["synthetic_data"]["density"] = 1.2
+
+    exact = _solve_elastic(exact_model)
+    guess = _solve_elastic(model, implemented_adjoint=True)
+
+    misfit = exact.forward_solution_receivers - guess.forward_solution_receivers
+    functional = spyro.utils.compute_functional(guess, misfit)
+    gradient = guess.gradient_solve(
+        misfit=misfit,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+    )
+
+    expected_controls = {
+        spyro.ElasticMaterialParameter.DENSITY,
+        spyro.ElasticMaterialParameter.LAMBDA,
+        spyro.ElasticMaterialParameter.MU,
+    }
+    assert guess.forward_residual_form is not None
+    assert guess.forward_residual_states is not None
+    assert guess.get_adjoint_source().function_space() == (
+        guess.source_function.function_space()
+    )
+    assert np.isfinite(functional)
+    assert set(gradient) == expected_controls
+    assert all(isinstance(value, fire.Function) for value in gradient.values())
+    assert all(np.isfinite(fire.norm(value)) for value in gradient.values())
+
+
+@pytest.mark.parametrize(
+    "parameter",
+    [
+        spyro.ElasticMaterialParameter.DENSITY,
+        spyro.ElasticMaterialParameter.LAMBDA,
+        spyro.ElasticMaterialParameter.MU,
+    ],
+)
+def test_elastic_implemented_adjoint_taylor_remainder(parameter):
+    model = _small_elastic_model()
+    exact_model = deepcopy(model)
+    exact_model["synthetic_data"][parameter.value] = (
+        1.2 * exact_model["synthetic_data"][parameter.value]
+    )
+
+    exact = _solve_elastic(exact_model)
+    real_record = exact.forward_solution_receivers
+
+    guess = _solve_elastic(model, implemented_adjoint=True)
+    base_controls = {
+        parameter: fire.Function(control.function_space(), name=control.name())
+        for parameter, control in guess.get_control_parameters().items()
+    }
+    for parameter, control in guess.get_control_parameters().items():
+        base_controls[parameter].assign(control)
+
+    misfit = real_record - guess.forward_solution_receivers
+    base_functional = spyro.utils.compute_functional(guess, misfit)
+    gradient = guess.gradient_solve(
+        misfit=misfit,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+    )
+
+    direction = fire.Function(base_controls[parameter].function_space())
+    direction.dat.data_wo[:] = (
+        np.random.default_rng(5).random(direction.dat.data_wo.shape) - 0.5
+    )
+    direction.assign(direction / fire.norm(direction))
+    directional_derivative = fire.assemble(
+        gradient[parameter] * direction * fire.dx(**guess.quadrature_rule)
+    )
+
+    steps = np.array([1e-2, 5e-3, 2.5e-3, 1.25e-3])
+    remainders = []
+    directional_errors = []
+    for step in steps:
+        controls = {
+            control_parameter: fire.Function(
+                control.function_space(), name=control.name(),
+            )
+            for control_parameter, control in base_controls.items()
+        }
+        for control_parameter, control in base_controls.items():
+            controls[control_parameter].assign(control)
+        controls[parameter].assign(base_controls[parameter] + step * direction)
+        guess.set_control_parameters(controls)
+        guess.forward_solve()
+        perturbed_misfit = real_record - guess.forward_solution_receivers
+        perturbed_functional = spyro.utils.compute_functional(
+            guess, perturbed_misfit,
+        )
+        finite_difference = (
+            perturbed_functional - base_functional
+        ) / step
+        remainders.append(abs(
+            perturbed_functional
+            - base_functional
+            - step * directional_derivative
+        ))
+        directional_errors.append(abs(
+            (finite_difference - directional_derivative)
+            / directional_derivative
+        ))
+
+    remainders = np.array(remainders)
+    directional_errors = np.array(directional_errors)
+    convergence_rates = np.log(remainders[:-1] / remainders[1:]) / np.log(
+        steps[:-1] / steps[1:]
+    )
+
+    assert np.all(np.isfinite(remainders))
+    assert np.all(convergence_rates > 1.8), convergence_rates
+    assert np.all(directional_errors < 0.1)
 
 
 def test_acoustic_implemented_adjoint_taylor_remainder():

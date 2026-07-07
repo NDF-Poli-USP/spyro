@@ -1,8 +1,9 @@
 from abc import abstractmethod, ABCMeta
 from firedrake import Constant
 
+from ..backward_time_integration import backward_wave_propagator
 from ..wave import Wave
-from ...utils.typing import override
+from ...utils.typing import AdjointType, override, RieszMapType
 
 
 class ElasticWave(Wave, metaclass=ABCMeta):
@@ -34,10 +35,53 @@ class ElasticWave(Wave, metaclass=ABCMeta):
         pass
 
     @override
-    def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
-        raise NotImplementedError(
-            "Elastic adjoint gradients are not implemented yet.",
-        )
+    def gradient_solve(
+        self,
+        guess=None,
+        misfit=None,
+        forward_solution=None,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+        riesz_map=RieszMapType.L2,
+    ):
+        """Compute UFL-derived implemented-adjoint elastic gradients.
+
+        The current elastic backend supports isotropic, non-PML forward
+        residuals exposed through ``forward_residual_form``.  The returned
+        gradient has the same structure as ``get_control_parameters()``: for
+        isotropic elastic waves it is a dictionary keyed by material parameter.
+        """
+        if adjoint_type != AdjointType.IMPLEMENTED_ADJOINT:
+            raise NotImplementedError(
+                "Elastic gradients currently support only IMPLEMENTED_ADJOINT.",
+            )
+        if riesz_map != RieszMapType.L2:
+            raise NotImplementedError(
+                f"Riesz map {riesz_map} not implemented for elastic gradients.",
+            )
+
+        self.enable_implemented_adjoint()
+        if misfit is not None:
+            self.misfit = misfit
+
+        if forward_solution is not None:
+            self.forward_solution = forward_solution
+        elif not self.forward_solution:
+            self.forward_solve()
+
+        if self.misfit is None:
+            if self.real_shot_record is None:
+                raise ValueError(
+                    "Please load or calculate a real shot record first"
+                )
+            self.misfit = (
+                self.real_shot_record - self.forward_solution_receivers
+            )
+
+        if self.abc_boundary_layer_type == "PML":
+            raise NotImplementedError(
+                "Elastic implemented adjoint does not support PML yet.",
+            )
+        return backward_wave_propagator(self)
 
     @override
     def update_source_expression(self, t):
