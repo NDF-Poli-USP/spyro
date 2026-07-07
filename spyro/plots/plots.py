@@ -5,6 +5,7 @@ import numpy as np
 import firedrake
 import copy
 from ..io import ensemble_save
+from ..domains.space import create_function_space
 from ..utils import change_scalar_field_resolution
 from ..tools.version_control import is_firedrake_new
 plt.rcParams.update({"font.family": "serif"})
@@ -183,7 +184,7 @@ def plot_mesh_sizes(
     mesh.coordinates.dat.data[:, 0] = coordinates[:, 1]
     mesh.coordinates.dat.data[:, 1] = coordinates[:, 0]
 
-    DG0 = firedrake.FunctionSpace(mesh, "DG", 0)
+    DG0 = create_function_space(mesh, "DG0", 0)
     f = firedrake.assemble(interpolate(firedrake.CellSize(mesh), DG0))
 
     fig, axes = plt.subplots()
