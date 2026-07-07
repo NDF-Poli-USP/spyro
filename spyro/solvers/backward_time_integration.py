@@ -53,6 +53,7 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
     dJ = fire.Function(gradient_space)
     rhs_forcing = fire.Cofunction(gradient_space.dual())
 
+    use_form_derived_gradient = _uses_form_derived_gradient(wave_obj)
     grad_solver, forward_field, uadj, gradi = _build_gradient_solver(
         wave_obj, mask_available,
     )
@@ -75,7 +76,7 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
             # Assign the adjoint solution at the step `np1` to `uadj`.
             uadj.assign(wave_obj.get_function(state=wave_obj.next_vstate))
 
-            if _uses_form_derived_gradient(wave_obj):
+            if use_form_derived_gradient:
                 _assign_forward_residual_states(wave_obj, forward_solution)
             elif wave_obj.abc_boundary_layer_type == "PML":
                 # Pop to keep the list in sync, but use the element one
@@ -89,7 +90,14 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
             else:
                 forward_field.assign(_compute_dufordt2(forward_solution, dt))
             grad_solver.solve()
-            _trapezoidal_gradient_integration(dJ, gradi, step, nt)
+            if use_form_derived_gradient:
+                # The residual-derived contribution is a discrete sum over
+                # time-step residuals. Endpoint weights enter through the
+                # objective source term, so applying trapezoidal weights here
+                # would underweight the endpoint residual gradients twice.
+                dJ += gradi
+            else:
+                _trapezoidal_gradient_integration(dJ, gradi, step, nt)
 
         advance_central_difference_state(wave_obj)
         t = step * float(dt)
@@ -99,7 +107,10 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
 
     helpers.display_progress(wave_obj.comm, t)
 
-    dJ.dat.data_with_halos[:] *= dt / 2
+    if use_form_derived_gradient:
+        dJ.dat.data_with_halos[:] *= dt
+    else:
+        dJ.dat.data_with_halos[:] *= dt / 2
     return dJ
 
 
@@ -224,41 +235,97 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
     return grad_solver, forward_field, uadj, gradi
 
 
+def build_adjoint_solver(
+    forward_residual_form,
+    forward_residual_states,
+    adjoint_current_state,
+    adjoint_previous_state,
+    adjoint_next_state,
+    adjoint_source,
+    solver_parameters,
+) -> fire.LinearVariationalSolver:
+    """Build a one-step adjoint solver from a discrete forward residual.
+
+    The input residual represents one forward time step,
+
+        R(y^{n+1}, y^n, y^{n-1}; m) = 0.
+
+    UFL differentiation gives the linearized blocks
+
+        R_{y^{n+1}}, R_{y^n}, R_{y^{n-1}},
+
+    and the discrete adjoint step solves
+
+        R_{y^{n+1}}^T lambda^{n+1}
+            = -R_{y^n}^T lambda^n
+              -R_{y^{n-1}}^T lambda^{n-1}
+              + J_y.
+
+    Parameters
+    ----------
+    forward_residual_form : ufl.Form
+        Forward residual form for one time step.
+    forward_residual_states : tuple
+        Formal residual states corresponding to ``y^{n+1}``, ``y^n`` and
+        ``y^{n-1}``.
+    adjoint_current_state : firedrake.Function
+        Current adjoint state, ``lambda^n``.
+    adjoint_previous_state : firedrake.Function
+        Previous adjoint state, ``lambda^{n-1}``.
+    adjoint_next_state : firedrake.Function
+        Unknown adjoint state solved by this step, ``lambda^{n+1}``.
+    adjoint_source : firedrake.Cofunction
+        Source term representing the derivative of the objective with respect
+        to the state.
+    solver_parameters : dict
+        Firedrake/PETSc solver parameters.
+    """
+    residual_np1, residual_n, residual_nm1 = forward_residual_states
+    state_space = residual_np1.function_space()
+    direction = fire.TrialFunction(state_space)
+
+    dR_dnp1 = fire.derivative(
+        forward_residual_form, residual_np1, direction,
+    )
+    dR_dn = fire.derivative(
+        forward_residual_form, residual_n, direction,
+    )
+    dR_dnm1 = fire.derivative(
+        forward_residual_form, residual_nm1, direction,
+    )
+
+    adjoint_lhs = fire.adjoint(dR_dnp1)
+    adjoint_rhs = (
+        -fire.action(fire.adjoint(dR_dn), adjoint_current_state)
+        - fire.action(fire.adjoint(dR_dnm1), adjoint_previous_state)
+    )
+    problem = fire.LinearVariationalProblem(
+        adjoint_lhs,
+        adjoint_rhs + adjoint_source,
+        adjoint_next_state,
+        constant_jacobian=True,
+    )
+    solver_parameters = dict(solver_parameters)
+    solver_parameters["mat_type"] = "matfree"
+    return fire.LinearVariationalSolver(
+        problem,
+        solver_parameters=solver_parameters,
+    )
+
+
 def _build_adjoint_solver(wave_obj: Wave) -> fire.LinearVariationalSolver:
     """Build the adjoint time-step solver from the forward residual form."""
     if not _uses_form_derived_gradient(wave_obj):
         return wave_obj.solver
 
-    residual_np1, residual_n, residual_nm1 = wave_obj.forward_residual_states
-    state_space = residual_np1.function_space()
-    direction = fire.TrialFunction(state_space)
-
-    dR_dnp1 = fire.derivative(
-        wave_obj.forward_residual_form, residual_np1, direction,
-    )
-    dR_dn = fire.derivative(
-        wave_obj.forward_residual_form, residual_n, direction,
-    )
-    dR_dnm1 = fire.derivative(
-        wave_obj.forward_residual_form, residual_nm1, direction,
-    )
-
-    adjoint_lhs = fire.adjoint(dR_dnp1)
-    adjoint_rhs = (
-        -fire.action(fire.adjoint(dR_dn), wave_obj.vstate)
-        - fire.action(fire.adjoint(dR_dnm1), wave_obj.prev_vstate)
-    )
-    problem = fire.LinearVariationalProblem(
-        adjoint_lhs,
-        adjoint_rhs + wave_obj.get_adjoint_source(),
+    return build_adjoint_solver(
+        wave_obj.forward_residual_form,
+        wave_obj.forward_residual_states,
+        wave_obj.vstate,
+        wave_obj.prev_vstate,
         wave_obj.next_vstate,
-        constant_jacobian=True,
-    )
-    solver_parameters = dict(wave_obj.solver_parameters)
-    solver_parameters["mat_type"] = "matfree"
-    return fire.LinearVariationalSolver(
-        problem,
-        solver_parameters=solver_parameters,
+        wave_obj.get_adjoint_source(),
+        wave_obj.solver_parameters,
     )
 
 
@@ -300,13 +367,14 @@ def _get_single_form_control(wave_obj: Wave):
 def _assign_forward_residual_states(wave_obj: Wave, forward_solution: list) -> None:
     """Assign replay states used by the UFL-derived residual gradient."""
     u_np1, u_n, u_nm1 = wave_obj.forward_residual_states
-    if len(forward_solution) > 2:
-        u_np1.assign(forward_solution.pop())
+    u_np1.assign(forward_solution.pop())
+    if len(forward_solution) > 0:
         u_n.assign(forward_solution[-1])
+    else:
+        u_n.assign(0.0)
+    if len(forward_solution) > 1:
         u_nm1.assign(forward_solution[-2])
     else:
-        u_np1.assign(forward_solution.pop())
-        u_n.assign(0.0)
         u_nm1.assign(0.0)
 
 
