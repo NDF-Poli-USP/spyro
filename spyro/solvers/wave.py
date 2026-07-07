@@ -549,6 +549,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             older_state.assign(0.0)
 
     def get_adjoint_receiver_source_space(self):
+<<<<<<< HEAD
         """Return the state-space component where receiver misfit is injected.
 
         Acoustic solvers inject the misfit into their scalar (pressure) space.
@@ -563,6 +564,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             return get_scalar_space()
         except ValueError:
             # Acoustic solver whose scalar space has not been created yet.
+=======
+        """Return the state-space component where receiver misfit is injected."""
+        try:
+            return self.get_scalar_function_space()
+        except (AttributeError, ValueError):
+>>>>>>> b83f6be6 (generalize)
             return self.function_space
 
     def set_forward_residual_form(
