@@ -183,6 +183,9 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
                         "Unsupported type for real_shot_record. Must be "
                         "either a numpy array or a Firedrake Function."
                     )
+                misfit_step_expr = misfit_step
+                misfit_step = fire.Function(usol_recv[-1].function_space())
+                misfit_step.interpolate(misfit_step_expr)
             else:
                 misfit_step = real_shot_record[step] - usol_recv[-1]
             wave_obj.misfit.append(misfit_step)

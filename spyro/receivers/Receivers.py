@@ -1,5 +1,6 @@
 from firedrake import *  # noqa: F403
 from spyro.receivers.dirac_delta_projector import Delta_projector
+from ..domains.space import create_function_space
 from ..utils.typing import WaveType
 import numpy as np
 from ..tools.version_control import is_firedrake_new
@@ -103,49 +104,61 @@ class Receivers(Delta_projector):
         """
         for rid in range(self.number_of_points):
             value = residual[IT][rid]
-            # Cell id 0 is a valid local cell, so this must be an explicit
-            # None check rather than a truth-value check.
-            if self.is_local[rid] is not None:
+            if self.is_local[rid]:
                 idx = np.int_(self.cellNodeMaps[rid])
                 phis = self.cell_tabulations[rid]
 
-                value = np.asarray(value)
-                if value.ndim == 0:
-                    tmp = phis * value
-                else:
-                    tmp = phis[:, None] * value
+                tmp = np.dot(phis, value)
                 rhs_forcing.dat.data_with_halos[idx] += tmp
             else:
                 tmp = rhs_forcing.dat.data_with_halos[0]
 
         return rhs_forcing
 
-    def apply_receivers_as_source_vertex_only_mesh(
-        self, residual, IT, target_space,
-    ):
+    def apply_receivers_as_source_vertex_only_mesh(self, misfit_form, target_space):
         """Return receiver misfit injection as a VOM-built cofunction.
 
         This is the adjoint of the receiver interpolation used by the
-        form-derived implemented adjoint.  It deliberately avoids the legacy
-        cell-tabulation path in :meth:`apply_receivers_as_source`.
-        """
-        receiver_mesh = VertexOnlyMesh(self.mesh, self.point_locations)
-        receiver_values = np.asarray(residual[IT])
+        form-derived implemented adjoint.
 
-        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
-            V_r = VectorFunctionSpace(receiver_mesh, "DG", 0)
+        Parameters
+        ----------
+        misfit_form : firedrake.Function or array_like
+            Receiver-space misfit at the current time step.  The implemented
+            adjoint uses the ``Function`` produced while accumulating the
+            functional during forward time integration.  Array input is kept for
+            compatibility with callers that provide receiver values directly.
+        target_space : firedrake.functionspaceimpl.WithGeometry
+            Finite element space where the adjoint source cofunction is
+            injected.
+
+        Returns
+        -------
+        firedrake.Cofunction
+            Cofunction on ``target_space.dual()`` containing the receiver
+            misfit injected into the finite element adjoint source space.
+        """
+        try:
+            V_r = misfit_form.function_space()
+            value = misfit_form
+        except AttributeError:
+            receiver_mesh = VertexOnlyMesh(self.mesh, self.point_locations)
+            receiver_values = np.asarray(misfit_form)
+
+            if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
+                V_r = create_function_space(
+                    receiver_mesh, "DG", 0, dim=self.dimension,
+                )
+            elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
+                V_r = create_function_space(receiver_mesh, "DG", 0)
+            else:
+                raise ValueError("Invalid wave type")
+
             value = Function(V_r)
-            if value.dat.data.shape[0] > 0:
-                value.dat.data[:] = receiver_values[:value.dat.data.shape[0]]
-            receiver_form = inner(value, TestFunction(V_r)) * dx
-        elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
-            V_r = FunctionSpace(receiver_mesh, "DG", 0)
-            value = Function(V_r)
-            if value.dat.data.shape[0] > 0:
-                value.dat.data[:] = receiver_values[:value.dat.data.shape[0]]
-            receiver_form = value * TestFunction(V_r) * dx
-        else:
-            raise ValueError("Invalid wave type")
+            local_value_count = value.dat.data_ro.shape[0]
+            if local_value_count > 0:
+                value.dat.data_wo[:] = receiver_values[:local_value_count]
+        receiver_form = inner(value, TestFunction(V_r)) * dx
 
         return Cofunction(target_space.dual()).interpolate(
             assemble(receiver_form),

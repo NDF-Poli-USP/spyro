@@ -539,9 +539,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         ``source_function`` is reserved for the forward problem. This method
         returns a distinct cofunction used by the adjoint problem, with the same
-        dual space by default. Mixed-state solvers may override it together with
-        :meth:`set_adjoint_source` to lift scalar receiver sources into the full
-        adjoint state space.
+        dual space by default.
         """
         if self.adjoint_source_function is None:
             self.adjoint_source_function = fire.Cofunction(
@@ -559,7 +557,26 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             respect to the wave state.
         """
         adjoint_source = self.get_adjoint_source()
-        adjoint_source.assign(misfit_form)
+        if adjoint_source.function_space() == misfit_form.function_space():
+            adjoint_source.assign(misfit_form)
+            return
+
+        try:
+            adjoint_source_component = adjoint_source.sub(0)
+        except (AttributeError, IndexError, ValueError) as exc:
+            raise ValueError(
+                "Misfit form space is incompatible with the adjoint source "
+                "space."
+            ) from exc
+
+        if adjoint_source_component.function_space() != misfit_form.function_space():
+            raise ValueError(
+                "Misfit form space is incompatible with the first component of "
+                "the adjoint source space."
+            )
+
+        adjoint_source.assign(0.0)
+        adjoint_source_component.assign(misfit_form)
 
     def set_material_properties(self, *args, **kwargs):
         """Wrapper for material_properties_io.set_material_property."""
@@ -609,6 +626,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
         self.store_forward_time_steps = True
         self.use_vertex_only_mesh = True
+        if self.functional_evaluation_mode is not FunctionalEvaluationMode.PER_TIMESTEP:
+            self.enable_compute_functional(
+                mode=FunctionalEvaluationMode.PER_TIMESTEP
+            )
 
     @property
     def forward_solution_receivers(self):

@@ -118,24 +118,36 @@ def _small_elastic_model():
     }
 
 
-def _solve_acoustic(model, velocity, edge_length=0.5, implemented_adjoint=False):
+def _solve_acoustic(
+    model, velocity, edge_length=0.5, implemented_adjoint=False,
+    real_shot_record=None,
+):
     wave = spyro.AcousticWave(dictionary=deepcopy(model))
     wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
     if isinstance(velocity, (float, int)):
         wave.set_initial_velocity_model(constant=velocity)
     else:
         wave.set_control_parameters(velocity)
+    if real_shot_record is not None:
+        wave.real_shot_record = real_shot_record
     if implemented_adjoint:
         wave.enable_implemented_adjoint()
     wave.forward_solve()
     return wave
 
 
-def _solve_elastic(model, edge_length=0.5, implemented_adjoint=False):
+def _solve_elastic(
+    model, edge_length=0.5, implemented_adjoint=False,
+    real_shot_record=None, use_vertex_only_mesh=False,
+):
     wave = spyro.IsotropicWave(dictionary=deepcopy(model))
     wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+    if real_shot_record is not None:
+        wave.real_shot_record = real_shot_record
     if implemented_adjoint:
         wave.enable_implemented_adjoint()
+    elif use_vertex_only_mesh:
+        wave.use_vertex_only_mesh = True
     wave.forward_solve()
     return wave
 
@@ -151,14 +163,13 @@ def test_acoustic_implemented_adjoint_uses_forward_residual_form():
     guess = spyro.AcousticWave(dictionary=deepcopy(model))
     guess.set_mesh(input_mesh_parameters={"edge_length": 0.5})
     guess.set_initial_velocity_model(constant=2.0)
+    guess.real_shot_record = exact.forward_solution_receivers
     guess.enable_implemented_adjoint()
     guess.forward_solve()
 
     assert guess.use_vertex_only_mesh
 
-    misfit = exact.forward_solution_receivers - guess.forward_solution_receivers
     gradient = guess.gradient_solve(
-        misfit=misfit,
         adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
     )
 
@@ -172,15 +183,16 @@ def test_elastic_implemented_adjoint_uses_forward_residual_form():
     exact_model = deepcopy(model)
     exact_model["synthetic_data"]["density"] = 1.2
 
-    exact = _solve_elastic(exact_model)
-    guess = _solve_elastic(model, implemented_adjoint=True)
+    exact = _solve_elastic(exact_model, use_vertex_only_mesh=True)
+    guess = _solve_elastic(
+        model, implemented_adjoint=True,
+        real_shot_record=exact.forward_solution_receivers,
+    )
 
     assert guess.use_vertex_only_mesh
 
-    misfit = exact.forward_solution_receivers - guess.forward_solution_receivers
-    functional = spyro.utils.compute_functional(guess, misfit)
+    functional = guess.functional_value
     gradient = guess.gradient_solve(
-        misfit=misfit,
         adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
     )
 
@@ -215,10 +227,13 @@ def test_elastic_implemented_adjoint_taylor_remainder(parameter):
         1.2 * exact_model["synthetic_data"][parameter.value]
     )
 
-    exact = _solve_elastic(exact_model)
+    exact = _solve_elastic(exact_model, use_vertex_only_mesh=True)
     real_record = exact.forward_solution_receivers
 
-    guess = _solve_elastic(model, implemented_adjoint=True)
+    guess = _solve_elastic(
+        model, implemented_adjoint=True,
+        real_shot_record=real_record,
+    )
     base_controls = {
         parameter: fire.Function(control.function_space(), name=control.name())
         for parameter, control in guess.get_control_parameters().items()
@@ -226,16 +241,15 @@ def test_elastic_implemented_adjoint_taylor_remainder(parameter):
     for parameter, control in guess.get_control_parameters().items():
         base_controls[parameter].assign(control)
 
-    misfit = real_record - guess.forward_solution_receivers
-    base_functional = spyro.utils.compute_functional(guess, misfit)
+    base_functional = guess.functional_value
     gradient = guess.gradient_solve(
-        misfit=misfit,
         adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
     )
 
     direction = fire.Function(base_controls[parameter].function_space())
+    direction_shape = direction.dat.data_ro.shape
     direction.dat.data_wo[:] = (
-        np.random.default_rng(5).random(direction.dat.data_wo.shape) - 0.5
+        np.random.default_rng(5).random(direction_shape) - 0.5
     )
     direction.assign(direction / fire.norm(direction))
     directional_derivative = fire.assemble(
@@ -257,10 +271,7 @@ def test_elastic_implemented_adjoint_taylor_remainder(parameter):
         controls[parameter].assign(base_controls[parameter] + step * direction)
         guess.set_control_parameters(controls)
         guess.forward_solve()
-        perturbed_misfit = real_record - guess.forward_solution_receivers
-        perturbed_functional = spyro.utils.compute_functional(
-            guess, perturbed_misfit,
-        )
+        perturbed_functional = guess.functional_value
         finite_difference = (
             perturbed_functional - base_functional
         ) / step
@@ -291,19 +302,21 @@ def test_acoustic_implemented_adjoint_taylor_remainder():
     exact = _solve_acoustic(model, 1.5)
     real_record = exact.forward_solution_receivers
 
-    guess = _solve_acoustic(model, 2.0, implemented_adjoint=True)
+    guess = _solve_acoustic(
+        model, 2.0, implemented_adjoint=True,
+        real_shot_record=real_record,
+    )
     base_control = fire.Function(guess.get_control_parameters())
     base_control.assign(guess.get_control_parameters())
-    misfit = real_record - guess.forward_solution_receivers
-    base_functional = spyro.utils.compute_functional(guess, misfit)
+    base_functional = guess.functional_value
     gradient = guess.gradient_solve(
-        misfit=misfit,
         adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
     )
 
     direction = fire.Function(guess.get_control_parameter_function_space())
+    direction_shape = direction.dat.data_ro.shape
     direction.dat.data_wo[:] = (
-        np.random.default_rng(7).random(direction.dat.data_wo.shape) - 0.5
+        np.random.default_rng(7).random(direction_shape) - 0.5
     )
     direction.assign(direction / fire.norm(direction))
     directional_derivative = fire.assemble(
@@ -317,10 +330,7 @@ def test_acoustic_implemented_adjoint_taylor_remainder():
         guess.reset_pressure()
         guess.initial_velocity_model = base_control + step * direction
         guess.forward_solve()
-        perturbed_misfit = real_record - guess.forward_solution_receivers
-        perturbed_functional = spyro.utils.compute_functional(
-            guess, perturbed_misfit,
-        )
+        perturbed_functional = guess.functional_value
         finite_difference = (
             perturbed_functional - base_functional
         ) / step
@@ -356,14 +366,13 @@ def test_acoustic_pml_implemented_adjoint_uses_mixed_residual_form():
     guess = spyro.AcousticWave(dictionary=deepcopy(model))
     guess.set_mesh(input_mesh_parameters={"edge_length": 0.5})
     guess.set_initial_velocity_model(constant=2.0)
+    guess.real_shot_record = exact.forward_solution_receivers
     guess.enable_implemented_adjoint()
     guess.forward_solve()
 
     assert guess.forward_solution[0].function_space() == guess.mixed_function_space
 
-    misfit = exact.forward_solution_receivers - guess.forward_solution_receivers
     gradient = guess.gradient_solve(
-        misfit=misfit,
         adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
     )
 

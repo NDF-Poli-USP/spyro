@@ -69,7 +69,7 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
     for step in range(nt - 1, -1, -1):
         if use_form_derived_gradient:
             misfit_form = receivers.apply_receivers_as_source_vertex_only_mesh(
-                wave_obj.misfit, step, receiver_source_space,
+                wave_obj.misfit[step], receiver_source_space,
             )
         else:
             rhs_forcing.assign(0.0)

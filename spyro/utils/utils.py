@@ -113,11 +113,7 @@ def compute_functional(
 
     J = 0
     for rn in range(num_receivers):
-        receiver_misfit = misfit[:, rn]
-        receiver_integrand = receiver_misfit**2
-        if receiver_integrand.ndim > 1:
-            receiver_integrand = np.sum(receiver_integrand, axis=-1)
-        J += np.trapezoid(receiver_integrand, dx=dt)
+        J += np.trapezoid(misfit[:, rn] ** 2, dx=dt)
 
     J *= 0.5
 
@@ -769,7 +765,8 @@ def get_real_shot_record(wave_object):
     """Get the real shot record for the active sources.
 
     The returned object is typically an array with shape
-    ``(n_timesteps, n_receivers)`` for a single active shot.
+    ``(n_timesteps, n_receivers)`` for scalar receiver data or
+    ``(n_timesteps, n_receivers, dimension)`` for vector receiver data.
     """
     real_shot_record = wave_object.real_shot_record
 
@@ -789,10 +786,16 @@ def get_real_shot_record(wave_object):
         )
 
     if isinstance(real_shot_record, np.ndarray):
-        if real_shot_record.ndim == 3:
-            return real_shot_record[wave_object.current_sources[0]]
-        if real_shot_record.ndim == 2:
+        if (
+            real_shot_record.ndim >= 2
+            and real_shot_record.shape[1] == wave_object.number_of_receivers
+        ):
             return real_shot_record
+        if (
+            real_shot_record.ndim >= 3
+            and real_shot_record.shape[2] == wave_object.number_of_receivers
+        ):
+            return real_shot_record[wave_object.current_sources[0]]
 
     if isinstance(real_shot_record, (list, tuple)):
         if (
@@ -800,7 +803,11 @@ def get_real_shot_record(wave_object):
             and len(real_shot_record) > wave_object.current_sources[0]
         ):
             source_record = real_shot_record[wave_object.current_sources[0]]
-            if isinstance(source_record, np.ndarray) and source_record.ndim == 2:
+            if (
+                isinstance(source_record, np.ndarray)
+                and source_record.ndim >= 2
+                and source_record.shape[1] == wave_object.number_of_receivers
+            ):
                 return source_record
 
     return real_shot_record
