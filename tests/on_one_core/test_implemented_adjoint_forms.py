@@ -81,8 +81,7 @@ def test_acoustic_implemented_adjoint_uses_forward_residual_form():
         adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
     )
 
-    assert hasattr(guess, "forward_residual_form")
-    assert guess.misfit_form is not None
+    assert guess.forward_residual_form is not None
     assert isinstance(gradient, fire.Function)
     assert np.isfinite(fire.norm(gradient))
 
@@ -110,7 +109,12 @@ def test_acoustic_pml_implemented_adjoint_uses_mixed_residual_form():
     )
 
     residual_np1, _, _ = guess.forward_residual_states
-    assert hasattr(guess, "forward_residual_form")
+    assert guess.forward_residual_form is not None
     assert residual_np1.function_space() == guess.mixed_function_space
+    assert (
+        guess.get_adjoint_source().function_space()
+        == guess.source_function.function_space()
+    )
+    assert guess.get_adjoint_source() is not guess.source_function
     assert isinstance(gradient, fire.Function)
     assert np.isfinite(fire.norm(gradient))

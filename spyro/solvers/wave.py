@@ -105,10 +105,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.automated_adjoint = None
         self.functional_value = None
         self.misfit = None
-        self.misfit_form = None
+        self.forward_residual_form = None
+        self.forward_residual_states = None
         self.current_time = 0.0
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
+        self.adjoint_source_function = None
         self.set_solver_parameters()
 
         # Create or get the mesh
@@ -531,6 +533,33 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         the DOFs associated with the subspace of the original problem).
         """
         pass
+
+    def get_adjoint_source(self):
+        """Return the cofunction used as the adjoint equation source.
+
+        ``source_function`` is reserved for the forward problem. This method
+        returns a distinct cofunction used by the adjoint problem, with the same
+        dual space by default. Mixed-state solvers may override it together with
+        :meth:`set_adjoint_source` to lift scalar receiver sources into the full
+        adjoint state space.
+        """
+        if self.adjoint_source_function is None:
+            self.adjoint_source_function = fire.Cofunction(
+                self.source_function.function_space()
+            )
+        return self.adjoint_source_function
+
+    def set_adjoint_source(self, misfit_form):
+        """Assign the misfit form into the adjoint source space.
+
+        Parameters
+        ----------
+        misfit_form : firedrake.Cofunction
+            Cofunction representing the derivative of the misfit functional with
+            respect to the wave state.
+        """
+        adjoint_source = self.get_adjoint_source()
+        adjoint_source.assign(misfit_form)
 
     def set_material_properties(self, *args, **kwargs):
         """Wrapper for material_properties_io.set_material_property."""

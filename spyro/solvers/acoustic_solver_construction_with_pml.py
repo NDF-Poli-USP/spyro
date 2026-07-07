@@ -36,7 +36,6 @@ def _set_forward_residual_form(Wave_object, W, X_n, X_nm1):
     Wave_object.forward_residual_form = (
         fire.action(Wave_object.lhs, residual_X_np1) - residual_rhs
     )
-    Wave_object.misfit_form = fire.Cofunction(W.dual())
 
 
 def construct_solver_or_matrix_with_pml(Wave_object):

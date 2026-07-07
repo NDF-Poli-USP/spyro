@@ -63,15 +63,12 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
 
     for step in range(nt - 1, -1, -1):
         rhs_forcing.assign(0.0)
-        receiver_source = receivers.apply_receivers_as_source(
+        misfit_form = receivers.apply_receivers_as_source(
             rhs_forcing, wave_obj.misfit, step,
         )
         if step == 0 or step == nt - 1:
-            receiver_source.assign(0.5 * receiver_source)
-        wave_obj.misfit_form = receiver_source
-        wave_obj.rhs_no_pml_source().assign(
-            receiver_source
-        )
+            misfit_form.assign(0.5 * misfit_form)
+        wave_obj.set_adjoint_source(misfit_form)
         adjoint_solver.solve()
 
         if step % wave_obj.gradient_sampling_frequency == 0:
@@ -251,14 +248,9 @@ def _build_adjoint_solver(wave_obj: Wave) -> fire.LinearVariationalSolver:
         -fire.action(fire.adjoint(dR_dn), wave_obj.vstate)
         - fire.action(fire.adjoint(dR_dnm1), wave_obj.prev_vstate)
     )
-    source = (
-        wave_obj.source_function
-        if wave_obj.abc_boundary_layer_type == "PML"
-        else wave_obj.rhs_no_pml_source()
-    )
     problem = fire.LinearVariationalProblem(
         adjoint_lhs,
-        adjoint_rhs + source,
+        adjoint_rhs + wave_obj.get_adjoint_source(),
         wave_obj.next_vstate,
         constant_jacobian=True,
     )
@@ -272,8 +264,8 @@ def _build_adjoint_solver(wave_obj: Wave) -> fire.LinearVariationalSolver:
 
 def _uses_form_derived_gradient(wave_obj: Wave) -> bool:
     return (
-        hasattr(wave_obj, "forward_residual_form")
-        and hasattr(wave_obj, "forward_residual_states")
+        wave_obj.forward_residual_form is not None
+        and wave_obj.forward_residual_states is not None
         and isinstance(_get_single_form_control(wave_obj), fire.Function)
     )
 

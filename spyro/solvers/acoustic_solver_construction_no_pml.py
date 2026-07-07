@@ -108,7 +108,6 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     )
 
     Wave_object.source_function = fire.Cofunction(V.dual())
-    Wave_object.misfit_form = fire.Cofunction(V.dual())
 
     lin_var = fire.LinearVariationalProblem(
         Wave_object.lhs,

@@ -29,7 +29,7 @@ def _forward_state_storage_space(wave_obj):
     """Return the space needed by the implemented-adjoint forward replay."""
     if (
         wave_obj.abc_boundary_layer_type == "PML"
-        and hasattr(wave_obj, "forward_residual_form")
+        and wave_obj.forward_residual_form is not None
     ):
         return wave_obj.mixed_function_space
     return wave_obj.function_space

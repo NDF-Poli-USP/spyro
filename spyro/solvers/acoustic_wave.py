@@ -346,6 +346,30 @@ class AcousticWave(Wave):
         else:
             return self.source_function
 
+    def get_adjoint_source(self):
+        """Return the adjoint source in the full acoustic state space.
+
+        For non-PML acoustic solves this is the scalar source cofunction.  For
+        PML solves the adjoint equation is posed on the mixed state space, so
+        the source returned here is the full mixed cofunction; receiver misfit
+        data are lifted into its pressure component by
+        :meth:`set_adjoint_source`.
+        """
+        if self.adjoint_source_function is None:
+            self.adjoint_source_function = fire.Cofunction(
+                self.source_function.function_space()
+            )
+        return self.adjoint_source_function
+
+    def set_adjoint_source(self, misfit_form):
+        """Lift a scalar misfit form into the acoustic adjoint state space."""
+        adjoint_source = self.get_adjoint_source()
+        if self.abc_boundary_layer_type == "PML":
+            adjoint_source.assign(0.0)
+            adjoint_source.sub(0).assign(misfit_form)
+        else:
+            adjoint_source.assign(misfit_form)
+
     def pressure_for_receivers(self):
         """Return the expression to be interpolated at receiver locations.
 
