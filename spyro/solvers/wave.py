@@ -722,7 +722,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def enable_implemented_adjoint(
         self,
-        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
     ):
         """Switch the solver into an implemented-adjoint mode.
 
@@ -756,7 +756,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def _prepare_implemented_adjoint(
         self, misfit=None, forward_solution=None,
-        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
     ):
         """Enable the implemented adjoint and ensure misfit + forward solution.
 

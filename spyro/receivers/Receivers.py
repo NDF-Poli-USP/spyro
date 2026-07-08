@@ -1,11 +1,5 @@
 from firedrake import (
-    Cofunction,
-    Function,
-    TestFunction,
-    VertexOnlyMesh,
-    assemble,
-    dx,
-    inner,
+    Cofunction, Function, TestFunction, VertexOnlyMesh, assemble, dx, inner,
 )
 from spyro.receivers.dirac_delta_projector import Delta_projector
 from ..domains.space import create_function_space

@@ -79,7 +79,7 @@ class AcousticWave(Wave):
     @ensemble_gradient
     def gradient_solve(
         self, misfit=None, forward_solution=None,
-        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
         riesz_map=RieszMapType.L2,
     ):
         """Compute the adjoint-based gradient.

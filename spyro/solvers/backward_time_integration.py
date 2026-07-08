@@ -14,7 +14,7 @@ _SINGLE_CONTROL_KEY = "control"
 def backward_wave_propagator(
     wave_obj: Wave,
     dt: float = None,
-    adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+    adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
 ):
     """Propagates the adjoint wave backwards in time.
 
