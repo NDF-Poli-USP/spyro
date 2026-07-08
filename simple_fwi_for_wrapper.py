@@ -6,8 +6,91 @@ runs a simple inversion loop against that record.
 
 import numpy as np
 import firedrake as fire
+from scipy.optimize import minimize as scipy_minimize
 import spyro
 import pytest
+
+
+class MyFWI(spyro.FullWaveformInversion):
+    def run_fwi(self, **kwargs):
+        """
+        Run full waveform inversion using scipy L-BFGS-B optimizer.
+
+        Performs the complete FWI optimization using scipy.optimize.minimize
+        with the L-BFGS-B method. The optimization minimizes the misfit between
+        observed and simulated data by updating the configured control
+        parameter.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Keyword arguments for customizing the optimization:
+
+            vmin : float, optional
+                Lower bound for the control parameter. Default is 1.429.
+            vmax : float, optional
+                Upper bound for the control parameter. Default is 6.0.
+            maxiter : int, optional
+                Maximum number of iterations. Default is 20.
+            scipy_options : dict, optional
+                Additional options passed to scipy.optimize.minimize.
+                Default includes disp=True, eps=1e-15, ftol=1e-11.
+
+        Notes
+        -----
+        The final control parameter is stored in ``control_parameter_result``
+        and saved to ``control_end.pvd``. The raw optimizer vector is also
+        saved to ``result.npy``.
+
+        This method uses the L-BFGS-B algorithm which is well-suited for
+        large-scale bound-constrained optimization problems.
+
+        Examples
+        --------
+        >>> fwi.run_fwi(maxiter=100, vmin=1.5, vmax=5.0)
+        """
+        parameters = {
+            "vmin": kwargs.pop("vmin", 1.429),
+            "vmax": kwargs.pop("vmax", 6.0),
+            "scipy_options": {
+                "disp": True,
+                "eps": kwargs.pop("eps", 1e-15),
+                "ftol": kwargs.pop("ftol", 1e-11),
+                "maxiter": kwargs.pop("maxiter", 20),
+            },
+        }
+        parameters.update(kwargs)
+
+        control_reference = self._guess_control_reference()
+        lower = self._expand_bound(parameters["vmin"], control_reference)
+        upper = self._expand_bound(parameters["vmax"], control_reference)
+        bounds = list(zip(lower, upper))
+        control_0 = self._flatten_control(control_reference)
+        options = parameters["scipy_options"]
+
+        result = scipy_minimize(
+            self.return_functional_and_gradient,
+            control_0,
+            method="L-BFGS-B",
+            jac=True,
+            tol=1e-15,
+            bounds=bounds,
+            options=options,
+        )
+
+        self.control_result = self._rebuild_control_from_vector(
+            control_reference,
+            result.x,
+        )
+        self.set_guess_control(self.control_result)
+
+        self.control_parameter_result = self._copy_control_structure(
+            self.control_result,
+        )
+        fire.VTKFile("control_end.pvd").write(self.control_parameter_result)
+
+        np.save("result", result.x)
+        return result
 
 
 def run_forward_real_model(input_dictionary, case="camembert", shot_filename="shots/shot_record_"):
@@ -28,7 +111,7 @@ def run_forward_real_model(input_dictionary, case="camembert", shot_filename="sh
         The generated shot record is written to disk.
     """
 
-    fwi_obj = spyro.FullWaveformInversion(dictionary=input_dictionary)
+    fwi_obj = MyFWI(dictionary=input_dictionary)
 
     fwi_obj.set_real_mesh(input_mesh_parameters={"edge_length": 0.05})
 
@@ -177,7 +260,7 @@ def run_fwi(load_real_shot=True):
 
     else:
         dictionary["inversion"]["real_shot_record_file"] = shots_filenames
-        fwi_obj = spyro.FullWaveformInversion(dictionary=dictionary)
+        fwi_obj = MyFWI(dictionary=dictionary)
 
     # Setting up initial guess problem
     fwi_obj.set_guess_mesh(input_mesh_parameters={"edge_length": 0.1})
