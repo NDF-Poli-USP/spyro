@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import spyro
 
-from spyro.utils.typing import AdjointType, ImplementedAdjointDerivation
+from spyro.utils.typing import AdjointType
 
 
 def _small_acoustic_model():
@@ -150,14 +150,6 @@ def _solve_elastic(
         wave.use_vertex_only_mesh = True
     wave.forward_solve()
     return wave
-
-
-def test_implemented_adjoint_derivation_is_separate_from_adjoint_type():
-    assert AdjointType.IMPLEMENTED_ADJOINT is AdjointType.IMPLEMENTED_ADJOINT
-    assert (
-        ImplementedAdjointDerivation.UFL_DIFFERENTIATION
-        is not ImplementedAdjointDerivation.HAND_DERIVED
-    )
 
 
 def test_acoustic_implemented_adjoint_uses_forward_residual_form():

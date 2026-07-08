@@ -2,7 +2,6 @@ import firedrake as fire
 from . import helpers
 from .wave import Wave
 from ..io.basicio import parallel_print
-from ..receivers.Receivers import Receivers
 from ..utils.typing import ImplementedAdjointDerivation
 
 # Key used to store a single-control (e.g. acoustic velocity) gradient in the
@@ -94,7 +93,7 @@ def backward_wave_propagator(
     # single-control solvers. ``controls_are_dict`` records whether the public
     # API should return that dict (elastic) or a single Function (acoustic).
     controls_are_dict = use_ufl_differentiation and isinstance(form_controls, dict)
-    receiver_source_space = _receiver_source_function_space(wave_obj)
+    receiver_source_space = wave_obj.get_adjoint_receiver_source_space()
     rhs_forcing = None
     if not use_ufl_differentiation:
         rhs_forcing = fire.Cofunction(receiver_source_space.dual())
@@ -236,29 +235,10 @@ def _build_gradient_solver(
     --------
     grad_solver, forward_field, uadj, gradi
     """
-    if (
-        wave_obj.use_vertex_only_mesh
-        and wave_obj.automatic_adjoint is False
-        and not use_ufl_differentiation
-    ):
-        # WORKAROUND: enable_implemented_adjoint() forces
-        # ``use_vertex_only_mesh = True``, which builds VOM-based receivers.
-        # The legacy hand-derived gradient path
-        # instead injects the misfit through ``apply_receivers_as_source``,
-        # which relies on the manual cell tabulations built by ``Receivers``
-        # only when the flag is False. Rebuild the receivers with the flag off
-        # to get those maps, then restore it so the rest of the object still
-        # sees ``use_vertex_only_mesh = True``.
-        # TODO: Use VertexOnlyMesh consistently across Spyro receiver-source
-        # paths so this rebuild-and-restore becomes unnecessary.
-        wave_obj.use_vertex_only_mesh = False
-        wave_obj.receivers = Receivers(wave_obj)
-        wave_obj.use_vertex_only_mesh = True
     if use_ufl_differentiation:
         dx = fire.dx(**wave_obj.quadrature_rule)
-        state_space = _receiver_source_function_space(wave_obj)
+        state_space = wave_obj.get_adjoint_receiver_source_space()
         uadj = fire.Function(state_space)
-        forward_field = fire.Function(state_space)
         # For PML the residual lives on the mixed state space, so it must be
         # paired with the full mixed adjoint. Without PML the residual is scalar
         # and pairs with the scalar adjoint field.
@@ -279,7 +259,7 @@ def _build_gradient_solver(
             "Using UFL-derived gradient from forward residual form",
             wave_obj.comm,
         )
-        return grad_solver, forward_field, uadj, gradi
+        return grad_solver, None, uadj, gradi
 
     V = wave_obj.get_scalar_function_space()
     qr = wave_obj.quadrature_rule
@@ -517,11 +497,6 @@ def _control_map(controls) -> dict:
     if isinstance(controls, dict):
         return controls
     return {_SINGLE_CONTROL_KEY: controls}
-
-
-def _receiver_source_function_space(wave_obj: Wave):
-    """Return the space used by receiver-injected adjoint sources."""
-    return wave_obj.get_adjoint_receiver_source_space()
 
 
 def _compute_dufordt2(forward_solution: list, dt: float) -> fire.Function:

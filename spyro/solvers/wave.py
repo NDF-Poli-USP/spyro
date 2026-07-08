@@ -558,8 +558,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Solvers without a dedicated scalar space (e.g. elastic) fall back to
         the full solution space.
         """
-        get_scalar_space = getattr(self, "get_scalar_function_space", None)
-        if get_scalar_space is None:
+        try:
+            get_scalar_space = self.get_scalar_function_space
+        except AttributeError:
             # Solver does not expose a scalar space (e.g. elastic).
             return self.function_space
         try:
