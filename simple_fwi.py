@@ -41,12 +41,6 @@ def run_forward_real_model(input_dictionary, case="camembert", shot_filename="sh
         mesh_z = fwi_obj.wave.mesh_z
         mesh_x = fwi_obj.wave.mesh_x
         cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
-    elif case == "layers":
-        # not yet done here
-        # Works for any number of horizontal layers and velocity values
-        z_switch = [-1.0]  # List of floats representing z value where vp changes
-        layer_vps = [2.5, 3.0]  # List of vp values
-        cond = multiple_layer_velocity_model(fwi_obj, z_switch, layer_vps)
     elif case not in supported_cases:
         return ValueError(f"Case of {case} not part of supported cases: {supported_cases}")
     else:
