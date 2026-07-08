@@ -95,7 +95,7 @@ def backward_wave_propagator(
     controls_are_dict = use_ufl_differentiation and isinstance(form_controls, dict)
     receiver_source_space = wave_obj.get_adjoint_receiver_source_space()
     rhs_forcing = None
-    if not use_ufl_differentiation:
+    if not use_ufl_differentiation and not wave_obj.use_vertex_only_mesh:
         rhs_forcing = fire.Cofunction(receiver_source_space.dual())
     grad_solver, forward_field, uadj, gradi = _build_gradient_solver(
         wave_obj, mask_available, use_ufl_differentiation, form_controls,
@@ -117,7 +117,7 @@ def backward_wave_propagator(
     receivers = wave_obj.receivers
 
     for step in range(nt - 1, -1, -1):
-        if use_ufl_differentiation:
+        if use_ufl_differentiation or wave_obj.use_vertex_only_mesh:
             misfit_form = receivers.apply_receivers_as_source_vertex_only_mesh(
                 wave_obj.misfit[step], receiver_source_space,
             )

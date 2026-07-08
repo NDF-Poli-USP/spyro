@@ -170,10 +170,14 @@ class Receivers(Delta_projector):
                 ) from exc
             receiver_mesh = VertexOnlyMesh(self.mesh, self.point_locations)
             receiver_values = np.asarray(misfit_form)
+            V_r_input = self._receiver_function_space(
+                receiver_mesh.input_ordering
+            )
+            value_input = Function(V_r_input, val=receiver_values)
             V_r = self._receiver_function_space(receiver_mesh)
-            value = Function(V_r, val=receiver_values)
+            value = interpolate(value_input, V_r)
         return Cofunction(target_space.dual()).interpolate(
-            assemble(inner(value, TestFunction(V_r)) * dx),
+            assemble(inner(value, TestFunction(V_r)) * dx(domain=V_r.mesh())),
         )
 
     def receiver_interpolator(self, f, reorder=True, vom_tolerance=None,
