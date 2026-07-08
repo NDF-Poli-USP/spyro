@@ -1,127 +1,263 @@
 import firedrake as fire
-import numpy as np
+
+from firedrake import *
 
 from . import helpers
 from .. import utils
-from ..utils.typing import FunctionalEvaluationMode
 
 
-def _propagate_forward_central_difference(wave_obj, source_ids):
-    """Advance the forward solve with the central-difference scheme.
-
-    This is an internal helper used by :meth:`Wave.wave_propagator`. It updates
-    the solver state in place.
-
-    Parameters
-    ----------
-    wave_obj: Wave
-        The wave solver object containing all necessary information to perform
-        the forward solve.
-    source_ids: list of int
-        List of source IDs to simulate.
+def central_difference(wave, source_id=0):
     """
-    if wave_obj.sources is not None:
-        wave_obj.sources.current_sources = source_ids
-        rhs_forcing = fire.Cofunction(wave_obj.function_space.dual())
+    Perform central difference time integration for wave propagation.
 
-    wave_obj.field_logger.start_logging(source_ids)
-    wave_obj.comm.comm.barrier()
-    functional_mode = wave_obj.functional_evaluation_mode
-    compute_functional = functional_mode is not None
-    t = wave_obj.current_time
-    nt = int(wave_obj.final_time / wave_obj.dt) + 1  # number of timesteps
+    Parameters:
+    -----------
+    wave: Spyro object
+        The Wave object containing the necessary data and parameters.
+
+    Returns:
+    --------
+        tuple:
+            A tuple containing the forward solution and the receiver output.
+    """
+    if wave.sources is not None:
+        wave.sources.current_source = source_id
+        rhs_forcing = fire.Cofunction(wave.function_space.dual())
+
+    wave.field_logger.start_logging(source_id)
+
+    wave.comm.comm.barrier()
+
+    t = wave.current_time
+    nt = int(wave.final_time / wave.dt) + 1  # number of timesteps
+
     usol = [
-        fire.Function(wave_obj.function_space, name=wave_obj.get_function_name())
+        fire.Function(wave.function_space, name=wave.get_function_name())
         for t in range(nt)
-        if t % wave_obj.gradient_sampling_frequency == 0
+        if t % wave.gradient_sampling_frequency == 0
     ]
-    source_cof = None
-    interpolate_receivers = None
-    if wave_obj.sources is not None and wave_obj.use_vertex_only_mesh:
-        # source_cof is a cofunction that represents a point source,
-        # being one at a point and zero elsewhere.
-        source_cof = wave_obj.sources.source_cofunction()
-        interpolate_receivers = wave_obj.receivers.receiver_interpolator(
-            wave_obj.vstate)
     usol_recv = []
     save_step = 0
-    if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
-        J = 0.0
     for step in range(nt):
         # Basic way of applying sources
-        wave_obj.update_source_expression(t)
+        wave.update_source_expression(t)
+        fire.assemble(wave.rhs, tensor=wave.B)
 
-        if wave_obj.sources is not None:
-            if wave_obj.use_vertex_only_mesh:
-                wave_obj.rhs_no_pml_source().assign(fire.assemble(
-                    wave_obj.sources.wavelet[step] * source_cof))
-            else:
-                wave_obj.rhs_no_pml_source().assign(
-                    wave_obj.sources.apply_source(rhs_forcing, step))
-        wave_obj.solver.solve()
+        # More efficient way of applying sources
+        if wave.sources is not None:
+            f = wave.sources.apply_source(rhs_forcing, step)
+            B0 = wave.rhs_no_pml()
+            B0 += f
 
-        wave_obj.prev_vstate = wave_obj.vstate
-        wave_obj.vstate = wave_obj.next_vstate
-        if wave_obj.use_vertex_only_mesh:
-            usol_recv.append(fire.assemble(interpolate_receivers))
-        else:
-            usol_recv.append(wave_obj.get_forward_solution_receivers())
+        wave.solver.solve(wave.next_vstate, wave.B)
 
-        if step % wave_obj.gradient_sampling_frequency == 0:
-            usol[save_step].assign(wave_obj.get_function())
+        wave.prev_vstate = wave.vstate
+        wave.vstate = wave.next_vstate
+        
+        if hasattr(wave, "viscoelastic"):
+            if wave.viscoelastic == True:
+                from .viscoelasticity_functions import (sigma_visco_kelvin, epsilon)
+                if wave.visco_type == 'maxwell_gsls_Q':
+                    dt = Constant(wave.dt)
+                    V = wave.function_space
+                    W = wave.strain_space
+
+                    xi_list    = wave.xi_list
+                    omega_list = wave.omega_list
+                    
+                    # =====================================
+                    # Strain rate
+                    # =====================================
+
+                    eps_curr = project(epsilon(wave.vstate), W)
+                    eps_prev = project(epsilon(wave.prev_vstate), W)
+                    eps_rate_n = project((eps_curr - eps_prev) / dt, W)
+
+                    # =====================================
+                    # Update memory variables
+                    # =====================================
+
+                    for i in range(len(xi_list)):
+
+                        xi_old = Function(W)
+                        xi_old.assign(xi_list[i])
+
+                        omega = omega_list[i]
+
+                        xi_np1 = project(xi_old + dt * omega * (eps_curr - xi_old), W)
+
+                        xi_list[i].assign(xi_np1)
+                
+                elif wave.visco_type == 'kelvin_voigt':
+                    wave.eps_old = epsilon(wave.vstate)
+                    
+                elif wave.visco_type == "zener":    
+                    V = wave.function_space
+                    dte = wave.tau_epsilon / wave.dt
+                    dts = wave.tau_sigma / wave.dt
+                    eps_new = epsilon(wave.prev_vstate)
+                    dim = V.mesh().topological_dimension()
+                    I = Identity(dim)
+
+                    # Termo elástico implícito (Backward Euler)
+                    elastic_part = wave.lmbda * tr(eps_new + dte * (eps_new - wave.eps_old)) * I \
+                        + 2.0 * wave.mu * (eps_new + dte * (eps_new - wave.eps_old))
+
+                    # Atualização da tensão (relaxação implícita)
+                    sigma_new = (elastic_part + dts * wave.sigma_old) / (1.0 + dts)
+
+                    # Atualização dos estados internos
+                    wave.eps_old.assign(project(eps_new, wave.eps_old.function_space()))
+                    wave.sigma_old = (sigma_new)
+
+                elif wave.visco_type == "gsls":
+                    V = wave.function_space
+                    W = wave.strain_space
+                    eps_new = epsilon(wave.prev_vstate)
+                    dim = V.mesh().topological_dimension()
+                    I = Identity(dim)
+                    n_branches = len(wave.tau_epsilons)
+                    lmbda_share = wave.lmbda / n_branches
+                    mu_share = wave.mu / n_branches
+
+                    for i in range(len(wave.tau_epsilons)):
+                        dte = wave.tau_epsilons[i] / wave.dt
+                        dts = wave.tau_sigmas[i] / wave.dt
+
+                        # Background elastic term
+                        elastic_term = lmbda_share * div(wave.prev_vstate) * I + 2 * mu_share * eps_new
+
+                        eps_old = wave.eps_old_list[i]
+                        sigma_old = wave.sigma_old_list[i]
+
+                        # Elasticidade implícita (Backward Euler)
+                        viscous_term = dte * (eps_new - eps_old)
+                        memory_term = dts * sigma_old
+
+                        sigma_new = (elastic_term + viscous_term + memory_term) / (1.0 + dts)
+
+                        # Atualização dos estados internos (forma estável)
+                        # Cria funções temporárias para projetar
+                        sigma_proj = Function(W)
+                        eps_proj = Function(W)
+
+                        sigma_proj.assign(project(sigma_new, W))
+                        eps_proj.assign(project(eps_new, W))
+
+                        # Atualiza as memórias
+                        wave.sigma_old_list[i].assign(sigma_proj)
+                        wave.eps_old_list[i].assign(eps_proj)
+
+                elif wave.visco_type == 'maxwell':
+                        sigma_old = wave.sigma_old
+                        eps_old   = wave.eps_old
+
+                        V = wave.function_space
+                        W = wave.strain_space
+
+                        dt = Constant(wave.dt)
+                        dim = V.mesh().topological_dimension()
+                        I = Identity(dim)
+                        eps = lambda w: 0.5*(grad(w) + grad(w).T)
+                    
+                        # Strains nos tempos n e n+1
+                        eps_n   = project(eps(wave.prev_vstate),   W)  # garantir que está em W
+                        eps_np1 = project(eps(wave.vstate), W)
+                        
+                        lambda_m     = wave.lmbda
+                        mu_m         = wave.mu
+                        tau_eps = wave.tau_epsilon
+                        tau_sig = wave.tau_sigma
+
+                        sigma_old = wave.sigma_old
+                        eps_old   = wave.eps_old
+
+                        tau_e = Constant(tau_eps)
+                        tau_s = Constant(tau_sig)
+
+                        # Ação de C_m em um tensor X: C_m:X = λ_m tr(X) I + 2 μ_m X
+                        def C_m_action(X):
+                            return lambda_m*tr(X)*Identity(dim) + 2.0*mu_m*X
+
+                            # σ^{n+1} = [ σ^n + C_m( ε^{n+1}(1 + dt/τ_e) - ε^n ) ] / (1 + dt/τ_s)
+                        num = sigma_old + C_m_action(eps_np1*(1.0 + dt/tau_e) - eps_n)
+                        sigma_np1 = project(num / (1.0 + dt/tau_s), W)
+
+                        sigma_old.assign(sigma_np1)
+                        eps_old.assign(eps_np1)
+                        
+                elif wave.visco_type == 'maxwell_gsls':
+                    sigma_old_list = wave.sigma_old_list
+
+                    V = wave.function_space
+                    W = wave.strain_space
+
+                    dt = Constant(wave.dt)
+
+                    dim = V.mesh().topological_dimension()
+                    I = Identity(dim)
+
+                    def eps(w):
+                        return 0.5 * (grad(w) + grad(w).T)
+
+                    # taxa de deformação da velocidade em n+1
+                    eps_v_np1 = project(eps(wave.vstate), W)
+
+                    lmbda = wave.lmbda  # λ_l
+                    mu    = wave.mu      # μ_l
+                    tau_sigma_list = wave.tau_sigmas  # τ_σ,l
+                    tau = wave.taus[0]
+
+                    for i in range(len(sigma_old_list)):
+
+                        tau_sigma = tau_sigma_list[i] #Antes era constant, agora fica no formato original
+
+                        def C_l_action(X):
+                            return lmbda*tau * tr(X) * I + 2.0 * mu *tau* X
+
+                        num = (
+                            sigma_old_list[i]
+                            - dt/tau_sigma * C_l_action(eps_v_np1)
+                        )
+
+                        sigma_np1 = project(
+                            num / (1.0 + dt / tau_sigma),
+                            W
+                        )
+
+                        sigma_old_list[i].assign(sigma_np1)
+
+        usol_recv.append(wave.get_receivers_output())
+
+        if step % wave.gradient_sampling_frequency == 0:
+            usol[save_step].assign(wave.get_function())
             save_step += 1
 
-        if (step - 1) % wave_obj.output_frequency == 0:
+        if (step - 1) % wave.output_frequency == 0:
             assert (
-                fire.norm(wave_obj.get_function()) < 1
+                fire.norm(wave.get_function()) < 1
             ), "Numerical instability. Try reducing dt or building the " \
                "mesh differently"
-            wave_obj.field_logger.log(t)
-            helpers.display_progress(wave_obj.comm, t)
+            wave.field_logger.log(t)
+            helpers.display_progress(wave.comm, t)
+        
+        
 
-        if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
-            observed_step = utils.get_real_shot_step(wave_obj, step)
-            if wave_obj.use_vertex_only_mesh:
-                if isinstance(observed_step, np.ndarray):
-                    real_shot = fire.Function(
-                        usol_recv[-1].function_space(),
-                        val=observed_step,
-                    )
-                    misfit_step = real_shot - usol_recv[-1]
-                elif isinstance(observed_step, fire.Function):
-                    misfit_step = observed_step - usol_recv[-1]
-                else:
-                    raise ValueError(
-                        "Unsupported type for real_shot_record. Must be "
-                        "either a numpy array or a Firedrake Function."
-                    )
-            else:
-                misfit_step = observed_step - usol_recv[-1]
-            J += utils.compute_functional(
-                wave_obj, misfit_step, evaluation_mode=FunctionalEvaluationMode.PER_TIMESTEP,
-                step=step, nsteps=nt
-            )
+        t = step * float(wave.dt)
 
-        t = step * float(wave_obj.dt)
+    wave.current_time = t
+    helpers.display_progress(wave.comm, t)
 
-    wave_obj.current_time = t
-    helpers.display_progress(wave_obj.comm, t)
     usol_recv = helpers.fill(
-        usol_recv, wave_obj.receivers.is_local, nt, wave_obj.receivers.number_of_points
+        usol_recv, wave.receivers.is_local, nt, wave.receivers.number_of_points
     )
+    usol_recv = utils.utils.communicate(usol_recv, wave.comm)
+    wave.receivers_output = usol_recv
 
-    usol_recv = utils.utils.communicate(usol_recv, wave_obj.comm)
+    wave.forward_solution = usol
+    wave.forward_solution_receivers = usol_recv
 
-    wave_obj.forward_solution = usol
-    wave_obj.forward_solution_receivers = usol_recv
+    wave.field_logger.stop_logging()
+    
 
-    if functional_mode is FunctionalEvaluationMode.AFTER_SOLVE:
-        observed_shot = utils.get_real_shot_record(wave_obj)
-        misfit = observed_shot - usol_recv
-        J = utils.compute_functional(wave_obj, misfit)
-    if compute_functional:
-        wave_obj.functional_value = J
-    else:
-        wave_obj.functional_value = None
-
-    wave_obj.field_logger.stop_logging()
+    return usol, usol_recv

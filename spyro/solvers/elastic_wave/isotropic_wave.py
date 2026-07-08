@@ -1,14 +1,20 @@
 import numpy as np
 
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
-                       FunctionSpace, project, VectorFunctionSpace)
+                       FunctionSpace, project, VectorFunctionSpace, TensorFunctionSpace, sym, grad,
+                       as_matrix, as_vector)
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
-                    isotropic_elastic_with_pml)
+                    isotropic_elastic_with_pml,viscoelastic_kelvin_voigt_without_pml,
+                    viscoelastic_zener_without_pml, viscoelastic_gsls_without_pml, viscoelastic_maxwell_gsls_without_pml,
+                    viscoelastic_maxwell_without_pml, viscoelastic_maxwell_gsls_without_pml_Q)
 from .functionals import mechanical_energy_form
-from ...utils.typing import override, WaveType
-from ...domains.space import create_function_space
+from ...domains.space import FE_method
+from ...utils.typing import override
+
+
+from .tensor_computation import *
 
 
 class IsotropicWave(ElasticWave):
@@ -16,7 +22,7 @@ class IsotropicWave(ElasticWave):
 
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
-        self.wave_type = WaveType.ISOTROPIC_ELASTIC
+
         self.rho = None   # Density
         self.lmbda = None  # First Lame parameter
         self.mu = None    # Second Lame parameter
@@ -27,7 +33,7 @@ class IsotropicWave(ElasticWave):
         self.u_nm2 = None  # Displacement field at iteration n-2
         self.u_np1 = None  # Displacement field in next iteration
 
-        # Volumetric sources (defined through UFL)
+        # Volumetric sourcers (defined through UFL)
         self.body_forces = None
 
         # Boundary conditions
@@ -48,9 +54,12 @@ class IsotropicWave(ElasticWave):
         self.mechanical_energy = None
         self.field_logger.add_functional("mechanical_energy",
                                          lambda: assemble(self.mechanical_energy))
+                                         
+        
 
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
+        import firedrake as fire
         def constant_wrapper(value):
             if np.isscalar(value):
                 return Constant(value)
@@ -94,6 +103,13 @@ class IsotropicWave(ElasticWave):
                             f"    S-wave velocity: {bool(self.c_s)}\n"
                             "The valid options are {Density, Lame first, Lame second} "
                             "or (exclusive) {Density, P-wave velocity, S-wave velocity}")
+        
+        V = fire.FunctionSpace(self.mesh, "CG", 1)
+        f = fire.Function(V)
+        f.interpolate(self.c)
+        
+        if isinstance(f, fire.Function):
+            self.initial_velocity_model = f.copy(deepcopy=True)
 
     @override
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
@@ -101,8 +117,8 @@ class IsotropicWave(ElasticWave):
 
     @override
     def _create_function_space(self):
-        return create_function_space(self.mesh, self.method, self.degree,
-                                     dim=self.dimension)
+        return FE_method(self.mesh, self.method, self.degree,
+                         dim=self.dimension)
 
     @override
     def _set_vstate(self, vstate):
@@ -131,7 +147,7 @@ class IsotropicWave(ElasticWave):
         return self.u_np1
 
     @override
-    def get_forward_solution_receivers(self):
+    def get_receivers_output(self):
         if self.abc_boundary_layer_type == "PML":
             raise NotImplementedError
         else:
@@ -172,11 +188,181 @@ class IsotropicWave(ElasticWave):
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
 
-        if self.abc_boundary_layer_type is None or \
-                self.abc_boundary_layer_type == "local":
-            isotropic_elastic_without_pml(self)
-        elif self.abc_boundary_layer_type == "PML":
-            isotropic_elastic_with_pml(self)
+        self.wave_type = self.input_dictionary.get("wave_type", 'isotropic')
+
+        W = fire.FunctionSpace(self.mesh, "CG", 1)
+
+        if self.wave_type == 'anisotropic_VTI':
+            d = self.input_dictionary.get("anisotropy")
+
+            class IsotropicProperties:
+                def __init__(self):
+                    self.vP = None
+                    self.vS = None
+                    self.rho = None
+
+            def isotropic_properties(self):
+                prop = IsotropicProperties()
+                prop.vP = Function(W).assign(Constant(d['vp']))
+                prop.vS = Function(W).assign(Constant(d['vs']))
+                prop.rho = Function(W).assign(Constant(d['rho']))
+                return prop
+
+            self.PropISO =  isotropic_properties(self)
+
+            class AnisotropicProperties:
+                def __init__(self):
+                    self.epsilon = None
+                    self.gamma = None
+                    self.delta = None
+                    self.anisotropy = None
+
+            def anisotropic_properties(self):
+                prop = AnisotropicProperties()
+                prop.epsilon = Function(W).assign(Constant(d['epsilon']))
+                prop.gamma = Function(W).assign(Constant(d['gamma']))
+                prop.delta = Function(W).assign(Constant(d['delta']))
+                prop.anisotropy = d['anisotropy'] 
+                return prop 
+
+            self.PropVTI =  anisotropic_properties(self)
+	
+        try:
+            d = self.input_dictionary.get("viscoelasticity", False)
+            self.viscoelastic = d["viscoelastic"]
+        except:
+            self.viscoelastic = False
+            
+        self.C_elas = C_computation(self)
+
+        if self.viscoelastic == True:
+            d = self.input_dictionary.get("viscoelasticity", False)
+            self.visco_type = d["visco_type"]
+            W = TensorFunctionSpace(self.function_space.mesh(), "DG", 0)
+            self.strain_space = W
+            
+            if d["visco_type"] == 'maxwell_gsls_Q':
+                from ufl import conditional, lt
+                # -------------------------
+                # Parâmetros do modelo GSLS
+                # -------------------------
+                self.y_list     = d["y_gsls"]        # lista de y_l
+                self.omega_list = d["omega_gsls"]    # lista de ω_l
+                dim = self.function_space.mesh().topological_dimension()
+
+                num_branches = d["branches"]  # ou len(self.y_list)
+
+                # -------------------------
+                # Parâmetros elásticos
+                # -------------------------
+                self.lmbda_s = float(d["lmbda_s"])
+                self.mu_s    = float(d["mu_s"])
+                # -------------------------
+                # Parâmetros de atenuação Q
+                # -------------------------
+                # Podem ser Constant ou Function
+                self.Q_type = d["Q_type"]
+                self.Qp_inv = d["Qp_inv"]
+                self.Qs_inv = d["Qs_inv"]
+
+                if self.Q_type in ['Constant', 'constant', 'const', 'file', 'File']:
+                        Qp_inv = self.Qp_inv
+                        Qs_inv = self.Qs_inv
+                elif self.Q_type in ['cond', 'Conditional', 'conditional']:
+                        Qp_inv = self.Qp_inv(self.mesh)
+                        Qs_inv = self.Qs_inv(self.mesh)
+                
+                self.C_elas = C_computation(self)
+                self.Gamma = build_Gamma(self)
+
+                # -------------------------
+                # Variáveis de memória ξ_l
+                # -------------------------
+                self.xi_list = [
+                    Function(self.strain_space, name=f"Memory variable xi_{i}")
+                    for i in range(num_branches)
+                ]
+
+                # Inicialização
+                for xi in self.xi_list:
+                    xi.assign(0.0)
+
+                # -------------------------
+                # deformações auxiliares
+                # -------------------------
+                self.eps_np1 = Function(self.strain_space, name="eps_np1")
+                self.eps_n   = Function(self.strain_space, name="eps_n")
+
+                self.eps_n.assign(0.0)
+
+                self.sigma_np1 = Function(self.strain_space, name="eps_np1")
+                self.sigma_n   = Function(self.strain_space, name="eps_n")
+
+                self.sigma_n.assign(0.0)
+
+            elif d["visco_type"] =='kelvin_voigt':
+                self.eta = float(d["eta"])
+                self.eps_old = Function(W, name="Previous strain")
+                
+            elif d["visco_type"] =='zener':
+                self.tau_sigma = float(d["tau_sigma"])
+                self.tau_epsilon = float(d["tau_epsilon"])
+                self.eps_old = Function(W, name="Previous strain")
+                self.sigma_old = Function(W, name="Previous stress")
+            
+            elif d["visco_type"] =='maxwell':
+                self.tau_sigma = float(d["tau_sigma"])
+                self.tau_epsilon = float(d["tau_epsilon"])
+                self.eps_old = Function(W, name="Previous strain")
+                self.sigma_old = Function(W, name="Previous stress")
+                self.lmbda_s = d["lmbda_s"]
+                self.mu_s = d["mu_s"]
+                
+            elif d["visco_type"] =='gsls':
+                self.tau_sigmas = d["tau_sigma_gsls"]
+                self.tau_epsilons = d["tau_epsilon_gsls"]
+                num_branches = len(self.tau_epsilons)  # ou len(wave.tau_sigmas)
+                self.eps_old_list = [Function(self.strain_space, name=f"Previous strain branch {i}") for i in range(num_branches)]
+                self.sigma_old_list = [Function(self.strain_space, name=f"Previous stress branch {i}") for i in range(num_branches)]
+                
+            elif d["visco_type"] =='maxwell_gsls':
+                self.tau_sigmas = d["tau_sigma_gsls"]
+                self.taus = d["taus"]
+                #self.tau_epsilons = d["tau_epsilon_gsls"]
+                self.lmbda_s = d["lmbda_s"]
+                self.mu_s = d["mu_s"]
+                num_branches = d["branches"]  # ou len(self.tau_sigmas)
+                
+                self.eps_old_list = [Function(self.strain_space, name=f"Previous strain branch {i}") for i in range(num_branches)]
+                self.eps_np1 = Function(self.strain_space, name="eps_np1")
+                self.eps_n = Function(self.strain_space, name="eps_np1")
+
+                self.eps_n.assign(0.0)
+                
+                self.sigma_old_list = [Function(self.strain_space, name=f"Previous stress branch {i}") for i in range(num_branches)]
+
+        else:
+            self.viscoelastic = False
+	
+        if self.viscoelastic == True:
+            if self.visco_type == 'kelvin_voigt':
+                viscoelastic_kelvin_voigt_without_pml(self)
+            elif self.visco_type == 'zener':
+                viscoelastic_zener_without_pml(self)
+            elif self.visco_type == 'gsls':
+                viscoelastic_gsls_without_pml(self)
+            elif self.visco_type == 'maxwell':
+                viscoelastic_maxwell_without_pml(self)
+            elif self.visco_type == 'maxwell_gsls':
+                viscoelastic_maxwell_gsls_without_pml(self)
+            elif self.visco_type == 'maxwell_gsls_Q':
+                viscoelastic_maxwell_gsls_without_pml_Q(self)
+        else:
+            if self.abc_boundary_layer_type is None:
+                isotropic_elastic_without_pml(self)
+            elif self.abc_boundary_layer_type == "PML":
+                isotropic_elastic_with_pml(self)
+            
 
     @override
     def rhs_no_pml(self):
@@ -184,12 +370,6 @@ class IsotropicWave(ElasticWave):
             raise NotImplementedError
         else:
             return self.B
-
-    def rhs_no_pml_source(self):
-        if self.abc_boundary_layer_type == "PML":
-            raise NotImplementedError
-        else:
-            return self.source_function
 
     def parse_initial_conditions(self):
         time_dict = self.input_dictionary["time_axis"]
@@ -201,7 +381,7 @@ class IsotropicWave(ElasticWave):
 
     def parse_boundary_conditions(self):
         bc_list = self.input_dictionary.get("boundary_conditions", [])
-        for tag, idbc, value in bc_list:
+        for tag, id, value in bc_list:
             if tag == "u":
                 subspace = self.function_space
             elif tag == "uz":
@@ -211,9 +391,8 @@ class IsotropicWave(ElasticWave):
             elif tag == "uy":
                 subspace = self.function_space.sub(2)
             else:
-                raise Exception(
-                    f"Unsupported boundary condition with tag: {tag}")
-            self.bcs.append(DirichletBC(subspace, value, idbc))
+                raise Exception(f"Unsupported boundary condition with tag: {tag}")
+            self.bcs.append(DirichletBC(subspace, value, id))
 
     def parse_volumetric_forces(self):
         acquisition_dict = self.input_dictionary["acquisition"]
