@@ -12,7 +12,7 @@ from ..utils import change_scalar_field_resolution
 from ..tools.version_control import is_firedrake_new
 plt.rcParams.update({"font.family": "serif"})
 plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
-__all__ = ["plot_shots"]
+__all__ = ["plot_shots", "plot_receiver_response"]
 
 
 # Use non-interactive backend in headless/container environments.
@@ -491,3 +491,85 @@ def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png", abc_points=None
     new_wave_obj.set_initial_velocity_model(conditional=Wave_object.initial_velocity_model)
 
     return plot_model(new_wave_obj, filename=filename, abc_points=abc_points, show=show, flip_axis=flip_axis)
+
+
+def plot_receiver_response(
+    receiver_data,
+    final_time,
+    show=False,
+    filename=None,
+    receiver_id_for_title=None,
+    hold=False,
+    color=None,
+    name=None,
+    **plot_kwargs,
+):
+    """Plot the time-series response for a single receiver.
+
+    Parameters
+    ----------
+    receiver_data : np.array
+        Receiver data to plot.
+    show : bool, optional
+        Whether to display the plot interactively. Default is False.
+    filename : str, optional
+        If provided, save the plot to this file.
+    hold : bool, optional
+        If True, plot on the current axes so multiple receivers can be
+        overlaid in sequence. Default is False.
+    color : str, optional
+        Line color to use when plotting. If None and hold is True, a random
+        color is selected.
+    name : str, optional
+        Label to use in the legend. When provided, the plot is added to the
+        legend so multiple held traces can be identified.
+    **plot_kwargs
+        Any additional keyword arguments accepted by matplotlib.axes.Axes.plot.
+
+    Returns
+    -------
+    None
+        The function creates the plot and displays it.
+    """
+    num_times = len(receiver_data)
+
+    time_vector = np.linspace(0.0, final_time, num_times)
+
+    if hold is False:
+        plt.close()
+        fig, axes = plt.subplots(figsize=(10, 4))
+    else:
+        fig = plt.gcf()
+        axes = plt.gca()
+        if fig.get_axes() == []:
+            fig, axes = plt.subplots(figsize=(10, 4))
+
+    if color is None and hold:
+        color_choices = plt.rcParams["axes.prop_cycle"].by_key().get("color", [None])
+        color = np.random.choice(color_choices)
+
+    line_kwargs = dict(plot_kwargs)
+    line_kwargs.setdefault("linewidth", 2)
+    line_kwargs.setdefault("color", color)
+    if name is not None:
+        line_kwargs.setdefault("label", name)
+
+    axes.plot(time_vector, receiver_data, **line_kwargs)
+    axes.set_xlabel("time (s)", fontsize=18)
+    axes.set_ylabel("receiver response", fontsize=18)
+    if receiver_id_for_title is not None:
+        axes.set_title(f"Receiver ID{receiver_id_for_title} data.", fontsize=22)
+    else:
+        axes.set_title("Receiver data.", fontsize=22)
+    if line_kwargs.get("label") is not None:
+        axes.legend()
+    axes.tick_params(axis="both", labelsize=18)
+    axes.grid(True, alpha=0.3)
+    fig.tight_layout()
+
+    if filename is not None:
+        plt.savefig(filename)
+    if show:
+        plt.show()
+    elif hold is False:
+        plt.close(fig)
