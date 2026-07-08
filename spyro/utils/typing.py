@@ -15,24 +15,40 @@ class WaveType(Enum):
     ISOTROPIC_ELASTIC = 2
 
 
+class ImplementedAdjointDerivation(Enum):
+    """Derivation used by implemented :class:`AdjointType` values."""
+
+    HAND_DERIVED = 0
+    UFL_DIFFERENTIATION = 1
+
+
 class AdjointType(Enum):
     """Enum for the type of adjoint solver to use.
 
     NONE: No adjoint solver.
     AUTOMATED_ADJOINT: Use the automated adjoint solver via `firedrake.adjoint`.
-    IMPLEMENTED_ADJOINT: Use Spyro's implemented adjoint solver.
+    IMPLEMENTED_ADJOINT: Use Spyro's legacy hand-derived implemented adjoint.
+    UFL_DERIVED_ADJOINT: Use Spyro's implemented adjoint
+        derived by UFL differentiation of the forward residual.
     """
 
-    NONE = 0
-    AUTOMATED_ADJOINT = 1
-    IMPLEMENTED_ADJOINT = 2
+    NONE = (0, None)
+    AUTOMATED_ADJOINT = (1, None)
+    IMPLEMENTED_ADJOINT = (2, ImplementedAdjointDerivation.HAND_DERIVED)
+    UFL_DERIVED_ADJOINT = (
+        3, ImplementedAdjointDerivation.UFL_DIFFERENTIATION,
+    )
 
+    def __new__(cls, value, implemented_derivation):
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.implemented_derivation = implemented_derivation
+        return obj
 
-class ImplementedAdjointDerivation(Enum):
-    """Derivation used by :class:`AdjointType.IMPLEMENTED_ADJOINT`."""
-
-    HAND_DERIVED = 0
-    UFL_DIFFERENTIATION = 1
+    @property
+    def is_implemented(self):
+        """Whether this adjoint type uses Spyro's implemented adjoint path."""
+        return self.implemented_derivation is not None
 
 
 class RieszMapType(Enum):

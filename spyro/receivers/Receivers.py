@@ -158,19 +158,26 @@ class Receivers(Delta_projector):
         firedrake.Cofunction
             Cofunction on ``target_space.dual()`` containing the receiver
             misfit injected into the finite element adjoint source space.
+
+        Raises
+        ------
+        TypeError
+            If ``misfit_form`` is neither a Firedrake ``Function`` nor
+            array-like receiver data.
         """
         try:
             V_r = misfit_form.function_space()
             value = misfit_form
-        except AttributeError:
+        except AttributeError as exc:
+            if not isinstance(misfit_form, (np.ndarray, list, tuple)):
+                raise TypeError(
+                    "misfit_form must be a Firedrake Function or array-like "
+                    "receiver data."
+                ) from exc
             receiver_mesh = VertexOnlyMesh(self.mesh, self.point_locations)
             receiver_values = np.asarray(misfit_form)
             V_r = self._receiver_function_space(receiver_mesh)
-
-            value = Function(V_r)
-            local_value_count = value.dat.data_ro.shape[0]
-            if local_value_count > 0:
-                value.dat.data_wo[:] = receiver_values[:local_value_count]
+            value = Function(V_r, val=receiver_values)
         return Cofunction(target_space.dual()).interpolate(
             assemble(inner(value, TestFunction(V_r)) * dx),
         )

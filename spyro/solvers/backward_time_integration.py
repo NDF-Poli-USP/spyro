@@ -2,7 +2,7 @@ import firedrake as fire
 from . import helpers
 from .wave import Wave
 from ..io.basicio import parallel_print
-from ..utils.typing import ImplementedAdjointDerivation
+from ..utils.typing import AdjointType, ImplementedAdjointDerivation
 
 # Key used to store a single-control (e.g. acoustic velocity) gradient in the
 # same control-keyed dictionary used for multi-parameter (elastic) controls.
@@ -14,7 +14,7 @@ _SINGLE_CONTROL_KEY = "control"
 def backward_wave_propagator(
     wave_obj: Wave,
     dt: float = None,
-    implemented_adjoint_derivation=ImplementedAdjointDerivation.UFL_DIFFERENTIATION,
+    adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
 ):
     """Propagates the adjoint wave backwards in time.
 
@@ -27,8 +27,8 @@ def backward_wave_propagator(
     dt : float (optional)
         Time step to be used explicitly. If not mentioned uses the default,
         that was estabilished in the wave object for the adjoint model.
-    implemented_adjoint_derivation : ImplementedAdjointDerivation, optional
-        How to derive Spyro's implemented adjoint.
+    adjoint_type : AdjointType, optional
+        Implemented adjoint variant to use.
 
     Returns:
     --------
@@ -42,7 +42,7 @@ def backward_wave_propagator(
     This is an unified backward wave propagation for both PML and no-PML cases.
     The implemented adjoint can use either UFL differentiation of the forward
     residual or the legacy hand-derived adjoint/gradient forms, selected by
-    ``implemented_adjoint_derivation``.
+    ``adjoint_type``.
     """
     wave_obj.reset_adjoint_state()
     mask_available = wave_obj.gradient_mask_available
@@ -62,7 +62,7 @@ def backward_wave_propagator(
     wave_obj.comm.comm.barrier()
 
     use_ufl_differentiation = (
-        implemented_adjoint_derivation
+        adjoint_type.implemented_derivation
         is ImplementedAdjointDerivation.UFL_DIFFERENTIATION
     )
     form_controls = None
@@ -179,11 +179,11 @@ def backward_wave_propagator(
 
     if use_ufl_differentiation:
         for gradient in dJ.values():
-            gradient.dat.data_wo[:] *= dt
+            gradient.assign(dt * gradient)
         if not controls_are_dict:
             dJ = dJ[_SINGLE_CONTROL_KEY]
     else:
-        dJ.dat.data_wo[:] *= dt / 2
+        dJ.assign((dt / 2) * dJ)
     return dJ
 
 

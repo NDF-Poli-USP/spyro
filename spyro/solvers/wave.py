@@ -15,8 +15,7 @@ from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from ..utils.typing import (
-    AdjointType, ImplementedAdjointDerivation, WaveType,
-    FunctionalEvaluationMode,
+    AdjointType, ImplementedAdjointDerivation, WaveType, FunctionalEvaluationMode,
 )
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
@@ -723,22 +722,27 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def enable_implemented_adjoint(
         self,
-        implemented_adjoint_derivation=ImplementedAdjointDerivation.UFL_DIFFERENTIATION,
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
     ):
         """Switch the solver into an implemented-adjoint mode.
 
         Side effects, required before a backward/gradient solve:
 
-        - selects :attr:`AdjointType.IMPLEMENTED_ADJOINT`;
+        - selects the requested implemented :class:`AdjointType`;
         - stores the forward field at every gradient-sampling step
           (``store_forward_time_steps``) so the adjoint replay can reassign it;
         - for the UFL-derived backend, enables the vertex-only-mesh receiver
           path and forces functional evaluation to ``PER_TIMESTEP``.
         """
-        self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
+        if not adjoint_type.is_implemented:
+            raise ValueError(
+                "enable_implemented_adjoint requires an implemented adjoint "
+                "AdjointType.",
+            )
+        self.adjoint_type = adjoint_type
         self.store_forward_time_steps = True
         if (
-            implemented_adjoint_derivation
+            adjoint_type.implemented_derivation
             is ImplementedAdjointDerivation.UFL_DIFFERENTIATION
         ):
             self.use_vertex_only_mesh = True
@@ -752,7 +756,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def _prepare_implemented_adjoint(
         self, misfit=None, forward_solution=None,
-        implemented_adjoint_derivation=ImplementedAdjointDerivation.UFL_DIFFERENTIATION,
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
     ):
         """Enable the implemented adjoint and ensure misfit + forward solution.
 
@@ -770,11 +774,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         forward_solution : optional
             Stored forward solution to reuse. If ``None`` and none is stored,
             a fresh forward solve is run.
-        implemented_adjoint_derivation : ImplementedAdjointDerivation, optional
-            How to derive Spyro's implemented adjoint.
+        adjoint_type : AdjointType, optional
+            Implemented adjoint variant to use.
         """
         self.enable_implemented_adjoint(
-            implemented_adjoint_derivation=implemented_adjoint_derivation,
+            adjoint_type=adjoint_type,
         )
         if misfit is not None:
             self.misfit = misfit

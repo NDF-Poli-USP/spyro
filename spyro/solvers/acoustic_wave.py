@@ -15,7 +15,7 @@ from .backward_time_integration import (
 )
 from ..domains.space import create_function_space
 from ..utils.typing import (
-    AdjointType, ImplementedAdjointDerivation, RieszMapType, override, WaveType,
+    AdjointType, RieszMapType, override, WaveType,
 )
 from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
@@ -79,9 +79,8 @@ class AcousticWave(Wave):
     @ensemble_gradient
     def gradient_solve(
         self, misfit=None, forward_solution=None,
-        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
         riesz_map=RieszMapType.L2,
-        implemented_adjoint_derivation=ImplementedAdjointDerivation.UFL_DIFFERENTIATION,
     ):
         """Compute the adjoint-based gradient.
 
@@ -97,14 +96,11 @@ class AcousticWave(Wave):
             computed by calling the forward solver. Providing the forward solution
             can save computational time if it has already been
             computed for the current velocity model, as it avoids redundant forward solves.
-        adjoint_type: AdjointType enum (default: AdjointType.IMPLEMENTED_ADJOINT)
+        adjoint_type: AdjointType enum
             Whether to use automated adjoint differentiation.
         riesz_map: RieszMapType enum (default: RieszMapType.L2)
             The type of Riesz map to use for the gradient. More details in the documentation of the
             :class:`RieszMapType` enum.
-        implemented_adjoint_derivation: ImplementedAdjointDerivation enum
-            How to derive Spyro's implemented adjoint. Defaults to UFL
-            differentiation of the forward residual.
 
         Returns:
         --------
@@ -114,6 +110,10 @@ class AcousticWave(Wave):
         """
         if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
             return self._automated_adjoint_gradient(riesz_map=riesz_map)
+        if not adjoint_type.is_implemented:
+            raise NotImplementedError(
+                f"Adjoint type {adjoint_type} is not implemented for gradients.",
+            )
 
         if riesz_map != RieszMapType.L2:
             raise NotImplementedError(
@@ -122,11 +122,11 @@ class AcousticWave(Wave):
 
         self._prepare_implemented_adjoint(
             misfit=misfit, forward_solution=forward_solution,
-            implemented_adjoint_derivation=implemented_adjoint_derivation,
+            adjoint_type=adjoint_type,
         )
         return backward_wave_propagator(
             self,
-            implemented_adjoint_derivation=implemented_adjoint_derivation,
+            adjoint_type=adjoint_type,
         )
 
     def _automated_adjoint_gradient(self, riesz_map=RieszMapType.L2):

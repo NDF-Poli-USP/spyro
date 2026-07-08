@@ -152,6 +152,13 @@ def _solve_elastic(
     return wave
 
 
+def _normalized_scalar_direction(function_space, seed):
+    values = np.random.default_rng(seed).random(function_space.dim()) - 0.5
+    direction = fire.Function(function_space, val=values)
+    direction.assign(direction / fire.norm(direction))
+    return direction
+
+
 def test_acoustic_implemented_adjoint_uses_forward_residual_form():
     model = _small_acoustic_model()
 
@@ -170,12 +177,27 @@ def test_acoustic_implemented_adjoint_uses_forward_residual_form():
     assert guess.use_vertex_only_mesh
 
     gradient = guess.gradient_solve(
-        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
     )
 
     assert guess.forward_residual_form is not None
     assert isinstance(gradient, fire.Function)
     assert np.isfinite(fire.norm(gradient))
+
+
+def test_vertex_only_receiver_source_rejects_invalid_misfit_type():
+    model = _small_acoustic_model()
+
+    wave = spyro.AcousticWave(dictionary=deepcopy(model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    wave.set_initial_velocity_model(constant=2.0)
+    wave.enable_implemented_adjoint()
+
+    with pytest.raises(TypeError, match="misfit_form must be"):
+        wave.receivers.apply_receivers_as_source_vertex_only_mesh(
+            {"invalid": "misfit"},
+            wave.get_adjoint_receiver_source_space(),
+        )
 
 
 def test_elastic_implemented_adjoint_uses_forward_residual_form():
@@ -193,7 +215,7 @@ def test_elastic_implemented_adjoint_uses_forward_residual_form():
 
     functional = guess.functional_value
     gradient = guess.gradient_solve(
-        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
     )
 
     expected_controls = {
@@ -243,15 +265,12 @@ def test_elastic_implemented_adjoint_taylor_remainder(parameter):
 
     base_functional = guess.functional_value
     gradient = guess.gradient_solve(
-        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
     )
 
-    direction = fire.Function(base_controls[parameter].function_space())
-    direction_shape = direction.dat.data_ro.shape
-    direction.dat.data_wo[:] = (
-        np.random.default_rng(5).random(direction_shape) - 0.5
+    direction = _normalized_scalar_direction(
+        base_controls[parameter].function_space(), 5,
     )
-    direction.assign(direction / fire.norm(direction))
     directional_derivative = fire.assemble(
         gradient[parameter] * direction * fire.dx(**guess.quadrature_rule)
     )
@@ -310,15 +329,12 @@ def test_acoustic_implemented_adjoint_taylor_remainder():
     base_control.assign(guess.get_control_parameters())
     base_functional = guess.functional_value
     gradient = guess.gradient_solve(
-        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
     )
 
-    direction = fire.Function(guess.get_control_parameter_function_space())
-    direction_shape = direction.dat.data_ro.shape
-    direction.dat.data_wo[:] = (
-        np.random.default_rng(7).random(direction_shape) - 0.5
+    direction = _normalized_scalar_direction(
+        guess.get_control_parameter_function_space(), 7,
     )
-    direction.assign(direction / fire.norm(direction))
     directional_derivative = fire.assemble(
         gradient * direction * fire.dx(**guess.quadrature_rule)
     )
@@ -373,7 +389,7 @@ def test_acoustic_pml_implemented_adjoint_uses_mixed_residual_form():
     assert guess.forward_solution[0].function_space() == guess.mixed_function_space
 
     gradient = guess.gradient_solve(
-        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
     )
 
     residual_np1, _, _ = guess.forward_residual_states

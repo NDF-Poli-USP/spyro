@@ -42,9 +42,8 @@ class ElasticWave(Wave, metaclass=ABCMeta):
         guess=None,
         misfit=None,
         forward_solution=None,
-        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
         riesz_map=RieszMapType.L2,
-        implemented_adjoint_derivation=ImplementedAdjointDerivation.UFL_DIFFERENTIATION,
     ):
         """Compute UFL-derived implemented-adjoint elastic gradients.
 
@@ -53,20 +52,17 @@ class ElasticWave(Wave, metaclass=ABCMeta):
         gradient has the same structure as ``get_control_parameters()``: for
         isotropic elastic waves it is a dictionary keyed by material parameter.
         """
-        if adjoint_type != AdjointType.IMPLEMENTED_ADJOINT:
+        if (
+            adjoint_type.implemented_derivation
+            is not ImplementedAdjointDerivation.UFL_DIFFERENTIATION
+        ):
             raise NotImplementedError(
-                "Elastic gradients currently support only IMPLEMENTED_ADJOINT.",
+                "Elastic gradients currently support only "
+                "UFL_DERIVED_ADJOINT.",
             )
         if riesz_map != RieszMapType.L2:
             raise NotImplementedError(
                 f"Riesz map {riesz_map} not implemented for elastic gradients.",
-            )
-        if (
-            implemented_adjoint_derivation
-            is not ImplementedAdjointDerivation.UFL_DIFFERENTIATION
-        ):
-            raise NotImplementedError(
-                "Elastic gradients currently support only UFL differentiation.",
             )
         if self.abc_boundary_layer_type == "PML":
             raise NotImplementedError(
@@ -75,11 +71,11 @@ class ElasticWave(Wave, metaclass=ABCMeta):
 
         self._prepare_implemented_adjoint(
             misfit=misfit, forward_solution=forward_solution,
-            implemented_adjoint_derivation=implemented_adjoint_derivation,
+            adjoint_type=adjoint_type,
         )
         return backward_wave_propagator(
             self,
-            implemented_adjoint_derivation=implemented_adjoint_derivation,
+            adjoint_type=adjoint_type,
         )
 
     @override
