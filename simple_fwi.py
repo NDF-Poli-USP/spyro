@@ -10,7 +10,7 @@ import spyro
 import pytest
 
 
-def run_forward_real_model(input_dictionary, case="camembert", output_filename="real_shot_record"):
+def run_forward_real_model(input_dictionary, case="camembert", shot_filename="shots/shot_record_"):
     """Generate and save a synthetic shot record for the chosen demo case.
 
     Parameters
@@ -50,9 +50,9 @@ def run_forward_real_model(input_dictionary, case="camembert", output_filename="
     fwi_obj.generate_real_shot_record(
         plot_model=True,
         model_filename="True_experiment.png",
+        shot_filename=shot_filename,
         abc_points=[(-0.5, 0.5), (-1.5, 0.5), (-1.5, 1.5), (-0.5, 1.5)]
     )
-    np.save(output_filename, fwi_obj.real_shot_record)
 
     return fwi_obj
 
@@ -126,17 +126,18 @@ def run_fwi(load_real_shot=True):
     None
         The inversion is run for its side effects.
     """
+    shots_filenames="shots/shot_record_"
 
     # Setting up to run synthetic real problem
     if load_real_shot is False:
         fwi_obj = run_forward_real_model(
             dictionary,
             case="camembert",
-            output_filename="real_shot_record",
+            shot_filename=shots_filenames,
         )
 
     else:
-        dictionary["inversion"]["shot_record_file"] = "real_shot_record"
+        dictionary["inversion"]["real_shot_record_file"] = shots_filenames
         fwi_obj = spyro.FullWaveformInversion(dictionary=dictionary)
 
 
