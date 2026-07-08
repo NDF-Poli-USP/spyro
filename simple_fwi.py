@@ -41,6 +41,12 @@ def run_forward_real_model(input_dictionary, case="camembert", shot_filename="sh
         mesh_z = fwi_obj.wave.mesh_z
         mesh_x = fwi_obj.wave.mesh_x
         cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
+    elif case == "layers":
+        # not yet done here
+        # Works for any number of horizontal layers and velocity values
+        z_switch = [-1.0]  # List of floats representing z value where vp changes
+        layer_vps = [2.5, 3.0]  # List of vp values
+        cond = multiple_layer_velocity_model(fwi_obj, z_switch, layer_vps)
     elif case not in supported_cases:
         return ValueError(f"Case of {case} not part of supported cases: {supported_cases}")
     else:
@@ -55,6 +61,39 @@ def run_forward_real_model(input_dictionary, case="camembert", shot_filename="sh
     )
 
     return fwi_obj
+
+
+def multiple_layer_velocity_model(fwi_obj, z_switch, layers):
+    """
+    Sets the heterogeneous velocity model to be split into horizontal layers.
+    Each layer's velocity value is defined by the corresponding value in the
+    layers list. The layers are separated by the values in the z_switch list.
+
+    Parameters
+    ----------
+    z_switch : list of floats
+        List of z values that separate the layers.
+    layers : list of floats
+        List of velocity values for each layer.
+    """
+    if len(z_switch) != (len(layers) - 1):
+        raise ValueError(
+            "Float list of z_switch has to have length exactly one less \
+                            than list of layer values"
+        )
+    if len(z_switch) == 0:
+        raise ValueError("Float list of z_switch cannot be empty")
+    for i in range(len(z_switch)):
+        if i == 0:
+            cond = fire.conditional(
+                fwi_obj.wave.mesh_z > z_switch[i], layers[i], layers[i + 1]
+            )
+        else:
+            cond = fire.conditional(
+                fwi_obj.wave.mesh_z > z_switch[i], cond, layers[i + 1]
+            )
+
+    return cond
 
 
 final_time = 0.9
@@ -132,7 +171,7 @@ def run_fwi(load_real_shot=True):
     if load_real_shot is False:
         fwi_obj = run_forward_real_model(
             dictionary,
-            case="camembert",
+            case="layers",
             shot_filename=shots_filenames,
         )
 
