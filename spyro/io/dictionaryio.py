@@ -1,4 +1,4 @@
-from ..utils.error_management import value_parameter_error
+from ..utils.error_management import value_numerical_error, value_parameter_error
 
 
 class Read_options:
@@ -101,10 +101,7 @@ class Read_options:
             self._method = "DG_quadrilateral"
             self.cell_type = "quadrilateral"
         elif value == "DG":
-            raise ValueError(
-                "DG is not a valid method. Please specify \
-                either DG_triangle or DG_quadrilateral."
-            )
+            value_parameter_error("method", value, dg_t_equivalents + dg_q_equivalents)
         elif value == "CG":
             if "variant" in self.input_dictionary["options"] and "cell_type" \
                     in self.input_dictionary["options"]:
@@ -182,7 +179,9 @@ class Read_options:
     def degree(self, value):
         if not isinstance(value, int):
             raise ValueError("Degree has to be integer")
-        self._degree = value
+        self._degree = value_numerical_error('degree', value, float_num=False,
+                                             integer_num=True, lower_bound=0,
+                                             include_lower_bound=False,)
 
     @property
     def dimension(self):
@@ -190,9 +189,7 @@ class Read_options:
 
     @dimension.setter
     def dimension(self, value):
-        if value not in {2, 3}:
-            raise ValueError(f"Dimension of {value} not 2 or 3.")
-        self._dimension = value
+        self._dimension = value_parameter_error('dimension', value, [2, 3])
 
     @property
     def analysis(self):

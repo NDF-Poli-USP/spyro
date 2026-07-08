@@ -16,7 +16,8 @@ from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_fie
 from ..utils.error_management import (enum_parameter_error, value_numerical_error,
                                       value_parameter_error)
 from ..utils.freq_tools import freq_response
-from ..utils.typing import HyperLayerDegreeType, LayerShapeType, LayerSizeRefFrequency
+from ..utils.typing import (BoundaryConditionsType, HyperLayerDegreeType,
+                            LayerShapeType, LayerSizeRefFrequency)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -245,17 +246,18 @@ class ABCLayer(NRBC):
         # Create the path to save data
         self.path_to_save_abc_layer_case(output_folder=output_folder)
 
+        # Initializing the NRBC class
+        NRBC.__init__(self, self.domain_dim,
+                      self.abc_boundary_layer_shape,
+                      dimension=self.dimension,
+                      output_folder=self.path_case_abc,
+                      comm=self.comm)
+
         # # Initializing the error measure class
         # HABCError.__init__(self, self.dt, self.freq_Nyquist,
         #                    self.receiver_locations,
         #                    output_folder=self.path_save,
         #                    output_case=self.path_case_abc)
-
-        # # Initializing the NRBC class
-        # NRBC.__init__(self, domain_dim,
-        #               self.abc_boundary_layer_shape,
-        #               dimension=self.dimension,
-        #               output_folder=self.path_case_abc)
 
     def _define_layer_shape(self):
         """Define the shape of the absorbing layer.
@@ -759,8 +761,7 @@ class ABCLayer(NRBC):
         del layer_mask, lay_field
 
         # Interpolating in the space function of the problem
-        Wave.c = Function(Wave.function_space,
-                          name="c[km/s])").interpolate(Wave.c)
+        Wave.c = Function(Wave.function_space, name="c[km/s])").interpolate(Wave.c)
 
         # Save new velocity model
         if save_file:
@@ -774,36 +775,57 @@ class ABCLayer(NRBC):
             outfile = VTKFile(self.path_save + file_name)
             outfile.write(Wave.c)
 
-    # def nrbc_on_boundary_layer(self, sommerfeld_bc=False):
-    #     """
-    #     Apply the Higdon ABCs on the outer boundary of the absorbing layer
+    def nrbc_on_boundary_layer(self, Wave_object, non_reflect_bc, save_file=True):
+        """Apply Non-Reflective BCs on the outer boundary of the absorbing layer.
 
-    #     Parameters
-    #     ----------
-    #     sommerfeld_bc : `bool`, optional
-    #         If `True`, use Sommerfeld BC instead of Higdon BC. Default is `False`
+        Parameters
+        ----------
+        Wave_object : `acoustic_wave.AcousticWave`
+            An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+        non_reflect_bc : `typing.BoundaryConditionsType`
+            Type of boundary condition to apply on the outer absorbing layer boundaries.
+            - Options for Non-Reflecting BCs:
+                'BoundaryConditionsType.HIGDON' or 'BoundaryConditionsType.SOMMERFELD'.
+        save_file : `bool`, optional
+            If `True`, save the velocity model with absorbing layer in a .pvd file.
+            Default is `True`.
 
-    #     Returns
-    #     -------
-    #     None
-    #     """
+        Returns
+        -------
+        None
+        """
 
-    #     pprint("\nApplying Non-Reflecting Boundary Conditions", comm=self.comm)
+        # Applying NRBCs on outer boundary layer
+        crit_source = bnd_nod_ids_nfs = bnd_nodes_nfs = None
+        if non_reflect_bc == BoundaryConditionsType.SOMMERFELD or \
+                non_reflect_bc == BoundaryConditionsType.HIGDON:
 
-    #     # Getting boundary data from the layer boundaries
-    #     bnd_nfs, bnd_nodes_nfs = self.layer_boundary_data(self.function_space)
+            pprint("\nApplying Non-Reflecting Boundary Conditions", comm=self.comm)
 
-    #     # Hypershape parameters
-    #     layer_shape = self.abc_boundary_layer_shape
-    #     if layer_shape == LayerShapeType.HYPERSHAPE:
-    #         hyp_par = (self.n_hyp, *self.hyper_axes)
-    #     else:
-    #         hyp_par = None
+            # Getting boundary data from the layer boundaries
+            if non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
+                bnd_nod_ids_nfs = \
+                    Wave_object.mesh_ops.layer_boundary_data(Wave_object.mesh,
+                                                             Wave_object.function_space,
+                                                             Wave_object.mesh_parameters)[0]
 
-    #     # Applying Higdon ABCs
-    #     self.cos_ang_HigdonBC(self.function_space, self.crit_source, bnd_nfs,
-    #                           bnd_nodes_nfs, hyp_par=hyp_par,
-    #                           sommerfeld_bc=sommerfeld_bc)
+            if non_reflect_bc == BoundaryConditionsType.HIGDON:
+                crit_source = self.crit_source
+                bnd_nod_ids_nfs, bnd_nodes_nfs = \
+                    Wave_object.mesh_ops.layer_boundary_data(Wave_object.mesh,
+                                                             Wave_object.function_space,
+                                                             Wave_object.mesh_parameters)
+
+            # Hypershape parameters
+            hyp_par = (self.layer_geometry.n_hyp, *self.layer_geometry.hyper_axes) \
+                if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else None
+
+            # Applying Higdon ABCs
+            self.cos_ang_HigdonBC(Wave_object.function_space, crit_source,
+                                  bnd_nod_ids_nfs, bnd_nodes_nfs, non_reflect_bc,
+                                  hyp_par=hyp_par, save_file=save_file)
+        else:
+            pprint("\nNot Non-Reflecting Boundary Conditions Prescribed", comm=self.comm)
 
     # def check_timestep_abc(self, max_divisor_tf=1, set_max_dt=True,
     #                        method='ANALYTICAL', mag_add=3):

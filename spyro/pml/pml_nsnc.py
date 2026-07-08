@@ -1,15 +1,20 @@
-# from firedrake import (as_tensor, conditional, Function, FunctionSpace,
-#                        SpatialCoordinate, VTKFile)
-from numpy import clip, log  # , where
+from firedrake import as_tensor, conditional, Function, VTKFile
+from numpy import log, where
 from ..abc.abc_layer import ABCLayer
-from ..utils.error_management import enum_parameter_error  # , value_parameter_error
+from ..domains.space import create_function_space
+from ..io.basicio import parallel_print as pprint
+from ..tools.habc_tools import layer_mask_field
+from ..utils.error_management import enum_parameter_error, value_numerical_error
+from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..utils.typing import BoundaryConditionsType, LayerShapeType, LayerSizeRefFrequency
+
 
 # Work from Ruben Andres Salas and Alexandre Olender
 # non-split non-convolutional PML formulation
 # Formulation based on:
 #   "Efficient PML for the wave equation". Grote and Sim (2010)
 #   "A Modified PML Acoustic Wave Equation". Kim (2019)
+# TODO: Add citation
 
 
 class PMLLayer(ABCLayer):
@@ -26,10 +31,10 @@ class PMLLayer(ABCLayer):
     bc_boundary_pml : `typing.BoundaryConditionsType`, optional
         Type of boundary condition to apply on the PML boundaries.
         - Options for Non-Reflecting BCs:
-            'BoundaryConditionsType.HIGDON' or  'BoundaryConditionsType.SOMMERFELD'.
+            'BoundaryConditionsType.HIGDON' or 'BoundaryConditionsType.SOMMERFELD'.
         - Options for typical BCs:
             'BoundaryConditionsType.DIRICHLET' or 'BoundaryConditionsType.NEUMANN'
-        Default is 'BoundaryConditionsType.HIGDON'.
+        Default is 'BoundaryConditionsType.NEUMANN'.
     pml_mask : `Firedrake.Function`
         Mask function to identify the PML domain.
     sigma_max : `float`
@@ -53,15 +58,13 @@ class PMLLayer(ABCLayer):
         Build  Damping matrices for a three-dimensional problem using PML.
     pml_layer()
         Set the damping profile within the PML layer.
-    pml_parameters_boundary_conditions()
-        Set the boundary conditions for the PML layer.
     pml_sigma_field()
         Generate a damping profile for the PML.
     """
 
     def __init__(self, domain_dim, frequency, f_Nyquist, dimension=2,
                  quadrilateral=False, func_space_type=None,
-                 bc_boundary_pml=BoundaryConditionsType.HIGDON,
+                 bc_boundary_pml=BoundaryConditionsType.SOMMERFELD,
                  abc_reference_freq=LayerSizeRefFrequency.SOURCE,
                  output_folder=None, comm=None):
         """
@@ -118,19 +121,26 @@ class PMLLayer(ABCLayer):
         self.bc_boundary_pml = enum_parameter_error('bc_boundary_pml', bc_boundary_pml,
                                                     BoundaryConditionsType)
 
-    def calc_pml_damping(self, dgr_prof=2, CR_min=1e-8, CR_max=1e-3):
+    def calc_pml_damping(self, abc_pml_R, abc_pml_cmax, abc_pad_length,
+                         degree_prof=2, CR_min=1e-8, CR_max=1e-3):
         """Calculate the maximum damping coefficient for the PML layer.
 
         Parameters
         ----------
-        dgr_prof : `int`, optional
-            Degree of the damping profile within the PML layer
+        abc_pml_R: float
+            Theoretical reflection coefficient of the PML layer.
+        abc_pml_cmax: float
+            Maximum propagation speed (km/s) in the PML layer.
+        abc_pad_length : `float`
+            Size of the absorbing layer
+        degree_prof : `int`, optional
+            Degree of the damping profile within the PML layer. Default is 2.
         CR_min : `float`, optional
             Minimum value for the desired reflection coefficient at outer
-            boundary of PML layer. Default is 1e-8
+            boundary of PML layer. Default is 1e-8.
         CR_max : `float`, optional
             Maximum value for the desired reflection coefficient at outer
-            boundary of PML layer. Default is 1e-3
+            boundary of PML layer. Default is 1e-3.
 
         Returns
         -------
@@ -138,197 +148,210 @@ class PMLLayer(ABCLayer):
         """
 
         # Desired reflection coefficient at outer boundary of PML layer.
-        CR = clip(self.abc_pml_R, CR_min, CR_max)
+        CR = value_numerical_error("abc_pml_R", abc_pml_R, float_num=True,
+                                   lower_bound=CR_min, upper_bound=CR_max,
+                                   include_lower_bound=True, include_upper_bound=True)
 
         # Degree of the damping profile within the PML layer.
-        dgr_prof = max(1, dgr_prof)
+        degree_prof = value_numerical_error("degree_prof", degree_prof, integer_num=True,
+                                            lower_bound=1, include_lower_bound=True)
 
         # Maximum damping coefficient within the PML layer
-        self.sigma_max = 0. if self.abc_get_ref_model else \
-            self.c_max * (dgr_prof + 1.) / (2. * self.abc_pad_length) * log(1. / CR)
+        self.sigma_max = ((degree_prof + 1.) / (2. * abc_pad_length)) * log(1. / CR)
+        self.sigma_max *= abc_pml_cmax
 
-    # def pml_sigma_field(self, coords, V):
-    #     """Generate a damping profile for the PML.
+    def pml_sigma_field(self, Wave_object, ufl_coordinates_pml, V,
+                        degree_prof=2, save_file=True):
+        """Generate a damping profile for the PML.
 
-    #     Parameters
-    #     ----------
-    #     coords : 'ufl.geometry.SpatialCoordinate'
-    #         Domain Coordinates including the absorbing layer
-    #     V : `Firedrake.FunctionSpace`
-    #         Function space for the mask field
+        Parameters
+        ----------
+        Wave_object : `acoustic_wave.AcousticWave`
+            An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+        ufl_coordinates_pml : `ufl.geometry.SpatialCoordinate`
+            Domain Coordinates including the absorbing layer.
+        V : `Firedrake.FunctionSpace`
+            Function space for the damping field
+        degree_prof : `int`, optional
+            Degree of the damping profile within the PML layer. Default is 2.
+        save_file : `bool`, optional
+            If `True`, save the mesh with absorbing layer in a .pvd file.
+            Default is `True`.
 
-    #     Returns
-    #     -------
-    #     None
-    #     """
+        Returns
+        -------
+        None
+        """
 
-    #     # Domain dimensions
-    #     length_z, length_x = self.domain_dim[:2]
+        # Domain dimensions
+        length_z, length_x = self.domain_dim[:2]
 
-    #     # Domain coordinates
-    #     z, x = coords[0], coords[1]
+        # UFL coordinates
+        z, x = ufl_coordinates_pml[0], ufl_coordinates_pml[1]
 
-    #     # Conditional value
-    #     val_condz = (z + length_z) ** 2
-    #     val_condx1 = x ** 2
-    #     val_condx2 = (x - length_x) ** 2
+        # Conditional expression
+        condz = z < -length_z
+        condx1 = x < 0.
+        condx2 = x > length_x
 
-    #     # Conditional expressions for the profile
-    #     z_sqr = conditional(z < -length_z, val_condz, 0.)
-    #     x_sqr = conditional(x < 0., val_condx1, 0.) + \
-    #         conditional(x > length_x, val_condx2, 0.)
+        # Conditional value
+        exprz = f"sqrt((z + {length_z})**2)"
+        exprx1 = "(sqrt(x))**2"
+        exprx2 = f"sqrt((x - {length_x})**2)"
+        valz = generate_ufl_functions(Wave_object.mesh, exprz, self.dimension)
+        valx1 = generate_ufl_functions(Wave_object.mesh, exprx1, self.dimension)
+        valx2 = generate_ufl_functions(Wave_object.mesh, exprx2, self.dimension)
 
-    #     # Quadratic damping profiles
-    #     ref_z = z_sqr / self.abc_pad_length ** 2
-    #     ref_x = x_sqr / self.abc_pad_length ** 2
-    #     self.sigma_z = Function(V, name='sigma_z [1/s]')
-    #     self.sigma_z.interpolate(self.pml_mask * self.sigma_max * ref_z)
-    #     self.sigma_x = Function(V, name='sigma_x [1/s]')
-    #     self.sigma_x.interpolate(self.pml_mask * self.sigma_max * ref_x)
+        # Conditional expressions for the profile
+        z_pd = conditional(condz, valz, 0.)
+        x_pd = conditional(condx1, valx1, 0.) + conditional(condx2, valx2, 0.)
 
-    #     if self.dimension == 3:  # 3D
+        # Damping profiles
+        ref_z = (z_pd / self.abc_pad_length) ** degree_prof
+        ref_x = (x_pd / self.abc_pad_length) ** degree_prof
+        self.sigma_z = Function(V, name='sigma_z[1/s]')
+        self.sigma_z.interpolate(self.pml_mask * self.sigma_max * ref_z)
+        self.sigma_x = Function(V, name='sigma_x[1/s]')
+        self.sigma_x.interpolate(self.pml_mask * self.sigma_max * ref_x)
 
-    #         # 3D dimension
-    #         length_y = self.domain_dim[2]
-    #         y = coords[2]
+        if self.dimension == 3:  # 3D
 
-    #         # Conditional value
-    #         val_condy1 = y**2
-    #         val_condy2 = (y - length_y)**2
+            # 3D dimension
+            length_y = self.domain_dim[2]
+            y = ufl_coordinates_pml[2]
 
-    #         # Conditional expressions for the profile
-    #         y_sqr = conditional(y < 0., val_condy1, 0.) + \
-    #             conditional(y > length_y, val_condy2, 0.)
+            # Conditional expression
+            condy1 = y < 0.
+            condy2 = y > length_y
 
-    #         # Quadratic damping profile
-    #         ref_y = y_sqr / self.abc_pad_length ** 2
-    #         self.sigma_y = Function(V, name='sigma_y [1/s]')
-    #         self.sigma_y.interpolate(self.pml_mask * self.sigma_max * ref_y)
+            # Conditional value
+            expry1 = "(sqrt(y))**2"
+            expry2 = f"sqrt((y - {length_y})**2)"
+            valy1 = generate_ufl_functions(Wave_object.mesh, expry1, self.dimension)
+            valy2 = generate_ufl_functions(Wave_object.mesh, expry2, self.dimension)
 
-    #     # Save damping profile
-    #     if hasattr(self, 'path_case_abc'):
-    #         outfile = VTKFile(self.path_case_abc + "sigma_pml.pvd")
-    #         if self.dimension == 2:  # 2D
-    #             outfile.write(self.sigma_z, self.sigma_x)
-    #         if self.dimension == 3:  # 3D
-    #             outfile.write(self.sigma_z, self.sigma_x, self.sigma_y)
+            # Conditional expressions for the mask
+            y_pd = conditional(condy1, valy1, 0.) + conditional(condy2, valy2, 0.)
 
-    # def pml_parameters_boundary_conditions(self):
-    #     """Set the boundary conditions for the PML layer.
+            # Damping profile
+            ref_y = (y_pd / self.abc_pad_length) ** degree_prof
+            self.sigma_y = Function(V, name='sigma_y[1/s]')
+            self.sigma_y.interpolate(self.pml_mask * self.sigma_max * ref_y)
 
-    #     Parameters
-    #     ----------
-    #     None
+        # Save damping profile
+        if not Wave_object.abc_get_ref_model and save_file:
+            outfile = VTKFile(self.path_case_abc + "sigma_pml.pvd")
+            if self.dimension == 2:  # 2D
+                outfile.write(self.sigma_z, self.sigma_x)
+            if self.dimension == 3:  # 3D
+                outfile.write(self.sigma_z, self.sigma_x, self.sigma_y)
 
-    #     Returns
-    #     -------
-    #     None
-    #     """
+    def pml_layer(self, Wave_object, save_file=True):
+        """Set the damping profile within the PML layer.
 
-    #     # ToDo: Integrate boundary mapping
-    #     # Tuple of boundary ids for NRBC
-    #     bnds = [self.absorb_top, self.absorb_bottom,
-    #             self.absorb_right, self.absorb_left]
-    #     if self.dimension == 3:
-    #         bnds.extend([self.absorb_front, self.absorb_back])
+        Parameters
+        ----------
+        Wave_object : `acoustic_wave.AcousticWave`
+            An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+        save_file : `bool`, optional
+            If `True`, save the mesh with absorbing layer in a .pvd file.
+            Default is `True`.
 
-    #     self.where_to_absorb = tuple(where(bnds)[0] + 1)  # ds starts at 1
+        Returns
+        -------
+        None
+        """
 
-    #     # Apply boundary conditions to the PML boundaries.
-    #     type_bc = self.bc_boundary_pml
-    #     if not (type_bc == "Dirichlet" or type_bc == "Neumann"):
+        pprint("\nCreating Damping PML Profile", comm=self.comm)
 
-    #         sommerfeld_bc = True if self.bc_boundary_pml == \
-    #             "Sommerfeld" else False
+        # New geometry with layer if pad_length is provided by the user.
+        if Wave_object.abc_user_pad_len:
+            self.abc_pad_length = Wave_object.abc_pad_length
+            self.abc_new_geometry()
 
-    #         # Applying NRBCs on outer boundary layer
-    #         self.nrbc_on_boundary_layer(sommerfeld_bc=sommerfeld_bc)
+        # Compute the maximum damping coefficient
+        abc_pml_cmax = Wave_object.abc_pml_cmax if Wave_object.abc_user_pml_cmax \
+            else Wave_object.c_bnd_max
 
-    # def pml_layer(self):
-    #     """Set the damping profile within the PML layer.
+        self.calc_pml_damping(Wave_object.abc_pml_R, abc_pml_cmax,
+                              Wave_object.abc_pad_length,
+                              degree_prof=Wave_object.abc_pml_exponent)
 
-    #     Parameters
-    #     ----------
-    #     None
+        # Scalar space for mask
+        method_element = "DQ" if self.quadrilateral else "DG"
+        V = create_function_space(Wave_object.mesh, method_element, 0)
 
-    #     Returns
-    #     -------
-    #     None
-    #     """
+        # Mesh coordinates including the absorbing layer
+        domain_layer = Wave_object.layer_ops.abc_domain_dimensions(full_hyp=False)
+        ufl_coordinates_pml = \
+            Wave_object.mesh_ops.get_spatial_coordinates_abc(Wave_object.mesh,
+                                                             domain_layer)
 
-    #     print("\nCreating Damping PML Profile", flush=True)
+        # Damping mask
+        self.pml_mask = layer_mask_field(self.domain_dim, Wave_object.mesh,
+                                         Wave_object.dimension, ufl_coordinates_pml,
+                                         V, type_marker="mask", name_mask='pml_mask')
 
-    #     # Compute the maximum damping coefficient
+        # Save damping mask
+        save_file = save_file and not Wave_object.abc_get_ref_model
+        if save_file:
+            outfile = VTKFile(self.path_case_abc + "pml_mask.pvd")
+            outfile.write(self.pml_mask)
 
-    #     self.calc_pml_damping()
+        # Damping fields
+        self.pml_sigma_field(Wave_object, ufl_coordinates_pml, V,
+                             degree_prof=Wave_object.abc_pml_exponent)
 
-    #     # Mesh coordinates
-    #     coords = SpatialCoordinate(self.mesh)
+        # Non-Reflective BCs for the PML layer if prescribed
+        self.nrbc_on_boundary_layer(Wave_object, self.bc_boundary_pml, save_file=save_file)
 
-    #     # Damping mask
-    #     V_mask = FunctionSpace(self.mesh, 'DG', 0)
-    #     self.pml_mask = self.layer_mask_field(coords, V_mask,
-    #                                           type_marker='mask',
-    #                                           name_mask='pml_mask')
+    def damping_pml_2d(self):
+        """Build damping matrices for a two-dimensional problem using PML.
 
-    #     # Save damping mask
-    #     if hasattr(self, 'path_case_abc'):
-    #         outfile = VTKFile(self.path_case_abc + "pml_mask.pvd")
-    #         outfile.write(self.pml_mask)
+        Parameters
+        ----------
+        sigma_z: Firedrake 'Function'
+            Damping profile in the z direction
+        sigma_x: Firedrake 'Function'
+            Damping profile in the x direction
 
-    #     # Damping fields
-    #     self.pml_sigma_field(coords, self.function_space)
+        Returns
+        -------
+        Gamma_1: Firedrake 'TensorFunction'
+            First damping matrix
+        Gamma_2: Firedrake 'TensorFunction'
+            Second damping matrix
+        """
+        Gamma_1 = as_tensor([[self.sigma_z, 0.], [0., self.sigma_x]])
+        Gamma_2 = as_tensor([[self.sigma_z - self.sigma_x, 0.],
+                             [0., self.sigma_x - self.sigma_z]])
 
-    #     # Boundary conditions for the PML layer
-    #     self.pml_parameters_boundary_conditions()
+        return Gamma_1, Gamma_2
 
-    # def damping_pml_2d(self):
-    #     """Build damping matrices for a two-dimensional problem using PML.
+    def damping_pml_3d(self):
+        """Build  Damping matrices for a three-dimensional problem using PML.
 
-    #     Parameters
-    #     ----------
-    #     sigma_z: Firedrake 'Function'
-    #         Damping profile in the z direction
-    #     sigma_x: Firedrake 'Function'
-    #         Damping profile in the x direction
+        Parameters
+        ----------
+        None
 
-    #     Returns
-    #     -------
-    #     Gamma_1: Firedrake 'TensorFunction'
-    #         First damping matrix
-    #     Gamma_2: Firedrake 'TensorFunction'
-    #         Second damping matrix
-    #     """
-    #     Gamma_1 = as_tensor([[self.sigma_z, 0.], [0., self.sigma_x]])
-    #     Gamma_2 = as_tensor([[self.sigma_z - self.sigma_x, 0.],
-    #                               [0., self.sigma_x - self.sigma_z]])
+        Returns
+        -------
+        Gamma_1: Firedrake 'TensorFunction'
+            First damping matrix
+        Gamma_2: Firedrake 'TensorFunction'
+            Second damping matrix
+        Gamma_3: Firedrake 'TensorFunction'
+            Third damping matrix
+        """
+        Gamma_1 = as_tensor([[self.sigma_z, 0., 0.],
+                             [0., self.sigma_x, 0.],
+                             [0., 0., self.sigma_y]])
+        Gamma_2 = as_tensor([[self.sigma_z - self.sigma_x - self.sigma_y, 0., 0.],
+                             [0., self.sigma_x - self.sigma_z - self.sigma_y, 0.],
+                             [0., 0., self.sigma_y - self.sigma_x - self.sigma_z]])
+        Gamma_3 = as_tensor([[self.sigma_x * self.sigma_y, 0., 0.],
+                             [0., self.sigma_z * self.sigma_y, 0.],
+                             [0., 0., self.sigma_z * self.sigma_x]])
 
-    #     return Gamma_1, Gamma_2
-
-    # def damping_pml_3d(self):
-    #     """Build  Damping matrices for a three-dimensional problem using PML.
-
-    #     Parameters
-    #     ----------
-    #     None
-
-    #     Returns
-    #     -------
-    #     Gamma_1: Firedrake 'TensorFunction'
-    #         First damping matrix
-    #     Gamma_2: Firedrake 'TensorFunction'
-    #         Second damping matrix
-    #     Gamma_3: Firedrake 'TensorFunction'
-    #         Third damping matrix
-    #     """
-    #     Gamma_1 = as_tensor([[self.sigma_z, 0., 0.],
-    #                               [0., self.sigma_x, 0.],
-    #                               [0., 0., self.sigma_y]])
-    #     Gamma_2 = as_tensor([[self.sigma_z - self.sigma_x - self.sigma_y, 0., 0.],
-    #                               [0., self.sigma_x - self.sigma_z - self.sigma_y, 0.],
-    #                               [0., 0., self.sigma_y - self.sigma_x - self.sigma_z]])
-    #     Gamma_3 = as_tensor([[self.sigma_x * self.sigma_y, 0., 0.],
-    #                               [0., self.sigma_z * self.sigma_y, 0.],
-    #                               [0., 0., self.sigma_z * self.sigma_x]])
-
-    #     return Gamma_1, Gamma_2, Gamma_3
+        return Gamma_1, Gamma_2, Gamma_3

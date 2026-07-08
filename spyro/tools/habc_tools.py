@@ -47,8 +47,6 @@ def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
 
     # UFL coordinates
     z, x = ufl_coordinates_habc[0], ufl_coordinates_habc[1]
-    if dimension == 3:  # 3D
-        y = ufl_coordinates_habc[2]
 
     # Conditional expression
     condz = z < -length_z
@@ -72,6 +70,7 @@ def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
 
         # 3D dimension
         length_y = domain_dim[2]
+        y = ufl_coordinates_habc[2]
 
         # Conditional expression
         condy1 = y < 0.
@@ -113,8 +112,8 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
         Function space for the mask field.
     damp_par : `tuple`, optional
         Damping parameters for the absorbing layer.
-        Structure: (pad_len, eta_crt, aq, bq).
-        - pad_len : `float`
+        Structure: (pad_length, eta_crt, aq, bq).
+        - pad_length : `float`
             Size of the absorbing layer.
         - eta_crt : `float`
             Critical damping coefficient (1/s).
@@ -144,9 +143,9 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
                                                      dimension, ufl_coordinates_habc,
                                                      type_marker=type_marker)
 
-    value_parameter_error('type_marker', type_marker, ['damping', 'mask'])
+    value_parameter_error('type_marker', type_marker, ["damping", "mask"])
 
-    if type_marker == 'damping':
+    if type_marker == "damping":
 
         # Damping profile for the absorbing layer
         if damp_par is None:
@@ -154,19 +153,15 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
                              "when 'type_marker' is 'damping'.")
 
         # Damping parameters
-        pad_len, eta_crt, aq, bq = damp_par
+        pad_length, eta_crt, aq, bq = damp_par
 
-        if pad_len <= 0:
-            raise ValueError(f"Invalid value for 'pad_len': {pad_len}. "
-                             "'pad_len' must be greater than zero "
-                             "when 'type_marker' is 'damping'.")
-        if eta_crt <= 0:
-            raise ValueError(f"Invalid value for 'eta_crt': {eta_crt}. "
-                             "'eta_crt' must be greater than zero "
-                             "when 'type_marker' is 'damping'.")
+        value_numerical_error("pad_length", pad_length, float_num=True,
+                              integer_num=True, lower_bound=0.)
+
+        value_numerical_error("eta_crt", eta_crt, float_num=True, lower_bound=0.)
 
         # Reference distance to the original boundary
-        ref_funct = fire_sqrt(ref_funct) / pad_len
+        ref_funct = fire_sqrt(ref_funct) / pad_length
 
         # Quadratic damping profile
         if bq == 0.:
@@ -174,7 +169,7 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
         else:
             ref_funct = eta_crt * (aq * ref_funct**2 + bq * ref_funct)
 
-    elif type_marker == 'mask':
+    elif type_marker == "mask":
 
         # Mask filter for layer boundary domain
         ref_funct = conditional(ref_funct > 0, 1., 0.)
