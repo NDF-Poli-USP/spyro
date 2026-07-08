@@ -140,7 +140,7 @@ class Receivers(Delta_projector):
         """Return receiver misfit injection as a VOM-built cofunction.
 
         This is the adjoint of the receiver interpolation used by the
-        form-derived implemented adjoint.
+        UFL-derived implemented adjoint.
 
         Parameters
         ----------

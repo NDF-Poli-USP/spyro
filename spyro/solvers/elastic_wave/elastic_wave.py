@@ -3,7 +3,9 @@ from firedrake import Constant
 
 from ..backward_time_integration import backward_wave_propagator
 from ..wave import Wave
-from ...utils.typing import AdjointType, override, RieszMapType
+from ...utils.typing import (
+    AdjointType, ImplementedAdjointDerivation, override, RieszMapType,
+)
 
 
 class ElasticWave(Wave, metaclass=ABCMeta):
@@ -42,6 +44,7 @@ class ElasticWave(Wave, metaclass=ABCMeta):
         forward_solution=None,
         adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
         riesz_map=RieszMapType.L2,
+        implemented_adjoint_derivation=ImplementedAdjointDerivation.UFL_DIFFERENTIATION,
     ):
         """Compute UFL-derived implemented-adjoint elastic gradients.
 
@@ -58,6 +61,13 @@ class ElasticWave(Wave, metaclass=ABCMeta):
             raise NotImplementedError(
                 f"Riesz map {riesz_map} not implemented for elastic gradients.",
             )
+        if (
+            implemented_adjoint_derivation
+            is not ImplementedAdjointDerivation.UFL_DIFFERENTIATION
+        ):
+            raise NotImplementedError(
+                "Elastic gradients currently support only UFL differentiation.",
+            )
         if self.abc_boundary_layer_type == "PML":
             raise NotImplementedError(
                 "Elastic implemented adjoint does not support PML yet.",
@@ -65,8 +75,12 @@ class ElasticWave(Wave, metaclass=ABCMeta):
 
         self._prepare_implemented_adjoint(
             misfit=misfit, forward_solution=forward_solution,
+            implemented_adjoint_derivation=implemented_adjoint_derivation,
         )
-        return backward_wave_propagator(self)
+        return backward_wave_propagator(
+            self,
+            implemented_adjoint_derivation=implemented_adjoint_derivation,
+        )
 
     @override
     def update_source_expression(self, t):

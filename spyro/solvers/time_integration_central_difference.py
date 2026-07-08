@@ -40,6 +40,7 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
         state_space = wave_obj.function_space
         if (
             wave_obj.abc_boundary_layer_type == "PML"
+            and wave_obj.use_vertex_only_mesh
             and wave_obj.forward_residual_form is not None
         ):
             state_space = wave_obj.mixed_function_space

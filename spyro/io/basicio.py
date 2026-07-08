@@ -245,7 +245,11 @@ def ensemble_functional(func):
 
         elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
             evaluation_mode = kwargs.get("evaluation_mode")
-            if getattr(evaluation_mode, "name", None) == "PER_TIMESTEP":
+            try:
+                is_per_timestep = evaluation_mode.name == "PER_TIMESTEP"
+            except AttributeError:
+                is_per_timestep = False
+            if is_per_timestep:
                 # PER_TIMESTEP accumulation runs inside a single source's
                 # forward solve; the serial-shot loop switches sources outside
                 # this call, so ``misfit`` (args[1]) already belongs to the

@@ -15,7 +15,7 @@ from .backward_time_integration import (
 )
 from ..domains.space import create_function_space
 from ..utils.typing import (
-    AdjointType, RieszMapType, override, WaveType,
+    AdjointType, ImplementedAdjointDerivation, RieszMapType, override, WaveType,
 )
 from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
@@ -81,6 +81,7 @@ class AcousticWave(Wave):
         self, misfit=None, forward_solution=None,
         adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
         riesz_map=RieszMapType.L2,
+        implemented_adjoint_derivation=ImplementedAdjointDerivation.UFL_DIFFERENTIATION,
     ):
         """Compute the adjoint-based gradient.
 
@@ -101,6 +102,9 @@ class AcousticWave(Wave):
         riesz_map: RieszMapType enum (default: RieszMapType.L2)
             The type of Riesz map to use for the gradient. More details in the documentation of the
             :class:`RieszMapType` enum.
+        implemented_adjoint_derivation: ImplementedAdjointDerivation enum
+            How to derive Spyro's implemented adjoint. Defaults to UFL
+            differentiation of the forward residual.
 
         Returns:
         --------
@@ -118,8 +122,12 @@ class AcousticWave(Wave):
 
         self._prepare_implemented_adjoint(
             misfit=misfit, forward_solution=forward_solution,
+            implemented_adjoint_derivation=implemented_adjoint_derivation,
         )
-        return backward_wave_propagator(self)
+        return backward_wave_propagator(
+            self,
+            implemented_adjoint_derivation=implemented_adjoint_derivation,
+        )
 
     def _automated_adjoint_gradient(self, riesz_map=RieszMapType.L2):
         """Compute the gradient using the automated adjoint.

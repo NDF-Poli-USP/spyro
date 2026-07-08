@@ -14,7 +14,10 @@ from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
-from ..utils.typing import AdjointType, WaveType, FunctionalEvaluationMode
+from ..utils.typing import (
+    AdjointType, ImplementedAdjointDerivation, WaveType,
+    FunctionalEvaluationMode,
+)
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from .modal.modal_sol import Modal_Solver
@@ -717,28 +720,39 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.functional_value = None
         self.misfit = None
 
-    def enable_implemented_adjoint(self):
-        """Switch the solver into implemented-adjoint (UFL-derived) mode.
+    def enable_implemented_adjoint(
+        self,
+        implemented_adjoint_derivation=ImplementedAdjointDerivation.UFL_DIFFERENTIATION,
+    ):
+        """Switch the solver into an implemented-adjoint mode.
 
         Side effects, required before a backward/gradient solve:
 
         - selects :attr:`AdjointType.IMPLEMENTED_ADJOINT`;
         - stores the forward field at every gradient-sampling step
           (``store_forward_time_steps``) so the adjoint replay can reassign it;
-        - enables the vertex-only-mesh receiver path used to inject the misfit
-          into the adjoint source;
-        - forces functional evaluation to ``PER_TIMESTEP`` so the functional is
-          accumulated during the forward solve.
+        - for the UFL-derived backend, enables the vertex-only-mesh receiver
+          path and forces functional evaluation to ``PER_TIMESTEP``.
         """
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
         self.store_forward_time_steps = True
-        self.use_vertex_only_mesh = True
-        if self.functional_evaluation_mode is not FunctionalEvaluationMode.PER_TIMESTEP:
-            self.enable_compute_functional(
-                mode=FunctionalEvaluationMode.PER_TIMESTEP
-            )
+        if (
+            implemented_adjoint_derivation
+            is ImplementedAdjointDerivation.UFL_DIFFERENTIATION
+        ):
+            self.use_vertex_only_mesh = True
+            if (
+                self.functional_evaluation_mode
+                is not FunctionalEvaluationMode.PER_TIMESTEP
+            ):
+                self.enable_compute_functional(
+                    mode=FunctionalEvaluationMode.PER_TIMESTEP
+                )
 
-    def _prepare_implemented_adjoint(self, misfit=None, forward_solution=None):
+    def _prepare_implemented_adjoint(
+        self, misfit=None, forward_solution=None,
+        implemented_adjoint_derivation=ImplementedAdjointDerivation.UFL_DIFFERENTIATION,
+    ):
         """Enable the implemented adjoint and ensure misfit + forward solution.
 
         Shared ``gradient_solve`` preamble for the acoustic and elastic
@@ -755,8 +769,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         forward_solution : optional
             Stored forward solution to reuse. If ``None`` and none is stored,
             a fresh forward solve is run.
+        implemented_adjoint_derivation : ImplementedAdjointDerivation, optional
+            How to derive Spyro's implemented adjoint.
         """
-        self.enable_implemented_adjoint()
+        self.enable_implemented_adjoint(
+            implemented_adjoint_derivation=implemented_adjoint_derivation,
+        )
         if misfit is not None:
             self.misfit = misfit
 

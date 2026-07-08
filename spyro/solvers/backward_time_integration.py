@@ -3,15 +3,20 @@ from . import helpers
 from .wave import Wave
 from ..io.basicio import parallel_print
 from ..receivers.Receivers import Receivers
+from ..utils.typing import ImplementedAdjointDerivation
 
 # Key used to store a single-control (e.g. acoustic velocity) gradient in the
 # same control-keyed dictionary used for multi-parameter (elastic) controls.
-# It lets the whole form-derived backward pass work with one dict layout and
+# It lets the whole UFL-derived backward pass work with one dict layout and
 # unwrap to a single Function only at the public API boundary.
 _SINGLE_CONTROL_KEY = "control"
 
 
-def backward_wave_propagator(wave_obj: Wave, dt: float = None):
+def backward_wave_propagator(
+    wave_obj: Wave,
+    dt: float = None,
+    implemented_adjoint_derivation=ImplementedAdjointDerivation.UFL_DIFFERENTIATION,
+):
     """Propagates the adjoint wave backwards in time.
 
     Currently uses central differences.
@@ -23,6 +28,8 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
     dt : float (optional)
         Time step to be used explicitly. If not mentioned uses the default,
         that was estabilished in the wave object for the adjoint model.
+    implemented_adjoint_derivation : ImplementedAdjointDerivation, optional
+        How to derive Spyro's implemented adjoint.
 
     Returns:
     --------
@@ -34,10 +41,9 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
     Notes:
     ------
     This is an unified backward wave propagation for both PML and no-PML cases.
-    When a forward residual form is available, the adjoint equation and
-    gradient are derived by UFL differentiation of that residual. Legacy
-    hard-coded gradient forms remain as fallbacks for solvers that do not expose
-    ``forward_residual_form``.
+    The implemented adjoint can use either UFL differentiation of the forward
+    residual or the legacy hand-derived adjoint/gradient forms, selected by
+    ``implemented_adjoint_derivation``.
     """
     wave_obj.reset_adjoint_state()
     mask_available = wave_obj.gradient_mask_available
@@ -56,7 +62,9 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
 
     wave_obj.comm.comm.barrier()
 
-    use_form_derived_gradient = _uses_form_derived_gradient(wave_obj)
+    use_ufl_differentiation = _uses_ufl_differentiation(
+        wave_obj, implemented_adjoint_derivation,
+    )
     # Initialize the reduced gradient accumulator with zero in the control
     # space(s).  During the backward time loop each step adds a contribution
     #
@@ -71,27 +79,27 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
     # ``_SINGLE_CONTROL_KEY``; elastic exposes one accumulator per material
     # parameter. The public return value is unwrapped back to a single Function
     # for acoustic at the end of the routine.
-    if use_form_derived_gradient:
+    if use_ufl_differentiation:
         dJ = {
             parameter: fire.Function(control.function_space())
             for parameter, control in _form_control_map(wave_obj).items()
         }
     else:
         dJ = fire.Function(wave_obj.get_scalar_function_space())
-    # The form-derived path works internally with a control-keyed dict, even for
+    # The UFL-derived path works internally with a control-keyed dict, even for
     # single-control solvers. ``controls_are_dict`` records whether the public
     # API should return that dict (elastic) or a single Function (acoustic).
-    controls_are_dict = use_form_derived_gradient and isinstance(
+    controls_are_dict = use_ufl_differentiation and isinstance(
         _get_form_controls(wave_obj), dict,
     )
     receiver_source_space = _receiver_source_function_space(wave_obj)
     rhs_forcing = None
-    if not use_form_derived_gradient:
+    if not use_ufl_differentiation:
         rhs_forcing = fire.Cofunction(receiver_source_space.dual())
     grad_solver, forward_field, uadj, gradi = _build_gradient_solver(
-        wave_obj, mask_available,
+        wave_obj, mask_available, implemented_adjoint_derivation,
     )
-    if use_form_derived_gradient:
+    if use_ufl_differentiation:
         adjoint_solver = build_adjoint_solver(
             wave_obj.forward_residual_form,
             wave_obj.forward_residual_states,
@@ -108,7 +116,7 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
     receivers = wave_obj.receivers
 
     for step in range(nt - 1, -1, -1):
-        if use_form_derived_gradient:
+        if use_ufl_differentiation:
             misfit_form = receivers.apply_receivers_as_source_vertex_only_mesh(
                 wave_obj.misfit[step], receiver_source_space,
             )
@@ -126,7 +134,7 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
             # Assign the adjoint solution at the step `np1` to `uadj`.
             uadj.assign(wave_obj.get_function(state=wave_obj.next_vstate))
 
-            if use_form_derived_gradient:
+            if use_ufl_differentiation:
                 residual_np1, residual_n, residual_nm1 = (
                     wave_obj.forward_residual_states
                 )
@@ -150,7 +158,7 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
                     forward_field.assign(0.0)
             else:
                 forward_field.assign(_compute_dufordt2(forward_solution, dt))
-            if use_form_derived_gradient:
+            if use_ufl_differentiation:
                 for control_solver in grad_solver.values():
                     control_solver.solve()
                 for parameter in dJ:
@@ -168,7 +176,7 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None):
 
     helpers.display_progress(wave_obj.comm, t)
 
-    if use_form_derived_gradient:
+    if use_ufl_differentiation:
         for gradient in dJ.values():
             gradient.dat.data_wo[:] *= dt
         if not controls_are_dict:
@@ -198,8 +206,12 @@ def _pml_interior_indicator(wave_obj: Wave) -> fire.conditional:
     return fire.conditional(inside, 1.0, 0.0)
 
 
-def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
-        fire.LinearVariationalSolver, fire.Function, fire.Function, fire.Function
+def _build_gradient_solver(
+    wave_obj: Wave,
+    mask_available: bool,
+    implemented_adjoint_derivation,
+) -> tuple[
+    fire.LinearVariationalSolver, fire.Function, fire.Function, fire.Function
 ]:
     """Assemble the gradient variational problem.
 
@@ -212,20 +224,24 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
     mask_available : bool
         Flag indicating whether a gradient mask is available. If True, the
         gradient will be computed only in the inner region of the domain.
+    implemented_adjoint_derivation : ImplementedAdjointDerivation
+        How to derive Spyro's implemented adjoint.
 
     Returns:
     --------
     grad_solver, forward_field, uadj, gradi
     """
-    form_derived = _uses_form_derived_gradient(wave_obj)
+    use_ufl_differentiation = _uses_ufl_differentiation(
+        wave_obj, implemented_adjoint_derivation,
+    )
     if (
         wave_obj.use_vertex_only_mesh
         and wave_obj.automatic_adjoint is False
-        and not form_derived
+        and not use_ufl_differentiation
     ):
         # WORKAROUND: enable_implemented_adjoint() forces
         # ``use_vertex_only_mesh = True``, which builds VOM-based receivers.
-        # The legacy hand-coded gradient path (no ``forward_residual_form``)
+        # The legacy hand-derived gradient path
         # instead injects the misfit through ``apply_receivers_as_source``,
         # which relies on the manual cell tabulations built by ``Receivers``
         # only when the flag is False. Rebuild the receivers with the flag off
@@ -236,7 +252,7 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
         wave_obj.use_vertex_only_mesh = False
         wave_obj.receivers = Receivers(wave_obj)
         wave_obj.use_vertex_only_mesh = True
-    if form_derived:
+    if use_ufl_differentiation:
         dx = fire.dx(**wave_obj.quadrature_rule)
         state_space = _receiver_source_function_space(wave_obj)
         uadj = fire.Function(state_space)
@@ -445,7 +461,16 @@ def build_adjoint_solver(
     )
 
 
-def _uses_form_derived_gradient(wave_obj: Wave) -> bool:
+def _uses_ufl_differentiation(
+    wave_obj: Wave,
+    implemented_adjoint_derivation,
+) -> bool:
+    """Return whether this wave should use UFL-derived adjoint equations."""
+    if (
+        implemented_adjoint_derivation
+        is not ImplementedAdjointDerivation.UFL_DIFFERENTIATION
+    ):
+        return False
     return (
         wave_obj.forward_residual_form is not None
         and wave_obj.forward_residual_states is not None
@@ -476,7 +501,7 @@ def _get_form_controls(wave_obj: Wave):
 
 
 def _form_control_map(wave_obj: Wave) -> dict:
-    """Return form-derived controls as a control-keyed dictionary.
+    """Return UFL-derived controls as a control-keyed dictionary.
 
     Multi-parameter solvers (isotropic elastic) already expose a dictionary.
     Single-control solvers (acoustic) are wrapped under ``_SINGLE_CONTROL_KEY``

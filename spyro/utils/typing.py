@@ -20,12 +20,19 @@ class AdjointType(Enum):
 
     NONE: No adjoint solver.
     AUTOMATED_ADJOINT: Use the automated adjoint solver via `firedrake.adjoint`.
-    IMPLEMENTED_ADJOINT: Use the manually implemented adjoint solver.
+    IMPLEMENTED_ADJOINT: Use Spyro's implemented adjoint solver.
     """
 
     NONE = 0
     AUTOMATED_ADJOINT = 1
     IMPLEMENTED_ADJOINT = 2
+
+
+class ImplementedAdjointDerivation(Enum):
+    """Derivation used by :class:`AdjointType.IMPLEMENTED_ADJOINT`."""
+
+    HAND_DERIVED = 0
+    UFL_DIFFERENTIATION = 1
 
 
 class RieszMapType(Enum):
