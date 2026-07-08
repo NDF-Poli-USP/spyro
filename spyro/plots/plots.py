@@ -1,4 +1,6 @@
 # from scipy.io import savemat
+import os
+from matplotlib import use
 import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
@@ -11,6 +13,17 @@ from ..tools.version_control import is_firedrake_new
 plt.rcParams.update({"font.family": "serif"})
 plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
 __all__ = ["plot_shots", "plot_receiver_response"]
+
+
+# Use non-interactive backend in headless/container environments.
+# Some containers may have DISPLAY set to ':0' without a real X server,
+# so treat an empty DISPLAY or ':0' as headless for safety.
+display_val = os.environ.get("DISPLAY", "")
+if display_val == "" or display_val == ":0":
+    use("Agg")
+    print("A", flush=True)
+else:
+    print(f"display_config = {os.environ.get("DISPLAY", "")}", flush=True)
 
 
 if is_firedrake_new() is False:
