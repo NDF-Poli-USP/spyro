@@ -200,7 +200,7 @@ def test_gradient_auto_adjoint(PML=True):
 def test_gradient_implemented_adjoint(PML=False):
     dictionary = set_dictionary(PML=PML)
     rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(
-        dictionary=dictionary, adjoint_type=AdjointType.IMPLEMENTED_ADJOINT)
+        dictionary=dictionary, adjoint_type=AdjointType.UFL_DERIVED_ADJOINT)
 
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
@@ -212,7 +212,7 @@ def test_gradient_implemented_adjoint(PML=False):
     # compute the gradient of the control (to be verified)
     dJ = Wave_obj_guess.gradient_solve(
         misfit=misfit, forward_solution=forward_solution_guess,
-        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
     )
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
 
