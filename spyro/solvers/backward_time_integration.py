@@ -128,7 +128,10 @@ def backward_wave_propagator(
             )
         if step == 0 or step == nt - 1:
             misfit_form.assign(0.5 * misfit_form)
-        wave_obj.set_adjoint_source(misfit_form)
+        if use_ufl_differentiation:
+            wave_obj.set_adjoint_source(misfit_form)
+        else:
+            wave_obj.rhs_no_pml_source().assign(misfit_form)
         adjoint_solver.solve()
 
         if step % wave_obj.gradient_sampling_frequency == 0:
