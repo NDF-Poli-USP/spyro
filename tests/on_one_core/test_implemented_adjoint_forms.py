@@ -33,7 +33,7 @@ def _small_acoustic_model():
         },
         "time_axis": {
             "initial_time": 0.0,
-            "final_time": 0.002,
+            "final_time": 0.5,
             "dt": 0.001,
             "amplitude": 1.0,
             "output_frequency": 10,
@@ -51,7 +51,7 @@ def _small_acoustic_model():
 
 def _taylor_acoustic_model():
     model = _small_acoustic_model()
-    model["time_axis"]["final_time"] = 0.05
+    model["time_axis"]["final_time"] = 0.5
     model["time_axis"]["dt"] = 0.005
     model["time_axis"]["output_frequency"] = 100
     return model
@@ -104,7 +104,7 @@ def _small_elastic_model():
         },
         "time_axis": {
             "initial_time": 0.0,
-            "final_time": 0.02,
+            "final_time": 0.5,
             "dt": 0.002,
             "output_frequency": 100,
             "gradient_sampling_frequency": 1,
