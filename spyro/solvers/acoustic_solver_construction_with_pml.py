@@ -1,227 +1,202 @@
-import firedrake as fire
-from firedrake import dx, ds, Constant, dot, grad, inner
+"""Constructs Firedrake solver for the acosutic wave with a PML."""
 
-from ..pml import damping
+from firedrake import (Cofunction, DirichletBC, div, dot, ds as fire_ds, dx as fire_dx,
+                       Function, grad, inner, lhs, LinearVariationalProblem,
+                       LinearVariationalSolver, rhs, split, TestFunctions, TrialFunctions)
+from ..utils.typing import BoundaryConditionsType
+
+
+# Work from Keith Roberts, Eduardo Moscatelli,
+# Ruben Andres Salas and Alexandre Olender
+# Formulation based on:
+#   "Efficient PML for the wave equation". Grote and Sim (2010)
+#   "A Modified PML Acoustic Wave Equation". Kim (2019)
+
+
+def forms_pml(Wave_object, W, X_n, X_nm1):
+    """
+    Build the variational form for the wave equation with a PML.
+
+    Parameters
+    ----------
+    Wave_object : `acoustic_wave.AcousticWave`
+        An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+    W : `Firedrake.MixedFunctionSpace`
+        Mixed function space for the wave equation with PML
+    X_n : `Firedrake.Function`
+        State variable at time step n
+    X_nm1 : `Firedrake.Function`
+        State variable at time step n - 1
+
+    Returns
+    -------
+    FF : `Firedrake.Form`
+        Variational form for the wave equation with PML
+    fix_bnd : `Firedrake.DirichletBC`
+        Dirichlet boundary conditions applied to the PML boundaries
+
+    Notes
+    -----
+    In the UFL forms, however, reference ``X_n``/``X_nm1`` directly via ``fire.split``.
+    The pyadjoint tape tracks ``X_n.assign(X_np1)`` between time steps; the subfunction
+    Functions are separately-tracked tape variables that are never explicitly written to
+    in the tape, so on replay their tape values stay at the initial (zero) state, making
+    ``J`` constant w.r.t. the control. Using ``fire.split(X_n)`` keeps the form dependent
+    on ``X_n`` itself, which is updated correctly on replay.
+    This is what makes the PML Taylor test converge.
+    """
+
+    # Simulation parameters for PML formulation
+    dt = Wave_object.dt
+    c = Wave_object.c
+    c_sqr_inv = 1. / (c * c)
+    q_rule = Wave_object.quadrature_rule
+    dx = fire_dx(**q_rule) if q_rule else fire_dx
+    Wave_object.layer_ops.pml_layer(Wave_object)
+
+    # Trial and test functions, and state variables
+    if Wave_object.dimension == 2:
+        u, pp = TrialFunctions(W)
+        v, qq = TestFunctions(W)
+        u_n, pp_n = split(X_n)
+        u_nm1, _ = split(X_nm1)
+
+    elif Wave_object.dimension == 3:
+        u, psi, pp = TrialFunctions(W)
+        v, phi, qq = TestFunctions(W)
+        u_n, psi_n, pp_n = split(X_n)
+        u_nm1, psi_nm1, _ = split(X_nm1)
+
+    # Acoustic form
+    m1 = (c_sqr_inv * (u - 2. * u_n + u_nm1) / dt**2) * v
+    a = dot(grad(u_n), grad(v))  # explicit
+    FF = (m1 + a) * dx
+
+    # Common PML forms (Centered difference for first time derivative)
+    pml3 = -dot(div(pp_n), v)
+    # -------------------------------------------------------
+    div_deriv = dt  # (2. * dt)
+    mm1 = inner((pp - pp_n) / div_deriv, qq)
+
+    # Surfaces to apply boundary conditions (NRBCs or Traditional BCs)
+    bc_surf = tuple([non_free_surf for non_free_surf, status in
+                     Wave_object.mesh_parameters.boundary_ids_map.items() if status])
+
+    if not Wave_object.abc_get_ref_model:
+
+        # Damping profiles and matrices
+        sigma_x, sigma_z = Wave_object.layer_ops.sigma_x, Wave_object.layer_ops.sigma_z
+        if Wave_object.dimension == 2:
+            Gamma_1, Gamma_2 = Wave_object.layer_ops.damping_pml_2d()
+
+        elif Wave_object.dimension == 3:
+            sigma_y = Wave_object.layer_ops.sigma_y
+            Gamma_1, Gamma_2, Gamma_3 = Wave_object.layer_ops.damping_pml_3d()
+
+        # PML forms (Centered difference for first time derivative)
+        mm2 = inner(dot(Gamma_1, pp_n), qq)
+        FF1 = c_sqr_inv * (mm1 + mm2)
+        if Wave_object.dimension == 2:
+            pml1 = (sigma_z + sigma_x) * dot((u_n - u_nm1) / div_deriv, v)
+            pml2 = sigma_z * sigma_x * dot(u_n, v)
+            FF += c_sqr_inv * (pml1 + pml2 + pml3) * dx
+            # -------------------------------------------------------
+            dd = inner(Gamma_2 * grad(u_n), qq)
+            FF += (FF1 + dd) * dx
+
+        elif Wave_object.dimension == 3:
+            pml1 = (sigma_z + sigma_x + sigma_y) * dot((u_n - u_nm1) / div_deriv, v)
+            pml2 = (sigma_z * sigma_x + sigma_x * sigma_y
+                    + sigma_z * sigma_y) * dot(u_n, v)
+            pml4 = (sigma_z * sigma_x * sigma_y) * dot(psi_n, v)
+            FF += c_sqr_inv * (pml1 + pml2 + pml3 + pml4) * dx
+            # -------------------------------------------------------
+            dd1 = inner(dot(Gamma_2, grad(u_n)), qq)
+            dd2 = -inner(dot(Gamma_3, grad(psi_n)), qq)
+            FF += (FF1 + dd1 + dd2) * dx
+            # -------------------------------------------------------
+            mmm1 = dot((psi - psi_n) / div_deriv, phi)
+            uuu1 = -dot(u_n, phi)
+            FF += (mmm1 + uuu1) * dx
+
+        # exterior_markers = set(Wave_object.mesh.exterior_facets.unique_markers)
+        # print("Available boundary markers:", exterior_markers)
+
+        # Apply NRBCs (Higdon or Sommerfeld) at PML boundaries
+        if Wave_object.layer_ops.bc_boundary_pml == BoundaryConditionsType.HIGDON or \
+                Wave_object.layer_ops.bc_boundary_pml == BoundaryConditionsType.SOMMERFELD:
+            ds = fire_ds(bc_surf, **q_rule) if q_rule else fire_ds(bc_surf)
+            f_abc = (1. / c) * dot((u_n - u_nm1) / div_deriv, v)
+            le = Wave_object.layer_ops.cosHig * f_abc * ds
+            FF += le
+
+    # Dirichlet BCs for PML model or Neumann BCs for the reference model
+    fix_bnd = DirichletBC(W.sub(0), 0., bc_surf) \
+        if Wave_object.layer_ops.bc_boundary_pml == BoundaryConditionsType.DIRICHLET and \
+        not Wave_object.abc_get_ref_model else None
+
+    return FF, fix_bnd
 
 
 def construct_solver_or_matrix_with_pml(Wave_object):
+    """Build solver operators for wave propagator with a PML.
+
+    Doesn't create mass matrices if matrix_free option is on, which it is by default.
+
+    Parameters
+    ----------
+    Wave_object : `acoustic_wave.AcousticWave`
+        An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Keep Function-typed subfunction views for non-form usage (in-place ``.assign``,
+    ``.dat`` access for receiver output, etc.). They share storage with ``X_n``/``X_nm1``
+    so writes to the mixed Functions are visible through these views.
     """
-    Builds solver operators for wave propagator with a PML. Doesn't create mass matrices if
-    matrix_free option is on, which it is by default.
-    """
+
+    # Build mixed function space
+    V = Wave_object.function_space
+    Z = Wave_object.vector_function_space
     if Wave_object.dimension == 2:
-        return construct_solver_or_matrix_with_pml_2d(Wave_object)
+        W = V * Z
     elif Wave_object.dimension == 3:
-        return construct_solver_or_matrix_with_pml_3d(Wave_object)
-
-
-def construct_solver_or_matrix_with_pml_2d(Wave_object):
-    """
-    Builds solver operators for 2D wave propagator with a PML. Doesn't create mass matrices if
-    matrix_free option is on, which it is by default.
-    """
-    dt = Wave_object.dt
-    c = Wave_object.c
-
-    V = Wave_object.function_space
-    Z = Wave_object.vector_function_space
-    W = V * Z
+        W = V * V * Z
     Wave_object.mixed_function_space = W
-    dxlump = dx(**Wave_object.quadrature_rule)
 
-    u, pp = fire.TrialFunctions(W)
-    v, qq = fire.TestFunctions(W)
+    # State variables
+    X_np1 = Function(W)
+    X_n = Function(W)
+    X_nm1 = Function(W)
 
-    X_np1 = fire.Function(W)
-    X_n = fire.Function(W)
-    X_nm1 = fire.Function(W)
+    if Wave_object.dimension == 2:
+        u_n_func, pp_n_func = X_n.subfunctions
+        u_nm1_func, _ = X_nm1.subfunctions
 
-    # Keep Function-typed subfunction views for non-form usage (in-place
-    # ``.assign``, ``.dat`` access for receiver output, etc.). They share
-    # storage with ``X_n``/``X_nm1`` so writes to the mixed Functions are
-    # visible through these views.
-    u_n_func, pp_n_func = X_n.subfunctions
-    u_nm1_func, _ = X_nm1.subfunctions
-
-    # In the UFL forms, however, reference ``X_n``/``X_nm1`` directly via
-    # ``fire.split``. The pyadjoint tape tracks ``X_n.assign(X_np1)`` between
-    # time steps; the subfunction Functions are separately-tracked tape
-    # variables that are never explicitly written to in the tape, so on
-    # replay their tape values stay at the initial (zero) state, making
-    # ``J`` constant w.r.t. the control. Using ``fire.split(X_n)`` keeps the
-    # form dependent on ``X_n`` itself, which is updated correctly on
-    # replay. This is what makes the PML Taylor test converge.
-    u_n, pp_n = fire.split(X_n)
-    u_nm1, _ = fire.split(X_nm1)
+    elif Wave_object.dimension == 3:
+        u_n_func, psi_n_func, pp_n_func = X_n.subfunctions
+        u_nm1_func, psi_nm1_func, _ = X_nm1.subfunctions
 
     Wave_object.u_n = u_n_func
     Wave_object.X_np1 = X_np1
     Wave_object.X_n = X_n
     Wave_object.X_nm1 = X_nm1
 
-    sigma_x, sigma_z = damping.functions(Wave_object)
-    Gamma_1, Gamma_2 = damping.matrices_2D(sigma_z, sigma_x)
-    pml1 = (sigma_x + sigma_z) * ((u - u_nm1) / Constant(2.0 * dt)) * v * dxlump
+    # Build variational forms
+    FF, fix_bnd = forms_pml(Wave_object, W, X_n, X_nm1)
+    Wave_object.lhs = lhs(FF)
+    Wave_object.rhs = rhs(FF)
+    Wave_object.source_function = Wave_object.B = Cofunction(W.dual())
 
-    # typical CG FEM in 2d/3d
-
-    # -------------------------------------------------------
-    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dxlump
-    a = c * c * dot(grad(u_n), grad(v)) * dxlump  # explicit
-
-    # First-order ABC on outer PML boundaries only (not the free surface).
-    # Firedrake documents the base facet labels in
-    # firedrake.utility_meshes.RectangleMesh/TensorRectangleMesh:
-    # https://www.firedrakeproject.org/_modules/firedrake/utility_meshes.html#RectangleMesh
-    # Spyro builds RectangleMesh(nz, nx, length_z, length_x) and negates
-    # Firedrake's first coordinate, so the labels map here as:
-    #   1 = top (z = 0, free surface), 2 = bottom, 3 = left, 4 = right
-    qr_s = Wave_object.surface_quadrature_rule
-    abc_expr = c * ((u_n - u_nm1) / dt) * v
-    nf = (
-        abc_expr * ds(2, **qr_s)
-        + abc_expr * ds(3, **qr_s)
-        + abc_expr * ds(4, **qr_s)
-    )
-    if Wave_object.absorb_top:
-        nf += abc_expr * ds(1, **qr_s)
-
-    FF = m1 + a + nf
-
-    pml2 = sigma_x * sigma_z * u_n * v * dxlump
-    pml3 = inner(pp_n, grad(v)) * dxlump
-    FF += pml1 + pml2 + pml3
-    # -------------------------------------------------------
-    mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dxlump
-    mm2 = inner(dot(Gamma_1, pp_n), qq) * dxlump
-    dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dxlump
-    FF += mm1 + mm2 + dd
-
-    Wave_object.lhs = fire.lhs(FF)
-    Wave_object.rhs = fire.rhs(FF)
-    Wave_object.source_function = fire.Cofunction(W.dual())
-
-    lin_var = fire.LinearVariationalProblem(
+    # Build solver
+    lin_var = LinearVariationalProblem(
         Wave_object.lhs, Wave_object.rhs + Wave_object.source_function,
-        X_np1, constant_jacobian=True)
+        X_np1, bcs=fix_bnd, constant_jacobian=True)
     solver_parameters = dict(Wave_object.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
-    Wave_object.solver = fire.LinearVariationalSolver(
-        lin_var, solver_parameters=solver_parameters,
-    )
-
-
-def construct_solver_or_matrix_with_pml_3d(Wave_object):
-    """
-    Builds solver operators for 3D wave propagator with a PML. Doesn't create mass matrices if
-    matrix_free option is on, which it is by default.
-    """
-    dt = Wave_object.dt
-    c = Wave_object.c
-
-    V = Wave_object.function_space
-    Z = Wave_object.vector_function_space
-    W = V * V * Z
-    Wave_object.mixed_function_space = W
-    dxlump = dx(**Wave_object.quadrature_rule)
-
-    u, psi, pp = fire.TrialFunctions(W)
-    v, phi, qq = fire.TestFunctions(W)
-
-    X_np1 = fire.Function(W)
-    X_n = fire.Function(W)
-    X_nm1 = fire.Function(W)
-
-    # See 2D variant: keep subfunction Functions for non-form usage but build
-    # the UFL forms against ``fire.split`` so the adjoint tape tracks the
-    # time-stepping updates of ``X_n`` / ``X_nm1`` correctly.
-    u_n_func, psi_n_func, pp_n_func = X_n.subfunctions
-    u_nm1_func, psi_nm1_func, _ = X_nm1.subfunctions
-
-    u_n, psi_n, pp_n = fire.split(X_n)
-    u_nm1, psi_nm1, _ = fire.split(X_nm1)
-
-    Wave_object.u_n = u_n_func
-    Wave_object.X_np1 = X_np1
-    Wave_object.X_n = X_n
-    Wave_object.X_nm1 = X_nm1
-
-    sigma_x, sigma_y, sigma_z = damping.functions(Wave_object)
-    Gamma_1, Gamma_2, Gamma_3 = damping.matrices_3D(sigma_x, sigma_y, sigma_z)
-
-    pml1 = (
-        (sigma_x + sigma_y + sigma_z)
-        * ((u - u_nm1) / Constant(2.0 * dt))
-        * v
-        * dxlump
-    )
-
-    pml2 = (
-        (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
-        * u_n
-        * v
-        * dxlump
-    )
-
-    pml3 = (sigma_x * sigma_y * sigma_z) * psi_n * v * dxlump
-    pml4 = inner(pp_n, grad(v)) * dxlump
-
-    # typical CG FEM in 2d/3d
-
-    # -------------------------------------------------------
-    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dxlump
-    a = c * c * dot(grad(u_n), grad(v)) * dxlump  # explicit
-
-    # First-order ABC on outer PML boundaries only (not the free surface).
-    # Firedrake documents the base facet labels in
-    # firedrake.utility_meshes.BoxMesh/TensorBoxMesh:
-    # https://www.firedrakeproject.org/_modules/firedrake/utility_meshes.html#BoxMesh
-    # Spyro builds BoxMesh(nz, nx, ny, length_z, length_x, length_y) and
-    # negates Firedrake's first coordinate, so ds(1) is the top free surface
-    # (z = 0) and ds(2) is the bottom boundary.
-    qr_s = Wave_object.surface_quadrature_rule
-    abc_expr = c * ((u_n - u_nm1) / dt) * v
-    nf = (
-        abc_expr * ds(2, **qr_s)
-        + abc_expr * ds(3, **qr_s)
-        + abc_expr * ds(4, **qr_s)
-        + abc_expr * ds(5, **qr_s)
-        + abc_expr * ds(6, **qr_s)
-    )
-    if Wave_object.absorb_top:
-        nf += abc_expr * ds(1, **qr_s)
-
-    FF = m1 + a + nf
-
-    B = fire.Cofunction(W.dual())
-
-    FF += pml1 + pml2 + pml3 + pml4
-    # -------------------------------------------------------
-    mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dxlump
-    mm2 = inner(dot(Gamma_1, pp_n), qq) * dxlump
-    dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dxlump
-    dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dxlump
-    FF += mm1 + mm2 + dd1 + dd2
-
-    mmm1 = (dot((psi - psi_n), phi) / Constant(dt)) * dxlump
-    uuu1 = (-u_n * phi) * dxlump
-    FF += mmm1 + uuu1
-
-    lhs_ = fire.lhs(FF)
-    rhs_ = fire.rhs(FF)
-
-    source_function = fire.Cofunction(W.dual())
-    Wave_object.source_function = source_function
-
-    lin_var = fire.LinearVariationalProblem(
-        lhs_, rhs_ + source_function, X_np1, constant_jacobian=True)
-    solver_parameters = dict(Wave_object.solver_parameters)
-    solver_parameters["mat_type"] = "matfree"
-    solver = fire.LinearVariationalSolver(
-        lin_var, solver_parameters=solver_parameters,
-    )
-    Wave_object.solver = solver
-    Wave_object.rhs = rhs_
-    Wave_object.B = B
-
-    return
+    Wave_object.solver = \
+        LinearVariationalSolver(lin_var, solver_parameters=solver_parameters)
