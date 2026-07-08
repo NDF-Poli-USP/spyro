@@ -54,6 +54,8 @@ def run_forward_real_model(input_dictionary, case="camembert", output_filename="
     )
     np.save(output_filename, fwi_obj.real_shot_record)
 
+    return fwi_obj
+
 
 final_time = 0.9
 
@@ -87,7 +89,7 @@ dictionary["acquisition"] = {
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": final_time,  # Final time for event
-    "dt": 0.001,  # timestep size
+    "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
     "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
@@ -127,21 +129,20 @@ def run_fwi(load_real_shot=True):
 
     # Setting up to run synthetic real problem
     if load_real_shot is False:
-        run_forward_real_model(
+        fwi_obj = run_forward_real_model(
             dictionary,
             case="camembert",
             output_filename="real_shot_record",
         )
-        dictionary["inversion"]["shot_record_file"] = "real_shot_record.npy"
 
     else:
-        dictionary["inversion"]["shot_record_file"] = "real_shot_record.npy"
+        dictionary["inversion"]["shot_record_file"] = "real_shot_record"
+        fwi_obj = spyro.FullWaveformInversion(dictionary=dictionary)
 
-    fwi_obj = spyro.FullWaveformInversion(dictionary=dictionary)
 
-    # Checking if shot recorded loaded:
-    if fwi_obj.real_shot_record is None:
-        raise ValueError("True shot record not loaded. Either create one or load correctly.")
+    # # Checking if shot recorded loaded:
+    # if fwi_obj.real_shot_record is None:
+    #     raise ValueError("True shot record not loaded. Either create one or load correctly.")
 
     # Setting up initial guess problem
     fwi_obj.set_guess_mesh(input_mesh_parameters={"edge_length": 0.1})
@@ -157,7 +158,7 @@ def run_fwi(load_real_shot=True):
     }
     fwi_obj.set_gradient_mask(boundaries=mask_boundaries)
 
-    fwi_obj.run_fwi(vmin=2.5, vmax=3.0, maxiter=5)
+    fwi_obj.run_fwi(vmin=2.5, vmax=3.0, maxiter=15)
 
     print("END", flush=True)
 
