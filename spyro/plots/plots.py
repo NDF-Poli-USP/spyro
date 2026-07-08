@@ -21,9 +21,6 @@ __all__ = ["plot_shots", "plot_receiver_response"]
 display_val = os.environ.get("DISPLAY", "")
 if display_val == "" or display_val == ":0":
     use("Agg")
-    print("A", flush=True)
-else:
-    print(f"display_config = {os.environ.get("DISPLAY", "")}", flush=True)
 
 
 if is_firedrake_new() is False:
