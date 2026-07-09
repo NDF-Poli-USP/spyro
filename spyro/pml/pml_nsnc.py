@@ -64,7 +64,7 @@ class PMLLayer(ABCLayer):
 
     def __init__(self, domain_dim, frequency, f_Nyquist, dimension=2,
                  quadrilateral=False, func_space_type=None,
-                 bc_boundary_pml=BoundaryConditionsType.SOMMERFELD,
+                 bc_boundary_pml=BoundaryConditionsType.NEUMANN,
                  abc_reference_freq=LayerSizeRefFrequency.SOURCE,
                  output_folder=None, comm=None):
         """
