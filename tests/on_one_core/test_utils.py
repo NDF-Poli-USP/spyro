@@ -5,9 +5,25 @@ import math
 
 
 def test_butter_lowpast_filter():
-    Wave_obj = spyro.examples.Rectangle_acoustic(
-        dictionary={"absorving_boundary_conditions": {"absorb_top": True}}
-    )
+    f_source = 5.0
+    # f   h   dt
+    # <=7 0.2 1e-4
+    rectangle_dictionary = {}
+    rectangle_dictionary["mesh"] = {
+        "h": 0.2,  # mesh size in km  # 0.05
+    }
+    rectangle_dictionary["acquisition"] = {
+        "frequency": f_source,
+        "delay_type": "time",
+    }
+    rectangle_dictionary["time_axis"] = {
+        "dt": 0.0001,  # Final time for event
+    }
+    rectangle_dictionary["absorving_boundary_conditions"] = {
+        "absorb_top": True,
+    }
+
+    Wave_obj = spyro.examples.Rectangle_acoustic(dictionary=rectangle_dictionary)
     layer_values = [1.5, 2.0, 2.5, 3.0]
     z_switches = [-0.25, -0.5, -0.75]
     Wave_obj.multiple_layer_velocity_model(z_switches, layer_values)
@@ -22,7 +38,7 @@ def test_butter_lowpast_filter():
     # Checks if frequency with greater power density is close to 5
     (f, S) = sp.signal.periodogram(rec10, fs)
     peak_frequency = f[np.argmax(S)]
-    test1 = math.isclose(peak_frequency, 5.0, rel_tol=1e-2)
+    test1 = math.isclose(peak_frequency, f_source, rel_tol=1e-2)
 
     # Checks if the new frequency is lower than the cutoff
     cutoff_frequency = 3.0
