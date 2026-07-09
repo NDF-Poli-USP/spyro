@@ -431,7 +431,7 @@ class HABCMesh(MeshOps):
             filt_bnd_pts = np.array([point for point in bnd_pts
                                      if point[1] <= z0])
             pprint(f"{pnt_str} Truncated Hyperellipse: {len(filt_bnd_pts)}",
-                   flush=True)
+                   comm=self.comm)
 
             # Identify truncation index
             ini_trunc = max(np.where(bnd_pts[:, 1] > z0)[0][0] - 1, 0)
@@ -591,8 +591,7 @@ class HABCMesh(MeshOps):
                                             optsteps2d=10,  # Optimize mesh
                                             )
                 hyp_mesh.Compress()
-                pprint("Hyperelliptical Mesh Generated Successfully",
-                       flush=True)
+                pprint("Hyperelliptical Mesh Generated Successfully", comm=self.comm)
                 break
 
             except Exception as e:
