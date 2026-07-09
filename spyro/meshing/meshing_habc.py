@@ -424,7 +424,7 @@ class HABCMesh(MeshOps):
                 or pnt_bef_trunc < 3 or pnt_aft_trunc < 3:
 
             num_bnd_pts += 1
-            pprint(pnt_str, f"Complete Hyperellipse: {num_bnd_pts}", comm=self.comm)
+            pprint(f"{pnt_str} Complete Hyperellipse: {num_bnd_pts}", comm=self.comm)
             bnd_pts = self.bnd_pnts_hyp_2D(a_hyp, b_hyp, n_hyp, num_bnd_pts)
 
             # Filter hyperellipse points based on the truncation plane z0
