@@ -430,7 +430,7 @@ class HABCMesh(MeshOps):
             # Filter hyperellipse points based on the truncation plane z0
             filt_bnd_pts = np.array([point for point in bnd_pts
                                      if point[1] <= z0])
-            pprint(pnt_str, f"Truncated Hyperellipse: {len(filt_bnd_pts)}",
+            pprint(f"{pnt_str} Truncated Hyperellipse: {len(filt_bnd_pts)}",
                    flush=True)
 
             # Identify truncation index
@@ -604,8 +604,7 @@ class HABCMesh(MeshOps):
                     spln = False
 
                 else:
-                    pprint(f"Error Meshing with Lines: {e}. Exiting.",
-                           flush=True)
+                    pprint(f"Error Meshing with Lines: {e}. Exiting.", comm=self.comm)
                     break
 
         # Mesh is transformed into a firedrake mesh
