@@ -458,7 +458,7 @@ class ABCLayer(NRBC):
 
                 # Get the minimum frequency excited at each critical point
                 freq_ref = freq_response(histPcrit, self.freq_Nyquist,
-                                         fpad=fpad, get_max_freq=True)
+                                         fpad=fpad, get_dominant_freq=True)
                 pprint(f"Frequency at Critical Point {n_crit:>2.0f}: {freq_ref:.5f}",
                        comm=self.comm)
 
