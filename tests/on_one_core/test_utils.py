@@ -5,25 +5,10 @@ import math
 
 
 def test_butter_lowpast_filter():
-    f_source = 5.0
-    # f   h   dt
-    # <=7 0.2 1e-4
-    rectangle_dictionary = {}
-    rectangle_dictionary["mesh"] = {
-        "h": 0.2,  # mesh size in km  # 0.05
-    }
-    rectangle_dictionary["acquisition"] = {
-        "frequency": f_source,
-        "delay_type": "time",
-    }
-    rectangle_dictionary["time_axis"] = {
-        "dt": 0.0001,  # Final time for event
-    }
-    rectangle_dictionary["absorving_boundary_conditions"] = {
-        "absorb_top": True,
-    }
+    Wave_obj = spyro.examples.Rectangle_acoustic(
+        dictionary={"absorving_boundary_conditions": {"absorb_top": True}}
+    )
 
-    Wave_obj = spyro.examples.Rectangle_acoustic(dictionary=rectangle_dictionary)
     layer_values = [1.5, 2.0, 2.5, 3.0]
     z_switches = [-0.25, -0.5, -0.75]
     Wave_obj.multiple_layer_velocity_model(z_switches, layer_values)
@@ -35,10 +20,19 @@ def test_butter_lowpast_filter():
 
     fs = 1.0 / Wave_obj.dt
 
-    # Checks if frequency with greater power density is close to 5
-    (f, S) = sp.signal.periodogram(rec10, fs)
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.windows.flattop.html#scipy.signal.windows.flattop
+    # Flat top windows are used for taking accurate measurements of signal amplitude in the
+    # frequency domain, with minimal scalloping error from the center of a frequency bin to
+    # its edges, compared to others. This is a 5th-order cosine window, with the 5 terms
+    # optimized to make the main lobe maximally flat.
+    # See D’Antona, G., Ferrero A., “Digital Signal Processing for Measurement Systems”,
+    # Springer Media, 2006, p. 70 DOI:10.1007/0-387-28666-7.
+    # TODO: Add citation
+    (f, S) = sp.signal.periodogram(rec10, fs, 'flattop')
     peak_frequency = f[np.argmax(S)]
-    test1 = math.isclose(peak_frequency, f_source, rel_tol=1e-2)
+
+    # Checks if frequency with greater power density is close to 5
+    test1 = math.isclose(peak_frequency, Wave_obj.frequency, rel_tol=1e-2)
 
     # Checks if the new frequency is lower than the cutoff
     cutoff_frequency = 3.0
@@ -51,8 +45,10 @@ def test_butter_lowpast_filter():
     filtered_peak_frequency = filt_f[np.argmax(filt_S)]
     test2 = filtered_peak_frequency < cutoff_frequency
 
-    print(f"Peak frequency is close to what it is supposed to be: {test1}")
-    print(f"Filtered peak frequency is lower than cutoff frequency: {test2}")
+    print(f"Peak frequency ({peak_frequency:.3f} Hz) "
+          f"is close to what it is supposed to be ({Wave_obj.frequency:.3f}): {test1}")
+    print(f"Filtered peak frequency ({filtered_peak_frequency:.3f}) Hz "
+          f"is lower than cutoff frequency ({cutoff_frequency:.3f}): {test2}")
 
     assert all([test1, test2])
 
