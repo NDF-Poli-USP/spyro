@@ -80,6 +80,7 @@ def viscoelastic_maxwell_gsls_without_pml_Q(wave):
     C_elas = wave.C_elas
     Gamma = wave.Gamma
 
+
     # -------------------------------------------------
     # 1) Funções de conversão para Voigt
     # -------------------------------------------------

@@ -263,15 +263,22 @@ def Gamma_VTI(self, PropISO, PropVTI, C, dim):
     gamma = PropVTI.gamma
     delta = PropVTI.delta
     anisotropy = PropVTI.anisotropy
+    
+    if dim == 2:
+        C11 = C[0, 0]
+        C13 = C[0, 1]
+        C33 = C[1, 1]
+        C44 = C[2, 2]
 
-    C11 = C[0, 0]
-    C13 = C[0, 1]
-    C33 = C[1, 1]
-    C44 = C[2, 2]
+    elif dim == 3:
+        C11 = C[0, 0]
+        C13 = C[0, 2]
+        C33 = C[2, 2]
+        C44 = C[3, 3]
 
-    Q33 = 2 * self.Qp_inv
+    Q33 = self.Qp_inv
     Q11 = 2 * epsilon/(1 + 2 * epsilon) * self.Qepsilon_inv + Q33 
-    Q44 = 2 * self.Qs_inv
+    Q44 = self.Qs_inv
     Q66 = 2 * gamma/(1 + 2 * gamma) * self.Qgamma_inv + Q44 
             
     num1 = vP**2 * (1 + 2 * epsilon)
@@ -280,17 +287,17 @@ def Gamma_VTI(self, PropISO, PropVTI, C, dim):
     Q12 = (num1 * Q11 - num2 * Q66)/denom
 
     if anisotropy == 'weak':
-        c1 = (2 * delta * C33 + 0.5 * (C11 + 2 * C33)) / (2 * C13)
-        c2 = (- C11 - 3 * C33) / (4 * C13) - 1
-        c3 = (C33 - C44) / (4 * C13)
-        c4 = C33**2 / (2 * C13)
+        c1 = (2 * delta * C33 + 0.5 * (C11 + 2 * C33 - 3 * C44)) / (2 * (C13 + C44))
+        c2 = (- C11 - 3 * C33 + 4 * C44) / (4 * (C13 + C44)) - 1
+        c3 = (C33 - C44) / (4 * (C13 + C44))
+        c4 = C33**2 / (2 * (C13 + C44))
         Q13 = (c1 * C33 * Q33 + c2 * C44 * Q44 + c3 * C11 * Q11 + c4 * delta * self.Qdelta_inv) / C13
        
     elif anisotropy == 'exact':
-        c1 = (C33 * (1 + 2 * gamma) + C33 * (1 + 2 * delta)) / (2 * C13)
-        c2 = (- C33 * (1 + 2 * delta) - C33) / (2 * C13) - 1
-        c3 = C33**2/C13
-        Q13 = (c1 * C33 * Q33 + c2 * C44 * Q44 + c3 * delta * self.Qdelta_inv)
+        c1 = (C33 * (1 + 2 * gamma) - C44 + (C33 - C44) * (1 + 2 * delta)) / (2 * (C13 + C44))
+        c2 = (- C33 * (1 + 2 * delta) + 2 * C44 - C33) / (2 * (C13 + C44)) - 1
+        c3 = C33 * (C33 - C44)/(C13 + C44)
+        Q13 = (c1 * C33 * Q33 + c2 * C44 * Q44 + c3 * delta * self.Qdelta_inv)/C13
 
     if dim == 2:
         Gamma = fire.as_matrix([[Q11, Q13, 0],
