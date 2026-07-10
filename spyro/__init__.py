@@ -12,6 +12,7 @@ from .solvers.inversion import FullWaveformInversion
 from .solvers.mms_acoustic import AcousticWaveMMS
 from .utils.geometry_creation import create_transect, create_2d_grid
 from .utils.geometry_creation import insert_fixed_value, create_3d_grid
+from .utils.estimate_timestep import estimate_timestep
 from . import utils
 from . import io
 from . import solvers
@@ -19,9 +20,9 @@ from . import tools
 from . import examples
 from . import sources
 from .meshing import (
-    rectangle_mesh,
-    periodic_rectangle_mesh,
-    box_mesh,
+    RectangleMesh,
+    PeriodicRectangleMesh,
+    BoxMesh,
 )
 
 __all__ = [
@@ -33,7 +34,7 @@ __all__ = [
     "create_transect",
     "create_2d_grid",
     "create_3d_grid",
-    "generate_ufl_functions",
+    "estimate_timestep",
     "insert_fixed_value",
     "ricker_wavelet",
     "full_ricker_wavelet",
@@ -47,8 +48,8 @@ __all__ = [
     "AcousticWave",
     "FullWaveformInversion",
     "AcousticWaveMMS",
-    "rectangle_mesh",
-    "periodic_rectangle_mesh",
-    "box_mesh",
+    "RectangleMesh",
+    "PeriodicRectangleMesh",
+    "BoxMesh",
     "IsotropicWave",
 ]

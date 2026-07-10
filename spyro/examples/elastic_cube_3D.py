@@ -38,9 +38,9 @@ d["parallelism"] = {
 }
 
 d["mesh"] = {
-    "length_z": L,
-    "length_x": L,
-    "length_y": L,
+    "Lz": L,
+    "Lx": L,
+    "Ly": L,
     "h": h,
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
@@ -87,4 +87,4 @@ d["absorving_boundary_conditions"] = {
 }
 
 wave = spyro.IsotropicWave(d)
-wave.set_mesh(input_mesh_parameters={'edge_length': h})
+wave.set_mesh(mesh_parameters={'dx': h})

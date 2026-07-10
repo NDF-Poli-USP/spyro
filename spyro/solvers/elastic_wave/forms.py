@@ -67,9 +67,13 @@ def viscoelastic_maxwell_gsls_without_pml_Q(wave):
     lmbda = wave.lmbda
     mu = wave.mu
 
-    xi_list = wave.xi_list
-    y_list = wave.y_list
-
+    if wave.viscoelastic == True:
+        xi_list = wave.xi_list
+        y_list = wave.y_list
+    else:
+        xi_list = []
+        y_list = []
+        
     dim = V.mesh().topological_dimension()
     voigt_size = 3 if dim == 2 else 6
 

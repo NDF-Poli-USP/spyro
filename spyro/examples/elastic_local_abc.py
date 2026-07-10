@@ -36,9 +36,9 @@ def build_solver(local_abc, dt_scheme):
     }
 
     d["mesh"] = {
-        "length_z": L,
-        "length_x": L,
-        "length_y": 0,
+        "Lz": L,
+        "Lx": L,
+        "Ly": 0,
         "h": h,
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",
@@ -49,7 +49,7 @@ def build_solver(local_abc, dt_scheme):
         "source_locations": source_locations,
         "frequency": freq,
         "delay": 1.5,
-        "delay_type": "multiples_of_minimum",
+        "delay_type": "multiples_of_minimun",
         "amplitude": smag * np.array([0, 1]),
         "receiver_locations": [],
     }
@@ -89,6 +89,6 @@ def build_solver(local_abc, dt_scheme):
         }
 
     wave = spyro.IsotropicWave(d)
-    wave.set_mesh(input_mesh_parameters={'edge_length': h})
+    wave.set_mesh(mesh_parameters={'dx': h})
 
     return wave

@@ -191,8 +191,12 @@ class IsotropicWave(ElasticWave):
         self.wave_type = self.input_dictionary.get("wave_type", 'isotropic')
 
         W = fire.FunctionSpace(self.mesh, "CG", 1)
+        
+        self.PropISO = None
+        self.PropVTI = None
+        self.PropTTI = None
 
-        if self.wave_type == 'anisotropic_VTI':
+        if self.wave_type in ['anisotropic_VTI', 'anisotropic_TTI']:
             d = self.input_dictionary.get("anisotropy")
 
             class IsotropicProperties:
@@ -226,6 +230,20 @@ class IsotropicWave(ElasticWave):
                 return prop 
 
             self.PropVTI =  anisotropic_properties(self)
+
+            if self.wave_type == 'anisotropic_TTI':
+                class AnisotropicPropertiesTTI:
+                    def __init__(self):
+                        self.theta = None
+                        self.phi = None
+
+                def anisotropic_properties_TTI(self):
+                    prop = AnisotropicPropertiesTTI()
+                    prop.theta = Function(W).assign(Constant(d['theta']))
+                    prop.phi = Function(W).assign(Constant(d['phi']))
+                    return prop 
+
+                self.PropTTI =  anisotropic_properties_TTI(self)
 	
         try:
             d = self.input_dictionary.get("viscoelasticity", False)
@@ -264,17 +282,24 @@ class IsotropicWave(ElasticWave):
                 self.Q_type = d["Q_type"]
                 self.Qp_inv = d["Qp_inv"]
                 self.Qs_inv = d["Qs_inv"]
+                self.Qepsilon_inv = d["Qepsilon_inv"]
+                self.Qgamma_inv = d["Qgamma_inv"]
+                self.Qdelta_inv = d["Qdelta_inv"]
 
                 if self.Q_type in ['Constant', 'constant', 'const', 'file', 'File']:
                         Qp_inv = self.Qp_inv
                         Qs_inv = self.Qs_inv
+                        Qepsilon_inv = self.Qepsilon_inv
+                        Qdelta_inv = self.Qdelta_inv
+                        Qgamma_inv = self.Qgamma_inv
                 elif self.Q_type in ['cond', 'Conditional', 'conditional']:
                         Qp_inv = self.Qp_inv(self.mesh)
                         Qs_inv = self.Qs_inv(self.mesh)
+                        Qepsilon_inv = self.Qepsilon_inv(self.mesh)
+                        Qdelta_inv = self.Qdelta_inv(self.mesh)
+                        Qgamma_inv = self.Qgamma_inv(self.mesh)
                 
-                self.C_elas = C_computation(self)
-                self.Gamma = build_Gamma(self)
-
+                
                 # -------------------------
                 # Variáveis de memória ξ_l
                 # -------------------------
@@ -343,7 +368,9 @@ class IsotropicWave(ElasticWave):
 
         else:
             self.viscoelastic = False
-	
+	    
+        self.Gamma = build_Gamma(self)
+        
         if self.viscoelastic == True:
             if self.visco_type == 'kelvin_voigt':
                 viscoelastic_kelvin_voigt_without_pml(self)
@@ -359,7 +386,7 @@ class IsotropicWave(ElasticWave):
                 viscoelastic_maxwell_gsls_without_pml_Q(self)
         else:
             if self.abc_boundary_layer_type is None:
-                isotropic_elastic_without_pml(self)
+                viscoelastic_maxwell_gsls_without_pml_Q(self)
             elif self.abc_boundary_layer_type == "PML":
                 isotropic_elastic_with_pml(self)
             

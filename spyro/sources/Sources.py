@@ -2,8 +2,6 @@ import math
 import numpy as np
 from scipy.signal import butter, filtfilt
 from spyro.receivers.dirac_delta_projector import Delta_projector
-from ..utils.typing import WaveType
-import firedrake as fire
 
 
 class Sources(Delta_projector):
@@ -71,7 +69,7 @@ class Sources(Delta_projector):
         self.number_of_points = wave_object.number_of_sources
         self.amplitude = wave_object.amplitude
         self.is_local = [0] * self.number_of_points
-        self.current_sources = None
+        self.current_source = None
         self.update_wavelet(wave_object)
         if np.isscalar(self.amplitude) or (self.amplitude.size <= 3):
             self.build_maps(order=0)
@@ -103,7 +101,7 @@ class Sources(Delta_projector):
             The right hand side of the wave equation with the source applied
         """
         for source_id in range(self.number_of_points):
-            if self.is_local[source_id] and source_id in self.current_sources:
+            if self.is_local[source_id] and source_id == self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     rhs_forcing.dat.data_with_halos[
                         int(self.cellNodeMaps[source_id][i])
@@ -113,39 +111,6 @@ class Sources(Delta_projector):
                     tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841
 
         return rhs_forcing
-
-    def source_cofunction(self):
-        """Return a cofunction with the source applied into the domain.
-
-        Returns
-        -------
-        source_cofunction: Firedrake.Cofunction
-            A cofunction with the source applied into the domain.
-        """
-        if self.current_sources is None or len(self.current_sources) == 0:
-            raise ValueError(
-                "VertexOnlyMesh source assembly requires at least one active source."
-            )
-
-        source_locations = [
-            self.point_locations[source_id] for source_id in self.current_sources
-        ]
-        source_mesh = fire.VertexOnlyMesh(self.mesh, source_locations)
-        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
-            V_s = fire.VectorFunctionSpace(source_mesh, "DG", 0)
-            R_s = fire.VectorFunctionSpace(source_mesh, "R", 0)
-        elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
-            V_s = fire.FunctionSpace(source_mesh, "DG", 0)
-            R_s = fire.FunctionSpace(source_mesh, "R", 0)
-        else:
-            raise ValueError("Invalid wave type")
-
-        ones = fire.Function(R_s, val=[1.0 for _ in range(V_s.value_size)])
-        source_form = fire.inner(fire.TestFunction(V_s), ones) * fire.dx
-
-        return fire.Cofunction(
-            self.function_space.dual()).interpolate(
-                fire.assemble(source_form))
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
@@ -158,7 +123,7 @@ def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
 
 
 def ricker_wavelet(
-    t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimum"
+    t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimun"
 ):
     """Creates a Ricker source function with a
     delay in term of multiples of the distance
@@ -177,7 +142,7 @@ def ricker_wavelet(
         between the minimums.
     delay_type: string
         Type of delay. Options are:
-        - multiples_of_minimum
+        - multiples_of_minimun
         - time
 
     Returns
@@ -185,7 +150,7 @@ def ricker_wavelet(
     float
         Value of the wavelet at time t
     """
-    if delay_type == "multiples_of_minimum":
+    if delay_type == "multiples_of_minimun":
         time_delay = delay * math.sqrt(6.0) / (math.pi * freq)
     elif delay_type == "time":
         time_delay = delay
@@ -201,7 +166,7 @@ def full_ricker_wavelet(
     frequency,
     cutoff=None,
     delay=1.5,
-    delay_type="multiples_of_minimum",
+    delay_type="multiples_of_minimun",
 ):
     """Compute the Ricker wavelet optionally applying low-pass filtering
     using cutoff frequency in Hertz.
@@ -221,7 +186,7 @@ def full_ricker_wavelet(
         between the minimums.
     delay_type: string
         Type of delay. Options are:
-        - multiples_of_minimum
+        - multiples_of_minimun
         - time
 
     Returns

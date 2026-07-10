@@ -42,9 +42,9 @@ cut_marmousi_dictionary["parallelism"] = {
 # to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 cut_marmousi_dictionary["mesh"] = {
-    "length_z": 2.0,  # depth in km - always positive
-    "length_x": 4.0,  # width in km - always positive
-    "length_y": 0.0,  # thickness in km - always positive
+    "Lz": 2.0,  # depth in km - always positive
+    "Lx": 4.0,  # width in km - always positive
+    "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": "meshes/cut_marmousi_small_p=2_M=7.02.msh",
 }
 cut_marmousi_dictionary[
@@ -107,16 +107,6 @@ cut_marmousi_dictionary["time_axis"] = {
 class Cut_marmousi_acoustic(Example_model_acoustic):
     """
     Class for the cut marmousi model.
-
-    Example Setup
-
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
-
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
-
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
-
-    Feel free to adapt these templates to your needs.
 
     Parameters
     ----------
