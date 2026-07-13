@@ -1,14 +1,11 @@
 from firedrake import as_tensor, conditional, Function, VTKFile
-from numpy import log, where
+from numpy import log
 from ..abc.abc_layer import ABCLayer
-from ..domains.space import create_function_space
 from ..io.basicio import parallel_print as pprint
-from ..tools.habc_tools import layer_mask_field
 from ..utils.error_management import enum_parameter_error, value_numerical_error
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..utils.typing import (BoundaryConditionsType, LayerDampingType,
                             LayerShapeType, LayerSizeRefFrequency)
-
 
 # Work from Ruben Andres Salas and Alexandre Olender
 # non-split non-convolutional PML formulation
@@ -23,21 +20,21 @@ class PMLLayer(ABCLayer):
 
     Attributes
     ----------
-    abc_pml_cmax: float
-        Maximum propagation speed (km/s) in the PML layer. Default is 4.7 km/s.
-    abc_pml_exponent: int
-        Exponent for the polynomial damping profile of the PML layer. Default is 2.
-    abc_pml_R: float
-        Theoretical reflection coefficient of the PML layer. Default is 1e-6.
-    bc_boundary_pml : `typing.BoundaryConditionsType`, optional
+    abc_pad_length : `float`
+        Size of the absorbing layer
+    bc_boundary_pml : `typing.BoundaryConditionsType`
         Type of boundary condition to apply on the PML boundaries.
         - Options for Non-Reflecting BCs:
-            'BoundaryConditionsType.HIGDON' or 'BoundaryConditionsType.SOMMERFELD'.
+            'BoundaryConditionsType.HIGDON' or  'BoundaryConditionsType.SOMMERFELD'.
         - Options for typical BCs:
             'BoundaryConditionsType.DIRICHLET' or 'BoundaryConditionsType.NEUMANN'
-        Default is 'BoundaryConditionsType.NEUMANN'.
-    pml_mask : `Firedrake.Function`
-        Mask function to identify the PML domain.
+        Default is 'BoundaryConditionsType.HIGDON'.
+    length_xabc : `float`
+        Length of the domain in the x-direction with absorbing layer
+    length_yabc : `float`
+        Length of the domain in the y-direction with absorbing layer (3D)
+    length_zabc : `float`
+        Length of the domain in the z-direction with absorbing layer
     sigma_max : `float`
         Maximum damping coefficient within the PML layer.
     sigma_x : `Firedrake.Function`
@@ -46,17 +43,15 @@ class PMLLayer(ABCLayer):
         Damping profile in the y direction within the PML layer (3D).
     sigma_z : `Firedrake.Function`
         Damping profile in the z direction within the PML layer.
-    where_to_absorb : `tuple`
-        Boundary ids where absorption is applied.
 
     Methods
     -------
     calc_pml_damping()
         Calculate the maximum damping coefficient for the PML layer.
     damping_pml_2d()
-        Build damping matrices for a two-dimensional problem using PML.
+        Build the damping matrices for a two-dimensional problem using PML.
     damping_pml_3d()
-        Build  Damping matrices for a three-dimensional problem using PML.
+        Build the damping matrices for a three-dimensional problem using PML.
     pml_layer()
         Set the damping profile within the PML layer.
     pml_sigma_field()
@@ -292,7 +287,7 @@ class PMLLayer(ABCLayer):
         self.nrbc_on_boundary_layer(Wave_object, self.bc_boundary_pml, save_file=save_file)
 
     def damping_pml_2d(self):
-        """Build damping matrices for a two-dimensional problem using PML.
+        """Build the damping matrices for a two-dimensional problem using PML.
 
         Parameters
         ----------
@@ -315,7 +310,7 @@ class PMLLayer(ABCLayer):
         return Gamma_1, Gamma_2
 
     def damping_pml_3d(self):
-        """Build  Damping matrices for a three-dimensional problem using PML.
+        """Build the damping matrices for a three-dimensional problem using PML.
 
         Parameters
         ----------
