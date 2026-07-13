@@ -267,14 +267,14 @@ class NRBC():
                                                                bnd_nodes_nfs)
 
             # Normal vector to the boundary
-            if abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
+            if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
                 # Normal vector to the boundary is a orthonormal vector, then
                 # cosine on incidence angle can be estimated from a projection
                 # of the reference vector to boundary onto the orthonormal
                 # vectors ([1, 0, 0] (2D), [0, 1, 0] (2D), [0, 0, 1] (3D))
                 cos_Hig = maximum.reduce(abs(unit_ref_vct))
 
-            if abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
+            if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
 
                 # Original domain dimensions
                 length_z, length_x = self.domain_dim[:2]
