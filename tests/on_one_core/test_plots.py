@@ -2,6 +2,7 @@ import spyro
 from spyro import create_transect
 import pytest
 import os
+import numpy as np
 
 
 def is_seismicmesh_installed():
@@ -110,6 +111,22 @@ def test_plot_model_in_p1():
     filename = "model_p1.png"
     spyro.plots.plot_model_in_p1(wave_obj, filename=str(filename), show=False)
     assert os.path.exists(str(filename))
+
+
+def test_plot_receiver_response(tmp_path):
+    receiver_data = np.sin(np.linspace(0.0, 2.0 * np.pi, 100))
+    output_file = tmp_path / "receiver_response.png"
+
+    spyro.plots.plot_receiver_response(
+        receiver_data,
+        final_time=2.0,
+        show=False,
+        filename=str(output_file),
+        receiver_id_for_title=7,
+        name="trace",
+    )
+
+    assert output_file.exists()
 
 
 if __name__ == "__main__":
