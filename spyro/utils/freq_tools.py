@@ -61,9 +61,6 @@ def freq_response(signal, f_Nyq, fpad=0, get_dominant_freq=False):
     # Get the Dominant frequency of the spectrum
     dominant_freq = xf[norm_magnitude.argmax()]
 
-    print(xf[:norm_magnitude.argmax() + 5])
-    print(norm_magnitude[:norm_magnitude.argmax() + 5])
-
     if get_dominant_freq:
 
         # Return the Dominant frequency only

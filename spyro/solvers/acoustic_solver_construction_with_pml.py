@@ -73,10 +73,10 @@ def forms_pml(Wave_object, W, X_n, X_nm1):
     FF = (m1 + a) * dx
 
     # Common PML forms (Centered difference for first time derivative)
-    pml3 = -dot(div(pp_n), v)
+    pml3 = -div(pp_n) * v
     # -------------------------------------------------------
     div_deriv = dt  # (2. * dt)
-    mm1 = inner((pp - pp_n) / div_deriv, qq)
+    mm1 = dot((pp - pp_n) / div_deriv, qq)
 
     # Surfaces to apply boundary conditions (NRBCs or Traditional BCs)
     bc_surf = tuple([non_free_surf for non_free_surf, status in
@@ -97,11 +97,11 @@ def forms_pml(Wave_object, W, X_n, X_nm1):
         mm2 = inner(dot(Gamma_1, pp_n), qq)
         FF1 = c_sqr_inv * (mm1 + mm2)
         if Wave_object.dimension == 2:
-            pml1 = (sigma_z + sigma_x) * dot((u_n - u_nm1) / div_deriv, v)
-            pml2 = sigma_z * sigma_x * dot(u_n, v)
+            pml1 = (sigma_z + sigma_x) * ((u_n - u_nm1) / div_deriv) * v
+            pml2 = sigma_z * sigma_x * u_n * v
             FF += c_sqr_inv * (pml1 + pml2 + pml3) * dx
             # -------------------------------------------------------
-            dd = inner(Gamma_2 * grad(u_n), qq)
+            dd = inner(dot(Gamma_2, grad(u_n)), qq)
             FF += (FF1 + dd) * dx
 
         elif Wave_object.dimension == 3:

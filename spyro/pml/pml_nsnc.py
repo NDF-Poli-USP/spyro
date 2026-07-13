@@ -211,9 +211,9 @@ class PMLLayer(ABCLayer):
         ref_z = (z_pd / self.abc_pad_length) ** degree_prof
         ref_x = (x_pd / self.abc_pad_length) ** degree_prof
         self.sigma_z = Function(V, name='sigma_z[1/s]')
-        self.sigma_z.interpolate(self.pml_mask * self.sigma_max * ref_z)
+        self.sigma_z.interpolate(self.sigma_max * ref_z)
         self.sigma_x = Function(V, name='sigma_x[1/s]')
-        self.sigma_x.interpolate(self.pml_mask * self.sigma_max * ref_x)
+        self.sigma_x.interpolate(self.sigma_max * ref_x)
 
         if self.dimension == 3:  # 3D
 
@@ -237,7 +237,7 @@ class PMLLayer(ABCLayer):
             # Damping profile
             ref_y = (y_pd / self.abc_pad_length) ** degree_prof
             self.sigma_y = Function(V, name='sigma_y[1/s]')
-            self.sigma_y.interpolate(self.pml_mask * self.sigma_max * ref_y)
+            self.sigma_y.interpolate(self.sigma_max * ref_y)
 
         # Save damping profile
         if not Wave_object.abc_get_ref_model and save_file:
@@ -278,29 +278,14 @@ class PMLLayer(ABCLayer):
                               Wave_object.abc_pad_length,
                               degree_prof=Wave_object.abc_pml_exponent)
 
-        # Scalar space for mask
-        method_element = "DQ" if self.quadrilateral else "DG"
-        V = create_function_space(Wave_object.mesh, method_element, 0)
-
         # Mesh coordinates including the absorbing layer
         domain_layer = Wave_object.layer_ops.abc_domain_dimensions(full_hyp=False)
         ufl_coordinates_pml = \
             Wave_object.mesh_ops.get_spatial_coordinates_abc(Wave_object.mesh,
                                                              domain_layer)
 
-        # Damping mask
-        self.pml_mask = layer_mask_field(self.domain_dim, Wave_object.mesh,
-                                         Wave_object.dimension, ufl_coordinates_pml,
-                                         V, type_marker="mask", name_mask='pml_mask')
-
-        # Save damping mask
-        save_file = save_file and not Wave_object.abc_get_ref_model
-        if save_file:
-            outfile = VTKFile(self.path_case_abc + "pml_mask.pvd")
-            outfile.write(self.pml_mask)
-
         # Damping fields
-        self.pml_sigma_field(Wave_object, ufl_coordinates_pml, V,
+        self.pml_sigma_field(Wave_object, ufl_coordinates_pml, Wave_object.function_space,
                              degree_prof=Wave_object.abc_pml_exponent)
 
         # Non-Reflective BCs for the PML layer if prescribed
