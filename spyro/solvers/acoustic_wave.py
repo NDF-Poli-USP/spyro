@@ -15,7 +15,7 @@ from .backward_time_integration import (
 )
 from ..domains.space import create_function_space
 from ..utils.typing import (
-    AdjointType, RieszMapType, override, WaveType,
+    AdjointType, RieszMapType, override, WaveType, LayerDampingType,
 )
 from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy

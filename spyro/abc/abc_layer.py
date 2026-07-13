@@ -14,7 +14,7 @@ from ..domains.space import create_function_space
 from ..plots.plots_habc import plot_function_layer_size
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
 from ..utils.error_management import (enum_parameter_error, value_numerical_error,
-                                      value_parameter_error)
+                                      value_parameter_error, value_string_error)
 from ..utils.freq_tools import freq_response
 from ..utils.typing import (BoundaryConditionsType, HyperLayerDegreeType,
                             LayerDampingType, LayerShapeType, LayerSizeRefFrequency)
@@ -195,24 +195,20 @@ class ABCLayer(NRBC):
             raise TypeError("domain_dim must be a tuple, "
                             f"got {type(domain_dim).__name__}.")
 
-        if output_folder is not None and not isinstance(output_folder, str):
-            raise TypeError("output_folder must be a string, "
-                            f"got {type(output_folder).__name__}.")
-
         # Original domain dimensions
         self.domain_dim = domain_dim
 
         # Source frequency
-        self.frequency = value_numerical_error('frequency', frequency, float_num=True,
+        self.frequency = value_numerical_error("frequency", frequency, float_num=True,
                                                integer_num=True, lower_bound=0.)
 
         # Nyquist frequency
-        self.freq_Nyquist = value_numerical_error('freq_Nyquist', freq_Nyquist,
+        self.freq_Nyquist = value_numerical_error("freq_Nyquist", freq_Nyquist,
                                                   float_num=True, integer_num=True,
                                                   lower_bound=0.)
 
         # Model dimension
-        self.dimension = value_parameter_error('dimension', dimension, [2, 3])
+        self.dimension = value_parameter_error("dimension", dimension, [2, 3])
 
         # Quadrilateral/hexahedral elements
         self.quadrilateral = quadrilateral
@@ -225,16 +221,16 @@ class ABCLayer(NRBC):
                                                             abc_boundary_layer_type,
                                                             LayerDampingType)
         if abc_boundary_layer_type == LayerDampingType.NOABCS:
-            value_parameter_error('abc_boundary_layer_type', abc_boundary_layer_type,
+            value_parameter_error("abc_boundary_layer_type", abc_boundary_layer_type,
                                   [LayerDampingType.HYBRID, LayerDampingType.PML])
 
-        self.abc_boundary_layer_shape = enum_parameter_error('abc_boundary_layer_shape',
+        self.abc_boundary_layer_shape = enum_parameter_error("abc_boundary_layer_shape",
                                                              abc_boundary_layer_shape,
                                                              LayerShapeType)
-        self.abc_reference_freq = enum_parameter_error('abc_reference_freq',
+        self.abc_reference_freq = enum_parameter_error("abc_reference_freq",
                                                        abc_reference_freq,
                                                        LayerSizeRefFrequency)
-        self.abc_degree_type = enum_parameter_error('abc_degree_type', abc_degree_type,
+        self.abc_degree_type = enum_parameter_error("abc_degree_type", abc_degree_type,
                                                     HyperLayerDegreeType)
 
         # Layer degree
@@ -387,6 +383,9 @@ class ABCLayer(NRBC):
         -------
         None
         """
+
+        # Validate the output folder parameter
+        value_string_error("output_folder", output_folder)
 
         # Identify the case of the ABC scheme for output labeling
         self.case_abc = self.identify_abc_layer_case()

@@ -1,5 +1,6 @@
 import firedrake as fire
 from firedrake import ds, dx, dot, grad
+from ..utils.typing import LayerDampingType
 
 
 def construct_solver_or_matrix_no_pml(Wave_object):

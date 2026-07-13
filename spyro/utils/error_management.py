@@ -155,7 +155,7 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
     Raises
     ------
     TypeError
-        If the parameter value is not of the expected type (float or integer).
+        If the parameter value is not of the expected type (`float` or `int`).
     ValueError
         If the parameter value is outside the specified bounds or the bounds are invalid.
     """
@@ -248,67 +248,29 @@ def enum_parameter_error(par_name, par_value, valid_enum):
                     f", got {type(par_value).__name__}")
 
 
-# def value_string_error(par_name, par_value):
-#     """Validate string parameters and raise a TypeError if invalid.
+def value_string_error(par_name, par_value):
+    """Validate string parameters and raise a TypeError if invalid.
 
-#     Parameters
-#     ----------
-#     par_name : `str`
-#         Name of the parameter that has an invalid value.
-#     par_value : `str`
-#         Value of the parameter that is invalid.
+    Parameters
+    ----------
+    par_name : `str`
+        Name of the parameter to be validated (used in error messages).
+    par_value : `str`
+        Value of the parameter to be validated.
 
-#     Returns
-#     -------
-#     par_value : `str`
-#         The validated parameter value.
+    Returns
+    -------
+    par_value : `str`
+        The validated parameter value.
 
-#     Raises
-#     ------
-#     TypeError
-#         If the parameter value is not of the expected type (float or integer).
-#     ValueError
-#         If the parameter value is outside the specified bounds or the bounds are invalid.
-#     """
+    Raises
+    ------
+    TypeError
+        If the parameter value is not of the expected type (`str`).
+    """
 
-#     # Checking the parameter type
-#     if not isinstance(par_value, (int, float)):
-#         if float_num and integer_num:
-#             str_type = "float or a integer"
-#         elif float_num:
-#             str_type = "float"
-#         elif integer_num:
-#             str_type = "integer"
+    # Checking the parameter type
+    if not isinstance(par_value, str):
+        raise TypeError(f"'{par_name}' must be a string, got {type(par_value).__name__}.")
 
-#         raise TypeError(f"'{par_name}' must be a {str_type} number, "
-#                         f"got {type(par_value).__name__}.")
-
-#     # Set default bounds
-#     upper_bound = inf if upper_bound is None else upper_bound
-#     lower_bound = -inf if lower_bound is None else lower_bound
-
-#     # Validate bounds
-#     if upper_bound <= lower_bound:
-#         raise ValueError(f"Invalid bounds: upper_bound ({upper_bound}) must "
-#                          f"be greater than lower_bound ({lower_bound}).")
-
-#     # Check if value is within bounds
-#     if par_value < lower_bound or par_value > upper_bound:
-#         if lower_bound > -inf and upper_bound < inf:  # Both bounds are finite
-#             bound_str = f"between {lower_bound} and {upper_bound}"
-#             if include_lower_bound and include_upper_bound:
-#                 bound_str += " (both bounds inclusive)"
-#             elif include_lower_bound:
-#                 bound_str += " (lower bound inclusive)"
-#             elif include_upper_bound:
-#                 bound_str += " (upper bound inclusive)"
-#         elif lower_bound > -inf:  # Only lower bound is finite
-#             bound_str = (f"greater than or equal to {lower_bound}"
-#                          if include_lower_bound else f"greater than {lower_bound}")
-#         elif upper_bound < inf:  # Only upper bound is finite
-#             bound_str = (f"less than or equal to {upper_bound}"
-#                          if include_upper_bound else f"less than {upper_bound}")
-
-#         raise ValueError(f"'{par_name}' must be {bound_str}, got {par_value}.")
-
-#     return par_value
+    return par_value
