@@ -17,7 +17,7 @@ from ..utils.error_management import (enum_parameter_error, value_numerical_erro
                                       value_parameter_error)
 from ..utils.freq_tools import freq_response
 from ..utils.typing import (BoundaryConditionsType, HyperLayerDegreeType,
-                            LayerShapeType, LayerSizeRefFrequency)
+                            LayerDampingType, LayerShapeType, LayerSizeRefFrequency)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -37,11 +37,13 @@ class ABCLayer(NRBC):
     abc_boundary_layer_shape : `typing.LayerShapeType`, optional
         Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
         `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
-    abc_boundary_layer_type : `str`
-        Type of the boundary layer. Options: 'hybrid' or 'PML'.
-        Default is 'hybrid'. Option 'hybrid' is based on paper of Salas et al. (2022).
+    abc_boundary_layer_type : `typing.LayerDampingType`
+        Type of the boundary layer. Options: `LayerDampingType.LOCAL`,
+        `LayerDampingType.HYBRID`, `LayerDampingType.PML` or `LayerDampingType.NOABCS`.
+        Default is `LayerDampingType.NOABCS` where no absorbing BCs are applied.
+        Option `LayerDampingType.HYBRID` is based on paper of Salas et al. (2022).
         doi: https://doi.org/10.1016/j.apm.2022.09.014
-        TODO: Add reference
+        TODO: Add citation
     abc_pad_length : `float`
         Size of the absorbing layer
     abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
@@ -137,7 +139,7 @@ class ABCLayer(NRBC):
     def __init__(self, domain_dim, frequency, freq_Nyquist, dimension=2,
                  quadrilateral=False, func_space_type=None,
                  abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
-                 abc_boundary_layer_type="hybrid",
+                 abc_boundary_layer_type=LayerDampingType.HYBRID,
                  abc_reference_freq=LayerSizeRefFrequency.SOURCE,
                  abc_degree_type=HyperLayerDegreeType.REAL, abc_deg_layer=None,
                  output_folder=None, comm=None):
@@ -205,7 +207,9 @@ class ABCLayer(NRBC):
                                                integer_num=True, lower_bound=0.)
 
         # Nyquist frequency
-        self.freq_Nyquist = freq_Nyquist
+        self.freq_Nyquist = value_numerical_error('freq_Nyquist', freq_Nyquist,
+                                                  float_num=True, integer_num=True,
+                                                  lower_bound=0.)
 
         # Model dimension
         self.dimension = value_parameter_error('dimension', dimension, [2, 3])
@@ -217,9 +221,13 @@ class ABCLayer(NRBC):
         self.func_space_type = func_space_type
 
         # ABC layer parameters
-        self.abc_boundary_layer_type = value_parameter_error('abc_boundary_layer_type',
-                                                             abc_boundary_layer_type,
-                                                             ["hybrid", "PML"])
+        self.abc_boundary_layer_type = enum_parameter_error("abc_boundary_layer_type",
+                                                            abc_boundary_layer_type,
+                                                            LayerDampingType)
+        if abc_boundary_layer_type == LayerDampingType.NOABCS:
+            value_parameter_error('abc_boundary_layer_type', abc_boundary_layer_type,
+                                  [LayerDampingType.HYBRID, LayerDampingType.PML])
+
         self.abc_boundary_layer_shape = enum_parameter_error('abc_boundary_layer_shape',
                                                              abc_boundary_layer_shape,
                                                              LayerShapeType)
@@ -233,9 +241,10 @@ class ABCLayer(NRBC):
         if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
             self.abc_deg_layer = None
         elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-            self.abc_deg_layer = value_numerical_error(
-                'abc_deg_layer', abc_deg_layer, float_num=True,
-                integer_num=True, lower_bound=2., include_lower_bound=True)
+            self.abc_deg_layer = value_numerical_error('abc_deg_layer', abc_deg_layer,
+                                                       float_num=True, integer_num=True,
+                                                       lower_bound=2.,
+                                                       include_lower_bound=True)
 
         # Communicator MPI
         self.comm = comm
@@ -314,9 +323,9 @@ class ABCLayer(NRBC):
         """
 
         # Layer type
-        if self.abc_boundary_layer_type == "hybrid":
+        if self.abc_boundary_layer_type == LayerDampingType.HYBRID:
             abc_layer_str = "Absorbing" if for_prints else "habc"
-        elif self.abc_boundary_layer_type == "PML":
+        elif self.abc_boundary_layer_type == LayerDampingType.PML:
             abc_layer_str = "PML" if for_prints else "pml"
 
         formatted_str = str_to_format.format(abc_layer_str)

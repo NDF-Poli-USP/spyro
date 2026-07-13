@@ -134,7 +134,7 @@ class LayerShapeType(Enum):
 
 
 class LayerSizeRefFrequency(Enum):
-    """Enum for different reference frequencies for sizing the hybrid absorbing layer.
+    """Enum for different reference frequencies for sizing the absorbing layer.
 
     SOURCE: Size based on dominant source frequency.
     BOUNDARY: Size based on wave frequency at the critical boundary point (Eikonal min.)
@@ -166,3 +166,18 @@ class BoundaryConditionsType(Enum):
     NEUMANN = "Neumann"
     HIGDON = "Higdon"
     SOMMERFELD = "Sommerfeld"
+
+
+class LayerDampingType(Enum):
+    """Enum for different types of damping for the absorbing layer.
+
+    LOCAL: An Non-Reflecting Boundary Condition (NRBC) at the boundary of the domain.
+    HYBRID: A combination of a sponge layer and an NRBC at the outer layer boundary
+    PML: Perfectly Matched Layer (PML) damping
+    NOABCS: No absorbing boundary conditions applied.
+
+    """
+    LOCAL = "local"
+    HYBRID = "hybrid"
+    PML = "PML"
+    NOABCS = "no_abcs"

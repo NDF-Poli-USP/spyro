@@ -7,8 +7,8 @@ from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
-from ...utils.typing import (ElasticMaterialParameter,
-                             ElasticMaterialParameterization, override)
+from ...utils.typing import (ElasticMaterialParameter, ElasticMaterialParameterization,
+                             LayerDampingType, override)
 from ...domains.space import create_function_space
 
 
@@ -231,7 +231,7 @@ class IsotropicWave(ElasticWave):
 
     @override
     def get_forward_solution_receivers(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_boundary_layer_type == LayerDampingType.PML:
             raise NotImplementedError
         else:
             data_with_halos = self.u_n.dat.data_ro_with_halos[:]
@@ -507,20 +507,20 @@ class IsotropicWave(ElasticWave):
         self.parse_volumetric_forces()
 
         if self.abc_boundary_layer_type is None or \
-                self.abc_boundary_layer_type == "local":
+                self.abc_boundary_layer_type == LayerDampingType.LOCAL:
             isotropic_elastic_without_pml(self)
-        elif self.abc_boundary_layer_type == "PML":
+        elif self.abc_boundary_layer_type == LayerDampingType.PML:
             isotropic_elastic_with_pml(self)
 
     @override
     def rhs_no_pml(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_boundary_layer_type == LayerDampingType.PML:
             raise NotImplementedError
         else:
             return self.B
 
     def rhs_no_pml_source(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_boundary_layer_type == LayerDampingType.PML:
             raise NotImplementedError
         else:
             return self.source_function

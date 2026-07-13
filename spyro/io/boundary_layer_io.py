@@ -1,7 +1,7 @@
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import (enum_parameter_error, value_numerical_error,
-                                      value_parameter_error)
-from ..utils.typing import HyperLayerDegreeType, LayerShapeType, LayerSizeRefFrequency
+from ..utils.error_management import enum_parameter_error, value_numerical_error
+from ..utils.typing import (HyperLayerDegreeType, LayerDampingType,
+                            LayerShapeType, LayerSizeRefFrequency)
 
 
 class Read_boundary_layer:
@@ -10,13 +10,16 @@ class Read_boundary_layer:
 
     Attributes
     ----------
-    abc_boundary_layer_shape : `typing.LayerShapeType`, optional
+    abc_boundary_layer_shape : `typing.LayerShapeType`
         Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
         `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
-    abc_boundary_layer_type : `str`
-        Type of the boundary layer. Options: 'hybrid' or 'PML'.
-        Option 'hybrid' is based on paper of Salas et al. (2022).
+    abc_boundary_layer_type : `typing.LayerDampingType`
+        Type of the boundary layer. Options: `LayerDampingType.LOCAL`,
+        `LayerDampingType.HYBRID`, `LayerDampingType.PML` or `LayerDampingType.NOABCS`.
+        Default is `LayerDampingType.NOABCS` where no absorbing BCs are applied.
+        Option `LayerDampingType.HYBRID` is based on paper of Salas et al. (2022).
         doi: https://doi.org/10.1016/j.apm.2022.09.014
+        TODO: Add citation
     abc_deg_eikonal : `int`
         Finite element order for the Eikonal analysis
     abc_deg_layer : `int` or `float`
@@ -47,8 +50,6 @@ class Read_boundary_layer:
         the pad length is determined with the HABC criterion.
     abc_user_pml_cmax : `bool`
         If True, the maximum propagation speed in the PML layer is provided by the user.
-    damping_type : `str`
-        Type of the boundary layer
     dictionary : `dict`
         Dictionary containing the boundary layer information
     """
@@ -110,7 +111,7 @@ class Read_boundary_layer:
                                           value, LayerShapeType)
 
         if shape_enum == LayerShapeType.NOLAYER:
-            raise ValueError("NOLAYER not allowed for active ABC.")
+            raise ValueError("`NOLAYER` option not allowed for active ABC.")
 
         self._abc_boundary_layer_shape = shape_enum
 
@@ -182,16 +183,14 @@ class Read_boundary_layer:
     def abc_boundary_layer_type(self, value):
         """Set the type of absorbing boundary layer with validation."""
         abc_dictionary = self.input_dictionary['absorving_boundary_conditions']
-        accepted_damping_types = [
-            "PML",
-            "local",
-            "hybrid",
-            None,
-        ]
 
         # Cheking damping type input
-        self._abc_boundary_layer_type = value_parameter_error(
-            'abc_boundary_layer_type', value, accepted_damping_types)
+        if value is None:
+            pprint("No Absorbing Boundary Conditions (ABCs) applied.", comm=self.comm)
+            value = "no_abcs"
+
+        self._abc_boundary_layer_type = enum_parameter_error(
+            "abc_boundary_layer_type", value, LayerDampingType)
 
         if value == "PML":
             # PML forces rectangular shape
@@ -204,9 +203,12 @@ class Read_boundary_layer:
             self.abc_pml_R = abc_dictionary["R"]
             abc_dictionary.setdefault("cmax", None)
             self.abc_pml_cmax = abc_dictionary["cmax"]
+
         if value == "hybrid":
+
             # Get shape from dictionary, default to rectangular
-            self.abc_boundary_layer_shape = abc_dictionary.get("layer_shape", "rectangular")
+            self.abc_boundary_layer_shape = abc_dictionary.get("layer_shape",
+                                                               "rectangular")
 
             # Hypershape-specific validation
             self.abc_deg_layer = None
