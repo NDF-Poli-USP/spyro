@@ -437,6 +437,12 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     HABC_Damping.__init__(self, dom_lay_trunc, layer_par, mesh_par,
     #                           wave_par, dimension=self.dimension, comm=self.comm)
 
+    #     # Damping mask
+    #     V_mask = create_function_space(self.mesh, "DG0", 0)
+    #     self.eta_mask = self.layer_mask_field(coords, V_mask,
+    #                                           type_marker='mask',
+    #                                           name_mask='eta_mask')
+
     #     # Estimating fundamental frequency
     #     self.fundamental_frequency(method=method, monitor=True,
     #                                fitting_c=fitting_c)
