@@ -1,4 +1,5 @@
 from abc import abstractmethod, ABCMeta
+from numpy import inf
 import warnings
 import firedrake as fire
 
@@ -698,7 +699,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         domain_dim = self.domain_dimensions()
 
         # Nyquist frequency
-        freq_Nyquist = None if self.analysis != "transient" else 1. / (2. * self.dt)
+        freq_Nyquist = inf if self.analysis != "transient" else 1. / (2. * self.dt)
 
         if self.abc_boundary_layer_type == LayerDampingType.PML:
             from ..pml.pml_nsnc import PMLLayer
