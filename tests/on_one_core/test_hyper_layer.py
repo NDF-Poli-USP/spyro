@@ -268,7 +268,7 @@ def test_half_hyp_volume_scales_linearly_with_c():
 
 def test_trunc_half_hyp_volume_no_truncation():
     result = HyperLayer.trunc_half_hyp_volume(1.0, 1.0, 1.0, 2, 1.0)
-    assert isclose(result, 2 * pi / 3, rel_tol=1e-6)
+    assert isclose(result, 2. * pi / 3, rel_tol=1e-6)
 
 
 def test_trunc_half_hyp_volume_zero_plane():
@@ -289,7 +289,7 @@ def test_trunc_half_hyp_volume_less_than_half():
 def test_hyp_full_perimeter_unit_circle():
     # n=2, a=b=1 gives a unit circle with perimeter 2*pi
     result = HyperLayer.hyp_full_perimeter(1.0, 1.0, 2)
-    assert isclose(result, 2 * pi, rel_tol=1e-6)
+    assert isclose(result, 2. * pi, rel_tol=1e-6)
 
 
 def test_hyp_full_perimeter_positive():

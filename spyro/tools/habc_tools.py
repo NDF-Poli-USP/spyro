@@ -1,6 +1,6 @@
 """Methods to extend the material property in an absorbing layer."""
 
-from firedrake import assemble, conditional, Function, FunctionSpace, VertexOnlyMesh
+from firedrake import assemble, conditional, Function, VertexOnlyMesh
 from firedrake import sqrt as fire_sqrt
 from numpy import clip, where
 from ..domains.space import create_function_space
@@ -164,10 +164,10 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
         ref_funct = fire_sqrt(ref_funct) / pad_length
 
         # Quadratic damping profile
-        if bq == 0.:
-            ref_funct = eta_crt * aq * ref_funct**2
-        else:
-            ref_funct = eta_crt * (aq * ref_funct**2 + bq * ref_funct)
+        ref_funct = aq * ref_funct**2
+        if bq != 0.:
+            ref_funct += bq * ref_funct
+        ref_funct *= eta_crt
 
     elif type_marker == "mask":
 
