@@ -3,7 +3,7 @@
 from firedrake import (Cofunction, DirichletBC, div, dot, ds as fire_ds, dx as fire_dx,
                        Function, grad, inner, lhs, LinearVariationalProblem,
                        LinearVariationalSolver, rhs, split, TestFunctions, TrialFunctions)
-from ..utils.typing import BoundaryConditionsTypefrom, LayerDampingType
+from ..utils.typing import BoundaryConditionsType, LayerDampingType
 
 
 # Work from Keith Roberts, Eduardo Moscatelli,
