@@ -1,7 +1,6 @@
 """Methods to extend the material property in an absorbing layer."""
 
-from firedrake import (assemble, conditional, Constant,
-                       Function, FunctionSpace, VertexOnlyMesh)
+from firedrake import assemble, conditional, Constant, Function, VertexOnlyMesh
 from firedrake import sqrt as fire_sqrt
 from numpy import clip, where
 from ..domains.space import create_function_space
@@ -163,14 +162,12 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
                              "when 'type_marker' is 'damping'.")
 
         # Reference distance to the original boundary
-        ref_funct = fire_sqrt(ref_funct) / Constant(pad_len)
+        ref_funct = fire_sqrt(ref_funct) / pad_len
 
         # Quadratic damping profile
-        if bq == 0.:
-            ref_funct = Constant(eta_crt) * Constant(aq) * ref_funct**2
-        else:
-            ref_funct = Constant(eta_crt) * (Constant(aq) * ref_funct**2
-                                             + Constant(bq) * ref_funct)
+        ref_funct = eta_crt * aq * ref_funct**2
+        if bq != 0.:
+            ref_funct += eta_crt * bq * ref_funct
 
     elif type_marker == 'mask':  # Mask filter for layer boundary domain
 
@@ -275,7 +272,7 @@ def point_cloud_field(parent_mesh, pts_cloud, parent_field, tolerance):
 
     # Cloud field
     V0 = create_function_space(pts_mesh, "DG0", 0)
-    f_pts = fire.assemble(fire.interpolate(parent_field, V0))
+    f_pts = assemble(interpolate(parent_field, V0))
 
     # Ensuring correct assemble
     V1 = create_function_space(pts_mesh.input_ordering, "DG0", 0)
