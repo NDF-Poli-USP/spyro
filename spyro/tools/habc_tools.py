@@ -5,7 +5,7 @@ from firedrake import sqrt as fire_sqrt
 from numpy import clip, where
 from ..domains.space import create_function_space
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import value_parameter_error
+from ..utils.error_management import value_numerical_error, value_parameter_error
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..tools.version_control import is_firedrake_new
 

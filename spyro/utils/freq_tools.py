@@ -1,6 +1,6 @@
 """Utilities for calculating the frequency response of a signal."""
 
-from numpy import abs, hanning, linspace, mean, pad, zeros
+from numpy import abs, hanning, linspace, mean, pad
 from scipy.fft import fft
 
 
@@ -49,7 +49,7 @@ def freq_response(signal, f_Nyq, fpad=0, get_dominant_freq=False):
     N_samples = len(signal_with_padding)
 
     # Determine the number of samples of the spectrum
-    samples_fft = N_samples // 2 + N_samples % 2
+    samples_fft = N_samples // 2 + 1
 
     # Calculate the response in frequency domain of the signal (FFT)
     norm_magnitude = abs(fft(signal_with_padding)[0:samples_fft])

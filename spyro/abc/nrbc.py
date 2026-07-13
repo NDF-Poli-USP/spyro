@@ -84,7 +84,7 @@ class NRBC():
         self.domain_dim = domain_dim
 
         # Shape type of pad layer
-        abc_boundary_layer_shape = abc_boundary_layer_shape
+        self.abc_boundary_layer_shape = abc_boundary_layer_shape
 
         # Maximum incidence angle considered
         self.angle_max = angle_max

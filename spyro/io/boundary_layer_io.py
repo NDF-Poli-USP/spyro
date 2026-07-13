@@ -173,7 +173,7 @@ class Read_boundary_layer:
         else:
             pml_cmax = value_numerical_error("abc_pml_cmax", value, float_num=True,
                                              integer_num=True, lower_bound=0.)
-        self._abc_pml_cmax = value
+        self._abc_pml_cmax = pml_cmax
 
     @property
     def abc_boundary_layer_type(self):
