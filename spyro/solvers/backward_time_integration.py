@@ -3,6 +3,7 @@ from . import helpers
 from .wave import Wave
 from ..io.basicio import parallel_print
 from ..receivers.Receivers import Receivers
+from ..utils.typing import LayerDampingType
 
 
 def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
