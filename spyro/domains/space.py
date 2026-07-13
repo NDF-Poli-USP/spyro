@@ -1,20 +1,55 @@
-from firedrake import (FiniteElement, FunctionSpace, VectorElement)
+from numbers import Integral
+
+from firedrake import (
+    FiniteElement, FunctionSpace, VectorElement,
+)
+from ufl.finiteelement import AbstractFiniteElement
 
 
-def create_function_space(mesh, method, degree, dim=1):
-    """Create a Firedrake function space based on the specified
-    finite element method.
+# Each entry is (family, variant, fixed_degree):
+# - family: Firedrake finite element family passed to FiniteElement.
+# - variant: optional Firedrake variant. None uses Firedrake's default.
+# - fixed_degree: required degree for aliases such as DG0. None means the
+#   caller-provided degree is used.
+_ELEMENT_SPECS = {
+    "mass_lumped_triangle": ("KMV", None, None),
+    "KMV": ("KMV", None, None),
+    "Kong-Mulder-Veldhuizen": ("KMV", None, None),
+    "spectral_quadrilateral": ("CG", "spectral", None),
+    "DG0": ("DG", None, 0),
+    "DG_triangle": ("DG", None, None),
+    "DG_quadrilateral": ("DG", None, None),
+    "DG": ("DG", None, None),
+    "CG_triangle": ("CG", None, None),
+    "CG_quadrilateral": ("CG", None, None),
+    "CG": ("CG", None, None),
+    "DQ_quadrilateral": ("DQ", "spectral", None),
+    "DQ": ("DQ", "spectral", None),
+}
+
+
+def _is_integer(value):
+    return isinstance(value, Integral) and not isinstance(value, bool)
+
+
+def create_function_space(mesh, method, degree=None, dim=1):
+    """Create a Firedrake function space from a mesh and finite element.
 
     Parameters:
     -----------
     mesh: Firedrake Mesh
         Mesh to be used in the finite element space.
-    method: str
-        Method to be used for the finite element space.
-    degree: int
-        Degree of the finite element space.
+    method: str or FiniteElement
+        Method to be used for the finite element space, or an already
+        constructed finite element.
+    degree: int or None
+        Degree of the finite element space. Required when ``method`` is a
+        supported method name. Ignored only when ``method`` is an already
+        constructed finite element.
     dim: int
-        Number of degrees of freedom per node.
+        Number of vector components. If ``dim`` is 1, a scalar function space
+        is created. If ``dim`` is greater than 1, the selected element is
+        wrapped in a vector element with ``dim`` components.
 
     Returns:
     --------
@@ -22,25 +57,40 @@ def create_function_space(mesh, method, degree, dim=1):
         Function space.
     """
 
-    if method == "mass_lumped_triangle":
+    if not _is_integer(dim) or dim < 1:
+        raise ValueError("Function space dimension must be a positive integer")
+    dim = int(dim)
+
+    if isinstance(method, AbstractFiniteElement):
+        if degree is not None:
+            raise ValueError(
+                "degree must be None when method is an already constructed "
+                "finite element"
+            )
+        element = method
+    else:
+        try:
+            family, variant, fixed_degree = _ELEMENT_SPECS[method]
+        except (KeyError, TypeError) as exc:
+            raise ValueError(
+                f"Finite element method {method} not supported"
+            ) from exc
+
+        if fixed_degree is not None:
+            if degree != fixed_degree:
+                raise ValueError(
+                    f"Finite element method {method} requires degree {fixed_degree}"
+                )
+            degree = fixed_degree
+        elif not _is_integer(degree) or degree < 0:
+            raise ValueError(
+                f"Finite element method {method} requires a non-negative integer degree"
+            )
+        else:
+            degree = int(degree)
+
         element = FiniteElement(
-            "KMV", mesh.ufl_cell(), degree=degree,
-        )
-    elif method == "spectral_quadrilateral":
-        element = FiniteElement(
-            "CG", mesh.ufl_cell(), degree=degree, variant="spectral"
-        )
-    elif method in ["DG_triangle", "DG_quadrilateral", "DG"]:
-        element = FiniteElement(
-            "DG", mesh.ufl_cell(), degree=degree
-        )
-    elif method in ["CG_triangle", "CG_quadrilateral", "CG"]:
-        element = FiniteElement(
-            "CG", mesh.ufl_cell(), degree=degree
-        )
-    elif method in ["DQ_quadrilateral", "DQ"]:
-        element = FiniteElement(
-            "DQ", mesh.ufl_cell(), degree=degree, variant="spectral"
+            family, mesh.ufl_cell(), degree=degree, variant=variant,
         )
 
     if dim > 1:

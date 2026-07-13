@@ -274,11 +274,11 @@ def point_cloud_field(parent_mesh, pts_cloud, parent_field, tolerance):
     del pts_cloud
 
     # Cloud field
-    V0 = FunctionSpace(pts_mesh, "DG", 0)
-    f_pts = assemble(interpolate(parent_field, V0))
+    V0 = create_function_space(pts_mesh, "DG0", 0)
+    f_pts = fire.assemble(fire.interpolate(parent_field, V0))
 
     # Ensuring correct assemble
-    V1 = FunctionSpace(pts_mesh.input_ordering, "DG", 0)
+    V1 = create_function_space(pts_mesh.input_ordering, "DG0", 0)
     del pts_mesh
     cloud_field = Function(V1)
     cloud_field.assign(assemble(interpolate(f_pts, V1)))
