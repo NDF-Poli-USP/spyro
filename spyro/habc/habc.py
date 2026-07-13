@@ -6,7 +6,8 @@ from shutil import rmtree
 from ..abc.abc_layer import ABCLayer
 from .damp_profile import HABC_Damping
 from ..solvers.modal.modal_sol import Modal_Solver
-from ..utils.typing import HyperLayerDegreeType, LayerShapeType, LayerSizeRefFrequency
+from ..utils.typing import (HyperLayerDegreeType, LayerDampingType,
+                            LayerShapeType, LayerSizeRefFrequency)
 from ..io.basicio import parallel_print as pprint
 # from sympy import divisors
 # from spyro.utils.error_management import value_parameter_error
