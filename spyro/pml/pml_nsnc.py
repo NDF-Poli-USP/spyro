@@ -6,7 +6,8 @@ from ..io.basicio import parallel_print as pprint
 from ..tools.habc_tools import layer_mask_field
 from ..utils.error_management import enum_parameter_error, value_numerical_error
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
-from ..utils.typing import BoundaryConditionsType, LayerShapeType, LayerSizeRefFrequency
+from ..utils.typing import (BoundaryConditionsType, LayerDampingType,
+                            LayerShapeType, LayerSizeRefFrequency)
 
 
 # Work from Ruben Andres Salas and Alexandre Olender
@@ -113,7 +114,7 @@ class PMLLayer(ABCLayer):
         ABCLayer.__init__(self, domain_dim, frequency, f_Nyquist, dimension=dimension,
                           quadrilateral=quadrilateral, func_space_type=func_space_type,
                           abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
-                          abc_boundary_layer_type="PML",
+                          abc_boundary_layer_type=LayerDampingType.PML,
                           abc_reference_freq=abc_reference_freq,
                           output_folder=output_folder, comm=comm)
 

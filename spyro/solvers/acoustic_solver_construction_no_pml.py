@@ -1,5 +1,5 @@
 import firedrake as fire
-from firedrake import ds, dx, Constant, dot, grad
+from firedrake import ds, dx, dot, grad
 
 
 def construct_solver_or_matrix_no_pml(Wave_object):
@@ -31,7 +31,7 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     # -------------------------------------------------------
     m1 = (
         (1 / (Wave_object.c * Wave_object.c))
-        * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2))
+        * ((u - 2.0 * u_n + u_nm1) / dt**2)
         * v
         * dx(**quad_rule)
     )
@@ -43,12 +43,12 @@ def construct_solver_or_matrix_no_pml(Wave_object):
         le += - q * v * dx(**quad_rule)
 
     if Wave_object.abc_active:
-        weak_expr_abc = dot((u_n - u_nm1) / Constant(dt), v)
+        weak_expr_abc = dot((u_n - u_nm1) / dt, v)
 
         f_abc = (1 / Wave_object.c) * weak_expr_abc
         qr_s = Wave_object.surface_quadrature_rule
 
-        if Wave_object.abc_boundary_layer_type == "hybrid":
+        if Wave_object.abc_boundary_layer_type == LayerDampingType.HYBRID:
 
             # NRBC
             le += Wave_object.cosHig * f_abc * ds(**qr_s)
