@@ -77,6 +77,7 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     # form = m1 + a - le
     # Signal for le is + in derivation, see Salas et al (2022)
     # doi: https://doi.org/10.1016/j.apm.2022.09.014
+    # TODO: Add citation
     form = m1 + a + le
     Wave_object.rhs = fire.rhs(form)
     Wave_object.lhs = fire.lhs(form)
