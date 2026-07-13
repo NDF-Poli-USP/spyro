@@ -1,4 +1,5 @@
 from abc import abstractmethod, ABCMeta
+from firedrake import Constant
 
 from ..wave import Wave
 from ...utils.typing import override, WaveType
@@ -29,7 +30,7 @@ class ElasticWave(Wave, metaclass=ABCMeta):
         """
 
         super().__init__(dictionary, wave_type=anisotropy, comm=comm)
-        self.time = 0  # Time variable
+        self.time = Constant(0)  # Time variable
 
     @override
     def _initialize_model_parameters(self):
