@@ -278,6 +278,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
                 "output_frequency", 99999)
             self.gradient_sampling_frequency = self.input_dictionary[
                 "time_axis"]["gradient_sampling_frequency"]
+            self.save_forward_solution = self.input_dictionary[
+                "time_axis"].get("save_forward_solution", True)
             self.output_frequency = self.input_dictionary[
                 "time_axis"]["output_frequency"]
         self._sanitize_automatic_adjoint()
