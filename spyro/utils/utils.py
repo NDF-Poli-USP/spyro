@@ -9,6 +9,7 @@ import warnings
 from ..io import ensemble_functional
 from ..io import parallel_print
 from ..io import write_velocity_model
+from ..domains.space import create_function_space
 from .typing import FunctionalEvaluationMode, FunctionalType
 
 
@@ -399,7 +400,7 @@ class Mask():
         Sets the `dg_mask` attribute to a DG0 function containing the
         interpolated mask values.
         """
-        V_dg = FunctionSpace(Wave_obj.mesh, "DG", 0)
+        V_dg = create_function_space(Wave_obj.mesh, "DG0", 0)
         dg_mask = Function(V_dg)
         dg_mask.interpolate(self.cond)
         self.dg_mask = dg_mask

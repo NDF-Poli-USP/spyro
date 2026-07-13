@@ -1,5 +1,6 @@
 from firedrake import *  # noqa: F403
 from spyro.receivers.dirac_delta_projector import Delta_projector
+from ..domains.space import create_function_space
 from ..utils.typing import WaveType
 import numpy as np
 from ..tools.version_control import is_firedrake_new
@@ -162,9 +163,9 @@ class Receivers(Delta_projector):
             redundant=vom_redundant,
             name=vom_name)
         if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
-            V_r = VectorFunctionSpace(vom, "DG", 0)
+            V_r = create_function_space(vom, "DG0", 0, dim=self.dimension)
         elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
-            V_r = FunctionSpace(vom, "DG", 0)
+            V_r = create_function_space(vom, "DG0", 0)
         else:
             raise ValueError("Invalid wave type")
         return interpolate(f, V_r)
