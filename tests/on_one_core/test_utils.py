@@ -29,7 +29,7 @@ def test_butter_lowpast_filter():
     # See D’Antona, G., Ferrero A., “Digital Signal Processing for Measurement Systems”,
     # Springer Media, 2006, p. 70 DOI:10.1007/0-387-28666-7.
     # TODO: Add citation
-    (f, S) = sp.signal.periodogram(rec10, fs, 'flattop')
+    (f, S) = sp.signal.periodogram(rec10, fs, window='flattop', detrend='linear')
     peak_frequency = f[np.argmax(S)]
 
     # Checks if frequency with greater power density is close to 5
