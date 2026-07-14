@@ -6,9 +6,12 @@ import os
 from scipy.signal import butter, filtfilt
 import warnings
 
-from ..io import ensemble_functional
-from ..io import parallel_print
-from ..io import write_velocity_model
+from ..io.basicio import parallel_print, write_velocity_model
+from ..io.parallelism_wrappers import (
+    ensemble_functional,
+    run_in_one_core,
+    run_in_one_core_and_broadcast,
+)
 from ..domains.space import create_function_space
 from .typing import FunctionalEvaluationMode, FunctionalType
 
@@ -582,129 +585,6 @@ class Gradient_mask_for_pml(Mask):
             "x_max": x_max,
         }
         super().__init__(boundaries, Wave_obj)
-
-
-def run_in_one_core(func):
-    """Decorator to execute function only on rank 0.
-
-    Ensures the decorated function runs only on the root process (rank 0)
-    of the communicator. Other processes skip execution. Useful for I/O
-    operations and serial tasks in parallel environments.
-
-    Parameters
-    ----------
-    func : callable
-        Function to decorate. The first argument of func must be an object
-        with a `comm` attribute containing an MPI communicator.
-
-    Returns
-    -------
-    callable
-        Wrapped function that executes only on rank 0.
-
-    Notes
-    -----
-    The function checks for two types of communicators:
-    - Ensemble communicator: Runs only if both `ensemble_comm.rank` == 0
-      and comm.rank == 0.
-    - Regular communicator: Runs only if comm.rank == 0.
-    - If comm is None, the function runs normally without restrictions.
-
-    The function does not broadcast results to other processes.
-
-    See Also
-    --------
-    run_in_one_core_and_broadcast : Similar decorator that also broadcasts results.
-
-    Examples
-    --------
-    >>> @run_in_one_core
-    ... def save_file(obj, filename):
-    ...     # Only rank 0 writes the file
-    ...     with open(filename, 'w') as f:
-    ...         f.write(str(obj.data))
-    """
-
-    def wrapper(*args, **kwargs):
-        comm = args[0].comm
-        if comm is None:
-            return func(*args, **kwargs)
-        else:
-            if getattr(comm, "ensemble_comm", None) is not None:
-                if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-                    return func(*args, **kwargs)
-            elif getattr(comm, "rank", None) is not None:
-                if comm.rank == 0:
-                    return func(*args, **kwargs)
-
-    return wrapper
-
-
-def run_in_one_core_and_broadcast(func):
-    """Decorator to execute function on rank 0 and broadcast result.
-
-    Ensures the decorated function runs only on the root process (rank 0)
-    and broadcasts the return value to all other processes. Useful for
-    file reading and other operations that should be performed once but
-    shared across all processes.
-
-    Parameters
-    ----------
-    func : callable
-        Function to decorate. The first argument of func must be an object
-        with a 'comm' attribute containing an MPI communicator.
-
-    Returns
-    -------
-    callable
-        Wrapped function that executes on rank 0 and broadcasts the result
-        to all processes.
-
-    Notes
-    -----
-    The function handles two types of communicators:
-    - Ensemble communicator: Executes on rank (0,0), broadcasts within
-      ensemble, then within spatial communicator.
-    - Regular communicator: Executes on rank 0, broadcasts to all.
-    - If comm is None, the function runs normally without MPI operations.
-
-    All processes receive the same return value from the broadcast.
-
-    See Also
-    --------
-    run_in_one_core : Similar decorator without broadcasting.
-
-    Examples
-    --------
-    >>> @run_in_one_core_and_broadcast
-    ... def load_config(obj, filename):
-    ...     # Only rank 0 reads the file, result shared with all
-    ...     with open(filename, 'r') as f:
-    ...         return json.load(f)
-    """
-
-    def wrapper(*args, **kwargs):
-        comm = args[0].comm
-        if comm is None:
-            return func(*args, **kwargs)
-        else:
-            result = None
-            if getattr(comm, "ensemble_comm", None) is not None:
-                # Handle ensemble communicator
-                if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-                    result = func(*args, **kwargs)
-                # Broadcast within ensemble
-                result = comm.ensemble_comm.bcast(result, root=0)
-                # Broadcast within spatial communicator
-                result = comm.comm.bcast(result, root=0)
-            elif getattr(comm, "rank", None) is not None:
-                # Handle regular communicator
-                if comm.rank == 0:
-                    result = func(*args, **kwargs)
-                result = comm.bcast(result, root=0)
-            return result
-
-    return wrapper
 
 
 @run_in_one_core_and_broadcast

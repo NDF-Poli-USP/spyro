@@ -2,7 +2,7 @@ import firedrake as fire
 
 from .wave import Wave
 from pyadjoint import Tape, AdjFloat
-from ..io.basicio import ensemble_gradient
+from ..io.parallelism_wrappers import ensemble_gradient
 from ..io import interpolate
 from .acoustic_solver_construction_no_pml import (
     construct_solver_or_matrix_no_pml,
