@@ -6,8 +6,23 @@ from spyro.utils.freq_tools import freq_response
 
 
 def test_butter_lowpast_filter():
+    """
+    Test the butter_lowpass_filter function from spyro.utils.utils module.
+
+    Notes
+    -----
+    https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.windows.flattop.html#scipy.signal.windows.flattop
+    Flat top windows are used for taking accurate measurements of signal amplitude in
+    the frequency domain, with minimal scalloping error from the center of a frequency
+    bin to its edges, compared to others. This is a 5th-order cosine window, with the
+    5 terms optimized to make the main lobe maximally flat.
+    See D’Antona, G., Ferrero A., “Digital Signal Processing for Measurement Systems”,
+    Springer Media, 2006, p. 70 DOI:10.1007/0-387-28666-7.
+    TODO: Add citation
+    """
     Wave_obj = spyro.examples.Rectangle_acoustic(
-        dictionary={"absorving_boundary_conditions": {"absorb_top": True}}
+        dictionary={"absorving_boundary_conditions": {"absorb_top": True},
+                    "mesh": {"h": 0.09}}  # Increasing from 0.05 to 0.09 to save time
     )
 
     layer_values = [1.5, 2.0, 2.5, 3.0]
@@ -21,14 +36,6 @@ def test_butter_lowpast_filter():
 
     fs = 1.0 / Wave_obj.dt
 
-    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.windows.flattop.html#scipy.signal.windows.flattop
-    # Flat top windows are used for taking accurate measurements of signal amplitude in
-    # the frequency domain, with minimal scalloping error from the center of a frequency
-    # bin to its edges, compared to others. This is a 5th-order cosine window, with the
-    # 5 terms optimized to make the main lobe maximally flat.
-    # See D’Antona, G., Ferrero A., “Digital Signal Processing for Measurement Systems”,
-    # Springer Media, 2006, p. 70 DOI:10.1007/0-387-28666-7.
-    # TODO: Add citation
     (f, S) = sp.signal.periodogram(rec10, fs, window='flattop', detrend='linear')
     peak_frequency = f[np.argmax(S)]
 
