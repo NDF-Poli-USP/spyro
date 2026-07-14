@@ -1,12 +1,10 @@
 from __future__ import with_statement
 
 import pickle
-from mpi4py import MPI
 import firedrake as fire
 import h5py
 import numpy as np
 from scipy.interpolate import griddata
-import glob
 import os
 import warnings
 import segyio
