@@ -49,6 +49,7 @@ def forms_pml(Wave_object, W, X_n, X_nm1):
     # Simulation parameters for PML formulation
     dt = Wave_object.dt
     c = Wave_object.c
+    c_sqr_inv = 1. / (c * c)
     q_rule = Wave_object.quadrature_rule
     dx = fire_dx(**q_rule) if q_rule else fire_dx
     Wave_object.layer_ops.pml_layer(Wave_object)
@@ -67,8 +68,8 @@ def forms_pml(Wave_object, W, X_n, X_nm1):
         u_nm1, psi_nm1, _ = split(X_nm1)
 
     # Acoustic form
-    m1 = ((u - 2. * u_n + u_nm1) / dt**2) * v
-    a = c * c * dot(grad(u_n), grad(v))  # explicit
+    m1 = c_sqr_inv * ((u - 2. * u_n + u_nm1) / dt**2) * v
+    a = dot(grad(u_n), grad(v))
     FF = (m1 + a) * dx
 
     # Common PML forms (Centered difference for first time derivative)
@@ -95,7 +96,6 @@ def forms_pml(Wave_object, W, X_n, X_nm1):
         # PML forms (Centered difference for first time derivative)
         mm2 = inner(dot(Gamma_1, pp_n), qq)
         dd1 = inner(dot(Gamma_2, grad(u_n)), qq)
-        FF1 = mm1 + mm2
         # -------------------------------------------------------
         if Wave_object.dimension == 2:
             pml1 = (sigma_z + sigma_x) * ((u_n - u_nm1) / dt) * v
@@ -105,7 +105,7 @@ def forms_pml(Wave_object, W, X_n, X_nm1):
             pml1 = (sigma_z + sigma_x + sigma_y) * ((u_n - u_nm1) / dt) * v
             pml2 = (sigma_z * sigma_x + sigma_x * sigma_y + sigma_z * sigma_y) * u_n * v
             pml4 = (sigma_z * sigma_x * sigma_y) * psi_n * v
-            FF += pml4 * dx
+            FF += c_sqr_inv * pml4 * dx
             # -------------------------------------------------------
             dd2 = -inner(dot(Gamma_3, grad(psi_n)), qq)
             FF += c * c * dd2 * dx
@@ -115,9 +115,9 @@ def forms_pml(Wave_object, W, X_n, X_nm1):
             FF += (mmm1 + uuu1) * dx
 
         # Adding common PML forms to the variational form
-        FF += (pml1 + pml2 + pml3) * dx
+        FF += c_sqr_inv * (pml1 + pml2 + pml3) * dx
         # -------------------------------------------------------
-        FF += (FF1 + c * c * dd1) * dx
+        FF += (mm1 + mm2 + c * c * dd1) * dx
 
         # exterior_markers = set(Wave_object.mesh.exterior_facets.unique_markers)
         # print("Available boundary markers:", exterior_markers)
