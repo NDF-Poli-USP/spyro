@@ -615,8 +615,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         V = create_function_space(self.mesh, method_element, 0)
 
         # Initialize velocity field and assigning the original velocity model
-        self.c = fire.Function(V).interpolate(self.initial_velocity_model,
-                                              allow_missing_dofs=True)
+        self.velocity_model = fire.Function(V).interpolate(
+            self.initial_velocity_model,
+            allow_missing_dofs=True,
+        )
 
         # Clipping coordinates to the layer domain
         ufl_coordinates_habc = self.get_spatial_coordinates_habc()
@@ -632,13 +634,15 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                         method=method, name_prop="Velocity")
 
         # Interpolating the velocity model in the layer
-        self.c.interpolate(extended_velocity * layer_mask + (
-            1. - layer_mask) * self.c, allow_missing_dofs=True)
+        self.velocity_model.interpolate(extended_velocity * layer_mask + (
+            1. - layer_mask) * self.velocity_model, allow_missing_dofs=True)
         del layer_mask, lay_field
 
         # Interpolating in the space function of the problem
-        self.c = fire.Function(self.function_space,
-                               name='c [km/s])').interpolate(self.c)
+        self.velocity_model = fire.Function(
+            self.function_space,
+            name='velocity [km/s]',
+        ).interpolate(self.velocity_model)
 
         # Save new velocity model
         if inf_model:
@@ -647,7 +651,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             file_name = self.case_habc + "/c_habc.pvd"
 
         outfile = fire.VTKFile(self.path_save + file_name)
-        outfile.write(self.c)
+        outfile.write(self.velocity_model)
 
     def fundamental_frequency(self, method=None, monitor=False,
                               fitting_c=(0., 0., 0., 0.)):
@@ -788,7 +792,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                            quad_rule=self.quadrature_rule,
                                            static_load_for_ceq=q_ref)
 
-            Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
+            Lsp = mod_sol.solve_eigenproblem(self.velocity_model, V=self.function_space,
                                              quad_rule=self.quadrature_rule,
                                              hyp_par=hyp_par, c_eqref=c_eqref,
                                              fitting_c=fitting_c,
@@ -802,12 +806,12 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                                       self.domain_dim,
                                                       self.hyper_axes)
 
-            Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
+            Lsp = mod_sol.solve_eigenproblem(self.velocity_model, V=self.function_space,
                                              quad_rule=self.quadrature_rule,
                                              coord_norm=coord_norm)
 
         else:
-            Lsp = mod_sol.solve_eigenproblem(self.c,
+            Lsp = mod_sol.solve_eigenproblem(self.velocity_model,
                                              V=self.function_space, shift=1e-8,
                                              quad_rule=self.quadrature_rule)
 
@@ -972,7 +976,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         dt_sol = eigsol.Modal_Solver(
             self.dimension, method=method, calc_max_dt=True)
         max_dt = dt_sol.estimate_timestep(
-            self.c, self.function_space, self.final_time, shift=1e-8,
+            self.velocity_model, self.function_space, self.final_time, shift=1e-8,
             quad_rule=self.quadrature_rule, fraction=1.)
 
         # Rounding power

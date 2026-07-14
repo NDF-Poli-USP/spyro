@@ -223,14 +223,14 @@ def run_tools(wave_obj, method_extend, n_root=1):
     pts_original_xge = pts_original[pts_original[:, 1] >= 0.5]
 
     # Cloud fields
-    layer_cloud_xlt = point_cloud_field(wave_obj.mesh, pts_layer_xlt, wave_obj.c,
+    layer_cloud_xlt = point_cloud_field(wave_obj.mesh, pts_layer_xlt, wave_obj.velocity_model,
                                         wave_obj.mesh_parameters.tol)
 
-    layer_cloud_xge = point_cloud_field(wave_obj.mesh, pts_layer_xge, wave_obj.c,
+    layer_cloud_xge = point_cloud_field(wave_obj.mesh, pts_layer_xge, wave_obj.velocity_model,
                                         wave_obj.mesh_parameters.tol)
-    original_cloud_xlt = point_cloud_field(wave_obj.mesh, pts_original_xlt, wave_obj.c,
+    original_cloud_xlt = point_cloud_field(wave_obj.mesh, pts_original_xlt, wave_obj.velocity_model,
                                            wave_obj.mesh_parameters.tol)
-    original_cloud_xge = point_cloud_field(wave_obj.mesh, pts_original_xge, wave_obj.c,
+    original_cloud_xge = point_cloud_field(wave_obj.mesh, pts_original_xge, wave_obj.velocity_model,
                                            wave_obj.mesh_parameters.tol)
     # Verify cloud values
     met_str = f"HABC Tools {ele_str}-{ext_str}" + \

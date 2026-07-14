@@ -176,7 +176,7 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
         indicator = _pml_interior_indicator(wave_obj)
         # Compute the gradient only in the physical domain.
         ffG = (
-            2.0 * wave_obj.c * indicator * fire.dot(
+            2.0 * wave_obj.velocity_model * indicator * fire.dot(
                 fire.grad(uadj), fire.grad(forward_field)) * m_v * dx
         )
         parallel_print(
@@ -184,7 +184,7 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
         )
     else:
         ffG = (
-            -2 * (wave_obj.c) ** (-3) * fire.dot(forward_field, uadj) * m_v * dx
+            -2 * wave_obj.velocity_model ** (-3) * fire.dot(forward_field, uadj) * m_v * dx
         )
         parallel_print(
             "No gradient mask found: computing gradients over full domain",

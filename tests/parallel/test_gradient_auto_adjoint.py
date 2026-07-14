@@ -104,7 +104,10 @@ def build_direction(Wave_obj):
     """
     z = Wave_obj.mesh_z
     x = Wave_obj.mesh_x
-    direction = fire.Function(Wave_obj.c.function_space(), name="direction")
+    direction = fire.Function(
+        Wave_obj.velocity_model.function_space(),
+        name="direction",
+    )
     # Smooth O(1) field, deterministic and identical on every ensemble member.
     direction.interpolate(1.0 + 0.25 * fire.sin(3.0 * x) * fire.cos(3.0 * z))
     return direction
@@ -143,7 +146,7 @@ def get_forward_model():
 
     # The control must be a Function for pyadjoint to differentiate it.
     Wave_obj_guess.enable_automated_adjoint()
-    assert isinstance(Wave_obj_guess.c, fire.Function)
+    assert isinstance(Wave_obj_guess.velocity_model, fire.Function)
 
     # The ensemble passed to the EnsembleReducedFunctional is wave.comm.
     assert Wave_obj_guess.automated_adjoint.ensemble is Wave_obj_guess.comm
@@ -183,7 +186,7 @@ def test_gradient_auto_adjoint_parallel():
     # The ensemble-summed gradient is a Function in the control space.
     dJ = Wave_obj_guess.automated_adjoint.compute_gradient()
     assert isinstance(dJ, fire.Function)
-    assert dJ.dat.data.shape == Wave_obj_guess.c.dat.data.shape
+    assert dJ.dat.data.shape == Wave_obj_guess.velocity_model.dat.data.shape
 
     # Deterministic perturbation direction, identical on both ensemble members.
     direction = build_direction(Wave_obj_guess)
@@ -192,7 +195,7 @@ def test_gradient_auto_adjoint_parallel():
     # EnsembleReducedFunctional itself so the ensemble reduction stays
     # consistent (do not pass dJdm here).
     rate = Wave_obj_guess.automated_adjoint.verify_gradient(
-        Wave_obj_guess.c, direction=direction
+        Wave_obj_guess.velocity_model, direction=direction
     )
     print(f"Automated-adjoint Taylor convergence rate: {rate}", flush=True)
     assert rate > 1.9, (

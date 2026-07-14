@@ -160,7 +160,7 @@ def get_forward_model(dictionary=None, adjoint_type=AdjointType.NONE):
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         Wave_obj_guess.enable_automated_adjoint()
-        assert isinstance(Wave_obj_guess.c, fire.Function)
+        assert isinstance(Wave_obj_guess.velocity_model, fire.Function)
     Wave_obj_guess.forward_solve()
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         assert Wave_obj_guess.automated_adjoint._tape is not None
@@ -185,11 +185,13 @@ def test_gradient_auto_adjoint(PML=True):
     )
 
     Wave_obj_guess.automated_adjoint.create_reduced_functional(Wave_obj_guess.functional_value)
-    size, = np.shape(Wave_obj_guess.c.dat.data[:])
+    size, = np.shape(Wave_obj_guess.velocity_model.dat.data[:])
     direction = fire.Function(
-        Wave_obj_guess.c.function_space(), val=np.random.default_rng(0).random(size))
+        Wave_obj_guess.velocity_model.function_space(),
+        val=np.random.default_rng(0).random(size),
+    )
     assert Wave_obj_guess.automated_adjoint.verify_gradient(
-        Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.9, \
+        Wave_obj_guess.velocity_model, direction=direction, dJdm=dJ) > 1.9, \
         "Automated adjoint gradient verification failed."
 
     Wave_obj_guess.automated_adjoint.clear_tape()
