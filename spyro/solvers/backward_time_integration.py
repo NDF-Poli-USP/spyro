@@ -176,6 +176,17 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
         # in the gradient in the PML region.
         indicator = _pml_interior_indicator(wave_obj)
         # Compute the gradient only in the physical domain.
+
+        """
+        TODO: Refactor the gradient due to new PML formulation
+        TODO: Add citations
+        Formulation based on:
+           "Efficient PML for the wave equation". Grote and Sim (2010)
+           "A Modified PML Acoustic Wave Equation". Kim (2019)
+        Acoustic Eq. is modified by dividing by c^2 (see implementation).
+        The remaining PML Eqs. remanin unchanged.
+        """
+
         ffG = (
             2.0 * wave_obj.c * indicator * fire.dot(
                 fire.grad(uadj), fire.grad(forward_field)) * m_v * dx

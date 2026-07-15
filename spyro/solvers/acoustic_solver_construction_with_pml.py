@@ -12,7 +12,7 @@ from ..utils.typing import BoundaryConditionsType
 # Formulation based on:
 #   "Efficient PML for the wave equation". Grote and Sim (2010)
 #   "A Modified PML Acoustic Wave Equation". Kim (2019)
-
+# TODO: Add citations
 
 def forms_pml(Wave_object, W, X_n, X_nm1):
     """
