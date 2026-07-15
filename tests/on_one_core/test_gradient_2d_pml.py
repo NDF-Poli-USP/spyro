@@ -197,7 +197,6 @@ def test_gradient_auto_adjoint(PML=True):
 
 
 @pytest.mark.slow
-@pytest.mark.skip(reason="PML formulation subject to another PR")
 def test_gradient_implemented_adjoint(PML=False):
     dictionary = set_dictionary(PML=PML)
     rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(
@@ -225,6 +224,7 @@ def test_gradient_pml_auto_adjoint():
 
 
 @pytest.mark.slow
+@pytest.mark.skip(reason="PML formulation subject to another PR")
 def test_gradient_pml_implemented_adjoint():
     test_gradient_implemented_adjoint(PML=True)
 
