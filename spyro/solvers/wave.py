@@ -6,7 +6,7 @@ import spyro.meshing.meshing_operations as mshops
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
 from ..domains.quadrature import quadrature_rules
-from ..domains.space import check_function_space_type, create_function_space
+from ..domains.space import check_function_space_type
 from ..io import Model_parameters
 from ..io import material_properties_io
 from ..io.basicio import ensemble_propagator
@@ -16,7 +16,6 @@ from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from ..utils.typing import AdjointType, WaveType, FunctionalEvaluationMode
 from .solver_parameters import get_default_parameters_for_method
-from ..utils import eval_functions_to_ufl
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
 
@@ -33,8 +32,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         An object representing the communication interface
     boundary_idx_map: dict
         Mapping of boundary IDs for applying absorbing boundary conditions
-    initial_velocity_model: firedrake function
-        Initial velocity model
     function_space: firedrake function space
         Function space for the wave equation
     current_time: float
@@ -66,8 +63,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Get the coordinates of the mesh.
     set_mesh()
         Sets or calculates new mesh
-    set_initial_velocity_model()
-        Sets initial velocity model
     set_last_solve_as_real_shot_record()
         Sets last solve as real shot record
     set_solver_parameters()
@@ -86,7 +81,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Contains model parameters
         """
         super().__init__(dictionary=dictionary, comm=comm)
-        self.initial_velocity_model = None
         self.gradient_mask_available = False
         self.wave_type = WaveType.NONE
 
@@ -112,7 +106,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # Create or get the mesh
         self.mesh = self.get_mesh()
-        self.c = None
         self.sources = None
         self.real_shot_record = None
 
@@ -276,80 +269,19 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         elif self.dimension == 3:
             return self.mesh_z, self.mesh_x, self.mesh_y
 
-    def set_initial_velocity_model(
-        self,
-        constant=None,
-        conditional=None,
-        velocity_model_function=None,
-        expression=None,
-        new_file=None,
-        output=False,
-        dg_velocity_model=True,
-    ):
-        """Method to define new user velocity model or file. It is optional.
+    def _copy_function(self, function):
+        """Return an independent copy of a Firedrake ``Function``.
 
-        Parameters:
-        -----------
-        conditional:  (optional)
-            Firedrake conditional object.
-        velocity_model_function: Firedrake function (optional)
-            Firedrake function to be used as the velocity model. Has to be in the same function space as the object.
-        expression:  str (optional)
-            If you use an expression, you can use the following variables:
-            x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
-            It will be interpoalte into either the same function space as the object or a DG0 function space
-            in the same mesh.
-        new_file:  str (optional)
-            Name of the file containing the velocity model.
-        output:  bool (optional)
-            If True, outputs the velocity model to a pvd file for visualization.
+        Concrete solvers can use or override this helper for their own model
+        parameters without the base class assuming a velocity
+        parameterization.
         """
-        # Resseting old velocity model
-        self.initial_velocity_model = None
-        self.initial_velocity_model_file = None
-        if new_file is not None:
-            self.initial_velocity_model_file = new_file
-        # If no mesh is set, we have to do it beforehand
-        if self.mesh is None:
-            self.set_mesh()
-
-        if self.debug_output:
-            output = True
-
-        if conditional is not None:
-            if dg_velocity_model:
-                V = create_function_space(self.mesh, "DG0", 0)
-            else:
-                V = self.function_space
-            vp = fire.Function(V, name="velocity")
-            vp.interpolate(conditional)
-            self.initial_velocity_model = vp
-        elif expression is not None:
-            V = self.function_space
-            vp = eval_functions_to_ufl.generate_ufl_functions(
-                self.mesh, expression, self.dimension)
-            self.initial_velocity_model = fire.Function(
-                V, name="velocity").interpolate(vp)
-
-        elif velocity_model_function is not None:
-            self.initial_velocity_model = velocity_model_function
-        elif new_file is not None:
-            self.initial_velocity_model_file = new_file
-            self._initialize_model_parameters()  # TODO in PR206
-        elif constant is not None:
-            V = self.function_space
-            vp = fire.Function(V, name="velocity")
-            vp.interpolate(fire.Constant(constant))
-            self.initial_velocity_model = vp
-        else:
-            raise ValueError(
-                "Please specify either a conditional, expression, "
-                "firedrake function or new file name (segy or hdf5)."
-            )
-        if output:
-            fire.VTKFile("initial_velocity_model.pvd").write(
-                self.initial_velocity_model, name="velocity"
-            )
+        copied_function = fire.Function(
+            function.function_space(),
+            name=function.name(),
+        )
+        copied_function.assign(function)
+        return copied_function
 
     def _map_sources_and_receivers(self):
         if self.source_type == "ricker":
@@ -398,16 +330,18 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             float: The calculated maximum time step (dt).
         """
 
-        if self.c is None:
-            c = self.initial_velocity_model
-        else:
-            c = self.c
+        cfl_wave_speed = self.get_cfl_wave_speed()
+        if cfl_wave_speed is None:
+            raise ValueError(
+                "Model parameters must be initialized before estimating the "
+                "maximum stable timestep.",
+            )
 
         # Maximum timestep size
         method = 'ANALYTICAL' if estimate_max_eigenvalue else 'ARNOLDI'
         dt_solver = Modal_Solver(self.dimension, method=method,
                                  calc_max_dt=True)
-        max_dt = dt_solver.estimate_timestep(c, self.function_space,
+        max_dt = dt_solver.estimate_timestep(cfl_wave_speed, self.function_space,
                                              self.final_time,
                                              quad_rule=self.quadrature_rule,
                                              fraction=fraction)
@@ -559,13 +493,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
         self._initialize_model_parameters()
-        if self.c is None:
+        controls = self.get_control_parameters()
+        if controls is None:
             raise ValueError(
-                "self.c must be set before enabling automated adjoint."
-                "Please set the velocity model using set_initial_velocity_model()"
-                "or set c directly."
+                "Control parameters must be initialized before enabling "
+                "automated adjoint.",
             )
-        controls = self.c
         # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
         # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
         # that the reduced functional is built as an
@@ -733,4 +666,23 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         raise NotImplementedError(
             f"{type(self).__name__} does not define a control parameter function space.",
+        )
+
+    @abstractmethod
+    def get_cfl_wave_speed(self):
+        """Return the physical wave-speed field used for CFL estimation.
+
+        The stable timestep depends on the fastest relevant propagation speed,
+        which is a property of the concrete physical model rather than a
+        generic inversion control. Acoustic solvers return their velocity
+        model; elastic solvers return their P-wave velocity (or a more
+        appropriate model-specific estimate).
+
+        Returns
+        -------
+        firedrake.Function or ufl.core.expr.Expr or None
+            Wave-speed field used by the modal timestep estimator.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not define a CFL wave speed.",
         )

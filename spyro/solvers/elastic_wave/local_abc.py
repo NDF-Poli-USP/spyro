@@ -24,8 +24,8 @@ def local_abc_form(Wave):
 
     dt = Constant(Wave.dt)
     rho = Wave.rho
-    c_p = Wave.c
-    c_s = Wave.c_s
+    c_p = Wave.p_wave_velocity
+    c_s = Wave.s_wave_velocity
 
     qr_s = Wave.surface_quadrature_rule
 

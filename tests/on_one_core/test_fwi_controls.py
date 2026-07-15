@@ -160,6 +160,58 @@ def test_acoustic_constant_control_is_converted_to_function():
     assert isinstance(fwi.guess_control, fire.Function)
     assert isinstance(fwi.wave.get_control_parameters(), fire.Function)
     assert np.allclose(fwi.guess_control.dat.data_ro, 2.0)
+    assert fwi.wave.initial_velocity_model is None
+    fwi.wave._initialize_model_parameters()
+    assert fwi.wave.initial_velocity_model is None
+
+
+def test_acoustic_velocity_model_is_canonical_and_c_is_compatible():
+    wave = spyro.AcousticWave(dictionary=build_acoustic_dictionary())
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.25})
+    wave.set_control_parameters(fire.Constant(2.0))
+
+    assert wave.get_control_parameters() is wave.velocity_model
+    assert wave.get_cfl_wave_speed() is wave.velocity_model
+    assert "c" not in wave.__dict__
+    with pytest.warns(DeprecationWarning, match="velocity_model"):
+        assert wave.c is wave.velocity_model
+
+
+def test_acoustic_initial_velocity_is_an_immutable_snapshot_during_fwi():
+    wave = spyro.AcousticWave(dictionary=build_acoustic_dictionary())
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.25})
+    provided_velocity = fire.Function(wave.function_space).assign(2.0)
+    wave.set_initial_velocity_model(
+        velocity_model_function=provided_velocity,
+    )
+
+    assert wave.velocity_model is not wave.initial_velocity_model
+    assert wave.initial_velocity_model is not provided_velocity
+    assert np.allclose(wave.initial_velocity_model.dat.data_ro, 2.0)
+
+    provided_velocity.assign(5.0)
+    assert np.allclose(wave.initial_velocity_model.dat.data_ro, 2.0)
+
+    wave.velocity_model.assign(3.0)
+    wave._initialize_model_parameters()
+
+    assert np.allclose(wave.velocity_model.dat.data_ro, 3.0)
+    assert np.allclose(wave.initial_velocity_model.dat.data_ro, 2.0)
+
+    wave.set_control_parameters(fire.Constant(4.0))
+
+    assert np.allclose(wave.velocity_model.dat.data_ro, 4.0)
+    assert np.allclose(wave.initial_velocity_model.dat.data_ro, 2.0)
+
+
+def test_acoustic_c_alias_updates_the_canonical_velocity_model():
+    wave = spyro.AcousticWave(dictionary=build_acoustic_dictionary())
+    marker = object()
+
+    with pytest.warns(DeprecationWarning, match="velocity_model"):
+        wave.c = marker
+
+    assert wave.velocity_model is marker
 
 
 def test_elastic_controls_roundtrip_on_isotropic_wave():
@@ -175,6 +227,13 @@ def test_elastic_controls_roundtrip_on_isotropic_wave():
         spyro.ElasticMaterialParameter.MU,
     }
     assert wave.get_control_parameters() is not controls
+    assert wave.get_cfl_wave_speed() is wave.p_wave_velocity
+    assert "c" not in wave.__dict__
+    assert "c_s" not in wave.__dict__
+    with pytest.warns(DeprecationWarning, match="p_wave_velocity"):
+        assert wave.c is wave.p_wave_velocity
+    with pytest.warns(DeprecationWarning, match="s_wave_velocity"):
+        assert wave.c_s is wave.s_wave_velocity
 
 
 def test_elastic_constant_controls_are_converted_to_functions():

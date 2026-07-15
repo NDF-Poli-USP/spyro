@@ -21,7 +21,7 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     matrix_free option is on, which it is by default.
     """
     dt = Wave_object.dt
-    c = Wave_object.c
+    velocity_model = Wave_object.velocity_model
 
     V = Wave_object.function_space
     Z = Wave_object.vector_function_space
@@ -67,7 +67,7 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
 
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dxlump
-    a = c * c * dot(grad(u_n), grad(v)) * dxlump  # explicit
+    a = velocity_model * velocity_model * dot(grad(u_n), grad(v)) * dxlump  # explicit
 
     # First-order ABC on outer PML boundaries only (not the free surface).
     # Firedrake documents the base facet labels in
@@ -77,7 +77,7 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     # Firedrake's first coordinate, so the labels map here as:
     #   1 = top (z = 0, free surface), 2 = bottom, 3 = left, 4 = right
     qr_s = Wave_object.surface_quadrature_rule
-    abc_expr = c * ((u_n - u_nm1) / dt) * v
+    abc_expr = velocity_model * ((u_n - u_nm1) / dt) * v
     nf = (
         abc_expr * ds(2, **qr_s)
         + abc_expr * ds(3, **qr_s)
@@ -94,7 +94,7 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     # -------------------------------------------------------
     mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dxlump
     mm2 = inner(dot(Gamma_1, pp_n), qq) * dxlump
-    dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dxlump
+    dd = velocity_model * velocity_model * inner(grad(u_n), dot(Gamma_2, qq)) * dxlump
     FF += mm1 + mm2 + dd
 
     Wave_object.lhs = fire.lhs(FF)
@@ -117,7 +117,7 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     matrix_free option is on, which it is by default.
     """
     dt = Wave_object.dt
-    c = Wave_object.c
+    velocity_model = Wave_object.velocity_model
 
     V = Wave_object.function_space
     Z = Wave_object.vector_function_space
@@ -170,7 +170,7 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
 
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dxlump
-    a = c * c * dot(grad(u_n), grad(v)) * dxlump  # explicit
+    a = velocity_model * velocity_model * dot(grad(u_n), grad(v)) * dxlump  # explicit
 
     # First-order ABC on outer PML boundaries only (not the free surface).
     # Firedrake documents the base facet labels in
@@ -180,7 +180,7 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     # negates Firedrake's first coordinate, so ds(1) is the top free surface
     # (z = 0) and ds(2) is the bottom boundary.
     qr_s = Wave_object.surface_quadrature_rule
-    abc_expr = c * ((u_n - u_nm1) / dt) * v
+    abc_expr = velocity_model * ((u_n - u_nm1) / dt) * v
     nf = (
         abc_expr * ds(2, **qr_s)
         + abc_expr * ds(3, **qr_s)
@@ -199,8 +199,8 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     # -------------------------------------------------------
     mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dxlump
     mm2 = inner(dot(Gamma_1, pp_n), qq) * dxlump
-    dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dxlump
-    dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dxlump
+    dd1 = velocity_model * velocity_model * inner(grad(u_n), dot(Gamma_2, qq)) * dxlump
+    dd2 = -velocity_model * velocity_model * inner(grad(psi_n), dot(Gamma_3, qq)) * dxlump
     FF += mm1 + mm2 + dd1 + dd2
 
     mmm1 = (dot((psi - psi_n), phi) / Constant(dt)) * dxlump

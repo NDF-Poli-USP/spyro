@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
@@ -57,7 +59,8 @@ class IsotropicWave(ElasticWave):
         self.rho = None   # Density
         self.lmbda = None  # First Lame parameter
         self.mu = None    # Second Lame parameter
-        self.c_s = None   # Secondary wave velocity
+        self.p_wave_velocity = None
+        self.s_wave_velocity = None
         self._control_parameterization = None
         self._material_parameter_function_space = None
 
@@ -88,6 +91,44 @@ class IsotropicWave(ElasticWave):
         self.field_logger.add_functional("mechanical_energy",
                                          lambda: assemble(self.mechanical_energy))
 
+    @property
+    def c(self):
+        """Deprecated alias for :attr:`p_wave_velocity`."""
+        warnings.warn(
+            "IsotropicWave.c is deprecated; use IsotropicWave.p_wave_velocity.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.p_wave_velocity
+
+    @c.setter
+    def c(self, value):
+        warnings.warn(
+            "IsotropicWave.c is deprecated; use IsotropicWave.p_wave_velocity.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.p_wave_velocity = value
+
+    @property
+    def c_s(self):
+        """Deprecated alias for :attr:`s_wave_velocity`."""
+        warnings.warn(
+            "IsotropicWave.c_s is deprecated; use IsotropicWave.s_wave_velocity.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.s_wave_velocity
+
+    @c_s.setter
+    def c_s(self, value):
+        warnings.warn(
+            "IsotropicWave.c_s is deprecated; use IsotropicWave.s_wave_velocity.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.s_wave_velocity = value
+
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
         """Initialize isotropic elastic material parameters from a dictionary.
@@ -111,8 +152,9 @@ class IsotropicWave(ElasticWave):
         Returns
         -------
         None
-            The method assigns ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s``, and
-            the active control parameterization on ``self``.
+            The method assigns ``rho``, ``lmbda``, ``mu``,
+            ``p_wave_velocity``, ``s_wave_velocity``, and the active control
+            parameterization on ``self``.
         """
         def material_parameter(value):
             """Normalize model-dictionary values for elastic parameters.
@@ -160,38 +202,38 @@ class IsotropicWave(ElasticWave):
             ElasticMaterialParameter.MU,
             "lame_second",
         )
-        self.c = get_value(ElasticMaterialParameter.P_WAVE_VELOCITY)
-        self.c_s = get_value(ElasticMaterialParameter.S_WAVE_VELOCITY)
+        self.p_wave_velocity = get_value(ElasticMaterialParameter.P_WAVE_VELOCITY)
+        self.s_wave_velocity = get_value(ElasticMaterialParameter.S_WAVE_VELOCITY)
 
-        # Check if {rho, lambda, mu} is set and {c, c_s} are not
+        # Check if {rho, lambda, mu} is set and wave velocities are not
         option_1 = bool(self.rho) and \
             bool(self.lmbda) and \
             bool(self.mu) and \
-            not bool(self.c) and \
-            not bool(self.c_s)
-        # Check if {rho, c, c_s} is set and {lambda, mu} are not
+            not bool(self.p_wave_velocity) and \
+            not bool(self.s_wave_velocity)
+        # Check if {rho, vp, vs} is set and {lambda, mu} are not
         option_2 = bool(self.rho) and \
-            bool(self.c) and \
-            bool(self.c_s) and \
+            bool(self.p_wave_velocity) and \
+            bool(self.s_wave_velocity) and \
             not bool(self.lmbda) and \
             not bool(self.mu)
 
         if option_1:
             self._control_parameterization = ElasticMaterialParameterization.LAME
-            self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
-            self.c_s = (self.mu/self.rho)**0.5
+            self.p_wave_velocity = ((self.lmbda + 2*self.mu)/self.rho)**0.5
+            self.s_wave_velocity = (self.mu/self.rho)**0.5
         elif option_2:
             self._control_parameterization = ElasticMaterialParameterization.VELOCITY
-            self.mu = self.rho*self.c_s**2
-            self.lmbda = self.rho*self.c**2 - 2*self.mu
+            self.mu = self.rho*self.s_wave_velocity**2
+            self.lmbda = self.rho*self.p_wave_velocity**2 - 2*self.mu
         else:
             raise ValueError(
                 "Inconsistent selection of isotropic elastic wave parameters:\n"
                 f"    Density        : {bool(self.rho)}\n"
                 f"    Lame first     : {bool(self.lmbda)}\n"
                 f"    Lame second    : {bool(self.mu)}\n"
-                f"    P-wave velocity: {bool(self.c)}\n"
-                f"    S-wave velocity: {bool(self.c_s)}\n"
+                f"    P-wave velocity: {bool(self.p_wave_velocity)}\n"
+                f"    S-wave velocity: {bool(self.s_wave_velocity)}\n"
                 "The valid options are {Density, Lame first, Lame second} "
                 "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
             )
@@ -279,6 +321,10 @@ class IsotropicWave(ElasticWave):
         )
         return self._material_parameter_function_space
 
+    def get_cfl_wave_speed(self):
+        """Return the P-wave speed used for CFL estimation."""
+        return self.p_wave_velocity
+
     def _as_control_field(self, value, name):
         """Return a material control as a scalar Firedrake Function.
 
@@ -340,7 +386,7 @@ class IsotropicWave(ElasticWave):
         --------
         Lame parameterization returns ``{DENSITY: rho, LAMBDA: lmbda, MU: mu}``.
         Velocity parameterization returns
-        ``{DENSITY: rho, P_WAVE_VELOCITY: c, S_WAVE_VELOCITY: c_s}``.
+        ``{DENSITY: rho, P_WAVE_VELOCITY: vp, S_WAVE_VELOCITY: vs}``.
         """
         parameterization = self._control_parameterization
         if parameterization is None:
@@ -357,9 +403,9 @@ class IsotropicWave(ElasticWave):
             elif parameter is ElasticMaterialParameter.MU:
                 parameters[parameter] = self.mu
             elif parameter is ElasticMaterialParameter.P_WAVE_VELOCITY:
-                parameters[parameter] = self.c
+                parameters[parameter] = self.p_wave_velocity
             elif parameter is ElasticMaterialParameter.S_WAVE_VELOCITY:
-                parameters[parameter] = self.c_s
+                parameters[parameter] = self.s_wave_velocity
             else:
                 raise ValueError(
                     f"Unsupported elastic control parameter '{parameter.value}'.",
@@ -384,8 +430,9 @@ class IsotropicWave(ElasticWave):
         Returns
         -------
         None
-            The method updates ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s`` and
-            the active material parameterization.
+            The method updates ``rho``, ``lmbda``, ``mu``,
+            ``p_wave_velocity``, ``s_wave_velocity`` and the active material
+            parameterization.
 
         Raises
         ------
@@ -460,25 +507,25 @@ class IsotropicWave(ElasticWave):
                 controls[ElasticMaterialParameter.MU],
                 ElasticMaterialParameter.MU.value,
             )
-            self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
-            self.c_s = (self.mu/self.rho)**0.5
+            self.p_wave_velocity = ((self.lmbda + 2*self.mu)/self.rho)**0.5
+            self.s_wave_velocity = (self.mu/self.rho)**0.5
             self._control_parameterization = ElasticMaterialParameterization.LAME
             synthetic_data["lambda"] = self.lmbda
             synthetic_data["mu"] = self.mu
         else:
-            self.c = self._as_control_field(
+            self.p_wave_velocity = self._as_control_field(
                 controls[ElasticMaterialParameter.P_WAVE_VELOCITY],
                 ElasticMaterialParameter.P_WAVE_VELOCITY.value,
             )
-            self.c_s = self._as_control_field(
+            self.s_wave_velocity = self._as_control_field(
                 controls[ElasticMaterialParameter.S_WAVE_VELOCITY],
                 ElasticMaterialParameter.S_WAVE_VELOCITY.value,
             )
-            self.mu = self.rho*self.c_s**2
-            self.lmbda = self.rho*self.c**2 - 2*self.mu
+            self.mu = self.rho*self.s_wave_velocity**2
+            self.lmbda = self.rho*self.p_wave_velocity**2 - 2*self.mu
             self._control_parameterization = ElasticMaterialParameterization.VELOCITY
-            synthetic_data["p_wave_velocity"] = self.c
-            synthetic_data["s_wave_velocity"] = self.c_s
+            synthetic_data["p_wave_velocity"] = self.p_wave_velocity
+            synthetic_data["s_wave_velocity"] = self.s_wave_velocity
 
         self.input_dictionary["synthetic_data"] = synthetic_data
 

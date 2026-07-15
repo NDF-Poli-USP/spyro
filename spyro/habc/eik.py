@@ -25,9 +25,9 @@ class HABC_Eikonal(Eikonal_Modeling):
         - (absorb_top, absorb_bottom, absorb_right, absorb_left) for 2D
         - (absorb_top, absorb_bottom, absorb_right,
             absorb_left, absorb_front, absorb_back) for 3D
-    c : `firedrake function`
+    velocity_model : `firedrake function`
         Velocity model without absorbing layer
-    c_min : `float`
+    minimum_velocity : `float`
         Minimum velocity value in the model without absorbing layer
     comm : object
         An object representing the communication interface
@@ -99,10 +99,11 @@ class HABC_Eikonal(Eikonal_Modeling):
         self.lmin = Wave.mesh_parameters.lmin
 
         # Velocity profile model
-        self.c = Wave.c
+        self.velocity_model = Wave.velocity_model
 
-        # Minimum velocity value in the model
-        self.c_min = Wave.c_min
+        # Computed by HABC_Mesh.preamble_mesh_operations() from the velocity
+        # model on the original domain.
+        self.minimum_velocity = Wave.minimum_velocity
 
         # Absorbing boundaries
         self.boundaries = Wave.get_absorbing_boundaries()
@@ -162,9 +163,12 @@ class HABC_Eikonal(Eikonal_Modeling):
         '''
 
         # Eikonal solution
-        self.yp = self.eikonal_solver(self.c, self.c_min,
-                                      self.funct_space_eik,
-                                      self.diam_mesh)
+        self.yp = self.eikonal_solver(
+            self.velocity_model,
+            self.minimum_velocity,
+            self.funct_space_eik,
+            self.diam_mesh,
+        )
 
         # Save Eikonal results
         eikonal_file = fire.VTKFile(self.path_save + "Eik.pvd")
@@ -238,8 +242,17 @@ class HABC_Eikonal(Eikonal_Modeling):
             # Identify minimum Eikonal and critical point on the boundary
             eikmin, pnt_crit = self.ident_eik_on_bnd(bnd_ids)
 
-            # Identifying propagation speed at critical point
-            c_bnd = np.float64(self.c.at(pnt_crit).item())
+            # Interpolate the velocity to a VertexOnlyMesh containing the
+            # critical point. point_cloud_field restores input point ordering.
+            critical_velocity = point_cloud_field(
+                self.mesh,
+                np.asarray([pnt_crit]),
+                self.velocity_model,
+                self.node_tol,
+            )
+            c_bnd = np.float64(
+                critical_velocity.dat.data_ro_with_halos[0],
+            )
 
             # Print critical point coordinates
             pnt_str = "at (in km): ({2:3.3f}, {3:3.3f})"
