@@ -4,6 +4,7 @@ import glob
 import numpy as np
 import firedrake as fire
 
+
 def run_in_one_core(func):
     """Decorator to execute function only on rank 0.
 
@@ -494,5 +495,3 @@ def ensemble_gradient(func):
             return grad_total
 
     return wrapper
-
-
