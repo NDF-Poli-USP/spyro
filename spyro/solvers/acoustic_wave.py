@@ -71,13 +71,11 @@ class AcousticWave(Wave):
         self.solver = None
         self.rhs = None
         self.B = None
+
         if abc_type in [LayerDampingType.LOCAL, LayerDampingType.HYBRID,
                         LayerDampingType.NOABCS]:
             construct_solver_or_matrix_no_pml(self)
         elif abc_type == LayerDampingType.PML:
-            V = self.function_space
-            Z = fire.VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
-            self.vector_function_space = Z
             self.X_np1 = None
             self.X_n = None
             self.X_nm1 = None

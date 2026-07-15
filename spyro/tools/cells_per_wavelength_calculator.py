@@ -358,7 +358,7 @@ class Meshing_parameter_calculator:
                 )
             else:
                 Wave_obj.dt = self.fixed_timestep
-            print("Maximum dt is ", Wave_obj.dt, flush=True)
+            print("Maximum dt (seconds) is", Wave_obj.dt, flush=True)
 
             t0 = timinglib.time()
             Wave_obj.forward_solve()
