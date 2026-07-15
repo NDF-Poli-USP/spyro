@@ -3,6 +3,7 @@
 from firedrake import (Cofunction, DirichletBC, div, dot, ds as fire_ds, dx as fire_dx,
                        Function, grad, inner, lhs, LinearVariationalProblem,
                        LinearVariationalSolver, rhs, split, TestFunctions, TrialFunctions)
+from ..domains.space import create_function_space
 from ..utils.typing import BoundaryConditionsType
 
 
@@ -160,7 +161,9 @@ def construct_solver_or_matrix_with_pml(Wave_object):
 
     # Build mixed function space
     V = Wave_object.function_space
-    Z = Wave_object.vector_function_space
+    Z = create_function_space(Wave_object.mesh, V.ufl_element(),
+                              dim=Wave_object.dimension)
+    Wave_object.vector_function_space = Z
     if Wave_object.dimension == 2:
         W = V * Z
     elif Wave_object.dimension == 3:

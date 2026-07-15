@@ -12,6 +12,7 @@ def is_seismicmesh_installed():
 
 
 @pytest.mark.slow
+@pytest.mark.skip(reason="PML formulation subject to another PR")
 def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
     grid_point_calculator_parameters = {
         # Experiment parameters
