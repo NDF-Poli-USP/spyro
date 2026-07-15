@@ -12,7 +12,6 @@ def is_seismicmesh_installed():
 
 
 @pytest.mark.slow
-@pytest.mark.skip(reason="PML formulation subject to another PR")
 def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
     grid_point_calculator_parameters = {
         # Experiment parameters
@@ -78,11 +77,12 @@ def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
     assert all([test1, test2, test3])
 
 
+# @pytest.mark.xfail(
+#     reason="Waiting for seismicmesh update for compatibility",
+# )
+# @pytest.mark.skipif(not is_seismicmesh_installed(), reason="SeismicMesh is not installed")
 @pytest.mark.slow
-@pytest.mark.xfail(
-    reason="Waiting for seismicmesh update for compatibility",
-)
-@pytest.mark.skipif(not is_seismicmesh_installed(), reason="SeismicMesh is not installed")
+@pytest.mark.skip(reason="PML formulation subject to another PR")
 def test_cpw_calc_triangles():
     method = "mass_lumped_triangle"
     correct_cpw = 2.3
