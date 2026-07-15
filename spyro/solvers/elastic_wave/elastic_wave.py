@@ -2,14 +2,34 @@ from abc import abstractmethod, ABCMeta
 from firedrake import Constant
 
 from ..wave import Wave
-from ...utils.typing import override
+from ...utils.typing import override, WaveType
 
 
 class ElasticWave(Wave, metaclass=ABCMeta):
-    '''Base class for elastic wave propagators'''
+    """Base class for elastic wave propagators."""
 
-    def __init__(self, dictionary, comm=None):
-        super().__init__(dictionary, comm=comm)
+    def __init__(self, dictionary, anisotropy=WaveType.ISOTROPIC_ELASTIC, comm=None):
+        """Wave Elastic object solver.
+
+        Parameters
+        ----------
+        dictionary : `dict`, optional
+            A dictionary containing the input parameters for the Wave class.
+            Default is `None`.
+        anisotropy : `WaveType`, optional
+            The type of anisotropy in the medium. Options:
+            - ISOTROPIC_ELASTIC: Isotropic elastic wave equation for Isotropic media.
+            - ANISOTROPIC_VTI_ELASTIC: Anisotropic elastic wave equation for VTI media.
+            - ANISOTROPIC_TTI_ELASTIC: Anisotropic elastic wave equation for TTI media.
+        comm : `object`, optional
+            MPI communicator for parallel execution. Default is `None`.
+
+        Returns
+        -------
+        None
+        """
+
+        super().__init__(dictionary, wave_type=anisotropy, comm=comm)
         self.time = Constant(0)  # Time variable
 
     @override
