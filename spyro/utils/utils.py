@@ -9,7 +9,6 @@ import warnings
 from ..io.basicio import parallel_print, write_velocity_model
 from ..io.parallelism_wrappers import (
     ensemble_functional,
-    run_in_one_core,
     run_in_one_core_and_broadcast,
 )
 from ..domains.space import create_function_space
