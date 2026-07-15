@@ -32,7 +32,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
 
         Wave_obj_guess.reset_pressure()
         c_guess = fire.Constant(2.0) + step*dm
-        Wave_obj_guess.initial_velocity_model = c_guess
+        Wave_obj_guess.set_control_parameters(c_guess)
         Wave_obj_guess.forward_solve()
         misfit_plusdm = rec_out_exact - Wave_obj_guess.forward_solution_receivers
         J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
