@@ -1,4 +1,5 @@
-# This file containts methods to estimate the computational cost of a process in Spyro.
+"""Utilities for computational cost estimations."""
+
 from numpy import savetxt
 from os import getcwd
 from time import perf_counter  # For runtime
@@ -11,21 +12,20 @@ def comp_cost(flag, tRef=None, user_name=None, save_time=True):
     Parameters
     ----------
     flag : `str`
-        Flag to indicate the action to be performed
-        - 'tini' to start the timer
-        - 'tfin' to finish the timer and print the results
+        Flag to indicate the action to be performed.
+        - "tini" to start the timer.
+        - "tfin" to finish the timer and print the results.
     tRef : `float`, optional
-        Reference time in seconds. Default is None
+        Reference time in seconds. Default is `None`.
     user_name: `str`, optional
-        User name or path to save the computational cost data
+        User name or path to save the computational cost data.
     save_time: `bool`, optional
-        Option to save the computational cost data to a file.
-        Default is True
+        Option to save the computational cost data to a file. Default is `True`.
 
     Returns
     -------
     tRef : float
-        Reference time in seconds. Only returned if flag is 'tini'
+        Reference time in seconds. Only returned if flag is "tini".
     """
 
     if flag == 'tini':
@@ -59,11 +59,6 @@ def comp_cost(flag, tRef=None, user_name=None, save_time=True):
         stop()
 
         # Save file for resource usage
-        file_name = 'cost.txt'
-        path_file = getcwd() + "/" if user_name is None else user_name
-        path_cost = path_file + file_name
-        savetxt(path_cost, (*val_time, *val_memo), delimiter='\t')
-
         if save_time:
             file_name = 'cost.txt'
             path_file = getcwd() + "/" if user_name is None else user_name
