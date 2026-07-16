@@ -1,4 +1,9 @@
-import numpy as np
+"""Statistical tools utilities.
+
+- Calculation the coefficient of determination (R^2) for regression models."""
+
+from numpy import asarray, mean, ndarray, sum
+from ..utils.error_management import value_numerical_error
 
 
 def coeff_of_determination(y_true, y_pred, p):
@@ -22,19 +27,40 @@ def coeff_of_determination(y_true, y_pred, p):
         Adjusted R^2 value
     '''
 
+    # Validate input arguments
+    if not isinstance(y_true, ndarray):
+        raise TypeError(f"'y_true' must be a array, got {type(y_true).__name__}.")
+
+    if not isinstance(y_pred, ndarray):
+        raise TypeError(f"'y_pred' must be a array, got {type(y_pred).__name__}.")
+
+    # Length checking
+    nt = len(y_true)
+    np = len(y_pred)
+    if nt != np:
+        raise ValueError(f"Length mismatch: 'y_true' has {nt} elements, "
+                         f"but 'y_pred' has {np} elements.")
+
+    # Checking predictors
+    value_numerical_error('p', p, float_num=False, integer_num=True,
+                          lower_bound=0., include_lower_bound=True)
+
     # Observations
     n = len(y_true)
 
     # Convert list to array
-    y_true = np.asarray(y_true)
-    y_pred = np.asarray(y_pred)
+    y_true = asarray(y_true)
+    y_pred = asarray(y_pred)
 
     # R^2 calculation
-    ss_res = np.sum((y_true - y_pred) ** 2)
-    ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
-    r2 = 1 - (ss_res / ss_tot)
+    r2 = 1.
+    ss_res = sum((y_true - y_pred) ** 2)
+    ss_tot = sum((y_true - mean(y_true)) ** 2)
+
+    if ss_tot > 0. and ss_res > 0.:
+        r2 -= (ss_res / ss_tot)
 
     # Adjusted R^2 calculation (if applicable)
-    r2_adj = r2 if (n - p - 1) <= 0 else 1 - (1 - r2) * (n - 1) / (n - p - 1)
+    r2_adj = r2 if (n - p - 1) <= 0 else 1. - (1. - r2) * (n - 1.) / (n - p - 1.)
 
     return r2_adj

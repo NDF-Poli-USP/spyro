@@ -1,6 +1,7 @@
-import math
-import pytest
+"""Unit tests for the RectangLayer class implemented in spyro.abc.rec_lay."""
 
+from math import isclose
+from pytest import fixture, raises
 from spyro.abc.rec_lay import RectangLayer
 
 # ---------------------------------------------------------------------------
@@ -8,7 +9,7 @@ from spyro.abc.rec_lay import RectangLayer
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
+@fixture
 def layer_2d():
     """2D RectangLayer with a 1 km x 1 km domain and 0.25 km pad."""
     hl = RectangLayer((1., 1.), dimension=2)
@@ -16,7 +17,7 @@ def layer_2d():
     return hl
 
 
-@pytest.fixture
+@fixture
 def layer_3d():
     """3D RectangLayer with a 1 km³ domain and 0.25 km pad."""
     hl = RectangLayer((1., 1., 1.), dimension=3)
@@ -42,13 +43,13 @@ def test_init_defaults_3d():
 
 def test_init_list_domain_dim_raises_error():
     # Test that passing None raises a TypeError
-    with pytest.raises(TypeError, match="domain_dim must be a tuple"):
+    with raises(TypeError, match="'domain_dim' must be a tuple"):
         RectangLayer([1., 1.])
 
 
 def test_init_dimension_raises_error():
     # Test that passing 10. raises a ValueError
-    with pytest.raises(ValueError, match="Invalid dimension: '10'."):
+    with raises(ValueError, match="Invalid dimension: '10'."):
         RectangLayer((1., 1.), dimension=10)
 
 # ---------------------------------------------------------------------------
@@ -59,14 +60,14 @@ def test_init_dimension_raises_error():
 def test_negative_pad_length_raises_error():
     # Test that passing a negative pad length raises a ValueError
     hl = RectangLayer((1., 1.))
-    with pytest.raises(ValueError, match="'pad_len' must be greater than 0"):
+    with raises(ValueError, match="'pad_len' must be greater than 0"):
         hl.define_rec_hyperaxes(-0.25)
 
 
 def test_none_pad_length_raises_error():
     # Test that passing a None pad length raises a TypeError
     hl = RectangLayer((1., 1.))
-    with pytest.raises(TypeError, match="'pad_len' must be a float or a integer"):
+    with raises(TypeError, match="'pad_len' must be a float or a integer"):
         hl.define_rec_hyperaxes(None)
 
 
@@ -98,9 +99,9 @@ def test_calc_rec_geom_prop_2d_area(layer_2d):
     assert layer_2d.area > 0.
     assert layer_2d.area_ratio > 1.
     assert layer_2d.f_Ah > 0.
-    assert math.isclose(layer_2d.area, 1.5 * 1.25, rel_tol=1e-9)
-    assert math.isclose(layer_2d.area_ratio, 1.5 * 1.25, rel_tol=1e-9)
-    assert math.isclose(layer_2d.f_Ah, 4., rel_tol=1e-9)
+    assert isclose(layer_2d.area, 1.5 * 1.25, rel_tol=1e-9)
+    assert isclose(layer_2d.area_ratio, 1.5 * 1.25, rel_tol=1e-9)
+    assert isclose(layer_2d.f_Ah, 4., rel_tol=1e-9)
 
 
 def test_calc_rec_geom_prop_3d_volume(layer_3d):
@@ -110,6 +111,6 @@ def test_calc_rec_geom_prop_3d_volume(layer_3d):
     assert layer_3d.vol > 0
     assert layer_3d.vol_ratio > 1.
     assert layer_3d.f_Vh > 0
-    assert math.isclose(layer_3d.vol, 1.5 * 1.25 * 1.5, rel_tol=1e-9)
-    assert math.isclose(layer_3d.vol_ratio, 1.5 * 1.25 * 1.5, rel_tol=1e-9)
-    assert math.isclose(layer_3d.f_Vh, 8., rel_tol=1e-9)
+    assert isclose(layer_3d.vol, 1.5 * 1.25 * 1.5, rel_tol=1e-9)
+    assert isclose(layer_3d.vol_ratio, 1.5 * 1.25 * 1.5, rel_tol=1e-9)
+    assert isclose(layer_3d.f_Vh, 8., rel_tol=1e-9)

@@ -1,6 +1,6 @@
 # import firedrake as fire
 # from spyro.utils.cost import comp_cost
-# import spyro.pml.pml_nsnc as pml
+# from spyro.solvers.acoustic_wave import AcousticWave
 
 
 # def wave_dict_2d(dt_usu, fr_files, habc_reference_freq, get_ref_model):
@@ -49,9 +49,9 @@
 #     # 1.00 x 1.00 km domain and compute the size for the Absorbing Layer (AL)
 #     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
 #     dictionary["mesh"] = {
-#         "Lz": 1.,  # depth in km - always positive
-#         "Lx": 1.,  # width in km - always positive
-#         "Ly": 0.,  # thickness in km - always positive
+#         "length_z": 1.,  # depth in km - always positive
+#         "length_x": 1.,  # width in km - always positive
+#         "length_y": 0.,  # thickness in km - always positive
 #         "mesh_type": "firedrake_mesh",
 #     }
 
@@ -99,6 +99,7 @@
 #         "gradient_filename": None,
 #         "acoustic_energy": True,  # Activate energy calculation
 #         "acoustic_energy_filename": "output/pml_test2d/preamble/acoustic_pot_energy",
+#         "output_folder": "output/pml_test2d",  # Output folder
 #     }
 
 #     return dictionary
@@ -154,9 +155,9 @@
 #     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
 #     Lz, Lx, Ly = [1., 1., 1.]  # in km
 #     dictionary["mesh"] = {
-#         "Lz": Lz,  # depth in km - always positive
-#         "Lx": Lx,  # width in km - always positive
-#         "Ly": Ly,  # thickness in km - always positive
+#         "length_z": Lz,  # depth in km - always positive
+#         "length_x": Lx,  # width in km - always positive
+#         "length_y": Ly,  # thickness in km - always positive
 #         "mesh_type": "firedrake_mesh",
 #     }
 
@@ -207,6 +208,7 @@
 #         "gradient_filename": None,
 #         "acoustic_energy": True,  # Activate energy calculation
 #         "acoustic_energy_filename": "output/pml_test3d/preamble/acoustic_pot_energy_3d",
+#         "output_folder": "output/pml_test3d"  # Output folder
 #     }
 
 #     return dictionary
@@ -237,10 +239,8 @@
 #     # Reference to resource usage
 #     tRef = comp_cost("tini")
 
-#     # Create the acoustic wave object with HABCs
-#     Wave_obj = pml.PML_Wave(dictionary=dictionary,
-#                             bc_boundary_pml="Higdon",
-#                             output_folder=f"output/pml_test{dimension}d")
+#     # Create the acoustic wave object with PML
+#     Wave_obj = AcousticWave(dictionary=dictionary)
 
 #     # Mesh
 #     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
@@ -250,22 +250,20 @@
 #     Wave_obj.set_initial_velocity_model(conditional=cond)
 
 #     # Preamble mesh operations
-#     Wave_obj.preamble_mesh_operations(f_est=f_est)
+#     Wave_obj.mesh_ops.preamble_mesh_operations(Wave_obj, f_est=f_est)
 
 #     # Estimating computational resource usage
-#     comp_cost("tfin", tRef=tRef,
-#               user_name=Wave_obj.path_save + "preamble/MSH_")
+#     comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "preamble/MSH_")
 
 #     # ============ EIKONAL ANALYSIS ============
 #     # Reference to resource usage
 #     tRef = comp_cost("tini")
 
 #     # Finding critical points
-#     Wave_obj.critical_boundary_points()
+#     Wave_obj.layer_ops.critical_boundary_points(Wave_obj)
 
 #     # Estimating computational resource usage
-#     comp_cost("tfin", tRef=tRef,
-#               user_name=Wave_obj.path_save + "preamble/EIK_")
+#     comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "preamble/EIK_")
 
 #     return Wave_obj
 
@@ -295,7 +293,7 @@
 #     tRef = comp_cost("tini")
 
 #     # Computing reference get_reference_signal
-#     Wave_obj.infinite_model(check_dt=True, max_divisor_tf=max_divisor_tf)
+#     Wave_obj.layer_ops.infinite_model(check_dt=True, max_divisor_tf=max_divisor_tf)
 
 #     # Set model parameters for the HABC scheme
 #     Wave_obj.abc_get_ref_model = False
@@ -341,6 +339,7 @@
 #     Wave_obj.velocity_abc()
 
 #     # Building the PML layer (damping and BCs)
+#     # bc_boundary_pml="Higdon",
 #     Wave_obj.pml_layer()
 
 #     # Solving the forward problem
@@ -541,12 +540,6 @@
 
 #     # Run the PML scheme
 #     run_pml(Wave_obj, habc_reference_freq_lst, modal_solver)
-
-
-# # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
-# if __name__ == "__main__":
-#     test_loop_pml_2d()
-#     # test_loop_pml_3d()
 
 
 # '''

@@ -200,7 +200,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
         self.sources = None
 
         # Checks time inputs
-        Read_time_axis.__init__(self)
+        if self.analysis == "transient":
+            Read_time_axis.__init__(self)
 
         # Checks outputs
         Read_outputs.__init__(self)
@@ -272,14 +273,15 @@ class Model_parameters(Read_options, Read_boundary_layer,
             "acquisition"].get("use_vertex_only_mesh", False)
 
         # Check automatic adjoint
-        self.input_dictionary["time_axis"].setdefault(
-            "output_frequency", 99999)
-        self.gradient_sampling_frequency = self.input_dictionary[
-            "time_axis"]["gradient_sampling_frequency"]
-        self.save_forward_solution = self.input_dictionary[
-            "time_axis"].get("save_forward_solution", True)
-        self.output_frequency = self.input_dictionary[
-            "time_axis"]["output_frequency"]
+        if self.analysis == "transient":
+            self.input_dictionary["time_axis"].setdefault(
+                "output_frequency", 99999)
+            self.gradient_sampling_frequency = self.input_dictionary[
+                "time_axis"]["gradient_sampling_frequency"]
+            self.save_forward_solution = self.input_dictionary[
+                "time_axis"].get("save_forward_solution", True)
+            self.output_frequency = self.input_dictionary[
+                "time_axis"]["output_frequency"]
         self._sanitize_automatic_adjoint()
 
         # add random string for temp files
@@ -506,8 +508,7 @@ class Model_parameters(Read_options, Read_boundary_layer,
             return None
 
     def domain_dimensions(self):
-        """
-        Return the dimensions of the domain as a tuple.
+        """Return the dimensions of the domain as a tuple.
 
         Parameters
         ----------

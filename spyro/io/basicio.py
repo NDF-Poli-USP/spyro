@@ -349,7 +349,7 @@ def read_mesh(mesh_parameters):
     return mesh
 
 
-def parallel_print(string, comm):
+def parallel_print(string, comm=None):
     """
     Just prints a string once. Without any comm it just prints,
     without ensemble_comm it prints in comm 0,
@@ -357,10 +357,10 @@ def parallel_print(string, comm):
 
     Parameters
     ----------
-    string: str
+    string: `str`
         The string to print
-    comm: Firedrake.ensemble_communicator
-        An ensemble communicator
+    comm: `Firedrake.ensemble_communicator`, optional
+        An ensemble communicator. Default is None
     """
     if comm is None:
         print(string, flush=True)

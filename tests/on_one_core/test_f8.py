@@ -1,8 +1,11 @@
+"""Test for the application of the HABC scheme implemented in spyro.habc.habc."""
+
 import firedrake as fire
 import glob
 import spyro.habc.habc as habc
-import spyro.habc.eik as eik
+import spyro.abc.eik_min as eik_min
 from spyro.utils.cost import comp_cost
+from spyro.utils.typing import LayerShapeType
 import pytest
 import os
 
@@ -125,8 +128,8 @@ def preamble_habc(dictionary, edge_length):
 
     Returns
     -------
-    Wave_obj : `habc.HABC_Wave`
-        An instance of the HABC_Wave class
+    Wave_obj : `habc.HABCLayer`
+        An instance of the HABCLayer class
     '''
 
     # ============ MESH FEATURES ============
@@ -134,7 +137,7 @@ def preamble_habc(dictionary, edge_length):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary,
+    Wave_obj = habc.HABCLayer(dictionary=dictionary,
                               output_folder="tests/inputfiles/")
 
     # Mesh
@@ -156,7 +159,7 @@ def preamble_habc(dictionary, edge_length):
     tRef = comp_cost("tini")
 
     # Initializing Eikonal object
-    Eik_obj = eik.HABC_Eikonal(Wave_obj)
+    Eik_obj = eik_min.HABC_Eikonal(Wave_obj)
 
     # Finding critical points
     Wave_obj.critical_boundary_points(Eik_obj)
@@ -174,8 +177,8 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
 
     Parameters
     ----------
-    Wave_obj : `habc.HABC_Wave`
-        An instance of the HABC_Wave class
+    Wave_obj : `habc.HABCLayer`
+        An instance of the HABCLayer class
     data_regr_xCR: `list`
         Data for the regression of the parameter xCR.
         Structure: [xCR, max_errIt, max_errPK, crit_opt]
@@ -223,8 +226,8 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
 
     Parameters
     ----------
-    Wave_obj : `habc.HABC_Wave`
-        An instance of the HABC_Wave class
+    Wave_obj : `habc.HABCLayer`
+        An instance of the HABCLayer class
     data_regr_xCR: `list`
         Data for the regression of the parameter xCR.
         Structure: [xCR, max_errIt, max_errPK, crit_opt]
@@ -236,7 +239,7 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
           The last value corresponds to the optimal xCR
     xCR_usu : `float`, optional
         User-defined heuristic factor for the minimum damping ratio.
-        Default is None, which defines an estimated value
+        Default is `None`, which defines an estimated value
     plot_comparison : `bool`, optional
         If True, the solution (time and frequency) at receivers
         and the error measures are plotted. Default is True.
@@ -405,8 +408,8 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst,
             for degree_layer in degree_layer_lst:
 
                 # Update the layer shape and its degree
-                Wave_obj.abc_boundary_layer_shape = "hypershape" \
-                    if degree_layer is not None else "rectangular"
+                Wave_obj.abc_boundary_layer_shape = LayerShapeType.HYPERSHAPE \
+                    if degree_layer is not None else LayerShapeType.RECTANGULAR
                 Wave_obj.abc_deg_layer = degree_layer
 
                 # Data for regression of xCR parameter

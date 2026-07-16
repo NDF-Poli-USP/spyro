@@ -125,11 +125,11 @@ def _initialize_material_property_from_ufl(wave, property_name,
     if expression is not None:
         print(f"Assigning {property_name} with an expression "
               f"field given by f = {expression} ", flush=True)
-        ufl_input = eval_functions_to_ufl.generate_ufl_functions(
-            wave.mesh, expression, wave.dimension)
+        ufl_input = eval_functions_to_ufl.generate_ufl_functions(wave.mesh,
+                                                                 expression,
+                                                                 wave.dimension)
 
-    mat_property = fire.Function(
-        V, name=property_name).interpolate(ufl_input)
+    mat_property = fire.Function(V, name=property_name).interpolate(ufl_input)
 
     return mat_property
 
