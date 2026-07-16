@@ -111,7 +111,7 @@ class Read_boundary_layer:
                                           value, LayerShapeType)
 
         if shape_enum == LayerShapeType.NOLAYER:
-            raise ValueError("`NOLAYER` option not allowed for active ABC.")
+            raise ValueError("'NOLAYER' option not allowed for active ABC.")
 
         self._abc_boundary_layer_shape = shape_enum
 

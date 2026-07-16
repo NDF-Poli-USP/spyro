@@ -148,9 +148,12 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
     if type_marker == "damping":
 
         # Damping profile for the absorbing layer
-        if damp_par is None:
+        if damp_par is None or len(damp_par) != 4:
             raise ValueError("Damping parameters must be provided "
                              "when 'type_marker' is 'damping'.")
+
+        if not isinstance(damp_par, tuple):
+            raise TypeError(f"'damp_par' must be a tuple, got {type(damp_par).__name__}.")
 
         # Damping parameters
         pad_length, eta_crt, aq, bq = damp_par
