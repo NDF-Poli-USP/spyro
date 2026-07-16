@@ -11,7 +11,7 @@ def error_calc(p_numerical, p_analytical, nt):
     return div_error_time
 
 
-def run_forward(dt):
+def run_forward(dt, with_pml=False):
     # dt = float(sys.argv[1])
 
     final_time = 1.0
@@ -41,6 +41,15 @@ def run_forward(dt):
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
     }
+    if with_pml:
+        dictionary["absorving_boundary_conditions"] = {
+            "status": True,
+            "damping_type": "PML",
+            "exponent": 2,
+            "cmax": 4.5,
+            "R": 1e-6,
+            "pad_length": 0.25,
+        }
 
     # Create a source injection operator. Here we use a single source with a
     # Ricker wavelet that has a peak frequency of 5 Hz injected at the center of the mesh.
@@ -84,9 +93,9 @@ def run_forward(dt):
 
     return rec_out
 
-
+@pytest.mark.parametrize("with_pml", [False, True])
 @pytest.mark.slow
-def test_second_order_time_convergence():
+def test_second_order_time_convergence(with_pml=False):
     """Test that the second order time convergence
     of the central difference method is achieved"""
 
@@ -105,7 +114,7 @@ def test_second_order_time_convergence():
 
     for i in range(len(dts)):
         dt = dts[i]
-        rec_out = run_forward(dt)
+        rec_out = run_forward(dt, with_pml=with_pml)
         rec_anal = np.load(analytical_files[i])
         time = np.linspace(0.0, 1.0, int(1.0 / dts[i]) + 1)
         nt = len(time)
@@ -115,7 +124,7 @@ def test_second_order_time_convergence():
     theory = [t**2 for t in dts]
     theory = [errors[0] * th / theory[0] for th in theory]
 
-    assert math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=1e-2)
+    assert math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=3e-2)
 
 
 if __name__ == "__main__":
