@@ -101,6 +101,7 @@ def create_function_space(mesh, method, degree=None, dim=1):
 
 def check_function_space_type(function_space):
     # Check if wave.function_space is a generates vector os scalar fields:
+
     if function_space.value_size == 1:
         return "scalar"
     elif function_space.value_size > 1:
