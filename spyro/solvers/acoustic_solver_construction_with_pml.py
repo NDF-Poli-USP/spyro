@@ -192,7 +192,8 @@ def construct_solver_or_matrix_with_pml(Wave_object):
     FF, fix_bnd = forms_pml(Wave_object, W, X_n, X_nm1)
     Wave_object.lhs = lhs(FF)
     Wave_object.rhs = rhs(FF)
-    Wave_object.source_function = Wave_object.B = Cofunction(W.dual())
+    Wave_object.source_function = Cofunction(W.dual())
+    Wave_object.B = Cofunction(W.dual())
 
     # Build solver
     lin_var = LinearVariationalProblem(
