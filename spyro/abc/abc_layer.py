@@ -192,8 +192,7 @@ class ABCLayer(NRBC):
 
         # Validate input arguments
         if not isinstance(domain_dim, tuple):
-            raise TypeError("domain_dim must be a tuple, "
-                            f"got {type(domain_dim).__name__}.")
+            raise TypeError(f"'domain_dim' must be a tuple, got {type(domain_dim).__name__}.")
 
         # Original domain dimensions
         self.domain_dim = domain_dim

@@ -88,6 +88,11 @@ class Read_options:
             "DGQ",
             "discontinuous_galerkin_quadrilateral",
         ]
+
+        # Check if the provided value is in any of the accepted methods
+        value_parameter_error("method", value, mlt_equivalents + sem_equivalents
+                              + dg_t_equivalents + dg_q_equivalents + ["CG", None])
+
         if value in mlt_equivalents:
             self._method = "mass_lumped_triangle"
             self.cell_type = "triangle"
@@ -100,18 +105,13 @@ class Read_options:
         elif value in dg_q_equivalents:
             self._method = "DG_quadrilateral"
             self.cell_type = "quadrilateral"
-        elif value == "DG":
-            value_parameter_error("method", value, dg_t_equivalents + dg_q_equivalents)
         elif value == "CG":
-            if "variant" in self.input_dictionary["options"] and "cell_type" \
-                    in self.input_dictionary["options"]:
-                self._method = "CG"
-            else:
+            options = self.input_dictionary["options"]
+            if not ("variant" in options and "cell_type" in options):
                 raise ValueError("Cant use CG without specifying cell type and variant.")
+            self._method = "CG"
         elif value is None:
             self._method = None
-        else:
-            raise ValueError(f"Method of {value} is not valid.")
 
     @property
     def cell_type(self):
@@ -177,8 +177,6 @@ class Read_options:
 
     @degree.setter
     def degree(self, value):
-        if not isinstance(value, int):
-            raise ValueError("Degree has to be integer")
         self._degree = value_numerical_error('degree', value, float_num=False,
                                              integer_num=True, lower_bound=0,
                                              include_lower_bound=False,)
