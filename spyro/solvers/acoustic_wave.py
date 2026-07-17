@@ -85,7 +85,7 @@ class AcousticWave(Wave):
         """
         if misfit is not None:
             self.misfit = misfit
-        elif self.current_time == 0.0:
+        elif self.current_time == 0.:
             self.forward_solve()
             self.misfit = self.real_shot_record - self.forward_solution_receivers
         else:
@@ -94,8 +94,8 @@ class AcousticWave(Wave):
 
     def reset_pressure(self):
         try:
-            self.u_nm1.assign(0.0)
-            self.u_n.assign(0.0)
+            self.u_nm1.assign(0.)
+            self.u_n.assign(0.)
         except Exception:
             warnings.warn("No pressure to reset")
 

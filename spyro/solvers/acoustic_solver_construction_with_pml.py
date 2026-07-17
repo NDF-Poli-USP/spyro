@@ -269,6 +269,7 @@ def construct_solver_or_matrix_with_pml_2d(Wave_obj):
     '''
     dt = Wave_obj.dt
     c_sqr_inv = 1. / (Wave_obj.c * Wave_obj.c)
+    c = Wave_obj.c
 
     V = Wave_obj.function_space
     Z = Wave_obj.vector_function_space
@@ -280,19 +281,17 @@ def construct_solver_or_matrix_with_pml_2d(Wave_obj):
     u, pp = fire.TrialFunctions(W)
     v, qq = fire.TestFunctions(W)
 
-    X = fire.Function(W)
+    X_np1 = fire.Function(W)
     X_n = fire.Function(W)
     X_nm1 = fire.Function(W)
-    X_np1 = fire.Function(W)  # ToDo: Not used?
 
     u_n, pp_n = X_n.subfunctions
     u_nm1, _ = X_nm1.subfunctions
 
     Wave_obj.u_n = u_n
-    Wave_obj.X = X
+    Wave_obj.X_np1 = X_np1
     Wave_obj.X_n = X_n
     Wave_obj.X_nm1 = X_nm1
-    Wave_obj.X_np1 = X_np1  # ToDo: Not used?
 
     # sigma_x, sigma_z = Wave_obj.sigma_x, Wave_obj.sigma_z
     sigma_x, sigma_z = pml_sigma_field(Wave_obj)
@@ -304,19 +303,19 @@ def construct_solver_or_matrix_with_pml_2d(Wave_obj):
     a = fire.dot(fire.grad(u_n), fire.grad(v)) * dx  # explicit
     FF = m1 + a
     # -------------------------------------------------------
-    pml1 = c_sqr_inv * (sigma_z + sigma_x) * \
+    pml1 = (sigma_z + sigma_x) * \
         fire.dot((u_n - u_nm1) / fire.Constant(dt), v) * dx
-    pml2 = c_sqr_inv * sigma_z * sigma_x * fire.dot(u, v) * dx
+    pml2 = sigma_z * sigma_x * fire.dot(u, v) * dx
     # fire.dot(u_n, v) * dx
-    pml3 = -c_sqr_inv * fire.dot(fire.div(pp_n), v) * dx
-    FF += pml1 + pml2 + pml3
+    pml3 = -fire.dot(fire.div(pp_n), v) * dx
+    FF += c_sqr_inv * (pml1 + pml2 + pml3)
     # -------------------------------------------------------
-    mm1 = c_sqr_inv * fire.inner((pp - pp_n) / fire.Constant(dt), qq) * dx
-    mm2 = c_sqr_inv * fire.inner(fire.dot(Gamma_1, pp_n), qq) * dx
+    mm1 = fire.inner((pp - pp_n) / fire.Constant(dt), qq) * dx
+    mm2 = fire.inner(fire.dot(Gamma_1, pp_n), qq) * dx
     dd = fire.inner(Gamma_2 * fire.grad(u_n), qq) * dx
-    FF += mm1 + mm2 + dd
+    FF += c_sqr_inv * (mm1 + mm2) + dd
     # -------------------------------------------------------
-    f_abc = (1. / Wave_obj.c) * fire.dot((u_n - u_nm1) / fire.Constant(dt), v)
+    f_abc = (1. / c) * fire.dot((u_n - u_nm1) / fire.Constant(dt), v)
     qr_s = Wave_obj.surface_quadrature_rule
 
     # Tuple of boundary ids for NRBC
@@ -324,21 +323,23 @@ def construct_solver_or_matrix_with_pml_2d(Wave_obj):
             Wave_obj.absorb_right, Wave_obj.absorb_left]
     where_to_absorb = tuple(where(bnds)[0] + 1)  # ds starts at 1
     le = f_abc * fire.ds(where_to_absorb, **qr_s)  # NRBC
-    FF += le
+    FF += c_sqr_inv * le
     # -------------------------------------------------------
 
-    lhs_ = fire.lhs(FF)
-    rhs_ = fire.rhs(FF)
+    Wave_object.lhs = fire.lhs(FF)
+    Wave_object.rhs = fire.rhs(FF)
+    Wave_object.source_function = fire.Cofunction(W.dual())
 
     # Apply Dirichlet BCs to the PML boundaries
-    fix_bnd = Dirichlet_bc_pml(Wave_obj, W)
+    fix_bnd = None  # Dirichlet_bc_pml(Wave_obj, W)
 
-    A = fire.assemble(lhs_, mat_type="matfree", bcs=fix_bnd)
-    solver = fire.LinearSolver(
-        A, solver_parameters=Wave_obj.solver_parameters)
-    Wave_obj.solver = solver
-    Wave_obj.rhs = rhs_
-    Wave_obj.B = B
+    lin_var = fire.LinearVariationalProblem(
+        Wave_object.lhs, Wave_object.rhs + Wave_object.source_function,
+        X_np1, bcs=fix_bnd, constant_jacobian=True)
+    solver_parameters = dict(Wave_object.solver_parameters)
+    solver_parameters["mat_type"] = "matfree"
+    Wave_object.solver = fire.LinearVariationalSolver(
+        lin_var, solver_parameters=solver_parameters)
 
 
 def construct_solver_or_matrix_with_pml_3d(Wave_obj):
@@ -359,19 +360,17 @@ def construct_solver_or_matrix_with_pml_3d(Wave_obj):
     u, psi, pp = fire.TrialFunctions(W)
     v, phi, qq = fire.TestFunctions(W)
 
-    X = fire.Function(W)
+    X_np1 = fire.Function(W)
     X_n = fire.Function(W)
     X_nm1 = fire.Function(W)
-    X_np1 = fire.Function(W)  # ToDo: Not used?
 
     u_n, psi_n, pp_n = X_n.subfunctions
     u_nm1, psi_nm1, _ = X_nm1.subfunctions
 
-    Wave_obj.u_n = u_n
-    Wave_obj.X = X
-    Wave_obj.X_n = X_n
-    Wave_obj.X_nm1 = X_nm1
-    Wave_obj.X_np1 = X_np1  # ToDo: Not used?
+    Wave_object.u_n = u_n
+    Wave_object.X_np1 = X_np1
+    Wave_object.X_n = X_n
+    Wave_object.X_nm1 = X_nm1
 
     # sigma_x, sigma_z = Wave_obj.sigma_x, Wave_obj.sigma_z
     # sigma_y = Wave_obj.sigma_y
@@ -399,7 +398,7 @@ def construct_solver_or_matrix_with_pml_3d(Wave_obj):
     FF += mm1 + mm2 + dd1 + dd2
     # -------------------------------------------------------
     mmm1 = fire.dot((psi - psi_n) / fire.Constant(dt), phi) * dx
-    uuu1 = -fire.dot(u_n * phi) * dx
+    uuu1 = -fire.dot(u_n, phi) * dx
     FF += mmm1 + uuu1
     # -------------------------------------------------------
     f_abc = (1. / Wave_obj.c) * fire.dot((u_n - u_nm1) / fire.Constant(dt), v)
@@ -414,17 +413,17 @@ def construct_solver_or_matrix_with_pml_3d(Wave_obj):
     FF += le
     # -------------------------------------------------------
 
-    lhs_ = fire.lhs(FF)
-    rhs_ = fire.rhs(FF)
+    Wave_object.lhs = fire.lhs(FF)
+    Wave_object.rhs = fire.rhs(FF)
+    Wave_object.source_function = fire.Cofunction(W.dual())
 
     # Apply Dirichlet BCs to the PML boundaries
-    fix_bnd = Dirichlet_bc_pml(Wave_obj, W)
+    fix_bnd = None  # Dirichlet_bc_pml(Wave_obj, W)
 
-    A = fire.assemble(lhs_, mat_type="matfree", bcs=fix_bnd)
-    solver = fire.LinearSolver(
-        A, solver_parameters=Wave_obj.solver_parameters)
-    Wave_obj.solver = solver
-    Wave_obj.rhs = rhs_
-    Wave_obj.B = B
-
-    return
+    lin_var = fire.LinearVariationalProblem(
+        Wave_object.lhs, Wave_object.rhs + Wave_object.source_function,
+        X_np1, bcs=fix_bnd, constant_jacobian=True)
+    solver_parameters = dict(Wave_object.solver_parameters)
+    solver_parameters["mat_type"] = "matfree"
+    Wave_object.solver = fire.LinearVariationalSolver(
+        lin_var, solver_parameters=solver_parameters)

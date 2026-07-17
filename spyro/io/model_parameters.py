@@ -92,7 +92,7 @@ class Model_parameters(Read_options, Read_boundary_layer,
         of Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
     abc_boundary_layer_shape : str
         Shape type of pad layer. Options: 'rectangular' or 'hypershape'
-    abc_deg_layer : `int`
+    abc_deg_layer : `float`
         Hypershape degree
     abc_degree_type : `str`
         Type of the hypereshape degree. Options: 'real' or 'integer'
@@ -159,7 +159,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
     '''
 
     def __init__(self, dictionary=None, comm=None):
-        '''Initializes class that reads and sanitizes input parameters.
+        '''
+        Initializes class that reads and sanitizes input parameters.
         A dictionary can be used.
 
         Parameters
@@ -178,6 +179,7 @@ class Model_parameters(Read_options, Read_boundary_layer,
         if "opts" in dictionary:
             warnings.warn("Old deprecated dictionary style in usage.")
             dictionary = io.Dictionary_conversion(dictionary).new_dictionary
+
         # Saves inout_dictionary internally
         self.input_dictionary = dictionary
 
@@ -249,9 +251,12 @@ class Model_parameters(Read_options, Read_boundary_layer,
             negative_z=self.input_dictionary["mesh"]["negative_z"]
         )
 
-        self.input_dictionary["acquisition"].setdefault("receiver_locations", None)
-        self.receiver_locations = self.input_dictionary["acquisition"]["receiver_locations"]
-        self.use_vertex_only_mesh = self.input_dictionary["acquisition"].get("use_vertex_only_mesh", False)
+        self.input_dictionary["acquisition"].setdefault(
+            "receiver_locations", None)
+        self.receiver_locations = self.input_dictionary[
+            "acquisition"]["receiver_locations"]
+        self.use_vertex_only_mesh = self.input_dictionary[
+            "acquisition"].get("use_vertex_only_mesh", False)
 
         # Check automatic adjoint
         self.input_dictionary["time_axis"].setdefault(
@@ -502,7 +507,7 @@ def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
     ValueError
         If the point is outside the mesh domain.
     '''
-    # avoid changing mesh lengths outside of this
+    # Avoid changing mesh lengths outside of this
     mesh_lengths = deepcopy(input_mesh_lengths)
     if negative_z:
         mesh_lengths[0] = -mesh_lengths[0]

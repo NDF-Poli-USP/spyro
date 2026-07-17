@@ -305,7 +305,8 @@ def test_loop_modal_3d():
     # ============ MESH AND EIKONAL ============
 
     # Create dictionary with parameters for the model
-    dictionary = wave_dict("rectangular", None, degree_type, habc_ref_freq, p_eik)
+    dictionary = wave_dict("rectangular", None, degree_type,
+                           habc_ref_freq, p_eik)
 
     # Creating mesh and performing eikonal analysis
     Wave_obj = preamble_modal(dictionary, edge_length, f_est)
@@ -421,7 +422,7 @@ if __name__ == "__main__":
 # KRYLOVSCH_GG  0.46466 (15.880s/  0.099MB) 0.46018 (18.018s/  0.091MB)
 # RAYLEIGH      0.49239 (37.112s/ 51.316MB) 0.48788 (42.566s/ 51.714MB)
 
-# Frequency[Hz]     REC         (texe/pmem)
+# Frequency[Hz]     REC          (texe/pmem)
 # ANALYTICAL    0.42136 (  9.017s/  5.521MB)
 # ARNOLDI       0.42562 (420.204s/435.557MB)
 # LANCZOS       0.42562 (405.329s/325.842MB)
