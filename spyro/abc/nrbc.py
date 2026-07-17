@@ -50,7 +50,7 @@ class NRBC():
     hypershape_normal_vector()
         Compute the normal vector to a hypershape at a boundary point.
     source_to_bnd_reference_vector()
-        Compute a unitary reference vector from the source to a boundary point.
+        Compute a unitary direction vector from the source to a boundary point.
     """
 
     def __init__(self, domain_dim, abc_boundary_layer_shape, angle_max=pi/4.,
@@ -105,7 +105,7 @@ class NRBC():
         self.comm = comm
 
     def source_to_bnd_reference_vector(self, source_coord, bnd_nodes_nfs):
-        """Compute a unitary reference vector from the source to a boundary point.
+        """Compute a unitary direction vector from the source to a boundary point.
 
         Parameters
         ----------
@@ -119,7 +119,7 @@ class NRBC():
         Returns
         -------
         unit_ref_vct : `array`
-            Unit reference vector from the source to a boundary point.
+            Unit direction vector from the source to a boundary point.
         """
 
         # Boundary node data
