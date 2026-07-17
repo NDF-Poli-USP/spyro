@@ -36,7 +36,8 @@ class Read_boundary_layer:
     abc_pad_length : `float`
         Thickness of the PML in the z-direction (km) - always positive
     abc_pml_cmax: float
-        Maximum propagation speed (km/s) in the PML layer. Default is 4.7 km/s.
+        Maximum propagation speed (km/s) in the PML layer.
+        Default is 4.7 km/s because of the usual value of a salt layer in Brazil.
     abc_pml_exponent: int
         Exponent for the polynomial damping profile of the PML layer. Default is 2.
     abc_pml_R: float

@@ -93,8 +93,9 @@ def run_forward(dt, with_pml=False):
 
     return rec_out
 
-@pytest.mark.parametrize("with_pml", [False, True])
+
 @pytest.mark.slow
+@pytest.mark.parametrize("with_pml", [False, True])
 def test_second_order_time_convergence(with_pml):
     """Test that the second order time convergence
     of the central difference method is achieved"""
