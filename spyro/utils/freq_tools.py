@@ -1,6 +1,6 @@
-# This file contains methods for calculating the frequency response of a signal
+"""Utilities for calculating the frequency response of a signal."""
 
-import numpy as np
+from numpy import abs, concatenate, linspace, zeros
 from scipy.fft import fft
 
 
@@ -10,20 +10,20 @@ def freq_response(signal, f_Nyq, fpad=4, get_dominant_freq=False):
     Parameters
     ----------
     signal : `array`
-        Signal data
+        Signal data.
     f_Nyq : `float`
-        Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
+        Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt).
     fpad : `int`, optional
-        Padding factor for FFT. Default is 4
+        Padding factor for FFT. Default is 4.
     get_dominant_freq : `bool`, optional
-        If True, return only the dominant frequency of the spectrum. Default is False
+        If `True`, return only the dominant frequency of the spectrum. Default is `False`.
 
     Returns
     -------
     norm_magnitude : `array`
-        Normalized frequency spectrum with respect to the maximum magnitude
+        Normalized frequency spectrum with respect to the maximum magnitude.
     dominant_freq : `float`, optional
-        Dominant frequency of the spectrum
+        Dominant frequency of the spectrum.
     """
 
     # Check if the signal is empty
@@ -36,7 +36,7 @@ def freq_response(signal, f_Nyq, fpad=4, get_dominant_freq=False):
                          "Cannot compute frequency response.")
 
     # Zero padding for increasing smoothing in FFT
-    signal_with_padding = np.concatenate([np.zeros(fpad * len(signal)), signal])
+    signal_with_padding = concatenate([zeros(fpad * len(signal)), signal])
 
     # Number of sample points
     N_samples = len(signal_with_padding)
@@ -45,11 +45,11 @@ def freq_response(signal, f_Nyq, fpad=4, get_dominant_freq=False):
     samples_fft = N_samples // 2 + N_samples % 2
 
     # Calculate the response in frequency domain of the signal (FFT)
-    norm_magnitude = np.abs(fft(signal_with_padding)[0:samples_fft])
+    norm_magnitude = abs(fft(signal_with_padding)[0:samples_fft])
     del signal_with_padding
 
     # Frequency vector
-    xf = np.linspace(0.0, f_Nyq, samples_fft)
+    xf = linspace(0.0, f_Nyq, samples_fft)
 
     # Get the Dominant frequency of the spectrum
     dominant_freq = xf[norm_magnitude.argmax()]

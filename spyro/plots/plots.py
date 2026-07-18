@@ -15,14 +15,6 @@ plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
 __all__ = ["plot_shots", "plot_receiver_response"]
 
 
-# Use non-interactive backend in headless/container environments.
-# Some containers may have DISPLAY set to ':0' without a real X server,
-# so treat an empty DISPLAY or ':0' as headless for safety.
-display_val = os.environ.get("DISPLAY", "")
-if display_val == "" or display_val == ":0":
-    use("Agg")
-
-
 if is_firedrake_new() is False:
     from firedrake.__future__ import interpolate
     firedrake.interpolate = interpolate

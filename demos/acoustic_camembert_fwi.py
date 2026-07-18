@@ -1,16 +1,23 @@
 """Demo script for running a small full waveform inversion example.
 
+This demo has automatic parallelism set up and 6 shots, therefore we need
+a 6n (n positive integer) number of cores in mpiexec -n N_CORES to run. 
+You can experiment with a different number of cores if desired, but you
+would need to change the parallelism dicionary setting.
+
 The script builds a synthetic "true" model, generates a shot record, and then
-runs a simple inversion loop against that record.
+runs a simple inversion loop against that record. It uses a simple Camembert
+circular cheese model.
 """
 
+from copy import deepcopy
 import numpy as np
 import firedrake as fire
 import spyro
 import pytest
 
 
-def run_forward_real_model(input_dictionary, case="camembert", shot_filename="shots/shot_record_"):
+def run_forward_real_model(input_dictionary, case="camembert", shot_filename="shots/shot_record_", dt=None):
     """Generate and save a synthetic shot record for the chosen demo case.
 
     Parameters
@@ -27,24 +34,21 @@ def run_forward_real_model(input_dictionary, case="camembert", shot_filename="sh
     None
         The generated shot record is written to disk.
     """
+    if dt is not None:
+        original_dt = deepcopy(dictionary["time_axis"]["dt"])
+        dictionary["time_axis"]["dt"] = dt
 
     fwi_obj = spyro.FullWaveformInversion(dictionary=input_dictionary)
 
     fwi_obj.set_real_mesh(input_mesh_parameters={"edge_length": 0.05})
 
-    supported_cases = ["camembert"]
-    if case == "camembert":
-        # Builds the true velocity model based on a conditional
-    
-        center_z = -1.0
-        center_x = 1.0
-        mesh_z = fwi_obj.wave.mesh_z
-        mesh_x = fwi_obj.wave.mesh_x
-        cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
-    elif case not in supported_cases:
-        return ValueError(f"Case of {case} not part of supported cases: {supported_cases}")
-    else:
-        return ValueError(f"Case of {case} only partially implemented.")
+    # Builds the true velocity model based on a conditional
+
+    center_z = -1.0
+    center_x = 1.0
+    mesh_z = fwi_obj.wave.mesh_z
+    mesh_x = fwi_obj.wave.mesh_x
+    cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
 
     fwi_obj.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
     fwi_obj.generate_real_shot_record(
@@ -53,44 +57,15 @@ def run_forward_real_model(input_dictionary, case="camembert", shot_filename="sh
         shot_filename=shot_filename,
         abc_points=[(-0.5, 0.5), (-1.5, 0.5), (-1.5, 1.5), (-0.5, 1.5)]
     )
+    if dt is not None:
+        fwi_obj.wave.dt = original_dt
 
     return fwi_obj
 
 
-def multiple_layer_velocity_model(fwi_obj, z_switch, layers):
-    """
-    Sets the heterogeneous velocity model to be split into horizontal layers.
-    Each layer's velocity value is defined by the corresponding value in the
-    layers list. The layers are separated by the values in the z_switch list.
-
-    Parameters
-    ----------
-    z_switch : list of floats
-        List of z values that separate the layers.
-    layers : list of floats
-        List of velocity values for each layer.
-    """
-    if len(z_switch) != (len(layers) - 1):
-        raise ValueError(
-            "Float list of z_switch has to have length exactly one less \
-                            than list of layer values"
-        )
-    if len(z_switch) == 0:
-        raise ValueError("Float list of z_switch cannot be empty")
-    for i in range(len(z_switch)):
-        if i == 0:
-            cond = fire.conditional(
-                fwi_obj.wave.mesh_z > z_switch[i], layers[i], layers[i + 1]
-            )
-        else:
-            cond = fire.conditional(
-                fwi_obj.wave.mesh_z > z_switch[i], cond, layers[i + 1]
-            )
-
-    return cond
-
-
 final_time = 0.9
+real_shot_record_dt = 0.0005
+simulation_dt = 0.001
 
 dictionary = {}
 dictionary["options"] = {
@@ -100,7 +75,7 @@ dictionary["options"] = {
     "dimension": 2,  # dimension
 }
 dictionary["parallelism"] = {
-    "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
+    "type": "automatic",  # options: automatic (same number of cores for every propagation)
 }
 dictionary["mesh"] = {
     "length_z": 2.0,  # depth in km - always positive
@@ -112,7 +87,6 @@ dictionary["mesh"] = {
 dictionary["acquisition"] = {
     "source_type": "ricker",
     "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 6),
-    # "source_locations": [(-1.1, 1.5)],
     "frequency": 5.0,
     "delay": 0.2,
     "delay_type": "time",
@@ -122,8 +96,8 @@ dictionary["acquisition"] = {
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": final_time,  # Final time for event
-    "dt": 0.0005,  # timestep size
-    "amplitude": 1,  # the Ricker has an amplitude of 1.
+    "dt": simulation_dt,  # timestep size
+    "amplitude": 1,  # the Ricker wave has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
     "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
 }
@@ -165,20 +139,29 @@ def run_fwi(load_real_shot=True):
     if load_real_shot is False:
         fwi_obj = run_forward_real_model(
             dictionary,
-            case="layers",
+            dt=real_shot_record_dt,
             shot_filename=shots_filenames,
         )
 
     else:
+        dictionary["time_axis"]["dt"] = simulation_dt
         dictionary["inversion"]["real_shot_record_file"] = shots_filenames
         fwi_obj = spyro.FullWaveformInversion(dictionary=dictionary)
 
+    # Since the shot record is using a different timestep than our guess model we have to interpolate it
+    fwi_obj.real_shot_record = spyro.io.time_io.interpolate_time_series(
+        fwi_obj.real_shot_record,
+        simulation_dt,
+        0.0,
+        final_time,
+    )
+
     # Setting up initial guess problem
-    fwi_obj.set_guess_mesh(input_mesh_parameters={"edge_length": 0.1})
+    fwi_obj.set_guess_mesh(input_mesh_parameters={"edge_length": 0.2})
     fwi_obj.set_guess_velocity_model(constant=2.5)
 
     # This is deprecated, in more complex cases we mark zero gradient boundaries directly on the mesh
-    # which is a lot more efficient
+    # which is a lot more efficient.
     mask_boundaries = {
         "z_min": -1.3,
         "z_max": -0.7,
@@ -187,7 +170,11 @@ def run_fwi(load_real_shot=True):
     }
     fwi_obj.set_gradient_mask(boundaries=mask_boundaries)
 
-    fwi_obj.run_fwi(vmin=2.5, vmax=3.0, maxiter=15)
+    fwi_obj.run_fwi(vmin=2.5, vmax=3.0, maxiter=20)
+    export_grid_spacing = 0.01
+
+    # Let us have a look at our solution
+    spyro.io.export_scalar_field(fwi_obj.wave.c, export_grid_spacing, "camembert.png", comm=fwi_obj.wave.comm)
 
     print("END", flush=True)
 

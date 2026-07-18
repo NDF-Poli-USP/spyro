@@ -2,7 +2,7 @@ import firedrake as fire
 
 from .wave import Wave
 from pyadjoint import Tape, AdjFloat
-from ..io.basicio import ensemble_gradient
+from ..io.parallelism_wrappers import ensemble_gradient
 from ..io import interpolate
 from .acoustic_solver_construction_no_pml import (
     construct_solver_or_matrix_no_pml,
@@ -23,14 +23,22 @@ from .functionals import acoustic_energy
 
 class AcousticWave(Wave):
     def __init__(self, dictionary, comm=None):
-        super().__init__(dictionary, comm=comm)
-        self.wave_type = WaveType.ISOTROPIC_ACOUSTIC
+        """Wave Acoustic object solver.
 
-        # In case sources and reeivers were initialized in super we have to pass the wave_type
-        if getattr(self, 'sources', None) is not None:
-            self.sources.wave_type = self.wave_type
-        if getattr(self, 'receivers', None) is not None:
-            self.receivers.wave_type = self.wave_type
+        Parameters
+        ----------
+        dictionary : `dict`, optional
+            A dictionary containing the input parameters for the Wave class.
+            Default is None
+        comm : `object`, optional
+            MPI communicator for parallel execution. Default is None
+
+        Returns
+        -------
+        None
+        """
+        super().__init__(dictionary, wave_type=WaveType.ISOTROPIC_ACOUSTIC, comm=comm)
+
         self.acoustic_energy = None
         self.field_logger.add_functional(
             "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))
