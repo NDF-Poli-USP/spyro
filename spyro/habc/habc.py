@@ -26,91 +26,14 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     Attributes
     ----------
-    abc_boundary_layer_shape : `typing.LayerShapeType`, optional
-        Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
-        `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
-    abc_boundary_layer_type : `typing.LayerDampingType`
-        Type of the boundary layer. Options: `LayerDampingType.LOCAL`,
-        `LayerDampingType.HYBRID`, `LayerDampingType.PML` or `LayerDampingType.NOABCS`.
-        Default is `LayerDampingType.NOABCS` where no absorbing BCs are applied.
-        Option `LayerDampingType.HYBRID` is based on paper of Salas et al. (2022).
-        doi: https://doi.org/10.1016/j.apm.2022.09.014
-        TODO: Add citation
-    abc_deg_layer : `int` or `float` or `None`, optional
-        Hypershape degree. For hypershape layers, the degree must be greater than or
-        equal to 2. `None` is used only for rectangular layers. Default is `None`.
-    abc_degree_type : `typing.HyperLayerDegreeType`, optional
-        Type of the hypereshape degree. Options: 'HyperLayerDegreeType.REAL' or
-        'HyperLayerDegreeType.INTEGER'. Default is 'HyperLayerDegreeType.REAL'.
-    abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
-        Reference frequency for sizing the absorbing layer.
-        Options: 'LayerSizeRefFrequency.SOURCE' or 'LayerSizeRefFrequency.BOUNDARY'.
-    a_par : `float`
-        Adimensional propagation speed parameter (a = z / f).
-        "z" parameter is the inverse of the minimum Eikonal (1 / phi_min).
-    c : `Firedrake.Function`
-        Velocity model without absorbing layer.
-    case_habc : `str`
-        Label for the output files that includes the layer shape.
-        ('REC' or 'HNI', I for the degree) and the reference frequency ('SOU' or 'BND').
-        Example: 'REC_SOU' or 'HN2_BND'.
-    crit_source : `tuple`
-       Critical source coordinates.
     CRmin : `float`
         Minimum reflection coefficient at the minimum damping ratio.
-    d_nomr : `float`
-        Normalized element size (lmin / pad_len).
-    eik_bnd : `list`
-        Properties on boundaries according to minimum values of Eikonal.
-        Structure sublist: [pt_cr, c_bnd, eikmin, z_par, lref, sou_cr]
-        - pt_cr : Critical point coordinates
-        - c_bnd : Propagation speed at critical point
-        - eikmin : Eikonal value in seconds
-        - z_par : Inverse of minimum Eikonal (Equivalent to c_bound / lref)
-        - lref : Distance to the closest source from critical point
-        - sou_cr : Critical source coordinates
-    ele_pad : `int`
-        Number of elements in the layer of edge length 'lmin'.
     eta_habc : `firedrake function`
         Damping profile within the absorbing layer.
     eta_mask : `firedrake function`
         Mask function to identify the absorbing layer domain.
-    F_L : `float`
-        Size parameter of the absorbing layer.
-    FLpos : `list`
-        Possible size parameters for the absorbing layer without rounding.
-    freq_Nyq : `float`
-        Nyquist frequency according to the time step. freq_Nyq = 1 / (2 * dt).
-    freq_ref : `float`
-        Reference frequency of the wave at the boundary.
-    fundam_freq : `float`
-        Fundamental frequency of the numerical model.
-    fwi_iter : `int`
-        The iteration number for the Full Waveform Inversion (FWI) algorithm.
-    Lx_habc : `float`
-        Length of the domain in the x-direction with absorbing layer.
-    Ly_habc : `float`
-        Length of the domain in the y-direction with absorbing layer (3D).
-    Lz_habc : `float`
-        Length of the domain in the z-direction with absorbing layer.
-    lref : `float`
-        Reference length for the size of the absorbing layer.
-    mesh: `firedrake mesh`
-        Mesh used in the simulation (HABC or Infinite Model).
-    number_of_receivers: `int`
-        Number of receivers used in the simulation.
-    pad_len : `float`
-        Size of the absorbing layer.
-    path_case_habc : `string`
-        Path to save data for the current case study.
-    path_save : `string`
-        Path to save data.
     psi_min : `float`
         Minimum damping ratio of the absorbing layer (psi_min = xCR * d).
-    receiver_locations: `list`
-        List of receiver locations.
-    forward_solution_receivers : `array`
-        Receiver waveform data in the HABC scheme.
     xCR : `float`
         Heuristic factor for the minimum damping ratio.
     xCR_lim: `list`
@@ -118,40 +41,12 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     Methods
     -------
-    check_timestep_habc()
-        Check if the timestep size is appropriate for the transient response.
-    create_mesh_habc()
-        Create a mesh with absorbing layer based on the determined size.
-    critical_boundary_points()
-        Determine the critical points on domain boundaries of the original
-        model to size an absorbing layer using the Eikonal criterion for HABCs.
-    damping_layer()
-        Set the damping profile within the absorbing layer.
-    det_reference_freq()
-        Determine the reference frequency for a new layer size.
     fundamental_frequency()
         Compute the fundamental frequency in Hz via modal analysis.
-    geometry_infinite_model()
-        Determine the geometry for the infinite domain model.
-    habc_domain_dimensions()
-        Determine the new dimensions of the domain with absorbing layer.
-    habc_new_geometry()
-        Determine the new domain geometry with the absorbing layer.
-    identify_habc_case()
-        Generate an identifier for the current case study of the HABC scheme.
-    infinite_model()
-        Create a reference model for the HABC scheme for comparative purposes.
-    layer_infinite_model()
-        Determine the domain extension size for the infinite domain model.
-    nrbc_on_boundary_layer()
-        Apply the Higdon ABCs on the outer boundary of the absorbing layer.
+    damping_layer()
+        Set the damping profile within the absorbing layer.
     rename_folder_habc()
-        Rename the folder of results if the degree for the hypershape
-        layer is out of the criterion limits.
-    size_habc_criterion()
-        Determine the size of the absorbing layer using the Eikonal criterion.
-    velocity_habc()
-        Set the velocity model for the model with absorbing layer.
+        Rename results folder if hypershape degree is out of limits.
     """
 
     def __init__(self, domain_dim, frequency, f_Nyquist, abc_deg_layer,
@@ -160,8 +55,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
                  abc_reference_freq=LayerSizeRefFrequency.SOURCE,
                  abc_degree_type=HyperLayerDegreeType.REAL,
                  output_folder=None, comm=None):
-        """
-        Initialize the HABC class
+        """Initialize the HABC class.
 
         Parameters
         ----------
@@ -367,9 +261,8 @@ class HABCLayer(ABCLayer, HABC_Damping):
                                              coord_norm=coord_norm)
 
         else:
-            Lsp = mod_sol.solve_eigenproblem(
-                Wave.c, V=Wave.function_space,
-                shift=1e-8, quad_rule=Wave.quadrature_rule)
+            Lsp = mod_sol.solve_eigenproblem(Wave.c, V=Wave.function_space, shift=1e-8,
+                                             quad_rule=Wave.quadrature_rule)
 
         for n_eig, eigval in enumerate(unique(Lsp)):
             f_eig = sqrt(abs(eigval)) / (2 * pi)
@@ -451,8 +344,8 @@ class HABCLayer(ABCLayer, HABC_Damping):
         layer_par = (self.factor_length_pad, self.a_par, self.d_norm)
 
         # mesh parameters
-        mesh_par = (self.mesh_parameters.lmin, self.mesh_parameters.lmax,
-                    self.mesh_parameters.alpha, self.variant)
+        mesh_par = (Wave.mesh_parameters.lmin, Wave.mesh_parameters.lmax,
+                    Wave.mesh_parameters.alpha, Wave.variant)
 
         # wave parameters
         c_ref = min([bnd[1] for bnd in self.eik_bnd])
@@ -469,7 +362,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
         pprint("\nCreating Damping Profile", comm=self.comm)
 
         # Compute the minimum damping ratio and the associated heuristic factor
-        eta_crt, self.psi_min, self.xCR, self.xCR_lim, self.CRmin\
+        eta_crt, self.psi_min, self.xCR, self.xCR_lim, self.CRmin \
             = self.calc_damping_properties(self.fundam_freq, xCR_usu=xCR_usu)
 
         # Compute the coefficients for quadratic damping function
@@ -488,9 +381,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
             outfile.write(self.eta_habc)
 
     def rename_folder_habc(self):
-        """
-        Rename the folder of results if the degree for the
-        hypershape layer is out of the criterion limits
+        """Rename results folder if hypershape degree is out of limits.
 
         Parameters
         ----------
