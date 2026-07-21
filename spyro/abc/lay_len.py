@@ -215,12 +215,12 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
     pad_length : `float`
         Size of the absorbing layer.
     ele_pad : `int`
-        Approximated number of elements in the layer of edge length 'lmin'.
+        Approximated number of elements in the layer of edge length equal to 'lmin'.
     d_norm : `float`
         Normalized element size (lmin / pad_length).
     a_par : `float`
         Adimensional propagation speed parameter (a = z / f, z = c / l).
-        Also, 'z' parameter is the inverse of the minimum Eikonal (1 / phi_min).
+        'z' parameter is the inverse of the minimum Eikonal (1 / phi_min).
     FLpos : `list`
         Possible size parameters for the absorbing layer without rounding.
     """
