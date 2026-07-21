@@ -272,11 +272,10 @@ class ABCLayer(NRBC):
         # Create the path to save data
         self.path_to_save_abc_layer_case(output_folder=output_folder)
 
-        # # Initializing the error measure class
-        # HABCError.__init__(self, self.dt, self.freq_Nyquist,
-        #                    self.receiver_locations,
-        #                    output_folder=self.path_save,
-        #                    output_case=self.path_case_abc)
+        # Initializing the error measure class
+        # HABCError.__init__(
+        #     self, self.dt, freq_Nyquist, self.receiver_locations,
+        #     output_folder=self.path_save, output_case=self.path_case_abc, comm)
 
     def _define_layer_shape(self):
         """Define the shape of the absorbing layer.
