@@ -124,7 +124,8 @@ class PMLLayer(ABCLayer):
         Parameters
         ----------
         abc_pml_R: float
-            Theoretical reflection coefficient of the PML layer.
+            Theoretical reflection coefficient of the PML layer. The lower the reflection
+            coefficient value, the larger the size of the layer.
         abc_pml_cmax: float
             Maximum propagation speed (km/s) in the PML layer.
         abc_pad_length : `float`
@@ -132,11 +133,16 @@ class PMLLayer(ABCLayer):
         degree_prof : `int`, optional
             Degree of the damping profile within the PML layer. Default is 2.
         CR_min : `float`, optional
-            Minimum value for the desired reflection coefficient at outer
-            boundary of PML layer. Default is 1e-8.
+            Minimum value for the desired reflection coefficient at outer boundary of PML
+            layer. Default is 1e-8 assuming an amplitude attenuation of 160 dB. If the
+            source's amplitude is extremely small, this attenuation might be excessive,
+            resulting in a large PML layer. See information on amplitude attenuation in:
+            https://ccrma.stanford.edu/~jos/mdft/Exponentials.html#fig:exponential
+            https://ccrma.stanford.edu/~jos/mdft/Audio_Decay_Time_T60.html
+            TODO: Add citation
         CR_max : `float`, optional
-            Maximum value for the desired reflection coefficient at outer
-            boundary of PML layer. Default is 1e-3.
+            Maximum value for the desired reflection coefficient at outer boundary of PML
+            layer. Default is 1e-3 assuming an amplitude attenuation of 60 dB.
 
         Returns
         -------
