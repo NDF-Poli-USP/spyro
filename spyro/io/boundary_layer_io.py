@@ -41,7 +41,12 @@ class Read_boundary_layer:
     abc_pml_exponent: int
         Exponent for the polynomial damping profile of the PML layer. Default is 2.
     abc_pml_R: float
-        Theoretical reflection coefficient of the PML layer. Default is 1e-6.
+        Theoretical reflection coefficient of the PML layer. Default is 1e-6 assuming an
+        amplitude attenuation of 120 dB. If the source's amplitude is extremely small,
+        this attenuation might be excessive, resulting in a large PML layer. See:
+        https://ccrma.stanford.edu/~jos/mdft/Exponentials.html#fig:exponential
+        https://ccrma.stanford.edu/~jos/mdft/Audio_Decay_Time_T60.html
+        TODO: Add citation
     abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
         Reference frequency for sizing the absorbing layer.
         Options: 'LayerSizeRefFrequency.SOURCE' or 'LayerSizeRefFrequency.BOUNDARY'.

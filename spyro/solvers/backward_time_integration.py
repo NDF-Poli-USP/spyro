@@ -191,9 +191,8 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
             2.0 * wave_obj.c * indicator * fire.dot(
                 fire.grad(uadj), fire.grad(forward_field)) * m_v * dx
         )
-        parallel_print(
-            "Excluding PML region from gradient (mixed space)", wave_obj.comm
-        )
+        raise ValueError("PML gradient calculation temporarily unavailable")
+
     else:
         ffG = (
             -2 * (wave_obj.c) ** (-3) * fire.dot(forward_field, uadj) * m_v * dx

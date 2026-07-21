@@ -175,7 +175,6 @@ class LayerDampingType(Enum):
     HYBRID: A combination of a sponge layer and an NRBC at the outer layer boundary
     PML: Perfectly Matched Layer (PML) damping
     NOABCS: No absorbing boundary conditions applied.
-
     """
     LOCAL = "local"
     HYBRID = "hybrid"
