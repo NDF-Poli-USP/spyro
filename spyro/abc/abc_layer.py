@@ -91,7 +91,7 @@ class ABCLayer(NRBC):
     freq_Nyquist : `float`
         Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt).
     freq_ref : `float`
-        Reference frequency of the wave at the boundary.
+        Reference frequency of the wave at the critical poin on boundary.
     func_space_type, `str`, optional
         Type of function space for the state variable.
         Options: 'scalar' or 'vector'. Default is None.
