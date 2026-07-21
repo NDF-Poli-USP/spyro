@@ -40,7 +40,7 @@ class Modal_Solver():
         List of valid methods for solving the eigenproblem
         Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
         'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
-        'ANALYTICAL' method is only available for isotropic hypershapes.
+        'ANALYTICAL' method is an approximation by using homogenization techniques.
         'RAYLEIGH' method is an approximation by Rayleigh quotient.
         In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
         use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
@@ -100,7 +100,7 @@ class Modal_Solver():
             Default is None, which uses the 'KRYLOVSCH_CH' method.
             Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
             'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
-            'ANALYTICAL' method is only available for isotropic hypershapes.
+            'ANALYTICAL' method is an approximation by using homogenization techniques.
             'RAYLEIGH' method is an approximation by Rayleigh quotient.
             In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
             use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
@@ -777,17 +777,17 @@ class Modal_Solver():
         c_eqref : `float`, optional
             Reference value for the equivalent velocity based on the original
             velocity model without an absorbing layer. Default is `None`
-        fitting_c : `list`, optional
+        fitting_c : `tuple`, optional
             Parameters for fitting equivalent velocity regression.
             Structure: (fc1, fc2, fp1, fp2). Default is (0., 0., 0., 0.)
             - fc1 : `float`
-                Exponent factor for the minimum reference velocity
+                Exponent factor for the minimum reference velocity..
             - fc2 : `float`
-                Exponent factor for the maximum reference velocity
+                Exponent factor for the maximum reference velocity..
             - fp1 : `float`
-                Exponent factor for the minimum equivalent velocity
+                Exponent factor for the minimum equivalent velocity..
             - fp2 : `float`
-                Exponent factor for the maximum equivalent velocity
+                Exponent factor for the maximum equivalent velocity..
         cut_plane_percent : `float`, optional
             Percentage of the cut plane (0 to 1). Default is 1 (no cut).
 
@@ -834,9 +834,9 @@ class Modal_Solver():
 
     def solver_analytical(self, c_eq, hyp_par, bc="Neumann", c_eqref=None,
                           fitting_c=(0., 0., 0., 0.), cut_plane_percent=1.):
-        """
-        Compute the analytical solution for the eigenvalue problem with
-        Neumann or Dirichlet boundary conditions for isotropic hypershapes
+        """"Compute the analytical eigenvalue for hypershapes by using homogenization.
+
+        Support Neumann or Dirichlet boundary conditions.
 
         Parameters
         ----------
@@ -864,13 +864,13 @@ class Modal_Solver():
             Parameters for fitting equivalent velocity regression.
             Structure: (fc1, fc2, fp1, fp2). Default is (0., 0., 0., 0.)
             - fc1 : `float`
-                Exponent factor for the minimum reference velocity
+                Exponent factor for the minimum reference velocity.
             - fc2 : `float`
-                Exponent factor for the maximum reference velocity
+                Exponent factor for the maximum reference velocity.
             - fp1 : `float`
-                Exponent factor for the minimum equivalent velocity
+                Exponent factor for the minimum equivalent velocity.
             - fp2 : `float`
-                Exponent factor for the maximum equivalent velocity
+                Exponent factor for the maximum equivalent velocity.
         cut_plane_percent : `float`, optional
             Percentage of the cut plane (0 to 1). Default is 1 (no cut)
 
@@ -914,8 +914,7 @@ class Modal_Solver():
         return Lsp
 
     def generate_norm_coords(self, mesh, domain_dim, hyp_axes):
-        """
-        Generate the normalized mesh coordinates w.r.t. the hypershape centroid
+        """Generate the normalized mesh coordinates w.r.t. the hypershape centroid.
 
         Parameters
         ----------
@@ -955,8 +954,7 @@ class Modal_Solver():
         return coord_norm
 
     def generate_eigenfunctions(self, coord_norm, V, k=2, bc="Neumann"):
-        """
-        Generate eigenfunctions for the Rayleigh Quotient method
+        """Generate eigenfunctions for the Rayleigh Quotient method.
 
         Parameters
         ----------
@@ -1025,8 +1023,7 @@ class Modal_Solver():
         return eig_funcs, grad_eig
 
     def solver_rayleigh_quotient(self, c, coord_norm, V, k=2, quad_rule=None):
-        """
-        Solve the eigenvalue problem using the Rayleigh Quotient method
+        """Solve the eigenvalue problem using the Rayleigh Quotient method.
 
         Parameters
         ----------
@@ -1088,8 +1085,7 @@ class Modal_Solver():
                            cut_plane_percent=1., c_eqref=None,
                            fitting_c=(0., 0., 0., 0.),
                            static_load_for_ceq=None):
-        """
-        Solve the eigenvalue problem with Neumann boundary conditions
+        """Solve the eigenvalue problem with Neumann boundary conditions.
 
         Parameters
         ----------
@@ -1131,13 +1127,13 @@ class Modal_Solver():
             Parameters for fitting equivalent velocity regression.
             Structure: (fc1, fc2, fp1, fp2). Default is (0., 0., 0., 0.)
             - fc1 : `float`
-                Exponent factor for the minimum reference velocity
+                Exponent factor for the minimum reference velocity..
             - fc2 : `float`
-                Exponent factor for the maximum reference velocity
+                Exponent factor for the maximum reference velocity..
             - fp1 : `float`
-                Exponent factor for the minimum equivalent velocity
+                Exponent factor for the minimum equivalent velocity..
             - fp2 : `float`
-                Exponent factor for the maximum equivalent velocity
+                Exponent factor for the maximum equivalent velocity..
         static_load_for_ceq : `Firedrake.Function`, optional
             Static load for the energy-equivalent homogenization.
             Only used if 'typ_homog'='energy'. Default is None, in which
@@ -1185,11 +1181,11 @@ class Modal_Solver():
 
     def estimate_timestep(self, c, V, final_time, shift=0., quad_rule=None,
                           inv_oper=False, fraction=0.7):
-        """
-        Estimate the maximum stable timestep based on the spectral radius
-        using optionally the Gershgorin Circle Theorem to estimate
-        the maximum generalized eigenvalue ('ANALYTICAL' method).
-        Otherwise computes the maximum generalized eigenvalue exactly
+        """Estimate the maximum stable timestep based on the spectral radius.
+
+        Optionally uses the Gershgorin Circle Theorem to estimate the
+        maximum generalized eigenvalue when `method` is 'ANALYTICAL'.
+        Otherwise, computes the maximum generalized eigenvalue exactly.
 
         Parameters
         ----------

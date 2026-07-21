@@ -749,11 +749,11 @@ class ABCLayer(NRBC):
 
         # Clipping coordinates to the layer domain
         domain_layer = self.abc_domain_dimensions(full_hyp=False)
-        ufl_coordinates_habc = Wave.mesh_ops.get_spatial_coordinates_abc(Wave.mesh,
-                                                                         domain_layer)
+        ufl_coordinates_abc = Wave.mesh_ops.get_spatial_coordinates_abc(Wave.mesh,
+                                                                        domain_layer)
         lay_field, layer_mask = \
             clipping_coordinates_lay_field(self.domain_dim, Wave.mesh,
-                                           self.dimension, ufl_coordinates_habc,
+                                           self.dimension, ufl_coordinates_abc,
                                            V, quadrilateral=self.quadrilateral)
 
         # Extending velocity model within the absorbing layer
@@ -782,12 +782,12 @@ class ABCLayer(NRBC):
             outfile = VTKFile(self.path_save + file_name)
             outfile.write(Wave.c)
 
-    def nrbc_on_boundary_layer(self, Wave_object, non_reflect_bc, save_file=True):
+    def nrbc_on_boundary_layer(self, Wave, non_reflect_bc, save_file=True):
         """Apply Non-Reflective BCs on the outer boundary of the absorbing layer.
 
         Parameters
         ----------
-        Wave_object : `acoustic_wave.AcousticWave`
+        Wave : `acoustic_wave.AcousticWave`
             An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
         non_reflect_bc : `typing.BoundaryConditionsType`
             Type of boundary condition to apply on the outer absorbing layer boundaries.
@@ -811,25 +811,24 @@ class ABCLayer(NRBC):
 
             # Getting boundary data from the layer boundaries
             if non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
-                bnd_nod_ids_nfs = \
-                    Wave_object.mesh_ops.layer_boundary_data(Wave_object.mesh,
-                                                             Wave_object.function_space,
-                                                             Wave_object.mesh_parameters)[0]
+                bnd_nod_ids_nfs = Wave.mesh_ops.layer_boundary_data(Wave.mesh,
+                                                                    Wave.function_space,
+                                                                    Wave.mesh_parameters)[0]
 
             if non_reflect_bc == BoundaryConditionsType.HIGDON:
                 crit_source = self.crit_source
                 bnd_nod_ids_nfs, bnd_nodes_nfs = \
-                    Wave_object.mesh_ops.layer_boundary_data(Wave_object.mesh,
-                                                             Wave_object.function_space,
-                                                             Wave_object.mesh_parameters)
+                    Wave.mesh_ops.layer_boundary_data(Wave.mesh,
+                                                      Wave.function_space,
+                                                      Wave.mesh_parameters)
 
             # Hypershape parameters
             hyp_par = (self.layer_geometry.n_hyp, *self.layer_geometry.hyper_axes) \
                 if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else None
 
             # Applying Higdon ABCs
-            self.cos_ang_HigdonBC(Wave_object.function_space, crit_source,
-                                  bnd_nod_ids_nfs, bnd_nodes_nfs, non_reflect_bc,
+            self.cos_ang_HigdonBC(Wave.function_space, crit_source, bnd_nod_ids_nfs,
+                                  bnd_nodes_nfs, non_reflect_bc,
                                   hyp_par=hyp_par, save_file=save_file)
         else:
             pprint("\nNot Non-Reflecting Boundary Conditions Prescribed", comm=self.comm)

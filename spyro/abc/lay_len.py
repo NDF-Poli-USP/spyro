@@ -1,6 +1,6 @@
 # This file contains methods for sizing an absorbing layer
-
-import numpy as np
+from ..io.basicio import parallel_print as pprint
+from numpy import array, ceil, cos, exp, floor, log10, pi, round, sin
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -8,32 +8,32 @@ import numpy as np
 # non-reflecting boundary conditions in scalar wave equations.
 # Applied Mathematical Modelling (2022)
 # doi: https://doi.org/10.1016/j.apm.2022.09.014
-# With additions by Alexandre Olender
+# With additions by Alexandre Olender.
 
 
-def f_layer(x, a, m=1, s=0.999, typ='FL'):
-    '''
+def f_layer(x, a_par, vibration_mode=1, damping_ratio=0.999, function_type='FL'):
+    """
     Function whose zeros are solution for the parameter size of the layer.
 
     Parameters
     ----------
     x : `float`
-        Size  parameter of the absorbing layer (F_L)
-    a : `float`
-        Adimensional propagation speed parameter (a = z / f, z = c / l)
-        Also, "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
-    m : `int`, optional
-        Vibration mode. Default is 1 (Fundamental mode)
-    s : `float`, optional
-        Damping ratio. Default is 0.999
-    typ : `str`, optional
-        Type of function to be computed. Default is 'FL'
-        Options: 'FL' (size layer criterion) or 'CR' (reflection coeficient)
+        Size  parameter of the absorbing layer (F_L).
+    a_par : `float`
+        Adimensional propagation speed parameter (a = z / f, z = c / l).
+        Also, 'z' parameter is the inverse of the minimum Eikonal (1 / phi_min).
+    vibration_mode : `int`, optional
+        Vibration mode (m). Default is 1 (Fundamental mode).
+    damping_ratio : `float`, optional
+        Damping ratio (s). Default is 0.999.
+    function_type : `str`, optional
+        Type of function to be computed. Default is 'FL'.
+        Options: 'FL' (size layer criterion) or 'CR' (reflection coeficient).
 
     Returns
     -------
-    CritFL = CR - RF : `float`
-        Value of the function for the size criterion
+    CritFL: `float`
+        Value of the function for the size criterion computed as CritFL = CR - RF.
     CR: `float`
         Value for the reflection coefficient4
 
@@ -54,48 +54,48 @@ def f_layer(x, a, m=1, s=0.999, typ='FL'):
     Tol 1e-3: F_L1=0.4259, F_L2=0.5959, F_L3=0.6624, F_L4=0.9179, F_L5=0.9431
     Tol 1e-4: F_L1=0.4259, F_L2=0.5959, F_L3=0.6624, F_L4=0.9179, F_L5=0.9431
     Tol 1e-5: F_L1=0.4259, F_L2=0.5959, F_L3=0.6624, F_L4=0.9179, F_L5=0.9431
-    '''
+    """
 
     # Reflection coefficient
-    CR = abs(s**2 / (s**2 + (4 * x / (m * a))**2))
+    s2 = damping_ratio ** 2.
+    ma = vibration_mode * a_par
+    CR = abs(s2 / (s2 + (4. * x / ma) ** 2.))
 
-    if typ == 'CR':
+    if typ == "CR":
         return CR
 
     # Attenuation amplitude factor
-    AS = 1 + (1 / 8) * (s * m * a / x)**2
-    ax0 = m * np.pi * AS
-    ax1 = (1 - s**2)**0.5
-    ax2 = s / ax1
-    ax3 = (2 * np.pi * x / a) * AS
-    RF = abs(np.exp(-s * ax0) * (np.cos(ax1 * ax0)
-                                 + ax2 * np.sin(ax1 * ax0)) * np.cos(ax3))
+    AS = 1. + (1. / 8.) * (damping_ratio * ma / x)**2.
+    ax0 = vibration_mode * pi * AS
+    ax1 = (1 - s2)**0.5
+    ax2 = damping_ratio / ax1
+    ax3 = (2 * pi * x / a_par) * AS
+    RF = abs(exp(-s * ax0) * (cos(ax1 * ax0) + ax2 * sin(ax1 * ax0)) * cos(ax3))
 
-    if typ == 'FL':
+    if typ == "FL":
         return CR - RF
 
 
-def calc_zero(xini, a, tol, nz=1):
-    '''
-    Compute several parameter sizes for the absorbing layer.
+def calc_zero(xini, a_par, tol, nz=1):
+    """Compute several parameter sizes for the absorbing layer.
 
     Parameters
     ----------
     xini : `float`
-        Initial guess for size parameter of the absorbing layer (F_L)
-    a : `float`
-        Adimensional propagation speed parameter (a = z / f, z = c / l)
-        Also, "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
+        Initial guess for size parameter of the absorbing layer (F_L).
+    a_par : `float`
+        Adimensional propagation speed parameter (a = z / f, z = c / l).
+        Also, "z" parameter is the inverse of the minimum Eikonal (1 / phi_min).
     tol : `float`
-        Tolerance for the n-th root fo the function f_layer(x, a)
+        Tolerance for the n-th root fo the function f_layer(x, a).
     nz : `int`, optional
-        Number of layer sizes calculated. Default is 1
+        Number of layer sizes calculated. Default is 1.
 
     Returns
     -------
     x : `float`
-        Size  parameter of the absorbing layer (F_L)
-    '''
+        Size  parameter of the absorbing layer (F_L).
+    """
 
     if nz == 1:
         x = tol * round(xini / tol)
@@ -104,17 +104,16 @@ def calc_zero(xini, a, tol, nz=1):
 
     # Initial tolerances
     f_tol = tol
-    tol_ref = tol / 100
+    tol_ref = tol / 100.
 
-    while abs(f_layer(x, a)) > f_tol or f_tol > tol_ref:
+    while abs(f_layer(x, a_par)) > f_tol or f_tol > tol_ref:
 
         # Identifying neighborhood of the root
-        if (abs(f_layer(x, a)) <= f_tol
-            or f_layer(x, a) * f_layer(x - f_tol, a) < 0) \
-                and x > xini + f_tol:
+        if (abs(f_layer(x, a_par)) <= f_tol
+                or f_layer(x, a_par) * f_layer(x - f_tol, a_par) < 0) and x > xini + f_tol:
 
             # Adjusting initial guess and tolerance
-            x = f_tol * np.floor((x - f_tol) / f_tol)
+            x = f_tol * floor((x - f_tol) / f_tol)
             f_tol *= 0.1
 
         x += f_tol  # Next step
@@ -125,57 +124,54 @@ def calc_zero(xini, a, tol, nz=1):
     return x
 
 
-def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3,
-               show_ig=True, monitor=False):
-    '''
-    Loop to calculate the size parameter for the absorbing layer.
+def loop_roots(a_par, lmin, lref, max_roots, tol_rel=1e-3, show_ig=True, monitor=False):
+    """Loop to calculate the size parameter for the absorbing layer.
 
     Parameters
     ----------
-    a : `float`
-        Adimensional propagation speed parameter (a = z / f, z = c / l)
-        Also, "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
+    a_par : `float`
+        Adimensional propagation speed parameter (a = z / f, z = c / l).
+        Also, 'z' parameter is the inverse of the minimum Eikonal (1 / phi_min).
     lmin : `float`
-        Minimal dimension of finite element in mesh
+        Minimal dimension of finite element in mesh.
     lref : `float`
-        Reference length for the size of the absorbing layer
+        Reference length for the size of the absorbing layer.
     nz : `int`, optional
-        Number of layer sizes to be calculated. Default is 5
+        Number of layer sizes to be calculated. Default is 5.
     tol_rel : `float`, optional
-        Relative convergence tolerance w.r.t the initial guess. Default is 1e-3
+        Relative convergence tolerance w.r.t the initial guess. Default is 1e-3.
     show_ig : `bool`, optional
-        Print the initial guess for the size parameter. Default is True
+        Print the initial guess for the size parameter. Default is `True`.
     monitor : `bool`, optional
-        Print the parameter sizes of the absorbing layer. Default is False
+        Print the parameter sizes of the absorbing layer. Default is `False`.
 
     Returns
     -------
     FLpos : `list`
-        Possible size parameters for the absorbing layer without rounding
-    '''
+        Possible size parameters for the absorbing layer without rounding.
+    """
 
     # Initial guess
     FLmin = 0.5 * lmin / lref
     if show_ig:
-        print("Initial Guess for Size Parameter: {:.4f}".format(
-            FLmin), flush=True)
+        pprint(f"Initial Guess for Size Parameter: {FLmin:.4f}")
 
     # Number of digits to round the size parameter
     dig_x = 13
 
     # Root Tolerance
-    tol = 10**int(np.log10(tol_rel * FLmin))
+    tol = 10**int(log10(tol_rel * FLmin))
 
     x = FLmin
     FLpos = []  # Size parameter
     for i in range(max_roots):
 
         # Calculating the size parameter
-        x = calc_zero(x, a, tol, nz=i + 1)
+        x = calc_zero(x, a_par, tol, nz=i + 1)
 
         # Checking for duplicate values
-        if round(x, 4) in np.round(FLpos, 4):
-            x = calc_zero(x + tol, a, tol, nz=i + 1)
+        if round(x, 4) in round(FLpos, 4):
+            x = calc_zero(x + tol, a_par, tol, nz=i + 1)
 
         # Rounding the size parameter
         x_rnd = round(x, dig_x)
@@ -183,147 +179,136 @@ def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3,
 
         # Monitoring the size parameter
         if monitor:
-            print("**************** Possible FL ****************", flush=True)
-            print(f"Root {i + 1}: {x_rnd: >} - Res: {f_layer(x_rnd, a): >}",
-                  flush=True)
+            pprint("**************** Possible FL ****************")
+            pprint(f"Root {i + 1}: {x_rnd: >} - Res: {f_layer(x_rnd, a_par): >}")
 
     return FLpos
 
 
 def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
                   layer_based_on_mesh=True, monitor=False):
-    '''
-    Calculate the lenght of the absorbing layer.
+    """Calculate the lenght of the absorbing layer.
 
     Parameters
     ----------
     freq_ref : `float`
-        Reference frequency of the wave
+        Reference frequency of the wave.
     z_par : `float`
-        Inverse of the minimum Eikonal (Equivalent to c_bound/lref)
+        Inverse of the minimum Eikonal (Equivalent to c_bound/lref).
     lmin : `float`
-        Minimal dimension of finite element in mesh
+        Minimal dimension of finite element in mesh.
     lref : `float`
-        Reference length for the size of the absorbing layer
+        Reference length for the size of the absorbing layer.
     nz : `int`, optional
-        Number of layer sizes to be calculated. Default is 5
+        Number of layer sizes to be calculated. Default is 5.
     n_root : `int`, optional
-        n-th Root selected for the size of the absorbing layer. Default is 1
+        n-th Root selected for the size of the absorbing layer. Default is 1.
     tol_rel : `float`, optional
-        Relative convergence tolerance w.r.t the initial guess. Default is 1e-3
+        Relative convergence tolerance w.r.t the initial guess. Default is 1e-3.
     monitor : `bool`, optional
-        Print the parameter sizes of the absorbing layer. Default is False
+        Print the parameter sizes of the absorbing layer. Default is False.
 
     Returns
     -------
-    F_L : `float`
-        Size  parameter of the absorbing layer
-    pad_len : `float`
-        Size of the absorbing layer
+    factor_length_pad : `float`
+        Size  parameter of the absorbing layer.
+    pad_length : `float`
+        Size of the absorbing layer.
     ele_pad : `int`
-        Approximated number of elements in the layer of edge length 'lmin'
+        Approximated number of elements in the layer of edge length 'lmin'.
     d_norm : `float`
-        Normalized element size (lmin / pad_len)
-    a : `float`
-        Adimensional propagation speed parameter (a = z / f, z = c / l)
-        Also, "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
+        Normalized element size (lmin / pad_length).
+    a_par : `float`
+        Adimensional propagation speed parameter (a = z / f, z = c / l).
+        Also, 'z' parameter is the inverse of the minimum Eikonal (1 / phi_min).
     FLpos : `list`
-        Possible size parameters for the absorbing layer without rounding
-    '''
+        Possible size parameters for the absorbing layer without rounding.
+    """
 
     # Visualizing parameters for computing layer size
-    print("\nComputing Size for Absorbing Layer", flush=True)
+    pprint("\nComputing Size for Absorbing Layer")
 
     # Parameters for the absorbing layer
-    aux0 = "Parameter z (1/s): {:.4f},".format(z_par)
-    a = z_par / fref  # Adimensional parameter
-    aux1 = "Parameter a (adim): {:.4f}".format(a)
-    print(aux0, aux1, flush=True)
+    a_par = z_par / fref  # Adimensional parameter
+    pprint(f"Parameter 'z' (1/s): {z_par:.4f} - Parameter 'a' (adim): {a_par:.4f}")
 
     # Minimum and reference length of the layer
-    aux2 = "Minimum Mesh Length (km): {:.4f},".format(lmin)
-    aux3 = "Reference Length (km): {:.4f}".format(lref)
-    print(aux2, aux3, flush=True)
+    pprint(f"Minimum Mesh Length (km): {lmin:.4f} - Reference Length (km): {lref:.4f}")
 
     # Maximum number of sizes to be computed
     nz = max(1, n_root + 1, nz)
 
     # Calculating roots of size parameter function
-    FLpos = loop_roots(a, lmin, lref, nz, tol_rel=tol_rel, monitor=monitor)
+    FLpos = loop_roots(a_par, lmin, lref, nz, tol_rel=tol_rel, monitor=monitor)
 
     # Reflection coefficients
-    CRpos = np.round(np.array([f_layer(x, a, typ="CR") for x in FLpos]), 4)
+    CRpos = round(array([f_layer(x, a_par, function_type="CR") for x in FLpos]), 4)
 
     # Visualizing options for layer size
-    format_FL = ', '.join(['{:.4f}'.format(x) for x in FLpos])
-    print("Options for FL: [{}]".format(format_FL), flush=True)
-    format_CR = ', '.join(['{:.4f}'.format(x) for x in CRpos])
-    print("Options for CR: [{}]".format(format_CR), flush=True)
-    format_lay = ', '.join(['{:.4f}'.format(x * lref) for x in FLpos])
-    print("Options for Layer Size (km): [{}]".format(format_lay), flush=True)
+    format_FL = ', '.join([f"{x:.4f}" for x in FLpos])
+    pprint(f"Options for FL: [{format_FL}]")
+    format_CR = ', '.join([f"{x:.4f}" for x in CRpos])
+    pprint(f"Options for CR: [{format_CR}]")
+    format_lay = ', '.join([f"{x * lref:.4f}" for x in FLpos])
+    pprint(f"Options for Layer Size (km): [{format_lay}]")
     format_ele = [int(x * lref / lmin) for x in FLpos]
-    print("Aprox. Number of Elements ({:.3f} km) in Layer: {}".format(
-        lmin, format_ele), flush=True)
+    pprint(f"Aprox. Number of Elements ({lmin:.3f} km) in Layer: {format_ele}")
 
     # Selecting a size
-    F_L = FLpos[n_root - 1]
+    factor_length_pad = FLpos[n_root - 1]
 
     # Size of the absorving layer
-    pad_len = F_L * lref
-
-    print("Selected Parameter Size FL: {:.4f}".format(F_L), flush=True)
-    print("Selected Layer Size (km): {:.4f}".format(pad_len), flush=True)
+    pad_length = factor_length_pad * lref
+    pprint(f"Selected Parameter Size FL: {factor_length_pad:.4f}")
+    pprint(f"Selected Layer Size (km): {pad_length:.4f}")
 
     # Approximated number of elements in the layer of edge length 'lmin'
     ele_pad = format_ele[n_root - 1]
 
     if layer_based_on_mesh:
-        F_L, pad_len, ele_pad = roundFL(lmin, lref, F_L)
+        factor_length_pad, pad_length, ele_pad = roundFL(lmin, lref, factor_length_pad)
 
     # Normalized element size
-    d_norm = lmin / pad_len
-    print("Normalized Element Size (adim): {0:.5f}".format(d_norm), flush=True)
+    d_norm = lmin / pad_length
+    pprint(f"Normalized Element Size (adim): {d_norm:.5f}")
 
-    return F_L, pad_len, ele_pad, d_norm, a, FLpos
+    return factor_length_pad, pad_length, ele_pad, d_norm, a_par, FLpos
 
 
-def roundFL(lmin, lref, F_L):
-    '''
-    Adjust the layer parameter based on the element size to get
-    an integer number of elements within the layer.
+def roundFL(lmin, lref, factor_length_pad):
+    """Adjust layer parameter to enforce an integer number of elements within the layer.
 
     Parameters
     ----------
-    F_L : `float`
-        Size parameter of the absorbing layer
+    factor_length_pad : `float`
+        Size parameter of the absorbing layer.
     lmin : `float`
-        Minimum mesh size
+        Minimum mesh size.
     lref : `float`
-        Reference length for the size of the absorbing layer
+        Reference length for the size of the absorbing layer.
 
     Returns
     -------
-    F_L : `float`
-        Modified size parameter of the absorbing layer according to mesh size
-    pad_len : `float`
-        Modified size of the absorbing layer
+    factor_length_pad : `float`
+        Modified size parameter of the absorbing layer according to mesh size.
+    pad_length : `float`
+        Modified size of the absorbing layer.
     ele_pad : `int`
-        Number of elements in the layer of edge length 'lmin'
-    '''
+        Number of elements in the layer of edge length 'lmin'.
+    """
 
     # Adjusting the parameter size of the layer
-    F_L = (lmin / lref) * np.ceil(lref * F_L / lmin)
+    factor_length_pad = (lmin / lref) * ceil(lref * factor_length_pad / lmin)
 
     # New size of the absorving layer
-    pad_len = F_L * lref
+    pad_length = factor_length_pad * lref
 
     # Number of elements in the layer
-    ele_pad = int(pad_len / lmin)
+    ele_pad = int(pad_length / lmin)
 
-    print("\nModifying Layer Size Based on the Element Size", flush=True)
-    print("Modified Parameter Size FL: {:.4f}".format(F_L), flush=True)
-    print("Modified Layer Size (km): {:.4f}".format(pad_len), flush=True)
-    print("Elements ({:.3f} km) in Layer: {}".format(
-        lmin, ele_pad), flush=True)
+    pprint("\nModifying Layer Size Based on the Element Size")
+    pprint(f"Modified Parameter Size FL: {factor_length_pad:.4f}")
+    pprint(f"Modified Layer Size (km): {pad_length:.4f}")
+    pprint(f"Elements ({lmin:.3f} km) in Layer: {ele_pad}")
 
-    return F_L, pad_len, ele_pad
+    return factor_length_pad, pad_length, ele_pad
