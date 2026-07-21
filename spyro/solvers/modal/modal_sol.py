@@ -1190,13 +1190,13 @@ class Modal_Solver():
         Parameters
         ----------
         c : `Firedrake.Function`
-            Velocity model
+            Velocity model.
         V : `Firedrake.FunctionSpace`
-            Function space for the modal problem
+            Function space for the modal problem.
         final_time : `float`
-            Final time for the transient simulation
+            Final time for the transient simulation.
         shift: `float`, optional
-            Value to stabilize the Neumann BC null space. Default is 0
+            Value to stabilize the Neumann BC null space. Default is 0.
         quad_rule : `str`, optional
             Quadrature rule to use for the integration.
             Default is None, which uses the default quadrature rule.
@@ -1209,7 +1209,7 @@ class Modal_Solver():
         Returns
         -------
         max_dt : `float`
-            Estimated maximum stable timestep
+            Estimated maximum stable timestep.
         """
 
         # Maximum eigenvalue
