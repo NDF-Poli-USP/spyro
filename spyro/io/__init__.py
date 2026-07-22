@@ -1,6 +1,5 @@
 from .basicio import (
     write_function_to_grid,
-    is_owner,
     save_shots,
     load_shots,
     read_mesh,
@@ -8,20 +7,28 @@ from .basicio import (
     project_grid_velocity_data,
     # ensemble_forward_ad,
     # ensemble_forward_elastic_waves,
-    ensemble_gradient,
     # ensemble_gradient_elastic_waves,
     parallel_print,
     saving_source_and_receiver_location_in_csv,
-    switch_serial_shot,
-    ensemble_save,
-    ensemble_load,
-    delete_tmp_files,
-    ensemble_shot_record,
-    ensemble_functional,
     read_bin_velocity_model,
     write_velocity_model
 )
-from .segy_io import create_segy, create_segy_from_grid, read_segy_velocity_model
+from .parallelism_wrappers import (
+    delete_tmp_files,
+    ensemble_functional,
+    ensemble_gradient,
+    ensemble_load,
+    ensemble_save,
+    ensemble_shot_record,
+    is_owner,
+    switch_serial_shot,
+)
+from .segy_io import (
+    create_segy,
+    create_segy_from_grid,
+    export_scalar_field,
+    read_segy_velocity_model,
+)
 from .model_parameters import Model_parameters
 from .backwards_compatibility_io import Dictionary_conversion
 from . import dictionaryio
@@ -62,4 +69,5 @@ __all__ = [
     "read_segy_velocity_model",
     "read_bin_velocity_model",
     "write_velocity_model",
+    "export_scalar_field"
 ]
