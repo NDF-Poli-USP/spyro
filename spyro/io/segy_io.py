@@ -140,10 +140,96 @@ def create_segy(function, V, grid_spacing, filename):
     -------
     None
     """
-    from ..io import write_function_to_grid  # Avoiding circular import
+    from ..io import write_function_to_grid  # Here to avoid circular import
     velocity_grid_data = write_function_to_grid(function, V, grid_spacing, buffer=True)
 
     return create_segy_from_grid(velocity_grid_data, filename)
+
+
+def read_segy_velocity_model(fname):
+    """Read a velocity model from a SEG-Y file.
+
+    Parameters
+    ----------
+    fname : str
+        Filename of the SEG-Y velocity model.
+
+    Returns
+    -------
+    vp : numpy.ndarray
+        Velocity model array in ``(z, x)`` order.
+    nz : int
+        Number of samples per trace, corresponding to the z direction.
+    nx : int
+        Number of traces in the SEG-Y file, corresponding to the x direction.
+
+    Raises
+    ------
+    ImportError
+        If ``segyio`` is not installed.
+    """
+    with segyio.open(fname, "r", ignore_geometry=True) as segy:
+        nx = len(segy.trace)
+        nz = len(segy.samples)
+        vp = np.zeros((nz, nx), dtype=np.float32)
+
+        for i in range(nx):
+            vp[:, i] = segy.trace[i]
+
+    vp = np.flipud(vp)
+
+    return vp, nz, nx
+
+
+def create_grid_dictionary_from_segy(filename, length_z=None, length_x=None):
+    """Read a SEG-Y file and return a grid velocity dictionary.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the SEG-Y file.
+    length_z : float
+        Physical model length in the z direction.
+    length_x : float
+        Physical model length in the x direction.
+
+    Returns
+    -------
+    dict
+        Grid velocity data with ``vp_values`` in ``(z, x)`` order.
+
+    Raises
+    ------
+    ValueError
+        If either ``length_z`` or ``length_x`` is not provided.
+
+    Notes
+    -----
+    The returned dictionary follows the structured-grid convention used by
+    the rest of the I/O layer, including directional spacing metadata and a
+    default ``abc_pad_length`` of ``0.0``.
+    """
+    if length_z is None or length_x is None:
+        raise ValueError(
+            "length_z and length_x are required to build a grid dictionary from SEG-Y."
+        )
+
+    vp_values, nz, nx = read_segy_velocity_model(filename)
+
+    spacing_z = float(length_z) / float(nz - 1)
+    spacing_x = float(length_x) / float(nx - 1)
+    grid_spacing = spacing_z if np.isclose(spacing_z, spacing_x) else None
+
+    grid_velocity_data = {
+        "vp_values": vp_values,
+        "grid_spacing": grid_spacing,
+        "grid_spacing_z": spacing_z,
+        "grid_spacing_x": spacing_x,
+        "length_z": float(length_z),
+        "length_x": float(length_x),
+        "abc_pad_length": 0.0,
+    }
+    return grid_velocity_data
 
 
 @run_in_one_core_kwarg_comm
