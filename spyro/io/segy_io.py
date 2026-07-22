@@ -1,7 +1,6 @@
 import numpy as np
 import segyio
 from io import BytesIO
-from ..io import write_function_to_grid
 import matplotlib.pyplot as plt
 
 
@@ -139,6 +138,7 @@ def create_segy(function, V, grid_spacing, filename):
     -------
     None
     """
+    from ..io import write_function_to_grid  # Here to avoid circular import
     velocity_grid_data = write_function_to_grid(function, V, grid_spacing, buffer=True)
 
     return create_segy_from_grid(velocity_grid_data, filename)
