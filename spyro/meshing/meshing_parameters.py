@@ -675,12 +675,10 @@ class MeshingParameters():
             "spectral_quadrilateral",
             "DG_quadrilateral",
             "CG",
+            None,
         ]
 
-        if value is not None and value not in allowed_types:
-            value_parameter_error("method", value, allowed_types)
-
-        self._method = value
+        self._method = value_parameter_error("method", value, allowed_types)
 
     @property
     def mesh_file(self):
