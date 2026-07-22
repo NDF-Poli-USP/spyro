@@ -5,6 +5,7 @@ from copy import deepcopy
 from firedrake import VTKFile
 import firedrake as fire
 import spyro
+import pytest
 
 
 def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
