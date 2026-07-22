@@ -1,7 +1,7 @@
 import numpy as np
 from firedrake import Mesh as FireMeshReader
-from ..io import parallel_print
-from ..io import create_segy_from_grid
+from ..io.basicio import parallel_print
+from ..io.segy_io import create_segy_from_grid
 from .meshing_gmsh2d import build_gmsh_geometry_and_groups, apply_structured_winslow_smoothing2d
 from .meshing_utils import create_sizing_function, calculate_edge_length
 from .firedrake_based_wrappers import rectangle_mesh, periodic_rectangle_mesh, box_mesh
