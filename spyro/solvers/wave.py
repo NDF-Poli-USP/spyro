@@ -8,7 +8,7 @@ from ..domains.quadrature import quadrature_rules
 from ..domains.space import check_function_space_type, create_function_space
 from ..io import Model_parameters
 from ..io import material_properties_io
-from ..io.basicio import ensemble_propagator
+from ..io.parallelism_wrappers import ensemble_propagator
 from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
