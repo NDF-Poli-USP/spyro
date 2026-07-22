@@ -18,11 +18,10 @@ from .basicio import (
     delete_tmp_files,
     ensemble_shot_record,
     ensemble_functional,
-    read_segy_velocity_model,
     read_bin_velocity_model,
     write_velocity_model
 )
-from .segy_io import create_segy, create_segy_from_grid
+from .segy_io import create_segy, create_segy_from_grid, read_segy_velocity_model
 from .model_parameters import Model_parameters
 from .backwards_compatibility_io import Dictionary_conversion
 from . import dictionaryio

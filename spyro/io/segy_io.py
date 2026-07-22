@@ -142,3 +142,38 @@ def create_segy(function, V, grid_spacing, filename):
     velocity_grid_data = write_function_to_grid(function, V, grid_spacing, buffer=True)
 
     return create_segy_from_grid(velocity_grid_data, filename)
+
+
+def read_segy_velocity_model(fname):
+    """Read a velocity model from a SEG-Y file.
+
+    Parameters
+    ----------
+    fname : str
+        Filename of the SEG-Y velocity model.
+
+    Returns
+    -------
+    vp : numpy.ndarray
+        Velocity model array in ``(z, x)`` order.
+    nz : int
+        Number of samples per trace, corresponding to the z direction.
+    nx : int
+        Number of traces in the SEG-Y file, corresponding to the x direction.
+
+    Raises
+    ------
+    ImportError
+        If ``segyio`` is not installed.
+    """
+    with segyio.open(fname, "r", ignore_geometry=True) as segy:
+        nx = len(segy.trace)
+        nz = len(segy.samples)
+        vp = np.zeros((nz, nx), dtype=np.float32)
+
+        for i in range(nx):
+            vp[:, i] = segy.trace[i]
+
+    vp = np.flipud(vp)
+
+    return vp, nz, nx
