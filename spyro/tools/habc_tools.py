@@ -4,7 +4,8 @@ from firedrake import assemble, conditional, Function, VertexOnlyMesh
 from firedrake import sqrt as fire_sqrt
 from numpy import clip, where
 from ..domains.space import create_function_space
-from ..utils.error_management import value_parameter_error
+from ..io.basicio import parallel_print as pprint
+from ..utils.error_management import value_numerical_error, value_parameter_error
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..tools.version_control import is_firedrake_new
 
@@ -46,8 +47,6 @@ def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
 
     # UFL coordinates
     z, x = ufl_coordinates_habc[0], ufl_coordinates_habc[1]
-    if dimension == 3:  # 3D
-        y = ufl_coordinates_habc[2]
 
     # Conditional expression
     condz = z < -length_z
@@ -71,6 +70,7 @@ def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
 
         # 3D dimension
         length_y = domain_dim[2]
+        y = ufl_coordinates_habc[2]
 
         # Conditional expression
         condy1 = y < 0.
@@ -112,8 +112,8 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
         Function space for the mask field.
     damp_par : `tuple`, optional
         Damping parameters for the absorbing layer.
-        Structure: (pad_len, eta_crt, aq, bq).
-        - pad_len : `float`
+        Structure: (pad_length, eta_crt, aq, bq).
+        - pad_length : `float`
             Size of the absorbing layer.
         - eta_crt : `float`
             Critical damping coefficient (1/s).
@@ -143,26 +143,28 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
                                                      dimension, ufl_coordinates_habc,
                                                      type_marker=type_marker)
 
-    if type_marker == 'damping':  # Damping profile for the absorbing layer
+    value_parameter_error('type_marker', type_marker, ["damping", "mask"])
 
-        if damp_par is None:
+    if type_marker == "damping":
+
+        # Damping profile for the absorbing layer
+        if damp_par is None or len(damp_par) != 4:
             raise ValueError("Damping parameters must be provided "
                              "when 'type_marker' is 'damping'.")
 
-        # Damping parameters
-        pad_len, eta_crt, aq, bq = damp_par
+        if not isinstance(damp_par, tuple):
+            raise TypeError(f"'damp_par' must be a tuple, got {type(damp_par).__name__}.")
 
-        if pad_len <= 0:
-            raise ValueError(f"Invalid value for 'pad_len': {pad_len}. "
-                             "'pad_len' must be greater than zero "
-                             "when 'type_marker' is 'damping'.")
-        if eta_crt <= 0:
-            raise ValueError(f"Invalid value for 'eta_crt': {eta_crt}. "
-                             "'eta_crt' must be greater than zero "
-                             "when 'type_marker' is 'damping'.")
+        # Damping parameters
+        pad_length, eta_crt, aq, bq = damp_par
+
+        value_numerical_error("pad_length", pad_length, float_num=True,
+                              integer_num=True, lower_bound=0.)
+
+        value_numerical_error("eta_crt", eta_crt, float_num=True, lower_bound=0.)
 
         # Reference distance to the original boundary
-        ref_funct = fire_sqrt(ref_funct) / pad_len
+        ref_funct = fire_sqrt(ref_funct) / pad_length
 
         # Quadratic damping profile
         ref_funct = aq * ref_funct**2
@@ -170,12 +172,10 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
             ref_funct += bq * ref_funct
         ref_funct *= eta_crt
 
-    elif type_marker == 'mask':  # Mask filter for layer boundary domain
+    elif type_marker == "mask":
 
+        # Mask filter for layer boundary domain
         ref_funct = conditional(ref_funct > 0, 1., 0.)
-
-    else:
-        value_parameter_error('type_marker', type_marker, ['damping', 'mask'])
 
     layer_mask = Function(V, name=name_mask)
     layer_mask.assign(assemble(interpolate(ref_funct, V)))
@@ -211,10 +211,10 @@ def clipping_coordinates_lay_field(domain_dim, mesh, dimension,
         Mask for the absorbing layer.
     """
 
-    print("Clipping Coordinates Inside Layer", flush=True)
+    pprint("Clipping Coordinates Inside Layer")
 
     # Domain dimensions
-    Lz, Lx = domain_dim[:2]
+    length_z, length_x = domain_dim[:2]
 
     # Vectorial space for auxiliar field of clipped coordinates
     method_element = "DQ" if quadrilateral else "DG"
@@ -224,16 +224,16 @@ def clipping_coordinates_lay_field(domain_dim, mesh, dimension,
     lay_field = Function(W)
     lay_field.assign(assemble(interpolate(ufl_coordinates_habc, W)))
     lay_arr = lay_field.dat.data_with_halos[:]
-    lay_arr[:, 0] = clip(lay_arr[:, 0], -Lz, 0.)
-    lay_arr[:, 1] = clip(lay_arr[:, 1], 0., Lx)
+    lay_arr[:, 0] = clip(lay_arr[:, 0], -length_z, 0.)
+    lay_arr[:, 1] = clip(lay_arr[:, 1], 0., length_x)
 
     if dimension == 3:  # 3D
 
         # 3D dimension
-        Ly = domain_dim[2]
+        length_y = domain_dim[2]
 
         # Clipping coordinates
-        lay_arr[:, 2] = clip(lay_arr[:, 2], 0., Ly)
+        lay_arr[:, 2] = clip(lay_arr[:, 2], 0., length_y)
 
     # Mask function to identify the absorbing layer domain
     layer_mask = layer_mask_field(domain_dim, mesh, dimension,
@@ -317,7 +317,7 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
         Extended scalar field defined on the same function space as `lay_field`.
     """
 
-    print("Extending Profile Inside Layer", flush=True)
+    pprint("Extending Profile Inside Layer")
 
     # Extracting the nodes from the layer field
     lay_nodes = lay_field.dat.data_with_halos[:]
@@ -327,9 +327,10 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
     pts_to_extend = lay_nodes[ind_nodes]
 
     # Set the property of the nearest point on the original boundary
+    value_parameter_error('method', method, ["point_cloud", "nearest_point"])
     if method == "point_cloud":
 
-        print(f"Using Cloud Points Method to Extend {name_prop} Profile", flush=True)
+        pprint(f"Using Cloud Points Method to Extend {name_prop} Profile")
 
         vel_to_extend = \
             point_cloud_field(mesh_original, pts_to_extend,
@@ -337,13 +338,10 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
 
     elif method == "nearest_point":
 
-        print(f"Using Nearest Point Method to Extend {name_prop} Profile", flush=True)
+        pprint(f"Using Nearest Point Method to Extend {name_prop} Profile")
 
         vel_to_extend = field_to_extend.at(pts_to_extend, dont_raise=True)
         del pts_to_extend
-
-    else:
-        value_parameter_error('method', method, ["point_cloud", "nearest_point"])
 
     # Velocity profile inside the layer
     lay_field.dat.data_with_halos[ind_nodes, 0] = vel_to_extend
