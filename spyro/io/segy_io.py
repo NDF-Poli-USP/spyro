@@ -177,3 +177,54 @@ def read_segy_velocity_model(fname):
     vp = np.flipud(vp)
 
     return vp, nz, nx
+
+
+def create_grid_dictionary_from_segy(filename, length_z=None, length_x=None):
+    """Read a SEG-Y file and return a grid velocity dictionary.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the SEG-Y file.
+    length_z : float
+        Physical model length in the z direction.
+    length_x : float
+        Physical model length in the x direction.
+
+    Returns
+    -------
+    dict
+        Grid velocity data with ``vp_values`` in ``(z, x)`` order.
+
+    Raises
+    ------
+    ValueError
+        If either ``length_z`` or ``length_x`` is not provided.
+
+    Notes
+    -----
+    The returned dictionary follows the structured-grid convention used by
+    the rest of the I/O layer, including directional spacing metadata and a
+    default ``abc_pad_length`` of ``0.0``.
+    """
+    if length_z is None or length_x is None:
+        raise ValueError(
+            "length_z and length_x are required to build a grid dictionary from SEG-Y."
+        )
+
+    vp_values, nz, nx = read_segy_velocity_model(filename)
+
+    spacing_z = float(length_z) / float(nz - 1)
+    spacing_x = float(length_x) / float(nx - 1)
+    grid_spacing = spacing_z if np.isclose(spacing_z, spacing_x) else None
+
+    grid_velocity_data = {
+        "vp_values": vp_values,
+        "grid_spacing": grid_spacing,
+        "grid_spacing_z": spacing_z,
+        "grid_spacing_x": spacing_x,
+        "length_z": float(length_z),
+        "length_x": float(length_x),
+        "abc_pad_length": 0.0,
+    }
+    return grid_velocity_data
