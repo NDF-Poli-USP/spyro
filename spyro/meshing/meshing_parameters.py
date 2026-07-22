@@ -248,21 +248,8 @@ class MeshingParameters():
         self.negative_z = negative_z
         if velocity_model is None:
             self.velocity_model = self.input_mesh_dictionary.get("velocity_model", None)
-        self.segy_velocity_model = self.input_mesh_dictionary.get("segy_velocity_model", None)
 
         self.minimum_velocity = self.input_mesh_dictionary.get("minimum_velocity", None)
-        self.hyper_n = self.input_mesh_dictionary.get("hyper_n", 3.0)
-        self.hmin_segy = self.input_mesh_dictionary.get("hmin_segy", 0.0)
-        self.grade = self.input_mesh_dictionary.get("grade", 0.9)
-        self.water_interface = self.input_mesh_dictionary.get("water_interface", False)
-        self.water_search_value = self.input_mesh_dictionary.get("water_search_value", 0.0)
-        self.vp_water = self.input_mesh_dictionary.get("vp_water", None)
-        self.structured_mesh = self.input_mesh_dictionary.get("structured_mesh", False)
-        self.min_element_size = self.input_mesh_dictionary.get("min_element_size", 35.0)
-        self.winslow_iterations = self.input_mesh_dictionary.get("winslow_iterations", 5000)
-        self.winslow_omega = self.input_mesh_dictionary.get("winslow_omega", 0.5)
-        self.extend_segy = self.input_mesh_dictionary.get("extend_segy", True)
-        self.apply_winslow = self.input_mesh_dictionary.get("apply_winslow", True)
 
         # Apply parameters from input_mesh_dictionary and direct arguments
         self.source_frequency = self.input_mesh_dictionary.get("source_frequency", source_frequency)
@@ -287,8 +274,24 @@ class MeshingParameters():
         self.padding_type = self.input_mesh_dictionary.get("padding_type")
         self.padding_x = self.input_mesh_dictionary.get("padding_x")
         self.padding_z = self.input_mesh_dictionary.get("padding_z")
-        self.h_padding = self.input_mesh_dictionary.get("h_padding", 500.0)
-        self.winslow_implementation = self.input_mesh_dictionary.get("winslow_implementation", "numba")
+
+        # Winslow gmsh only parameters
+        if self.mesh_type == "gmsh_mesh":
+            self.winslow_implementation = self.input_mesh_dictionary.get("winslow_implementation", "numba")
+            self.h_padding = self.input_mesh_dictionary.get("h_padding", 500.0)
+            self.vp_water = self.input_mesh_dictionary.get("vp_water", None)
+            self.structured_mesh = self.input_mesh_dictionary.get("structured_mesh", False)
+            self.hyper_n = self.input_mesh_dictionary.get("hyper_n", 3.0)
+            self.hmin_segy = self.input_mesh_dictionary.get("hmin_segy", 0.0)
+            self.grade = self.input_mesh_dictionary.get("grade", 0.9)
+            self.water_interface = self.input_mesh_dictionary.get("water_interface", False)
+            self.water_search_value = self.input_mesh_dictionary.get("water_search_value", 0.0)
+            self.min_element_size = self.input_mesh_dictionary.get("min_element_size", 35.0)
+            self.winslow_iterations = self.input_mesh_dictionary.get("winslow_iterations", 5000)
+            self.winslow_omega = self.input_mesh_dictionary.get("winslow_omega", 0.5)
+            self.extend_segy = self.input_mesh_dictionary.get("extend_segy", True)
+            self.apply_winslow = self.input_mesh_dictionary.get("apply_winslow", True)
+            self.segy_velocity_model = self.input_mesh_dictionary.get("segy_velocity_model", None)
 
         self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh", "gmsh_mesh"}
         self.is_complete = None
