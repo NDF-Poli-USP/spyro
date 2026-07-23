@@ -9,6 +9,7 @@ setup(
     url="https://github.com/NDF-Poli-USP/spyro",
     packages=find_packages(),
     install_requires=[
+        "dataclasses",
         "numpy",
         "scipy",
         "matplotlib",
