@@ -3,7 +3,7 @@ from scipy.integrate import dblquad, quad
 from scipy.special import beta, betainc, gamma
 from sys import float_info
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import (enum_parameter_error, value_dimension_error,
+from ..utils.error_management import (enum_parameter_error, value_model_dimension_error,
                                       value_numerical_error, value_parameter_error)
 from ..utils.typing import HyperLayerDegreeType
 
@@ -125,8 +125,7 @@ class HyperLayer():
         if n_hyp < 2.:
             raise ValueError(f"n_hyp must be >= 2, got {n_hyp}.")
 
-        if dimension not in [2, 3]:
-            value_parameter_error('dimension', dimension, [2, 3])
+        value_parameter_error('dimension', dimension, [2, 3])
 
         # Original domain dimensions
         self.domain_dim = domain_dim
@@ -789,11 +788,8 @@ class HyperLayer():
         pprint("Determining Hypershape Layer Parameters")
 
         # Domain dimensions w/o layer
-        chk_domd = len(self.domain_dim)
-        chk_habc = len(domain_hyp)
-        if self.dimension != chk_domd or self.dimension != chk_habc:
-            value_dimension_error(('domain_dim', 'domain_hyp'),
-                                  (chk_domd, chk_habc), self.dimension)
+        value_model_dimension_error(('domain_dim', 'domain_hyp'),
+                                    (self.domain_dim, domain_hyp), self.dimension)
 
         # Defining the hypershape semi-axes
         self.define_hyperaxes(domain_hyp)
