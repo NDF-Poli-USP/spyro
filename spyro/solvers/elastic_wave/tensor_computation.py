@@ -314,8 +314,7 @@ def Gamma_VTI(self, PropISO, PropVTI, C, dim):
 
 def Gamma_TTI(self, PropISO, PropVTI, PropTTI, dim, C):
     """
-    Constrói a matriz Gamma (Q^{-1}) no sistema TTI.
-    Funciona com Firedrake em modo real (sem números complexos).
+    Build Gamma (Q^{-1}) on TTI system.
     """
     # 1. Obter a parte real da matriz VTI
     C_vti_real = c_vti_tensor(PropISO, PropVTI, dim)
@@ -345,17 +344,17 @@ def Gamma_TTI(self, PropISO, PropVTI, PropTTI, dim, C):
 
         # Q12 derivado
         denom = C11 - 2*C66
-        Q12_inv = conditional(abs(denom) > 1e-12,
+        Q12 = conditional(abs(denom) > 1e-12,
                               (C11/Q11 - 2*C66/Q66) / denom,
                               0.0)
 
         C_imag = fire.as_tensor([
-            [C11/Q11, C12*Q12_inv, C13/Q13, 0.0, 0.0, 0.0],
-            [C12*Q12_inv, C11/Q11, C13/Q13, 0.0, 0.0, 0.0],
-            [C13/Q13, C13/Q13, C33/Q33, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, C44/Q44, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0, C44/Q44, 0.0],
-            [0.0, 0.0, 0.0, 0.0, 0.0, C66/Q66]
+            [C11*Q11, C12*Q12, C13*Q13, 0.0, 0.0, 0.0],
+            [C12*Q12, C11/Q11, C13*Q13, 0.0, 0.0, 0.0],
+            [C13*Q13, C13*Q13, C33*Q33, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, C44*Q44, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, C44*Q44, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, C66*Q66]
         ])
 
     elif n == 3:  # 2D elástico P-SV
@@ -382,8 +381,8 @@ def Gamma_TTI(self, PropISO, PropVTI, PropTTI, dim, C):
         C33 = C_vti_real[1,1]
 
         C_imag = fire.as_tensor([
-            [C11/Q11, C13/Q13],
-            [C13/Q13, C33/Q33]
+            [C11*Q11, C13*Q13],
+            [C13*Q13, C33*Q33]
         ])
 
     else:

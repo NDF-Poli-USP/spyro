@@ -39,6 +39,93 @@ def isotropic_elastic_without_pml(wave):
     wave.rhs = rhs(F)
     wave.B = Cofunction(V.dual())
     
+
+def elastic_without_pml(wave):
+    print("Elastic wave propagation")
+
+    V = wave.function_space
+    quad = wave.quadrature_rule
+
+    u = TrialFunction(V)
+    v = TestFunction(V)
+
+    u_nm1 = wave.u_nm1
+    u_n = wave.u_n
+
+    dt = Constant(wave.dt)
+    rho = wave.rho
+    lmbda = wave.lmbda
+    mu = wave.mu
+        
+    dim = V.mesh().topological_dimension()
+    voigt_size = 3 if dim == 2 else 6
+
+    C_elas = wave.C_elas
+
+    # -------------------------------------------------
+    # Conversion to Voigt notation
+    # -------------------------------------------------
+    def strain_vector_from_displacement(w):
+        g = grad(w)
+        if dim == 2:
+            return as_vector([g[0, 0], g[1, 1], g[0, 1] + g[1, 0]])
+        else:
+            return as_vector([g[0, 0], g[1, 1], g[2, 2],
+                              g[1, 2] + g[2, 1],
+                              g[0, 2] + g[2, 0],
+                              g[0, 1] + g[1, 0]])
+
+    def tensor_to_voigt(T):
+        if dim == 2:
+            return as_vector([T[0, 0], T[1, 1], T[0, 1] + T[1, 0]])
+        else:
+            return as_vector([T[0, 0], T[1, 1], T[2, 2],
+                              T[1, 2] + T[2, 1],
+                              T[0, 2] + T[2, 0],
+                              T[0, 1] + T[1, 0]])
+
+    # -------------------------------------------------
+    # Inertial term
+    # -------------------------------------------------
+    F_m = (rho / (dt**2)) * dot(u - 2*u_n + u_nm1, v) * dx(scheme=quad)
+
+    # -------------------------------------------------
+    # Displacement strain
+    # -------------------------------------------------
+    e_n = strain_vector_from_displacement(u_n)
+    e_v = strain_vector_from_displacement(v)
+
+    # -------------------------------------------------
+    # Total elastic strain
+    # -------------------------------------------------
+    sigma_vec = dot(C_elas, e_n)
+
+    # -------------------------------------------------
+    # Variational form
+    # -------------------------------------------------
+    F_k = dot(e_v, sigma_vec) * dx(scheme=quad)
+
+    # -------------------------------------------------
+    # Sources and boundary
+    # -------------------------------------------------
+    F_s = 0
+    if getattr(wave, "body_forces", None) is not None:
+        F_s += dot(wave.body_forces, v) * dx(scheme=quad)
+
+    F_t = local_abc_form(wave)
+
+    # -------------------------------------------------
+    # Total form
+    # -------------------------------------------------
+    F = F_m + F_k - F_s - F_t
+
+    wave.lhs = lhs(F)
+    A = assemble(wave.lhs, bcs=wave.bcs, mat_type="matfree")
+    wave.solver = LinearSolver(A, solver_parameters=wave.solver_parameters)
+
+    wave.rhs = rhs(F)
+    wave.B = Cofunction(V.dual())
+
 ##################################################################################################
 def viscoelastic_maxwell_gsls_without_pml_Q(wave):
     """
@@ -68,10 +155,10 @@ def viscoelastic_maxwell_gsls_without_pml_Q(wave):
     mu = wave.mu
 
     if wave.viscoelastic == True:
-        xi_list = wave.xi_list
+        zeta_list = wave.zeta_list
         y_list = wave.y_list
     else:
-        xi_list = []
+        zeta_list = []
         y_list = []
         
     dim = V.mesh().topological_dimension()
@@ -121,11 +208,11 @@ def viscoelastic_maxwell_gsls_without_pml_Q(wave):
     # 6) Deformação de memória acumulada
     # -------------------------------------------------
     e_mem_components = [0.0] * voigt_size
-    if len(xi_list) > 0:
-        for i in range(len(xi_list)):
-            xi_voigt = tensor_to_voigt(xi_list[i])
+    if len(zeta_list) > 0:
+        for i in range(len(zeta_list)):
+            zeta_voigt = tensor_to_voigt(zeta_list[i])
             for j in range(voigt_size):
-                e_mem_components[j] += y_list[i] * xi_voigt[j]
+                e_mem_components[j] += y_list[i] * zeta_voigt[j]
     e_mem = as_vector(e_mem_components)
 
     # -------------------------------------------------

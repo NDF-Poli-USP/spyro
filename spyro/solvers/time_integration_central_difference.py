@@ -62,31 +62,25 @@ def central_difference(wave, source_id=0):
                     V = wave.function_space
                     W = wave.strain_space
 
-                    xi_list    = wave.xi_list
+                    zeta_list    = wave.zeta_list
                     omega_list = wave.omega_list
                     
-                    # =====================================
                     # Strain rate
-                    # =====================================
 
-                    eps_curr = project(epsilon(wave.vstate), W)
-                    eps_prev = project(epsilon(wave.prev_vstate), W)
-                    eps_rate_n = project((eps_curr - eps_prev) / dt, W)
+                    eps = project(epsilon(wave.vstate), W)
 
-                    # =====================================
                     # Update memory variables
-                    # =====================================
 
-                    for i in range(len(xi_list)):
+                    for i in range(len(zeta_list)):
 
-                        xi_old = Function(W)
-                        xi_old.assign(xi_list[i])
+                        zeta_old = Function(W)
+                        zeta_old.assign(zeta_list[i])
 
                         omega = omega_list[i]
 
-                        xi_np1 = project(xi_old + dt * omega * (eps_curr - xi_old), W)
+                        zeta_np1 = project(zeta_old + dt * omega * (eps - zeta_old), W)
 
-                        xi_list[i].assign(xi_np1)
+                        zeta_list[i].assign(zeta_np1)
                 
                 elif wave.visco_type == 'kelvin_voigt':
                     wave.eps_old = epsilon(wave.vstate)

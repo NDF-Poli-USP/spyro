@@ -5,10 +5,13 @@ from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
                        as_matrix, as_vector)
 
 from .elastic_wave import ElasticWave
-from .forms import (isotropic_elastic_without_pml,
-                    isotropic_elastic_with_pml,viscoelastic_kelvin_voigt_without_pml,
-                    viscoelastic_zener_without_pml, viscoelastic_gsls_without_pml, viscoelastic_maxwell_gsls_without_pml,
-                    viscoelastic_maxwell_without_pml, viscoelastic_maxwell_gsls_without_pml_Q)
+from .forms import (elastic_without_pml,
+                    viscoelastic_kelvin_voigt_without_pml,
+                    viscoelastic_zener_without_pml, 
+                    viscoelastic_gsls_without_pml, 
+                    viscoelastic_maxwell_gsls_without_pml,
+                    viscoelastic_maxwell_without_pml, 
+                    viscoelastic_maxwell_gsls_without_pml_Q)
 from .functionals import mechanical_energy_form
 from ...domains.space import FE_method
 from ...utils.typing import override
@@ -188,7 +191,10 @@ class IsotropicWave(ElasticWave):
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
 
-        self.wave_type = self.input_dictionary.get("wave_type", 'isotropic')
+        try:
+            self.wave_type = self.input_dictionary.get("wave_type", 'isotropic')
+        except:
+            self.wave_type = 'isotropic'
 
         W = fire.FunctionSpace(self.mesh, "CG", 1)
         
@@ -261,30 +267,25 @@ class IsotropicWave(ElasticWave):
             
             if d["visco_type"] == 'maxwell_gsls_Q':
                 from ufl import conditional, lt
-                # -------------------------
-                # Parâmetros do modelo GSLS
-                # -------------------------
-                self.y_list     = d["y_gsls"]        # lista de y_l
-                self.omega_list = d["omega_gsls"]    # lista de ω_l
+                
+                # GSLS parameters
+                self.y_list     = d["y_gsls"]        # list of y_l
+                self.omega_list = d["omega_gsls"]    # list of omega_l
                 dim = self.function_space.mesh().topological_dimension()
 
-                num_branches = d["branches"]  # ou len(self.y_list)
+                num_branches = d["branches"] 
 
-                # -------------------------
-                # Parâmetros elásticos
-                # -------------------------
+                # Elastic parameters
                 self.lmbda_s = float(d["lmbda_s"])
                 self.mu_s    = float(d["mu_s"])
-                # -------------------------
-                # Parâmetros de atenuação Q
-                # -------------------------
-                # Podem ser Constant ou Function
-                self.Q_type = d["Q_type"]
-                self.Qp_inv = d["Qp_inv"]
-                self.Qs_inv = d["Qs_inv"]
-                self.Qepsilon_inv = d["Qepsilon_inv"]
-                self.Qgamma_inv = d["Qgamma_inv"]
-                self.Qdelta_inv = d["Qdelta_inv"]
+                
+                # Q parameters
+                self.Q_type = d["Q_type"] 
+                self.Qp_inv = d["Qp_inv"] # Attenuation related to the P-Wave
+                self.Qs_inv = d["Qs_inv"] # Attenuation related to the S-Wave
+                self.Qepsilon_inv = d["Qepsilon_inv"] # Attenuation related to epsilon
+                self.Qgamma_inv = d["Qgamma_inv"] # Attenuation related to gamma
+                self.Qdelta_inv = d["Qdelta_inv"] # Attenuation related to delta
 
                 if self.Q_type in ['Constant', 'constant', 'const', 'file', 'File']:
                         Qp_inv = self.Qp_inv
@@ -292,6 +293,7 @@ class IsotropicWave(ElasticWave):
                         Qepsilon_inv = self.Qepsilon_inv
                         Qdelta_inv = self.Qdelta_inv
                         Qgamma_inv = self.Qgamma_inv
+
                 elif self.Q_type in ['cond', 'Conditional', 'conditional']:
                         Qp_inv = self.Qp_inv(self.mesh)
                         Qs_inv = self.Qs_inv(self.mesh)
@@ -299,22 +301,15 @@ class IsotropicWave(ElasticWave):
                         Qdelta_inv = self.Qdelta_inv(self.mesh)
                         Qgamma_inv = self.Qgamma_inv(self.mesh)
                 
-                
-                # -------------------------
-                # Variáveis de memória ξ_l
-                # -------------------------
-                self.xi_list = [
-                    Function(self.strain_space, name=f"Memory variable xi_{i}")
+                # Memory variables
+                self.zeta_list = [
+                    Function(self.strain_space, name=f"Memory variable zeta_{i}")
                     for i in range(num_branches)
                 ]
 
-                # Inicialização
-                for xi in self.xi_list:
-                    xi.assign(0.0)
+                for zeta in self.zeta_list:
+                    zeta.assign(0.0)
 
-                # -------------------------
-                # deformações auxiliares
-                # -------------------------
                 self.eps_np1 = Function(self.strain_space, name="eps_np1")
                 self.eps_n   = Function(self.strain_space, name="eps_n")
 
@@ -386,7 +381,7 @@ class IsotropicWave(ElasticWave):
                 viscoelastic_maxwell_gsls_without_pml_Q(self)
         else:
             if self.abc_boundary_layer_type is None:
-                viscoelastic_maxwell_gsls_without_pml_Q(self)
+                elastic_without_pml(self)
             elif self.abc_boundary_layer_type == "PML":
                 isotropic_elastic_with_pml(self)
             
