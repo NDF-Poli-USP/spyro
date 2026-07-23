@@ -20,13 +20,21 @@ is ``wave.comm``; differentiating it ``allreduce``-sums
 ``dJ/dm = sum_i dJ_i/dm`` over the ensemble communicator. The gradient is then
 validated with a Taylor test.
 """
+from pathlib import Path
+import sys
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 import firedrake as fire
 import firedrake.adjoint as fire_ad
 import spyro
 import pytest
+from checkpoint_schedules import Revolve, SingleMemoryStorageSchedule
 
 
-final_time = 0.6
+final_time = 0.5
 
 dictionary = {}
 dictionary["options"] = {
@@ -110,7 +118,7 @@ def build_direction(Wave_obj):
     return direction
 
 
-def get_forward_model():
+def get_forward_model(checkpointing=False, schedule=None):
     """Build exact and guess models and record the automated-adjoint tape.
 
     The exact model uses a two-layer velocity contrast; the guess model is a
@@ -126,7 +134,7 @@ def get_forward_model():
     """
     # Exact model (observed data).
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.2})
     cond = fire.conditional(Wave_obj_exact.mesh_z > -0.5, 1.5, 3.5)
     Wave_obj_exact.set_initial_velocity_model(
         conditional=cond,
@@ -138,11 +146,12 @@ def get_forward_model():
     # Guess model (control to be differentiated).
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.real_shot_record = rec_out_exact
-    Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.2})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
 
     # The control must be a Function for pyadjoint to differentiate it.
-    Wave_obj_guess.enable_automated_adjoint()
+    Wave_obj_guess.enable_automated_adjoint(
+        checkpointing=checkpointing, checkpoint_schedule=schedule)
     assert isinstance(Wave_obj_guess.c, fire.Function)
 
     # The ensemble passed to the EnsembleReducedFunctional is wave.comm.
@@ -159,12 +168,21 @@ def get_forward_model():
 
 @pytest.mark.newer_firedrake
 @pytest.mark.parallel(2)
-def test_gradient_auto_adjoint_parallel():
+@pytest.mark.parametrize(
+    "checkpointing, schedule",
+    [
+        (False, None),
+        (True, Revolve(int(final_time / dictionary["time_axis"]["dt"]) + 1, 10)),
+        (True, SingleMemoryStorageSchedule()),
+    ],
+)
+def test_gradient_auto_adjoint_parallel(checkpointing, schedule):
     """Taylor-test the ensemble automated-adjoint gradient.
 
     Runs on two cores: two sources (ensemble parallelism), one core per shot.
     """
-    Wave_obj_guess = get_forward_model()
+    Wave_obj_guess = get_forward_model(
+        checkpointing=checkpointing, schedule=schedule)
 
     # Sanity check the ensemble (shot) parallelism is active, one core per shot.
     comm = Wave_obj_guess.comm
@@ -206,4 +224,7 @@ def test_gradient_auto_adjoint_parallel():
 
 
 if __name__ == "__main__":
-    test_gradient_auto_adjoint_parallel()
+    test_gradient_auto_adjoint_parallel(
+        checkpointing=True,
+        schedule=Revolve(int(final_time / dictionary["time_axis"]["dt"]) + 1, 10),
+    )
