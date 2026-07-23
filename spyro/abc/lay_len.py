@@ -57,22 +57,24 @@ def f_layer(x, a_par, vibration_mode=1, damping_ratio=0.999, function_type='FL')
     """
 
     # Reflection coefficient
+    s = damping_ratio
     s2 = damping_ratio ** 2.
+    m = vibration_mode
     ma = vibration_mode * a_par
     CR = abs(s2 / (s2 + (4. * x / ma) ** 2.))
 
-    if typ == "CR":
+    if function_type == "CR":
         return CR
 
     # Attenuation amplitude factor
-    AS = 1. + (1. / 8.) * (damping_ratio * ma / x)**2.
-    ax0 = vibration_mode * pi * AS
-    ax1 = (1 - s2)**0.5
-    ax2 = damping_ratio / ax1
-    ax3 = (2 * pi * x / a_par) * AS
+    AS = 1. + (1. / 8.) * (s * ma / x)**2.
+    ax0 = m * pi * AS
+    ax1 = (1. - s2)**0.5
+    ax2 = s / ax1
+    ax3 = (2. * pi * x / a_par) * AS
     RF = abs(exp(-s * ax0) * (cos(ax1 * ax0) + ax2 * sin(ax1 * ax0)) * cos(ax3))
 
-    if typ == "FL":
+    if function_type == "FL":
         return CR - RF
 
 

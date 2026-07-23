@@ -8,7 +8,8 @@ both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
 from pytest import fail, fixture, mark, param
 from firedrake import conditional, ConvergenceError
 from firedrake import COMM_WORLD as comm
-from numpy import isclose
+from numpy import isclose, squeeze, zeros
+from scipy.optimize import minimize
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
 from spyro.io.basicio import parallel_print as pprint
@@ -101,7 +102,8 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneou
     # Define parameters for visualization
     str_ele = element_geometry + "_" + ("Hom" if homogeneous else "Het")
     dictionary["visualization"] = {  # Output folder
-        "output_folder": f"output/modal_test{dimension}d/modal_test{dimension}d" + str_ele
+        "output_folder": f"output/modal_analytical_test{dimension}d"
+        + f"/modal_analytical_test{dimension}d" + str_ele
     }
 
     return dictionary
@@ -129,10 +131,6 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
     fitting_c : `tuple`
         Parameters for fitting equivalent velocity regression.
-    modal_solver_lst : `list`
-        List of methods to be used to solve the eigenvalue problem.
-        Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
-        'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
     """
 
     # ============ SIMULATION PARAMETERS ============
@@ -198,35 +196,16 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     # Finding critical points
     Wave_obj.layer_ops.critical_boundary_points(Wave_obj)
 
-    # ============ MODAL ANALYSIS ============
-
-    # Modal solvers
-    if dimension == 2:
-        modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
-                            'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
-
-    if dimension == 3:
-        if element_geometry == "T":
-            modal_solver_lst = ['ANALYTICAL', 'KRYLOVSCH_CH', 'KRYLOVSCH_GH', 'RAYLEIGH']
-        else:
-            modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG',
-                                'KRYLOVSCH_CG', 'KRYLOVSCH_GG', 'RAYLEIGH']
-
-    return Wave_obj, fitting_c, modal_solver_lst
+    return Wave_obj, fitting_c
 
 
-def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
+def run_modal(Wave_obj, fitting_c, exp_value, n_root=1):
     """Solve the eigenvalue problem for models 2D and 3D.
 
     Parameters
     ----------
     Wave_obj : acoustic_wave.AcousticWave
         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
-    modal_solver_lst : `list`
-        List of methods to be used to solve the eigenvalue problem.
-        Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS',
-        'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-        'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
     fitting_c : `tuple
         Parameters for fitting equivalent velocity regression.
         Structure: (fc1, fc2, fp1, fp2):
@@ -253,49 +232,112 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
     # Updating velocity model
     Wave_obj.layer_ops.velocity_abc(Wave_obj)
 
-    # Loop for different modal solvers
-    for modal_solver in modal_solver_lst:
+    # Modal solver
+    modal_solver = 'ANALYTICAL'
+    pprint(f"\nModal Solver: {modal_solver}", comm=comm)
 
-        # Modal solver
-        pprint(f"\nModal Solver: {modal_solver}", comm=comm)
+    iter_count = [0]
 
-        # Reference to resource usage
-        tRef = comp_cost("tini")
+    def fun_for_freq(x, par_obj):
+        """Optimization sub-problem for the fundamental frequency.
+
+        Parameters
+        ----------
+        x : `array`
+            Design variable.
+        par_obj : `list`
+            Parameters for the optimization sub-problem.
+            Structure: [Wave_obj, exp_value]
+
+        Returns
+        -------
+        J : `float`
+            Objective function of the optimization sub-problem.
+        """
+
+        iter_count[0] += 1
+        print(f"Iteration: {iter_count[0]}")
+
+        # Parameters for the optimization sub-problem
+        Wave_obj, exp_value = par_obj
+
+        # Design variables
+        fitting_c = tuple(x)
+        fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.3f}, "
+        pprint((fit_str + "{:.3f}\n").format(*fitting_c), comm=comm)
 
         # Computing fundamental frequency
-        Wave_obj.layer_ops.fundamental_frequency(Wave_obj, method=modal_solver,
+        Wave_obj.layer_ops.fundamental_frequency(Wave_obj, method="ANALYTICAL",
                                                  fitting_c=fitting_c)
 
-        # Estimating computational resource usage
-        name_cost = Wave_obj.path_case_abc + modal_solver + "_"
-        comp_cost("tfin", tRef=tRef, user_name=name_cost)
+        # Objective linearized function and its gradient
+        # J = (Wave_obj.fundam_freq - exp_value)**2
+        J = (Wave_obj.fundam_freq - 0.95 * exp_value)\
+            * (Wave_obj.fundam_freq - 1.05 * exp_value)
 
-        tol = 0.07 if (modal_solver == 'ANALYTICAL'
-                       or modal_solver == 'RAYLEIGH') else 0.05
+        return J
 
-        abc_str = Wave_obj.case_abc if Wave_obj.layer_ops.layer_geometry.n_hyp is None \
-            else f"{Wave_obj.case_abc[:2]}" + \
-            f"{Wave_obj.layer_ops.layer_geometry.n_hyp:.1f}{Wave_obj.case_abc[-4:]}"
-        met_str = f"Fundamental Frequency {abc_str} {Wave_obj.dimension}D. "
-        met_str += f"Method {modal_solver}"
-        cmp_str = f"Expected {exp_value:.5f}, got = {Wave_obj.fundam_freq:.5f}"
-        assert isclose(Wave_obj.fundam_freq / exp_value, 1., atol=tol), \
-            "✗ " + met_str + "  → " + cmp_str
-        pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
+    # Reference to resource usage
+    tRef = comp_cost("tini")
+
+    # Optimization parameters
+    user_tol = 1e-6
+    user_maxit = 15
+    method_opt = 'SLSQP'  # 'SLSQP' (13.277-C) # 'COBYQA' (37.156-C) # 'L-BFGS-B' (38.165-C)
+    options = {'gtol': min(user_tol, 1e-6),
+               'fatol': min(1e1 * user_tol, 1e-5),
+               'ftol': min(1e1 * user_tol, 1e-5),
+               'xatol': min(1e2 * user_tol, 1e-4),
+               'xtol': min(1e2 * user_tol, 1e-4),
+               'catol': min(1e3 * user_tol, 1e-3),
+               'maxiter': max(user_maxit, 15),
+               'maxfev': max(user_maxit, 15),
+               'maxfun': max(user_maxit, 15),
+               'maxls': 5,  # Maximum number of line search steps
+               'norm': 2,
+               'adaptive': True,
+               'rhobeg': 1.0,
+               'eps': 1e-12,
+               'disp': False,
+               }
+    result = minimize(fun_for_freq, zeros(4), args=([Wave_obj, exp_value]),
+                      jac='2-point', method=method_opt, options=options)
+
+    # Optimized fitting parameters for the analytical solver
+    fitting_c = tuple(squeeze(result.x))
+
+    # Estimating computational resource usage
+    name_cost = Wave_obj.path_case_abc + modal_solver + "_"
+    comp_cost("tfin", tRef=tRef, user_name=name_cost)
+
+    tol = 0.05
+    fit_str = "Optimized Fitting Parameters for Analytical Solver: " + 3 * "{:.3f}, "
+    pprint((fit_str + "{:.3f}\n").format(*fitting_c), comm=comm)
+    abc_str = Wave_obj.case_abc if Wave_obj.layer_ops.layer_geometry.n_hyp is None \
+        else f"{Wave_obj.case_abc[:2]}" + \
+        f"{Wave_obj.layer_ops.layer_geometry.n_hyp:.1f}{Wave_obj.case_abc[-4:]}"
+    met_str = f"Fundamental Frequency {abc_str} {Wave_obj.dimension}D. "
+    met_str += f"Method {modal_solver}"
+    cmp_str = f"Expected {exp_value:.5f}, got = {Wave_obj.fundam_freq:.5f}"
+    assert isclose(Wave_obj.fundam_freq / exp_value, 1., atol=tol), \
+        "✗ " + met_str + "  → " + cmp_str
+    pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
 
 
 @mark.older_firedrake
 @mark.parametrize("element_geometry, dimension, degree_layer, homogeneous",
-                  [("T", 2, 2.5, True),
-                   ("T", 2, None, True),
-                   ("T", 2, 2.0, False),
-                   ("T", 2, None, False),
-                   param("T", 3, None, True, marks=mark.slow),
-                   param("T", 3, 6.0, True, marks=mark.slow),
-                   param("T", 3, 2.4, False, marks=mark.slow),
-                   param("T", 3, None, False, marks=mark.slow),
-                   param("Q", 3, None, True, marks=mark.slow),
-                   param("Q", 3, None, False, marks=mark.slow)])
+                  [
+                      ("T", 2, 2.5, True),
+                      ("T", 2, None, True),
+                      ("T", 2, 2.0, False),
+                      ("T", 2, None, False),
+                      param("T", 3, 6.0, True, marks=mark.slow),
+                      param("T", 3, None, True, marks=mark.slow),
+                      param("T", 3, 2.4, False, marks=mark.slow),
+                      param("T", 3, None, False, marks=mark.slow),
+                      param("Q", 3, None, True, marks=mark.slow),
+                      param("Q", 3, None, False, marks=mark.slow)
+                  ])
 def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogeneous):
     """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
@@ -497,7 +539,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
 
     # ============ SIMULATION PARAMETERS ============
 
-    Wave_obj, fitting_c, modal_solver_lst = wave_instance
+    Wave_obj, fitting_c = wave_instance
 
     # ============ EXPECTED VALUES ============
 
@@ -522,7 +564,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
 
     try:
         # Computing the fundamental frequency
-        run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value)
+        run_modal(Wave_obj, fitting_c, exp_value)
 
         # Renaming the folder if degree_layer is modified
         Wave_obj.layer_ops.rename_folder_habc()

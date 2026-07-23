@@ -5,7 +5,7 @@ from sympy import divisors
 from .nrbc import NRBC
 from .eik_min import Minimum_Eikonal
 from .lay_len import calc_size_lay
-from ..habc.error_measure import HABCError
+# from ..habc.error_measure import HABCError
 from ..solvers.modal.modal_sol import Modal_Solver
 from ..io.basicio import parallel_print as pprint
 from ..domains.space import create_function_space
@@ -898,7 +898,7 @@ class ABCLayer(NRBC):
         pot = int(abs(ceil(log10(max_dt))) + mag_add)
 
         # Maximum timestep size according to divisors of the final time
-        val_int_tf = int(10**pot * Wave..final_time)
+        val_int_tf = int(10**pot * Wave.final_time)
         val_int_dt = int(10**pot * max_dt)
         max_div = [d for d in divisors(val_int_tf) if d < val_int_dt]
         n_div = len(max_div)
