@@ -3,6 +3,7 @@ from . import helpers
 from .wave import Wave
 from ..io.basicio import parallel_print
 from ..receivers.Receivers import Receivers
+from ..utils.typing import LayerDampingType
 
 
 def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
@@ -75,7 +76,7 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
             # Assign the adjoint solution at the step `np1` to `uadj`.
             uadj.assign(wave_obj.get_function(state=wave_obj.next_vstate))
 
-            if wave_obj.abc_boundary_layer_type == "PML":
+            if wave_obj.abc_boundary_layer_type == LayerDampingType.PML:
                 # Pop to keep the list in sync, but use the element one
                 # step behind so that u_fwd and u_adj are at the same
                 # physical time (usol[k] = u^{k+1}; we need u^k).
@@ -89,7 +90,7 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
             grad_solver.solve()
             _trapezoidal_gradient_integration(dJ, gradi, step, nt)
 
-        if wave_obj.abc_boundary_layer_type == "PML":
+        if wave_obj.abc_boundary_layer_type == LayerDampingType.PML:
             wave_obj.X_nm1.assign(wave_obj.X_n)
             wave_obj.X_n.assign(wave_obj.X_np1)
         else:
@@ -168,20 +169,30 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
     forward_field = fire.Function(V)
     uadj = fire.Function(V)
 
-    if wave_obj.abc_boundary_layer_type == "PML":
+    if wave_obj.abc_boundary_layer_type == LayerDampingType.PML:
         # Always exclude PML region from gradient.
         # This is necessary once the gradient expression is not considering
         # the PML auxiliary variables. In addition, we are not interested
         # in the gradient in the PML region.
         indicator = _pml_interior_indicator(wave_obj)
         # Compute the gradient only in the physical domain.
+
+        """
+        TODO: Refactor the gradient due to new PML formulation
+        TODO: Add citations
+        Formulation based on:
+           "Efficient PML for the wave equation". Grote and Sim (2010)
+           "A Modified PML Acoustic Wave Equation". Kim (2019)
+        Acoustic Eq. is modified by dividing by c^2 (see implementation).
+        The remaining PML Eqs. remanin unchanged.
+        """
+
         ffG = (
             2.0 * wave_obj.c * indicator * fire.dot(
                 fire.grad(uadj), fire.grad(forward_field)) * m_v * dx
         )
-        parallel_print(
-            "Excluding PML region from gradient (mixed space)", wave_obj.comm
-        )
+        raise ValueError("PML gradient calculation temporarily unavailable")
+
     else:
         ffG = (
             -2 * (wave_obj.c) ** (-3) * fire.dot(forward_field, uadj) * m_v * dx

@@ -7,31 +7,38 @@ from numpy import inf, isinf, isnan, where
 
 
 def value_parameter_error(par_name, par_value, valid_values):
-    """Raise a ValueError with a specific error message.
+    """Validate parameter value and raise a ValueError with a specific error message.
 
     Parameters
     ----------
     par_name : `str`
-        Name of the parameter that has an invalid value.
+        Name of the parameter to be validated (used in error messages).
     par_value : `str`, `int` or `float`
-        Value of the parameter that is invalid.
+        Value of the parameter to be validated.
     valid_values : `list`
         List of valid values for the parameter.
+
+    Returns
+    -------
+    par_value : `str`, `int` or `float`
+        The validated parameter value.
 
     Raises
     ------
     ValueError
         If the parameter value is not in the list of valid values.
     """
-
     # Error message about the invalid parameter
-    err_str = f"Invalid {par_name}: '{par_value}'. Please use: "
-    opt_str = ", ".join([f"'{val}'" for val in valid_values])
-    last_comma = opt_str.rfind(',')
-    opt_str = opt_str[:last_comma] + " or" + opt_str[last_comma + 1:] \
-        if len(valid_values) > 1 else opt_str
+    if par_value not in valid_values:
+        err_str = f"Invalid {par_name}: '{par_value}'. Please use: "
+        opt_str = ", ".join([f"'{val}'" for val in valid_values])
+        last_comma = opt_str.rfind(',')
+        opt_str = opt_str[:last_comma] + " or" + opt_str[last_comma + 1:] \
+            if len(valid_values) > 1 else opt_str
 
-    raise ValueError(err_str + opt_str)
+        raise ValueError(err_str + opt_str)
+
+    return par_value
 
 
 def mutually_exclusive_parameter_error(par_name_lst, par_value_lst):
@@ -68,15 +75,15 @@ def mutually_exclusive_parameter_error(par_name_lst, par_value_lst):
     raise ValueError(exc_str + err_str + opt_str)
 
 
-def value_dimension_error(par_names, par_values, expected_dim):
-    """Raise a ValueError if parameter dimensions mismatch expected dimension.
+def value_model_dimension_error(par_names, parameters, expected_dim):
+    """Raise a ValueError if parameter dimensions mismatch expected model dimension.
 
     Parameters
     ----------
     par_names : `tuple`
         Names of the parameters to check dimensions.
-    par_values : `tuple`
-        Values of the parameters to check dimensions.
+    parameters : `tuple`
+        Parameters to check dimensions.
     expected_dim : `int`
         Expected dimension of the parameters (2 or 3).
 
@@ -87,13 +94,16 @@ def value_dimension_error(par_names, par_values, expected_dim):
     """
 
     str_reference, str_comparison = par_names
-    chk_reference, chk_comparison = par_values
+    par_reference, par_comparison = parameters
 
-    dim_err = (
-        f"Mismatch in domain dimensions\n"
-        f"{str_reference} ({chk_reference}), {str_comparison} ({chk_comparison}) "
-        f"do not match expected model dimension ({expected_dim}D).")
-    raise ValueError(dim_err)
+    chk_reference = len(par_reference)
+    chk_comparison = len(par_comparison)
+    if expected_dim != chk_reference or expected_dim != chk_comparison:
+        dim_err = (f"Mismatch in domain dimensions\n"
+                   f"{str_reference} ({chk_reference}), "
+                   f"{str_comparison} ({chk_comparison}) "
+                   f"do not match expected model dimension ({expected_dim}D).")
+        raise ValueError(dim_err)
 
 
 def clean_inst_num(data_arr):
@@ -116,14 +126,14 @@ def clean_inst_num(data_arr):
 def value_numerical_error(par_name, par_value, float_num=True, integer_num=False,
                           lower_bound=None, upper_bound=None,
                           include_lower_bound=False, include_upper_bound=False):
-    """Raise a ValueError with a specific error message for numerical parameters.
+    """Validate numerical parameters and raise a ValueError if invalid.
 
     Parameters
     ----------
     par_name : `str`
-        Name of the parameter that has an invalid value.
+        Name of the parameter to be validated (used in error messages).
     par_value : `int` or `float`
-        Value of the parameter that is invalid.
+        Value of the parameter to be validated.
     float_num : `bool`, optional
         If `True`, the parameter can be a float. Default is `True`.
     integer_num : `bool`, optional
@@ -137,10 +147,15 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
     include_upper_bound : `bool`, optional
         If `True`, the upper bound is included in the valid range. Default is `False`.
 
+    Returns
+    -------
+    par_value : `int` or `float`
+        The validated parameter value.
+
     Raises
     ------
     TypeError
-        If the parameter value is not of the expected type (float or integer).
+        If the parameter value is not of the expected type (`float` or `int`).
     ValueError
         If the parameter value is outside the specified bounds or the bounds are invalid.
     """
@@ -185,6 +200,8 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
 
         raise ValueError(f"'{par_name}' must be {bound_str}, got {par_value}.")
 
+    return par_value
+
 
 def enum_parameter_error(par_name, par_value, valid_enum):
     """Validate and convert an enum parameter, returning the enum instance.
@@ -197,9 +214,9 @@ def enum_parameter_error(par_name, par_value, valid_enum):
     Parameters
     ----------
     par_name : `str`
-        Name of the parameter being validated (used in error messages).
+        Name of the parameter to be validated (used in error messages).
     par_value : `object`
-        Value of the parameter to validate. Can be an `enum.EnumMeta` or a `str`.
+        Value of the parameter to be validated. Can be an `enum.EnumMeta` or a `str`.
     valid_enum : `enum.EnumMeta`
         Enum class containing the valid values for the parameter.
 
@@ -223,10 +240,37 @@ def enum_parameter_error(par_name, par_value, valid_enum):
     # Check if string maps to valid enum value
     if isinstance(par_value, str):
         valid_values = [enum.value for enum in valid_enum]
-        if par_value not in valid_values:
-            value_parameter_error(par_name, par_value, valid_values)
+        value_parameter_error(par_name, par_value, valid_values)
         return valid_enum(par_value)
 
     # Invalid type - neither enum instance nor string
     raise TypeError(f"'{par_name}' must be {valid_enum.__name__} or str"
                     f", got {type(par_value).__name__}")
+
+
+def value_string_error(par_name, par_value):
+    """Validate string parameters and raise a TypeError if invalid.
+
+    Parameters
+    ----------
+    par_name : `str`
+        Name of the parameter to be validated (used in error messages).
+    par_value : `str`
+        Value of the parameter to be validated.
+
+    Returns
+    -------
+    par_value : `str`
+        The validated parameter value.
+
+    Raises
+    ------
+    TypeError
+        If the parameter value is not of the expected type (`str`).
+    """
+
+    # Checking the parameter type
+    if not isinstance(par_value, str):
+        raise TypeError(f"'{par_name}' must be a string, got {type(par_value).__name__}.")
+
+    return par_value

@@ -181,7 +181,9 @@ def read_segy_velocity_model(fname):
     return vp, nz, nx
 
 
-def create_grid_dictionary_from_segy(filename, length_z=None, length_x=None):
+def create_grid_dictionary_from_segy(
+    filename: str, length_z: float, length_x: float
+):
     """Read a SEG-Y file and return a grid velocity dictionary.
 
     Parameters

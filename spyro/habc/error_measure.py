@@ -360,6 +360,9 @@ class HABCError():
     #     max_errIt = dat_reg_xCR[1]
     #     max_errPK = dat_reg_xCR[2]
 
+    #     value_parameter_error('crit_opt', crit_opt,
+    #                   ['err_difference', 'err_integral', 'err_sum'])
+
     #     if crit_opt == 'err_difference':
     #         y_err = [eI - eP for eI, eP in zip(max_errIt, max_errPK)]
 
@@ -368,11 +371,6 @@ class HABCError():
 
     #     elif crit_opt == 'err_sum':
     #         y_err = [eI + eP for eI, eP in zip(max_errIt, max_errPK)]
-
-    #     else:
-    #         value_parameter_error(
-    #             'crit_opt', crit_opt,
-    #             ['err_difference', 'err_integral', 'err_sum'])
 
     #     # Limits for the heuristic factor
     #     xCR_inf, xCR_sup = self.xCR_lim

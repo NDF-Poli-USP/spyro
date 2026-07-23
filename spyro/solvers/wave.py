@@ -1,4 +1,5 @@
 from abc import abstractmethod, ABCMeta
+from numpy import inf
 import warnings
 import firedrake as fire
 
@@ -15,7 +16,8 @@ from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
-from ..utils.typing import (AdjointType, FunctionalEvaluationMode,
+from ..utils.error_management import enum_parameter_error
+from ..utils.typing import (AdjointType, FunctionalEvaluationMode, LayerDampingType,
                             LayerShapeType, WaveType)
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
@@ -120,12 +122,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         model_parameters : `Python object`
             Contains model parameters.
         """
+
         super().__init__(dictionary=dictionary, comm=comm)
         self.initial_velocity_model = None
         self.gradient_mask_available = False
 
         # Setting wave type
-        self.wave_type = wave_type
+        self.wave_type = enum_parameter_error("wave_type", wave_type, WaveType)
 
         self.function_space = None
         self.dg0_scalar_function_space = None
@@ -185,7 +188,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        if self.abc_boundary_layer_type != "hybrid":
+        if self.abc_boundary_layer_type != LayerDampingType.HYBRID:
             self._initialize_model_parameters()
         self.matrix_building()
         self.wave_propagator()
@@ -698,9 +701,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         domain_dim = self.domain_dimensions()
 
         # Nyquist frequency
-        freq_Nyquist = None if self.analysis != "transient" else 1. / (2. * self.dt)
+        freq_Nyquist = inf if self.analysis != "transient" else 1. / (2. * self.dt)
 
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_boundary_layer_type == LayerDampingType.PML:
             from ..pml.pml_nsnc import PMLLayer
             self.layer_ops = PMLLayer(domain_dim, self.frequency, freq_Nyquist,
                                       dimension=self.dimension,
@@ -709,7 +712,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                       abc_reference_freq=self.abc_reference_freq,
                                       output_folder=self.output_folder, comm=self.comm)
 
-        if self.abc_boundary_layer_type == "hybrid":
+        if self.abc_boundary_layer_type == LayerDampingType.HYBRID:
             from ..habc.habc import HABCLayer
             self.layer_ops = HABCLayer(domain_dim, self.frequency, freq_Nyquist,
                                        self.abc_deg_layer, dimension=self.dimension,
@@ -721,7 +724,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                        output_folder=self.output_folder, comm=self.comm)
 
         # Identifier for the current case study
-        if self.abc_boundary_layer_type in ["PML", "hybrid"]:
+        if self.abc_boundary_layer_type in [LayerDampingType.PML, LayerDampingType.HYBRID]:
             self.case_abc = self.layer_ops.case_abc
             self.path_save = self.layer_ops.path_save
             self.path_case_abc = self.layer_ops.path_case_abc
