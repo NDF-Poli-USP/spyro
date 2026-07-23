@@ -13,10 +13,11 @@ from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..utils.typing import WaveType
 from ..plots import plot_model as spyro_plot_model
-from ..io.basicio import parallel_print, switch_serial_shot
+from ..io.basicio import parallel_print
 from ..io.basicio import load_shots, save_shots
+from ..io.parallelism_wrappers import switch_serial_shot
 from ..io import create_segy
-from ..utils import run_in_one_core
+from ..io.parallelism_wrappers import run_in_one_core
 
 
 try:
