@@ -39,7 +39,7 @@ def test_plot():
         "frequency": 8.0,
     }
     rectangle_dictionary["time_axis"] = {
-        "final_time": 2.0,  # Final time for event
+        "final_time": 1.5,  # Final time for event
     }
     Wave_obj = spyro.examples.Rectangle_acoustic(
         dictionary=rectangle_dictionary

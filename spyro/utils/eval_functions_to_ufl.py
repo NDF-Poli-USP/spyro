@@ -71,8 +71,7 @@ def generate_ufl_functions(mesh, expression, dimension):
     """
 
     # Check model dimension
-    if dimension not in [2, 3]:
-        value_parameter_error('dimension', dimension, [2, 3])
+    value_parameter_error('dimension', dimension, [2, 3])
 
     # Get available functions and variables
     namespace = available_functions_to_eval(mesh, dimension)

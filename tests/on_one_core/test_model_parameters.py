@@ -84,67 +84,55 @@ def test_method_reader():
         "dimension": 2,  # dimension
     }
     # Trying out different method entries and seeing if all of them work for MLT
-    test1 = False
     test_dictionary = deepcopy(test_dictionary0)
     test_dictionary["options"]["method"] = "MLT"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == "mass_lumped_triangle":
-        test1 = True
+    assert model.method == "mass_lumped_triangle", \
+        f"Expected 'mass_lumped_triangle', got '{model.method}'"
 
     test_dictionary = deepcopy(test_dictionary0)
-    test2 = False
     test_dictionary["options"]["method"] = "KMV"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == "mass_lumped_triangle":
-        test2 = True
+    assert model.method == "mass_lumped_triangle", \
+        f"Expected 'mass_lumped_triangle', got '{model.method}'"
 
     test_dictionary = deepcopy(test_dictionary0)
-    test3 = False
     test_dictionary["options"]["method"] = "mass_lumped_triangle"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == "mass_lumped_triangle":
-        test3 = True
+    assert model.method == "mass_lumped_triangle", \
+        f"Expected 'mass_lumped_triangle', got '{model.method}'"
 
     # Trying out different method entries for spectral quads
     test_dictionary = deepcopy(test_dictionary0)
-    test4 = False
     test_dictionary["options"]["method"] = "spectral_quadrilateral"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == "spectral_quadrilateral":
-        test4 = True
+    assert model.method == "spectral_quadrilateral", \
+        f"Expected 'spectral_quadrilateral', got '{model.method}'"
 
-    test5 = False
     test_dictionary = deepcopy(test_dictionary0)
     test_dictionary["options"]["method"] = "CG"
     test_dictionary["options"]["variant"] = "GLL"
-    try:
+    with pytest.raises(ValueError, match="Invalid variant: 'GLL'."):
         model = Model_parameters(dictionary=test_dictionary)
-    except ValueError:
-        test5 = True
 
-    test6 = False
     test_dictionary = deepcopy(test_dictionary0)
     test_dictionary["options"]["method"] = "SEM"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == "spectral_quadrilateral":
-        test6 = True
+    assert model.method == "spectral_quadrilateral", \
+        f"Expected 'spectral_quadrilateral', got '{model.method}'"
 
     # Trying out some entries for other less used methods
-    test7 = False
     test_dictionary = deepcopy(test_dictionary0)
     test_dictionary["options"]["method"] = "DG_triangle"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == "DG_triangle":
-        test7 = True
+    assert model.method == "DG_triangle", \
+        f"Expected 'DG_triangle', got '{model.method}'"
 
-    test8 = False
     test_dictionary = deepcopy(test_dictionary0)
     test_dictionary["options"]["method"] = "DG_quadrilateral"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == "DG_quadrilateral":
-        test8 = True
-
-    assert all([test1, test2, test3, test4, test5, test6, test7, test8])
+    assert model.method == "DG_quadrilateral", \
+        f"Expected 'DG_quadrilateral', got '{model.method}'"
 
 
 def test_cell_type_reader():
@@ -159,55 +147,44 @@ def test_cell_type_reader():
     # Testing lumped cases
     ct_dictionary0["options"]["variant"] = "lumped"
 
-    test1 = False
     ct_dictionary = deepcopy(ct_dictionary0)
     ct_dictionary["options"]["cell_type"] = "triangle"
     model = Model_parameters(dictionary=ct_dictionary)
-    if model.method == "mass_lumped_triangle":
-        test1 = True
+    assert model.method == "mass_lumped_triangle", \
+        f"Expected 'mass_lumped_triangle', got '{model.method}'"
 
-    test2 = False
     ct_dictionary = deepcopy(ct_dictionary0)
     ct_dictionary["options"]["cell_type"] = "quadrilateral"
     model = Model_parameters(dictionary=ct_dictionary)
-    if model.method == "spectral_quadrilateral":
-        test2 = True
+    assert model.method == "spectral_quadrilateral", \
+        f"Expected 'spectral_quadrilateral', got '{model.method}'"
 
     # Testing equispaced cases
     ct_dictionary0["options"]["variant"] = "equispaced"
 
-    test3 = False
     ct_dictionary = deepcopy(ct_dictionary0)
     ct_dictionary["options"]["cell_type"] = "triangle"
     model = Model_parameters(dictionary=ct_dictionary)
-    if model.method == "CG":
-        test3 = True
+    assert model.method == "CG", f"Expected 'CG', got '{model.method}'"
 
-    test4 = False
     ct_dictionary = deepcopy(ct_dictionary0)
     ct_dictionary["options"]["cell_type"] = "quadrilateral"
     model = Model_parameters(dictionary=ct_dictionary)
-    if model.method == "CG":
-        test4 = True
+    assert model.method == "CG", f"Expected 'CG', got '{model.method}'"
 
     # Testing DG cases
     ct_dictionary0["options"]["variant"] = "DG"
 
-    test5 = False
     ct_dictionary = deepcopy(ct_dictionary0)
     ct_dictionary["options"]["cell_type"] = "triangle"
     model = Model_parameters(dictionary=ct_dictionary)
-    if model.method == "DG_triangle":
-        test5 = True
+    assert model.method == "DG_triangle", f"Expected 'DG_triangle', got '{model.method}'"
 
-    test6 = False
     ct_dictionary = deepcopy(ct_dictionary0)
     ct_dictionary["options"]["cell_type"] = "quadrilateral"
     model = Model_parameters(dictionary=ct_dictionary)
-    if model.method == "DG_quadrilateral":
-        test6 = True
-
-    assert all([test1, test2, test3, test4, test5, test6])
+    assert model.method == "DG_quadrilateral", \
+        f"Expected 'DG_quadrilateral', got '{model.method}'"
 
 
 def test_dictionary_conversion():
@@ -341,23 +318,13 @@ def test_dictionary_conversion():
     model_from_new = Model_parameters(dictionary=new_dictionary)
 
     # checking relevant information from models
-    same = True
-    if model_from_new.method != model_from_old.method:
-        same = False
-    if model_from_new.initial_time != model_from_old.initial_time:
-        same = False
-    if model_from_new.degree != model_from_old.degree:
-        same = False
-    if model_from_new.dimension != model_from_old.dimension:
-        same = False
-    if model_from_new.dt != model_from_old.dt:
-        same = False
-    if model_from_new.final_time != model_from_old.final_time:
-        same = False
-    if model_from_new.forward_output_filename != model_from_old.forward_output_filename:
-        same = False
-
-    assert same
+    assert model_from_new.method == model_from_old.method
+    assert model_from_new.initial_time == pytest.approx(model_from_old.initial_time)
+    assert model_from_new.degree == model_from_old.degree
+    assert model_from_new.dimension == model_from_old.dimension
+    assert model_from_new.dt == pytest.approx(model_from_old.dt)
+    assert model_from_new.final_time == pytest.approx(model_from_old.final_time)
+    assert model_from_new.forward_output_filename == model_from_old.forward_output_filename
 
 
 def test_time_exception():  # TODO: improve
@@ -387,6 +354,17 @@ def test_receiver_exception():  # TODO: improve
         model = Model_parameters(dictionary=ex_dictionary)  # noqa: F841
 
 
+def test_analysis_exception():
+    ex_dictionary = deepcopy(dictionary)
+    with pytest.raises(ValueError, match="Invalid analysis: 'None'."):
+        ex_dictionary["options"] = {
+            "degree": 4,  # p order
+            "dimension": 2,  # dimension
+            "analysis": None,  # Options: transient, modal or eikonal
+        }
+        model = Model_parameters(dictionary=ex_dictionary)  # noqa: F841
+
+
 if __name__ == "__main__":
     test_method_reader()
     test_cell_type_reader()
@@ -394,5 +372,6 @@ if __name__ == "__main__":
     test_time_exception()
     test_source_exception()
     test_receiver_exception()
+    test_analysis_exception()
 
     print("END")
