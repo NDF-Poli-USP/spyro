@@ -216,8 +216,7 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
 
 
 def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
-    """
-    Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
+    """Solve the eigenvalue problem for models 2D and 3D.
 
     Parameters
     ----------
