@@ -283,7 +283,7 @@ def run_modal(Wave_obj, fitting_c, exp_value, n_root=1):
     # Optimization parameters
     user_tol = 1e-6
     user_maxit = 15
-    method_opt = 'SLSQP'  # 'SLSQP' (13.277-C) # 'COBYQA' (37.156-C) # 'L-BFGS-B' (38.165-C)
+    method_opt = 'SLSQP'  # 'SLSQP' (13.277) # 'COBYQA' (37.156) # 'L-BFGS-B' (38.165)
     options = {'gtol': min(user_tol, 1e-6),
                'fatol': min(1e1 * user_tol, 1e-5),
                'ftol': min(1e1 * user_tol, 1e-5),
