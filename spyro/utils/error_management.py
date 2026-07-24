@@ -3,7 +3,7 @@
 This file contains methods for handling errors in Spyro, either to send
 messages to the user or to prevent numerical instability in objects."""
 
-from numpy import inf, isinf, isnan, where
+from numpy import inf, isinf, isnan, ndarray, where
 
 
 def value_parameter_error(par_name, par_value, valid_values):
@@ -28,6 +28,7 @@ def value_parameter_error(par_name, par_value, valid_values):
     ValueError
         If the parameter value is not in the list of valid values.
     """
+
     # Error message about the invalid parameter
     if par_value not in valid_values:
         err_str = f"Invalid {par_name}: '{par_value}'. Please use: "
@@ -119,6 +120,7 @@ def clean_inst_num(data_arr):
     data_arr : `array`
         An array with null or positive components.
     """
+    type_array_error("data_arr", data_arr, ndarray, (float, int))
     data_arr[where(isnan(data_arr) | isinf(data_arr) | (data_arr < 0.0))] = 0.0
     return data_arr
 
@@ -255,7 +257,7 @@ def value_string_error(par_name, par_value):
     ----------
     par_name : `str`
         Name of the parameter to be validated (used in error messages).
-    par_value : `str`
+    par_value : `object`
         Value of the parameter to be validated.
 
     Returns
@@ -272,5 +274,80 @@ def value_string_error(par_name, par_value):
     # Checking the parameter type
     if not isinstance(par_value, str):
         raise TypeError(f"'{par_name}' must be a string, got {type(par_value).__name__}.")
+
+    return par_value
+
+
+def type_data_structure_error(par_name, par_value, expected_type,
+                              expected_type_element, expected_length=None):
+    """Validate data structure parameters and raise a TypeError if invalid.
+
+    Parameters
+    ----------
+    par_name : `str`
+        Name of the parameter to be validated (used in error messages).
+    par_value : `object`
+        Value of the parameter to be validated.
+    expected_type : `str`
+        Expected type of the data structure parameter as a `str`. The validation
+        supports the types `dict`, `list`, `tuple`, or `ndarray` (NumPy arrays).
+    expected_type_element : `tuple`
+        Expected type of the data structure elements passed as a `str`. The validation
+        supports the types `float`, `int`, `str` or `NoneType`. Exs: ("float", "int")
+        for a NumPy array or ("float", "int", "str" or "NoneType") for a mixed list.
+    expected_length : `int`, optional
+        Expected length of the data structure parameter. Default is `None`,
+        in which case the length is not checked.
+
+    Returns
+    -------
+    par_value : `dict`, `list`, `tuple`, or `ndarray`
+        The validated parameter value.
+
+    Raises
+    ------
+    TypeError
+        If the parameter value is not of the expected type given by 'expected_type' or the
+        elements are not of the expected type given by 'expected_type_element'.
+    ValueError
+        If the parameter value does not have the expected length (if provided).
+    """
+
+    value_parameter_error("expected_type", expected_type,
+                          ["dict", "list", "tuple", "ndarray"])
+
+    parameter_map = {"dict": dict,
+                     "list": list,
+                     "tuple": tuple,
+                     "ndarray": ndarray}
+
+    element_map = {"int": int,
+                   "float": float,
+                   "NoneType": type(None),
+                   "str": str}
+
+    # Checking the parameter type
+    if not isinstance(par_value, parameter_map[expected_type]):
+        raise TypeError(f"'{par_name}' must be a {expected_type}, "
+                        f"got {type(par_value).__name__}.")
+
+    # Check if the parameter has the expected length
+    if expected_length is not None and len(par_value) != expected_length:
+        raise ValueError(f"'{par_name}' must have length {expected_length}, "
+                         f"got length {len(par_value)}.")
+
+    # Check if all elements are of expected type
+    if isinstance(expected_type_element, str):
+        expected_type_element = (expected_type_element,)
+    for etype in expected_type_element:
+        value_parameter_error("expected_type_element", etype,
+                              ["float", "int", "str", "NoneType"])
+    expected_types = tuple(element_map[etype] for etype in expected_type_element)
+    if not all(isinstance(item, expected_types) for item in par_value):
+        opt_str = ", ".join([f"'{etype}'" for etype in expected_type_element])
+        last_comma = opt_str.rfind(',')
+        opt_str = opt_str[:last_comma] + " or" + opt_str[last_comma + 1:] \
+            if len(expected_type_element) > 1 else opt_str
+        raise TypeError(f"All elements of '{par_name}' must be of type: {opt_str}.")
 
     return par_value
