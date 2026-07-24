@@ -10,6 +10,7 @@ from scipy.special import (beta, betainc, gamma, jn_zeros, jnp_zeros,
                            mathieu_modcem1, spherical_jn)
 from scipy.stats import norm as sn
 from sys import float_info
+from .modal_forms_and_matrices import assemble_sparse_matrices, weak_forms
 from ...utils.error_management import value_parameter_error
 from ...utils.stats_tools import coeff_of_determination
 from ...io.basicio import parallel_print as pprint
@@ -54,8 +55,6 @@ class Modal_Solver():
 
     Methods
     -------
-    assemble_sparse_matrices()
-        Assemble the sparse matrices for SciPy solvers.
     c_equivalent()
         Compute equivalent homogeneous velocity for an inhomogeneous model.
     estimate_timestep()
@@ -72,8 +71,6 @@ class Modal_Solver():
         Solve the eigenvalue problem with sparse matrices using SciPy.
     solver_with_ufl()
         Solve the eigenvalue problem using UFL forms with SLEPc.
-    weak_forms()
-        Generate the bilinear forms for the modal problem.
     """
 
     def __init__(self, dimension=2, method=None, calc_max_dt=False, comm=None):
@@ -134,57 +131,6 @@ class Modal_Solver():
 
         pprint(f"Solver Method: {self.method}", comm=self.comm)
 
-    @staticmethod
-    def weak_forms(c, V, quad_rule=None, source=False, user_load=None):
-        """Generate the bilinear forms for the modal problem.
-
-        Also, it can generate a source term in weak form.
-
-        Parameters
-        ----------
-        c : `Firedrake.Function`
-            Velocity model.
-        V : `Firedrake.FunctionSpace`
-            Function space for the modal problem.
-        quad_rule : `str`, optional
-            Quadrature rule to use for the integration.
-            Default is None, which uses the default quadrature rule.
-        source : `bool`, optional
-            Option to get a source term in weak form. Default is `False`
-        user_load : `Firedrake.Function`, optional
-            User-defined load for the source term. Default is `None`, in
-            which a small constant load is applied over the entire domain.
-
-        Returns
-        -------
-        a : `Firedrake.Form`
-            Weak form representing the stiffness matrix.
-        m : `Firedrake.Form`
-            Weak form  representing the mass matrix.
-        L : `Firedrake.Form`, optional
-            Weak form representing a source term. Returned only if 'source' is `True`
-        """
-
-        # Functions for the problem
-        u, v = fire.TrialFunction(V), fire.TestFunction(V)
-        dx = fire.dx(**quad_rule) if quad_rule else fire.dx
-
-        # Bilinear forms
-        a = c * c * fire.inner(fire.grad(u), fire.grad(v)) * dx
-
-        if source:  # Source term
-            if user_load is None:
-                q = fire.Constant(1.e-3)
-            else:
-                q = user_load
-
-            L = q * v * dx
-            return a, L
-
-        m = fire.inner(u, v) * dx
-
-        return a, m
-
     def c_equivalent(self, c, V, quad_rule=None, type_homog="energy",
                      static_load_for_ceq=None):
         """Compute equivalent homogeneous velocity for an inhomogeneous model.
@@ -226,8 +172,8 @@ class Modal_Solver():
             # Equivalent velocity by energy-equivalent homogenization
 
             # Weak forms
-            a, L = self.weak_forms(c, V, quad_rule=quad_rule, source=True,
-                                   user_load=static_load_for_ceq)
+            a, L = weak_forms(c, V, quad_rule=quad_rule, source=True,
+                              user_load=static_load_for_ceq)
 
             # Compute the energy
             solve(a == L, u)
@@ -248,49 +194,6 @@ class Modal_Solver():
             c_eq = assemble(c * dx) / volume
 
         return c_eq
-
-    @staticmethod
-    def assemble_sparse_matrices(a, m, return_M_inv=False):
-        """Assemble the sparse matrices for SciPy solvers.
-
-        Parameters
-        ----------
-        a : `Firedrake.Form`
-            Weak form representing the stiffness matrix.
-        m : `Firedrake.Form`
-            Weak form  representing the mass matrix.
-        return_M_inv : `bool`, optional
-            Option to return the inverse mass matrix instead of the mass.
-
-        Returns
-        -------
-        Asp : `csr matrix`
-            Sparse matrix representing the stiffness matrix.
-        Msp : `csr matrix`
-            Sparse matrix representing the mass matrix.
-        Msp_inv : `csr matrix`, optional
-            Sparse matrix representing the inverse mass matrix.
-            Returned only if 'return_M_inv' is `True`
-        """
-
-        # Assemble the stiffness matrix
-        A = fire.assemble(a)
-        a_ptr, a_ind, a_val = A.petscmat.getValuesCSR()
-        Asp = ss.csr_matrix((a_val, a_ind, a_ptr), A.petscmat.size)
-
-        # Assemble the mass matrix
-        M = fire.assemble(m)
-        m_ptr, m_ind, m_val = M.petscmat.getValuesCSR()
-        Msp = ss.csr_matrix((m_val, m_ind, m_ptr), M.petscmat.size)
-
-        if return_M_inv:
-            # Assemble the inverse mass matrix
-            m_val_inv = np.array(m_val)
-            m_val_inv[m_val_inv != 0.] = 1. / m_val_inv[m_val_inv != 0.]
-            Msp_inv = ss.csr_matrix((m_val_inv, m_ind, m_ptr), M.petscmat.size)
-            return Asp, Msp_inv
-
-        return Asp, Msp
 
     def solver_with_sparse_matrix(self, Asp, Msp, method, k=2, inv_oper=False):
         """Solve the eigenvalue problem with sparse matrices using Scipy.
@@ -669,7 +572,7 @@ class Modal_Solver():
                                                 quad_rule=quad_rule)
         else:
             # Get bilinear forms
-            a, m = self.weak_forms(c, V, quad_rule=quad_rule)
+            a, m = weak_forms(c, V, quad_rule=quad_rule)
 
             # Add shift to stabilize Neumann BC null space
             if shift > 0:
@@ -679,7 +582,7 @@ class Modal_Solver():
             Lsp = self.solver_with_ufl(a, m, k=k)
 
         elif self.method in ['ARNOLDI', 'LANCZOS', 'LOBPCG']:
-            Asp, Msp = self.assemble_sparse_matrices(a, m)
+            Asp, Msp = assemble_sparse_matrices(a, m)
             Lsp = self.solver_with_sparse_matrix(Asp, Msp, self.method,
                                                  k=k, inv_oper=inv_oper)
 
@@ -687,8 +590,8 @@ class Modal_Solver():
 
         return Lsp
 
-    def estimate_timestep(self, c, V, final_time, shift=0., quad_rule=None,
-                          inv_oper=False, fraction=0.7):
+    def estimate_timestep(self, c, V, final_time, shift=0.,
+                          quad_rule=None, inv_oper=False, fraction=0.7):
         """Estimate the maximum stable timestep based on the spectral radius.
 
         Optionally uses the Gershgorin Circle Theorem to estimate the
@@ -724,21 +627,21 @@ class Modal_Solver():
         if self.method == 'ANALYTICAL':
             pprint("Estimating Maximum Eigenvalue", comm=self.comm)
 
-            a, m = self.weak_forms(c, V, quad_rule=quad_rule)
+            a, m = weak_forms(c, V, quad_rule=quad_rule)
 
             if shift > 0:
-                a += fire.Constant(shift) * m
+                a += shift * m
 
-            Asp, Msp_inv = \
-                self.assemble_sparse_matrices(a, m, return_M_inv=True)
+            Asp, Msp_inv = assemble_sparse_matrices(a, m, return_M_inv=True)
             Lsp = Msp_inv.multiply(Asp)
             max_eigval = np.amax(np.abs(Lsp.diagonal())) - shift
 
         else:
             pprint("Computing Exact Maximum Eigenvalue", comm=self.comm)
+
+            # (eig = 0 is a rigid body motion)
             Lsp = self.solve_eigenproblem(
                 c, V=V, shift=shift, quad_rule=quad_rule, inv_oper=inv_oper)
-            # (eig = 0 is a rigid body motion)
             max_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
 
         # Maximum stable timestep
