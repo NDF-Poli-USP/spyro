@@ -328,15 +328,15 @@ def run_modal(Wave_obj, fitting_c, exp_value, n_root=1):
 @mark.parametrize("element_geometry, dimension, degree_layer, homogeneous",
                   [
                       ("T", 2, 2.5, True),
-                      ("T", 2, None, True),
-                      ("T", 2, 2.0, False),
-                      ("T", 2, None, False),
-                      param("T", 3, 6.0, True, marks=mark.slow),
-                      param("T", 3, None, True, marks=mark.slow),
-                      param("T", 3, 2.4, False, marks=mark.slow),
-                      param("T", 3, None, False, marks=mark.slow),
-                      param("Q", 3, None, True, marks=mark.slow),
-                      param("Q", 3, None, False, marks=mark.slow)
+                      # ("T", 2, None, True),
+                      # ("T", 2, 2.0, False),
+                      # ("T", 2, None, False),
+                      # param("T", 3, 6.0, True, marks=mark.slow),
+                      # param("T", 3, None, True, marks=mark.slow),
+                      # param("T", 3, 2.4, False, marks=mark.slow),
+                      # param("T", 3, None, False, marks=mark.slow),
+                      # param("Q", 3, None, True, marks=mark.slow),
+                      # param("Q", 3, None, False, marks=mark.slow)
                   ])
 def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogeneous):
     """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).

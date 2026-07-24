@@ -120,7 +120,7 @@ def clean_inst_num(data_arr):
     data_arr : `array`
         An array with null or positive components.
     """
-    type_array_error("data_arr", data_arr, ndarray, (float, int))
+    type_data_structure_error("data_arr", data_arr, "ndarray", ("float", "int"))
     data_arr[where(isnan(data_arr) | isinf(data_arr) | (data_arr < 0.0))] = 0.0
     return data_arr
 
