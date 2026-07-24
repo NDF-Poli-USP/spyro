@@ -1,5 +1,4 @@
-from firedrake import (assemble, ConvergenceError, dx as fire_dx,
-                       Function, grad, inner, solve)
+from firedrake import ConvergenceError
 from numpy import (arange, arccosh, argmax, array, asarray,
                    diag, inf, maximum, mean, pi, sqrt)
 from scipy.optimize import broyden1, curve_fit
@@ -27,9 +26,9 @@ class Modal_Analytical_Solver():
 
     Attributes
     ----------
-    calc_max_dt : `bool`
-        Option to estimate the maximum stable timestep for the computation of the
-        transient response. Default is `False`.
+    comm : `object`, optional
+        An object representing the communication interface for parallel processing.
+        Default is `None`.
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D.
 
@@ -43,13 +42,11 @@ class Modal_Analytical_Solver():
         Compute the frequency factor for rectangular or prismatic geometries.
     _reg_geometry_hyp()
         Perform the nonlinear regression for the hypershape geometry factor.
-    c_equivalent()
-        Compute equivalent homogeneous velocity for an inhomogeneous model.
     solver_analytical()
         Compute the analytical eigenvalue for hypershapes by using homogenization.
     """
 
-    def __init__(self, dimension=2):
+    def __init__(self, dimension=2, comm=None):
         """Initialize the Modal_Analytical_Solver class.
 
         Parameters
@@ -70,69 +67,6 @@ class Modal_Analytical_Solver():
 
         # Communicator MPI
         self.comm = comm
-
-    def c_equivalent(self, c, V, quad_rule=None, type_homog="energy",
-                     static_load_for_ceq=None):
-        """Compute equivalent homogeneous velocity for an inhomogeneous model.
-
-        The method uses an energy-equivalent homogenization by default.
-
-        Parameters
-        ----------
-        c : `Firedrake.Function`
-            Velocity model.
-        V : `Firedrake.FunctionSpace`
-            Function space for the modal problem.
-        quad_rule : `str`, optional
-            Quadrature rule to use for the integration.
-            Default is `None`, which uses the default quadrature rule.
-        type_homog : `str`, optional
-            Type of homogenization: "energy" or "volume". Default is "energy"
-        static_load_for_ceq : `Firedrake.Function`, optional
-            Static load for the energy-equivalent homogenization.
-            Only used if 'type_homog' is "energy". Default is `None`, in which
-            a small constant load is applied over the entire domain.
-
-        Returns
-        -------
-        c_eq : `float`
-            Equivalent homogeneous velocity.
-        """
-
-        # Check type of homogenization
-        value_parameter_error("type_homog", type_homog, ["energy", "volume"])
-
-        # Integration measure
-        dx = fire_dx(**quad_rule) if quad_rule else fire_dx
-
-        # State variable
-        u = Function(V)
-
-        if type_homog == "energy":
-            # Equivalent velocity by energy-equivalent homogenization
-
-            # Weak forms
-            a, L = self.weak_forms(c, V, quad_rule=quad_rule, source=True,
-                                   user_load=static_load_for_ceq)
-
-            # Compute the energy
-            solve(a == L, u)
-            energy = assemble(0.5 * c * c * inner(grad(u), grad(u)) * dx)
-
-            # Compute the equivalent velocity
-            c_eq = sqrt(energy / assemble(bilinear_term * dx))
-
-        elif type_homog == "volume":
-            # Equivalent velocity by volume-average homogenization
-
-            # Compute the volume
-            u.assign(1.)
-            volume = assemble(u * dx)
-
-            # Compute the equivalent velocity
-            c_eq = assemble(c * dx) / volume
-
-        return c_eq
 
     @ staticmethod
     def _freq_factor_rec(hyper_axes, bc="Neumann"):
@@ -580,7 +514,7 @@ class Modal_Analytical_Solver():
         value_numerical_error("c_eq", c_eq, lower_bound=0., include_lower_bound=False)
 
         # Hyperellipse parameters
-        n_hyp, hyp_axes = hyp_par[0], hyp_par[1:]
+        n_hyp, hyper_axes = hyp_par[0], hyp_par[1:]
 
         # Check the hypershape degree
         n_hyp = 330 if n_hyp is None else value_numerical_error(
@@ -606,17 +540,17 @@ class Modal_Analytical_Solver():
                               lower_bound=0., upper_bound=1.,
                               include_lower_bound=True, include_upper_bound=True)
 
-        a, b = hyp_axes[: 2]
+        a, b = hyper_axes[: 2]
         if self.dimension == 2:  # 2D
             all_axes_equal = (a == b)
 
         if self.dimension == 3:  # 3D
-            c = hyp_axes[2]
+            c = hyper_axes[2]
             all_axes_equal = (a == b == c)
 
         # Frequency factors
-        f_rec = self._freq_factor_rec(hyp_axes, bc=bc)
-        f_ell = self._freq_factor_ell(hyp_axes, bc=bc, all_axes_equal=all_axes_equal)
+        f_rec = self._freq_factor_rec(hyper_axes, bc=bc)
+        f_ell = self._freq_factor_ell(hyper_axes, bc=bc, all_axes_equal=all_axes_equal)
         f_hyp, c_reg = self._freq_factor_hyp(n_hyp, f_rec, f_ell, c_eq, bc=bc,
                                              c_eqref=c_eqref, fitting_c=fitting_c,
                                              cut_plane_percent=cut_plane_percent)

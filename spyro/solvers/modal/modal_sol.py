@@ -1,5 +1,9 @@
 import firedrake as fire
 import numpy as np
+from firedrake import (assemble, ConvergenceError, dx as fire_dx,
+                       Function, grad, inner, solve)
+from numpy import sqrt
+
 import scipy.sparse as ss
 from scipy.optimize import broyden1, curve_fit
 from scipy.special import (beta, betainc, gamma, jn_zeros, jnp_zeros,
@@ -34,7 +38,7 @@ class Modal_Solver():
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D.
     method : `str`
-        Method to use for solving the eigenvalue problem.
+        Method to use for solving the eigenvalue problem. See `valid_methods` for options.
         Default is `None`, which uses the 'KRYLOVSCH_CH' method.
     valid_methods: `list`
         List of valid methods for solving the eigenproblem
@@ -52,6 +56,8 @@ class Modal_Solver():
     -------
     assemble_sparse_matrices()
         Assemble the sparse matrices for SciPy solvers.
+    c_equivalent()
+        Compute equivalent homogeneous velocity for an inhomogeneous model.
     estimate_timestep()
         Estimate the maximum stable timestep based on the spectral radius.
     generate_eigenfunctions()
@@ -110,19 +116,21 @@ class Modal_Solver():
         # Communicator MPI
         self.comm = comm
 
-        # Default methods
-        if method is None:
-            self.method = 'KRYLOVSCH_CH'
-        else:
-            self.method = method
-
         # Valid methods for solving the eigenproblem
-        valid_methods = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG']
-        if not self.calc_max_dt:
-            valid_methods.extend(['KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-                                  'KRYLOVSCH_GH', 'KRYLOVSCH_GG',
-                                  'RAYLEIGH'])
-        self.valid_methods = value_parameter_error('method', self.method, valid_methods)
+        def_methods = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG']
+        self.valid_methods = def_methods + (['KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+                                             'KRYLOVSCH_GH', 'KRYLOVSCH_GG',
+                                             'RAYLEIGH'] if not self.calc_max_dt else [])
+
+        # Method for solving the eigenproblem
+        method = 'KRYLOVSCH_CH' if method is None else method
+        self.method = value_parameter_error('method', method, self.valid_methods)
+
+        # Initializating the layer
+        if not self.calc_max_dt and self.method == 'ANALYTICAL':
+            # Initializing the analytical solver
+            from .modal_ana_sol import Modal_Analytical_Solver
+            self.AnaModSol = Modal_Analytical_Solver(dimension=self.dimension, comm=comm)
 
         pprint(f"Solver Method: {self.method}", comm=self.comm)
 
@@ -176,6 +184,70 @@ class Modal_Solver():
         m = fire.inner(u, v) * dx
 
         return a, m
+
+    def c_equivalent(self, c, V, quad_rule=None, type_homog="energy",
+                     static_load_for_ceq=None):
+        """Compute equivalent homogeneous velocity for an inhomogeneous model.
+
+        The method uses an energy-equivalent homogenization by default.
+
+        Parameters
+        ----------
+        c : `Firedrake.Function`
+            Velocity model.
+        V : `Firedrake.FunctionSpace`
+            Function space for the modal problem.
+        quad_rule : `str`, optional
+            Quadrature rule to use for the integration.
+            Default is `None`, which uses the default quadrature rule.
+        type_homog : `str`, optional
+            Type of homogenization: "energy" or "volume". Default is "energy"
+        static_load_for_ceq : `Firedrake.Function`, optional
+            Static load for the energy-equivalent homogenization.
+            Only used if 'type_homog' is "energy". Default is `None`, in which
+            a small constant load is applied over the entire domain.
+
+        Returns
+        -------
+        c_eq : `float`
+            Equivalent homogeneous velocity.
+        """
+
+        # Check type of homogenization
+        value_parameter_error("type_homog", type_homog, ["energy", "volume"])
+
+        # Integration measure
+        dx = fire_dx(**quad_rule) if quad_rule else fire_dx
+
+        # State variable
+        u = Function(V)
+
+        if type_homog == "energy":
+            # Equivalent velocity by energy-equivalent homogenization
+
+            # Weak forms
+            a, L = self.weak_forms(c, V, quad_rule=quad_rule, source=True,
+                                   user_load=static_load_for_ceq)
+
+            # Compute the energy
+            solve(a == L, u)
+            bilinear_term = 0.5 * inner(grad(u), grad(u))
+            energy = assemble(c * c * bilinear_term * dx)
+
+            # Compute the equivalent velocity
+            c_eq = sqrt(energy / assemble(bilinear_term * dx))
+
+        elif type_homog == "volume":
+            # Equivalent velocity by volume-average homogenization
+
+            # Compute the volume
+            u.assign(1.)
+            volume = assemble(u * dx)
+
+            # Compute the equivalent velocity
+            c_eq = assemble(c * dx) / volume
+
+        return c_eq
 
     @staticmethod
     def assemble_sparse_matrices(a, m, return_M_inv=False):
@@ -588,9 +660,9 @@ class Modal_Solver():
             c_eq = self.c_equivalent(c, V, quad_rule=quad_rule,
                                      static_load_for_ceq=static_load_for_ceq)
 
-            Lsp = self.solver_analytical(c_eq, hyp_par,
-                                         c_eqref=c_eqref, fitting_c=fitting_c,
-                                         cut_plane_percent=cut_plane_percent)
+            Lsp = self.AnaModSol.solver_analytical(c_eq, hyp_par, c_eqref=c_eqref,
+                                                   fitting_c=fitting_c,
+                                                   cut_plane_percent=cut_plane_percent)
 
         elif self.method == 'RAYLEIGH':
             Lsp = self.solver_rayleigh_quotient(c, coord_norm, V, k=k,
