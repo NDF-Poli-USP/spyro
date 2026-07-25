@@ -154,7 +154,7 @@ def _check_units(c):
     return c
 
 
-def _grid_velocity_data_to_source_function(grid_velocity_data):
+def _grid_velocity_data_to_source_function(grid_velocity_data, comm=None):
     """Build a CG1 Firedrake function on a structured mesh from grid data."""
 
     # Adding imports here to avoid circular imports
@@ -183,7 +183,7 @@ def _grid_velocity_data_to_source_function(grid_velocity_data):
         "abc_pad_length": grid_velocity_data.get("abc_pad_length"),
     }
     source_mesh = AutomaticMesh(
-        MeshingParameters(input_mesh_dictionary=source_mesh_parameters)
+        MeshingParameters(input_mesh_dictionary=source_mesh_parameters, comm=comm)
     ).create_mesh()
 
     source_space = fire.FunctionSpace(source_mesh, "CG", 1)
@@ -208,10 +208,13 @@ def _grid_velocity_data_to_source_function(grid_velocity_data):
     return source
 
 
-def project_grid_velocity_data(grid_velocity_data, V):
+def project_grid_velocity_data(grid_velocity_data, V, comm=None):
     """Project a structured grid dictionary onto a Firedrake function space."""
-    source = _grid_velocity_data_to_source_function(grid_velocity_data)
+    from ..plots.plots import debug_pvd
+    source = _grid_velocity_data_to_source_function(grid_velocity_data, comm=comm)
+    debug_pvd(source, "check_source.pvd")
     c = fire.Function(V).interpolate(source, allow_missing_dofs=True)
+    debug_pvd(c, "check_c.pvd")
     return _check_units(c)
 
 
@@ -286,10 +289,10 @@ def interpolate(Model, fname, V):
 
     """
     if isinstance(fname, dict):
-        return project_grid_velocity_data(fname, V)
+        return project_grid_velocity_data(fname, V, comm=Model.comm)
     elif isinstance(fname, str) and fname.endswith((".hdf5", ".h5")):
         grid_velocity_data = _hdf5_velocity_model_to_grid_velocity_data(Model, fname)
-        return project_grid_velocity_data(grid_velocity_data, V)
+        return project_grid_velocity_data(grid_velocity_data, V, comm=Model.comm)
     else:
         raise NotImplementedError
 
