@@ -150,7 +150,7 @@ class HyperLayer():
         domain_hyp : `tuple`
             Domain dimensions with layer without truncation by free surface.
             2D : (length_z + 2 * pad_len, length_x + 2 * pad_len).
-            3D : (length_x + 2 * pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len).
+            3D : (length_z + 2 * pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len).
 
         Returns
         -------
