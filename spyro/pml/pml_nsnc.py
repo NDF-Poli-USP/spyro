@@ -171,7 +171,7 @@ class PMLLayer(ABCLayer):
         Wave_object : `acoustic_wave.AcousticWave`
             An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
         ufl_coordinates_pml : `ufl.geometry.SpatialCoordinate`
-            Domain Coordinates including the absorbing layer.
+            Domain coordinates including the absorbing layer.
         V : `Firedrake.FunctionSpace`
             Function space for the damping field
         degree_prof : `int`, optional

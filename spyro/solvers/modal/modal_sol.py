@@ -11,9 +11,12 @@ from scipy.special import (beta, betainc, gamma, jn_zeros, jnp_zeros,
 from scipy.stats import norm as sn
 from sys import float_info
 from .modal_forms_and_matrices import assemble_sparse_matrices, weak_forms
+from .modal_rq_matrices import generate_eigenfunctions, matrices_rayleigh_quotient
 from ...utils.error_management import value_parameter_error
-from ...utils.stats_tools import coeff_of_determination
 from ...io.basicio import parallel_print as pprint
+from ...utils.stats_tools import coeff_of_determination
+from ...utils.eval_functions_to_ufl import generate_ufl_functions
+
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -59,10 +62,6 @@ class Modal_Solver():
         Compute equivalent homogeneous velocity for an inhomogeneous model.
     estimate_timestep()
         Estimate the maximum stable timestep based on the spectral radius.
-    generate_eigenfunctions()
-        Generate eigenfunctions for the Rayleigh Quotient method.
-    generate_norm_coords()
-        Generate the normalized mesh coordinates w.r.t. the hypershape centroid.
     solve_eigenproblem()
         Solve the eigenvalue problem with Neumann boundary conditions.
     solver_rayleigh_quotient()
@@ -123,9 +122,8 @@ class Modal_Solver():
         method = 'KRYLOVSCH_CH' if method is None else method
         self.method = value_parameter_error('method', method, self.valid_methods)
 
-        # Initializating the layer
+        # Initializing the analytical solver
         if not self.calc_max_dt and self.method == 'ANALYTICAL':
-            # Initializing the analytical solver
             from .modal_ana_sol import Modal_Analytical_Solver
             self.AnaModSol = Modal_Analytical_Solver(dimension=self.dimension, comm=comm)
 
@@ -321,127 +319,25 @@ class Modal_Solver():
 
         return Lsp
 
-    def generate_norm_coords(self, mesh, domain_dim, hyp_axes):
-        """Generate the normalized mesh coordinates w.r.t. the hypershape centroid.
-
-        Parameters
-        ----------
-        mesh : `firedrake mesh`
-            Mesh for the modal problem
-        domain_dim : `tuple`
-            Original domain dimensions (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
-        hyp_axes : `tuple`
-            Semi-axes of the hyperellipse (a, b) or hyperellipsoid (a, b, c)
-
-        Returns
-        -------
-        coord_norm : `tuple`
-            Normalized coordinates w.r.t. the hypershape centroid.
-            Structure: (xn, zn) for 2D and (xn, zn, yn) for 3D
-        """
-
-        # Original domain dimensions
-        Lx, Lz = domain_dim[:2]
-
-        # Hypershape semi-axes
-        a, b = hyp_axes[:2]
-
-        # Mesh coordinates
-        coord = fire.SpatialCoordinate(mesh)
-        x, z = coord[0], coord[1]
-
-        # Normalized coordinates w.r.t. the hypershape centroid
-        x_e = (x - fire.Constant(Lx / 2.)) / fire.Constant(2. * a)
-        z_e = (z + fire.Constant(Lz / 2.)) / fire.Constant(2. * b)
-        coord_norm = (x_e, z_e)
-        if self.dimension == 3:  # 3D
-            Ly, c, y = domain_dim[2], hyp_axes[2], coord[2]
-            y_e = (y - fire.Constant(Ly / 2.)) / fire.Constant(2. * c)
-            coord_norm += (y_e,)
-
-        return coord_norm
-
-    def generate_eigenfunctions(self, coord_norm, V, k=2, bc="Neumann"):
-        """Generate eigenfunctions for the Rayleigh Quotient method.
-
-        Parameters
-        ----------
-        coord_norm : `tuple`
-            Normalized coordinates w.r.t. the hypershape centroid.
-            Structure: (xn, zn) for 2D and (xn, zn, yn) for 3D
-        V : `Firedrake.FunctionSpace`
-            Function space for the modal problem
-        k : `int`, optional
-            Number of eigenvalues to compute. Default is 2
-        bc : `str`, optional
-            Boundary condition type: "Dirichlet" or "Neumann".
-            Default is "Neumann"
-
-        Returns
-        -------
-        eig_funcs : `list`
-            Eigenfunctions computed as Firedrake functions
-        grad_eig : `list`
-            Eigenfunction gradients computed as Firedrake functions
-        """
-
-        # Number of eigenfunctions to use
-        n_eigfunc = max(2 * k, 2)
-
-        # Mesh normalized coordinates w.r.t. the hypershape centroid
-        xn, zn = coord_norm[:2]
-
-        # Precompute cosine values for efficiency
-        if bc == "Neumann":
-            fi_lst = [fire.cos(i * fire.pi * xn) for i in range(n_eigfunc)]
-            fj_lst = [fire.cos(j * fire.pi * zn) for j in range(n_eigfunc)]
-
-        if bc == "Dirichlet":
-            fi_lst = [fire.sin(i * fire.pi * xn) for i in range(n_eigfunc)]
-            fj_lst = [fire.sin(j * fire.pi * zn) for j in range(n_eigfunc)]
-
-        if self.dimension == 3:  # 3D
-            yn = coord_norm[2]
-            if bc == "Neumann":
-                fk_lst = [fire.cos(k * fire.pi * yn) for k in range(n_eigfunc)]
-            if bc == "Dirichlet":
-                fk_lst = [fire.sin(k * fire.pi * yn) for k in range(n_eigfunc)]
-
-        # Create eigenfunctions
-        eig_funcs = []
-        grad_eig = []
-        for i in range(n_eigfunc):
-            fi = fi_lst[i]
-            for j in range(n_eigfunc):
-                fj = fj_lst[j]
-
-                if self.dimension == 2:  # 2D
-                    # Eigenfunction: cos/sin(iπx/Lx) * cos/sin(jπz/Lz)
-                    u_eig = fire.Function(V).interpolate(fi * fj)
-                    eig_funcs.append(u_eig)
-                    grad_eig.append(fire.grad(u_eig))
-
-                if self.dimension == 3:  # 3D
-                    for k in range(n_eigfunc):
-                        fk = fk_lst[k]
-                        u_eig = fire.Function(V).interpolate(fi * fj * fk)
-                        eig_funcs.append(u_eig)
-                        grad_eig.append(fire.grad(u_eig))
-
-        return eig_funcs, grad_eig
-
-    def solver_rayleigh_quotient(self, c, coord_norm, V, k=2, quad_rule=None):
+    def solver_rayleigh_quotient(self, c, ufl_coordinates, V,
+                                 mesh_limits, k=2, quad_rule=None):
         """Solve the eigenvalue problem using the Rayleigh Quotient method.
 
         Parameters
         ----------
         c : `Firedrake.Function` or `float`
             Velocity model
-        coord_norm : `tuple`
-            Normalized coordinates w.r.t. the hypershape centroid.
-            Structure: (xn, zn) for 2D and (xn, zn, yn) for 3D
+        ufl_coordinates : `ufl.geometry.SpatialCoordinate`
+            Domain coordinates.
         V : `Firedrake.FunctionSpace`
             Function space for the modal problem
+        mesh_limits : `tuple`, optional
+            Tuple containing the minimum and maximum coordinates of the mesh.
+            Structure: (min_coordinates, max_coordinates):
+            - min_coordinates : `array`
+                Array containing the minimum coordinates in each dimension (z, x, y).
+            - max_coordinates : `array`
+                Array containing the maximum coordinates in each dimension (z, x, y).
         k : `int`, optional
             Number of eigenvalues to compute. Default is 2
         quad_rule : `str`, optional
@@ -455,44 +351,21 @@ class Modal_Solver():
         """
 
         # Create eigenfunctions
-        eig_funcs, grad_eig = self.generate_eigenfunctions(coord_norm, V, k=k)
+        eig_funcs, grad_eig = generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
+                                                      k=k, dimension=self.dimension)
 
-        # Initialize matrices for generalized eigenvalue problem
-        n_funcs = len(eig_funcs)
-        Asp = ss.lil_matrix((n_funcs, n_funcs))  # Stiffness matrix
-        Msp = ss.lil_matrix((n_funcs, n_funcs))  # Mass matrix
-
-        # Assemble stiffness and mass matrices
-        dx = fire.dx(**quad_rule) if quad_rule else fire.dx
-        for i in range(n_funcs):
-            for j in range(i, n_funcs):  # Only upper triangle
-                # Stiffness and mass matrix term
-                A_term = fire.assemble(c * c * fire.inner(grad_eig[i],
-                                                          grad_eig[j]) * dx)
-                M_term = fire.assemble(fire.inner(eig_funcs[i],
-                                                  eig_funcs[j]) * dx)
-
-                # Set symmetric entries
-                Asp[i, j] = A_term
-                Asp[j, i] = A_term
-                Msp[i, j] = M_term
-                Msp[j, i] = M_term
-
-        # Convert to CSR format for eigenvalue solver
-        Asp = Asp.tocsr()
-        Msp = Msp.tocsr()
+        # Assemble matrices for generalized eigenvalue problem
+        Asp, Msp = matrices_rayleigh_quotient(c, eig_funcs, grad_eig, quad_rule=quad_rule)
 
         # Solve the generalized eigenvalue problem
         Lsp = self.solver_with_sparse_matrix(Asp, Msp, 'ARNOLDI', k=k)
 
         return Lsp
 
-    def solve_eigenproblem(self, c, V=None, k=2, shift=0.,
-                           quad_rule=None, inv_oper=False,
-                           coord_norm=None, hyp_par=None,
-                           cut_plane_percent=1., c_eqref=None,
-                           fitting_c=(0., 0., 0., 0.),
-                           static_load_for_ceq=None):
+    def solve_eigenproblem(self, c, V=None, k=2, shift=0., quad_rule=None,
+                           inv_oper=False, ufl_coordinates=None, mesh_limits=None,
+                           hyp_par=None, cut_plane_percent=1., c_eqref=None,
+                           fitting_c=(0., 0., 0., 0.), static_load_for_ceq=None):
         """Solve the eigenvalue problem with Neumann boundary conditions.
 
         Parameters
@@ -511,9 +384,15 @@ class Modal_Solver():
         inv_oper : `bool`, optional
             Option to use an inverse operator for improving convergence.
             Default is False
-        coord_norm : `tuple`
-            Normalized coordinates w.r.t. the hypershape centroid.
-            Structure: (xn, zn) for 2D and (xn, zn, yn) for 3D
+        ufl_coordinates : `ufl.geometry.SpatialCoordinate`
+            Domain coordinates.
+        mesh_limits : `tuple`, optional
+            Tuple containing the minimum and maximum coordinates of the mesh.
+            Structure: (min_coordinates, max_coordinates):
+            - min_coordinates : `array`
+                Array containing the minimum coordinates in each dimension (z, x, y).
+            - max_coordinates : `array`
+                Array containing the maximum coordinates in each dimension (z, x, y).
         hyp_par : `tuple`, optional
             Hyperellipshape parameters. Default is None
             Structure 2D: (n_hyp, a_hyp, b_hyp)
@@ -568,8 +447,8 @@ class Modal_Solver():
                                                    cut_plane_percent=cut_plane_percent)
 
         elif self.method == 'RAYLEIGH':
-            Lsp = self.solver_rayleigh_quotient(c, coord_norm, V, k=k,
-                                                quad_rule=quad_rule)
+            Lsp = self.solver_rayleigh_quotient(c, ufl_coordinates, V, mesh_limits,
+                                                k=k, quad_rule=quad_rule)
         else:
             # Get bilinear forms
             a, m = weak_forms(c, V, quad_rule=quad_rule)
@@ -640,8 +519,9 @@ class Modal_Solver():
             pprint("Computing Exact Maximum Eigenvalue", comm=self.comm)
 
             # (eig = 0 is a rigid body motion)
-            Lsp = self.solve_eigenproblem(
-                c, V=V, shift=shift, quad_rule=quad_rule, inv_oper=inv_oper)
+            Lsp = self.solve_eigenproblem(c, V=V, shift=shift,
+                                          quad_rule=quad_rule,
+                                          inv_oper=inv_oper)
             max_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
 
         # Maximum stable timestep

@@ -224,7 +224,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
             z_cut = length_z / 2.
 
             # Cut plane percentage
-            cut_plane_perc = z_cut / self.layer_geometry.hyper_axes[1]
+            cut_plane_percent = z_cut / self.layer_geometry.hyper_axes[1]
 
             # Define the load for the energy-equivalent homogenization
             # Static load for HABC model
@@ -246,19 +246,21 @@ class HABCLayer(ABCLayer, HABC_Damping):
                                              quad_rule=Wave.quadrature_rule,
                                              hyp_par=hyp_par, c_eqref=c_eqref,
                                              fitting_c=fitting_c,
-                                             cut_plane_percent=cut_plane_perc,
+                                             cut_plane_percent=cut_plane_percent,
                                              static_load_for_ceq=q_lay)
 
         elif method == 'RAYLEIGH':
 
-            # Normalized coordinates
-            coord_norm = mod_sol.generate_norm_coords(Wave.mesh,
-                                                      self.domain_dim,
-                                                      self.layer_geometry.hyper_axes)
+            # Domain dimensions with free surface truncation
+            dom_layer_trunc = self.abc_domain_dimensions(full_hyp=False)
+            ufl_coordinates_habc, min_coords, max_coords = \
+                Wave.mesh_ops.get_spatial_coordinates_abc(Wave.mesh, dom_layer_trunc,
+                                                          return_mesh_limits=True)
 
             Lsp = mod_sol.solve_eigenproblem(Wave.c, V=Wave.function_space,
                                              quad_rule=Wave.quadrature_rule,
-                                             coord_norm=coord_norm)
+                                             ufl_coordinates=ufl_coordinates_habc,
+                                             mesh_limits=(min_coords, max_coords))
 
         else:
             Lsp = mod_sol.solve_eigenproblem(Wave.c, V=Wave.function_space, shift=1e-8,
