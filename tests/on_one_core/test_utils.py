@@ -2,12 +2,29 @@ import spyro
 import scipy as sp
 import numpy as np
 import math
+from spyro.utils.freq_tools import freq_response
 
 
 def test_butter_lowpast_filter():
+    """
+    Test the butter_lowpass_filter function from spyro.utils.utils module.
+
+    Notes
+    -----
+    https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.windows.flattop.html#scipy.signal.windows.flattop
+    Flat top windows are used for taking accurate measurements of signal amplitude in
+    the frequency domain, with minimal scalloping error from the center of a frequency
+    bin to its edges, compared to others. This is a 5th-order cosine window, with the
+    5 terms optimized to make the main lobe maximally flat.
+    See D’Antona, G., Ferrero A., “Digital Signal Processing for Measurement Systems”,
+    Springer Media, 2006, p. 70 DOI:10.1007/0-387-28666-7.
+    TODO: Add citation
+    """
     Wave_obj = spyro.examples.Rectangle_acoustic(
-        dictionary={"absorving_boundary_conditions": {"absorb_top": True}}
+        dictionary={"absorving_boundary_conditions": {"absorb_top": True},
+                    "mesh": {"h": 0.09}}  # Increasing from 0.05 to 0.09 to save time
     )
+
     layer_values = [1.5, 2.0, 2.5, 3.0]
     z_switches = [-0.25, -0.5, -0.75]
     Wave_obj.multiple_layer_velocity_model(z_switches, layer_values)
@@ -19,10 +36,11 @@ def test_butter_lowpast_filter():
 
     fs = 1.0 / Wave_obj.dt
 
-    # Checks if frequency with greater power density is close to 5
-    (f, S) = sp.signal.periodogram(rec10, fs)
+    (f, S) = sp.signal.periodogram(rec10, fs, window='flattop', detrend='linear')
     peak_frequency = f[np.argmax(S)]
-    test1 = math.isclose(peak_frequency, 5.0, rel_tol=1e-2)
+
+    # Checks if frequency with greater power density is close to 5
+    test1 = math.isclose(peak_frequency, Wave_obj.frequency, rel_tol=1e-2)
 
     # Checks if the new frequency is lower than the cutoff
     cutoff_frequency = 3.0
@@ -35,10 +53,19 @@ def test_butter_lowpast_filter():
     filtered_peak_frequency = filt_f[np.argmax(filt_S)]
     test2 = filtered_peak_frequency < cutoff_frequency
 
-    print(f"Peak frequency is close to what it is supposed to be: {test1}")
-    print(f"Filtered peak frequency is lower than cutoff frequency: {test2}")
+    # Get the dominant frequency of filtered signal by using FFT
+    freq_Nyquist = fs / 2.
+    freq_filt_by_FFT = freq_response(filtered_rec10, freq_Nyquist, get_dominant_freq=True)
+    test3 = freq_filt_by_FFT < cutoff_frequency
 
-    assert all([test1, test2])
+    print(f"Peak frequency ({peak_frequency:.2f} Hz) "
+          f"is close to what it is supposed to be ({Wave_obj.frequency:.2f}): {test1}")
+    print(f"Filtered peak frequency ({filtered_peak_frequency:.2f}) Hz "
+          f"is lower than cutoff frequency ({cutoff_frequency:.2f}): {test2}")
+    print(f"Filtered peak frequency ({freq_filt_by_FFT:.2f}) Hz "
+          f"is lower than cutoff frequency ({cutoff_frequency:.2f}): {test3}")
+
+    assert all([test1, test2, test3])
 
 
 def test_geometry_creation():

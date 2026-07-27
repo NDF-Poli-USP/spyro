@@ -3,7 +3,7 @@ import numpy as np
 
 from . import helpers
 from .. import utils
-from ..utils.typing import FunctionalEvaluationMode, AdjointType
+from ..utils.typing import FunctionalEvaluationMode, AdjointType, LayerDampingType
 
 
 def _propagate_forward_central_difference(wave_obj, source_ids):
@@ -49,14 +49,14 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
         # being one at a point and zero elsewhere.
         source_cof = wave_obj.sources.source_cofunction()
 
-        if wave_obj.abc_boundary_layer_type == "PML":
+        if wave_obj.abc_boundary_layer_type == LayerDampingType.PML:
             pressure_expr = fire.split(wave_obj.X_n)[0]
         else:
             pressure_expr = wave_obj.u_n
         interpolate_receivers = wave_obj.receivers.receiver_interpolator(
             pressure_expr)
         if (
-            wave_obj.abc_boundary_layer_type == "PML"
+            wave_obj.abc_boundary_layer_type == LayerDampingType.PML
             and wave_obj.source_function is not None
         ):
             master_source_W = fire.Cofunction(
