@@ -8,7 +8,7 @@ import pytest
 class DummyModel():
     def __init__(self):
         self.parallelism_type = "automatic"
-        self.number_of_sources = 6
+        self.number_of_sources = 8
 
 
 @pytest.mark.parallel(8)
