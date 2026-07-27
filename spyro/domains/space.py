@@ -37,23 +37,23 @@ def create_function_space(mesh, method, degree=None, dim=1):
 
     Parameters:
     -----------
-    mesh: Firedrake Mesh
+    mesh: `Firedrake.Mesh`
         Mesh to be used in the finite element space.
-    method: str or FiniteElement
+    method: `str` or `FiniteElement`
         Method to be used for the finite element space, or an already
         constructed finite element.
-    degree: int or None
+    degree: `int` or `None`
         Degree of the finite element space. Required when ``method`` is a
         supported method name. Ignored only when ``method`` is an already
         constructed finite element.
-    dim: int
+    dim: `int`
         Number of vector components. If ``dim`` is 1, a scalar function space
         is created. If ``dim`` is greater than 1, the selected element is
         wrapped in a vector element with ``dim`` components.
 
     Returns:
     --------
-    function_space: Firedrake FunctionSpace
+    function_space: `Firedrake.FunctionSpace`
         Function space.
     """
 

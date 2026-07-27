@@ -6,7 +6,8 @@ from shutil import rmtree
 from ..abc.abc_layer import ABCLayer
 from .damp_profile import HABC_Damping
 from ..solvers.modal.modal_sol import Modal_Solver
-from ..utils.typing import HyperLayerDegreeType, LayerShapeType, LayerSizeRefFrequency
+from ..utils.typing import (HyperLayerDegreeType, LayerDampingType,
+                            LayerShapeType, LayerSizeRefFrequency)
 from ..io.basicio import parallel_print as pprint
 # from sympy import divisors
 # from spyro.utils.error_management import value_parameter_error
@@ -29,6 +30,13 @@ class HABCLayer(ABCLayer, HABC_Damping):
     abc_boundary_layer_shape : `typing.LayerShapeType`, optional
         Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
         `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
+    abc_boundary_layer_type : `typing.LayerDampingType`
+        Type of the boundary layer. Options: `LayerDampingType.LOCAL`,
+        `LayerDampingType.HYBRID`, `LayerDampingType.PML` or `LayerDampingType.NOABCS`.
+        Default is `LayerDampingType.NOABCS` where no absorbing BCs are applied.
+        Option `LayerDampingType.HYBRID` is based on paper of Salas et al. (2022).
+        doi: https://doi.org/10.1016/j.apm.2022.09.014
+        TODO: Add citation
     abc_deg_layer : `int` or `float` or `None`, optional
         Hypershape degree. For hypershape layers, the degree must be greater than or
         equal to 2. `None` is used only for rectangular layers. Default is `None`.
@@ -200,7 +208,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
         ABCLayer.__init__(self, domain_dim, frequency, f_Nyquist, dimension=dimension,
                           quadrilateral=quadrilateral, func_space_type=func_space_type,
                           abc_boundary_layer_shape=abc_boundary_layer_shape,
-                          abc_boundary_layer_type="hybrid",
+                          abc_boundary_layer_type=LayerDampingType.HYBRID,
                           abc_reference_freq=abc_reference_freq,
                           abc_degree_type=abc_degree_type, abc_deg_layer=abc_deg_layer,
                           output_folder=output_folder, comm=comm)
