@@ -3,7 +3,9 @@
 This file contains methods for handling errors in Spyro, either to send
 messages to the user or to prevent numerical instability in objects."""
 
-from numpy import inf, isinf, isnan, ndarray, where
+from numpy import float64, inf, int64, isinf, isnan, ndarray, where
+from firedrake import Function, FunctionSpace, Mesh
+from firedrake.functionspaceimpl import WithGeometry
 
 
 def value_parameter_error(par_name, par_value, valid_values):
@@ -120,7 +122,8 @@ def clean_inst_num(data_arr):
     data_arr : `array`
         An array with null or positive components.
     """
-    type_data_structure_error("data_arr", data_arr, "array", ("float", "int"))
+    type_data_structure_error("data_arr", data_arr, "array",
+                              expected_type_element=("float", "int"))
     data_arr[where(isnan(data_arr) | isinf(data_arr) | (data_arr < 0.0))] = 0.0
     return data_arr
 
@@ -279,7 +282,8 @@ def value_string_error(par_name, par_value):
 
 
 def type_data_structure_error(par_name, par_value, expected_type,
-                              expected_type_element, expected_length=None):
+                              expected_type_element=None,
+                              expected_length=None, none_default=False):
     """Validate data structure parameters and raise a TypeError if invalid.
 
     Parameters
@@ -291,13 +295,17 @@ def type_data_structure_error(par_name, par_value, expected_type,
     expected_type : `str`
         Expected type of the data structure parameter as a `str`. The validation
         supports the types `dict`, `list`, `tuple`, or `ndarray` (NumPy arrays).
-    expected_type_element : `tuple`
+    expected_type_element : `tuple`, optional
         Expected type of the data structure elements passed as a `str`. The validation
         supports the types `float`, `int`, `str` or `NoneType`. Exs: ("float", "int")
-        for a NumPy array or ("float", "int", "str" or "NoneType") for a mixed list.
+        for a NumPy array or ("float", "int", "str", "NoneType") for a mixed elements.
+        Default is `None`, in which case the elements are not checked.
     expected_length : `int`, optional
         Expected length of the data structure parameter. Default is `None`,
         in which case the length is not checked.
+    none_default : `bool`, optional
+        If `True`, the parameter value is allowed to be validated as `None`.
+        Default is `False`, in which case `None` is not allowed.
 
     Returns
     -------
@@ -312,6 +320,9 @@ def type_data_structure_error(par_name, par_value, expected_type,
     ValueError
         If the parameter value does not have the expected length (if provided).
     """
+
+    if par_value is None and none_default:
+        return par_value
 
     value_parameter_error("expected_type", expected_type,
                           ["dict", "list", "tuple", "array"])
@@ -337,17 +348,71 @@ def type_data_structure_error(par_name, par_value, expected_type,
                          f"got length {len(par_value)}.")
 
     # Check if all elements are of expected type
-    if isinstance(expected_type_element, str):
-        expected_type_element = (expected_type_element,)
-    for etype in expected_type_element:
-        value_parameter_error("expected_type_element", etype,
-                              ["float", "int", "str", "NoneType"])
-    expected_types = tuple(element_map[etype] for etype in expected_type_element)
-    if not all(isinstance(item, expected_types) for item in par_value):
-        opt_str = ", ".join([f"'{etype}'" for etype in expected_type_element])
+    if expected_type_element is not None:
+        if isinstance(expected_type_element, str):
+            expected_type_element = (expected_type_element,)
+        for etype in expected_type_element:
+            value_parameter_error("expected_type_element", etype,
+                                  ["float", "int", "str", "NoneType"])
+        expected_types = tuple(element_map[etype] for etype in expected_type_element)
+        expected_types += (int64,) if "int" in expected_type_element else ()
+        expected_types += (float64,) if "float" in expected_type_element else ()
+        if not all(isinstance(item, expected_types) for item in par_value):
+            opt_str = ", ".join([f"'{etype}'" for etype in expected_type_element])
+            last_comma = opt_str.rfind(',')
+            opt_str = opt_str[:last_comma] + " or" + opt_str[last_comma + 1:] \
+                if len(expected_type_element) > 1 else opt_str
+            raise TypeError(f"All elements of '{par_name}' must be of type: {opt_str}.")
+
+    return par_value
+
+
+def type_firedrake_error(par_name, par_value, expected_type, none_default=False):
+    """Validate Firedrake parameters and raise a TypeError if invalid.
+
+    Parameters
+    ----------
+    par_name : `str`
+        Name of the parameter to be validated (used in error messages).
+    par_value : `object`
+        Value of the parameter to be validated.
+    expected_type : `str`
+        Expected type of the Firedrake parameter as a `str`. The validation
+        supports the types `Function`, `FunctionSpace`, or `Mesh`.
+    none_default : `bool`, optional
+        If `True`, the parameter value is allowed to be validated as `None`.
+        Default is `False`, in which case `None` is not allowed.
+
+    Returns
+    -------
+    par_value : `firedrake.Function`, `firedrake.FunctionSpace`, or `firedrake.Mesh`
+        The validated parameter value.
+
+    Raises
+    ------
+    TypeError
+        If the parameter value is not of the expected type given by 'expected_type'.
+    """
+
+    if par_value is None and none_default:
+        return par_value
+
+    value_parameter_error("expected_type", expected_type,
+                          ["Function", "FunctionSpace", "Mesh"])
+
+    parameter_map = {"Function": Function,
+                     "FunctionSpace": type(FunctionSpace),
+                     "Mesh": Mesh}
+
+    # Checking the parameter type
+    expected_valid = (parameter_map[expected_type],)
+    expected_valid += (WithGeometry,) if "FunctionSpace" in expected_type else ()
+    if not isinstance(par_value, expected_valid):
+        opt_str = ", ".join([f"'{etype}'" for etype in expected_valid])
         last_comma = opt_str.rfind(',')
         opt_str = opt_str[:last_comma] + " or" + opt_str[last_comma + 1:] \
-            if len(expected_type_element) > 1 else opt_str
-        raise TypeError(f"All elements of '{par_name}' must be of type: {opt_str}.")
+            if len(expected_valid) > 1 else opt_str
+        raise TypeError(f"'{par_name}' must be of type: {opt_str}, "
+                        f"got {type(par_value).__name__}.")
 
     return par_value

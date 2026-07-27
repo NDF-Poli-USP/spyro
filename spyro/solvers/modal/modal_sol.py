@@ -10,10 +10,10 @@ from scipy.special import (beta, betainc, gamma, jn_zeros, jnp_zeros,
                            mathieu_modcem1, spherical_jn)
 from scipy.stats import norm as sn
 from sys import float_info
+from ...io.basicio import parallel_print as pprint
 from .modal_forms_and_matrices import assemble_sparse_matrices, weak_forms
 from .modal_rq_matrices import generate_eigenfunctions, matrices_rayleigh_quotient
 from ...utils.error_management import value_parameter_error
-from ...io.basicio import parallel_print as pprint
 from ...utils.stats_tools import coeff_of_determination
 from ...utils.eval_functions_to_ufl import generate_ufl_functions
 
@@ -33,9 +33,12 @@ class Modal_Solver():
 
     Attributes
     ----------
+    AnaModSol : `modal_ana_sol.Modal_Analytical_Solver`
+        An instance of the :class:`~spyro.solvers.modal.modal_ana_sol.Modal_Analytical_Solver`.
+        Only initialized if `method` is "ANALYTICAL" and `calc_max_dt` is `False`.
     calc_max_dt : `bool`
         Option to estimate the maximum stable timestep for the computation of the
-        transient response. Default is `False`
+        transient response. Default is `False`.
     comm : `object`, optional
         An object representing the communication interface for parallel processing.
         Default is `None`.
@@ -43,23 +46,21 @@ class Modal_Solver():
         Model dimension (2D or 3D). Default is 2D.
     method : `str`
         Method to use for solving the eigenvalue problem. See `valid_methods` for options.
-        Default is `None`, which uses the 'KRYLOVSCH_CH' method.
+        Default is `None`, which uses the "KRYLOVSCH_CH" method.
     valid_methods: `list`
         List of valid methods for solving the eigenproblem
-        Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
-        'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
-        'ANALYTICAL' method is an approximation by using homogenization techniques.
-        'RAYLEIGH' method is an approximation by Rayleigh quotient.
-        In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
-        use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
-        Residual (gmres). (P) indicates the preconditioner to use: 'H' for
-        Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
-        example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
+        Options: "ANALYTICAL", "ARNOLDI", "LANCZOS", "LOBPCG", "KRYLOVSCH_CH",
+        "KRYLOVSCH_CG", "KRYLOVSCH_GH", "KRYLOVSCH_GG" or "RAYLEIGH".
+        "ANALYTICAL" method is an approximation by using homogenization techniques.
+        "RAYLEIGH" method is an approximation by Rayleigh quotient.
+        In "KRYLOVSCH_(K)(P)" methods, (K) indicates the Krylov solver to
+        use: "C" for Conjugate Gradient (cg) or "G" for Generalized Minimal
+        Residual (gmres). (P) indicates the preconditioner to use: "H" for
+        Hypre (hypre) or "G" for Geometric Algebraic Multigrid (gamg). For
+        example, "KRYLOVSCH_CH" uses cg solver with hypre preconditioner.
 
     Methods
     -------
-    c_equivalent()
-        Compute equivalent homogeneous velocity for an inhomogeneous model.
     estimate_timestep()
         Estimate the maximum stable timestep based on the spectral radius.
     solve_eigenproblem()
@@ -81,16 +82,16 @@ class Modal_Solver():
             Model dimension (2D or 3D). Default is 2D.
         method : `str`, optional
             Method to use for solving the eigenvalue problem.
-            Default is None, which uses the 'KRYLOVSCH_CH' method.
-            Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
-            'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
-            'ANALYTICAL' method is an approximation by using homogenization techniques.
-            'RAYLEIGH' method is an approximation by Rayleigh quotient.
-            In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
-            use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
-            Residual (gmres). (P) indicates the preconditioner to use: 'H' for
-            Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
-            example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
+            Default is None, which uses the "KRYLOVSCH_CH" method.
+            Opts: "ANALYTICAL", "ARNOLDI", "LANCZOS", "LOBPCG", "KRYLOVSCH_CH",
+            "KRYLOVSCH_CG", "KRYLOVSCH_GH", "KRYLOVSCH_GG" or "RAYLEIGH".
+            "ANALYTICAL" method is an approximation by using homogenization techniques.
+            "RAYLEIGH" method is an approximation by Rayleigh quotient.
+            In "KRYLOVSCH_(K)(P)" methods, (K) indicates the Krylov solver to
+            use: "C" for Conjugate Gradient (cg) or "G" for Generalized Minimal
+            Residual (gmres). (P) indicates the preconditioner to use: "H" for
+            Hypre (hypre) or "G" for Geometric Algebraic Multigrid (gamg). For
+            example, "KRYLOVSCH_CH" uses cg solver with hypre preconditioner.
         calc_max_dt : `bool`
             Option to estimate the maximum stable timestep for the computation
             of the transient response. Default is `False`.
@@ -113,85 +114,21 @@ class Modal_Solver():
         self.comm = comm
 
         # Valid methods for solving the eigenproblem
-        def_methods = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG']
-        self.valid_methods = def_methods + (['KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-                                             'KRYLOVSCH_GH', 'KRYLOVSCH_GG',
-                                             'RAYLEIGH'] if not self.calc_max_dt else [])
+        def_methods = ["ANALYTICAL", "ARNOLDI", "LANCZOS", "LOBPCG"]
+        self.valid_methods = def_methods + (["KRYLOVSCH_CH", "KRYLOVSCH_CG",
+                                             "KRYLOVSCH_GH", "KRYLOVSCH_GG",
+                                             "RAYLEIGH"] if not self.calc_max_dt else [])
 
         # Method for solving the eigenproblem
-        method = 'KRYLOVSCH_CH' if method is None else method
-        self.method = value_parameter_error('method', method, self.valid_methods)
+        method = "KRYLOVSCH_CH" if method is None else method
+        self.method = value_parameter_error("method", method, self.valid_methods)
 
         # Initializing the analytical solver
-        if not self.calc_max_dt and self.method == 'ANALYTICAL':
+        if not self.calc_max_dt and self.method == "ANALYTICAL":
             from .modal_ana_sol import Modal_Analytical_Solver
             self.AnaModSol = Modal_Analytical_Solver(dimension=self.dimension, comm=comm)
 
         pprint(f"Solver Method: {self.method}", comm=self.comm)
-
-    def c_equivalent(self, c, V, quad_rule=None, type_homog="energy",
-                     static_load_for_ceq=None):
-        """Compute equivalent homogeneous velocity for an inhomogeneous model.
-
-        The method uses an energy-equivalent homogenization by default.
-
-        Parameters
-        ----------
-        c : `Firedrake.Function`
-            Velocity model.
-        V : `Firedrake.FunctionSpace`
-            Function space for the modal problem.
-        quad_rule : `str`, optional
-            Quadrature rule to use for the integration.
-            Default is `None`, which uses the default quadrature rule.
-        type_homog : `str`, optional
-            Type of homogenization: "energy" or "volume". Default is "energy"
-        static_load_for_ceq : `Firedrake.Function`, optional
-            Static load for the energy-equivalent homogenization.
-            Only used if 'type_homog' is "energy". Default is `None`, in which
-            a small constant load is applied over the entire domain.
-
-        Returns
-        -------
-        c_eq : `float`
-            Equivalent homogeneous velocity.
-        """
-
-        # Check type of homogenization
-        value_parameter_error("type_homog", type_homog, ["energy", "volume"])
-
-        # Integration measure
-        dx = fire_dx(**quad_rule) if quad_rule else fire_dx
-
-        # State variable
-        u = Function(V)
-
-        if type_homog == "energy":
-            # Equivalent velocity by energy-equivalent homogenization
-
-            # Weak forms
-            a, L = weak_forms(c, V, quad_rule=quad_rule, source=True,
-                              user_load=static_load_for_ceq)
-
-            # Compute the energy
-            solve(a == L, u)
-            bilinear_term = 0.5 * inner(grad(u), grad(u))
-            energy = assemble(c * c * bilinear_term * dx)
-
-            # Compute the equivalent velocity
-            c_eq = sqrt(energy / assemble(bilinear_term * dx))
-
-        elif type_homog == "volume":
-            # Equivalent velocity by volume-average homogenization
-
-            # Compute the volume
-            u.assign(1.)
-            volume = assemble(u * dx)
-
-            # Compute the equivalent velocity
-            c_eq = assemble(c * dx) / volume
-
-        return c_eq
 
     def solver_with_sparse_matrix(self, Asp, Msp, method, k=2, inv_oper=False):
         """Solve the eigenvalue problem with sparse matrices using Scipy.
@@ -204,7 +141,7 @@ class Modal_Solver():
             Sparse matrix representing the mass matrix
         method : `str`
             Method to use for solving the eigenvalue problem.
-            Opts: 'ARNOLDI', 'LANCZOS' or 'LOBPCG'
+            Opts: "ARNOLDI", "LANCZOS" or "LOBPCG"
         k : `int`, optional
             Number of eigenvalues to compute. Default is 2
         inv_oper : `bool`, optional
@@ -217,32 +154,32 @@ class Modal_Solver():
             Array containing the computed eigenvalues.
         """
 
-        if method == 'ARNOLDI' or method == 'LANCZOS':
+        if method == "ARNOLDI" or method == "LANCZOS":
             # Inverse operator for improving convergence
             M_ilu = ss.linalg.spilu(Msp) if inv_oper else None
             Minv = M_ilu.solve if inv_oper else None
             A_ilu = ss.linalg.spilu(Asp) if inv_oper else None
             OPinv = A_ilu.solve if inv_oper else None
 
-        if method == 'ARNOLDI':
+        if method == "ARNOLDI":
             # Solve the eigenproblem using ARNOLDI (ARPACK)
             if self.calc_max_dt:
-                Lsp = ss.linalg.eigs(Asp, k=k, M=Msp, which='LM', Minv=Minv,
+                Lsp = ss.linalg.eigs(Asp, k=k, M=Msp, which="LM", Minv=Minv,
                                      OPinv=OPinv, return_eigenvectors=False)
             else:
                 Lsp = ss.linalg.eigs(Asp, k=k, M=Msp, sigma=0.0, Minv=Minv,
                                      OPinv=OPinv, return_eigenvectors=False)
 
-        if method == 'LANCZOS':
+        if method == "LANCZOS":
             # Solve the eigenproblem using LANCZOS (ARPACK)
             if self.calc_max_dt:
-                Lsp = ss.linalg.eigsh(Asp, k=k, M=Msp, which='LM', Minv=Minv,
+                Lsp = ss.linalg.eigsh(Asp, k=k, M=Msp, which="LM", Minv=Minv,
                                       OPinv=OPinv, return_eigenvectors=False)
             else:
                 Lsp = ss.linalg.eigsh(Asp, k=k, M=Msp, sigma=0.0, Minv=Minv,
                                       OPinv=OPinv, return_eigenvectors=False)
 
-        if method == 'LOBPCG':
+        if method == "LOBPCG":
             # Initialize LI vectors for LOBPCG
             X = np.eye(Msp.shape[0], k)
 
@@ -321,16 +258,16 @@ class Modal_Solver():
 
     def solver_rayleigh_quotient(self, c, ufl_coordinates, V,
                                  mesh_limits, k=2, quad_rule=None):
-        """Solve the eigenvalue problem using the Rayleigh Quotient method.
+        """Solve the eigenvalue problem using the Rayleigh Quotient method for Neumann Bcs.
 
         Parameters
         ----------
         c : `Firedrake.Function` or `float`
-            Velocity model
+            Velocity model.
         ufl_coordinates : `ufl.geometry.SpatialCoordinate`
             Domain coordinates.
         V : `Firedrake.FunctionSpace`
-            Function space for the modal problem
+            Function space for the modal problem.
         mesh_limits : `tuple`, optional
             Tuple containing the minimum and maximum coordinates of the mesh.
             Structure: (min_coordinates, max_coordinates):
@@ -339,15 +276,15 @@ class Modal_Solver():
             - max_coordinates : `array`
                 Array containing the maximum coordinates in each dimension (z, x, y).
         k : `int`, optional
-            Number of eigenvalues to compute. Default is 2
-        quad_rule : `str`, optional
+            Number of eigenvalues to compute. Default is 2.
+        quad_rule : `dict`, optional
             Quadrature rule to use for the integration.
-            Default is None, which uses the default quadrature rule.
+            Default is `None`, which uses the default quadrature rule.
 
         Returns
         -------
         Lsp : `array`
-            Array containing the computed eigenvalues
+            Array containing the computed eigenvalues.
         """
 
         # Create eigenfunctions
@@ -358,32 +295,32 @@ class Modal_Solver():
         Asp, Msp = matrices_rayleigh_quotient(c, eig_funcs, grad_eig, quad_rule=quad_rule)
 
         # Solve the generalized eigenvalue problem
-        Lsp = self.solver_with_sparse_matrix(Asp, Msp, 'ARNOLDI', k=k)
+        Lsp = self.solver_with_sparse_matrix(Asp, Msp, "ARNOLDI", k=k)
 
         return Lsp
 
-    def solve_eigenproblem(self, c, V=None, k=2, shift=0., quad_rule=None,
-                           inv_oper=False, ufl_coordinates=None, mesh_limits=None,
-                           hyp_par=None, cut_plane_percent=1., c_eqref=None,
-                           fitting_c=(0., 0., 0., 0.), static_load_for_ceq=None):
+    def solve_eigenproblem(self, c, V=None, k=2, shift=0., quad_rule=None, inv_oper=False,
+                           ufl_coordinates=None, mesh_limits=None, hyp_par=None,
+                           cut_plane_percent=1., c_ref=None, V_ref=None, dof_load=None,
+                           amplitude_load=None, fitting_c=(0., 0., 0., 0.)):
         """Solve the eigenvalue problem with Neumann boundary conditions.
 
         Parameters
         ----------
         c : `Firedrake.Function` or `float`
-            Velocity model
+            Velocity model.
         V : `Firedrake.FunctionSpace`, optional
-            Function space for the modal problem. Default is None
+            Function space for the modal problem. Default is `None`.
         k : `int`, optional
-            Number of eigenvalues to compute. Default is 2
+            Number of eigenvalues to compute. Default is 2.
         shift: `float`, optional
-            Value to stabilize the Neumann BC null space. Default is 0
-        quad_rule : `str`, optional
+            Value to stabilize the Neumann BC null space. Default is 0.
+        quad_rule : `dict`, optional
             Quadrature rule to use for the integration.
-            Default is None, which uses the default quadrature rule.
+            Default is `None`, which uses the default quadrature rule.
         inv_oper : `bool`, optional
             Option to use an inverse operator for improving convergence.
-            Default is False
+            Default is `False`.
         ufl_coordinates : `ufl.geometry.SpatialCoordinate`
             Domain coordinates.
         mesh_limits : `tuple`, optional
@@ -394,59 +331,65 @@ class Modal_Solver():
             - max_coordinates : `array`
                 Array containing the maximum coordinates in each dimension (z, x, y).
         hyp_par : `tuple`, optional
-            Hyperellipshape parameters. Default is None
+            Hyperellipshape parameters. Default is `None`.
             Structure 2D: (n_hyp, a_hyp, b_hyp)
             Structure 3D: (n_hyp, a_hyp, b_hyp, c_hyp)
             - n_hyp : `float`
-                Degree of the hypershape
+                Degree of the hypershape.
            - a_hyp : `float`
-                Hypershape semi-axis in direction x
+                Hypershape semi-axis in direction x.
             - b_hyp : `float`
-                Hypershape semi-axis in direction z
+                Hypershape semi-axis in direction z.
             - c_hyp : `float`
-                Hypershape semi-axis in direction y (3D only)
+                Hypershape semi-axis in direction y (3D only).
         cut_plane_percent : `float`, optional
             Percentage of the cut plane (0 to 1). Default is 1 (no cut)
-        c_eqref : `float`, optional
-            Reference value for the equivalent velocity based on the original
-            velocity model without an absorbing layer. Default is None
+        c_ref : `Firedrake.Function`, optional
+            Velocity model for the reference model without absorbing layer.
+            Default is `None`.
+        V_ref : `Firedrake.FunctionSpace`, optional
+            Function space for the reference model without absorbing layer.
+            Default is `None`.
+        dof_load : `array`, optional
+           Degrees of freedom (DOFs) where the dummy static load is applied for the
+           calculation of the equivalent velocities when 'method' is "ANALYTICAL".
+           Default is `None`.
+        amplitude_load : `array`, optional
+            Amplitude of the dummy static load at the specified DOFs. Default is `None`.
         fitting_c : `tuple`, optional
             Parameters for fitting equivalent velocity regression.
             Structure: (fc1, fc2, fp1, fp2). Default is (0., 0., 0., 0.)
             - fc1 : `float`
-                Exponent factor for the minimum reference velocity..
+                Exponent factor for the minimum reference velocity.
             - fc2 : `float`
-                Exponent factor for the maximum reference velocity..
+                Exponent factor for the maximum reference velocity.
             - fp1 : `float`
-                Exponent factor for the minimum equivalent velocity..
+                Exponent factor for the minimum equivalent velocity.
             - fp2 : `float`
-                Exponent factor for the maximum equivalent velocity..
-        static_load_for_ceq : `Firedrake.Function`, optional
-            Static load for the energy-equivalent homogenization.
-            Only used if 'typ_homog'='energy'. Default is None, in which
-            a small constant load is applied over the entire domain.
+                Exponent factor for the maximum equivalent velocity.
 
         Returns
         -------
         Lsp : `array` or `float`
-            Array containing the computed eigenvalues or the first
-            eigenvalue of the hypershape with Neumann or Dirichlet BCs
+            Array containing the computed eigenvalues or the
+            first eigenvalue of the model with Neumann BCs.
         """
 
-        if self.method in ['ANALYTICAL', 'RAYLEIGH']:
+        if self.method in ["ANALYTICAL", "RAYLEIGH"]:
             shift = 0.  # No shift for analytical and Rayleigh methods
 
-        if self.method == 'ANALYTICAL':
+        if self.method == "ANALYTICAL":
 
-            # Compute equivalent velocity for the hypershape
-            c_eq = self.c_equivalent(c, V, quad_rule=quad_rule,
-                                     static_load_for_ceq=static_load_for_ceq)
+            # Compute equivalent homogenized velocities
+            c_eq, c_eqref = self.AnaModSol.homogenized_velocities(
+                c, V, c_ref=c_ref, V_ref=V_ref, quad_rule=quad_rule,
+                dof_load=dof_load, amplitude_load=amplitude_load)
 
             Lsp = self.AnaModSol.solver_analytical(c_eq, hyp_par, c_eqref=c_eqref,
                                                    fitting_c=fitting_c,
                                                    cut_plane_percent=cut_plane_percent)
 
-        elif self.method == 'RAYLEIGH':
+        elif self.method == "RAYLEIGH":
             Lsp = self.solver_rayleigh_quotient(c, ufl_coordinates, V, mesh_limits,
                                                 k=k, quad_rule=quad_rule)
         else:
@@ -457,10 +400,10 @@ class Modal_Solver():
             if shift > 0:
                 a += fire.Constant(shift) * m
 
-        if self.method.startswith('KRYLOVSCH'):
+        if self.method.startswith("KRYLOVSCH"):
             Lsp = self.solver_with_ufl(a, m, k=k)
 
-        elif self.method in ['ARNOLDI', 'LANCZOS', 'LOBPCG']:
+        elif self.method in ["ARNOLDI", "LANCZOS", "LOBPCG"]:
             Asp, Msp = assemble_sparse_matrices(a, m)
             Lsp = self.solver_with_sparse_matrix(Asp, Msp, self.method,
                                                  k=k, inv_oper=inv_oper)
@@ -474,7 +417,7 @@ class Modal_Solver():
         """Estimate the maximum stable timestep based on the spectral radius.
 
         Optionally uses the Gershgorin Circle Theorem to estimate the
-        maximum generalized eigenvalue when `method` is 'ANALYTICAL'.
+        maximum generalized eigenvalue when 'method' is "ANALYTICAL".
         Otherwise, computes the maximum generalized eigenvalue exactly.
 
         Parameters
@@ -487,12 +430,12 @@ class Modal_Solver():
             Final time for the transient simulation.
         shift: `float`, optional
             Value to stabilize the Neumann BC null space. Default is 0.
-        quad_rule : `str`, optional
+        quad_rule : `dict`, optional
             Quadrature rule to use for the integration.
-            Default is None, which uses the default quadrature rule.
+            Default is `None`, which uses the default quadrature rule.
         inv_oper : `bool`, optional
             Option to use an inverse operator for improving convergence.
-            Default is False
+            Default is `False`.
         fraction : `float`, optional
             Fraction of the estimated timestep to use. Defaults to 0.7.
 
@@ -503,7 +446,7 @@ class Modal_Solver():
         """
 
         # Maximum eigenvalue
-        if self.method == 'ANALYTICAL':
+        if self.method == "ANALYTICAL":
             pprint("Estimating Maximum Eigenvalue", comm=self.comm)
 
             a, m = weak_forms(c, V, quad_rule=quad_rule)

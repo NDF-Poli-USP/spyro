@@ -1,4 +1,5 @@
-from firedrake import ConvergenceError
+from firedrake import (assemble, ConvergenceError, dx as fire_dx,
+                       Function, grad, inner, solve)
 from numpy import (arange, arccosh, argmax, array, asarray,
                    diag, inf, maximum, mean, pi, sqrt)
 from scipy.optimize import broyden1, curve_fit
@@ -6,10 +7,11 @@ from scipy.special import (beta, betainc, gamma, jn_zeros, jnp_zeros,
                            mathieu_modcem1, spherical_jn)
 from scipy.stats import norm as sn
 from sys import float_info
-from ...utils.error_management import (type_data_structure_error, value_numerical_error,
-                                       value_parameter_error)
-from ...utils.stats_tools import coeff_of_determination
 from ...io.basicio import parallel_print as pprint
+from .modal_forms_and_matrices import weak_forms
+from ...utils.error_management import (type_data_structure_error, type_firedrake_error,
+                                       value_numerical_error, value_parameter_error)
+from ...utils.stats_tools import coeff_of_determination
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -42,6 +44,8 @@ class Modal_Analytical_Solver():
         Compute the frequency factor for rectangular or prismatic geometries.
     _reg_geometry_hyp()
         Perform the nonlinear regression for the hypershape geometry factor.
+    c_equivalent()
+        Compute equivalent homogeneous velocity for an inhomogeneous model.
     solver_analytical()
         Compute the analytical eigenvalue for hypershapes by using homogenization.
     """
@@ -150,7 +154,7 @@ class Modal_Analytical_Solver():
             psi0 = arccosh(a0 / f0)
             idx = int(bc == "Neumann")
             m = 1 if bc == "Neumann" else 0  # Order of the MMF
-            pprint(bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx], comm=self.comm)
+            # pprint(bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx], comm=self.comm)
             return mathieu_modcem1(m, q, psi0)[idx]
 
         def ZBF(m=0, n=1):
@@ -170,6 +174,7 @@ class Modal_Analytical_Solver():
             """
             deriv = (bc == "Neumann")
             Jmz = jnp_zeros(m, n) if deriv else jn_zeros(m, n)
+            # pprint(bc, m, n, Jmz, comm=self.comm)
             return Jmz
 
         def SBF(q, m=0):
@@ -405,7 +410,7 @@ class Modal_Analytical_Solver():
         f_ell : `float`
             Fundamental frequency factor for elliptical or ellipsoidal geometry.
         c_eq : `float`
-            Equivalente isotropic velocity in the hypershape.
+            Equivalente homogeneous velocity in the hypershape.
         bc : `str`, optional
             Boundary condition type: "Dirichlet" or "Neumann". Default is "Neumann".
         c_eqref : `float`, optional
@@ -462,6 +467,174 @@ class Modal_Analytical_Solver():
 
         return f_hyp, c_reg
 
+    def dummy_load_static_(self, V, dof_load, amplitude_load, V_ref=None):
+        """Build a static load for the energy-equivalent homogenization.
+
+        Parameters
+        ----------
+        V : `Firedrake.FunctionSpace`
+            Function space for the modal problem.
+        dof_load : `array`
+           Degrees of freedom (DOFs) where the static load is applied.
+        amplitude_load : `array`
+            Amplitude of the static load at the specified DOFs.
+        V_ref : `Firedrake.FunctionSpace`, optional
+            Function space for the reference model (without absorbing layer).
+            Default is `None`, in which case only the static load for the model
+            with absorbing layer is returned.
+
+        Returns
+        -------
+        q_dummy : `Firedrake.Function`
+            Static load for model with absorbing layer.
+        q_ref : `Firedrake.Function`
+            Static load for reference model (without absorbing layer).
+            Only returned if 'V_ref' is not `None`.
+        """
+
+        # Check imput arguments
+        type_data_structure_error("dof_load", dof_load, "array",
+                                  expected_type_element=("int"))
+        type_data_structure_error("amplitude_load", amplitude_load, "array",
+                                  expected_type_element=("float", "int"))
+        type_firedrake_error("V", V, "FunctionSpace")
+
+        # Static load for model with absorbing layer
+        q_dummy = Function(V)
+        q_dummy.dat.data_with_halos[dof_load] = amplitude_load
+
+        # Static load for reference model (without absorbing layer)
+        q_ref = None
+        if V_ref is not None:
+            type_firedrake_error("V_ref", V_ref, "FunctionSpace")
+            q_ref = Function(V_ref)
+            q_ref.interpolate(q_dummy, allow_missing_dofs=True)
+
+        return (q_dummy, q_ref)
+
+    def c_equivalent(self, c, V, quad_rule=None, type_homog="energy",
+                     static_load_for_ceq=None):
+        """Compute equivalent homogeneous velocity for an inhomogeneous model.
+
+        The method uses an energy-equivalent homogenization by default.
+
+        Parameters
+        ----------
+        c : `Firedrake.Function`
+            Velocity model.
+        V : `Firedrake.FunctionSpace`
+            Function space for the modal problem.
+        quad_rule : `dict`, optional
+            Quadrature rule to use for the integration.
+            Default is `None`, which uses the default quadrature rule.
+        type_homog : `str`, optional
+            Type of homogenization: "energy" or "volume". Default is "energy"
+        static_load_for_ceq : `Firedrake.Function`, optional
+            Static load for the energy-equivalent homogenization.
+            Only used if 'type_homog' is "energy". Default is `None`, in which
+            a small constant load is applied over the entire domain.
+
+        Returns
+        -------
+        c_eq : `float`
+            Equivalent homogeneous velocity.
+        """
+
+        # Check input arguments
+        type_firedrake_error("c", c, "Function")
+        type_firedrake_error("V", V, "FunctionSpace")
+        type_data_structure_error("quad_rule", quad_rule, "dict", none_default=True)
+        value_parameter_error("type_homog", type_homog, ["energy", "volume"])
+        type_firedrake_error("static_load_for_ceq", static_load_for_ceq,
+                             "Function", none_default=True)
+
+        # Integration measure
+        dx = fire_dx(**quad_rule) if quad_rule else fire_dx
+
+        # State variable
+        u = Function(V)
+
+        if type_homog == "energy":
+            # Equivalent velocity by energy-equivalent homogenization
+
+            # Weak forms
+            a, L = weak_forms(c, V, quad_rule=quad_rule, source=True,
+                              user_load=static_load_for_ceq)
+
+            # Compute the energy
+            solve(a == L, u)
+            bilinear_term = 0.5 * inner(grad(u), grad(u))
+            energy = assemble(c * c * bilinear_term * dx)
+
+            # Compute the equivalent velocity
+            c_eq = sqrt(energy / assemble(bilinear_term * dx))
+
+        elif type_homog == "volume":
+            # Equivalent velocity by volume-average homogenization
+
+            # Compute the volume
+            u.assign(1.)
+            volume = assemble(u * dx)
+
+            # Compute the equivalent velocity
+            c_eq = assemble(c * dx) / volume
+
+        return c_eq
+
+    def homogenized_velocities(self, c, V, c_ref=None, V_ref=None, quad_rule=None,
+                               dof_load=None, amplitude_load=None, type_homog="energy"):
+        """Compute equivalent homogeneous velocities required for the analytical solver.
+
+        Parameters
+        ----------
+        c : `Firedrake.Function`
+            Velocity model for the model with absorbing layer.
+        V : `Firedrake.FunctionSpace`
+            Function space for the model with absorbing layer.
+        c_ref : `Firedrake.Function`, optional
+            Velocity model for the reference model without absorbing layer.
+            Default is `None`.
+        V_ref : `Firedrake.FunctionSpace`, optional
+            Function space for the reference model without absorbing layer.
+            Default is `None`.
+        quad_rule : `dict`, optional
+            Quadrature rule to use for the integration.
+            Default is `None`, which uses the default quadrature rule.
+        dof_load : `array`, optional
+           Degrees of freedom (DOFs) where the static load is applied.
+        amplitude_load : `array`, optional
+            Amplitude of the static load at the specified DOFs.
+        type_homog : `str`, optional
+            Type of homogenization: "energy" or "volume". Default is "energy"
+
+        Returns
+        -------
+        c_eq : `float`
+            Equivalent homogeneous velocity for the model with absorbing layer.
+        c_eqref : `float`
+            Equivalent homogeneous velocity for the reference model without layer.
+        """
+
+        # Check type of homogenization
+        value_parameter_error("type_homog", type_homog, ["energy", "volume"])
+
+        # Define the load for the energy-equivalent homogenization
+        dummy_load = self.dummy_load_static_(V, dof_load, amplitude_load, V_ref=V_ref) \
+            if type_homog == "energy" else (None, None)
+
+        # Compute the equivalent velocity for the model with absorbing layer
+        c_eq = self.c_equivalent(c, V, quad_rule=quad_rule, type_homog=type_homog,
+                                 static_load_for_ceq=dummy_load[0])
+
+        # Compute the equivalent velocity for the reference model without layer
+        c_eqref = None
+        if c_ref is not None and V_ref is not None:
+            c_eqref = self.c_equivalent(c_ref, V_ref, quad_rule=quad_rule,
+                                        type_homog=type_homog,
+                                        static_load_for_ceq=dummy_load[1])
+
+        return (c_eq, c_eqref)
+
     def solver_analytical(self, c_eq, hyp_par, bc="Neumann", c_eqref=None,
                           fitting_c=(0., 0., 0., 0.), cut_plane_percent=1.):
         """"Compute the analytical eigenvalue for hypershapes by using homogenization.
@@ -471,7 +644,7 @@ class Modal_Analytical_Solver():
         Parameters
         ----------
         c_eq : `float`
-            Equivalente isotropic velocity in the hypershape.
+            Equivalente homogeneous velocity in the hypershape.
         hyp_par : `tuple`
             Hyperellipshape parameters.
             Structure 2D: (n_hyp, a_hyp, b_hyp).
@@ -510,7 +683,7 @@ class Modal_Analytical_Solver():
             First eigenvalue of the hypershape with Neumann or Dirichlet BCs.
         """
 
-        # Check the isotropic velocity
+        # Check the homogeneous velocity
         value_numerical_error("c_eq", c_eq, lower_bound=0., include_lower_bound=False)
 
         # Hyperellipse parameters
@@ -522,18 +695,20 @@ class Modal_Analytical_Solver():
 
         # Check semi-axes type
         type_data_structure_error("hyper_axes", hyper_axes, "tuple",
-                                  ("float", "int"), expected_length=self.dimension)
+                                  expected_type_element=("float", "int"),
+                                  expected_length=self.dimension)
 
         # Check boundary condition type
         value_parameter_error("bc", bc, ["Dirichlet", "Neumann"])
 
-        # Check the isotropic velocity from original model without absorbing layer
+        # Check the homogeneous velocity from original model without absorbing layer
         c_eqref = c_eq if c_eqref is None else value_numerical_error(
             "c_eqref", c_eqref, lower_bound=0., include_lower_bound=False)
 
         # Check the parameters for fitting equivalent velocity regression.
         type_data_structure_error("fitting_c", fitting_c, "tuple",
-                                  ("float", "int"), expected_length=4)
+                                  expected_type_element=("float", "int"),
+                                  expected_length=4)
 
         # Check the cutting plane percent is between 0 and 1
         value_numerical_error("cut_plane_percent", cut_plane_percent,
