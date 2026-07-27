@@ -47,12 +47,20 @@ jobs:
         run: |
           apt-get update
           apt-get -y install git python3
-
-      - uses: actions/checkout@v4
-
-      - name: Cloning firedrake and installing dependencies
+    
+      - name: Checkout main repository (avenir_spyro_elastic)
+        uses: actions/checkout@v4
+    
+      - name: Fetch Firedrake Source
+        uses: actions/checkout@v4
+        with:
+          repository: 'firedrakeproject/firedrake'
+          ref: 'main'
+          path: 'firedrake-repo' # Places Firedrake safely into ./firedrake-repo
+          fetch-depth: 1
+    
+      - name: Installing system dependencies (2)
         run: |
-          git clone https://github.com/firedrakeproject/firedrake.git firedrake-repo
           apt-get -y install \
             $(python3 ./firedrake-repo/scripts/firedrake-configure --show-system-packages)
           apt-get -y install python3-venv
@@ -64,12 +72,12 @@ jobs:
           python3 ../firedrake-repo/scripts/firedrake-configure \
             --show-petsc-configure-options | \
             xargs -L1 ./configure --with-make-np=8 --download-slepc
-          make PETSC_DIR=/__w/spyro/spyro/petsc PETSC_ARCH=arch-firedrake-default all
-          make PETSC_DIR=/__w/spyro/spyro/petsc PETSC_ARCH=arch-firedrake-default check
+          make PETSC_DIR=/__w/avenir_spyro_elastic/avenir_spyro_elastic/petsc PETSC_ARCH=arch-firedrake-default all
+          make PETSC_DIR=/__w/avenir_spyro_elastic/avenir_spyro_elastic/petsc PETSC_ARCH=arch-firedrake-default check
           {
-            echo "PETSC_DIR=/__w/spyro/spyro/petsc"
+            echo "PETSC_DIR=/__w/avenir_spyro_elastic/avenir_spyro_elastic/petsc"
             echo "PETSC_ARCH=arch-firedrake-default"
-            echo "SLEPC_DIR=/__w/spyro/spyro/petsc/arch-firedrake-default"
+            echo "SLEPC_DIR=/__w/avenir_spyro_elastic/avenir_spyro_elastic/petsc/arch-firedrake-default"
           } >> "$GITHUB_ENV"
 
       - name: Install Firedrake
@@ -103,7 +111,7 @@ jobs:
           firedrake-check
         timeout-minutes: 5
       
-      - name: Run spyro smoke tests
+      - name: Run avenir_spyro_elastic smoke tests
         run: |
           . venv/bin/activate
 
