@@ -20,7 +20,7 @@ import spyro
 import pytest
 
 
-def run_forward_real_model(input_dictionary, case="camembert", shot_filename="shots/shot_record_", dt=None, save_vp_as_segy=False, segy_filename="real_vp.segy"):
+def run_forward_real_model(input_dictionary, shot_filename="shots/shot_record_", dt=None, save_vp_as_segy=False, segy_filename="real_vp.segy"):
     """Generate and save a synthetic shot record for the chosen demo case.
 
     Parameters
