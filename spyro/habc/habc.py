@@ -226,28 +226,14 @@ class HABCLayer(ABCLayer, HABC_Damping):
             # Cut plane percentage
             cut_plane_percent = z_cut / self.layer_geometry.hyper_axes[1]
 
-            # Define the load for the energy-equivalent homogenization
-            # Static load for HABC model
-            q_lay = Wave.set_material_property("q_lay", 'scalar', constant=0.)
-            q_lay.dat.data_with_halos[Wave.sources.cellNodeMaps.flatten().astype(
-                int)] = Wave.sources.cell_tabulations.flatten()
-
-            # Static load for Reference model
-            q_ref = Function(Wave.mesh_parameters.funct_space_eik)
-            q_ref.interpolate(q_lay, allow_missing_dofs=True)
-
-            # Equivalent velocity for the original model
-            c_eqref = mod_sol.c_equivalent(Wave.initial_velocity_model,
-                                           V=Wave.mesh_parameters.funct_space_eik,
-                                           quad_rule=Wave.quadrature_rule,
-                                           static_load_for_ceq=q_ref)
-
-            Lsp = mod_sol.solve_eigenproblem(Wave.c, V=Wave.function_space,
-                                             quad_rule=Wave.quadrature_rule,
-                                             hyp_par=hyp_par, c_eqref=c_eqref,
-                                             fitting_c=fitting_c,
-                                             cut_plane_percent=cut_plane_percent,
-                                             static_load_for_ceq=q_lay)
+            Lsp = mod_sol.solve_eigenproblem(
+                Wave.c, V=Wave.function_space, quad_rule=Wave.quadrature_rule,
+                hyp_par=hyp_par, cut_plane_percent=cut_plane_percent,
+                c_ref=Wave.initial_velocity_model,
+                V_ref=Wave.mesh_parameters.funct_space_eik,
+                dof_load=Wave.sources.cellNodeMaps.flatten().astype(int),
+                amplitude_load=Wave.sources.cell_tabulations.flatten(),
+                fitting_c=fitting_c)
 
         elif method == 'RAYLEIGH':
 

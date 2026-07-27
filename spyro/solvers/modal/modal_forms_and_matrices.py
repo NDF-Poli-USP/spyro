@@ -16,7 +16,7 @@ def weak_forms(c, V, quad_rule=None, source=False, user_load=None):
         Velocity model.
     V : `Firedrake.FunctionSpace`
         Function space for the modal problem.
-    quad_rule : `str`, optional
+    quad_rule : `dict`, optional
         Quadrature rule to use for the integration.
         Default is None, which uses the default quadrature rule.
     source : `bool`, optional

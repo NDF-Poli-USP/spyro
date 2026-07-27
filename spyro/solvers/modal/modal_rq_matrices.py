@@ -98,7 +98,7 @@ def matrices_rayleigh_quotient(c, eig_funcs, grad_eig, quad_rule=None):
         Eigenfunctions computed as `Firedrake.Function`.
     grad_eig : `list`
         Eigenfunction gradients computed as `Firedrake.Function`.
-    quad_rule : `str`, optional
+    quad_rule : `dict`, optional
         Quadrature rule to use for the integration.
         Default is `None`, which uses the default quadrature rule.
 
