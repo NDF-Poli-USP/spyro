@@ -56,6 +56,7 @@ jobs:
       run: |
         make clean
         python3 -m pytest -n 6 --cov-report=xml --cov=spyro tests/demo_tests/test_acoustic_camembert_demo.py
+        python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/demo_tests/test_acoustic_layer_demo.py
 
     - name: Post-run cleanup
       if: always()
