@@ -5,7 +5,6 @@ from numpy.testing import assert_array_equal
 from enum import Enum
 from unittest.mock import Mock, patch
 from firedrake import Function, FunctionSpace, Mesh
-from firedrake.functionspaceimpl import WithGeometry
 from ufl.geometry import SpatialCoordinate
 from spyro.utils.error_management import (
     clean_inst_num, enum_parameter_error, mutually_exclusive_parameter_error,
