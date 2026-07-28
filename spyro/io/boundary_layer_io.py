@@ -267,6 +267,7 @@ class Read_boundary_layer:
             self.abc_user_pad_len = False
         else:
             pad_length = value_numerical_error("abc_pad_length", value, float_num=True,
-                                               integer_num=True, lower_bound=0.)
+                                               integer_num=True, lower_bound=0.,
+                                               include_lower_bound=True)
             pprint(f"Pad length provided by user (km): {pad_length:.4f}", comm=self.comm)
         self._abc_pad_length = pad_length
