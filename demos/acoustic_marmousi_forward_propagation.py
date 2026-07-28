@@ -46,9 +46,9 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.01, 4.0), (-0.01, 12.0), 1),
+    "source_locations": [(-0.01, 8.0)],
     "frequency": frequency,
-    "delay": 0.2,
+    "delay": 1.0/frequency,
     "delay_type": "time",
     "receiver_locations": spyro.create_transect((-0.1, 4.0), (-0.1, 12.0), 100),
 }
@@ -76,7 +76,7 @@ def test_real_shot_record_generation_parallel():
     real_dictionary["mesh"]["mesh_file"] = "meshes/real5hz.msh"
 
     real_wave = spyro.AcousticWave(dictionary=real_dictionary)
-    real_wave.set_initial_velocity_model(new_file="velocity_models/vp_marmousi-ii.hdf5", fast_interpolate=True)
+    real_wave.set_initial_velocity_model(new_file="velocity_models/vp_marmousi-ii.segy", fast_interpolate=True)
     real_wave.forward_solve()
     VTKFile("vp.pvd").write(real_wave.c)
     spyro.io.save_shots(real_wave)
