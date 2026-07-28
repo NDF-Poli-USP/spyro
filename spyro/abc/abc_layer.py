@@ -1,5 +1,6 @@
 from firedrake import Function, VTKFile
 # from numpy import abs, array, ceil, inf, log10, minimum
+from numpy import inf
 from os import getcwd
 # from sympy import divisors
 from .nrbc import NRBC
