@@ -1,4 +1,4 @@
-from ..utils.error_management import value_parameter_error
+from ..utils.error_management import value_numerical_error, value_parameter_error
 
 
 class Read_options:
@@ -51,8 +51,7 @@ class Read_options:
 
         self.variant = options_dictionary["variant"]
         self.method = options_dictionary["method"]
-        if options_dictionary["cell_type"] is not None:
-            self.cell_type = options_dictionary["cell_type"]
+        self.cell_type = options_dictionary["cell_type"]
         self.degree = options_dictionary["degree"]
         self.dimension = options_dictionary["dimension"]
         self.analysis = options_dictionary["analysis"]
@@ -64,9 +63,7 @@ class Read_options:
     @variant.setter
     def variant(self, value):
         accepted_variants = ["lumped", "equispaced", "DG", None]
-        if value not in accepted_variants:
-            raise ValueError(f"Variant of {value} is not valid.")
-        self._variant = value
+        self._variant = value_parameter_error("variant", value, accepted_variants)
 
     @property
     def method(self):
@@ -91,6 +88,11 @@ class Read_options:
             "DGQ",
             "discontinuous_galerkin_quadrilateral",
         ]
+
+        # Check if the provided value is in any of the accepted methods
+        value_parameter_error("method", value, mlt_equivalents + sem_equivalents
+                              + dg_t_equivalents + dg_q_equivalents + ["CG", None])
+
         if value in mlt_equivalents:
             self._method = "mass_lumped_triangle"
             self.cell_type = "triangle"
@@ -103,21 +105,13 @@ class Read_options:
         elif value in dg_q_equivalents:
             self._method = "DG_quadrilateral"
             self.cell_type = "quadrilateral"
-        elif value == "DG":
-            raise ValueError(
-                "DG is not a valid method. Please specify \
-                either DG_triangle or DG_quadrilateral."
-            )
         elif value == "CG":
-            if "variant" in self.input_dictionary["options"] and "cell_type" \
-                    in self.input_dictionary["options"]:
-                self._method = "CG"
-            else:
+            options = self.input_dictionary["options"]
+            if not ("variant" in options and "cell_type" in options):
                 raise ValueError("Cant use CG without specifying cell type and variant.")
+            self._method = "CG"
         elif value is None:
             self._method = None
-        else:
-            raise ValueError(f"Method of {value} is not valid.")
 
     @property
     def cell_type(self):
@@ -183,9 +177,9 @@ class Read_options:
 
     @degree.setter
     def degree(self, value):
-        if not isinstance(value, int):
-            raise ValueError("Degree has to be integer")
-        self._degree = value
+        self._degree = value_numerical_error('degree', value, float_num=False,
+                                             integer_num=True, lower_bound=0,
+                                             include_lower_bound=False,)
 
     @property
     def dimension(self):
@@ -193,9 +187,7 @@ class Read_options:
 
     @dimension.setter
     def dimension(self, value):
-        if value not in {2, 3}:
-            raise ValueError(f"Dimension of {value} not 2 or 3.")
-        self._dimension = value
+        self._dimension = value_parameter_error('dimension', value, [2, 3])
 
     @property
     def analysis(self):
@@ -204,9 +196,7 @@ class Read_options:
     @analysis.setter
     def analysis(self, value):
         allowed_analyses = ["transient", "modal", "eikonal"]
-        if value not in allowed_analyses:
-            raise value_parameter_error('analysis', value, allowed_analyses)
-        self._analysis = value
+        self._analysis = value_parameter_error('analysis', value, allowed_analyses)
 
 
 class Read_outputs:

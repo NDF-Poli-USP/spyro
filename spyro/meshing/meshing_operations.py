@@ -219,6 +219,7 @@ class MeshOps():
             coords.append(assemble(interpolate(ufl_input, V)))
 
         # Get the node positions
+        value_parameter_error('output_type', output_type, ["tuple", "array"])
         if output_type == "tuple":
             z_data = coords[0].dat.data_with_halos[:]
             x_data = coords[1].dat.data_with_halos[:]
@@ -230,9 +231,6 @@ class MeshOps():
         elif output_type == "array":
             node_positions = column_stack([comp.dat.data_with_halos[:]
                                            for comp in coords])
-
-        else:
-            value_parameter_error('output_type', output_type, ["tuple", "array"])
         del coords
 
         # TODO: either put wave's similar method here or just remove the one from wave
