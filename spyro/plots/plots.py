@@ -1,5 +1,3 @@
-# from scipy.io import savemat
-import os
 from matplotlib import use
 import matplotlib.pyplot as plt
 from PIL import Image
