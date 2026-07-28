@@ -7,9 +7,9 @@ import numpy as np
 from scipy.interpolate import griddata
 import os
 import warnings
-import segyio
 from .parallelism_wrappers import ensemble_save, ensemble_load
 from ..tools.version_control import is_firedrake_new
+from .segy_io import read_segy_velocity_model
 
 
 if is_firedrake_new() is False:
@@ -406,41 +406,6 @@ def saving_source_and_receiver_location_in_csv(model, folder_name=None):
     file_obj.close()
 
     return None
-
-
-def read_segy_velocity_model(fname):
-    """Read a velocity model from a SEG-Y file.
-
-    Parameters
-    ----------
-    fname : str
-        Filename of the SEG-Y velocity model.
-
-    Returns
-    -------
-    vp : numpy.ndarray
-        Velocity model array in ``(z, x)`` order.
-    nz : int
-        Number of samples per trace, corresponding to the z direction.
-    nx : int
-        Number of traces in the SEG-Y file, corresponding to the x direction.
-
-    Raises
-    ------
-    ImportError
-        If ``segyio`` is not installed.
-    """
-    with segyio.open(fname, "r", ignore_geometry=True) as segy:
-        nx = len(segy.trace)
-        nz = len(segy.samples)
-        vp = np.zeros((nz, nx), dtype=np.float32)
-
-        for i in range(nx):
-            vp[:, i] = segy.trace[i]
-
-    vp = np.flipud(vp)
-
-    return vp, nz, nx
 
 
 def _parse_axes_order(axes_order, ndim=3):

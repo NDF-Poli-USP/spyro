@@ -120,10 +120,8 @@ class Eikonal_Modeling():
 
         # Finite element type.
         allowed_ele_types = ['consistent', 'underintegrated']
-        if ele_type_eik not in allowed_ele_types:
-            value_parameter_error('ele_type_eik', ele_type_eik, allowed_ele_types)
-        else:
-            self.ele_type_eik = ele_type_eik
+        self.ele_type_eik = value_parameter_error('ele_type_eik', ele_type_eik,
+                                                  allowed_ele_types)
 
         # Finite element order for the Eikonal analysis
         self.degree_eik = degree_eik if degree_eik is not None else \

@@ -79,31 +79,46 @@ class Model_parameters(Read_options, Read_boundary_layer,
         Firedrake mesh.
     abc_active: bool
         Whether or not the absorbing boundary conditions are used.
-    abc_exponent: int
-        Exponent of the absorbing boundary conditions.
-    abc_cmax: float
-        Maximum acoustic wave velocity in the absorbing boundary conditions.
-    abc_R: float
-        Theoretical reflection coefficient of the absorbing boundary
-        conditions.
-    abc_pad_length: float
-        Thickness of the absorbing boundary conditions.
-    abc_boundary_layer_type : `str`
-        Type of the boundary layer. Option 'hybrid' is based on paper
-        of Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
-    abc_boundary_layer_shape : str
-        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
-    abc_deg_layer : `float`
-        Hypershape degree
-    abc_degree_type : `str`
-        Type of the hypereshape degree. Options: 'real' or 'integer'
-    abc_reference_freq : `str`
-        Reference frequency for sizing the hybrid absorbing layer.
-        Options: 'source' or 'boundary'
+    abc_boundary_layer_shape : `typing.LayerShapeType`
+        Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
+        `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
+    abc_boundary_layer_type : `typing.LayerDampingType`
+        Type of the boundary layer. Options: `LayerDampingType.LOCAL`,
+        `LayerDampingType.HYBRID`, `LayerDampingType.PML` or `LayerDampingType.NOABCS`.
+        Default is `LayerDampingType.NOABCS` where no absorbing BCs are applied.
+        Option `LayerDampingType.HYBRID` is based on paper of Salas et al. (2022).
+        doi: https://doi.org/10.1016/j.apm.2022.09.014
+        TODo: Add citation
     abc_deg_eikonal : `int`
         Finite element order for the Eikonal analysis
+    abc_deg_layer : `int` or `float`
+        Hypershape degree
+    abc_degree_type : `typing.HyperLayerDegreeType`, optional
+        Type of the hypereshape degree. Options: 'HyperLayerDegreeType.REAL' or
+        'HyperLayerDegreeType.INTEGER'. Default is 'HyperLayerDegreeType.REAL'
+    abc_extend_properties : `str`
+        Mode to extend the properties into the absorbing layer.
+        Options: 'abc_driven'  (performed by a specific method) or
+        'builtin' (automatic at field definition)
     abc_get_ref_model : `bool`
         If True, the infinite model is created
+    abc_pad_length : `float`
+        Thickness of the PML in the z-direction (km) - always positive
+    abc_pml_cmax: float
+        Maximum propagation speed (km/s) in the PML layer. Default is 4.7 km/s.
+    abc_pml_exponent: int
+        Exponent for the polynomial damping profile of the PML layer. Default is 2.
+    abc_pml_R: float
+        Theoretical reflection coefficient of the PML layer. Default is 1e-6.
+    abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
+        Reference frequency for sizing the absorbing layer.
+        Options: 'LayerSizeRefFrequency.SOURCE' or 'LayerSizeRefFrequency.BOUNDARY'.
+        Default is 'LayerSizeRefFrequency.SOURCE'.
+    abc_user_pad_length : `bool`
+        If True, the pad length is provided by the user. If False,
+        the pad length is determined with the HABC criterion.
+    abc_user_pml_cmax : `bool`
+        If True, the maximum propagation speed in the PML layer is provided by the user.
     source_type: str
         Type of source used in the simulation. Can be "ricker" for a Ricker
         wavelet or "MMS" for a manufactured solution.

@@ -140,9 +140,7 @@ class Modal_Solver():
             self.valid_methods.extend(['KRYLOVSCH_CH', 'KRYLOVSCH_CG',
                                        'KRYLOVSCH_GH', 'KRYLOVSCH_GG',
                                        'RAYLEIGH'])
-
-        if self.method not in self.valid_methods:
-            value_parameter_error('method', method, self.valid_methods)
+        value_parameter_error('method', self.method, self.valid_methods)
 
         pprint(f"Solver Method: {self.method}", comm=self.comm)
 
@@ -448,12 +446,12 @@ class Modal_Solver():
             Fundamental frequency factor for rectangular or prismatic geometry.
         """
 
+        # Check boundary condition type
+        value_parameter_error('bc', bc, ["Dirichlet", "Neumann"])
         if bc == "Neumann":
             f_rec = 1. / max(hyper_axes)
         elif bc == "Dirichlet":
             f_rec = sum(1. / np.asarray(hyper_axes)**2)**0.5
-        else:
-            value_parameter_error('bc', bc, ["Dirichlet", "Neumann"])
 
         f_rec *= np.pi / 2.
 
@@ -484,8 +482,8 @@ class Modal_Solver():
             Fundamental frequency factor for elliptical or ellipsoidal geometry.
         """
 
-        if bc not in ["Dirichlet", "Neumann"]:
-            value_parameter_error('bc', bc, ["Dirichlet", "Neumann"])
+        # Check boundary condition type
+        value_parameter_error('bc', bc, ["Dirichlet", "Neumann"])
 
         def MMF(q):
             """Compute the Modified Mathieiu's Function (MMF) or its derivative.

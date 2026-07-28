@@ -10,7 +10,6 @@ from .basicio import (
     # ensemble_gradient_elastic_waves,
     parallel_print,
     saving_source_and_receiver_location_in_csv,
-    read_segy_velocity_model,
     read_bin_velocity_model,
     write_velocity_model
 )
@@ -24,7 +23,12 @@ from .parallelism_wrappers import (
     is_owner,
     switch_serial_shot,
 )
-from .segy_io import create_segy, create_segy_from_grid, export_scalar_field
+from .segy_io import (
+    create_segy,
+    create_segy_from_grid,
+    export_scalar_field,
+    read_segy_velocity_model,
+)
 from .model_parameters import Model_parameters
 from .backwards_compatibility_io import Dictionary_conversion
 from . import dictionaryio
