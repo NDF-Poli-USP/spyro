@@ -5,7 +5,7 @@ frequency with expected values for different domain configurations. The tests co
 both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
 """
 
-from pytest import fail, fixture, mark  # , param
+from pytest import fail, fixture, mark, param
 from firedrake import conditional, ConvergenceError
 from firedrake import COMM_WORLD as comm
 from numpy import isclose, squeeze, zeros
@@ -330,12 +330,12 @@ def run_modal(Wave_obj, fitting_c, exp_value, n_root=1):
     ("T", 2, None, True),
     ("T", 2, 2.0, False),
     ("T", 2, None, False),
-    ("T", 3, 6.0, True),
     ("T", 3, None, True),
-    ("T", 3, 2.4, False),
-    ("T", 3, None, False),
     ("Q", 3, None, True),
-    ("Q", 3, None, False)])
+    param("T", 3, 6.0, True, marks=mark.slow),
+    param("T", 3, 2.4, False, marks=mark.slow),
+    param("T", 3, None, False, marks=mark.slow),
+    param("Q", 3, None, False, marks=mark.slow)])
 def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogeneous):
     """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
