@@ -5,7 +5,7 @@ frequency with expected values for different domain configurations. The tests co
 both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
 """
 
-from pytest import fail, fixture, mark, param
+from pytest import fail, fixture, mark  # , param
 from firedrake import conditional, ConvergenceError
 from firedrake import COMM_WORLD as comm
 from numpy import isclose, squeeze, zeros
