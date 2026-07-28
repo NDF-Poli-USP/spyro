@@ -3,15 +3,14 @@ from .basicio import (
     save_shots,
     load_shots,
     read_mesh,
-    interpolate,
-    project_grid_velocity_data,
-    # ensemble_forward_ad,
-    # ensemble_forward_elastic_waves,
-    # ensemble_gradient_elastic_waves,
     parallel_print,
     saving_source_and_receiver_location_in_csv,
     read_bin_velocity_model,
     write_velocity_model
+)
+from .interpolators import (
+    interpolate,
+    project_grid_velocity_data,
 )
 from .parallelism_wrappers import (
     delete_tmp_files,
