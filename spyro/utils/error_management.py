@@ -3,7 +3,7 @@
 This file contains methods for handling errors in Spyro, either to send
 messages to the user or to prevent numerical instability in objects."""
 
-from numpy import float64, inf, int64, isinf, isnan, ndarray, where
+from numpy import float64, inf, int64, isinf, isnan, ndarray
 from firedrake import Function, FunctionSpace, Mesh
 from firedrake.functionspaceimpl import WithGeometry
 from ufl.geometry import SpatialCoordinate
