@@ -1,6 +1,6 @@
-from numpy import asarray, clip, cos, isreal, pi, polyfit, roots, sin, tan
-from ..io.basicio import parallel_print as pprint
-from spyro.utils.error_management import value_parameter_error
+# from numpy import asarray, clip, cos, isreal, pi, polyfit, roots, sin, tan
+# from ..io.basicio import parallel_print as pprint
+# from spyro.utils.error_management import value_parameter_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
