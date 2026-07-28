@@ -11,45 +11,58 @@ def C_computation(self):
     dim = self.function_space.mesh().topological_dimension()
 
     if self.wave_type == 'isotropic':
-        C_elas = c_iso_tensor(self)
+        Elastic_C = c_isotropic_tensor(self)
 
     elif self.wave_type == 'anisotropic_VTI':
-        C_elas = c_vti_tensor(self.PropISO, self.PropVTI, dim)
+        Elastic_C = c_vti_tensor(self.IsotropicProperties, self.AnisotropicPropertiesVTI, dim)
 
-    else:
-        c_vti = c_vti_tensor(self.PropISO, self.PropVTI, dim)
-        C_elas = c_tti_tensor(c_vti, self.PropTTI, dim)
+    elif self.wave_type == 'anisotropic_TTI':
+        c_vti = c_vti_tensor(self.IsotropicProperties, self.AnisotropicPropertiesVTI, dim)
+        Elastic_C = c_tti_tensor(c_vti, self.AnisotropicPropertiesTTI, dim)
     
-    return C_elas
+    return Elastic_C
 
-def c_iso_tensor(self):
+def c_isotropic_tensor(self):
+    """
+    Elastic tensor in terms of vp, vs and rho.
+    """
+
     dim = self.function_space.mesh().topological_dimension()
 
-    if dim == 2:
-        c = as_matrix([
-                [self.lmbda + 2*self.mu, self.lmbda,       0],
-                [self.lmbda,       self.lmbda + 2*self.mu, 0],
-                [0,           0,            self.mu]
-                ])
-    else:
-        c = as_matrix([
-            [self.lmbda + 2*self.mu, self.lmbda,       self.lmbda,       0,    0,    0],
-            [self.lmbda,       self.lmbda + 2*self.mu, self.lmbda,       0,    0,    0],
-            [self.lmbda,       self.lmbda,       self.lmbda + 2*self.mu, 0,    0,    0],
-            [0,           0,           0,           self.mu,   0,    0],
-            [0,           0,           0,           0,    self.mu,   0],
-            [0,           0,           0,           0,    0,    self.mu]
-            ])
-    return c
+    rho = self.IsotropicProperties.rho
+    vp  = self.IsotropicProperties.vP
+    vs  = self.IsotropicProperties.vS
 
-def c_vti_tensor(PropISO, PropVTI, dim):
+    C11 = rho * vp**2
+    C44 = rho * vs**2
+    C12 = C11 - 2*C44
+
+    if dim == 2:
+        C_isotropic = fire.as_tensor((
+            (C11, C12, 0),
+            (C12, C11, 0),
+            (0,   0,   C44)
+        ))
+    else:
+        C_isotropic = fire.as_tensor((
+            (C11, C12, C12, 0,   0,   0),
+            (C12, C11, C12, 0,   0,   0),
+            (C12, C12, C11, 0,   0,   0),
+            (0,   0,   0,   C44, 0,   0),
+            (0,   0,   0,   0,   C44, 0),
+            (0,   0,   0,   0,   0,   C44)
+        ))
+
+    return C_isotropic
+
+def c_vti_tensor(IsotropicProperties, AnisotropicPropertiesVTI, dim):
     """Constructs the elastic tensor for a material with VTI anisotropy.
 
     TODO References: Thomsen (1986). Geophysics 51, 10, 1954-1966
 
     Parameters
         ----------
-    PropISO: `object`
+    IsotropicProperties: `object`
         An instance of the isotropic properties class. Attributes:
         - vP: `Firedrake.Function`
             P-wave velocity [m/s]
@@ -57,7 +70,7 @@ def c_vti_tensor(PropISO, PropVTI, dim):
             S-wave velocity [m/s]
         - rho: `Firedrake.Function`
             Density [kg/m³]
-    PropVTI: `object`
+    AnisotropicPropertiesVTI: `object`
         An instance of the VTI anisotropy properties class. Attributes:
         - epsilon: `Firedrake.Function`
             Thomsen parameter epsilon
@@ -74,18 +87,16 @@ def c_vti_tensor(PropISO, PropVTI, dim):
         Elastic tensor
     """
 
-    print('VTI')
-
     # Assigning isotropic properties
-    rho = PropISO.rho
-    vP = PropISO.vP
-    vS = PropISO.vS
+    rho = IsotropicProperties.rho
+    vP = IsotropicProperties.vP
+    vS = IsotropicProperties.vS
 
     # Assigning anisotropic properties
-    epsilon = PropVTI.epsilon
-    gamma = PropVTI.gamma
-    delta = PropVTI.delta
-    anisotropy = PropVTI.anisotropy
+    epsilon = AnisotropicPropertiesVTI.epsilon
+    gamma = AnisotropicPropertiesVTI.gamma
+    delta = AnisotropicPropertiesVTI.delta
+    anisotropy = AnisotropicPropertiesVTI.anisotropy
 
     # Computing the elastic tensor components
     C33 = rho * vP ** 2
@@ -118,7 +129,7 @@ def c_vti_tensor(PropISO, PropVTI, dim):
 
     return C_vti
 
-def c_tti_tensor(C_vti, PropTTI, dim):
+def c_tti_tensor(C_vti, AnisotropicPropertiesTTI, dim):
     """Constructs the elastic tensor for a material with TTI anisotropy.
 
     TODO References: Yang et al (2020). Survey in Geophysics 41, 805-833
@@ -127,7 +138,7 @@ def c_tti_tensor(C_vti, PropTTI, dim):
     ----------
     C_vti: `ufl.tensors.ListTensor`
         Elastic tensor for VTI anisotropy
-    PropTTI: `object`
+    AnisotropicPropertiesTTI: `object`
         An instance of the TTI anisotropy properties class. Attributes:
         - theta: `Firedrake.Function`
             Tilt angle in degrees
@@ -139,10 +150,9 @@ def c_tti_tensor(C_vti, PropTTI, dim):
     C_tti: `ufl.tensors.ListTensor`
         Elastic tensor for TTI anisotropy
     """
-
     # Assigning anisotropic properties
-    theta = PropTTI.theta
-    phi = PropTTI.phi
+    theta = AnisotropicPropertiesTTI.theta
+    phi = AnisotropicPropertiesTTI.phi
     
     if dim == 2:
         T = bond_rotation_2d_elastic(theta)
@@ -210,59 +220,71 @@ def build_Gamma(self):
 
     dim = self.function_space.mesh().topological_dimension()
 
-    C = self.C_elas
+    C = self.Elastic_C
 
-    PropISO = self.PropISO
-    PropVTI = self.PropVTI
-    PropTTI = self.PropTTI
+    IsotropicProperties = self.IsotropicProperties
+    AnisotropicPropertiesVTI = self.AnisotropicPropertiesVTI
+    AnisotropicPropertiesTTI = self.AnisotropicPropertiesTTI
 
     if self.viscoelastic == True:
         if self.wave_type == 'isotropic':
-            Gamma = Gamma_iso(self)
+            Gamma = Gamma_isotropic(self)
 
         elif self.wave_type == 'anisotropic_VTI':
-            Gamma = Gamma_VTI(self, PropISO, PropVTI, C, dim)
+            Gamma = Gamma_VTI(self, IsotropicProperties, AnisotropicPropertiesVTI, C, dim)
         
         elif self.wave_type == 'anisotropic_TTI':
-            Gamma = Gamma_TTI(self, PropISO, PropVTI, PropTTI, dim, C)
+            Gamma = Gamma_TTI(self, IsotropicProperties, AnisotropicPropertiesVTI, 
+            AnisotropicPropertiesTTI, dim, C)
     else: 
         Gamma = np.zeros((6,6))
     return Gamma
 
-def Gamma_iso(self):
-    kappa = self.lmbda + (2/3) * self.mu
-    alpha_sq = (self.lmbda + 2*self.mu) / self.rho
-    beta_sq = self.mu / self.rho
-    denom = alpha_sq - (4/3) * beta_sq
+def Gamma_isotropic(self):
+
+    vp_sq = self.IsotropicProperties.vP**2
+    vs_sq = self.IsotropicProperties.vS**2
+
+    denom = vp_sq - (4.0/3.0) * vs_sq
 
     Qkappa_inv = conditional(
-        lt(abs(denom), 1e-12), self.Qp_inv, (alpha_sq * self.Qp_inv - (4/3) * beta_sq * self.Qs_inv) / denom)
+        lt(abs(denom), 1e-12),
+        self.Qp_inv,
+        (vp_sq * self.Qp_inv - (4.0/3.0) * vs_sq * self.Qs_inv) / denom
+    )
 
-    lmbda_Q = kappa * Qkappa_inv - (2/3) * self.mu * self.Qs_inv
+    lambda_expr = vp_sq - 2.0 * vs_sq
 
-    ratio = conditional(lt(abs(self.lmbda), 1e-12), 0.0, lmbda_Q / self.lmbda)
+    ratio = conditional(
+        lt(abs(lambda_expr), 1e-12),
+        0.0,
+        (
+            (vp_sq - (4.0/3.0) * vs_sq) * Qkappa_inv
+            - (2.0/3.0) * vs_sq * self.Qs_inv
+        ) / lambda_expr
+    )
 
     Gamma = as_matrix([
-                    [self.Qp_inv,   ratio,    ratio,    0, 0, 0],
-                    [ratio,    self.Qp_inv,   ratio,    0, 0, 0],
-                    [ratio,    ratio,    self.Qp_inv,   0, 0, 0],
-                    [0,        0,        0,        self.Qs_inv, 0, 0],
-                    [0,        0,        0,        0, self.Qs_inv, 0],
-                    [0,        0,        0,        0, 0, self.Qs_inv]
-                    ])
-    
+        [self.Qp_inv, ratio,       ratio,       0,            0,            0],
+        [ratio,       self.Qp_inv, ratio,       0,            0,            0],
+        [ratio,       ratio,       self.Qp_inv, 0,            0,            0],
+        [0,           0,           0,           self.Qs_inv,  0,            0],
+        [0,           0,           0,           0,            self.Qs_inv,  0],
+        [0,           0,           0,           0,            0,            self.Qs_inv],
+    ])
+
     return Gamma
 
-def Gamma_VTI(self, PropISO, PropVTI, C, dim):
+def Gamma_VTI(self, IsotropicProperties, AnisotropicPropertiesVTI, C, dim):
 
-    rho = PropISO.rho
-    vP = PropISO.vP
-    vS = PropISO.vS
+    rho = IsotropicProperties.rho
+    vP = IsotropicProperties.vP
+    vS = IsotropicProperties.vS
 
-    epsilon = PropVTI.epsilon
-    gamma = PropVTI.gamma
-    delta = PropVTI.delta
-    anisotropy = PropVTI.anisotropy
+    epsilon = AnisotropicPropertiesVTI.epsilon
+    gamma = AnisotropicPropertiesVTI.gamma
+    delta = AnisotropicPropertiesVTI.delta
+    anisotropy = AnisotropicPropertiesVTI.anisotropy
     
     if dim == 2:
         C11 = C[0, 0]
@@ -312,14 +334,14 @@ def Gamma_VTI(self, PropISO, PropVTI, C, dim):
                                 [0, 0, 0, 0, 0, Q66]])
     return Gamma
 
-def Gamma_TTI(self, PropISO, PropVTI, PropTTI, dim, C):
+def Gamma_TTI(self, IsotropicProperties, AnisotropicPropertiesVTI, AnisotropicPropertiesTTI, dim, C):
     """
     Build Gamma (Q^{-1}) on TTI system.
     """
     # 1. Obter a parte real da matriz VTI
-    C_vti_real = c_vti_tensor(PropISO, PropVTI, dim)
+    C_vti_real = c_vti_tensor(IsotropicProperties, AnisotropicPropertiesVTI, dim)
 
-    Q_vti = Gamma_VTI(self, PropISO, PropVTI, C, dim)
+    Q_vti = Gamma_VTI(self, IsotropicProperties, AnisotropicPropertiesVTI, C, dim)
 
     eps = 1e-12
 
@@ -390,8 +412,8 @@ def Gamma_TTI(self, PropISO, PropVTI, PropTTI, dim, C):
 
     # 3. Rotacionar separadamente as partes real e imaginária
     #    (a função c_tti_tensor aplica a rotação de Bond)
-    C_tti_real = c_tti_tensor(C_vti_real, PropTTI, dim)
-    C_tti_imag = c_tti_tensor(C_imag, PropTTI, dim)
+    C_tti_real = c_tti_tensor(C_vti_real, AnisotropicPropertiesTTI, dim)
+    C_tti_imag = c_tti_tensor(C_imag, AnisotropicPropertiesTTI, dim)
 
     # 4. Calcular Gamma = imag / real (com proteção)
     eps = 1e-12

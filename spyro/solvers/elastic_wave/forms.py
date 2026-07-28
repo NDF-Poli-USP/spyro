@@ -60,7 +60,7 @@ def elastic_without_pml(wave):
     dim = V.mesh().topological_dimension()
     voigt_size = 3 if dim == 2 else 6
 
-    C_elas = wave.C_elas
+    Elastic_C = wave.Elastic_C
 
     # -------------------------------------------------
     # Conversion to Voigt notation
@@ -98,7 +98,7 @@ def elastic_without_pml(wave):
     # -------------------------------------------------
     # Total elastic strain
     # -------------------------------------------------
-    sigma_vec = dot(C_elas, e_n)
+    sigma_vec = dot(Elastic_C, e_n)
 
     # -------------------------------------------------
     # Variational form
@@ -164,7 +164,7 @@ def viscoelastic_maxwell_gsls_without_pml_Q(wave):
     dim = V.mesh().topological_dimension()
     voigt_size = 3 if dim == 2 else 6
 
-    C_elas = wave.C_elas
+    Elastic_C = wave.Elastic_C
     Gamma = wave.Gamma
 
 
@@ -195,8 +195,8 @@ def viscoelastic_maxwell_gsls_without_pml_Q(wave):
     # -------------------------------------------------
     F_m = (rho / (dt**2)) * dot(u - 2*u_n + u_nm1, v) * dx(scheme=quad)
 
-    # Produto Hadamard (elemento a elemento) de C_elas e Gamma
-    M = as_matrix([[C_elas[i, j] * Gamma[i, j] for j in range(voigt_size)] for i in range(voigt_size)])
+    # Produto Hadamard (elemento a elemento) de Elastic_C e Gamma
+    M = as_matrix([[Elastic_C[i, j] * Gamma[i, j] for j in range(voigt_size)] for i in range(voigt_size)])
 
     # -------------------------------------------------
     # 5) Deformações do deslocamento
@@ -218,7 +218,7 @@ def viscoelastic_maxwell_gsls_without_pml_Q(wave):
     # -------------------------------------------------
     # 7) Tensão viscoelástica total em Voigt
     # -------------------------------------------------
-    sigma_visco_vec = dot(C_elas, e_n) - dot(M, e_mem)
+    sigma_visco_vec = dot(Elastic_C, e_n) - dot(M, e_mem)
 
     # -------------------------------------------------
     # 8) Forma variacional

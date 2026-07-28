@@ -193,49 +193,51 @@ class IsotropicWave(ElasticWave):
 
         try:
             self.wave_type = self.input_dictionary.get("wave_type", 'isotropic')
-        except:
+        except: # Acrescentar a "Exception"
             self.wave_type = 'isotropic'
 
-        W = fire.FunctionSpace(self.mesh, "CG", 1)
+        W = FunctionSpace(self.mesh, "CG", 1)
         
-        self.PropISO = None
-        self.PropVTI = None
-        self.PropTTI = None
+        self.IsotropicProperties = None
+        self.AnisotropicPropertiesVTI = None
+        self.AnisotropicPropertiesTTI = None
+
+        d = self.input_dictionary.get("synthetic_data")
+
+        class IsotropicProperties:
+            def __init__(self):
+                self.vP = None
+                self.vS = None
+                self.rho = None
+
+        def isotropic_properties(self):
+                properties = IsotropicProperties()
+                properties.vP = Function(W).assign(self.c)
+                properties.vS = Function(W).assign(self.c_s)
+                properties.rho = Function(W).assign(self.rho)
+                return properties
+
+        self.IsotropicProperties =  isotropic_properties(self)
 
         if self.wave_type in ['anisotropic_VTI', 'anisotropic_TTI']:
             d = self.input_dictionary.get("anisotropy")
 
-            class IsotropicProperties:
-                def __init__(self):
-                    self.vP = None
-                    self.vS = None
-                    self.rho = None
-
-            def isotropic_properties(self):
-                prop = IsotropicProperties()
-                prop.vP = Function(W).assign(Constant(d['vp']))
-                prop.vS = Function(W).assign(Constant(d['vs']))
-                prop.rho = Function(W).assign(Constant(d['rho']))
-                return prop
-
-            self.PropISO =  isotropic_properties(self)
-
-            class AnisotropicProperties:
+            class AnisotropicPropertiesVTI:
                 def __init__(self):
                     self.epsilon = None
                     self.gamma = None
                     self.delta = None
                     self.anisotropy = None
 
-            def anisotropic_properties(self):
-                prop = AnisotropicProperties()
-                prop.epsilon = Function(W).assign(Constant(d['epsilon']))
-                prop.gamma = Function(W).assign(Constant(d['gamma']))
-                prop.delta = Function(W).assign(Constant(d['delta']))
-                prop.anisotropy = d['anisotropy'] 
-                return prop 
+            def anisotropic_properties_VTI(self):
+                properties = AnisotropicPropertiesVTI()
+                properties.epsilon = Function(W).assign(Constant(d['epsilon']))
+                properties.gamma = Function(W).assign(Constant(d['gamma']))
+                properties.delta = Function(W).assign(Constant(d['delta']))
+                properties.anisotropy = d['anisotropy'] 
+                return properties 
 
-            self.PropVTI =  anisotropic_properties(self)
+            self.AnisotropicPropertiesVTI =  anisotropic_properties_VTI(self)
 
             if self.wave_type == 'anisotropic_TTI':
                 class AnisotropicPropertiesTTI:
@@ -244,20 +246,20 @@ class IsotropicWave(ElasticWave):
                         self.phi = None
 
                 def anisotropic_properties_TTI(self):
-                    prop = AnisotropicPropertiesTTI()
-                    prop.theta = Function(W).assign(Constant(d['theta']))
-                    prop.phi = Function(W).assign(Constant(d['phi']))
-                    return prop 
+                    properties = AnisotropicPropertiesTTI()
+                    properties.theta = Function(W).assign(Constant(d['theta']))
+                    properties.phi = Function(W).assign(Constant(d['phi']))
+                    return properties 
 
-                self.PropTTI =  anisotropic_properties_TTI(self)
-	
+                self.AnisotropicPropertiesTTI =  anisotropic_properties_TTI(self)
+
+        self.Elastic_C = C_computation(self)
+
         try:
             d = self.input_dictionary.get("viscoelasticity", False)
             self.viscoelastic = d["viscoelastic"]
         except:
             self.viscoelastic = False
-            
-        self.C_elas = C_computation(self)
 
         if self.viscoelastic == True:
             d = self.input_dictionary.get("viscoelasticity", False)
@@ -283,23 +285,27 @@ class IsotropicWave(ElasticWave):
                 self.Q_type = d["Q_type"] 
                 self.Qp_inv = d["Qp_inv"] # Attenuation related to the P-Wave
                 self.Qs_inv = d["Qs_inv"] # Attenuation related to the S-Wave
-                self.Qepsilon_inv = d["Qepsilon_inv"] # Attenuation related to epsilon
-                self.Qgamma_inv = d["Qgamma_inv"] # Attenuation related to gamma
-                self.Qdelta_inv = d["Qdelta_inv"] # Attenuation related to delta
+
+                if self.wave_type is not 'isotropic':
+                    self.Qepsilon_inv = d["Qepsilon_inv"] # Attenuation related to epsilon
+                    self.Qgamma_inv = d["Qgamma_inv"] # Attenuation related to gamma
+                    self.Qdelta_inv = d["Qdelta_inv"] # Attenuation related to delta
 
                 if self.Q_type in ['Constant', 'constant', 'const', 'file', 'File']:
                         Qp_inv = self.Qp_inv
                         Qs_inv = self.Qs_inv
-                        Qepsilon_inv = self.Qepsilon_inv
-                        Qdelta_inv = self.Qdelta_inv
-                        Qgamma_inv = self.Qgamma_inv
+                        if self.wave_type is not 'isotropic':
+                            Qepsilon_inv = self.Qepsilon_inv
+                            Qdelta_inv = self.Qdelta_inv
+                            Qgamma_inv = self.Qgamma_inv
 
                 elif self.Q_type in ['cond', 'Conditional', 'conditional']:
-                        Qp_inv = self.Qp_inv(self.mesh)
-                        Qs_inv = self.Qs_inv(self.mesh)
-                        Qepsilon_inv = self.Qepsilon_inv(self.mesh)
-                        Qdelta_inv = self.Qdelta_inv(self.mesh)
-                        Qgamma_inv = self.Qgamma_inv(self.mesh)
+                        self.Qp_inv = self.Qp_inv(self.mesh)
+                        self.Qs_inv = self.Qs_inv(self.mesh)
+                        if self.wave_type is not 'isotropic':
+                            self.Qepsilon_inv = self.Qepsilon_inv(self.mesh)
+                            self.Qdelta_inv = self.Qdelta_inv(self.mesh)
+                            self.Qgamma_inv = self.Qgamma_inv(self.mesh)
                 
                 # Memory variables
                 self.zeta_list = [
