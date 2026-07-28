@@ -327,7 +327,7 @@ def run_modal(Wave_obj, fitting_c, exp_value, n_root=1):
 @mark.older_firedrake
 @mark.parametrize("element_geometry, dimension, degree_layer, homogeneous",
                   [
-                      ("T", 2, 2.5, True),
+                      # ("T", 2, 2.5, True),
                       # ("T", 2, None, True),
                       # ("T", 2, 2.0, False),
                       # ("T", 2, None, False),
@@ -335,8 +335,8 @@ def run_modal(Wave_obj, fitting_c, exp_value, n_root=1):
                       # param("T", 3, None, True, marks=mark.slow),
                       # param("T", 3, 2.4, False, marks=mark.slow),
                       # param("T", 3, None, False, marks=mark.slow),
-                      # param("Q", 3, None, True, marks=mark.slow),
-                      # param("Q", 3, None, False, marks=mark.slow)
+                      param("Q", 3, None, True, marks=mark.slow),
+                      param("Q", 3, None, False, marks=mark.slow)
                   ])
 def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogeneous):
     """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).
@@ -372,23 +372,18 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.01  128.447*
      0.02  145.478
 
-    *RESULTS HOMOGENEOUS
-    Frequency[Hz]    N2.5      (texe/pmem)     REC      (texe/pmem)
-    ANALYTICAL    0.50934 (0.359s/2.160MB) 0.46875 (0.352s/2.146MB)
-    ARNOLDI       0.51046 (0.078s/4.665MB) 0.46875 (0.104s/5.066MB)
-    LANCZOS       0.51046 (0.047s/4.102MB) 0.46875 (0.044s/4.435MB)
-    LOBPCG        0.51046 (1.983s/4.025MB) 0.46875 (1.543s/4.359MB)
-    KRYLOVSCH_CH  0.51046 (0.045s/0.084MB) 0.46875 (0.026s/0.084MB)
-    KRYLOVSCH_CG  0.51046 (0.038s/0.070MB) 0.46875 (0.036s/0.071MB)
-    KRYLOVSCH_GH  0.51046 (0.071s/0.078MB) 0.46875 (0.031s/0.078MB)
-    KRYLOVSCH_GG  0.51046 (0.068s/0.091MB) 0.46875 (0.027s/0.091MB)
-    RAYLEIGH      0.52572 (1.764s/3.309MB) 0.48624 (1.579s/3.315MB)
+    *RESULTS HOMOGENEOUS (usr: without optimization)
+    Frequency[Hz]    N2.5 iter      (texe/pmem)     REC iter      (texe/pmem)
+    ANALYTICAL    0.51121   20 (3.897s/6.152MB) 0.46875    5 (1.115s/3.061MB)
+    ANALYTICAL    0.50934  usr (0.359s/2.160MB) 0.46875  usr (0.352s/2.146MB)
+    KRYLOVSCH_CG  0.51046  n/a (0.038s/0.070MB) 0.46875  n/a (0.036s/0.071MB)
+    RAYLEIGH      0.51084  n/a (1.328s/3.098MB) 0.46875  n/a (1.335s/2.909MB)
 
     *ANALYTICAL
        Case      REC*   N2.5*
-    fnum[Hz]  0.46875 0.50934
+    fnum[Hz]  0.46875 0.51121
     fana[Hz]  0.46875 0.51046
-    fray[Hz]  0.48624 0.52572
+    fray[Hz]  0.46875 0.51084
 
     *EIKONAL HETEROGENEOUS
     eik_min = 83.333 ms
@@ -402,29 +397,18 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.07  84.160
      0.08  85.233
 
-    *RESULTS HETEROGENEOUS
-    Frequency[Hz]    N2.0      (texe/pmem)     REC      (texe/pmem)
-    ANALYTICAL    0.50428 (0.462s/3.152MB) 0.45737 (0.652s/2.990MB)
-    ARNOLDI       0.50440 (0.102s/6.693MB) 0.45539 (0.128s/7.118MB)
-    LANCZOS       0.50440 (0.086s/5.965MB) 0.45539 (0.071s/6.350MB)
-    LOBPCG        0.50440 (4.269s/5.898MB) 0.45539 (3.752s/6.212MB)
-    KRYLOVSCH_CH  0.50440 (0.038s/0.085MB) 0.45539 (0.047s/0.083MB)
-    KRYLOVSCH_CG  0.50440 (0.040s/0.072MB) 0.45539 (0.044s/0.072MB)
-    KRYLOVSCH_GH  0.50440 (0.048s/0.077MB) 0.45539 (0.042s/0.078MB)
-    KRYLOVSCH_GG  0.50440 (0.054s/0.097MB) 0.45539 (0.039s/0.095MB)
-    RAYLEIGH      0.52783 (1.512s/3.667MB) 0.47634 (1.467s/3.672MB)
+    *RESULTS HETEROGENEOUS (usr: without optimization)
+    Frequency[Hz]    N2.0 iter      (texe/pmem)     REC iter      (texe/pmem)
+    ANALYTICAL    0.50461   35 (0.462s/3.152MB) 0.45574   40 (8.095s/8.566MB)
+    ANALYTICAL    0.50428  usr (0.462s/3.152MB) 0.45737  usr (0.652s/2.990MB)
+    KRYLOVSCH_CG  0.50440  n/a (0.040s/0.072MB) 0.45539  n/a (0.044s/0.072MB)
+    RAYLEIGH      0.52768  n/a (1.474s/3.345MB) 0.47634  n/a (1.612s/3.455MB)
 
     *ANALYTICAL
        Case      REC*   N2.0*
-    fnum[Hz]  0.45737 0.50428
-    fana[Hz]  0.45503 0.50807
-    fray[Hz]  0.47634 0.52783
-
-    *RAYLEIGH N2.0
-    n_eigfunc       2      *4       6       8
-    freq[Hz]  0.66237 0.52783 0.51705 0.51355
-    texe[s]     0.263   1.956   5.947  17.152
-    mem[MB]     1.359   3.792   8.075  13.311
+    fnum[Hz]  0.45539 0.50440
+    fana[Hz]  0.45574 0.50461
+    fray[Hz]  0.47634 0.52768
 
     ===================================================
     Natural Frequency for 3D model Δx = 150m - Ele = T
@@ -436,12 +420,18 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.02  146.002*
      0.03  153.839
 
-    *RESULTS HOMOGENEOUS
-    Frequency[Hz]    N5.5        (texe/pmem)     REC        (texe/pmem)
-    ANALYTICAL    0.51628 ( 2.918s/ 5.911MB) 0.47727 ( 3.259s/ 5.725MB)
-    KRYLOVSCH_CH  0.52345 ( 9.954s/ 0.936MB) 0.47727 (14.255s/ 0.925MB)
-    KRYLOVSCH_GH  0.52345 ( 9.869s/ 0.077MB) 0.47727 (14.509s/ 0.075MB)
-    RAYLEIGH      0.55066 (29.679s/48.528MB) 0.49966 (32.511s/55.762MB)
+    *RESULTS HOMOGENEOUS (usr: without optimization)
+    Frequency[Hz]    N6.0 iter        (texe/pmem)     REC iter        (texe/pmem)
+    ANALYTICAL    0.52342   16 (34.635s/27.926MB) 0.47727    5 (13.720s/12.9155MB)
+    ANALYTICAL    0.51628  usr ( 2.918s/ 5.911MB) 0.47727  usr ( 3.259s/ 5.725MB)
+    KRYLOVSCH_CH  0.52345  n/a ( 9.954s/ 0.936MB) 0.47727  n/a (14.255s/ 0.925MB)
+    RAYLEIGH      0.52678  n/a (27.041s/45.495MB) 0.47727  n/a (30.821s/52.629MB)
+
+    *ANALYTICAL
+        Case      REC*  N6.0*
+    fnum[Hz]  0.47727 0.52345
+    fana[Hz]  0.47727 0.52342
+    fray[Hz]  0.47727 0.52678
 
     *EIKONAL HETEROGENEOUS
     eik_min = 83.333 ms
@@ -451,24 +441,18 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.05 82.273*
      0.06 85.347
 
-    *RESULTS HETEROGENEOUS
-    Frequency[Hz]    N2.4        (texe/pmem)     REC         (texe/pmem)
-    ANALYTICAL    0.51833 ( 5.761s/10.364MB) 0.42415 ( 8.884s/ 12.748MB)
-    KRYLOVSCH_CH  0.51535 (24.633s/ 0.935MB) 0.42562 (66.466s/  0.926MB)
-    KRYLOVSCH_GH  0.51535 (25.103s/ 0.077MB) 0.42562 (64.295s/  0.075MB)
-    RAYLEIGH      0.54617 (38.478s/73.414MB) 0.44942 (51.352s/108.206MB)
+    *RESULTS HETEROGENEOUS (usr: without optimization)
+    Frequency[Hz]    N2.4 iter         (texe/pmem) iter     REC          (texe/pmem)
+    ANALYTICAL    0.51653   30 (120.432s/82.775MB)   26 0.42568 (177.947s/ 74.301MB)
+    ANALYTICAL    0.51833  usr (  5.761s/10.364MB)  usr 0.42415 (  8.884s/ 12.748MB)
+    KRYLOVSCH_GH  0.51535  n/a ( 25.103s/ 0.077MB)  n/a 0.42562 ( 64.295s/  0.075MB)
+    RAYLEIGH      0.54073  n/a ( 37.131s/71.052MB)  n/a 0.44257 ( 47.741s/104.142MB)
 
-    ANALYTICAL
+    *ANALYTICAL
        Case      REC*  N2.4*
-    fnum[Hz]  0.42136 0.51833
-    fana[Hz]  0.42562 0.51535
-    fray[Hz]  0.44942 0.54617
-
-    RAYLEIGH N2.4
-    n_eigfunc       2      *4       6
-    freq[Hz]  0.65356 0.54617 0.53122
-    texe[s]     0.799  34.327 373.401
-    mem[MB]     6.730  47.889 154.636
+    fnum[Hz]  0.42562 0.51535
+    fana[Hz]  0.42568 0.51653
+    fray[Hz]  0.44257 0.54073
 
     ===================================================
     Natural Frequency for 3D model Δx = 150m - Ele = Q
@@ -480,20 +464,17 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.02  138.931*
      0.02  142.020
 
-    *RESULTS HETEROGENEOUS
-    Frequency[Hz]     REC         (texe/pmem)
-    ANALYTICAL    0.47741 ( 2.239s/  9.275MB)
-    ARNOLDI       0.47727 ( 8.990s/145.647MB)
-    LANCZOS       0.47727 ( 7.876s/ 96.980MB)
-    LOBPCG        0.47727 ( 7.454s/ 95.550MB)
-    KRYLOVSCH_CG  0.47727 ( 5.036s/  0.084MB)
-    KRYLOVSCH_GG  0.47727 ( 4.860s/  0.076MB)
-    RAYLEIGH      0.49966 (30.048s/ 33.385MB)
+    *RESULTS HETEROGENEOUS (usr: without optimization)
+    Frequency[Hz]     REC iter        (texe/pmem)
+    ANALYTICAL    0.47741    5 ( 7.483s/14.672MB)
+    ANALYTICAL    0.47741  usr ( 2.239s/ 9.275MB)
+    KRYLOVSCH_GG  0.47727  n/a ( 4.860s/ 0.076MB)
+    RAYLEIGH      0.47727  n/a (28.788s/30.570MB)
 
         Case      REC*
     fnum[Hz]  0.47741
     fana[Hz]  0.47727
-    fray[Hz]  0.49966
+    fray[Hz]  0.47727
 
     *EIKONAL HETEROGENEOUS
     eik_min = 83.333 ms
@@ -507,27 +488,18 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.08  84.377*
      0.09  87.376
 
-    *RESULTS HETEROGENEOUS
-    Frequency[Hz]     REC          (texe/pmem)
-    ANALYTICAL    0.41373 ( 4.707s/ 11.191MB)
-    ARNOLDI       0.41127 (32.395s/326.702MB)
-    LANCZOS       0.41127 (31.732s/218.844MB)
-    LOBPCG        0.41127 (35.811s/215.802MB)
-    KRYLOVSCH_CG  0.41127 (25.506s/  0.085MB)
-    KRYLOVSCH_GG  0.41127 (25.221s/  0.086MB)
-    RAYLEIGH      0.43304 (29.833s/ 53.146MB)
+    *RESULTS HETEROGENEOUS (usr: without optimization)
+    Frequency[Hz]     REC iter        (texe/pmem)
+    ANALYTICAL    0.41350   25 (79.510s/42.848MB)
+    ANALYTICAL    0.41373  usr ( 4.707s/11.191MB)
+    KRYLOVSCH_GG  0.41127  n/a (25.221s/ 0.086MB)
+    RAYLEIGH      0.42935  n/a (31.954s/51.852MB)
 
     ANALYTICAL
        Case      REC*
     fnum[Hz]  0.41127
-    fana[Hz]  0.41373
-    fray[Hz]  0.43304
-
-    RAYLEIGH REC
-    n_eigfunc       2      *4       6
-    freq[Hz]  0.50637 0.43304 0.42081
-    texe[s]     0.859  25.615 497.458
-    mem[MB]     8.168  51.299 185.377
+    fana[Hz]  0.41350
+    fray[Hz]  0.42935
     """
 
     c_hom = "Homogeneous" if homogeneous else "Heterogeneous"
