@@ -150,13 +150,14 @@ class PMLLayer(ABCLayer):
         """
 
         # Desired reflection coefficient at outer boundary of PML layer.
-        CR = value_numerical_error("abc_pml_R", abc_pml_R, float_num=True,
-                                   lower_bound=CR_min, upper_bound=CR_max,
-                                   include_lower_bound=True, include_upper_bound=True)
+        CR = value_numerical_error(
+            "abc_pml_R", abc_pml_R, float_num=True, integer_num=False, lower_bound=CR_min,
+            upper_bound=CR_max, include_lower_bound=True, include_upper_bound=True)
 
         # Degree of the damping profile within the PML layer.
-        degree_prof = value_numerical_error("degree_prof", degree_prof, integer_num=True,
-                                            lower_bound=1, include_lower_bound=True)
+        degree_prof = value_numerical_error(
+            "degree_prof", degree_prof, float_num=False,
+            integer_num=True, lower_bound=1, include_lower_bound=True)
 
         # Maximum damping coefficient within the PML layer
         self.sigma_max = ((degree_prof + 1.) / (2. * abc_pad_length)) * log(1. / CR)

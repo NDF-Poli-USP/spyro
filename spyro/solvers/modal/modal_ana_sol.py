@@ -720,8 +720,8 @@ class Modal_Analytical_Solver():
                                   expected_length=4)
 
         # Check the cutting plane percent is between 0 and 1
-        value_numerical_error("cut_plane_percent", cut_plane_percent,
-                              lower_bound=0., upper_bound=1.,
+        value_numerical_error("cut_plane_percent", cut_plane_percent, float_num=True,
+                              integer_num=False, lower_bound=0., upper_bound=1.,
                               include_lower_bound=True, include_upper_bound=True)
 
         a, b = hyper_axes[: 2]

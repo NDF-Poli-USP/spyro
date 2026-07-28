@@ -412,7 +412,7 @@ class Modal_Solver():
             first eigenvalue of the model with Neumann BCs.
         """
 
-        value_numerical_error("k", k, integer_num=True, lower_bound=0)
+        value_numerical_error("k", k, float_num=False, integer_num=True, lower_bound=0)
 
         if self.method in ["ANALYTICAL", "RAYLEIGH"]:
             shift = 0.  # No shift for analytical and Rayleigh methods
