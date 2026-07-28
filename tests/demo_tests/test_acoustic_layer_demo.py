@@ -20,7 +20,7 @@ def test_acoustic_camembert_fwi():
     setting_up_fwi()
     run_fwi()
 
-    comm.comm.barrier()
+    comm.global_comm.Barrier()
     length_z = 2.0
     length_x = 2.0
     grid_vp_data = spyro.io.segy_io.create_grid_dictionary_from_segy(

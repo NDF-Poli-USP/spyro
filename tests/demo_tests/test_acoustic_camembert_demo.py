@@ -14,7 +14,12 @@ class DummyModel():
 @pytest.mark.parallel(6)
 def test_acoustic_camembert_fwi():
     from demos.acoustic_camembert_fwi import run_fwi
+    model = DummyModel()
+    comm = spyro.utils.mpi_init(model)
+
     run_fwi(load_real_shot=False)
+
+    comm.global_comm.Barrier()
     length_z = 2.0
     length_x = 2.0
     grid_vp_data = spyro.io.segy_io.create_grid_dictionary_from_segy(
@@ -23,8 +28,6 @@ def test_acoustic_camembert_fwi():
             length_x,
         )
 
-    model = DummyModel()
-    comm = spyro.utils.mpi_init(model)
     mesh = fire.RectangleMesh(200, 200, length_z, length_x, comm=comm.comm)
     mesh.coordinates.dat.data[:, 0] *= -1.0
     V = fire.FunctionSpace(mesh, "CG", 1)
