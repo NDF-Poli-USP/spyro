@@ -227,7 +227,7 @@ class ABCLayer(NRBC):
         # Nyquist frequency
         self.freq_Nyquist = value_numerical_error("freq_Nyquist", freq_Nyquist,
                                                   float_num=True, integer_num=True,
-                                                  lower_bound=0.)
+                                                  lower_bound=0., none_default=True)
 
         # Model dimension
         self.dimension = value_parameter_error("dimension", dimension, [2, 3])
