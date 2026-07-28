@@ -3,8 +3,8 @@
 The script builds a synthetic "true" model, generates a shot record, and then
 runs a simple inversion loop against that record.
 
-This demo is made only for advance users who which to experiment with different FWI
-classes
+This demo is made only for advanced otimization users who wish to experiment
+with different FWI classes,
 """
 
 import numpy as np
