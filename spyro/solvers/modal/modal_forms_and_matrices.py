@@ -18,7 +18,7 @@ def weak_forms(c, V, quad_rule=None, source=False, user_load=None):
         Function space for the modal problem.
     quad_rule : `dict`, optional
         Quadrature rule to use for the integration.
-        Default is None, which uses the default quadrature rule.
+        Default is `None`, which uses the default quadrature rule.
     source : `bool`, optional
         Option to get a source term in weak form. Default is `False`
     user_load : `Firedrake.Function`, optional
@@ -32,7 +32,7 @@ def weak_forms(c, V, quad_rule=None, source=False, user_load=None):
     m : `Firedrake.Form`
         Weak form  representing the mass matrix.
     L : `Firedrake.Form`, optional
-        Weak form representing a source term. Returned only if 'source' is `True`
+        Weak form representing a source term. Returned only if 'source' is `True`.
     """
 
     # Functions for the problem

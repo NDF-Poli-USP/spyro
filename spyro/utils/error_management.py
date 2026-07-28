@@ -6,6 +6,7 @@ messages to the user or to prevent numerical instability in objects."""
 from numpy import float64, inf, int64, isinf, isnan, ndarray, where
 from firedrake import Function, FunctionSpace, Mesh
 from firedrake.functionspaceimpl import WithGeometry
+from ufl.geometry import SpatialCoordinate
 
 
 def value_parameter_error(par_name, par_value, valid_values):
@@ -129,7 +130,7 @@ def clean_inst_num(data_arr):
 
 
 def value_numerical_error(par_name, par_value, float_num=True, integer_num=False,
-                          lower_bound=None, upper_bound=None,
+                          none_default=False, lower_bound=None, upper_bound=None,
                           include_lower_bound=False, include_upper_bound=False):
     """Validate numerical parameters and raise a ValueError if invalid.
 
@@ -143,6 +144,9 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
         If `True`, the parameter can be a float. Default is `True`.
     integer_num : `bool`, optional
         If `True`, the parameter can be an integer. Default is `False`.
+    none_default : `bool`, optional
+        If `True`, the parameter value is allowed to be validated as `None`.
+        Default is `False`, in which case `None` is not allowed.
     lower_bound : `int` or `float`, optional
         Lower bound for the parameter value. Default is `None` (no lower bound).
     upper_bound : `int` or `float`, optional
@@ -164,6 +168,9 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
     ValueError
         If the parameter value is outside the specified bounds or the bounds are invalid.
     """
+
+    if par_value is None and none_default:
+        return par_value
 
     # Checking the parameter type
     if not isinstance(par_value, (int, float)):
@@ -253,7 +260,7 @@ def enum_parameter_error(par_name, par_value, valid_enum):
                     f", got {type(par_value).__name__}")
 
 
-def value_string_error(par_name, par_value):
+def value_string_error(par_name, par_value, none_default=False):
     """Validate string parameters and raise a TypeError if invalid.
 
     Parameters
@@ -262,6 +269,9 @@ def value_string_error(par_name, par_value):
         Name of the parameter to be validated (used in error messages).
     par_value : `object`
         Value of the parameter to be validated.
+    none_default : `bool`, optional
+        If `True`, the parameter value is allowed to be validated as `None`.
+        Default is `False`, in which case `None` is not allowed.
 
     Returns
     -------
@@ -273,6 +283,9 @@ def value_string_error(par_name, par_value):
     TypeError
         If the parameter value is not of the expected type (`str`).
     """
+
+    if par_value is None and none_default:
+        return par_value
 
     # Checking the parameter type
     if not isinstance(par_value, str):
@@ -398,11 +411,12 @@ def type_firedrake_error(par_name, par_value, expected_type, none_default=False)
         return par_value
 
     value_parameter_error("expected_type", expected_type,
-                          ["Function", "FunctionSpace", "Mesh"])
+                          ["Function", "FunctionSpace", "Mesh", "SpatialCoordinate"])
 
     parameter_map = {"Function": Function,
                      "FunctionSpace": type(FunctionSpace),
-                     "Mesh": Mesh}
+                     "Mesh": Mesh,
+                     "SpatialCoordinate": SpatialCoordinate}
 
     # Checking the parameter type
     expected_valid = (parameter_map[expected_type],)

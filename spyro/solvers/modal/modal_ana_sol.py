@@ -72,7 +72,7 @@ class Modal_Analytical_Solver():
         # Communicator MPI
         self.comm = comm
 
-    @ staticmethod
+    @staticmethod
     def _freq_factor_rec(hyper_axes, bc="Neumann"):
         """Compute the frequency factor for rectangular or prismatic geometries.
 
@@ -505,8 +505,8 @@ class Modal_Analytical_Solver():
 
         # Static load for reference model (without absorbing layer)
         q_ref = None
-        if V_ref is not None:
-            type_firedrake_error("V_ref", V_ref, "FunctionSpace")
+        V_ref = type_firedrake_error("V_ref", V_ref, "FunctionSpace", none_default=True)
+        if V_ref:
             q_ref = Function(V_ref)
             q_ref.interpolate(q_dummy, allow_missing_dofs=True)
 
@@ -587,11 +587,11 @@ class Modal_Analytical_Solver():
 
         Parameters
         ----------
-        c : `Firedrake.Function`
+        c : `Firedrake.Function` or `float`
             Velocity model for the model with absorbing layer.
         V : `Firedrake.FunctionSpace`
             Function space for the model with absorbing layer.
-        c_ref : `Firedrake.Function`, optional
+        c_ref : `Firedrake.Function` or `float`, optional
             Velocity model for the reference model without absorbing layer.
             Default is `None`.
         V_ref : `Firedrake.FunctionSpace`, optional
@@ -619,19 +619,26 @@ class Modal_Analytical_Solver():
         value_parameter_error("type_homog", type_homog, ["energy", "volume"])
 
         # Define the load for the energy-equivalent homogenization
-        dummy_load = self.dummy_load_static_(V, dof_load, amplitude_load, V_ref=V_ref) \
-            if type_homog == "energy" else (None, None)
+        c_is_float = isinstance(c, (int, float))
+        dummy_load = self.dummy_load_static_(
+            V, dof_load, amplitude_load, V_ref=V_ref) \
+            if (type_homog == "energy" and not c_is_float) else (None, None)
 
         # Compute the equivalent velocity for the model with absorbing layer
-        c_eq = self.c_equivalent(c, V, quad_rule=quad_rule, type_homog=type_homog,
-                                 static_load_for_ceq=dummy_load[0])
+        c_eq = value_numerical_error(
+            "c", c, float_num=True, integer_num=True, lower_bound=0.) if c_is_float \
+            else self.c_equivalent(c, V, quad_rule=quad_rule, type_homog=type_homog,
+                                   static_load_for_ceq=dummy_load[0])
 
         # Compute the equivalent velocity for the reference model without layer
         c_eqref = None
-        if c_ref is not None and V_ref is not None:
-            c_eqref = self.c_equivalent(c_ref, V_ref, quad_rule=quad_rule,
-                                        type_homog=type_homog,
-                                        static_load_for_ceq=dummy_load[1])
+        if V_ref is not None:
+            c_ref_is_float = isinstance(c_eqref, (int, float))
+            c_eqref = value_numerical_error(
+                "c_ref", c_ref, float_num=True, integer_num=True, lower_bound=0.) \
+                if c_ref_is_float else self.c_equivalent(c_ref, V_ref, quad_rule=quad_rule,
+                                                         type_homog=type_homog,
+                                                         static_load_for_ceq=dummy_load[1])
 
         return (c_eq, c_eqref)
 
@@ -684,14 +691,15 @@ class Modal_Analytical_Solver():
         """
 
         # Check the homogeneous velocity
-        value_numerical_error("c_eq", c_eq, lower_bound=0., include_lower_bound=False)
+        value_numerical_error("c_eq", c_eq, float_num=True, integer_num=True, lower_bound=0.)
 
         # Hyperellipse parameters
         n_hyp, hyper_axes = hyp_par[0], hyp_par[1:]
 
         # Check the hypershape degree
-        n_hyp = 330 if n_hyp is None else value_numerical_error(
-            "n_hyp", n_hyp, lower_bound=2., include_lower_bound=True)
+        value_numerical_error("n_hyp", n_hyp, float_num=True, integer_num=True,
+                              none_default=True, lower_bound=2., include_lower_bound=True)
+        n_hyp = 330 if n_hyp is None else n_hyp
 
         # Check semi-axes type
         type_data_structure_error("hyper_axes", hyper_axes, "tuple",
@@ -702,8 +710,9 @@ class Modal_Analytical_Solver():
         value_parameter_error("bc", bc, ["Dirichlet", "Neumann"])
 
         # Check the homogeneous velocity from original model without absorbing layer
-        c_eqref = c_eq if c_eqref is None else value_numerical_error(
-            "c_eqref", c_eqref, lower_bound=0., include_lower_bound=False)
+        value_numerical_error("c_eqref", c_eqref, float_num=True, integer_num=True,
+                              none_default=True, lower_bound=0.)
+        c_eqref = c_eq if c_eqref is None else c_eqref
 
         # Check the parameters for fitting equivalent velocity regression.
         type_data_structure_error("fitting_c", fitting_c, "tuple",

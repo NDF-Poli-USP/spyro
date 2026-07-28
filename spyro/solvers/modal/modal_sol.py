@@ -1,22 +1,11 @@
-import firedrake as fire
-import numpy as np
-from firedrake import (assemble, ConvergenceError, dx as fire_dx,
-                       Function, grad, inner, solve)
-from numpy import sqrt
-
+from firedrake import LinearEigenproblem, LinearEigensolver
+from numpy import abs, amax, array, asarray, eye, imag, real, sqrt, unique
 import scipy.sparse as ss
-from scipy.optimize import broyden1, curve_fit
-from scipy.special import (beta, betainc, gamma, jn_zeros, jnp_zeros,
-                           mathieu_modcem1, spherical_jn)
-from scipy.stats import norm as sn
-from sys import float_info
 from ...io.basicio import parallel_print as pprint
 from .modal_forms_and_matrices import assemble_sparse_matrices, weak_forms
 from .modal_rq_matrices import generate_eigenfunctions, matrices_rayleigh_quotient
-from ...utils.error_management import value_parameter_error
-from ...utils.stats_tools import coeff_of_determination
-from ...utils.eval_functions_to_ufl import generate_ufl_functions
-
+from ...utils.error_management import (type_data_structure_error, type_firedrake_error,
+                                       value_numerical_error, value_parameter_error)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -61,16 +50,18 @@ class Modal_Solver():
 
     Methods
     -------
+    assemble_weak_forms()
+        Build the weak forms for the modal problem solved using UFL or sparse matrices.
     estimate_timestep()
         Estimate the maximum stable timestep based on the spectral radius.
     solve_eigenproblem()
         Solve the eigenvalue problem with Neumann boundary conditions.
     solver_rayleigh_quotient()
-            Solve the eigenvalue problem using the Rayleigh Quotient method.
+        Solve the eigenvalue problem using the Rayleigh Quotient method for Neumann Bcs.
     solver_with_sparse_matrix()
-        Solve the eigenvalue problem with sparse matrices using SciPy.
+        Solve the eigenvalue problem with sparse matrices using Scipy.
     solver_with_ufl()
-        Solve the eigenvalue problem using UFL forms with SLEPc.
+            Solve the eigenvalue problem using UFL forms with SLEPc.
     """
 
     def __init__(self, dimension=2, method=None, calc_max_dt=False, comm=None):
@@ -136,14 +127,14 @@ class Modal_Solver():
         Parameters
         ----------
         Asp : `csr matrix`
-            Sparse matrix representing the stiffness matrix
+            Sparse matrix representing the stiffness matrix.
         Msp : `csr matrix`
-            Sparse matrix representing the mass matrix
+            Sparse matrix representing the mass matrix.
         method : `str`
             Method to use for solving the eigenvalue problem.
-            Opts: "ARNOLDI", "LANCZOS" or "LOBPCG"
+            Opts: "ARNOLDI", "LANCZOS" or "LOBPCG".
         k : `int`, optional
-            Number of eigenvalues to compute. Default is 2
+            Number of eigenvalues to compute. Default is 2.
         inv_oper : `bool`, optional
             Option to use an inverse operator for improving convergence.
             Default is `False`.
@@ -153,6 +144,9 @@ class Modal_Solver():
         Lsp : `array`
             Array containing the computed eigenvalues.
         """
+
+        # Check methods
+        value_parameter_error("method", method, ["ARNOLDI", "LANCZOS", "LOBPCG"])
 
         if method == "ARNOLDI" or method == "LANCZOS":
             # Inverse operator for improving convergence
@@ -181,7 +175,7 @@ class Modal_Solver():
 
         if method == "LOBPCG":
             # Initialize LI vectors for LOBPCG
-            X = np.eye(Msp.shape[0], k)
+            X = eye(Msp.shape[0], k)
 
             # Solve the eigenproblem using LOBPCG (iterative method)
             it_mod = 2500
@@ -193,7 +187,7 @@ class Modal_Solver():
                                                  retResidualNormsHistory=True)
 
                 it_mod //= 2  # Reduce iterations for next loop
-                rmin = np.array(resid)[:, 1].min()
+                rmin = array(resid)[:, 1].min()
                 if rmin < 5e-4 or it_mod < 20:
                     del X, resid
                     break
@@ -218,15 +212,14 @@ class Modal_Solver():
             Array containing the computed eigenvalues.
         """
 
-        if self.method[-2] == "C":
-            ksp_type = "cg"
-        elif self.method[-2] == "G":
-            ksp_type = "gmres"
+        krylovsch_config = {"KRYLOVSCH_CH": {"ksp": "cg", "pc": "hypre"},
+                            "KRYLOVSCH_CG": {"ksp": "cg", "pc": "gamg"},
+                            "KRYLOVSCH_GH": {"ksp": "gmres", "pc": "hypre"},
+                            "KRYLOVSCH_GG": {"ksp": "gmres", "pc": "gamg"}}
 
-        if self.method[-1] == "H":
-            pc_type = "hypre"
-        elif self.method[-1] == "G":
-            pc_type = "gamg"
+        if self.method in krylovsch_config:
+            ksp_type = krylovsch_config[self.method]["ksp"]
+            pc_type = krylovsch_config[self.method]["pc"]
 
         opts = {
             "eps_gen_hermitian": None,       # Problem is Hermitian
@@ -248,11 +241,10 @@ class Modal_Solver():
             # Smallest eigenvalues magnitude
             opts.update({"eps_smallest_magnitude": None})
 
-        eigenproblem = fire.LinearEigenproblem(a, M=m)
-        eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=k,
-                                             solver_parameters=opts)
+        eigenproblem = LinearEigenproblem(a, M=m)
+        eigensolver = LinearEigensolver(eigenproblem, n_evals=k, solver_parameters=opts)
         eigensolver.solve()
-        Lsp = np.asarray([eigensolver.eigenvalue(mod) for mod in range(k)])
+        Lsp = asarray([eigensolver.eigenvalue(mod) for mod in range(k)])
 
         return Lsp
 
@@ -287,6 +279,13 @@ class Modal_Solver():
             Array containing the computed eigenvalues.
         """
 
+        # Check input arguments
+        type_firedrake_error("c", c, "Function")
+        type_firedrake_error("ufl_coordinates", ufl_coordinates, "SpatialCoordinate")
+        type_firedrake_error("V", V, "FunctionSpace")
+        type_data_structure_error("mesh_limits", mesh_limits, "tuple")
+        type_data_structure_error("quad_rule", quad_rule, "dict", none_default=True)
+
         # Create eigenfunctions
         eig_funcs, grad_eig = generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
                                                       k=k, dimension=self.dimension)
@@ -298,6 +297,45 @@ class Modal_Solver():
         Lsp = self.solver_with_sparse_matrix(Asp, Msp, "ARNOLDI", k=k)
 
         return Lsp
+
+    def assemble_weak_forms(self, c, V, quad_rule=None, shift=0.):
+        """Build the weak forms for the modal problem solved using UFL or sparse matrices.
+
+        Parameters
+        ----------
+        c : `Firedrake.Function`
+            Velocity model.
+        V : `Firedrake.FunctionSpace`
+            Function space for the modal problem.
+        quad_rule : `dict`, optional
+            Quadrature rule to use for the integration.
+            Default is `None`, which uses the default quadrature rule.
+        shift: `float`, optional
+            Value to stabilize the Neumann BC null space. Default is 0.
+
+        Returns
+        -------
+        a : `Firedrake.Form`
+            Weak form representing the stiffness matrix.
+        m : `Firedrake.Form`
+            Weak form  representing the mass matrix.
+        """
+
+        # Check input arguments
+        type_firedrake_error("c", c, "Function")
+        type_firedrake_error("V", V, "FunctionSpace")
+        type_data_structure_error("quad_rule", quad_rule, "dict", none_default=True)
+        value_numerical_error("shift", shift, float_num=True, integer_num=True,
+                              lower_bound=0., include_lower_bound=True)
+
+        # Get bilinear forms
+        a, m = weak_forms(c, V, quad_rule=quad_rule)
+
+        # Add shift to stabilize Neumann BC null space
+        if shift > 0:
+            a += shift * m
+
+        return a, m
 
     def solve_eigenproblem(self, c, V=None, k=2, shift=0., quad_rule=None, inv_oper=False,
                            ufl_coordinates=None, mesh_limits=None, hyp_par=None,
@@ -344,7 +382,7 @@ class Modal_Solver():
                 Hypershape semi-axis in direction y (3D only).
         cut_plane_percent : `float`, optional
             Percentage of the cut plane (0 to 1). Default is 1 (no cut)
-        c_ref : `Firedrake.Function`, optional
+        c_ref : `Firedrake.Function` or `float`, optional
             Velocity model for the reference model without absorbing layer.
             Default is `None`.
         V_ref : `Firedrake.FunctionSpace`, optional
@@ -375,6 +413,8 @@ class Modal_Solver():
             first eigenvalue of the model with Neumann BCs.
         """
 
+        value_numerical_error("k", k, integer_num=True, lower_bound=0)
+
         if self.method in ["ANALYTICAL", "RAYLEIGH"]:
             shift = 0.  # No shift for analytical and Rayleigh methods
 
@@ -393,12 +433,8 @@ class Modal_Solver():
             Lsp = self.solver_rayleigh_quotient(c, ufl_coordinates, V, mesh_limits,
                                                 k=k, quad_rule=quad_rule)
         else:
-            # Get bilinear forms
-            a, m = weak_forms(c, V, quad_rule=quad_rule)
-
-            # Add shift to stabilize Neumann BC null space
-            if shift > 0:
-                a += fire.Constant(shift) * m
+            # Get weak forms for the modal problem
+            a, m = self.assemble_weak_forms(c, V, quad_rule=quad_rule, shift=shift)
 
         if self.method.startswith("KRYLOVSCH"):
             Lsp = self.solver_with_ufl(a, m, k=k)
@@ -449,26 +485,21 @@ class Modal_Solver():
         if self.method == "ANALYTICAL":
             pprint("Estimating Maximum Eigenvalue", comm=self.comm)
 
-            a, m = weak_forms(c, V, quad_rule=quad_rule)
-
-            if shift > 0:
-                a += shift * m
-
+            a, m = self.assemble_weak_forms(c, V, quad_rule=quad_rule, shift=shift)
             Asp, Msp_inv = assemble_sparse_matrices(a, m, return_M_inv=True)
             Lsp = Msp_inv.multiply(Asp)
-            max_eigval = np.amax(np.abs(Lsp.diagonal())) - shift
+            max_eigval = amax(abs(Lsp.diagonal())) - shift
 
         else:
             pprint("Computing Exact Maximum Eigenvalue", comm=self.comm)
 
             # (eig = 0 is a rigid body motion)
-            Lsp = self.solve_eigenproblem(c, V=V, shift=shift,
-                                          quad_rule=quad_rule,
-                                          inv_oper=inv_oper)
-            max_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
+            Lsp = self.solve_eigenproblem(
+                c, V=V, shift=shift, quad_rule=quad_rule, inv_oper=inv_oper)
+            max_eigval = max(unique(Lsp[(Lsp > 0.) & (imag(Lsp) == 0.)]))
 
         # Maximum stable timestep
-        max_dt = float(np.real(2. / np.sqrt(max_eigval)))
+        max_dt = float(real(2. / sqrt(max_eigval)))
         pprint("Maximum Stable Timestep Should Be Approximately "
                f"(ms): {1e3 * max_dt:.3f}", comm=self.comm)
 
