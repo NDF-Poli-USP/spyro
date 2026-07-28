@@ -5,7 +5,6 @@ import firedrake as fire
 import h5py
 import numpy as np
 from scipy.interpolate import griddata
-from scipy.interpolate import RegularGridInterpolator
 import os
 import warnings
 from .parallelism_wrappers import ensemble_save, ensemble_load
