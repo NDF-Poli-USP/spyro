@@ -3,7 +3,7 @@
 This file contains methods for handling errors in Spyro, either to send
 messages to the user or to prevent numerical instability in objects."""
 
-from numpy import float64, inf, int64, isinf, isnan, ndarray
+from numpy import float32, float64, inf, int32, int64, isinf, isnan, ndarray
 from firedrake import Function, FunctionSpace, Mesh
 from firedrake.functionspaceimpl import WithGeometry
 from ufl.geometry import SpatialCoordinate
@@ -417,8 +417,8 @@ def type_data_structure_error(par_name, par_value, expected_type,
             value_parameter_error("expected_type_element", etype,
                                   ["float", "int", "str", "NoneType"])
         expected_types = tuple(element_map[etype] for etype in expected_type_element)
-        expected_types += (int64,) if "int" in expected_type_element else ()
-        expected_types += (float64,) if "float" in expected_type_element else ()
+        expected_types += (int32, int64,) if "int" in expected_type_element else ()
+        expected_types += (float32, float64,) if "float" in expected_type_element else ()
         if not all(isinstance(item, expected_types) for item in par_value):
             opt_str = ", ".join([f"'{etype}'" for etype in expected_type_element])
             last_comma = opt_str.rfind(',')
