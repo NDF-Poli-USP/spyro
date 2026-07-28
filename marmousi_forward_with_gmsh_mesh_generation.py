@@ -28,6 +28,7 @@ dictionary["mesh"] = {
     "frequency": frequency,
     "segy_velocity_model": "velocity_models/vp_marmousi-ii.segy",
     "mesh_type": "gmsh_mesh",
+    "grade": 0.1,
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
@@ -59,8 +60,8 @@ dictionary["visualization"] = {
 def test_real_shot_record_generation_parallel():
     real_wave = spyro.AcousticWave(dictionary=dictionary)
     real_wave.set_initial_velocity_model(new_file="velocity_models/vp_marmousi-ii.segy", fast_interpolate=True)
-    real_wave.forward_solve()
     VTKFile("vp.pvd").write(real_wave.c)
+    real_wave.forward_solve()
     spyro.io.save_shots(real_wave)
 
 
