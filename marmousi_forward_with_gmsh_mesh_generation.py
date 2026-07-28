@@ -28,7 +28,7 @@ dictionary["mesh"] = {
     "frequency": frequency,
     "segy_velocity_model": "velocity_models/vp_marmousi-ii.segy",
     "mesh_type": "gmsh_mesh",
-    "grade": 0.1,
+    "grade": 0.05,
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
