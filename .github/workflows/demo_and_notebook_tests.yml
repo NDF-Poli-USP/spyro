@@ -55,8 +55,9 @@ jobs:
     - name: Running serial fast tests
       run: |
         make clean
-        python3 -m pytest -n 6 --cov-report=xml --cov=spyro tests/demo_tests/test_acoustic_camembert_demo.py
-        python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/demo_tests/test_acoustic_layer_demo.py
+        mpiexec -n 6 pytest tests/demo_tests/test_acoustic_camembert_demo.py
+        mpiexec -n 8 pytest tests/demo_tests/test_acoustic_layer_demo.py
+        pytest tests/demo_tests/test_acoustic_marmousi_forward_propagation.py
 
     - name: Post-run cleanup
       if: always()
