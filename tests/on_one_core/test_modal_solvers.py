@@ -382,9 +382,9 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
 
     *RAYLEIGH N2.0
     n_eigfunc       2      *4       6       8
-    freq[Hz]  0.66237 0.52783 0.51705 0.51355
-    texe[s]     0.263   1.956   5.947  17.152
-    mem[MB]     1.359   3.792   8.075  13.311
+    freq[Hz]  0.66237 0.52768 0.51705 0.51355
+    texe[s]     0.263   1.474   5.947  17.152
+    mem[MB]     1.359   3.345   8.075  13.311
 
     ===================================================
     Natural Frequency for 3D model Δx = 150m - Ele = T
@@ -397,15 +397,15 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.03  153.839
 
     *RESULTS HOMOGENEOUS
-    Frequency[Hz]    N5.5        (texe/pmem)     REC        (texe/pmem)
+    Frequency[Hz]    N6.0        (texe/pmem)     REC        (texe/pmem)
     ANALYTICAL    0.51628 ( 2.918s/ 5.911MB) 0.47727 ( 3.259s/ 5.725MB)
     KRYLOVSCH_CH  0.52345 ( 9.954s/ 0.936MB) 0.47727 (14.255s/ 0.925MB)
     KRYLOVSCH_GH  0.52345 ( 9.869s/ 0.077MB) 0.47727 (14.509s/ 0.075MB)
     RAYLEIGH      0.52678 (27.041s/45.495MB) 0.47727 (30.821s/52.629MB)
 
-    ANALYTICAL
-       Case      REC*  N5.5*
-    fnum[Hz]  0.47727 0.51345
+    *ANALYTICAL
+        Case     REC*   N6.0*
+    fnum[Hz]  0.47727 0.52345
     fana[Hz]  0.47727 0.51628
     fray[Hz]  0.47727 0.52678
 
@@ -424,17 +424,17 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     KRYLOVSCH_GH  0.51535 (25.103s/ 0.077MB) 0.42562 (64.295s/  0.075MB)
     RAYLEIGH      0.54073 (37.131s/71.052MB) 0.44257 (47.741s/104.142MB)
 
-    ANALYTICAL
+    *ANALYTICAL
        Case      REC*  N2.4*
     fnum[Hz]  0.42562 0.51535
     fana[Hz]  0.42415 0.51833
     fray[Hz]  0.44257 0.54073
 
-    RAYLEIGH N2.4
+    *RAYLEIGH N2.4
     n_eigfunc       2      *4       6
-    freq[Hz]  0.65356 0.54617 0.53122
-    texe[s]     0.799  34.327 373.401
-    mem[MB]     6.730  47.889 154.636
+    freq[Hz]  0.65356 0.54073 0.53122
+    texe[s]     0.799  37.131 373.401
+    mem[MB]     6.730  71.052 154.636
 
     ===================================================
     Natural Frequency for 3D model Δx = 150m - Ele = Q
@@ -456,6 +456,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     KRYLOVSCH_GG  0.47727 ( 4.860s/  0.076MB)
     RAYLEIGH      0.47727 (28.788s/ 30.570MB)
 
+    *ANALYTICAL
         Case      REC*
     fnum[Hz]  0.47727
     fana[Hz]  0.47741
@@ -483,17 +484,17 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     KRYLOVSCH_GG  0.41127 (25.221s/  0.086MB)
     RAYLEIGH      0.42935 (31.954s/ 51.852MB)
 
-    ANALYTICAL
+    *ANALYTICAL
        Case      REC*
     fnum[Hz]  0.41127
     fana[Hz]  0.41373
     fray[Hz]  0.42935
 
-    RAYLEIGH REC
+    *RAYLEIGH REC
     n_eigfunc       2      *4       6
-    freq[Hz]  0.50637 0.43304 0.42081
-    texe[s]     0.859  25.615 497.458
-    mem[MB]     8.168  51.299 185.377
+    freq[Hz]  0.50637 0.42935 0.42081
+    texe[s]     0.859  31.954 497.458
+    mem[MB]     8.168  51.852 185.377
     """
 
     c_hom = "Homogeneous" if homogeneous else "Heterogeneous"

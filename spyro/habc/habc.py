@@ -261,112 +261,112 @@ class HABCLayer(ABCLayer, HABC_Damping):
         Wave.fundam_freq = real(sqrt(min_eigval) / (2 * pi))
         pprint(f"Fundamental Frequency (Hz): {Wave.fundam_freq:.5f}", comm=self.comm)
 
-    def damping_layer(self, Wave, xCR_usu=None, method=None,
-                      fitting_c=(0., 0., 0., 0.), save_file=True):
-        """Set the damping profile within the absorbing layer.
+    # def damping_layer(self, Wave, xCR_usu=None, method=None,
+    #                   fitting_c=(0., 0., 0., 0.), save_file=True):
+    #     """Set the damping profile within the absorbing layer.
 
-        Minimum damping ratio is computed as psi_min = xCR * d, where xCR is a
-        heuristic factor for the minimum damping ratio and d is the normalized
-        element size (d = lmin / pad_length).
-        Maximum damping ratio is psi_max = 2 * pi * f_fund * psi,
-        where f_fund is the fundamental frequency and psi = 0.999.
+    #     Minimum damping ratio is computed as psi_min = xCR * d, where xCR is a
+    #     heuristic factor for the minimum damping ratio and d is the normalized
+    #     element size (d = lmin / pad_length).
+    #     Maximum damping ratio is psi_max = 2 * pi * f_fund * psi,
+    #     where f_fund is the fundamental frequency and psi = 0.999.
 
-        Parameters
-        ----------
-        Wave : `acoustic_wave.AcousticWave`
-            An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
-        xCR_usu : `float`, optional
-            User-defined heuristic factor for the minimum damping ratio.
-            Default is `None`, which defines an estimated value
-        method : `str`, optional
-            Method to use for solving the eigenvalue problem.
-            Default is None, which uses the 'KRYLOVSCH_CH' method.
-            Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
-            'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
-            'ANALYTICAL' method is an approximation by using homogenization techniques.
-            'RAYLEIGH' method is an approximation by Rayleigh quotient.
-            In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
-            use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
-            Residual (gmres). (P) indicates the preconditioner to use: 'H' for
-            Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
-            example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
-        fitting_c : `tuple`, optional
-            Parameters for fitting equivalent velocity regression.
-            Structure: (fc1, fc2, fp1, fp2). Default is (0., 0., 0., 0.)
-            - fc1 : `float`
-                Exponent factor for the minimum reference velocity.
-            - fc2 : `float`
-                Exponent factor for the maximum reference velocity.
-            - fp1 : `float`
-                Exponent factor for the minimum equivalent velocity.
-            - fp2 : `float`
-                Exponent factor for the maximum equivalent velocity.
-        save_file : `bool`, optional
-            If `True`, save the velocity model with absorbing layer in a .pvd file.
-            Default is `True`.
+    #     Parameters
+    #     ----------
+    #     Wave : `acoustic_wave.AcousticWave`
+    #         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+    #     xCR_usu : `float`, optional
+    #         User-defined heuristic factor for the minimum damping ratio.
+    #         Default is `None`, which defines an estimated value
+    #     method : `str`, optional
+    #         Method to use for solving the eigenvalue problem.
+    #         Default is None, which uses the 'KRYLOVSCH_CH' method.
+    #         Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
+    #         'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
+    #         'ANALYTICAL' method is an approximation by using homogenization techniques.
+    #         'RAYLEIGH' method is an approximation by Rayleigh quotient.
+    #         In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
+    #         use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
+    #         Residual (gmres). (P) indicates the preconditioner to use: 'H' for
+    #         Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
+    #         example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
+    #     fitting_c : `tuple`, optional
+    #         Parameters for fitting equivalent velocity regression.
+    #         Structure: (fc1, fc2, fp1, fp2). Default is (0., 0., 0., 0.)
+    #         - fc1 : `float`
+    #             Exponent factor for the minimum reference velocity.
+    #         - fc2 : `float`
+    #             Exponent factor for the maximum reference velocity.
+    #         - fp1 : `float`
+    #             Exponent factor for the minimum equivalent velocity.
+    #         - fp2 : `float`
+    #             Exponent factor for the maximum equivalent velocity.
+    #     save_file : `bool`, optional
+    #         If `True`, save the velocity model with absorbing layer in a .pvd file.
+    #         Default is `True`.
 
-        Returns
-        -------
-        None
-        """
+    #     Returns
+    #     -------
+    #     None
+    #     """
 
-        pprint("\nBuilding Mask for Damping Profile", comm=self.comm)
+    #     pprint("\nBuilding Mask for Damping Profile", comm=self.comm)
 
-        # Damping mask
-        V_mask = create_function_space(Wave.mesh, "DG0", 0)
-        ufl_coordinates_habc = Wave.mesh_ops.get_spatial_coordinates_abc(Wave.mesh,
-                                                                         domain_layer)
-        self.eta_mask = layer_mask_field(self.domain_dim, Wave.mesh, self.dimension,
-                                         ufl_coordinates_habc, V_mask, damp_par=None,
-                                         type_marker='mask', name_mask='eta_mask')
+    #     # Damping mask
+    #     V_mask = create_function_space(Wave.mesh, "DG0", 0)
+    #     ufl_coordinates_habc = Wave.mesh_ops.get_spatial_coordinates_abc(Wave.mesh,
+    #                                                                      domain_layer)
+    #     self.eta_mask = layer_mask_field(self.domain_dim, Wave.mesh, self.dimension,
+    #                                      ufl_coordinates_habc, V_mask, damp_par=None,
+    #                                      type_marker='mask', name_mask='eta_mask')
 
-        # Save damping mask
-        if save_file:
-            outfile = VTKFile(self.path_case_abc + "eta_mask.pvd")
-            outfile.write(self.eta_mask)
+    #     # Save damping mask
+    #     if save_file:
+    #         outfile = VTKFile(self.path_case_abc + "eta_mask.pvd")
+    #         outfile.write(self.eta_mask)
 
-        # Domain dimensions with free surface truncation
-        dom_lay_trunc = self.abc_domain_dimensions(full_hyp=False)
+    #     # Domain dimensions with free surface truncation
+    #     dom_lay_trunc = self.abc_domain_dimensions(full_hyp=False)
 
-        # Layer parameters
-        layer_par = (self.factor_length_pad, self.a_par, self.d_norm)
+    #     # Layer parameters
+    #     layer_par = (self.factor_length_pad, self.a_par, self.d_norm)
 
-        # mesh parameters
-        mesh_par = (Wave.mesh_parameters.lmin, Wave.mesh_parameters.lmax,
-                    Wave.mesh_parameters.alpha, Wave.variant)
+    #     # mesh parameters
+    #     mesh_par = (Wave.mesh_parameters.lmin, Wave.mesh_parameters.lmax,
+    #                 Wave.mesh_parameters.alpha, Wave.variant)
 
-        # wave parameters
-        c_ref = min([bnd[1] for bnd in self.eik_bnd])
-        c_bnd = self.eik_bnd[0][1]
-        wave_par = (self.freq_ref, c_ref, c_bnd)
+    #     # wave parameters
+    #     c_ref = min([bnd[1] for bnd in self.eik_bnd])
+    #     c_bnd = self.eik_bnd[0][1]
+    #     wave_par = (self.freq_ref, c_ref, c_bnd)
 
-        # Initializing the parent class for damping
-        HABC_Damping.__init__(self, dom_lay_trunc, layer_par, mesh_par, wave_par,
-                              dimension=self.dimension, comm=self.comm)
+    #     # Initializing the parent class for damping
+    #     HABC_Damping.__init__(self, dom_lay_trunc, layer_par, mesh_par, wave_par,
+    #                           dimension=self.dimension, comm=self.comm)
 
-        # Estimating fundamental frequency
-        self.fundamental_frequency(Wave, method=method, fitting_c=fitting_c)
+    #     # Estimating fundamental frequency
+    #     self.fundamental_frequency(Wave, method=method, fitting_c=fitting_c)
 
-        pprint("\nCreating Damping Profile", comm=self.comm)
+    #     pprint("\nCreating Damping Profile", comm=self.comm)
 
-        # Compute the minimum damping ratio and the associated heuristic factor
-        eta_crt, self.psi_min, self.xCR, self.xCR_lim, self.CRmin \
-            = self.calc_damping_properties(self.fundam_freq, xCR_usu=xCR_usu)
+    #     # Compute the minimum damping ratio and the associated heuristic factor
+    #     eta_crt, self.psi_min, self.xCR, self.xCR_lim, self.CRmin \
+    #         = self.calc_damping_properties(self.fundam_freq, xCR_usu=xCR_usu)
 
-        # Compute the coefficients for quadratic damping function
-        aq, bq = self.coeff_damp_fun(self.psi_min)
+    #     # Compute the coefficients for quadratic damping function
+    #     aq, bq = self.coeff_damp_fun(self.psi_min)
 
-        # Damping field
-        damp_par = (self.abc_pad_length, eta_crt, aq, bq)
-        self.eta_habc = layer_mask_field(self.domain_dim, Wave.mesh, self.dimension,
-                                         ufl_coordinates_habc, Wave.function_space,
-                                         damp_par=damp_par, type_marker='damping',
-                                         name_mask='eta[1/s])')
+    #     # Damping field
+    #     damp_par = (self.abc_pad_length, eta_crt, aq, bq)
+    #     self.eta_habc = layer_mask_field(self.domain_dim, Wave.mesh, self.dimension,
+    #                                      ufl_coordinates_habc, Wave.function_space,
+    #                                      damp_par=damp_par, type_marker='damping',
+    #                                      name_mask='eta[1/s])')
 
-        # Save damping profile
-        if save_file:
-            outfile = VTKFile(self.path_case_abc + "eta_habc.pvd")
-            outfile.write(self.eta_habc)
+    #     # Save damping profile
+    #     if save_file:
+    #         outfile = VTKFile(self.path_case_abc + "eta_habc.pvd")
+    #         outfile.write(self.eta_habc)
 
     def rename_folder_habc(self):
         """Rename results folder if hypershape degree is out of limits.
