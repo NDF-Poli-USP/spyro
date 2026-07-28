@@ -52,11 +52,11 @@ jobs:
                .pytest_cache
         find . -name '*.pkl' -delete || true
 
-    - name: Running serial fast tests
+    - name: Running demo tests
       run: |
         make clean
         mpiexec -n 6 pytest tests/demo_tests/test_acoustic_camembert_demo.py
-        mpiexec -n 8 pytest tests/demo_tests/test_acoustic_layer_demo.py
+        mpiexec -n 6 pytest tests/demo_tests/test_acoustic_layer_demo.py
         pytest tests/demo_tests/test_acoustic_marmousi_forward_propagation.py
 
     - name: Post-run cleanup

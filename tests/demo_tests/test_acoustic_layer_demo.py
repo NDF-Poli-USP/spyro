@@ -8,10 +8,10 @@ import pytest
 class DummyModel():
     def __init__(self):
         self.parallelism_type = "automatic"
-        self.number_of_sources = 8
+        self.number_of_sources = 6
 
 
-@pytest.mark.parallel(8)
+@pytest.mark.parallel(6)
 def test_acoustic_camembert_fwi():
     from demos.acoustic_layers_fwi import setting_up_fwi,  run_fwi
 

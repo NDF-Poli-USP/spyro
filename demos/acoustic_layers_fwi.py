@@ -131,7 +131,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.05, 0.5), (-0.05, 1.5), 8),
+    "source_locations": spyro.create_transect((-0.05, 0.5), (-0.05, 1.5), 6),
     "frequency": frequency,
     "delay": 0.2,
     "delay_type": "time",
