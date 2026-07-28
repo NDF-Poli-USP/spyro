@@ -1,4 +1,4 @@
-from firedrake import Function, VTKFile
+# from firedrake import Function, VTKFile
 from numpy import abs, imag, pi, real, sqrt, unique
 from os import path, rename
 from shutil import rmtree
@@ -6,7 +6,7 @@ from ..abc.abc_layer import ABCLayer
 from .damp_profile import HABC_Damping
 from ..io.basicio import parallel_print as pprint
 from ..solvers.modal.modal_sol import Modal_Solver
-from ..tools.habc_tools import layer_mask_field
+# from ..tools.habc_tools import layer_mask_field
 from ..utils.typing import (HyperLayerDegreeType, LayerDampingType,
                             LayerShapeType, LayerSizeRefFrequency)
 # from spyro.utils.error_management import value_parameter_error

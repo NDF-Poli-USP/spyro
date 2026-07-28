@@ -1,12 +1,12 @@
 from firedrake import Function, VTKFile
-from numpy import abs, array, ceil, inf, log10, minimum
+# from numpy import abs, array, ceil, inf, log10, minimum
 from os import getcwd
-from sympy import divisors
+# from sympy import divisors
 from .nrbc import NRBC
 from .eik_min import Minimum_Eikonal
 from .lay_len import calc_size_lay
 # from ..habc.error_measure import HABCError
-from ..solvers.modal.modal_sol import Modal_Solver
+# from ..solvers.modal.modal_sol import Modal_Solver
 from ..io.basicio import parallel_print as pprint
 from ..domains.space import create_function_space
 from ..plots.plots_habc import plot_function_layer_size

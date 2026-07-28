@@ -305,8 +305,8 @@ class HABC_Damping():
         z = polyfit(xCR_reg, CRmin_reg, 2)
 
         # Roots of the quadratic equation
-        roots = roots(z)
-        real_roots = [r.real for r in roots if isreal(r)]
+        roots_values = roots(z)
+        real_roots = [r.real for r in root_values if isreal(r)]
         max_root = max(real_roots) if len(real_roots) == 2 else 0.
 
         # Vertex of parabola
