@@ -275,7 +275,7 @@ class MeshingParameters():
         self.padding_x = self.input_mesh_dictionary.get("padding_x")
         self.padding_z = self.input_mesh_dictionary.get("padding_z")
 
-        # Winslow gmsh only parameters
+        # Gmsh only parameters
         if self.mesh_type == "gmsh_mesh":
             self.winslow_implementation = self.input_mesh_dictionary.get("winslow_implementation", "numba")
             self.h_padding = self.input_mesh_dictionary.get("h_padding", 500.0)
