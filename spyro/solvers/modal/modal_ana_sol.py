@@ -9,7 +9,6 @@ from scipy.stats import norm as sn
 from sys import float_info
 from ...io.basicio import parallel_print as pprint
 from .modal_forms_and_matrices import weak_forms
-from ..solver_parameters import get_default_parameters_for_method
 from ...utils.error_management import (type_data_structure_error, type_firedrake_error,
                                        value_numerical_error, value_parameter_error)
 from ...utils.stats_tools import coeff_of_determination
@@ -33,9 +32,6 @@ class Modal_Analytical_Solver():
     comm : `object`, optional
         An object representing the communication interface for parallel processing.
         Default is `None`.
-    quadrilateral : `bool`, optional
-        Flag to indicate whether to use quadrilateral/hexahedral elements.
-        Default is `False` (triangular/tetrahedral elements).
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D.
 
@@ -55,16 +51,13 @@ class Modal_Analytical_Solver():
         Compute the analytical eigenvalue for hypershapes by using homogenization.
     """
 
-    def __init__(self, dimension=2, quadrilateral=False, comm=None):
+    def __init__(self, dimension=2, comm=None):
         """Initialize the Modal_Analytical_Solver class.
 
         Parameters
         ----------
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
-        quadrilateral : `bool`, optional
-            Flag to indicate whether to use quadrilateral/hexahedral elements.
-            Default is `False` (triangular/tetrahedral elements).
         comm : `object`, optional
             An object representing the communication interface for parallel processing.
             Default is `None`.
@@ -76,9 +69,6 @@ class Modal_Analytical_Solver():
 
         # Dimension of the problem
         self.dimension = value_parameter_error("dimension", dimension, [2, 3])
-
-        # Quadrilateral/hexahedral elements
-        self.quadrilateral = quadrilateral
 
         # Communicator MPI
         self.comm = comm
@@ -574,11 +564,13 @@ class Modal_Analytical_Solver():
 
             # Solve static load problem for the energy-equivalent homogenization
             lin_var = LinearVariationalProblem(a, L, u, constant_jacobian=True)
-            fem_method = "spectral_quadrilateral" if self.quadrilateral \
-                else "mass_lumped_triangle"
-            solver_parameters = get_default_parameters_for_method(fem_method)
-            solver_parameters["mat_type"] = "matfree"
-            LinearVariationalSolver(lin_var, solver_parameters=solver_parameters).solve()
+            solver_param = {"ksp_type": "gmres",
+                            "pc_type": "hypre",
+                            "pc_hypre_type": "boomeramg",
+                            "ksp_rtol": 1e-12,
+                            "ksp_atol": 1e-12,
+                            "ksp_gmres_restart": 100}
+            LinearVariationalSolver(lin_var, solver_parameters=solver_param).solve()
 
             # Compute the energy
             bilinear_term = 0.5 * inner(grad(u), grad(u))
