@@ -12,7 +12,7 @@ class DummyModel():
 
 
 @pytest.mark.parallel(6)
-def test_acoustic_camembert_fwi():
+def test_acoustic_layer_fwi():
     from demos.acoustic_layers_fwi import setting_up_fwi,  run_fwi
 
     model = DummyModel()
