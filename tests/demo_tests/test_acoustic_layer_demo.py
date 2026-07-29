@@ -37,5 +37,5 @@ def test_acoustic_camembert_fwi():
     switch_vp = float(u.at((-1.05, 1.0)))
     before_switch_vp = float(u.at((-0.7, 1.7)))
 
-    assert switch_vp == pytest.approx(3.0, rtol=1e-1)
+    assert switch_vp == pytest.approx(3.0, rel=1e-1)
     assert before_switch_vp == pytest.approx(2.5)
