@@ -71,7 +71,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
             equal to 2. `None` is used only for rectangular layers. Default is `None`.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
-        quadrilateral : bool, optional
+        quadrilateral : `bool`, optional
             Flag to indicate whether to use quadrilateral/hexahedral elements.
             Default is `False` (triangular/tetrahedral elements).
         func_space_type, `str`, optional
@@ -212,7 +212,8 @@ class HABCLayer(ABCLayer, HABC_Damping):
         """
 
         pprint("\nSolving Eigenvalue Problem", comm=self.comm)
-        mod_sol = Modal_Solver(self.dimension, method=method)
+        mod_sol = Modal_Solver(self.dimension, method=method,
+                               quadrilateral=self.quadrilateral)
 
         if method == 'ANALYTICAL':
 
