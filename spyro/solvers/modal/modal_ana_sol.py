@@ -1,5 +1,5 @@
-from firedrake import (assemble, ConvergenceError, dx as fire_dx,
-                       Function, grad, inner, solve)
+from firedrake import (assemble, ConvergenceError, dx as fire_dx, Function, grad,
+                       inner, LinearVariationalProblem, LinearVariationalSolver)
 from numpy import (arange, arccosh, argmax, array, asarray,
                    diag, inf, maximum, mean, pi, sqrt)
 from scipy.optimize import broyden1, curve_fit
@@ -9,9 +9,11 @@ from scipy.stats import norm as sn
 from sys import float_info
 from ...io.basicio import parallel_print as pprint
 from .modal_forms_and_matrices import weak_forms
+from ..solver_parameters import get_default_parameters_for_method
 from ...utils.error_management import (type_data_structure_error, type_firedrake_error,
                                        value_numerical_error, value_parameter_error)
 from ...utils.stats_tools import coeff_of_determination
+
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -31,6 +33,9 @@ class Modal_Analytical_Solver():
     comm : `object`, optional
         An object representing the communication interface for parallel processing.
         Default is `None`.
+    quadrilateral : `bool`, optional
+        Flag to indicate whether to use quadrilateral/hexahedral elements.
+        Default is `False` (triangular/tetrahedral elements).
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D.
 
@@ -50,13 +55,16 @@ class Modal_Analytical_Solver():
         Compute the analytical eigenvalue for hypershapes by using homogenization.
     """
 
-    def __init__(self, dimension=2, comm=None):
+    def __init__(self, dimension=2, quadrilateral=False, comm=None):
         """Initialize the Modal_Analytical_Solver class.
 
         Parameters
         ----------
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
+        quadrilateral : `bool`, optional
+            Flag to indicate whether to use quadrilateral/hexahedral elements.
+            Default is `False` (triangular/tetrahedral elements).
         comm : `object`, optional
             An object representing the communication interface for parallel processing.
             Default is `None`.
@@ -68,6 +76,9 @@ class Modal_Analytical_Solver():
 
         # Dimension of the problem
         self.dimension = value_parameter_error("dimension", dimension, [2, 3])
+
+        # Quadrilateral/hexahedral elements
+        self.quadrilateral = quadrilateral
 
         # Communicator MPI
         self.comm = comm
@@ -512,8 +523,8 @@ class Modal_Analytical_Solver():
 
         return (q_dummy, q_ref)
 
-    def c_equivalent(self, c, V, quad_rule=None, type_homog="energy",
-                     static_load_for_ceq=None):
+    def c_equivalent(self, c, V, quad_rule=None,
+                     type_homog="energy", static_load_for_ceq=None):
         """Compute equivalent homogeneous velocity for an inhomogeneous model.
 
         The method uses an energy-equivalent homogenization by default.
@@ -561,8 +572,15 @@ class Modal_Analytical_Solver():
             a, L = weak_forms(c, V, quad_rule=quad_rule, source=True,
                               user_load=static_load_for_ceq)
 
+            # Solve static load problem for the energy-equivalent homogenization
+            lin_var = LinearVariationalProblem(a, L, u, constant_jacobian=True)
+            fem_method = "spectral_quadrilateral" if self.quadrilateral \
+                else "mass_lumped_triangle"
+            solver_parameters = get_default_parameters_for_method(fem_method)
+            solver_parameters["mat_type"] = "matfree"
+            LinearVariationalSolver(lin_var, solver_parameters=solver_parameters).solve()
+
             # Compute the energy
-            solve(a == L, u)
             bilinear_term = 0.5 * inner(grad(u), grad(u))
             energy = assemble(c * c * bilinear_term * dx)
 

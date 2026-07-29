@@ -200,7 +200,7 @@ def clipping_coordinates_lay_field(domain_dim, mesh, dimension,
         Domain coordinates including the absorbing layer.
     V : `Firedrake.FunctionSpace`
         Function space for the mask field.
-    quadrilateral : bool, optional
+    quadrilateral : `bool`, optional
         Flag to indicate whether to use quadrilateral/hexahedral elements.
 
     Returns

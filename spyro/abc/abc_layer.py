@@ -116,7 +116,7 @@ class ABCLayer(NRBC):
         Path to save data for the current case study.
     path_save : `string`
         Path to save data.
-    quadrilateral : bool, optional
+    quadrilateral : `bool`, optional
         Flag to indicate whether to use quadrilateral/hexahedral elements.
         Default is `False` (triangular/tetrahedral elements).
 
@@ -176,7 +176,7 @@ class ABCLayer(NRBC):
             Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt)
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
-        quadrilateral : bool, optional
+        quadrilateral : `bool`, optional
             Flag to indicate whether to use quadrilateral/hexahedral elements.
             Default is `False` (triangular/tetrahedral elements).
         func_space_type, `str`, optional
