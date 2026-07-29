@@ -2,7 +2,7 @@ from firedrake import (assemble, ConvergenceError, dx as fire_dx,
                        Function, grad, inner, solve)
 from numpy import (arange, arccosh, argmax, array, asarray,
                    diag, inf, maximum, mean, pi, sqrt)
-from scipy.optimize import broyden1, curve_fit
+from scipy.optimize import curve_fit, fsolve, minimize_scalar
 from scipy.special import (beta, betainc, gamma, jn_zeros, jnp_zeros,
                            mathieu_modcem1, spherical_jn)
 from scipy.stats import norm as sn
@@ -154,7 +154,7 @@ class Modal_Analytical_Solver():
             psi0 = arccosh(a0 / f0)
             idx = int(bc == "Neumann")
             m = 1 if bc == "Neumann" else 0  # Order of the MMF
-            # pprint(bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx], comm=self.comm)
+            # pprint((bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx]), comm=self.comm)
             return mathieu_modcem1(m, q, psi0)[idx]
 
         def ZBF(m=0, n=1):
@@ -174,7 +174,7 @@ class Modal_Analytical_Solver():
             """
             deriv = (bc == "Neumann")
             Jmz = jnp_zeros(m, n) if deriv else jn_zeros(m, n)
-            # pprint(bc, m, n, Jmz, comm=self.comm)
+            # pprint((bc, m, n, Jmz), comm=self.comm)
             return Jmz
 
         def SBF(q, m=0):
@@ -194,29 +194,56 @@ class Modal_Analytical_Solver():
             """
             deriv = (bc == "Neumann")
             m = int(deriv)  # Order of the SBF: 0 (False) or 1 (True)
-            # pprint(bc, m, q, spherical_jn(m, q, derivative=deriv, comm=self.comm))
+            # pprint((bc, m, q, spherical_jn(m, q, derivative=deriv)), comm=self.comm)
             return spherical_jn(m, q, derivative=deriv)
+
+        def ana_rq_ellipsoid(alpha):
+            """Rayleigh quotient for ellipsoid with trial function ψ = (1 - r²)(1 + α r²).
+
+            Parameters
+            ----------
+            alpha : `float`
+                Parameter of the trial function ψ = (1 - r²)(1 + α r²).
+
+            Returns
+            -------
+            RQ(α) : `float`
+            Rayleigh quotient RQ(α) = E(α) / N(α)
+            """
+            # Radial integral I_r
+            I_r = (alpha - 1)**2./5. - 4 * alpha * (alpha - 1.)/7. + 4. * alpha**2./9.
+
+            # Radial integral J_r
+            J_r = (1./3. + (2 * alpha - 2)/5. + (alpha**2. - 4.*alpha + 1.)/7.
+                   - (2. * alpha**2. - 2. * alpha)/9. + alpha**2./11.)
+
+            RQ = (4./3.) * (1./a**2 + 1./b**2 + 1./c**2) * (I_r / J_r)
+            # pprint((bc, I_r, J_r, alpha, RQ), comm=self.comm)
+            return RQ
 
         # Semi-axes
         a, b = hyper_axes[: 2]
+
+        # Circular or spherical case
+        if all_axes_equal:
+            m = 1 if bc == "Neumann" else 0
+
+            # 1st root for the mth-order Bessel's function
+            first_root_2D = ZBF(m=m, n=1)[0]
+
+            if self.dimension == 2:  # 2D circular
+                J01 = first_root_2D
+
+            if self.dimension == 3:  # 3D spherical
+                J01 = fsolve(SBF, first_root_2D, xtol=1e-14)[0]
+
+            return J01 / a
 
         # Frequency factor for rectangular/prismatic case
         f_rec = self._freq_factor_rec(hyper_axes, bc=bc)
 
         # Initial guess
         igss = f_rec if bc == "Neumann" else 0.
-
-        # Circular or spherical case
-        if all_axes_equal:
-            # 1st root for the mth-order Bessel's function
-            if self.dimension == 2:  # 2D circular
-                m = 1 if bc == "Neumann" else 0
-                J01 = ZBF(m=m, n=1)[0]
-
-            if self.dimension == 3:  # 3D spherical
-                J01 = float(broyden1(SBF, igss, f_tol=1e-14))
-
-            return J01 / a
 
         # Elliptical or ellipsoidal case
         if self.dimension == 2:  # 2D elliptical
@@ -229,13 +256,11 @@ class Modal_Analytical_Solver():
 
             # 1st root or the mth-order Modified Mathieu's Function
             a0 = a
-            M01 = float(broyden1(MMF, igss, f_tol=1e-14))
+            M01 = fsolve(MMF, igss, xtol=1e-14)[0]
 
             return (2 / f0) * M01 ** 0.5
 
         if self.dimension == 3:  # 3D ellipsoidal
-
-            f_ell_arr = []
 
             # Order semi-axes
             a, b, c = sorted(hyper_axes, reverse=True)
@@ -248,22 +273,27 @@ class Modal_Analytical_Solver():
             if bc == "Neumann":
                 # Only use the pair with maximum eccentricity
                 max_ecc_idx = argmax([ecc for _, _, ecc in ecc_arr])
-                ecc_arr = [ecc_arr[max_ecc_idx]]
-
-            for a0, b0, f0 in ecc_arr:
+                a0, b0, f0 = ecc_arr[max_ecc_idx]
 
                 if f0 == 0:  # Circular cross-section
                     # 1st root for the mth-order Bessel's function
                     J01 = ZBF(m=0, n=1)[0]
-                    f_ell_arr.append((J01 / a0) ** 2)
+
+                    return J01 / a
 
                 else:  # Elliptical cross-section
                     # 1st root or the mth-order Modified Mathieu's Function
-                    M01 = float(broyden1(MMF, igss, f_tol=1e-14))
-                    f_ell_arr.append(4 * M01 / f0 ** 2)
+                    M01 = fsolve(MMF, igss, xtol=1e-14)[0]
 
-            # Sum and return square root
-            return sum(f_ell_arr) ** 0.5
+                    return (2 / f0) * M01 ** 0.5
+
+            if bc == "Dirichlet":
+
+                # Use Rayleigh-Ritz  optimizing the parameter α in the trial function ψ.
+                RQ = minimize_scalar(ana_rq_ellipsoid, bounds=(-1., 1.),
+                                     method='bounded', tol=1e-14)
+
+                return RQ.fun ** 0.5
 
     def _reg_geometry_hyp(self, cut_plane_percent=1.):
         """Perform the nonlinear regression for the hypershape geometry factor.

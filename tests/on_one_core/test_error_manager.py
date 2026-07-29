@@ -12,7 +12,7 @@ from spyro.utils.error_management import (
     value_numerical_error, value_parameter_error, value_string_error)
 
 
-class TestEnum(Enum):
+class ExampleEnum(Enum):
     """Test enum class for enum_parameter_error tests."""
     VALUE1 = "value1"
     VALUE2 = "value2"
@@ -365,25 +365,25 @@ class TestEnumParameterError:
 
     def test_valid_enum_instance(self):
         """Test with valid enum instance."""
-        result = enum_parameter_error("test_param", TestEnum.VALUE1, TestEnum)
-        assert result == TestEnum.VALUE1
+        result = enum_parameter_error("test_param", ExampleEnum.VALUE1, ExampleEnum)
+        assert result == ExampleEnum.VALUE1
 
     def test_valid_string_value(self):
         """Test with valid string value."""
-        result = enum_parameter_error("test_param", "value2", TestEnum)
-        assert result == TestEnum.VALUE2
+        result = enum_parameter_error("test_param", "value2", ExampleEnum)
+        assert result == ExampleEnum.VALUE2
 
     def test_invalid_string_value(self):
         """Test with invalid string value."""
         with raises(ValueError) as exc_info:
-            enum_parameter_error("test_param", "invalid", TestEnum)
+            enum_parameter_error("test_param", "invalid", ExampleEnum)
         assert "Invalid test_param: 'invalid'" in str(exc_info.value)
 
     def test_invalid_type(self):
         """Test with invalid type(not enum instance or string)."""
         with raises(TypeError) as exc_info:
-            enum_parameter_error("test_param", 123, TestEnum)
-        assert "'test_param' must be TestEnum or str" in str(exc_info.value)
+            enum_parameter_error("test_param", 123, ExampleEnum)
+        assert "'test_param' must be ExampleEnum or str" in str(exc_info.value)
 
 
 class TestValueStringError:
