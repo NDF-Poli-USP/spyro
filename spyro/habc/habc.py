@@ -212,8 +212,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
         """
 
         pprint("\nSolving Eigenvalue Problem", comm=self.comm)
-        mod_sol = Modal_Solver(self.dimension, method=method,
-                               quadrilateral=self.quadrilateral)
+        mod_sol = Modal_Solver(self.dimension, method=method)
 
         if method == 'ANALYTICAL':
 

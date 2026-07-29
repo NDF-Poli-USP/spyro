@@ -36,9 +36,6 @@ class Modal_Solver():
     method : `str`
         Method to use for solving the eigenvalue problem. See `valid_methods` for options.
         Default is `None`, which uses the "KRYLOVSCH_CH" method.
-    quadrilateral : `bool`
-        Flag to indicate whether to use quadrilateral/hexahedral elements.
-        Default is `False` (triangular/tetrahedral elements).
     valid_methods: `list`
         List of valid methods for solving the eigenproblem
         Options: "ANALYTICAL", "ARNOLDI", "LANCZOS", "LOBPCG", "KRYLOVSCH_CH",
@@ -67,8 +64,7 @@ class Modal_Solver():
             Solve the eigenvalue problem using UFL forms with SLEPc.
     """
 
-    def __init__(self, dimension=2, method=None,
-                 quadrilateral=False, calc_max_dt=False, comm=None):
+    def __init__(self, dimension=2, method=None, calc_max_dt=False, comm=None):
         """Initialize the Modal_Solver class.
 
         Parameters
@@ -87,9 +83,6 @@ class Modal_Solver():
             Residual (gmres). (P) indicates the preconditioner to use: "H" for
             Hypre (hypre) or "G" for Geometric Algebraic Multigrid (gamg). For
             example, "KRYLOVSCH_CH" uses cg solver with hypre preconditioner.
-        quadrilateral : `bool`, optional
-            Flag to indicate whether to use quadrilateral/hexahedral elements.
-            Default is `False` (triangular/tetrahedral elements).
         calc_max_dt : `bool`
             Option to estimate the maximum stable timestep for the computation
             of the transient response. Default is `False`.
@@ -121,14 +114,10 @@ class Modal_Solver():
         method = "KRYLOVSCH_CH" if method is None else method
         self.method = value_parameter_error("method", method, self.valid_methods)
 
-        # Quadrilateral/hexahedral elements
-        self.quadrilateral = quadrilateral
-
         # Initializing the analytical solver
         if not self.calc_max_dt and self.method == "ANALYTICAL":
             from .modal_ana_sol import Modal_Analytical_Solver
-            self.AnaModSol = Modal_Analytical_Solver(
-                dimension=self.dimension, quadrilateral=self.quadrilateral, comm=comm)
+            self.AnaModSol = Modal_Analytical_Solver(dimension=self.dimension, comm=comm)
 
         pprint(f"Solver Method: {self.method}", comm=self.comm)
 
