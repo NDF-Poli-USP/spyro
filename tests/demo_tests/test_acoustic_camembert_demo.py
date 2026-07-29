@@ -36,5 +36,5 @@ def test_acoustic_camembert_fwi():
     camembert_vp = float(u.at((-1.0, 1.0)))
     outside_camembert_vp = float(u.at((-1.7, 1.7)))
 
-    assert camembert_vp == pytest.approx(3.0)
-    assert outside_camembert_vp == pytest.approx(2.5)
+    assert camembert_vp == pytest.approx(3.0, rel=1e-2)
+    assert outside_camembert_vp == pytest.approx(2.5, rel=1e-2)

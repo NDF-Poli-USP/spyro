@@ -170,7 +170,7 @@ def run_fwi(load_real_shot=True):
     }
     fwi_obj.set_gradient_mask(boundaries=mask_boundaries)
 
-    fwi_obj.run_fwi(vmin=2.5, vmax=3.0, maxiter=20)
+    fwi_obj.run_fwi(vmin=2.5, vmax=3.0, maxiter=30)
     export_grid_spacing = 0.01
 
     # Let us have a look at our solution
