@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev pyt
 RUN pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git
 RUN pip3 install pyamg
 RUN pip3 install meshio
+RUN pip3 install --no-cache-dir "pakmsh[examples] @ git+https://github.com/NDF-Poli-USP/PakMsh.git"
 
 FROM spyro_base AS spyro_release
 
