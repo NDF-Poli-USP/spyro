@@ -341,8 +341,8 @@ class TestModalAnalyticalSolver:
             prev_fr_ell = fr_ell
             prev_fr_rec = fr_rec
 
-    def test_freq_factor_hyp(self, solver_2d):
-        """Test _freq_factor_hyp with Neumann BC."""
+    def test_freq_factor_hyp_2d(self, solver_2d):
+        """Test _freq_factor_hyp with Neumann BC for 2D."""
         # Test parameters
         hyp_degrees = [3, 5, 10, 20, 50, 100, 200, 1000]
         f_rec = 1.0
@@ -364,6 +364,38 @@ class TestModalAnalyticalSolver:
         for n_hyp in hyp_degrees:
 
             f_hyp, c_reg = solver_2d._freq_factor_hyp(n_hyp, f_rec, f_ell,
+                                                      c_eq, bc="Dirichlet")
+
+            # Check results are positive and finite
+            assert np.isfinite(f_hyp) and f_hyp > 0
+            assert np.isfinite(c_reg) and c_reg > 0
+
+            # f_hyp should be between f_ell and f_rec
+            assert f_rec < f_hyp < f_ell
+
+    def test_freq_factor_hyp_3d(self, solver_3d):
+        """Test _freq_factor_hyp with Neumann BC fpr 3D."""
+        # Test parameters
+        hyp_degrees = [3, 5, 10, 20, 50, 100, 200, 1000]
+        f_rec = 1.0
+        f_ell = 2.0
+        c_eq = 3.0
+
+        for n_hyp in hyp_degrees:
+
+            f_hyp, c_reg = solver_3d._freq_factor_hyp(n_hyp, f_rec, f_ell,
+                                                      c_eq, bc="Neumann")
+
+            # Check results are positive and finite
+            assert np.isfinite(f_hyp) and f_hyp > 0
+            assert np.isfinite(c_reg) and c_reg > 0
+
+            # f_hyp should be between f_ell and f_rec
+            assert f_rec < f_hyp < f_ell
+
+        for n_hyp in hyp_degrees:
+
+            f_hyp, c_reg = solver_3d._freq_factor_hyp(n_hyp, f_rec, f_ell,
                                                       c_eq, bc="Dirichlet")
 
             # Check results are positive and finite
