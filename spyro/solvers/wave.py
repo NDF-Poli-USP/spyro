@@ -460,10 +460,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # Maximum timestep size
         method = 'ANALYTICAL' if estimate_max_eigenvalue else 'ARNOLDI'
-        dt_solver = Modal_Solver(self.dimension, method=method,
-                                 calc_max_dt=True)
-        max_dt = dt_solver.estimate_timestep(c, self.function_space,
-                                             self.final_time,
+        dt_solver = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
+        max_dt = dt_solver.estimate_timestep(c, self.function_space, self.final_time,
                                              quad_rule=self.quadrature_rule,
                                              fraction=fraction)
         self.dt = max_dt
