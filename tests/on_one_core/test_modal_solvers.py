@@ -153,11 +153,10 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     if dimension == 3:
         if element_geometry == "T":
             f_est = 0.02 if homogeneous else 0.05
-            fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.4, 0.2, 0.5, -1.0)
 
         else:
             f_est = 0.02 if homogeneous else 0.08
-            fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.3, 0.0, 0.5, -1.0)
+        fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.4, 0.2, 0.5, -1.0)
 
     # Layer shape
     layer_shape = "rectangular" if degree_layer is None else "hypershape"

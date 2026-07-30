@@ -95,7 +95,7 @@ class HABCMesh(MeshOps):
             or (length_z, length_x, length_y) for 3D.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
-        quadrilateral : bool, optional
+        quadrilateral : `bool`, optional
             Flag to indicate whether to use quadrilateral/hexahedral elements.
         func_space_type, `str`, optional
             Type of function space for the state variable.

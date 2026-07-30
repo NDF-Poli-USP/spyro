@@ -1,5 +1,5 @@
-from firedrake import (assemble, ConvergenceError, dx as fire_dx,
-                       Function, grad, inner, solve)
+from firedrake import (assemble, ConvergenceError, dx as fire_dx, Function, grad,
+                       inner, LinearVariationalProblem, LinearVariationalSolver)
 from numpy import (arange, arccosh, argmax, array, asarray,
                    diag, inf, maximum, mean, pi, sqrt)
 from scipy.optimize import broyden1, curve_fit
@@ -12,6 +12,7 @@ from .modal_forms_and_matrices import weak_forms
 from ...utils.error_management import (type_data_structure_error, type_firedrake_error,
                                        value_numerical_error, value_parameter_error)
 from ...utils.stats_tools import coeff_of_determination
+
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -512,8 +513,8 @@ class Modal_Analytical_Solver():
 
         return (q_dummy, q_ref)
 
-    def c_equivalent(self, c, V, quad_rule=None, type_homog="energy",
-                     static_load_for_ceq=None):
+    def c_equivalent(self, c, V, quad_rule=None,
+                     type_homog="energy", static_load_for_ceq=None):
         """Compute equivalent homogeneous velocity for an inhomogeneous model.
 
         The method uses an energy-equivalent homogenization by default.
@@ -561,8 +562,17 @@ class Modal_Analytical_Solver():
             a, L = weak_forms(c, V, quad_rule=quad_rule, source=True,
                               user_load=static_load_for_ceq)
 
+            # Solve static load problem for the energy-equivalent homogenization
+            lin_var = LinearVariationalProblem(a, L, u, constant_jacobian=True)
+            solver_param = {"ksp_type": "gmres",
+                            "pc_type": "hypre",
+                            "pc_hypre_type": "boomeramg",
+                            "ksp_rtol": 1e-12,
+                            "ksp_atol": 1e-12,
+                            "ksp_gmres_restart": 100}
+            LinearVariationalSolver(lin_var, solver_parameters=solver_param).solve()
+
             # Compute the energy
-            solve(a == L, u)
             bilinear_term = 0.5 * inner(grad(u), grad(u))
             energy = assemble(c * c * bilinear_term * dx)
 

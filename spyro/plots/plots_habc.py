@@ -416,7 +416,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 #             - 'err_difference' : Minimizes difference between integral and peak errors
 #             - 'err_integral' : Minimizes integral error
 #             - 'err_sum' : Minimizes the sum of integral and peak errors
-#     show : bool, optional
+#     show : `bool`, optional
 #         Whether to display the plot interactively. Default is `False`.
 
 #     Returns
