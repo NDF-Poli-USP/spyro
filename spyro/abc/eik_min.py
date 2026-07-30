@@ -207,14 +207,14 @@ class Minimum_Eikonal(Eikonal_Modeling):
         Returns
         -------
         eik_bnd: `list`
-            Properties on boundaries according to minimum values of Eikonal
+            Properties on boundaries according to minimum values of Eikonal.
             Structure sublist: [pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]
-            - pnt_crit : Critical point coordinates
-            - c_bnd : Propagation speed at critical point
-            - eikmin : Eikonal value in seconds
-            - z_par : Inverse of minimum Eikonal (Equivalent to c_bound/lref)
-            - lref : Distance to the closest source from critical point
-            - sou_crit : Critical source coordinates
+            - pnt_crit : Critical point coordinates.
+            - c_bnd : Propagation speed at critical point.
+            - eikmin : Eikonal value in seconds.
+            - z_par : Inverse of minimum Eikonal (Equivalent to c_bound/lref).
+            - lref : Distance to the closest source from critical point.
+            - sou_crit : Critical source coordinates.
         """
 
         # Build the boundary ID mapping

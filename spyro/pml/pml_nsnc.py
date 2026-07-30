@@ -77,7 +77,7 @@ class PMLLayer(ABCLayer):
             Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt).
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
-        quadrilateral : bool, optional
+        quadrilateral : `bool`, optional
             Flag to indicate whether to use quadrilateral/hexahedral elements.
             Default is `False` (triangular/tetrahedral elements).
         func_space_type, `str`, optional
@@ -171,7 +171,7 @@ class PMLLayer(ABCLayer):
         Wave_object : `acoustic_wave.AcousticWave`
             An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
         ufl_coordinates_pml : `ufl.geometry.SpatialCoordinate`
-            Domain Coordinates including the absorbing layer.
+            Domain coordinates including the absorbing layer.
         V : `Firedrake.FunctionSpace`
             Function space for the damping field
         degree_prof : `int`, optional
