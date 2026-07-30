@@ -148,7 +148,7 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     if dimension == 2:
         if element_geometry == "T":
             f_est = 0.01 if homogeneous else 0.06
-            fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.5, 0.3, -2.2, -1.3)
+        fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.5, 0.3, -2.2, -1.3)
 
     if dimension == 3:
         if element_geometry == "T":
@@ -156,7 +156,7 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
 
         else:
             f_est = 0.02 if homogeneous else 0.08
-        fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.4, 0.2, 0.5, -1.0)
+        fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.5, 0.3, -1.3, -0.9)
 
     # Layer shape
     layer_shape = "rectangular" if degree_layer is None else "hypershape"
@@ -416,7 +416,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
 
     *RESULTS HETEROGENEOUS
     Frequency[Hz]    N2.4        (texe/pmem)     REC         (texe/pmem)
-    ANALYTICAL    0.51833 ( 5.761s/10.364MB) 0.42415 ( 8.884s/ 12.748MB)
+    ANALYTICAL    0.51787 ( 4.430s/10.494MB) 0.41840 ( 6.531s/ 12.903MB)
     KRYLOVSCH_CH  0.51535 (24.633s/ 0.935MB) 0.42562 (66.466s/  0.926MB)
     KRYLOVSCH_GH  0.51535 (25.103s/ 0.077MB) 0.42562 (64.295s/  0.075MB)
     RAYLEIGH      0.54073 (37.131s/71.052MB) 0.44257 (47.741s/104.142MB)
@@ -424,7 +424,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     *ANALYTICAL
        Case      REC*  N2.4*
     fnum[Hz]  0.42562 0.51535
-    fana[Hz]  0.42415 0.51833
+    fana[Hz]  0.41840 0.51787
     fray[Hz]  0.44257 0.54073
 
     *RAYLEIGH N2.4
@@ -473,7 +473,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
 
     *RESULTS HETEROGENEOUS
     Frequency[Hz]     REC          (texe/pmem)
-    ANALYTICAL    0.41373 ( 4.707s/ 11.191MB)
+    ANALYTICAL    0.42873 ( 3.689s/ 12.027MB)
     ARNOLDI       0.41127 (32.395s/326.702MB)
     LANCZOS       0.41127 (31.732s/218.844MB)
     LOBPCG        0.41127 (35.811s/215.802MB)
@@ -484,7 +484,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     *ANALYTICAL
        Case      REC*
     fnum[Hz]  0.41127
-    fana[Hz]  0.41373
+    fana[Hz]  0.42873
     fray[Hz]  0.42935
 
     *RAYLEIGH REC
