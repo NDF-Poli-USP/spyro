@@ -274,3 +274,25 @@ class TestModalAnalyticalSolver:
             # Ellipse should have higher frequency factor
             assert f_ell > f_rec, f"Elliptical f_ell={f_ell} " \
                 f"should be > rectangular f_rec={f_rec} for ratio={ratio}"
+
+    def test_reg_geometry_hyp_no_cut(self, solver_2d, solver_3d):
+        """Test _reg_geometry_hyp for 2D  and 3D with no cut (cut_plane_percent=1.)."""
+        pn, qn, fr_ell, fr_rec = solver_2d._reg_geometry_hyp(cut_plane_percent=1.)
+
+        # Check that fitted parameters are positive and finite
+        assert np.isfinite(pn) and pn > 0.
+        assert np.isfinite(qn) and qn > 0.
+
+        # For no cut, fr_ell and fr_rec should be 1.0 (no truncation)
+        np.testing.assert_almost_equal(fr_ell, 1., decimal=10)
+        np.testing.assert_almost_equal(fr_rec, 1., decimal=10)
+
+        pn, qn, fr_ell, fr_rec = solver_3d._reg_geometry_hyp(cut_plane_percent=1.0)
+
+        # Check that fitted parameters are positive and finite
+        assert np.isfinite(pn) and pn > 0.
+        assert np.isfinite(qn) and qn > 0.
+
+        # For no cut, fr_ell and fr_rec should be 1.0 (no truncation)
+        np.testing.assert_almost_equal(fr_ell, 1., decimal=10)
+        np.testing.assert_almost_equal(fr_rec, 1., decimal=10)

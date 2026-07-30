@@ -371,16 +371,14 @@ class Modal_Analytical_Solver():
             f_max = 2. * fax_trunc
             fn2 = area_function(2., cut_plane_percent)
             fr_ell = fn2 / area_function(2., 1.)
-            fr_rec = area_function(100., cut_plane_percent
-                                   ) / area_function(100., 1.)
+            fr_rec = area_function(100., cut_plane_percent) / area_function(100., 1.)
             f_data = area_function(n_data, cut_plane_percent)
 
         if self.dimension == 3:  # 3D
             f_max = 4. * fax_trunc
             fn2 = volume_function(2., cut_plane_percent)
             fr_ell = fn2 / volume_function(2., 1.)
-            fr_rec = volume_function(100., cut_plane_percent
-                                     ) / area_function(100., 1.)
+            fr_rec = volume_function(100., cut_plane_percent) / volume_function(100., 1.)
             f_data = volume_function(n_data, cut_plane_percent)
 
         # Initial guess
