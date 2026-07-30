@@ -29,7 +29,7 @@ def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
     dimension : `int`
         Model dimension (2D or 3D).
     ufl_coordinates_habc : `ufl.geometry.SpatialCoordinate`
-        Domain Coordinates including the absorbing layer.
+        Domain coordinates including the absorbing layer.
     type_marker : `string`, optional
         Type of marker for the absorbing layer. Default is 'mask'.
         - 'damping' : Get the reference distance to the original boundary.
@@ -107,7 +107,7 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
     dimension : `int`, optional
         Model dimension (2D or 3D).
     ufl_coordinates_habc : `ufl.geometry.SpatialCoordinate`
-        Domain Coordinates including the absorbing layer.
+        Domain coordinates including the absorbing layer.
     V : `Firedrake.FunctionSpace`
         Function space for the mask field.
     damp_par : `tuple`, optional
@@ -197,10 +197,10 @@ def clipping_coordinates_lay_field(domain_dim, mesh, dimension,
     dimension : `int`
         Model dimension (2D or 3D).
     ufl_coordinates_habc : `ufl.geometry.SpatialCoordinate`
-        Domain Coordinates including the absorbing layer.
+        Domain coordinates including the absorbing layer.
     V : `Firedrake.FunctionSpace`
         Function space for the mask field.
-    quadrilateral : bool, optional
+    quadrilateral : `bool`, optional
         Flag to indicate whether to use quadrilateral/hexahedral elements.
 
     Returns

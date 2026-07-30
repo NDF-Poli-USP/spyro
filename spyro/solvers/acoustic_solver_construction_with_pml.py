@@ -51,8 +51,8 @@ def forms_pml(Wave_object, W, X_n, X_nm1):
     dt = Wave_object.dt
     c = Wave_object.c
     c_sqr_inv = 1. / (c * c)
-    q_rule = Wave_object.quadrature_rule
-    dx = fire_dx(**q_rule) if q_rule else fire_dx
+    quad_rule = Wave_object.quadrature_rule
+    dx = fire_dx(**quad_rule) if quad_rule else fire_dx
     Wave_object.layer_ops.pml_layer(Wave_object)
 
     # Trial and test functions, and state variables
@@ -125,7 +125,7 @@ def forms_pml(Wave_object, W, X_n, X_nm1):
 
         # Apply NRBCs (Higdon or Sommerfeld) at PML boundaries
         if abc_type in [BoundaryConditionsType.HIGDON, BoundaryConditionsType.SOMMERFELD]:
-            ds = fire_ds(bc_surf, **q_rule) if q_rule else fire_ds(bc_surf)
+            ds = fire_ds(bc_surf, **quad_rule) if quad_rule else fire_ds(bc_surf)
             f_abc = c * ((u_n - u_nm1) / dt) * v
             le = Wave_object.layer_ops.cosHig * f_abc * ds
             FF += le

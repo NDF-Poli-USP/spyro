@@ -95,7 +95,7 @@ class HABCMesh(MeshOps):
             or (length_z, length_x, length_y) for 3D.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
-        quadrilateral : bool, optional
+        quadrilateral : `bool`, optional
             Flag to indicate whether to use quadrilateral/hexahedral elements.
         func_space_type, `str`, optional
             Type of function space for the state variable.
@@ -1096,7 +1096,7 @@ class HABCMesh(MeshOps):
 
         return bnd_nod_ids_nfs, bnd_nodes_nfs
 
-    def get_spatial_coordinates_abc(self, mesh, domain_layer):
+    def get_spatial_coordinates_abc(self, mesh, domain_layer, return_mesh_limits=False):
         """Get the ufl coordinates of the mesh with absorbing layer.
 
         Parameters
@@ -1104,19 +1104,23 @@ class HABCMesh(MeshOps):
         mesh : `Firedrake.Mesh`
             Current mesh.
         domain_layer : `tuple`
-            Domain dimensions with layer. For rectangular layers, truncation
-            due to the free surface is included (n = 1). For hypershape layers,
-            truncation by free surface is not included (n = 2) if 'full_hyp' is
-            True; otherwise, it is included (n = 1). Dimensions are defined as:
-            2D: (length_z + n * pad_len, length_x + 2 * pad_len).
-            3D: (length_x + 2 * pad_len, length_z + n * pad_len, length_y + 2 * pad_len).
+            Domain dimensions with layer:
+            2D: (length_z + pad_len, length_x + 2 * pad_len).
+            3D: (length_z + n * pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len).
+        return_mesh_limits : `bool`, optional
+            Flag to indicate whether to return the mesh limits (min and max coordinates).
 
         Returns
         -------
         ufl_coordinates_abc : `ufl.geometry.SpatialCoordinate`
-            Domain Coordinates including the absorbing layer.
+            Domain coordinates including the absorbing layer.
+        min_coordinates : `array`
+            Array containing the minimum coordinates in each dimension (z, x, y).
+        max_coordinates : `array`
+            Array containing the maximum coordinates in each dimension (z, x, y).
         """
 
+        # Mesh limits
         min_coordinates, max_coordinates = self.extract_extreme_coordinates(mesh)
         domain_abc = np.asarray(domain_layer)
         domain_to_check = abs(max_coordinates - min_coordinates)
@@ -1126,6 +1130,10 @@ class HABCMesh(MeshOps):
             f"domain with absorbing layer. Expected: {np.round(domain_abc, 3)}, " \
             f"Got: {np.round(domain_to_check, 3)}."
 
+        # UFL coordinates for the mesh with absorbing layer
         ufl_coordinates_abc = fire.SpatialCoordinate(mesh)
 
-        return ufl_coordinates_abc
+        if return_mesh_limits:
+            return ufl_coordinates_abc, min_coordinates, max_coordinates
+        else:
+            return ufl_coordinates_abc
