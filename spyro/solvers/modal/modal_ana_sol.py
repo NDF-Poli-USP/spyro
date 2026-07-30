@@ -467,6 +467,9 @@ class Modal_Analytical_Solver():
             Approximate equivalent velocity for the hypershape.
         """
 
+        # Check the homogeneous velocity from original model without absorbing layer
+        c_eqref = c_eq if c_eqref is None else c_eqref
+
         # Regression for hypershape geometry factor
         pn, qn, fr_ell, fr_rec = self._reg_geometry_hyp(cut_plane_percent=cut_plane_percent)
 

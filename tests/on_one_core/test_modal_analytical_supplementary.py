@@ -296,3 +296,79 @@ class TestModalAnalyticalSolver:
         # For no cut, fr_ell and fr_rec should be 1.0 (no truncation)
         np.testing.assert_almost_equal(fr_ell, 1., decimal=10)
         np.testing.assert_almost_equal(fr_rec, 1., decimal=10)
+
+    def test_reg_geometry_hyp_cut_percent_variation(self, solver_2d, solver_3d):
+        """Test _reg_geometry_hyp for different cut percentages."""
+        cut_percents = [0.01, 0.3, 0.5, 0.7, 0.9, 0.99]
+
+        prev_fr_ell = None
+        prev_fr_rec = None
+
+        for cut in cut_percents:
+            pn, qn, fr_ell, fr_rec = solver_2d._reg_geometry_hyp(cut_plane_percent=cut)
+
+            # Check fitted parameters are valid
+            assert np.isfinite(pn) and pn > 0
+            assert np.isfinite(qn) and qn > 0
+
+            # As cut_percent increases (less truncation), fr_ell and fr_rec should increase
+            if prev_fr_ell is not None:
+                assert fr_ell > prev_fr_ell, \
+                    f"fr_ell should increase with cut_percent: {prev_fr_ell} -> {fr_ell}"
+                assert fr_rec > prev_fr_rec, \
+                    f"fr_rec should increase with cut_percent: {prev_fr_rec} -> {fr_rec}"
+
+            prev_fr_ell = fr_ell
+            prev_fr_rec = fr_rec
+
+        prev_fr_ell = None
+        prev_fr_rec = None
+
+        for cut in cut_percents:
+            pn, qn, fr_ell, fr_rec = solver_3d._reg_geometry_hyp(cut_plane_percent=cut)
+
+            # Check fitted parameters are valid
+            assert np.isfinite(pn) and pn > 0
+            assert np.isfinite(qn) and qn > 0
+
+            # As cut_percent increases (less truncation), fr_ell and fr_rec should increase
+            if prev_fr_ell is not None:
+                assert fr_ell > prev_fr_ell, \
+                    f"fr_ell should increase with cut_percent: {prev_fr_ell} -> {fr_ell}"
+                assert fr_rec > prev_fr_rec, \
+                    f"fr_rec should increase with cut_percent: {prev_fr_rec} -> {fr_rec}"
+
+            prev_fr_ell = fr_ell
+            prev_fr_rec = fr_rec
+
+    def test_freq_factor_hyp(self, solver_2d):
+        """Test _freq_factor_hyp with Neumann BC."""
+        # Test parameters
+        hyp_degrees = [3, 5, 10, 20, 50, 100, 200, 1000]
+        f_rec = 1.0
+        f_ell = 2.0
+        c_eq = 3.0
+
+        for n_hyp in hyp_degrees:
+
+            f_hyp, c_reg = solver_2d._freq_factor_hyp(n_hyp, f_rec, f_ell,
+                                                      c_eq, bc="Neumann")
+
+            # Check results are positive and finite
+            assert np.isfinite(f_hyp) and f_hyp > 0
+            assert np.isfinite(c_reg) and c_reg > 0
+
+            # f_hyp should be between f_ell and f_rec
+            assert f_rec < f_hyp < f_ell
+
+        for n_hyp in hyp_degrees:
+
+            f_hyp, c_reg = solver_2d._freq_factor_hyp(n_hyp, f_rec, f_ell,
+                                                      c_eq, bc="Dirichlet")
+
+            # Check results are positive and finite
+            assert np.isfinite(f_hyp) and f_hyp > 0
+            assert np.isfinite(c_reg) and c_reg > 0
+
+            # f_hyp should be between f_ell and f_rec
+            assert f_rec < f_hyp < f_ell
