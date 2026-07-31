@@ -39,18 +39,15 @@ def _grid_velocity_data_to_source_function(grid_velocity_data, comm=None):
     source = fire.Function(source_space)
     source_coords = source_mesh.coordinates.dat.data
 
+    z_nodes = np.unique(source_coords[:, 0])
+    x_nodes = np.unique(source_coords[:, 1])
+    z_index = np.searchsorted(z_nodes, source_coords[:, 0])
+    x_index = np.searchsorted(x_nodes, source_coords[:, 1])
+
     if vp_values.ndim == 2:
-        z_nodes = np.unique(source_coords[:, 0])
-        x_nodes = np.unique(source_coords[:, 1])
-        z_index = np.searchsorted(z_nodes, source_coords[:, 0])
-        x_index = np.searchsorted(x_nodes, source_coords[:, 1])
         source.dat.data[:] = vp_values[z_index, x_index]
     else:
-        z_nodes = np.unique(source_coords[:, 0])
-        x_nodes = np.unique(source_coords[:, 1])
         y_nodes = np.unique(source_coords[:, 2])
-        z_index = np.searchsorted(z_nodes, source_coords[:, 0])
-        x_index = np.searchsorted(x_nodes, source_coords[:, 1])
         y_index = np.searchsorted(y_nodes, source_coords[:, 2])
         source.dat.data[:] = vp_values[z_index, x_index, y_index]
 
