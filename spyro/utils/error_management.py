@@ -112,7 +112,7 @@ def value_model_dimension_error(par_names, parameters, expected_dim):
         raise ValueError(dim_err)
 
 
-def clean_inst_num(data_arr, nan_values=True, inf_values=True, negative_values=True):
+def sanitize_num_array(data_arr, nan_values=True, inf_values=True, negative_values=True):
     """Set NaNs, infinities, and/or negative values to zero in an array.
 
     Parameters
