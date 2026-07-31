@@ -307,7 +307,7 @@ class FullWaveformInversion:
         Parameters
         ----------
         dictionary : dict, optional
-            Model and inversion configuration used to construct ``wave_class``
+            Model and inversion configuration used to construct ``Wave`` class
             when ``wave`` is not provided.
         comm : object, optional
             Communicator passed to ``wave_class`` when constructing the wave

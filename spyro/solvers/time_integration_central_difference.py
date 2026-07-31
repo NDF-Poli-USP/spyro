@@ -9,7 +9,7 @@ from ..utils.typing import FunctionalEvaluationMode, AdjointType, LayerDampingTy
 def _propagate_forward_central_difference(wave_obj, source_ids):
     """Advance the forward solve with the central-difference scheme.
 
-    This is an internal helper used by :meth:`Wave.wave_propagator`. It updates
+    This is an internal helper used by :meth:`wave.wave_propagator`. It updates
     the solver state in place.
 
     Parameters
