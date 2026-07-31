@@ -138,7 +138,7 @@ def preamble_habc(dictionary, edge_length):
 
     # Create the acoustic wave object with HABCs
     wave = habc.HABCLayer(dictionary=dictionary,
-                              output_folder="tests/inputfiles/")
+                          output_folder="tests/inputfiles/")
 
     # Mesh
     wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
@@ -256,8 +256,7 @@ def habc_fig8(wave, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     wave.get_reference_signal(foldername="")
 
     # Determining layer size
-    wave.size_habc_criterion(n_root=1,
-                                 layer_based_on_mesh=True)
+    wave.size_habc_criterion(n_root=1, layer_based_on_mesh=True)
 
     # Creating mesh with absorbing layer
     wave.create_mesh_habc()
@@ -286,7 +285,7 @@ def habc_fig8(wave, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
 
         # Plotting the solution at receivers and the error measures
         wave.comparison_plots(regression_xCR=True,
-                                  data_regr_xCR=dat_regr_xCR)
+                              data_regr_xCR=dat_regr_xCR)
 
 
 # @pytest.mark.slow

@@ -262,8 +262,9 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
         tRef = comp_cost("tini")
 
         # Computing fundamental frequency
-        wave.layer_ops.fundamental_frequency(wave, method=modal_solver,
-                                                 fitting_c=fitting_c)
+        wave.layer_ops.fundamental_frequency(
+            wave, method=modal_solver, fitting_c=fitting_c,
+        )
 
         # Estimating computational resource usage
         name_cost = wave.path_case_abc + modal_solver + "_"

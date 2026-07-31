@@ -727,11 +727,11 @@ def test_vector_mat_prop(wave_instance, cell_type):
 
     dummy = wave.set_material_property('dummy', 'vector', constant=0.)
     dummy.sub(0).assign(wave.set_material_property('dummy_z', 'scalar',
-                                                       constant=alphaT_o))
+                                                   constant=alphaT_o))
     dummy.sub(1).assign(wave.set_material_property('dummy_x', 'scalar',
-                                                       constant=2*alphaT_o))
+                                                   constant=2*alphaT_o))
     dummy.sub(2).assign(wave.set_material_property('dummy_y', 'scalar',
-                                                       constant=3*alphaT_o))
+                                                   constant=3*alphaT_o))
 
     # Different function space (DG0)
     alphaT_dg0 = wave.set_material_property(
@@ -802,8 +802,8 @@ def test_tensor_mat_prop(wave_instance, cell_type):
 
     # Tensor 6x6
     dummy = wave.set_material_property('dummy', 'tensor',
-                                           shape_func_space=shape_func_space,
-                                           constant=0.)
+                                       shape_func_space=shape_func_space,
+                                       constant=0.)
 
     entries = []
     for i in range(shape_func_space[0]):
@@ -825,15 +825,15 @@ def test_tensor_mat_prop(wave_instance, cell_type):
 
     # Same function space
     Celast = wave.set_material_property('Celast', 'tensor', fire_function=dummy,
-                                            shape_func_space=shape_func_space)
+                                        shape_func_space=shape_func_space)
 
     assert Celast is not None, "Failed to set Celast"
     print("Celast Verified: Tensorial function assign", flush=True)
 
     # Tensor 2x3
-    dummy = wave.set_material_property('dummy', 'tensor',
-                                           shape_func_space=(2, 3),
-                                           constant=0.)
+    dummy = wave.set_material_property(
+        'dummy', 'tensor', shape_func_space=(2, 3), constant=0.,
+    )
 
     compC_name = ['C11', 'C33', 'C44', 'C66', 'C12', 'C13']
     compC_val = as_tensor(((C11, C33, C44),
@@ -845,7 +845,7 @@ def test_tensor_mat_prop(wave_instance, cell_type):
         for j in range(3):
             val = float(compC_val[i, j])
             row.append(wave.set_material_property(compC_name[3 * i + j],
-                                                      'scalar', constant=val))
+                                                  'scalar', constant=val))
         entries.append(row)
     tensor_expr = as_tensor(entries)
 

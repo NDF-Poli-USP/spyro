@@ -115,7 +115,7 @@ def test_representative_mesh_dimensions(element_type, dimension):
     # Call the method and assign the outputs to the mesh_parameters object
     mesh_derived_parameters = \
         wave.mesh_ops.representative_mesh_dimensions(wave.mesh,
-                                                         wave.function_space)
+                                                     wave.function_space)
     wave.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
     wave.mesh_parameters.lmin = mesh_derived_parameters[1]
     wave.mesh_parameters.lmax = mesh_derived_parameters[2]

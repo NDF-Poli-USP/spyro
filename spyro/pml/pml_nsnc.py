@@ -283,8 +283,10 @@ class PMLLayer(ABCLayer):
         # Mesh coordinates including the absorbing layer
         domain_layer = wave.layer_ops.abc_domain_dimensions(full_hyp=False)
         ufl_coordinates_pml = \
-            wave.mesh_ops.get_spatial_coordinates_abc(wave.mesh,
-                                                             domain_layer)
+            wave.mesh_ops.get_spatial_coordinates_abc(
+                wave.mesh,
+                domain_layer,
+            )
 
         # Damping fields
         self.pml_sigma_field(wave, ufl_coordinates_pml, wave.function_space,

@@ -212,8 +212,9 @@ def run_tools(wave, method_extend, n_root=1):
         V, type_marker='mask', name_mask='test_mask')
 
     # Extracting nodes from the layer field
-    mask_nodes = wave.mesh_ops.extract_node_positions(wave.mesh, V,
-                                                          output_type="array")
+    mask_nodes = wave.mesh_ops.extract_node_positions(
+        wave.mesh, V, output_type="array",
+    )
     indlay_nodes = where(layer_mask.dat.data_with_halos == 1.)[0]
     pts_layer = mask_nodes[indlay_nodes]  # Inside layer
     pts_layer_xlt = pts_layer[pts_layer[:, 1] < 0.5]

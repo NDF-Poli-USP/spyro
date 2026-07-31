@@ -267,8 +267,9 @@ def run_modal(wave, fitting_c, exp_value, n_root=1):
         pprint((fit_str + "{:.3f}\n").format(*fitting_c), comm=comm)
 
         # Computing fundamental frequency
-        wave.layer_ops.fundamental_frequency(wave, method="ANALYTICAL",
-                                                 fitting_c=fitting_c)
+        wave.layer_ops.fundamental_frequency(
+            wave, method="ANALYTICAL", fitting_c=fitting_c,
+        )
 
         # Objective linearized function and its gradient
         # J = (wave.fundam_freq - exp_value)**2
