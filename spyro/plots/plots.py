@@ -83,8 +83,8 @@ def plot_shots(
 
     Examples
     --------
-    >>> plot_shots(wave_obj, show=True, file_name="my_shot", shot_ids=[0, 1])
-    >>> plot_shots(wave_obj, vmin=-1e-3, vmax=1e-3, file_format="png")
+    >>> plot_shots(wave, show=True, file_name="my_shot", shot_ids=[0, 1])
+    >>> plot_shots(wave, vmin=-1e-3, vmax=1e-3, file_format="png")
     """
     file_name = file_name + str(shot_ids) + "." + file_format
     num_recvs = wave.number_of_receivers

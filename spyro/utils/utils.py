@@ -355,7 +355,7 @@ class Mask():
     Create a mask to zero gradients below z=-5.0 and outside x=[0, 10]:
 
     >>> boundaries = {'z_min': -5.0, 'x_min': 0.0, 'x_max': 10.0}
-    >>> mask = Mask(boundaries, wave_obj)
+    >>> mask = Mask(boundaries, wave)
     >>> masked_gradient = mask.apply_mask(gradient)
     """
 
@@ -566,7 +566,7 @@ class Gradient_mask_for_pml(Mask):
 
     Examples
     --------
-    >>> gradient_mask = Gradient_mask_for_pml(wave_obj)
+    >>> gradient_mask = Gradient_mask_for_pml(wave)
     >>> masked_gradient = gradient_mask.apply_mask(gradient)
     """
 
@@ -617,7 +617,7 @@ def write_hdf5_velocity_model(obj_with_comm, segy_filename):
 
     Examples
     --------
-    >>> output_file = write_hdf5_velocity_model(wave_obj, "velocity.segy")
+    >>> output_file = write_hdf5_velocity_model(wave, "velocity.segy")
     >>> print(output_file)
     'velocity.hdf5'
     """

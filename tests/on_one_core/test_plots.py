@@ -107,9 +107,9 @@ def test_plot_mesh_sizes():
 
 
 def test_plot_model_in_p1():
-    wave_obj = get_wave_obj()
+    wave = get_wave_obj()
     filename = "model_p1.png"
-    spyro.plots.plot_model_in_p1(wave_obj, filename=str(filename), show=False)
+    spyro.plots.plot_model_in_p1(wave, filename=str(filename), show=False)
     assert os.path.exists(str(filename))
 
 
