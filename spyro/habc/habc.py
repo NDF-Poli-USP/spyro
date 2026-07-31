@@ -106,14 +106,14 @@ class HABCLayer(ABCLayer, HABC_Damping):
                           abc_degree_type=abc_degree_type, abc_deg_layer=abc_deg_layer,
                           output_folder=output_folder, comm=comm)
 
-    def fundamental_frequency(self, Wave, method=None, fitting_c=(0., 0., 0., 0.)):
+    def fundamental_frequency(self, wave, method=None, fitting_c=(0., 0., 0., 0.)):
         """Compute the fundamental frequency in Hz via modal analysis.
 
         Considering the numerical model with Neumann BCs.
 
         Parameters
         ----------
-        Wave : `wave.Wave`
+        wave : `wave.Wave`
             An instance of the :class:`~spyro.solvers.wave.Wave`.
         method : `str`, optional
             Method to use for solving the eigenvalue problem.
@@ -227,12 +227,12 @@ class HABCLayer(ABCLayer, HABC_Damping):
             cut_plane_percent = z_cut / self.layer_geometry.hyper_axes[1]
 
             Lsp = mod_sol.solve_eigenproblem(
-                Wave.c, V=Wave.function_space, quad_rule=Wave.quadrature_rule,
+                wave.c, V=wave.function_space, quad_rule=wave.quadrature_rule,
                 hyp_par=hyp_par, cut_plane_percent=cut_plane_percent,
-                c_ref=Wave.initial_velocity_model,
-                V_ref=Wave.mesh_parameters.funct_space_eik,
-                dof_load=Wave.sources.cellNodeMaps.flatten().astype(int),
-                amplitude_load=Wave.sources.cell_tabulations.flatten(),
+                c_ref=wave.initial_velocity_model,
+                V_ref=wave.mesh_parameters.funct_space_eik,
+                dof_load=wave.sources.cellNodeMaps.flatten().astype(int),
+                amplitude_load=wave.sources.cell_tabulations.flatten(),
                 fitting_c=fitting_c)
 
         elif method == 'RAYLEIGH':
@@ -240,17 +240,17 @@ class HABCLayer(ABCLayer, HABC_Damping):
             # Domain dimensions with free surface truncation
             dom_layer_trunc = self.abc_domain_dimensions(full_hyp=False)
             ufl_coordinates_habc, min_coords, max_coords = \
-                Wave.mesh_ops.get_spatial_coordinates_abc(Wave.mesh, dom_layer_trunc,
+                wave.mesh_ops.get_spatial_coordinates_abc(wave.mesh, dom_layer_trunc,
                                                           return_mesh_limits=True)
 
-            Lsp = mod_sol.solve_eigenproblem(Wave.c, V=Wave.function_space,
-                                             quad_rule=Wave.quadrature_rule,
+            Lsp = mod_sol.solve_eigenproblem(wave.c, V=wave.function_space,
+                                             quad_rule=wave.quadrature_rule,
                                              ufl_coordinates=ufl_coordinates_habc,
                                              mesh_limits=(min_coords, max_coords))
 
         else:
-            Lsp = mod_sol.solve_eigenproblem(Wave.c, V=Wave.function_space, shift=1e-8,
-                                             quad_rule=Wave.quadrature_rule)
+            Lsp = mod_sol.solve_eigenproblem(wave.c, V=wave.function_space, shift=1e-8,
+                                             quad_rule=wave.quadrature_rule)
 
         for n_eig, eigval in enumerate(unique(Lsp)):
             f_eig = sqrt(abs(eigval)) / (2 * pi)
@@ -258,10 +258,10 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
         # Fundamental frequency (eig = 0 is a rigid body motion)
         min_eigval = max(unique(Lsp[(Lsp > 0.) & (imag(Lsp) == 0.)]))
-        Wave.fundam_freq = real(sqrt(min_eigval) / (2 * pi))
-        pprint(f"Fundamental Frequency (Hz): {Wave.fundam_freq:.5f}", comm=self.comm)
+        wave.fundam_freq = real(sqrt(min_eigval) / (2 * pi))
+        pprint(f"Fundamental Frequency (Hz): {wave.fundam_freq:.5f}", comm=self.comm)
 
-    # def damping_layer(self, Wave, xCR_usu=None, method=None,
+    # def damping_layer(self, wave, xCR_usu=None, method=None,
     #                   fitting_c=(0., 0., 0., 0.), save_file=True):
     #     """Set the damping profile within the absorbing layer.
 
@@ -273,7 +273,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     #     Parameters
     #     ----------
-    #     Wave : `acoustic_wave.AcousticWave`
+    #     wave : `acoustic_wave.AcousticWave`
     #         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
     #     xCR_usu : `float`, optional
     #         User-defined heuristic factor for the minimum damping ratio.
@@ -313,10 +313,10 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     pprint("\nBuilding Mask for Damping Profile", comm=self.comm)
 
     #     # Damping mask
-    #     V_mask = create_function_space(Wave.mesh, "DG0", 0)
-    #     ufl_coordinates_habc = Wave.mesh_ops.get_spatial_coordinates_abc(Wave.mesh,
+    #     V_mask = create_function_space(wave.mesh, "DG0", 0)
+    #     ufl_coordinates_habc = wave.mesh_ops.get_spatial_coordinates_abc(wave.mesh,
     #                                                                      domain_layer)
-    #     self.eta_mask = layer_mask_field(self.domain_dim, Wave.mesh, self.dimension,
+    #     self.eta_mask = layer_mask_field(self.domain_dim, wave.mesh, self.dimension,
     #                                      ufl_coordinates_habc, V_mask, damp_par=None,
     #                                      type_marker='mask', name_mask='eta_mask')
 
@@ -332,8 +332,8 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     layer_par = (self.factor_length_pad, self.a_par, self.d_norm)
 
     #     # mesh parameters
-    #     mesh_par = (Wave.mesh_parameters.lmin, Wave.mesh_parameters.lmax,
-    #                 Wave.mesh_parameters.alpha, Wave.variant)
+    #     mesh_par = (wave.mesh_parameters.lmin, wave.mesh_parameters.lmax,
+    #                 wave.mesh_parameters.alpha, wave.variant)
 
     #     # wave parameters
     #     c_ref = min([bnd[1] for bnd in self.eik_bnd])
@@ -345,7 +345,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #                           dimension=self.dimension, comm=self.comm)
 
     #     # Estimating fundamental frequency
-    #     self.fundamental_frequency(Wave, method=method, fitting_c=fitting_c)
+    #     self.fundamental_frequency(wave, method=method, fitting_c=fitting_c)
 
     #     pprint("\nCreating Damping Profile", comm=self.comm)
 
@@ -358,8 +358,8 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     #     # Damping field
     #     damp_par = (self.abc_pad_length, eta_crt, aq, bq)
-    #     self.eta_habc = layer_mask_field(self.domain_dim, Wave.mesh, self.dimension,
-    #                                      ufl_coordinates_habc, Wave.function_space,
+    #     self.eta_habc = layer_mask_field(self.domain_dim, wave.mesh, self.dimension,
+    #                                      ufl_coordinates_habc, wave.function_space,
     #                                      damp_par=damp_par, type_marker='damping',
     #                                      name_mask='eta[1/s])')
 

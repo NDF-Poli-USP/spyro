@@ -217,33 +217,33 @@ dictionary["visualization"] = {
 
 
 # Create an AcousticWave object with the above dictionary.
-Wave_obj = spyro.AcousticWave(dictionary=dictionary)
+wave = spyro.AcousticWave(dictionary=dictionary)
 
 # Defines the element size in the automatically generated firedrake mesh.
-Wave_obj.set_mesh(dx=0.01)
+wave.set_mesh(dx=0.01)
 
 
 # Manually create a simple two layer seismic velocity model.
 # Note: the user can specify their own velocity model in a HDF5 or SEG-Y file format.
 # The HDF5 file has to contain an array with
 # the velocity data and it is linearly interpolated onto the mesh nodes at run-time.
-z = Wave_obj.mesh_z
+z = wave.mesh_z
 import firedrake as fire
 velocity_conditional = fire.conditional(z > -0.35, 1.5, 3.0)
-Wave_obj.set_initial_velocity_model(conditional=velocity_conditional, output=True)
+wave.set_initial_velocity_model(conditional=velocity_conditional, output=True)
 
 # And now we simulate the shot using a 2nd order central time-stepping scheme
 # Note: simulation results are stored in the folder `~/results/` by default
-Wave_obj.forward_solve()
+wave.forward_solve()
 
 # Visualize the shot record
-spyro.plots.plot_shots(Wave_obj, show=True)
+spyro.plots.plot_shots(wave, show=True)
 
 # Save the shot (a Numpy array) as a pickle for other use.
-spyro.io.save_shots(Wave_obj)
+spyro.io.save_shots(wave)
 
 # can be loaded back via
-my_shot = spyro.io.load_shots(Wave_obj)
+my_shot = spyro.io.load_shots(wave)
 ```
 
 ### Testing

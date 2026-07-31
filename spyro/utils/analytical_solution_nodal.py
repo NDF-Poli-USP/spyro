@@ -3,14 +3,14 @@ from scipy.special import hankel2
 from ..sources import full_ricker_wavelet
 
 
-def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
+def nodal_homogeneous_analytical(wave, offset, c_value, n_extra=5000):
     """
     This function calculates the analytical solution for an homogeneous
     medium with a single source and receiver.
 
     Parameters
     ----------
-    Wave_object: spyro.Wave
+    wave: spyro.Wave
         Wave object
     offset: float
         Offset between source and receiver.
@@ -26,15 +26,15 @@ def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
     """
 
     # Generating extended ricker wavelet
-    dt = Wave_object.dt
-    final_time = Wave_object.final_time
+    dt = wave.dt
+    final_time = wave.final_time
     num_t = int(final_time / dt + 1)
 
     extended_final_time = n_extra * final_time
 
-    frequency = Wave_object.frequency
-    delay = Wave_object.delay
-    delay_type = Wave_object.delay_type
+    frequency = wave.frequency
+    delay = wave.delay
+    delay_type = wave.delay_type
 
     ricker_wavelet = full_ricker_wavelet(
         dt=dt,

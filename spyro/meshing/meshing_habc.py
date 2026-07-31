@@ -250,12 +250,12 @@ class HABCMesh(MeshOps):
 
         return funct_space_eik
 
-    def preamble_mesh_operations(self, Wave, ele_type_eik='consistent', f_est=0.03):
+    def preamble_mesh_operations(self, wave, ele_type_eik='consistent', f_est=0.03):
         """Perform mesh operations previous to size an absorbing layer.
 
         Parameters
         ----------
-        Wave : `wave.Wave`
+        wave : `wave.Wave`
             An instance of the :class:`~spyro.solvers.wave.Wave` with attributes:
             abc_deg_eikonal : `int`
                 Finite element order for the Eikonal analysis.
@@ -298,35 +298,35 @@ class HABCMesh(MeshOps):
         pprint("\nCreating Mesh and Initial Velocity Model", comm=self.comm)
 
         # Mesh data
-        pprint(f"Original Mesh with {Wave.mesh.num_vertices()} Nodes "
-               f"and {Wave.mesh.num_cells()} Volume Elements", comm=self.comm)
+        pprint(f"Original Mesh with {wave.mesh.num_vertices()} Nodes "
+               f"and {wave.mesh.num_cells()} Volume Elements", comm=self.comm)
 
         # Save a copy of the original mesh
-        Wave.mesh_original = Wave.mesh
-        mesh_orig = fire.VTKFile(Wave.path_save + "preamble/mesh_orig.pvd")
-        mesh_orig.write(Wave.mesh_original)
+        wave.mesh_original = wave.mesh
+        mesh_orig = fire.VTKFile(wave.path_save + "preamble/mesh_orig.pvd")
+        mesh_orig.write(wave.mesh_original)
 
         # Velocity profile model
-        Wave.c, Wave.c_min, Wave.c_max = self.creating_velocity_profile(
-            Wave.function_space, Wave.initial_velocity_model, Wave.path_save)
+        wave.c, wave.c_min, wave.c_max = self.creating_velocity_profile(
+            wave.function_space, wave.initial_velocity_model, wave.path_save)
 
         # Generating boundary data from the original domain mesh
-        Wave.c_bnd_min, Wave.c_bnd_max, \
+        wave.c_bnd_min, wave.c_bnd_max, \
             self.coord_bnd_nodes = self.original_boundary_data(
-                Wave.mesh, Wave.function_space,
-                Wave.mesh_parameters, Wave.initial_velocity_model)
+                wave.mesh, wave.function_space,
+                wave.mesh_parameters, wave.initial_velocity_model)
 
         # Setting the properties of the mesh used to solve the Eikonal equation
-        Wave.mesh_parameters.degree_eik = Wave.degree if not hasattr(
-            Wave, 'abc_deg_eikonal') else Wave.abc_deg_eikonal
-        Wave.mesh_parameters.ele_type_eik = ele_type_eik
+        wave.mesh_parameters.degree_eik = wave.degree if not hasattr(
+            wave, 'abc_deg_eikonal') else wave.abc_deg_eikonal
+        wave.mesh_parameters.ele_type_eik = ele_type_eik
 
         # Factor for the stabilizing term in Eikonal equation
-        Wave.mesh_parameters.f_est = f_est
+        wave.mesh_parameters.f_est = f_est
 
         # Function space for Eikonal modeling
-        Wave.mesh_parameters.funct_space_eik = self.create_function_space_eik(
-            Wave.mesh, Wave.mesh_parameters.degree_eik, ele_type_eik=ele_type_eik)
+        wave.mesh_parameters.funct_space_eik = self.create_function_space_eik(
+            wave.mesh, wave.mesh_parameters.degree_eik, ele_type_eik=ele_type_eik)
 
     @staticmethod
     def bnd_pnts_hyp_2D(a, b, n, num_pts):
