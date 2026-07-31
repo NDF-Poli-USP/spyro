@@ -18,32 +18,32 @@ from spyro.utils.error_management import type_firedrake_error
 class TestModalAnalyticalSolver:
     """Test suite for Modal_Analytical_Solver class."""
 
-    @ fixture
+    @fixture
     def solver_2d(self):
         """Create a 2D solver instance."""
         return Modal_Analytical_Solver(dimension=2)
 
-    @ fixture
+    @fixture
     def solver_3d(self):
         """Create a 3D solver instance."""
         return Modal_Analytical_Solver(dimension=3)
 
-    @ fixture
+    @fixture
     def mesh_2d(self):
         """Create a 2D mesh."""
         return UnitSquareMesh(4, 4)
 
-    @ fixture
+    @fixture
     def mesh_3d(self):
         """Create a 3D mesh."""
         return UnitCubeMesh(4, 4, 4)
 
-    @ fixture
+    @fixture
     def V_2d(self, mesh_2d):
         """Create a 2D function space."""
         return FunctionSpace(mesh_2d, "KMV", 4)
 
-    @ fixture
+    @fixture
     def V_3d(self, mesh_3d):
         """Create a 3D function space."""
         return FunctionSpace(mesh_3d, "KMV", 3)
@@ -499,9 +499,9 @@ class TestModalAnalyticalSolver:
             # Create a different function space for reference
             V_ref = FunctionSpace(mesh, "CG", 3)
 
-            q_dummy, q_ref = solver_2d.dummy_load_static(V, dof_load,
-                                                         amplitude_load,
-                                                         V_ref=V_ref)
+            q_dummy, q_ref = solver.dummy_load_static(V, dof_load,
+                                                      amplitude_load,
+                                                      V_ref=V_ref)
 
             # q_dummy should be in V
             assert type_firedrake_error("q_dummy", q_dummy, "Function")
