@@ -150,8 +150,9 @@ class Read_boundary_layer:
     @abc_pml_exponent.setter
     def abc_pml_exponent(self, value):
         """Set the exponent for the polynomial damping profile in PML with validation."""
-        pml_exponent = value_numerical_error("abc_pml_exponent", value, integer_num=True,
-                                             lower_bound=1, include_lower_bound=True)
+        pml_exponent = value_numerical_error("abc_pml_exponent", value, float_num=False,
+                                             integer_num=True, lower_bound=1,
+                                             include_lower_bound=True)
         self._abc_pml_exponent = pml_exponent
 
     @property
@@ -161,7 +162,8 @@ class Read_boundary_layer:
     @abc_pml_R.setter
     def abc_pml_R(self, value):
         """Set the theoretical reflection coefficient in the PML layer with validation."""
-        pml_R = value_numerical_error("abc_pml_R", value, float_num=True, lower_bound=0.)
+        pml_R = value_numerical_error("abc_pml_R", value, float_num=True,
+                                      integer_num=False, lower_bound=0.)
         self._abc_pml_R = pml_R
 
     @property
@@ -265,6 +267,7 @@ class Read_boundary_layer:
             self.abc_user_pad_len = False
         else:
             pad_length = value_numerical_error("abc_pad_length", value, float_num=True,
-                                               integer_num=True, lower_bound=0.)
+                                               integer_num=True, lower_bound=0.,
+                                               include_lower_bound=True)
             pprint(f"Pad length provided by user (km): {pad_length:.4f}", comm=self.comm)
         self._abc_pad_length = pad_length
