@@ -80,7 +80,16 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         wave_obj.automated_adjoint.start_recording()
 
-    for step in range(nt):
+    checkpointed_tape = None
+    steps = range(nt)
+    if (
+        adjoint_type == AdjointType.AUTOMATED_ADJOINT
+        and wave_obj.automated_adjoint.checkpointing
+    ):
+        checkpointed_tape = wave_obj.automated_adjoint._tape
+        steps = checkpointed_tape.timestepper(iter(steps))
+
+    for step in steps:
         # Basic way of applying sources
         wave_obj.update_source_expression(t)
 
@@ -153,6 +162,9 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
             )
 
         t = step * float(wave_obj.dt)
+
+    if checkpointed_tape is not None:
+        checkpointed_tape.end_timestep()
 
     wave_obj.current_time = t
 
