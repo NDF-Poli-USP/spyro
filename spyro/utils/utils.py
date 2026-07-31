@@ -47,7 +47,7 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
 
 @ensemble_functional
 def compute_functional(
-    wave_object, misfit, evaluation_mode=FunctionalEvaluationMode.AFTER_SOLVE, step=None, nsteps=None,
+    wave, misfit, evaluation_mode=FunctionalEvaluationMode.AFTER_SOLVE, step=None, nsteps=None,
     functional_form=FunctionalType.L2Norm
 ):
     """Compute the functional value for the given misfit at receiver
@@ -59,7 +59,7 @@ def compute_functional(
 
     Parameters
     ----------
-    wave_object : object
+    wave : object
         Wave propagation object containing simulation parameters.
         Must have attributes:
         - number_of_receivers : int
@@ -99,20 +99,20 @@ def compute_functional(
     if evaluation_mode == FunctionalEvaluationMode.PER_TIMESTEP:
         weight = 0.5 if step == 0 or step == nsteps - 1 else 1.0
 
-        if wave_object.use_vertex_only_mesh:
+        if wave.use_vertex_only_mesh:
             return assemble(
-                0.5 * wave_object.dt * weight
+                0.5 * wave.dt * weight
                 * inner(misfit, misfit) * dx
             )
         elif isinstance(misfit, np.ndarray):
-            return np.sum(misfit**2) * (0.5 * wave_object.dt * weight)
+            return np.sum(misfit**2) * (0.5 * wave.dt * weight)
         else:
             raise ValueError(
                 "Expected misfit to be a numpy array when not using vertex-only mesh."
             )
 
-    num_receivers = wave_object.number_of_receivers
-    dt = wave_object.dt
+    num_receivers = wave.number_of_receivers
+    dt = wave.dt
 
     J = 0
     for rn in range(num_receivers):
@@ -641,13 +641,13 @@ def write_hdf5_velocity_model(obj_with_comm, segy_filename):
 #     )
 #     return p
 
-def get_real_shot_record(wave_object):
+def get_real_shot_record(wave):
     """Get the real shot record for the active sources.
 
     The returned object is typically an array with shape
     ``(n_timesteps, n_receivers)`` for a single active shot.
     """
-    real_shot_record = wave_object.real_shot_record
+    real_shot_record = wave.real_shot_record
 
     if real_shot_record is None:
         raise ValueError(
@@ -656,8 +656,8 @@ def get_real_shot_record(wave_object):
         )
 
     if (
-        not isinstance(wave_object.current_sources, (list, tuple))
-        or len(wave_object.current_sources) == 0
+        not isinstance(wave.current_sources, (list, tuple))
+        or len(wave.current_sources) == 0
     ):
         raise ValueError(
             "Current sources must be set to a non-empty list or tuple "
@@ -666,16 +666,16 @@ def get_real_shot_record(wave_object):
 
     if isinstance(real_shot_record, np.ndarray):
         if real_shot_record.ndim == 3:
-            return real_shot_record[wave_object.current_sources[0]]
+            return real_shot_record[wave.current_sources[0]]
         if real_shot_record.ndim == 2:
             return real_shot_record
 
     if isinstance(real_shot_record, (list, tuple)):
         if (
-            wave_object.current_sources is not None
-            and len(real_shot_record) > wave_object.current_sources[0]
+            wave.current_sources is not None
+            and len(real_shot_record) > wave.current_sources[0]
         ):
-            source_record = real_shot_record[wave_object.current_sources[0]]
+            source_record = real_shot_record[wave.current_sources[0]]
             if isinstance(source_record, np.ndarray) and source_record.ndim == 2:
                 return source_record
 

@@ -163,7 +163,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
     close()
 
 
-# def plot_hist_receivers(wave_object, show=False):
+# def plot_hist_receivers(wave, show=False):
 #     """Plot time-domain receiver response comparison.
 
 #     Creates a multi-panel plot comparing the time-domain response at each
@@ -203,8 +203,8 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 #     print("\nPlotting Time Comparison", flush=True)
 
 #     # Time data
-#     dt = wave_object.dt
-#     tf = wave_object.final_time
+#     dt = wave.dt
+#     tf = wave.final_time
 #     nt = int(round(tf / dt)) + 1  # number of timesteps
 #     t_rec = linspace(0., tf, nt)
 
@@ -212,7 +212,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 #     rcParams['font.size'] = 7
 
 #     # Setting subplots
-#     num_recvs = wave_object.number_of_receivers
+#     num_recvs = wave.number_of_receivers
 #     rcParams['axes.grid'] = True
 #     fig, axes = subplots(nrows=num_recvs, ncols=1)
 #     fig.subplots_adjust(hspace=0.6)
@@ -224,8 +224,8 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 #     for rec in range(num_recvs):
 
 #         # Plot the receiver data
-#         rc_dat = wave_object.forward_solution_receivers[:, rec]
-#         rf_dat = wave_object.receivers_reference[:, rec]
+#         rc_dat = wave.forward_solution_receivers[:, rec]
+#         rf_dat = wave.receivers_reference[:, rec]
 #         axes[rec].plot(t_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
 #         axes[rec].plot(t_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
 
@@ -251,14 +251,14 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 #             axes[rec].set_xlabel(r'$t \; (s)$')
 
 #     # Saving the plot
-#     time_str = wave_object.path_case_abc + "time"
+#     time_str = wave.path_case_abc + "time"
 #     savefig(time_str + ".png", bbox_inches='tight')
 #     savefig(time_str + ".pdf", bbox_inches='tight')
 #     plt_show() if show else None
 #     close()
 
 
-# def plot_rfft_receivers(wave_object, factor_xlim=4., show=False):
+# def plot_rfft_receivers(wave, factor_xlim=4., show=False):
 #     """Plot frequency-domain receiver response comparison.
 
 #     Creates a multi-panel plot comparing the normalized frequency-domain
@@ -306,9 +306,9 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 #     print("\nPlotting Frequency Comparison", flush=True)
 
 #     # Frequency data
-#     freq_Nyq = wave_object.freq_Nyq
-#     freq_sou = wave_object.frequency
-#     samples_fft = wave_object.receivers_out_fft.shape[0] - 1
+#     freq_Nyq = wave.freq_Nyq
+#     freq_sou = wave.frequency
+#     samples_fft = wave.receivers_out_fft.shape[0] - 1
 #     df = freq_Nyq / samples_fft
 #     limf = round(clip(factor_xlim * freq_sou, 2 * freq_sou, freq_Nyq), 1)
 #     idx_lim = int(limf / df) + 1
@@ -318,7 +318,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 #     rcParams['font.size'] = 7
 
 #     # Setting subplots
-#     num_recvs = wave_object.number_of_receivers
+#     num_recvs = wave.number_of_receivers
 #     rcParams['axes.grid'] = True
 #     fig, axes = subplots(nrows=num_recvs, ncols=1)
 #     fig.subplots_adjust(hspace=0.6)
@@ -330,17 +330,17 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 #     for rec in range(num_recvs):
 
 #         # Plot the receiver data
-#         rc_dat = wave_object.receivers_out_fft[:idx_lim, rec]
-#         rf_dat = wave_object.receivers_ref_fft[:idx_lim, rec]
+#         rc_dat = wave.receivers_out_fft[:idx_lim, rec]
+#         rf_dat = wave.receivers_ref_fft[:idx_lim, rec]
 #         axes[rec].plot(f_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
 #         axes[rec].plot(f_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
 
 #         # Add a vertical line at f_ref and freq_sou
-#         if freq_sou == wave_object.freq_ref:
+#         if freq_sou == wave.freq_ref:
 #             f_ref = freq_sou
 #             f_str = r'$f_{ref} = f_{sou}$'
 #         else:
-#             f_ref = wave_object.freq_ref
+#             f_ref = wave.freq_ref
 #             f_str = r'$f_{ref}$'
 #             axes[rec].axvline(x=freq_sou, color='black', linestyle='-', linewidth=1.25)
 
@@ -373,17 +373,17 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 #             axes[rec].text(
 #                 freq_sou + limf / 500., axes[rec].get_ylim()[0] * 1.05, r'$f_{sou}$',
 #                 color='black', fontsize=8, fontweight='bold', ha='left',
-#                 va='bottom') if freq_sou != wave_object.freq_ref else None
+#                 va='bottom') if freq_sou != wave.freq_ref else None
 
 #     # Saving the plot
-#     time_str = wave_object.path_case_abc + "freq"
+#     time_str = wave.path_case_abc + "freq"
 #     savefig(time_str + ".png", bbox_inches='tight')
 #     savefig(time_str + ".pdf", bbox_inches='tight')
 #     plt_show() if show else None
 #     close()
 
 
-# def plot_xCR_opt(wave_object, data_regr_xCR, show=False):
+# def plot_xCR_opt(wave, data_regr_xCR, show=False):
 #     """Plot the regression curve for the optimal xCR parameter.
 
 #     Creates a plot showing the quadratic regression of integral and peak
@@ -393,7 +393,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 
 #     Parameters
 #     ----------
-#     wave_object: `wave`
+#     wave: `wave`
 #         The Wave object containing the simulation results and configuration.
 #         Must have attributes:
 #         - xCR_bounds: Bounds for the xCR parameter
@@ -452,7 +452,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 #          label=r'Peak Error: ' + eq_str_eP)
 
 #     # xCR limits
-#     xCR_inf, xCR_sup = wave_object.xCR_lim
+#     xCR_inf, xCR_sup = wave.xCR_lim
 
 #     # Regression curves
 #     xgraf = linspace(xCR_inf, xCR_sup, int((xCR_sup - xCR_inf) / 0.1))
@@ -489,7 +489,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 #     ylabel(r'$e_I \; | \; e_P \; (\%)$')
 
 #     # Saving the plot
-#     xcr_str = wave_object.path_case_abc + "xCR"
+#     xcr_str = wave.path_case_abc + "xCR"
 #     savefig(xcr_str + '.png', bbox_inches='tight')
 #     savefig(xcr_str + '.pdf', bbox_inches='tight')
 #     plt_show() if show else None
