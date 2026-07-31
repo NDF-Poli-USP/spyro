@@ -51,54 +51,54 @@ class TestModalAnalyticalSolver:
     def test_freq_factor_rec_dirichlet_2d(self, solver_2d):
         """Test _freq_factor_rec with Dirichlet BC for 2D rectangle."""
         # Test cases: (hyper_axes, expected_result)
-        factor = np.pi / 2
+        factor = pi / 2
         test_cases = [
             # Rectangle
-            ((1., 5.), factor * np.sqrt(1/1.**2 + 1/5.**2)),
+            ((1., 5.), factor * sqrt(1/1.**2 + 1/5.**2)),
             # Square
-            ((2., 2.), factor * np.sqrt(2 * (1/2.**2))),
+            ((2., 2.), factor * sqrt(2 * (1/2.**2))),
             # Large dimensions
-            ((2e3, 1e3), factor * np.sqrt(1 / 2e3**2 + 1 / 1e3**2)),
+            ((2e3, 1e3), factor * sqrt(1 / 2e3**2 + 1 / 1e3**2)),
             # Small dimensions
-            ((1e-3, 2e-3), factor * np.sqrt(1 / 1e-3**2 + 1 / 2e-3**2)),
+            ((1e-3, 2e-3), factor * sqrt(1 / 1e-3**2 + 1 / 2e-3**2)),
             # Dissimilar dimensions
-            ((1e-3, 1e3), factor * np.sqrt(1/1e-3**2 + 1/1e3**2)),
+            ((1e-3, 1e3), factor * sqrt(1/1e-3**2 + 1/1e3**2)),
             # Irrational values
-            ((1./3., 1./7.), factor * np.sqrt(1/(1./3.)**2 + 1/(1./7.)**2)),
+            ((1./3., 1./7.), factor * sqrt(1/(1./3.)**2 + 1/(1./7.)**2)),
         ]
 
         for hyper_axes, expected in test_cases:
             f_rec = solver_2d._freq_factor_rec(hyper_axes, bc="Dirichlet")
-            np.testing.assert_almost_equal(f_rec, expected, decimal=10,
-                                           err_msg=f"Failed for hyper_axes={hyper_axes}")
+            assert_almost_equal(f_rec, expected, decimal=10,
+                                err_msg=f"Failed for hyper_axes={hyper_axes}")
 
     def test_freq_factor_rec_dirichlet_3d(self, solver_3d):
         """Test _freq_factor_rec with Dirichlet BC for 3D prism."""
         # Test cases: (hyper_axes, expected_result)
-        factor = np.pi / 2
+        factor = pi / 2
         test_cases = [
             # Prism
-            ((2., 3., 4.), factor * np.sqrt(1/2.**2 + 1/3.**2 + 1/4.**2)),
+            ((2., 3., 4.), factor * sqrt(1/2.**2 + 1/3.**2 + 1/4.**2)),
             # Cube
-            ((2., 2., 2.), factor * np.sqrt(3 * (1/2.**2))),
+            ((2., 2., 2.), factor * sqrt(3 * (1/2.**2))),
             # Long prism
-            ((1.0, 2.0, 10.), factor * np.sqrt(1/1.**2 + 1/2.**2 + 1/10.**2)),
+            ((1.0, 2.0, 10.), factor * sqrt(1/1.**2 + 1/2.**2 + 1/10.**2)),
             # Short prism
-            ((10., 10., 1.), factor * np.sqrt(2 * (1/10.**2) + 1/1.**2)),
+            ((10., 10., 1.), factor * sqrt(2 * (1/10.**2) + 1/1.**2)),
             # Large dimensions
-            ((2e3, 1e3, 4e3), factor * np.sqrt(1 / 2e3**2 + 1 / 1e3**2 + 1 / 4e3**2)),
+            ((2e3, 1e3, 4e3), factor * sqrt(1 / 2e3**2 + 1 / 1e3**2 + 1 / 4e3**2)),
             # Small dimensions
-            ((1e-3, 2e-3, 1e-4), factor * np.sqrt(1 / 1e-3**2 + 1 / 2e-3**2 + 1 / 1e-4**2)),
+            ((1e-3, 2e-3, 1e-4), factor * sqrt(1 / 1e-3**2 + 1 / 2e-3**2 + 1 / 1e-4**2)),
             # Dissimilar dimensions
-            ((1e-3, 1e3, 5), factor * np.sqrt(1/1e-3**2 + 1/1e3**2 + 1/5**2)),
+            ((1e-3, 1e3, 5), factor * sqrt(1/1e-3**2 + 1/1e3**2 + 1/5**2)),
             # Irrational values
-            ((1./3., 1./7., 1/9.), factor * np.sqrt(1/(1./3.)**2 + 1/(1./7.)**2 + 1/(1/9.)**2))
+            ((1./3., 1./7., 1/9.), factor * sqrt(1/(1./3.)**2 + 1/(1./7.)**2 + 1/(1/9.)**2))
         ]
 
         for hyper_axes, expected in test_cases:
             f_rec = solver_3d._freq_factor_rec(hyper_axes, bc="Dirichlet")
-            np.testing.assert_almost_equal(f_rec, expected, decimal=10,
-                                           err_msg=f"Failed for hyper_axes={hyper_axes}")
+            assert_almost_equal(f_rec, expected, decimal=10,
+                                err_msg=f"Failed for hyper_axes={hyper_axes}")
 
     def test_freq_factor_rec_dirichlet_vs_neumann(self, solver_2d):
         """Compare Dirichlet and Neumann BC results."""
@@ -116,7 +116,7 @@ class TestModalAnalyticalSolver:
 
         # For a square: Dirichlet = pi/2 * sqrt(2)/a, Neumann = pi/(2a)
         # So Dirichlet/Neumann = sqrt(2)
-        np.testing.assert_almost_equal(dir_square / neu_square, np.sqrt(2), decimal=10)
+        assert_almost_equal(dir_square / neu_square, sqrt(2), decimal=10)
 
     def test_freq_factor_ell_dirichlet_2d_circular(self, solver_2d):
         """Test _freq_factor_ell with Dirichlet BC for 2D circular membrane.
@@ -133,15 +133,15 @@ class TestModalAnalyticalSolver:
             (3.0, J01 / 3.0),
             (0.5, J01 / 0.5),
             (10.0, J01 / 10.0),
-            (np.pi, J01 / np.pi),
+            (pi, J01 / pi),
         ]
 
         for radius, expected in test_cases:
             hyper_axes = (radius, radius)  # Equal axes = circle
             f_cir = solver_2d._freq_factor_ell(hyper_axes, bc="Dirichlet",
                                                all_axes_equal=True)
-            np.testing.assert_almost_equal(f_cir, expected, decimal=10,
-                                           err_msg=f"Failed for radius={radius}")
+            assert_almost_equal(f_cir, expected, decimal=10,
+                                err_msg=f"Failed for radius={radius}")
 
     def test_freq_factor_ell_dirichlet_2d_elliptical(self, solver_2d):
         """Test _freq_factor_ell with Dirichlet BC for 2D elliptical membrane.
@@ -168,7 +168,7 @@ class TestModalAnalyticalSolver:
         for hyper_axes in test_cases:
             # Get result and verify it's a positive finite number
             f_ell = solver_2d._freq_factor_ell(hyper_axes, bc="Dirichlet")
-            assert np.isfinite(f_ell) and f_ell > 0.
+            assert isfinite(f_ell) and f_ell > 0.
 
             # Compare with rectangular case
             a, b = hyper_axes
@@ -212,7 +212,7 @@ class TestModalAnalyticalSolver:
                                                all_axes_equal=True)
 
             # Verify f_cir is positive and finite
-            assert np.isfinite(f_cir) and f_cir > 0.
+            assert isfinite(f_cir) and f_cir > 0.
 
             # For sphere, frequency factor should scale as 1/a
             if radius == 1.:
@@ -220,7 +220,7 @@ class TestModalAnalyticalSolver:
             else:
                 # For same problem, f_ell * a should be constant
                 ratio = f_cir * radius / f_cir_ref
-                np.testing.assert_almost_equal(
+                assert_almost_equal(
                     ratio, 1., decimal=10, err_msg=f"Scaling failed for radius={radius}")
 
     def test_freq_factor_ell_dirichlet_3d_ellipsoidal(self, solver_3d):
@@ -242,7 +242,7 @@ class TestModalAnalyticalSolver:
             f_ell = solver_3d._freq_factor_ell(hyper_axes, bc="Dirichlet")
 
             # Verify f_ell is positive and finite
-            assert np.isfinite(f_ell) and f_ell > 0.
+            assert isfinite(f_ell) and f_ell > 0.
 
             # Compare with prism case. Ellipsoid has smaller volume than prism for the
             # same semi-axes then the frequency factor should be larger for ellipsoid.
@@ -311,22 +311,22 @@ class TestModalAnalyticalSolver:
         pn, qn, fr_ell, fr_rec = solver_2d._reg_geometry_hyp(cut_plane_percent=1.)
 
         # Check that fitted parameters are positive and finite
-        assert np.isfinite(pn) and pn > 0.
-        assert np.isfinite(qn) and qn > 0.
+        assert isfinite(pn) and pn > 0.
+        assert isfinite(qn) and qn > 0.
 
         # For no cut, fr_ell and fr_rec should be 1.0 (no truncation)
-        np.testing.assert_almost_equal(fr_ell, 1., decimal=10)
-        np.testing.assert_almost_equal(fr_rec, 1., decimal=10)
+        assert_almost_equal(fr_ell, 1., decimal=10)
+        assert_almost_equal(fr_rec, 1., decimal=10)
 
         pn, qn, fr_ell, fr_rec = solver_3d._reg_geometry_hyp(cut_plane_percent=1.0)
 
         # Check that fitted parameters are positive and finite
-        assert np.isfinite(pn) and pn > 0.
-        assert np.isfinite(qn) and qn > 0.
+        assert isfinite(pn) and pn > 0.
+        assert isfinite(qn) and qn > 0.
 
         # For no cut, fr_ell and fr_rec should be 1.0 (no truncation)
-        np.testing.assert_almost_equal(fr_ell, 1., decimal=10)
-        np.testing.assert_almost_equal(fr_rec, 1., decimal=10)
+        assert_almost_equal(fr_ell, 1., decimal=10)
+        assert_almost_equal(fr_rec, 1., decimal=10)
 
     def test_reg_geometry_hyp_cut_percent_variation(self, solver_2d, solver_3d):
         """Test _reg_geometry_hyp for different cut percentages."""
@@ -339,8 +339,8 @@ class TestModalAnalyticalSolver:
             pn, qn, fr_ell, fr_rec = solver_2d._reg_geometry_hyp(cut_plane_percent=cut)
 
             # Check fitted parameters are valid
-            assert np.isfinite(pn) and pn > 0.
-            assert np.isfinite(qn) and qn > 0.
+            assert isfinite(pn) and pn > 0.
+            assert isfinite(qn) and qn > 0.
 
             # As cut_percent increases (less truncation), fr_ell and fr_rec should increase
             if prev_fr_ell is not None:
@@ -359,8 +359,8 @@ class TestModalAnalyticalSolver:
             pn, qn, fr_ell, fr_rec = solver_3d._reg_geometry_hyp(cut_plane_percent=cut)
 
             # Check fitted parameters are valid
-            assert np.isfinite(pn) and pn > 0.
-            assert np.isfinite(qn) and qn > 0.
+            assert isfinite(pn) and pn > 0.
+            assert isfinite(qn) and qn > 0.
 
             # As cut_percent increases (less truncation), fr_ell and fr_rec should increase
             if prev_fr_ell is not None:
@@ -393,8 +393,8 @@ class TestModalAnalyticalSolver:
                                                               fbc_dirichlet=fbc_dirichlet)
 
             # Check results are positive and finite
-            assert np.isfinite(f_hyp_dir) and f_hyp_dir > 0.
-            assert np.isfinite(c_reg_dir) and c_reg_dir > 0.
+            assert isfinite(f_hyp_dir) and f_hyp_dir > 0.
+            assert isfinite(c_reg_dir) and c_reg_dir > 0.
 
             # f_hyp_dir should be between f_rec_dir and f_ell_dir
             assert f_rec_dir < f_hyp_dir < f_ell_dir
@@ -403,8 +403,8 @@ class TestModalAnalyticalSolver:
                                                               c_eq, bc="Neumann")
 
             # Check results are positive and finite
-            assert np.isfinite(f_hyp_neu) and f_hyp_neu > 0.
-            assert np.isfinite(c_reg_neu) and c_reg_neu > 0.
+            assert isfinite(f_hyp_neu) and f_hyp_neu > 0.
+            assert isfinite(c_reg_neu) and c_reg_neu > 0.
 
             # f_hyp_neu should be between f_rec_neu and f_ell_neu
             assert f_rec_neu < f_hyp_neu < f_ell_neu
@@ -432,8 +432,8 @@ class TestModalAnalyticalSolver:
                                                               fbc_dirichlet=fbc_dirichlet)
 
             # Check results are positive and finite
-            assert np.isfinite(f_hyp_dir) and f_hyp_dir > 0.
-            assert np.isfinite(c_reg_dir) and c_reg_dir > 0.
+            assert isfinite(f_hyp_dir) and f_hyp_dir > 0.
+            assert isfinite(c_reg_dir) and c_reg_dir > 0.
 
             # f_hyp_dir should be between f_rec_dir and f_ell_dir
             assert f_rec_dir < f_hyp_dir < f_ell_dir
@@ -442,8 +442,8 @@ class TestModalAnalyticalSolver:
                                                               c_eq, bc="Neumann")
 
             # Check results are positive and finite
-            assert np.isfinite(f_hyp_neu) and f_hyp_neu > 0.
-            assert np.isfinite(c_reg_neu) and c_reg_neu > 0.
+            assert isfinite(f_hyp_neu) and f_hyp_neu > 0.
+            assert isfinite(c_reg_neu) and c_reg_neu > 0.
 
             # f_hyp_neu should be between f_rec_neu and f_ell_neu
             assert f_rec_neu < f_hyp_neu < f_ell_neu
@@ -453,8 +453,8 @@ class TestModalAnalyticalSolver:
 
     def test_dummy_load_static(self, solver_2d, V_2d, solver_3d, V_3d):
         """Test basic functionality of dummy_load_static."""
-        dof_load = np.array([0, 5, 10])
-        amplitude_load = np.array([1., -2., 3.])
+        dof_load = array([0, 5, 10])
+        amplitude_load = array([1., -2., 3.])
 
         for dimension in [2, 3]:
             if dimension == 2:
@@ -471,10 +471,10 @@ class TestModalAnalyticalSolver:
             assert q_dummy.function_space() == V
 
             # Check values at specified DOFs
-            assert np.all(q_dummy.dat.data[dof_load] == amplitude_load)
+            assert all(q_dummy.dat.data[dof_load] == amplitude_load)
 
             # Check that other DOFs remain zero
-            other_dofs = np.setdiff1d(np.arange(V.dim()), dof_load)
+            other_dofs = setdiff1d(arange(V.dim()), dof_load)
             assert sum(q_dummy.dat.data[other_dofs]) == 0.
 
             # q_ref should be None when V_ref is not provided
@@ -482,8 +482,8 @@ class TestModalAnalyticalSolver:
 
     def test_dummy_load_static_with_reference(self, solver_2d, V_2d, solver_3d, V_3d):
         """Test dummy_load_static with reference function space."""
-        dof_load = np.array([0, 5, 10])
-        amplitude_load = np.array([1., -2., 3.])
+        dof_load = array([0, 5, 10])
+        amplitude_load = array([1., -2., 3.])
 
         for dimension in [2, 3]:
             if dimension == 2:
@@ -508,10 +508,10 @@ class TestModalAnalyticalSolver:
             assert q_dummy.function_space() == V
 
             # Check values at specified DOFs
-            assert np.all(q_dummy.dat.data[dof_load] == amplitude_load)
+            assert all(q_dummy.dat.data[dof_load] == amplitude_load)
 
             # Check that other DOFs remain zero
-            other_dofs = np.setdiff1d(np.arange(V.dim()), dof_load)
+            other_dofs = setdiff1d(arange(V.dim()), dof_load)
             assert sum(q_dummy.dat.data[other_dofs]) == 0.
 
             # q_ref should be in V_ref
@@ -528,7 +528,7 @@ class TestModalAnalyticalSolver:
         c_eq = solver_2d.c_equivalent(c, V_2d, type_homog="volume")
 
         # For constant velocity, c_eq should equal the constant value
-        np.testing.assert_almost_equal(c_eq, 3.0, decimal=10)
+        assert_almost_equal(c_eq, 3.0, decimal=10)
 
     def test_c_equivalent_volume_homog_constant_3d(self, solver_3d, V_3d):
         """Test c_equivalent with volume homogenization for constant velocity in 3D."""
@@ -540,7 +540,7 @@ class TestModalAnalyticalSolver:
         c_eq = solver_3d.c_equivalent(c, V_3d, type_homog="volume")
 
         # For constant velocity, c_eq should equal the constant value
-        np.testing.assert_almost_equal(c_eq, 2.5, decimal=10)
+        assert_almost_equal(c_eq, 2.5, decimal=10)
 
     def test_c_equivalent_volume_homog_variable_2d(self, solver_2d, V_2d):
         """Test c_equivalent with volume homogenization for variable velocity in 2D."""
@@ -554,7 +554,7 @@ class TestModalAnalyticalSolver:
 
         # For volume homogenization, c_eq should be the average velocity
         # Expected average of (1 + x + y) over unit square = 1 + 0.5 + 0.5 = 2.0
-        np.testing.assert_almost_equal(c_eq, 2.0, decimal=6)
+        assert_almost_equal(c_eq, 2.0, decimal=6)
 
     def test_c_equivalent_volume_homog_variable_3d(self, solver_3d, V_3d):
         """Test c_equivalent with volume homogenization for variable velocity in 3D."""
@@ -567,7 +567,7 @@ class TestModalAnalyticalSolver:
         c_eq = solver_3d.c_equivalent(c, V_3d, type_homog="volume")
 
         # Expected average of (2 + x + y + z) over unit cube = 2 + 0.5 + 0.5 + 0.5 = 3.5
-        np.testing.assert_almost_equal(c_eq, 3.5, decimal=6)
+        assert_almost_equal(c_eq, 3.5, decimal=6)
 
     def test_c_equivalent_energy_homog_constant_2d(self, solver_2d, V_2d):
         """Test c_equivalent with energy homogenization for constant velocity in 2D."""
@@ -575,8 +575,8 @@ class TestModalAnalyticalSolver:
         c = Function(V_2d).assign(3.)
 
         # Create a static load
-        dof_load = np.array([0])
-        amplitude_load = np.array([1.])
+        dof_load = array([0])
+        amplitude_load = array([1.])
         q_dummy = solver_2d.dummy_load_static(V_2d, dof_load, amplitude_load)[0]
 
         # Compute equivalent velocity
@@ -584,7 +584,7 @@ class TestModalAnalyticalSolver:
                                       static_load_for_ceq=q_dummy)
 
         # For constant velocity, c_eq should be equal to the constant value
-        np.testing.assert_almost_equal(c_eq, 3., decimal=6)
+        assert_almost_equal(c_eq, 3., decimal=6)
 
     def test_c_equivalent_energy_homog_constant_3d(self, solver_3d, V_3d):
         """Test c_equivalent with energy homogenization for constant velocity in 3D."""
@@ -592,8 +592,8 @@ class TestModalAnalyticalSolver:
         c = Function(V_3d).assign(3.)
 
         # Create a static load (point load at center)
-        dof_load = np.array([0])
-        amplitude_load = np.array([1.])
+        dof_load = array([0])
+        amplitude_load = array([1.])
         q_dummy = solver_3d.dummy_load_static(V_3d, dof_load, amplitude_load)[0]
 
         # Compute equivalent velocity
@@ -601,7 +601,7 @@ class TestModalAnalyticalSolver:
                                       static_load_for_ceq=q_dummy)
 
         # For constant velocity, c_eq should be equal to the constant value
-        np.testing.assert_almost_equal(c_eq, 3., decimal=6)
+        assert_almost_equal(c_eq, 3., decimal=6)
 
     def test_c_equivalent_invalid_type_homog(self, solver_2d, V_2d):
         """Test c_equivalent with invalid type_homog."""
