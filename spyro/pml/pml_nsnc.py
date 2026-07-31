@@ -162,13 +162,13 @@ class PMLLayer(ABCLayer):
         self.sigma_max = ((degree_prof + 1.) / (2. * abc_pad_length)) * log(1. / CR)
         self.sigma_max *= abc_pml_cmax
 
-    def pml_sigma_field(self, Wave_object, ufl_coordinates_pml, V,
+    def pml_sigma_field(self, wave, ufl_coordinates_pml, V,
                         degree_prof=2, save_file=True):
         """Generate a damping profile for the PML.
 
         Parameters
         ----------
-        Wave_object : `acoustic_wave.AcousticWave`
+        wave : `acoustic_wave.AcousticWave`
             An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
         ufl_coordinates_pml : `ufl.geometry.SpatialCoordinate`
             Domain coordinates including the absorbing layer.
@@ -200,9 +200,9 @@ class PMLLayer(ABCLayer):
         exprz = f"sqrt((z + {length_z})**2)"
         exprx1 = "(sqrt(x))**2"
         exprx2 = f"sqrt((x - {length_x})**2)"
-        valz = generate_ufl_functions(Wave_object.mesh, exprz, self.dimension)
-        valx1 = generate_ufl_functions(Wave_object.mesh, exprx1, self.dimension)
-        valx2 = generate_ufl_functions(Wave_object.mesh, exprx2, self.dimension)
+        valz = generate_ufl_functions(wave.mesh, exprz, self.dimension)
+        valx1 = generate_ufl_functions(wave.mesh, exprx1, self.dimension)
+        valx2 = generate_ufl_functions(wave.mesh, exprx2, self.dimension)
 
         # Conditional expressions for the profile
         z_pd = conditional(condz, valz, 0.)
@@ -229,8 +229,8 @@ class PMLLayer(ABCLayer):
             # Conditional value
             expry1 = "(sqrt(y))**2"
             expry2 = f"sqrt((y - {length_y})**2)"
-            valy1 = generate_ufl_functions(Wave_object.mesh, expry1, self.dimension)
-            valy2 = generate_ufl_functions(Wave_object.mesh, expry2, self.dimension)
+            valy1 = generate_ufl_functions(wave.mesh, expry1, self.dimension)
+            valy2 = generate_ufl_functions(wave.mesh, expry2, self.dimension)
 
             # Conditional expressions for the mask
             y_pd = conditional(condy1, valy1, 0.) + conditional(condy2, valy2, 0.)
@@ -241,19 +241,19 @@ class PMLLayer(ABCLayer):
             self.sigma_y.interpolate(self.sigma_max * ref_y)
 
         # Save damping profile
-        if not Wave_object.abc_get_ref_model and save_file:
+        if not wave.abc_get_ref_model and save_file:
             outfile = VTKFile(self.path_case_abc + "sigma_pml.pvd")
             if self.dimension == 2:  # 2D
                 outfile.write(self.sigma_z, self.sigma_x)
             if self.dimension == 3:  # 3D
                 outfile.write(self.sigma_z, self.sigma_x, self.sigma_y)
 
-    def pml_layer(self, Wave_object, save_file=True):
+    def pml_layer(self, wave, save_file=True):
         """Set the damping profile within the PML layer.
 
         Parameters
         ----------
-        Wave_object : `acoustic_wave.AcousticWave`
+        wave : `acoustic_wave.AcousticWave`
             An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
         save_file : `bool`, optional
             If `True`, save the mesh with absorbing layer in a .pvd file.
@@ -267,30 +267,30 @@ class PMLLayer(ABCLayer):
         pprint("\nCreating Damping PML Profile", comm=self.comm)
 
         # New geometry with layer if pad_length is provided by the user.
-        if Wave_object.abc_user_pad_len:
-            self.abc_pad_length = Wave_object.abc_pad_length
+        if wave.abc_user_pad_len:
+            self.abc_pad_length = wave.abc_pad_length
             self.abc_new_geometry()
 
         # Compute the maximum damping coefficient
-        abc_pml_cmax = Wave_object.abc_pml_cmax if Wave_object.abc_user_pml_cmax \
-            else Wave_object.c_bnd_max
+        abc_pml_cmax = wave.abc_pml_cmax if wave.abc_user_pml_cmax \
+            else wave.c_bnd_max
 
-        self.calc_pml_damping(Wave_object.abc_pml_R, abc_pml_cmax,
-                              Wave_object.abc_pad_length,
-                              degree_prof=Wave_object.abc_pml_exponent)
+        self.calc_pml_damping(wave.abc_pml_R, abc_pml_cmax,
+                              wave.abc_pad_length,
+                              degree_prof=wave.abc_pml_exponent)
 
         # Mesh coordinates including the absorbing layer
-        domain_layer = Wave_object.layer_ops.abc_domain_dimensions(full_hyp=False)
+        domain_layer = wave.layer_ops.abc_domain_dimensions(full_hyp=False)
         ufl_coordinates_pml = \
-            Wave_object.mesh_ops.get_spatial_coordinates_abc(Wave_object.mesh,
+            wave.mesh_ops.get_spatial_coordinates_abc(wave.mesh,
                                                              domain_layer)
 
         # Damping fields
-        self.pml_sigma_field(Wave_object, ufl_coordinates_pml, Wave_object.function_space,
-                             degree_prof=Wave_object.abc_pml_exponent)
+        self.pml_sigma_field(wave, ufl_coordinates_pml, wave.function_space,
+                             degree_prof=wave.abc_pml_exponent)
 
         # Non-Reflective BCs for the PML layer if prescribed
-        self.nrbc_on_boundary_layer(Wave_object, self.bc_boundary_pml, save_file=save_file)
+        self.nrbc_on_boundary_layer(wave, self.bc_boundary_pml, save_file=save_file)
 
     def damping_pml_2d(self):
         """Build the damping matrices for a two-dimensional problem using PML.

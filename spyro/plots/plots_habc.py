@@ -173,7 +173,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 
 #     Parameters
 #     ----------
-#     Wave_object : `wave`
+#     wave : `wave`
 #         The Wave object containing the simulation results. Must have the
 #         following attributes:
 #         - forward_solution_receivers: Computed receiver data
@@ -268,7 +268,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 
 #     Parameters
 #     ----------
-#     Wave_object : `wave`
+#     wave : `wave`
 #         Wave object containing the simulation results. Must have the
 #         following attributes:
 #         - receivers_out_fft: FFT of computed receiver data
