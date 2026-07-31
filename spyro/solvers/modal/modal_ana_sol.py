@@ -592,7 +592,7 @@ class Modal_Analytical_Solver():
                              "Function", none_default=True)
 
         # Integration measure
-        dx = fire_dx(**quad_rule) if quad_rule else fire_dx
+        dx = fire_dx(**quad_rule) if quad_rule else fire_dx(**{"degree": 0})
 
         # State variable
         u = Function(V)

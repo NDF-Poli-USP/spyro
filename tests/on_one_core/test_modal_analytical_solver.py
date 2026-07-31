@@ -1,13 +1,12 @@
-"""Unit tests for the Modal solvers implemented in spyro.solvers.modal.modal_sol.
+"""Unit tests for the Analytical Modal solver in spyro.solvers.modal.modal_ana_sol.
 
-These tests verify the implemented modal solvers by comparing the computed fundamental
+These tests verify the analytical modal solver by comparing the computed fundamental
 frequency with expected values for different domain configurations. The tests cover
 both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
 """
 
 from pytest import fail, fixture, mark, param
-from firedrake import conditional, ConvergenceError
-from firedrake import COMM_WORLD as comm
+from firedrake import COMM_WORLD as comm, conditional, ConvergenceError
 from numpy import isclose, squeeze, zeros
 from scipy.optimize import minimize
 from spyro.solvers.acoustic_wave import AcousticWave
