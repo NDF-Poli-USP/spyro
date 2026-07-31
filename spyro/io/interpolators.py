@@ -72,22 +72,18 @@ def _hdf5_velocity_model_to_grid_velocity_data(Model, fname):
     pad_length = Model.mesh_parameters.abc_pad_length
     pad_length = 0.0 if pad_length is None else pad_length
 
+    z_extent = Model.mesh_parameters.length_z + pad_length
+    x_extent = Model.mesh_parameters.length_x + 2.0 * pad_length
+    spacing_z = z_extent / float(vp_values.shape[0] - 1)
+    spacing_x = x_extent / float(vp_values.shape[1] - 1)
     if vp_values.ndim == 2:
-        z_extent = Model.mesh_parameters.length_z + pad_length
-        x_extent = Model.mesh_parameters.length_x + 2.0 * pad_length
-        spacing_z = z_extent / float(vp_values.shape[0] - 1)
-        spacing_x = x_extent / float(vp_values.shape[1] - 1)
         grid_spacing = spacing_z if np.isclose(spacing_z, spacing_x) else None
         length_y = None
     elif vp_values.ndim == 3:
         if Model.mesh_parameters.length_y is None:
             raise ValueError("3D HDF5 velocity model requires length_y.")
 
-        z_extent = Model.mesh_parameters.length_z + pad_length
-        x_extent = Model.mesh_parameters.length_x + 2.0 * pad_length
         y_extent = Model.mesh_parameters.length_y + 2.0 * pad_length
-        spacing_z = z_extent / float(vp_values.shape[0] - 1)
-        spacing_x = x_extent / float(vp_values.shape[1] - 1)
         spacing_y = y_extent / float(vp_values.shape[2] - 1)
         grid_spacing = (
             spacing_z
