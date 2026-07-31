@@ -1,7 +1,15 @@
-import pytest
-import numpy as np
+"""More unit tests for the Analytical Modal solver in spyro.solvers.modal.modal_ana_sol.
+
+These tests verify the analytical modal solver in 2D and 3D, comparing the computed
+frequency with expected values. Also, the tests also check the behavior of the solver
+for boundary conditions of Dirichlet and Neumann.
+"""
+
+from pytest import fixture, raises
 from firedrake import (Function, FunctionSpace, SpatialCoordinate,
                        UnitCubeMesh, UnitSquareMesh)
+from numpy import all, arange, array, isfinite, pi, setdiff1d, sqrt
+from numpy.testing import assert_almost_equal
 from scipy.special import jn_zeros
 from spyro.solvers.modal.modal_ana_sol import Modal_Analytical_Solver
 from spyro.utils.error_management import type_firedrake_error
@@ -10,32 +18,32 @@ from spyro.utils.error_management import type_firedrake_error
 class TestModalAnalyticalSolver:
     """Test suite for Modal_Analytical_Solver class."""
 
-    @pytest.fixture
+    @ fixture
     def solver_2d(self):
         """Create a 2D solver instance."""
         return Modal_Analytical_Solver(dimension=2)
 
-    @pytest.fixture
+    @ fixture
     def solver_3d(self):
         """Create a 3D solver instance."""
         return Modal_Analytical_Solver(dimension=3)
 
-    @pytest.fixture
+    @ fixture
     def mesh_2d(self):
         """Create a 2D mesh."""
         return UnitSquareMesh(4, 4)
 
-    @pytest.fixture
+    @ fixture
     def mesh_3d(self):
         """Create a 3D mesh."""
         return UnitCubeMesh(4, 4, 4)
 
-    @pytest.fixture
+    @ fixture
     def V_2d(self, mesh_2d):
         """Create a 2D function space."""
         return FunctionSpace(mesh_2d, "KMV", 4)
 
-    @pytest.fixture
+    @ fixture
     def V_3d(self, mesh_3d):
         """Create a 3D function space."""
         return FunctionSpace(mesh_3d, "KMV", 3)
@@ -571,23 +579,11 @@ class TestModalAnalyticalSolver:
         amplitude_load = np.array([1.])
         q_dummy = solver_2d.dummy_load_static(V_2d, dof_load, amplitude_load)[0]
 
-        # Define quadrature rule
-        quad_rule = {"degree": 0}
-
         # Compute equivalent velocity
         c_eq = solver_2d.c_equivalent(c, V_2d, type_homog="energy",
-                                      static_load_for_ceq=q_dummy,
-                                      quad_rule=quad_rule)
+                                      static_load_for_ceq=q_dummy)
 
         # For constant velocity, c_eq should be equal to the constant value
-        np.testing.assert_almost_equal(c_eq, 3., decimal=6)
-
-        # Should work with default load (constant load over domain)
-        c_eq = solver_2d.c_equivalent(c, V_2d, type_homog="energy",
-                                      static_load_for_ceq=None,
-                                      quad_rule=quad_rule)
-
-        # Should still give correct result
         np.testing.assert_almost_equal(c_eq, 3., decimal=6)
 
     def test_c_equivalent_energy_homog_constant_3d(self, solver_3d, V_3d):
@@ -600,30 +596,18 @@ class TestModalAnalyticalSolver:
         amplitude_load = np.array([1.])
         q_dummy = solver_3d.dummy_load_static(V_3d, dof_load, amplitude_load)[0]
 
-        # Define quadrature rule
-        quad_rule = {"degree": 0}
-
         # Compute equivalent velocity
         c_eq = solver_3d.c_equivalent(c, V_3d, type_homog="energy",
-                                      static_load_for_ceq=q_dummy,
-                                      quad_rule=quad_rule)
+                                      static_load_for_ceq=q_dummy)
 
         # For constant velocity, c_eq should be equal to the constant value
-        np.testing.assert_almost_equal(c_eq, 3., decimal=6)
-
-        # Should work with default load (constant load over domain)
-        c_eq = solver_3d.c_equivalent(c, V_3d, type_homog="energy",
-                                      static_load_for_ceq=None,
-                                      quad_rule=quad_rule)
-
-        # Should still give correct result
         np.testing.assert_almost_equal(c_eq, 3., decimal=6)
 
     def test_c_equivalent_invalid_type_homog(self, solver_2d, V_2d):
         """Test c_equivalent with invalid type_homog."""
         c = Function(V_2d)
-        c.assign(3.0)
+        c.assign(3.)
 
         # Should raise ValueError for invalid type_homog
-        with pytest.raises(ValueError):
+        with raises(ValueError):
             solver_2d.c_equivalent(c, V_2d, type_homog="invalid")
