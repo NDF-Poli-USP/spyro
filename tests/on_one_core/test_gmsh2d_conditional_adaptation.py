@@ -229,13 +229,13 @@ def test_gmsh_adaptation():
         "gradient_filename": None,
     }
 
-    wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    wave_obj.set_initial_velocity_model(conditional=cond)
-    spyro.plots.debug_pvd(wave_obj.initial_velocity_model)
-    # wave_obj.forward_solve()
+    wave = spyro.AcousticWave(dictionary=dictionary)
+    wave.set_initial_velocity_model(conditional=cond)
+    spyro.plots.debug_pvd(wave.initial_velocity_model)
+    # wave.forward_solve()
 
-    DG0 = fire.FunctionSpace(wave_obj.mesh, "DG", 0)
-    f = fire.assemble(fire.interpolate(fire.CellSize(wave_obj.mesh), DG0))
+    DG0 = fire.FunctionSpace(wave.mesh, "DG", 0)
+    f = fire.assemble(fire.interpolate(fire.CellSize(wave.mesh), DG0))
 
     # at centre of minas cheese (gold square):
     lbda_centre = 3.0/20.0  # vp/freq
