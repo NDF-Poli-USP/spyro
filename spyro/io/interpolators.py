@@ -169,7 +169,7 @@ def fast_interpolation(Model, fname, V):
 
     add_pad = False
     if Model.mesh_parameters.abc_pad_length is not None:
-        if Model.mesh_parameters.abc_pad_length > 1e-15:
+        if Model.mesh_parameters.abc_pad_length > 0.0:
             add_pad = True
     if add_pad:
         abc_pad_length = Model.mesh_parameters.abc_pad_length
