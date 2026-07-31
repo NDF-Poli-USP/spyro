@@ -154,7 +154,7 @@ def test_spyro_acoustic_solver_compatibility(test_mesh_with_tags):
     u = fire.TrialFunction(V)
     v = fire.TestFunction(V)
 
-    # Simulate Wave_object parameters
+    # Simulate wave parameters
     c = fire.Function(V)
     c.assign(fire.Constant(1500.0))
     dt_val = 0.001
