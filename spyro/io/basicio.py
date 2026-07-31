@@ -94,12 +94,12 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
 
 
 @ensemble_save
-def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
+def save_shots(wave, file_name="shots/shot_record_", shot_ids=0):
     """Save a the shot record from last forward solve to a `pickle`.
 
     Parameters
     ----------
-    Wave_obj: :class:`Wave` object
+    wave: :class:`Wave` object
         A :class:`Wave` object
     source_id: int, optional by default 0
         The source number
@@ -113,17 +113,17 @@ def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
     """
     file_name = file_name + str(shot_ids) + ".dat"
     with open(file_name, "wb") as f:
-        pickle.dump(Wave_obj.forward_solution_receivers, f)
+        pickle.dump(wave.forward_solution_receivers, f)
     return None
 
 
 @ensemble_load
-def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
+def load_shots(wave, file_name="shots/shot_record_", shot_ids=0):
     """Load a `pickle` to a `numpy.ndarray`.
 
     Parameters
     ----------
-    Wave_obj: :class:`Wave` object
+    wave: :class:`Wave` object
         A :class:`Wave` object
     source_id: int, optional by default 0
         The source number
@@ -141,7 +141,7 @@ def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
 
     with open(file_name, "rb") as f:
         array = np.asarray(pickle.load(f), dtype=float)
-        Wave_obj.forward_solution_receivers = array
+        wave.forward_solution_receivers = array
     return None
 
 

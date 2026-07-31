@@ -306,7 +306,7 @@ class Mask():
         Dictionary containing spatial boundaries for the mask. Valid keys are
         'z_min', 'z_max', 'x_min', 'x_max', 'y_min', 'y_max', with float
         values specifying the boundary locations.
-    Wave_obj : object
+    wave : object
         Wave object containing mesh information. Must have attributes:
         - mesh : firedrake.mesh.MeshGeometry
             Computational mesh.
@@ -359,7 +359,7 @@ class Mask():
     >>> masked_gradient = mask.apply_mask(gradient)
     """
 
-    def __init__(self, boundaries, Wave_obj, dg=False, inverse_mask=False):
+    def __init__(self, boundaries, wave, dg=False, inverse_mask=False):
         possible_boundaries = [
             "z_min",
             "z_max",
@@ -376,14 +376,14 @@ class Mask():
                 active_boundaries.append(possible_boundary)
 
         self.active_boundaries = active_boundaries
-        self._calculate_mask_conditional(Wave_obj, inverse_mask)
+        self._calculate_mask_conditional(wave, inverse_mask)
         self.in_dg = dg
         if dg is False:
-            self._calculate_mask_dofs(Wave_obj)
+            self._calculate_mask_dofs(wave)
         elif dg is True:
-            self._calculate_dg_mask(Wave_obj)
+            self._calculate_dg_mask(wave)
 
-    def _calculate_dg_mask(self, Wave_obj):
+    def _calculate_dg_mask(self, wave):
         """Calculate the discontinuous Galerkin (DG) mask.
 
         Creates a DG0 function space mask by interpolating the mask
@@ -391,7 +391,7 @@ class Mask():
 
         Parameters
         ----------
-        Wave_obj : object
+        wave : object
             Wave object containing the mesh on which to create the DG mask.
             Must have attribute:
             - mesh : firedrake.mesh.MeshGeometry
@@ -402,12 +402,12 @@ class Mask():
         Sets the `dg_mask` attribute to a DG0 function containing the
         interpolated mask values.
         """
-        V_dg = create_function_space(Wave_obj.mesh, "DG0", 0)
+        V_dg = create_function_space(wave.mesh, "DG0", 0)
         dg_mask = Function(V_dg)
         dg_mask.interpolate(self.cond)
         self.dg_mask = dg_mask
 
-    def _calculate_mask_conditional(self, Wave_obj, inverted=False):
+    def _calculate_mask_conditional(self, wave, inverted=False):
         """Calculate the UFL conditional expression for the mask.
 
         Constructs a UFL conditional that evaluates to 1 (or 0 if inverted)
@@ -415,7 +415,7 @@ class Mask():
 
         Parameters
         ----------
-        Wave_obj : object
+        wave : object
             Wave object containing mesh coordinate functions. Must have:
             - mesh_z : firedrake.SpatialCoordinate
                 Z-coordinate function.
@@ -440,10 +440,10 @@ class Mask():
         """
         # Getting necessary data from wave object
         active_boundaries = self.active_boundaries
-        self.z = Wave_obj.mesh_z
-        self.x = Wave_obj.mesh_x
+        self.z = wave.mesh_z
+        self.x = wave.mesh_x
         if ("y_min" in active_boundaries) or ("y_max" in active_boundaries):
-            self.y = Wave_obj.mesh_y
+            self.y = wave.mesh_y
 
         # Getting mask conditional
         if inverted:
@@ -466,7 +466,7 @@ class Mask():
 
         self.cond = cond[0]
 
-    def _calculate_mask_dofs(self, Wave_obj):
+    def _calculate_mask_dofs(self, wave):
         """Calculate degrees of freedom indices for the mask application.
 
         Interpolates the mask conditional onto the wave function space and
@@ -474,7 +474,7 @@ class Mask():
 
         Parameters
         ----------
-        Wave_obj : object
+        wave : object
             Wave object containing the function space for mask interpolation.
             Must have attribute:
             - function_space : firedrake.functionspace.FunctionSpace
@@ -499,7 +499,7 @@ class Mask():
         if self.in_dg:
             raise ValueError("DG space can have different DoFs than the functional space")
         warnings.warn("When applying a mask in a continuous space, expect some error in the element adjacent to the mask")
-        mask = Function(Wave_obj.function_space)
+        mask = Function(wave.function_space)
         mask.interpolate(self.cond)
         # Saving mask dofs
         self.mask_dofs = np.where(mask.dat.data[:] > 0.3)
@@ -539,7 +539,7 @@ class Gradient_mask_for_pml(Mask):
 
     Parameters
     ----------
-    Wave_obj : object
+    wave : object
         Wave object with active PML boundary conditions. Must have:
         - abc_active : bool
             Must be True; indicates PML is active.
@@ -552,7 +552,7 @@ class Gradient_mask_for_pml(Mask):
     Raises
     ------
     ValueError
-        If Wave_obj.abc_active is False (no PML present).
+        If wave.abc_active is False (no PML present).
 
     Notes
     -----
@@ -570,20 +570,20 @@ class Gradient_mask_for_pml(Mask):
     >>> masked_gradient = gradient_mask.apply_mask(gradient)
     """
 
-    def __init__(self, Wave_obj):
-        if Wave_obj.abc_active is False:
+    def __init__(self, wave):
+        if wave.abc_active is False:
             raise ValueError("No PML present in wave object")
 
         # building firedrake function for mask
-        z_min = -(Wave_obj.mesh_parameters.length_z)
+        z_min = -(wave.mesh_parameters.length_z)
         x_min = 0.0
-        x_max = Wave_obj.mesh_parameters.length_x
+        x_max = wave.mesh_parameters.length_x
         boundaries = {
             "z_min": z_min,
             "x_min": x_min,
             "x_max": x_max,
         }
-        super().__init__(boundaries, Wave_obj)
+        super().__init__(boundaries, wave)
 
 
 @run_in_one_core_and_broadcast

@@ -128,7 +128,7 @@ def preamble_habc(dictionary, edge_length):
 
     Returns
     -------
-    Wave_obj : `habc.HABCLayer`
+    wave : `habc.HABCLayer`
         An instance of the HABCLayer class
     '''
 
@@ -137,47 +137,47 @@ def preamble_habc(dictionary, edge_length):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = habc.HABCLayer(dictionary=dictionary,
+    wave = habc.HABCLayer(dictionary=dictionary,
                               output_folder="tests/inputfiles/")
 
     # Mesh
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+    wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
-    cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
-    Wave_obj.set_initial_velocity_model(conditional=cond)
+    cond = fire.conditional(wave.mesh_x < 0.5, 3.0, 1.5)
+    wave.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
-    Wave_obj.preamble_mesh_operations()
+    wave.preamble_mesh_operations()
 
     # Estimating computational resource usage
     comp_cost("tfin", tRef=tRef,
-              user_name=Wave_obj.path_save + "preamble/MSH_")
+              user_name=wave.path_save + "preamble/MSH_")
 
     # ============ EIKONAL ANALYSIS ============
     # Reference to resource usage
     tRef = comp_cost("tini")
 
     # Initializing Eikonal object
-    Eik_obj = eik_min.HABC_Eikonal(Wave_obj)
+    Eik_obj = eik_min.HABC_Eikonal(wave)
 
     # Finding critical points
-    Wave_obj.critical_boundary_points(Eik_obj)
+    wave.critical_boundary_points(Eik_obj)
 
     # Estimating computational resource usage
     comp_cost("tfin", tRef=tRef,
-              user_name=Wave_obj.path_save + "preamble/EIK_")
+              user_name=wave.path_save + "preamble/EIK_")
 
-    return Wave_obj
+    return wave
 
 
-def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
+def get_xCR_usu(wave, dat_regr_xCR, typ_xCR, n_pts):
     '''
     Get the user-defined heuristic factor for the minimum damping ratio.
 
     Parameters
     ----------
-    Wave_obj : `habc.HABCLayer`
+    wave : `habc.HABCLayer`
         An instance of the HABCLayer class
     data_regr_xCR: `list`
         Data for the regression of the parameter xCR.
@@ -209,24 +209,24 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
     if typ_xCR == "candidates":
 
         # Determining the xCR candidates for iterations
-        xCR_cand = Wave_obj.get_xCR_candidates(n_pts=n_pts)
+        xCR_cand = wave.get_xCR_candidates(n_pts=n_pts)
         return xCR_cand
 
     elif typ_xCR == "optimal":
 
         # Getting an optimal xCR
         crit_opt = dat_regr_xCR[-1]  # Criterion for optimal xCR
-        xCR_opt = Wave_obj.get_xCR_optimal(dat_regr_xCR, crit_opt=crit_opt)
+        xCR_opt = wave.get_xCR_optimal(dat_regr_xCR, crit_opt=crit_opt)
         return xCR_opt
 
 
-def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
+def habc_fig8(wave, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     '''
     Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
 
     Parameters
     ----------
-    Wave_obj : `habc.HABCLayer`
+    wave : `habc.HABCLayer`
         An instance of the HABCLayer class
     data_regr_xCR: `list`
         Data for the regression of the parameter xCR.
@@ -250,42 +250,42 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     '''
 
     # Identifier for the current case study
-    Wave_obj.identify_habc_case()
+    wave.identify_habc_case()
 
     # Acquiring reference signal
-    Wave_obj.get_reference_signal(foldername="")
+    wave.get_reference_signal(foldername="")
 
     # Determining layer size
-    Wave_obj.size_habc_criterion(n_root=1,
+    wave.size_habc_criterion(n_root=1,
                                  layer_based_on_mesh=True)
 
     # Creating mesh with absorbing layer
-    Wave_obj.create_mesh_habc()
+    wave.create_mesh_habc()
 
     # Updating velocity model
-    Wave_obj.velocity_habc()
+    wave.velocity_habc()
 
     # Setting the damping profile within absorbing layer
-    Wave_obj.damping_layer(xCR_usu=xCR_usu)
+    wave.damping_layer(xCR_usu=xCR_usu)
 
     # Applying NRBCs on outer boundary layer
-    Wave_obj.cos_ang_HigdonBC()
+    wave.cos_ang_HigdonBC()
 
     # Solving the forward problem
-    Wave_obj.forward_solve()
+    wave.forward_solve()
 
     # Computing the error measures
-    Wave_obj.error_measures_habc()
+    wave.error_measures_habc()
 
     # Collecting data for regression
-    dat_regr_xCR[0].append(Wave_obj.xCR)
-    dat_regr_xCR[1].append(Wave_obj.max_errIt)
-    dat_regr_xCR[2].append(Wave_obj.max_errPK)
+    dat_regr_xCR[0].append(wave.xCR)
+    dat_regr_xCR[1].append(wave.max_errIt)
+    dat_regr_xCR[2].append(wave.max_errPK)
 
     if plot_comparison:
 
         # Plotting the solution at receivers and the error measures
-        Wave_obj.comparison_plots(regression_xCR=True,
+        wave.comparison_plots(regression_xCR=True,
                                   data_regr_xCR=dat_regr_xCR)
 
 
@@ -371,7 +371,7 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst,
                            None, "source", get_ref_model)
 
     # Creating mesh and performing eikonal analysis
-    Wave_obj = preamble_habc(dictionary, edge_length)
+    wave = preamble_habc(dictionary, edge_length)
 
     # ============ REFERENCE MODEL ============
     if get_ref_model:
@@ -379,14 +379,14 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst,
         tRef = comp_cost("tini")
 
         # Computing reference get_reference_signal
-        Wave_obj.infinite_model()
+        wave.infinite_model()
 
         # Set model parameters for the HABC scheme
-        Wave_obj.abc_get_ref_model = False
+        wave.abc_get_ref_model = False
 
         # Estimating computational resource usage
         comp_cost("tfin", tRef=tRef,
-                  user_name=Wave_obj.path_save + "preamble/INF_")
+                  user_name=wave.path_save + "preamble/INF_")
 
     # ============ HABC SCHEME ============
     if loop_modeling:
@@ -399,7 +399,7 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst,
         for habc_reference_freq in habc_reference_freq_lst:
 
             # Reference frequency for sizing the hybrid absorbing layer
-            Wave_obj.abc_reference_freq = habc_reference_freq
+            wave.abc_reference_freq = habc_reference_freq
             print(crit_str.format(n_pts, crit_opt.replace("_", " ").title()))
 
             # Criterion for optinal heuristic factor xCR
@@ -408,9 +408,9 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst,
             for degree_layer in degree_layer_lst:
 
                 # Update the layer shape and its degree
-                Wave_obj.abc_boundary_layer_shape = LayerShapeType.HYPERSHAPE \
+                wave.abc_boundary_layer_shape = LayerShapeType.HYPERSHAPE \
                     if degree_layer is not None else LayerShapeType.RECTANGULAR
-                Wave_obj.abc_deg_layer = degree_layer
+                wave.abc_deg_layer = degree_layer
 
                 # Data for regression of xCR parameter
                 dat_regr_xCR = [[] for _ in range(3)]
@@ -435,20 +435,20 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst,
 
                         # Run the HABC scheme
                         plot_comparison = True if itr_xCR == n_pts else False
-                        habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=xCR_usu,
+                        habc_fig8(wave, dat_regr_xCR, xCR_usu=xCR_usu,
                                   plot_comparison=plot_comparison)
 
                         # Estimating computational resource usage
-                        u_name = Wave_obj.path_save + Wave_obj.case_habc + "/"
+                        u_name = wave.path_save + wave.case_habc + "/"
                         comp_cost("tfin", tRef=tRef, user_name=u_name)
 
                         # User-defined heuristic factor x_CR
                         if itr_xCR == 0:
                             xCR_cand = get_xCR_usu(
-                                Wave_obj, dat_regr_xCR, "candidates", n_pts)
+                                wave, dat_regr_xCR, "candidates", n_pts)
                         elif itr_xCR == n_pts - 1:
                             xCR_opt = get_xCR_usu(
-                                Wave_obj, dat_regr_xCR, "optimal", n_pts)
+                                wave, dat_regr_xCR, "optimal", n_pts)
 
                     except fire.ConvergenceError as e:
                         print(f"Error Solving: {e}")

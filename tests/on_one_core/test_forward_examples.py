@@ -13,17 +13,17 @@ def test_camembert_forward():
     #     "R": 1e-6,
     #     "pad_length": 0.25,
     # }
-    Wave_obj = spyro.examples.Camembert_acoustic(dictionary=dictionary)
+    wave = spyro.examples.Camembert_acoustic(dictionary=dictionary)
 
     # Check if velocity model is correct
     c_center = 4.6
     c_outside_center = 1.6
-    c_wave = Wave_obj.initial_velocity_model
+    c_wave = wave.initial_velocity_model
     test1 = math.isclose(c_center, c_wave.at(-0.5, 0.5))
     test2 = math.isclose(c_outside_center, c_wave.at(-0.1, 0.5))
 
     # Check if forward solve runs
-    Wave_obj.forward_solve()
+    wave.forward_solve()
     test3 = True
 
     assert all([test1, test2, test3])
@@ -36,13 +36,13 @@ def test_rectangle_forward():
         "damping_type": None,
         "pad_length": 0.,
     }
-    Wave_obj = spyro.examples.Rectangle_acoustic()
+    wave = spyro.examples.Rectangle_acoustic()
 
     # Check if velocity model is correct
     layer_values = [1.5, 2.0, 2.5, 3.0]
     z_switches = [-0.25, -0.5, -0.75]
-    Wave_obj.multiple_layer_velocity_model(z_switches, layer_values)
-    c_wave = Wave_obj.initial_velocity_model
+    wave.multiple_layer_velocity_model(z_switches, layer_values)
+    c_wave = wave.initial_velocity_model
 
     c0 = layer_values[0]
     test1 = math.isclose(c0, c_wave.at(-0.2, 0.5))
@@ -51,7 +51,7 @@ def test_rectangle_forward():
     test2 = math.isclose(c2, c_wave.at(-0.6, 0.5))
 
     # Check if forward solve runs
-    Wave_obj.forward_solve()
+    wave.forward_solve()
     test3 = True
 
     assert all([test1, test2, test3])
@@ -81,15 +81,15 @@ def test_acoustic_local_abc():
 def test_immersed_polygon_forward():
     from spyro.examples.immersed_polygon import Polygon_acoustic
 
-    Wave_obj = Polygon_acoustic()
+    wave = Polygon_acoustic()
 
     # Check if velocity model is correct
-    c_wave = Wave_obj.initial_velocity_model
+    c_wave = wave.initial_velocity_model
     test1 = math.isclose(3.25, c_wave.at(-0.5, 0.5))
     test2 = math.isclose(2.5, c_wave.at(-0.5, 0.1))
 
     # Check if forward solve runs
-    Wave_obj.forward_solve()
+    wave.forward_solve()
     test3 = True
 
     assert all([test1, test2, test3])
