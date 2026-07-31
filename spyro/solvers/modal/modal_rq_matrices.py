@@ -39,7 +39,7 @@ def generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
     """
 
     # Check input parameters
-    value_numerical_error("k", k, integer_num=True, lower_bound=0)
+    value_numerical_error("k", k, float_num=False, integer_num=True, lower_bound=0)
     value_parameter_error("dimension", dimension, [2, 3])
     value_parameter_error("bc", bc, ["Dirichlet", "Neumann"])
 
