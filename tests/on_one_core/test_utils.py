@@ -20,27 +20,27 @@ def test_butter_lowpast_filter():
     Springer Media, 2006, p. 70 DOI:10.1007/0-387-28666-7.
     TODO: Add citation
     """
-    Wave_obj = spyro.examples.Rectangle_acoustic(
+    wave = spyro.examples.Rectangle_acoustic(
         dictionary={"absorving_boundary_conditions": {"absorb_top": True},
                     "mesh": {"h": 0.09}}  # Increasing from 0.05 to 0.09 to save time
     )
 
     layer_values = [1.5, 2.0, 2.5, 3.0]
     z_switches = [-0.25, -0.5, -0.75]
-    Wave_obj.multiple_layer_velocity_model(z_switches, layer_values)
-    Wave_obj.forward_solve()
+    wave.multiple_layer_velocity_model(z_switches, layer_values)
+    wave.forward_solve()
 
-    spyro.io.save_shots(Wave_obj, file_name="test_butter_prefilter")
-    shot_record = Wave_obj.forward_solution_receivers
+    spyro.io.save_shots(wave, file_name="test_butter_prefilter")
+    shot_record = wave.forward_solution_receivers
     rec10 = shot_record[:, 10]
 
-    fs = 1.0 / Wave_obj.dt
+    fs = 1.0 / wave.dt
 
     (f, S) = sp.signal.periodogram(rec10, fs, window='flattop', detrend='linear')
     peak_frequency = f[np.argmax(S)]
 
     # Checks if frequency with greater power density is close to 5
-    test1 = math.isclose(peak_frequency, Wave_obj.frequency, rel_tol=1e-2)
+    test1 = math.isclose(peak_frequency, wave.frequency, rel_tol=1e-2)
 
     # Checks if the new frequency is lower than the cutoff
     cutoff_frequency = 3.0
@@ -59,7 +59,7 @@ def test_butter_lowpast_filter():
     test3 = freq_filt_by_FFT < cutoff_frequency
 
     print(f"Peak frequency ({peak_frequency:.2f} Hz) "
-          f"is close to what it is supposed to be ({Wave_obj.frequency:.2f}): {test1}")
+          f"is close to what it is supposed to be ({wave.frequency:.2f}): {test1}")
     print(f"Filtered peak frequency ({filtered_peak_frequency:.2f}) Hz "
           f"is lower than cutoff frequency ({cutoff_frequency:.2f}): {test2}")
     print(f"Filtered peak frequency ({freq_filt_by_FFT:.2f}) Hz "

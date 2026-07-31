@@ -72,16 +72,16 @@ def test_forward_supershot():
         "gradient_filename": None,
     }
 
-    Wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02, "periodic": True})
+    wave = spyro.AcousticWave(dictionary=dictionary)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.02, "periodic": True})
 
-    Wave_obj.set_initial_velocity_model(constant=1.5)
-    Wave_obj.forward_solve()
-    comm = Wave_obj.comm
+    wave.set_initial_velocity_model(constant=1.5)
+    wave.forward_solve()
+    comm = wave.comm
 
-    rec_out = Wave_obj.forward_solution_receivers
+    rec_out = wave.forward_solution_receivers
     if comm.comm.rank == 0:
-        analytical_p = spyro.utils.nodal_homogeneous_analytical(Wave_obj, 0.2, 1.5, n_extra=100)
+        analytical_p = spyro.utils.nodal_homogeneous_analytical(wave, 0.2, 1.5, n_extra=100)
     else:
         analytical_p = None
 
@@ -100,7 +100,7 @@ def test_forward_supershot():
     comm.comm.barrier()
 
     if comm.comm.rank == 0:
-        print(f"Combined error for shots {Wave_obj.current_sources} is {error_all} and test has passed equals {np.abs(error_all) < 0.01}", flush=True)
+        print(f"Combined error for shots {wave.current_sources} is {error_all} and test has passed equals {np.abs(error_all) < 0.01}", flush=True)
 
     test = np.abs(error_all) < 0.01
 

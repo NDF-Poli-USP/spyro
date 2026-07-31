@@ -106,57 +106,57 @@ def test_representative_mesh_dimensions(element_type, dimension):
     dictionary = wave_dict(element_type, dimension)
 
     # Create the acoustic wave object
-    Wave_obj = AcousticWave(dictionary=dictionary)
+    wave = AcousticWave(dictionary=dictionary)
 
     # Mesh the domain with the specified edge length
     edge_length = 0.1
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+    wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
     # Call the method and assign the outputs to the mesh_parameters object
     mesh_derived_parameters = \
-        Wave_obj.mesh_ops.representative_mesh_dimensions(Wave_obj.mesh,
-                                                         Wave_obj.function_space)
-    Wave_obj.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
-    Wave_obj.mesh_parameters.lmin = mesh_derived_parameters[1]
-    Wave_obj.mesh_parameters.lmax = mesh_derived_parameters[2]
-    Wave_obj.mesh_parameters.alpha = mesh_derived_parameters[3]
-    Wave_obj.mesh_parameters.tol = mesh_derived_parameters[4]
+        wave.mesh_ops.representative_mesh_dimensions(wave.mesh,
+                                                     wave.function_space)
+    wave.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
+    wave.mesh_parameters.lmin = mesh_derived_parameters[1]
+    wave.mesh_parameters.lmax = mesh_derived_parameters[2]
+    wave.mesh_parameters.alpha = mesh_derived_parameters[3]
+    wave.mesh_parameters.tol = mesh_derived_parameters[4]
 
     # Print mesh info and computed values
     print("\nMesh Information:")
     print(f"  - Mesh type: {element_type}")
-    print(f"  - Number of cells: {Wave_obj.mesh.num_cells()}")
-    print(f"  - Number of vertices: {Wave_obj.mesh.num_vertices()}")
+    print(f"  - Number of cells: {wave.mesh.num_cells()}")
+    print(f"  - Number of vertices: {wave.mesh.num_vertices()}")
     print("\nComputed representative mesh dimensions:")
-    print(f"  - lmin (minimum mesh size): {Wave_obj.mesh_parameters.lmin:.6f}")
-    print(f"  - lmax (maximum mesh size): {Wave_obj.mesh_parameters.lmax:.6f}")
-    print(f"  - alpha (lmax/lmin ratio): {Wave_obj.mesh_parameters.alpha:.6f}")
-    print(f"  - tol (tolerance): {Wave_obj.mesh_parameters.tol:.2e}")
+    print(f"  - lmin (minimum mesh size): {wave.mesh_parameters.lmin:.6f}")
+    print(f"  - lmax (maximum mesh size): {wave.mesh_parameters.lmax:.6f}")
+    print(f"  - alpha (lmax/lmin ratio): {wave.mesh_parameters.alpha:.6f}")
+    print(f"  - tol (tolerance): {wave.mesh_parameters.tol:.2e}")
 
     # Verify attributes are set
-    assert hasattr(Wave_obj.mesh_parameters, 'diam_mesh'), "'diam_mesh' not set"
-    assert hasattr(Wave_obj.mesh_parameters, 'lmin'), "'lmin' not set"
-    assert hasattr(Wave_obj.mesh_parameters, 'lmax'), "'lmax' not set"
-    assert hasattr(Wave_obj.mesh_parameters, 'alpha'), "'alpha' not set"
-    assert hasattr(Wave_obj.mesh_parameters, 'tol'), "'tol' not set"
+    assert hasattr(wave.mesh_parameters, 'diam_mesh'), "'diam_mesh' not set"
+    assert hasattr(wave.mesh_parameters, 'lmin'), "'lmin' not set"
+    assert hasattr(wave.mesh_parameters, 'lmax'), "'lmax' not set"
+    assert hasattr(wave.mesh_parameters, 'alpha'), "'alpha' not set"
+    assert hasattr(wave.mesh_parameters, 'tol'), "'tol' not set"
 
     # Verify values are reasonable
-    assert Wave_obj.mesh_parameters.lmin > 0, \
-        f"lmin should be positive, got {Wave_obj.mesh_parameters.lmin}"
-    assert Wave_obj.mesh_parameters.lmax > 0, \
-        f"lmax should be positive, got {Wave_obj.mesh_parameters.lmax}"
-    assert Wave_obj.mesh_parameters.lmin <= Wave_obj.mesh_parameters.lmax, \
-        f"lmin ({Wave_obj.mesh_parameters.lmin}) should " + \
-        f"be <= lmax ({Wave_obj.mesh_parameters.lmax})"
-    assert Wave_obj.mesh_parameters.alpha >= 1., \
-        f"alpha should be >= 1, got {Wave_obj.mesh_parameters.alpha}"
-    assert Wave_obj.mesh_parameters.tol > 0, \
-        f"tol should be positive, got {Wave_obj.mesh_parameters.tol}"
-    assert Wave_obj.mesh_parameters.tol <= 1e-6, \
-        f"tol should be small, got {Wave_obj.mesh_parameters.tol}"
+    assert wave.mesh_parameters.lmin > 0, \
+        f"lmin should be positive, got {wave.mesh_parameters.lmin}"
+    assert wave.mesh_parameters.lmax > 0, \
+        f"lmax should be positive, got {wave.mesh_parameters.lmax}"
+    assert wave.mesh_parameters.lmin <= wave.mesh_parameters.lmax, \
+        f"lmin ({wave.mesh_parameters.lmin}) should " + \
+        f"be <= lmax ({wave.mesh_parameters.lmax})"
+    assert wave.mesh_parameters.alpha >= 1., \
+        f"alpha should be >= 1, got {wave.mesh_parameters.alpha}"
+    assert wave.mesh_parameters.tol > 0, \
+        f"tol should be positive, got {wave.mesh_parameters.tol}"
+    assert wave.mesh_parameters.tol <= 1e-6, \
+        f"tol should be small, got {wave.mesh_parameters.tol}"
     expected_lmin = expected_lmax = 0.1
-    assert isclose(Wave_obj.mesh_parameters.lmin, expected_lmin, rtol=1e-6)
-    assert isclose(Wave_obj.mesh_parameters.lmax, expected_lmax, rtol=1e-6)
+    assert isclose(wave.mesh_parameters.lmin, expected_lmin, rtol=1e-6)
+    assert isclose(wave.mesh_parameters.lmax, expected_lmax, rtol=1e-6)
 
 
 @mark.parametrize('element_type, dimension', [("T", 2),   # Triangular 2D
