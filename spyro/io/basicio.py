@@ -99,8 +99,8 @@ def save_shots(wave, file_name="shots/shot_record_", shot_ids=0):
 
     Parameters
     ----------
-    wave: :class:`Wave` object
-        A :class:`Wave` object
+    wave: :class:`spyro.solvers.Wave` object
+        A :class:`spyro.solvers.Wave` object
     source_id: int, optional by default 0
         The source number
     file_name: str, optional by default shot_number_#.dat
@@ -123,8 +123,8 @@ def load_shots(wave, file_name="shots/shot_record_", shot_ids=0):
 
     Parameters
     ----------
-    wave: :class:`Wave` object
-        A :class:`Wave` object
+    wave: :class:`spyro.solvers.Wave` object
+        A :class:`spyro.solvers.Wave` object
     source_id: int, optional by default 0
         The source number
     filename: str, optional by default shot_number_#.dat

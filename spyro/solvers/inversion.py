@@ -307,14 +307,13 @@ class FullWaveformInversion:
         Parameters
         ----------
         dictionary : dict, optional
-            Model and inversion configuration used to construct ``Wave`` class
-            when ``wave`` is not provided.
+            Model and inversion configuration used to construct ``spyro.solvers.Wave``
+            class when ``wave`` is not provided.
         comm : object, optional
-            Communicator passed to ``wave_class`` when constructing the wave
-            solver.
+            Communicator passed when constructing the wave solver.
         wave_class : type, optional
             Wave solver class used when ``wave`` is not provided. The class
-            must construct a :class:`Wave` with
+            must construct a :class:`spyro.solvers.Wave` with
             :attr:`WaveType.ISOTROPIC_ACOUSTIC` while FWI support is limited
             to acoustic adjoint solves.
         wave : object, optional
