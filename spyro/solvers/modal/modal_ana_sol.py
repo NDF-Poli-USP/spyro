@@ -419,8 +419,9 @@ class Modal_Analytical_Solver():
         except ConvergenceError as e:
             pprint(f"Nonlinear Curve Fit Failed: {e}", comm=self.comm)
 
-    def _freq_factor_hyp(self, n_hyp, f_rec, f_ell, c_eq, bc="Neumann", c_eqref=None,
-                         fitting_c=(0., 0., 0., 0.), cut_plane_percent=1.):
+    def _freq_factor_hyp(self, n_hyp, f_rec, f_ell, c_eq, bc="Neumann",
+                         c_eqref=None, fitting_c=(0., 0., 0., 0.),
+                         fbc_dirichlet=None, cut_plane_percent=1.):
         """Compute an approximate frequency factor for a full or truncated hypershape.
 
         The truncation plane is at z = cut_plane_percent * b, with b = Lz + pad_len.
@@ -456,6 +457,13 @@ class Modal_Analytical_Solver():
                 Exponent factor for the minimum equivalent velocity.
             - fp2 : `float`
                 Exponent factor for the maximum equivalent velocity.
+        fbc_dirichlet : `tuple`, optional
+            Multiplicative factor for Dirichlet BCs. Default is `None`.
+            Structure: (ratio_rec_dir, ratio_rec_ell):
+            - ratio_f_ell : `float`
+                Ratio for elliptical or ellipsoidal geometry (f_ell_dir / f_ell_neu).
+            - ratio_f_rec : `float`
+                Ratio for rectangular or prismatic geometry (f_rec_dir / f_rec_neu).
         cut_plane_percent : `float`, optional
             Percentage of the cut plane (0 to 1). Default is 1 (no cut).
 
@@ -471,17 +479,20 @@ class Modal_Analytical_Solver():
         c_eqref = c_eq if c_eqref is None else c_eqref
 
         # Regression for hypershape geometry factor
-        pn, qn, fr_ell, fr_rec = self._reg_geometry_hyp(cut_plane_percent=cut_plane_percent)
+        pn, qn, fr_ell, fr_rec = \
+            self._reg_geometry_hyp(cut_plane_percent=cut_plane_percent)
 
+        # Multiplicative fator by Dirichlet BCs
         if bc == "Dirichlet":
-            f_min = f_rec / fr_rec
-            cn2 = f_min - f_ell / fr_ell
-
-        if bc == "Neumann":
-            f_min = f_rec
-            cn2 = f_min - f_ell
+            type_data_structure_error("fbc_dirichlet", fbc_dirichlet, "tuple",
+                                      expected_type_element=("float"), expected_length=2)
+            ratio_f_ell, ratio_f_rec, = fbc_dirichlet
+            fr_ell *= ratio_f_ell
+            fr_rec *= ratio_f_rec
 
         # Hypershape frequency factor
+        f_min = f_rec
+        cn2 = f_min - f_ell
         pot_term = (1. / (qn * n_hyp + 1 - 2 * qn)) ** pn
         f_hyp = f_min - cn2 * pot_term
 
@@ -499,7 +510,7 @@ class Modal_Analytical_Solver():
 
         return f_hyp, c_reg
 
-    def dummy_load_static_(self, V, dof_load, amplitude_load, V_ref=None):
+    def dummy_load_static(self, V, dof_load, amplitude_load, V_ref=None):
         """Build a static load for the energy-equivalent homogenization.
 
         Parameters
@@ -661,7 +672,7 @@ class Modal_Analytical_Solver():
 
         # Define the load for the energy-equivalent homogenization
         c_is_float = isinstance(c, (int, float))
-        dummy_load = self.dummy_load_static_(
+        dummy_load = self.dummy_load_static(
             V, dof_load, amplitude_load, V_ref=V_ref) \
             if (type_homog == "energy" and not c_is_float) else (None, None)
 
@@ -776,8 +787,19 @@ class Modal_Analytical_Solver():
         # Frequency factors
         f_rec = self._freq_factor_rec(hyper_axes, bc=bc)
         f_ell = self._freq_factor_ell(hyper_axes, bc=bc, all_axes_equal=all_axes_equal)
+
+        # Multiplicative factor for Dirichlet BCs
+        if bc == "Dirichlet":
+            f_ell_neu = self._freq_factor_ell(hyper_axes, bc="Neumann")
+            f_rec_neu = self._freq_factor_rec(hyper_axes, bc="Neumann")
+            fbc_dirichlet = (f_ell / f_ell_neu, f_rec / f_rec_neu)
+
+        else:
+            fbc_dirichlet = None
+
         f_hyp, c_reg = self._freq_factor_hyp(n_hyp, f_rec, f_ell, c_eq, bc=bc,
                                              c_eqref=c_eqref, fitting_c=fitting_c,
+                                             fbc_dirichlet=fbc_dirichlet,
                                              cut_plane_percent=cut_plane_percent)
 
         pprint(f"Hypershape Equivalent Velocity c_eq (km/s) = {c_reg:.3f}", comm=self.comm)
