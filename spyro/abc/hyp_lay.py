@@ -454,7 +454,8 @@ class HyperLayer():
                               integer_num=True, lower_bound=0.)
 
         # Checking the minimum mesh size
-        value_numerical_error('lmin', lmin, float_num=True, lower_bound=0.)
+        value_numerical_error('lmin', lmin, float_num=True,
+                              integer_num=True, lower_bound=0.)
 
         # Domain dimensions
         length_z, length_x = self.domain_dim[:2]
