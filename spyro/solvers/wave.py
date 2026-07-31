@@ -697,27 +697,28 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Domain dimensions
         domain_dim = self.domain_dimensions()
 
-        # Nyquist frequency
-        freq_Nyquist = None if self.analysis != "transient" else 1. / (2. * self.dt)
+        # Timestep of the simulation. It is `None` if the response is not 'transient'.
+        time_step = None if self.analysis != "transient" else self.dt
 
-        if self.abc_boundary_layer_type == LayerDampingType.PML:
+        if self.abc_boundary_layer_type == LayerDampingType.PML:  # PML
             from ..pml.pml_nsnc import PMLLayer
-            self.layer_ops = PMLLayer(domain_dim, self.frequency, freq_Nyquist,
-                                      dimension=self.dimension,
+            self.layer_ops = PMLLayer(domain_dim, frequency=self.frequency,
+                                      dt=time_step, dimension=self.dimension,
                                       quadrilateral=self.mesh_parameters.quadrilateral,
                                       func_space_type=self.mesh_ops.func_space_type,
                                       abc_reference_freq=self.abc_reference_freq,
                                       output_folder=self.output_folder, comm=self.comm)
 
-        if self.abc_boundary_layer_type == LayerDampingType.HYBRID:
+        if self.abc_boundary_layer_type == LayerDampingType.HYBRID:  # HABC
             from ..habc.habc import HABCLayer
-            self.layer_ops = HABCLayer(domain_dim, self.frequency, freq_Nyquist,
-                                       self.abc_deg_layer, dimension=self.dimension,
+            self.layer_ops = HABCLayer(domain_dim, frequency=self.frequency,
+                                       dt=time_step, dimension=self.dimension,
                                        quadrilateral=self.mesh_parameters.quadrilateral,
                                        func_space_type=self.mesh_ops.func_space_type,
                                        abc_boundary_layer_shape=self.abc_boundary_layer_shape,
                                        abc_reference_freq=self.abc_reference_freq,
                                        abc_degree_type=self.abc_degree_type,
+                                       abc_deg_layer=self.abc_deg_layer,
                                        output_folder=self.output_folder, comm=self.comm)
 
         # Identifier for the current case study
