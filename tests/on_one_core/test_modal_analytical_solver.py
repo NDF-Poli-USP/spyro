@@ -479,7 +479,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.02  69.442
      0.03  70.974
      0.04  73.179
-     0.05  7¡5.766
+     0.05  75.766
      0.06  78.548
      0.07  81.431
      0.08  84.377*
