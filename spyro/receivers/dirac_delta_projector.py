@@ -56,23 +56,23 @@ class Delta_projector:
         List of cell IDs local to the processor
     """
 
-    def __init__(self, wave_object):
+    def __init__(self, wave):
         """
         Initializes the class
 
         Parameters
         ----------
-        wave_object: spyro.wave.Wave
+        wave: spyro.wave.Wave
             Wave object
         """
-        self.automatic_adjoint = wave_object.automatic_adjoint
-        self.mesh = wave_object.mesh
-        self.function_space = wave_object.function_space
-        self.wave_type = wave_object.wave_type
+        self.automatic_adjoint = wave.automatic_adjoint
+        self.mesh = wave.mesh
+        self.function_space = wave.function_space
+        self.wave_type = wave.wave_type
         self.space = self.function_space.sub(0)
-        self.my_ensemble = wave_object.comm
-        self.dimension = wave_object.dimension
-        self.degree = wave_object.degree
+        self.my_ensemble = wave.comm
+        self.dimension = wave.dimension
+        self.degree = wave.degree
 
         self.point_locations = None
         self.number_of_points = None
@@ -82,12 +82,12 @@ class Delta_projector:
         self.cell_tabulations = None
         self.cellNodeMaps = None
         self.nodes_per_cell = None
-        if wave_object.cell_type == "quadrilateral":
+        if wave.cell_type == "quadrilateral":
             self.quadrilateral = True
         else:
             self.quadrilateral = False
         self.is_local = None
-        self.use_vertex_only_mesh = wave_object.use_vertex_only_mesh
+        self.use_vertex_only_mesh = wave.use_vertex_only_mesh
 
     def build_maps(self, order=0):
         """Calculates and stores tabulations for interpolation

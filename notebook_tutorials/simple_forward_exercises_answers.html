@@ -7753,7 +7753,7 @@ a.anchor-link {
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">Wave_obj</span> <span class="o">=</span> <span class="n">spyro</span><span class="o">.</span><span class="n">AcousticWave</span><span class="p">(</span><span class="n">dictionary</span><span class="o">=</span><span class="n">dictionary</span><span class="p">)</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">wave</span> <span class="o">=</span> <span class="n">spyro</span><span class="o">.</span><span class="n">AcousticWave</span><span class="p">(</span><span class="n">dictionary</span><span class="o">=</span><span class="n">dictionary</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -7801,7 +7801,7 @@ a.anchor-link {
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">Wave_obj</span><span class="o">.</span><span class="n">set_mesh</span><span class="p">(</span><span class="n">mesh_parameters</span><span class="o">=</span><span class="p">{</span><span class="s2">"dx"</span><span class="p">:</span> <span class="mf">0.05</span><span class="p">})</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">wave</span><span class="o">.</span><span class="n">set_mesh</span><span class="p">(</span><span class="n">mesh_parameters</span><span class="o">=</span><span class="p">{</span><span class="s2">"dx"</span><span class="p">:</span> <span class="mf">0.05</span><span class="p">})</span>
 </pre></div>
 </div>
 </div>
@@ -7829,13 +7829,13 @@ a.anchor-link {
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">firedrake</span> <span class="kn">import</span> <span class="n">conditional</span>
 
-<span class="n">z</span> <span class="o">=</span> <span class="n">Wave_obj</span><span class="o">.</span><span class="n">mesh_z</span>
-<span class="n">x</span> <span class="o">=</span> <span class="n">Wave_obj</span><span class="o">.</span><span class="n">mesh_x</span>
+<span class="n">z</span> <span class="o">=</span> <span class="n">wave</span><span class="o">.</span><span class="n">mesh_z</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">wave</span><span class="o">.</span><span class="n">mesh_x</span>
 
 <span class="n">vp</span> <span class="o">=</span> <span class="n">conditional</span><span class="p">(</span><span class="n">z</span> <span class="o">&gt;</span> <span class="o">-</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">)</span>
 <span class="n">vp</span> <span class="o">=</span> <span class="n">conditional</span><span class="p">(((</span><span class="n">z</span><span class="o">+</span><span class="mf">1.0</span><span class="p">)</span><span class="o">/</span><span class="mf">0.2</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="o">+</span><span class="p">((</span><span class="n">x</span><span class="o">-</span><span class="mf">3.0</span><span class="p">)</span><span class="o">/</span><span class="mf">0.5</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">,</span> <span class="mf">4.5</span><span class="p">,</span> <span class="n">vp</span><span class="p">)</span>
 
-<span class="n">Wave_obj</span><span class="o">.</span><span class="n">set_initial_velocity_model</span><span class="p">(</span><span class="n">conditional</span><span class="o">=</span><span class="n">vp</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dg_velocity_model</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">wave</span><span class="o">.</span><span class="n">set_initial_velocity_model</span><span class="p">(</span><span class="n">conditional</span><span class="o">=</span><span class="n">vp</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dg_velocity_model</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -7860,7 +7860,7 @@ a.anchor-link {
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">spyro</span><span class="o">.</span><span class="n">plots</span><span class="o">.</span><span class="n">plot_model</span><span class="p">(</span><span class="n">Wave_obj</span><span class="p">,</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">spyro</span><span class="o">.</span><span class="n">plots</span><span class="o">.</span><span class="n">plot_model</span><span class="p">(</span><span class="n">wave</span><span class="p">,</span>
                        <span class="n">filename</span><span class="o">=</span><span class="s2">"simple_forward_exercise_model.png"</span><span class="p">,</span>
                        <span class="n">show</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
                        <span class="n">abc_points</span><span class="o">=</span><span class="p">[(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.5</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.5</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">)])</span>
@@ -7907,7 +7907,7 @@ a.anchor-link {
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">Wave_obj</span><span class="o">.</span><span class="n">forward_solve</span><span class="p">()</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">wave</span><span class="o">.</span><span class="n">forward_solve</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
@@ -7997,7 +7997,7 @@ Simulation time is:        5.0 seconds
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">shot_record</span> <span class="o">=</span> <span class="n">Wave_obj</span><span class="o">.</span><span class="n">forward_solution_receivers</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">shot_record</span> <span class="o">=</span> <span class="n">wave</span><span class="o">.</span><span class="n">forward_solution_receivers</span>
 </pre></div>
 </div>
 </div>
@@ -8023,7 +8023,7 @@ Simulation time is:        5.0 seconds
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">vmax</span> <span class="o">=</span> <span class="mf">0.1</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">shot_record</span><span class="p">)</span>
-<span class="n">spyro</span><span class="o">.</span><span class="n">plots</span><span class="o">.</span><span class="n">plot_shots</span><span class="p">(</span><span class="n">Wave_obj</span><span class="p">,</span> <span class="n">contour_lines</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="n">vmax</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">vmax</span><span class="p">,</span> <span class="n">show</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">spyro</span><span class="o">.</span><span class="n">plots</span><span class="o">.</span><span class="n">plot_shots</span><span class="p">(</span><span class="n">wave</span><span class="p">,</span> <span class="n">contour_lines</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="n">vmax</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">vmax</span><span class="p">,</span> <span class="n">show</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -8060,7 +8060,7 @@ Simulation time is:        5.0 seconds
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">pressure_dofs</span> <span class="o">=</span> <span class="n">Wave_obj</span><span class="o">.</span><span class="n">function_space</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">pressure_dofs</span> <span class="o">=</span> <span class="n">wave</span><span class="o">.</span><span class="n">function_space</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Pressure DoFs: </span><span class="si">{</span><span class="n">pressure_dofs</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -8099,7 +8099,7 @@ Simulation time is:        5.0 seconds
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">total_dofs</span> <span class="o">=</span> <span class="n">Wave_obj</span><span class="o">.</span><span class="n">function_space</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">+</span> <span class="n">Wave_obj</span><span class="o">.</span><span class="n">vector_function_space</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">total_dofs</span> <span class="o">=</span> <span class="n">wave</span><span class="o">.</span><span class="n">function_space</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">+</span> <span class="n">wave</span><span class="o">.</span><span class="n">vector_function_space</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total DoFs: </span><span class="si">{</span><span class="n">total_dofs</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -8139,8 +8139,8 @@ Simulation time is:        5.0 seconds
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">zi</span> <span class="o">=</span> <span class="n">spyro</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">write_function_to_grid</span><span class="p">(</span>
-    <span class="n">Wave_obj</span><span class="o">.</span><span class="n">c</span><span class="p">,</span>
-    <span class="n">Wave_obj</span><span class="o">.</span><span class="n">function_space</span><span class="p">,</span>
+    <span class="n">wave</span><span class="o">.</span><span class="n">c</span><span class="p">,</span>
+    <span class="n">wave</span><span class="o">.</span><span class="n">function_space</span><span class="p">,</span>
     <span class="mf">0.01</span><span class="p">)</span>
 <span class="n">spyro</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">create_segy</span><span class="p">(</span><span class="n">zi</span><span class="p">,</span> <span class="s2">"velocity_models/tutorial.segy"</span><span class="p">)</span>
 </pre></div>

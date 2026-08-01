@@ -10,13 +10,13 @@ model["acquisition"]["source_type"] = "MMS"
 def run_solve(model):
     testmodel = deepcopy(model)
 
-    Wave_obj = spyro.AcousticWaveMMS(dictionary=testmodel)
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02})
-    Wave_obj.set_initial_velocity_model(expression="1 + sin(pi*-z)*sin(pi*x)")
-    Wave_obj.forward_solve()
+    wave = spyro.AcousticWaveMMS(dictionary=testmodel)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.02})
+    wave.set_initial_velocity_model(expression="1 + sin(pi*-z)*sin(pi*x)")
+    wave.forward_solve()
 
-    u_an = Wave_obj.analytical_solution(Wave_obj.current_time)
-    u_num = Wave_obj.u_n
+    u_an = wave.analytical_solution(wave.current_time)
+    u_num = wave.u_n
 
     return errornorm(u_num, u_an)
 
