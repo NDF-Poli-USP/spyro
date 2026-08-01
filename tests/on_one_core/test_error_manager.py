@@ -7,12 +7,12 @@ from unittest.mock import Mock, patch
 from firedrake import Function, FunctionSpace, Mesh
 from ufl.geometry import SpatialCoordinate
 from spyro.utils.error_management import (
-    clean_inst_num, enum_parameter_error, mutually_exclusive_parameter_error,
+    enum_parameter_error, mutually_exclusive_parameter_error, sanitize_num_array,
     type_data_structure_error, type_firedrake_error, value_model_dimension_error,
     value_numerical_error, value_parameter_error, value_string_error)
 
 
-class TestEnum(Enum):
+class ExampleEnum(Enum):
     """Test enum class for enum_parameter_error tests."""
     VALUE1 = "value1"
     VALUE2 = "value2"
@@ -138,47 +138,47 @@ class TestValueModelDimensionError:
 
 
 class TestCleanInstNum:
-    """Tests for clean_inst_num function."""
+    """Tests for sanitize_num_array function."""
 
     def test_clean_nan_values(self):
         """Test cleaning NaN values."""
         arr = array([1.0, nan, 3.0, nan, 5.0])
-        result = clean_inst_num(arr)
+        result = sanitize_num_array(arr)
         expected = array([1.0, 0.0, 3.0, 0.0, 5.0])
         assert_array_equal(result, expected)
 
     def test_clean_inf_values(self):
         """Test cleaning inf values."""
         arr = array([1.0, inf, 3.0, -inf, 5.0])
-        result = clean_inst_num(arr)
+        result = sanitize_num_array(arr)
         expected = array([1.0, 0.0, 3.0, 0.0, 5.0])
         assert_array_equal(result, expected)
 
     def test_clean_negative_values(self):
         """Test cleaning negative values."""
         arr = array([1.0, -2.0, 3.0, -4.0, 5.0])
-        result = clean_inst_num(arr)
+        result = sanitize_num_array(arr)
         expected = array([1.0, 0.0, 3.0, 0.0, 5.0])
         assert_array_equal(result, expected)
 
     def test_clean_mixed_invalid_values(self):
         """Test cleaning mixed invalid values."""
         arr = array([1.0, nan, -2.0, inf, 5.0, -inf])
-        result = clean_inst_num(arr)
+        result = sanitize_num_array(arr)
         expected = array([1.0, 0.0, 0.0, 0.0, 5.0, 0.0])
         assert_array_equal(result, expected)
 
     def test_clean_already_clean_values(self):
         """Test with already clean values."""
         arr = array([1.0, 2.0, 3.0, 4.0, 5.0])
-        result = clean_inst_num(arr)
+        result = sanitize_num_array(arr)
         expected = array([1.0, 2.0, 3.0, 4.0, 5.0])
         assert_array_equal(result, expected)
 
     def test_clean_only_nan(self):
         """Test cleaning only NaN values."""
         arr = array([1.0, nan, -2.0, inf, 5.0])
-        result = clean_inst_num(
+        result = sanitize_num_array(
             arr, nan_values=True, inf_values=False, negative_values=False)
         expected = array([1.0, 0.0, -2.0, inf, 5.0])
         assert_array_equal(result, expected)
@@ -186,7 +186,7 @@ class TestCleanInstNum:
     def test_clean_only_inf(self):
         """Test cleaning only infinite values."""
         arr = array([1.0, nan, -2.0, inf, 5.0, -inf])
-        result = clean_inst_num(
+        result = sanitize_num_array(
             arr, nan_values=False, inf_values=True, negative_values=False)
         expected = array([1.0, nan, -2.0, 0.0, 5.0, 0.0])
         assert_array_equal(result, expected)
@@ -194,7 +194,7 @@ class TestCleanInstNum:
     def test_clean_only_negative(self):
         """Test cleaning only negative values."""
         arr = array([1.0, nan, -2.0, inf, 5.0])
-        result = clean_inst_num(
+        result = sanitize_num_array(
             arr, nan_values=False, inf_values=False, negative_values=True)
         expected = array([1.0, nan, 0.0, inf, 5.0])
         assert_array_equal(result, expected)
@@ -202,7 +202,7 @@ class TestCleanInstNum:
     def test_clean_nan_and_negative(self):
         """Test cleaning NaN and negative values only."""
         arr = array([1.0, nan, -2.0, inf, 5.0])
-        result = clean_inst_num(
+        result = sanitize_num_array(
             arr, nan_values=True, inf_values=False, negative_values=True)
         expected = array([1.0, 0.0, 0.0, inf, 5.0])
         assert_array_equal(result, expected)
@@ -210,7 +210,7 @@ class TestCleanInstNum:
     def test_clean_disabled(self):
         """Test with all cleaning options disabled."""
         arr = array([1.0, nan, -2.0, inf, 5.0])
-        result = clean_inst_num(
+        result = sanitize_num_array(
             arr, nan_values=False, inf_values=False, negative_values=False)
         expected = array([1.0, nan, -2.0, inf, 5.0])
         assert_array_equal(result, expected)
@@ -218,7 +218,7 @@ class TestCleanInstNum:
     def test_clean_type_error(self):
         """Test with invalid input type."""
         with raises(TypeError):
-            clean_inst_num([1, 2, 3])  # list instead of array
+            sanitize_num_array([1, 2, 3])  # list instead of array
 
 
 class TestValueNumericalError:
@@ -365,25 +365,25 @@ class TestEnumParameterError:
 
     def test_valid_enum_instance(self):
         """Test with valid enum instance."""
-        result = enum_parameter_error("test_param", TestEnum.VALUE1, TestEnum)
-        assert result == TestEnum.VALUE1
+        result = enum_parameter_error("test_param", ExampleEnum.VALUE1, ExampleEnum)
+        assert result == ExampleEnum.VALUE1
 
     def test_valid_string_value(self):
         """Test with valid string value."""
-        result = enum_parameter_error("test_param", "value2", TestEnum)
-        assert result == TestEnum.VALUE2
+        result = enum_parameter_error("test_param", "value2", ExampleEnum)
+        assert result == ExampleEnum.VALUE2
 
     def test_invalid_string_value(self):
         """Test with invalid string value."""
         with raises(ValueError) as exc_info:
-            enum_parameter_error("test_param", "invalid", TestEnum)
+            enum_parameter_error("test_param", "invalid", ExampleEnum)
         assert "Invalid test_param: 'invalid'" in str(exc_info.value)
 
     def test_invalid_type(self):
         """Test with invalid type(not enum instance or string)."""
         with raises(TypeError) as exc_info:
-            enum_parameter_error("test_param", 123, TestEnum)
-        assert "'test_param' must be TestEnum or str" in str(exc_info.value)
+            enum_parameter_error("test_param", 123, ExampleEnum)
+        assert "'test_param' must be ExampleEnum or str" in str(exc_info.value)
 
 
 class TestValueStringError:

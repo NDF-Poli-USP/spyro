@@ -2,7 +2,7 @@ from firedrake import (assemble, ConvergenceError, dx as fire_dx, Function, grad
                        inner, LinearVariationalProblem, LinearVariationalSolver)
 from numpy import (arange, arccosh, argmax, array, asarray,
                    diag, inf, maximum, mean, pi, sqrt)
-from scipy.optimize import broyden1, curve_fit
+from scipy.optimize import curve_fit, fsolve, minimize_scalar
 from scipy.special import (beta, betainc, gamma, jn_zeros, jnp_zeros,
                            mathieu_modcem1, spherical_jn)
 from scipy.stats import norm as sn
@@ -155,7 +155,7 @@ class Modal_Analytical_Solver():
             psi0 = arccosh(a0 / f0)
             idx = int(bc == "Neumann")
             m = 1 if bc == "Neumann" else 0  # Order of the MMF
-            # pprint(bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx], comm=self.comm)
+            # pprint((bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx]), comm=self.comm)
             return mathieu_modcem1(m, q, psi0)[idx]
 
         def ZBF(m=0, n=1):
@@ -175,7 +175,7 @@ class Modal_Analytical_Solver():
             """
             deriv = (bc == "Neumann")
             Jmz = jnp_zeros(m, n) if deriv else jn_zeros(m, n)
-            # pprint(bc, m, n, Jmz, comm=self.comm)
+            # pprint((bc, m, n, Jmz), comm=self.comm)
             return Jmz
 
         def SBF(q, m=0):
@@ -195,29 +195,56 @@ class Modal_Analytical_Solver():
             """
             deriv = (bc == "Neumann")
             m = int(deriv)  # Order of the SBF: 0 (False) or 1 (True)
-            # pprint(bc, m, q, spherical_jn(m, q, derivative=deriv, comm=self.comm))
+            # pprint((bc, m, q, spherical_jn(m, q, derivative=deriv)), comm=self.comm)
             return spherical_jn(m, q, derivative=deriv)
+
+        def ana_rq_ellipsoid(alpha):
+            """Rayleigh quotient for ellipsoid with trial function ψ = (1 - r²)(1 + α r²).
+
+            Parameters
+            ----------
+            alpha : `float`
+                Parameter of the trial function ψ = (1 - r²)(1 + α r²).
+
+            Returns
+            -------
+            RQ(α) : `float`
+            Rayleigh quotient RQ(α) = E(α) / N(α)
+            """
+            # Radial integral I_r
+            I_r = (alpha - 1)**2./5. - 4 * alpha * (alpha - 1.)/7. + 4. * alpha**2./9.
+
+            # Radial integral J_r
+            J_r = (1./3. + (2 * alpha - 2)/5. + (alpha**2. - 4.*alpha + 1.)/7.
+                   - (2. * alpha**2. - 2. * alpha)/9. + alpha**2./11.)
+
+            RQ = (4./3.) * (1./a**2 + 1./b**2 + 1./c**2) * (I_r / J_r)
+            # pprint((bc, I_r, J_r, alpha, RQ), comm=self.comm)
+            return RQ
 
         # Semi-axes
         a, b = hyper_axes[: 2]
+
+        # Circular or spherical case
+        if all_axes_equal:
+            m = 1 if bc == "Neumann" else 0
+
+            # 1st root for the mth-order Bessel's function
+            first_root_2D = ZBF(m=m, n=1)[0]
+
+            if self.dimension == 2:  # 2D circular
+                J01 = first_root_2D
+
+            if self.dimension == 3:  # 3D spherical
+                J01 = fsolve(SBF, first_root_2D, xtol=1e-14)[0]
+
+            return J01 / a
 
         # Frequency factor for rectangular/prismatic case
         f_rec = self._freq_factor_rec(hyper_axes, bc=bc)
 
         # Initial guess
         igss = f_rec if bc == "Neumann" else 0.
-
-        # Circular or spherical case
-        if all_axes_equal:
-            # 1st root for the mth-order Bessel's function
-            if self.dimension == 2:  # 2D circular
-                m = 1 if bc == "Neumann" else 0
-                J01 = ZBF(m=m, n=1)[0]
-
-            if self.dimension == 3:  # 3D spherical
-                J01 = float(broyden1(SBF, igss, f_tol=1e-14))
-
-            return J01 / a
 
         # Elliptical or ellipsoidal case
         if self.dimension == 2:  # 2D elliptical
@@ -230,13 +257,11 @@ class Modal_Analytical_Solver():
 
             # 1st root or the mth-order Modified Mathieu's Function
             a0 = a
-            M01 = float(broyden1(MMF, igss, f_tol=1e-14))
+            M01 = fsolve(MMF, igss, xtol=1e-14)[0]
 
             return (2 / f0) * M01 ** 0.5
 
         if self.dimension == 3:  # 3D ellipsoidal
-
-            f_ell_arr = []
 
             # Order semi-axes
             a, b, c = sorted(hyper_axes, reverse=True)
@@ -249,22 +274,27 @@ class Modal_Analytical_Solver():
             if bc == "Neumann":
                 # Only use the pair with maximum eccentricity
                 max_ecc_idx = argmax([ecc for _, _, ecc in ecc_arr])
-                ecc_arr = [ecc_arr[max_ecc_idx]]
-
-            for a0, b0, f0 in ecc_arr:
+                a0, b0, f0 = ecc_arr[max_ecc_idx]
 
                 if f0 == 0:  # Circular cross-section
                     # 1st root for the mth-order Bessel's function
                     J01 = ZBF(m=0, n=1)[0]
-                    f_ell_arr.append((J01 / a0) ** 2)
+
+                    return J01 / a
 
                 else:  # Elliptical cross-section
                     # 1st root or the mth-order Modified Mathieu's Function
-                    M01 = float(broyden1(MMF, igss, f_tol=1e-14))
-                    f_ell_arr.append(4 * M01 / f0 ** 2)
+                    M01 = fsolve(MMF, igss, xtol=1e-14)[0]
 
-            # Sum and return square root
-            return sum(f_ell_arr) ** 0.5
+                    return (2 / f0) * M01 ** 0.5
+
+            if bc == "Dirichlet":
+
+                # Use Rayleigh-Ritz  optimizing the parameter α in the trial function ψ.
+                RQ = minimize_scalar(ana_rq_ellipsoid, bounds=(-1., 1.),
+                                     method='bounded', tol=1e-14)
+
+                return RQ.fun ** 0.5
 
     def _reg_geometry_hyp(self, cut_plane_percent=1.):
         """Perform the nonlinear regression for the hypershape geometry factor.
@@ -341,16 +371,14 @@ class Modal_Analytical_Solver():
             f_max = 2. * fax_trunc
             fn2 = area_function(2., cut_plane_percent)
             fr_ell = fn2 / area_function(2., 1.)
-            fr_rec = area_function(100., cut_plane_percent
-                                   ) / area_function(100., 1.)
+            fr_rec = area_function(100., cut_plane_percent) / area_function(100., 1.)
             f_data = area_function(n_data, cut_plane_percent)
 
         if self.dimension == 3:  # 3D
             f_max = 4. * fax_trunc
             fn2 = volume_function(2., cut_plane_percent)
             fr_ell = fn2 / volume_function(2., 1.)
-            fr_rec = volume_function(100., cut_plane_percent
-                                     ) / area_function(100., 1.)
+            fr_rec = volume_function(100., cut_plane_percent) / volume_function(100., 1.)
             f_data = volume_function(n_data, cut_plane_percent)
 
         # Initial guess
@@ -391,8 +419,9 @@ class Modal_Analytical_Solver():
         except ConvergenceError as e:
             pprint(f"Nonlinear Curve Fit Failed: {e}", comm=self.comm)
 
-    def _freq_factor_hyp(self, n_hyp, f_rec, f_ell, c_eq, bc="Neumann", c_eqref=None,
-                         fitting_c=(0., 0., 0., 0.), cut_plane_percent=1.):
+    def _freq_factor_hyp(self, n_hyp, f_rec, f_ell, c_eq, bc="Neumann",
+                         c_eqref=None, fitting_c=(0., 0., 0., 0.),
+                         fbc_dirichlet=None, cut_plane_percent=1.):
         """Compute an approximate frequency factor for a full or truncated hypershape.
 
         The truncation plane is at z = cut_plane_percent * b, with b = Lz + pad_len.
@@ -428,6 +457,13 @@ class Modal_Analytical_Solver():
                 Exponent factor for the minimum equivalent velocity.
             - fp2 : `float`
                 Exponent factor for the maximum equivalent velocity.
+        fbc_dirichlet : `tuple`, optional
+            Multiplicative factor for Dirichlet BCs. Default is `None`.
+            Structure: (ratio_rec_dir, ratio_rec_ell):
+            - ratio_f_ell : `float`
+                Ratio for elliptical or ellipsoidal geometry (f_ell_dir / f_ell_neu).
+            - ratio_f_rec : `float`
+                Ratio for rectangular or prismatic geometry (f_rec_dir / f_rec_neu).
         cut_plane_percent : `float`, optional
             Percentage of the cut plane (0 to 1). Default is 1 (no cut).
 
@@ -439,18 +475,24 @@ class Modal_Analytical_Solver():
             Approximate equivalent velocity for the hypershape.
         """
 
+        # Check the homogeneous velocity from original model without absorbing layer
+        c_eqref = c_eq if c_eqref is None else c_eqref
+
         # Regression for hypershape geometry factor
-        pn, qn, fr_ell, fr_rec = self._reg_geometry_hyp(cut_plane_percent=cut_plane_percent)
+        pn, qn, fr_ell, fr_rec = \
+            self._reg_geometry_hyp(cut_plane_percent=cut_plane_percent)
 
+        # Multiplicative fator by Dirichlet BCs
         if bc == "Dirichlet":
-            f_min = f_rec / fr_rec
-            cn2 = f_min - f_ell / fr_ell
-
-        if bc == "Neumann":
-            f_min = f_rec
-            cn2 = f_min - f_ell
+            type_data_structure_error("fbc_dirichlet", fbc_dirichlet, "tuple",
+                                      expected_type_element=("float"), expected_length=2)
+            ratio_f_ell, ratio_f_rec, = fbc_dirichlet
+            fr_ell *= ratio_f_ell
+            fr_rec *= ratio_f_rec
 
         # Hypershape frequency factor
+        f_min = f_rec
+        cn2 = f_min - f_ell
         pot_term = (1. / (qn * n_hyp + 1 - 2 * qn)) ** pn
         f_hyp = f_min - cn2 * pot_term
 
@@ -468,7 +510,7 @@ class Modal_Analytical_Solver():
 
         return f_hyp, c_reg
 
-    def dummy_load_static_(self, V, dof_load, amplitude_load, V_ref=None):
+    def dummy_load_static(self, V, dof_load, amplitude_load, V_ref=None):
         """Build a static load for the energy-equivalent homogenization.
 
         Parameters
@@ -550,7 +592,7 @@ class Modal_Analytical_Solver():
                              "Function", none_default=True)
 
         # Integration measure
-        dx = fire_dx(**quad_rule) if quad_rule else fire_dx
+        dx = fire_dx(**quad_rule) if quad_rule else fire_dx(**{"degree": 0})
 
         # State variable
         u = Function(V)
@@ -630,7 +672,7 @@ class Modal_Analytical_Solver():
 
         # Define the load for the energy-equivalent homogenization
         c_is_float = isinstance(c, (int, float))
-        dummy_load = self.dummy_load_static_(
+        dummy_load = self.dummy_load_static(
             V, dof_load, amplitude_load, V_ref=V_ref) \
             if (type_homog == "energy" and not c_is_float) else (None, None)
 
@@ -745,8 +787,19 @@ class Modal_Analytical_Solver():
         # Frequency factors
         f_rec = self._freq_factor_rec(hyper_axes, bc=bc)
         f_ell = self._freq_factor_ell(hyper_axes, bc=bc, all_axes_equal=all_axes_equal)
+
+        # Multiplicative factor for Dirichlet BCs
+        if bc == "Dirichlet":
+            f_ell_neu = self._freq_factor_ell(hyper_axes, bc="Neumann")
+            f_rec_neu = self._freq_factor_rec(hyper_axes, bc="Neumann")
+            fbc_dirichlet = (f_ell / f_ell_neu, f_rec / f_rec_neu)
+
+        else:
+            fbc_dirichlet = None
+
         f_hyp, c_reg = self._freq_factor_hyp(n_hyp, f_rec, f_ell, c_eq, bc=bc,
                                              c_eqref=c_eqref, fitting_c=fitting_c,
+                                             fbc_dirichlet=fbc_dirichlet,
                                              cut_plane_percent=cut_plane_percent)
 
         pprint(f"Hypershape Equivalent Velocity c_eq (km/s) = {c_reg:.3f}", comm=self.comm)

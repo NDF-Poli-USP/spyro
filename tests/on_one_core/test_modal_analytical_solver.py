@@ -1,13 +1,12 @@
-"""Unit tests for the Modal solvers implemented in spyro.solvers.modal.modal_sol.
+"""Unit tests for the Analytical Modal solver in spyro.solvers.modal.modal_ana_sol.
 
-These tests verify the implemented modal solvers by comparing the computed fundamental
+These tests verify the analytical modal solver by comparing the computed fundamental
 frequency with expected values for different domain configurations. The tests cover
 both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
 """
 
 from pytest import fail, fixture, mark, param
-from firedrake import conditional, ConvergenceError
-from firedrake import COMM_WORLD as comm
+from firedrake import COMM_WORLD as comm, conditional, ConvergenceError
 from numpy import isclose, squeeze, zeros
 from scipy.optimize import minimize
 from spyro.solvers.acoustic_wave import AcousticWave
@@ -441,11 +440,11 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.06 85.347
 
     *RESULTS HETEROGENEOUS (usr: without optimization)
-    Frequency[Hz]    N2.4 iter         (texe/pmem) iter     REC          (texe/pmem)
-    ANALYTICAL    0.51653   30 (120.432s/82.775MB)   26 0.42568 (177.947s/ 74.301MB)
-    ANALYTICAL    0.51833  usr (  5.761s/10.364MB)  usr 0.42415 (  8.884s/ 12.748MB)
-    KRYLOVSCH_GH  0.51535  n/a ( 25.103s/ 0.077MB)  n/a 0.42562 ( 64.295s/  0.075MB)
-    RAYLEIGH      0.54073  n/a ( 37.131s/71.052MB)  n/a 0.44257 ( 47.741s/104.142MB)
+    Frequency[Hz]    N2.4 iter         (texe/pmem)     REC iter          (texe/pmem)
+    ANALYTICAL    0.51653   30 (120.432s/82.775MB) 0.42568   26 (177.947s/ 74.301MB)
+    ANALYTICAL    0.51787  usr (  4.430s/10.494MB) 0.41840  usr (  6.531s/ 12.903MB)
+    KRYLOVSCH_GH  0.51535  n/a ( 25.103s/ 0.077MB) 0.42562  n/a ( 64.295s/  0.075MB)
+    RAYLEIGH      0.54073  n/a ( 37.131s/71.052MB) 0.44257  n/a ( 47.741s/104.142MB)
 
     *ANALYTICAL
        Case      REC*  N2.4*
@@ -490,7 +489,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     *RESULTS HETEROGENEOUS (usr: without optimization)
     Frequency[Hz]     REC iter        (texe/pmem)
     ANALYTICAL    0.41350   25 (79.510s/42.848MB)
-    ANALYTICAL    0.41373  usr ( 4.707s/11.191MB)
+    ANALYTICAL    0.42873  usr ( 3.689s/12.027MB)
     KRYLOVSCH_GG  0.41127  n/a (25.221s/ 0.086MB)
     RAYLEIGH      0.42935  n/a (31.954s/51.852MB)
 
