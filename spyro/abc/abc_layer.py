@@ -426,7 +426,7 @@ class ABCLayer(NRBC):
         self.path_save = path_save
         self.path_case_abc = path_case_abc
 
-    def critical_boundary_points(self, Wave):
+    def critical_boundary_points(self, wave):
         """Determine critical boundary points using the Eikonal criterion.
 
         Use original-domain boundaries to size the absorbing layer.
@@ -437,7 +437,7 @@ class ABCLayer(NRBC):
 
         Parameters
         ----------
-        Wave : `wave.Wave`
+        wave : `wave.Wave`
             An instance of the :class:`~spyro.solvers.wave.Wave`.
 
         Returns
@@ -446,7 +446,7 @@ class ABCLayer(NRBC):
         """
 
         # Initializing Eikonal object
-        Eik = Minimum_Eikonal(Wave)
+        Eik = Minimum_Eikonal(wave)
 
         # Solving Eikonal
         Eik.solve_eik()
@@ -456,8 +456,8 @@ class ABCLayer(NRBC):
 
         # Critical point coordinates as receivers
         pcrit = [bnd[0] for bnd in self.eik_bnd]
-        Wave.receiver_locations = pcrit + Wave.receiver_locations
-        Wave.number_of_receivers = len(Wave.receiver_locations)
+        wave.receiver_locations = pcrit + wave.receiver_locations
+        wave.number_of_receivers = len(wave.receiver_locations)
 
     def det_reference_freq(self, fpad=4):
         """Determine the reference frequency for a new layer size.
@@ -632,12 +632,12 @@ class ABCLayer(NRBC):
             self.layer_geometry.calc_hyp_geom_prop(
                 domain_layer_full, self.abc_pad_length, self.lmin)
 
-    def create_mesh_with_layer(self, Wave, inf_model=False, spln=True, save_file=True):
+    def create_mesh_with_layer(self, wave, inf_model=False, spln=True, save_file=True):
         """Create a mesh with absorbing layer based on the determined size.
 
         Parameters
         ----------
-        Wave : `wave.Wave`
+        wave : `wave.Wave`
             An instance of the :class:`~spyro.solvers.wave.Wave`.
         inf_model : `bool`, optional
             If `True`, build a rectangular layer for the infinite or reference.
@@ -666,17 +666,17 @@ class ABCLayer(NRBC):
         # New mesh with layer
         if layer_shape == LayerShapeType.RECTANGULAR:
 
-            # Update the pad length in Wave object
-            Wave.abc_pad_length = self.abc_pad_length
+            # Update the pad length in wave object
+            wave.abc_pad_length = self.abc_pad_length
 
             # Create the mesh
-            Wave.set_mesh()
+            wave.set_mesh()
             pprint("Extended Rectangular Mesh Generated Successfully", comm=self.comm)
 
         elif layer_shape == LayerShapeType.HYPERSHAPE:
 
-            # Update the pad length in Wave.mesh_parameters object
-            Wave.mesh_parameters.abc_pad_length = self.abc_pad_length
+            # Update the pad length in wave.mesh_parameters object
+            wave.mesh_parameters.abc_pad_length = self.abc_pad_length
 
             # Parameters for hypershape mesh
             if self.dimension == 2:  # 2D
@@ -689,11 +689,11 @@ class ABCLayer(NRBC):
                 self.layer_geometry.n_hyp, geometry_param, *self.layer_geometry.hyper_axes)
 
             # Creating the mesh with the absorbing layer based on the hypershape geometry
-            mesh_abc = Wave.mesh_ops.hypershape_mesh_habc(
-                hypershape_param, Wave.mesh_original, Wave.mesh_parameters, spln=spln)
+            mesh_abc = wave.mesh_ops.hypershape_mesh_habc(
+                hypershape_param, wave.mesh_original, wave.mesh_parameters, spln=spln)
 
             # Updating the mesh with the absorbing layer
-            Wave.set_mesh(user_mesh=mesh_abc)
+            wave.set_mesh(user_mesh=mesh_abc)
 
         pprint("Mesh Generated Successfully", comm=self.comm)
 
@@ -707,14 +707,14 @@ class ABCLayer(NRBC):
 
             # Save new mesh
             outfile = VTKFile(pth_mesh)
-            outfile.write(Wave.mesh)
+            outfile.write(wave.mesh)
 
-    def velocity_abc(self, Wave, inf_model=False, method="point_cloud", save_file=True):
+    def velocity_abc(self, wave, inf_model=False, method="point_cloud", save_file=True):
         """Set the velocity profile for the model with absorbing layer.
 
         Parameters
         ----------
-        Wave : `wave.Wave`
+        wave : `wave.Wave`
             An instance of the :class:`~spyro.solvers.wave.Wave`.
         inf_model : `bool`, optional
             If `True`, build a rectangular layer for the infinite or reference
@@ -751,34 +751,34 @@ class ABCLayer(NRBC):
 
         # Scalar space for auxiliar field of clipped coordinates
         method_element = "DQ" if self.quadrilateral else "DG"
-        V = create_function_space(Wave.mesh, method_element, 0)
+        V = create_function_space(wave.mesh, method_element, 0)
 
         # Initialize velocity field and assigning the original velocity model
-        Wave.c = Function(V).interpolate(Wave.initial_velocity_model,
+        wave.c = Function(V).interpolate(wave.initial_velocity_model,
                                          allow_missing_dofs=True)
 
         # Clipping coordinates to the layer domain
         domain_layer = self.abc_domain_dimensions(full_hyp=False)
-        ufl_coordinates_abc = Wave.mesh_ops.get_spatial_coordinates_abc(Wave.mesh,
+        ufl_coordinates_abc = wave.mesh_ops.get_spatial_coordinates_abc(wave.mesh,
                                                                         domain_layer)
         lay_field, layer_mask = \
-            clipping_coordinates_lay_field(self.domain_dim, Wave.mesh,
+            clipping_coordinates_lay_field(self.domain_dim, wave.mesh,
                                            self.dimension, ufl_coordinates_abc,
                                            V, quadrilateral=self.quadrilateral)
 
         # Extending velocity model within the absorbing layer
         extended_velocity = \
-            extend_scalar_field_profile(Wave.mesh_original, Wave.initial_velocity_model,
-                                        lay_field, layer_mask, Wave.mesh_parameters.tol,
+            extend_scalar_field_profile(wave.mesh_original, wave.initial_velocity_model,
+                                        lay_field, layer_mask, wave.mesh_parameters.tol,
                                         method=method, name_prop="Velocity")
 
         # Interpolating the velocity model in the layer
-        Wave.c.interpolate(extended_velocity * layer_mask + (1. - layer_mask)
-                           * Wave.c, allow_missing_dofs=True)
+        wave.c.interpolate(extended_velocity * layer_mask + (1. - layer_mask)
+                           * wave.c, allow_missing_dofs=True)
         del layer_mask, lay_field
 
         # Interpolating in the space function of the problem
-        Wave.c = Function(Wave.function_space, name="c[km/s])").interpolate(Wave.c)
+        wave.c = Function(wave.function_space, name="c[km/s])").interpolate(wave.c)
 
         # Save new velocity model
         if save_file:
@@ -790,14 +790,14 @@ class ABCLayer(NRBC):
                 file_name = self.case_abc + c_file_name
 
             outfile = VTKFile(self.path_save + file_name)
-            outfile.write(Wave.c)
+            outfile.write(wave.c)
 
-    def nrbc_on_boundary_layer(self, Wave, non_reflect_bc, save_file=True):
+    def nrbc_on_boundary_layer(self, wave, non_reflect_bc, save_file=True):
         """Apply Non-Reflective BCs on the outer boundary of the absorbing layer.
 
         Parameters
         ----------
-        Wave : `acoustic_wave.AcousticWave`
+        wave : `acoustic_wave.AcousticWave`
             An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
         non_reflect_bc : `typing.BoundaryConditionsType`
             Type of boundary condition to apply on the outer absorbing layer boundaries.
@@ -826,35 +826,35 @@ class ABCLayer(NRBC):
 
             # Getting boundary data from the layer boundaries
             if non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
-                bnd_nod_ids_nfs = Wave.mesh_ops.layer_boundary_data(Wave.mesh,
-                                                                    Wave.function_space,
-                                                                    Wave.mesh_parameters)[0]
+                bnd_nod_ids_nfs = wave.mesh_ops.layer_boundary_data(wave.mesh,
+                                                                    wave.function_space,
+                                                                    wave.mesh_parameters)[0]
 
             if non_reflect_bc == BoundaryConditionsType.HIGDON:
                 crit_source = self.crit_source
                 bnd_nod_ids_nfs, bnd_nodes_nfs = \
-                    Wave.mesh_ops.layer_boundary_data(Wave.mesh,
-                                                      Wave.function_space,
-                                                      Wave.mesh_parameters)
+                    wave.mesh_ops.layer_boundary_data(wave.mesh,
+                                                      wave.function_space,
+                                                      wave.mesh_parameters)
 
             # Hypershape parameters
             hyp_par = (self.layer_geometry.n_hyp, *self.layer_geometry.hyper_axes) \
                 if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else None
 
             # Applying Higdon ABCs
-            self.cos_ang_HigdonBC(Wave.function_space, crit_source, bnd_nod_ids_nfs,
+            self.cos_ang_HigdonBC(wave.function_space, crit_source, bnd_nod_ids_nfs,
                                   bnd_nodes_nfs, non_reflect_bc,
                                   hyp_par=hyp_par, save_file=save_file)
         else:
             pprint("\nNot Non-Reflecting Boundary Conditions Prescribed", comm=self.comm)
 
-    # def check_timestep_abc(self, Wave, max_divisor_tf=1, set_max_dt=True,
-    #                        method='ANALYTICAL', mag_add=3):
+    # def check_timestep_abc(self, wave, max_divisor_tf=1,
+    #                        set_max_dt=True, method='ANALYTICAL', mag_add=3):
     #     """Check if the timestep size is appropriate for the transient response.
 
     #     Parameters
     #     ----------
-    #     Wave : `acoustic_wave.AcousticWave`
+    #     wave : `acoustic_wave.AcousticWave`
     #         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
     #     max_divisor_tf : `int`, optional
     #         Index to select the maximum divisor of the final time, converted to an
@@ -879,19 +879,19 @@ class ABCLayer(NRBC):
     #     pprint("\nChecking Timestep Size", comm=self.comm)
 
     #     # User timestep
-    #     usr_dt = Wave.get_dt()
+    #     usr_dt = wave.get_dt()
 
     #     # Maximum timestep size
     #     dt_sol = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
-    #     max_dt = dt_sol.estimate_timestep(Wave.c, Wave.function_space, Wave.final_time,
-    #                                       shift=1e-8, quad_rule=Wave.quadrature_rule,
+    #     max_dt = dt_sol.estimate_timestep(wave.c, wave.function_space, wave.final_time,
+    #                                       shift=1e-8, quad_rule=wave.quadrature_rule,
     #                                       fraction=1.)
 
     #     # Rounding power
     #     pot = int(abs(ceil(log10(max_dt))) + mag_add)
 
     #     # Maximum timestep size according to divisors of the final time
-    #     val_int_tf = int(10**pot * Wave.final_time)
+    #     val_int_tf = int(10**pot * wave.final_time)
     #     val_int_dt = int(10**pot * max_dt)
     #     max_div = [d for d in divisors(val_int_tf) if d < val_int_dt]
     #     n_div = len(max_div)
@@ -900,8 +900,8 @@ class ABCLayer(NRBC):
 
     #     # Set the timestep size
     #     dt = max_dt if set_max_dt else min(usr_dt, max_dt)
-    #     Wave.set_dt(dt)
-    #     dt_ms = 1e3 * Wave.dt
+    #     wave.set_dt(dt)
+    #     dt_ms = 1e3 * wave.dt
     #     if set_max_dt:
     #         case_div = f"{min(max_divisor_tf, n_div)} of {n_div}"
     #         str_dt = f"Selected Timestep Size ({case_div}): {dt_ms:.{mag_add}f} ms"
@@ -911,14 +911,14 @@ class ABCLayer(NRBC):
     #     pprint(str_dt, comm=self.comm)
 
     #     # Updating Nyquist frequency
-    #     self.freq_Nyquist = 1. / (2. * Wave.dt)
+    #     self.freq_Nyquist = 1. / (2. * wave.dt)
 
-    # def layer_infinite_model(self, Wave):
+    # def layer_infinite_model(self, wave):
     #     """Determine the domain extension size for the infinite domain model.
 
     #     Parameters
     #     ----------
-    #     Wave : `acoustic_wave.AcousticWave`
+    #     wave : `acoustic_wave.AcousticWave`
     #         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
 
     #     Returns
@@ -928,7 +928,7 @@ class ABCLayer(NRBC):
     #     """
 
     #     # Size of the domain extension
-    #     add_dom = Wave.c_bnd_max * Wave.final_time / 2.
+    #     add_dom = wave.c_bnd_max * wave.final_time / 2.
 
     #     # Distance already travelled by the wave
     #     if hasattr(self, 'eik_bnd'):
@@ -937,21 +937,21 @@ class ABCLayer(NRBC):
     #         eikmin = self.eik_bnd[0][2]
 
     #         # Minimum distance to the nearest boundary
-    #         dist_to_bnd = Wave.c_bnd_max * eikmin / 2.
+    #         dist_to_bnd = wave.c_bnd_max * eikmin / 2.
     #     else:
 
     #         # If Eikonal analysis was not performed
-    #         sources_loc = array(Wave.source_locations)
+    #         sources_loc = array(wave.source_locations)
 
     #         # Candidate to minimum distance to the boundaries
-    #         delta_z = abs(sources_loc[:, 0] - Wave.mesh_parameters.length_z)
+    #         delta_z = abs(sources_loc[:, 0] - wave.mesh_parameters.length_z)
     #         delta_x = minimum(abs(sources_loc[:, 1]),
-    #                           abs(sources_loc[:, 1] - Wave.mesh_parameters.length_x))
+    #                           abs(sources_loc[:, 1] - wave.mesh_parameters.length_x))
     #         cand_dist = (delta_z, delta_x)
 
     #         if self.dimension == 3:  # 3D
     #             delta_y = minimum(abs(sources_loc[:, 2]),
-    #                               abs(sources_loc[:, 2] - Wave.mesh_parameters.length_y))
+    #                               abs(sources_loc[:, 2] - wave.mesh_parameters.length_y))
     #             cand_dist += (delta_y,)
 
     #         # Minimum distance to the nearest boundary
@@ -984,13 +984,13 @@ class ABCLayer(NRBC):
     #     # New dimensions
     #     self.abc_new_geometry()
 
-    # def infinite_model(self, Wave, check_dt=False, max_divisor_tf=1,
+    # def infinite_model(self, wave, check_dt=False, max_divisor_tf=1,
     #                    method='ANALYTICAL', mag_add=3):
     #     """Create a reference model for the ABC scheme for comparative purposes.
 
     #     Parameters
     #     ----------
-    #     Wave : `acoustic_wave.AcousticWave`
+    #     wave : `acoustic_wave.AcousticWave`
     #         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
     #     check_dt : `bool`, optional
     #         If `True`, check if the timestep size is appropriate for the transient
@@ -1024,10 +1024,10 @@ class ABCLayer(NRBC):
     #     self.geometry_infinite_model()
 
     #     # Creating mesh for infinite domain
-    #     self.create_mesh_with_layer(Wave, inf_model=True)
+    #     self.create_mesh_with_layer(wave, inf_model=True)
 
     #     # Updating velocity model
-    #     self.velocity_abc(self, Wave, inf_model=True)
+    #     self.velocity_abc(self, wave, inf_model=True)
 
     #     # Setting no damping
     #     if self.abc_boundary_layer_type == "hybrid":

@@ -231,7 +231,7 @@
 
 #     Returns
 #     -------
-#     Wave_obj : `habc.HABC_Wave`
+#     wave : `habc.HABC_Wave`
 #         An instance of the HABC_Wave class
 #     '''
 
@@ -240,41 +240,41 @@
 #     tRef = comp_cost("tini")
 
 #     # Create the acoustic wave object with PML
-#     Wave_obj = AcousticWave(dictionary=dictionary)
+#     wave = AcousticWave(dictionary=dictionary)
 
 #     # Mesh
-#     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+#     wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
 #     # Initial velocity model
-#     cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
-#     Wave_obj.set_initial_velocity_model(conditional=cond)
+#     cond = fire.conditional(wave.mesh_x < 0.5, 3.0, 1.5)
+#     wave.set_initial_velocity_model(conditional=cond)
 
 #     # Preamble mesh operations
-#     Wave_obj.mesh_ops.preamble_mesh_operations(Wave_obj, f_est=f_est)
+#     wave.mesh_ops.preamble_mesh_operations(wave, f_est=f_est)
 
 #     # Estimating computational resource usage
-#     comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "preamble/MSH_")
+#     comp_cost("tfin", tRef=tRef, user_name=wave.path_save + "preamble/MSH_")
 
 #     # ============ EIKONAL ANALYSIS ============
 #     # Reference to resource usage
 #     tRef = comp_cost("tini")
 
 #     # Finding critical points
-#     Wave_obj.layer_ops.critical_boundary_points(Wave_obj)
+#     wave.layer_ops.critical_boundary_points(wave)
 
 #     # Estimating computational resource usage
-#     comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "preamble/EIK_")
+#     comp_cost("tfin", tRef=tRef, user_name=wave.path_save + "preamble/EIK_")
 
-#     return Wave_obj
+#     return wave
 
 
-# def run_reference(Wave_obj, max_divisor_tf=1):
+# def run_reference(wave, max_divisor_tf=1):
 #     '''
 #     Run the infinite model to get the reference signal for the PML scheme
 
 #     Parameters
 #     ----------
-#     Wave_obj : `habc.HABC_Wave`
+#     wave : `habc.HABC_Wave`
 #         An instance of the HABC_Wave class
 #     max_divisor_tf : `int`, optional
 #         Index to select the maximum divisor of the final time, converted
@@ -293,23 +293,23 @@
 #     tRef = comp_cost("tini")
 
 #     # Computing reference get_reference_signal
-#     Wave_obj.layer_ops.infinite_model(check_dt=True, max_divisor_tf=max_divisor_tf)
+#     wave.layer_ops.infinite_model(check_dt=True, max_divisor_tf=max_divisor_tf)
 
 #     # Set model parameters for the HABC scheme
-#     Wave_obj.abc_get_ref_model = False
+#     wave.abc_get_ref_model = False
 
 #     # Estimating computational resource usage
 #     comp_cost("tfin", tRef=tRef,
-#               user_name=Wave_obj.path_save + "preamble/INF_")
+#               user_name=wave.path_save + "preamble/INF_")
 
 
-# def pml_fig8(Wave_obj, modal_solver):
+# def pml_fig8(wave, modal_solver):
 #     '''
 #     Apply the PML scheme to the model in Fig. 8 of Salas et al. (2022)
 
 #     Parameters
 #     ----------
-#     Wave_obj : `habc.HABC_Wave`
+#     wave : `habc.HABC_Wave`
 #         An instance of the HABC_Wave class
 #     modal_solver : `str`
 #         Method to use for solving the eigenvalue problem.
@@ -323,42 +323,42 @@
 #     '''
 
 #     # Identifier for the current case study
-#     Wave_obj.identify_abc_layer_case(
-#         output_folder=f"output/pml_test{Wave_obj.dimension}d")
+#     wave.identify_abc_layer_case(
+#         output_folder=f"output/pml_test{wave.dimension}d")
 
 #     # Acquiring reference signal
-#     Wave_obj.get_reference_signal()
+#     wave.get_reference_signal()
 
 #     # Determining layer size
-#     Wave_obj.layer_size_criterion(n_root=1)
+#     wave.layer_size_criterion(n_root=1)
 
 #     # Creating mesh with absorbing layer
-#     Wave_obj.create_mesh_with_layer()
+#     wave.create_mesh_with_layer()
 
 #     # Updating velocity model
-#     Wave_obj.velocity_abc()
+#     wave.velocity_abc()
 
 #     # Building the PML layer (damping and BCs)
 #     # bc_boundary_pml="Higdon",
-#     Wave_obj.pml_layer()
+#     wave.pml_layer()
 
 #     # Solving the forward problem
-#     Wave_obj.forward_solve()
+#     wave.forward_solve()
 
 #     # Computing the error measures
-#     Wave_obj.error_measures_habc()
+#     wave.error_measures_habc()
 
 #     # Plotting the solution at receivers and the error measures
-#     Wave_obj.comparison_plots()
+#     wave.comparison_plots()
 
 
-# def run_pml(Wave_obj, habc_reference_freq_lst, modal_solver):
+# def run_pml(wave, habc_reference_freq_lst, modal_solver):
 #     '''
 #     Run the PML scheme for different reference frequencies.
 
 #     Parameters
 #     ----------
-#     Wave_obj : `habc.HABC_Wave`
+#     wave : `habc.HABC_Wave`
 #         An instance of the HABC_Wave class
 #     habc_reference_freq_lst : `list`
 #         List of reference frequencies for sizing the PML layer.
@@ -382,7 +382,7 @@
 #     for habc_ref_freq in habc_reference_freq_lst:
 
 #         # Reference frequency for sizing the hybrid absorbing layer
-#         Wave_obj.abc_reference_freq = habc_ref_freq
+#         wave.abc_reference_freq = habc_ref_freq
 #         print(fref_str.format(habc_ref_freq.capitalize()), flush=True)
 
 #         # Modal solver for fundamental frequency
@@ -394,11 +394,11 @@
 #             tRef = comp_cost("tini")
 
 #             # Run the HABC scheme
-#             pml_fig8(Wave_obj, modal_solver)
+#             pml_fig8(wave, modal_solver)
 
 #             # Estimating computational resource usage
 #             comp_cost("tfin", tRef=tRef,
-#                       user_name=Wave_obj.path_case_abc)
+#                       user_name=wave.path_case_abc)
 
 #         except fire.ConvergenceError as e:
 #             print(f"Error Solving: {e}", flush=True)
@@ -457,18 +457,18 @@
 #     dictionary = wave_dict_2d(dt_usu, fr_files, "source", get_ref_model)
 
 #     # Creating mesh and performing eikonal analysis
-#     Wave_obj = preamble_pml(dictionary, edge_length, f_est, 2)
+#     wave = preamble_pml(dictionary, edge_length, f_est, 2)
 
 #     # ============ REFERENCE MODEL ============
 
 #     # Create the infinite model and get the reference signal
 #     if get_ref_model:
-#         run_reference(Wave_obj, max_divisor_tf=max_div_tf)
+#         run_reference(wave, max_divisor_tf=max_div_tf)
 
 #     # ============ PML SCHEME ============
 
 #     # Run the PML scheme
-#     run_pml(Wave_obj, habc_reference_freq_lst, modal_solver)
+#     run_pml(wave, habc_reference_freq_lst, modal_solver)
 
 
 # def test_loop_pml_3d():
@@ -528,18 +528,18 @@
 #     dictionary = wave_dict_3d(dt_usu, fr_files, "source", get_ref_model, p_eik)
 
 #     # Creating mesh and performing eikonal analysis
-#     Wave_obj = preamble_pml(dictionary, edge_length, f_est, 3)
+#     wave = preamble_pml(dictionary, edge_length, f_est, 3)
 
 #     # ============ REFERENCE MODEL ============
 
 #     # Create the infinite model and get the reference signal
 #     if get_ref_model:
-#         run_reference(Wave_obj, max_divisor_tf=max_div_tf)
+#         run_reference(wave, max_divisor_tf=max_div_tf)
 
 #     # ============ PML SCHEME ============
 
 #     # Run the PML scheme
-#     run_pml(Wave_obj, habc_reference_freq_lst, modal_solver)
+#     run_pml(wave, habc_reference_freq_lst, modal_solver)
 
 
 # '''

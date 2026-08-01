@@ -732,7 +732,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Return inversion controls exposed by a concrete wave solver.
 
         Subclasses override this method when they can participate in inversion
-        workflows. The base class raises because a generic ``Wave`` does not
+        workflows. The base class raises because a generic ``spyro.solvers.Wave`` does not
         know which physical parameters should be optimized.
 
         Returns
