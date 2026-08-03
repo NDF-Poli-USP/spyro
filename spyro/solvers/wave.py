@@ -16,7 +16,7 @@ from ..sources.Sources import Sources
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from ..utils.error_management import enum_parameter_error
-from ..utils.typing import (AdjointType, FunctionalEvaluationMode, LayerDampingType,
+from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
                             LayerShapeType, WaveType)
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
@@ -187,7 +187,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        if self.abc_boundary_layer_type != LayerDampingType.HYBRID:
+        if self.abc_type != AbsorbingBCsType.HYBRID:
             self._initialize_model_parameters()
         self.matrix_building()
         self.wave_propagator()
@@ -700,7 +700,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Timestep of the simulation. It is `None` if the response is not 'transient'.
         time_step = None if self.analysis != "transient" else self.dt
 
-        if self.abc_boundary_layer_type == LayerDampingType.PML:  # PML
+        if self.abc_type == AbsorbingBCsType.PML:  # PML
             from ..pml.pml_nsnc import PMLLayer
             self.layer_ops = PMLLayer(domain_dim, frequency=self.frequency,
                                       dt=time_step, dimension=self.dimension,
@@ -709,7 +709,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                       abc_reference_freq=self.abc_reference_freq,
                                       output_folder=self.output_folder, comm=self.comm)
 
-        if self.abc_boundary_layer_type == LayerDampingType.HYBRID:  # HABC
+        if self.abc_type == AbsorbingBCsType.HYBRID:  # HABC
             from ..habc.habc import HABCLayer
             self.layer_ops = HABCLayer(domain_dim, frequency=self.frequency,
                                        dt=time_step, dimension=self.dimension,
@@ -722,7 +722,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                        output_folder=self.output_folder, comm=self.comm)
 
         # Identifier for the current case study
-        if self.abc_boundary_layer_type in [LayerDampingType.PML, LayerDampingType.HYBRID]:
+        if self.abc_type in [AbsorbingBCsType.PML, AbsorbingBCsType.HYBRID]:
             self.case_abc = self.layer_ops.case_abc
             self.path_save = self.layer_ops.path_save
             self.path_case_abc = self.layer_ops.path_case_abc

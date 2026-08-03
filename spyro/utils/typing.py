@@ -168,15 +168,19 @@ class BoundaryConditionsType(Enum):
     SOMMERFELD = "Sommerfeld"
 
 
-class LayerDampingType(Enum):
-    """Enum for different types of damping for the absorbing layer.
+class AbsorbingBCsType(Enum):
+    """Enum for different types of Absorbing Boundary Conditions (ABCs).
 
-    LOCAL: An Non-Reflecting Boundary Condition (NRBC) at the boundary of the domain.
-    HYBRID: A combination of a sponge layer and an NRBC at the outer layer boundary
-    PML: Perfectly Matched Layer (PML) damping
     NOABCS: No absorbing boundary conditions applied.
+
+    - NRBCs:
+    NRBC: An Non-Reflecting BC (NRBC) at the boundary of the acoustic domain.
+
+    - Layers:
+    HYBRID: A combination of a sponge layer and an NRBC at the outer layer boundary.
+    PML: Non-split and non-convolutional Perfectly Matched Layer (PML).
     """
-    LOCAL = "local"
+    NOABCS = "no_abcs"
+    NRBC = "nrbc"
     HYBRID = "hybrid"
     PML = "PML"
-    NOABCS = "no_abcs"

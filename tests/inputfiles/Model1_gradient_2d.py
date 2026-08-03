@@ -35,7 +35,7 @@ mesh = {
 BCs = {
     "status": False,  # True,  # True or false
     "outer_bc": "None",  # "non-reflective",  #  neumann, non-reflective (outer boundary condition)
-    "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
+    "abc_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
     "exponent": 2,
     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
     "R": 0.001,  # theoretical reflection coefficient

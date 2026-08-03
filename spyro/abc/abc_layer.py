@@ -17,7 +17,7 @@ from ..utils.error_management import (enum_parameter_error, type_data_structure_
                                       value_string_error)
 from ..utils.freq_tools import freq_response
 from ..utils.typing import (BoundaryConditionsType, HyperLayerDegreeType,
-                            LayerDampingType, LayerShapeType, LayerSizeRefFrequency)
+                            AbsorbingBCsType, LayerShapeType, LayerSizeRefFrequency)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -40,11 +40,11 @@ class ABCLayer(NRBC):
     abc_boundary_layer_shape : `typing.LayerShapeType`
         Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
         `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
-    abc_boundary_layer_type : `typing.LayerDampingType`
-        Type of the boundary layer. Options: `LayerDampingType.LOCAL`,
-        `LayerDampingType.HYBRID`, `LayerDampingType.PML` or `LayerDampingType.NOABCS`.
-        Default is `LayerDampingType.NOABCS` where no absorbing BCs are applied.
-        Option `LayerDampingType.HYBRID` is based on paper of Salas et al. (2022).
+    abc_boundary_layer_type : `typing.AbsorbingBCsType`
+        Type of the boundary layer. Options: `AbsorbingBCsType.NRBC`,
+        `AbsorbingBCsType.HYBRID`, `AbsorbingBCsType.PML` or `AbsorbingBCsType.NOABCS`.
+        Default is `AbsorbingBCsType.NOABCS` where no absorbing BCs are applied.
+        Option `AbsorbingBCsType.HYBRID` is based on paper of Salas et al. (2022).
         doi: https://doi.org/10.1016/j.apm.2022.09.014
         TODO: Add citation
     abc_deg_layer : `int` or `float` or `None`
@@ -169,7 +169,7 @@ class ABCLayer(NRBC):
     def __init__(self, domain_dim, frequency=None, dt=None,
                  dimension=2, quadrilateral=False, func_space_type=None,
                  abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
-                 abc_boundary_layer_type=LayerDampingType.HYBRID,
+                 abc_boundary_layer_type=AbsorbingBCsType.HYBRID,
                  abc_reference_freq=LayerSizeRefFrequency.SOURCE,
                  abc_degree_type=HyperLayerDegreeType.REAL,
                  abc_deg_layer=None, output_folder=None, comm=None):
@@ -195,11 +195,11 @@ class ABCLayer(NRBC):
         abc_boundary_layer_shape : `typing.LayerShapeType`, optional
             Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
             `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
-        abc_boundary_layer_type : `typing.LayerDampingType`
-            Type of the boundary layer. Options: `LayerDampingType.LOCAL`,
-            `LayerDampingType.HYBRID`, `LayerDampingType.PML` or `LayerDampingType.NOABCS`.
-            Default is `LayerDampingType.NOABCS` where no absorbing BCs are applied.
-            Option `LayerDampingType.HYBRID` is based on paper of Salas et al. (2022).
+        abc_boundary_layer_type : `typing.AbsorbingBCsType`
+            Type of the boundary layer. Options: `AbsorbingBCsType.NRBC`,
+            `AbsorbingBCsType.HYBRID`, `AbsorbingBCsType.PML` or `AbsorbingBCsType.NOABCS`.
+            Default is `AbsorbingBCsType.NOABCS` where no absorbing BCs are applied.
+            Option `AbsorbingBCsType.HYBRID` is based on paper of Salas et al. (2022).
             doi: https://doi.org/10.1016/j.apm.2022.09.014
             TODO: Add citation
         abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
@@ -251,10 +251,10 @@ class ABCLayer(NRBC):
         # ABC layer parameters
         self.abc_boundary_layer_type = enum_parameter_error("abc_boundary_layer_type",
                                                             abc_boundary_layer_type,
-                                                            LayerDampingType)
-        if abc_boundary_layer_type == LayerDampingType.NOABCS:
+                                                            AbsorbingBCsType)
+        if abc_boundary_layer_type == AbsorbingBCsType.NOABCS:
             value_parameter_error("abc_boundary_layer_type", abc_boundary_layer_type,
-                                  [LayerDampingType.HYBRID, LayerDampingType.PML])
+                                  [AbsorbingBCsType.HYBRID, AbsorbingBCsType.PML])
 
         self.abc_boundary_layer_shape = enum_parameter_error("abc_boundary_layer_shape",
                                                              abc_boundary_layer_shape,
@@ -344,9 +344,9 @@ class ABCLayer(NRBC):
         """
 
         # Layer type
-        if self.abc_boundary_layer_type == LayerDampingType.HYBRID:
+        if self.abc_boundary_layer_type == AbsorbingBCsType.HYBRID:
             abc_layer_str = "Absorbing" if for_prints else "habc"
-        elif self.abc_boundary_layer_type == LayerDampingType.PML:
+        elif self.abc_boundary_layer_type == AbsorbingBCsType.PML:
             abc_layer_str = "PML" if for_prints else "pml"
 
         formatted_str = str_to_format.format(abc_layer_str)
