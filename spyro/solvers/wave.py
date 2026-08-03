@@ -1,5 +1,4 @@
 from abc import abstractmethod, ABCMeta
-from numpy import inf
 import warnings
 import firedrake as fire
 
@@ -461,10 +460,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # Maximum timestep size
         method = 'ANALYTICAL' if estimate_max_eigenvalue else 'ARNOLDI'
-        dt_solver = Modal_Solver(self.dimension, method=method,
-                                 calc_max_dt=True)
-        max_dt = dt_solver.estimate_timestep(c, self.function_space,
-                                             self.final_time,
+        dt_solver = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
+        max_dt = dt_solver.estimate_timestep(c, self.function_space, self.final_time,
                                              quad_rule=self.quadrature_rule,
                                              fraction=fraction)
         self.dt = max_dt
@@ -701,7 +698,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         domain_dim = self.domain_dimensions()
 
         # Nyquist frequency
-        freq_Nyquist = inf if self.analysis != "transient" else 1. / (2. * self.dt)
+        freq_Nyquist = None if self.analysis != "transient" else 1. / (2. * self.dt)
 
         if self.abc_boundary_layer_type == LayerDampingType.PML:
             from ..pml.pml_nsnc import PMLLayer
@@ -734,7 +731,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Return inversion controls exposed by a concrete wave solver.
 
         Subclasses override this method when they can participate in inversion
-        workflows. The base class raises because a generic ``Wave`` does not
+        workflows. The base class raises because a generic ``spyro.solvers.Wave`` does not
         know which physical parameters should be optimized.
 
         Returns

@@ -207,7 +207,7 @@ def switch_serial_shot(wave, propagation_id, file_name=None, just_for_dat_manage
     Switches the current serial shot for a given wave to shot identified with propagation ID.
 
     Args:
-        wave (:class:`Wave`): The wave object.
+        wave (:class:`spyro.solvers.Wave`): The wave object.
         propagation_id (int): The propagation ID.
 
     Returns:
@@ -238,7 +238,8 @@ def _shot_filename(propagation_id, wave, prefix='tmp', random_str_in_use=True):
     -----------
     propagation_id (int): The index identifying the current propagation.
 
-    wave (object): A :class:`Wave` object containing shot and communication information. Must have attributes:
+    wave (object): A :class:`spyro.solvers.Wave` object containing shot and communication information.
+        Must have attributes:
         - shot_ids_per_propagation: A list or dict mapping propagation IDs to shot IDs.
         - comm: The current MPI communicator.
     prefix (str, optional): Prefix for the filename. Defaults to 'tmp'.
@@ -275,7 +276,7 @@ def ensemble_save(func):
     Parameters:
     -----------
     func: The wrapped function that performs the actual saving operation.
-    Expected to accept a :class:`Wave` based object as first argument.
+    Expected to accept a :class:`spyro.solvers.Wave` based object as first argument.
 
     Returns:
     --------
@@ -317,7 +318,7 @@ def ensemble_load(func):
     Parameters:
     -----------
     func: The wrapped function that performs the actual loading operation.
-    Expected to accept a :class:`Wave` based object as first argument.
+    Expected to accept a :class:`spyro.solvers.Wave` based object as first argument.
 
     Returns:
     --------
@@ -371,7 +372,7 @@ def ensemble_propagator(func):
     Parameters:
     -----------
     func: The wrapped function that performs the actual propagation operation.
-    Expected to accept a :class:`Wave` based object as first argument.
+    Expected to accept a :class:`spyro.solvers.Wave` based object as first argument.
 
     Returns:
     --------
@@ -403,7 +404,7 @@ def save_serial_data(wave, propagation_id):
     Save serial data to numpy files.
 
     Args:
-        wave (:class:`Wave`): The wave object containing the forward solution.
+        wave (:class:`spyro.solvers.Wave`): The wave object containing the forward solution.
         propagation_id (int): The propagation ID.
 
     Returns:

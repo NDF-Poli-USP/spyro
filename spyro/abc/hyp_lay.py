@@ -150,7 +150,7 @@ class HyperLayer():
         domain_hyp : `tuple`
             Domain dimensions with layer without truncation by free surface.
             2D : (length_z + 2 * pad_len, length_x + 2 * pad_len).
-            3D : (length_x + 2 * pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len).
+            3D : (length_z + 2 * pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len).
 
         Returns
         -------
@@ -454,7 +454,8 @@ class HyperLayer():
                               integer_num=True, lower_bound=0.)
 
         # Checking the minimum mesh size
-        value_numerical_error('lmin', lmin, float_num=True, lower_bound=0.)
+        value_numerical_error('lmin', lmin, float_num=True,
+                              integer_num=True, lower_bound=0.)
 
         # Domain dimensions
         length_z, length_x = self.domain_dim[:2]

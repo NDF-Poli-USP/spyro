@@ -66,12 +66,12 @@ class Minimum_Eikonal(Eikonal_Modeling):
         Solve the nonlinear Eikonal.
     """
 
-    def __init__(self, Wave):
+    def __init__(self, wave):
         """Initialize the Eikonal class.
 
         Parameters
         ----------
-        Wave : `wave.Wave`
+        wave : `wave.Wave`
             An instance of the :class:`~spyro.solvers.wave.Wave`.
 
         Returns
@@ -79,37 +79,37 @@ class Minimum_Eikonal(Eikonal_Modeling):
         None
         """
 
-        super().__init__(Wave.dimension, Wave.sources.point_locations,
-                         ele_type_eik=Wave.mesh_parameters.ele_type_eik,
-                         degree_eik=Wave.mesh_parameters.degree_eik,
-                         f_est=Wave.mesh_parameters.f_est)
+        super().__init__(wave.dimension, wave.sources.point_locations,
+                         ele_type_eik=wave.mesh_parameters.ele_type_eik,
+                         degree_eik=wave.mesh_parameters.degree_eik,
+                         f_est=wave.mesh_parameters.f_est)
 
         # Communicator MPI
-        self.comm = Wave.comm
+        self.comm = wave.comm
 
         # Setting the mesh
-        self.mesh = Wave.mesh_original
+        self.mesh = wave.mesh_original
 
         # Function space for the Eikonal modeling
-        self.funct_space_eik = Wave.mesh_parameters.funct_space_eik
+        self.funct_space_eik = wave.mesh_parameters.funct_space_eik
 
         # Mesh cell diameters
-        self.diam_mesh = Wave.mesh_parameters.diam_mesh
+        self.diam_mesh = wave.mesh_parameters.diam_mesh
 
         # Minimum mesh size
-        self.lmin = Wave.mesh_parameters.lmin
+        self.lmin = wave.mesh_parameters.lmin
 
         # Velocity profile model
-        self.c = Wave.c
+        self.c = wave.c
 
         # Minimum velocity value in the model
-        self.c_min = Wave.c_min
+        self.c_min = wave.c_min
 
         # Absorbing boundaries
-        self.boundaries = Wave.get_absorbing_boundaries()
+        self.boundaries = wave.get_absorbing_boundaries()
 
         # Mesh operations
-        self.mesh_ops = Wave.mesh_ops
+        self.mesh_ops = wave.mesh_ops
 
         # Extract node positions
         self.node_positions = self.mesh_ops.extract_node_positions(self.mesh,
@@ -117,10 +117,10 @@ class Minimum_Eikonal(Eikonal_Modeling):
                                                                    output_type="array")
 
         # Tolerance for identifying minimum Eikonal values on boundaries
-        self.node_tol = Wave.mesh_parameters.tol
+        self.node_tol = wave.mesh_parameters.tol
 
         # Path to save data
-        self.path_save = Wave.path_save + "preamble/"
+        self.path_save = wave.path_save + "preamble/"
 
         # Eikonal boundary conditions
         self.define_bcs()
@@ -207,14 +207,14 @@ class Minimum_Eikonal(Eikonal_Modeling):
         Returns
         -------
         eik_bnd: `list`
-            Properties on boundaries according to minimum values of Eikonal
+            Properties on boundaries according to minimum values of Eikonal.
             Structure sublist: [pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]
-            - pnt_crit : Critical point coordinates
-            - c_bnd : Propagation speed at critical point
-            - eikmin : Eikonal value in seconds
-            - z_par : Inverse of minimum Eikonal (Equivalent to c_bound/lref)
-            - lref : Distance to the closest source from critical point
-            - sou_crit : Critical source coordinates
+            - pnt_crit : Critical point coordinates.
+            - c_bnd : Propagation speed at critical point.
+            - eikmin : Eikonal value in seconds.
+            - z_par : Inverse of minimum Eikonal (Equivalent to c_bound/lref).
+            - lref : Distance to the closest source from critical point.
+            - sou_crit : Critical source coordinates.
         """
 
         # Build the boundary ID mapping

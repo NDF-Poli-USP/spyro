@@ -1,7 +1,7 @@
 import firedrake as fire
 import numpy as np
 from sys import float_info, exit
-from ...utils.error_management import clean_inst_num, value_parameter_error
+from ...utils.error_management import sanitize_num_array, value_parameter_error
 from ...domains.quadrature import quadrature_rules
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -584,7 +584,7 @@ class Eikonal_Modeling():
                 c, c_min, V, diam_mesh).dat.data_with_halos[:]
         else:
             # Clean numerical instabilities
-            data_eikL = clean_inst_num(lin_sol.dat.data_with_halos[:])
+            data_eikL = sanitize_num_array(lin_sol.dat.data_with_halos[:])
 
         user_atol = self.tol
         user_est = self.f_est

@@ -82,7 +82,7 @@ dictionary["visualization"] = {
 }
 
 
-def build_direction(Wave_obj):
+def build_direction(wave):
     """Build a deterministic perturbation direction shared across the ensemble.
 
     The direction is interpolated from a smooth function of the mesh
@@ -94,7 +94,7 @@ def build_direction(Wave_obj):
 
     Parameters
     ----------
-    Wave_obj : spyro.AcousticWave
+    wave : spyro.AcousticWave
         Wave object whose control function space and mesh coordinates are used.
 
     Returns
@@ -102,9 +102,9 @@ def build_direction(Wave_obj):
     firedrake.Function
         The perturbation direction in the control function space.
     """
-    z = Wave_obj.mesh_z
-    x = Wave_obj.mesh_x
-    direction = fire.Function(Wave_obj.c.function_space(), name="direction")
+    z = wave.mesh_z
+    x = wave.mesh_x
+    direction = fire.Function(wave.c.function_space(), name="direction")
     # Smooth O(1) field, deterministic and identical on every ensemble member.
     direction.interpolate(1.0 + 0.25 * fire.sin(3.0 * x) * fire.cos(3.0 * z))
     return direction

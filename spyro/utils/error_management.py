@@ -3,7 +3,10 @@
 This file contains methods for handling errors in Spyro, either to send
 messages to the user or to prevent numerical instability in objects."""
 
-from numpy import inf, isinf, isnan, where
+from numpy import float32, float64, inf, int32, int64, isinf, isnan, ndarray
+from firedrake import Function, FunctionSpace, Mesh
+from firedrake.functionspaceimpl import WithGeometry
+from ufl.geometry import SpatialCoordinate
 
 
 def value_parameter_error(par_name, par_value, valid_values):
@@ -28,6 +31,7 @@ def value_parameter_error(par_name, par_value, valid_values):
     ValueError
         If the parameter value is not in the list of valid values.
     """
+
     # Error message about the invalid parameter
     if par_value not in valid_values:
         err_str = f"Invalid {par_name}: '{par_value}'. Please use: "
@@ -62,17 +66,19 @@ def mutually_exclusive_parameter_error(par_name_lst, par_value_lst):
                                            par_value_lst)
                    if val is not None]
 
-    # Error message about the invalid parameter
-    exc_str = "Parameters " + ", ".join([f"'{name}'" for name in par_defined])
-    last_comma = exc_str.rfind(',')
-    exc_str = exc_str[:last_comma] + ' and' + exc_str[last_comma + 1:]
-    exc_str += " mutually exclusive.\n"
-    err_str = "Please specify only one of these parameters: "
-    opt_str = ", ".join([f"'{val}'" for val in par_name_lst])
-    last_comma = opt_str.rfind(',')
-    opt_str = opt_str[:last_comma] + " or" + opt_str[last_comma + 1:]
+    # Only raise if two or more parameters are defined
+    if len(par_defined) > 1:
+        # Error message about the invalid parameter
+        exc_str = "Parameters " + ", ".join([f"'{name}'" for name in par_defined])
+        last_comma = exc_str.rfind(',')
+        exc_str = exc_str[:last_comma] + ' and' + exc_str[last_comma + 1:]
+        exc_str += " mutually exclusive.\n"
+        err_str = "Please specify only one of these parameters: "
+        opt_str = ", ".join([f"'{val}'" for val in par_name_lst])
+        last_comma = opt_str.rfind(',')
+        opt_str = opt_str[:last_comma] + " or" + opt_str[last_comma + 1:]
 
-    raise ValueError(exc_str + err_str + opt_str)
+        raise ValueError(exc_str + err_str + opt_str)
 
 
 def value_model_dimension_error(par_names, parameters, expected_dim):
@@ -106,25 +112,56 @@ def value_model_dimension_error(par_names, parameters, expected_dim):
         raise ValueError(dim_err)
 
 
-def clean_inst_num(data_arr):
-    """Set NaNs and negative values to zero in an array.
+def sanitize_num_array(data_arr, nan_values=True, inf_values=True, negative_values=True):
+    """Set NaNs, infinities, and/or negative values to zero in an array.
 
     Parameters
     ----------
     data_arr : `array`
         An array with possible with possible NaN or negative components.
+    nan_values : `bool`, optional
+        If `True`, replace NaN values with zero. Default is `True`.
+    inf_values : `bool`, optional
+        If `True`, replace infinite values (both +inf and -inf) with zero.
+        Default is `True`.
+    negative_values : `bool`, optional
+        If `True`, replace negative values with zero. Default is `True`.
 
     Returns
     -------
     data_arr : `array`
-        An array with null or positive components.
+        An array with null or positive components and invalid values replaced by zero.
+
+    Raises
+    ------
+    TypeError
+        If data_arr is not a numpy array or contains elements that are not
+        numeric (float or int).
     """
-    data_arr[where(isnan(data_arr) | isinf(data_arr) | (data_arr < 0.0))] = 0.0
+
+    # Validate input type
+    type_data_structure_error("data_arr", data_arr, "array",
+                              expected_type_element=("float", "int"))
+
+    # Build condition mask
+    condition = False
+    if nan_values:
+        condition = condition | isnan(data_arr)
+
+    if inf_values:
+        condition = condition | isinf(data_arr)
+
+    if negative_values:
+        condition = condition | (data_arr < 0.0)
+
+    # Apply cleaning
+    data_arr[condition] = 0.0
+
     return data_arr
 
 
-def value_numerical_error(par_name, par_value, float_num=True, integer_num=False,
-                          lower_bound=None, upper_bound=None,
+def value_numerical_error(par_name, par_value, float_num=True, integer_num=True,
+                          none_default=False, lower_bound=None, upper_bound=None,
                           include_lower_bound=False, include_upper_bound=False):
     """Validate numerical parameters and raise a ValueError if invalid.
 
@@ -138,6 +175,9 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
         If `True`, the parameter can be a float. Default is `True`.
     integer_num : `bool`, optional
         If `True`, the parameter can be an integer. Default is `False`.
+    none_default : `bool`, optional
+        If `True`, the parameter value is allowed to be validated as `None`.
+        Default is `False`, in which case `None` is not allowed.
     lower_bound : `int` or `float`, optional
         Lower bound for the parameter value. Default is `None` (no lower bound).
     upper_bound : `int` or `float`, optional
@@ -160,7 +200,10 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
         If the parameter value is outside the specified bounds or the bounds are invalid.
     """
 
-    # Checking the parameter type
+    if par_value is None and none_default:
+        return par_value
+
+    # Not int or float
     if not isinstance(par_value, (int, float)):
         if float_num and integer_num:
             str_type = "float or a integer"
@@ -172,6 +215,16 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
         raise TypeError(f"'{par_name}' must be a {str_type} number, "
                         f"got {type(par_value).__name__}.")
 
+    # Check if float is allowed when value is integer
+    if isinstance(par_value, float) and (integer_num and not float_num):
+        raise TypeError(f"'{par_name}' must be an integer number, "
+                        f"got {type(par_value).__name__}.")
+
+    # Check if integer is allowed when value is integer
+    if isinstance(par_value, int) and (not integer_num and float_num):
+        raise TypeError(f"'{par_name}' must be a float number, "
+                        f"got {type(par_value).__name__}.")
+
     # Set default bounds
     upper_bound = inf if upper_bound is None else upper_bound
     lower_bound = -inf if lower_bound is None else lower_bound
@@ -181,8 +234,14 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
         raise ValueError(f"Invalid bounds: upper_bound ({upper_bound}) must "
                          f"be greater than lower_bound ({lower_bound}).")
 
+    lower_invalid = par_value < lower_bound if include_lower_bound \
+        else par_value <= lower_bound
+    upper_invalid = par_value > upper_bound if include_upper_bound \
+        else par_value >= upper_bound
+
     # Check if value is within bounds
-    if par_value < lower_bound or par_value > upper_bound:
+    if lower_invalid or upper_invalid:
+        # Build error message based on which bounds are finite
         if lower_bound > -inf and upper_bound < inf:  # Both bounds are finite
             bound_str = f"between {lower_bound} and {upper_bound}"
             if include_lower_bound and include_upper_bound:
@@ -191,6 +250,8 @@ def value_numerical_error(par_name, par_value, float_num=True, integer_num=False
                 bound_str += " (lower bound inclusive)"
             elif include_upper_bound:
                 bound_str += " (upper bound inclusive)"
+            else:
+                bound_str += " (both bounds exclusive)"
         elif lower_bound > -inf:  # Only lower bound is finite
             bound_str = (f"greater than or equal to {lower_bound}"
                          if include_lower_bound else f"greater than {lower_bound}")
@@ -248,15 +309,18 @@ def enum_parameter_error(par_name, par_value, valid_enum):
                     f", got {type(par_value).__name__}")
 
 
-def value_string_error(par_name, par_value):
+def value_string_error(par_name, par_value, none_default=False):
     """Validate string parameters and raise a TypeError if invalid.
 
     Parameters
     ----------
     par_name : `str`
         Name of the parameter to be validated (used in error messages).
-    par_value : `str`
+    par_value : `object`
         Value of the parameter to be validated.
+    none_default : `bool`, optional
+        If `True`, the parameter value is allowed to be validated as `None`.
+        Default is `False`, in which case `None` is not allowed.
 
     Returns
     -------
@@ -269,8 +333,149 @@ def value_string_error(par_name, par_value):
         If the parameter value is not of the expected type (`str`).
     """
 
+    if par_value is None and none_default:
+        return par_value
+
     # Checking the parameter type
     if not isinstance(par_value, str):
         raise TypeError(f"'{par_name}' must be a string, got {type(par_value).__name__}.")
+
+    return par_value
+
+
+def type_data_structure_error(par_name, par_value, expected_type,
+                              expected_type_element=None,
+                              expected_length=None, none_default=False):
+    """Validate data structure parameters and raise a TypeError if invalid.
+
+    Parameters
+    ----------
+    par_name : `str`
+        Name of the parameter to be validated (used in error messages).
+    par_value : `object`
+        Value of the parameter to be validated.
+    expected_type : `str`
+        Expected type of the data structure parameter as a `str`. The validation
+        supports the types `dict`, `list`, `tuple`, or `ndarray` (NumPy arrays).
+    expected_type_element : `tuple`, optional
+        Expected type of the data structure elements passed as a `str`. The validation
+        supports the types `float`, `int`, `str` or `NoneType`. Exs: ("float", "int")
+        for a NumPy array or ("float", "int", "str", "NoneType") for a mixed elements.
+        Default is `None`, in which case the elements are not checked.
+    expected_length : `int`, optional
+        Expected length of the data structure parameter. Default is `None`,
+        in which case the length is not checked.
+    none_default : `bool`, optional
+        If `True`, the parameter value is allowed to be validated as `None`.
+        Default is `False`, in which case `None` is not allowed.
+
+    Returns
+    -------
+    par_value : `dict`, `list`, `tuple`, or `ndarray`
+        The validated parameter value.
+
+    Raises
+    ------
+    TypeError
+        If the parameter value is not of the expected type given by 'expected_type' or the
+        elements are not of the expected type given by 'expected_type_element'.
+    ValueError
+        If the parameter value does not have the expected length (if provided).
+    """
+
+    if par_value is None and none_default:
+        return par_value
+
+    value_parameter_error("expected_type", expected_type,
+                          ["dict", "list", "tuple", "array"])
+
+    parameter_map = {"dict": dict,
+                     "list": list,
+                     "tuple": tuple,
+                     "array": ndarray}
+
+    element_map = {"int": int,
+                   "float": float,
+                   "NoneType": type(None),
+                   "str": str}
+
+    # Checking the parameter type
+    if not isinstance(par_value, parameter_map[expected_type]):
+        raise TypeError(f"'{par_name}' must be a {expected_type}, "
+                        f"got {type(par_value).__name__}.")
+
+    # Check if the parameter has the expected length
+    if expected_length is not None and len(par_value) != expected_length:
+        raise ValueError(f"'{par_name}' must have length {expected_length}, "
+                         f"got length {len(par_value)}.")
+
+    # Check if all elements are of expected type
+    if expected_type_element is not None:
+        if isinstance(expected_type_element, str):
+            expected_type_element = (expected_type_element,)
+        for etype in expected_type_element:
+            value_parameter_error("expected_type_element", etype,
+                                  ["float", "int", "str", "NoneType"])
+        expected_types = tuple(element_map[etype] for etype in expected_type_element)
+        expected_types += (int32, int64,) if "int" in expected_type_element else ()
+        expected_types += (float32, float64,) if "float" in expected_type_element else ()
+        if not all(isinstance(item, expected_types) for item in par_value):
+            opt_str = ", ".join([f"'{etype}'" for etype in expected_type_element])
+            last_comma = opt_str.rfind(',')
+            opt_str = opt_str[:last_comma] + " or" + opt_str[last_comma + 1:] \
+                if len(expected_type_element) > 1 else opt_str
+            raise TypeError(f"All elements of '{par_name}' must be of type: {opt_str}.")
+
+    return par_value
+
+
+def type_firedrake_error(par_name, par_value, expected_type, none_default=False):
+    """Validate Firedrake parameters and raise a TypeError if invalid.
+
+    Parameters
+    ----------
+    par_name : `str`
+        Name of the parameter to be validated (used in error messages).
+    par_value : `object`
+        Value of the parameter to be validated.
+    expected_type : `str`
+        Expected type of the Firedrake parameter as a `str`. The validation
+        supports the types `Function`, `FunctionSpace`, or `Mesh`.
+    none_default : `bool`, optional
+        If `True`, the parameter value is allowed to be validated as `None`.
+        Default is `False`, in which case `None` is not allowed.
+
+    Returns
+    -------
+    par_value : `firedrake.Function`, `firedrake.FunctionSpace`, or `firedrake.Mesh`
+        The validated parameter value.
+
+    Raises
+    ------
+    TypeError
+        If the parameter value is not of the expected type given by 'expected_type'.
+    """
+
+    if par_value is None and none_default:
+        return par_value
+
+    value_parameter_error("expected_type", expected_type,
+                          ["Function", "FunctionSpace", "Mesh", "SpatialCoordinate"])
+
+    parameter_map = {"Function": Function,
+                     "FunctionSpace": type(FunctionSpace),
+                     "Mesh": type(Mesh),
+                     "SpatialCoordinate": SpatialCoordinate}
+
+    # Checking the parameter type
+    expected_valid = (parameter_map[expected_type],)
+    expected_valid += (WithGeometry,) if "FunctionSpace" in expected_type else ()
+    if not isinstance(par_value, expected_valid):
+        opt_str = ", ".join([f"'{etype}'" for etype in expected_valid])
+        last_comma = opt_str.rfind(',')
+        opt_str = opt_str[:last_comma] + " or" + opt_str[last_comma + 1:] \
+            if len(expected_valid) > 1 else opt_str
+        raise TypeError(f"'{par_name}' must be of type: {opt_str}, "
+                        f"got {type(par_value).__name__}.")
 
     return par_value
