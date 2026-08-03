@@ -34,6 +34,7 @@ def wave_dict(element_type, dimension):
         # accepted_variants = ["lumped", "equispaced", "DG"]
         "degree": 4 if dimension == 2 else 3,  # p<=4 for 2D and p<=3 for 3D
         "dimension": dimension,  # dimension
+        "analysis": "eikonal",  # Options: transient, modal or eikonal
     }
 
     # Number of cores for the shot. For simplicity, we keep things serial.
@@ -64,7 +65,6 @@ def wave_dict(element_type, dimension):
         "source_locations": ([(-0.5, 0.25)] if dimension == 2
                              else [(-0.5, 0.25, 0.5)]),
         "frequency": 5.,  # in Hz
-        "delay": 1.5,
         "receiver_locations": ([(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)]
                                if dimension == 2
                                else [(-Lz, 0., 0.), (-Lz, Lx, 0.),
@@ -72,25 +72,6 @@ def wave_dict(element_type, dimension):
                                      (-Lz, 0., Ly), (-Lz, Lx, Ly),
                                      (0., 0., Ly), (0., Lx, Ly)])
     }
-
-    # Simulate for 1. seconds.
-    dictionary["time_axis"] = {
-        "initial_time": 0.,  # Initial time for event
-        "final_time": 2.,    # Final time for event
-        "dt": 0.001,  # timestep size in seconds
-        "amplitude": 1.,  # The Ricker has an amplitude of 1.
-        "output_frequency": 100,  # How frequently to output solution to pvds
-        "gradient_sampling_frequency": 100,  # How frequently to save to RAM
-    }
-
-    # Define Parameters for absorbing boundary conditions
-    dictionary["absorving_boundary_conditions"] = {
-        "status": False,  # Activate ABCs
-        "abc_type": "hybrid",  # Activate HABC
-    }
-
-    # Define parameters for visualization
-    dictionary["visualization"] = {}
 
     return dictionary
 
