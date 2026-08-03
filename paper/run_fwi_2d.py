@@ -46,8 +46,7 @@ model["mesh"] = {
 }
 model["BCs"] = {
     "status": True,  # True or false
-    "outer_bc": "non-reflective",  # None or non-reflective (outer boundary condition)
-    "abc_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
+    "abc_type": "PML",
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 4.5,  # maximum acoustic wave velocity in PML - km/s
     "R": 1e-6,  # theoretical reflection coefficient
