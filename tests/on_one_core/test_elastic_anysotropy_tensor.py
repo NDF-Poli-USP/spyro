@@ -1,5 +1,4 @@
 import pytest
-import firedrake as fire
 from numpy import allclose, any, all, isnan, isinf
 from firedrake import Constant, Function, UnitCubeMesh, FunctionSpace
 from ufl.tensors import ListTensor
