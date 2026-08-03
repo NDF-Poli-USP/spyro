@@ -61,7 +61,6 @@ def wave_dict(element_type, dimension):
     # point of the mesh. We also specify to record the solution at the corners
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
-        "source_type": "ricker",
         "source_locations": ([(-0.5, 0.25)] if dimension == 2
                              else [(-0.5, 0.25, 0.5)]),
         "frequency": 5.,  # in Hz
