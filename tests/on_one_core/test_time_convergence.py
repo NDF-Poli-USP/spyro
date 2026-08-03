@@ -83,13 +83,13 @@ def run_forward(dt, with_pml=False):
         "gradient_filename": None,
     }
 
-    Wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02, "periodic": True})
+    wave = spyro.AcousticWave(dictionary=dictionary)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.02, "periodic": True})
 
-    Wave_obj.set_initial_velocity_model(constant=1.5)
-    Wave_obj.forward_solve()
+    wave.set_initial_velocity_model(constant=1.5)
+    wave.forward_solve()
 
-    rec_out = Wave_obj.forward_solution_receivers
+    rec_out = wave.forward_solution_receivers
 
     return rec_out
 

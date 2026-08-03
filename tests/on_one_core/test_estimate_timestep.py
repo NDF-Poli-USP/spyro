@@ -23,34 +23,34 @@ def test_estimate_timestep_mlt():
     rectangle_dictionary["time_axis"] = {
         "final_time": 1.0,  # Final time for event
     }
-    Wave_obj = spyro.examples.Rectangle_acoustic(
+    wave = spyro.examples.Rectangle_acoustic(
         dictionary=rectangle_dictionary
     )
     layer_values = [1.5, 3.0]
     z_switches = [-0.5]
-    Wave_obj.multiple_layer_velocity_model(z_switches, layer_values)
+    wave.multiple_layer_velocity_model(z_switches, layer_values)
 
     # Tests value and if stable for 0.7 times estimated timestep
-    maxdt = Wave_obj.get_and_set_maximum_dt(fraction=0.7)
+    maxdt = wave.get_and_set_maximum_dt(fraction=0.7)
     print(f"Timestep (in ms) considering a fraction of 0.7: {1e3 * maxdt}")
     test1 = math.isclose(maxdt, 0.000644745, rel_tol=1e-3)
 
     test2 = False
     try:
-        Wave_obj.forward_solve()
+        wave.forward_solve()
         test2 = True
     except AssertionError:
         test2 = False
 
     # Tests value and if unstable for 1.1 times estimated timestep
-    Wave_obj.current_time = 0.0
-    maxdt = Wave_obj.get_and_set_maximum_dt(fraction=1.1)
+    wave.current_time = 0.0
+    maxdt = wave.get_and_set_maximum_dt(fraction=1.1)
     print(f"Timestep (in ms) considering a fraction of 1.1: {1e3 * maxdt}")
     test3 = math.isclose(maxdt, 0.00101317122593, rel_tol=1e-3)
 
     test4 = False
     try:
-        Wave_obj.forward_solve()
+        wave.forward_solve()
         test4 = False
     except AssertionError:
         test4 = True

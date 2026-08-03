@@ -46,7 +46,7 @@ class Sources(Delta_projector):
         Applies value at source locations in rhs_forcing operator
     """
 
-    def __init__(self, wave_object):
+    def __init__(self, wave):
         """Initializes class and gets all receiver parameters from
         input file.
 
@@ -66,27 +66,27 @@ class Sources(Delta_projector):
         Sources: :class: 'Source' object
 
         """
-        super().__init__(wave_object)
+        super().__init__(wave)
 
-        self.point_locations = wave_object.source_locations
-        self.number_of_points = wave_object.number_of_sources
-        self.amplitude = wave_object.amplitude
+        self.point_locations = wave.source_locations
+        self.number_of_points = wave.number_of_sources
+        self.amplitude = wave.amplitude
         self.is_local = [0] * self.number_of_points
         self.current_sources = None
-        if wave_object.analysis == "transient":
-            self.update_wavelet(wave_object)
+        if wave.analysis == "transient":
+            self.update_wavelet(wave)
         if np.isscalar(self.amplitude) or (self.amplitude.size <= 3):
             self.build_maps(order=0)
         else:
             self.build_maps(order=1)
 
-    def update_wavelet(self, wave_object):
+    def update_wavelet(self, wave):
         self.wavelet = full_ricker_wavelet(
-            dt=wave_object.dt,
-            final_time=wave_object.final_time,
-            frequency=wave_object.frequency,
-            delay=wave_object.delay,
-            delay_type=wave_object.delay_type,
+            dt=wave.dt,
+            final_time=wave.final_time,
+            frequency=wave.frequency,
+            delay=wave.delay,
+            delay_type=wave.delay_type,
         )
 
     def apply_source(self, rhs_forcing, step):

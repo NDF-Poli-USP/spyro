@@ -1,13 +1,12 @@
-"""Unit tests for the Modal solvers implemented in spyro.solvers.modal.modal_sol.
+"""Unit tests for the Analytical Modal solver in spyro.solvers.modal.modal_ana_sol.
 
-These tests verify the implemented modal solvers by comparing the computed fundamental
+These tests verify the analytical modal solver by comparing the computed fundamental
 frequency with expected values for different domain configurations. The tests cover
 both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
 """
 
 from pytest import fail, fixture, mark, param
-from firedrake import conditional, ConvergenceError
-from firedrake import COMM_WORLD as comm
+from firedrake import COMM_WORLD as comm, conditional, ConvergenceError
 from numpy import isclose, squeeze, zeros
 from scipy.optimize import minimize
 from spyro.solvers.acoustic_wave import AcousticWave
@@ -127,7 +126,7 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
 
     Returns
     -------
-    Wave_obj : acoustic_wave.AcousticWave
+    wave : acoustic_wave.AcousticWave
         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
     fitting_c : `tuple`
         Parameters for fitting equivalent velocity regression.
@@ -175,36 +174,36 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     # ============ MESH FEATURES ============
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = AcousticWave(dictionary=dictionary)
+    wave = AcousticWave(dictionary=dictionary)
 
     # Mesh
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+    wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
     if homogeneous:
-        Wave_obj.set_initial_velocity_model(constant=1.5)
+        wave.set_initial_velocity_model(constant=1.5)
 
     else:
-        cond = conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
-        Wave_obj.set_initial_velocity_model(conditional=cond)
+        cond = conditional(wave.mesh_x < 0.5, 3.0, 1.5)
+        wave.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
-    Wave_obj.mesh_ops.preamble_mesh_operations(Wave_obj, f_est=f_est)
+    wave.mesh_ops.preamble_mesh_operations(wave, f_est=f_est)
 
     # ============ EIKONAL ANALYSIS ============
 
     # Finding critical points
-    Wave_obj.layer_ops.critical_boundary_points(Wave_obj)
+    wave.layer_ops.critical_boundary_points(wave)
 
-    return Wave_obj, fitting_c
+    return wave, fitting_c
 
 
-def run_modal(Wave_obj, fitting_c, exp_value, n_root=1):
+def run_modal(wave, fitting_c, exp_value, n_root=1):
     """Solve the eigenvalue problem for models 2D and 3D.
 
     Parameters
     ----------
-    Wave_obj : acoustic_wave.AcousticWave
+    wave : acoustic_wave.AcousticWave
         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
     fitting_c : `tuple
         Parameters for fitting equivalent velocity regression.
@@ -224,13 +223,13 @@ def run_modal(Wave_obj, fitting_c, exp_value, n_root=1):
     """
 
     # Determining layer size
-    Wave_obj.layer_ops.layer_size_criterion(Wave_obj.mesh_parameters.lmin, n_root=n_root)
+    wave.layer_ops.layer_size_criterion(wave.mesh_parameters.lmin, n_root=n_root)
 
     # Creating mesh with absorbing layer
-    Wave_obj.layer_ops.create_mesh_with_layer(Wave_obj)
+    wave.layer_ops.create_mesh_with_layer(wave)
 
     # Updating velocity model
-    Wave_obj.layer_ops.velocity_abc(Wave_obj)
+    wave.layer_ops.velocity_abc(wave)
 
     # Modal solver
     modal_solver = 'ANALYTICAL'
@@ -247,7 +246,7 @@ def run_modal(Wave_obj, fitting_c, exp_value, n_root=1):
             Design variable.
         par_obj : `list`
             Parameters for the optimization sub-problem.
-            Structure: [Wave_obj, exp_value]
+            Structure: [wave, exp_value]
 
         Returns
         -------
@@ -259,7 +258,7 @@ def run_modal(Wave_obj, fitting_c, exp_value, n_root=1):
         print(f"Iteration: {iter_count[0]}")
 
         # Parameters for the optimization sub-problem
-        Wave_obj, exp_value = par_obj
+        wave, exp_value = par_obj
 
         # Design variables
         fitting_c = tuple(x)
@@ -267,13 +266,14 @@ def run_modal(Wave_obj, fitting_c, exp_value, n_root=1):
         pprint((fit_str + "{:.3f}\n").format(*fitting_c), comm=comm)
 
         # Computing fundamental frequency
-        Wave_obj.layer_ops.fundamental_frequency(Wave_obj, method="ANALYTICAL",
-                                                 fitting_c=fitting_c)
+        wave.layer_ops.fundamental_frequency(
+            wave, method="ANALYTICAL", fitting_c=fitting_c,
+        )
 
         # Objective linearized function and its gradient
-        # J = (Wave_obj.fundam_freq - exp_value)**2
-        J = (Wave_obj.fundam_freq - 0.95 * exp_value)\
-            * (Wave_obj.fundam_freq - 1.05 * exp_value)
+        # J = (wave.fundam_freq - exp_value)**2
+        J = (wave.fundam_freq - 0.95 * exp_value)\
+            * (wave.fundam_freq - 1.05 * exp_value)
 
         return J
 
@@ -300,26 +300,26 @@ def run_modal(Wave_obj, fitting_c, exp_value, n_root=1):
                'eps': 1e-12,
                'disp': False,
                }
-    result = minimize(fun_for_freq, zeros(4), args=([Wave_obj, exp_value]),
+    result = minimize(fun_for_freq, zeros(4), args=([wave, exp_value]),
                       jac='2-point', method=method_opt, options=options)
 
     # Optimized fitting parameters for the analytical solver
     fitting_c = tuple(squeeze(result.x))
 
     # Estimating computational resource usage
-    name_cost = Wave_obj.path_case_abc + modal_solver + "_"
+    name_cost = wave.path_case_abc + modal_solver + "_"
     comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
     tol = 0.05
     fit_str = "Optimized Fitting Parameters for Analytical Solver: " + 3 * "{:.3f}, "
     pprint((fit_str + "{:.3f}\n").format(*fitting_c), comm=comm)
-    abc_str = Wave_obj.case_abc if Wave_obj.layer_ops.layer_geometry.n_hyp is None \
-        else f"{Wave_obj.case_abc[:2]}" + \
-        f"{Wave_obj.layer_ops.layer_geometry.n_hyp:.1f}{Wave_obj.case_abc[-4:]}"
-    met_str = f"Fundamental Frequency {abc_str} {Wave_obj.dimension}D. "
+    abc_str = wave.case_abc if wave.layer_ops.layer_geometry.n_hyp is None \
+        else f"{wave.case_abc[:2]}" + \
+        f"{wave.layer_ops.layer_geometry.n_hyp:.1f}{wave.case_abc[-4:]}"
+    met_str = f"Fundamental Frequency {abc_str} {wave.dimension}D. "
     met_str += f"Method {modal_solver}"
-    cmp_str = f"Expected {exp_value:.5f}, got = {Wave_obj.fundam_freq:.5f}"
-    assert isclose(Wave_obj.fundam_freq / exp_value, 1., atol=tol), \
+    cmp_str = f"Expected {exp_value:.5f}, got = {wave.fundam_freq:.5f}"
+    assert isclose(wave.fundam_freq / exp_value, 1., atol=tol), \
         "✗ " + met_str + "  → " + cmp_str
     pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
 
@@ -440,11 +440,11 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.06 85.347
 
     *RESULTS HETEROGENEOUS (usr: without optimization)
-    Frequency[Hz]    N2.4 iter         (texe/pmem) iter     REC          (texe/pmem)
-    ANALYTICAL    0.51653   30 (120.432s/82.775MB)   26 0.42568 (177.947s/ 74.301MB)
-    ANALYTICAL    0.51833  usr (  5.761s/10.364MB)  usr 0.42415 (  8.884s/ 12.748MB)
-    KRYLOVSCH_GH  0.51535  n/a ( 25.103s/ 0.077MB)  n/a 0.42562 ( 64.295s/  0.075MB)
-    RAYLEIGH      0.54073  n/a ( 37.131s/71.052MB)  n/a 0.44257 ( 47.741s/104.142MB)
+    Frequency[Hz]    N2.4 iter         (texe/pmem)     REC iter          (texe/pmem)
+    ANALYTICAL    0.51653   30 (120.432s/82.775MB) 0.42568   26 (177.947s/ 74.301MB)
+    ANALYTICAL    0.51787  usr (  4.430s/10.494MB) 0.41840  usr (  6.531s/ 12.903MB)
+    KRYLOVSCH_GH  0.51535  n/a ( 25.103s/ 0.077MB) 0.42562  n/a ( 64.295s/  0.075MB)
+    RAYLEIGH      0.54073  n/a ( 37.131s/71.052MB) 0.44257  n/a ( 47.741s/104.142MB)
 
     *ANALYTICAL
        Case      REC*  N2.4*
@@ -489,7 +489,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     *RESULTS HETEROGENEOUS (usr: without optimization)
     Frequency[Hz]     REC iter        (texe/pmem)
     ANALYTICAL    0.41350   25 (79.510s/42.848MB)
-    ANALYTICAL    0.41373  usr ( 4.707s/11.191MB)
+    ANALYTICAL    0.42873  usr ( 3.689s/12.027MB)
     KRYLOVSCH_GG  0.41127  n/a (25.221s/ 0.086MB)
     RAYLEIGH      0.42935  n/a (31.954s/51.852MB)
 
@@ -509,23 +509,23 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
 
     # ============ SIMULATION PARAMETERS ============
 
-    Wave_obj, fitting_c = wave_instance
+    wave, fitting_c = wave_instance
 
     # ============ EXPECTED VALUES ============
 
     if dimension == 2:
         if homogeneous:
-            exp_value = 0.46875 if Wave_obj.abc_deg_layer is None else 0.51046
+            exp_value = 0.46875 if wave.abc_deg_layer is None else 0.51046
 
         else:
-            exp_value = 0.45539 if Wave_obj.abc_deg_layer is None else 0.50440
+            exp_value = 0.45539 if wave.abc_deg_layer is None else 0.50440
 
     if dimension == 3:
         if element_geometry == "T":
             if homogeneous:
-                exp_value = 0.47727 if Wave_obj.abc_deg_layer is None else 0.52345
+                exp_value = 0.47727 if wave.abc_deg_layer is None else 0.52345
             else:
-                exp_value = 0.42562 if Wave_obj.abc_deg_layer is None else 0.51535
+                exp_value = 0.42562 if wave.abc_deg_layer is None else 0.51535
         else:
             if homogeneous:
                 exp_value = 0.47727
@@ -534,10 +534,10 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
 
     try:
         # Computing the fundamental frequency
-        run_modal(Wave_obj, fitting_c, exp_value)
+        run_modal(wave, fitting_c, exp_value)
 
         # Renaming the folder if degree_layer is modified
-        Wave_obj.layer_ops.rename_folder_habc()
+        wave.layer_ops.rename_folder_habc()
 
     except ConvergenceError as e:
         fail(f"Checking Modal Solvers with {element_geometry} elements "
