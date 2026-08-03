@@ -7,7 +7,7 @@ from .damp_profile import HABC_Damping
 from ..io.basicio import parallel_print as pprint
 from ..solvers.modal.modal_sol import Modal_Solver
 # from ..tools.habc_tools import layer_mask_field
-from ..utils.typing import (HyperLayerDegreeType, LayerDampingType,
+from ..utils.typing import (HyperLayerDegreeType, AbsorbingBCsType,
                             LayerShapeType, LayerSizeRefFrequency)
 # from spyro.utils.error_management import value_parameter_error
 
@@ -102,7 +102,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
                           dimension=dimension, quadrilateral=quadrilateral,
                           func_space_type=func_space_type,
                           abc_boundary_layer_shape=abc_boundary_layer_shape,
-                          abc_boundary_layer_type=LayerDampingType.HYBRID,
+                          abc_boundary_layer_type=AbsorbingBCsType.HYBRID,
                           abc_reference_freq=abc_reference_freq,
                           abc_degree_type=abc_degree_type, abc_deg_layer=abc_deg_layer,
                           output_folder=output_folder, comm=comm)

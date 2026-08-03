@@ -86,7 +86,7 @@ def wave_dict(element_type, dimension):
     # Define Parameters for absorbing boundary conditions
     dictionary["absorving_boundary_conditions"] = {
         "status": False,  # Activate ABCs
-        "damping_type": "hybrid",  # Activate HABC
+        "abc_type": "hybrid",  # Activate HABC
     }
 
     # Define parameters for visualization

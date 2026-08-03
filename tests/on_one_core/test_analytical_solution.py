@@ -20,7 +20,7 @@ def test_analytical_solution(use_vertex_only_mesh):
     dictionary = {}
     dictionary["absorving_boundary_conditions"] = {
         "status": False,
-        "damping_type": None,
+        "abc_type": None,
         "exponent": None,
         "cmax": None,
         "R": None,
