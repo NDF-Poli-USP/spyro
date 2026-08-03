@@ -17,7 +17,10 @@ smag = 1e9  # Source magnitude
 freq = 1   # Source frequency [Hz]
 
 final_time = 2
-time_step = 5e-4
+# FIAT 2025.10 changed tetrahedral KMV elements to a spectral basis. The
+# resulting stiffness operator makes this example more sensitive to time
+# stepping than the old KMV basis/quadrature combination.
+time_step = 3e-4
 out_freq = (0.01/time_step)
 
 print(f'Element size: {h} m')

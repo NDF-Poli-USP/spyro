@@ -1,10 +1,31 @@
-import ast
+"""Utilities to safely evaluate expression strings into UFL objects.
+
+This module validates a user-provided mathematical expression with Python's
+AST before evaluating it in a restricted namespace containing Firedrake/UFL
+functions, constants, and spatial coordinates.
+"""
+
+from ast import parse, walk, Add, BinOp, Call, Constant, Div, \
+    Expression, Load, Mult, Name, Pow, Sub, UnaryOp, UAdd, USub
 from firedrake import SpatialCoordinate, acos, asin, atan, atan2, \
     cos, cosh, e, erf, exp, ln, pi, sin, sinh, sqrt, tan, tanh
+from spyro.utils.error_management import value_parameter_error
 
 
 def available_functions_to_eval(mesh, dimension):
+    """Return a dictionary of available functions and variables for eval.
 
+    This function creates a namespace dictionary that includes mathematical functions
+    from Firedrake and the spatial coordinates of the mesh. The namespace is used to
+    safely evaluate user-provided expressions as UFL functions.
+
+    Parameters
+    ----------
+    mesh : `Firedrake.Mesh`
+        The mesh on which the UFL function will be defined.
+    dimension : `int`
+        The spatial dimension of the mesh. It should be 2 or 3
+    """
     namespace = {"acos": acos,
                  "asin": asin,
                  "atan": atan,
@@ -34,26 +55,38 @@ def available_functions_to_eval(mesh, dimension):
 
 
 def generate_ufl_functions(mesh, expression, dimension):
-    '''
-    Use AST to validate expression structure before eval.
-    '''
+    """Use AST to validate expression structure before eval.
+
+    This function takes a string expression, validates its syntax using the Abstract
+    Syntax Tree (AST) module, and safely evaluates it to produce a UFL function.
+
+    Parameters
+    ----------
+    mesh : `Firedrake.Mesh`
+        The mesh on which the UFL function will be defined.
+    expression : `str`
+        The string expression to be evaluated as a UFL function.
+    dimension : `int`
+        The spatial dimension of the mesh. It should be 2 or 3
+    """
+
+    # Check model dimension
+    value_parameter_error('dimension', dimension, [2, 3])
 
     # Get available functions and variables
     namespace = available_functions_to_eval(mesh, dimension)
 
     # Parse to AST
     try:
-        tree = ast.parse(expression, mode='eval')
+        tree = parse(expression, mode='eval')
     except SyntaxError as e:
         raise ValueError(f"Invalid syntax: {e}")
 
     # Validate AST nodes
-    for node in ast.walk(tree):
+    for node in walk(tree):
         # Only allow specific node types including context nodes
-        allowed_node_types = (ast.Expression, ast.BinOp, ast.UnaryOp,
-                              ast.Call, ast.Name, ast.Add, ast.Sub,
-                              ast.Mult, ast.Div, ast.Pow, ast.USub,
-                              ast.UAdd, ast.Constant, ast.Load)
+        allowed_node_types = (Expression, BinOp, UnaryOp, Call, Name, Add,
+                              Sub, Mult, Div, Pow, USub, UAdd, Constant, Load)
 
         if not isinstance(node, allowed_node_types):
             raise ValueError(
@@ -65,14 +98,14 @@ def generate_ufl_functions(mesh, expression, dimension):
                 f"Disallowed syntax element: {type(node).__name__}")
 
         # Validate function calls
-        if isinstance(node, ast.Call):
-            if not isinstance(node.func, ast.Name):
+        if isinstance(node, Call):
+            if not isinstance(node.func, Name):
                 raise ValueError("Only simple function calls allowed")
             if node.func.id not in namespace:
                 raise ValueError(f"Unknown function: {node.func.id}")
 
         # Validate names
-        if isinstance(node, ast.Name):
+        if isinstance(node, Name):
             if node.id not in namespace:
                 raise ValueError(f"Unknown variable: {node.id}")
 

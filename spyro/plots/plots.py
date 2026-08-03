@@ -5,16 +5,22 @@ import numpy as np
 import firedrake
 import copy
 from ..io import ensemble_save
+from ..domains.space import create_function_space
 from ..utils import change_scalar_field_resolution
-from spyro.utils.stats_tools import coeff_of_determination
+from ..tools.version_control import is_firedrake_new
 plt.rcParams.update({"font.family": "serif"})
 plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
-__all__ = ["plot_shots", "plot_hist_receivers"]
+__all__ = ["plot_shots", "plot_receiver_response"]
+
+
+if is_firedrake_new() is False:
+    from firedrake.__future__ import interpolate
+    firedrake.interpolate = interpolate
 
 
 @ensemble_save
 def plot_shots(
-    Wave_object,
+    wave,
     show=False,
     file_name="plot_of_shot",
     shot_ids=[0],
@@ -36,7 +42,7 @@ def plot_shots(
 
     Parameters
     ----------
-    Wave_object : Wave
+    wave : Wave
         Wave simulation object containing the shot record data in the
         forward_solution_receivers attribute, along with timing and receiver information.
     show : bool, optional
@@ -77,19 +83,19 @@ def plot_shots(
 
     Examples
     --------
-    >>> plot_shots(wave_obj, show=True, file_name="my_shot", shot_ids=[0, 1])
-    >>> plot_shots(wave_obj, vmin=-1e-3, vmax=1e-3, file_format="png")
+    >>> plot_shots(wave, show=True, file_name="my_shot", shot_ids=[0, 1])
+    >>> plot_shots(wave, vmin=-1e-3, vmax=1e-3, file_format="png")
     """
     file_name = file_name + str(shot_ids) + "." + file_format
-    num_recvs = Wave_object.number_of_receivers
+    num_recvs = wave.number_of_receivers
 
-    dt = Wave_object.dt
-    tf = Wave_object.final_time
+    dt = wave.dt
+    tf = wave.final_time
 
     if out_index is None:
-        arr = Wave_object.forward_solution_receivers
+        arr = wave.forward_solution_receivers
     else:
-        arr = Wave_object.forward_solution_receivers[:, :, out_index]
+        arr = wave.forward_solution_receivers[:, :, out_index]
 
     nt = int(tf / dt) + 1  # number of timesteps
 
@@ -178,8 +184,8 @@ def plot_mesh_sizes(
     mesh.coordinates.dat.data[:, 0] = coordinates[:, 1]
     mesh.coordinates.dat.data[:, 1] = coordinates[:, 0]
 
-    DG0 = firedrake.FunctionSpace(mesh, "DG", 0)
-    f = firedrake.interpolate(firedrake.CellSize(mesh), DG0)
+    DG0 = create_function_space(mesh, "DG0", 0)
+    f = firedrake.assemble(interpolate(firedrake.CellSize(mesh), DG0))
 
     fig, axes = plt.subplots()
     if show_size_contour:
@@ -209,7 +215,7 @@ def plot_mesh_sizes(
 
 
 def plot_model(
-    Wave_object,
+    wave,
     filename="model.png",
     abc_points=None,
     show=False,
@@ -227,7 +233,7 @@ def plot_model(
 
     Parameters
     ----------
-    Wave_object : Wave
+    wave : Wave
         The Wave object containing the velocity model, source locations,
         and receiver locations.
     filename : str, optional
@@ -266,15 +272,15 @@ def plot_model(
     fig.set_figwidth = 9.0
     fig.set_figheight = 9.0
     if high_resolution:
-        vp_object, _ = change_scalar_field_resolution(Wave_object, high_resolution_grid_value)
+        vp_object, _ = change_scalar_field_resolution(wave, high_resolution_grid_value)
 
     else:
-        vp_object = Wave_object.initial_velocity_model
+        vp_object = wave.initial_velocity_model
     vp_image = firedrake.tripcolor(vp_object, axes=axes)
-    for source in Wave_object.source_locations:
+    for source in wave.source_locations:
         z, x = source
         plt.scatter(z, x, c="green")
-    for receiver in Wave_object.receiver_locations:
+    for receiver in wave.receiver_locations:
         z, x = receiver
         plt.scatter(z, x, c="red")
 
@@ -415,368 +421,7 @@ def debug_pvd(function, filename="debug.pvd"):
     out.write(function)
 
 
-def plot_hist_receivers(Wave_object, show=False):
-    """
-    Plot time-domain receiver response comparison.
-
-    Creates a multi-panel plot comparing the time-domain response at each
-    receiver between the computed solution and a reference solution. Each
-    receiver is plotted in its own subplot with the computed solution in
-    green and the reference solution in red dashed line.
-
-    Parameters
-    ----------
-    Wave_object : Wave
-        The Wave object containing the simulation results. Must have the
-        following attributes:
-        - forward_solution_receivers: Computed receiver data
-        - receivers_reference: Reference receiver data
-        - dt: Time step
-        - final_time: Final simulation time
-        - number_of_receivers: Number of receivers
-        - path_save: Directory path for saving plots
-        - case_habc: Case name for file naming
-
-    show : bool, optional
-        Whether to display the plot interactively. Default is False.
-
-    Returns
-    -------
-    None
-
-    Notes
-    -----
-    The function saves two files:
-    - {path_save}/{case_habc}/time.png
-    - {path_save}/{case_habc}/time.pdf
-
-    The green solid line represents the computed solution (HABC scheme),
-    while the red dashed line represents the reference solution.
-    """
-
-    print("\nPlotting Time Comparison")
-
-    # Time data
-    dt = Wave_object.dt
-    tf = Wave_object.final_time
-    nt = int(tf / dt) + 1  # number of timesteps
-    t_rec = np.linspace(0.0, tf, nt)
-
-    # Setting fonts
-    plt.rcParams['font.size'] = 7
-
-    # Setting subplots
-    num_recvs = Wave_object.number_of_receivers
-    plt.rcParams['axes.grid'] = True
-    fig, axes = plt.subplots(nrows=num_recvs, ncols=1)
-    fig.subplots_adjust(hspace=0.6)
-
-    # Setting colormap
-    cl_rc = (0., 1., 0., 1.)  # RGB-alpha (Green)
-    cl_rf = (1., 0., 0., 1.)  # RGB-alpha (Red)
-
-    for rec in range(num_recvs):
-
-        # Plot the receiver data
-        rc_dat = Wave_object.forward_solution_receivers[:, rec]
-        rf_dat = Wave_object.receivers_reference[:, rec]
-        axes[rec].plot(t_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
-        axes[rec].plot(t_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
-
-        # Adding the receiver number label
-        axes[rec].text(0.995, 0.9, "R" + str(rec + 1), fontsize=8.5,
-                       transform=axes[rec].transAxes, fontweight='bold',
-                       verticalalignment='top', horizontalalignment='right',
-                       bbox=dict(facecolor='none', edgecolor='none'))
-
-        # Centered title
-        if rec == num_recvs // 2:
-            axes[rec].set_ylabel(r'$sol \; recs$')
-
-        # Hide all the xticks for receiver different of the last one
-        hide_xticks = False if rec < num_recvs - 1 else True
-        plt.setp(axes[rec].get_xticklabels(), visible=hide_xticks)
-
-        # Axis format
-        axes[rec].set_xlim(0, tf)
-        axes[rec].ticklabel_format(
-            axis='y', style='scientific', scilimits=(-2, 2))
-        if rec == num_recvs - 1:
-            axes[rec].set_xlabel(r'$t \; (s)$')
-
-    # Saving the plot
-    time_str = Wave_object.path_save + Wave_object.case_habc + "/time"
-    plt.savefig(time_str + ".png", bbox_inches='tight')
-    plt.savefig(time_str + ".pdf", bbox_inches='tight')
-    plt.show() if show else None
-    plt.close()
-
-
-def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
-    """
-    Plot frequency-domain receiver response comparison.
-
-    Creates a multi-panel plot comparing the normalized frequency-domain
-    (FFT) response at each receiver between the computed solution and a
-    reference solution. Vertical lines indicate the source and reference
-    frequencies.
-
-    Parameters
-    ----------
-    Wave_object : Wave
-        Wave object containing the simulation results. Must have the
-        following attributes:
-        - receivers_out_fft: FFT of computed receiver data
-        - receivers_ref_fft: FFT of reference receiver data
-        - f_Nyq: Nyquist frequency
-        - frequency: Source frequency
-        - freq_ref: Reference frequency
-        - number_of_receivers: Number of receivers
-        - path_save: Directory path for saving plots
-        - case_habc: Case name for file naming
-
-    fxlim : float, optional
-        Factor to set the x-axis limits relative to the source frequency.
-        The plot will show frequencies up to fxlim * source_frequency,
-        capped at the Nyquist frequency. Minimum value is 2.
-        Default is 4.
-
-    show : bool, optional
-        Whether to display the plot interactively. Default is False.
-
-    Returns
-    -------
-    None
-
-    Notes
-    -----
-    The function saves two files:
-    - {path_save}/{case_habc}/freq.png
-    - {path_save}/{case_habc}/freq.pdf
-
-    The green solid line represents the FFT of the computed solution,
-    while the red dashed line represents the FFT of the reference solution.
-    Black vertical lines mark the source and reference frequencies.
-    """
-
-    print("\nPlotting Frequency Comparison")
-
-    # Frequency data
-    f_Nyq = Wave_object.f_Nyq
-    f_sou = Wave_object.frequency
-    pfft = Wave_object.receivers_out_fft.shape[0] - 1
-    df = f_Nyq / pfft
-    limf = round(min(max(fxlim, 2.) * f_sou, f_Nyq), 1)
-    idx_lim = int(limf / df) + 1
-    f_rec = np.linspace(0, df * idx_lim, idx_lim)
-
-    # Setting fonts
-    plt.rcParams['font.size'] = 7
-
-    # Setting subplots
-    num_recvs = Wave_object.number_of_receivers
-    plt.rcParams['axes.grid'] = True
-    fig, axes = plt.subplots(nrows=num_recvs, ncols=1)
-    fig.subplots_adjust(hspace=0.6)
-
-    # Setting colormap
-    cl_rc = (0., 1., 0., 1.)  # RGB-alpha (Green)
-    cl_rf = (1., 0., 0., 1.)  # RGB-alpha (Red)
-
-    for rec in range(num_recvs):
-
-        # Plot the receiver data
-        rc_dat = Wave_object.receivers_out_fft[:idx_lim, rec]
-        rf_dat = Wave_object.receivers_ref_fft[:idx_lim, rec]
-        axes[rec].plot(f_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
-        axes[rec].plot(f_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
-
-        # Add a vertical line at f_ref and f_sou
-        if f_sou == Wave_object.freq_ref:
-            f_ref = f_sou
-            f_str = r'$f_{ref} = f_{sou}$'
-        else:
-            f_ref = Wave_object.freq_ref
-            f_str = r'$f_{ref}$'
-            axes[rec].axvline(
-                x=f_sou, color='black', linestyle='-', linewidth=1.25)
-
-        axes[rec].axvline(
-            x=f_ref, color='black', linestyle='-', linewidth=1.25)
-
-        # Adding the receiver number label
-        axes[rec].text(0.995, 0.9, "R" + str(rec + 1), fontsize=8.5,
-                       transform=axes[rec].transAxes, fontweight='bold',
-                       verticalalignment='top', horizontalalignment='right',
-                       bbox=dict(facecolor='none', edgecolor='none'))
-
-        # Centered title
-        if rec == num_recvs // 2:
-            axes[rec].set_ylabel(r'$FFT \; recs_{norm}$')
-
-        # Hide all the xticks for receiver different of the last one
-        hide_xticks = False if rec < num_recvs - 1 else True
-        plt.setp(axes[rec].get_xticklabels(), visible=hide_xticks)
-
-        # Axis format
-        axes[rec].set_xlim(0, limf)
-        axes[rec].ticklabel_format(
-            axis='y', style='scientific', scilimits=(-2, 2))
-        if rec == num_recvs - 1:
-            axes[rec].set_xlabel(r'$f \; (Hz)$')
-
-            # Adding the frequency labels
-            axes[rec].text(f_ref - limf / 500., axes[rec].get_ylim()[0] * 1.05,
-                           f_str, color='black', fontsize=8, fontweight='bold',
-                           ha='right', va='bottom')
-            axes[rec].text(f_sou + limf / 500., axes[rec].get_ylim()[0] * 1.05,
-                           r'$f_{sou}$', color='black', fontsize=8,
-                           fontweight='bold', ha='left', va='bottom') \
-                if f_sou != Wave_object.freq_ref else None
-
-    # Saving the plot
-    time_str = Wave_object.path_save + Wave_object.case_habc + "/freq"
-    plt.savefig(time_str + ".png", bbox_inches='tight')
-    plt.savefig(time_str + ".pdf", bbox_inches='tight')
-    plt.show() if show else None
-    plt.close()
-
-
-def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
-    """
-    Plot quadratic regression analysis for optimal xCR parameter.
-
-    Creates a plot showing the quadratic regression of integral and peak
-    errors as a function of the heuristic factor xCR, highlighting the
-    optimal value based on a specified criterion. The plot includes
-    regression equations, R² values, and the optimal xCR marker.
-
-    Parameters
-    ----------
-    Wave_object : Wave
-        The Wave object containing the simulation results and configuration.
-        Must have attributes:
-        - xCR_bounds: Bounds for the xCR parameter
-        - path_save: Directory path for saving plots
-        - case_habc: Case name for file naming
-
-    data_regr_xCR : list
-        Data for the regression of the parameter xCR with structure:
-        [xCR, max_errIt, max_errPk, crit_opt] where:
-
-        - xCR : array-like
-            Values of xCR used in the regression. The last value is the
-            optimal xCR.
-        - max_errIt : array-like
-            Values of the maximum integral error at each xCR.
-            The last value corresponds to the optimal xCR.
-        - max_errPk : array-like
-            Values of the maximum peak error at each xCR.
-            The last value corresponds to the optimal xCR.
-        - crit_opt : str
-            Criterion used to determine the optimal xCR.
-            Options:
-
-            - 'error_difference': Minimizes difference between integral
-              and peak errors
-            - 'error_integral': Minimizes integral error
-
-    show : bool, optional
-        Whether to display the plot interactively. Default is False.
-
-    Returns
-    -------
-    None
-
-    Notes
-    -----
-    The function saves two files:
-    - {path_save}/{case_habc}/xCR.png
-    - {path_save}/{case_habc}/xCR.pdf
-
-    The plot displays:
-    - Red circles and dashed curve for integral error (eI)
-    - Blue circles and dashed curve for peak error (eP)
-    - Black star marker for the optimal xCR value
-    - Quadratic regression equations with R² values
-    - Vertical line from x-axis to optimal point
-    """
-
-    # Data for regression
-    xCR, max_errIt, max_errPk, crit_opt = data_regr_xCR
-    xCR_opt = xCR[-1]
-    err_opt = max_errIt[-1]
-    eq_eI = np.polyfit(xCR[:-1], max_errIt[:-1], 2)
-    eq_eP = np.polyfit(xCR[:-1], max_errPk[:-1], 2)
-
-    # Compute R^2 values
-    y_eI_true = max_errIt[:-1]
-    y_eI_pred = np.polyval(eq_eI, xCR[:-1])
-    y_eP_true = max_errPk[:-1]
-    y_eP_pred = np.polyval(eq_eP, xCR[:-1])
-    p = 2  # Quadratic model (Predictors: x and x^2)
-    r2_eI = coeff_of_determination(y_eI_true, y_eI_pred, p)
-    r2_eP = coeff_of_determination(y_eP_true, y_eP_pred, p)
-
-    # Format equations
-    qua_reg = r'${:.3e} x^{{2}} + {:.3e} x + {:.3e}, R^{{2}} = {:.3f}$'
-    eq_str_eI = (
-        r'$e_I = $' + qua_reg).format(*eq_eI, r2_eI).replace("+ -", "- ")
-    eq_str_eP = (
-        r'$e_P = $' + qua_reg).format(*eq_eP, r2_eP).replace("+ -", "- ")
-
-    # Regression points
-    plt.plot(xCR[:-1], 100 * np.asarray(max_errIt[:-1]), 'ro',
-             label=r'Integral Error: ' + eq_str_eI)
-    plt.plot(xCR[:-1], 100 * np.asarray(max_errPk[:-1]), 'bo',
-             label=r'Peak Error: ' + eq_str_eP)
-
-    # xCR limits
-    xCR_inf, xCR_sup = Wave_object.xCR_bounds[0]
-
-    # Regression curves
-    xgraf = np.linspace(xCR_inf, xCR_sup, int((xCR_sup - xCR_inf) / 0.1))
-    y_eI = np.polyval(eq_eI, xgraf)
-    y_eP = np.polyval(eq_eP, xgraf)
-    plt.plot(xgraf, 100 * y_eI, color='r', linestyle='--')
-    plt.plot(xgraf, 100 * y_eP, color='b', linestyle='--')
-
-    # Locating the optimal value
-    plt.plot([xCR_opt, xCR_opt], [0., 100 * err_opt], 'k-')
-    xopt_str = r'Optimized Heuristic Factor: $X^{{*}}_{{C_{{R}}}} = {:.3f}$'
-    if round(100 * np.polyval(eq_eI, xCR_opt), 2) == round(
-            100 * np.polyval(eq_eP, xCR_opt), 2):
-        xopt_str += r' | $e_{{I}} = e_{{P}} = {:.2f}\%$'
-        label = xopt_str.format(xCR_opt, 100 * err_opt)
-    else:
-        xopt_str += r' | $e_{{I}} = {:.2f}\%$ | $e_{{P}} = {:.2f}\%$'
-        label = xopt_str.format(xCR_opt, 100 * err_opt, 100 * max_errPk[-1])
-    plt.plot(xCR_opt, 100 * err_opt, marker=r'$\ast$', color='k',
-             markersize=10, label=label)
-    plt.legend(loc="best", fontsize=8.5)
-
-    # Formatting the plot
-    max_err = max(max(max_errIt[:-1]), max(max_errPk[:-1]))
-    plt.xlim(0, round(xCR_sup, 1) + 0.1)
-    plt.ylim(0, round(100 * max_err, 1) + 0.1)
-    if crit_opt == 'error_difference':
-        str_crt = r' (Criterion: Min $(e_I - e_P)$)'
-    elif crit_opt == 'error_integral':
-        str_crt = r' (Criterion: Min $e_I$)'
-
-    plt.xlabel(r'$X_{C_{R}}$' + str_crt)
-    plt.tight_layout(pad=2)
-    plt.ylabel(r'$e_I \; | \; e_P \; (\%)$')
-
-    # Saving the plot
-    xcr_str = Wave_object.path_save + Wave_object.case_habc + "/xCR"
-    plt.savefig(xcr_str + '.png', bbox_inches='tight')
-    plt.savefig(xcr_str + '.pdf', bbox_inches='tight')
-    plt.show() if show else None
-    plt.close()
-
-
-def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png", abc_points=None, show=False, flip_axis=True):
+def plot_model_in_p1(wave, dx=0.01, filename="model.png", abc_points=None, show=False, flip_axis=True):
     """
     Plot velocity model with P1 finite element projection.
 
@@ -787,7 +432,7 @@ def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png", abc_points=None
 
     Parameters
     ----------
-    Wave_object : Wave
+    wave : Wave
         An instance of a wave simulation object containing the velocity model
         and configuration dictionary.
     dx : float, optional
@@ -812,7 +457,7 @@ def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png", abc_points=None
     Notes
     -----
     This function:
-    1. Deep copies the Wave_object's input dictionary
+    1. Deep copies the wave's input dictionary
     2. Modifies it to use CG (Continuous Galerkin) method with degree 1
     3. Creates a new AcousticWave object with the modified configuration
     4. Sets up a new mesh with the specified edge length
@@ -826,13 +471,95 @@ def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png", abc_points=None
 
     # Local import to avoid circular import
     from ..solvers import AcousticWave
-    p1_obj_dict = copy.deepcopy(Wave_object.input_dictionary)
+    p1_obj_dict = copy.deepcopy(wave.input_dictionary)
     p1_obj_dict["options"]["method"] = "CG"
     p1_obj_dict["options"]["variant"] = "equispaced"
     p1_obj_dict["options"]["degree"] = 1
 
     new_wave_obj = AcousticWave(dictionary=p1_obj_dict)
     new_wave_obj.set_mesh(input_mesh_parameters={"edge_length": dx})
-    new_wave_obj.set_initial_velocity_model(conditional=Wave_object.initial_velocity_model)
+    new_wave_obj.set_initial_velocity_model(conditional=wave.initial_velocity_model)
 
     return plot_model(new_wave_obj, filename=filename, abc_points=abc_points, show=show, flip_axis=flip_axis)
+
+
+def plot_receiver_response(
+    receiver_data,
+    final_time,
+    show=False,
+    filename=None,
+    receiver_id_for_title=None,
+    hold=False,
+    color=None,
+    name=None,
+    **plot_kwargs,
+):
+    """Plot the time-series response for a single receiver.
+
+    Parameters
+    ----------
+    receiver_data : np.array
+        Receiver data to plot.
+    show : bool, optional
+        Whether to display the plot interactively. Default is False.
+    filename : str, optional
+        If provided, save the plot to this file.
+    hold : bool, optional
+        If True, plot on the current axes so multiple receivers can be
+        overlaid in sequence. Default is False.
+    color : str, optional
+        Line color to use when plotting. If None and hold is True, a random
+        color is selected.
+    name : str, optional
+        Label to use in the legend. When provided, the plot is added to the
+        legend so multiple held traces can be identified.
+    **plot_kwargs
+        Any additional keyword arguments accepted by matplotlib.axes.Axes.plot.
+
+    Returns
+    -------
+    None
+        The function creates the plot and displays it.
+    """
+    num_times = len(receiver_data)
+
+    time_vector = np.linspace(0.0, final_time, num_times)
+
+    if hold is False:
+        plt.close()
+        fig, axes = plt.subplots(figsize=(10, 4))
+    else:
+        fig = plt.gcf()
+        axes = plt.gca()
+        if fig.get_axes() == []:
+            fig, axes = plt.subplots(figsize=(10, 4))
+
+    if color is None and hold:
+        color_choices = plt.rcParams["axes.prop_cycle"].by_key().get("color", [None])
+        color = np.random.choice(color_choices)
+
+    line_kwargs = dict(plot_kwargs)
+    line_kwargs.setdefault("linewidth", 2)
+    line_kwargs.setdefault("color", color)
+    if name is not None:
+        line_kwargs.setdefault("label", name)
+
+    axes.plot(time_vector, receiver_data, **line_kwargs)
+    axes.set_xlabel("time (s)", fontsize=18)
+    axes.set_ylabel("receiver response", fontsize=18)
+    if receiver_id_for_title is not None:
+        axes.set_title(f"Receiver ID{receiver_id_for_title} data.", fontsize=22)
+    else:
+        axes.set_title("Receiver data.", fontsize=22)
+    if line_kwargs.get("label") is not None:
+        axes.legend()
+    axes.tick_params(axis="both", labelsize=18)
+    axes.grid(True, alpha=0.3)
+    fig.tight_layout()
+
+    if filename is not None:
+        plt.savefig(filename)
+    if show:
+        plt.show()
+    elif hold is False:
+        plt.close(fig)
