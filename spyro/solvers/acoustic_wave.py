@@ -207,7 +207,7 @@ class AcousticWave(Wave):
             self.u_n.assign(0.0)
 
     @override
-    def _initialize_model_parameters(self):
+    def _initialize_model_parameters(self, fast_interpolate=False):
         if self.initial_velocity_model is None:
             if self.initial_velocity_model_file is None:
                 if getattr(self.mesh_parameters, "grid_velocity_data", None) is not None:
@@ -232,6 +232,7 @@ class AcousticWave(Wave):
                     self,
                     self.initial_velocity_model_file,
                     self.function_space.sub(0),
+                    fast_interpolate=fast_interpolate,
                 )
 
             if self.debug_output:
