@@ -267,20 +267,26 @@ class Modal_Analytical_Solver():
             a, b, c = sorted(hyper_axes, reverse=True)
 
             # Eccentricities for each pair of semi-axes
-            ecc_arr = [(a, b, (a**2 - b**2)**0.5 if a > b else 0.),
-                       (b, c, (b**2 - c**2)**0.5 if b > c else 0.),
-                       (a, c, (a**2 - c**2)**0.5 if a > c else 0.)]
+            ecc_arr = [(a, b, (a**2 - b**2)**0.5 if a > b else 0., pi * a * b),
+                       (b, c, (b**2 - c**2)**0.5 if b > c else 0., pi * b * c),
+                       (a, c, (a**2 - c**2)**0.5 if a > c else 0., pi * a * c)]
 
             if bc == "Neumann":
-                # Only use the pair with maximum eccentricity
-                max_ecc_idx = argmax([ecc for _, _, ecc in ecc_arr])
-                a0, b0, f0 = ecc_arr[max_ecc_idx]
+                '''
+                Suppose semi-axes a, b and c lie along in directions x, y and z, the
+                lowest fundamental frequency is found in the plane with highest area:
+                - Oblate ellipsoid (lentil) a = b > c: Plane xy(a,b).
+                - Prolate ellipsoid (rugby ball) a = b < c: Planes xz(a,c) and yz(b,c).
+                - Triaxial Ellipsoid (General): Plane with maximum eccentricity.
+                '''
+                max_area_idx = argmax([ecc_plane[-1] for ecc_plane in ecc_arr])
+                a0, b0, f0 = ecc_arr[max_area_idx][:-1]
 
                 if f0 == 0:  # Circular cross-section
                     # 1st root for the mth-order Bessel's function
                     J01 = ZBF(m=0, n=1)[0]
 
-                    return J01 / a
+                    return J01 / a0
 
                 else:  # Elliptical cross-section
                     # 1st root or the mth-order Modified Mathieu's Function

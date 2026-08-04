@@ -31,8 +31,8 @@ class HABCError():
         - errPk : Peak error
         - pkMax : Maximum reference peak
         - final_energy : Dissipated energy in the HABC scheme
-    freq_Nyq : `float`
-        Nyquist frequency according to the time step. freq_Nyq = 1 / (2 * dt)
+    freq_Nyquist : `float`
+        Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt)
     max_errIt : `float`
         Maximum integral error at the receivers for the HABC scheme
     max_errPK : `float`
@@ -70,20 +70,16 @@ class HABCError():
         Save the reference signal for the HABC scheme
     """
 
-    def __init__(self, dt, freq_Nyq, receiver_locations, forward_solution_receivers=None,
-                 output_folder=None, output_case=None, comm=None):
+    def __init__(self, dt=None, freq_Nyquist=None, output_folder=None,
+                 output_case=None, comm=None):
         """Initialize the HABCError class.
 
         Parameters
         ----------
-        dt : `float`
-            Time step used in the simulation.
-        freq_Nyq : `float`
-            Nyquist frequency according to the time step. freq_Nyq = 1 / (2 * dt).
-        receiver_locations: `list`
-            List of receiver locations.
-        forward_solution_receivers : `array`, optional
-            Receiver waveform data in the HABC scheme. Default is `None`.
+        dt : `float`, optional
+            Time step used in the simulation. Default is `None`.
+        freq_Nyquist : `float`, optional
+            Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt).
         output_folder : `str`, optional
             The folder where output data will be saved. Default is `None`.
         output_case : `str`, optional
@@ -101,12 +97,7 @@ class HABCError():
         self.dt = dt
 
         # Nyquist frequency
-        self.freq_Nyq = freq_Nyq
-
-        # Receivers data and initialization
-        self.receiver_locations = receiver_locations
-        self.number_of_receivers = len(self.receiver_locations)
-        self.forward_solution_receivers = forward_solution_receivers
+        self.freq_Nyquist = freq_Nyquist
 
         # Path to save data
         if output_folder is None:
@@ -135,6 +126,16 @@ class HABCError():
     #     None
     #     """
 
+    # TODO: Review
+    # receiver_locations: `list`
+    #     List of receiver locations.
+    # forward_solution_receivers : `array`, optional
+    #     Receiver waveform data in the HABC scheme. Default is `None`.
+    # # Receivers data and initialization
+    # self.receiver_locations = receiver_locations
+    # self.number_of_receivers = len(self.receiver_locations)
+    # self.forward_solution_receivers = forward_solution_receivers
+
     #     pprint("\nSaving Reference Output", comm=self.comm)
 
     #     # Path to save the reference signal
@@ -148,7 +149,7 @@ class HABCError():
     #     self.receivers_ref_fft = []
     #     for rec in range(self.number_of_receivers):
     #         signal = self.receivers_reference[:, rec]
-    #         yf = freq_response(signal, self.freq_Nyq)
+    #         yf = freq_response(signal, self.freq_Nyquist)
     #         self.receivers_ref_fft.append(yf)
     #     np.save(pth_str + "habc_fft.npy", self.receivers_ref_fft)
 
@@ -282,7 +283,7 @@ class HABCError():
     #     self.receivers_out_fft = []
     #     for rec in range(self.number_of_receivers):
     #         signal = self.forward_solution_receivers[:, rec]
-    #         yf = freq_response(signal, self.freq_Nyq)
+    #         yf = freq_response(signal, self.freq_Nyquist)
     #         self.receivers_out_fft.append(yf)
     #     self.receivers_out_fft = np.asarray(self.receivers_out_fft).T
 

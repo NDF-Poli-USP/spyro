@@ -232,7 +232,7 @@ class TestModalAnalyticalSolver:
         test_cases = [
             # (semi-axes a, b, c)
             (3.0, 2.0, 1.0),   # Triaxial ellipsoid
-            (2.0, 1.5, 1.0),   # Prolate spheroid
+            (2.0, 1.0, 1.0),   # Prolate spheroid
             (2.0, 2.0, 1.0),   # Oblate spheroid
             (4.0, 3.0, 2.0),   # Large ellipsoid
             (0.5, 0.3, 0.2),   # Small ellipsoid
@@ -276,7 +276,7 @@ class TestModalAnalyticalSolver:
             assert diff < 0.1, f"Ellipsoidal f_ell={f_ell} " \
                 f"should approach spherical f_sph={f_sph}"
 
-    def test_freq_factor_ell_dirichlet_neumann_comparison(self, solver_2d):
+    def test_freq_factor_ell_dirichlet_neumann_comparison(self, solver_2d, solver_3d):
         """Compare Dirichlet and Neumann BC for elliptical case."""
         hyper_axes = (2.0, 1.0)
 
@@ -286,6 +286,20 @@ class TestModalAnalyticalSolver:
         # For the same geometry, Dirichlet should generally be larger than Neumann
         assert dir_f_ell > neu_f_ell, f"Dirichlet f_ell={dir_f_ell} " \
             f"should be > Neumann f_ell={neu_f_ell}"
+
+        test_cases = [
+            # (semi-axes a, b, c)
+            (3.0, 2.0, 1.0),   # Triaxial ellipsoid
+            (2.0, 1.0, 1.0),   # Prolate spheroid
+            (2.0, 2.0, 1.0),   # Oblate spheroid
+        ]
+        for hyper_axes in test_cases:
+            dir_f_ell = solver_3d._freq_factor_ell(hyper_axes, bc="Dirichlet")
+            neu_f_ell = solver_3d._freq_factor_ell(hyper_axes, bc="Neumann")
+
+            # For the same geometry, Dirichlet should generally be larger than Neumann
+            assert dir_f_ell > neu_f_ell, f"Dirichlet f_ell={dir_f_ell} " \
+                f"should be > Neumann f_ell={neu_f_ell}"
 
     def test_freq_factor_ell_dirichlet_comparison_with_rec(self, solver_2d):
         """Compare elliptical and rectangular frequency factors for Dirichlet BC."""

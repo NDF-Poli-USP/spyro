@@ -7,7 +7,7 @@ from .damp_profile import HABC_Damping
 from ..io.basicio import parallel_print as pprint
 from ..solvers.modal.modal_sol import Modal_Solver
 # from ..tools.habc_tools import layer_mask_field
-from ..utils.typing import (HyperLayerDegreeType, LayerDampingType,
+from ..utils.typing import (HyperLayerDegreeType, AbsorbingBCsType,
                             LayerShapeType, LayerSizeRefFrequency)
 # from spyro.utils.error_management import value_parameter_error
 
@@ -49,12 +49,12 @@ class HABCLayer(ABCLayer, HABC_Damping):
         Rename results folder if hypershape degree is out of limits.
     """
 
-    def __init__(self, domain_dim, frequency, f_Nyquist, abc_deg_layer,
-                 dimension=2, quadrilateral=False, func_space_type=None,
+    def __init__(self, domain_dim, frequency=None, dt=None, dimension=2,
+                 quadrilateral=False, func_space_type=None,
                  abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
                  abc_reference_freq=LayerSizeRefFrequency.SOURCE,
                  abc_degree_type=HyperLayerDegreeType.REAL,
-                 output_folder=None, comm=None):
+                 abc_deg_layer=None, output_folder=None, comm=None):
         """Initialize the HABC class.
 
         Parameters
@@ -62,13 +62,10 @@ class HABCLayer(ABCLayer, HABC_Damping):
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
             or (length_z, length_x, length_y) for 3D.
-        frequency: `float`
-            Frequency of the source.
-        f_Nyquist : `float`
-            Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt).
-        abc_deg_layer : `int` or `float` or `None`, optional
-            Hypershape degree. For hypershape layers, the degree must be greater than or
-            equal to 2. `None` is used only for rectangular layers. Default is `None`.
+        frequency: `float`, optional
+            Frequency of the source. Default is `None`.
+        dt : `float`, optional
+            Time step used in the simulation. Default is `None`.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
         quadrilateral : `bool`, optional
@@ -86,6 +83,9 @@ class HABCLayer(ABCLayer, HABC_Damping):
         abc_degree_type : `typing.HyperLayerDegreeType`, optional
             Type of the hypereshape degree. Options: 'HyperLayerDegreeType.REAL' or
             'HyperLayerDegreeType.INTEGER'. Default is 'HyperLayerDegreeType.REAL'.
+        abc_deg_layer : `int` or `float` or `None`, optional
+            Hypershape degree. For hypershape layers, the degree must be greater than or
+            equal to 2. `None` is used only for rectangular layers. Default is `None`.
         output_folder : `str`, optional
             The folder where output data will be saved. Default is `None`.
         comm : `object`, optional
@@ -98,10 +98,11 @@ class HABCLayer(ABCLayer, HABC_Damping):
         """
 
         # Initializing the ABCLayer class
-        ABCLayer.__init__(self, domain_dim, frequency, f_Nyquist, dimension=dimension,
-                          quadrilateral=quadrilateral, func_space_type=func_space_type,
+        ABCLayer.__init__(self, domain_dim, frequency=frequency, dt=dt,
+                          dimension=dimension, quadrilateral=quadrilateral,
+                          func_space_type=func_space_type,
                           abc_boundary_layer_shape=abc_boundary_layer_shape,
-                          abc_boundary_layer_type=LayerDampingType.HYBRID,
+                          abc_boundary_layer_type=AbsorbingBCsType.HYBRID,
                           abc_reference_freq=abc_reference_freq,
                           abc_degree_type=abc_degree_type, abc_deg_layer=abc_deg_layer,
                           output_folder=output_folder, comm=comm)
