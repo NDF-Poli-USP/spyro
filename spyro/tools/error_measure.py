@@ -1,11 +1,10 @@
 
+from firedrake import assemble
 from os import getcwd
-from numpy import load, save
+from numpy import array, concatenate, inf, load, save, savetxt, trapezoid
 from scipy.signal import find_peaks
 from ..io.basicio import parallel_print as pprint
 from ..utils.freq_tools import freq_response
-
-# from firedrake import assemble
 # from spyro.plots.plots_habc import plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
 # from spyro.utils.error_management import value_parameter_error
 
@@ -24,19 +23,6 @@ class MeasureError():
 
     Attributes
     ----------
-    dt : `float`
-        Time step used in the simulation.
-    err_habc : `list`
-        Error measures at the receivers for the HABC scheme.
-        Structure: [errIt, errPk, pkMax, final_energy]
-        - errIt : Integral error.
-        - errPk : Peak error.
-        - pkMax : Maximum reference peak.
-        - final_energy : Dissipated energy in the HABC scheme.
-    max_errIt : `float`
-        Maximum integral error at the receivers for the HABC scheme.
-    max_errPK : `float`
-        Maximum peak error at the receivers for the HABC scheme.
     path_reference : `str`
         Path to save the reference signal.
     path_save_error : `str`
@@ -61,13 +47,11 @@ class MeasureError():
         Get the optimal heuristic factor for the quadratic damping
     """
 
-    def __init__(self, dt=None, output_folder=None, output_case=None, comm=None):
+    def __init__(self, output_folder=None, output_case=None, comm=None):
         """Initialize the MeasureError class.
 
         Parameters
         ----------
-        dt : `float`, optional
-            Time step used in the simulation. Default is `None`.
         output_folder : `str`, optional
             The folder where output data will be saved. Default is `None`.
         output_case : `str`, optional
@@ -80,9 +64,6 @@ class MeasureError():
         -------
         None
         """
-
-        # Time step
-        self.dt = dt
 
         # Path to save data
         if output_folder is None:
@@ -104,7 +85,7 @@ class MeasureError():
 
     def save_reference_signal(self, receiver_locations, forward_solution_receivers,
                               number_of_receivers, freq_Nyquist, output_file="reference"):
-        """Save the reference signal for comparison betwwen models.
+        """Save the reference signal for comparison between models.
 
         Parameters
         ----------
@@ -145,7 +126,7 @@ class MeasureError():
             save(pth_str + "fft.npy", receivers_ref_fft)
 
     def get_reference_signal(self):
-        """Acquire the reference signal to compare with the HABC scheme.
+        """Acquire the reference signal for comparison between models.
 
         Parameters
         ----------
@@ -153,7 +134,6 @@ class MeasureError():
 
         Returns
         -------
-        None
         receivers_reference : `array`
             Receiver waveform data in the reference model
         receivers_ref_fft : `array`
@@ -173,9 +153,15 @@ class MeasureError():
 
         return receivers_reference, receivers_ref_fft
 
-    def peak_error(self, signal_model, signal_reference):
-        """
-        Compute the peak error between the model and reference signals.
+    @staticmethod
+    def peak_error(signal_model, signal_reference):
+        """Compute the peak error between the model and reference signals.
+
+        Error measures used in Salas et al. (2022) Sec. 2.5.
+        Hybrid absorbing scheme based on hyperelliptical layers with non-reflecting
+        boundary conditions in scalar wave equations. Applied Mathematical Modelling.
+        doi: https://doi.org/10.1016/j.apm.2022.09.014
+        TODO: add citation
 
         Parameters
         ----------
@@ -207,79 +193,158 @@ class MeasureError():
 
         return peak_error, peak_reference
 
-    # def
+    @staticmethod
+    def integral_error(signal_model, signal_reference, dt):
+        """Compute the integral error between the model and reference signals.
 
-    # def error_measures_habc(self):
-    #     """
-    #     Compute the error measures at the receivers for the HABC scheme.
-    #     Error measures as in Salas et al. (2022) Sec. 2.5.
-    #     Obs: If you get an error during running in find_peaks means that
-    #     the transient time of the simulation must be increased.
+        Error measures used in Salas et al. (2022) Sec. 2.5.
+        Hybrid absorbing scheme based on hyperelliptical layers with non-reflecting
+        boundary conditions in scalar wave equations. Applied Mathematical Modelling.
+        doi: https://doi.org/10.1016/j.apm.2022.09.014
+        TODO: add citation
 
-    #     Parameters
-    #     ----------
-    #     None
+        Parameters
+        ----------
+        signal_model : `array`
+            Transient response at the receiver for the model.
+        signal_reference : `array`
+            Transient response at the receiver for the reference model.
+        dt : `float`
+            Time step used in the simulation.
 
-    #     Returns
-    #     -------
-    #     None
-    #     """
+        Returns
+        -------
+        integral_error : `float`
+            Integral error between the model and reference signals.
+        """
 
-    #     pprint("\nComputing Error Measures", comm=self.comm)
+        # Completing with zeros if arrays lengths are different
+        model_len = len(signal_model)
+        reference_len = len(signal_reference)
+        delta_len = abs(model_len - reference_len)
+        if reference_len < model_len:
+            signal_reference = concatenate([signal_reference, zeros(delta_len)])
+        elif reference_len > model_len:
+            signal_model = concatenate([signal_model, zeros(delta_len)])
 
-    #     # Initializing error measures
-    #     pkMax = []
-    #     errPk = []
-    #     errIt = []
+        # Integral error
+        numerator = trapezoid((signal_model - signal_reference)**2, dx=dt)
+        denominator = trapezoid(signal_reference**2, dx=dt)
+        integral_error = numerator / denominator if denominator != 0 else inf
 
-    #     for i in range(self.number_of_receivers):
+        return integral_error
 
-    #         # Transient response at receiver
-    #         u_abc = self.forward_solution_receivers[:, i]
-    #         u_ref = self.receivers_reference[:, i]
+    def error_measures(self, forward_solution_receivers, receivers_reference, dt,
+                       number_of_receivers, energy=None, energy_reference=None):
+        """Compute the error measures at the receivers for comparison between models.
 
-    #         # Finding peaks in transient response
-    #         u_pks = find_peaks(u_abc)
-    #         if u_pks[0].size == 0:
-    #             wrn_str0 = "No peak observed in the transient response. "
-    #             wrn_str1 = "Increase the transient time of the simulation."
-    #             UserWarning(wrn_str0 + wrn_str1)
+        Error measures used in Salas et al. (2022) Sec. 2.5.
+        Hybrid absorbing scheme based on hyperelliptical layers with non-reflecting
+        boundary conditions in scalar wave equations. Applied Mathematical Modelling.
+        doi: https://doi.org/10.1016/j.apm.2022.09.014
+        TODO: add citation
 
-    #         # Maximum peak value
-    #         p_abc = max(abs(u_abc))
-    #         p_ref = max(abs(u_ref))
-    #         pkMax.append(p_ref)
+        Parameters
+        ----------
+        forward_solution_receivers : `array`
+            Receiver waveform data acquired from forward proeblem.
+        receivers_reference : `array`
+            Receiver waveform data in the reference model
+        dt : `float`
+            Time step used in the simulation.
+        number_of_receivers: `int`
+            Number of receivers used in the simulation.
+        energy : `firedrake.form`, optional
+            Firedrake form for the energy. Default is `None`.
+        energy_reference : `firedrake.form`, optional
+            Firedrake form for the energy in the reference model. Default is `None`.
 
-    #         # Completing with zeros if the length of arrays is different
-    #         delta_len = abs(len(u_abc) - len(u_ref))
-    #         if len(u_ref) < len(u_abc):
-    #             u_ref = np.concatenate([u_ref, np.zeros(delta_len)])
-    #         elif len(u_ref) > len(u_abc):
-    #             u_abc = np.concatenate([u_abc, np.zeros(delta_len)])
+        Returns
+        -------
+        err_habc : `list`
+            Error measures at the receivers with respect to a reference model.
+            Structure: [errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener]
+            - errIt : `list`
+                Integral error.
+            - errPk : `list`
+                Peak error.
+            - pkMax : `list`
+                Maximum reference peak.
+            - max_errIt : `float`
+                Maximum integral error.
+            - max_errPK : `float`
+                Maximum peak error
+            - final_ener : `float`
+                Final energy of the model. Only available if `energy` is provided.
+            - dsspt_ener : `float`
+                Total energy dissipated with respect to a reference model.
+                Only available if `energy_reference` is provided.
 
-    #         # Integral error
-    #         errIt.append(np.trapezoid((u_abc - u_ref)**2, dx=self.dt)
-    #                      / np.trapezoid(u_ref**2, dx=self.dt))
+        Notes
+        -----
+        - An error during execution in `find_peaks` means that the simulation
+            transient time should be increased in order to observe a peak.
+        - The `final_ener` value correspond to the mechanical energy in the
+            last step of the simulation. If the model has an ABC scheme, the
+            value should be close to zero. Otherwise, the value is constant
+            during the simulation due to the law of conservation of energy.
+        - The total energy dissipated by an ABC scheme can be calculated as the
+            difference of the final energies with respect to an infinite model.
+        """
 
-    #         # Peak error
-    #         errPk.append(abs(p_abc / p_ref - 1))
+        pprint("\nComputing Error Measures", comm=self.comm)
 
-    #     # Final value of the dissipated energy in the HABC scheme
-    #     final_energy = assemble(self.acoustic_energy)
-    #     self.err_habc = [errIt, errPk, pkMax, final_energy]
-    #     self.max_errIt = max(errIt)
-    #     self.max_errPK = max(errPk)
-    #     pprint(f"Maximum Integral Error: {self.max_errIt:.2%}", comm=self.comm)
-    #     pprint(f"Maximum Peak Error: {self.max_errPK:.2%}", comm=self.comm)
-    #     pprint(f"Acoustic Energy: {final_energy:.2e}", comm=self.comm)
+        # Initializing error measures
+        pkMax = []  # Maximum reference peak
+        errPk = []  # Peak error
+        errIt = []  # Integral error
 
-    #     # Save error measures
-    #     err_str = self.path_save_err_case + "habc_errs.txt"
-    #     np.savetxt(err_str, (errIt, errPk, pkMax), delimiter='\t')
+        for i in range(number_of_receivers):
 
-    #     # Append the energy value at the end
-    #     with open(err_str, 'a') as f:
-    #         np.savetxt(f, np.array([final_energy]), delimiter='\t')
+            # Transient response at receiver
+            u_abc = forward_solution_receivers[:, i]
+            u_ref = receivers_reference[:, i]
+
+            # Peak error and Maximum peak
+            peak_error, peak_reference = self.peak_error(u_abc, u_ref)
+            pkMax.append(peak_reference)
+            errPk.append(peak_error)
+
+            # Integral error
+            integral_error = self.integral_error(u_abc, u_ref, dt)
+            errIt.append(integral_error)
+
+        # Receiver error measures
+        error_measures = [errIt, errPk, pkMax]
+        max_errIt = max(errIt)
+        max_errPK = max(errPk)
+        scalar_values = [max_errIt, max_errPK]
+        pprint(f"Maximum Integral Error: {max_errIt:.2%}", comm=self.comm)
+        pprint(f"Maximum Peak Error: {max_errPK:.2%}", comm=self.comm)
+
+        # Save error measures
+        # err_str = self.path_save_err_case + "habc_errs.txt"
+        # savetxt(err_str, error_measures, delimiter='\t')
+
+        # Final energy
+        if energy is not None:
+            final_ener = assemble(energy)
+            scalar_values.append(final_ener)
+            pprint(f"Final Energy: {final_ener:.2e}", comm=self.comm)
+
+            # Dissipated energy
+            if energy_reference is not None:
+                dsspt = assemble(energy_reference) - final_ener
+                scalar_values.append(dsspt)
+                pprint(f"Dissipated Energy: {dsspt:.2e}", comm=self.comm)
+
+        # Append scala values to the error measures list
+        # with open(err_str, 'a') as f:
+        #     savetxt(f, scalar_values, delimiter='\t')
+
+        error_measures.extend([scalar_values])
+
+        return error_measures
 
     # def comparison_plots(self, regression_xCR=False, data_regr_xCR=None):
     #     """
