@@ -279,7 +279,7 @@ class ABCLayer(NRBC, MeasureError):
         self.path_to_save_abc_layer_case(output_folder=output_folder)
 
         # Initializing the error measure class
-        MeasureError.__init__(self, dt=self.dt, output_folder=self.path_save,
+        MeasureError.__init__(self, output_folder=self.path_save,
                               output_case=self.path_case_abc, comm=self.comm)
 
     def _define_layer_shape(self):

@@ -109,8 +109,11 @@ def wave_dict(element_geometry, dimension, calc_eik, abc_type, dt_usu):
 
     # Define parameters for visualization
     str_ele = element_geometry + "_" + ("Eik" if calc_eik else "NoEik")
+    output_folder = f"output/inf_test{dimension}d/inf_test{dimension}d" + str_ele
     dictionary["visualization"] = {  # Output folder
-        "output_folder": f"output/inf_test{dimension}d/inf_test{dimension}d" + str_ele
+        "output_folder": output_folder,
+        "acoustic_energy": True,  # Activate energy calculation
+        "acoustic_energy_filename": output_folder + "/preamble/acoustic_pot_energy"
     }
 
     return dictionary
@@ -292,11 +295,16 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
 
             if abc_type == "hybrid":
                 signal_reference = receivers_reference
+                energy_reference = wave.acoustic_energy
             else:
                 signal_model = receivers_reference
+                energy_model = wave.acoustic_energy
 
-        # peak_error, peak_reference = wave.layer_ops.peak_error(signal_model,
-        #                                                        signal_reference)
+        dt = wave.get_dt()
+        error_measures = wave.layer_ops.error_measures(signal_reference, signal_model, dt,
+                                                       wave.number_of_receivers,
+                                                       energy=energy_model,
+                                                       energy_reference=energy_reference)
 
         # tol = 0.07 if (modal_solver == 'ANALYTICAL'
         #                or modal_solver == 'RAYLEIGH') else 0.05
