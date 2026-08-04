@@ -63,7 +63,7 @@ def interpolate_time_series(
     initial_time : float
         Starting time of the simulation.
     final_time : float
-        Final time of the simulation
+        Final time of the simulation.
 
     Returns
     -------
