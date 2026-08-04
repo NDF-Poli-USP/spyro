@@ -11,7 +11,7 @@ from .wave import Wave
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
-from ..utils.typing import WaveType
+from ..utils.typing import WaveType, AdjointType
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import parallel_print
 from ..io.basicio import load_shots, save_shots
@@ -783,7 +783,10 @@ class FullWaveformInversion:
             raise ValueError("No guess control parameter has been configured.")
 
         self._sync_wave_real_shot_record()
+        if self.wave.adjoint_type == AdjointType.IMPLEMENTED_ADJOINT:
+            self.wave.enable_implemented_adjoint()
         self.wave.forward_solve()
+        # self.guess_forward_solution = self.wave.f
         current_control = self.wave.get_control_parameters()
         fire.VTKFile(f"control_{self.current_iteration}.pvd").write(current_control)
         np.save(
@@ -888,29 +891,6 @@ class FullWaveformInversion:
         else:
             self.real_shot_record = real_wave.forward_solution_receivers
         self._sync_wave_real_shot_record()
-
-    def set_smooth_guess_velocity_model(self, real_velocity_model_file=None):
-        """
-        Set a smoothed initial guess based on the true velocity model.
-
-        This method is intended to create a smooth initial guess from a known
-        true velocity model for synthetic tests. Currently a placeholder.
-
-        Parameters
-        ----------
-        real_velocity_model_file : str, optional
-            Path to the file containing the true velocity model. If not provided,
-            uses self.real_velocity_model_file.
-
-        Notes
-        -----
-        TODO: this method currently does not implement the smoothing operation and
-        may need to be completed for actual use.
-        """
-        if real_velocity_model_file is not None:
-            real_velocity_model_file = real_velocity_model_file
-        else:
-            real_velocity_model_file = self.real_velocity_model_file
 
     def set_real_velocity_model(
         self,
@@ -1254,6 +1234,8 @@ class FullWaveformInversion:
                 "maxiter": kwargs.pop("maxiter", 20),
             },
         }
+        if kwargs.pop("adjoint_type", None) is not None:
+            self.adjoint_type = kwargs.pop("adjoint_type")
         parameters.update(kwargs)
 
         control_reference = self._guess_control_reference()

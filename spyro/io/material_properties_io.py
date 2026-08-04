@@ -5,7 +5,7 @@ import firedrake as fire
 from numpy import log10, ones
 from numpy.random import uniform
 
-from .basicio import interpolate
+from .interpolators import interpolate
 from ..utils import error_management
 from ..utils import eval_functions_to_ufl
 from ..domains.space import check_function_space_type, create_function_space
