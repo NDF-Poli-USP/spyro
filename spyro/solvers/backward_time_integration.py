@@ -159,7 +159,7 @@ def _build_gradient_solver(wave: Wave, mask_available: bool) -> tuple[
     m_v = fire.TestFunction(V)
     if mask_available:
         # Use masked integration over inner region only
-        dx = fire.dx(2, scheme=qr)
+        dx = fire.dx(2, **qr)
         mask_available = True
     else:
         dx = fire.dx(**qr)
@@ -196,10 +196,6 @@ def _build_gradient_solver(wave: Wave, mask_available: bool) -> tuple[
     else:
         ffG = (
             -2 * (wave.c) ** (-3) * fire.dot(forward_field, uadj) * m_v * dx
-        )
-        parallel_print(
-            "No gradient mask found: computing gradients over full domain",
-            wave.comm,
         )
 
     gradi = fire.Function(V)
