@@ -465,11 +465,15 @@ class Model_parameters(Read_options, Read_boundary_layer,
                 abc_pad_length=pad_length,
             )
 
-        autoMeshing = None if not self.mesh_parameters.automatic_mesh else \
-            meshing.AutomaticMesh(mesh_parameters=self.mesh_parameters)
-
-        self.user_mesh = user_mesh if user_mesh is not None \
-            else autoMeshing.create_mesh()
+        if self.mesh_parameters.automatic_mesh:
+            automatic_mesh = meshing.AutomaticMesh(
+                mesh_parameters=self.mesh_parameters
+            )
+            self.user_mesh = (
+                user_mesh if user_mesh is not None else automatic_mesh.create_mesh()
+            )
+        else:
+            self.user_mesh = user_mesh
 
     def _set_mesh_length(self,
                          length_z=None,
