@@ -1,8 +1,9 @@
-# Submodules of this package are imported explicitly by their users, e.g.
-#     from ..abc.abc_layer import ABCLayer
-#
-# Do not eagerly import every submodule here (e.g. with pkgutil/importlib):
-# it makes touching any single abc submodule import the whole package, which
-# is the other half of the spyro.abc <-> spyro.habc circular import.
+import importlib
+import pkgutil
 
 __all__ = []
+for module_info in pkgutil.walk_packages(__path__):
+    module_name = module_info.name
+    __all__.append(module_name)
+    module = importlib.import_module(f"{__name__}.{module_name}")
+    globals()[module_name] = module
