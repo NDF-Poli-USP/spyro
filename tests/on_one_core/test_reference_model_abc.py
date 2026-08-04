@@ -96,7 +96,7 @@ def wave_dict(element_geometry, dimension, calc_eik, abc_type, dt_usu):
         "final_time": 2. if dimension == 2 else 1.5,  # Final time for event
         "dt": dt_usu,  # timestep size in seconds
         "amplitude": 1.,  # the Ricker has an amplitude of 1.
-        # "output_frequency": 100,  # how frequently to output solution to pvds
+        "output_frequency": 100,  # how frequently to output solution to pvds
         # "gradient_sampling_frequency": 100,  # how frequently to save to RAM
     }
 
@@ -269,7 +269,7 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
 
     # ============ REFERENCE MODEL ============
 
-    for abc_type in ["PML"]:  # ["hybrid", "PML"]:
+    for abc_type in ["hybrid", "PML"]:
         try:
 
             # Reference to resource usage
@@ -285,6 +285,8 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
             # Computing reference get_reference_signal
             wave.layer_ops.infinite_model(wave, check_dt=calc_eik,
                                           max_divisor_tf=max_divisor_tf)
+
+            receivers_reference, receivers_ref_fft = wave.layer_ops.get_reference_signal()
 
             # Estimating computational resource usage
             comp_cost("tfin", tRef=tRef, user_name=wave.path_save + "preamble/INF_")

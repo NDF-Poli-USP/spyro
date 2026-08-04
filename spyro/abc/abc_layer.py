@@ -2,14 +2,14 @@ from firedrake import Function, VTKFile
 from numpy import abs, array, ceil, inf, log10, minimum
 from os import getcwd
 from sympy import divisors
-from ..domains.space import create_function_space
 from .eik_min import Minimum_Eikonal
-from ..habc.error_measure import HABCError
+from .nrbc import NRBC
+from ..solvers.modal.modal_sol import Modal_Solver
+from ..tools.error_measure import MeasureError
+from ..domains.space import create_function_space
 from ..io.basicio import parallel_print as pprint
 from .lay_len import calc_size_lay
-from .nrbc import NRBC
 from ..plots.plots_habc import plot_function_layer_size
-from ..solvers.modal.modal_sol import Modal_Solver
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
 from ..utils.error_management import (enum_parameter_error, type_data_structure_error,
                                       value_numerical_error, value_parameter_error,
@@ -28,7 +28,7 @@ from ..utils.typing import (BoundaryConditionsType, HyperLayerDegreeType,
 # TODO: Add reference
 
 
-class ABCLayer(NRBC):
+class ABCLayer(NRBC, MeasureError):
     """Class for ABCs based on absorbing layers.
 
     Attributes
@@ -279,10 +279,8 @@ class ABCLayer(NRBC):
         self.path_to_save_abc_layer_case(output_folder=output_folder)
 
         # Initializing the error measure class
-        HABCError.__init__(self, dt=self.dt,
-                           freq_Nyquist=self.freq_Nyquist,
-                           output_folder=self.path_save,
-                           output_case=self.path_case_abc, comm=self.comm)
+        MeasureError.__init__(self, dt=self.dt, output_folder=self.path_save,
+                              output_case=self.path_case_abc, comm=self.comm)
 
     def _define_layer_shape(self):
         """Define the shape of the absorbing layer.
@@ -1042,29 +1040,14 @@ class ABCLayer(NRBC):
         # Updating velocity model
         self.velocity_abc(wave, inf_model=True)
 
-        # Setting no damping
-        if self.abc_boundary_layer_type == "hybrid":
-            self.cosHig = self.eta_mask = self.eta_habc = 0.
-        elif self.abc_boundary_layer_type == "PML":
-            self.sigma_z = self.sigma_x = 0.
-            if self.dimension == 3:
-                self.sigma_y = 0.
-
         pprint("\nSolving Infinite Model", comm=self.comm)
 
         # Solving the forward problem
         wave.forward_solve()
 
-        # # Saving reference signal
-        # self.save_reference_signal()
+        # Saving reference signal
+        output_file = self.abc_boundary_layer_type.value + "_ref.npy"
 
-        # # Deleting variables to be computed for the ABC scheme
-        # del self.abc_pad_length, self.length_xabc, self.length_zabc
-        # if self.dimension == 3:
-        #     del self.length_yabc
-        # if self.abc_boundary_layer_type == "hybrid":
-        #     del self.cosHig, self.eta_mask, self.eta_habc
-        # elif self.abc_boundary_layer_type == "PML":
-        #     del self.sigma_z, self.sigma_x
-        #     if self.dimension == 3:
-        #         del self.sigma_y
+        self.save_reference_signal(
+            wave.receiver_locations, wave.forward_solution_receivers,
+            wave.number_of_receivers, self.freq_Nyquist, output_file=output_file)

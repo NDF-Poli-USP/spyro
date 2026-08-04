@@ -15,8 +15,7 @@ from ..utils.typing import BoundaryConditionsType
 # TODO: Add citations
 
 def forms_pml(wave, W, X_n, X_nm1):
-    """
-    Build the variational form for the wave equation with a PML.
+    """Build the variational form for the wave equation with a PML.
 
     Parameters
     ----------
@@ -73,17 +72,17 @@ def forms_pml(wave, W, X_n, X_nm1):
     a = dot(grad(u_n), grad(v))
     FF = (m1 + a) * dx
 
-    # Common PML forms (Backward difference for first time derivative)
-    pml3 = -div(pp_n) * v
-    # -------------------------------------------------------
-    mm1 = dot((pp - pp_n) / dt, qq)  # 1st order in error
-
     # Surfaces to apply boundary conditions (NRBCs or Traditional BCs)
     bc_surf = tuple([non_free_surf for non_free_surf, status in
                      wave.mesh_parameters.boundary_ids_map.items() if status])
-    abc_type = wave.layer_ops.bc_boundary_pml
+    bc_bndr = wave.layer_ops.bc_boundary_pml
 
     if not wave.abc_get_ref_model:
+
+        # Common PML forms (Backward difference for first time derivative)
+        pml3 = -div(pp_n) * v
+        # -------------------------------------------------------
+        mm1 = dot((pp - pp_n) / dt, qq)  # 1st order in error
 
         # Damping profiles and matrices
         sigma_x, sigma_z = wave.layer_ops.sigma_x, wave.layer_ops.sigma_z
@@ -124,7 +123,7 @@ def forms_pml(wave, W, X_n, X_nm1):
         # print("Available boundary markers:", exterior_markers)
 
         # Apply NRBCs (Higdon or Sommerfeld) at PML boundaries
-        if abc_type in [BoundaryConditionsType.HIGDON, BoundaryConditionsType.SOMMERFELD]:
+        if bc_bndr in [BoundaryConditionsType.HIGDON, BoundaryConditionsType.SOMMERFELD]:
             ds = fire_ds(bc_surf, **quad_rule) if quad_rule else fire_ds(bc_surf)
             f_abc = c * ((u_n - u_nm1) / dt) * v
             le = wave.layer_ops.cosHig * f_abc * ds
@@ -132,8 +131,8 @@ def forms_pml(wave, W, X_n, X_nm1):
 
     # Dirichlet BCs for PML model or Neumann BCs for the reference model
     get_ref_model_negat = not wave.abc_get_ref_model
-    fix_bnd = DirichletBC(W.sub(0), 0., bc_surf) \
-        if abc_type == BoundaryConditionsType.DIRICHLET and get_ref_model_negat else None
+    fix_bnd = DirichletBC(W.sub(0), 0., bc_surf) if \
+        bc_bndr == BoundaryConditionsType.DIRICHLET and get_ref_model_negat else None
 
     return FF, fix_bnd
 
