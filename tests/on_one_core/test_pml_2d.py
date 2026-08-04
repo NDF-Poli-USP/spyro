@@ -72,7 +72,7 @@ def run_forward():
 
     dictionary["absorving_boundary_conditions"] = {
         "status": True,
-        "damping_type": "PML",
+        "abc_type": "PML",
         "exponent": 2,
         "cmax": 4.5,
         "R": 1e-6,

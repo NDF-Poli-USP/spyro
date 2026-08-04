@@ -3,20 +3,21 @@ from firedrake import Function, VTKFile
 from numpy import inf
 from os import getcwd
 # from sympy import divisors
-from .nrbc import NRBC
-from .eik_min import Minimum_Eikonal
-from .lay_len import calc_size_lay
-# from ..habc.error_measure import HABCError
-# from ..solvers.modal.modal_sol import Modal_Solver
-from ..io.basicio import parallel_print as pprint
 from ..domains.space import create_function_space
+from .eik_min import Minimum_Eikonal
+from ..habc.error_measure import HABCError
+from ..io.basicio import parallel_print as pprint
+from .lay_len import calc_size_lay
+from .nrbc import NRBC
 from ..plots.plots_habc import plot_function_layer_size
+# from ..solvers.modal.modal_sol import Modal_Solver
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
-from ..utils.error_management import (enum_parameter_error, value_numerical_error,
-                                      value_parameter_error, value_string_error)
+from ..utils.error_management import (enum_parameter_error, type_data_structure_error,
+                                      value_numerical_error, value_parameter_error,
+                                      value_string_error)
 from ..utils.freq_tools import freq_response
 from ..utils.typing import (BoundaryConditionsType, HyperLayerDegreeType,
-                            LayerDampingType, LayerShapeType, LayerSizeRefFrequency)
+                            AbsorbingBCsType, LayerShapeType, LayerSizeRefFrequency)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -39,11 +40,11 @@ class ABCLayer(NRBC):
     abc_boundary_layer_shape : `typing.LayerShapeType`
         Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
         `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
-    abc_boundary_layer_type : `typing.LayerDampingType`
-        Type of the boundary layer. Options: `LayerDampingType.LOCAL`,
-        `LayerDampingType.HYBRID`, `LayerDampingType.PML` or `LayerDampingType.NOABCS`.
-        Default is `LayerDampingType.NOABCS` where no absorbing BCs are applied.
-        Option `LayerDampingType.HYBRID` is based on paper of Salas et al. (2022).
+    abc_boundary_layer_type : `typing.AbsorbingBCsType`
+        Type of the boundary layer. Options: `AbsorbingBCsType.NRBC`,
+        `AbsorbingBCsType.HYBRID`, `AbsorbingBCsType.PML` or `AbsorbingBCsType.NOABCS`.
+        Default is `AbsorbingBCsType.NOABCS` where no absorbing BCs are applied.
+        Option `AbsorbingBCsType.HYBRID` is based on paper of Salas et al. (2022).
         doi: https://doi.org/10.1016/j.apm.2022.09.014
         TODO: Add citation
     abc_deg_layer : `int` or `float` or `None`
@@ -75,16 +76,25 @@ class ABCLayer(NRBC):
     domain_dim : `tuple`
         Original domain dimensions: (length_z, length_x) for 2D
         or (length_z, length_x, length_y) for 3D.
+    dt : `float` or `None`
+        Time step used in the simulation. It is `None` if the response is not 'transient'.
     eik_bnd : `list`
         Properties on boundaries according to minimum values of Eikonal.
-        Structure sublist: [pt_cr, c_bnd, eikmin, z_par, lref, sou_cr]
-        - pt_cr : Critical point coordinates.
-        - c_bnd : Propagation speed at critical point.
-        - eikmin : Eikonal value in seconds.
-        - z_par : Inverse of minimum Eikonal (Equivalent to c_bound / lref).
-        - lref : Distance to the closest source from critical point.
+        Structure sublist: [pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]
+        - pnt_crit : `array`
+            Critical point coordinates.
+        - c_bnd :  `float`
+            Propagation speed at critical point.
+        - eikmin : `float`
+            Minimum eikonal value in seconds.
+        - z_par :  `float`
+            Inverse of minimum Eikonal (Equivalent to c_bound/lref).
+        - lref : `float`
+            Distance to the closest source from critical point.
+        - sou_crit : `tuple`
+            Critical source coordinates.
     ele_pad : `int`
-        Number of elements in the layer of edge length equal to 'lmin'.        - sou_cr : Critical source coordinates.
+        Number of elements in the layer of edge length equal to 'lmin'.
     factor_length_pad : `float`
         Size parameter of the absorbing layer.
     frequency: `float`
@@ -156,13 +166,13 @@ class ABCLayer(NRBC):
         Set the velocity profile for the model with absorbing layer.
     """
 
-    def __init__(self, domain_dim, frequency, freq_Nyquist, dimension=2,
-                 quadrilateral=False, func_space_type=None,
+    def __init__(self, domain_dim, frequency=None, dt=None,
+                 dimension=2, quadrilateral=False, func_space_type=None,
                  abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
-                 abc_boundary_layer_type=LayerDampingType.HYBRID,
+                 abc_boundary_layer_type=AbsorbingBCsType.HYBRID,
                  abc_reference_freq=LayerSizeRefFrequency.SOURCE,
-                 abc_degree_type=HyperLayerDegreeType.REAL, abc_deg_layer=None,
-                 output_folder=None, comm=None):
+                 abc_degree_type=HyperLayerDegreeType.REAL,
+                 abc_deg_layer=None, output_folder=None, comm=None):
         """Initialize the ABCLayer class.
 
         Parameters
@@ -170,10 +180,10 @@ class ABCLayer(NRBC):
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
             or (length_z, length_x, length_y) for 3D.
-        frequency: `float`
+        frequency: `float`, optional
             Frequency of the source.
-        freq_Nyquist : `float`
-            Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt)
+        dt : `float`, optional
+            Time step used in the simulation. Default is `None`.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
         quadrilateral : `bool`, optional
@@ -185,11 +195,11 @@ class ABCLayer(NRBC):
         abc_boundary_layer_shape : `typing.LayerShapeType`, optional
             Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
             `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
-        abc_boundary_layer_type : `typing.LayerDampingType`
-            Type of the boundary layer. Options: `LayerDampingType.LOCAL`,
-            `LayerDampingType.HYBRID`, `LayerDampingType.PML` or `LayerDampingType.NOABCS`.
-            Default is `LayerDampingType.NOABCS` where no absorbing BCs are applied.
-            Option `LayerDampingType.HYBRID` is based on paper of Salas et al. (2022).
+        abc_boundary_layer_type : `typing.AbsorbingBCsType`
+            Type of the boundary layer. Options: `AbsorbingBCsType.NRBC`,
+            `AbsorbingBCsType.HYBRID`, `AbsorbingBCsType.PML` or `AbsorbingBCsType.NOABCS`.
+            Default is `AbsorbingBCsType.NOABCS` where no absorbing BCs are applied.
+            Option `AbsorbingBCsType.HYBRID` is based on paper of Salas et al. (2022).
             doi: https://doi.org/10.1016/j.apm.2022.09.014
             TODO: Add citation
         abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
@@ -213,24 +223,24 @@ class ABCLayer(NRBC):
         None
         """
 
-        # Validate input arguments
-        if not isinstance(domain_dim, tuple):
-            raise TypeError(f"'domain_dim' must be a tuple, got {type(domain_dim).__name__}.")
-
-        # Original domain dimensions
-        self.domain_dim = domain_dim
-
-        # Source frequency
-        self.frequency = value_numerical_error("frequency", frequency, float_num=True,
-                                               integer_num=True, lower_bound=0.)
-
-        # Nyquist frequency
-        self.freq_Nyquist = value_numerical_error("freq_Nyquist", freq_Nyquist,
-                                                  float_num=True, integer_num=True,
-                                                  lower_bound=0., none_default=True)
-
         # Model dimension
         self.dimension = value_parameter_error("dimension", dimension, [2, 3])
+
+        # Original domain dimensions
+        self.domain_dim = type_data_structure_error("domain_dim", domain_dim, "tuple",
+                                                    expected_type_element=("float", "int"),
+                                                    expected_length=dimension)
+        # Source frequency
+        self.frequency = value_numerical_error("frequency", frequency,
+                                               float_num=True, integer_num=True,
+                                               lower_bound=0., none_default=True)
+
+        # Timestep for the transient simulation
+        self.dt = value_numerical_error("dt", dt, float_num=True, integer_num=True,
+                                        lower_bound=0., none_default=True)
+
+        # Nyquist frequency
+        self.freq_Nyquist = None if self.dt is None else 1. / (2. * self.dt)
 
         # Quadrilateral/hexahedral elements
         self.quadrilateral = quadrilateral
@@ -241,10 +251,10 @@ class ABCLayer(NRBC):
         # ABC layer parameters
         self.abc_boundary_layer_type = enum_parameter_error("abc_boundary_layer_type",
                                                             abc_boundary_layer_type,
-                                                            LayerDampingType)
-        if abc_boundary_layer_type == LayerDampingType.NOABCS:
+                                                            AbsorbingBCsType)
+        if abc_boundary_layer_type == AbsorbingBCsType.NOABCS:
             value_parameter_error("abc_boundary_layer_type", abc_boundary_layer_type,
-                                  [LayerDampingType.HYBRID, LayerDampingType.PML])
+                                  [AbsorbingBCsType.HYBRID, AbsorbingBCsType.PML])
 
         self.abc_boundary_layer_shape = enum_parameter_error("abc_boundary_layer_shape",
                                                              abc_boundary_layer_shape,
@@ -274,9 +284,10 @@ class ABCLayer(NRBC):
         self.path_to_save_abc_layer_case(output_folder=output_folder)
 
         # Initializing the error measure class
-        # HABCError.__init__(
-        #     self, self.dt, freq_Nyquist, self.receiver_locations,
-        #     output_folder=self.path_save, output_case=self.path_case_abc, comm)
+        HABCError.__init__(self, dt=self.dt,
+                           freq_Nyquist=self.freq_Nyquist,
+                           output_folder=self.path_save,
+                           output_case=self.path_case_abc, comm=self.comm)
 
     def _define_layer_shape(self):
         """Define the shape of the absorbing layer.
@@ -333,9 +344,9 @@ class ABCLayer(NRBC):
         """
 
         # Layer type
-        if self.abc_boundary_layer_type == LayerDampingType.HYBRID:
+        if self.abc_boundary_layer_type == AbsorbingBCsType.HYBRID:
             abc_layer_str = "Absorbing" if for_prints else "habc"
-        elif self.abc_boundary_layer_type == LayerDampingType.PML:
+        elif self.abc_boundary_layer_type == AbsorbingBCsType.PML:
             abc_layer_str = "PML" if for_prints else "pml"
 
         formatted_str = str_to_format.format(abc_layer_str)
@@ -725,22 +736,6 @@ class ABCLayer(NRBC):
 
         Notes
         -----
-        dx = 0.05 km (2D)
-        Pts approach: 0.699 0.599 0.717 mean = 0.672
-        Lst approach: 0.914 0.769 0.830 mean = 0.847
-        New approach: 1.602 1.495 1.588 mean = 1.562
-        Old approach: 1.982 2.124 1.961 mean = 2.022
-
-        dx = 0.02 km
-        Pts approach: 2.290 2.844 2.133 mean = 2.422
-        Lst approach: 2.784 2.726 3.085 mean = 2.865
-        New approach: 5.276 5.214 6.275 mean = 5.588
-        Old approach: 12.232 12.372 12.078 = 12.227
-
-        dx = 0.05 km (3D)
-        Pts approach: 33.234 31.697 31.598 = 32.176
-        Lst approach: 60.101 60.919 50.918 = 57.313
-
         "point_cloud" - dx = 0.05 km (2D)
         Estimating Runtime and Used Memory
         Runtime: (s):18.437, (m):0.307, (h):0.005
@@ -868,9 +863,9 @@ class ABCLayer(NRBC):
     #         order, less than or equal to the user's timestep size. If the value is 1,
     #         the timestep size is set as the maximum divisor. Default is 1.
     #     set_max_dt : `bool`, optional
-    #         If `True`, set the timestep size to the selected divisor. Default is `True`
+    #         If `True`, set the timestep size to the selected divisor. Default is `True`.
     #     method : `str`, optional
-    #         Method to use for solving the eigenvalue problem. Defaultis 'ANALYTICAL'
+    #         Method to use for solving the eigenvalue problem. Default is 'ANALYTICAL'
     #         method that estimates the maximum eigenvalue using the Gershgorin Circle
     #         Theorem. Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS' or 'LOBPCG'.
     #     mag_add : `int`, optional
@@ -879,9 +874,6 @@ class ABCLayer(NRBC):
     #     Returns
     #     -------
     #     None
-
-    #     # Estimation: 2.770 (Old), 2.768 (New) (Scipy-sparse)
-    #     # Exact: 1.842 (Old), 1.842 (New) (Scipy)
     #     """
 
     #     pprint("\nChecking Timestep Size", comm=self.comm)
@@ -1010,7 +1002,7 @@ class ABCLayer(NRBC):
     #         order, less than or equal to the user's timestep size. If the value is 1,
     #         the timestep size is set as the maximum divisor. Default is 1.
     #     method : `str`, optional
-    #         Method to use for solving the eigenvalue problem. Defaultis 'ANALYTICAL'
+    #         Method to use for solving the eigenvalue problem. Default is 'ANALYTICAL'
     #         method that estimates the maximum eigenvalue using the Gershgorin Circle
     #         Theorem. Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS' or 'LOBPCG'.
     #     mag_add : `int`, optional

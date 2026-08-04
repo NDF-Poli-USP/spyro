@@ -4,7 +4,7 @@ from ..abc.abc_layer import ABCLayer
 from ..io.basicio import parallel_print as pprint
 from ..utils.error_management import enum_parameter_error, value_numerical_error
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
-from ..utils.typing import (BoundaryConditionsType, LayerDampingType,
+from ..utils.typing import (BoundaryConditionsType, AbsorbingBCsType,
                             LayerShapeType, LayerSizeRefFrequency)
 
 # Work from Ruben Andres Salas and Alexandre Olender
@@ -58,7 +58,7 @@ class PMLLayer(ABCLayer):
         Generate a damping profile for the PML.
     """
 
-    def __init__(self, domain_dim, frequency, f_Nyquist, dimension=2,
+    def __init__(self, domain_dim, frequency=None, dt=None, dimension=2,
                  quadrilateral=False, func_space_type=None,
                  bc_boundary_pml=BoundaryConditionsType.NEUMANN,
                  abc_reference_freq=LayerSizeRefFrequency.SOURCE,
@@ -71,10 +71,10 @@ class PMLLayer(ABCLayer):
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
             or (length_z, length_x, length_y) for 3D.
-        frequency: `float`
-            Frequency of the source.
-        f_Nyquist : `float`
-            Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt).
+        frequency: `float`, optional
+            Frequency of the source. Default is `None`.
+        dt : `float`, optional
+            Time step used in the simulation. Default is `None`.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
         quadrilateral : `bool`, optional
@@ -106,10 +106,11 @@ class PMLLayer(ABCLayer):
         """
 
         # Initializing the ABCLayer class
-        ABCLayer.__init__(self, domain_dim, frequency, f_Nyquist, dimension=dimension,
-                          quadrilateral=quadrilateral, func_space_type=func_space_type,
+        ABCLayer.__init__(self, domain_dim, frequency=frequency, dt=dt,
+                          dimension=dimension, quadrilateral=quadrilateral,
+                          func_space_type=func_space_type,
                           abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
-                          abc_boundary_layer_type=LayerDampingType.PML,
+                          abc_boundary_layer_type=AbsorbingBCsType.PML,
                           abc_reference_freq=abc_reference_freq,
                           output_folder=output_folder, comm=comm)
 

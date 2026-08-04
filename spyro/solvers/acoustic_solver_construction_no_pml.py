@@ -1,6 +1,6 @@
 import firedrake as fire
 from firedrake import ds, dx, dot, grad
-from ..utils.typing import LayerDampingType
+from ..utils.typing import AbsorbingBCsType
 
 
 def construct_solver_or_matrix_no_pml(wave):
@@ -49,7 +49,7 @@ def construct_solver_or_matrix_no_pml(wave):
         f_abc = (1 / wave.c) * weak_expr_abc
         qr_s = wave.surface_quadrature_rule
 
-        if wave.abc_boundary_layer_type == LayerDampingType.HYBRID:
+        if wave.abc_type == AbsorbingBCsType.HYBRID:
 
             # NRBC
             le += wave.cosHig * f_abc * ds(**qr_s)
