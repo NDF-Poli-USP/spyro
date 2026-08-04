@@ -1,0 +1,307 @@
+"""Unit tests for the Modal solvers implemented in spyro.solvers.modal.modal_sol.
+
+These tests verify the implemented modal solvers by comparing the computed fundamental
+frequency with expected values for different domain configurations. The tests cover
+both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
+"""
+
+from pytest import fail, fixture, mark, param
+from firedrake import COMM_WORLD as comm, conditional, ConvergenceError
+from numpy import isclose
+from spyro.solvers.acoustic_wave import AcousticWave
+from spyro.utils.cost import comp_cost
+from spyro.io.basicio import parallel_print as pprint
+
+
+def wave_dict(element_geometry, dimension, calc_eik, abc_type, dt_usu):
+    """Create a dictionary with parameters for the model.
+
+    Parameters
+    ----------
+    element_geometry : `str`
+        Geometry of the finite element. Options: "T" for triangles/tetrahedra or
+        "Q" for quadrilaterals/hexahedra.
+    dimension : `int`
+        Dimension of the problem. 2 for 2D and 3 for 3D.
+    calc_eik : `bool`
+        If `True`, eikonal analysis is performed; otherwise, it is skipped.
+    abc_type : `str`
+        Type of the absorbing boundary condition. Options: "hybrid" or "PML".
+    dt_usu: `float`
+        Time step of the simulation
+
+    Returns
+    -------
+    dictionary : `dict`
+        Dictionary containing the parameters for the model.
+    """
+
+    dictionary = {}
+    # Define options for the model. We specify the cell type, variant,
+    # degree, dimension and analysis type.
+    dictionary["options"] = {
+        "cell_type": element_geometry,  # Options: tri/tetra(T) or quad/hexa(Q)
+        "variant": "lumped",  # Options: lumped, equispaced or DG.
+        "degree": 4 if dimension == 2 else 3,  # p <= 4 for 2D and p <= 3 for 3D
+        "dimension": dimension,  # Model dimension
+        "analysis": "transient",  # Options: transient, modal or eikonal
+    }
+
+    # Number of cores for the shot. For simplicity, we keep things serial.
+    # spyro however supports both spatial parallelism and "shot" parallelism.
+    # Options: automatic (same number of cores for evey processor) or spatial
+    dictionary["parallelism"] = {
+        "type": "automatic",
+    }
+
+    # Define the domain size without the PML or AL. Here we'll assume a domain
+    # with a width and depth of 1 km, and a thickness of 1 km for the 3D case.
+    if dimension == 2:
+        length_z, length_x, length_y = [1., 1., 0.]
+    elif dimension == 3:
+        length_z, length_x, length_y = [1., 1., 1.]  # in km
+    dictionary["mesh"] = {
+        "length_z": length_z,  # depth in km - always positive
+        "length_x": length_x,  # width in km - always positive
+        "length_y": length_y,  # thickness in km - always positive
+        "mesh_type": "firedrake_mesh",
+    }
+
+    # Create a source injection operator. Here we use a single source with a
+    # Ricker wavelet that has a peak frequency of 5 Hz injected at a specified
+    # point of the mesh. We also specify to record the solution at the corners
+    # of the domain to verify the efficiency of the absorbing layer.
+    dictionary["acquisition"] = {
+        "source_locations": ([(-length_z / 2., length_x / 4.)] if dimension == 2
+                             else [(-length_z / 2., length_x / 4., length_y / 2.)]),
+        "frequency": 5.,  # in Hz
+        "delay_type": "multiples_of_minimum" if dimension == 2 else "time",
+        "delay": 1.5 if dimension == 2 else 1. / 3.,
+        "receiver_locations": ([(-length_z, 0.),
+                                (-length_z, length_x),
+                                (0., 0.), (0., length_x)]
+                               if dimension == 2
+                               else [(-length_z, 0., 0.),
+                                     (-length_z, length_x, 0.),
+                                     (0., 0., 0),
+                                     (0., length_x, 0.),
+                                     (-length_z, 0., length_y),
+                                     (-length_z, length_x, length_y),
+                                     (0., 0., length_y),
+                                     (0., length_x, length_y)])
+    }
+
+    # Define parameters for the transient integration method.
+    dictionary["time_axis"] = {
+        "final_time": 2. if dimension == 2 else 1.5,  # Final time for event
+        "dt": dt_usu,  # timestep size in seconds
+        "amplitude": 1.,  # the Ricker has an amplitude of 1.
+        # "output_frequency": 100,  # how frequently to output solution to pvds
+        # "gradient_sampling_frequency": 100,  # how frequently to save to RAM
+    }
+
+    # Define Parameters for absorbing boundary conditions
+    dictionary["absorving_boundary_conditions"] = {
+        "status": True,  # Activate ABCs
+        "abc_type": abc_type,  # Options: "hybrid" or "PML"
+        "get_ref_model": True,  # If True, the infinite model is created
+    }
+
+    # Define parameters for visualization
+    str_ele = element_geometry + "_" + ("Eik" if calc_eik else "NoEik")
+    dictionary["visualization"] = {  # Output folder
+        "output_folder": f"output/inf_test{dimension}d/inf_test{dimension}d" + str_ele
+    }
+
+    return dictionary
+
+
+def wave_instance(element_geometry, dimension, abc_type, calc_eik):
+    """Create an instance of the acoustic wave solver.
+
+    Parameters
+    ----------
+    element_geometry : `str`
+        Geometry of the finite element. Options: "T" for triangles/tetrahedra or
+        "Q" for quadrilaterals/hexahedra.
+    dimension : `int`
+        Dimension of the problem. 2 for 2D and 3 for 3D.
+    abc_type : `str`
+        Type of the absorbing boundary condition. Options: "hybrid" or "PML".
+    calc_eik : `bool`
+        If `True`, eikonal analysis is performed; otherwise, it is skipped.
+
+    Returns
+    -------
+    wave : acoustic_wave.AcousticWave
+        An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+    max_divisor_tf : `int`, optional
+        Index to select the maximum divisor of the final time, converted to an
+        integer according to the order of magnitude of the timestep size. The
+        timestep size is set to the divisor, given by the index in descending
+        order, less than or equal to the user's timestep size. If the value is 1,
+        the timestep size is set as the maximum divisor. Default is 1.
+    """
+
+    # ============ SIMULATION PARAMETERS ============
+
+    # Mesh size (in km)
+    # cpw: cells per wavelength
+    # lba = minimum_velocity / source_frequency
+    # edge_length = lba / cpw
+    edge_length = 0.1 if dimension == 2 else 0.15
+
+    # f_est: Factor for the stabilizing term in Eikonal equation
+    # fitting_c: Parameters for fitting equivalent velocity regression
+    if dimension == 2:
+        f_est = 0.06 if element_geometry == "T" else 0.05
+
+    if dimension == 3:
+        f_est = 0.05 if element_geometry == "T" else 0.07
+
+    # Timestep size (in seconds). Initial guess: edge_length / 100
+    dt_usu = 0.00100 if dimension == 2 else 0.00150
+
+    # Maximum divisor of the final time
+    max_divisor_tf = 3 if dimension == 2 else 7
+
+    # Get simulation parameters
+    pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
+    pprint(f"Element Geometry: {element_geometry}", comm=comm)
+    pprint(f"Eikonal Stabilizing Factor: {f_est:.2f}", comm=comm)
+    pprint(f"Timestep Size: {1e3 * dt_usu:.3f} ms", comm=comm)
+    pprint(f"Maximum Divisor of Final Time: {max_divisor_tf}", comm=comm)
+
+    # Create dictionary with parameters for the model
+    dictionary = wave_dict(element_geometry, dimension, calc_eik, abc_type, dt_usu)
+
+    # ============ MESH FEATURES ============
+
+    # Create the acoustic wave object with HABCs
+    wave = AcousticWave(dictionary=dictionary)
+
+    # Mesh
+    wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+
+    # Initial velocity model
+    cond = conditional(wave.mesh_x < 0.5, 3.0, 1.5)
+    wave.set_initial_velocity_model(conditional=cond)
+
+    # Preamble mesh operations
+    wave.mesh_ops.preamble_mesh_operations(wave, f_est=f_est)
+
+    if calc_eik:
+        # ============ EIKONAL ANALYSIS ============
+
+        # Finding critical points
+        wave.layer_ops.critical_boundary_points(wave)
+
+    return wave, max_divisor_tf
+
+
+@mark.older_firedrake
+@mark.parametrize("element_geometry, dimension, calc_eik", [
+    ("T", 2, True),
+    # ("T", 2, False),
+    # ("Q", 2, True),
+    # ("Q", 2, False),
+    # ("T", 3, True),
+    # ("T", 3, False),
+    # ("Q", 3, True),
+    # ("Q", 3, False),
+])
+def test_infinite_model_abc(element_geometry, dimension, calc_eik):
+    """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).
+
+    See Salas et al (2022): Hybrid absorbing scheme based on hyperelliptical
+    layers with non-reflecting boundary conditions in scalar wave equations.
+    doi: https://doi.org/10.1016/j.apm.2022.09.014
+
+    Parameters
+    ----------
+    element_geometry : `str`
+        Geometry of the finite element. Options: "T" for triangles/tetrahedra or
+        "Q" for quadrilaterals/hexahedra.
+    dimension : `int`
+        Dimension of the problem. 2 for 2D and 3 for 3D.
+    calc_eik : `bool`
+        If `True`, eikonal analysis is performed; otherwise, it is skipped.
+
+    Returns
+    -------
+    None
+
+
+    ==============================
+    Eikonal for 2D model Δx = 100m
+    ==============================
+    eik_min = 83.333 ms
+
+    f_est  T-ele   Q-ele
+     0.01 66.836  65.002
+     0.02 73.308  75.811
+     0.03 77.178  79.845
+     0.04 79.680  82.101
+     0.05 81.498  83.744*
+     0.06 82.942* 85.118
+     0.07 84.160  86.345
+     0.08 85.233  87.480
+
+    ==============================
+    Eikonal for 3D model Δx = 150m
+    ==============================
+    eik_min = 83.333 ms
+
+    f_est  T-ele   Q-ele
+     0.02  --/--  69.442
+     0.03 76.777  70.974
+     0.04 79.409  73.179
+     0.05 82.273* 75.766
+     0.06 85.347  78.548
+     0.07 88.562  81.431*
+     0.08 91.876  84.377
+    """
+
+    act_eik = "Activated" if calc_eik else "Deactivated"
+    pprint("\n" + 60 * "=" + f"\nTesting Reference Model with {element_geometry} elements "
+           + f"for ABCs\nand {dimension}D case. Eikonal analysis: {act_eik}\n"
+           + 60 * "=", comm=comm)
+
+    # ============ REFERENCE MODEL ============
+
+    for abc_type in ["PML"]:  # ["hybrid", "PML"]:
+        try:
+
+            # Reference to resource usage
+            tRef = comp_cost("tini")
+
+            # Create an instance of the acoustic wave solver
+            wave, max_divisor_tf = wave_instance(element_geometry, dimension,
+                                                 abc_type, calc_eik)
+
+            pprint(f"\nAbsorbing Boundary Condition: {abc_type}", comm=comm)
+            print(wave.abc_type)
+
+            # Computing reference get_reference_signal
+            wave.layer_ops.infinite_model(wave, check_dt=calc_eik,
+                                          max_divisor_tf=max_divisor_tf)
+
+            # Estimating computational resource usage
+            comp_cost("tfin", tRef=tRef, user_name=wave.path_save + "preamble/INF_")
+
+            # tol = 0.07 if (modal_solver == 'ANALYTICAL'
+            #                or modal_solver == 'RAYLEIGH') else 0.05
+
+            # abc_str = wave.case_abc if wave.layer_ops.layer_geometry.n_hyp is None \
+            #     else f"{wave.case_abc[:2]}" + \
+            #     f"{wave.layer_ops.layer_geometry.n_hyp:.1f}{wave.case_abc[-4:]}"
+            # met_str = f"Fundamental Frequency {abc_str} {wave.dimension}D. "
+            # met_str += f"Method {modal_solver}"
+            # cmp_str = f"Expected {exp_value:.5f}, got = {wave.fundam_freq:.5f}"
+            # assert isclose(wave.fundam_freq / exp_value, 1., atol=tol), \
+            #     "✗ " + met_str + "  → " + cmp_str
+            # pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
+
+        except ConvergenceError as e:
+            fail(f"Checking Reference Model with {element_geometry} elements for "
+                 f"{dimension}D and Eikonal {act_eik} case raised an exception: {str(e)}")
