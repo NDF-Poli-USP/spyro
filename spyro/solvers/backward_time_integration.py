@@ -3,7 +3,7 @@ from . import helpers
 from .wave import Wave
 from ..io.basicio import parallel_print
 from ..receivers.Receivers import Receivers
-from ..utils.typing import LayerDampingType
+from ..utils.typing import AbsorbingBCsType
 
 
 def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
@@ -76,7 +76,7 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
             # Assign the adjoint solution at the step `np1` to `uadj`.
             uadj.assign(wave.get_function(state=wave.next_vstate))
 
-            if wave.abc_boundary_layer_type == LayerDampingType.PML:
+            if wave.abc_type == AbsorbingBCsType.PML:
                 # Pop to keep the list in sync, but use the element one
                 # step behind so that u_fwd and u_adj are at the same
                 # physical time (usol[k] = u^{k+1}; we need u^k).
@@ -90,7 +90,7 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
             grad_solver.solve()
             _trapezoidal_gradient_integration(dJ, gradi, step, nt)
 
-        if wave.abc_boundary_layer_type == LayerDampingType.PML:
+        if wave.abc_type == AbsorbingBCsType.PML:
             wave.X_nm1.assign(wave.X_n)
             wave.X_n.assign(wave.X_np1)
         else:
@@ -169,7 +169,7 @@ def _build_gradient_solver(wave: Wave, mask_available: bool) -> tuple[
     forward_field = fire.Function(V)
     uadj = fire.Function(V)
 
-    if wave.abc_boundary_layer_type == LayerDampingType.PML:
+    if wave.abc_type == AbsorbingBCsType.PML:
         # Always exclude PML region from gradient.
         # This is necessary once the gradient expression is not considering
         # the PML auxiliary variables. In addition, we are not interested

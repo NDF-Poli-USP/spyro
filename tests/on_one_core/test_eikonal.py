@@ -90,7 +90,7 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
     # Define Parameters for absorbing boundary conditions
     dictionary["absorving_boundary_conditions"] = {
         "status": True,  # Activate ABCs
-        "damping_type": "hybrid",  # Activate HABC
+        "abc_type": "hybrid",  # Activate HABC
         "degree_eikonal": degree_eikonal,  # FEM order for the Eikonal analysis
     }
 

@@ -81,7 +81,7 @@
 #     # Define Parameters for absorbing boundary conditions
 #     dictionary["absorving_boundary_conditions"] = {
 #         "status": True,  # Activate ABCs
-#         "damping_type": "PML",  # Activate HABC
+#         "abc_type": "PML",  # Activate HABC
 #         "exponent": 2,
 #         "R": 1e-6,
 #         "habc_reference_freq": habc_reference_freq,  # Options: source or boundary
@@ -190,7 +190,7 @@
 #     # Define Parameters for absorbing boundary conditions
 #     dictionary["absorving_boundary_conditions"] = {
 #         "status": True,  # Activate ABCs
-#         "damping_type": "PML",  # Activate HABC
+#         "abc_type": "PML",  # Activate HABC
 #         "exponent": 2,
 #         "R": 1e-6,
 #         "habc_reference_freq": habc_reference_freq,  # Options: source or boundary

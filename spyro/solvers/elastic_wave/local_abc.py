@@ -12,8 +12,8 @@ def local_abc_form(wave):
     else:
         abc_active = abc_dict.get("status", False)
         if abc_active:
-            abc_type = abc_dict.get("local", {}).get("type", "Stacey")
-            dt_scheme = abc_dict.get("local", {}).get("dt_scheme", "backward")
+            abc_type = abc_dict.get("nrbc", {}).get("type", "Stacey")
+            dt_scheme = abc_dict.get("nrbc", {}).get("dt_scheme", "backward")
         else:
             return 0
 

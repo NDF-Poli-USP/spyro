@@ -7,7 +7,7 @@ def test_camembert_forward():
     dictionary = {}
     # dictionary["absorving_boundary_conditions"] = {
     #     "status": True,
-    #     "damping_type": "PML",
+    #     "abc_type": "PML",
     #     "exponent": 2,
     #     "cmax": 4.5,
     #     "R": 1e-6,
@@ -33,7 +33,7 @@ def test_rectangle_forward():
     dictionary = {}
     dictionary["absorving_boundary_conditions"] = {
         "status": False,
-        "damping_type": None,
+        "abc_type": None,
         "pad_length": 0.,
     }
     wave = spyro.examples.Rectangle_acoustic()
@@ -61,7 +61,7 @@ def test_acoustic_local_abc():
     dictionary = {}
     dictionary["absorving_boundary_conditions"] = {
         "status": True,
-        "damping_type": "local",
+        "abc_type": "nrbc",
         "absorb_top": True,
         "absorb_bottom": True,
         "absorb_right": True,

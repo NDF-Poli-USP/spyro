@@ -92,7 +92,7 @@ def wave_dict(dt_usu, layer_shape, degree_layer,
     # Define Parameters for absorbing boundary conditions
     dictionary["absorving_boundary_conditions"] = {
         "status": True,  # Activate ABCs
-        "damping_type": "hybrid",  # Activate HABC
+        "abc_type": "hybrid",  # Activate HABC
         "layer_shape": layer_shape,  # Options: rectangular or hypershape
         "degree_layer": degree_layer,  # Integer >= 2. Only for hypershape
         "habc_reference_freq": habc_reference_freq,  # Options: source or boundary
