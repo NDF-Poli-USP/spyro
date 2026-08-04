@@ -198,6 +198,10 @@ def run_fwi():
         "segy_velocity_model": "initial_guess.segy",
         "mesh_type": "gmsh_mesh",
         "grade": 0.05,
+        "vp_water": 1.5,
+        "water_interface": True,
+        "water_search_value": 1.5,
+        "gradient_mask": True,
     }
     fwi_obj.set_guess_mesh(input_mesh_parameters=meshing_dictionary)
 

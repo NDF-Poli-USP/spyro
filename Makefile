@@ -25,11 +25,11 @@ clean-pyc:
 	@rm -rf dist/
 
 clean-root:
-	@rm -f *.msh *.vtk *.png *.vtu *.pvtu *.pvd *.npy *.pdf *.dat *.segy *.hdf5
+	@rm -f *.vtk *.png *.vtu *.pvtu *.pvd *.npy *.pdf *.dat
 	@rm -rf asn*/ bsn*/
 
 clean-data:
-	@rm -f shots/*.dat
+	@rm -f shots/*.dat *.segy *.hdf5 *.msh
 	@rm -f *.txt
 
 clean-output:
@@ -38,6 +38,8 @@ clean-output:
 	@rm -rf control_*/ gradient*/ initial_velocity_model/ output*/ vp_end*/ test_debug*/
 
 clean: clean-pyc clean-root clean-data clean-output
+
+clean-not-data: clean-pyc clean-root clean-output
 
 format:
 	autopep8 --in-place --global-config setup.cfg --recursive .
