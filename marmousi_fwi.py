@@ -95,7 +95,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.01, 4.0), (-0.01, 12.0), 6),
+    "source_locations": spyro.create_transect((-0.01, 4.0), (-0.01, 12.0), 40),
     "frequency": frequency,
     "delay": 1.0/frequency,
     "delay_type": "time",
@@ -135,14 +135,14 @@ def setting_up_fwi():
 
     # Let us create a smoothed out initial guess based on a gaussian
     # filter of our true model
-    sigma = 20  # standart deviation for the gaussian filter
+    sigma = 100  # standart deviation for the gaussian filter
     spyro.tools.smooth_velocity_field_file(
         "velocity_models/vp_marmousi-ii.segy",
         "initial_guess.segy",
         sigma,
         save_fig=True,
         vp_limit=0.0,
-        i_limit=25,
+        i_limit=45,
         comm=wave_obj.comm,
     )
 
@@ -213,5 +213,5 @@ def run_fwi():
 
 
 if __name__ == "__main__":
-    # setting_up_fwi()
+    setting_up_fwi()
     run_fwi()
