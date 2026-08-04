@@ -266,6 +266,10 @@ class PMLLayer(ABCLayer):
         None
         """
 
+        # Check if the velocity model exists
+        if wave.c is None:
+            wave.c = wave.initial_velocity_model
+
         pprint("\nCreating Damping PML Profile", comm=self.comm)
 
         # New geometry with layer if pad_length is provided by the user.

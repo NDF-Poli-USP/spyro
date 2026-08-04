@@ -269,18 +269,17 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
 
     # ============ REFERENCE MODEL ============
 
-    for abc_type in ["hybrid", "PML"]:
-        try:
+    try:
+        for abc_type in ["hybrid", "PML"]:
 
             # Reference to resource usage
             tRef = comp_cost("tini")
 
+            pprint(f"\nAbsorbing Boundary Condition: {abc_type}", comm=comm)
+
             # Create an instance of the acoustic wave solver
             wave, max_divisor_tf = wave_instance(element_geometry, dimension,
                                                  abc_type, calc_eik)
-
-            pprint(f"\nAbsorbing Boundary Condition: {abc_type}", comm=comm)
-            print(wave.abc_type)
 
             # Computing reference get_reference_signal
             wave.layer_ops.infinite_model(wave, check_dt=calc_eik,
@@ -291,19 +290,27 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
             # Estimating computational resource usage
             comp_cost("tfin", tRef=tRef, user_name=wave.path_save + "preamble/INF_")
 
-            # tol = 0.07 if (modal_solver == 'ANALYTICAL'
-            #                or modal_solver == 'RAYLEIGH') else 0.05
+            if abc_type == "hybrid":
+                signal_reference = receivers_reference
+            else:
+                signal_model = receivers_reference
 
-            # abc_str = wave.case_abc if wave.layer_ops.layer_geometry.n_hyp is None \
-            #     else f"{wave.case_abc[:2]}" + \
-            #     f"{wave.layer_ops.layer_geometry.n_hyp:.1f}{wave.case_abc[-4:]}"
-            # met_str = f"Fundamental Frequency {abc_str} {wave.dimension}D. "
-            # met_str += f"Method {modal_solver}"
-            # cmp_str = f"Expected {exp_value:.5f}, got = {wave.fundam_freq:.5f}"
-            # assert isclose(wave.fundam_freq / exp_value, 1., atol=tol), \
-            #     "✗ " + met_str + "  → " + cmp_str
-            # pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
+        # peak_error, peak_reference = wave.layer_ops.peak_error(signal_model,
+        #                                                        signal_reference)
 
-        except ConvergenceError as e:
-            fail(f"Checking Reference Model with {element_geometry} elements for "
-                 f"{dimension}D and Eikonal {act_eik} case raised an exception: {str(e)}")
+        # tol = 0.07 if (modal_solver == 'ANALYTICAL'
+        #                or modal_solver == 'RAYLEIGH') else 0.05
+
+        # abc_str = wave.case_abc if wave.layer_ops.layer_geometry.n_hyp is None \
+        #     else f"{wave.case_abc[:2]}" + \
+        #     f"{wave.layer_ops.layer_geometry.n_hyp:.1f}{wave.case_abc[-4:]}"
+        # met_str = f"Fundamental Frequency {abc_str} {wave.dimension}D. "
+        # met_str += f"Method {modal_solver}"
+        # cmp_str = f"Expected {exp_value:.5f}, got = {wave.fundam_freq:.5f}"
+        # assert isclose(wave.fundam_freq / exp_value, 1., atol=tol), \
+        #     "✗ " + met_str + "  → " + cmp_str
+        # pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
+
+    except ConvergenceError as e:
+        fail(f"Checking Reference Model with {element_geometry} elements for "
+             f"{dimension}D and Eikonal {act_eik} case raised an exception: {str(e)}")
