@@ -1,11 +1,11 @@
 
 from os import getcwd
 from numpy import load, save
+from scipy.signal import find_peaks
 from ..io.basicio import parallel_print as pprint
 from ..utils.freq_tools import freq_response
 
 # from firedrake import assemble
-# from scipy.signal import find_peaks
 # from spyro.plots.plots_habc import plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
 # from spyro.utils.error_management import value_parameter_error
 
@@ -173,6 +173,42 @@ class MeasureError():
 
         return receivers_reference, receivers_ref_fft
 
+    def peak_error(self, signal_model, signal_reference):
+        """
+        Compute the peak error between the model and reference signals.
+
+        Parameters
+        ----------
+        signal_model : `array`
+            Transient response ar the receiver for the model.
+        signal_reference : `array`
+            Transient response at the receiver for the reference model.
+
+        Returns
+        -------
+        peak_error : `float`
+            Peak error between the model and reference signals.
+        peak_reference : `float`
+            Maximum peak value of the reference signal.
+        """
+
+        # Finding peaks in transient response
+        peaks_in_signal = find_peaks(signal_model)
+        if peaks_in_signal[0].size == 0:
+            UserWarning("No peak observed in the transient response. "
+                        "Increase the transient time of the simulation.")
+
+        # Maximum peak value
+        peak_model = max(abs(signal_model))
+        peak_reference = max(abs(signal_reference))
+
+        # Peak error
+        peak_error = abs(peak_model / peak_reference - 1)
+
+        return peak_error, peak_reference
+
+    # def
+
     # def error_measures_habc(self):
     #     """
     #     Compute the error measures at the receivers for the HABC scheme.
@@ -198,7 +234,7 @@ class MeasureError():
 
     #     for i in range(self.number_of_receivers):
 
-    #         # Transient response in receiver
+    #         # Transient response at receiver
     #         u_abc = self.forward_solution_receivers[:, i]
     #         u_ref = self.receivers_reference[:, i]
 

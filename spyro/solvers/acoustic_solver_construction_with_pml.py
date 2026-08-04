@@ -47,12 +47,12 @@ def forms_pml(wave, W, X_n, X_nm1):
     """
 
     # Simulation parameters for PML formulation
+    wave.layer_ops.pml_layer(wave)
     dt = wave.dt
     c = wave.c
     c_sqr_inv = 1. / (c * c)
     quad_rule = wave.quadrature_rule
     dx = fire_dx(**quad_rule) if quad_rule else fire_dx
-    wave.layer_ops.pml_layer(wave)
 
     # Trial and test functions, and state variables
     if wave.dimension == 2:
@@ -195,10 +195,8 @@ def construct_solver_or_matrix_with_pml(wave):
     wave.B = Cofunction(W.dual())
 
     # Build solver
-    lin_var = LinearVariationalProblem(
-        wave.lhs, wave.rhs + wave.source_function,
-        X_np1, bcs=fix_bnd, constant_jacobian=True)
+    lin_var = LinearVariationalProblem(wave.lhs, wave.rhs + wave.source_function,
+                                       X_np1, bcs=fix_bnd, constant_jacobian=True)
     solver_parameters = dict(wave.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
-    wave.solver = \
-        LinearVariationalSolver(lin_var, solver_parameters=solver_parameters)
+    wave.solver = LinearVariationalSolver(lin_var, solver_parameters=solver_parameters)
