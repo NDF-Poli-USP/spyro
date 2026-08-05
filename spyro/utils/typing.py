@@ -1,3 +1,5 @@
+"""This module defines the enums and decorators used for typing in Spyro."""
+
 from enum import Enum
 
 
@@ -10,9 +12,19 @@ def override(func):
 
 
 class WaveType(Enum):
+    """Enum for different types of wave equations that can be solved.
+
+    NONE: No wave equation.
+    ISOTROPIC_ACOUSTIC: Isotropic acoustic wave equation.
+    ISOTROPIC_ELASTIC: Isotropic elastic wave equation for Isotropic media.
+    ANISOTROPIC_VTI_ELASTIC: Anisotropic elastic wave equation for VTI media.
+    ANISOTROPIC_TTI_ELASTIC: Anisotropic elastic wave equation for TTI media.
+    """
     NONE = 0
     ISOTROPIC_ACOUSTIC = 1
     ISOTROPIC_ELASTIC = 2
+    ANISOTROPIC_VTI_ELASTIC = 3
+    ANISOTROPIC_TTI_ELASTIC = 4
 
 
 class ImplementedAdjointDerivation(Enum):
@@ -125,8 +137,73 @@ class FunctionalType(Enum):
 class FunctionalEvaluationMode(Enum):
     """The mode in which to evaluate the functional.
 
-        PER_TIMESTEP: Evaluate the functional at every time step during the time integration.
-        AFTER_SOLVE: Evaluate the functional after the time integration is complete.
+    PER_TIMESTEP: Evaluate the functional at every time step during the time integration.
+    AFTER_SOLVE: Evaluate the functional after the time integration is complete.
     """
     PER_TIMESTEP = "per_timestep"
     AFTER_SOLVE = "after_solve"
+
+
+class LayerShapeType(Enum):
+    """Enum for different types of absorbing layer shapes for ABCs.
+
+    NOLAYER: No absorbing layer, i.e., no ABCs applied.
+    RECTANGULAR: Rectangular absorbing layer`around the computational domain.
+    HYPERSHAPE: Hypershape absorbing layer around the computational domain
+    """
+    NOLAYER = "no_layer"
+    RECTANGULAR = "rectangular"
+    HYPERSHAPE = "hypershape"
+
+
+class LayerSizeRefFrequency(Enum):
+    """Enum for different reference frequencies for sizing the absorbing layer.
+
+    SOURCE: Size based on dominant source frequency.
+    BOUNDARY: Size based on wave frequency at the critical boundary point (Eikonal min.)
+    """
+    SOURCE = "source"
+    BOUNDARY = "boundary"
+
+
+class HyperLayerDegreeType(Enum):
+    """Enum for different types of hypershape degrees for HABCs.
+
+    REAL: Hypershape degree can take real values >= 2.0 with one decimal place precision.
+    INTEGER: Hypershape degree is restricted to integer values >= 2
+    """
+    REAL = "real"
+    INTEGER = "integer"
+
+
+class BoundaryConditionsType(Enum):
+    """Enum for different types of boundary conditions including Non-Reflecting BCs.
+
+    DIRICHLET: Dirichlet boundary condition
+    NEUMANN: Neumann boundary condition
+    HIGDON: 1-st order Higdon boundary condition (NRBC type)
+    SOMMERFELD: Sommerfeld (Radiation) boundary condition (NRBC type)
+
+    """
+    DIRICHLET = "Dirichlet"
+    NEUMANN = "Neumann"
+    HIGDON = "Higdon"
+    SOMMERFELD = "Sommerfeld"
+
+
+class AbsorbingBCsType(Enum):
+    """Enum for different types of Absorbing Boundary Conditions (ABCs).
+
+    NOABCS: No absorbing boundary conditions applied.
+
+    - NRBCs:
+    NRBC: An Non-Reflecting BC (NRBC) at the boundary of the acoustic domain.
+
+    - Layers:
+    HYBRID: A combination of a sponge layer and an NRBC at the outer layer boundary.
+    PML: Non-split and non-convolutional Perfectly Matched Layer (PML).
+    """
+    NOABCS = "no_abcs"
+    NRBC = "nrbc"
+    HYBRID = "hybrid"
+    PML = "PML"

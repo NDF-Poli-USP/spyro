@@ -1,4 +1,3 @@
-# from scipy.io import savemat
 import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
@@ -10,7 +9,7 @@ from ..utils import change_scalar_field_resolution
 from ..tools.version_control import is_firedrake_new
 plt.rcParams.update({"font.family": "serif"})
 plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
-__all__ = ["plot_shots"]
+__all__ = ["plot_shots", "plot_receiver_response"]
 
 
 if is_firedrake_new() is False:
@@ -20,7 +19,7 @@ if is_firedrake_new() is False:
 
 @ensemble_save
 def plot_shots(
-    Wave_object,
+    wave,
     show=False,
     file_name="plot_of_shot",
     shot_ids=[0],
@@ -42,7 +41,7 @@ def plot_shots(
 
     Parameters
     ----------
-    Wave_object : Wave
+    wave : Wave
         Wave simulation object containing the shot record data in the
         forward_solution_receivers attribute, along with timing and receiver information.
     show : bool, optional
@@ -83,19 +82,19 @@ def plot_shots(
 
     Examples
     --------
-    >>> plot_shots(wave_obj, show=True, file_name="my_shot", shot_ids=[0, 1])
-    >>> plot_shots(wave_obj, vmin=-1e-3, vmax=1e-3, file_format="png")
+    >>> plot_shots(wave, show=True, file_name="my_shot", shot_ids=[0, 1])
+    >>> plot_shots(wave, vmin=-1e-3, vmax=1e-3, file_format="png")
     """
     file_name = file_name + str(shot_ids) + "." + file_format
-    num_recvs = Wave_object.number_of_receivers
+    num_recvs = wave.number_of_receivers
 
-    dt = Wave_object.dt
-    tf = Wave_object.final_time
+    dt = wave.dt
+    tf = wave.final_time
 
     if out_index is None:
-        arr = Wave_object.forward_solution_receivers
+        arr = wave.forward_solution_receivers
     else:
-        arr = Wave_object.forward_solution_receivers[:, :, out_index]
+        arr = wave.forward_solution_receivers[:, :, out_index]
 
     nt = int(tf / dt) + 1  # number of timesteps
 
@@ -215,7 +214,7 @@ def plot_mesh_sizes(
 
 
 def plot_model(
-    Wave_object,
+    wave,
     filename="model.png",
     abc_points=None,
     show=False,
@@ -233,7 +232,7 @@ def plot_model(
 
     Parameters
     ----------
-    Wave_object : Wave
+    wave : Wave
         The Wave object containing the velocity model, source locations,
         and receiver locations.
     filename : str, optional
@@ -272,15 +271,15 @@ def plot_model(
     fig.set_figwidth = 9.0
     fig.set_figheight = 9.0
     if high_resolution:
-        vp_object, _ = change_scalar_field_resolution(Wave_object, high_resolution_grid_value)
+        vp_object, _ = change_scalar_field_resolution(wave, high_resolution_grid_value)
 
     else:
-        vp_object = Wave_object.initial_velocity_model
+        vp_object = wave.initial_velocity_model
     vp_image = firedrake.tripcolor(vp_object, axes=axes)
-    for source in Wave_object.source_locations:
+    for source in wave.source_locations:
         z, x = source
         plt.scatter(z, x, c="green")
-    for receiver in Wave_object.receiver_locations:
+    for receiver in wave.receiver_locations:
         z, x = receiver
         plt.scatter(z, x, c="red")
 
@@ -421,7 +420,7 @@ def debug_pvd(function, filename="debug.pvd"):
     out.write(function)
 
 
-def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png", abc_points=None, show=False, flip_axis=True):
+def plot_model_in_p1(wave, dx=0.01, filename="model.png", abc_points=None, show=False, flip_axis=True):
     """
     Plot velocity model with P1 finite element projection.
 
@@ -432,7 +431,7 @@ def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png", abc_points=None
 
     Parameters
     ----------
-    Wave_object : Wave
+    wave : Wave
         An instance of a wave simulation object containing the velocity model
         and configuration dictionary.
     dx : float, optional
@@ -457,7 +456,7 @@ def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png", abc_points=None
     Notes
     -----
     This function:
-    1. Deep copies the Wave_object's input dictionary
+    1. Deep copies the wave's input dictionary
     2. Modifies it to use CG (Continuous Galerkin) method with degree 1
     3. Creates a new AcousticWave object with the modified configuration
     4. Sets up a new mesh with the specified edge length
@@ -471,13 +470,95 @@ def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png", abc_points=None
 
     # Local import to avoid circular import
     from ..solvers import AcousticWave
-    p1_obj_dict = copy.deepcopy(Wave_object.input_dictionary)
+    p1_obj_dict = copy.deepcopy(wave.input_dictionary)
     p1_obj_dict["options"]["method"] = "CG"
     p1_obj_dict["options"]["variant"] = "equispaced"
     p1_obj_dict["options"]["degree"] = 1
 
     new_wave_obj = AcousticWave(dictionary=p1_obj_dict)
     new_wave_obj.set_mesh(input_mesh_parameters={"edge_length": dx})
-    new_wave_obj.set_initial_velocity_model(conditional=Wave_object.initial_velocity_model)
+    new_wave_obj.set_initial_velocity_model(conditional=wave.initial_velocity_model)
 
     return plot_model(new_wave_obj, filename=filename, abc_points=abc_points, show=show, flip_axis=flip_axis)
+
+
+def plot_receiver_response(
+    receiver_data,
+    final_time,
+    show=False,
+    filename=None,
+    receiver_id_for_title=None,
+    hold=False,
+    color=None,
+    name=None,
+    **plot_kwargs,
+):
+    """Plot the time-series response for a single receiver.
+
+    Parameters
+    ----------
+    receiver_data : np.array
+        Receiver data to plot.
+    show : bool, optional
+        Whether to display the plot interactively. Default is False.
+    filename : str, optional
+        If provided, save the plot to this file.
+    hold : bool, optional
+        If True, plot on the current axes so multiple receivers can be
+        overlaid in sequence. Default is False.
+    color : str, optional
+        Line color to use when plotting. If None and hold is True, a random
+        color is selected.
+    name : str, optional
+        Label to use in the legend. When provided, the plot is added to the
+        legend so multiple held traces can be identified.
+    **plot_kwargs
+        Any additional keyword arguments accepted by matplotlib.axes.Axes.plot.
+
+    Returns
+    -------
+    None
+        The function creates the plot and displays it.
+    """
+    num_times = len(receiver_data)
+
+    time_vector = np.linspace(0.0, final_time, num_times)
+
+    if hold is False:
+        plt.close()
+        fig, axes = plt.subplots(figsize=(10, 4))
+    else:
+        fig = plt.gcf()
+        axes = plt.gca()
+        if fig.get_axes() == []:
+            fig, axes = plt.subplots(figsize=(10, 4))
+
+    if color is None and hold:
+        color_choices = plt.rcParams["axes.prop_cycle"].by_key().get("color", [None])
+        color = np.random.choice(color_choices)
+
+    line_kwargs = dict(plot_kwargs)
+    line_kwargs.setdefault("linewidth", 2)
+    line_kwargs.setdefault("color", color)
+    if name is not None:
+        line_kwargs.setdefault("label", name)
+
+    axes.plot(time_vector, receiver_data, **line_kwargs)
+    axes.set_xlabel("time (s)", fontsize=18)
+    axes.set_ylabel("receiver response", fontsize=18)
+    if receiver_id_for_title is not None:
+        axes.set_title(f"Receiver ID{receiver_id_for_title} data.", fontsize=22)
+    else:
+        axes.set_title("Receiver data.", fontsize=22)
+    if line_kwargs.get("label") is not None:
+        axes.legend()
+    axes.tick_params(axis="both", labelsize=18)
+    axes.grid(True, alpha=0.3)
+    fig.tight_layout()
+
+    if filename is not None:
+        plt.savefig(filename)
+    if show:
+        plt.show()
+    elif hold is False:
+        plt.close(fig)
