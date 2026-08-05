@@ -72,7 +72,7 @@ def run_forward():
 
     dictionary["absorving_boundary_conditions"] = {
         "status": True,
-        "damping_type": "PML",
+        "abc_type": "PML",
         "exponent": 2,
         "cmax": 4.5,
         "R": 1e-6,
@@ -88,20 +88,20 @@ def run_forward():
         "gradient_filename": None,
     }
 
-    Wave_obj = spyro.solvers.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02})
+    wave = spyro.solvers.AcousticWave(dictionary=dictionary)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.02})
 
-    z = Wave_obj.mesh_z
+    z = wave.mesh_z
     cond = fire.conditional(
         z > -0.333, 1.5, fire.conditional(z > -0.667, 3.0, 4.5)
     )
-    Wave_obj.set_initial_velocity_model(conditional=cond)
-    Wave_obj.forward_solve()
+    wave.set_initial_velocity_model(conditional=cond)
+    wave.forward_solve()
 
     t1 = timer.time()
     print("Time elapsed: ", t1 - t0)
     nt = int(final_time / dt) + 1
-    p_r = Wave_obj.forward_solution_receivers
+    p_r = wave.forward_solution_receivers
 
     return p_r, nt
 

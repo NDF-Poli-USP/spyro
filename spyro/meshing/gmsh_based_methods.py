@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
-from ..utils import run_in_one_core
+from ..io.parallelism_wrappers import run_in_one_core
 from .meshing_utils import check_gmsh, vp_to_sizing
 
 try:

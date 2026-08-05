@@ -5,7 +5,7 @@ import firedrake as fire
 from numpy import log10, ones
 from numpy.random import uniform
 
-from .basicio import interpolate
+from .interpolators import interpolate
 from ..utils import error_management
 from ..utils import eval_functions_to_ufl
 from ..domains.space import check_function_space_type, create_function_space
@@ -43,10 +43,8 @@ def define_property_function_space(wave, func_space_type, dg_property,
 
     # Checking input arguments
     opts_func_space_type = ["scalar", "vector", "tensor"]
-    if func_space_type not in opts_func_space_type:
-        error_management.value_parameter_error("func_space_type",
-                                               func_space_type,
-                                               opts_func_space_type)
+    error_management.value_parameter_error("func_space_type", func_space_type,
+                                           opts_func_space_type)
 
     if dg_property is False and func_space_type == "scalar":
         return point_to_scalar_wave_function_space(wave)
@@ -125,11 +123,11 @@ def _initialize_material_property_from_ufl(wave, property_name,
     if expression is not None:
         print(f"Assigning {property_name} with an expression "
               f"field given by f = {expression} ", flush=True)
-        ufl_input = eval_functions_to_ufl.generate_ufl_functions(
-            wave.mesh, expression, wave.dimension)
+        ufl_input = eval_functions_to_ufl.generate_ufl_functions(wave.mesh,
+                                                                 expression,
+                                                                 wave.dimension)
 
-    mat_property = fire.Function(
-        V, name=property_name).interpolate(ufl_input)
+    mat_property = fire.Function(V, name=property_name).interpolate(ufl_input)
 
     return mat_property
 

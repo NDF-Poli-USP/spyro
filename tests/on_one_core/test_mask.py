@@ -27,14 +27,14 @@ def test_mask():
     dictionary["absorving_boundary_conditions"] = {
         "status": False,
         "pad_length": 0.,
-        "damping_type": None,
+        "abc_type": None,
     }
     dictionary["mesh"] = {
         "length_z": 1.0,
         "length_x": 1.0,
         "h": 0.03
     }
-    Wave_obj = Rectangle_acoustic(dictionary=dictionary)
+    wave = Rectangle_acoustic(dictionary=dictionary)
     boundaries = {
         "z_min": -0.9,
         "z_max": -0.1,
@@ -43,7 +43,7 @@ def test_mask():
     }
 
     # Points we are going to check
-    tol = Wave_obj.input_dictionary["mesh"]["h"]
+    tol = wave.input_dictionary["mesh"]["h"]
     points_not_masked = [
         # Interior
         (-0.15, 0.25),
@@ -96,8 +96,8 @@ def test_mask():
     # ]
 
     # Testing mask that applies zeros to a function in the objects space
-    Mask_not_dg = Mask(boundaries, Wave_obj)
-    V = Wave_obj.function_space
+    Mask_not_dg = Mask(boundaries, wave)
+    V = wave.function_space
     u = fire.Function(V)
     u.interpolate(fire.Constant(10))
     u = Mask_not_dg.apply_mask(u)
@@ -116,7 +116,7 @@ def test_mask():
         assert np.isclose(result, 10.0), f"Interior is masked: {result}"
 
     # Testing DG mask for 1 in mask and 0 outside
-    Mask_dg = Mask(boundaries, Wave_obj, dg=True)
+    Mask_dg = Mask(boundaries, wave, dg=True)
     dg_func = Mask_dg.dg_mask
 
     unmasked_results = dg_func.at(points_not_masked)
@@ -132,7 +132,7 @@ def test_mask():
         assert np.isclose(result, 0.0), f"Value of DG point unmask should be zero not: {result}"
 
     # Testing DG inverse mask for 0 in mask and 1 outside
-    Mask_dg = Mask(boundaries, Wave_obj, dg=True, inverse_mask=True)
+    Mask_dg = Mask(boundaries, wave, dg=True, inverse_mask=True)
     dg_func_inverted = Mask_dg.dg_mask
 
     unmasked_results = dg_func_inverted.at(points_not_masked)
@@ -165,9 +165,9 @@ def test_gradient_mask():
         "length_x": 1.0,
         "h": 0.03
     }
-    Wave_obj = Rectangle_acoustic(dictionary=dictionary)
+    wave = Rectangle_acoustic(dictionary=dictionary)
     # Points we are going to check
-    tol = Wave_obj.input_dictionary["mesh"]["h"]
+    tol = wave.input_dictionary["mesh"]["h"]
     points_not_masked = [
         # Interior
         (-0.15, 0.25),
@@ -222,8 +222,8 @@ def test_gradient_mask():
     # Testing mask that applies zeros to a function in the objects space
     test1 = True
 
-    Mask_not_dg = Gradient_mask_for_pml(Wave_obj)
-    V = Wave_obj.function_space
+    Mask_not_dg = Gradient_mask_for_pml(wave)
+    V = wave.function_space
     u = fire.Function(V)
     u.interpolate(fire.Constant(10))
     u = Mask_not_dg.apply_mask(u)

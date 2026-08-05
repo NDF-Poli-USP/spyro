@@ -4,7 +4,6 @@ from .utils import (
     compute_functional,
     Mask,
     Gradient_mask_for_pml,
-    run_in_one_core,
     write_hdf5_velocity_model,
     get_real_shot_record,
 )
@@ -21,7 +20,6 @@ __all__ = [
     "Mask",
     "Gradient_mask_for_pml",
     "velocity_to_grid",
-    "run_in_one_core",
     "change_scalar_field_resolution",
     "write_hdf5_velocity_model",
     "get_real_shot_record",

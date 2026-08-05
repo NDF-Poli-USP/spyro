@@ -5,7 +5,7 @@ import firedrake as fire
 from .wave import Wave
 from pyadjoint import Tape, AdjFloat
 from ..domains.space import create_function_space
-from ..io.basicio import ensemble_gradient
+from ..io.parallelism_wrappers import ensemble_gradient
 from ..io import interpolate
 from .acoustic_solver_construction_no_pml import (
     construct_solver_or_matrix_no_pml,
@@ -17,7 +17,7 @@ from .backward_time_integration import (
     backward_wave_propagator,
 )
 from ..utils.typing import (
-    AdjointType, RieszMapType, override, WaveType,
+    AdjointType, RieszMapType, override, WaveType, AbsorbingBCsType,
 )
 from ..utils import eval_functions_to_ufl, write_hdf5_velocity_model
 from .functionals import acoustic_energy
@@ -25,16 +25,24 @@ from .functionals import acoustic_energy
 
 class AcousticWave(Wave):
     def __init__(self, dictionary, comm=None):
-        super().__init__(dictionary, comm=comm)
+        """Wave Acoustic object solver.
+
+        Parameters
+        ----------
+        dictionary : `dict`, optional
+            A dictionary containing the input parameters for the Wave class.
+            Default is None
+        comm : `object`, optional
+            MPI communicator for parallel execution. Default is None
+
+        Returns
+        -------
+        None
+        """
+        super().__init__(dictionary, wave_type=WaveType.ISOTROPIC_ACOUSTIC, comm=comm)
         self._velocity_model = None
         self.initial_velocity_model = None
-        self.wave_type = WaveType.ISOTROPIC_ACOUSTIC
 
-        # In case sources and reeivers were initialized in super we have to pass the wave_type
-        if getattr(self, 'sources', None) is not None:
-            self.sources.wave_type = self.wave_type
-        if getattr(self, 'receivers', None) is not None:
-            self.receivers.wave_type = self.wave_type
         self.acoustic_energy = None
         self.field_logger.add_functional(
             "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))
@@ -57,6 +65,7 @@ class AcousticWave(Wave):
         new_file=None,
         output=False,
         dg_velocity_model=True,
+        fast_interpolate=False,
     ):
         """Set independent initial and current acoustic velocity models."""
         self.initial_velocity_model = None
@@ -93,7 +102,7 @@ class AcousticWave(Wave):
                 velocity_model_function,
             )
         elif new_file is not None:
-            self._initialize_model_parameters()
+            self._initialize_model_parameters(fast_interpolate=fast_interpolate)
         elif constant is not None:
             self.initial_velocity_model = fire.Function(
                 self.function_space,
@@ -151,8 +160,6 @@ class AcousticWave(Wave):
         """
         self.current_time = 0.0
 
-        abc_type = self.abc_boundary_layer_type
-
         # Just to document variables that will be overwritten
         self.trial_function = None
         self.u_nm1 = None
@@ -162,16 +169,14 @@ class AcousticWave(Wave):
         self.solver = None
         self.rhs = None
         self.B = None
-        if abc_type is None or abc_type == "local" or abc_type == "hybrid":
-            construct_solver_or_matrix_no_pml(self)
-        elif abc_type == "PML":
-            V = self.function_space
-            Z = fire.VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
-            self.vector_function_space = Z
+
+        if self.abc_type == AbsorbingBCsType.PML:
             self.X_np1 = None
             self.X_n = None
             self.X_nm1 = None
             construct_solver_or_matrix_with_pml(self)
+        else:
+            construct_solver_or_matrix_no_pml(self)
 
         self.acoustic_energy = acoustic_energy(self)
 
@@ -291,7 +296,7 @@ class AcousticWave(Wave):
             )
 
     def reset_pressure(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_type == AbsorbingBCsType.PML:
             self.X_n.assign(0.0)
             self.X_nm1.assign(0.0)
         else:
@@ -299,7 +304,7 @@ class AcousticWave(Wave):
             self.u_n.assign(0.0)
 
     @override
-    def _initialize_model_parameters(self):
+    def _initialize_model_parameters(self, fast_interpolate=False):
         if self.velocity_model is not None:
             return
 
@@ -331,6 +336,7 @@ class AcousticWave(Wave):
                         self,
                         self.initial_velocity_model_file,
                         self.function_space.sub(0),
+                        fast_interpolate=fast_interpolate,
                     )
 
             if self.debug_output:
@@ -345,49 +351,49 @@ class AcousticWave(Wave):
 
     @override
     def _set_vstate(self, vstate):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_type == AbsorbingBCsType.PML:
             self.X_n.assign(vstate)
         else:
             self.u_n.assign(vstate)
 
     @override
     def _get_vstate(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_type == AbsorbingBCsType.PML:
             return self.X_n
         else:
             return self.u_n
 
     @override
     def _set_prev_vstate(self, vstate):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_type == AbsorbingBCsType.PML:
             self.X_nm1.assign(vstate)
         else:
             self.u_nm1.assign(vstate)
 
     @override
     def _get_prev_vstate(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_type == AbsorbingBCsType.PML:
             return self.X_nm1
         else:
             return self.u_nm1
 
     @override
     def _set_next_vstate(self, vstate):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_type == AbsorbingBCsType.PML:
             self.X_np1.assign(vstate)
         else:
             self.u_np1.assign(vstate)
 
     @override
     def _get_next_vstate(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_type == AbsorbingBCsType.PML:
             return self.X_np1
         else:
             return self.u_np1
 
     @override
     def get_forward_solution_receivers(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_type == AbsorbingBCsType.PML:
             data_with_halos = self.X_n.dat.data_ro_with_halos[0][:]
         else:
             data_with_halos = self.u_n.dat.data_ro_with_halos[:]
@@ -414,12 +420,12 @@ class AcousticWave(Wave):
             The scalar wave field corresponding to the specified `state` or the time step ``n``.
         """
         if state is None:
-            if self.abc_boundary_layer_type == "PML":
+            if self.abc_type == AbsorbingBCsType.PML:
                 return self.X_n.sub(0)
             else:
                 return self.u_n
         else:
-            if self.abc_boundary_layer_type == "PML":
+            if self.abc_type == AbsorbingBCsType.PML:
                 return state.sub(0)
             else:
                 return state
@@ -441,7 +447,7 @@ class AcousticWave(Wave):
 
     @override
     def rhs_no_pml(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_type == AbsorbingBCsType.PML:
             return self.B.sub(0)
         else:
             return self.B
@@ -450,7 +456,7 @@ class AcousticWave(Wave):
         """Return the source cofunction added to the variational right-hand
         side.
         """
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_type == AbsorbingBCsType.PML:
             return self.source_function.sub(0)
         else:
             return self.source_function
@@ -467,7 +473,7 @@ class AcousticWave(Wave):
         For the non-mixed case ``self.u_n`` is already the form coefficient
         Function, which is updated directly by ``u_n.assign(...)``.
         """
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_type == AbsorbingBCsType.PML:
             return fire.split(self.X_n)[0]
         return self.u_n
 
