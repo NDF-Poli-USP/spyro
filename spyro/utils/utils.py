@@ -6,14 +6,13 @@ import os
 from scipy.signal import butter, filtfilt
 import warnings
 
-from ..io import ensemble_functional
-from ..io import parallel_print
+from ..io.basicio import parallel_print, write_velocity_model
+from ..io.parallelism_wrappers import (
+    ensemble_functional,
+    run_in_one_core_and_broadcast,
+)
+from ..domains.space import create_function_space
 from .typing import FunctionalEvaluationMode, FunctionalType, WaveType
-try:
-    from SeismicMesh import write_velocity_model
-    SEISMIC_MESH_AVAILABLE = True
-except ImportError:
-    SEISMIC_MESH_AVAILABLE = False
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
@@ -48,7 +47,7 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
 
 @ensemble_functional
 def compute_functional(
-    wave_object, misfit, evaluation_mode=FunctionalEvaluationMode.AFTER_SOLVE, step=None, nsteps=None,
+    wave, misfit, evaluation_mode=FunctionalEvaluationMode.AFTER_SOLVE, step=None, nsteps=None,
     functional_form=FunctionalType.L2Norm
 ):
     """Compute the functional value for the given misfit at receiver
@@ -60,7 +59,7 @@ def compute_functional(
 
     Parameters
     ----------
-    wave_object : object
+    wave : object
         Wave propagation object containing simulation parameters.
         Must have attributes:
         - number_of_receivers : int
@@ -100,20 +99,20 @@ def compute_functional(
     if evaluation_mode == FunctionalEvaluationMode.PER_TIMESTEP:
         weight = 0.5 if step == 0 or step == nsteps - 1 else 1.0
 
-        if wave_object.use_vertex_only_mesh:
+        if wave.use_vertex_only_mesh:
             return assemble(
-                0.5 * wave_object.dt * weight
+                0.5 * wave.dt * weight
                 * inner(misfit, misfit) * dx
             )
         elif isinstance(misfit, np.ndarray):
-            return np.sum(misfit**2) * (0.5 * wave_object.dt * weight)
+            return np.sum(misfit**2) * (0.5 * wave.dt * weight)
         else:
             raise ValueError(
                 "Expected misfit to be a numpy array when not using vertex-only mesh."
             )
 
-    num_receivers = wave_object.number_of_receivers
-    dt = wave_object.dt
+    num_receivers = wave.number_of_receivers
+    dt = wave.dt
 
     J = 0
     for rn in range(num_receivers):
@@ -307,7 +306,7 @@ class Mask():
         Dictionary containing spatial boundaries for the mask. Valid keys are
         'z_min', 'z_max', 'x_min', 'x_max', 'y_min', 'y_max', with float
         values specifying the boundary locations.
-    Wave_obj : object
+    wave : object
         Wave object containing mesh information. Must have attributes:
         - mesh : firedrake.mesh.MeshGeometry
             Computational mesh.
@@ -356,11 +355,11 @@ class Mask():
     Create a mask to zero gradients below z=-5.0 and outside x=[0, 10]:
 
     >>> boundaries = {'z_min': -5.0, 'x_min': 0.0, 'x_max': 10.0}
-    >>> mask = Mask(boundaries, wave_obj)
+    >>> mask = Mask(boundaries, wave)
     >>> masked_gradient = mask.apply_mask(gradient)
     """
 
-    def __init__(self, boundaries, Wave_obj, dg=False, inverse_mask=False):
+    def __init__(self, boundaries, wave, dg=False, inverse_mask=False):
         possible_boundaries = [
             "z_min",
             "z_max",
@@ -377,14 +376,14 @@ class Mask():
                 active_boundaries.append(possible_boundary)
 
         self.active_boundaries = active_boundaries
-        self._calculate_mask_conditional(Wave_obj, inverse_mask)
+        self._calculate_mask_conditional(wave, inverse_mask)
         self.in_dg = dg
         if dg is False:
-            self._calculate_mask_dofs(Wave_obj)
+            self._calculate_mask_dofs(wave)
         elif dg is True:
-            self._calculate_dg_mask(Wave_obj)
+            self._calculate_dg_mask(wave)
 
-    def _calculate_dg_mask(self, Wave_obj):
+    def _calculate_dg_mask(self, wave):
         """Calculate the discontinuous Galerkin (DG) mask.
 
         Creates a DG0 function space mask by interpolating the mask
@@ -392,7 +391,7 @@ class Mask():
 
         Parameters
         ----------
-        Wave_obj : object
+        wave : object
             Wave object containing the mesh on which to create the DG mask.
             Must have attribute:
             - mesh : firedrake.mesh.MeshGeometry
@@ -403,12 +402,12 @@ class Mask():
         Sets the `dg_mask` attribute to a DG0 function containing the
         interpolated mask values.
         """
-        V_dg = FunctionSpace(Wave_obj.mesh, "DG", 0)
+        V_dg = create_function_space(wave.mesh, "DG0", 0)
         dg_mask = Function(V_dg)
         dg_mask.interpolate(self.cond)
         self.dg_mask = dg_mask
 
-    def _calculate_mask_conditional(self, Wave_obj, inverted=False):
+    def _calculate_mask_conditional(self, wave, inverted=False):
         """Calculate the UFL conditional expression for the mask.
 
         Constructs a UFL conditional that evaluates to 1 (or 0 if inverted)
@@ -416,7 +415,7 @@ class Mask():
 
         Parameters
         ----------
-        Wave_obj : object
+        wave : object
             Wave object containing mesh coordinate functions. Must have:
             - mesh_z : firedrake.SpatialCoordinate
                 Z-coordinate function.
@@ -441,10 +440,10 @@ class Mask():
         """
         # Getting necessary data from wave object
         active_boundaries = self.active_boundaries
-        self.z = Wave_obj.mesh_z
-        self.x = Wave_obj.mesh_x
+        self.z = wave.mesh_z
+        self.x = wave.mesh_x
         if ("y_min" in active_boundaries) or ("y_max" in active_boundaries):
-            self.y = Wave_obj.mesh_y
+            self.y = wave.mesh_y
 
         # Getting mask conditional
         if inverted:
@@ -467,7 +466,7 @@ class Mask():
 
         self.cond = cond[0]
 
-    def _calculate_mask_dofs(self, Wave_obj):
+    def _calculate_mask_dofs(self, wave):
         """Calculate degrees of freedom indices for the mask application.
 
         Interpolates the mask conditional onto the wave function space and
@@ -475,7 +474,7 @@ class Mask():
 
         Parameters
         ----------
-        Wave_obj : object
+        wave : object
             Wave object containing the function space for mask interpolation.
             Must have attribute:
             - function_space : firedrake.functionspace.FunctionSpace
@@ -500,7 +499,7 @@ class Mask():
         if self.in_dg:
             raise ValueError("DG space can have different DoFs than the functional space")
         warnings.warn("When applying a mask in a continuous space, expect some error in the element adjacent to the mask")
-        mask = Function(Wave_obj.function_space)
+        mask = Function(wave.function_space)
         mask.interpolate(self.cond)
         # Saving mask dofs
         self.mask_dofs = np.where(mask.dat.data[:] > 0.3)
@@ -540,7 +539,7 @@ class Gradient_mask_for_pml(Mask):
 
     Parameters
     ----------
-    Wave_obj : object
+    wave : object
         Wave object with active PML boundary conditions. Must have:
         - abc_active : bool
             Must be True; indicates PML is active.
@@ -553,7 +552,7 @@ class Gradient_mask_for_pml(Mask):
     Raises
     ------
     ValueError
-        If Wave_obj.abc_active is False (no PML present).
+        If wave.abc_active is False (no PML present).
 
     Notes
     -----
@@ -567,161 +566,38 @@ class Gradient_mask_for_pml(Mask):
 
     Examples
     --------
-    >>> gradient_mask = Gradient_mask_for_pml(wave_obj)
+    >>> gradient_mask = Gradient_mask_for_pml(wave)
     >>> masked_gradient = gradient_mask.apply_mask(gradient)
     """
 
-    def __init__(self, Wave_obj):
-        if Wave_obj.abc_active is False:
+    def __init__(self, wave):
+        if wave.abc_active is False:
             raise ValueError("No PML present in wave object")
 
         # building firedrake function for mask
-        z_min = -(Wave_obj.mesh_parameters.length_z)
+        z_min = -(wave.mesh_parameters.length_z)
         x_min = 0.0
-        x_max = Wave_obj.mesh_parameters.length_x
+        x_max = wave.mesh_parameters.length_x
         boundaries = {
             "z_min": z_min,
             "x_min": x_min,
             "x_max": x_max,
         }
-        super().__init__(boundaries, Wave_obj)
-
-
-def run_in_one_core(func):
-    """Decorator to execute function only on rank 0.
-
-    Ensures the decorated function runs only on the root process (rank 0)
-    of the communicator. Other processes skip execution. Useful for I/O
-    operations and serial tasks in parallel environments.
-
-    Parameters
-    ----------
-    func : callable
-        Function to decorate. The first argument of func must be an object
-        with a `comm` attribute containing an MPI communicator.
-
-    Returns
-    -------
-    callable
-        Wrapped function that executes only on rank 0.
-
-    Notes
-    -----
-    The function checks for two types of communicators:
-    - Ensemble communicator: Runs only if both `ensemble_comm.rank` == 0
-      and comm.rank == 0.
-    - Regular communicator: Runs only if comm.rank == 0.
-    - If comm is None, the function runs normally without restrictions.
-
-    The function does not broadcast results to other processes.
-
-    See Also
-    --------
-    run_in_one_core_and_broadcast : Similar decorator that also broadcasts results.
-
-    Examples
-    --------
-    >>> @run_in_one_core
-    ... def save_file(obj, filename):
-    ...     # Only rank 0 writes the file
-    ...     with open(filename, 'w') as f:
-    ...         f.write(str(obj.data))
-    """
-
-    def wrapper(*args, **kwargs):
-        comm = args[0].comm
-        if comm is None:
-            return func(*args, **kwargs)
-        else:
-            if getattr(comm, "ensemble_comm", None) is not None:
-                if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-                    return func(*args, **kwargs)
-            elif getattr(comm, "rank", None) is not None:
-                if comm.rank == 0:
-                    return func(*args, **kwargs)
-
-    return wrapper
-
-
-def run_in_one_core_and_broadcast(func):
-    """Decorator to execute function on rank 0 and broadcast result.
-
-    Ensures the decorated function runs only on the root process (rank 0)
-    and broadcasts the return value to all other processes. Useful for
-    file reading and other operations that should be performed once but
-    shared across all processes.
-
-    Parameters
-    ----------
-    func : callable
-        Function to decorate. The first argument of func must be an object
-        with a 'comm' attribute containing an MPI communicator.
-
-    Returns
-    -------
-    callable
-        Wrapped function that executes on rank 0 and broadcasts the result
-        to all processes.
-
-    Notes
-    -----
-    The function handles two types of communicators:
-    - Ensemble communicator: Executes on rank (0,0), broadcasts within
-      ensemble, then within spatial communicator.
-    - Regular communicator: Executes on rank 0, broadcasts to all.
-    - If comm is None, the function runs normally without MPI operations.
-
-    All processes receive the same return value from the broadcast.
-
-    See Also
-    --------
-    run_in_one_core : Similar decorator without broadcasting.
-
-    Examples
-    --------
-    >>> @run_in_one_core_and_broadcast
-    ... def load_config(obj, filename):
-    ...     # Only rank 0 reads the file, result shared with all
-    ...     with open(filename, 'r') as f:
-    ...         return json.load(f)
-    """
-
-    def wrapper(*args, **kwargs):
-        comm = args[0].comm
-        if comm is None:
-            return func(*args, **kwargs)
-        else:
-            result = None
-            if getattr(comm, "ensemble_comm", None) is not None:
-                # Handle ensemble communicator
-                if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-                    result = func(*args, **kwargs)
-                # Broadcast within ensemble
-                result = comm.ensemble_comm.bcast(result, root=0)
-                # Broadcast within spatial communicator
-                result = comm.comm.bcast(result, root=0)
-            elif getattr(comm, "rank", None) is not None:
-                # Handle regular communicator
-                if comm.rank == 0:
-                    result = func(*args, **kwargs)
-                result = comm.bcast(result, root=0)
-            return result
-
-    return wrapper
+        super().__init__(boundaries, wave)
 
 
 @run_in_one_core_and_broadcast
 def write_hdf5_velocity_model(obj_with_comm, segy_filename):
-    """Convert SEG-Y velocity model to HDF5 format.
+    """Convert a SEG-Y velocity model to HDF5 format.
 
-    Converts a SEG-Y format velocity model file to HDF5 format using
-    SeismicMesh. The conversion is performed on rank 0 and the output
-    filename is broadcast to all processes.
+    Converts a SEG-Y velocity model file to HDF5 using the native
+    ``write_velocity_model`` function. The conversion is performed on rank 0
+    and the output filename is broadcast to all processes.
 
     Parameters
     ----------
     obj_with_comm : object
-        Object with a 'comm' attribute containing an MPI communicator.
+        Object with a ``comm`` attribute containing an MPI communicator.
         Used by the decorator to determine which process performs the
         conversion.
     segy_filename : str
@@ -730,42 +606,29 @@ def write_hdf5_velocity_model(obj_with_comm, segy_filename):
     Returns
     -------
     str
-        Path to the output HDF5 file (input basename with .hdf5 extension).
-
-    Raises
-    ------
-    ValueError
-        If SeismicMesh is not installed.
+        Path to the output HDF5 file, using the input basename with
+        ``.hdf5`` extension.
 
     Notes
     -----
-    This is just a wrapper for the equivelant SeismicMesh method. We
-    need to substitute this with our own method, since it is not related
-    to mesh generation.
-
-    This function requires the SeismicMesh package to be installed.
-    The output filename is constructed by replacing the input file
-    extension with '.hdf5'.
-
-    Due to the @run_in_one_core_and_broadcast decorator, only rank 0
-    performs the actual file conversion, but all processes receive
-    the output filename.
+    Due to the ``@run_in_one_core_and_broadcast`` decorator, only rank 0
+    performs the actual file conversion, but all processes receive the
+    output filename.
 
     Examples
     --------
-    >>> output_file = write_hdf5_velocity_model(wave_obj, 'velocity.segy')
+    >>> output_file = write_hdf5_velocity_model(wave, "velocity.segy")
     >>> print(output_file)
     'velocity.hdf5'
     """
-    if SEISMIC_MESH_AVAILABLE is False:
-        raise ValueError("Segy to HDF5 not yet implemented natively. Please install SeismicMesh")
-    vp_filename, vp_filetype = os.path.splitext(
-        segy_filename
+    vp_filename, _ = os.path.splitext(segy_filename)
+
+    output_filename = write_velocity_model(
+        filename=segy_filename,
+        ofname=vp_filename,
+        model_type="segy",
     )
-    write_velocity_model(
-        segy_filename, ofname=vp_filename
-    )
-    output_filename = vp_filename + ".hdf5"
+
     return output_filename
 
 
@@ -778,13 +641,13 @@ def write_hdf5_velocity_model(obj_with_comm, segy_filename):
 #     )
 #     return p
 
-def get_real_shot_record(wave_object):
+def get_real_shot_record(wave):
     """Get the real shot record for the active sources.
 
     The returned object is typically an array with shape
     ``(n_timesteps, n_receivers)`` for a single active shot.
     """
-    real_shot_record = wave_object.real_shot_record
+    real_shot_record = wave.real_shot_record
 
     if real_shot_record is None:
         raise ValueError(
@@ -793,8 +656,8 @@ def get_real_shot_record(wave_object):
         )
 
     if (
-        not isinstance(wave_object.current_sources, (list, tuple))
-        or len(wave_object.current_sources) == 0
+        not isinstance(wave.current_sources, (list, tuple))
+        or len(wave.current_sources) == 0
     ):
         raise ValueError(
             "Current sources must be set to a non-empty list or tuple "
@@ -804,20 +667,20 @@ def get_real_shot_record(wave_object):
     if isinstance(real_shot_record, np.ndarray):
         if real_shot_record.ndim == 3:
             if (
-                wave_object.wave_type == WaveType.ISOTROPIC_ELASTIC
-                and real_shot_record.shape[-1] == wave_object.dimension
+                wave.wave_type == WaveType.ISOTROPIC_ELASTIC
+                and real_shot_record.shape[-1] == wave.dimension
             ):
                 return real_shot_record
-            return real_shot_record[wave_object.current_sources[0]]
+            return real_shot_record[wave.current_sources[0]]
         if real_shot_record.ndim == 2:
             return real_shot_record
 
     if isinstance(real_shot_record, (list, tuple)):
         if (
-            wave_object.current_sources is not None
-            and len(real_shot_record) > wave_object.current_sources[0]
+            wave.current_sources is not None
+            and len(real_shot_record) > wave.current_sources[0]
         ):
-            source_record = real_shot_record[wave_object.current_sources[0]]
+            source_record = real_shot_record[wave.current_sources[0]]
             if isinstance(source_record, np.ndarray) and source_record.ndim == 2:
                 return source_record
 

@@ -1,11 +1,9 @@
-import pytest
-import warnings
-import firedrake as fire
+from firedrake import ExtrudedMesh, UnitCubeMesh, UnitSquareMesh
 from numpy import allclose, isclose
-from spyro.habc.habc import HABC_Wave
-import spyro.meshing.meshing_operations as mshops
-fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
-warnings.filterwarnings("ignore", category=RuntimeWarning)
+from pytest import mark
+from spyro.domains.space import create_function_space
+from spyro.meshing.meshing_operations import MeshOps
+from spyro.solvers.acoustic_wave import AcousticWave
 
 
 def wave_dict(element_type, dimension):
@@ -88,7 +86,7 @@ def wave_dict(element_type, dimension):
     # Define Parameters for absorbing boundary conditions
     dictionary["absorving_boundary_conditions"] = {
         "status": False,  # Activate ABCs
-        "damping_type": "hybrid",  # Activate HABC
+        "abc_type": "hybrid",  # Activate HABC
     }
 
     # Define parameters for visualization
@@ -97,11 +95,10 @@ def wave_dict(element_type, dimension):
     return dictionary
 
 
-@pytest.mark.parametrize('element_type, dimension', [
-    ("T", 2),   # Triangular 2D
-    ("Q", 2),    # Quadrilateral 2D
-    ("T", 3),   # Tetrahedral 3D
-    ("Q", 3)])   # Hexahedral 3D
+@mark.parametrize('element_type, dimension', [("T", 2),   # Triangular 2D
+                                              ("Q", 2),    # Quadrilateral 2D
+                                              ("T", 3),   # Tetrahedral 3D
+                                              ("Q", 3)])   # Hexahedral 3D
 def test_representative_mesh_dimensions(element_type, dimension):
     """Test representative_mesh_dimensions for 2D and 3D meshes."""
 
@@ -109,73 +106,72 @@ def test_representative_mesh_dimensions(element_type, dimension):
     dictionary = wave_dict(element_type, dimension)
 
     # Create the acoustic wave object
-    Wave_obj = HABC_Wave(dictionary=dictionary)
+    wave = AcousticWave(dictionary=dictionary)
 
     # Mesh the domain with the specified edge length
     edge_length = 0.1
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+    wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
     # Call the method and assign the outputs to the mesh_parameters object
     mesh_derived_parameters = \
-        Wave_obj.mesh_ops.representative_mesh_dimensions(Wave_obj.mesh,
-                                                         Wave_obj.function_space)
-    Wave_obj.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
-    Wave_obj.mesh_parameters.lmin = mesh_derived_parameters[1]
-    Wave_obj.mesh_parameters.lmax = mesh_derived_parameters[2]
-    Wave_obj.mesh_parameters.alpha = mesh_derived_parameters[3]
-    Wave_obj.mesh_parameters.tol = mesh_derived_parameters[4]
+        wave.mesh_ops.representative_mesh_dimensions(wave.mesh,
+                                                     wave.function_space)
+    wave.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
+    wave.mesh_parameters.lmin = mesh_derived_parameters[1]
+    wave.mesh_parameters.lmax = mesh_derived_parameters[2]
+    wave.mesh_parameters.alpha = mesh_derived_parameters[3]
+    wave.mesh_parameters.tol = mesh_derived_parameters[4]
 
     # Print mesh info and computed values
     print("\nMesh Information:")
     print(f"  - Mesh type: {element_type}")
-    print(f"  - Number of cells: {Wave_obj.mesh.num_cells()}")
-    print(f"  - Number of vertices: {Wave_obj.mesh.num_vertices()}")
+    print(f"  - Number of cells: {wave.mesh.num_cells()}")
+    print(f"  - Number of vertices: {wave.mesh.num_vertices()}")
     print("\nComputed representative mesh dimensions:")
-    print(f"  - lmin (minimum mesh size): {Wave_obj.mesh_parameters.lmin:.6f}")
-    print(f"  - lmax (maximum mesh size): {Wave_obj.mesh_parameters.lmax:.6f}")
-    print(f"  - alpha (lmax/lmin ratio): {Wave_obj.mesh_parameters.alpha:.6f}")
-    print(f"  - tol (tolerance): {Wave_obj.mesh_parameters.tol:.2e}")
+    print(f"  - lmin (minimum mesh size): {wave.mesh_parameters.lmin:.6f}")
+    print(f"  - lmax (maximum mesh size): {wave.mesh_parameters.lmax:.6f}")
+    print(f"  - alpha (lmax/lmin ratio): {wave.mesh_parameters.alpha:.6f}")
+    print(f"  - tol (tolerance): {wave.mesh_parameters.tol:.2e}")
 
     # Verify attributes are set
-    assert hasattr(Wave_obj.mesh_parameters, 'diam_mesh'), "'diam_mesh' not set"
-    assert hasattr(Wave_obj.mesh_parameters, 'lmin'), "'lmin' not set"
-    assert hasattr(Wave_obj.mesh_parameters, 'lmax'), "'lmax' not set"
-    assert hasattr(Wave_obj.mesh_parameters, 'alpha'), "'alpha' not set"
-    assert hasattr(Wave_obj.mesh_parameters, 'tol'), "'tol' not set"
+    assert hasattr(wave.mesh_parameters, 'diam_mesh'), "'diam_mesh' not set"
+    assert hasattr(wave.mesh_parameters, 'lmin'), "'lmin' not set"
+    assert hasattr(wave.mesh_parameters, 'lmax'), "'lmax' not set"
+    assert hasattr(wave.mesh_parameters, 'alpha'), "'alpha' not set"
+    assert hasattr(wave.mesh_parameters, 'tol'), "'tol' not set"
 
     # Verify values are reasonable
-    assert Wave_obj.mesh_parameters.lmin > 0, \
-        f"lmin should be positive, got {Wave_obj.mesh_parameters.lmin}"
-    assert Wave_obj.mesh_parameters.lmax > 0, \
-        f"lmax should be positive, got {Wave_obj.mesh_parameters.lmax}"
-    assert Wave_obj.mesh_parameters.lmin <= Wave_obj.mesh_parameters.lmax, \
-        f"lmin ({Wave_obj.mesh_parameters.lmin}) should " + \
-        f"be <= lmax ({Wave_obj.mesh_parameters.lmax})"
-    assert Wave_obj.mesh_parameters.alpha >= 1., \
-        f"alpha should be >= 1, got {Wave_obj.mesh_parameters.alpha}"
-    assert Wave_obj.mesh_parameters.tol > 0, \
-        f"tol should be positive, got {Wave_obj.mesh_parameters.tol}"
-    assert Wave_obj.mesh_parameters.tol <= 1e-6, \
-        f"tol should be small, got {Wave_obj.mesh_parameters.tol}"
+    assert wave.mesh_parameters.lmin > 0, \
+        f"lmin should be positive, got {wave.mesh_parameters.lmin}"
+    assert wave.mesh_parameters.lmax > 0, \
+        f"lmax should be positive, got {wave.mesh_parameters.lmax}"
+    assert wave.mesh_parameters.lmin <= wave.mesh_parameters.lmax, \
+        f"lmin ({wave.mesh_parameters.lmin}) should " + \
+        f"be <= lmax ({wave.mesh_parameters.lmax})"
+    assert wave.mesh_parameters.alpha >= 1., \
+        f"alpha should be >= 1, got {wave.mesh_parameters.alpha}"
+    assert wave.mesh_parameters.tol > 0, \
+        f"tol should be positive, got {wave.mesh_parameters.tol}"
+    assert wave.mesh_parameters.tol <= 1e-6, \
+        f"tol should be small, got {wave.mesh_parameters.tol}"
     expected_lmin = expected_lmax = 0.1
-    assert isclose(Wave_obj.mesh_parameters.lmin, expected_lmin, rtol=1e-6)
-    assert isclose(Wave_obj.mesh_parameters.lmax, expected_lmax, rtol=1e-6)
+    assert isclose(wave.mesh_parameters.lmin, expected_lmin, rtol=1e-6)
+    assert isclose(wave.mesh_parameters.lmax, expected_lmax, rtol=1e-6)
 
 
-@pytest.mark.parametrize('element_type, dimension', [
-    ("T", 2),   # Triangular 2D
-    ("Q", 2),    # Quadrilateral 2D
-    ("T", 3),   # Tetrahedral 3D
-    ("Q", 3)])   # Hexahedral 3D
+@mark.parametrize('element_type, dimension', [("T", 2),   # Triangular 2D
+                                              ("Q", 2),    # Quadrilateral 2D
+                                              ("T", 3),   # Tetrahedral 3D
+                                              ("Q", 3)])   # Hexahedral 3D
 def test_boundary_ids(element_type, dimension):
     """Test representative_mesh_dimensions for 2D and 3D meshes."""
 
     # Crete object for mesh operations
     domain_dim = (1., 1.) if dimension == 2 else (1., 1., 1.)
     quadrilateral = True if element_type == "Q" else False
-    mesh_ops = mshops.MeshOps(domain_dim, dimension=dimension,
-                              quadrilateral=quadrilateral,
-                              func_space_type='scalar')
+    mesh_ops = MeshOps(domain_dim, dimension=dimension,
+                       quadrilateral=quadrilateral,
+                       func_space_type='scalar')
 
     # Assuming Spyro's system coordinates: (z, x, y)
     # Boundaries2D = [top (zmax, 2), bottom(zmin, 1), right(xmax, 4), left(xmin, 3)]
@@ -193,22 +189,20 @@ def test_boundary_ids(element_type, dimension):
 
     # Mesh parameters
     degree_ele = 4 if dimension == 2 else 3
-    family = "CG" if element_type == "Q" else "KMV"
 
     # Create mesh
     if quadrilateral:
-        mesh = fire.UnitSquareMesh(10, 10, quadrilateral=quadrilateral)
+        mesh = UnitSquareMesh(10, 10, quadrilateral=quadrilateral)
         if dimension == 3:
             quad_mesh = mesh
             layer_height = 1. / 10
-            mesh = fire.ExtrudedMesh(quad_mesh, 10, layer_height=layer_height)
-        element = fire.FiniteElement(family, mesh.ufl_cell(),
-                                     degree=degree_ele, variant="spectral")
-        V = fire.FunctionSpace(mesh, element)
+            mesh = ExtrudedMesh(quad_mesh, 10, layer_height=layer_height)
     else:
-        mesh = fire.UnitSquareMesh(10, 10) if dimension == 2 \
-            else fire.UnitCubeMesh(10, 10, 10)
-        V = fire.FunctionSpace(mesh, family, degree_ele)
+        mesh = UnitSquareMesh(10, 10) if dimension == 2 else UnitCubeMesh(10, 10, 10)
+
+    # Create function space
+    method_element = "spectral_quadrilateral" if quadrilateral else "mass_lumped_triangle"
+    V = create_function_space(mesh, method_element, degree_ele)
 
     # Node coordinates
     node_positions = mesh_ops.extract_node_positions(mesh, V, output_type="array")

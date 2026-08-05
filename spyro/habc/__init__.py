@@ -1,9 +1,10 @@
-import importlib
-import pkgutil
+# Submodules of this package are imported explicitly by their users, e.g.
+#     from ..habc.error_measure import HABCError
+#
+# Do not eagerly import every submodule here (e.g. with pkgutil/importlib).
+# Doing so turns the one-way dependency
+#     abc.abc_layer -> habc.error_measure
+# into a circular import, because pulling in any single habc submodule would
+# also pull in habc.habc, which subclasses abc.abc_layer.ABCLayer.
 
 __all__ = []
-for module_info in pkgutil.walk_packages(__path__):
-    module_name = module_info.name
-    __all__.append(module_name)
-    module = importlib.import_module(f"{__name__}.{module_name}")
-    globals()[module_name] = module

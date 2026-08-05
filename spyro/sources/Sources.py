@@ -2,6 +2,7 @@ import math
 import numpy as np
 from scipy.signal import butter, filtfilt
 from spyro.receivers.dirac_delta_projector import Delta_projector
+from ..domains.space import create_function_space
 from ..utils.typing import WaveType
 import firedrake as fire
 
@@ -45,7 +46,7 @@ class Sources(Delta_projector):
         Applies value at source locations in rhs_forcing operator
     """
 
-    def __init__(self, wave_object):
+    def __init__(self, wave):
         """Initializes class and gets all receiver parameters from
         input file.
 
@@ -65,26 +66,27 @@ class Sources(Delta_projector):
         Sources: :class: 'Source' object
 
         """
-        super().__init__(wave_object)
+        super().__init__(wave)
 
-        self.point_locations = wave_object.source_locations
-        self.number_of_points = wave_object.number_of_sources
-        self.amplitude = wave_object.amplitude
+        self.point_locations = wave.source_locations
+        self.number_of_points = wave.number_of_sources
+        self.amplitude = wave.amplitude
         self.is_local = [0] * self.number_of_points
         self.current_sources = None
-        self.update_wavelet(wave_object)
+        if wave.analysis == "transient":
+            self.update_wavelet(wave)
         if np.isscalar(self.amplitude) or (self.amplitude.size <= 3):
             self.build_maps(order=0)
         else:
             self.build_maps(order=1)
 
-    def update_wavelet(self, wave_object):
+    def update_wavelet(self, wave):
         self.wavelet = full_ricker_wavelet(
-            dt=wave_object.dt,
-            final_time=wave_object.final_time,
-            frequency=wave_object.frequency,
-            delay=wave_object.delay,
-            delay_type=wave_object.delay_type,
+            dt=wave.dt,
+            final_time=wave.final_time,
+            frequency=wave.frequency,
+            delay=wave.delay,
+            delay_type=wave.delay_type,
         )
 
     def apply_source(self, rhs_forcing, step):
@@ -132,29 +134,18 @@ class Sources(Delta_projector):
         ]
         source_mesh = fire.VertexOnlyMesh(self.mesh, source_locations)
         if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
-            V_s = fire.VectorFunctionSpace(source_mesh, "DG", 0)
-            R_s = fire.VectorFunctionSpace(source_mesh, "R", 0)
+            V_s = create_function_space(source_mesh, "DG0", 0, dim=self.dimension)
+            source_value = fire.Function(V_s)
+            if source_value.dat.data.shape[0] > 0:
+                source_value.dat.data[:] = self.amplitude
+            source_form = fire.inner(source_value, fire.TestFunction(V_s)) * fire.dx
         elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
-            V_s = fire.FunctionSpace(source_mesh, "DG", 0)
-            R_s = fire.FunctionSpace(source_mesh, "R", 0)
+            V_s = create_function_space(source_mesh, "DG0", 0)
+            source_value = fire.Function(V_s)
+            source_value.assign(float(self.amplitude))
+            source_form = source_value * fire.TestFunction(V_s) * fire.dx
         else:
             raise ValueError("Invalid wave type")
-
-        amplitude = np.asarray(self.amplitude, dtype=float).ravel()
-        if V_s.value_size == 1:
-            source_value = float(amplitude[0])
-        elif amplitude.size == 1:
-            source_value = [float(amplitude[0]) for _ in range(V_s.value_size)]
-        elif amplitude.size == V_s.value_size:
-            source_value = amplitude.tolist()
-        else:
-            raise ValueError(
-                "Source amplitude size must be scalar or match the wave "
-                f"dimension ({V_s.value_size})."
-            )
-
-        source_amplitude = fire.Function(R_s, val=source_value)
-        source_form = fire.inner(fire.TestFunction(V_s), source_amplitude) * fire.dx
 
         return fire.Cofunction(
             self.function_space.dual()).interpolate(
