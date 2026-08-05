@@ -1,12 +1,12 @@
-
-from firedrake import assemble
 from os import getcwd
 from numpy import array, concatenate, inf, load, save, savetxt, trapezoid
 from scipy.signal import find_peaks
 from ..io.basicio import parallel_print as pprint
+from ..utils.error_management import (type_data_structure_error, value_numerical_error,
+                                      value_string_error)
 from ..utils.freq_tools import freq_response
-# from spyro.plots.plots_habc import plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
-# from spyro.utils.error_management import value_parameter_error
+# from ..plots.plots_habc import plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
+# from ..utils.error_management import value_parameter_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -69,13 +69,13 @@ class MeasureError():
         if output_folder is None:
             self.path_save_error = getcwd() + "/output/"
         else:
-            self.path_save_error = output_folder
+            self.path_save_error = value_string_error("output_folder", output_folder)
 
         # Path to save data
         if output_case is None:
             self.path_save_err_case = self.path_save_error
         else:
-            self.path_save_err_case = output_case
+            self.path_save_err_case = value_string_error("output_case", output_case)
 
         # Path to save the reference signal
         self.path_reference = self.path_save_error + "preamble/"
@@ -106,10 +106,22 @@ class MeasureError():
         None
         """
 
+        # Check the input parameters
+        value_numerical_error("number_of_receivers", number_of_receivers,
+                              float_num=False, integer_num=True, lower_bound=0.)
+        type_data_structure_error("receiver_locations", receiver_locations, "list",
+                                  expected_type_element="tuple",
+                                  expected_length=number_of_receivers)
+        type_data_structure_error("forward_solution_receivers", forward_solution_receivers,
+                                  "array2D", expected_type_element="float",
+                                  expected_shape=(None, number_of_receivers))
+        value_numerical_error("freq_Nyquist", freq_Nyquist, float_num=True,
+                              integer_num=True, lower_bound=0.)
+
         pprint("\nSaving Reference Output", comm=self.comm)
 
         # File name for saving the reference signal
-        self.output_file = output_file
+        self.output_file = value_string_error("output_file", output_file)
 
         # Path to the reference data folder with reference signals
         pth_str = self.path_reference + self.output_file + "_"
@@ -178,6 +190,12 @@ class MeasureError():
             Maximum peak value of the reference signal.
         """
 
+        # Check the input parameters
+        type_data_structure_error("signal_model", signal_model, "array",
+                                  expected_type_element="float")
+        type_data_structure_error("signal_reference", signal_reference, "array",
+                                  expected_type_element="float")
+
         # Finding peaks in transient response
         peaks_in_signal = find_peaks(signal_model)
         if peaks_in_signal[0].size == 0:
@@ -218,6 +236,13 @@ class MeasureError():
             Integral error between the model and reference signals.
         """
 
+        # Check the input parameters
+        type_data_structure_error("signal_model", signal_model, "array",
+                                  expected_type_element="float")
+        type_data_structure_error("signal_reference", signal_reference, "array",
+                                  expected_type_element="float")
+        value_numerical_error("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
+
         # Completing with zeros if arrays lengths are different
         model_len = len(signal_model)
         reference_len = len(signal_reference)
@@ -235,7 +260,8 @@ class MeasureError():
         return integral_error
 
     def error_measures(self, forward_solution_receivers, receivers_reference, dt,
-                       number_of_receivers, energy=None, energy_reference=None):
+                       number_of_receivers, final_energy=None,
+                       final_energy_reference=None, save_in_case_folder=True):
         """Compute the error measures at the receivers for comparison between models.
 
         Error measures used in Salas et al. (2022) Sec. 2.5.
@@ -254,14 +280,17 @@ class MeasureError():
             Time step used in the simulation.
         number_of_receivers: `int`
             Number of receivers used in the simulation.
-        energy : `firedrake.form`, optional
-            Firedrake form for the energy. Default is `None`.
-        energy_reference : `firedrake.form`, optional
-            Firedrake form for the energy in the reference model. Default is `None`.
+        final_energy : `float`, optional
+            Energy of the model in the last time step. Default is `None`.
+        final_energy_reference : `float`, optional
+            Energy of the reference model in the last time step. Default is `None`.
+        save_in_case_folder : `bool`, optional
+            If `True`, save the error measures in the current case folder. Otherwise,
+            save the error measures in the reference folder. Default is `True`.
 
         Returns
         -------
-        err_habc : `list`
+        error_measures : `list`
             Error measures at the receivers with respect to a reference model.
             Structure: [errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener]
             - errIt : `list`
@@ -275,10 +304,10 @@ class MeasureError():
             - max_errPK : `float`
                 Maximum peak error
             - final_ener : `float`
-                Final energy of the model. Only available if `energy` is provided.
+                Final energy of the model. Only available if `final_energy` is provided.
             - dsspt_ener : `float`
                 Total energy dissipated with respect to a reference model.
-                Only available if `energy_reference` is provided.
+                Only available if `final_energy_reference` is provided.
 
         Notes
         -----
@@ -291,6 +320,19 @@ class MeasureError():
         - The total energy dissipated by an ABC scheme can be calculated as the
             difference of the final energies with respect to an infinite model.
         """
+
+        # Check the input parameters
+        value_numerical_error("number_of_receivers", number_of_receivers,
+                              float_num=False, integer_num=True, lower_bound=0.)
+        type_data_structure_error("forward_solution_receivers", forward_solution_receivers,
+                                  "array2D", expected_shape=(None, number_of_receivers))
+        type_data_structure_error("receivers_reference", receivers_reference, "array2D",
+                                  expected_shape=(None, number_of_receivers))
+        value_numerical_error("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
+        value_numerical_error("final_energy", final_energy, float_num=True,
+                              integer_num=False, lower_bound=0.)
+        value_numerical_error("final_energy_reference", final_energy_reference,
+                              float_num=True, integer_num=False, lower_bound=0.)
 
         pprint("\nComputing Error Measures", comm=self.comm)
 
@@ -323,26 +365,26 @@ class MeasureError():
         pprint(f"Maximum Peak Error: {max_errPK:.2%}", comm=self.comm)
 
         # Save error measures
-        # err_str = self.path_save_err_case + "habc_errs.txt"
-        # savetxt(err_str, error_measures, delimiter='\t')
+        pth_str = self.path_save_err_case if save_in_case_folder else self.path_reference
+        err_str = pth_str + "measure_errs.txt"
+        savetxt(err_str, error_measures, delimiter='\t')
 
         # Final energy
-        if energy is not None:
-            final_ener = assemble(energy)
-            scalar_values.append(final_ener)
-            pprint(f"Final Energy: {final_ener:.2e}", comm=self.comm)
+        if final_energy is not None:
+            scalar_values.append(final_energy)
+            pprint(f"Final Energy (J): {final_energy:.2e}", comm=self.comm)
 
             # Dissipated energy
-            if energy_reference is not None:
-                dsspt = 1 - final_ener / assemble(energy_reference)
-                scalar_values.append(dsspt)
-                pprint(f"Dissipated Energy: {dsspt:.2%}", comm=self.comm)
+            if final_energy_reference is not None:
+                dsspt_ener = 1 - final_energy / final_energy_reference
+                scalar_values.append(dsspt_ener)
+                pprint(f"Dissipated Energy: {dsspt_ener:.2%}", comm=self.comm)
 
-        # Append scala values to the error measures list
-        # with open(err_str, 'a') as f:
-        #     savetxt(f, scalar_values, delimiter='\t')
+        error_measures.extend(scalar_values)
 
-        error_measures.extend([scalar_values])
+        # Append scalar values to the error measures list
+        with open(err_str, 'a') as f:
+            savetxt(f, scalar_values, delimiter='\t')
 
         return error_measures
 

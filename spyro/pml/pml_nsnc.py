@@ -267,6 +267,7 @@ class PMLLayer(ABCLayer):
         """
 
         # Check if the velocity model exists
+        # TODO: Delete support for initial_velocity_model
         if wave.c is None:
             wave.c = wave.initial_velocity_model
 
