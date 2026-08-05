@@ -135,7 +135,7 @@ def setting_up_fwi():
 
     # Let us create a smoothed out initial guess based on a gaussian
     # filter of our true model
-    sigma = 100  # standart deviation for the gaussian filter
+    sigma = 20  # standart deviation for the gaussian filter
     spyro.tools.smooth_velocity_field_file(
         "velocity_models/vp_marmousi-ii.segy",
         "initial_guess.segy",
