@@ -47,7 +47,11 @@ clean-output:
 clean: clean-pyc clean-root clean-data clean-output
 
 format:
-	autopep8 --in-place --global-config setup.cfg --recursive .
+	@black .
+	ruff check . --fix
+	black .
+	pydocstringformatter .
+	black .
 
 lint:
 	python3 -m flake8 spyro tests test_integration
