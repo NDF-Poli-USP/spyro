@@ -1,5 +1,5 @@
 from os import getcwd
-from numpy import array, concatenate, inf, load, save, savetxt, trapezoid
+from numpy import concatenate, inf, load, save, savetxt, trapezoid, zeros
 from scipy.signal import find_peaks
 from ..io.basicio import parallel_print as pprint
 from ..utils.error_management import (type_data_structure_error, value_numerical_error,
