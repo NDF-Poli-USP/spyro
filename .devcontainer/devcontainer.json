@@ -7,6 +7,16 @@
     "settings": {
       "terminal.integrated.shell.linux": "/bin/bash"
     },
+    "customizations": {
+      "vscode": {
+        "extensions": [
+          "ms-python.python",
+          "github.vscode-pull-request-github",
+          "ms-vsliveshare.vsliveshare",
+          "ms-toolsai.jupyter"
+        ]
+      }
+    },
     "postCreateCommand": "python3 -m pip install -e '.[dev]'",
     "remoteUser": "root"
   }
