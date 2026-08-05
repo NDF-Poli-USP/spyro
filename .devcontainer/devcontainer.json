@@ -7,7 +7,7 @@
     "settings": {
       "terminal.integrated.shell.linux": "/bin/bash"
     },
-    "postCreateCommand": "python -m pip install -e '.[dev]'",
+    "postCreateCommand": "python3 -m pip install -e '.[dev]'",
     "remoteUser": "root"
   }
   
