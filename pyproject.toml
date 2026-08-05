@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spyro"
+version = "0.9.2"
+description = "Wave modeling with the finite element method"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GNU Lesser General Public License v3 or later (LGPLv3+)" }
+authors = [
+  { name = "Alexandre F. G. Olender" },
+  { name = "Keith J. Roberts" },
+  { name = "Paula Neves de Araújo"}
+  { name = "Ruben Andres Salas" },
+  { name = "Daiane I. Dolci" },
+  { name = "Jéssica Sales P. dos Santos"}
+  { name = "Romildo Soares Jr"}
+  { name = "Bruno Mariz de Oliveira Teixeira"}
+  { name = "Thiago Dias dos Santos" },
+  { name = "Bruno Souza Carmo"},
+  { name = "Usama Bin Qasim"},
+  { name = "Hassan Imran"},
+  { name = "Eduardo Moscatelli de Souza" },
+  { name = "Lucas Franceschini" },
+]
+dependencies = [
+  "numpy",
+  "scipy",
+  "matplotlib",
+  "segyio",
+  "meshio",
+  "mpi-pytest",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build",
+  "flake8",
+  "memory-profiler",
+  "mpi-pytest",
+  "psutil",
+  "pyamg",
+  "pyinstrument",
+  "pytest",
+  "pytest-cov",
+  "twine",
+  "SeismicMesh @ git+https://github.com/NDF-Poli-USP/SeismicMesh.git",
+  "pakmsh[examples] @ git+https://github.com/NDF-Poli-USP/PakMsh.git",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["spyro*"]
+exclude = ["tests*", "test_integration*", "paper*", "benchmarks*", "demos*", "notebook_tutorials*"]
+
+[tool.flake8]
+ignore = [
+    "E501",
+    "F403",
+    "F405",
+    "E226",
+    "E402",
+    "E721",
+    "E731",
+    "E741",
+    "W503",
+    "F999",
+    "N801",
+    "N802",
+    "N803",
+    "N806",
+    "N807",
+    "N811",
+    "N813",
+    "N814",
+    "N815",
+    "N816",
+]
+exclude = [".git", "__pycache__"]
+
+[tool.coverage.run]
+omit = ["*/site-packages/*", "*/tests/*", "*/.eggs/*", "/home/alexandre/firedrake/*"]
+
+[tool.pytest.ini_options]
+markers = [
+  "slow: mark test as slow",
+  "high_memory: mark test as requiring high memory",
+  "older_firedrake: mark test as only compatible with older firedrake versions",
+  "newer_firedrake: mark test as only compatible with newer firedrake versions",
+]
