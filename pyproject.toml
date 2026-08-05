@@ -12,16 +12,16 @@ license = { text = "GNU Lesser General Public License v3 or later (LGPLv3+)" }
 authors = [
   { name = "Alexandre F. G. Olender" },
   { name = "Keith J. Roberts" },
-  { name = "Paula Neves de Araújo"}
+  { name = "Paula Neves de Araújo" },
   { name = "Ruben Andres Salas" },
   { name = "Daiane I. Dolci" },
-  { name = "Jéssica Sales P. dos Santos"}
-  { name = "Romildo Soares Jr"}
-  { name = "Bruno Mariz de Oliveira Teixeira"}
+  { name = "Jéssica Sales P. dos Santos" },
+  { name = "Romildo Soares Jr" },
+  { name = "Bruno Mariz de Oliveira Teixeira" },
   { name = "Thiago Dias dos Santos" },
-  { name = "Bruno Souza Carmo"},
-  { name = "Usama Bin Qasim"},
-  { name = "Hassan Imran"},
+  { name = "Bruno Souza Carmo" },
+  { name = "Usama Bin Qasim" },
+  { name = "Hassan Imran" },
   { name = "Eduardo Moscatelli de Souza" },
   { name = "Lucas Franceschini" },
 ]
