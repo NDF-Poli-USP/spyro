@@ -334,9 +334,9 @@ class MeasureError():
 
             # Dissipated energy
             if energy_reference is not None:
-                dsspt = assemble(energy_reference) - final_ener
+                dsspt = 1 - final_ener / assemble(energy_reference)
                 scalar_values.append(dsspt)
-                pprint(f"Dissipated Energy: {dsspt:.2e}", comm=self.comm)
+                pprint(f"Dissipated Energy: {dsspt:.2%}", comm=self.comm)
 
         # Append scala values to the error measures list
         # with open(err_str, 'a') as f:
