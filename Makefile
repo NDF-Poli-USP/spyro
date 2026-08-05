@@ -47,11 +47,19 @@ clean-output:
 clean: clean-pyc clean-root clean-data clean-output
 
 format:
-	@black .
-	ruff check . --fix
-	black .
-	pydocstringformatter .
-	black .
+	@if [ -n "$(FILE)" ]; then \
+		black "$(FILE)"; \
+		ruff check "$(FILE)" --fix; \
+		black "$(FILE)"; \
+		pydocstringformatter "$(FILE)"; \
+		black "$(FILE)"; \
+	else \
+		black .; \
+		ruff check . --fix; \
+		black .; \
+		pydocstringformatter .; \
+		black .; \
+	fi
 
 lint:
 	python3 -m flake8 spyro tests test_integration
