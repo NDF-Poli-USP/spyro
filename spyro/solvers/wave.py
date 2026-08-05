@@ -17,7 +17,7 @@ from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from ..utils.error_management import enum_parameter_error
 from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
-                            LayerShapeType, WaveType)
+                            ImplementedAdjointDerivation, LayerShapeType, WaveType)
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
 
@@ -144,8 +144,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.automated_adjoint = None
         self.functional_value = None
         self.misfit = None
+        self.forward_residual_form = None
+        self.forward_residual_states = None
         self.current_time = 0.0
-        self.source_expression = None  # Expression for sources using UFL (less efficient)
+        # Expression to define sources through UFL (less efficient)
+        self.source_expression = None
+        self.adjoint_source_function = None
         self.set_solver_parameters()
 
         # Create or get the mesh
@@ -585,6 +589,146 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         pass
 
+    def reset_adjoint_state(self):
+        """Reset the time-stepping registers used by the adjoint solve."""
+        self.prev_vstate.assign(0.0)
+        self.vstate.assign(0.0)
+        self.next_vstate.assign(0.0)
+
+        try:
+            older_state = self.u_nm2
+        except AttributeError:
+            return
+
+        if older_state is not None:
+            older_state.assign(0.0)
+
+    def get_adjoint_receiver_source_space(self):
+        """Return the state-space component where receiver misfit is injected.
+
+        Acoustic solvers inject the misfit into their scalar (pressure) space.
+        Solvers without a dedicated scalar space (e.g. elastic) fall back to
+        the full solution space.
+        """
+        try:
+            get_scalar_space = self.get_scalar_function_space
+        except AttributeError:
+            # Solver does not expose a scalar space (e.g. elastic).
+            return self.function_space
+        try:
+            return get_scalar_space()
+        except ValueError:
+            # Acoustic solver whose scalar space has not been created yet.
+            return self.function_space
+
+    def set_forward_residual_form(
+        self, residual_form, live_states, state_space=None,
+        state_name="residual state",
+    ):
+        """Expose a forward residual for UFL adjoint differentiation.
+
+        The residual is rewritten with formal state ``Function`` objects that
+        are independent of the live time-stepping registers.  During adjoint
+        replay these formal states are assigned from the stored forward
+        solution before differentiating
+
+            R(u^{n+1}, u^n, u^{n-1}; m)
+
+        with respect to the state and control parameters.
+
+        Parameters
+        ----------
+        residual_form : ufl.Form
+            Forward time-step residual form.
+        live_states : tuple
+            Objects representing ``u^{n+1}``, ``u^n`` and ``u^{n-1}`` in
+            ``residual_form``.
+        state_space : firedrake.FunctionSpace, optional
+            Space for the formal residual states.  If omitted, the space is
+            inferred from the first live state.
+        state_name : str, optional
+            Base name used for the formal residual state functions.
+
+        Notes
+        -----
+        This currently assumes a three-level central-difference residual,
+        ``R(u^{n+1}, u^n, u^{n-1}; m)``, hence exactly three ``live_states``.
+        Other integrators (Newmark, Runge-Kutta, staggered leapfrog, schemes
+        with memory) would need a different number of formal states and a
+        matching adjoint advance; see ``docs/GENERALIZED_UFL_ADJOINT_NOTES.md``
+        (section 7).
+        """
+        if len(live_states) != 3:
+            raise ValueError("Expected live states (np1, n, nm1).")
+
+        if state_space is None:
+            try:
+                state_space = live_states[0].function_space()
+            except AttributeError as exc:
+                raise ValueError(
+                    "state_space is required when it cannot be inferred from "
+                    "the first live state."
+                ) from exc
+
+        residual_states = (
+            fire.Function(state_space, name=f"{state_name} t+dt"),
+            fire.Function(state_space, name=state_name),
+            fire.Function(state_space, name=f"{state_name} t-dt"),
+        )
+        self.forward_residual_states = residual_states
+        self.forward_residual_form = fire.replace(
+            residual_form,
+            dict(zip(live_states, residual_states)),
+        )
+
+    def get_adjoint_source(self):
+        """Return the cofunction used as the adjoint equation source.
+
+        ``source_function`` is reserved for the forward problem. This method
+        returns a distinct cofunction used by the adjoint problem, with the same
+        dual space by default.
+        """
+        if self.adjoint_source_function is None:
+            self.adjoint_source_function = fire.Cofunction(
+                self.source_function.function_space()
+            )
+        return self.adjoint_source_function
+
+    def set_adjoint_source(self, misfit_form):
+        """Assign the misfit form into the adjoint source space.
+
+        Parameters
+        ----------
+        misfit_form : firedrake.Cofunction
+            Cofunction representing the derivative of the misfit functional with
+            respect to the wave state.
+        """
+        adjoint_source = self.get_adjoint_source()
+        if adjoint_source.function_space() == misfit_form.function_space():
+            adjoint_source.assign(misfit_form)
+            return
+
+        # ``sub(0)`` only makes sense on a mixed (e.g. PML) adjoint source.
+        # On a non-mixed source it fails in a backend-dependent way, so the
+        # broad catch is intentional: translate any such failure into a single
+        # clear "incompatible spaces" error.
+        try:
+            adjoint_source_component = adjoint_source.sub(0)
+        except (AttributeError, IndexError, ValueError) as exc:
+            raise ValueError(
+                "Misfit form space is incompatible with the adjoint source "
+                "space."
+            ) from exc
+
+        if adjoint_source_component.function_space() != misfit_form.function_space():
+            raise ValueError(
+                "Misfit form space is incompatible with the first component of "
+                "the adjoint source space."
+            )
+
+        adjoint_source.assign(0.0)
+        adjoint_source_component.assign(misfit_form)
+
     def set_material_properties(self, *args, **kwargs):
         """Wrapper for material_properties_io.set_material_property."""
         return material_properties_io.set_material_property(
@@ -629,9 +773,103 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.functional_value = None
         self.misfit = None
 
-    def enable_implemented_adjoint(self):
-        self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
+    def enable_implemented_adjoint(
+        self,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+    ):
+        """Switch the solver into an implemented-adjoint mode.
+
+        Side effects, required before a backward/gradient solve:
+
+        - selects the requested implemented :class:`AdjointType`;
+        - stores the forward field at every gradient-sampling step
+          (``store_forward_time_steps``) so the adjoint replay can reassign it;
+        - for the UFL-derived backend, enables the vertex-only-mesh receiver
+          path and forces functional evaluation to ``PER_TIMESTEP``.
+        """
+        if not adjoint_type.is_implemented:
+            raise ValueError(
+                "enable_implemented_adjoint requires an implemented adjoint "
+                "AdjointType.",
+            )
+        self.adjoint_type = adjoint_type
         self.store_forward_time_steps = True
+        if (
+            adjoint_type.implemented_derivation
+            is ImplementedAdjointDerivation.UFL_DIFFERENTIATION
+        ):
+            self.use_vertex_only_mesh = True
+            if (
+                self.functional_evaluation_mode
+                is not FunctionalEvaluationMode.PER_TIMESTEP
+            ):
+                self.enable_compute_functional(
+                    mode=FunctionalEvaluationMode.PER_TIMESTEP
+                )
+
+    def _prepare_implemented_adjoint(
+        self, misfit=None, forward_solution=None,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+    ):
+        """Enable the implemented adjoint and ensure misfit + forward solution.
+
+        Shared ``gradient_solve`` preamble for the acoustic and elastic
+        solvers. It turns on the implemented-adjoint bookkeeping, stores the
+        supplied ``misfit``, makes sure a stored forward solution is available,
+        and, when no misfit was given, falls back to
+        ``real_shot_record - forward_solution_receivers``.
+
+        Parameters
+        ----------
+        misfit : optional
+            Precomputed receiver misfit. If ``None`` it is derived from the
+            stored real shot record.
+        forward_solution : optional
+            Stored forward solution to reuse. If ``None`` and none is stored,
+            a fresh forward solve is run.
+        adjoint_type : AdjointType, optional
+            Implemented adjoint variant to use.
+        """
+        self.enable_implemented_adjoint(
+            adjoint_type=adjoint_type,
+        )
+        if misfit is not None:
+            self.misfit = misfit
+
+        if forward_solution is not None:
+            self.forward_solution = forward_solution
+        elif not self.forward_solution:
+            # Only re-run when ``self.forward_solution`` is empty — either it
+            # was never run, or it ran before ``enable_implemented_adjoint()``
+            # (so ``store_forward_time_steps`` was False and nothing was
+            # stored).
+            #
+            # IMPORTANT: for the multi-source FWI path, ``ensemble_gradient``
+            # invokes ``gradient_solve`` once per source after
+            # ``switch_serial_shot`` loads that source's stored forward
+            # solution into ``self.forward_solution``. Calling
+            # ``forward_solve()`` here would discard the per-source data and
+            # run a fresh (multi-source) ensemble forward solve, leaving the
+            # backward propagator with the wrong forward state and producing an
+            # incorrect gradient.
+            if misfit is None:
+                self.forward_solve()
+            else:
+                functional_mode = self.functional_evaluation_mode
+                self._functional_evaluation_mode = None
+                try:
+                    self.forward_solve()
+                finally:
+                    self._functional_evaluation_mode = functional_mode
+
+        if self.misfit is None:
+            if self.real_shot_record is None:
+                raise ValueError(
+                    "Please load or calculate a real shot record first"
+                )
+            self.misfit = (
+                self.real_shot_record - self.forward_solution_receivers
+            )
 
     @property
     def forward_solution_receivers(self):

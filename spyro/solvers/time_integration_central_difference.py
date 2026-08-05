@@ -35,9 +35,18 @@ def _propagate_forward_central_difference(wave, source_ids):
     t = wave.current_time
     nt = int(wave.final_time / wave.dt) + 1  # number of timesteps
     usol = None
+    store_mixed_forward_state = False
     if wave.store_forward_time_steps:
+        state_space = wave.function_space
+        if (
+            wave.abc_type == AbsorbingBCsType.PML
+            and wave.use_vertex_only_mesh
+            and wave.forward_residual_form is not None
+        ):
+            state_space = wave.mixed_function_space
+            store_mixed_forward_state = True
         usol = [
-            fire.Function(wave.function_space, name=wave.get_function_name())
+            fire.Function(state_space, name=wave.get_function_name())
             for t in range(nt)
             if t % wave.gradient_sampling_frequency == 0
         ]
@@ -118,7 +127,10 @@ def _propagate_forward_central_difference(wave, source_ids):
             wave.store_forward_time_steps
             and step % wave.gradient_sampling_frequency == 0
         ):
-            usol[save_step].assign(wave.get_function())
+            if store_mixed_forward_state:
+                usol[save_step].assign(wave.vstate)
+            else:
+                usol[save_step].assign(wave.get_function())
             save_step += 1
 
         if (step - 1) % wave.output_frequency == 0:
@@ -144,6 +156,9 @@ def _propagate_forward_central_difference(wave, source_ids):
                         "Unsupported type for real_shot_record. Must be "
                         "either a numpy array or a Firedrake Function."
                     )
+                misfit_step_expr = misfit_step
+                misfit_step = fire.Function(usol_recv[-1].function_space())
+                misfit_step.interpolate(misfit_step_expr)
             else:
                 misfit_step = real_shot_record[step] - usol_recv[-1]
             wave.misfit.append(misfit_step)

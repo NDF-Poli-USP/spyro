@@ -100,7 +100,7 @@ class AcousticWave(Wave):
             computed by calling the forward solver. Providing the forward solution
             can save computational time if it has already been
             computed for the current velocity model, as it avoids redundant forward solves.
-        adjoint_type: AdjointType enum (default: AdjointType.IMPLEMENTED_ADJOINT)
+        adjoint_type: AdjointType enum
             Whether to use automated adjoint differentiation.
         riesz_map: RieszMapType enum (default: RieszMapType.L2)
             The type of Riesz map to use for the gradient. More details in the documentation of the
@@ -114,42 +114,24 @@ class AcousticWave(Wave):
         """
         if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
             return self._automated_adjoint_gradient(riesz_map=riesz_map)
-
-        self.enable_implemented_adjoint()
-        if misfit is not None:
-            self.misfit = misfit
-
-        if forward_solution is not None:
-            self.forward_solution = forward_solution
-        elif not self.forward_solution:
-            # No stored forward solution — either never run, or run before
-            # enable_implemented_adjoint() was called (store_forward_time_steps
-            # was False at the time). Re-run now with storage enabled.
-            #
-            # IMPORTANT: only re-run when ``self.forward_solution`` is empty.
-            # For the multi-source FWI path, ``ensemble_gradient`` invokes this
-            # method once per source after calling ``switch_serial_shot`` to
-            # load that source's stored forward solution into
-            # ``self.forward_solution``; calling ``forward_solve()`` here
-            # would discard the per-source data and run a fresh (multi-source)
-            # ensemble forward solve, leaving the backward propagator with the
-            # wrong forward state and producing an incorrect gradient.
-            self.forward_solve()
-
-        if self.misfit is None:
-            if self.real_shot_record is None:
-                raise ValueError(
-                    "Please load or calculate a real shot record first"
-                )
-            self.misfit = (
-                self.real_shot_record - self.forward_solution_receivers
+        if not adjoint_type.is_implemented:
+            raise NotImplementedError(
+                f"Adjoint type {adjoint_type} is not implemented for gradients.",
             )
 
         if riesz_map != RieszMapType.L2:
             raise NotImplementedError(
                 f"Riesz map {riesz_map} not implemented for implemented adjoint."
             )
-        return backward_wave_propagator(self)
+
+        self._prepare_implemented_adjoint(
+            misfit=misfit, forward_solution=forward_solution,
+            adjoint_type=adjoint_type,
+        )
+        return backward_wave_propagator(
+            self,
+            adjoint_type=adjoint_type,
+        )
 
     def _automated_adjoint_gradient(self, riesz_map=RieszMapType.L2):
         """Compute the gradient using the automated adjoint.

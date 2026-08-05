@@ -1,8 +1,9 @@
 """Constructs Firedrake solver for the acosutic wave with a PML."""
 
-from firedrake import (Cofunction, DirichletBC, div, dot, ds as fire_ds, dx as fire_dx,
-                       Function, grad, inner, lhs, LinearVariationalProblem,
-                       LinearVariationalSolver, rhs, split, TestFunctions, TrialFunctions)
+from firedrake import (action, Cofunction, DirichletBC, div, dot, ds as fire_ds,
+                       dx as fire_dx, Function, grad, inner, lhs,
+                       LinearVariationalProblem, LinearVariationalSolver, rhs, split,
+                       TestFunctions, TrialFunctions)
 from ..domains.space import create_function_space
 from ..utils.typing import BoundaryConditionsType
 
@@ -192,6 +193,12 @@ def construct_solver_or_matrix_with_pml(wave):
     FF, fix_bnd = forms_pml(wave, W, X_n, X_nm1)
     wave.lhs = lhs(FF)
     wave.rhs = rhs(FF)
+    wave.set_forward_residual_form(
+        action(wave.lhs, X_np1) - wave.rhs,
+        (X_np1, X_n, X_nm1),
+        state_space=W,
+        state_name="residual PML state",
+    )
     wave.source_function = Cofunction(W.dual())
     wave.B = Cofunction(W.dual())
 
