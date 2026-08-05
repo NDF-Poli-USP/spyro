@@ -6,6 +6,7 @@ messages to the user or to prevent numerical instability in objects."""
 from numpy import float32, float64, inf, int32, int64, isinf, isnan, ndarray
 from firedrake import Function, FunctionSpace, Mesh
 from firedrake.functionspaceimpl import WithGeometry
+from ufl.form import Form
 from ufl.geometry import SpatialCoordinate
 
 
@@ -344,8 +345,8 @@ def value_string_error(par_name, par_value, none_default=False):
 
 
 def type_data_structure_error(par_name, par_value, expected_type,
-                              expected_type_element=None,
-                              expected_length=None, none_default=False):
+                              expected_type_element=None, expected_length=None,
+                              expected_shape=None, none_default=False):
     """Validate data structure parameters and raise a TypeError if invalid.
 
     Parameters
@@ -365,6 +366,13 @@ def type_data_structure_error(par_name, par_value, expected_type,
     expected_length : `int`, optional
         Expected length of the data structure parameter. Default is `None`,
         in which case the length is not checked.
+    expected_shape : `tuple`, optional
+        Expected shape of the data structure parameter (only for "array2D" or "array3D").
+        The expecte shape should be provided as a tuple of integers. If a length of the
+        shape dimension is not known, it can be set to `None`. For example, an expected
+        shape of (3, None) means that the first dimension should have length 3, while the
+        second dimension can have any length greater than zero. Default is `None`,
+        in which case the shape is not checked.
     none_default : `bool`, optional
         If `True`, the parameter value is allowed to be validated as `None`.
         Default is `False`, in which case `None` is not allowed.
@@ -386,23 +394,40 @@ def type_data_structure_error(par_name, par_value, expected_type,
     if par_value is None and none_default:
         return par_value
 
-    value_parameter_error("expected_type", expected_type,
-                          ["dict", "list", "tuple", "array"])
-
     parameter_map = {"dict": dict,
                      "list": list,
                      "tuple": tuple,
-                     "array": ndarray}
+                     "array": ndarray,
+                     "array2D": ndarray,
+                     "array3D": ndarray}
+
+    value_parameter_error("expected_type", expected_type, parameter_map.keys())
 
     element_map = {"int": int,
                    "float": float,
+                   "list": list,
                    "NoneType": type(None),
-                   "str": str}
+                   "str": str,
+                   "tuple": tuple}
 
     # Checking the parameter type
     if not isinstance(par_value, parameter_map[expected_type]):
         raise TypeError(f"'{par_name}' must be a {expected_type}, "
                         f"got {type(par_value).__name__}.")
+
+    if expected_type in ["array2D", "array3D"]:
+        expected_dim = 2 if expected_type == "array2D" else 3
+        if par_value.ndim != expected_dim:
+            raise ValueError(f"'{par_name}' must be a {expected_dim}D array, "
+                             f"got {par_value.ndim}D array.")
+
+        if expected_shape is not None:
+            par_shape = par_value.shape
+            for dim in range(expected_dim):
+                if expected_shape[dim] is not None and \
+                        par_shape[dim] != expected_shape[dim]:
+                    raise ValueError(f"'{par_name}' must have shape {expected_shape}, "
+                                     f"got shape {par_shape}.")
 
     # Check if the parameter has the expected length
     if expected_length is not None and len(par_value) != expected_length:
@@ -414,12 +439,13 @@ def type_data_structure_error(par_name, par_value, expected_type,
         if isinstance(expected_type_element, str):
             expected_type_element = (expected_type_element,)
         for etype in expected_type_element:
-            value_parameter_error("expected_type_element", etype,
-                                  ["float", "int", "str", "NoneType"])
+            value_parameter_error("expected_type_element", etype, element_map.keys())
         expected_types = tuple(element_map[etype] for etype in expected_type_element)
         expected_types += (int32, int64,) if "int" in expected_type_element else ()
         expected_types += (float32, float64,) if "float" in expected_type_element else ()
-        if not all(isinstance(item, expected_types) for item in par_value):
+        par_value_check = par_value if expected_type not in ["array2D", "array3D"] \
+            else par_value.flatten()
+        if not all(isinstance(item, expected_types) for item in par_value_check):
             opt_str = ", ".join([f"'{etype}'" for etype in expected_type_element])
             last_comma = opt_str.rfind(',')
             opt_str = opt_str[:last_comma] + " or" + opt_str[last_comma + 1:] \
@@ -459,13 +485,13 @@ def type_firedrake_error(par_name, par_value, expected_type, none_default=False)
     if par_value is None and none_default:
         return par_value
 
-    value_parameter_error("expected_type", expected_type,
-                          ["Function", "FunctionSpace", "Mesh", "SpatialCoordinate"])
-
-    parameter_map = {"Function": Function,
+    parameter_map = {"Form": Form,
+                     "Function": Function,
                      "FunctionSpace": type(FunctionSpace),
                      "Mesh": type(Mesh),
                      "SpatialCoordinate": SpatialCoordinate}
+
+    value_parameter_error("expected_type", expected_type, parameter_map.keys())
 
     # Checking the parameter type
     expected_valid = (parameter_map[expected_type],)

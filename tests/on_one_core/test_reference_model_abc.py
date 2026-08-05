@@ -1,13 +1,14 @@
-"""Unit tests for the Modal solvers implemented in spyro.solvers.modal.modal_sol.
+"""Unit tests for the Reference Model implemented in spyro.abc.abc_layer.
 
-These tests verify the implemented modal solvers by comparing the computed fundamental
-frequency with expected values for different domain configurations. The tests cover
-both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
+These tests verify the consistency of the solver with HABCs and PML without any
+damping for a model of reference with an extended pad to avoid reflections. The
+tests are designed to ensure that the computed transiente responses and energies
+are consistent with expected values. The tests cover both 2D and 3D cases.
 """
 
-from pytest import fail, fixture, mark, param
+from pytest import fail, mark  # fixture, param
 from firedrake import COMM_WORLD as comm, conditional, ConvergenceError
-from numpy import isclose
+from numpy import all, sum
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
 from spyro.io.basicio import parallel_print as pprint
@@ -113,7 +114,7 @@ def wave_dict(element_geometry, dimension, calc_eik, abc_type, dt_usu):
     dictionary["visualization"] = {  # Output folder
         "output_folder": output_folder,
         "acoustic_energy": True,  # Activate energy calculation
-        "acoustic_energy_filename": output_folder + "/preamble/acoustic_pot_energy"
+        "acoustic_energy_filename": output_folder + f"/preamble/acoustic_energy_{abc_type}"
     }
 
     return dictionary
@@ -205,14 +206,13 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
 @mark.older_firedrake
 @mark.parametrize("element_geometry, dimension, calc_eik", [
     ("T", 2, True),
-    # ("T", 2, False),
-    # ("Q", 2, True),
-    # ("Q", 2, False),
-    # ("T", 3, True),
-    # ("T", 3, False),
-    # ("Q", 3, True),
-    # ("Q", 3, False),
-])
+    ("Q", 2, True),
+    ("T", 3, True),
+    ("Q", 3, True),
+    ("T", 2, False),
+    ("Q", 2, False),
+    ("T", 3, False),
+    ("Q", 3, False)])
 def test_infinite_model_abc(element_geometry, dimension, calc_eik):
     """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
@@ -233,7 +233,6 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
     Returns
     -------
     None
-
 
     ==============================
     Eikonal for 2D model Δx = 100m
@@ -272,6 +271,12 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
 
     # ============ REFERENCE MODEL ============
 
+    # Initialize variables to store hybrid and PML results
+    hybrid_signal = None
+    pml_signal = None
+    hybrid_energy = None
+    pml_energy = None
+
     try:
         for abc_type in ["hybrid", "PML"]:
 
@@ -294,30 +299,36 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
             comp_cost("tfin", tRef=tRef, user_name=wave.path_save + "preamble/INF_")
 
             if abc_type == "hybrid":
-                signal_reference = receivers_reference
-                energy_reference = wave.acoustic_energy
+                hybrid_signal = receivers_reference
+                hybrid_energy = wave.field_logger.get("acoustic_energy")
             else:
-                signal_model = receivers_reference
-                energy_model = wave.acoustic_energy
+                pml_signal = receivers_reference
+                pml_energy = wave.field_logger.get("acoustic_energy")
+
+        # Checking both signals
+        assert hybrid_signal is not None, "Hybrid signal not found"
+        assert pml_signal is not None, "PML signal not found"
 
         dt = wave.get_dt()
-        error_measures = wave.layer_ops.error_measures(signal_reference, signal_model, dt,
+        error_measures = wave.layer_ops.error_measures(pml_signal, hybrid_signal, dt,
                                                        wave.number_of_receivers,
-                                                       energy=energy_model,
-                                                       energy_reference=energy_reference)
+                                                       final_energy=pml_energy,
+                                                       final_energy_reference=hybrid_energy,
+                                                       save_in_case_folder=False)
+        errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener = error_measures
 
-        # tol = 0.07 if (modal_solver == 'ANALYTICAL'
-        #                or modal_solver == 'RAYLEIGH') else 0.05
-
-        # abc_str = wave.case_abc if wave.layer_ops.layer_geometry.n_hyp is None \
-        #     else f"{wave.case_abc[:2]}" + \
-        #     f"{wave.layer_ops.layer_geometry.n_hyp:.1f}{wave.case_abc[-4:]}"
-        # met_str = f"Fundamental Frequency {abc_str} {wave.dimension}D. "
-        # met_str += f"Method {modal_solver}"
-        # cmp_str = f"Expected {exp_value:.5f}, got = {wave.fundam_freq:.5f}"
-        # assert isclose(wave.fundam_freq / exp_value, 1., atol=tol), \
-        #     "✗ " + met_str + "  → " + cmp_str
-        # pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
+        assert sum(errIt) == 0. and max_errIt == 0., \
+            "✗ Integral Error check for 'hybrid' and 'PML' solvers in Reference Model " \
+            f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
+        pprint("✓ Integral Error Verified for 'hybrid' and 'PML' solvers", comm=comm)
+        assert sum(errPk) == 0. and max_errPK == 0. and all(pkMax) > 0., \
+            "✗ Peak Error check for 'hybrid' and 'PML' solvers in Reference Model " \
+            f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
+        pprint("✓ Peak Error Verified for 'hybrid' and 'PML' solvers", comm=comm)
+        assert final_ener > 0. and dsspt_ener == 0., \
+            "✗ Final Energy check for 'hybrid' and 'PML' solvers in Reference Model " \
+            f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
+        pprint("✓ Final Energy Verified for 'hybrid' and 'PML' solvers", comm=comm)
 
     except ConvergenceError as e:
         fail(f"Checking Reference Model with {element_geometry} elements for "

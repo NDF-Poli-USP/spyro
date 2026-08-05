@@ -448,7 +448,7 @@ class ABCLayer(NRBC, MeasureError):
         self.eik_bnd = eik.ident_crit_eik()
 
         # Critical point coordinates as receivers
-        pcrit = [bnd[0] for bnd in self.eik_bnd]
+        pcrit = [tuple(bnd[0]) for bnd in self.eik_bnd]
         wave.receiver_locations = pcrit + wave.receiver_locations
         wave.number_of_receivers = len(wave.receiver_locations)
 
@@ -869,6 +869,12 @@ class ABCLayer(NRBC, MeasureError):
         None
         """
 
+        # Cheking input parameters
+        value_numerical_error("max_divisor_tf", max_divisor_tf,
+                              float_num=False, integer_num=True, lower_bound=0.)
+        value_numerical_error("mag_add", mag_add, float_num=False, integer_num=True,
+                              lower_bound=0., include_lower_bound=True)
+
         pprint("\nChecking Timestep Size", comm=self.comm)
 
         # User timestep
@@ -929,6 +935,16 @@ class ABCLayer(NRBC, MeasureError):
             Size of the domain extension for the infinite domain model.
         """
 
+        # Cheking input parameters
+        value_numerical_error("lmin", lmin, float_num=True,
+                              integer_num=True, lower_bound=0.)
+        value_numerical_error("c_bnd_max", c_bnd_max, float_num=True,
+                              integer_num=True, lower_bound=0.)
+        value_numerical_error("final_time", final_time, float_num=True,
+                              integer_num=True, lower_bound=0.)
+        type_data_structure_error("source_locations", source_locations, "list",
+                                  expected_type_element="tuple", none_default=True)
+
         # Size of the domain extension
         add_dom = c_bnd_max * final_time / 2.
 
@@ -959,7 +975,7 @@ class ABCLayer(NRBC, MeasureError):
                 cand_dist += (delta_y,)
 
             # Minimum distance to the nearest boundary
-            dist_to_bnd = min(cand_dist)
+            dist_to_bnd = float(min(cand_dist))
 
         # Subtracting the distance already travelled by the wave
         add_dom -= dist_to_bnd
@@ -1046,8 +1062,7 @@ class ABCLayer(NRBC, MeasureError):
         wave.forward_solve()
 
         # Saving reference signal
-        output_file = self.abc_boundary_layer_type.value + "_ref.npy"
-
+        output_file = self.abc_boundary_layer_type.value + "_ref"
         self.save_reference_signal(
             wave.receiver_locations, wave.forward_solution_receivers,
             wave.number_of_receivers, self.freq_Nyquist, output_file=output_file)
