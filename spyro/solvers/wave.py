@@ -194,32 +194,21 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 and self.automated_adjoint is not None
                 and self.automated_adjoint.controls is None
             ):
-                if self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
-                    controls = (
-                        self.c if self.c is not None
-                        else self.initial_velocity_model
-                    )
-                elif self.wave_type == WaveType.ISOTROPIC_ELASTIC:
-                    if (
-                        self.rho is not None
-                        and self.lmbda is not None
-                        and self.mu is not None
-                    ):
-                        controls = [self.rho, self.lmbda, self.mu]
-                    else:
-                        raise ValueError(
-                            "For elastic wave, must provide "
-                            "{rho, lambda, mu} as scalars or Functions to "
-                            "use automated adjoint."
-                        )
+                # Only the elastic path gets here: enable_automated_adjoint
+                # already installs the acoustic control (self.c).
+                if (
+                    self.rho is not None
+                    and self.lmbda is not None
+                    and self.mu is not None
+                ):
+                    self.automated_adjoint.controls = [
+                        self.rho, self.lmbda, self.mu,
+                    ]
                 else:
                     raise ValueError(
-                        "Unsupported wave type for automated adjoint. "
-                        "Supported types are: "
-                        f"{WaveType.ISOTROPIC_ACOUSTIC} and "
-                        f"{WaveType.ISOTROPIC_ELASTIC}."
+                        "For elastic wave, must provide {rho, lambda, mu} as "
+                        "scalars or Functions to use automated adjoint."
                     )
-                self.automated_adjoint.controls = controls
         self.matrix_building()
         self.wave_propagator()
 
