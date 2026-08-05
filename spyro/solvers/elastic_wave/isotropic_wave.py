@@ -1,15 +1,14 @@
 import numpy as np
 
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
-                       FunctionSpace, project, VectorFunctionSpace)
+                       project)
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
-from ...utils.typing import (ElasticMaterialParameter,
-                             ElasticMaterialParameterization, override,
-                             WaveType)
+from ...utils.typing import (ElasticMaterialParameter, ElasticMaterialParameterization,
+                             AbsorbingBCsType, override)
 from ...domains.space import create_function_space
 
 
@@ -53,7 +52,6 @@ class IsotropicWave(ElasticWave):
 
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
-        self.wave_type = WaveType.ISOTROPIC_ELASTIC
         self.rho = None   # Density
         self.lmbda = None  # First Lame parameter
         self.mu = None    # Second Lame parameter
@@ -232,7 +230,7 @@ class IsotropicWave(ElasticWave):
 
     @override
     def get_forward_solution_receivers(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_type == AbsorbingBCsType.PML:
             raise NotImplementedError
         else:
             data_with_halos = self.u_n.dat.data_ro_with_halos[:]
@@ -496,7 +494,7 @@ class IsotropicWave(ElasticWave):
         if abc_dict is not None:
             abc_active = abc_dict.get("status", False)
             if abc_active:
-                dt_scheme = abc_dict.get("local", {}).get("dt_scheme", None)
+                dt_scheme = abc_dict.get("nrbc", {}).get("dt_scheme", None)
                 if dt_scheme == "backward_2nd":
                     self.u_nm2 = Function(self.function_space,
                                           name=self.get_function_name())
@@ -507,21 +505,20 @@ class IsotropicWave(ElasticWave):
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
 
-        if self.abc_boundary_layer_type is None or \
-                self.abc_boundary_layer_type == "local":
+        if self.abc_type in [AbsorbingBCsType.NRBC, AbsorbingBCsType.NOABCS]:
             isotropic_elastic_without_pml(self)
-        elif self.abc_boundary_layer_type == "PML":
+        elif self.abc_type == AbsorbingBCsType.PML:
             isotropic_elastic_with_pml(self)
 
     @override
     def rhs_no_pml(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_type == AbsorbingBCsType.PML:
             raise NotImplementedError
         else:
             return self.B
 
     def rhs_no_pml_source(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.abc_type == AbsorbingBCsType.PML:
             raise NotImplementedError
         else:
             return self.source_function
@@ -559,7 +556,7 @@ class IsotropicWave(ElasticWave):
 
     def update_p_wave(self):
         if self.p_wave is None:
-            self.D_h = FunctionSpace(self.mesh, "DG", 0)
+            self.D_h = create_function_space(self.mesh, "DG0", 0)
             self.p_wave = Function(self.D_h)
 
         self.p_wave.assign(project(div(self.get_function()), self.D_h))
@@ -569,9 +566,10 @@ class IsotropicWave(ElasticWave):
     def update_s_wave(self):
         if self.s_wave is None:
             if self.dimension == 2:
-                self.C_h = FunctionSpace(self.mesh, "DG", 0)
+                self.C_h = create_function_space(self.mesh, "DG0", 0)
             else:
-                self.C_h = VectorFunctionSpace(self.mesh, "DG", 0)
+                self.C_h = create_function_space(self.mesh, "DG0", 0,
+                                                 dim=self.dimension)
             self.s_wave = Function(self.C_h)
 
         self.s_wave.assign(project(curl(self.get_function()), self.C_h))

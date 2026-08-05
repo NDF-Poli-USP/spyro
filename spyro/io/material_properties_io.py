@@ -5,10 +5,10 @@ import firedrake as fire
 from numpy import log10, ones
 from numpy.random import uniform
 
-from .basicio import interpolate
+from .interpolators import interpolate
 from ..utils import error_management
 from ..utils import eval_functions_to_ufl
-from ..domains.space import check_function_space_type
+from ..domains.space import check_function_space_type, create_function_space
 
 try:
     from SeismicMesh import write_velocity_model
@@ -43,10 +43,8 @@ def define_property_function_space(wave, func_space_type, dg_property,
 
     # Checking input arguments
     opts_func_space_type = ["scalar", "vector", "tensor"]
-    if func_space_type not in opts_func_space_type:
-        error_management.value_parameter_error("func_space_type",
-                                               func_space_type,
-                                               opts_func_space_type)
+    error_management.value_parameter_error("func_space_type", func_space_type,
+                                           opts_func_space_type)
 
     if dg_property is False and func_space_type == "scalar":
         return point_to_scalar_wave_function_space(wave)
@@ -125,11 +123,11 @@ def _initialize_material_property_from_ufl(wave, property_name,
     if expression is not None:
         print(f"Assigning {property_name} with an expression "
               f"field given by f = {expression} ", flush=True)
-        ufl_input = eval_functions_to_ufl.generate_ufl_functions(
-            wave.mesh, expression, wave.dimension)
+        ufl_input = eval_functions_to_ufl.generate_ufl_functions(wave.mesh,
+                                                                 expression,
+                                                                 wave.dimension)
 
-    mat_property = fire.Function(
-        V, name=property_name).interpolate(ufl_input)
+    mat_property = fire.Function(V, name=property_name).interpolate(ufl_input)
 
     return mat_property
 
@@ -233,10 +231,15 @@ def _initialize_material_property_from_file(wave, property_name, from_file, V):
     element_family = V.ufl_element().family()
     element_degree = V.ufl_element().degree()
 
-    print(f"Assigning {property_name} from file {from_file}",
+    source_label = from_file if isinstance(from_file, str) else "grid velocity data"
+    print(f"Assigning {property_name} from {source_label}",
           ("in the same" if element_family == original_family
            and element_degree == original_degree else "in another"),
           f"function space: {element_family} {element_degree}.", flush=True)
+
+    if isinstance(from_file, dict):
+        mat_property = interpolate(wave, from_file, V)
+        return mat_property
 
     if from_file.endswith(".segy"):
         if not SEISMIC_MESH_AVAILABLE:
@@ -451,7 +454,8 @@ def point_to_scalar_wave_function_space(wave):
     elif original_function_space_type == "vector":
         vector_element = wave.function_space.ufl_element()
         element = vector_element.sub_elements[0]
-        wave.scalar_function_space = fire.FunctionSpace(wave.function_space.mesh(), element)
+        wave.scalar_function_space = create_function_space(
+            wave.function_space.mesh(), element)
         return wave.scalar_function_space
     else:
         raise ValueError(f"Should not create a new FunctionSpace from {original_function_space_type}")
@@ -463,7 +467,8 @@ def point_to_vector_wave_function_space(wave):
     if wave.vector_function_space is not None:
         return wave.vector_function_space
     elif original_function_space_type == "scalar":
-        wave.vector_function_space = fire.VectorFunctionSpace(wave.function_space.mesh(), wave.function_space.ufl_element())
+        wave.vector_function_space = fire.VectorFunctionSpace(
+            wave.function_space.mesh(), wave.function_space.ufl_element())
         return wave.vector_function_space
     else:
         raise ValueError(f"Should not create a new VectorFunctionSpace from {original_function_space_type}")
@@ -473,7 +478,8 @@ def point_to_dg_scalar_wave_function_space(wave):
     if wave.dg0_scalar_function_space is not None:
         return wave.dg0_scalar_function_space
     else:
-        wave.dg0_scalar_function_space = fire.FunctionSpace(wave.function_space.mesh(), "DG", 0)
+        wave.dg0_scalar_function_space = create_function_space(
+            wave.function_space.mesh(), "DG0", 0)
         return wave.dg0_scalar_function_space
 
 
@@ -481,7 +487,8 @@ def point_to_dg_vector_wave_function_space(wave):
     if wave.dg0_vector_function_space is not None:
         return wave.dg0_vector_function_space
     else:
-        wave.dg0_vector_function_space = fire.VectorFunctionSpace(wave.function_space.mesh(), "DG", 0)
+        wave.dg0_vector_function_space = fire.VectorFunctionSpace(
+            wave.function_space.mesh(), "DG", 0)
         return wave.dg0_vector_function_space
 
 
@@ -549,3 +556,14 @@ def set_tensor_function_space(wave, shape_func_space, is_dg):
             shape=shape_func_space,
         )
         return V
+
+
+class VelocityModelFileIO:
+    def __init__(self):
+        """
+        Initialize VelocityModelFileIO.
+        """
+        self.velocity_model_file = None
+        if self.input_dictionary is not None:
+            synthetic_data = self.input_dictionary.get("synthetic_data", {})
+            self.initial_velocity_model_file = synthetic_data.get("real_velocity_file")

@@ -224,12 +224,12 @@ class Dictionary_conversion:
         """
         old_dictionary = self.old_dictionary["BCs"]
         if old_dictionary["status"]:
-            damping_type = "PML"
+            abc_type = "PML"
         else:
-            damping_type = None
+            abc_type = None
         self.new_dictionary["absorving_boundary_conditions"] = {
             "status": old_dictionary["status"],
-            "damping_type": damping_type,
+            "abc_type": abc_type,
             "exponent": old_dictionary["exponent"],
             "cmax": old_dictionary["cmax"],
             "R": old_dictionary["R"],

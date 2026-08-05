@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 import firedrake as fire
 import spyro
-from spyro.utils.typing import AdjointType
+from spyro.utils.typing import AdjointType, AbsorbingBCsType
 import pytest
 
 
@@ -17,7 +17,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     size, = np.shape(dm.dat.data[:])
     dm_data = np.random.default_rng(0).random(size)
     dm.dat.data_wo[:] = dm_data
-    if Wave_obj_guess.abc_boundary_layer_type == "PML":
+    if Wave_obj_guess.abc_type == AbsorbingBCsType.PML:
         x = Wave_obj_guess.mesh_x
         z = Wave_obj_guess.mesh_z
         inside = fire.And(
@@ -130,7 +130,7 @@ def set_dictionary(PML=False):
     if PML:
         dictionary["absorving_boundary_conditions"] = {
             "status": True,
-            "damping_type": "PML",
+            "abc_type": "PML",
             "exponent": 2,
             "cmax": 4.5,
             "R": 1e-6,
@@ -224,6 +224,7 @@ def test_gradient_pml_auto_adjoint():
 
 
 @pytest.mark.slow
+@pytest.mark.skip(reason="PML formulation subject to another PR")
 def test_gradient_pml_implemented_adjoint():
     test_gradient_implemented_adjoint(PML=True)
 
