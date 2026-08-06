@@ -159,10 +159,10 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
         pad_length, eta_crt, aq, bq = damp_par
 
         validate_numeric("pad_length", pad_length, float_num=True,
-                              integer_num=True, lower_bound=0.)
+                         integer_num=True, lower_bound=0.)
 
         validate_numeric("eta_crt", eta_crt, float_num=True,
-                              integer_num=False, lower_bound=0.)
+                         integer_num=False, lower_bound=0.)
 
         # Reference distance to the original boundary
         ref_funct = fire_sqrt(ref_funct) / pad_length

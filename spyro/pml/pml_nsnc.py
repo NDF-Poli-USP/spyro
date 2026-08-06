@@ -116,7 +116,7 @@ class PMLLayer(ABCLayer):
 
         # Type of boundary condition to apply on the PML boundaries
         self.bc_boundary_pml = validate_enum('bc_boundary_pml', bc_boundary_pml,
-                                                    BoundaryConditionsType)
+                                             BoundaryConditionsType)
 
     def calc_pml_damping(self, abc_pml_R, abc_pml_cmax, abc_pad_length,
                          degree_prof=2, CR_min=1e-8, CR_max=1e-3):

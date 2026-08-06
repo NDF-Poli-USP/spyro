@@ -227,12 +227,12 @@ class ABCLayer(NRBC, MeasureError):
                                                   expected_length=dimension)
         # Source frequency
         self.frequency = validate_numeric("frequency", frequency,
-                                               float_num=True, integer_num=True,
-                                               lower_bound=0., accept_parameter_as_none=True)
+                                          float_num=True, integer_num=True,
+                                          lower_bound=0., accept_parameter_as_none=True)
 
         # Timestep for the transient simulation
         self.dt = validate_numeric("dt", dt, float_num=True, integer_num=True,
-                                        lower_bound=0., accept_parameter_as_none=True)
+                                   lower_bound=0., accept_parameter_as_none=True)
 
         # Nyquist frequency
         self.freq_Nyquist = None if self.dt is None else 1. / (2. * self.dt)
@@ -245,29 +245,29 @@ class ABCLayer(NRBC, MeasureError):
 
         # ABC layer parameters
         self.abc_boundary_layer_type = validate_enum("abc_boundary_layer_type",
-                                                            abc_boundary_layer_type,
-                                                            AbsorbingBCsType)
+                                                     abc_boundary_layer_type,
+                                                     AbsorbingBCsType)
         if abc_boundary_layer_type not in [AbsorbingBCsType.HYBRID, AbsorbingBCsType.PML]:
             validate_parameter("abc_boundary_layer_type", abc_boundary_layer_type,
-                                  [AbsorbingBCsType.HYBRID, AbsorbingBCsType.PML])
+                               [AbsorbingBCsType.HYBRID, AbsorbingBCsType.PML])
 
         self.abc_boundary_layer_shape = validate_enum("abc_boundary_layer_shape",
-                                                             abc_boundary_layer_shape,
-                                                             LayerShapeType)
+                                                      abc_boundary_layer_shape,
+                                                      LayerShapeType)
         self.abc_reference_freq = validate_enum("abc_reference_freq",
-                                                       abc_reference_freq,
-                                                       LayerSizeRefFrequency)
+                                                abc_reference_freq,
+                                                LayerSizeRefFrequency)
         self.abc_degree_type = validate_enum("abc_degree_type", abc_degree_type,
-                                                    HyperLayerDegreeType)
+                                             HyperLayerDegreeType)
 
         # Layer degree
         if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
             self.abc_deg_layer = None
         elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
             self.abc_deg_layer = validate_numeric('abc_deg_layer', abc_deg_layer,
-                                                       float_num=True, integer_num=True,
-                                                       lower_bound=2.,
-                                                       include_lower_bound=True)
+                                                  float_num=True, integer_num=True,
+                                                  lower_bound=2.,
+                                                  include_lower_bound=True)
 
         # Communicator MPI
         self.comm = comm
@@ -871,9 +871,9 @@ class ABCLayer(NRBC, MeasureError):
 
         # Cheking input parameters
         validate_numeric("max_divisor_tf", max_divisor_tf,
-                              float_num=False, integer_num=True, lower_bound=0.)
+                         float_num=False, integer_num=True, lower_bound=0.)
         validate_numeric("mag_add", mag_add, float_num=False, integer_num=True,
-                              lower_bound=0., include_lower_bound=True)
+                         lower_bound=0., include_lower_bound=True)
 
         pprint("\nChecking Timestep Size", comm=self.comm)
 
@@ -937,13 +937,13 @@ class ABCLayer(NRBC, MeasureError):
 
         # Cheking input parameters
         validate_numeric("lmin", lmin, float_num=True,
-                              integer_num=True, lower_bound=0.)
+                         integer_num=True, lower_bound=0.)
         validate_numeric("c_bnd_max", c_bnd_max, float_num=True,
-                              integer_num=True, lower_bound=0.)
+                         integer_num=True, lower_bound=0.)
         validate_numeric("final_time", final_time, float_num=True,
-                              integer_num=True, lower_bound=0.)
+                         integer_num=True, lower_bound=0.)
         validate_data_structure("source_locations", source_locations, "list",
-                                  expected_type_element="tuple", accept_parameter_as_none=True)
+                                expected_type_element="tuple", accept_parameter_as_none=True)
 
         # Size of the domain extension
         add_dom = c_bnd_max * final_time / 2.

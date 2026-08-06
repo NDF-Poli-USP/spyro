@@ -325,7 +325,7 @@ class Modal_Solver():
         validate_firedrake_parameter("V", V, "FunctionSpace")
         validate_data_structure("quad_rule", quad_rule, "dict", accept_parameter_as_none=True)
         validate_numeric("shift", shift, float_num=True, integer_num=True,
-                              lower_bound=0., include_lower_bound=True)
+                         lower_bound=0., include_lower_bound=True)
 
         # Get bilinear forms
         a, m = weak_forms(c, V, quad_rule=quad_rule)

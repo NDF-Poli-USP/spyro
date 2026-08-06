@@ -491,7 +491,7 @@ class Modal_Analytical_Solver():
         # Multiplicative fator by Dirichlet BCs
         if bc == "Dirichlet":
             validate_data_structure("fbc_dirichlet", fbc_dirichlet, "tuple",
-                                      expected_type_element=("float"), expected_length=2)
+                                    expected_type_element=("float"), expected_length=2)
             ratio_f_ell, ratio_f_rec, = fbc_dirichlet
             fr_ell *= ratio_f_ell
             fr_rec *= ratio_f_rec
@@ -543,9 +543,9 @@ class Modal_Analytical_Solver():
 
         # Check imput arguments
         validate_data_structure("dof_load", dof_load, "array",
-                                  expected_type_element=("int"))
+                                expected_type_element=("int"))
         validate_data_structure("amplitude_load", amplitude_load, "array",
-                                  expected_type_element=("float", "int"))
+                                expected_type_element=("float", "int"))
         validate_firedrake_parameter("V", V, "FunctionSpace")
 
         # Static load for model with absorbing layer
@@ -595,7 +595,7 @@ class Modal_Analytical_Solver():
         validate_data_structure("quad_rule", quad_rule, "dict", accept_parameter_as_none=True)
         validate_parameter("type_homog", type_homog, ["energy", "volume"])
         validate_firedrake_parameter("static_load_for_ceq", static_load_for_ceq,
-                             "Function", accept_parameter_as_none=True)
+                                     "Function", accept_parameter_as_none=True)
 
         # Integration measure
         dx = fire_dx(**quad_rule) if quad_rule else fire_dx(**{"degree": 0})
@@ -756,31 +756,31 @@ class Modal_Analytical_Solver():
 
         # Check the hypershape degree
         validate_numeric("n_hyp", n_hyp, float_num=True, integer_num=True,
-                              accept_parameter_as_none=True, lower_bound=2., include_lower_bound=True)
+                         accept_parameter_as_none=True, lower_bound=2., include_lower_bound=True)
         n_hyp = 330 if n_hyp is None else n_hyp
 
         # Check semi-axes type
         validate_data_structure("hyper_axes", hyper_axes, "tuple",
-                                  expected_type_element=("float", "int"),
-                                  expected_length=self.dimension)
+                                expected_type_element=("float", "int"),
+                                expected_length=self.dimension)
 
         # Check boundary condition type
         validate_parameter("bc", bc, ["Dirichlet", "Neumann"])
 
         # Check the homogeneous velocity from original model without absorbing layer
         validate_numeric("c_eqref", c_eqref, float_num=True, integer_num=True,
-                              accept_parameter_as_none=True, lower_bound=0.)
+                         accept_parameter_as_none=True, lower_bound=0.)
         c_eqref = c_eq if c_eqref is None else c_eqref
 
         # Check the parameters for fitting equivalent velocity regression.
         validate_data_structure("fitting_c", fitting_c, "tuple",
-                                  expected_type_element=("float", "int"),
-                                  expected_length=4)
+                                expected_type_element=("float", "int"),
+                                expected_length=4)
 
         # Check the cutting plane percent is between 0 and 1
         validate_numeric("cut_plane_percent", cut_plane_percent, float_num=True,
-                              integer_num=False, lower_bound=0., upper_bound=1.,
-                              include_lower_bound=True, include_upper_bound=True)
+                         integer_num=False, lower_bound=0., upper_bound=1.,
+                         include_lower_bound=True, include_upper_bound=True)
 
         a, b = hyper_axes[: 2]
         if self.dimension == 2:  # 2D

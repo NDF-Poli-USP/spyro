@@ -48,11 +48,11 @@ def generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
 
     # Check mesh limits
     min_coordinates = validate_data_structure("min_coordinates", mesh_limits[0], "array",
-                                                expected_type_element=("float", "int"),
-                                                expected_length=dimension)
+                                              expected_type_element=("float", "int"),
+                                              expected_length=dimension)
     max_coordinates = validate_data_structure("max_coordinates", mesh_limits[1], "array",
-                                                expected_type_element=("float", "int"),
-                                                expected_length=dimension)
+                                              expected_type_element=("float", "int"),
+                                              expected_length=dimension)
 
     # Minimum coordinates
     z_min, x_min = min_coordinates[:2]

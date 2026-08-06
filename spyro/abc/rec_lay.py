@@ -105,7 +105,7 @@ class RectangLayer():
 
         # Checking the pad length
         validate_numeric('pad_len', pad_len, float_num=True,
-                              integer_num=True, lower_bound=0.)
+                         integer_num=True, lower_bound=0.)
 
         # Rectangular semi-axes
         length_z, length_x = self.domain_dim[:2]
@@ -139,7 +139,7 @@ class RectangLayer():
 
         # Checking inputs
         validate_model_dimension(('domain_dim', 'domain_layer'),
-                                    (self.domain_dim, domain_layer), self.dimension)
+                                 (self.domain_dim, domain_layer), self.dimension)
 
         # Domain dimensions w/o layer
         length_z, length_x = self.domain_dim[:2]

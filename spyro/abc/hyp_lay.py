@@ -451,11 +451,11 @@ class HyperLayer():
 
         # Checking the pad length
         validate_numeric('pad_len', pad_len, float_num=True,
-                              integer_num=True, lower_bound=0.)
+                         integer_num=True, lower_bound=0.)
 
         # Checking the minimum mesh size
         validate_numeric('lmin', lmin, float_num=True,
-                              integer_num=True, lower_bound=0.)
+                         integer_num=True, lower_bound=0.)
 
         # Domain dimensions
         length_z, length_x = self.domain_dim[:2]
@@ -790,7 +790,7 @@ class HyperLayer():
 
         # Domain dimensions w/o layer
         validate_model_dimension(('domain_dim', 'domain_hyp'),
-                                    (self.domain_dim, domain_hyp), self.dimension)
+                                 (self.domain_dim, domain_hyp), self.dimension)
 
         # Defining the hypershape semi-axes
         self.define_hyperaxes(domain_hyp)

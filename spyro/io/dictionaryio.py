@@ -90,8 +90,11 @@ class Read_options:
         ]
 
         # Check if the provided value is in any of the accepted methods
-        validate_parameter("method", value, mlt_equivalents + sem_equivalents
-                              + dg_t_equivalents + dg_q_equivalents + ["CG", None])
+        validate_parameter(
+            "method",
+            value,
+            mlt_equivalents + sem_equivalents + dg_t_equivalents + dg_q_equivalents + ["CG", None],
+        )
 
         if value in mlt_equivalents:
             self._method = "mass_lumped_triangle"
@@ -177,9 +180,11 @@ class Read_options:
 
     @degree.setter
     def degree(self, value):
-        self._degree = validate_numeric('degree', value, float_num=False,
-                                             integer_num=True, lower_bound=0,
-                                             include_lower_bound=False,)
+        self._degree = validate_numeric(
+            'degree', value, float_num=False,
+            integer_num=True, lower_bound=0,
+            include_lower_bound=False,
+        )
 
     @property
     def dimension(self):
@@ -222,16 +227,18 @@ class Read_outputs:
         # Gradient output
         self.input_dictionary[v_str].setdefault("gradient_output", False)
         self.gradient_output = self.input_dictionary[v_str]["gradient_output"]
-        self.input_dictionary[v_str].setdefault("gradient_filename",
-                                                "results/gradient.pvd")
+        self.input_dictionary[v_str].setdefault(
+            "gradient_filename", "results/gradient.pvd",
+        )
         self.gradient_filename = self.input_dictionary[
             v_str]["gradient_filename"]
 
         # Adjoint output
         self.input_dictionary[v_str].setdefault("adjoint_output", False)
         self.adjoint_output = self.input_dictionary[v_str]["adjoint_output"]
-        self.input_dictionary[v_str].setdefault("adjoint_filename",
-                                                "results/adjoint.pvd")
+        self.input_dictionary[v_str].setdefault(
+            "adjoint_filename", "results/adjoint.pvd",
+        )
         self.adjoint_filename = self.input_dictionary[
             v_str]["adjoint_filename"]
 

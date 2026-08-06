@@ -43,7 +43,7 @@ def coeff_of_determination(y_true, y_pred, p):
 
     # Checking predictors
     validate_numeric('p', p, float_num=False, integer_num=True,
-                          lower_bound=0., include_lower_bound=True)
+                     lower_bound=0., include_lower_bound=True)
 
     # Observations
     n = len(y_true)

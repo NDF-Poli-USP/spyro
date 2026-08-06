@@ -249,8 +249,8 @@ class NRBC():
 
         # Check if the non-reflective BC type is valid
         self.nrbc = validate_parameter('non_reflect_bc', non_reflect_bc,
-                                          [BoundaryConditionsType.HIGDON,
-                                           BoundaryConditionsType.SOMMERFELD])
+                                       [BoundaryConditionsType.HIGDON,
+                                        BoundaryConditionsType.SOMMERFELD])
 
         pprint(f"Creating Field for NRBC: {non_reflect_bc.value}", comm=self.comm)
 

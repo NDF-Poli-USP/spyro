@@ -121,7 +121,7 @@ class Eikonal_Modeling():
         # Finite element type.
         allowed_ele_types = ['consistent', 'underintegrated']
         self.ele_type_eik = validate_parameter('ele_type_eik', ele_type_eik,
-                                                  allowed_ele_types)
+                                               allowed_ele_types)
 
         # Finite element order for the Eikonal analysis
         self.degree_eik = degree_eik if degree_eik is not None else \
