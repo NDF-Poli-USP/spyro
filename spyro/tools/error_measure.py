@@ -2,8 +2,8 @@ from os import getcwd
 from numpy import concatenate, inf, load, save, savetxt, trapezoid, zeros
 from scipy.signal import find_peaks
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import (type_data_structure_error, value_numerical_error,
-                                      value_string_error)
+from ..utils.error_management import (type_data_structure_error, value_file_error,
+                                      value_numerical_error, value_string_error)
 from ..utils.freq_tools import freq_response
 # from ..plots.plots_habc import plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
 # from ..utils.error_management import value_parameter_error
@@ -38,7 +38,6 @@ class MeasureError():
         Acquire the reference signal to compare with the HABC scheme
     save_reference_signal()
         Save the reference signal for the HABC scheme
-
     comparison_plots()
         Plot the comparison between the HABC scheme and the reference model
     get_xCR_candidates()
@@ -158,10 +157,14 @@ class MeasureError():
         pth_str = self.path_reference + self.output_file + "_"
 
         # Time domain signal
-        receivers_reference = load(pth_str + "time.npy")
+        receivers_reference_file = value_file_error(pth_str + "time.npy",
+                                                    check_file_existance=True)
+        receivers_reference = load(receivers_reference_file)
 
         # Frequency domain signal
-        receivers_ref_fft = load(pth_str + "fft.npy").T
+        receivers_reference_fft_file = value_file_error(pth_str + "fft.npy",
+                                                        check_file_existance=True)
+        receivers_ref_fft = load(receivers_reference_fft_file).T
 
         return receivers_reference, receivers_ref_fft
 
