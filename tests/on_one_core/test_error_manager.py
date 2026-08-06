@@ -1,5 +1,5 @@
 """"Unit tests for the error utilities implemented in spyro.utils.modal.error_management."""
-from pytest import fail, raises
+from pytest import fail, raises, mark
 from firedrake import Function, FunctionSpace, Mesh
 from firedrake.functionspaceimpl import WithGeometry
 from numpy import array, inf, nan
@@ -64,7 +64,7 @@ class TestMutuallyExclusiveParameterError:
             mutually_exclusive_parameter_error(parameter_names, parameter_values)
 
         error_msg = str(exc_info.value)
-        assert "Parameters 'param1' and 'param2' mutually exclusive" in error_msg
+        assert "Parameters 'param1' and 'param2' are mutually exclusive" in error_msg
         assert ("Please specify only one of these parameters: "
                 "'param1', 'param2' or 'param3'") in error_msg
 
@@ -99,7 +99,7 @@ class TestMutuallyExclusiveParameterError:
             mutually_exclusive_parameter_error(parameter_names, parameter_values)
 
         error_msg = str(exc_info.value)
-        assert "Parameters 'param1', 'param2' and 'param3' mutually exclusive" in error_msg
+        assert "Parameters 'param1', 'param2' and 'param3' are mutually exclusive" in error_msg
 
 
 class TestValueModelDimensionError:
@@ -739,26 +739,21 @@ class TestValueFileError:
         result = validate_file("test_param", "file.txt", [".txt", ".csv"])
         assert result == "file.txt"
 
-    def test_valid_file_extension_lowercase(self):
-        """Test with lowercase file extension."""
-        result = validate_file("test_param", "file.txt", [".txt", ".csv"])
-        assert result == "file.txt"
-
-    def test_valid_file_extension_uppercase(self):
-        """Test with uppercase file extension."""
-        result = validate_file("test_param", "file.TXT", [".TXT", ".csv"])
-        assert result == "file.TXT"
-
-    def test_valid_file_extension_case_sensitive_fail(self):
-        """Test that case-sensitive extension matching fails."""
-        with raises(ValueError) as exc_info:
-            validate_file("test_param", "file.TXT", [".txt", ".csv"])
-        assert "extension_type" in str(exc_info.value)
-
-    def test_valid_file_extension_mixed_case(self):
-        """Test with mixed case file extension."""
-        result = validate_file("test_param", "file.TxT", [".TxT", ".csv"])
-        assert result == "file.TxT"
+    @mark.parametrize(
+        "filename",
+        [
+            "file.txt",
+            "file.TXT",
+            "file.TxT",
+            "file.tXt",
+        ],
+    )
+    def test_validate_file_case_insensitive(filename):
+        assert validate_file(
+            "file",
+            filename,
+            [".txt", ".csv"],
+        ) == filename
 
     def test_invalid_file_extension(self):
         """Test with invalid file extension."""

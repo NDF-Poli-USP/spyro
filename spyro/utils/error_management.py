@@ -38,7 +38,7 @@ def validate_parameter(parameter_name, parameter_value, valid_values):
     if parameter_value not in valid_values:
         raise ValueError(
             f"Invalid {parameter_name}: '{parameter_value}'. "
-            f"Please use {_join_options(valid_values)}."
+            f"Please use: {_join_options(valid_values)}."
         )
 
     return parameter_value
