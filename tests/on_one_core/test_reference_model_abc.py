@@ -153,21 +153,25 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length = 0.1 if dimension == 2 else 0.15
+    edge_length = 0.2
 
     # f_est: Factor for the stabilizing term in Eikonal equation
     # fitting_c: Parameters for fitting equivalent velocity regression
     if dimension == 2:
-        f_est = 0.06 if element_geometry == "T" else 0.05
+        f_est = 0.06 if element_geometry == "T" else 0.49
 
     if dimension == 3:
         f_est = 0.05 if element_geometry == "T" else 0.07
 
     # Timestep size (in seconds). Initial guess: edge_length / 100
-    dt_usu = 0.00100 if dimension == 2 else 0.00150
+    if dimension == 2:
+        dt_usu = 0.00250 if element_geometry == "T" else 0.00320
+
+    if dimension == 3:
+        dt_usu = 0.00400 if element_geometry == "T" else 0.00500
 
     # Maximum divisor of the final time
-    max_divisor_tf = 3 if dimension == 2 else 7
+    max_divisor_tf = 4
 
     # Get simulation parameters
     pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
@@ -207,10 +211,10 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
 @mark.parametrize("element_geometry, dimension, calc_eik", [
     ("T", 2, True),
     ("Q", 2, True),
-    ("T", 3, True),
-    ("Q", 3, True),
     ("T", 2, False),
     ("Q", 2, False),
+    ("T", 3, True),
+    ("Q", 3, True),
     ("T", 3, False),
     ("Q", 3, False)])
 def test_infinite_model_abc(element_geometry, dimension, calc_eik):
@@ -235,33 +239,45 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
     None
 
     ==============================
-    Eikonal for 2D model Δx = 100m
+    Eikonal for 2D model Δx = 200m
     ==============================
     eik_min = 83.333 ms
 
     f_est  T-ele   Q-ele
-     0.01 66.836  65.002
-     0.02 73.308  75.811
-     0.03 77.178  79.845
-     0.04 79.680  82.101
-     0.05 81.498  83.744*
-     0.06 82.942* 85.118
-     0.07 84.160  86.345
-     0.08 85.233  87.480
+     0.03 61.030  69.624
+     0.04 67.176  69.783
+     0.05 67.369  69.985
+     0.06 67.392* 70.200
+     0.07 67.356  70.405
+     0.08 67.287  70.588
+     0.09 67.192  70.744
+     0.10 67.076  70.871
+     0.20  --/--  71.201
+     0.30  --/--  71.204
+     0.40  --/--  71.298
+     0.47  --/--  71.343
+     0.48  --/--  71.345
+     0.49  --/--  71.346*
+     0.50  --/--  71.345
+     0.51  --/--  71.343
+     0.52  --/--  71.340
+     0.53  --/--  71.335
+     0.54  --/--  71.328
+     0.55  --/--  71.320
+     0.60  --/--  71.225
 
     ==============================
-    Eikonal for 3D model Δx = 150m
+    Eikonal for 3D model Δx = 200m
     ==============================
     eik_min = 83.333 ms
 
     f_est  T-ele   Q-ele
-     0.02  --/--  69.442
-     0.03 76.777  70.974
-     0.04 79.409  73.179
-     0.05 82.273* 75.766
-     0.06 85.347  78.548
-     0.07 88.562  81.431*
-     0.08 91.876  84.377
+     0.03 75.742   --/--
+     0.04 79.075   --/--
+     0.05 82.037* 79.259
+     0.06 85.005  81.807
+     0.07 88.033  84.542*
+     0.08 91.126  87.421
     """
 
     act_eik = "Activated" if calc_eik else "Deactivated"
@@ -290,7 +306,7 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
                                                  abc_type, calc_eik)
 
             # Computing reference get_reference_signal
-            wave.layer_ops.infinite_model(wave, check_dt=calc_eik,
+            wave.layer_ops.infinite_model(wave, check_dt=True,
                                           max_divisor_tf=max_divisor_tf)
 
             receivers_reference, receivers_ref_fft = wave.layer_ops.get_reference_signal()
