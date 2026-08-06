@@ -164,25 +164,24 @@ class IsotropicWave(ElasticWave):
 
             Returns
             -------
-            firedrake.Constant, firedrake.Function, or object
+            firedrake.Function or object
                 Scalars and ``Constant`` values are converted to scalar
-                material ``Function`` objects once a mesh exists. Before mesh
-                creation, scalar values remain as ``Constant`` values so the
-                regular model initialization flow can continue.
+                material ``Function`` objects through ``set_material_property``,
+                so material parameters are never stored as ``Constant``.
 
             Examples
             --------
-            ``density=1.0`` becomes ``Constant(1.0)`` before the mesh exists,
-            and becomes a scalar material ``Function`` after the mesh has been
-            created.
+            ``density=1.0`` becomes a scalar material ``Function``.
             """
             if np.isscalar(value) or isinstance(value, Constant):
-                if self.mesh is None:
+                # set_material_property resolves the material space from
+                # wave.function_space, which does not exist yet when the model
+                # is initialized straight from the input dictionary. Only the
+                # unified material schema (step 3) removes this ordering
+                # constraint; until then the Constant fallback is required.
+                if self.function_space is None:
                     return Constant(value) if np.isscalar(value) else value
-                V = create_function_space(
-                    self.mesh, self.method, self.degree, dim=1,
-                )
-                return Function(V).interpolate(value)
+                return self._as_control_field(value, "material_parameter")
             return value
 
         def get_value(parameter, *aliases):
@@ -354,16 +353,17 @@ class IsotropicWave(ElasticWave):
         if value is None:
             return None
 
-        V = self.get_control_parameter_function_space()
-        field = Function(V, name=name)
+        # Single field-construction engine: set_material_property. Every branch
+        # below returns a Function, so controls are never stored as Constant.
         if isinstance(value, Function):
-            if value.function_space() == V:
-                field.assign(value)
-            else:
-                field.interpolate(value)
-        else:
-            field.interpolate(value)
-        return field
+            # copy=True keeps the caller's Function independent of the control.
+            return self.set_material_property(
+                name, "scalar", fire_function=value, copy=True,
+            )
+        if np.isscalar(value):
+            return self.set_material_property(name, "scalar", constant=value)
+        # Firedrake Constant or UFL expression: interpolated as a UFL input.
+        return self.set_material_property(name, "scalar", conditional=value)
 
     def get_control_parameters(self):
         """Return the active isotropic elastic material controls.

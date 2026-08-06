@@ -133,7 +133,7 @@ def _initialize_material_property_from_ufl(wave, property_name,
 
 
 def _initialize_material_property_from_func(wave, property_name,
-                                            fire_function, V):
+                                            fire_function, V, copy=False):
     """
     Initialize material property from a firedrake function.
 
@@ -145,6 +145,10 @@ def _initialize_material_property_from_func(wave, property_name,
         Firedrake function based on the input object
     V: `firedrake function space`
         Function space for the material property
+    copy: `bool`, optional
+        If True, always returns an independent copy so the caller keeps
+        ownership of 'fire_function'. If False (default), a function already
+        in the target space is adopted and renamed in place. Default is False
 
     Returns:
     --------
@@ -164,8 +168,13 @@ def _initialize_material_property_from_func(wave, property_name,
 
     if element_family == original_family and element_degree == original_degree:
         # Same function space
-        mat_property = fire_function
-        mat_property.rename(property_name)
+        if copy:
+            # Independent copy: the caller keeps ownership of 'fire_function'
+            mat_property = fire.Function(V, name=property_name)
+            mat_property.assign(fire_function)
+        else:
+            mat_property = fire_function
+            mat_property.rename(property_name)
 
     else:  # Different function space
         mat_property = fire.Function(
@@ -207,7 +216,8 @@ def _initialize_random_material_prop(property_name, random, V):
     return mat_property
 
 
-def _initialize_material_property_from_file(wave, property_name, from_file, V):
+def _initialize_material_property_from_file(wave, property_name, from_file, V,
+                                            fast_interpolate=False):
     """
     Initialize material property from a file.
 
@@ -215,10 +225,13 @@ def _initialize_material_property_from_file(wave, property_name, from_file, V):
     -----------
     property_name: `str`
         Name of the material property to be set.
-    from_file: `str`
-        Name of the file containing the material property
+    from_file: `str` or `dict`
+        Name of the file containing the material property (``*.segy``,
+        ``*.hdf5`` or ``*.h5``), or a grid data dictionary.
     V: `firedrake function space`
         Function space for the material property
+    fast_interpolate: `bool`, optional
+        If True, uses the faster interpolation path. Default is False
 
     Returns:
     --------
@@ -238,8 +251,8 @@ def _initialize_material_property_from_file(wave, property_name, from_file, V):
           f"function space: {element_family} {element_degree}.", flush=True)
 
     if isinstance(from_file, dict):
-        mat_property = interpolate(wave, from_file, V)
-        return mat_property
+        return interpolate(wave, from_file, V,
+                           fast_interpolate=fast_interpolate)
 
     if from_file.endswith(".segy"):
         if not SEISMIC_MESH_AVAILABLE:
@@ -251,10 +264,12 @@ def _initialize_material_property_from_file(wave, property_name, from_file, V):
         write_velocity_model(from_file, ofname=mp_filename)
         from_file = mp_filename + ".hdf5"
 
-    if from_file.endswith((".hdf5", ".h5")):
-        mat_property = interpolate(wave, from_file, V)
+    if not from_file.endswith((".hdf5", ".h5")):
+        raise ValueError(
+            f"Cannot initialize {property_name} from {from_file!r}: expected a "
+            "'*.segy', '*.hdf5' or '*.h5' file, or a grid data dictionary.")
 
-    return mat_property
+    return interpolate(wave, from_file, V, fast_interpolate=fast_interpolate)
 
 
 def _saving_property_to_file(wave, mat_property, property_name,
@@ -332,7 +347,8 @@ def set_material_property(wave, property_name, func_space_type,
                           conditional=None, expression=None,
                           random=None, fire_function=None,
                           from_file=None, dg_property=False,
-                          output=False, foldername="default"):
+                          output=False, foldername="default",
+                          fast_interpolate=False, copy=False):
     """
     Set a material property(e.g., density, etc.) in the model.
 
@@ -346,8 +362,9 @@ def set_material_property(wave, property_name, func_space_type,
     shape_func_space: `tuple`, optional
         Shape of the function space for only tensorial material property.
         Default is None
-    from_file: `str`, optional
-        Name of the file containing the material property. Default is None
+    from_file: `str` or `dict`, optional
+        Name of the file containing the material property (``*.segy``,
+        ``*.hdf5`` or ``*.h5``), or a grid data dictionary. Default is None
     constant: `float`, optional
         Constant value for the material property. Default is None
     conditional: `firedrake conditional`, optional
@@ -372,6 +389,13 @@ def set_material_property(wave, property_name, func_space_type,
     foldername: `string`, optional
         Name of the folder where the material property is saved.
         If default is 'default', property is saved in '/property_fields/'
+    fast_interpolate: `bool`, optional
+        If True, uses the faster interpolation path when reading a property
+        from a file or grid data. Only used with 'from_file'. Default is False
+    copy: `bool`, optional
+        If True, always returns an independent copy so the caller keeps
+        ownership of 'fire_function'. Only used with 'fire_function'.
+        Default is False
 
     Returns:
     -----------
@@ -406,14 +430,12 @@ def set_material_property(wave, property_name, func_space_type,
 
         if fire_function is not None:
             mat_property = _initialize_material_property_from_func(
-                wave, property_name, fire_function, V)
+                wave, property_name, fire_function, V, copy=copy)
 
         if from_file is not None:
-            raise NotImplementedError("Initializing property "
-                                      "from file is currently "
-                                      "not implemented")
-            # mat_property = _initialize_material_property_from_file(
-            #     wave, property_name, from_file, V)
+            mat_property = _initialize_material_property_from_file(
+                wave, property_name, from_file, V,
+                fast_interpolate=fast_interpolate)
 
     else:
 
@@ -432,7 +454,7 @@ def set_material_property(wave, property_name, func_space_type,
 
         if fire_function is not None:
             mat_property = _initialize_material_property_from_func(
-                wave, property_name, fire_function, V)
+                wave, property_name, fire_function, V, copy=copy)
 
     if output:
         _saving_property_to_file(wave, mat_property, property_name,

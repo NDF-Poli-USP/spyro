@@ -13,9 +13,10 @@ from firedrake import (as_tensor, assemble, conditional,
 from firedrake import exp as fire_exp
 from numpy import (abs, acos, all, allclose, atan2, cos, exp,
                    isclose, isin, log, pi, sqrt, sin, where)
-from pytest import fail, fixture, mark, raises
+from pytest import fail, fixture, mark, raises, skip
 from os import getcwd
 from spyro.io import create_segy
+from spyro.io.material_properties_io import SEISMIC_MESH_AVAILABLE
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 
 
@@ -678,18 +679,34 @@ def test_fromfile_mat_prop(wave_instance, cell_type):
     create_segy(dummy, wave.function_space.sub(0),
                 wave.mesh_parameters.edge_length, from_file_segy)
 
-    with raises(NotImplementedError) as exc_info:
-        vel_S = wave.set_material_property(   # noqa: F841
-            'vel_S', 'scalar', from_file=from_file_segy, output=True,
-            foldername='/property_fields/from_file/')
+    if not SEISMIC_MESH_AVAILABLE:
+        skip("SeismicMesh is required to convert segy files.")
 
-    # Verify the error message
-    expect_msg = "Initializing property from file is currently not implemented"
-    assert expect_msg in str(exc_info.value), \
+    vel_S = wave.set_material_property(
+        'vel_S', 'scalar', from_file=from_file_segy, output=True,
+        foldername='/property_fields/from_file/')
+
+    # The property read back from file must match the one written to it
+    assert allclose(vel_S.dat.data_with_halos,
+                    dummy.dat.data_with_halos, rtol=1e-2), \
+        "Material property read from file does not match the written one."
+
+    print("Material Property from file: Correctly loaded from "
+          f"{from_file_segy}", flush=True)
+
+
+@mark.parametrize("cell_type", ["T"])
+def test_fromfile_mat_prop_rejects_unknown_extension(wave_instance, cell_type):
+    """An unsupported file extension must raise a clear ValueError."""
+
+    wave = wave_instance
+
+    with raises(ValueError) as exc_info:
+        wave.set_material_property('vel_S', 'scalar',
+                                   from_file='velocity_model.txt')
+
+    assert "expected a" in str(exc_info.value), \
         f"Unexpected error message: {str(exc_info.value)}"
-
-    print("Material Property from file: Correctly raised "
-          f"NotImplementedError: {exc_info.value}", flush=True)
 
 
 @mark.parametrize("cell_type", ["T", "Q"])
