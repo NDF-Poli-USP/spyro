@@ -1,24 +1,24 @@
+"""Quadrature rule builders for supported finite-element families."""
+
 import FIAT
 import finat
 from firedrake import *  # noqa:F403
 
 
 def quadrature_rules(V):
-    """Quadrature rule - Gauss-Lobatto-Legendre, Gauss-Legendre and Equi
-    spaced, KMV
-
-    Parameters:
-    -----------
-    V: Firedrake FunctionSpace
+    """Select quadrature rules for supported element families.
+    Supports Gauss-Lobatto-Legendre, Gauss-Legendre, and KMV schemes.
+    Parameters
+    ----------
+    V : Firedrake FunctionSpace
         Function space to be used in the quadrature rule.
-
-    Returns:
-    --------
-    qr_x: FIAT quadrature rule
+    Returns
+    -------
+    qr_x : FIAT quadrature rule
         Quadrature rule for the spatial domain.
-    qr_s: FIAT quadrature rule
+    qr_s : FIAT quadrature rule
         Quadrature rule for the boundary of the spatial domain.
-    qr_k: FIAT quadrature rule
+    qr_k : FIAT quadrature rule
         Quadrature rule for the spatial domain stiffness matrix.
     """
     cell_geometry = V.mesh().ufl_cell()
