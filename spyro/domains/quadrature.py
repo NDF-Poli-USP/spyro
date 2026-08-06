@@ -76,7 +76,7 @@ def quadrature_rules(V):
 # Spectral method - Gauss-Lobatto-Legendre rule
 # 1D
 def gauss_lobatto_legendre_line_rule(degree):
-    """Returns GLL quad rule for a given degree in a line.
+    """Return GLL quad rule for a given degree in a line.
 
     Parameters
     ----------
