@@ -1,17 +1,19 @@
 """"Unit tests for the error utilities implemented in spyro.utils.modal.error_management."""
 from pytest import fail, raises
-from numpy import array, inf, nan
-from numpy.testing import assert_array_equal
-from enum import Enum
-from unittest.mock import Mock, patch
-from ufl.form import Form
 from firedrake import Function, FunctionSpace, Mesh
 from firedrake.functionspaceimpl import WithGeometry
+from numpy import array, inf, nan
+from numpy.testing import assert_array_equal
+from os import path
+from unittest.mock import Mock, patch
+from ufl.form import Form
 from ufl.geometry import SpatialCoordinate
+from enum import Enum
 from spyro.utils.error_management import (
     enum_parameter_error, mutually_exclusive_parameter_error, sanitize_num_array,
-    type_data_structure_error, type_firedrake_error, value_model_dimension_error,
-    value_numerical_error, value_parameter_error, value_string_error)
+    type_data_structure_error, type_firedrake_error, value_file_error,
+    value_model_dimension_error, value_numerical_error,
+    value_parameter_error, value_string_error)
 
 
 class ExampleEnum(Enum):
@@ -727,3 +729,88 @@ class TestTypeFiredrakeError:
         with raises(ValueError) as exc_info:
             type_firedrake_error("test_param", "anything", "Invalid")
         assert "Invalid expected_type: 'Invalid'" in str(exc_info.value)
+
+
+class TestValueFileError:
+    """Tests for type_firedrake_error function."""
+
+    def test_valid_file_extension(self):
+        """Test with valid file extension."""
+        result = value_file_error("test_param", "file.txt", [".txt", ".csv"])
+        assert result == "file.txt"
+
+    def test_valid_file_extension_lowercase(self):
+        """Test with lowercase file extension."""
+        result = value_file_error("test_param", "file.txt", [".txt", ".csv"])
+        assert result == "file.txt"
+
+    def test_valid_file_extension_uppercase(self):
+        """Test with uppercase file extension."""
+        result = value_file_error("test_param", "file.TXT", [".TXT", ".csv"])
+        assert result == "file.TXT"
+
+    def test_valid_file_extension_case_sensitive_fail(self):
+        """Test that case-sensitive extension matching fails."""
+        with raises(ValueError) as exc_info:
+            value_file_error("test_param", "file.TXT", [".txt", ".csv"])
+        assert "extension_type" in str(exc_info.value)
+
+    def test_valid_file_extension_mixed_case(self):
+        """Test with mixed case file extension."""
+        result = value_file_error("test_param", "file.TxT", [".TxT", ".csv"])
+        assert result == "file.TxT"
+
+    def test_invalid_file_extension(self):
+        """Test with invalid file extension."""
+        with raises(ValueError) as exc_info:
+            value_file_error("test_param", "file.pdf", [".txt", ".csv"])
+        assert "extension_type" in str(exc_info.value)
+
+    def test_none_not_allowed(self):
+        """Test with None value when none_default=False."""
+        with raises(TypeError) as exc_info:
+            value_file_error("test_param", None, [".txt"])
+        assert "'test_param' must be a string, got NoneType." in str(exc_info.value)
+
+    def test_none_allowed(self):
+        """Test with None value when none_default=True."""
+        result = value_file_error("test_param", None, [".txt"], none_default=True)
+        assert result is None
+
+    def test_non_string_value(self):
+        """Test with non-string value."""
+        with raises(TypeError) as exc_info:
+            value_file_error("test_param", 123, [".txt"])
+        assert "'test_param' must be a string, got int." in str(exc_info.value)
+
+    @patch('os.path.exists')
+    def test_file_exists(self, mock_exists):
+        """Test with file existence check when file exists."""
+        mock_exists.return_value = True
+        result = value_file_error("test_param", "file.txt", [".txt"], check_file_existance=True)
+        assert result == "file.txt"
+
+    @patch('os.path.exists')
+    def test_file_does_not_exist(self, mock_exists):
+        """Test with file existence check when file does not exist."""
+        mock_exists.return_value = False
+        with raises(FileNotFoundError) as exc_info:
+            value_file_error("test_param", "missing.txt", [".txt"], check_file_existance=True)
+        assert "does not exist" in str(exc_info.value)
+
+    def test_empty_string(self):
+        """Test with empty string value."""
+        with raises(ValueError) as exc_info:
+            value_file_error("test_param", "", [".txt"])
+        assert "extension_type" in str(exc_info.value)
+
+    def test_file_without_extension(self):
+        """Test with a file name that has no extension."""
+        with raises(ValueError) as exc_info:
+            value_file_error("test_param", "file", [".txt", ".csv"])
+        assert "extension_type" in str(exc_info.value)
+
+    def test_multiple_valid_extensions(self):
+        """Test with multiple valid extensions."""
+        result = value_file_error("data", "data.csv", [".txt", ".csv", ".json"])
+        assert result == "data.csv"

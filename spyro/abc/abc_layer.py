@@ -955,7 +955,8 @@ class ABCLayer(NRBC, MeasureError):
 
             str_pad += "Minimun Eikonal at Critical Boundary Points"
 
-            # If Eikonal analysis was performed
+            # If Eikonal analysis was performed (see `critical_boundary_points` method)
+            # Structure eikmin: [pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]
             eikmin = self.eik_bnd[0][2]
 
             # Minimum distance to the nearest boundary
@@ -965,19 +966,19 @@ class ABCLayer(NRBC, MeasureError):
             str_pad += "Minimum Distance Source-Boundary"
 
             # If Eikonal analysis was not performed
-            sou_loc = array(source_locations)
+            source_loc = array(source_locations)
 
             # Original  domain dimensions
             length_z, length_x = self.domain_dim[:2]
 
             # Candidate to minimum distance to the boundaries
-            delta_z = abs(sou_loc[:, 0] - length_z)
-            delta_x = minimum(abs(sou_loc[:, 1]), abs(sou_loc[:, 1] - length_x))
+            delta_z = abs(source_loc[:, 0] - length_z)
+            delta_x = minimum(abs(source_loc[:, 1]), abs(source_loc[:, 1] - length_x))
             cand_dist = (delta_z, delta_x)
 
             if self.dimension == 3:  # 3D
                 length_y = self.domain_dim[2]
-                delta_y = minimum(abs(sou_loc[:, 2]), abs(sou_loc[:, 2] - length_y))
+                delta_y = minimum(abs(source_loc[:, 2]), abs(source_loc[:, 2] - length_y))
                 cand_dist += (delta_y,)
 
             # Minimum distance to the nearest boundary

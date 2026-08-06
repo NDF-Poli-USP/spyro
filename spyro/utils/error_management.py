@@ -3,9 +3,10 @@
 This file contains methods for handling errors in Spyro, either to send
 messages to the user or to prevent numerical instability in objects."""
 
-from numpy import float32, float64, inf, int32, int64, isinf, isnan, ndarray
 from firedrake import Function, FunctionSpace, Mesh
 from firedrake.functionspaceimpl import WithGeometry
+from numpy import float32, float64, inf, int32, int64, isinf, isnan, ndarray
+from os import path
 from ufl.form import Form
 from ufl.geometry import SpatialCoordinate
 
@@ -503,5 +504,56 @@ def type_firedrake_error(par_name, par_value, expected_type, none_default=False)
             if len(expected_valid) > 1 else opt_str
         raise TypeError(f"'{par_name}' must be of type: {opt_str}, "
                         f"got {type(par_value).__name__}.")
+
+    return par_value
+
+
+def value_file_error(par_name, par_value, valid_extensions,
+                     none_default=False, check_file_existance=False):
+    """Validate a file parameter and raise a ValueError if invalid.
+
+    Parameters
+    ----------
+    par_name : `str`
+        Name of the parameter to be validated (used in error messages).
+    par_value : `str`
+        Value of the parameter to be validated.
+    valid_extensions : `list`
+        List of valid file extensions for the parameter.
+    none_default : `bool`, optional
+        If `True`, the parameter value is allowed to be validated as `None`.
+        Default is `False`, in which case `None` is not allowed.
+    check_file_existance : `bool`, optional
+        If `True`, we will check if the file existis. Default is `False`
+
+    Returns
+    -------
+    par_value : `str`
+        The validated file path or file name.
+
+    Raises
+    ------
+    TypeError
+        If the parameter value is not a `str`.
+    ValueError
+        If the file extension is not in the list of valid extensions.
+    FileNotFoundError
+        If the file does not exist and check_exists is True
+    """
+
+    par_value = value_string_error(par_name, par_value, none_default=none_default)
+
+    if par_value is None and none_default:
+        return par_value
+
+    # # Check for empty string
+    # if par_value == "":
+    #     raise ValueError(f"'{par_name}' cannot be an empty string.")
+
+    if not path.exists(par_value) and check_file_existance:
+        raise FileNotFoundError(f"'{par_name}' '{par_value}' does not exist")
+
+    file_extension = path.splitext(par_value)[1]
+    value_parameter_error("extension_type", file_extension, valid_extensions)
 
     return par_value

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 import spyro
-
+# from spyro.tools.error_measure import MeasureError
 # import matplotlib.pyplot as plt
 
 
@@ -53,6 +53,13 @@ def test_analytical_solution(use_vertex_only_mesh):
 
     nt = len(time_vector)
     error = error_calc(numerical_p, analytical_p, nt)
+
+    # import ipdb
+    # ipdb.set_trace()
+
+    # errPk = MeasureError().peak_error(numerical_p, analytical_p)[0]
+    # errIt = MeasureError().integral_error(numerical_p, analytical_p, wave.dt)
+
     vom_label = "VOM" if use_vertex_only_mesh else "NO VOM"
     print("Error ({}) = {:.4e}".format(vom_label, error))
 
