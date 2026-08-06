@@ -41,7 +41,7 @@ def test_analytical_solution(use_vertex_only_mesh):
     wave = spyro.examples.Rectangle_acoustic(
         dictionary=dictionary, periodic=True
     )
-    wave.set_initial_velocity_model(constant=c_value)
+    wave.initialize_model_parameters(constant=c_value)
     analytical_p = spyro.utils.nodal_homogeneous_analytical(
         wave, offset, c_value
     )

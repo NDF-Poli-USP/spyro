@@ -230,7 +230,7 @@ def test_gmsh_adaptation():
     }
 
     wave = spyro.AcousticWave(dictionary=dictionary)
-    wave.set_initial_velocity_model(conditional=cond)
+    wave.initialize_model_parameters(conditional=cond)
     spyro.plots.debug_pvd(wave.initial_velocity_model)
     # wave.forward_solve()
 

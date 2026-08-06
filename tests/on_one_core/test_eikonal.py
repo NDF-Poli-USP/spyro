@@ -136,7 +136,7 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
 
     # Initial velocity model
     cond = conditional(wave.mesh_x < 0.5, 3.0, 1.5)
-    wave.set_initial_velocity_model(conditional=cond)
+    wave.initialize_model_parameters(conditional=cond)
 
     # Preamble mesh operations
     wave.mesh_ops.preamble_mesh_operations(

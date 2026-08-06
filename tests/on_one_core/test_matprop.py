@@ -13,9 +13,8 @@ from firedrake import (as_tensor, assemble, conditional,
 from firedrake import exp as fire_exp
 from numpy import (abs, acos, all, allclose, atan2, cos, exp,
                    isclose, isin, log, pi, sqrt, sin, where)
-from pytest import fail, fixture, mark, raises
-from os import getcwd
-from spyro.io import create_segy
+from pytest import fail, fixture, mark
+from spyro.io import material_properties_io
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 
 
@@ -644,7 +643,7 @@ def test_function_mat_prop(wave_instance, cell_type):
 
 
 @mark.parametrize("cell_type", ["T", "Q"])
-def test_fromfile_mat_prop(wave_instance, cell_type):
+def test_fromfile_mat_prop(wave_instance, cell_type, monkeypatch):
     """Test to assign input files as material properties to an instance of Wave.
 
     Material properties:
@@ -667,29 +666,36 @@ def test_fromfile_mat_prop(wave_instance, cell_type):
     wave = wave_instance
 
     print("\nTesting Input Files as Material Properties", flush=True)
-    vel_P = wave.set_material_property(
-        'vel_P', 'scalar', constant=1., output=True,
-        foldername='/property_fields/from_file/')
+    expected = wave.set_material_property(
+        'vel_S', 'scalar', constant=0.5,
+    )
+    grid_data = {"mock": "grid-data"}
+    captured = {}
 
-    dummy = wave.set_material_property('dummy', 'scalar', constant=1.)
-    dummy.dat.data_with_halos[:] = vel_P.dat.data_with_halos[:] / 2.
+    def fake_interpolate(actual_wave, source, V, fast_interpolate=False):
+        captured["wave"] = actual_wave
+        captured["source"] = source
+        captured["function_space"] = V
+        captured["fast_interpolate"] = fast_interpolate
+        return expected
 
-    from_file_segy = getcwd() + '/property_fields/from_file/vel_S.segy'
-    create_segy(dummy, wave.function_space.sub(0),
-                wave.mesh_parameters.edge_length, from_file_segy)
+    monkeypatch.setattr(
+        material_properties_io,
+        "interpolate",
+        fake_interpolate,
+    )
 
-    with raises(NotImplementedError) as exc_info:
-        vel_S = wave.set_material_property(   # noqa: F841
-            'vel_S', 'scalar', from_file=from_file_segy, output=True,
-            foldername='/property_fields/from_file/')
+    actual = wave.set_material_property(
+        'vel_S',
+        'scalar',
+        from_file=grid_data,
+        fast_interpolate=True,
+    )
 
-    # Verify the error message
-    expect_msg = "Initializing property from file is currently not implemented"
-    assert expect_msg in str(exc_info.value), \
-        f"Unexpected error message: {str(exc_info.value)}"
-
-    print("Material Property from file: Correctly raised "
-          f"NotImplementedError: {exc_info.value}", flush=True)
+    assert actual is expected
+    assert captured["wave"] is wave
+    assert captured["source"] is grid_data
+    assert captured["fast_interpolate"] is True
 
 
 @mark.parametrize("cell_type", ["T", "Q"])

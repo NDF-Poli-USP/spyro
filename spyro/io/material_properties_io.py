@@ -1,5 +1,4 @@
 from os import getcwd
-from os.path import splitext
 
 import firedrake as fire
 from numpy import log10, ones
@@ -8,14 +7,8 @@ from numpy.random import uniform
 from .interpolators import interpolate
 from ..utils import error_management
 from ..utils import eval_functions_to_ufl
+from ..utils.utils import write_hdf5_velocity_model
 from ..domains.space import check_function_space_type, create_function_space
-
-try:
-    from SeismicMesh import write_velocity_model
-
-    SEISMIC_MESH_AVAILABLE = True
-except ImportError:
-    SEISMIC_MESH_AVAILABLE = False
 
 
 def define_property_function_space(wave, func_space_type, dg_property,
@@ -207,7 +200,13 @@ def _initialize_random_material_prop(property_name, random, V):
     return mat_property
 
 
-def _initialize_material_property_from_file(wave, property_name, from_file, V):
+def _initialize_material_property_from_file(
+    wave,
+    property_name,
+    from_file,
+    V,
+    fast_interpolate=False,
+):
     """
     Initialize material property from a file.
 
@@ -215,8 +214,8 @@ def _initialize_material_property_from_file(wave, property_name, from_file, V):
     -----------
     property_name: `str`
         Name of the material property to be set.
-    from_file: `str`
-        Name of the file containing the material property
+    from_file: `str` or `dict`
+        Name of the file containing the material property, or grid data.
     V: `firedrake function space`
         Function space for the material property
 
@@ -238,23 +237,28 @@ def _initialize_material_property_from_file(wave, property_name, from_file, V):
           f"function space: {element_family} {element_degree}.", flush=True)
 
     if isinstance(from_file, dict):
-        mat_property = interpolate(wave, from_file, V)
-        return mat_property
+        return interpolate(
+            wave,
+            from_file,
+            V,
+            fast_interpolate=fast_interpolate,
+        )
 
     if from_file.endswith(".segy"):
-        if not SEISMIC_MESH_AVAILABLE:
-            raise ImportError(
-                "SeismicMesh is required to convert segy files.")
+        from_file = write_hdf5_velocity_model(wave, from_file)
 
-        mp_filename, _ = splitext(from_file)
-        # ToDo: Change method name
-        write_velocity_model(from_file, ofname=mp_filename)
-        from_file = mp_filename + ".hdf5"
+    if not from_file.endswith((".hdf5", ".h5")):
+        raise ValueError(
+            f"Cannot initialize {property_name} from {from_file!r}: "
+            "expected a '*.segy', '*.hdf5' or '*.h5' file, or grid data.",
+        )
 
-    if from_file.endswith((".hdf5", ".h5")):
-        mat_property = interpolate(wave, from_file, V)
-
-    return mat_property
+    return interpolate(
+        wave,
+        from_file,
+        V,
+        fast_interpolate=fast_interpolate,
+    )
 
 
 def _saving_property_to_file(wave, mat_property, property_name,
@@ -311,7 +315,14 @@ def _check_material_property_inputs(val_lst, func_space_type,
     None
     """
 
-    if sum(value is not None for value in val_lst) > 1:
+    number_of_sources = sum(value is not None for value in val_lst)
+    if number_of_sources == 0:
+        raise ValueError(
+            "A material property requires exactly one value source: "
+            "constant, conditional, expression, random, fire_function or "
+            "from_file.",
+        )
+    if number_of_sources > 1:
         name_lst = ["constant", "conditional", "expression",
                     "random", "fire_function", "from_file"]
         name_lst[-1] += " (*.segy or *.hdf5)"
@@ -332,7 +343,8 @@ def set_material_property(wave, property_name, func_space_type,
                           conditional=None, expression=None,
                           random=None, fire_function=None,
                           from_file=None, dg_property=False,
-                          output=False, foldername="default"):
+                          output=False, foldername="default",
+                          fast_interpolate=False):
     """
     Set a material property(e.g., density, etc.) in the model.
 
@@ -346,8 +358,9 @@ def set_material_property(wave, property_name, func_space_type,
     shape_func_space: `tuple`, optional
         Shape of the function space for only tensorial material property.
         Default is None
-    from_file: `str`, optional
-        Name of the file containing the material property. Default is None
+    from_file: `str` or `dict`, optional
+        Name of the file containing the material property, or grid data.
+        Default is None.
     constant: `float`, optional
         Constant value for the material property. Default is None
     conditional: `firedrake conditional`, optional
@@ -372,6 +385,9 @@ def set_material_property(wave, property_name, func_space_type,
     foldername: `string`, optional
         Name of the folder where the material property is saved.
         If default is 'default', property is saved in '/property_fields/'
+    fast_interpolate: `bool`, optional
+        If True, use the fast interpolation path for grid and HDF5 inputs.
+        Default is False.
 
     Returns:
     -----------
@@ -409,11 +425,13 @@ def set_material_property(wave, property_name, func_space_type,
                 wave, property_name, fire_function, V)
 
         if from_file is not None:
-            raise NotImplementedError("Initializing property "
-                                      "from file is currently "
-                                      "not implemented")
-            # mat_property = _initialize_material_property_from_file(
-            #     wave, property_name, from_file, V)
+            mat_property = _initialize_material_property_from_file(
+                wave,
+                property_name,
+                from_file,
+                V,
+                fast_interpolate=fast_interpolate,
+            )
 
     else:
 

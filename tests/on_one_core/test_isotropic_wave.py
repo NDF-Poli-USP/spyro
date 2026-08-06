@@ -33,16 +33,17 @@ dummy_dict = {
 }
 
 
-def test_initialize_model_parameters_from_object_missing_parameters():
+def test_initialize_model_parameters_missing_parameters():
     synthetic_dict = {
         "type": "object",
     }
     wave = IsotropicWave(dummy_dict)
-    with pytest.raises(Exception) as e:  # noqa: F841
-        wave.initialize_model_parameters_from_object(synthetic_dict)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.2})
+    with pytest.raises(ValueError):
+        wave.initialize_model_parameters(synthetic_data=synthetic_dict)
 
 
-def test_initialize_model_parameters_from_object_first_option():
+def test_initialize_model_parameters_lame_parameterization(monkeypatch):
     synthetic_dict = {
         "type": "object",
         "density": 1,
@@ -50,10 +51,21 @@ def test_initialize_model_parameters_from_object_first_option():
         "mu": 3,
     }
     wave = IsotropicWave(dummy_dict)
-    wave.initialize_model_parameters_from_object(synthetic_dict)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.2})
+    calls = []
+    set_material_property = wave.set_material_property
+
+    def record_material_property(*args, **kwargs):
+        calls.append(args[0])
+        return set_material_property(*args, **kwargs)
+
+    monkeypatch.setattr(wave, "set_material_property", record_material_property)
+    wave.initialize_model_parameters(synthetic_data=synthetic_dict)
+
+    assert calls == ["density", "lambda", "mu"]
 
 
-def test_initialize_model_parameters_from_object_second_option():
+def test_initialize_model_parameters_velocity_parameterization(monkeypatch):
     synthetic_dict = {
         "type": "object",
         "density": 1,
@@ -61,10 +73,21 @@ def test_initialize_model_parameters_from_object_second_option():
         "s_wave_velocity": 3,
     }
     wave = IsotropicWave(dummy_dict)
-    wave.initialize_model_parameters_from_object(synthetic_dict)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.2})
+    calls = []
+    set_material_property = wave.set_material_property
+
+    def record_material_property(*args, **kwargs):
+        calls.append(args[0])
+        return set_material_property(*args, **kwargs)
+
+    monkeypatch.setattr(wave, "set_material_property", record_material_property)
+    wave.initialize_model_parameters(synthetic_data=synthetic_dict)
+
+    assert calls == ["density", "p_wave_velocity", "s_wave_velocity"]
 
 
-def test_initialize_model_parameters_from_object_redundant():
+def test_initialize_model_parameters_redundant():
     synthetic_dict = {
         "type": "object",
         "density": 1,
@@ -74,8 +97,9 @@ def test_initialize_model_parameters_from_object_redundant():
         "s_wave_velocity": 3,
     }
     wave = IsotropicWave(dummy_dict)
-    with pytest.raises(Exception) as e:  # noqa: F841
-        wave.initialize_model_parameters_from_object(synthetic_dict)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.2})
+    with pytest.raises(ValueError):
+        wave.initialize_model_parameters(synthetic_data=synthetic_dict)
 
 
 def test_parse_boundary_conditions():
@@ -120,24 +144,41 @@ def test_parse_boundary_conditions_exception():
     ]
     wave = IsotropicWave(d)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.2, "periodic": True})
-    with pytest.raises(Exception) as e:  # noqa: F841
+    with pytest.raises(Exception):
         wave.parse_boundary_conditions()
 
 
-def test_initialize_model_parameters_from_file_notimplemented():
+def test_elastic_file_material_parameters_notimplemented():
     synthetic_dict = {
         "type": "file",
     }
     wave = IsotropicWave(dummy_dict)
-    with pytest.raises(NotImplementedError) as e:  # noqa: F841
-        wave.initialize_model_parameters_from_file(synthetic_dict)
+    with pytest.raises(NotImplementedError):
+        wave.initialize_model_parameters(synthetic_data=synthetic_dict)
 
 
-if __name__ == "__main__":
-    test_initialize_model_parameters_from_object_missing_parameters()
-    test_initialize_model_parameters_from_object_first_option()
-    test_initialize_model_parameters_from_object_second_option()
-    test_initialize_model_parameters_from_object_redundant()
-    test_parse_boundary_conditions()
-    test_parse_boundary_conditions_exception()
-    test_initialize_model_parameters_from_file_notimplemented()
+def test_initialize_model_parameters_preserves_material_properties():
+    wave = IsotropicWave(dummy_dict)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.2})
+    wave.rho = wave.set_material_property(
+        "density", "scalar", constant=1.0,
+    )
+    wave.lmbda = wave.set_material_property(
+        "lambda", "scalar", constant=2.0,
+    )
+    wave.mu = wave.set_material_property(
+        "mu", "scalar", constant=3.0,
+    )
+
+    wave.initialize_model_parameters()
+    parameters = (wave.rho, wave.lmbda, wave.mu, wave.c, wave.c_s)
+
+    wave.initialize_model_parameters()
+
+    assert all(
+        before is after
+        for before, after in zip(
+            parameters,
+            (wave.rho, wave.lmbda, wave.mu, wave.c, wave.c_s),
+        )
+    )

@@ -128,7 +128,7 @@ def get_forward_model():
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     cond = fire.conditional(Wave_obj_exact.mesh_z > -0.5, 1.5, 3.5)
-    Wave_obj_exact.set_initial_velocity_model(
+    Wave_obj_exact.initialize_model_parameters(
         conditional=cond,
         dg_velocity_model=False,
     )
@@ -139,7 +139,7 @@ def get_forward_model():
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.real_shot_record = rec_out_exact
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
-    Wave_obj_guess.set_initial_velocity_model(constant=2.0)
+    Wave_obj_guess.initialize_model_parameters(constant=2.0)
 
     # The control must be a Function for pyadjoint to differentiate it.
     Wave_obj_guess.enable_automated_adjoint()

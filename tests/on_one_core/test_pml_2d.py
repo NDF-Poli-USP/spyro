@@ -95,7 +95,7 @@ def run_forward():
     cond = fire.conditional(
         z > -0.333, 1.5, fire.conditional(z > -0.667, 3.0, 4.5)
     )
-    wave.set_initial_velocity_model(conditional=cond)
+    wave.initialize_model_parameters(conditional=cond)
     wave.forward_solve()
 
     t1 = timer.time()

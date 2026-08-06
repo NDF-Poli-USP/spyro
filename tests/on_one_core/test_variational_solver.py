@@ -8,6 +8,25 @@ from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 from .model import dictionary as acoustic_model
 
 
+def test_initialize_model_parameters_uses_material_property(monkeypatch):
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    calls = []
+    set_material_property = wave.set_material_property
+
+    def record_material_property(*args, **kwargs):
+        calls.append((args, kwargs))
+        return set_material_property(*args, **kwargs)
+
+    monkeypatch.setattr(wave, "set_material_property", record_material_property)
+
+    wave.initialize_model_parameters(constant=1.5)
+
+    assert len(calls) == 1
+    assert calls[0][0] == ("velocity", "scalar")
+    assert calls[0][1]["constant"] == 1.5
+
+
 def test_mass_matrix_diagonal_from_lhs():
     model = deepcopy(acoustic_model)
     model["time_axis"]["final_time"] = model["time_axis"]["dt"]
@@ -16,8 +35,7 @@ def test_mass_matrix_diagonal_from_lhs():
 
     wave = spyro.AcousticWave(dictionary=model)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
-    wave.set_initial_velocity_model(constant=1.5)
-    wave._initialize_model_parameters()
+    wave.initialize_model_parameters(constant=1.5)
     wave.matrix_building()
 
     diagonal = wave.get_mass_matrix_diagonal()
@@ -79,8 +97,7 @@ def test_pml_3d_matrix_building_variational_setup():
     wave.length_x = wave.mesh_parameters.length_x
     wave.length_y = wave.mesh_parameters.length_y
     wave.length_z = wave.mesh_parameters.length_z
-    wave.set_initial_velocity_model(constant=1.5)
-    wave._initialize_model_parameters()
+    wave.initialize_model_parameters(constant=1.5)
     wave.matrix_building()
 
     assert isinstance(wave.solver, fire.LinearVariationalSolver)
@@ -135,7 +152,7 @@ def test_isotropic_rhs_source_accessor():
 
     wave = IsotropicWave(model)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
-    wave._initialize_model_parameters()
+    wave.initialize_model_parameters()
     wave.matrix_building()
 
     assert wave.rhs_no_pml_source() is wave.source_function

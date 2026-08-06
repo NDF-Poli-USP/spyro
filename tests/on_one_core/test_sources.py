@@ -139,7 +139,7 @@ def _build_wave(
     wave = wave_class(model)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
     if initial_velocity is not None:
-        wave.set_initial_velocity_model(constant=initial_velocity)
+        wave.initialize_model_parameters(constant=initial_velocity)
     wave.sources.current_sources = list(range(len(source_locations)))
     return wave
 

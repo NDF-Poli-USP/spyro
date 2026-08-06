@@ -145,7 +145,7 @@ def preamble_habc(dictionary, edge_length):
 
     # Initial velocity model
     cond = fire.conditional(wave.mesh_x < 0.5, 3.0, 1.5)
-    wave.set_initial_velocity_model(conditional=cond)
+    wave.initialize_model_parameters(conditional=cond)
 
     # Preamble mesh operations
     wave.preamble_mesh_operations()

@@ -12,7 +12,7 @@ def run_solve(model):
 
     wave = spyro.AcousticWaveMMS(dictionary=testmodel)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.02})
-    wave.set_initial_velocity_model(expression="1 + sin(pi*-z)*sin(pi*x)")
+    wave.initialize_model_parameters(expression="1 + sin(pi*-z)*sin(pi*x)")
     wave.forward_solve()
 
     u_an = wave.analytical_solution(wave.current_time)

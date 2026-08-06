@@ -3,7 +3,6 @@ import firedrake as fire
 from .wave import Wave
 from pyadjoint import Tape, AdjFloat
 from ..io.parallelism_wrappers import ensemble_gradient
-from ..io import interpolate
 from .acoustic_solver_construction_no_pml import (
     construct_solver_or_matrix_no_pml,
 )
@@ -17,7 +16,6 @@ from ..domains.space import create_function_space
 from ..utils.typing import (
     AdjointType, RieszMapType, override, WaveType, AbsorbingBCsType,
 )
-from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
 
 
@@ -204,42 +202,6 @@ class AcousticWave(Wave):
             self.u_n.assign(0.0)
 
     @override
-    def _initialize_model_parameters(self, fast_interpolate=False):
-        if self.initial_velocity_model is None:
-            if self.initial_velocity_model_file is None:
-                if getattr(self.mesh_parameters, "grid_velocity_data", None) is not None:
-                    self.initial_velocity_model = interpolate(
-                        self,
-                        self.mesh_parameters.grid_velocity_data,
-                        self.function_space.sub(0),
-                    )
-                    if self.debug_output:
-                        fire.VTKFile("initial_velocity_model.pvd").write(
-                            self.initial_velocity_model, name="velocity"
-                        )
-                    self.c = self.initial_velocity_model
-                    return
-                raise ValueError("No velocity model or velocity file to load.")
-
-            if self.initial_velocity_model_file.endswith(".segy"):
-                self.initial_velocity_model_file = write_hdf5_velocity_model(self, self.initial_velocity_model_file)
-
-            if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
-                self.initial_velocity_model = interpolate(
-                    self,
-                    self.initial_velocity_model_file,
-                    self.function_space.sub(0),
-                    fast_interpolate=fast_interpolate,
-                )
-
-            if self.debug_output:
-                fire.VTKFile("initial_velocity_model.pvd").write(
-                    self.initial_velocity_model, name="velocity"
-                )
-
-        self.c = self.initial_velocity_model
-
-    @override
     def _set_vstate(self, vstate):
         if self.abc_type == AbsorbingBCsType.PML:
             self.X_n.assign(vstate)
@@ -380,7 +342,7 @@ class AcousticWave(Wave):
 
         Examples
         --------
-        After ``set_initial_velocity_model(constant=2.0)``, this method returns
+        After ``initialize_model_parameters(constant=2.0)``, this method returns
         the velocity ``Function`` filled with ``2.0``.
         """
         return self.initial_velocity_model

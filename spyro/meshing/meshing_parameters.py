@@ -231,6 +231,9 @@ class MeshingParameters():
         self._edge_length_z = None
         self._edge_length_x = None
         self._edge_length_y = None
+        self.boundary_ids_map = None
+        self.boundary_nodes_ids = None
+        self.diam_mesh = None
 
         # Initialize private attributes for gmsh mesh properties
         self._padding_x = None
