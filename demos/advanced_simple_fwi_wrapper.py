@@ -163,15 +163,12 @@ def multiple_layer_velocity_model(fwi_obj, z_switch, layers):
         )
     if len(z_switch) == 0:
         raise ValueError("Float list of z_switch cannot be empty")
-    for i in range(len(z_switch)):
-        if i == 0:
-            cond = fire.conditional(
-                fwi_obj.wave.mesh_z > z_switch[i], layers[i], layers[i + 1]
-            )
-        else:
-            cond = fire.conditional(
-                fwi_obj.wave.mesh_z > z_switch[i], cond, layers[i + 1]
-            )
+
+    cond = fire.conditional(fwi_obj.wave.mesh_z > z_switch[0], layers[0], layers[1])
+    for i in range(1, len(z_switch)):
+        cond = fire.conditional(
+            fwi_obj.wave.mesh_z > z_switch[i], cond, layers[i + 1]
+        )
 
     return cond
 

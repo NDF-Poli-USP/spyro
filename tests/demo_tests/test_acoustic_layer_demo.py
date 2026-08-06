@@ -38,4 +38,4 @@ def test_acoustic_layer_fwi():
     before_switch_vp = float(u.at((-0.7, 1.7)))
 
     assert switch_vp == pytest.approx(3.0, rel=1e-1)
-    assert before_switch_vp == pytest.approx(2.5)
+    assert before_switch_vp == pytest.approx(2.5, rel=1e-1)

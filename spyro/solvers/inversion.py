@@ -60,7 +60,7 @@ class L2Inner(object):
 
     Parameters
     ----------
-    Wave_obj : AcousticWave
+    wave : AcousticWave
         Wave object containing the function space and quadrature rule.
 
     Attributes
@@ -75,17 +75,17 @@ class L2Inner(object):
     eval(_u, _v)
         Evaluate the L2 inner product between two functions.
     """
-    def __init__(self, Wave_obj):
+    def __init__(self, wave):
         """
         Initialize the L2 inner product operator.
 
         Parameters
         ----------
-        Wave_obj : AcousticWave
+        wave : AcousticWave
             Wave object containing the function space and quadrature rule.
         """
-        V = Wave_obj.function_space
-        dxlump = fire.dx(**Wave_obj.quadrature_rule)
+        V = wave.function_space
+        dxlump = fire.dx(**wave.quadrature_rule)
         self.A = fire.assemble(
             fire.TrialFunction(V) * fire.TestFunction(V) * dxlump,
             mat_type="matfree"
@@ -307,14 +307,13 @@ class FullWaveformInversion:
         Parameters
         ----------
         dictionary : dict, optional
-            Model and inversion configuration used to construct ``wave_class``
-            when ``wave`` is not provided.
+            Model and inversion configuration used to construct ``spyro.solvers.Wave``
+            class when ``wave`` is not provided.
         comm : object, optional
-            Communicator passed to ``wave_class`` when constructing the wave
-            solver.
+            Communicator passed when constructing the wave solver.
         wave_class : type, optional
             Wave solver class used when ``wave`` is not provided. The class
-            must construct a :class:`Wave` with
+            must construct a :class:`spyro.solvers.Wave` with
             :attr:`WaveType.ISOTROPIC_ACOUSTIC` while FWI support is limited
             to acoustic adjoint solves.
         wave : object, optional

@@ -90,7 +90,7 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
     # Define Parameters for absorbing boundary conditions
     dictionary["absorving_boundary_conditions"] = {
         "status": True,  # Activate ABCs
-        "damping_type": "hybrid",  # Activate HABC
+        "abc_type": "hybrid",  # Activate HABC
         "degree_eikonal": degree_eikonal,  # FEM order for the Eikonal analysis
     }
 
@@ -129,34 +129,34 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = AcousticWave(dictionary=dictionary)
+    wave = AcousticWave(dictionary=dictionary)
 
     # Mesh
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+    wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
-    cond = conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
-    Wave_obj.set_initial_velocity_model(conditional=cond)
+    cond = conditional(wave.mesh_x < 0.5, 3.0, 1.5)
+    wave.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
-    Wave_obj.mesh_ops.preamble_mesh_operations(
-        Wave_obj, ele_type_eik=element_type, f_est=f_est)
+    wave.mesh_ops.preamble_mesh_operations(
+        wave, ele_type_eik=element_type, f_est=f_est)
 
     # Estimating computational resource usage
-    comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "MSH_")
+    comp_cost("tfin", tRef=tRef, user_name=wave.path_save + "MSH_")
 
     # ============ EIKONAL ANALYSIS ============
     # Reference to resource usage
     tRef = comp_cost("tini")
 
     # Finding critical points
-    Wave_obj.layer_ops.critical_boundary_points(Wave_obj)
+    wave.layer_ops.critical_boundary_points(wave)
 
     # Estimating computational resource usage
-    comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "EIK_")
+    comp_cost("tfin", tRef=tRef, user_name=wave.path_save + "EIK_")
 
     # Extracting  minimum Eikonal
-    min_eik = 1e3 * Wave_obj.layer_ops.eik_bnd[0][2]
+    min_eik = 1e3 * wave.layer_ops.eik_bnd[0][2]
 
     return min_eik
 

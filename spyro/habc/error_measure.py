@@ -2,8 +2,7 @@
 from os import getcwd
 # from firedrake import assemble
 # from scipy.signal import find_peaks
-# from spyro.plots.plots_habc import plot_hist_receivers, \
-#     plot_rfft_receivers, plot_xCR_opt
+# from spyro.plots.plots_habc import plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
 # from spyro.utils.freq_tools import freq_response
 # from spyro.utils.error_management import value_parameter_error
 
@@ -18,7 +17,7 @@ from os import getcwd
 
 
 class HABCError():
-    '''
+    """
     Class for the error calculation for the HABC scheme
 
     Attributes
@@ -32,8 +31,8 @@ class HABCError():
         - errPk : Peak error
         - pkMax : Maximum reference peak
         - final_energy : Dissipated energy in the HABC scheme
-    freq_Nyq : `float`
-        Nyquist frequency according to the time step. freq_Nyq = 1 / (2 * dt)
+    freq_Nyquist : `float`
+        Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt)
     max_errIt : `float`
         Maximum integral error at the receivers for the HABC scheme
     max_errPK : `float`
@@ -69,43 +68,36 @@ class HABCError():
         Get the optimal heuristic factor for the quadratic damping
     save_reference_signal()
         Save the reference signal for the HABC scheme
-    '''
+    """
 
-    def __init__(self, dt, freq_Nyq, receiver_locations, forward_solution_receivers=None,
-                 output_folder=None, output_case=None):
-        '''
-        Initialize the HABCError class.
+    def __init__(self, dt=None, freq_Nyquist=None, output_folder=None,
+                 output_case=None, comm=None):
+        """Initialize the HABCError class.
 
         Parameters
         ----------
-        dt : `float`
-            Time step used in the simulation
-        freq_Nyq : `float`
-            Nyquist frequency according to the time step. freq_Nyq = 1 / (2 * dt)
-        receiver_locations: `list`
-            List of receiver locations
-        forward_solution_receivers : `array`, optional
-            Receiver waveform data in the HABC scheme. Default is None
-        output_folder : str, optional
-            The folder where output data will be saved. Default is None
-        output_case : str, optional
-            The folder for the current case study. Default is None
+        dt : `float`, optional
+            Time step used in the simulation. Default is `None`.
+        freq_Nyquist : `float`, optional
+            Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt).
+        output_folder : `str`, optional
+            The folder where output data will be saved. Default is `None`.
+        output_case : `str`, optional
+            The folder for the current case study. Default is `None`.
+        comm : `object`, optional
+            An object representing the communication interface for parallel processing.
+            Default is `None`.
 
         Returns
         -------
         None
-        '''
+        """
 
         # Time step
         self.dt = dt
 
         # Nyquist frequency
-        self.freq_Nyq = freq_Nyq
-
-        # Receivers data and initialization
-        self.receiver_locations = receiver_locations
-        self.number_of_receivers = len(self.receiver_locations)
-        self.forward_solution_receivers = forward_solution_receivers
+        self.freq_Nyquist = freq_Nyquist
 
         # Path to save data
         if output_folder is None:
@@ -119,9 +111,11 @@ class HABCError():
         else:
             self.path_save_err_case = output_case
 
+        # Communicator MPI
+        self.comm = comm
+
     # def save_reference_signal(self):
-    #     '''
-    #     Save the reference signal for the HABC scheme
+    #     """Save the reference signal for the HABC scheme.
 
     #     Parameters
     #     ----------
@@ -130,9 +124,19 @@ class HABCError():
     #     Returns
     #     -------
     #     None
-    #     '''
+    #     """
 
-    #     print("\nSaving Reference Output", flush=True)
+    # TODO: Review
+    # receiver_locations: `list`
+    #     List of receiver locations.
+    # forward_solution_receivers : `array`, optional
+    #     Receiver waveform data in the HABC scheme. Default is `None`.
+    # # Receivers data and initialization
+    # self.receiver_locations = receiver_locations
+    # self.number_of_receivers = len(self.receiver_locations)
+    # self.forward_solution_receivers = forward_solution_receivers
+
+    #     pprint("\nSaving Reference Output", comm=self.comm)
 
     #     # Path to save the reference signal
     #     pth_str = self.path_save_error + "preamble/"
@@ -145,26 +149,24 @@ class HABCError():
     #     self.receivers_ref_fft = []
     #     for rec in range(self.number_of_receivers):
     #         signal = self.receivers_reference[:, rec]
-    #         yf = freq_response(signal, self.freq_Nyq)
+    #         yf = freq_response(signal, self.freq_Nyquist)
     #         self.receivers_ref_fft.append(yf)
     #     np.save(pth_str + "habc_fft.npy", self.receivers_ref_fft)
 
     # def get_reference_signal(self, foldername="preamble/"):
-    #     '''
-    #     Acquire the reference signal to compare with the HABC scheme
+    #     """Acquire the reference signal to compare with the HABC scheme.
 
     #     Parameters
     #     ----------
     #     foldername : `string`, optional
-    #         Name of the folder where the reference signal is stored.
-    #         Default is "preamble/"
+    #         Name of the folder where the reference signal is stored. Default is "preamble/"
 
     #     Returns
     #     -------
     #     None
-    #     '''
+    #     """
 
-    #     print("\nLoading Reference Signal from Infinite Model", flush=True)
+    #     pprint("\nLoading Reference Signal from Infinite Model", comm=self.comm)
 
     #     # Path to the reference data folder
     #     pth_str = self.path_save_error + foldername
@@ -176,7 +178,7 @@ class HABCError():
     #     self.receivers_ref_fft = np.load(pth_str + "habc_fft.npy").T
 
     # def error_measures_habc(self):
-    #     '''
+    #     """
     #     Compute the error measures at the receivers for the HABC scheme.
     #     Error measures as in Salas et al. (2022) Sec. 2.5.
     #     Obs: If you get an error during running in find_peaks means that
@@ -189,9 +191,9 @@ class HABCError():
     #     Returns
     #     -------
     #     None
-    #     '''
+    #     """
 
-    #     print("\nComputing Error Measures", flush=True)
+    #     pprint("\nComputing Error Measures", comm=self.comm)
 
     #     # Initializing error measures
     #     pkMax = []
@@ -235,10 +237,9 @@ class HABCError():
     #     self.err_habc = [errIt, errPk, pkMax, final_energy]
     #     self.max_errIt = max(errIt)
     #     self.max_errPK = max(errPk)
-    #     print("Maximum Integral Error: {:.2%}".format(
-    #         self.max_errIt), flush=True)
-    #     print("Maximum Peak Error: {:.2%}".format(self.max_errPK), flush=True)
-    #     print("Acoustic Energy: {:.2e}".format(final_energy), flush=True)
+    #     pprint(f"Maximum Integral Error: {self.max_errIt:.2%}", comm=self.comm)
+    #     pprint(f"Maximum Peak Error: {self.max_errPK:.2%}", comm=self.comm)
+    #     pprint(f"Acoustic Energy: {final_energy:.2e}", comm=self.comm)
 
     #     # Save error measures
     #     err_str = self.path_save_err_case + "habc_errs.txt"
@@ -249,7 +250,7 @@ class HABCError():
     #         np.savetxt(f, np.array([final_energy]), delimiter='\t')
 
     # def comparison_plots(self, regression_xCR=False, data_regr_xCR=None):
-    #     '''
+    #     """
     #     Plot the comparison between the HABC scheme and the reference model.
 
     #     Parameters
@@ -273,7 +274,7 @@ class HABCError():
     #     Returns
     #     -------
     #     None
-    #     '''
+    #     """
 
     #     # Time domain comparison
     #     plot_hist_receivers(self)
@@ -282,7 +283,7 @@ class HABCError():
     #     self.receivers_out_fft = []
     #     for rec in range(self.number_of_receivers):
     #         signal = self.forward_solution_receivers[:, rec]
-    #         yf = freq_response(signal, self.freq_Nyq)
+    #         yf = freq_response(signal, self.freq_Nyquist)
     #         self.receivers_out_fft.append(yf)
     #     self.receivers_out_fft = np.asarray(self.receivers_out_fft).T
 
@@ -294,7 +295,7 @@ class HABCError():
     #         plot_xCR_opt(self, data_regr_xCR)
 
     # def get_xCR_candidates(self, n_pts=3):
-    #     '''
+    #     """
     #     Get the heuristic factor candidates for the quadratic regression.
 
     #     Parameters
@@ -309,7 +310,7 @@ class HABCError():
     #         Candidates for the heuristic factor xCR based on the
     #         current xCR and its bounds. The candidates are sorted
     #         in ascending order and current xCR is not included
-    #     '''
+    #     """
 
     #     # Setting odd number of points for regression
     #     n_pts = max(3, n_pts + 1 if n_pts % 2 == 0 else n_pts)
@@ -328,13 +329,12 @@ class HABCError():
     #         xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts-1))
 
     #     format_xCR = ', '.join(['{:.3f}'.format(x) for x in xCR_cand])
-    #     print("Candidates for Heuristic Factor xCR: [{}]".format(
-    #         format_xCR), flush=True)
+    #     pprint(f"Candidates for Heuristic Factor xCR: [{format_xCR}]", comm=self.comm)
 
     #     return xCR_cand
 
-    # def get_xCR_optimal(self, dat_reg_xCR, crit_opt='err_sum'):
-    #     '''
+    # def get_xCR_optimal(self, dat_reg_xCR, crit_opt="err_sum"):
+    #     """
     #     Get the optimal heuristic factor for the quadratic damping.
 
     #     Parameters
@@ -353,23 +353,23 @@ class HABCError():
     #     -------
     #     xCR_opt : `float`, optional
     #         Optimal heuristic factor for the quadratic damping
-    #     '''
+    #     """
 
     #     # Data for regression
     #     xCR = dat_reg_xCR[0]
     #     max_errIt = dat_reg_xCR[1]
     #     max_errPK = dat_reg_xCR[2]
 
-    #     value_parameter_error('crit_opt', crit_opt,
-    #                   ['err_difference', 'err_integral', 'err_sum'])
+    #     value_parameter_error("crit_opt", crit_opt,
+    #                           ["err_difference", "err_integral", "err_sum"])
 
-    #     if crit_opt == 'err_difference':
+    #     if crit_opt == "err_difference":
     #         y_err = [eI - eP for eI, eP in zip(max_errIt, max_errPK)]
 
-    #     elif crit_opt == 'err_integral':
+    #     elif crit_opt == "err_integral":
     #         y_err = max_errIt
 
-    #     elif crit_opt == 'err_sum':
+    #     elif crit_opt == "err_sum":
     #         y_err = [eI + eP for eI, eP in zip(max_errIt, max_errPK)]
 
     #     # Limits for the heuristic factor
@@ -378,7 +378,7 @@ class HABCError():
     #     # Coefficients for the quadratic equation
     #     eq_xCR = np.polyfit(xCR, y_err, 2)
 
-    #     if crit_opt == 'err_difference':
+    #     if crit_opt == "err_difference":
     #         # Roots of the quadratic equation
     #         roots = np.roots(eq_xCR)
     #         valid_roots = [np.clip(rth, xCR_inf, xCR_sup)
@@ -393,13 +393,12 @@ class HABCError():
     #             vtx = - eq_xCR[1] / (2 * eq_xCR[0])
     #             xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
 
-    #     elif crit_opt == 'err_integral' or crit_opt == 'err_sum':
+    #     elif crit_opt == "err_integral" or crit_opt == "err_sum":
 
     #         # Vertex of the quadratic equation
     #         vtx = - eq_xCR[1] / (2 * eq_xCR[0])
     #         xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
 
-    #     print("Optimal Heuristic Factor xCR: {:.3f}".format(
-    #         xCR_opt), flush=True)
+    #     pprint(f"Optimal Heuristic Factor xCR: {xCR_opt:.3f}", comm=self.comm)
 
     #     return xCR_opt
