@@ -1,0 +1,135 @@
+import spyro
+from spyro import create_transect
+import pytest
+import os
+import numpy as np
+
+
+def is_seismicmesh_installed():
+    try:
+        import SeismicMesh  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def get_wave_obj():
+    dictionary = {}
+    dictionary["absorving_boundary_conditions"] = {
+        "status": True,
+        "abc_type": "PML",
+        "exponent": 2,
+        "cmax": 4.5,
+        "R": 1e-6,
+        "pad_length": 0.25,
+    }
+    return spyro.examples.Camembert_acoustic(dictionary=dictionary)
+
+
+def test_plot():
+    rectangle_dictionary = {}
+    rectangle_dictionary["mesh"] = {
+        "length_z": 0.75,  # depth in km - always positive
+        "length_x": 1.5,
+        "h": 0.05,
+    }
+    rectangle_dictionary["acquisition"] = {
+        "source_locations": [(-0.1, 0.75)],
+        "receiver_locations": create_transect((-0.10, 0.1), (-0.10, 1.4), 50),
+        "frequency": 8.0,
+    }
+    rectangle_dictionary["time_axis"] = {
+        "final_time": 1.5,  # Final time for event
+    }
+    wave = spyro.examples.Rectangle_acoustic(
+        dictionary=rectangle_dictionary
+    )
+    layer_values = [1.5, 3.0]
+    z_switches = [-0.5]
+    wave.multiple_layer_velocity_model(z_switches, layer_values)
+    wave.forward_solve()
+    spyro.plots.plot_shots(wave, show=False, file_name="test_plot", file_format="png")
+    expected_file = "test_plot[0].png"
+    assert os.path.exists(expected_file)
+
+    spyro.plots.debug_plot(wave.u_n, filename="test_debug_plot.png")
+    expected_file = "test_debug_plot.png"
+    assert os.path.exists(expected_file)
+
+    spyro.plots.debug_pvd(wave.u_n, filename="test_debug_plot1.pvd")
+    expected_file = "test_debug_plot1.pvd"
+    assert os.path.exists(expected_file)
+
+
+@pytest.mark.skipif(not is_seismicmesh_installed(), reason="SeismicMesh is not installed")
+@pytest.mark.older_firedrake
+def test_plot_mesh_sizes():
+    mesh_filename = "test_mesh_for_plots.msh"
+    Lz = 1.0
+    Lx = 2.0
+    c = 1.5
+    freq = 5.0
+    lbda = c/freq
+    pad = 0.3
+    cpw = 3
+
+    input_mesh_parameters = {
+        "length_z": Lz,
+        "length_x": Lx,
+        "length_y": 0.0,
+        "cell_type": "triangle",
+        "mesh_type": "SeismicMesh",
+        "dx": None,
+        "periodic": False,
+        "velocity_model_file": None,
+        "cells_per_wavelength": cpw,
+        "source_frequency": freq,
+        "minimum_velocity": c,
+        "abc_pad_length": pad,
+        "lbda": lbda,
+        "dimension": 2,
+        "edge_length": lbda/cpw,
+        "output_filename": mesh_filename,
+    }
+
+    mesh_parameters = spyro.meshing.MeshingParameters()
+    mesh_parameters.set_mesh(input_mesh_parameters=input_mesh_parameters)
+
+    Mesh_obj = spyro.meshing.AutomaticMesh(
+        mesh_parameters=mesh_parameters,
+    )
+
+    mesh = Mesh_obj.create_mesh()  # noqa: F841
+
+    image_output_filename = "mesh_size.png"
+    spyro.plots.plot_mesh_sizes(mesh_filename=mesh_filename, output_filename=image_output_filename, show=False)
+    assert os.path.exists(str(image_output_filename))
+
+
+def test_plot_model_in_p1():
+    wave = get_wave_obj()
+    filename = "model_p1.png"
+    spyro.plots.plot_model_in_p1(wave, filename=str(filename), show=False)
+    assert os.path.exists(str(filename))
+
+
+def test_plot_receiver_response(tmp_path):
+    receiver_data = np.sin(np.linspace(0.0, 2.0 * np.pi, 100))
+    output_file = tmp_path / "receiver_response.png"
+
+    spyro.plots.plot_receiver_response(
+        receiver_data,
+        final_time=2.0,
+        show=False,
+        filename=str(output_file),
+        receiver_id_for_title=7,
+        name="trace",
+    )
+
+    assert output_file.exists()
+
+
+if __name__ == "__main__":
+    test_plot()
+    test_plot_mesh_sizes()
+    test_plot_model_in_p1()

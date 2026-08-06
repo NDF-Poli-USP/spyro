@@ -1,0 +1,263 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Python tests
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+concurrency:
+  # Cancel running jobs if new commits are pushed
+  group: >
+    ${{ github.workflow }}-
+    ${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast-tests:
+    name: Fast Tests
+    runs-on: self-hosted
+    # Runs on all pushes and pull requests for quick feedback
+
+    container:
+      image: firedrakeproject/firedrake:2025.4.1
+      options: --user root  # Ensures it can install packages if needed
+
+    steps:
+
+    - name: Pre-run cleanup
+        # Make sure the current directory is empty
+      run: find . -delete
+
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        apt-get update \
+        && apt-get -y install git python3 \
+        && apt-get -y install gmsh patchelf \
+        && pip3 install segyio \
+        && apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk \
+        && pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
+        && pip3 install pyamg \
+        && pip3 install meshio \
+        && pip3 install -U memory_profiler \
+        && pip3 install pytest pytest-cov \
+        && pip3 install pytest-sugar
+
+    - name: Clear all firedrake-related caches
+      run: |
+        rm -rf ~/.cache/loopy \
+               ~/.loopy_kernel_cache \
+               ~/.cache/pyop2 \
+               ~/.cache/tsfc \
+               .pytest_cache
+        find . -name '*.pkl' -delete || true
+
+    - name: Running serial fast tests
+      run: |
+        make clean
+        python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/on_one_core/ --skip-slow --skip-newer-firedrake --durations=10
+
+    - name: Rename coverage file
+      # This is necessary because upload-artifact doesnt recognize hidden files
+      run: |
+        cp .coverage cov-data
+
+    - name: Upload coverage data
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage
+        path: cov-data
+
+    - name: Post-run cleanup
+      if: always()
+      run: find . -delete
+
+  slow-tests:
+    name: Slow Tests and Parallel Tests
+    runs-on: self-hosted
+    needs: fast-tests
+    if: github.event_name == 'pull_request'
+    # Only runs on PRs after fast tests pass - saves resources
+
+    container:
+      image: firedrakeproject/firedrake:2025.4.1
+      options: --user root  # Ensures it can install packages if needed
+
+    steps:
+
+    - name: Pre-run cleanup
+        # Make sure the current directory is empty
+      run: find . -delete
+
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        apt-get update \
+        && apt-get -y install git python3 \
+        && apt-get -y install gmsh patchelf \
+        && pip3 install segyio \
+        && apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk \
+        && pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
+        && pip3 install pyamg \
+        && pip3 install meshio \
+        && pip3 install -U memory_profiler \
+        && pip3 install pytest pytest-cov \
+        && pip3 install pytest-sugar
+
+    - name: Clear all firedrake-related caches
+      run: |
+        rm -rf ~/.cache/loopy \
+               ~/.loopy_kernel_cache \
+               ~/.cache/pyop2 \
+               ~/.cache/tsfc \
+               .pytest_cache
+        find . -name '*.pkl' -delete || true
+
+    - name: Download coverage data
+      uses: actions/download-artifact@v4
+      with:
+        name: coverage
+
+    - name: Rename coverage file
+      # This is necessary because .coverage was renamed since upload-artifact doesnt recognize hidden files
+      run: |
+        cp cov-data .coverage
+
+    - name: Running serial slow tests
+      run: |
+        make clean
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/  --only-slow --skip-newer-firedrake
+
+    - name: Running parallel tests for forward problem only
+      run: |
+          make clean
+          mpiexec -n 6 pytest tests/three_dimension/test_hexahedral_convergence.py
+          mpiexec -n 6 pytest tests/parallel/test_forward.py
+          mpiexec -n 6 pytest tests/parallel/test_forward_supershot.py
+          mpiexec -n 2 pytest tests/parallel/test_parallel_io.py
+          mpiexec -n 2 pytest tests/parallel/test_forward_multiple_serial_shots.py
+    
+    - name: Running parallel tests for inversion
+      run: |
+          make clean
+          mpiexec -n 6 pytest tests/parallel/test_fwi.py
+          mpiexec -n 3 pytest tests/parallel/test_supershot_grad.py
+          mpiexec -n 2 pytest tests/parallel/test_gradient_serialshots.py
+          mpiexec -n 6 pytest tests/parallel/test_simple_fwi_with_segy_output.py
+
+    - name: Covering parallel 3D forward test
+      continue-on-error: true
+      run: |
+        mpiexec -n 6 python3 -m pytest --cov-report=xml --cov-append --cov=spyro tests/three_dimension/test_hexahedral_convergence.py
+    - name: Covering parallel forward test
+      continue-on-error: true
+      run: |
+        mpiexec -n 6 python3 -m pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_forward.py
+    - name: Covering parallel fwi test
+      continue-on-error: true
+      run: |
+          mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_fwi.py
+    - name: Covering parallel supershot test
+      continue-on-error: true
+      run: |
+          mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_forward_supershot.py
+    - name: Covering parallel io test
+      continue-on-error: true
+      run: |
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_parallel_io.py
+    - name: Covering parallel supershot grad test
+      continue-on-error: true
+      run: |
+          mpiexec -n 3 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_supershot_grad.py
+    - name: Covering spatially parallelized shots in serial
+      continue-on-error: true
+      run: |
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_forward_multiple_serial_shots.py
+    - name: Covering spatially parallelized shots in serial
+      continue-on-error: true
+      run: |
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_gradient_serialshots.py
+    - name: Covering source parallelized fwi with segy output
+      continue-on-error: true
+      run: |
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_simple_fwi_with_segy_output.py
+    - name: Uploading coverage to Codecov
+      run: |
+        export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && curl -s https://codecov.io/bash | bash
+    - name: Post-run cleanup
+      if: always()
+      run: find . -delete
+  
+  new-firedrake-tests:
+    name: Updated Firedrake tests
+    runs-on: self-hosted
+    needs: slow-tests
+    if: github.event_name == 'pull_request'
+    # Only runs on PRs after fast tests pass - saves resources
+
+    container:
+      image: firedrakeproject/firedrake:2026.4.0
+      options: --user root  # Ensures it can install packages if needed
+
+    steps:
+
+    - name: Pre-run cleanup
+        # Make sure the current directory is empty
+      run: find . -delete
+
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        apt-get update \
+        && apt-get -y install git python3 \
+        && apt-get -y install gmsh patchelf \
+        && pip3 install segyio \
+        && apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk \
+        && pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
+        && pip3 install pyamg \
+        && pip3 install meshio \
+        && pip3 install -U memory_profiler \
+        && pip3 install pytest pytest-cov \
+        && pip3 install pytest-sugar \
+        && pip3 install gmsh
+
+    - name: Clear all firedrake-related caches
+      run: |
+        rm -rf ~/.cache/loopy \
+               ~/.loopy_kernel_cache \
+               ~/.cache/pyop2 \
+               ~/.cache/tsfc \
+               .pytest_cache
+        find . -name '*.pkl' -delete || true
+
+    - name: Running serial tests
+      run: |
+        make clean
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/  --skip-older-firedrake
+
+    - name: Running parallel tests for forward problem only
+      run: |
+          make clean
+          mpiexec -n 6 pytest tests/three_dimension/test_hexahedral_convergence.py
+          mpiexec -n 6 pytest tests/parallel/test_forward.py
+          mpiexec -n 6 pytest tests/parallel/test_forward_supershot.py
+          mpiexec -n 2 pytest tests/parallel/test_parallel_io.py
+          mpiexec -n 2 pytest tests/parallel/test_forward_multiple_serial_shots.py
+    
+    - name: Running parallel tests for inversion
+      run: |
+          make clean
+          mpiexec -n 6 pytest tests/parallel/test_fwi.py
+          mpiexec -n 3 pytest tests/parallel/test_supershot_grad.py
+          mpiexec -n 2 pytest tests/parallel/test_gradient_serialshots.py
+          mpiexec -n 2 pytest tests/parallel/test_gradient_auto_adjoint.py
+
+    - name: Post-run cleanup
+      if: always()
+      run: find . -delete
