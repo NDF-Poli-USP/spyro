@@ -97,7 +97,7 @@ def gauss_lobatto_legendre_line_rule(degree):
 
 # 3D
 def gauss_lobatto_legendre_cube_rule(dimension, degree):
-    """Returns GLL quad rule for a given degree in a multidimensional space.
+    """Return GLL quad rule for a given degree in a multidimensional space.
 
     Parameters
     ----------
