@@ -2,7 +2,6 @@
 
 import FIAT
 import finat
-# from firedrake import *  # noqa:F403
 from firedrake import (
     triangle,
     tetrahedron,
