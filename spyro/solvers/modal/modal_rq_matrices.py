@@ -2,8 +2,8 @@
 
 from firedrake import assemble, cos, dx as fire_dx, Function, grad, inner, pi, sin
 from scipy.sparse import lil_matrix
-from ...utils.error_management import (type_data_structure_error, validade_numeric,
-                                       validade_parameter)
+from ...utils.error_management import (validate_data_structure, validate_numeric,
+                                       validate_parameter)
 
 
 def generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
@@ -39,18 +39,18 @@ def generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
     """
 
     # Check input parameters
-    validade_numeric("k", k, float_num=False, integer_num=True, lower_bound=0)
-    validade_parameter("dimension", dimension, [2, 3])
-    validade_parameter("bc", bc, ["Dirichlet", "Neumann"])
+    validate_numeric("k", k, float_num=False, integer_num=True, lower_bound=0)
+    validate_parameter("dimension", dimension, [2, 3])
+    validate_parameter("bc", bc, ["Dirichlet", "Neumann"])
 
     # Mesh coordinates
     z, x = ufl_coordinates[0], ufl_coordinates[1]
 
     # Check mesh limits
-    min_coordinates = type_data_structure_error("min_coordinates", mesh_limits[0], "array",
+    min_coordinates = validate_data_structure("min_coordinates", mesh_limits[0], "array",
                                                 expected_type_element=("float", "int"),
                                                 expected_length=dimension)
-    max_coordinates = type_data_structure_error("max_coordinates", mesh_limits[1], "array",
+    max_coordinates = validate_data_structure("max_coordinates", mesh_limits[1], "array",
                                                 expected_type_element=("float", "int"),
                                                 expected_length=dimension)
 

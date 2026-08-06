@@ -1,4 +1,4 @@
-from ..utils.error_management import validade_numeric, validade_parameter
+from ..utils.error_management import validate_numeric, validate_parameter
 
 
 class Read_options:
@@ -63,7 +63,7 @@ class Read_options:
     @variant.setter
     def variant(self, value):
         accepted_variants = ["lumped", "equispaced", "DG", None]
-        self._variant = validade_parameter("variant", value, accepted_variants)
+        self._variant = validate_parameter("variant", value, accepted_variants)
 
     @property
     def method(self):
@@ -90,7 +90,7 @@ class Read_options:
         ]
 
         # Check if the provided value is in any of the accepted methods
-        validade_parameter("method", value, mlt_equivalents + sem_equivalents
+        validate_parameter("method", value, mlt_equivalents + sem_equivalents
                               + dg_t_equivalents + dg_q_equivalents + ["CG", None])
 
         if value in mlt_equivalents:
@@ -177,7 +177,7 @@ class Read_options:
 
     @degree.setter
     def degree(self, value):
-        self._degree = validade_numeric('degree', value, float_num=False,
+        self._degree = validate_numeric('degree', value, float_num=False,
                                              integer_num=True, lower_bound=0,
                                              include_lower_bound=False,)
 
@@ -187,7 +187,7 @@ class Read_options:
 
     @dimension.setter
     def dimension(self, value):
-        self._dimension = validade_parameter('dimension', value, [2, 3])
+        self._dimension = validate_parameter('dimension', value, [2, 3])
 
     @property
     def analysis(self):
@@ -196,7 +196,7 @@ class Read_options:
     @analysis.setter
     def analysis(self, value):
         allowed_analyses = ["transient", "modal", "eikonal"]
-        self._analysis = validade_parameter('analysis', value, allowed_analyses)
+        self._analysis = validate_parameter('analysis', value, allowed_analyses)
 
 
 class Read_outputs:

@@ -12,7 +12,7 @@ from ufl.form import Form
 from ufl.geometry import SpatialCoordinate
 
 
-def validade_parameter(parameter_name, parameter_value, valid_values):
+def validate_parameter(parameter_name, parameter_value, valid_values):
     """Validate parameter value and raise a ValueError with a specific error message.
 
     Parameters
@@ -49,7 +49,7 @@ def mutually_exclusive_parameter_error(parameter_name_lst, parameter_value_lst):
 
     Parameters
     ----------
-    parameter_name_Lst : `list` of `str`
+    parameter_name_lst : `list` of `str`
         List of names of the parameters that are mutually exclusive.
     parameter_value_lst : `list`
         List of values of the parameters that are mutually exclusive.
@@ -73,16 +73,14 @@ def mutually_exclusive_parameter_error(parameter_name_lst, parameter_value_lst):
             f"Parameters {_join_options(parameter_defined, conjunction='and')} "
             "are mutually exclusive.\n"
         )
-
         err_str = (
             "Please specify only one of these parameters: "
             f"{_join_options(parameter_name_lst)}."
         )
-
         raise ValueError(exc_str + err_str)
 
 
-def value_model_dimension_error(parameter_names, parameters, expected_dimension):
+def validate_model_dimension(parameter_names, parameters, expected_dimension):
     """Raise a ValueError if parameter dimensions mismatch expected model dimension.
 
     Parameters
@@ -119,10 +117,12 @@ def sanitize_num_array(
 ):
     """Set NaNs, infinities, and/or negative values to zero in an array.
 
+    This function modifies data_arr in place.
+
     Parameters
     ----------
     data_arr : `array`
-        An array with possible with possible NaN or negative components.
+        An array with possible NaN or negative components.
     nan_values : `bool`, optional
         If `True`, replace NaN values with zero. Default is `True`.
     inf_values : `bool`, optional
@@ -143,7 +143,7 @@ def sanitize_num_array(
         numeric (float or int).
     """
     # Validate input type
-    type_data_structure_error(
+    validate_data_structure(
         "data_arr", data_arr, "array", expected_type_element=("float", "int")
     )
 
@@ -164,7 +164,7 @@ def sanitize_num_array(
     return data_arr
 
 
-def validade_numeric(
+def validate_numeric(
     parameter_name,
     parameter_value,
     float_num=True,
@@ -218,28 +218,28 @@ def validade_numeric(
     # Not int or float
     if not isinstance(parameter_value, (int, float)):
         if float_num and integer_num:
-            str_type = "float or a integer"
+            str_type = "float or an integer"
         elif float_num:
             str_type = "float"
         elif integer_num:
             str_type = "integer"
 
         raise TypeError(
-            f"'{parameter_name}' must be a {str_type} number, "
+            f"'{parameter_name}' must be a {str_type}, "
             f"got {type(parameter_value).__name__}."
         )
 
     # Check if float is allowed when value is integer
     if isinstance(parameter_value, float) and (integer_num and not float_num):
         raise TypeError(
-            f"'{parameter_name}' must be an integer number, "
+            f"'{parameter_name}' must be an integer, "
             f"got {type(parameter_value).__name__}."
         )
 
     # Check if integer is allowed when value is integer
     if isinstance(parameter_value, int) and (not integer_num and float_num):
         raise TypeError(
-            f"'{parameter_name}' must be a float number, "
+            f"'{parameter_name}' must be a float, "
             f"got {type(parameter_value).__name__}."
         )
 
@@ -298,7 +298,7 @@ def validade_numeric(
     return parameter_value
 
 
-def validade_enum(parameter_name, parameter_value, valid_enum):
+def validate_enum(parameter_name, parameter_value, valid_enum):
     """Validate and convert an enum parameter, returning the enum instance.
 
     This method validates that the provided parameter value is either an
@@ -335,7 +335,7 @@ def validade_enum(parameter_name, parameter_value, valid_enum):
     # Check if string maps to valid enum value
     if isinstance(parameter_value, str):
         valid_values = [enum.value for enum in valid_enum]
-        validade_parameter(parameter_name, parameter_value, valid_values)
+        validate_parameter(parameter_name, parameter_value, valid_values)
         return valid_enum(parameter_value)
 
     # Invalid type - neither enum instance nor string
@@ -345,7 +345,7 @@ def validade_enum(parameter_name, parameter_value, valid_enum):
     )
 
 
-def validade_string(parameter_name, parameter_value, accept_parameter_as_none=False):
+def validate_string(parameter_name, parameter_value, accept_parameter_as_none=False):
     """Validate string parameters and raise a TypeError if invalid.
 
     Parameters
@@ -379,7 +379,7 @@ def validade_string(parameter_name, parameter_value, accept_parameter_as_none=Fa
     return parameter_value
 
 
-def type_data_structure_error(
+def validate_data_structure(
     parameter_name,
     parameter_value,
     expected_type,
@@ -444,7 +444,7 @@ def type_data_structure_error(
         "array3D": ndarray,
     }
 
-    validade_parameter("expected_type", expected_type, parameter_map.keys())
+    validate_parameter("expected_type", expected_type, parameter_map.keys())
 
     element_map = {
         "int": int,
@@ -494,7 +494,7 @@ def type_data_structure_error(
         if isinstance(expected_type_element, str):
             expected_type_element = (expected_type_element,)
         for etype in expected_type_element:
-            validade_parameter("expected_type_element", etype, element_map.keys())
+            validate_parameter("expected_type_element", etype, element_map.keys())
         expected_types = tuple(element_map[etype] for etype in expected_type_element)
         expected_types += (
             (
@@ -532,7 +532,7 @@ def type_data_structure_error(
     return parameter_value
 
 
-def type_firedrake_error(
+def validate_firedrake_parameter(
     parameter_name, parameter_value, expected_type, accept_parameter_as_none=False
 ):
     """Validate Firedrake parameters and raise a TypeError if invalid.
@@ -572,7 +572,7 @@ def type_firedrake_error(
         "SpatialCoordinate": SpatialCoordinate,
     }
 
-    validade_parameter("expected_type", expected_type, parameter_map.keys())
+    validate_parameter("expected_type", expected_type, parameter_map.keys())
 
     # Checking the parameter type
     expected_valid = (parameter_map[expected_type],)
@@ -593,7 +593,7 @@ def type_firedrake_error(
     return parameter_value
 
 
-def value_file_error(
+def validate_file(
     parameter_name,
     parameter_value,
     valid_extensions,
@@ -614,7 +614,7 @@ def value_file_error(
         If `True`, the parameter value is allowed to be validated as `None`.
         Default is `False`, in which case `None` is not allowed.
     check_file_existance : `bool`, optional
-        If `True`, we will check if the file existis. Default is `False`
+        If `True`, we will check if the file exists. Default is `False`
 
     Returns
     -------
@@ -630,7 +630,7 @@ def value_file_error(
     FileNotFoundError
         If the file does not exist and check_exists is True
     """
-    parameter_value = validade_string(
+    parameter_value = validate_string(
         parameter_name,
         parameter_value,
         accept_parameter_as_none=accept_parameter_as_none,
@@ -645,7 +645,7 @@ def value_file_error(
         )
 
     file_extension = path.splitext(parameter_value)[1].lower()
-    validade_parameter("extension_type", file_extension, valid_extensions)
+    validate_parameter("extension_type", file_extension, valid_extensions)
 
     return parameter_value
 

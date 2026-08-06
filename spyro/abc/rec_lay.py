@@ -1,6 +1,6 @@
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import (value_model_dimension_error, validade_numeric,
-                                      validade_parameter)
+from ..utils.error_management import (validate_model_dimension, validate_numeric,
+                                      validate_parameter)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -76,7 +76,7 @@ class RectangLayer():
             raise TypeError("'domain_dim' must be a tuple, "
                             f"got {type(domain_dim).__name__}.")
 
-        validade_parameter('dimension', dimension, [2, 3])
+        validate_parameter('dimension', dimension, [2, 3])
 
         # Original domain dimensions
         self.domain_dim = domain_dim
@@ -104,7 +104,7 @@ class RectangLayer():
         """
 
         # Checking the pad length
-        validade_numeric('pad_len', pad_len, float_num=True,
+        validate_numeric('pad_len', pad_len, float_num=True,
                               integer_num=True, lower_bound=0.)
 
         # Rectangular semi-axes
@@ -138,7 +138,7 @@ class RectangLayer():
         pprint("Determining Rectangular Layer Parameters", comm=self.comm)
 
         # Checking inputs
-        value_model_dimension_error(('domain_dim', 'domain_layer'),
+        validate_model_dimension(('domain_dim', 'domain_layer'),
                                     (self.domain_dim, domain_layer), self.dimension)
 
         # Domain dimensions w/o layer

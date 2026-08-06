@@ -1,5 +1,5 @@
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import validade_enum, validade_numeric
+from ..utils.error_management import validate_enum, validate_numeric
 from ..utils.typing import (HyperLayerDegreeType, AbsorbingBCsType,
                             LayerShapeType, LayerSizeRefFrequency)
 
@@ -113,7 +113,7 @@ class Read_boundary_layer:
     @abc_boundary_layer_shape.setter
     def abc_boundary_layer_shape(self, value):
         """Set boundary layer shape with enum validation."""
-        shape_enum = validade_enum("abc_boundary_layer_shape",
+        shape_enum = validate_enum("abc_boundary_layer_shape",
                                           value, LayerShapeType)
 
         if shape_enum == LayerShapeType.NOLAYER:
@@ -128,7 +128,7 @@ class Read_boundary_layer:
     @abc_reference_freq.setter
     def abc_reference_freq(self, value):
         """Set reference frequency for sizing the absorbing layer with enum validation."""
-        reference_freq_enum = validade_enum("abc_reference_freq", value,
+        reference_freq_enum = validate_enum("abc_reference_freq", value,
                                                    LayerSizeRefFrequency)
         self._abc_reference_freq = reference_freq_enum
 
@@ -139,7 +139,7 @@ class Read_boundary_layer:
     @abc_degree_type.setter
     def abc_degree_type(self, value):
         """Set hypershape degree type for hypershape layers with enum validation."""
-        degree_type_enum = validade_enum("abc_degree_type", value,
+        degree_type_enum = validate_enum("abc_degree_type", value,
                                                 HyperLayerDegreeType)
         self._abc_degree_type = degree_type_enum
 
@@ -150,7 +150,7 @@ class Read_boundary_layer:
     @abc_pml_exponent.setter
     def abc_pml_exponent(self, value):
         """Set the exponent for the polynomial damping profile in PML with validation."""
-        pml_exponent = validade_numeric("abc_pml_exponent", value, float_num=False,
+        pml_exponent = validate_numeric("abc_pml_exponent", value, float_num=False,
                                              integer_num=True, lower_bound=1,
                                              include_lower_bound=True)
         self._abc_pml_exponent = pml_exponent
@@ -162,7 +162,7 @@ class Read_boundary_layer:
     @abc_pml_R.setter
     def abc_pml_R(self, value):
         """Set the theoretical reflection coefficient in the PML layer with validation."""
-        pml_R = validade_numeric("abc_pml_R", value, float_num=True,
+        pml_R = validate_numeric("abc_pml_R", value, float_num=True,
                                       integer_num=False, lower_bound=0.)
         self._abc_pml_R = pml_R
 
@@ -179,7 +179,7 @@ class Read_boundary_layer:
             self.abc_user_pml_cmax = False
             pml_cmax = value
         else:
-            pml_cmax = validade_numeric("abc_pml_cmax", value, float_num=True,
+            pml_cmax = validate_numeric("abc_pml_cmax", value, float_num=True,
                                              integer_num=True, lower_bound=0.)
         self._abc_pml_cmax = pml_cmax
 
@@ -197,7 +197,7 @@ class Read_boundary_layer:
             pprint("No Absorbing Boundary Conditions (ABCs) applied.", comm=self.comm)
             value = "no_abcs"
 
-        self._abc_type = validade_enum("abc_type", value, AbsorbingBCsType)
+        self._abc_type = validate_enum("abc_type", value, AbsorbingBCsType)
 
         if value == "PML":
             # PML forces rectangular shape
@@ -221,7 +221,7 @@ class Read_boundary_layer:
             self.abc_deg_layer = None
             if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
                 self.abc_deg_layer = abc_dictionary.get("degree_layer", 2.)
-                validade_numeric(
+                validate_numeric(
                     'abc_deg_layer', self.abc_deg_layer, float_num=True,
                     integer_num=True, lower_bound=2., include_lower_bound=True)
 
@@ -265,7 +265,7 @@ class Read_boundary_layer:
             pad_length = 0.
             self.abc_user_pad_len = False
         else:
-            pad_length = validade_numeric("abc_pad_length", value, float_num=True,
+            pad_length = validate_numeric("abc_pad_length", value, float_num=True,
                                                integer_num=True, lower_bound=0.,
                                                include_lower_bound=True)
             pprint(f"Pad length provided by user (km): {pad_length:.4f}", comm=self.comm)

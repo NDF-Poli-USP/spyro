@@ -9,7 +9,7 @@ from ..solvers.modal.modal_sol import Modal_Solver
 # from ..tools.habc_tools import layer_mask_field
 from ..utils.typing import (HyperLayerDegreeType, AbsorbingBCsType,
                             LayerShapeType, LayerSizeRefFrequency)
-# from spyro.utils.error_management import validade_parameter
+# from spyro.utils.error_management import validate_parameter
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.

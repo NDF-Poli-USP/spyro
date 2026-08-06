@@ -2,11 +2,11 @@ from os import getcwd
 from numpy import concatenate, inf, load, save, savetxt, trapezoid, zeros
 from scipy.signal import find_peaks
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import (type_data_structure_error, value_file_error,
-                                      validade_numeric, validade_string)
+from ..utils.error_management import (validate_data_structure, validate_file,
+                                      validate_numeric, validate_string)
 from ..utils.freq_tools import freq_response
 # from ..plots.plots_habc import plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
-# from ..utils.error_management import validade_parameter
+# from ..utils.error_management import validate_parameter
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -68,13 +68,13 @@ class MeasureError():
         if output_folder is None:
             self.path_save_error = getcwd() + "/output/"
         else:
-            self.path_save_error = validade_string("output_folder", output_folder)
+            self.path_save_error = validate_string("output_folder", output_folder)
 
         # Path to save data
         if output_case is None:
             self.path_save_err_case = self.path_save_error
         else:
-            self.path_save_err_case = validade_string("output_case", output_case)
+            self.path_save_err_case = validate_string("output_case", output_case)
 
         # Path to save the reference signal
         self.path_reference = self.path_save_error + "preamble/"
@@ -106,21 +106,21 @@ class MeasureError():
         """
 
         # Check the input parameters
-        validade_numeric("number_of_receivers", number_of_receivers,
+        validate_numeric("number_of_receivers", number_of_receivers,
                               float_num=False, integer_num=True, lower_bound=0.)
-        type_data_structure_error("receiver_locations", receiver_locations, "list",
+        validate_data_structure("receiver_locations", receiver_locations, "list",
                                   expected_type_element="tuple",
                                   expected_length=number_of_receivers)
-        type_data_structure_error("forward_solution_receivers", forward_solution_receivers,
+        validate_data_structure("forward_solution_receivers", forward_solution_receivers,
                                   "array2D", expected_type_element="float",
                                   expected_shape=(None, number_of_receivers))
-        validade_numeric("freq_Nyquist", freq_Nyquist, float_num=True,
+        validate_numeric("freq_Nyquist", freq_Nyquist, float_num=True,
                               integer_num=True, lower_bound=0.)
 
         pprint("\nSaving Reference Output", comm=self.comm)
 
         # File name for saving the reference signal
-        self.output_file = validade_string("output_file", output_file)
+        self.output_file = validate_string("output_file", output_file)
 
         # Path to the reference data folder with reference signals
         pth_str = self.path_reference + self.output_file + "_"
@@ -157,12 +157,12 @@ class MeasureError():
         pth_str = self.path_reference + self.output_file + "_"
 
         # Time domain signal
-        receivers_reference_file = value_file_error(pth_str + "time.npy",
+        receivers_reference_file = validate_file(pth_str + "time.npy",
                                                     check_file_existance=True)
         receivers_reference = load(receivers_reference_file)
 
         # Frequency domain signal
-        receivers_reference_fft_file = value_file_error(pth_str + "fft.npy",
+        receivers_reference_fft_file = validate_file(pth_str + "fft.npy",
                                                         check_file_existance=True)
         receivers_ref_fft = load(receivers_reference_fft_file).T
 
@@ -194,9 +194,9 @@ class MeasureError():
         """
 
         # Check the input parameters
-        type_data_structure_error("signal_model", signal_model, "array",
+        validate_data_structure("signal_model", signal_model, "array",
                                   expected_type_element="float")
-        type_data_structure_error("signal_reference", signal_reference, "array",
+        validate_data_structure("signal_reference", signal_reference, "array",
                                   expected_type_element="float")
 
         # Finding peaks in transient response
@@ -240,11 +240,11 @@ class MeasureError():
         """
 
         # Check the input parameters
-        type_data_structure_error("signal_model", signal_model, "array",
+        validate_data_structure("signal_model", signal_model, "array",
                                   expected_type_element="float")
-        type_data_structure_error("signal_reference", signal_reference, "array",
+        validate_data_structure("signal_reference", signal_reference, "array",
                                   expected_type_element="float")
-        validade_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
+        validate_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
 
         # Completing with zeros if arrays lengths are different
         model_len = len(signal_model)
@@ -325,16 +325,16 @@ class MeasureError():
         """
 
         # Check the input parameters
-        validade_numeric("number_of_receivers", number_of_receivers,
+        validate_numeric("number_of_receivers", number_of_receivers,
                               float_num=False, integer_num=True, lower_bound=0.)
-        type_data_structure_error("forward_solution_receivers", forward_solution_receivers,
+        validate_data_structure("forward_solution_receivers", forward_solution_receivers,
                                   "array2D", expected_shape=(None, number_of_receivers))
-        type_data_structure_error("receivers_reference", receivers_reference, "array2D",
+        validate_data_structure("receivers_reference", receivers_reference, "array2D",
                                   expected_shape=(None, number_of_receivers))
-        validade_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
-        validade_numeric("final_energy", final_energy, float_num=True,
+        validate_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
+        validate_numeric("final_energy", final_energy, float_num=True,
                               integer_num=False, lower_bound=0.)
-        validade_numeric("final_energy_reference", final_energy_reference,
+        validate_numeric("final_energy_reference", final_energy_reference,
                               float_num=True, integer_num=False, lower_bound=0.)
 
         pprint("\nComputing Error Measures", comm=self.comm)
@@ -507,7 +507,7 @@ class MeasureError():
     #     max_errIt = dat_reg_xCR[1]
     #     max_errPK = dat_reg_xCR[2]
 
-    #     validade_parameter("crit_opt", crit_opt,
+    #     validate_parameter("crit_opt", crit_opt,
     #                           ["err_difference", "err_integral", "err_sum"])
 
     #     if crit_opt == "err_difference":

@@ -11,9 +11,9 @@ from ..io.basicio import parallel_print as pprint
 from .lay_len import calc_size_lay
 from ..plots.plots_habc import plot_function_layer_size
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
-from ..utils.error_management import (validade_enum, type_data_structure_error,
-                                      validade_numeric, validade_parameter,
-                                      validade_string)
+from ..utils.error_management import (validate_enum, validate_data_structure,
+                                      validate_numeric, validate_parameter,
+                                      validate_string)
 from ..utils.freq_tools import freq_response
 from ..utils.typing import (BoundaryConditionsType, HyperLayerDegreeType,
                             AbsorbingBCsType, LayerShapeType, LayerSizeRefFrequency)
@@ -219,19 +219,19 @@ class ABCLayer(NRBC, MeasureError):
         """
 
         # Model dimension
-        self.dimension = validade_parameter("dimension", dimension, [2, 3])
+        self.dimension = validate_parameter("dimension", dimension, [2, 3])
 
         # Original domain dimensions
-        self.domain_dim = type_data_structure_error("domain_dim", domain_dim, "tuple",
+        self.domain_dim = validate_data_structure("domain_dim", domain_dim, "tuple",
                                                     expected_type_element=("float", "int"),
                                                     expected_length=dimension)
         # Source frequency
-        self.frequency = validade_numeric("frequency", frequency,
+        self.frequency = validate_numeric("frequency", frequency,
                                                float_num=True, integer_num=True,
                                                lower_bound=0., accept_parameter_as_none=True)
 
         # Timestep for the transient simulation
-        self.dt = validade_numeric("dt", dt, float_num=True, integer_num=True,
+        self.dt = validate_numeric("dt", dt, float_num=True, integer_num=True,
                                         lower_bound=0., accept_parameter_as_none=True)
 
         # Nyquist frequency
@@ -244,27 +244,27 @@ class ABCLayer(NRBC, MeasureError):
         self.func_space_type = func_space_type
 
         # ABC layer parameters
-        self.abc_boundary_layer_type = validade_enum("abc_boundary_layer_type",
+        self.abc_boundary_layer_type = validate_enum("abc_boundary_layer_type",
                                                             abc_boundary_layer_type,
                                                             AbsorbingBCsType)
         if abc_boundary_layer_type not in [AbsorbingBCsType.HYBRID, AbsorbingBCsType.PML]:
-            validade_parameter("abc_boundary_layer_type", abc_boundary_layer_type,
+            validate_parameter("abc_boundary_layer_type", abc_boundary_layer_type,
                                   [AbsorbingBCsType.HYBRID, AbsorbingBCsType.PML])
 
-        self.abc_boundary_layer_shape = validade_enum("abc_boundary_layer_shape",
+        self.abc_boundary_layer_shape = validate_enum("abc_boundary_layer_shape",
                                                              abc_boundary_layer_shape,
                                                              LayerShapeType)
-        self.abc_reference_freq = validade_enum("abc_reference_freq",
+        self.abc_reference_freq = validate_enum("abc_reference_freq",
                                                        abc_reference_freq,
                                                        LayerSizeRefFrequency)
-        self.abc_degree_type = validade_enum("abc_degree_type", abc_degree_type,
+        self.abc_degree_type = validate_enum("abc_degree_type", abc_degree_type,
                                                     HyperLayerDegreeType)
 
         # Layer degree
         if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
             self.abc_deg_layer = None
         elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-            self.abc_deg_layer = validade_numeric('abc_deg_layer', abc_deg_layer,
+            self.abc_deg_layer = validate_numeric('abc_deg_layer', abc_deg_layer,
                                                        float_num=True, integer_num=True,
                                                        lower_bound=2.,
                                                        include_lower_bound=True)
@@ -403,7 +403,7 @@ class ABCLayer(NRBC, MeasureError):
         """
 
         # Validate the output folder parameter
-        validade_string("output_folder", output_folder)
+        validate_string("output_folder", output_folder)
 
         # Identify the case of the ABC scheme for output labeling
         self.case_abc = self.identify_abc_layer_case()
@@ -870,9 +870,9 @@ class ABCLayer(NRBC, MeasureError):
         """
 
         # Cheking input parameters
-        validade_numeric("max_divisor_tf", max_divisor_tf,
+        validate_numeric("max_divisor_tf", max_divisor_tf,
                               float_num=False, integer_num=True, lower_bound=0.)
-        validade_numeric("mag_add", mag_add, float_num=False, integer_num=True,
+        validate_numeric("mag_add", mag_add, float_num=False, integer_num=True,
                               lower_bound=0., include_lower_bound=True)
 
         pprint("\nChecking Timestep Size", comm=self.comm)
@@ -936,13 +936,13 @@ class ABCLayer(NRBC, MeasureError):
         """
 
         # Cheking input parameters
-        validade_numeric("lmin", lmin, float_num=True,
+        validate_numeric("lmin", lmin, float_num=True,
                               integer_num=True, lower_bound=0.)
-        validade_numeric("c_bnd_max", c_bnd_max, float_num=True,
+        validate_numeric("c_bnd_max", c_bnd_max, float_num=True,
                               integer_num=True, lower_bound=0.)
-        validade_numeric("final_time", final_time, float_num=True,
+        validate_numeric("final_time", final_time, float_num=True,
                               integer_num=True, lower_bound=0.)
-        type_data_structure_error("source_locations", source_locations, "list",
+        validate_data_structure("source_locations", source_locations, "list",
                                   expected_type_element="tuple", accept_parameter_as_none=True)
 
         # Size of the domain extension

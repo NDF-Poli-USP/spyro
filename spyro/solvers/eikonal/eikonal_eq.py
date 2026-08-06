@@ -1,7 +1,7 @@
 import firedrake as fire
 import numpy as np
 from sys import float_info, exit
-from ...utils.error_management import sanitize_num_array, validade_parameter
+from ...utils.error_management import sanitize_num_array, validate_parameter
 from ...domains.quadrature import quadrature_rules
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -120,7 +120,7 @@ class Eikonal_Modeling():
 
         # Finite element type.
         allowed_ele_types = ['consistent', 'underintegrated']
-        self.ele_type_eik = validade_parameter('ele_type_eik', ele_type_eik,
+        self.ele_type_eik = validate_parameter('ele_type_eik', ele_type_eik,
                                                   allowed_ele_types)
 
         # Finite element order for the Eikonal analysis
@@ -443,7 +443,7 @@ class Eikonal_Modeling():
             init_guess = cell_diameter_function / fire.Constant(c_min)
 
         else:
-            validade_parameter('typ_igs', typ_igs, ['constant', 'variable'])
+            validate_parameter('typ_igs', typ_igs, ['constant', 'variable'])
 
         return init_guess
 

@@ -270,7 +270,7 @@ def export_scalar_field(function, grid_spacing, output_filename, comm=None):
         create_segy(function, V, grid_spacing, segy_filename)
         segy_to_png(segy_filename, output_file=output_filename)
     else:
-        from ..utils.error_management import validade_parameter  # Avoinding circular import
+        from ..utils.error_management import validate_parameter  # Avoinding circular import
         valid_extensions = [".segy", ".sgy", ".png"]
         extension = Path(output_filename).suffix.lower()
-        validade_parameter("extension_type", extension, valid_extensions)
+        validate_parameter("extension_type", extension, valid_extensions)

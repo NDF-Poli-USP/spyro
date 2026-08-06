@@ -3,8 +3,8 @@ from scipy.integrate import dblquad, quad
 from scipy.special import beta, betainc, gamma
 from sys import float_info
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import (validade_enum, value_model_dimension_error,
-                                      validade_numeric, validade_parameter)
+from ..utils.error_management import (validate_enum, validate_model_dimension,
+                                      validate_numeric, validate_parameter)
 from ..utils.typing import HyperLayerDegreeType
 
 
@@ -125,7 +125,7 @@ class HyperLayer():
         if n_hyp < 2.:
             raise ValueError(f"n_hyp must be >= 2, got {n_hyp}.")
 
-        validade_parameter('dimension', dimension, [2, 3])
+        validate_parameter('dimension', dimension, [2, 3])
 
         # Original domain dimensions
         self.domain_dim = domain_dim
@@ -137,7 +137,7 @@ class HyperLayer():
         self.dimension = dimension
 
         # Type of the hypereshape degree
-        self.n_type = validade_enum('n_type', n_type, HyperLayerDegreeType)
+        self.n_type = validate_enum('n_type', n_type, HyperLayerDegreeType)
 
         # Communicator MPI
         self.comm = comm
@@ -450,11 +450,11 @@ class HyperLayer():
         """
 
         # Checking the pad length
-        validade_numeric('pad_len', pad_len, float_num=True,
+        validate_numeric('pad_len', pad_len, float_num=True,
                               integer_num=True, lower_bound=0.)
 
         # Checking the minimum mesh size
-        validade_numeric('lmin', lmin, float_num=True,
+        validate_numeric('lmin', lmin, float_num=True,
                               integer_num=True, lower_bound=0.)
 
         # Domain dimensions
@@ -789,7 +789,7 @@ class HyperLayer():
         pprint("Determining Hypershape Layer Parameters")
 
         # Domain dimensions w/o layer
-        value_model_dimension_error(('domain_dim', 'domain_hyp'),
+        validate_model_dimension(('domain_dim', 'domain_hyp'),
                                     (self.domain_dim, domain_hyp), self.dimension)
 
         # Defining the hypershape semi-axes

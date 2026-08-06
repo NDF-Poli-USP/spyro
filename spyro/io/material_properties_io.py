@@ -43,7 +43,7 @@ def define_property_function_space(wave, func_space_type, dg_property,
 
     # Checking input arguments
     opts_func_space_type = ["scalar", "vector", "tensor"]
-    error_management.validade_parameter("func_space_type", func_space_type,
+    error_management.validate_parameter("func_space_type", func_space_type,
                                            opts_func_space_type)
 
     if dg_property is False and func_space_type == "scalar":

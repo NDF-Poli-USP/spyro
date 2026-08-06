@@ -10,45 +10,45 @@ from ufl.form import Form
 from ufl.geometry import SpatialCoordinate
 from enum import Enum
 from spyro.utils.error_management import (
-    validade_enum, mutually_exclusive_parameter_error, sanitize_num_array,
-    type_data_structure_error, type_firedrake_error, value_file_error,
-    value_model_dimension_error, validade_numeric,
-    validade_parameter, validade_string)
+    validate_enum, mutually_exclusive_parameter_error, sanitize_num_array,
+    validate_data_structure, validate_firedrake_parameter, validate_file,
+    validate_model_dimension, validate_numeric,
+    validate_parameter, validate_string)
 
 
 class ExampleEnum(Enum):
-    """Test enum class for validade_enum tests."""
+    """Test enum class for validate_enum tests."""
     VALUE1 = "value1"
     VALUE2 = "value2"
     VALUE3 = "value3"
 
 
 class TestValueParameterError:
-    """Tests for validade_parameter function."""
+    """Tests for validate_parameter function."""
 
     def test_valid_parameter(self):
         """Test with valid parameter value."""
-        result = validade_parameter("test_param", "valid", ["valid", "invalid"])
+        result = validate_parameter("test_param", "valid", ["valid", "invalid"])
         assert result == "valid"
 
     def test_invalid_parameter_single(self):
         """Test with invalid parameter when only one valid value."""
         with raises(ValueError) as exc_info:
-            validade_parameter("test_param", "invalid", ["valid"])
+            validate_parameter("test_param", "invalid", ["valid"])
         assert "Invalid test_param: 'invalid'" in str(exc_info.value)
         assert "Please use: 'valid'" in str(exc_info.value)
 
     def test_invalid_parameter_multiple(self):
         """Test with invalid parameter when multiple valid values."""
         with raises(ValueError) as exc_info:
-            validade_parameter("test_param", "invalid", ["valid1", "valid2", "valid3"])
+            validate_parameter("test_param", "invalid", ["valid1", "valid2", "valid3"])
         assert "Invalid test_param: 'invalid'" in str(exc_info.value)
         assert "Please use: 'valid1', 'valid2' or 'valid3'" in str(exc_info.value)
 
     def test_invalid_parameter_two_values(self):
         """Test with invalid parameter when two valid values."""
         with raises(ValueError) as exc_info:
-            validade_parameter("test_param", "invalid", ["valid1", "valid2"])
+            validate_parameter("test_param", "invalid", ["valid1", "valid2"])
         assert "Please use: 'valid1' or 'valid2'" in str(exc_info.value)
 
 
@@ -103,7 +103,7 @@ class TestMutuallyExclusiveParameterError:
 
 
 class TestValueModelDimensionError:
-    """Tests for value_model_dimension_error function."""
+    """Tests for validate_model_dimension function."""
 
     def test_matching_dimensions(self):
         """Test with matching dimensions(should not raise)."""
@@ -112,9 +112,9 @@ class TestValueModelDimensionError:
 
         # Should not raise an exception
         try:
-            value_model_dimension_error(parameter_names, parameters, 2)
+            validate_model_dimension(parameter_names, parameters, 2)
         except ValueError:
-            fail("value_model_dimension_error raised ValueError unexpectedly")
+            fail("validate_model_dimension raised ValueError unexpectedly")
 
     def test_mismatching_dimensions(self):
         """Test with mismatching dimensions."""
@@ -122,7 +122,7 @@ class TestValueModelDimensionError:
         parameters = ([1, 2], [3, 4, 5])
 
         with raises(ValueError) as exc_info:
-            value_model_dimension_error(parameter_names, parameters, 2)
+            validate_model_dimension(parameter_names, parameters, 2)
 
         error_msg = str(exc_info.value)
         assert "Mismatch in domain dimensions" in error_msg
@@ -135,7 +135,7 @@ class TestValueModelDimensionError:
         parameters = ([1, 2, 3], [3, 4])
 
         with raises(ValueError) as exc_info:
-            value_model_dimension_error(parameter_names, parameters, 2)
+            validate_model_dimension(parameter_names, parameters, 2)
 
         error_msg = str(exc_info.value)
         assert "coord1 (3), coord2 (2)" in error_msg
@@ -226,23 +226,23 @@ class TestCleanInstNum:
 
 
 class TestValueNumericalError:
-    """Tests for validade_numeric function."""
+    """Tests for validate_numeric function."""
 
     def test_valid_float(self):
         """Test with valid float value."""
-        result = validade_numeric("test_param", 3.14)
+        result = validate_numeric("test_param", 3.14)
         assert result == 3.14
 
     def test_valid_integer(self):
         """Test with valid integer value."""
-        result = validade_numeric("test_param", 42)
+        result = validate_numeric("test_param", 42)
         assert result == 42
 
     def test_float_and_integer_allowed(self):
         """Test with both float and integer allowed."""
-        result_float = validade_numeric(
+        result_float = validate_numeric(
             "test_param", 3.14, float_num=True, integer_num=True)
-        result_int = validade_numeric(
+        result_int = validate_numeric(
             "test_param", 42, float_num=True, integer_num=True)
         assert result_float == 3.14
         assert result_int == 42
@@ -250,295 +250,295 @@ class TestValueNumericalError:
     def test_valid_float_as_int(self):
         """Test with float when integer is expected."""
         with raises(TypeError) as exc_info:
-            validade_numeric("test_param", 3.14, float_num=False, integer_num=True)
+            validate_numeric("test_param", 3.14, float_num=False, integer_num=True)
         assert "'test_param' must be an integer" in str(exc_info.value)
 
     def test_valid_int_as_float(self):
         """Test with integer when float is expected."""
         with raises(TypeError) as exc_info:
-            validade_numeric("test_param", 42, float_num=True, integer_num=False)
+            validate_numeric("test_param", 42, float_num=True, integer_num=False)
         assert "'test_param' must be a float" in str(exc_info.value)
 
     def test_valid_accept_parameter_as_none(self):
         """Test with None when accept_parameter_as_none is True."""
-        result = validade_numeric("test_param", None, accept_parameter_as_none=True)
+        result = validate_numeric("test_param", None, accept_parameter_as_none=True)
         assert result is None
 
     def test_valid_none_not_default(self):
         """Test with None when accept_parameter_as_none is False."""
         with raises(TypeError) as exc_info:
-            validade_numeric("test_param", None)
+            validate_numeric("test_param", None)
         assert "'test_param' must be a float" in str(exc_info.value)
 
     def test_valid_string_parameter(self):
         """Test with string parameter(should raise TypeError)."""
         with raises(TypeError) as exc_info:
-            validade_numeric("test_param", "not a number")
+            validate_numeric("test_param", "not a number")
         assert "'test_param' must be a float" in str(exc_info.value)
 
     def test_both_bounds_inclusive(self):
         """Test with both bounds inclusive."""
-        result = validade_numeric("test_param", 5, lower_bound=0, upper_bound=10,
+        result = validate_numeric("test_param", 5, lower_bound=0, upper_bound=10,
                                        include_lower_bound=True, include_upper_bound=True)
         assert result == 5
 
         with raises(ValueError) as exc_info:
-            validade_numeric("test_param", -1., lower_bound=0, upper_bound=10,
+            validate_numeric("test_param", -1., lower_bound=0, upper_bound=10,
                                   include_lower_bound=True, include_upper_bound=True)
         assert ("'test_param' must be between 0 and 10 "
                 "(both bounds inclusive)") in str(exc_info.value)
 
         with raises(ValueError) as exc_info:
-            validade_numeric("test_param", 11., lower_bound=0, upper_bound=10,
+            validate_numeric("test_param", 11., lower_bound=0, upper_bound=10,
                                   include_lower_bound=True, include_upper_bound=True)
         assert ("'test_param' must be between 0 and 10 "
                 "(both bounds inclusive)") in str(exc_info.value)
 
     def test_lower_bound_inclusive(self):
         """Test with lower bound inclusive."""
-        result = validade_numeric("test_param", 0, lower_bound=0,
+        result = validate_numeric("test_param", 0, lower_bound=0,
                                        include_lower_bound=True)
         assert result == 0
 
-        result = validade_numeric("test_param", 5., lower_bound=0,
+        result = validate_numeric("test_param", 5., lower_bound=0,
                                        include_lower_bound=True)
         assert result == 5.
 
         with raises(ValueError) as exc_info:
-            validade_numeric(
+            validate_numeric(
                 "test_param", -1., lower_bound=0, include_lower_bound=True)
         assert "'test_param' must be greater than or equal to 0" in str(exc_info.value)
 
     def test_upper_bound_inclusive(self):
         """Test with upper bound inclusive."""
-        result = validade_numeric("test_param", 10., upper_bound=10,
+        result = validate_numeric("test_param", 10., upper_bound=10,
                                        include_upper_bound=True)
         assert result == 10
 
-        result = validade_numeric("test_param", 9, upper_bound=10,
+        result = validate_numeric("test_param", 9, upper_bound=10,
                                        include_upper_bound=True)
         assert result == 9.
 
         with raises(ValueError) as exc_info:
-            validade_numeric("test_param", 11, upper_bound=10,
+            validate_numeric("test_param", 11, upper_bound=10,
                                   include_upper_bound=True)
         assert "'test_param' must be less than or equal to 10" in str(exc_info.value)
 
     def test_both_bounds_exclusive(self):
         """Test with both bounds exclusive(at bound)."""
-        result = validade_numeric("test_param", 6, lower_bound=5, upper_bound=10)
+        result = validate_numeric("test_param", 6, lower_bound=5, upper_bound=10)
         assert result == 6
 
         with raises(ValueError) as exc_info:
-            validade_numeric("test_param", 5, lower_bound=5, upper_bound=10)
+            validate_numeric("test_param", 5, lower_bound=5, upper_bound=10)
         assert ("'test_param' must be between 5 and 10 "
                 "(both bounds exclusive)") in str(exc_info.value)
 
         with raises(ValueError) as exc_info:
-            validade_numeric("test_param", 10, lower_bound=5, upper_bound=10)
+            validate_numeric("test_param", 10, lower_bound=5, upper_bound=10)
         assert ("'test_param' must be between 5 and 10 "
                 "(both bounds exclusive)") in str(exc_info.value)
 
     def test_lower_bound_exclusive(self):
         """Test with lower bound exclusive."""
-        result = validade_numeric("test_param", 6., lower_bound=5,
+        result = validate_numeric("test_param", 6., lower_bound=5,
                                        include_lower_bound=False)
         assert result == 6.
 
         with raises(ValueError) as exc_info:
-            validade_numeric(
+            validate_numeric(
                 "test_param", 5, lower_bound=5, include_lower_bound=False)
         assert "'test_param' must be greater than 5" in str(exc_info.value)
 
     def test_upper_bound_exclusive(self):
         """Test with upper bound exclusive."""
         with raises(ValueError) as exc_info:
-            validade_numeric(
+            validate_numeric(
                 "test_param", 10, upper_bound=10, include_upper_bound=False)
         assert "'test_param' must be less than 10" in str(exc_info.value)
 
     def test_invalid_bounds(self):
         """Test with invalid bounds(lower > upper)."""
         with raises(ValueError) as exc_info:
-            validade_numeric("test_param", 5, lower_bound=10, upper_bound=0)
+            validate_numeric("test_param", 5, lower_bound=10, upper_bound=0)
         assert "Invalid bounds" in str(exc_info.value)
 
 
 class TestEnumParameterError:
-    """Tests for validade_enum function."""
+    """Tests for validate_enum function."""
 
     def test_valid_enum_instance(self):
         """Test with valid enum instance."""
-        result = validade_enum("test_param", ExampleEnum.VALUE1, ExampleEnum)
+        result = validate_enum("test_param", ExampleEnum.VALUE1, ExampleEnum)
         assert result == ExampleEnum.VALUE1
 
     def test_valid_string_value(self):
         """Test with valid string value."""
-        result = validade_enum("test_param", "value2", ExampleEnum)
+        result = validate_enum("test_param", "value2", ExampleEnum)
         assert result == ExampleEnum.VALUE2
 
     def test_invalid_string_value(self):
         """Test with invalid string value."""
         with raises(ValueError) as exc_info:
-            validade_enum("test_param", "invalid", ExampleEnum)
+            validate_enum("test_param", "invalid", ExampleEnum)
         assert "Invalid test_param: 'invalid'" in str(exc_info.value)
 
     def test_invalid_type(self):
         """Test with invalid type(not enum instance or string)."""
         with raises(TypeError) as exc_info:
-            validade_enum("test_param", 123, ExampleEnum)
+            validate_enum("test_param", 123, ExampleEnum)
         assert "'test_param' must be ExampleEnum or str" in str(exc_info.value)
 
 
 class TestValueStringError:
-    """Tests for validade_string function."""
+    """Tests for validate_string function."""
 
     def test_valid_string(self):
         """Test with valid string."""
-        result = validade_string("test_param", "valid_string")
+        result = validate_string("test_param", "valid_string")
         assert result == "valid_string"
 
     def test_valid_accept_parameter_as_none(self):
         """Test with None when accept_parameter_as_none is True."""
-        result = validade_string("test_param", None, accept_parameter_as_none=True)
+        result = validate_string("test_param", None, accept_parameter_as_none=True)
         assert result is None
 
     def test_valid_none_not_default(self):
         """Test with None when accept_parameter_as_none is False."""
         with raises(TypeError) as exc_info:
-            validade_string("test_param", None)
+            validate_string("test_param", None)
         assert "'test_param' must be a string" in str(exc_info.value)
 
     def test_invalid_type(self):
         """Test with invalid type."""
         with raises(TypeError) as exc_info:
-            validade_string("test_param", 123)
+            validate_string("test_param", 123)
         assert "'test_param' must be a string" in str(exc_info.value)
 
 
 class TestTypeDataStructureError:
-    """Tests for type_data_structure_error function."""
+    """Tests for validate_data_structure function."""
 
     def test_valid_list(self):
         """Test with valid list."""
-        result = type_data_structure_error("test_param", [1, 2, 3], "list")
+        result = validate_data_structure("test_param", [1, 2, 3], "list")
         assert result == [1, 2, 3]
 
     def test_valid_dict(self):
         """Test with valid dict."""
-        result = type_data_structure_error("test_param", {"a": 1, "b": 2}, "dict")
+        result = validate_data_structure("test_param", {"a": 1, "b": 2}, "dict")
         assert result == {"a": 1, "b": 2}
 
     def test_valid_tuple(self):
         """Test with valid tuple."""
-        result = type_data_structure_error("test_param", (1, 2, 3), "tuple")
+        result = validate_data_structure("test_param", (1, 2, 3), "tuple")
         assert result == (1, 2, 3)
 
     def test_valid_array(self):
         """Test with valid numpy array."""
         arr = array([1, 2, 3])
-        result = type_data_structure_error("test_param", arr, "array")
+        result = validate_data_structure("test_param", arr, "array")
         assert_array_equal(result, arr)
 
     def test_valid_accept_parameter_as_none(self):
         """Test with None when accept_parameter_as_none is True."""
-        result = type_data_structure_error("test_param", None, "list", accept_parameter_as_none=True)
+        result = validate_data_structure("test_param", None, "list", accept_parameter_as_none=True)
         assert result is None
 
     def test_valid_none_not_default(self):
         """Test with None when accept_parameter_as_none is False."""
         with raises(TypeError) as exc_info:
-            type_data_structure_error("test_param", None, "list")
+            validate_data_structure("test_param", None, "list")
         assert "'test_param' must be a list" in str(exc_info.value)
 
     def test_invalid_type(self):
         """Test with invalid type."""
         with raises(TypeError) as exc_info:
-            type_data_structure_error("test_param", "not a list", "list")
+            validate_data_structure("test_param", "not a list", "list")
         assert "'test_param' must be a list" in str(exc_info.value)
 
     def test_invalid_expected_type(self):
         """Test with invalid expected_type."""
         with raises(ValueError) as exc_info:
-            type_data_structure_error("test_param", [1, 2, 3], "invalid")
+            validate_data_structure("test_param", [1, 2, 3], "invalid")
         assert "Invalid expected_type: 'invalid'" in str(exc_info.value)
 
     def test_expected_length_match(self):
         """Test with matching expected length."""
-        result = type_data_structure_error("test_param", [1, 2, 3],
+        result = validate_data_structure("test_param", [1, 2, 3],
                                            "list", expected_length=3)
         assert result == [1, 2, 3]
 
     def test_expected_length_mismatch(self):
         """Test with mismatching expected length."""
         with raises(ValueError) as exc_info:
-            type_data_structure_error("test_param", [1, 2, 3],
+            validate_data_structure("test_param", [1, 2, 3],
                                       "list", expected_length=4)
         assert "'test_param' must have length 4" in str(exc_info.value)
 
     def test_element_type_check_single(self):
         """Test with single element type check."""
-        result = type_data_structure_error("test_param", [1, 2, 3], "list",
+        result = validate_data_structure("test_param", [1, 2, 3], "list",
                                            expected_type_element="int")
         assert result == [1, 2, 3]
 
     def test_element_type_check_multiple(self):
         """Test with multiple element type check."""
-        result = type_data_structure_error("test_param", [1, 2.5, 3], "list",
+        result = validate_data_structure("test_param", [1, 2.5, 3], "list",
                                            expected_type_element=("int", "float"))
         assert result == [1, 2.5, 3]
 
     def test_element_type_check_failure(self):
         """Test with element type check failure."""
         with raises(TypeError) as exc_info:
-            type_data_structure_error("test_param", [1, "string", 3], "list",
+            validate_data_structure("test_param", [1, "string", 3], "list",
                                       expected_type_element="int")
         assert ("All elements of 'test_param' must be "
                 "of type: 'int'") in str(exc_info.value)
 
     def test_element_type_check_with_none(self):
         """Test with element type check including None."""
-        result = type_data_structure_error("test_param", [1, None, 3], "list",
+        result = validate_data_structure("test_param", [1, None, 3], "list",
                                            expected_type_element=("int", "NoneType"))
         assert result == [1, None, 3]
 
     def test_valid_array2D(self):
         """Test with valid 2D numpy array."""
         arr = array([[1, 2], [3, 4]])
-        result = type_data_structure_error("test_param", arr, "array2D")
+        result = validate_data_structure("test_param", arr, "array2D")
         assert_array_equal(result, arr)
 
     def test_valid_array3D(self):
         """Test with valid 3D numpy array."""
         arr = array([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
-        result = type_data_structure_error("test_param", arr, "array3D")
+        result = validate_data_structure("test_param", arr, "array3D")
         assert_array_equal(result, arr)
 
     def test_array2D_wrong_dimensions(self):
         """Test with array2D but 3D array provided."""
         arr = array([[[1, 2], [3, 4]]])
         with raises(ValueError) as exc_info:
-            type_data_structure_error("test_param", arr, "array2D")
+            validate_data_structure("test_param", arr, "array2D")
         assert "'test_param' must be a 2D array" in str(exc_info.value)
 
     def test_array3D_wrong_dimensions(self):
         """Test with array3D but 2D array provided."""
         arr = array([[1, 2], [3, 4]])
         with raises(ValueError) as exc_info:
-            type_data_structure_error("test_param", arr, "array3D")
+            validate_data_structure("test_param", arr, "array3D")
         assert "'test_param' must be a 3D array" in str(exc_info.value)
 
     def test_shape_check_match(self):
         """Test with matching shape."""
         arr = array([[1, 2], [3, 4]])
-        result = type_data_structure_error("test_param", arr, "array2D",
+        result = validate_data_structure("test_param", arr, "array2D",
                                            expected_shape=(2, 2))
         assert_array_equal(result, arr)
 
     def test_shape_check_with_none_dimension(self):
         """Test with shape containing None dimension."""
         arr = array([[1, 2, 3], [4, 5, 6]])
-        result = type_data_structure_error("test_param", arr, "array2D",
+        result = validate_data_structure("test_param", arr, "array2D",
                                            expected_shape=(2, None))
         assert_array_equal(result, arr)
 
@@ -546,14 +546,14 @@ class TestTypeDataStructureError:
         """Test with shape mismatch."""
         arr = array([[1, 2], [3, 4]])
         with raises(ValueError) as exc_info:
-            type_data_structure_error("test_param", arr, "array2D",
+            validate_data_structure("test_param", arr, "array2D",
                                       expected_shape=(3, 2))
         assert "'test_param' must have shape (3, 2)" in str(exc_info.value)
 
     def test_element_type_check_for_array(self):
         """Test element type check for numpy array."""
         arr = array([1, 2, 3])
-        result = type_data_structure_error("test_param", arr, "array",
+        result = validate_data_structure("test_param", arr, "array",
                                            expected_type_element="int")
         assert_array_equal(result, arr)
 
@@ -561,93 +561,93 @@ class TestTypeDataStructureError:
         """Test element type check failure for numpy array."""
         arr = array([1, 2.5, 3])
         with raises(TypeError) as exc_info:
-            type_data_structure_error("test_param", arr, "array",
+            validate_data_structure("test_param", arr, "array",
                                       expected_type_element="int")
         assert "All elements of 'test_param' must be of type: 'int'" in str(exc_info.value)
 
     def test_element_type_check_single_string(self):
         """Test with single element type check as string (not tuple)."""
-        result = type_data_structure_error("test_param", ["a", "b", "c"], "list",
+        result = validate_data_structure("test_param", ["a", "b", "c"], "list",
                                            expected_type_element="str")
         assert result == ["a", "b", "c"]
 
     def test_invalid_expected_type_element(self):
         """Test with invalid expected_type_element."""
         with raises(ValueError) as exc_info:
-            type_data_structure_error("test_param", [1, 2, 3], "list",
+            validate_data_structure("test_param", [1, 2, 3], "list",
                                       expected_type_element="invalid")
         assert "Invalid expected_type_element: 'invalid'" in str(exc_info.value)
 
     def test_mixed_element_types_valid(self):
         """Test with mixed valid element types."""
-        result = type_data_structure_error(
+        result = validate_data_structure(
             "test_param", [1, "two", 3.0, None], "list",
             expected_type_element=("int", "str", "float", "NoneType"))
         assert result == [1, "two", 3.0, None]
 
 
 class TestTypeFiredrakeError:
-    """Tests for type_firedrake_error function."""
+    """Tests for validate_firedrake_parameter function."""
 
     @patch('firedrake.Function')
     def test_valid_function(self, mock_function):
         """Test with valid Function."""
         mock_func = Mock(spec=Function)
-        result = type_firedrake_error("test_param", mock_func, "Function")
+        result = validate_firedrake_parameter("test_param", mock_func, "Function")
         assert result == mock_func
 
     def test_none_without_default_for_function(self):
         """Test with None when accept_parameter_as_none is False for Function."""
         with raises(TypeError) as exc_info:
-            type_firedrake_error("test_param", None, "Function")
+            validate_firedrake_parameter("test_param", None, "Function")
         assert "'test_param' must be of type:" in str(exc_info.value)
 
     def test_none_with_default_for_function(self):
         """Test with None when accept_parameter_as_none is True for Function."""
-        result = type_firedrake_error("test_param", None, "Function", accept_parameter_as_none=True)
+        result = validate_firedrake_parameter("test_param", None, "Function", accept_parameter_as_none=True)
         assert result is None
 
     def test_function_invalid_type(self):
         """Test with invalid type for Mesh."""
         with raises(TypeError) as exc_info:
-            type_firedrake_error("test_param", "not a function", "Function")
+            validate_firedrake_parameter("test_param", "not a function", "Function")
         assert "'test_param' must be of type:" in str(exc_info.value)
 
     @patch('firedrake.FunctionSpace')
     def test_valid_functionspace(self, mock_fs):
         """Test with valid FunctionSpace."""
         mock_fs_instance = Mock(spec=FunctionSpace)
-        result = type_firedrake_error("test_param", mock_fs_instance, "FunctionSpace")
+        result = validate_firedrake_parameter("test_param", mock_fs_instance, "FunctionSpace")
         assert result == mock_fs_instance
 
     def test_functionspace_with_geometry_instance(self):
         """Test that WithGeometry instances are accepted for FunctionSpace."""
         mock_with_geom = Mock(spec=WithGeometry)
-        result = type_firedrake_error("test_param", mock_with_geom, "FunctionSpace")
+        result = validate_firedrake_parameter("test_param", mock_with_geom, "FunctionSpace")
         assert result == mock_with_geom
 
     def test_functionspace_with_invalid_type(self):
         """Test with invalid type for FunctionSpace."""
         with raises(TypeError) as exc_info:
-            type_firedrake_error("test_param", "not a functionspace", "FunctionSpace")
+            validate_firedrake_parameter("test_param", "not a functionspace", "FunctionSpace")
         assert "'test_param' must be of type:" in str(exc_info.value)
 
     def test_none_without_default_for_functionspace(self):
         """Test with None when accept_parameter_as_none is False for FunctionSpace."""
         with raises(TypeError) as exc_info:
-            type_firedrake_error("test_param", None, "FunctionSpace")
+            validate_firedrake_parameter("test_param", None, "FunctionSpace")
         assert "'test_param' must be of type:" in str(exc_info.value)
 
     def test_none_with_default_for_functionspace(self):
         """Test with None when accept_parameter_as_none is True for FunctionSpace."""
-        result = type_firedrake_error(
+        result = validate_firedrake_parameter(
             "test_param", None, "FunctionSpace", accept_parameter_as_none=True)
         assert result is None
 
     def test_error_message_format_for_functionspace(self):
         """Test that error message correctly shows both FunctionSpace and WithGeometry."""
         with raises(TypeError) as exc_info:
-            type_firedrake_error("test_param", "invalid", "FunctionSpace")
+            validate_firedrake_parameter("test_param", "invalid", "FunctionSpace")
         error_msg = str(exc_info.value)
         assert "'test_param' must be of type:" in error_msg
         assert "FunctionSpace" in error_msg or "WithGeometry" in error_msg
@@ -656,138 +656,138 @@ class TestTypeFiredrakeError:
     def test_valid_mesh(self, mock_mesh):
         """Test with valid Mesh."""
         mock_mesh_instance = Mock(spec=Mesh)
-        result = type_firedrake_error("test_param", mock_mesh_instance, "Mesh")
+        result = validate_firedrake_parameter("test_param", mock_mesh_instance, "Mesh")
         assert result == mock_mesh_instance
 
     def test_mesh_invalid_type(self):
         """Test with invalid type for Mesh."""
         with raises(TypeError) as exc_info:
-            type_firedrake_error("test_param", "not a mesh", "Mesh")
+            validate_firedrake_parameter("test_param", "not a mesh", "Mesh")
         assert "'test_param' must be of type:" in str(exc_info.value)
 
     def test_none_without_default_for_mesh(self):
         """Test with None when accept_parameter_as_none is False for Mesh."""
         with raises(TypeError) as exc_info:
-            type_firedrake_error("test_param", None, "Mesh")
+            validate_firedrake_parameter("test_param", None, "Mesh")
         assert "'test_param' must be of type:" in str(exc_info.value)
 
     def test_none_with_default_for_mesh(self):
         """Test with None when accept_parameter_as_none is True for Mesh."""
-        result = type_firedrake_error("test_param", None, "Mesh", accept_parameter_as_none=True)
+        result = validate_firedrake_parameter("test_param", None, "Mesh", accept_parameter_as_none=True)
         assert result is None
 
     @patch('ufl.geometry.SpatialCoordinate')
     def test_valid_spatial_coordinate(self, mock_sc_instance):
         """Test with valid SpatialCoordinate."""
         mock_sc_instance = Mock(spec=SpatialCoordinate)
-        result = type_firedrake_error("test_param", mock_sc_instance, "SpatialCoordinate")
+        result = validate_firedrake_parameter("test_param", mock_sc_instance, "SpatialCoordinate")
         assert result == mock_sc_instance
 
     def test_spatial_coordinate_invalid_type(self):
         """Test with invalid type for SpatialCoordinate."""
         with raises(TypeError) as exc_info:
-            type_firedrake_error("test_param", "not a coordinate", "SpatialCoordinate")
+            validate_firedrake_parameter("test_param", "not a coordinate", "SpatialCoordinate")
         assert "'test_param' must be of type:" in str(exc_info.value)
 
     def test_none_without_default_for_spatial_coordinate(self):
         """Test with None when accept_parameter_as_none is False for SpatialCoordinate."""
         with raises(TypeError) as exc_info:
-            type_firedrake_error("test_param", None, "SpatialCoordinate")
+            validate_firedrake_parameter("test_param", None, "SpatialCoordinate")
         assert "'test_param' must be of type:" in str(exc_info.value)
 
     def test_none_with_default_for_spatial_coordinate(self):
         """Test with None when accept_parameter_as_none is True for SpatialCoordinate."""
-        result = type_firedrake_error("test_param", None, "SpatialCoordinate",
+        result = validate_firedrake_parameter("test_param", None, "SpatialCoordinate",
                                       accept_parameter_as_none=True)
         assert result is None
 
     def test_form_type(self):
         """Test with valid Form."""
         mock_form = Mock(spec=Form)
-        result = type_firedrake_error("test_param", mock_form, "Form")
+        result = validate_firedrake_parameter("test_param", mock_form, "Form")
         assert result == mock_form
 
     def test_form_invalid_type(self):
         """Test with invalid type for Form."""
         with raises(TypeError) as exc_info:
-            type_firedrake_error("test_param", "not a form", "Form")
+            validate_firedrake_parameter("test_param", "not a form", "Form")
         assert "'test_param' must be of type:" in str(exc_info.value)
 
     def test_none_without_default_for_form(self):
         """Test with None when accept_parameter_as_none is False for Form."""
         with raises(TypeError) as exc_info:
-            type_firedrake_error("test_param", None, "Form")
+            validate_firedrake_parameter("test_param", None, "Form")
         assert "'test_param' must be of type:" in str(exc_info.value)
 
     def test_none_with_default_for_form(self):
         """Test with None when accept_parameter_as_none is True for Form."""
-        result = type_firedrake_error("test_param", None, "Form", accept_parameter_as_none=True)
+        result = validate_firedrake_parameter("test_param", None, "Form", accept_parameter_as_none=True)
         assert result is None
 
     def test_invalid_expected_type(self):
         """Test with invalid expected_type."""
         with raises(ValueError) as exc_info:
-            type_firedrake_error("test_param", "anything", "Invalid")
+            validate_firedrake_parameter("test_param", "anything", "Invalid")
         assert "Invalid expected_type: 'Invalid'" in str(exc_info.value)
 
 
 class TestValueFileError:
-    """Tests for type_firedrake_error function."""
+    """Tests for validate_firedrake_parameter function."""
 
     def test_valid_file_extension(self):
         """Test with valid file extension."""
-        result = value_file_error("test_param", "file.txt", [".txt", ".csv"])
+        result = validate_file("test_param", "file.txt", [".txt", ".csv"])
         assert result == "file.txt"
 
     def test_valid_file_extension_lowercase(self):
         """Test with lowercase file extension."""
-        result = value_file_error("test_param", "file.txt", [".txt", ".csv"])
+        result = validate_file("test_param", "file.txt", [".txt", ".csv"])
         assert result == "file.txt"
 
     def test_valid_file_extension_uppercase(self):
         """Test with uppercase file extension."""
-        result = value_file_error("test_param", "file.TXT", [".TXT", ".csv"])
+        result = validate_file("test_param", "file.TXT", [".TXT", ".csv"])
         assert result == "file.TXT"
 
     def test_valid_file_extension_case_sensitive_fail(self):
         """Test that case-sensitive extension matching fails."""
         with raises(ValueError) as exc_info:
-            value_file_error("test_param", "file.TXT", [".txt", ".csv"])
+            validate_file("test_param", "file.TXT", [".txt", ".csv"])
         assert "extension_type" in str(exc_info.value)
 
     def test_valid_file_extension_mixed_case(self):
         """Test with mixed case file extension."""
-        result = value_file_error("test_param", "file.TxT", [".TxT", ".csv"])
+        result = validate_file("test_param", "file.TxT", [".TxT", ".csv"])
         assert result == "file.TxT"
 
     def test_invalid_file_extension(self):
         """Test with invalid file extension."""
         with raises(ValueError) as exc_info:
-            value_file_error("test_param", "file.pdf", [".txt", ".csv"])
+            validate_file("test_param", "file.pdf", [".txt", ".csv"])
         assert "extension_type" in str(exc_info.value)
 
     def test_none_not_allowed(self):
         """Test with None value when accept_parameter_as_none=False."""
         with raises(TypeError) as exc_info:
-            value_file_error("test_param", None, [".txt"])
+            validate_file("test_param", None, [".txt"])
         assert "'test_param' must be a string, got NoneType." in str(exc_info.value)
 
     def test_none_allowed(self):
         """Test with None value when accept_parameter_as_none=True."""
-        result = value_file_error("test_param", None, [".txt"], accept_parameter_as_none=True)
+        result = validate_file("test_param", None, [".txt"], accept_parameter_as_none=True)
         assert result is None
 
     def test_non_string_value(self):
         """Test with non-string value."""
         with raises(TypeError) as exc_info:
-            value_file_error("test_param", 123, [".txt"])
+            validate_file("test_param", 123, [".txt"])
         assert "'test_param' must be a string, got int." in str(exc_info.value)
 
     @patch('os.path.exists')
     def test_file_exists(self, mock_exists):
         """Test with file existence check when file exists."""
         mock_exists.return_value = True
-        result = value_file_error("test_param", "file.txt", [".txt"], check_file_existance=True)
+        result = validate_file("test_param", "file.txt", [".txt"], check_file_existance=True)
         assert result == "file.txt"
 
     @patch('os.path.exists')
@@ -795,22 +795,22 @@ class TestValueFileError:
         """Test with file existence check when file does not exist."""
         mock_exists.return_value = False
         with raises(FileNotFoundError) as exc_info:
-            value_file_error("test_param", "missing.txt", [".txt"], check_file_existance=True)
+            validate_file("test_param", "missing.txt", [".txt"], check_file_existance=True)
         assert "does not exist" in str(exc_info.value)
 
     def test_empty_string(self):
         """Test with empty string value."""
         with raises(ValueError) as exc_info:
-            value_file_error("test_param", "", [".txt"])
+            validate_file("test_param", "", [".txt"])
         assert "extension_type" in str(exc_info.value)
 
     def test_file_without_extension(self):
         """Test with a file name that has no extension."""
         with raises(ValueError) as exc_info:
-            value_file_error("test_param", "file", [".txt", ".csv"])
+            validate_file("test_param", "file", [".txt", ".csv"])
         assert "extension_type" in str(exc_info.value)
 
     def test_multiple_valid_extensions(self):
         """Test with multiple valid extensions."""
-        result = value_file_error("data", "data.csv", [".txt", ".csv", ".json"])
+        result = validate_file("data", "data.csv", [".txt", ".csv", ".json"])
         assert result == "data.csv"
