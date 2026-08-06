@@ -97,7 +97,7 @@ def validate_model_dimension(parameter_names, parameters, expected_dimension):
     ValueError
         If the dimensions of the parameters do not match the expected dimension.
     """
-    str_reference, str_comparison = parameter_names
+    reference_name, comparison_name = parameter_names
     parameter_reference, parameter_comparison = parameters
 
     chk_reference = len(parameter_reference)
@@ -105,8 +105,8 @@ def validate_model_dimension(parameter_names, parameters, expected_dimension):
     if expected_dimension != chk_reference or expected_dimension != chk_comparison:
         dim_err = (
             f"Mismatch in domain dimensions\n"
-            f"{str_reference} ({chk_reference}), "
-            f"{str_comparison} ({chk_comparison}) "
+            f"{reference_name} ({chk_reference}), "
+            f"{comparison_name} ({chk_comparison}) "
             f"do not match expected model dimension ({expected_dimension}D)."
         )
         raise ValueError(dim_err)
@@ -518,13 +518,7 @@ def validate_data_structure(
             else parameter_value.flatten()
         )
         if not all(isinstance(item, expected_types) for item in parameter_value_check):
-            opt_str = ", ".join([f"'{etype}'" for etype in expected_type_element])
-            last_comma = opt_str.rfind(",")
-            opt_str = (
-                opt_str[:last_comma] + " or" + opt_str[last_comma + 1 :]
-                if len(expected_type_element) > 1
-                else opt_str
-            )
+            opt_str = _join_options(expected_type_element)
             raise TypeError(
                 f"All elements of '{parameter_name}' must be of type: {opt_str}."
             )
@@ -578,13 +572,7 @@ def validate_firedrake_parameter(
     expected_valid = (parameter_map[expected_type],)
     expected_valid += (WithGeometry,) if "FunctionSpace" in expected_type else ()
     if not isinstance(parameter_value, expected_valid):
-        opt_str = ", ".join([f"'{etype}'" for etype in expected_valid])
-        last_comma = opt_str.rfind(",")
-        opt_str = (
-            opt_str[:last_comma] + " or" + opt_str[last_comma + 1 :]
-            if len(expected_valid) > 1
-            else opt_str
-        )
+        opt_str = _join_options(cls.__name__ for cls in expected_valid)
         raise TypeError(
             f"'{parameter_name}' must be of type: {opt_str}, "
             f"got {type(parameter_value).__name__}."
