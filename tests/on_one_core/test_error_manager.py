@@ -279,25 +279,25 @@ class TestValueNumericalError:
     def test_both_bounds_inclusive(self):
         """Test with both bounds inclusive."""
         result = validate_numeric("test_param", 5, lower_bound=0, upper_bound=10,
-                                       include_lower_bound=True, include_upper_bound=True)
+                                  include_lower_bound=True, include_upper_bound=True)
         assert result == 5
 
         with raises(ValueError) as exc_info:
             validate_numeric("test_param", -1., lower_bound=0, upper_bound=10,
-                                  include_lower_bound=True, include_upper_bound=True)
+                             include_lower_bound=True, include_upper_bound=True)
         assert ("'test_param' must be between 0 and 10 "
                 "(both bounds inclusive)") in str(exc_info.value)
 
         with raises(ValueError) as exc_info:
             validate_numeric("test_param", 11., lower_bound=0, upper_bound=10,
-                                  include_lower_bound=True, include_upper_bound=True)
+                             include_lower_bound=True, include_upper_bound=True)
         assert ("'test_param' must be between 0 and 10 "
                 "(both bounds inclusive)") in str(exc_info.value)
 
     def test_lower_bound_inclusive(self):
         """Test with lower bound inclusive."""
         result = validate_numeric("test_param", 0, lower_bound=0,
-                                       include_lower_bound=True)
+                                  include_lower_bound=True)
         assert result == 0
 
         result = validate_numeric("test_param", 5., lower_bound=0,
@@ -316,7 +316,7 @@ class TestValueNumericalError:
         assert result == 10
 
         result = validate_numeric("test_param", 9, upper_bound=10,
-                                       include_upper_bound=True)
+                                  include_upper_bound=True)
         assert result == 9.
 
         with raises(ValueError) as exc_info:
@@ -499,7 +499,7 @@ class TestTypeDataStructureError:
     def test_element_type_check_with_none(self):
         """Test with element type check including None."""
         result = validate_data_structure("test_param", [1, None, 3], "list",
-                                           expected_type_element=("int", "NoneType"))
+                                         expected_type_element=("int", "NoneType"))
         assert result == [1, None, 3]
 
     def test_valid_array2D(self):
@@ -554,7 +554,7 @@ class TestTypeDataStructureError:
         """Test element type check for numpy array."""
         arr = array([1, 2, 3])
         result = validate_data_structure("test_param", arr, "array",
-                                           expected_type_element="int")
+                                         expected_type_element="int")
         assert_array_equal(result, arr)
 
     def test_element_type_check_for_array_failure(self):
@@ -562,7 +562,7 @@ class TestTypeDataStructureError:
         arr = array([1, 2.5, 3])
         with raises(TypeError) as exc_info:
             validate_data_structure("test_param", arr, "array",
-                                      expected_type_element="int")
+                                    expected_type_element="int")
         assert "All elements of 'test_param' must be of type: 'int'" in str(exc_info.value)
 
     def test_element_type_check_single_string(self):
@@ -575,7 +575,7 @@ class TestTypeDataStructureError:
         """Test with invalid expected_type_element."""
         with raises(ValueError) as exc_info:
             validate_data_structure("test_param", [1, 2, 3], "list",
-                                      expected_type_element="invalid")
+                                    expected_type_element="invalid")
         assert "Invalid expected_type_element: 'invalid'" in str(exc_info.value)
 
     def test_mixed_element_types_valid(self):
@@ -698,7 +698,7 @@ class TestTypeFiredrakeError:
     def test_none_with_default_for_spatial_coordinate(self):
         """Test with None when accept_parameter_as_none is True for SpatialCoordinate."""
         result = validate_firedrake_parameter("test_param", None, "SpatialCoordinate",
-                                      accept_parameter_as_none=True)
+                                              accept_parameter_as_none=True)
         assert result is None
 
     def test_form_type(self):
@@ -782,7 +782,7 @@ class TestValueFileError:
     def test_file_exists(self, mock_exists):
         """Test with file existence check when file exists."""
         mock_exists.return_value = True
-        result = validate_file("test_param", "file.txt", [".txt"], check_file_existance=True)
+        result = validate_file("test_param", "file.txt", [".txt"], check_file_existence=True)
         assert result == "file.txt"
 
     @patch('os.path.exists')
@@ -790,7 +790,7 @@ class TestValueFileError:
         """Test with file existence check when file does not exist."""
         mock_exists.return_value = False
         with raises(FileNotFoundError) as exc_info:
-            validate_file("test_param", "missing.txt", [".txt"], check_file_existance=True)
+            validate_file("test_param", "missing.txt", [".txt"], check_file_existence=True)
         assert "does not exist" in str(exc_info.value)
 
     def test_empty_string(self):

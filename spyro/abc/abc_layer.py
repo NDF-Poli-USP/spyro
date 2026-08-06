@@ -223,8 +223,8 @@ class ABCLayer(NRBC, MeasureError):
 
         # Original domain dimensions
         self.domain_dim = validate_data_structure("domain_dim", domain_dim, "tuple",
-                                                    expected_type_element=("float", "int"),
-                                                    expected_length=dimension)
+                                                  expected_type_element=("float", "int"),
+                                                  expected_length=dimension)
         # Source frequency
         self.frequency = validate_numeric("frequency", frequency,
                                                float_num=True, integer_num=True,

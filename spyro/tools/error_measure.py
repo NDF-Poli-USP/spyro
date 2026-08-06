@@ -158,12 +158,12 @@ class MeasureError():
 
         # Time domain signal
         receivers_reference_file = validate_file(pth_str + "time.npy",
-                                                    check_file_existance=True)
+                                                    check_file_existence=True)
         receivers_reference = load(receivers_reference_file)
 
         # Frequency domain signal
         receivers_reference_fft_file = validate_file(pth_str + "fft.npy",
-                                                        check_file_existance=True)
+                                                        check_file_existence=True)
         receivers_ref_fft = load(receivers_reference_fft_file).T
 
         return receivers_reference, receivers_ref_fft

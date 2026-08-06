@@ -586,7 +586,7 @@ def validate_file(
     parameter_value,
     valid_extensions,
     accept_parameter_as_none=False,
-    check_file_existance=False,
+    check_file_existence=False,
 ):
     """Validate a file parameter and raise a ValueError if invalid.
 
@@ -601,7 +601,7 @@ def validate_file(
     accept_parameter_as_none : `bool`, optional
         If `True`, the parameter value is allowed to be validated as `None`.
         Default is `False`, in which case `None` is not allowed.
-    check_file_existance : `bool`, optional
+    check_file_existence : `bool`, optional
         If `True`, we will check if the file exists. Default is `False`
 
     Returns
@@ -627,7 +627,7 @@ def validate_file(
     if parameter_value is None and accept_parameter_as_none:
         return parameter_value
 
-    if not path.exists(parameter_value) and check_file_existance:
+    if not path.exists(parameter_value) and check_file_existence:
         raise FileNotFoundError(
             f"'{parameter_name}' '{parameter_value}' does not exist"
         )
