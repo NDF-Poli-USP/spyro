@@ -5,7 +5,7 @@ from ...io.basicio import parallel_print as pprint
 from .modal_forms_and_matrices import assemble_sparse_matrices, weak_forms
 from .modal_rq_matrices import generate_eigenfunctions, matrices_rayleigh_quotient
 from ...utils.error_management import (type_data_structure_error, type_firedrake_error,
-                                       value_numerical_error, value_parameter_error)
+                                       validade_numeric, validade_parameter)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -96,7 +96,7 @@ class Modal_Solver():
         """
 
         # Dimension of the problem
-        self.dimension = value_parameter_error("dimension", dimension, [2, 3])
+        self.dimension = validade_parameter("dimension", dimension, [2, 3])
 
         # Option to estimate the maximum stable timestep
         self.calc_max_dt = calc_max_dt
@@ -112,7 +112,7 @@ class Modal_Solver():
 
         # Method for solving the eigenproblem
         method = "KRYLOVSCH_CH" if method is None else method
-        self.method = value_parameter_error("method", method, self.valid_methods)
+        self.method = validade_parameter("method", method, self.valid_methods)
 
         # Initializing the analytical solver
         if not self.calc_max_dt and self.method == "ANALYTICAL":
@@ -146,7 +146,7 @@ class Modal_Solver():
         """
 
         # Check methods
-        value_parameter_error("method", method, ["ARNOLDI", "LANCZOS", "LOBPCG"])
+        validade_parameter("method", method, ["ARNOLDI", "LANCZOS", "LOBPCG"])
 
         if method == "ARNOLDI" or method == "LANCZOS":
             # Inverse operator for improving convergence
@@ -283,7 +283,7 @@ class Modal_Solver():
         type_firedrake_error("ufl_coordinates", ufl_coordinates, "SpatialCoordinate")
         type_firedrake_error("V", V, "FunctionSpace")
         type_data_structure_error("mesh_limits", mesh_limits, "tuple")
-        type_data_structure_error("quad_rule", quad_rule, "dict", none_default=True)
+        type_data_structure_error("quad_rule", quad_rule, "dict", accept_parameter_as_none=True)
 
         # Create eigenfunctions
         eig_funcs, grad_eig = generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
@@ -323,8 +323,8 @@ class Modal_Solver():
         # Check input arguments
         type_firedrake_error("c", c, "Function")
         type_firedrake_error("V", V, "FunctionSpace")
-        type_data_structure_error("quad_rule", quad_rule, "dict", none_default=True)
-        value_numerical_error("shift", shift, float_num=True, integer_num=True,
+        type_data_structure_error("quad_rule", quad_rule, "dict", accept_parameter_as_none=True)
+        validade_numeric("shift", shift, float_num=True, integer_num=True,
                               lower_bound=0., include_lower_bound=True)
 
         # Get bilinear forms
@@ -412,7 +412,7 @@ class Modal_Solver():
             first eigenvalue of the model with Neumann BCs.
         """
 
-        value_numerical_error("k", k, float_num=False, integer_num=True, lower_bound=0)
+        validade_numeric("k", k, float_num=False, integer_num=True, lower_bound=0)
 
         if self.method in ["ANALYTICAL", "RAYLEIGH"]:
             shift = 0.  # No shift for analytical and Rayleigh methods

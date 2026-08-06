@@ -10,7 +10,7 @@ from sys import float_info
 from ...io.basicio import parallel_print as pprint
 from .modal_forms_and_matrices import weak_forms
 from ...utils.error_management import (type_data_structure_error, type_firedrake_error,
-                                       value_numerical_error, value_parameter_error)
+                                       validade_numeric, validade_parameter)
 from ...utils.stats_tools import coeff_of_determination
 
 
@@ -68,7 +68,7 @@ class Modal_Analytical_Solver():
         """
 
         # Dimension of the problem
-        self.dimension = value_parameter_error("dimension", dimension, [2, 3])
+        self.dimension = validade_parameter("dimension", dimension, [2, 3])
 
         # Communicator MPI
         self.comm = comm
@@ -554,7 +554,7 @@ class Modal_Analytical_Solver():
 
         # Static load for reference model (without absorbing layer)
         q_ref = None
-        V_ref = type_firedrake_error("V_ref", V_ref, "FunctionSpace", none_default=True)
+        V_ref = type_firedrake_error("V_ref", V_ref, "FunctionSpace", accept_parameter_as_none=True)
         if V_ref:
             q_ref = Function(V_ref)
             q_ref.interpolate(q_dummy, allow_missing_dofs=True)
@@ -592,10 +592,10 @@ class Modal_Analytical_Solver():
         # Check input arguments
         type_firedrake_error("c", c, "Function")
         type_firedrake_error("V", V, "FunctionSpace")
-        type_data_structure_error("quad_rule", quad_rule, "dict", none_default=True)
-        value_parameter_error("type_homog", type_homog, ["energy", "volume"])
+        type_data_structure_error("quad_rule", quad_rule, "dict", accept_parameter_as_none=True)
+        validade_parameter("type_homog", type_homog, ["energy", "volume"])
         type_firedrake_error("static_load_for_ceq", static_load_for_ceq,
-                             "Function", none_default=True)
+                             "Function", accept_parameter_as_none=True)
 
         # Integration measure
         dx = fire_dx(**quad_rule) if quad_rule else fire_dx(**{"degree": 0})
@@ -674,7 +674,7 @@ class Modal_Analytical_Solver():
         """
 
         # Check type of homogenization
-        value_parameter_error("type_homog", type_homog, ["energy", "volume"])
+        validade_parameter("type_homog", type_homog, ["energy", "volume"])
 
         # Define the load for the energy-equivalent homogenization
         c_is_float = isinstance(c, (int, float))
@@ -683,7 +683,7 @@ class Modal_Analytical_Solver():
             if (type_homog == "energy" and not c_is_float) else (None, None)
 
         # Compute the equivalent velocity for the model with absorbing layer
-        c_eq = value_numerical_error(
+        c_eq = validade_numeric(
             "c", c, float_num=True, integer_num=True, lower_bound=0.) if c_is_float \
             else self.c_equivalent(c, V, quad_rule=quad_rule, type_homog=type_homog,
                                    static_load_for_ceq=dummy_load[0])
@@ -692,7 +692,7 @@ class Modal_Analytical_Solver():
         c_eqref = None
         if V_ref is not None:
             c_ref_is_float = isinstance(c_eqref, (int, float))
-            c_eqref = value_numerical_error(
+            c_eqref = validade_numeric(
                 "c_ref", c_ref, float_num=True, integer_num=True, lower_bound=0.) \
                 if c_ref_is_float else self.c_equivalent(c_ref, V_ref, quad_rule=quad_rule,
                                                          type_homog=type_homog,
@@ -749,14 +749,14 @@ class Modal_Analytical_Solver():
         """
 
         # Check the homogeneous velocity
-        value_numerical_error("c_eq", c_eq, float_num=True, integer_num=True, lower_bound=0.)
+        validade_numeric("c_eq", c_eq, float_num=True, integer_num=True, lower_bound=0.)
 
         # Hyperellipse parameters
         n_hyp, hyper_axes = hyp_par[0], hyp_par[1:]
 
         # Check the hypershape degree
-        value_numerical_error("n_hyp", n_hyp, float_num=True, integer_num=True,
-                              none_default=True, lower_bound=2., include_lower_bound=True)
+        validade_numeric("n_hyp", n_hyp, float_num=True, integer_num=True,
+                              accept_parameter_as_none=True, lower_bound=2., include_lower_bound=True)
         n_hyp = 330 if n_hyp is None else n_hyp
 
         # Check semi-axes type
@@ -765,11 +765,11 @@ class Modal_Analytical_Solver():
                                   expected_length=self.dimension)
 
         # Check boundary condition type
-        value_parameter_error("bc", bc, ["Dirichlet", "Neumann"])
+        validade_parameter("bc", bc, ["Dirichlet", "Neumann"])
 
         # Check the homogeneous velocity from original model without absorbing layer
-        value_numerical_error("c_eqref", c_eqref, float_num=True, integer_num=True,
-                              none_default=True, lower_bound=0.)
+        validade_numeric("c_eqref", c_eqref, float_num=True, integer_num=True,
+                              accept_parameter_as_none=True, lower_bound=0.)
         c_eqref = c_eq if c_eqref is None else c_eqref
 
         # Check the parameters for fitting equivalent velocity regression.
@@ -778,7 +778,7 @@ class Modal_Analytical_Solver():
                                   expected_length=4)
 
         # Check the cutting plane percent is between 0 and 1
-        value_numerical_error("cut_plane_percent", cut_plane_percent, float_num=True,
+        validade_numeric("cut_plane_percent", cut_plane_percent, float_num=True,
                               integer_num=False, lower_bound=0., upper_bound=1.,
                               include_lower_bound=True, include_upper_bound=True)
 

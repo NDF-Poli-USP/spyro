@@ -3,7 +3,7 @@
 - Calculation the coefficient of determination (R^2) for regression models."""
 
 from numpy import asarray, mean, ndarray, sum
-from ..utils.error_management import value_numerical_error
+from ..utils.error_management import validade_numeric
 
 
 def coeff_of_determination(y_true, y_pred, p):
@@ -42,7 +42,7 @@ def coeff_of_determination(y_true, y_pred, p):
                          f"but 'y_pred' has {np} elements.")
 
     # Checking predictors
-    value_numerical_error('p', p, float_num=False, integer_num=True,
+    validade_numeric('p', p, float_num=False, integer_num=True,
                           lower_bound=0., include_lower_bound=True)
 
     # Observations

@@ -2,8 +2,8 @@
 
 from firedrake import assemble, cos, dx as fire_dx, Function, grad, inner, pi, sin
 from scipy.sparse import lil_matrix
-from ...utils.error_management import (type_data_structure_error, value_numerical_error,
-                                       value_parameter_error)
+from ...utils.error_management import (type_data_structure_error, validade_numeric,
+                                       validade_parameter)
 
 
 def generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
@@ -39,9 +39,9 @@ def generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
     """
 
     # Check input parameters
-    value_numerical_error("k", k, float_num=False, integer_num=True, lower_bound=0)
-    value_parameter_error("dimension", dimension, [2, 3])
-    value_parameter_error("bc", bc, ["Dirichlet", "Neumann"])
+    validade_numeric("k", k, float_num=False, integer_num=True, lower_bound=0)
+    validade_parameter("dimension", dimension, [2, 3])
+    validade_parameter("bc", bc, ["Dirichlet", "Neumann"])
 
     # Mesh coordinates
     z, x = ufl_coordinates[0], ufl_coordinates[1]
