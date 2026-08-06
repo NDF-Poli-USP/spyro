@@ -219,7 +219,7 @@ def test_gradient_sampling_frequency(full_sampling_gradient, freq):
     g_sub = _gradient_for_sampling_frequency(freq)
     rel_diff = np.linalg.norm(g_sub - g_full) / np.linalg.norm(g_full)
     print(f"freq={freq}: relative gradient difference vs full sampling = {rel_diff:.4f}")
-    assert rel_diff < 0.1
+    assert rel_diff < 0.05
 
 
 if __name__ == "__main__":
