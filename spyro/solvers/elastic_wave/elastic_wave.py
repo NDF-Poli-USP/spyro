@@ -34,24 +34,26 @@ class ElasticWave(Wave, metaclass=ABCMeta):
 
     @override
     def _initialize_model_parameters(self):
+        """Declare and materialize the material parameters.
+
+        The source of each parameter (constant, function, expression or file)
+        is resolved by ``set_material_property`` during materialization, so no
+        per-source dispatch is needed here.
+        """
         d = self.input_dictionary.get("synthetic_data", False)
-        if bool(d) and "type" in d:
-            if d["type"] == "object":
-                self.initialize_model_parameters_from_object(d)
-            elif d["type"] == "file":
-                self.initialize_model_parameters_from_file(d)
-            else:
-                raise Exception(f"Invalid synthetic data type: {d['type']}")
-        else:
-            raise Exception("Input dictionary must contain ['synthetic_data']['type']")
+        if not bool(d):
+            raise Exception("Input dictionary must contain ['synthetic_data']")
+
+        self.declare_model_parameters(d)
+        self.materialize_model_parameters()
 
     @abstractmethod
-    def initialize_model_parameters_from_object(self, synthetic_data_dict):
-        pass
+    def declare_model_parameters(self, synthetic_data_dict):
+        """Phase A: read and validate the material declaration."""
 
     @abstractmethod
-    def initialize_model_parameters_from_file(self, synthetic_data_dict):
-        pass
+    def materialize_model_parameters(self):
+        """Phase B: build every declared material parameter as a Function."""
 
     @override
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):

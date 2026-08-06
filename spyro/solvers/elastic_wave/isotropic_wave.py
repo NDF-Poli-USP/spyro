@@ -2,7 +2,7 @@ import warnings
 
 import numpy as np
 
-from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
+from firedrake import (assemble, curl, DirichletBC, div, Function,
                        project)
 
 from .elastic_wave import ElasticWave
@@ -61,6 +61,7 @@ class IsotropicWave(ElasticWave):
         self.s_wave_velocity = None
         self._control_parameterization = None
         self._material_parameter_function_space = None
+        self._material_specs = None
 
         self.u_n = None   # Current displacement field
         self.u_nm1 = None  # Displacement field in previous iteration
@@ -128,116 +129,159 @@ class IsotropicWave(ElasticWave):
         self.s_wave_velocity = value
 
     @override
-    def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
-        """Initialize isotropic elastic material parameters from a dictionary.
+    def declare_model_parameters(self, synthetic_data_dict: dict):
+        """Phase A: read and validate the material declaration.
 
         The dictionary must define exactly one supported material
         parameterization: either density with Lame parameters, or density with
-        P- and S-wave velocities. The missing derived parameters are computed
-        from the provided set, and the active control parameterization is stored
-        for FWI.
+        P- and S-wave velocities.
+
+        This phase is pure: it records which material parameters were declared
+        and which parameterization they form, without building any Firedrake
+        object. It therefore needs neither a mesh nor a function space, which
+        is what allows material parameters to be always materialized as
+        ``Function`` later (see :meth:`materialize_model_parameters`).
 
         Parameters
         ----------
         synthetic_data_dict : dict
             Material parameter dictionary using the public Spyro model schema.
-            Valid combinations are ``density``, ``lambda`` (or ``lame_first``),
-            and ``mu`` (or ``lame_second``); or ``density``,
-            ``p_wave_velocity``, and ``s_wave_velocity``. Values may be
-            scalars, Firedrake ``Constant`` objects, Firedrake ``Function``
-            objects, or UFL expressions.
 
         Returns
         -------
         None
-            The method assigns ``rho``, ``lmbda``, ``mu``,
-            ``p_wave_velocity``, ``s_wave_velocity``, and the active control
-            parameterization on ``self``.
+            Stores the declared specs and the active parameterization.
+
+        Raises
+        ------
+        ValueError
+            If the declaration does not form exactly one supported
+            parameterization.
         """
-        def material_parameter(value):
-            """Normalize model-dictionary values for elastic parameters.
-
-            Parameters
-            ----------
-            value : scalar, firedrake.Constant, firedrake.Function, or UFL expression
-                Material parameter read from ``synthetic_data_dict``.
-
-            Returns
-            -------
-            firedrake.Function or object
-                Scalars and ``Constant`` values are converted to scalar
-                material ``Function`` objects through ``set_material_property``,
-                so material parameters are never stored as ``Constant``.
-
-            Examples
-            --------
-            ``density=1.0`` becomes a scalar material ``Function``.
-            """
-            if np.isscalar(value) or isinstance(value, Constant):
-                # set_material_property resolves the material space from
-                # wave.function_space, which does not exist yet when the model
-                # is initialized straight from the input dictionary. Only the
-                # unified material schema (step 3) removes this ordering
-                # constraint; until then the Constant fallback is required.
-                if self.function_space is None:
-                    return Constant(value) if np.isscalar(value) else value
-                return self._as_control_field(value, "material_parameter")
-            return value
-
         def get_value(parameter, *aliases):
             for key in (parameter.value, *aliases):
                 if key in synthetic_data_dict:
-                    return material_parameter(synthetic_data_dict[key])
+                    return synthetic_data_dict[key]
             return None
 
-        self.rho = get_value(ElasticMaterialParameter.DENSITY)
-        self.lmbda = get_value(
-            ElasticMaterialParameter.LAMBDA,
-            "lame_first",
-        )
-        self.mu = get_value(
-            ElasticMaterialParameter.MU,
-            "lame_second",
-        )
-        self.p_wave_velocity = get_value(ElasticMaterialParameter.P_WAVE_VELOCITY)
-        self.s_wave_velocity = get_value(ElasticMaterialParameter.S_WAVE_VELOCITY)
+        specs = {
+            ElasticMaterialParameter.DENSITY: get_value(
+                ElasticMaterialParameter.DENSITY),
+            ElasticMaterialParameter.LAMBDA: get_value(
+                ElasticMaterialParameter.LAMBDA, "lame_first"),
+            ElasticMaterialParameter.MU: get_value(
+                ElasticMaterialParameter.MU, "lame_second"),
+            ElasticMaterialParameter.P_WAVE_VELOCITY: get_value(
+                ElasticMaterialParameter.P_WAVE_VELOCITY),
+            ElasticMaterialParameter.S_WAVE_VELOCITY: get_value(
+                ElasticMaterialParameter.S_WAVE_VELOCITY),
+        }
 
-        # Check if {rho, lambda, mu} is set and wave velocities are not
-        option_1 = bool(self.rho) and \
-            bool(self.lmbda) and \
-            bool(self.mu) and \
-            not bool(self.p_wave_velocity) and \
-            not bool(self.s_wave_velocity)
-        # Check if {rho, vp, vs} is set and {lambda, mu} are not
-        option_2 = bool(self.rho) and \
-            bool(self.p_wave_velocity) and \
-            bool(self.s_wave_velocity) and \
-            not bool(self.lmbda) and \
-            not bool(self.mu)
+        # Validation is by declaration, not by truthiness: a legitimately zero
+        # valued parameter must not read as 'not declared'.
+        declared = {key for key, value in specs.items() if value is not None}
+        lame = set(CONTROL_PARAMETERS_BY_PARAMETERIZATION[
+            ElasticMaterialParameterization.LAME])
+        velocity = set(CONTROL_PARAMETERS_BY_PARAMETERIZATION[
+            ElasticMaterialParameterization.VELOCITY])
 
-        if option_1:
-            self._control_parameterization = ElasticMaterialParameterization.LAME
-            self.p_wave_velocity = ((self.lmbda + 2*self.mu)/self.rho)**0.5
-            self.s_wave_velocity = (self.mu/self.rho)**0.5
-        elif option_2:
-            self._control_parameterization = ElasticMaterialParameterization.VELOCITY
-            self.mu = self.rho*self.s_wave_velocity**2
-            self.lmbda = self.rho*self.p_wave_velocity**2 - 2*self.mu
+        if declared == lame:
+            self._control_parameterization = \
+                ElasticMaterialParameterization.LAME
+        elif declared == velocity:
+            self._control_parameterization = \
+                ElasticMaterialParameterization.VELOCITY
         else:
+            def declared_flag(parameter):
+                return parameter in declared
+
             raise ValueError(
                 "Inconsistent selection of isotropic elastic wave parameters:\n"
-                f"    Density        : {bool(self.rho)}\n"
-                f"    Lame first     : {bool(self.lmbda)}\n"
-                f"    Lame second    : {bool(self.mu)}\n"
-                f"    P-wave velocity: {bool(self.p_wave_velocity)}\n"
-                f"    S-wave velocity: {bool(self.s_wave_velocity)}\n"
+                f"    Density        : "
+                f"{declared_flag(ElasticMaterialParameter.DENSITY)}\n"
+                f"    Lame first     : "
+                f"{declared_flag(ElasticMaterialParameter.LAMBDA)}\n"
+                f"    Lame second    : "
+                f"{declared_flag(ElasticMaterialParameter.MU)}\n"
+                f"    P-wave velocity: "
+                f"{declared_flag(ElasticMaterialParameter.P_WAVE_VELOCITY)}\n"
+                f"    S-wave velocity: "
+                f"{declared_flag(ElasticMaterialParameter.S_WAVE_VELOCITY)}\n"
                 "The valid options are {Density, Lame first, Lame second} "
                 "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
             )
 
-    @override
-    def initialize_model_parameters_from_file(self, synthetic_data_dict):
-        raise NotImplementedError
+        self._material_specs = {
+            key: value for key, value in specs.items() if value is not None
+        }
+
+    def materialize_model_parameters(self):
+        """Phase B: build every declared material parameter as a Function.
+
+        Requires a function space, so it is deferred until the mesh and the
+        function space exist. Both the declared and the derived parameters are
+        built through ``set_material_property``, so no material parameter is
+        left as a ``Constant`` or as a UFL expression.
+
+        Returns
+        -------
+        None
+            Assigns ``rho``, ``lmbda``, ``mu``, ``p_wave_velocity`` and
+            ``s_wave_velocity`` as scalar ``Function`` objects.
+        """
+        if self._material_specs is None:
+            raise ValueError(
+                "Material parameters must be declared before being "
+                "materialized.",
+            )
+
+        if self.function_space is None:
+            if self.mesh is None:
+                self.mesh = self.get_mesh()
+            if self.mesh is None:
+                raise ValueError(
+                    "A mesh is required to materialize elastic material "
+                    "parameters. Call set_mesh() first, or use "
+                    "declare_model_parameters() alone to validate a material "
+                    "declaration without building any field.",
+                )
+            self.force_rebuild_function_space()
+
+        specs = self._material_specs
+        self.rho = self._as_control_field(
+            specs[ElasticMaterialParameter.DENSITY],
+            ElasticMaterialParameter.DENSITY.value)
+
+        # Declared parameters first, then the derived ones. Both go through
+        # set_material_property, so none is left as a Constant or a UFL
+        # expression.
+        if self._control_parameterization is \
+                ElasticMaterialParameterization.LAME:
+            self.lmbda = self._as_control_field(
+                specs[ElasticMaterialParameter.LAMBDA],
+                ElasticMaterialParameter.LAMBDA.value)
+            self.mu = self._as_control_field(
+                specs[ElasticMaterialParameter.MU],
+                ElasticMaterialParameter.MU.value)
+            self.p_wave_velocity = self._as_control_field(
+                ((self.lmbda + 2*self.mu)/self.rho)**0.5,
+                ElasticMaterialParameter.P_WAVE_VELOCITY.value)
+            self.s_wave_velocity = self._as_control_field(
+                (self.mu/self.rho)**0.5,
+                ElasticMaterialParameter.S_WAVE_VELOCITY.value)
+        else:
+            self.p_wave_velocity = self._as_control_field(
+                specs[ElasticMaterialParameter.P_WAVE_VELOCITY],
+                ElasticMaterialParameter.P_WAVE_VELOCITY.value)
+            self.s_wave_velocity = self._as_control_field(
+                specs[ElasticMaterialParameter.S_WAVE_VELOCITY],
+                ElasticMaterialParameter.S_WAVE_VELOCITY.value)
+            self.mu = self._as_control_field(
+                self.rho*self.s_wave_velocity**2,
+                ElasticMaterialParameter.MU.value)
+            self.lmbda = self._as_control_field(
+                self.rho*self.p_wave_velocity**2 - 2*self.mu,
+                ElasticMaterialParameter.LAMBDA.value)
 
     @override
     def _create_function_space(self):

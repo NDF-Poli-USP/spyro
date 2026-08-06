@@ -310,11 +310,10 @@ class AcousticWave(Wave):
 
         if self.initial_velocity_model is None:
             if self.initial_velocity_model_file is None:
-                grid_velocity_data = getattr(
-                    self.mesh_parameters,
-                    "grid_velocity_data",
-                    None,
-                )
+                try:
+                    grid_velocity_data = self.mesh_parameters.grid_velocity_data
+                except AttributeError:
+                    grid_velocity_data = None
                 if grid_velocity_data is None:
                     raise ValueError("No velocity model or velocity file to load.")
                 self.initial_velocity_model = interpolate(

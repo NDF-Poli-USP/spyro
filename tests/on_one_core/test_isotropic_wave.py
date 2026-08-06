@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
+from spyro.utils.typing import ElasticMaterialParameterization
 
 dummy_dict = {
     "options": {
@@ -39,7 +40,7 @@ def test_initialize_model_parameters_from_object_missing_parameters():
     }
     wave = IsotropicWave(dummy_dict)
     with pytest.raises(Exception) as e:  # noqa: F841
-        wave.initialize_model_parameters_from_object(synthetic_dict)
+        wave.declare_model_parameters(synthetic_dict)
 
 
 def test_initialize_model_parameters_from_object_first_option():
@@ -50,7 +51,10 @@ def test_initialize_model_parameters_from_object_first_option():
         "mu": 3,
     }
     wave = IsotropicWave(dummy_dict)
-    wave.initialize_model_parameters_from_object(synthetic_dict)
+    # Phase A only: validating a declaration needs no mesh or function space.
+    wave.declare_model_parameters(synthetic_dict)
+
+    assert wave._control_parameterization is ElasticMaterialParameterization.LAME
 
 
 def test_initialize_model_parameters_from_object_second_option():
@@ -61,7 +65,24 @@ def test_initialize_model_parameters_from_object_second_option():
         "s_wave_velocity": 3,
     }
     wave = IsotropicWave(dummy_dict)
-    wave.initialize_model_parameters_from_object(synthetic_dict)
+    wave.declare_model_parameters(synthetic_dict)
+
+    assert wave._control_parameterization is \
+        ElasticMaterialParameterization.VELOCITY
+
+
+def test_declare_model_parameters_accepts_zero_valued_parameter():
+    """A zero-valued parameter is declared, even though bool(0) is False."""
+    synthetic_dict = {
+        "type": "object",
+        "density": 1,
+        "lambda": 0.0,
+        "mu": 3,
+    }
+    wave = IsotropicWave(dummy_dict)
+    wave.declare_model_parameters(synthetic_dict)
+
+    assert wave._control_parameterization is ElasticMaterialParameterization.LAME
 
 
 def test_initialize_model_parameters_from_object_redundant():
@@ -75,7 +96,7 @@ def test_initialize_model_parameters_from_object_redundant():
     }
     wave = IsotropicWave(dummy_dict)
     with pytest.raises(Exception) as e:  # noqa: F841
-        wave.initialize_model_parameters_from_object(synthetic_dict)
+        wave.declare_model_parameters(synthetic_dict)
 
 
 def test_parse_boundary_conditions():
@@ -124,20 +145,17 @@ def test_parse_boundary_conditions_exception():
         wave.parse_boundary_conditions()
 
 
-def test_initialize_model_parameters_from_file_notimplemented():
-    synthetic_dict = {
-        "type": "file",
-    }
-    wave = IsotropicWave(dummy_dict)
-    with pytest.raises(NotImplementedError) as e:  # noqa: F841
-        wave.initialize_model_parameters_from_file(synthetic_dict)
+# NOTE: the former test_initialize_model_parameters_from_file_notimplemented
+# covered initialize_model_parameters_from_file, which no longer exists: a file
+# is just one more material-parameter source resolved by set_material_property.
+# That path is now covered by test_matprop.py::test_fromfile_mat_prop.
 
 
 if __name__ == "__main__":
     test_initialize_model_parameters_from_object_missing_parameters()
     test_initialize_model_parameters_from_object_first_option()
     test_initialize_model_parameters_from_object_second_option()
+    test_declare_model_parameters_accepts_zero_valued_parameter()
     test_initialize_model_parameters_from_object_redundant()
     test_parse_boundary_conditions()
     test_parse_boundary_conditions_exception()
-    test_initialize_model_parameters_from_file_notimplemented()
