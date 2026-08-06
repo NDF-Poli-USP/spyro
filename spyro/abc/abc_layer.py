@@ -948,8 +948,12 @@ class ABCLayer(NRBC, MeasureError):
         # Size of the domain extension
         add_dom = c_bnd_max * final_time / 2.
 
+        str_pad = "Infinite Domain Extension Based on "
+
         # Distance already travelled by the wave
         if hasattr(self, 'eik_bnd'):
+
+            str_pad += "Minimun Eikonal at Critical Boundary Points"
 
             # If Eikonal analysis was performed
             eikmin = self.eik_bnd[0][2]
@@ -957,6 +961,8 @@ class ABCLayer(NRBC, MeasureError):
             # Minimum distance to the nearest boundary
             dist_to_bnd = c_bnd_max * eikmin / 2.
         else:
+
+            str_pad += "Minimum Distance Source-Boundary"
 
             # If Eikonal analysis was not performed
             sou_loc = array(source_locations)
@@ -976,6 +982,8 @@ class ABCLayer(NRBC, MeasureError):
 
             # Minimum distance to the nearest boundary
             dist_to_bnd = float(min(cand_dist))
+
+        pprint(str_pad, comm=self.comm)
 
         # Subtracting the distance already travelled by the wave
         add_dom -= dist_to_bnd
