@@ -342,9 +342,42 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.receivers = Receivers(self)
         self.receivers.wave_type = self.wave_type
 
-    @abstractmethod
     def _initialize_model_parameters(self):
-        pass
+        """Declare and materialize the material parameters of any wave type.
+
+        The declaration is normalized into ``set_material_property``
+        specifications, so the source of each property (constant, conditional,
+        expression, function or file) is resolved by a single engine and no
+        per-source dispatch is needed here.
+        """
+        declaration = material_properties_io.normalize_material_declaration(
+            self.input_dictionary.get("synthetic_data", None),
+        )
+        self.declare_model_parameters(declaration)
+        self.materialize_model_parameters()
+
+    @abstractmethod
+    def declare_model_parameters(self, declaration):
+        """Phase A: record and validate the material declaration.
+
+        Concrete solvers state which properties they require and check that the
+        declaration forms a valid set. This phase must not build any Firedrake
+        object, so it needs neither a mesh nor a function space.
+
+        Parameters
+        ----------
+        declaration : dict
+            Mapping of property name to a ``set_material_property``
+            specification.
+        """
+
+    @abstractmethod
+    def materialize_model_parameters(self):
+        """Phase B: build the declared material parameters as Functions.
+
+        Runs once the function space exists, and builds every property through
+        ``set_material_property``.
+        """
 
     @abstractmethod
     def _create_function_space(self):

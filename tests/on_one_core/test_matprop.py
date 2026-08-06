@@ -886,3 +886,33 @@ def test_tensor_mat_prop(wave_instance, cell_type):
 
     assert Celast_dg0 is not None, "Failed to set Celast_dg0"
     print("Celast_2x3 Verified: Tensorial function saving DG0", flush=True)
+
+
+def test_normalize_material_declaration_legacy_and_canonical():
+    """Legacy and canonical declarations map onto set_material_property specs."""
+    from spyro.io.material_properties_io import normalize_material_declaration
+
+    # Legacy acoustic: a velocity file under its old key.
+    assert normalize_material_declaration(
+        {"type": "file", "real_velocity_file": "vp.segy"},
+    ) == {"velocity": {"from_file": "vp.segy"}}
+
+    # Legacy elastic: raw values, including the Lame aliases.
+    assert normalize_material_declaration(
+        {"type": "object", "density": 1.0, "lame_first": 4.0, "lame_second": 1.0},
+    ) == {
+        "density": {"constant": 1.0},
+        "lambda": {"constant": 4.0},
+        "mu": {"constant": 1.0},
+    }
+
+    # Canonical: an explicit per-property source is preserved.
+    assert normalize_material_declaration(
+        {"velocity": {"from_file": "vp.hdf5"}},
+    ) == {"velocity": {"from_file": "vp.hdf5"}}
+
+    # None values carry no declaration.
+    assert normalize_material_declaration(
+        {"type": "object", "real_velocity_file": None},
+    ) == {}
+    assert normalize_material_declaration(None) == {}

@@ -129,10 +129,10 @@ class IsotropicWave(ElasticWave):
         self.s_wave_velocity = value
 
     @override
-    def declare_model_parameters(self, synthetic_data_dict: dict):
+    def declare_model_parameters(self, declaration: dict):
         """Phase A: read and validate the material declaration.
 
-        The dictionary must define exactly one supported material
+        The declaration must define exactly one supported material
         parameterization: either density with Lame parameters, or density with
         P- and S-wave velocities.
 
@@ -144,8 +144,9 @@ class IsotropicWave(ElasticWave):
 
         Parameters
         ----------
-        synthetic_data_dict : dict
-            Material parameter dictionary using the public Spyro model schema.
+        declaration : dict
+            Mapping of property name to a ``set_material_property``
+            specification, as produced by ``normalize_material_declaration``.
 
         Returns
         -------
@@ -158,23 +159,9 @@ class IsotropicWave(ElasticWave):
             If the declaration does not form exactly one supported
             parameterization.
         """
-        def get_value(parameter, *aliases):
-            for key in (parameter.value, *aliases):
-                if key in synthetic_data_dict:
-                    return synthetic_data_dict[key]
-            return None
-
         specs = {
-            ElasticMaterialParameter.DENSITY: get_value(
-                ElasticMaterialParameter.DENSITY),
-            ElasticMaterialParameter.LAMBDA: get_value(
-                ElasticMaterialParameter.LAMBDA, "lame_first"),
-            ElasticMaterialParameter.MU: get_value(
-                ElasticMaterialParameter.MU, "lame_second"),
-            ElasticMaterialParameter.P_WAVE_VELOCITY: get_value(
-                ElasticMaterialParameter.P_WAVE_VELOCITY),
-            ElasticMaterialParameter.S_WAVE_VELOCITY: get_value(
-                ElasticMaterialParameter.S_WAVE_VELOCITY),
+            parameter: declaration.get(parameter.value)
+            for parameter in ElasticMaterialParameter
         }
 
         # Validation is by declaration, not by truthiness: a legitimately zero
@@ -247,22 +234,21 @@ class IsotropicWave(ElasticWave):
                 )
             self.force_rebuild_function_space()
 
-        specs = self._material_specs
-        self.rho = self._as_control_field(
-            specs[ElasticMaterialParameter.DENSITY],
-            ElasticMaterialParameter.DENSITY.value)
+        def build(parameter):
+            """Build a declared parameter through the single field engine."""
+            return self.set_material_property(
+                parameter.value, "scalar",
+                **self._material_specs[parameter])
+
+        self.rho = build(ElasticMaterialParameter.DENSITY)
 
         # Declared parameters first, then the derived ones. Both go through
         # set_material_property, so none is left as a Constant or a UFL
         # expression.
         if self._control_parameterization is \
                 ElasticMaterialParameterization.LAME:
-            self.lmbda = self._as_control_field(
-                specs[ElasticMaterialParameter.LAMBDA],
-                ElasticMaterialParameter.LAMBDA.value)
-            self.mu = self._as_control_field(
-                specs[ElasticMaterialParameter.MU],
-                ElasticMaterialParameter.MU.value)
+            self.lmbda = build(ElasticMaterialParameter.LAMBDA)
+            self.mu = build(ElasticMaterialParameter.MU)
             self.p_wave_velocity = self._as_control_field(
                 ((self.lmbda + 2*self.mu)/self.rho)**0.5,
                 ElasticMaterialParameter.P_WAVE_VELOCITY.value)
@@ -270,12 +256,10 @@ class IsotropicWave(ElasticWave):
                 (self.mu/self.rho)**0.5,
                 ElasticMaterialParameter.S_WAVE_VELOCITY.value)
         else:
-            self.p_wave_velocity = self._as_control_field(
-                specs[ElasticMaterialParameter.P_WAVE_VELOCITY],
-                ElasticMaterialParameter.P_WAVE_VELOCITY.value)
-            self.s_wave_velocity = self._as_control_field(
-                specs[ElasticMaterialParameter.S_WAVE_VELOCITY],
-                ElasticMaterialParameter.S_WAVE_VELOCITY.value)
+            self.p_wave_velocity = build(
+                ElasticMaterialParameter.P_WAVE_VELOCITY)
+            self.s_wave_velocity = build(
+                ElasticMaterialParameter.S_WAVE_VELOCITY)
             self.mu = self._as_control_field(
                 self.rho*self.s_wave_velocity**2,
                 ElasticMaterialParameter.MU.value)

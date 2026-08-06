@@ -2,7 +2,7 @@ from os import getcwd
 from os.path import splitext
 
 import firedrake as fire
-from numpy import log10, ones
+from numpy import isscalar, log10, ones
 from numpy.random import uniform
 
 from .interpolators import interpolate
@@ -466,6 +466,95 @@ def set_material_property(wave, property_name, func_space_type,
 def set_material_properties(wave, *args, **kwargs):
     """Backward-compatible alias for set_material_property."""
     return set_material_property(wave, *args, **kwargs)
+
+
+#: Source keywords understood by :func:`set_material_property`.
+MATERIAL_PROPERTY_SOURCES = frozenset({
+    "constant", "conditional", "expression", "random", "fire_function",
+    "from_file",
+})
+
+#: Legacy keys mapped onto canonical material property names.
+_LEGACY_PROPERTY_NAMES = {
+    "real_velocity_file": "velocity",
+    "lame_first": "lambda",
+    "lame_second": "mu",
+}
+
+
+def _infer_material_property_source(value):
+    """Infer the ``set_material_property`` source keyword for a raw value.
+
+    Parameters
+    ----------
+    value : str, dict, firedrake.Function, scalar or UFL expression
+        Material property value written in the legacy declaration style.
+
+    Returns
+    -------
+    dict
+        A single-entry specification such as ``{"constant": 1.5}``.
+    """
+    if isinstance(value, str):
+        return {"from_file": value}
+
+    if isinstance(value, dict):
+        # Already a specification if every key names a known source.
+        if value and set(value).issubset(MATERIAL_PROPERTY_SOURCES):
+            return dict(value)
+        # Otherwise it is grid data, which set_material_property reads
+        # through its from_file path.
+        return {"from_file": value}
+
+    if isinstance(value, fire.Function):
+        return {"fire_function": value}
+
+    if isscalar(value):
+        return {"constant": value}
+
+    # Firedrake Constant or UFL expression: interpolated as a UFL input.
+    return {"conditional": value}
+
+
+def normalize_material_declaration(synthetic_data):
+    """Translate a material declaration into ``set_material_property`` specs.
+
+    Accepts both the canonical per-property style and the legacy styles, so a
+    single generic initialization can serve every wave type.
+
+    Parameters
+    ----------
+    synthetic_data : dict or None
+        The ``synthetic_data`` block of the input dictionary. Values may be
+        explicit specifications (``{"velocity": {"from_file": "vp.segy"}}``) or
+        legacy raw values (``{"density": 1.0}``, ``{"real_velocity_file":
+        "vp.segy"}``).
+
+    Returns
+    -------
+    dict
+        Mapping of canonical property name to a specification dictionary
+        suitable for ``set_material_property(name, ..., **spec)``.
+
+    Examples
+    --------
+    ``{"real_velocity_file": "vp.segy"}`` becomes
+    ``{"velocity": {"from_file": "vp.segy"}}``.
+    """
+    if not synthetic_data:
+        return {}
+
+    declaration = {}
+    for key, value in synthetic_data.items():
+        # 'type' selected the old object/file dispatch and carries no material
+        # information; the source is now part of each property specification.
+        if key == "type" or value is None:
+            continue
+
+        name = _LEGACY_PROPERTY_NAMES.get(key, key)
+        declaration[name] = _infer_material_property_source(value)
+
+    return declaration
 
 
 def point_to_scalar_wave_function_space(wave):

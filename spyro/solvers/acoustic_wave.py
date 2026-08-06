@@ -42,6 +42,7 @@ class AcousticWave(Wave):
         super().__init__(dictionary, wave_type=WaveType.ISOTROPIC_ACOUSTIC, comm=comm)
         self._velocity_model = None
         self.initial_velocity_model = None
+        self._material_specs = None
 
         self.acoustic_energy = None
         self.field_logger.add_functional(
@@ -102,7 +103,8 @@ class AcousticWave(Wave):
                 velocity_model_function,
             )
         elif new_file is not None:
-            self._initialize_model_parameters(fast_interpolate=fast_interpolate)
+            self._load_initial_velocity_model(
+                fast_interpolate=fast_interpolate)
         elif constant is not None:
             self.initial_velocity_model = fire.Function(
                 self.function_space,
@@ -304,48 +306,80 @@ class AcousticWave(Wave):
             self.u_n.assign(0.0)
 
     @override
-    def _initialize_model_parameters(self, fast_interpolate=False):
+    def declare_model_parameters(self, declaration):
+        """Phase A: record the acoustic velocity declaration.
+
+        Acoustic propagation needs a single material property, so the
+        declaration is simply stored. Validation of its presence is deferred to
+        materialization, because the velocity may instead be provided
+        imperatively through ``set_initial_velocity_model`` or as an inversion
+        control.
+
+        Parameters
+        ----------
+        declaration : dict
+            Mapping of property name to a ``set_material_property``
+            specification.
+        """
+        self._material_specs = declaration
+
+    @override
+    def materialize_model_parameters(self, fast_interpolate=False):
+        """Phase B: build the acoustic velocity model.
+
+        Keeps the acoustic snapshot semantics: ``initial_velocity_model`` is
+        the pristine model and ``velocity_model`` is the working copy updated
+        during inversion.
+        """
         if self.velocity_model is not None:
             return
 
         if self.initial_velocity_model is None:
-            if self.initial_velocity_model_file is None:
-                try:
-                    grid_velocity_data = self.mesh_parameters.grid_velocity_data
-                except AttributeError:
-                    grid_velocity_data = None
-                if grid_velocity_data is None:
-                    raise ValueError("No velocity model or velocity file to load.")
-                self.initial_velocity_model = interpolate(
-                    self,
-                    grid_velocity_data,
-                    self.function_space.sub(0),
-                )
+            velocity_spec = (self._material_specs or {}).get("velocity")
+            if velocity_spec is not None \
+                    and self.initial_velocity_model_file is None:
+                self.initial_velocity_model = self.set_material_property(
+                    "velocity", "scalar", **velocity_spec)
             else:
-                if self.initial_velocity_model_file.endswith(".segy"):
-                    self.initial_velocity_model_file = (
-                        write_hdf5_velocity_model(
-                            self,
-                            self.initial_velocity_model_file,
-                        )
-                    )
+                self._load_initial_velocity_model(
+                    fast_interpolate=fast_interpolate)
 
-                if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
-                    self.initial_velocity_model = interpolate(
+        self.velocity_model = self._copy_function(self.initial_velocity_model)
+
+    def _load_initial_velocity_model(self, fast_interpolate=False):
+        """Load the pristine velocity model from a file or from grid data."""
+        if self.initial_velocity_model_file is None:
+            try:
+                grid_velocity_data = self.mesh_parameters.grid_velocity_data
+            except AttributeError:
+                grid_velocity_data = None
+            if grid_velocity_data is None:
+                raise ValueError("No velocity model or velocity file to load.")
+            self.initial_velocity_model = interpolate(
+                self,
+                grid_velocity_data,
+                self.function_space.sub(0),
+            )
+        else:
+            if self.initial_velocity_model_file.endswith(".segy"):
+                self.initial_velocity_model_file = (
+                    write_hdf5_velocity_model(
                         self,
                         self.initial_velocity_model_file,
-                        self.function_space.sub(0),
-                        fast_interpolate=fast_interpolate,
                     )
-
-            if self.debug_output:
-                fire.VTKFile("initial_velocity_model.pvd").write(
-                    self.initial_velocity_model, name="velocity"
                 )
 
-        if self.velocity_model is None:
-            self.velocity_model = self._copy_function(
-                self.initial_velocity_model,
+            if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
+                self.initial_velocity_model = interpolate(
+                    self,
+                    self.initial_velocity_model_file,
+                    self.function_space.sub(0),
+                    fast_interpolate=fast_interpolate,
+                )
+
+        if self.debug_output:
+            fire.VTKFile("initial_velocity_model.pvd").write(
+                self.initial_velocity_model, name="velocity"
             )
 
     @override

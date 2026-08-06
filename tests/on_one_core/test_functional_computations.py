@@ -15,7 +15,10 @@ class DummyWave(Wave):
     def matrix_building(self):
         pass
 
-    def _initialize_model_parameters(self):
+    def declare_model_parameters(self, declaration):
+        pass
+
+    def materialize_model_parameters(self):
         pass
 
     def _create_function_space(self):
