@@ -153,7 +153,7 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length = 0.2
+    edge_length = 0.2 if dimension == 2 else 0.25
 
     # f_est: Factor for the stabilizing term in Eikonal equation
     # fitting_c: Parameters for fitting equivalent velocity regression
@@ -161,14 +161,14 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
         f_est = 0.06 if element_geometry == "T" else 0.49
 
     if dimension == 3:
-        f_est = 0.05 if element_geometry == "T" else 0.07
+        f_est = 0.04 if element_geometry == "T" else 0.05
 
     # Timestep size (in seconds). Initial guess: edge_length / 100
     if dimension == 2:
         dt_usu = 0.00250 if element_geometry == "T" else 0.00320
 
-    if dimension == 3:
-        dt_usu = 0.00400 if element_geometry == "T" else 0.00500
+    if dimension == 3:  # HERE
+        dt_usu = 0.00500 if element_geometry == "T" else 0.00750
 
     # Maximum divisor of the final time
     max_divisor_tf = 4
@@ -266,23 +266,22 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
      0.55  --/--  71.320
      0.60  --/--  71.225
 
+
     ==============================
-    Eikonal for 3D model Δx = 200m
+    Eikonal for 3D model Δx = 250m
     ==============================
     eik_min = 83.333 ms
 
-    f_est  T-ele   Q-ele
-     0.03 75.742   --/--
-     0.04 79.075   --/--
-     0.05 82.037* 79.259
-     0.06 85.005  81.807
-     0.07 88.033  84.542*
-     0.08 91.126  87.421
+    f_est   T-ele    Q-ele
+     0.04  99.167*   --/--
+     0.05 107.802  129.219*
+     0.06 115.924  144.657
+     0.07 123.697  159.725
     """
 
     act_eik = "Activated" if calc_eik else "Deactivated"
-    pprint("\n" + 60 * "=" + f"\nTesting Reference Model with {element_geometry} elements "
-           + f"for ABCs\nand {dimension}D case. Eikonal analysis: {act_eik}\n"
+    pprint("\n" + 60 * "=" + f"\nTesting Reference Model with {element_geometry} "
+           + f"elements for ABCs\nand {dimension}D case. Eikonal analysis: {act_eik}\n"
            + 60 * "=", comm=comm)
 
     # ============ REFERENCE MODEL ============
