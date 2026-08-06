@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pytest
 from copy import deepcopy
 from firedrake import VTKFile
 import firedrake as fire
@@ -164,5 +165,64 @@ def test_gradient():
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True)
 
 
+def _gradient_for_sampling_frequency(freq, final_time_override=0.5):
+    """Compute the adjoint gradient for a given ``gradient_sampling_frequency``.
+
+    Returns the raw nodal gradient values so gradients computed with different
+    sampling frequencies can be compared directly. A shorter ``final_time`` is
+    used to keep the regression test cheap.
+    """
+    d = deepcopy(dictionary)
+    d["time_axis"]["final_time"] = final_time_override
+    d["time_axis"]["gradient_sampling_frequency"] = freq
+
+    Wave_obj_exact = spyro.AcousticWave(dictionary=d)
+    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    cond = fire.conditional(Wave_obj_exact.mesh_z > -0.5, 1.5, 3.5)
+    Wave_obj_exact.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
+    Wave_obj_exact.forward_solve()
+    rec_out_exact = Wave_obj_exact.forward_solution_receivers
+
+    Wave_obj_guess = spyro.AcousticWave(dictionary=d)
+    Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    Wave_obj_guess.set_initial_velocity_model(constant=2.0)
+    Wave_obj_guess.forward_solve()
+    rec_out_guess = Wave_obj_guess.forward_solution_receivers
+
+    misfit = rec_out_exact - rec_out_guess
+    # gradient_solve re-runs the forward solve with storage enabled, keeping the
+    # wavefield only every ``freq`` steps, then back-propagates the adjoint.
+    dJ = Wave_obj_guess.gradient_solve(misfit=misfit)
+    return dJ.dat.data_ro.copy()
+
+
+@pytest.fixture(scope="module")
+def full_sampling_gradient():
+    """Reference gradient with every timestep stored (frequency = 1)."""
+    return _gradient_for_sampling_frequency(1)
+
+
+@pytest.mark.parametrize("freq", [2, 3])
+def test_gradient_sampling_frequency(full_sampling_gradient, freq):
+    """``gradient_sampling_frequency`` > 1 subsamples the stored forward
+    wavefield to save memory. The resulting gradient must match the
+    fully-sampled gradient up to small subsampling (discretization) error, and
+    must NOT be rescaled by a spurious factor of ~``freq``.
+
+    This guards the sample-spacing fix in ``backward_time_integration``: the
+    second-derivative stencil and the trapezoidal quadrature must use
+    ``freq * dt`` as the sample spacing. Before the fix this test sees a
+    relative difference of ~0.97 (freq=2) / ~1.9 (freq=3); after it, ~0.02 /
+    ~0.03.
+    """
+    g_full = full_sampling_gradient
+    g_sub = _gradient_for_sampling_frequency(freq)
+    rel_diff = np.linalg.norm(g_sub - g_full) / np.linalg.norm(g_full)
+    print(f"freq={freq}: relative gradient difference vs full sampling = {rel_diff:.4f}")
+    assert rel_diff < 0.1
+
+
 if __name__ == "__main__":
     test_gradient()
+    test_gradient_sampling_frequency(_gradient_for_sampling_frequency(1), 2)
+    test_gradient_sampling_frequency(_gradient_for_sampling_frequency(1), 3)
