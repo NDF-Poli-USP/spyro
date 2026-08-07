@@ -80,6 +80,24 @@ def test_set_initial_velocity_model_deprecated_forwards(monkeypatch):
     assert forwarded["kwargs"]["constant"] == 1.5
 
 
+def test_set_material_properties_deprecated_forwards(monkeypatch):
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    forwarded = {}
+
+    def record(*args, **kwargs):
+        forwarded["args"] = args
+        forwarded["kwargs"] = kwargs
+
+    monkeypatch.setattr(wave, "set_material_property", record)
+
+    with pytest.warns(DeprecationWarning):
+        wave.set_material_properties("velocity", "scalar", constant=1.5)
+
+    assert forwarded["args"] == ("velocity", "scalar")
+    assert forwarded["kwargs"]["constant"] == 1.5
+
+
 def test_mass_matrix_diagonal_from_lhs():
     model = deepcopy(acoustic_model)
     model["time_axis"]["final_time"] = model["time_axis"]["dt"]

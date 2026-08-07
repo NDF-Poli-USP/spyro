@@ -914,7 +914,18 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         )
 
     def set_material_properties(self, *args, **kwargs):
-        """Backward-compatible alias for set_material_property."""
+        """Deprecated alias for :meth:`set_material_property`.
+
+        .. deprecated::
+            Use :meth:`set_material_property` instead. This wrapper forwards
+            every argument unchanged and will be removed in a future release.
+        """
+        warnings.warn(
+            "set_material_properties() is deprecated; use "
+            "set_material_property() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.set_material_property(*args, **kwargs)
 
     @property

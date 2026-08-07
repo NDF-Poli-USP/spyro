@@ -1,3 +1,4 @@
+import warnings
 from os import getcwd
 
 import firedrake as fire
@@ -460,7 +461,18 @@ def set_material_property(wave, property_name, func_space_type,
 
 
 def set_material_properties(wave, *args, **kwargs):
-    """Backward-compatible alias for set_material_property."""
+    """Deprecated alias for :func:`set_material_property`.
+
+    .. deprecated::
+        Use :func:`set_material_property` instead. This wrapper forwards every
+        argument unchanged and will be removed in a future release.
+    """
+    warnings.warn(
+        "set_material_properties() is deprecated; use "
+        "set_material_property() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return set_material_property(wave, *args, **kwargs)
 
 
