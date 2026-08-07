@@ -508,16 +508,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 **acoustic_sources,
             )
             self.initial_velocity_model_file = new_file
-            self.c = None
 
             if output:
                 fire.VTKFile("initial_velocity_model.pvd").write(
                     self.initial_velocity_model,
                     name="velocity",
                 )
-
-        if self.c is not None:
-            return
 
         if self.initial_velocity_model is None:
             velocity_source = self.initial_velocity_model_file
