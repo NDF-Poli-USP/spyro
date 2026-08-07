@@ -1,4 +1,5 @@
 from firedrake import VTKFile
+import matplotlib.pyplot as plt
 from .general_plots import plot_function
 
 def debug_plot(function, filename="debug.png"):
