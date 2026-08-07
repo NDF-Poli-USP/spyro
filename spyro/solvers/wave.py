@@ -375,7 +375,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         dg_velocity_model : bool, optional
             Materialize a conditional acoustic model in DG0. Default is True.
         fast_interpolate : bool, optional
-            Use the fast interpolation path for grid and HDF5 inputs.
+            Only affects file/grid velocity inputs. When ``False`` (default)
+            the model read from a SEGY/HDF5 file or grid is L2-projected onto
+            the finite-element space -- robust, and smooths differences between
+            the model grid and the mesh. When ``True`` the model is instead
+            sampled directly at the node coordinates of the space, skipping the
+            projection solve: this is faster but relies on point sampling of
+            the grid. Has no effect for constant/conditional/expression inputs.
             Default is False.
 
         Raises
@@ -439,7 +445,48 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         dg_velocity_model,
         fast_interpolate,
     ):
-        """Initialize the acoustic velocity model ``self.c``."""
+        """Initialize the acoustic P-wave velocity ``self.c``.
+
+        Two situations are handled. If an explicit source was given
+        (``has_acoustic_source``), the velocity is built from it through the
+        shared I/O engine. Otherwise the velocity is loaded from a previously
+        registered file or from the grid data attached to the mesh. In both
+        cases ``self.c`` ends up pointing at ``self.initial_velocity_model``.
+
+        Parameters
+        ----------
+        acoustic_sources : dict
+            Mapping of I/O engine keyword to value (``constant``,
+            ``conditional``, ``expression``, ``fire_function``, ``from_file``).
+            At most one entry is non-``None``.
+        has_acoustic_source : bool
+            Whether ``acoustic_sources`` holds a user-provided source. When
+            ``False`` the velocity is loaded from file/grid data instead.
+        synthetic_data : dict or None
+            Elastic declaration; only checked here to reject the invalid
+            combination of an acoustic source together with ``synthetic_data``.
+        conditional : firedrake expression or None
+            The conditional source, inspected to decide whether the model is
+            materialized in DG0 (``dg_velocity_model``).
+        new_file : str or None
+            File path to record in ``initial_velocity_model_file`` when an
+            explicit source is used.
+        output : bool
+            Write the initialized velocity to PVD. Forced ``True`` when
+            ``self.debug_output`` is set.
+        dg_velocity_model : bool
+            Materialize a conditional model in DG0 rather than the wave's own
+            function space.
+        fast_interpolate : bool
+            Forwarded to the I/O engine; see
+            :meth:`initialize_model_parameters` for the meaning.
+
+        Raises
+        ------
+        ValueError
+            If an acoustic source is combined with ``synthetic_data`` or if no
+            velocity model or file is available to load.
+        """
         if has_acoustic_source:
             if synthetic_data is not None:
                 raise ValueError(
@@ -497,9 +544,33 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def _initialize_elastic_parameters(self, synthetic_data=None):
         """Initialize the isotropic-elastic material parameters.
 
-        Materializes any symbolic values, derives the complementary
-        parameterization and records the control parameterization and material
-        signature used to keep repeated calls idempotent.
+        The isotropic elastic model is described by exactly one of two
+        parameterizations: Lame ``{density, lambda, mu}`` or velocity
+        ``{density, p_wave_velocity, s_wave_velocity}``. Whichever set is
+        supplied becomes the *control* parameterization (the one an inversion
+        updates), and the complementary fields are derived from it.
+
+        The method is idempotent. On the first call it reads the declaration,
+        materializes the fields and derives the missing ones. On later calls it
+        only recomputes the derived fields when the underlying material objects
+        actually changed (tracked through :meth:`_material_signature`), so it is
+        safe to call repeatedly, e.g. inside an inversion loop.
+
+        Parameters
+        ----------
+        synthetic_data : dict, optional
+            Material declaration with a ``type`` key and the parameter fields.
+            When ``None`` the ``synthetic_data`` section of
+            ``input_dictionary`` is used. Ignored once a parameterization is
+            already active.
+
+        Raises
+        ------
+        ValueError
+            If the declaration is missing, has an unknown ``type``, or yields an
+            inconsistent mix of Lame and velocity parameters.
+        NotImplementedError
+            If the declaration requests a file-based initialization.
         """
         active = self._control_parameterization
 
@@ -556,7 +627,18 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._model_parameter_signature = self._material_signature()
 
     def _detect_parameterization(self):
-        """Return the parameterization implied by the current fields, or None."""
+        """Infer the elastic parameterization from the fields currently set.
+
+        Exactly one complete, non-overlapping set must be present for a match:
+        Lame requires ``{rho, lmbda, mu}`` with both velocities unset, and
+        velocity requires ``{rho, c, c_s}`` with both Lame parameters unset.
+
+        Returns
+        -------
+        ElasticMaterialParameterization or None
+            ``LAME`` or ``VELOCITY`` when one complete set is present,
+            otherwise ``None`` (nothing set yet, or an ambiguous mix).
+        """
         has_lame_parameters = (
             self.rho is not None
             and self.lmbda is not None
@@ -578,7 +660,30 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         return None
 
     def _load_elastic_parameters_from_declaration(self, synthetic_data=None):
-        """Populate the missing elastic fields from a material declaration."""
+        """Populate the missing elastic fields from a material declaration.
+
+        Reads each material field from the declaration dictionary and turns it
+        into a scalar Function via :meth:`_material_parameter_field`. Only
+        fields that are still unset on the wave are filled, so values already
+        assigned by the caller take precedence. Field names accept the aliases
+        ``lambda``/``lmbda``/``lame_first`` and ``mu``/``lame_second``.
+
+        Parameters
+        ----------
+        synthetic_data : dict, optional
+            Declaration with a ``type`` key (must be ``"object"``) and the
+            material fields. When ``None`` the ``synthetic_data`` section of
+            ``input_dictionary`` is used.
+
+        Raises
+        ------
+        ValueError
+            If the declaration is missing, is not a dict, has no ``type`` key,
+            or has a ``type`` other than ``"object"`` or ``"file"``.
+        NotImplementedError
+            If ``type`` is ``"file"`` (file-based elastic loading is not
+            implemented yet).
+        """
         data = synthetic_data
         if data is None:
             data = self.input_dictionary.get("synthetic_data")
@@ -621,14 +726,49 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @staticmethod
     def _first_declared(data, *names):
-        """Return the first ``(name, value)`` declared in ``data``."""
+        """Return the first key from ``names`` that is present in ``data``.
+
+        Used to resolve field aliases (e.g. ``lambda`` vs ``lame_first``) by
+        probing candidate names in priority order.
+
+        Parameters
+        ----------
+        data : dict
+            The material declaration being read.
+        *names : str
+            Candidate keys, tried left to right.
+
+        Returns
+        -------
+        tuple
+            ``(name, value)`` for the first key found in ``data``, or
+            ``(None, None)`` if none of ``names`` is present.
+        """
         for name in names:
             if name in data:
                 return name, data[name]
         return None, None
 
     def _materialize_existing(self, value, name):
-        """Turn an existing symbolic material value into a Function."""
+        """Turn an already-assigned material value into a mesh Function.
+
+        Leaves the value untouched when it cannot yet be materialized (no mesh)
+        or is absent (``None``), and when it already is a Function. Scalars,
+        Constants and UFL expressions are converted to a scalar Function so the
+        derived-parameter formulas operate on concrete fields.
+
+        Parameters
+        ----------
+        value : scalar, firedrake.Constant, firedrake.Function, UFL expr or None
+            The current value of a material field.
+        name : str
+            Property name forwarded to the I/O engine (used in log messages).
+
+        Returns
+        -------
+        firedrake.Function or the original value
+            A Function when conversion happened, otherwise ``value`` unchanged.
+        """
         if self.mesh is None or value is None:
             return value
         if isinstance(value, fire.Function):
@@ -636,7 +776,19 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         return self._material_parameter_field(value, name)
 
     def _derive_complementary_parameters(self):
-        """Compute the derived elastic fields for the active parameterization."""
+        """Compute the elastic fields not carried by the control set.
+
+        For the Lame control set ``{rho, lmbda, mu}`` it derives the wave
+        velocities ``c = sqrt((lmbda + 2*mu)/rho)`` and ``c_s = sqrt(mu/rho)``.
+        For the velocity control set ``{rho, c, c_s}`` it derives the Lame
+        parameters ``mu = rho*c_s**2`` and ``lmbda = rho*c**2 - 2*mu``. The
+        active set is read from ``self._control_parameterization``.
+
+        Returns
+        -------
+        None
+            The derived fields are written back onto ``self``.
+        """
         if self._control_parameterization is (
             ElasticMaterialParameterization.LAME
         ):
@@ -647,14 +799,39 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.lmbda = self.rho*self.c**2 - 2*self.mu
 
     def _recompute_derived_parameters(self):
-        """Refresh derived fields only when the material identities changed."""
+        """Refresh derived fields only when the control fields changed.
+
+        Compares the current :meth:`_material_signature` against the stored one
+        and, if they differ, re-derives the complementary fields and updates the
+        stored signature. This keeps repeated initialization calls cheap while
+        still reacting to a control field being replaced (e.g. by an inversion
+        update).
+
+        Returns
+        -------
+        None
+        """
         signature = self._material_signature()
         if self._model_parameter_signature != signature:
             self._derive_complementary_parameters()
             self._model_parameter_signature = signature
 
     def _material_signature(self):
-        """Identity signature of the primary fields for the active setup."""
+        """Return an identity fingerprint of the control fields.
+
+        The fingerprint combines the active parameterization with the ``id()``
+        of each control field, so a change of any control field (a new Function
+        object) produces a different signature. It is a cheap way to detect
+        that the derived fields must be recomputed, without comparing field
+        values node by node.
+
+        Returns
+        -------
+        tuple
+            ``(parameterization, id(rho), id(lmbda), id(mu))`` for the Lame
+            control set, or ``(parameterization, id(rho), id(c), id(c_s))`` for
+            the velocity control set.
+        """
         parameterization = self._control_parameterization
         if parameterization is ElasticMaterialParameterization.LAME:
             return (
@@ -687,6 +864,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Use :meth:`initialize_model_parameters` instead. This wrapper
             forwards every argument unchanged and will be removed in a future
             release.
+
+        Parameters
+        ----------
+        constant, conditional, velocity_model_function, expression, new_file, \
+output, dg_velocity_model, fast_interpolate
+            Same meaning as in :meth:`initialize_model_parameters`; every
+            argument is forwarded there unchanged.
         """
         warnings.warn(
             "set_initial_velocity_model() is deprecated; use "
@@ -711,7 +895,35 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         name,
         fast_interpolate=False,
     ):
-        """Create a scalar material field through the shared I/O engine."""
+        """Create a scalar material Function through the shared I/O engine.
+
+        Normalizes ``value`` to the right keyword of
+        :meth:`set_material_property` based on its Python type: scalars become
+        ``constant``, Functions become ``fire_function``, strings/dicts become
+        ``from_file`` (path or grid data), and anything else (a UFL/conditional
+        expression) becomes ``conditional``. This is the single funnel through
+        which every material field is materialized.
+
+        Parameters
+        ----------
+        value : scalar, firedrake.Function, str, dict or UFL expression
+            The material value to materialize. Its type selects the I/O path.
+        name : str
+            Property name passed to the I/O engine (e.g. ``"density"``).
+        fast_interpolate : bool, optional
+            Forwarded to the I/O engine for ``from_file`` inputs; see
+            :meth:`initialize_model_parameters`. Default is ``False``.
+
+        Returns
+        -------
+        firedrake.Function
+            The materialized scalar field.
+
+        Raises
+        ------
+        ValueError
+            If no function space exists yet (``set_mesh()`` was not called).
+        """
         if self.function_space is None:
             raise ValueError(
                 "A function space is required to initialize model parameters. "
