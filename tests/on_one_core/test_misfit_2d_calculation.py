@@ -111,7 +111,7 @@ def test_misfit_2d():
     # Using only wave objects
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.05})
-    Wave_obj_exact.set_initial_velocity_model(
+    Wave_obj_exact.initialize_model_parameters(
         expression="4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((x - 1.5) ** 2 + (z + 1.5) ** 2)))",
         output=True
     )
@@ -120,7 +120,7 @@ def test_misfit_2d():
 
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05})
-    Wave_obj_guess.set_initial_velocity_model(constant=4.0)
+    Wave_obj_guess.initialize_model_parameters(constant=4.0)
     Wave_obj_guess.real_shot_record = rec_out_exact
     Wave_obj_guess.enable_compute_functional()
     Wave_obj_guess.forward_solve()

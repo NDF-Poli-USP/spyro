@@ -477,7 +477,7 @@ def plot_model_in_p1(wave, dx=0.01, filename="model.png", abc_points=None, show=
 
     new_wave_obj = AcousticWave(dictionary=p1_obj_dict)
     new_wave_obj.set_mesh(input_mesh_parameters={"edge_length": dx})
-    new_wave_obj.set_initial_velocity_model(conditional=wave.initial_velocity_model)
+    new_wave_obj.initialize_model_parameters(conditional=wave.initial_velocity_model)
 
     return plot_model(new_wave_obj, filename=filename, abc_points=abc_points, show=show, flip_axis=flip_axis)
 

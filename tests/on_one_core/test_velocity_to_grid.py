@@ -68,7 +68,7 @@ def test_velocity_to_grid():
     cond = fire.conditional(
         (z - zc) ** 2 + (x - xc) ** 2 < rc**2, vmax, vmin
     )
-    wave.set_initial_velocity_model(conditional=cond)
+    wave.initialize_model_parameters(conditional=cond)
     grid_spacing = 0.02
     grid_velocity_data = spyro.utils.velocity_to_grid(
         wave.initial_velocity_model,

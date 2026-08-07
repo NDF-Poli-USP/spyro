@@ -76,6 +76,7 @@ class Read_boundary_layer:
         """
 
         # General parameters
+        self._abc_boundary_layer_shape = LayerShapeType.NOLAYER
         self.input_dictionary.setdefault("absorving_boundary_conditions", {})
         self.input_dictionary[
             "absorving_boundary_conditions"].setdefault("status", False)
@@ -106,8 +107,6 @@ class Read_boundary_layer:
 
     @property
     def abc_boundary_layer_shape(self):
-        if not hasattr(self, "_abc_boundary_layer_shape"):
-            self._abc_boundary_layer_shape = LayerShapeType.NOLAYER
         return self._abc_boundary_layer_shape
 
     @abc_boundary_layer_shape.setter

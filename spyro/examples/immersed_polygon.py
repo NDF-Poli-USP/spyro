@@ -130,7 +130,7 @@ class Polygon_velocity:
             middle_of_pad = -self.mesh_parameters.length_z - self.mesh_parameters.abc_pad_length*0.5
             cond = fire.conditional(z <= middle_of_pad, v0, cond)
 
-        self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
+        self.initialize_model_parameters(conditional=cond, dg_velocity_model=False)
         return None
 
 

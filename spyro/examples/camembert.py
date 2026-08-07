@@ -131,7 +131,7 @@ class CamembertVelocity:
         cond = fire.conditional(
             (z - zc) ** 2 + (x - xc) ** 2 < rc**2, c_salt, c_not_salt
         )
-        self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
+        self.initialize_model_parameters(conditional=cond, dg_velocity_model=False)
         return None
 
 

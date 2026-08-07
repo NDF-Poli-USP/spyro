@@ -86,7 +86,7 @@ def run_forward(dt, with_pml=False):
     wave = spyro.AcousticWave(dictionary=dictionary)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.02, "periodic": True})
 
-    wave.set_initial_velocity_model(constant=1.5)
+    wave.initialize_model_parameters(constant=1.5)
     wave.forward_solve()
 
     rec_out = wave.forward_solution_receivers

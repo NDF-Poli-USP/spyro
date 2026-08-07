@@ -155,7 +155,7 @@ class Rectangle_mesh_and_velocity:
                     self.mesh_z > z_switch[i], cond, layers[i + 1]
                 )
         # cond = fire.conditional(self.mesh_z > z_switch, layer1, layer2)
-        self.set_initial_velocity_model(conditional=cond)
+        self.initialize_model_parameters(conditional=cond)
 
 
 class Rectangle_acoustic(Rectangle_mesh_and_velocity, Example_model_acoustic):

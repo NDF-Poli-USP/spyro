@@ -64,7 +64,7 @@ def test_forward_3_shots():
 
     mesh_z = wave.mesh_z
     cond = fire.conditional(mesh_z < -1.5, 3.5, 1.5)
-    wave.set_initial_velocity_model(conditional=cond, output=True)
+    wave.initialize_model_parameters(conditional=cond, output=True)
 
     wave.forward_solve()
 

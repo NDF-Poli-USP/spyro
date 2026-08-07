@@ -86,7 +86,7 @@ def run_forward_hexahedral(dt, final_time, offset):
     }
     wave.set_mesh(input_mesh_parameters=mesh_parameters)
 
-    wave.set_initial_velocity_model(constant=1.5)
+    wave.initialize_model_parameters(constant=1.5)
     wave.forward_solve()
     # time_vector = np.linspace(0.0, final_time, int(final_time/dt)+1)
 
