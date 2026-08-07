@@ -657,6 +657,13 @@ def test_fromfile_mat_prop(wave_instance, cell_type, monkeypatch):
     cell_type : `str`
         Type of cell for the mesh. Options: "T" for triangle or tetrahedra,
         "Q" for quadrilateral or hexahedra.
+    monkeypatch : `pytest.MonkeyPatch`
+        Pytest fixture used to temporarily replace
+        ``material_properties_io.interpolate`` with a stub for the duration of
+        this test (pytest restores the original automatically at teardown).
+        This lets the test verify that ``set_material_property`` forwards the
+        file source and the ``fast_interpolate`` flag to the interpolation
+        engine, without performing any real file I/O.
 
     Returns
     -------
@@ -672,6 +679,9 @@ def test_fromfile_mat_prop(wave_instance, cell_type, monkeypatch):
     grid_data = {"mock": "grid-data"}
     captured = {}
 
+    # Stub replacing the real interpolation engine: it records the arguments it
+    # received (so the test can assert on them) and returns a known Function
+    # instead of reading a file.
     def fake_interpolate(actual_wave, source, V, fast_interpolate=False):
         captured["wave"] = actual_wave
         captured["source"] = source
