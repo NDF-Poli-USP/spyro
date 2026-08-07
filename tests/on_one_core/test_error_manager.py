@@ -4,7 +4,6 @@ from firedrake import Function, FunctionSpace, Mesh
 from firedrake.functionspaceimpl import WithGeometry
 from numpy import array, inf, nan
 from numpy.testing import assert_array_equal
-from os import path
 from unittest.mock import Mock, patch
 from ufl.form import Form
 from ufl.geometry import SpatialCoordinate
