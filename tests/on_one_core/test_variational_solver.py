@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import firedrake as fire
 import numpy as np
+import pytest
 import spyro
 
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
@@ -25,6 +26,23 @@ def test_initialize_model_parameters_uses_material_property(monkeypatch):
     assert len(calls) == 1
     assert calls[0][0] == ("velocity", "scalar")
     assert calls[0][1]["constant"] == 1.5
+
+
+def test_set_initial_velocity_model_deprecated_forwards(monkeypatch):
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    forwarded = {}
+
+    def record(*args, **kwargs):
+        forwarded["args"] = args
+        forwarded["kwargs"] = kwargs
+
+    monkeypatch.setattr(wave, "initialize_model_parameters", record)
+
+    with pytest.warns(DeprecationWarning):
+        wave.set_initial_velocity_model(constant=1.5)
+
+    assert forwarded["kwargs"]["constant"] == 1.5
 
 
 def test_mass_matrix_diagonal_from_lhs():

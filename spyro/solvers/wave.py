@@ -608,6 +608,41 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 id(self.c_s),
             )
 
+    def set_initial_velocity_model(
+        self,
+        constant=None,
+        conditional=None,
+        velocity_model_function=None,
+        expression=None,
+        new_file=None,
+        output=False,
+        dg_velocity_model=True,
+        fast_interpolate=False,
+    ):
+        """Deprecated alias for :meth:`initialize_model_parameters`.
+
+        .. deprecated::
+            Use :meth:`initialize_model_parameters` instead. This wrapper
+            forwards every argument unchanged and will be removed in a future
+            release.
+        """
+        warnings.warn(
+            "set_initial_velocity_model() is deprecated; use "
+            "initialize_model_parameters() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.initialize_model_parameters(
+            constant=constant,
+            conditional=conditional,
+            velocity_model_function=velocity_model_function,
+            expression=expression,
+            new_file=new_file,
+            output=output,
+            dg_velocity_model=dg_velocity_model,
+            fast_interpolate=fast_interpolate,
+        )
+
     def _material_parameter_field(
         self,
         value,
