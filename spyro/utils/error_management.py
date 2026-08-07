@@ -546,10 +546,6 @@ def value_file_error(par_name, par_value, valid_extensions,
     if par_value is None and none_default:
         return par_value
 
-    # # Check for empty string
-    # if par_value == "":
-    #     raise ValueError(f"'{par_name}' cannot be an empty string.")
-
     if not path.exists(par_value) and check_file_existance:
         raise FileNotFoundError(f"'{par_name}' '{par_value}' does not exist")
 
