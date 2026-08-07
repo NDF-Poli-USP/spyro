@@ -209,21 +209,43 @@ def _initialize_material_property_from_file(
     fast_interpolate=False,
 ):
     """
-    Initialize material property from a file.
+    Initialize a scalar material property from a file or grid data.
 
-    Parameters:
-    -----------
-    property_name: `str`
-        Name of the material property to be set.
-    from_file: `str` or `dict`
-        Name of the file containing the material property, or grid data.
-    V: `firedrake function space`
-        Function space for the material property
+    The source may be a gridded dictionary (already in memory), an HDF5/H5
+    file, or a SEGY file. SEGY inputs are first converted to HDF5 with
+    :func:`write_hdf5_velocity_model`. The model is then transferred onto the
+    finite-element space ``V`` by :func:`interpolate`.
 
-    Returns:
-    --------
-    mat_property: `firedrake function`
-        Material property
+    Parameters
+    ----------
+    wave : spyro Wave object
+        The wave solver that owns the mesh, communicator and mesh parameters
+        used while reading and transferring the model.
+    property_name : `str`
+        Name of the material property being set (used only in log messages).
+    from_file : `str` or `dict`
+        Path to a ``*.segy``, ``*.hdf5`` or ``*.h5`` file, or a grid
+        dictionary holding the model values already loaded in memory.
+    V : `firedrake.FunctionSpace`
+        Function space onto which the property is transferred.
+    fast_interpolate : `bool`, optional
+        Selects how the gridded model is transferred onto ``V``. When
+        ``False`` (default) the model is read and L2-projected onto ``V``,
+        which is robust and smooths between the model grid and the mesh. When
+        ``True`` the model values are sampled directly at the node coordinates
+        of ``V``, which skips the projection solve and is faster, but relies on
+        point sampling of the grid. Only meaningful for file/grid inputs.
+
+    Returns
+    -------
+    mat_property : `firedrake.Function`
+        The material property interpolated onto ``V``.
+
+    Raises
+    ------
+    ValueError
+        If ``from_file`` is a path that is not a ``*.segy``, ``*.hdf5`` or
+        ``*.h5`` file.
     """
 
     original_family = wave.function_space.ufl_element().family()
@@ -294,26 +316,42 @@ def _saving_property_to_file(wave, mat_property, property_name,
 def _check_material_property_inputs(val_lst, func_space_type,
                                     shape_func_space, output):
     """
-    Check the inputs for setting a material property.
+    Validate that exactly one value source was given for a material property.
 
-    Parameters:
-    -----------
-    val_lst: `list`
-        List of values for constant, conditional, expression,
-        random, fire_function and from_file.
-    func_space_type, `str`
-        Type of function space for the material property.
-        Options: 'scalar', 'vector' or 'tensor'
-    shape_func_space: `tuple`, optional
-        Shape of the function space for only tensorial material
-        property. Default is None
-    output: `bool`, optional
-        If True, outputs the material property to a pvd file for
-        visualization. Default is False
+    A material property must be defined by a single source. This guard rejects
+    two invalid cases before any function space is built:
 
-    Returns:
-    --------
+    - **zero sources** (all entries of ``val_lst`` are ``None``): previously
+      this silently fell through and later failed with an obscure
+      ``UnboundLocalError`` on ``mat_property``; it now raises a clear
+      ``ValueError`` naming the accepted sources;
+    - **more than one source**: raises a ``ValueError`` listing the sources
+      that were supplied together.
+
+    Parameters
+    ----------
+    val_lst : `list`
+        Values for ``constant``, ``conditional``, ``expression``, ``random``,
+        ``fire_function`` and ``from_file``, in this order. Unused sources are
+        ``None``.
+    func_space_type : `str`
+        Type of function space for the material property. One of ``'scalar'``,
+        ``'vector'`` or ``'tensor'``.
+    shape_func_space : `tuple`, optional
+        Shape of the function space, only for tensorial properties. Default is
+        ``None``.
+    output : `bool`, optional
+        If ``True`` the property is later written to a PVD file for
+        visualization. Default is ``False``.
+
+    Returns
+    -------
     None
+
+    Raises
+    ------
+    ValueError
+        If no source or more than one source is provided.
     """
 
     number_of_sources = sum(value is not None for value in val_lst)
@@ -351,6 +389,9 @@ def set_material_property(wave, property_name, func_space_type,
 
     Parameters:
     -----------
+    wave: spyro Wave object
+        The wave solver that owns the mesh and function spaces onto which the
+        property is defined.
     property_name: `str`
         Name of the material property to be set.
     func_space_type, `str`
@@ -387,8 +428,13 @@ def set_material_property(wave, property_name, func_space_type,
         Name of the folder where the material property is saved.
         If default is 'default', property is saved in '/property_fields/'
     fast_interpolate: `bool`, optional
-        If True, use the fast interpolation path for grid and HDF5 inputs.
-        Default is False.
+        Only used for ``from_file`` (grid/HDF5) inputs; ignored otherwise.
+        Selects how the gridded model is transferred onto the target space.
+        When False (default), the model is read and L2-projected onto the
+        space, which is robust and smooths differences between the model grid
+        and the mesh. When True, the model values are sampled directly at the
+        node coordinates of the space, skipping the projection solve: this is
+        faster but relies on point sampling of the grid. Default is False.
 
     Returns:
     -----------
