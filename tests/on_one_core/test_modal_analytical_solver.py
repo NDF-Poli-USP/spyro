@@ -462,7 +462,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.02  138.931*
      0.02  142.020
 
-    *RESULTS HETEROGENEOUS (usr: without optimization)
+    *RESULTS HOMOGENEOUS (usr: without optimization)
     Frequency[Hz]     REC iter        (texe/pmem)
     ANALYTICAL    0.47741    5 ( 7.483s/14.672MB)
     ANALYTICAL    0.47741  usr ( 2.239s/ 9.275MB)

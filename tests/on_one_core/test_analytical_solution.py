@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 import spyro
-
 # import matplotlib.pyplot as plt
 
 

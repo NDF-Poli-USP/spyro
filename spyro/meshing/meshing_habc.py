@@ -298,8 +298,8 @@ class HABCMesh(MeshOps):
         pprint("\nCreating Mesh and Initial Velocity Model", comm=self.comm)
 
         # Mesh data
-        pprint(f"Original Mesh with {wave.mesh.num_vertices()} Nodes "
-               f"and {wave.mesh.num_cells()} Volume Elements", comm=self.comm)
+        pprint(f"Original Mesh with {wave.mesh.num_vertices()} Nodes and "
+               f"{wave.mesh.num_cells()} Volume Elements", comm=self.comm)
 
         # Save a copy of the original mesh
         wave.mesh_original = wave.mesh
