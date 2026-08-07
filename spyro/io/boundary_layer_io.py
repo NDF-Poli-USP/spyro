@@ -192,7 +192,7 @@ class Read_boundary_layer:
         """Set the type of absorbing boundary condtion with validation."""
         abc_dictionary = self.input_dictionary['absorving_boundary_conditions']
 
-        # Cheking damping type input
+        # Cheking ABC type input
         if value is None:
             pprint("No Absorbing Boundary Conditions (ABCs) applied.", comm=self.comm)
             value = "no_abcs"
