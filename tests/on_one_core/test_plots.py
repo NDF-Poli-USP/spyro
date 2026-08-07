@@ -48,7 +48,7 @@ def test_plot():
     z_switches = [-0.5]
     wave.multiple_layer_velocity_model(z_switches, layer_values)
     wave.forward_solve()
-    spyro.plots.plot_shots(wave, show=False, file_name="test_plot", file_format="png")
+    spyro.plots.plot_shots(wave, show=False, filename="test_plot", file_format="png")
     expected_file = "test_plot[0].png"
     assert os.path.exists(expected_file)
 
