@@ -1,167 +1,176 @@
-"""HABC related plotting routines."""
+"""HABC-related plotting routines."""
 
-from matplotlib.pyplot import (
-    figure,
-    gca,
-    grid,
-    legend,
-    plot,
-    rcParams,
-    scatter,
-    xlabel,
-    xlim,
-    xticks,
-    ylabel,
-    ylim,
-)
+from pathlib import Path
+from typing import Sequence
 
-# from numpy import arange, asarray, ceil, clip, linspace, inf, polyfit, polyval, zeros
-from numpy import arange, ceil, linspace, inf, zeros
-from os import makedirs, path
+import matplotlib.pyplot as plt
+import numpy as np
+
 from ..abc.lay_len import f_layer, loop_roots
 from .plot_helpers import _finalize_figure
 
-# from ..utils.stats_tools import coeff_of_determination
-rcParams.update({"font.family": "serif"})
-rcParams["text.latex.preamble"] = r"\usepackage{bm} \usepackage{amsmath}"
+plt.rcParams.update({"font.family": "serif"})
+plt.rcParams["text.latex.preamble"] = r"\usepackage{bm} \usepackage{amsmath}"
 
 
-def create_folder(folder):
-    """Verify if a folder exists, if not, it creates the folder.
+def create_folder(folder: str | Path) -> None:
+    """Ensure a directory exists, creating it if needed.
 
     Parameters
     ----------
-    folder: `str`
-        Path to the folder to be created
+    folder : str or pathlib.Path
+        Path to the directory to create.
 
     Returns
     -------
     None
     """
-    # Create the folder if it does not exist
-    if not path.isdir(folder):
-        makedirs(folder)
+    # TODO: replace with the validation method to come
+    folder_path = Path(folder)
+    if not folder_path.is_dir():
+        folder_path.mkdir(parents=True, exist_ok=True)
 
 
 def plot_function_layer_size(
-    lay_par, freq_par, geom_par, FLpos, output_folder="output/", show=False
-):
-    """Plot the function of the layer size criterion for the HABC scheme.
+    layer_parameters: Sequence[float],
+    frequency_parameters: Sequence[float],
+    geometry_parameters: Sequence[float],
+    reference_frequency_layer_sizes: Sequence[float],
+    output_folder: str | Path = "output/",
+    show: bool = False,
+) -> None:
+    """Plot the layer-size criterion for the HABC scheme.
 
     Parameters
     ----------
-    lay_par: `list`
-        Parameters of the layer:
-        - a : `float`
-            Adimensional propagation speed parameter (a = z / f, z = c / l).
-        - z_par : `float`
-            Inverse of min. Eikonal (1 / phi_min, equivalent to c_bound/lref).
-    freq_par: `list`
+    layer_parameters : sequence of float
+        Parameters of the absorbing layer:
+        - ``a`` : float
+            Dimensionless propagation speed parameter (``a = z / f``).
+        - ``z_par`` : float
+            Inverse of the minimum Eikonal parameter.
+    frequency_parameters : sequence of float
         Parameters of the frequency:
-        - reference_frequency : `float`
+        - ``reference_frequency`` : float
             Reference frequency of the wave.
-        - source_frequency : `float`
+        - ``source_frequency`` : float
             Source frequency.
-    geom_par: `list`
+    geometry_parameters : sequence of float
         Parameters of the domain geometry:
-        - lmin : `float`
-            Minimal dimension of finite element in mesh.
-        - lref : `float`
-            Reference length for the size of the absorbing layer.
-    FLpos: `list`
-        List of size parameters for the reference frequency.
-    output_folder: `str`, optional
-        Folder to save the output plots. Default is "output/".
-    show: `bool`, optional
-        Whether to show the plot. Default is `False`.
+        - ``lmin`` : float
+            Minimal dimension of the finite element in the mesh.
+        - ``lref`` : float
+            Reference length for the absorbing layer.
+    reference_frequency_layer_sizes : sequence of float
+        Layer-size values associated with the reference frequency.
+    output_folder : str or pathlib.Path, optional
+        Folder used to save the output plots. Default is ``"output/"``.
+    show : bool, optional
+        Whether to show the plot interactively. Default is ``False``.
 
     Returns
     -------
     None
     """
-    # Create the output folder if it does not exist
     create_folder(output_folder)
 
-    # Unpack the parameters
-    a, z = lay_par
-    reference_frequency, source_frequency = freq_par
-    lmin, lref = geom_par
+    a, z = layer_parameters
+    reference_frequency, source_frequency = frequency_parameters
+    minimum_element_size, reference_length = geometry_parameters
 
-    # Prepare the data for the plot
-    a_lst = [a]
-    F_lst = [FLpos]
-    l_lst = ["{:.2f}".format(reference_frequency)]
-    c_lst = ["C0"]
+    layer_size_values = [a]
+    layer_size_samples = [reference_frequency_layer_sizes]
+    frequency_labels = [f"{reference_frequency:.2f}"]
+    colors = ["C0"]
+    frequency_label_tokens = [r"f_{\mathrm{sou}}"]
 
     if source_frequency == reference_frequency:
-
-        # Layer size based on source frequency
-        FLsou = []
-        w_lst = ["f_{{sou}}"]
-
+        source_frequency_layer_sizes = []
     else:
-
-        # Calculate the size parameter for the source frequency
-        a_sou = z / source_frequency  # Adimensional parameter
-        FLsou = loop_roots(a_sou, lmin, lref, len(FLpos), show_ig=False)
-        a_lst.append(a_sou)
-        F_lst.append(FLsou)
-        l_lst.append("{:.2f}".format(source_frequency))
-        c_lst.append("C1")
-        w_lst = ["f_{{bnd}}", "f_{{sou}}"]
-
-    # Calculate the maximum layer size for the plot
-    FL_max = max(FLpos + FLsou) + 0.4
-    FL_lim = ceil(FL_max * 10) / 10
-    F_L = linspace(0.001, FL_lim, int(FL_lim * 1e3))
-
-    # Plot the size criterion
-    figure(figsize=(12, 6))  # Set figure size
-    ax = gca()
-    lim_crit = inf
-    for a_pr, FL_rt, lab, col, w_str in zip(a_lst, F_lst, l_lst, c_lst, w_lst):
-        crit = f_layer(F_L, a_pr)
-        lim_crit = min(lim_crit, crit.min())
-        plot(
-            F_L,
-            crit,
-            color=col,
-            zorder=2,
-            label=r"$\Psi_{{F_L}}({}={}\text{{Hz}})$".format(w_str, lab),
+        source_frequency_parameter = z / source_frequency
+        source_frequency_layer_sizes = loop_roots(
+            source_frequency_parameter,
+            minimum_element_size,
+            reference_length,
+            len(reference_frequency_layer_sizes),
+            show_ig=False,
         )
-        scatter(FL_rt, zeros(len(FL_rt)), color=col, zorder=3)
+        layer_size_values.append(source_frequency_parameter)
+        layer_size_samples.append(source_frequency_layer_sizes)
+        frequency_labels.append(f"{source_frequency:.2f}")
+        colors.append("C1")
+        frequency_label_tokens = [r"f_{\mathrm{bnd}}", r"f_{\mathrm{sou}}"]
 
-    # Identify the roots of the criterion function
-    delta_x = FL_lim / 40.0
-    delta_y = abs(lim_crit) / 2.0
-    off_x = 0.5 * delta_x
-    off_y = 0.85 * delta_y
-    for lay, (FL_rt, col) in enumerate(zip(F_lst, c_lst)):
-        base_y = -1.3 * delta_y if lay == 0 else 0.8 * delta_y
+    maximum_layer_size = (
+        max(list(reference_frequency_layer_sizes) + source_frequency_layer_sizes) + 0.4
+    )
+    layer_size_limit = np.ceil(maximum_layer_size * 10) / 10
+    layer_size_axis = np.linspace(0.001, layer_size_limit, int(layer_size_limit * 1e3))
+
+    plt.figure(figsize=(12, 6))
+    axes = plt.gca()
+    minimum_criterion_value = np.inf
+
+    for (
+        layer_size_value,
+        size_samples,
+        frequency_label,
+        color,
+        frequency_label_token,
+    ) in zip(
+        layer_size_values,
+        layer_size_samples,
+        frequency_labels,
+        colors,
+        frequency_label_tokens,
+    ):
+        criterion = f_layer(layer_size_axis, layer_size_value)
+        minimum_criterion_value = min(minimum_criterion_value, criterion.min())
+        plt.plot(
+            layer_size_axis,
+            criterion,
+            color=color,
+            zorder=2,
+            label=rf"$\Psi_{{F_L}}({frequency_label_token}={frequency_label}\text{{Hz}})$",
+        )
+        plt.scatter(size_samples, np.zeros(len(size_samples)), color=color, zorder=3)
+
+    delta_x = layer_size_limit / 40.0
+    delta_y = abs(minimum_criterion_value) / 2.0
+    offset_x = 0.5 * delta_x
+    offset_y = 0.85 * delta_y
+
+    for layer_index, (size_samples, color) in enumerate(
+        zip(layer_size_samples, colors)
+    ):
+        base_y = -1.3 * delta_y if layer_index == 0 else 0.8 * delta_y
         used_positions = []
 
-        for rt, FL_par in enumerate(FL_rt):
-            xFL = FL_par + delta_x if rt % 2 == 0 else FL_par - delta_x
-            y_FL = base_y
+        for sample_index, layer_size_value in enumerate(size_samples):
+            x_layer_size = (
+                layer_size_value + delta_x
+                if sample_index % 2 == 0
+                else layer_size_value - delta_x
+            )
+            y_layer_size = base_y
 
-            # Check for overlap and adjust if needed
-            for prev_x, prev_y in used_positions:
+            for previous_x, previous_y in used_positions:
                 if (
-                    abs(xFL - prev_x) < 2.6 * delta_x
-                    and abs(y_FL - prev_y) < 0.9 * off_y
+                    abs(x_layer_size - previous_x) < 2.6 * delta_x
+                    and abs(y_layer_size - previous_y) < 0.9 * offset_y
                 ):
-                    xFL += -off_x if rt % 2 == 0 else off_x
-                    y_FL += -off_y if lay == 0 else off_y
-            used_positions.append((xFL, y_FL))
+                    x_layer_size += -offset_x if sample_index % 2 == 0 else offset_x
+                    y_layer_size += -offset_y if layer_index == 0 else offset_y
+            used_positions.append((x_layer_size, y_layer_size))
 
-            ax.annotate(
-                f"{FL_par:.4f}",  # Text
-                xy=(FL_par, 0),  # Point to connect to
-                xytext=(xFL, y_FL),  # Text position
+            axes.annotate(
+                f"{layer_size_value:.4f}",
+                xy=(layer_size_value, 0),
+                xytext=(x_layer_size, y_layer_size),
                 ha="center",
                 va="bottom",
                 zorder=4,
-                bbox=dict(facecolor=col, alpha=0.9),
+                bbox=dict(facecolor=color, alpha=0.9),
                 arrowprops=dict(
                     arrowstyle="-",
                     color="black",
@@ -171,23 +180,22 @@ def plot_function_layer_size(
                 ),
             )
 
-    # Formatting the plot
-    FL_str = r"$F_L \; (L_{{\xi}} \; = \; L_{{ref}} \, F_L \;$"
-    lref_str = r"$\therefore \; L_{{ref}} \; = \; {:.4f}\text{{km}})$"
-    xlabel((FL_str + lref_str).format(lref))
-    ylabel(r"$\Psi_{{F_L}} \; = \; |C_{Rmin}| \; - \; R$")
-    xticks(arange(0, FL_lim + 0.01, 0.5 if FL_lim > 1 else 0.2))
-    xlim((0, FL_lim))
-    ylim((lim_crit - 0.01, 1.01))
-    grid(zorder=1)
-    legend()
+    layer_size_label = r"$F_L \; (L_{{\xi}} \; = \; L_{{ref}} \, F_L \;$"
+    reference_length_label = r"$\therefore \; L_{{ref}} \; = \; {:.4f}\text{{km}})$"
+    plt.xlabel((layer_size_label + reference_length_label).format(reference_length))
+    plt.ylabel(r"$\Psi_{{F_L}} \; = \; |C_{Rmin}| \; - \; R$")
+    plt.xticks(
+        np.arange(0, layer_size_limit + 0.01, 0.5 if layer_size_limit > 1 else 0.2)
+    )
+    plt.xlim((0, layer_size_limit))
+    plt.ylim((minimum_criterion_value - 0.01, 1.01))
+    plt.grid(zorder=1)
+    plt.legend()
 
-    # Saving the plot
-    layer_str = output_folder + "layer_opts"
-
+    output_path = Path(output_folder) / "layer_opts"
     _finalize_figure(
-        plot.gcf(),
-        layer_str,
+        plt.gcf(),
+        output_path,
         formats=("png", "pdf"),
         show=show,
         bbox_inches="tight",
