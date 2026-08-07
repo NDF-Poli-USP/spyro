@@ -182,3 +182,20 @@ def test_initialize_model_parameters_preserves_material_properties():
             (wave.rho, wave.lmbda, wave.mu, wave.c, wave.c_s),
         )
     )
+
+
+def test_initialize_model_parameters_recomputes_after_change():
+    wave = IsotropicWave(dummy_dict)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.2})
+    wave.rho = wave.set_material_property("density", "scalar", constant=1.0)
+    wave.lmbda = wave.set_material_property("lambda", "scalar", constant=2.0)
+    wave.mu = wave.set_material_property("mu", "scalar", constant=3.0)
+
+    wave.initialize_model_parameters()
+    c_before, c_s_before = wave.c, wave.c_s
+
+    wave.mu = wave.set_material_property("mu", "scalar", constant=5.0)
+    wave.initialize_model_parameters()
+
+    assert wave.c is not c_before
+    assert wave.c_s is not c_s_before

@@ -28,6 +28,41 @@ def test_initialize_model_parameters_uses_material_property(monkeypatch):
     assert calls[0][1]["constant"] == 1.5
 
 
+def test_initialize_model_parameters_from_velocity_function(monkeypatch):
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    velocity = wave.set_material_property("velocity", "scalar", constant=1.5)
+    captured = {}
+
+    def fake(*args, **kwargs):
+        captured.update(kwargs)
+        return velocity
+
+    monkeypatch.setattr(wave, "set_material_property", fake)
+    wave.initialize_model_parameters(velocity_model_function=velocity)
+
+    assert captured["fire_function"] is velocity
+    assert wave.c is velocity
+
+
+def test_initialize_model_parameters_from_file_records_source(monkeypatch):
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    model = wave.set_material_property("velocity", "scalar", constant=1.5)
+    captured = {}
+
+    def fake(*args, **kwargs):
+        captured.update(kwargs)
+        return model
+
+    monkeypatch.setattr(wave, "set_material_property", fake)
+    wave.initialize_model_parameters(new_file="velocity.hdf5")
+
+    assert captured["from_file"] == "velocity.hdf5"
+    assert wave.initial_velocity_model_file == "velocity.hdf5"
+    assert wave.c is model
+
+
 def test_set_initial_velocity_model_deprecated_forwards(monkeypatch):
     wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
