@@ -6,7 +6,7 @@ tests are designed to ensure that the computed transiente responses and energies
 are consistent with expected values. The tests cover both 2D and 3D cases.
 """
 
-from pytest import fail, mark  # fixture, param
+from pytest import fail, mark, param
 from firedrake import COMM_WORLD as comm, conditional, ConvergenceError
 from numpy import all, sum
 from spyro.solvers.acoustic_wave import AcousticWave
@@ -97,8 +97,7 @@ def wave_dict(element_geometry, dimension, calc_eik, abc_type, dt_usu):
         "final_time": 2. if dimension == 2 else 1.5,  # Final time for event
         "dt": dt_usu,  # timestep size in seconds
         "amplitude": 1.,  # the Ricker has an amplitude of 1.
-        "output_frequency": 100,  # how frequently to output solution to pvds
-        # "gradient_sampling_frequency": 100,  # how frequently to save to RAM
+        "output_frequency": 50,  # how frequently to output solution to pvds
     }
 
     # Define Parameters for absorbing boundary conditions
@@ -153,25 +152,24 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length = 0.2 if dimension == 2 else 0.25
+    edge_length = 0.25 if dimension == 2 else 0.5
 
     # f_est: Factor for the stabilizing term in Eikonal equation
-    # fitting_c: Parameters for fitting equivalent velocity regression
     if dimension == 2:
-        f_est = 0.06 if element_geometry == "T" else 0.49
+        f_est = 0.03 if element_geometry == "T" else 0.05
 
     if dimension == 3:
-        f_est = 0.04 if element_geometry == "T" else 0.05
+        f_est = 0.67 if element_geometry == "T" else 0.07
 
     # Timestep size (in seconds). Initial guess: edge_length / 100
     if dimension == 2:
-        dt_usu = 0.00250 if element_geometry == "T" else 0.00320
+        dt_usu = 0.00400 if element_geometry == "T" else 0.00500
 
-    if dimension == 3:  # HERE
-        dt_usu = 0.00500 if element_geometry == "T" else 0.00750
+    if dimension == 3:
+        dt_usu = 0.01000 if element_geometry == "T" else 0.01250
 
     # Maximum divisor of the final time
-    max_divisor_tf = 4
+    max_divisor_tf = 3 if dimension == 2 else 4
 
     # Get simulation parameters
     pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
@@ -210,13 +208,13 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
 @mark.older_firedrake
 @mark.parametrize("element_geometry, dimension, calc_eik", [
     ("T", 2, True),
-    ("Q", 2, True),
     ("T", 2, False),
+    ("Q", 2, True),
     ("Q", 2, False),
-    ("T", 3, True),
-    ("Q", 3, True),
-    ("T", 3, False),
-    ("Q", 3, False)])
+    param("T", 3, True, marks=mark.slow),
+    param("T", 3, False, marks=mark.slow),
+    param("Q", 3, True, marks=mark.slow),
+    param("Q", 3, False, marks=mark.slow)])
 def test_infinite_model_abc(element_geometry, dimension, calc_eik):
     """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
@@ -239,44 +237,38 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
     None
 
     ==============================
-    Eikonal for 2D model Δx = 200m
+    Eikonal for 2D model Δx = 250m
     ==============================
     eik_min = 83.333 ms
 
     f_est  T-ele   Q-ele
-     0.03 61.030  69.624
-     0.04 67.176  69.783
-     0.05 67.369  69.985
-     0.06 67.392* 70.200
-     0.07 67.356  70.405
-     0.08 67.287  70.588
-     0.09 67.192  70.744
-     0.10 67.076  70.871
-     0.20  --/--  71.201
-     0.30  --/--  71.204
-     0.40  --/--  71.298
-     0.47  --/--  71.343
-     0.48  --/--  71.345
-     0.49  --/--  71.346*
-     0.50  --/--  71.345
-     0.51  --/--  71.343
-     0.52  --/--  71.340
-     0.53  --/--  71.335
-     0.54  --/--  71.328
-     0.55  --/--  71.320
-     0.60  --/--  71.225
-
+     0.03 84.586*  --/--
+     0.04 87.945   --/--
+     0.05  --/--  93.368*
+     0.06  --/--  97.456
 
     ==============================
-    Eikonal for 3D model Δx = 250m
+    Eikonal for 3D model Δx = 500m
     ==============================
     eik_min = 83.333 ms
 
     f_est   T-ele    Q-ele
-     0.04  99.167*   --/--
-     0.05 107.802  129.219*
-     0.06 115.924  144.657
-     0.07 123.697  159.725
+     0.06   3.618   63.319
+     0.07   4.782   78.381*
+     0.08   6.509   93.750
+     0.09   8.398  109.148
+     0.10  10.336  124.374
+     0.20  28.403    --/--
+     0.30  41.259    --/--
+     0.40  48.893    --/--
+     0.50  52.831    --/--
+     0.60  54.439    --/--
+     0.65  54.672    --/--
+     0.66  54.685    --/--
+     0.67  54.687*   --/--
+     0.68  54.680    --/--
+     0.69  54.664    --/--
+     0.70  54.639    --/--
     """
 
     act_eik = "Activated" if calc_eik else "Deactivated"

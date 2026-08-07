@@ -155,6 +155,7 @@ class MeasureError():
 
         # Path to the reference data folder with reference signals
         pth_str = self.path_reference + self.output_file + "_"
+        extension = [".npy"]
 
         # Time domain signal
         receivers_reference_file = validate_file(pth_str + "time.npy",
