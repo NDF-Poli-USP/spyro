@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from .plot_helpers import _finalize_figure
 
 def plot_receiver_response(
     receiver_data,
@@ -76,12 +77,7 @@ def plot_receiver_response(
     axes.grid(True, alpha=0.3)
     fig.tight_layout()
 
-    if filename is not None:
-        plt.savefig(filename)
-    if show:
-        plt.show()
-    elif hold is False:
-        plt.close(fig)
+    _finalize_figure(fig, filename=filename, show=show)
 
 
 def plot_displacement_components(

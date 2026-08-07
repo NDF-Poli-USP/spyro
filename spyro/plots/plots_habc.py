@@ -10,6 +10,7 @@ from matplotlib.pyplot import show as plt_show
 from numpy import arange, ceil, linspace, inf, zeros
 from os import makedirs, path
 from ..abc.lay_len import f_layer, loop_roots
+from .plot_helpers import _finalize_figure
 # from ..utils.stats_tools import coeff_of_determination
 rcParams.update({"font.family": "serif"})
 rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
@@ -157,10 +158,14 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 
     # Saving the plot
     layer_str = output_folder + "layer_opts"
-    savefig(layer_str + ".png", bbox_inches='tight')
-    savefig(layer_str + ".pdf", bbox_inches='tight')
-    plt_show() if show else None
-    close()
+    
+    _finalize_figure(
+        plot.gcf(),
+        layer_str,
+        formats=("png", "pdf"),
+        show=show,
+        bbox_inches="tight",
+    )
 
 
 # def plot_hist_receivers(wave, show=False):

@@ -1,4 +1,3 @@
-import copy
 from firedrake import (
     assemble,
     CellSize,
@@ -10,6 +9,7 @@ from firedrake import (
 import matplotlib.pyplot as plt
 from ..domains.space import create_function_space
 from ..tools.version_control import is_firedrake_new
+from .plot_helpers import _finalize_figure
 
 
 if is_firedrake_new() is False:
@@ -60,7 +60,6 @@ def plot_mesh_sizes(
     The function temporarily swaps mesh coordinates for visualization and
     restores them afterwards to avoid side effects.
     """
-    # plt.rcParams['font.family'] = "Times New Roman"
     plt.rcParams["font.size"] = 12
 
     if mesh_filename is not None:
@@ -70,7 +69,7 @@ def plot_mesh_sizes(
     else:
         raise ValueError("Please specify mesh")
 
-    coordinates = copy.deepcopy(mesh.coordinates.dat.data)
+    coordinates = mesh.coordinates.dat.data.copy()
 
     mesh.coordinates.dat.data[:, 0] = coordinates[:, 1]
     mesh.coordinates.dat.data[:, 1] = coordinates[:, 0]
@@ -93,13 +92,10 @@ def plot_mesh_sizes(
         cbar = fig.colorbar(im, orientation="horizontal")
         cbar.ax.set_xlabel("circumcircle radius (km)")
     fig.set_size_inches(13, 10)
-    if show:
-        plt.show()
-    if output_filename is not None:
-        plt.savefig(output_filename)
+    _finalize_figure(fig, filename=output_filename, show=show)
 
     # Flip back mesh coordinates so it does not change outside of method
-    coordinates = copy.deepcopy(mesh.coordinates.dat.data)
+    coordinates = mesh.coordinates.dat.data.copy()
 
     mesh.coordinates.dat.data[:, 0] = coordinates[:, 1]
     mesh.coordinates.dat.data[:, 1] = coordinates[:, 0]

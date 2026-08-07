@@ -5,6 +5,7 @@ import numpy as np
 from PIL import Image
 from ..io import ensemble_save
 from ..utils import change_scalar_field_resolution
+from .plot_helpers import _finalize_figure
 
 def plot_model(
     wave,
@@ -61,8 +62,6 @@ def plot_model(
     plt.close()
     fig = plt.figure(figsize=(9, 9))
     axes = fig.add_subplot(111)
-    fig.set_figwidth = 9.0
-    fig.set_figheight = 9.0
     if high_resolution:
         vp_object, _ = change_scalar_field_resolution(wave, high_resolution_grid_value)
 
@@ -111,8 +110,8 @@ def plot_model(
         zs.append(z_first)
         xs.append(x_first)
         plt.plot(zs, xs, "--")
-    print(f"File name {filename}", flush=True)
-    plt.savefig(filename)
+
+    _finalize_figure(fig, filename=filename, show=show)
 
     if flip_axis:
         img = Image.open(filename)
@@ -120,10 +119,6 @@ def plot_model(
 
         # Save the rotated image
         img_rotated.save(filename)
-    if show:
-        plt.show()
-    else:
-        plt.close()
 
 
 def plot_model_in_p1(
@@ -200,7 +195,7 @@ def plot_model_in_p1(
 def plot_shots(
     wave,
     show=False,
-    file_name="plot_of_shot",
+    filename="plot_of_shot",
     shot_ids=[0],
     vmin=-1e-5,
     vmax=1e-5,
@@ -225,7 +220,7 @@ def plot_shots(
         forward_solution_receivers attribute, along with timing and receiver information.
     show : bool, optional
         If True, display the plot interactively. Default is False.
-    file_name : str, optional
+    filename : str, optional
         Base name for the saved image file (without extension).
         Default is "plot_of_shot".
     shot_ids : list of int, optional
@@ -264,7 +259,7 @@ def plot_shots(
     >>> plot_shots(wave, show=True, file_name="my_shot", shot_ids=[0, 1])
     >>> plot_shots(wave, vmin=-1e-3, vmax=1e-3, file_format="png")
     """
-    file_name = file_name + str(shot_ids) + "." + file_format
+    filename = filename + str(shot_ids) + "." + file_format
     num_recvs = wave.number_of_receivers
 
     dt = wave.dt
@@ -286,7 +281,7 @@ def plot_shots(
 
     cmap = plt.get_cmap("gray")
     plt.contourf(X, Y, arr, contour_lines, cmap=cmap, vmin=vmin, vmax=vmax)
-    # savemat("test.mat", {"mydata": arr})
+    fig = plt.gcf()
     plt.xlabel("receiver number", fontsize=18)
     plt.ylabel("time (s)", fontsize=18)
     plt.xticks(fontsize=18)
@@ -294,11 +289,7 @@ def plot_shots(
     plt.xlim(start_index, end_index)
     plt.ylim(tf, 0)
     plt.subplots_adjust(left=0.18, right=0.95, bottom=0.14, top=0.95)
-    plt.savefig(file_name, format=file_format)
-    # plt.axis("image")
-    if show:
-        plt.show()
-    # plt.close()
+    _finalize_figure(fig, filename=filename, show=show)
     return None
 
 
