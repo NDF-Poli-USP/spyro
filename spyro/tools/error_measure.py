@@ -155,14 +155,18 @@ class MeasureError():
 
         # Path to the reference data folder with reference signals
         pth_str = self.path_reference + self.output_file + "_"
+        extension = [".npy"]
 
         # Time domain signal
-        receivers_reference_file = value_file_error(pth_str + "time.npy",
+        pth_time = pth_str + "time.npy"
+        receivers_reference_file = value_file_error("pth_time", pth_time, extension,
                                                     check_file_existance=True)
+
         receivers_reference = load(receivers_reference_file)
 
         # Frequency domain signal
-        receivers_reference_fft_file = value_file_error(pth_str + "fft.npy",
+        pth_freq = pth_str + "fft.npy"
+        receivers_reference_fft_file = value_file_error("pth_freq", pth_freq, extension,
                                                         check_file_existance=True)
         receivers_ref_fft = load(receivers_reference_fft_file).T
 
