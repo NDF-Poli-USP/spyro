@@ -6,7 +6,7 @@ tests are designed to ensure that the computed transiente responses and energies
 are consistent with expected values. The tests cover both 2D and 3D cases.
 """
 
-from pytest import fail, mark  # fixture, param
+from pytest import fail, mark, param
 from firedrake import COMM_WORLD as comm, conditional, ConvergenceError
 from numpy import all, sum
 from spyro.solvers.acoustic_wave import AcousticWave
@@ -208,13 +208,13 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
 @mark.older_firedrake
 @mark.parametrize("element_geometry, dimension, calc_eik", [
     ("T", 2, True),
-    ("Q", 2, True),
     ("T", 2, False),
+    ("Q", 2, True),
     ("Q", 2, False),
-    ("T", 3, True),
-    ("Q", 3, True),
-    ("T", 3, False),
-    ("Q", 3, False)])
+    param("T", 3, True, marks=mark.slow),
+    param("T", 3, False, marks=mark.slow),
+    param("Q", 3, True, marks=mark.slow),
+    param("Q", 3, False, marks=mark.slow)])
 def test_infinite_model_abc(element_geometry, dimension, calc_eik):
     """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
