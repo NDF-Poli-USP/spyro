@@ -65,7 +65,7 @@ def cells_per_wavelength(method, degree, dimension):
     return cell_per_wavelength_dictionary.get(key)
 
 
-class MeshingParameters():
+class MeshingParameters():  # noqa: UP039
 
     """Manage mesh parameters and configuration for seismic wave simulations.
 
@@ -234,6 +234,7 @@ class MeshingParameters():
 
         # Initialize private attributes for gmsh mesh properties
         self._padding_x = None
+        self._padding_y = None
         self._padding_z = None
         self._h_padding = None
         self._padding_type = None
@@ -273,6 +274,7 @@ class MeshingParameters():
         # Apply gmsh meshing properties
         self.padding_type = self.input_mesh_dictionary.get("padding_type")
         self.padding_x = self.input_mesh_dictionary.get("padding_x")
+        self.padding_y = self.input_mesh_dictionary.get("padding_y")
         self.padding_z = self.input_mesh_dictionary.get("padding_z")
 
         # Gmsh only parameters
@@ -292,6 +294,19 @@ class MeshingParameters():
             self.extend_segy = self.input_mesh_dictionary.get("extend_segy", True)
             self.apply_winslow = self.input_mesh_dictionary.get("apply_winslow", True)
             self.segy_velocity_model = self.input_mesh_dictionary.get("segy_velocity_model", None)
+
+            # 3d Meshing parameters
+            self.segy_nz = self.input_mesh_dictionary.get("segy_nz", None)
+            self.segy_nx = self.input_mesh_dictionary.get("segy_nx", None)
+            self.segy_ny = self.input_mesh_dictionary.get("segy_ny", None)
+            self.segy_dz = self.input_mesh_dictionary.get("segy_dz", None)
+            self.segy_dx = self.input_mesh_dictionary.get("segy_dx", None)
+            self.segy_dy = self.input_mesh_dictionary.get("segy_dy", None)
+            self.segy_byte_order = self.input_mesh_dictionary.get("segy_byte_order", "big")
+            self.segy_axes_order = self.input_mesh_dictionary.get("segy_axes_order", (0, 1, 2))
+            self.segy_axes_order_sort = self.input_mesh_dictionary.get("segy_axes_order_sort", "F")
+            self.segy_dtype = self.input_mesh_dictionary.get("segy_dtype", "float32")
+            self.gmsh_parallel = self.input_mesh_dictionary.get("gmsh_parallel", False)
 
         self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh", "gmsh_mesh"}
         self.is_complete = None
@@ -1003,6 +1018,24 @@ class MeshingParameters():
     @padding_x.setter
     def padding_x(self, value):
         self._set_length_with_unit_check("_padding_x", value)
+
+    @property
+    def padding_y(self):
+        """Pad length in the y-direction.
+
+        Returns
+        -------
+        float or None
+            The y-direction padding. If it is not set, the
+            absorbing-boundary padding length is returned.
+        """
+        if self._padding_y is None:
+            return self._abc_pad_length
+        return self._padding_y
+
+    @padding_y.setter
+    def padding_y(self, value):
+        self._set_length_with_unit_check("_padding_y", value)
 
     @property
     def padding_z(self):
