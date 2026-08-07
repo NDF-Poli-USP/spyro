@@ -47,6 +47,17 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
         )
     nt = int(t / dt) + 1
 
+    # The forward wavefield is stored only every ``gradient_sampling_frequency``
+    # steps, so consecutive stored samples are ``sample_dt = freq * dt`` apart in
+    # physical time. Every time-derivative stencil and every quadrature weight in
+    # the gradient must use ``sample_dt`` (not ``dt``); otherwise the gradient is
+    # off by a factor of ``freq**2`` (second derivative) and ``freq``
+    # (trapezoidal spacing). ``last_sample`` is the largest sampled step index,
+    # i.e. the last endpoint of the trapezoidal rule over sampled steps.
+    freq = wave.gradient_sampling_frequency
+    sample_dt = freq * dt
+    last_sample = ((nt - 1) // freq) * freq
+
     wave.comm.comm.barrier()
 
     gradient_space = wave.get_scalar_function_space()
@@ -86,9 +97,9 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
                 else:
                     forward_field.assign(0.0)
             else:
-                forward_field.assign(_compute_dufordt2(forward_solution, dt))
+                forward_field.assign(_compute_dufordt2(forward_solution, sample_dt))
             grad_solver.solve()
-            _trapezoidal_gradient_integration(dJ, gradi, step, nt)
+            _trapezoidal_gradient_integration(dJ, gradi, step, last_sample)
 
         if wave.abc_type == AbsorbingBCsType.PML:
             wave.X_nm1.assign(wave.X_n)
@@ -103,7 +114,7 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
 
     helpers.display_progress(wave.comm, t)
 
-    dJ.dat.data_with_halos[:] *= dt / 2
+    dJ.dat.data_with_halos[:] *= sample_dt / 2
     return dJ
 
 
@@ -210,21 +221,27 @@ def _build_gradient_solver(wave: Wave, mask_available: bool) -> tuple[
     return grad_solver, forward_field, uadj, gradi
 
 
-def _compute_dufordt2(forward_solution: list, dt: float) -> fire.Function:
-    """Second time-derivative via 3-point central finite differences."""
+def _compute_dufordt2(forward_solution: list, sample_dt: float) -> fire.Function:
+    """Second time-derivative via 3-point finite differences.
+
+    ``sample_dt`` is the physical time between consecutive stored samples
+    (``gradient_sampling_frequency * dt``), which equals ``dt`` only when every
+    step is stored.
+    """
     if len(forward_solution) > 2:
         return (
             forward_solution.pop()
             - 2.0 * forward_solution[-1]
             + forward_solution[-2]
-        ) / fire.Constant(dt**2)
+        ) / fire.Constant(sample_dt**2)
     else:
-        return forward_solution.pop() / fire.Constant(dt**2)
+        return forward_solution.pop() / fire.Constant(sample_dt**2)
 
 
 def _trapezoidal_gradient_integration(
-        dJ: fire.Function, gradi: fire.Function, step: int, nt: int) -> None:
-    """Trapezoidal-rule gradient accumulation.
+        dJ: fire.Function, gradi: fire.Function, step: int,
+        last_sample: int) -> None:
+    """Trapezoidal-rule gradient accumulation over the stored (sampled) steps.
 
     Parameters:
     -----------
@@ -234,11 +251,12 @@ def _trapezoidal_gradient_integration(
         The gradient at the current time step.
     step : int
         The current time step.
-    nt : int
-        The total number of time steps.
+    last_sample : int
+        The largest sampled step index. Together with step 0 these are the two
+        endpoints of the trapezoidal rule (weight 1); interior samples weight 2.
     """
 
-    if step == nt - 1 or step == 0:
+    if step == last_sample or step == 0:
         dJ += gradi
     else:
         dJ += 2 * gradi
