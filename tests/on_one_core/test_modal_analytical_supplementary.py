@@ -12,7 +12,7 @@ from numpy import all, arange, array, isfinite, pi, setdiff1d, sqrt
 from numpy.testing import assert_almost_equal
 from scipy.special import jn_zeros
 from spyro.solvers.modal.modal_ana_sol import Modal_Analytical_Solver
-from spyro.utils.error_management import type_firedrake_error
+from spyro.utils.error_management import validate_firedrake_parameter
 
 
 class TestModalAnalyticalSolver:
@@ -481,7 +481,7 @@ class TestModalAnalyticalSolver:
             q_dummy, q_ref = solver.dummy_load_static(V, dof_load, amplitude_load)
 
             # Check that q_dummy is a Function
-            assert type_firedrake_error("q_dummy", q_dummy, "Function")
+            assert validate_firedrake_parameter("q_dummy", q_dummy, "Function")
             assert q_dummy.function_space() == V
 
             # Check values at specified DOFs
@@ -518,7 +518,7 @@ class TestModalAnalyticalSolver:
                                                       V_ref=V_ref)
 
             # q_dummy should be in V
-            assert type_firedrake_error("q_dummy", q_dummy, "Function")
+            assert validate_firedrake_parameter("q_dummy", q_dummy, "Function")
             assert q_dummy.function_space() == V
 
             # Check values at specified DOFs
@@ -529,7 +529,7 @@ class TestModalAnalyticalSolver:
             assert sum(q_dummy.dat.data[other_dofs]) == 0.
 
             # q_ref should be in V_ref
-            assert type_firedrake_error("q_ref", q_ref, "Function")
+            assert validate_firedrake_parameter("q_ref", q_ref, "Function")
             assert q_ref.function_space() == V_ref
 
     def test_c_equivalent_volume_homog_constant_2d(self, solver_2d, V_2d):
