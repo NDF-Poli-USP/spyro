@@ -247,9 +247,8 @@ class AutomaticMesh:
             self.ensure_common_origin(mesh, pad=self.abc_pad)
 
         # Mesh data
-        msh_str = f"Mesh Created with {mesh.num_vertices()} Nodes " + \
-            f"and {mesh.num_cells()} " + typ_ele_str
-        parallel_print(msh_str, comm=self.comm)
+        parallel_print(f"Mesh Created with {mesh.num_vertices()} Nodes and "
+                       + f"{mesh.num_cells()} " + typ_ele_str, comm=self.comm)
 
         return mesh
 
