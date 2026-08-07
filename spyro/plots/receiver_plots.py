@@ -202,3 +202,165 @@ def plot_displacement_components(
     plt.show()
     plt.close(separated_fig)
     plt.close(combined_fig)
+
+
+def plot_comparison_of_receivers_to_reference(wave_object, reference_array, show=False):
+    """Plot receiver time-domain comparisons from a Wave object.
+
+    This is a convenience wrapper around
+    :func:`plot_compare_receivers_array` that extracts the receiver data
+    and time vector from a ``Wave_object`` before generating the plot.
+
+    Parameters
+    ----------
+    Wave_object : wave
+        Wave object containing the receiver data and simulation metadata.
+        The following attributes are used:
+
+        - ``dt``: simulation time step.
+        - ``final_time``: final simulation time.
+        - ``forward_solution_receivers``: receiver data from the simulation.
+        - ``path_case_habc``: output directory for the generated figures.
+    reference_array: reference receiver data.
+    show : bool, optional
+        Whether to display the figure interactively. Defaults to ``False``.
+
+    Returns
+    -------
+    None
+
+    See Also
+    --------
+    plot_compare_receivers_array
+        Generic plotting function that compares two receiver arrays.
+    """
+    dt = wave_object.dt
+    final_time = wave_object.final_time
+    num_timesteps = int(round(final_time / dt)) + 1
+
+    time_values = np.linspace(0.0, final_time, num_timesteps)
+
+    plot_compare_receivers_array(
+        receiver_data_first=wave_object.forward_solution_receivers,
+        receiver_data_second=reference_array,
+        time_values=time_values,
+        first_label="Simulation",
+        second_label="Reference",
+        output_path="output/time_comparion",
+        show=show,
+    )
+
+
+def plot_compare_receivers_array(
+    receiver_data_first: np.ndarray,
+    receiver_data_second: np.ndarray,
+    time_values: np.ndarray,
+    *,
+    first_label: str = "Solution",
+    second_label: str = "Reference",
+    output_path: str | Path | None = None,
+    show: bool = False,
+) -> None:
+    """Plot receiver time-domain comparisons.
+
+    Parameters
+    ----------
+    receiver_data_first
+        Receiver data with shape ``(n_timesteps, n_receivers)``.
+    receiver_data_second
+        Receiver data with shape ``(n_timesteps, n_receivers)``.
+    time_values
+        Time corresponding to each sample.
+    first_label
+        Legend label for the first receiver array.
+    second_label
+        Legend label for the second receiver array.
+    output_path
+        Path (without extension) where the figure should be saved.
+        If ``None``, the figure is not saved.
+    show
+        Whether to display the figure.
+
+    Returns
+    -------
+    None
+    """
+    print("\nPlotting receiver comparison", flush=True)
+
+    if receiver_data_first.shape != receiver_data_second.shape:
+        raise ValueError("Receiver arrays must have the same shape.")
+
+    num_receivers = receiver_data_first.shape[1]
+
+    plt.rcParams["font.size"] = 7
+    plt.rcParams["axes.grid"] = True
+
+    figure, receiver_axes = plt.subplots(
+        nrows=num_receivers,
+        ncols=1,
+        sharex=True,
+    )
+
+    if num_receivers == 1:
+        receiver_axes = [receiver_axes]
+
+    figure.subplots_adjust(hspace=0.6)
+
+    first_color = (0.0, 1.0, 0.0, 1.0)
+    second_color = (1.0, 0.0, 0.0, 1.0)
+
+    final_time = time_values[-1]
+
+    for receiver_index in range(num_receivers):
+
+        first_receiver_trace = receiver_data_first[:, receiver_index]
+        second_receiver_trace = receiver_data_second[:, receiver_index]
+
+        receiver_axes[receiver_index].plot(
+            time_values,
+            first_receiver_trace,
+            color=first_color,
+            linewidth=2,
+            label=first_label,
+        )
+
+        receiver_axes[receiver_index].plot(
+            time_values,
+            second_receiver_trace,
+            color=second_color,
+            linestyle="--",
+            linewidth=2,
+            label=second_label,
+        )
+
+        receiver_axes[receiver_index].text(
+            0.995,
+            0.9,
+            f"R{receiver_index + 1}",
+            fontsize=8.5,
+            transform=receiver_axes[receiver_index].transAxes,
+            fontweight="bold",
+            verticalalignment="top",
+            horizontalalignment="right",
+        )
+
+        if receiver_index == num_receivers // 2:
+            receiver_axes[receiver_index].set_ylabel(r"$sol \; recs$")
+
+        receiver_axes[receiver_index].set_xlim(0.0, final_time)
+        receiver_axes[receiver_index].ticklabel_format(
+            axis="y",
+            style="scientific",
+            scilimits=(-2, 2),
+        )
+
+    receiver_axes[-1].set_xlabel(r"$t \; (s)$")
+    receiver_axes[0].legend()
+
+    _finalize_figure(
+        plt.gcf(),
+        output_path,
+        formats=("png", "pdf"),
+        show=show,
+        bbox_inches="tight"
+    )
