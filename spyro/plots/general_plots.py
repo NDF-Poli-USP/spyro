@@ -1,5 +1,9 @@
+"""General plotting routines for simulation data and diagnostic outputs."""
+
 import copy
-from firedrake import tripcolor, tricontourf
+from typing import TYPE_CHECKING, List, Optional, Tuple
+
+from firedrake import tripcolor, tricontourf, Function
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
@@ -7,15 +11,19 @@ from ..io import ensemble_save
 from ..utils import change_scalar_field_resolution
 from .plot_helpers import _finalize_figure
 
+if TYPE_CHECKING:  # Avoinding circular imports lazily
+    from ..solvers.wave import Wave
+
+
 def plot_model(
-    wave,
-    filename="model.png",
-    abc_points=None,
-    show=False,
-    flip_axis=True,
-    high_resolution=False,
-    high_resolution_grid_value=0.01,
-):
+    wave: "Wave",
+    filename: str = "model.png",
+    abc_points: Optional[List[Tuple[float, float]]] = None,
+    show: bool = False,
+    flip_axis: bool = True,
+    high_resolution: bool = False,
+    high_resolution_grid_value: float = 0.01,
+) -> None:
     """
     Plot the velocity model with source and receiver locations.
 
@@ -122,8 +130,13 @@ def plot_model(
 
 
 def plot_model_in_p1(
-    wave, dx=0.01, filename="model.png", abc_points=None, show=False, flip_axis=True
-):
+    wave: "Wave",
+    dx: float = 0.01,
+    filename: str = "model.png",
+    abc_points: Optional[List[Tuple[float, float]]] = None,
+    show: bool = False,
+    flip_axis: bool = True,
+) -> None:
     """
     Plot velocity model with P1 finite element projection.
 
@@ -193,18 +206,18 @@ def plot_model_in_p1(
 
 @ensemble_save
 def plot_shots(
-    wave,
-    show=False,
-    filename="plot_of_shot",
-    shot_ids=[0],
-    vmin=-1e-5,
-    vmax=1e-5,
-    contour_lines=700,
-    file_format="pdf",
-    start_index=0,
-    end_index=0,
-    out_index=None,
-):
+    wave: "Wave",
+    show: bool = False,
+    filename: str = "plot_of_shot",
+    shot_ids: List[int] = [0],
+    vmin: float = -1e-5,
+    vmax: float = 1e-5,
+    contour_lines: int = 700,
+    file_format: str = "pdf",
+    start_index: int = 0,
+    end_index: int = 0,
+    out_index: Optional[int] = None,
+) -> None:
     """
     Plot shot records and save to disk.
 
@@ -293,7 +306,7 @@ def plot_shots(
     return None
 
 
-def plot_function(function):
+def plot_function(function: Function) -> None:
     """
     Plot a Firedrake function using filled contour visualization.
 

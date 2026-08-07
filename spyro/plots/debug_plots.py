@@ -1,8 +1,15 @@
-from firedrake import VTKFile
+"""Plots for debugging purposes."""
+
+from firedrake import VTKFile, Function
 import matplotlib.pyplot as plt
+from pathlib import Path
 from .general_plots import plot_function
 
-def debug_plot(function, filename="debug.png"):
+
+def debug_plot(
+    function: Function,
+    filename: str | Path = "debug.png",
+):
     """
     Quick debug plot of a Firedrake function saved to a file.
 
@@ -29,7 +36,10 @@ def debug_plot(function, filename="debug.png"):
     plt.savefig(filename)
 
 
-def debug_pvd(function, filename="debug.pvd"):
+def debug_pvd(
+    function: Function,
+    filename: str | Path = "debug.pvd",
+):
     """
     Save a Firedrake function to a VTK file for visualization.
 

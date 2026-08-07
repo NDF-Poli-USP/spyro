@@ -1,5 +1,8 @@
+"""Helpers for use in other plotting methods."""
+
 import matplotlib.pyplot as plt
 from pathlib import Path
+
 
 def _finalize_figure(
     fig,
