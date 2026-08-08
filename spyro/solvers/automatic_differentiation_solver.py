@@ -165,7 +165,10 @@ pyadjoint.ReducedFunctional or None
             The reduced functional, also stored on
             :attr:`reduced_functional`.
         """
-        control = fire_ad.Control(self.controls)
+        if isinstance(self.controls, (list, tuple)):
+            control = [fire_ad.Control(control) for control in self.controls]
+        else:
+            control = fire_ad.Control(self.controls)
 
         self.reduced_functional = fire_ad.EnsembleReducedFunctional(
             functional,
@@ -285,8 +288,14 @@ pyadjoint.ReducedFunctional or None
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
         if direction is None:
-            direction = fire.Function(control_var.function_space())
-            direction.interpolate(0.01)
+            if isinstance(control_var, (list, tuple)):
+                direction = [
+                    fire.Function(control.function_space()).interpolate(0.01)
+                    for control in control_var
+                ]
+            else:
+                direction = fire.Function(control_var.function_space())
+                direction.interpolate(0.01)
         # pyadjoint's ``taylor_test`` expects ``dJdm`` to be the scalar
         # directional derivative ``J'(m)(h)``, not the gradient itself. When a
         # Firedrake ``Function`` (Riesz representer of the gradient) or a

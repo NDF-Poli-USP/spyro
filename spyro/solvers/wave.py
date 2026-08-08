@@ -189,6 +189,26 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         if self.abc_type in [AbsorbingBCsType.NOABCS, AbsorbingBCsType.NRBC]:
             self._initialize_model_parameters()
+            if (
+                self.adjoint_type == AdjointType.AUTOMATED_ADJOINT
+                and self.automated_adjoint is not None
+                and self.automated_adjoint.controls is None
+            ):
+                # Only the elastic path gets here: enable_automated_adjoint
+                # already installs the acoustic control (self.c).
+                if (
+                    self.rho is not None
+                    and self.lmbda is not None
+                    and self.mu is not None
+                ):
+                    self.automated_adjoint.controls = [
+                        self.rho, self.lmbda, self.mu,
+                    ]
+                else:
+                    raise ValueError(
+                        "For elastic wave, must provide {rho, lambda, mu} as "
+                        "scalars or Functions to use automated adjoint."
+                    )
         self.matrix_building()
         self.wave_propagator()
 
@@ -619,7 +639,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 "Please set the velocity model using set_initial_velocity_model()"
                 "or set c directly."
             )
-        controls = self.c
+        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
+            # Elastic inversion controls are the material parameters
+            # {rho, lambda, mu}, not the derived P-wave velocity. They are only
+            # available as Functions once the model parameters are built, so
+            # leave them unset here; forward_solve installs them.
+            controls = None
+        else:
+            controls = self.c
         # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
         # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
         # that the reduced functional is built as an

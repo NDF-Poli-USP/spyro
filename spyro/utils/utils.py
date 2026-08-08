@@ -12,7 +12,7 @@ from ..io.parallelism_wrappers import (
     run_in_one_core_and_broadcast,
 )
 from ..domains.space import create_function_space
-from .typing import FunctionalEvaluationMode, FunctionalType
+from .typing import FunctionalEvaluationMode, FunctionalType, WaveType
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
@@ -666,6 +666,11 @@ def get_real_shot_record(wave):
 
     if isinstance(real_shot_record, np.ndarray):
         if real_shot_record.ndim == 3:
+            if (
+                wave.wave_type == WaveType.ISOTROPIC_ELASTIC
+                and real_shot_record.shape[-1] == wave.dimension
+            ):
+                return real_shot_record
             return real_shot_record[wave.current_sources[0]]
         if real_shot_record.ndim == 2:
             return real_shot_record
