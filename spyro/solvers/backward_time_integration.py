@@ -199,14 +199,14 @@ def _build_gradient_solver(wave: Wave, mask_available: bool) -> tuple[
         """
 
         ffG = (
-            2.0 * wave.c * indicator * fire.dot(
+            2.0 * wave.velocity_model * indicator * fire.dot(
                 fire.grad(uadj), fire.grad(forward_field)) * m_v * dx
         )
         raise ValueError("PML gradient calculation temporarily unavailable")
 
     else:
         ffG = (
-            -2 * (wave.c) ** (-3) * fire.dot(forward_field, uadj) * m_v * dx
+            -2 * (wave.velocity_model) ** (-3) * fire.dot(forward_field, uadj) * m_v * dx
         )
 
     gradi = fire.Function(V)

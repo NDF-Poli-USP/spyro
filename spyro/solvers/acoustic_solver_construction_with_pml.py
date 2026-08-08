@@ -49,7 +49,7 @@ def forms_pml(wave, W, X_n, X_nm1):
     # Simulation parameters for PML formulation
     wave.layer_ops.pml_layer(wave)
     dt = wave.dt
-    c = wave.c
+    c = wave.velocity_model
     c_sqr_inv = 1. / (c * c)
     quad_rule = wave.quadrature_rule
     dx = fire_dx(**quad_rule) if quad_rule else fire_dx

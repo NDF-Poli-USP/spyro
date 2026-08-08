@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from contextlib import contextmanager
 
 from pyadjoint import Tape, continue_annotation, pause_annotation, taylor_test
@@ -48,14 +49,16 @@ class AutomatedAdjoint:
             wave.forward_solve()          # forward run recorded on the tape
         wave.automated_adjoint.create_reduced_functional(wave.functional_value)
         dJ = wave.automated_adjoint.compute_gradient()
-        rate = wave.automated_adjoint.verify_gradient(wave.c)  # Taylor test
+        rate = wave.automated_adjoint.verify_gradient(
+            wave.get_control_parameters(),
+        )  # Taylor test
 
     Parameters
     ----------
-    controls : firedrake.Function, optional
-        The control with respect to which the functional is differentiated.
-        It is wrapped in a :class:`pyadjoint.Control` when the reduced functional is
-        created.
+    controls : firedrake.Function, sequence, or mapping, optional
+        Controls with respect to which the functional is differentiated. Each
+        value is wrapped in a :class:`pyadjoint.Control` when the reduced
+        functional is created.
     ensemble : firedrake.ensemble.Ensemble, optional
         The Firedrake ensemble communicator used to sum the per-shot
         functionals and gradients across ensemble members. In practice this is
@@ -64,8 +67,8 @@ class AutomatedAdjoint:
 
     Attributes
     ----------
-    controls : firedrake.Function
-        The control passed at construction time.
+    controls : firedrake.Function, sequence, or mapping
+        Controls passed at construction time.
     ensemble : firedrake.ensemble.Ensemble or None
         The ensemble communicator used by the reduced functional.
     reduced_functional : firedrake.adjoint.EnsembleReducedFunctional or \
@@ -165,11 +168,23 @@ pyadjoint.ReducedFunctional or None
             The reduced functional, also stored on
             :attr:`reduced_functional`.
         """
-        control = fire_ad.Control(self.controls)
+        controls = self.controls
+        if isinstance(controls, Mapping):
+            controls = list(controls.values())
+        elif not isinstance(controls, (list, tuple)):
+            controls = [controls]
+        if not controls:
+            raise ValueError(
+                "At least one control is required to create a reduced functional.",
+            )
+
+        pyadjoint_controls = [fire_ad.Control(control) for control in controls]
+        if len(pyadjoint_controls) == 1:
+            pyadjoint_controls = pyadjoint_controls[0]
 
         self.reduced_functional = fire_ad.EnsembleReducedFunctional(
             functional,
-            control,
+            pyadjoint_controls,
             self.ensemble,
             scatter_control=True,
             tape=self._tape,

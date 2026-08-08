@@ -213,6 +213,37 @@ def plot_mesh_sizes(
     mesh.coordinates.dat.data[:, 1] = coordinates[:, 0]
 
 
+def _velocity_model_to_plot(wave):
+    """Return the acoustic velocity model that should be plotted.
+
+    ``velocity_model`` holds the active inversion control and is what
+    ``set_control_parameters`` updates, so it is the model the caller
+    configured. ``initial_velocity_model`` is only populated when the model
+    comes from a file or from ``set_initial_velocity_model``, and stays
+    ``None`` when the control was assigned directly.
+
+    Parameters
+    ----------
+    wave : `acoustic_wave.AcousticWave`
+        Wave object carrying the velocity model.
+
+    Returns
+    -------
+    firedrake.Function
+        The velocity model to plot.
+    """
+    velocity_model = getattr(wave, "velocity_model", None)
+    if velocity_model is None:
+        velocity_model = wave.initial_velocity_model
+    if velocity_model is None:
+        raise ValueError(
+            "No velocity model to plot. Set one with "
+            "set_initial_velocity_model() or set_control_parameters() before "
+            "plotting."
+        )
+    return velocity_model
+
+
 def plot_model(
     wave,
     filename="model.png",
@@ -274,7 +305,7 @@ def plot_model(
         vp_object, _ = change_scalar_field_resolution(wave, high_resolution_grid_value)
 
     else:
-        vp_object = wave.initial_velocity_model
+        vp_object = _velocity_model_to_plot(wave)
     vp_image = firedrake.tripcolor(vp_object, axes=axes)
     for source in wave.source_locations:
         z, x = source
@@ -477,7 +508,9 @@ def plot_model_in_p1(wave, dx=0.01, filename="model.png", abc_points=None, show=
 
     new_wave_obj = AcousticWave(dictionary=p1_obj_dict)
     new_wave_obj.set_mesh(input_mesh_parameters={"edge_length": dx})
-    new_wave_obj.set_initial_velocity_model(conditional=wave.initial_velocity_model)
+    new_wave_obj.set_initial_velocity_model(
+        conditional=_velocity_model_to_plot(wave)
+    )
 
     return plot_model(new_wave_obj, filename=filename, abc_points=abc_points, show=show, flip_axis=flip_axis)
 

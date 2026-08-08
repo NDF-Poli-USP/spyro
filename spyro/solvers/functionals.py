@@ -8,6 +8,6 @@ def acoustic_energy(wave):
     u is the velocity).
     '''
     u = wave.get_function()
-    c = wave.c
+    velocity_model = wave.velocity_model
 
-    return (0.5 * (u / c)**2) * dx
+    return (0.5 * (u / velocity_model)**2) * dx

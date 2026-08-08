@@ -63,6 +63,9 @@ class DummyWave(Wave):
     def get_control_parameter_function_space(self):
         raise NotImplementedError
 
+    def get_cfl_wave_speed(self):
+        raise NotImplementedError
+
 
 def _build_wave():
     wave = DummyWave.__new__(DummyWave)
