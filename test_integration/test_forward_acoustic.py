@@ -91,7 +91,9 @@ def test_forward_3_shots():
     arr0 = arr[:, rec_id]
     arr0 = arr0.flatten()
 
+    # TODO: Use MeasureError class from spyro.tools.error_measure instead of this.
     error = error_calc(arr0[:430], analytical_p[:430], 430)
+
     if comm.comm.rank == 0:
         print(
             f"Error for shot {wave.current_sources} is {error} and test has passed equals {np.abs(error) < 0.01}",
