@@ -9,10 +9,9 @@ runs a simple inversion loop against that record.
 # debugpy.wait_for_client()
 
 from copy import deepcopy
-import numpy as np
 import firedrake as fire
 import spyro
-import pytest
+import pytest  # noqa: F401
 
 
 def run_forward_real_model(input_dictionary, case="camembert", shot_filename="shots/shot_record_", dt=None):
@@ -43,7 +42,7 @@ def run_forward_real_model(input_dictionary, case="camembert", shot_filename="sh
     supported_cases = ["camembert"]
     if case == "camembert":
         # Builds the true velocity model based on a conditional
-    
+
         center_z = -1.0
         center_x = 1.0
         mesh_z = fwi_obj.wave.mesh_z
@@ -176,7 +175,7 @@ def test_camembert_fwi_with_output(load_real_shot=False):
         "shot_record_file": None,
     }
 
-    shots_filenames="shots/shot_record_"
+    shots_filenames = "shots/shot_record_"
 
     # Setting up to run synthetic real problem
     if load_real_shot is False:
