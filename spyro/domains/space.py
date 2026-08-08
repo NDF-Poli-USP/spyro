@@ -33,27 +33,29 @@ def _is_integer(value):
 
 
 def create_function_space(mesh, method, degree=None, dim=1):
-    """Create a Firedrake function space from a mesh and finite element.
+    """Create a Firedrake function space.
 
-    Parameters:
-    -----------
-    mesh: `Firedrake.Mesh`
+    The finite-element method selects the underlying element family.
+
+    Parameters
+    ----------
+    mesh : `Firedrake.Mesh`
         Mesh to be used in the finite element space.
-    method: `str` or `FiniteElement`
+    method : `str` or `FiniteElement`
         Method to be used for the finite element space, or an already
         constructed finite element.
-    degree: `int` or `None`
+    degree : `int` or `None`
         Degree of the finite element space. Required when ``method`` is a
         supported method name. Ignored only when ``method`` is an already
         constructed finite element.
-    dim: `int`
+    dim : `int`
         Number of vector components. If ``dim`` is 1, a scalar function space
         is created. If ``dim`` is greater than 1, the selected element is
         wrapped in a vector element with ``dim`` components.
 
-    Returns:
-    --------
-    function_space: `Firedrake.FunctionSpace`
+    Returns
+    -------
+    function_space : `Firedrake.FunctionSpace`
         Function space.
     """
 
@@ -100,7 +102,13 @@ def create_function_space(mesh, method, degree=None, dim=1):
 
 
 def check_function_space_type(function_space):
-    # Check if wave.function_space is a generates vector os scalar fields:
+    """Return whether a function space is scalar, vector, or mixed.
+
+    Parameters
+    ----------
+    function_space : Firedrake FunctionSpace
+        Function space.
+    """
 
     if function_space.value_size == 1:
         return "scalar"
