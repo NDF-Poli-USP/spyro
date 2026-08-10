@@ -86,13 +86,20 @@ class RieszMapType(Enum):
 
 
 class ElasticMaterialParameter(Enum):
-    """Supported isotropic elastic material parameter names."""
+    """Supported isotropic and anisotropic elastic material parameter names."""
 
     DENSITY = "density"
     LAMBDA = "lambda"
     MU = "mu"
     P_WAVE_VELOCITY = "p_wave_velocity"
     S_WAVE_VELOCITY = "s_wave_velocity"
+    DELTA = "delta"
+    EPSILON = "epsilon"
+    GAMMA = "gamma"
+    THETA = "theta"
+    PHI = "phi"
+    ANISOTROPY_TYPE = "anisotropy"
+
 
 
 class ElasticMaterialParameterization(Enum):

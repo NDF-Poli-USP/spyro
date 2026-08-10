@@ -17,11 +17,21 @@ CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
         ElasticMaterialParameter.DENSITY,
         ElasticMaterialParameter.LAMBDA,
         ElasticMaterialParameter.MU,
+        ElasticMaterialParameter.DELTA,
+        ElasticMaterialParameter.EPSILON,
+        ElasticMaterialParameter.GAMMA,
+        ElasticMaterialParameter.THETA,
+        ElasticMaterialParameter.PHI,
     ),
     ElasticMaterialParameterization.VELOCITY: (
         ElasticMaterialParameter.DENSITY,
         ElasticMaterialParameter.P_WAVE_VELOCITY,
         ElasticMaterialParameter.S_WAVE_VELOCITY,
+        ElasticMaterialParameter.DELTA,
+        ElasticMaterialParameter.EPSILON,
+        ElasticMaterialParameter.GAMMA,
+        ElasticMaterialParameter.THETA,
+        ElasticMaterialParameter.PHI,
     ),
 }
 
@@ -47,15 +57,20 @@ def _format_control_parameters(parameters):
     return "{" + ", ".join(parameter.value for parameter in parameters) + "}"
 
 
-class IsotropicWave(ElasticWave):
-    '''Isotropic elastic wave propagator'''
+class AnisotropicTTIWave(ElasticWave):
+    '''Anisotropic elastic wave propagator'''
 
     def __init__(self, dictionary, comm=None):
-        super().__init__(dictionary, comm=comm)
+        super().__init__(dictionary, anisotropy = WaveType.ANISOTROPIC_TTI_ELASTIC, comm=comm)
         self.rho = None   # Density
         self.lmbda = None  # First Lame parameter
         self.mu = None    # Second Lame parameter
         self.c_s = None   # Secondary wave velocity
+        self.delta = None
+        self.epsilon = None
+        self.gamma = None
+        self.theta = None
+        self.phi = None
         self._control_parameterization = None
         self._material_parameter_function_space = None
 
@@ -160,6 +175,12 @@ class IsotropicWave(ElasticWave):
         )
         self.c = get_value(ElasticMaterialParameter.P_WAVE_VELOCITY)
         self.c_s = get_value(ElasticMaterialParameter.S_WAVE_VELOCITY)
+        self.delta = get_value(ElasticMaterialParameter.DELTA)
+        self.gamma = get_value(ElasticMaterialParameter.GAMMA)
+        self.epsilon = get_value(ElasticMaterialParameter.EPSILON)
+        self.theta = get_value(ElasticMaterialParameter.THETA)
+        self.phi = get_value(ElasticMaterialParameter.PHI)
+        self.anisotropy_type = synthetic_data_dict["anisotropy"]
 
         # Check if {rho, lambda, mu} is set and {c, c_s} are not
         option_1 = bool(self.rho) and \
@@ -358,6 +379,18 @@ class IsotropicWave(ElasticWave):
                 parameters[parameter] = self.c
             elif parameter is ElasticMaterialParameter.S_WAVE_VELOCITY:
                 parameters[parameter] = self.c_s
+            elif parameter is ElasticMaterialParameter.DELTA:
+                parameters[parameter] = self.delta
+            elif parameter is ElasticMaterialParameter.EPSILON:
+                parameters[parameter] = self.epsilon
+            elif parameter is ElasticMaterialParameter.GAMMA:
+                parameters[parameter] = self.gamma
+            elif parameter is ElasticMaterialParameter.THETA:
+                parameters[parameter] = self.theta
+            elif parameter is ElasticMaterialParameter.PHI:
+                parameters[parameter] = self.phi
+            elif parameter is ElasticMaterialParameter.ANISOTROPY_TYPE:
+                parameters[parameter] = self.anisotropy_type
             else:
                 raise ValueError(
                     f"Unsupported elastic control parameter '{parameter.value}'.",
@@ -463,6 +496,12 @@ class IsotropicWave(ElasticWave):
             self._control_parameterization = ElasticMaterialParameterization.LAME
             synthetic_data["lambda"] = self.lmbda
             synthetic_data["mu"] = self.mu
+            synthetic_data["delta"] = self.delta
+            synthetic_data["epsilon"] = self.epsilon
+            synthetic_data["gamma"] = self.gamma
+            synthetic_data["theta"] = self.theta
+            synthetic_data["phi"] = self.phi
+            synthetic_data["anisotropy"] = self.anisotropy_type
         else:
             self.c = self._as_control_field(
                 controls[ElasticMaterialParameter.P_WAVE_VELOCITY],
@@ -477,6 +516,12 @@ class IsotropicWave(ElasticWave):
             self._control_parameterization = ElasticMaterialParameterization.VELOCITY
             synthetic_data["p_wave_velocity"] = self.c
             synthetic_data["s_wave_velocity"] = self.c_s
+            synthetic_data["delta"] = self.delta
+            synthetic_data["epsilon"] = self.epsilon
+            synthetic_data["gamma"] = self.gamma
+            synthetic_data["theta"] = self.theta
+            synthetic_data["phi"] = self.phi
+            synthetic_data["anisotropy"] = self.anisotropy_type
 
         self.input_dictionary["synthetic_data"] = synthetic_data
 
@@ -505,50 +550,6 @@ class IsotropicWave(ElasticWave):
         self.parse_initial_conditions()
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
-
-        print("wavetype", self.wave_type)
-
-        W = FunctionSpace(self.mesh, "CG", 1)
-        
-        self.IsotropicProperties = None
-        self.AnisotropicPropertiesVTI = None
-        self.AnisotropicPropertiesTTI = None
-
-        d = self.input_dictionary.get("synthetic_data")
-        
-        if self.wave_type in ['anisotropic_VTI', 'anisotropic_TTI']:
-            d = self.input_dictionary.get("anisotropy")
-
-            class AnisotropicPropertiesVTI:
-                def __init__(self):
-                    self.epsilon = None
-                    self.gamma = None
-                    self.delta = None
-                    self.anisotropy = None
-
-            def anisotropic_properties_VTI(self):
-                properties = AnisotropicPropertiesVTI()
-                properties.epsilon = Function(W).assign(Constant(d['epsilon']))
-                properties.gamma = Function(W).assign(Constant(d['gamma']))
-                properties.delta = Function(W).assign(Constant(d['delta']))
-                properties.anisotropy = d['anisotropy'] 
-                return properties 
-
-            self.AnisotropicPropertiesVTI =  anisotropic_properties_VTI(self)
-
-            if self.wave_type == 'anisotropic_TTI':
-                class AnisotropicPropertiesTTI:
-                    def __init__(self):
-                        self.theta = None
-                        self.phi = None
-
-                def anisotropic_properties_TTI(self):
-                    properties = AnisotropicPropertiesTTI()
-                    properties.theta = Function(W).assign(Constant(d['theta']))
-                    properties.phi = Function(W).assign(Constant(d['phi']))
-                    return properties 
-
-                self.AnisotropicPropertiesTTI =  anisotropic_properties_TTI(self)
 
         self.Elastic_C = C_computation(self)
 
