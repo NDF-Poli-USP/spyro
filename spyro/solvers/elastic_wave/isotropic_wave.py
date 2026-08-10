@@ -1,16 +1,16 @@
 import numpy as np
 
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
-                       project)
+                       FunctionSpace, project)
 
 from .elastic_wave import ElasticWave
-from .forms import (isotropic_elastic_without_pml,
+from .forms import (elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
 from ...utils.typing import (ElasticMaterialParameter, ElasticMaterialParameterization,
                              AbsorbingBCsType, override)
 from ...domains.space import create_function_space
-
+from .tensor_computation import *
 
 CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
     ElasticMaterialParameterization.LAME: (
@@ -506,8 +506,54 @@ class IsotropicWave(ElasticWave):
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
 
+        print("wavetype", self.wave_type)
+
+        W = FunctionSpace(self.mesh, "CG", 1)
+        
+        self.IsotropicProperties = None
+        self.AnisotropicPropertiesVTI = None
+        self.AnisotropicPropertiesTTI = None
+
+        d = self.input_dictionary.get("synthetic_data")
+        
+        if self.wave_type in ['anisotropic_VTI', 'anisotropic_TTI']:
+            d = self.input_dictionary.get("anisotropy")
+
+            class AnisotropicPropertiesVTI:
+                def __init__(self):
+                    self.epsilon = None
+                    self.gamma = None
+                    self.delta = None
+                    self.anisotropy = None
+
+            def anisotropic_properties_VTI(self):
+                properties = AnisotropicPropertiesVTI()
+                properties.epsilon = Function(W).assign(Constant(d['epsilon']))
+                properties.gamma = Function(W).assign(Constant(d['gamma']))
+                properties.delta = Function(W).assign(Constant(d['delta']))
+                properties.anisotropy = d['anisotropy'] 
+                return properties 
+
+            self.AnisotropicPropertiesVTI =  anisotropic_properties_VTI(self)
+
+            if self.wave_type == 'anisotropic_TTI':
+                class AnisotropicPropertiesTTI:
+                    def __init__(self):
+                        self.theta = None
+                        self.phi = None
+
+                def anisotropic_properties_TTI(self):
+                    properties = AnisotropicPropertiesTTI()
+                    properties.theta = Function(W).assign(Constant(d['theta']))
+                    properties.phi = Function(W).assign(Constant(d['phi']))
+                    return properties 
+
+                self.AnisotropicPropertiesTTI =  anisotropic_properties_TTI(self)
+
+        self.Elastic_C = C_computation(self)
+
         if self.abc_type in [AbsorbingBCsType.NRBC, AbsorbingBCsType.NOABCS]:
-            isotropic_elastic_without_pml(self)
+            elastic_without_pml(self)
         elif self.abc_type == AbsorbingBCsType.PML:
             isotropic_elastic_with_pml(self)
 
