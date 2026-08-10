@@ -1,5 +1,4 @@
 import firedrake as fire
-import numpy as np
 import spyro
 import pytest
 
@@ -13,7 +12,7 @@ class DummyModel():
 
 @pytest.mark.parallel(6)
 def test_acoustic_layer_fwi():
-    from demos.acoustic_layers_fwi import setting_up_fwi,  run_fwi
+    from demos.acoustic_layers_fwi import setting_up_fwi, run_fwi
 
     model = DummyModel()
     comm = spyro.utils.mpi_init(model)
@@ -24,10 +23,10 @@ def test_acoustic_layer_fwi():
     length_z = 2.0
     length_x = 2.0
     grid_vp_data = spyro.io.segy_io.create_grid_dictionary_from_segy(
-            "layers.segy",
-            length_z,
-            length_x,
-        )
+        "layers.segy",
+        length_z,
+        length_x,
+    )
 
     mesh = fire.RectangleMesh(200, 200, length_z, length_x, comm=comm.comm)
     mesh.coordinates.dat.data[:, 0] *= -1.0

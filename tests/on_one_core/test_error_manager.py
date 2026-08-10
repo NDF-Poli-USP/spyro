@@ -1,15 +1,18 @@
 """"Unit tests for the error utilities implemented in spyro.utils.modal.error_management."""
 from pytest import fail, raises
+from firedrake import Function, FunctionSpace, Mesh
+from firedrake.functionspaceimpl import WithGeometry
 from numpy import array, inf, nan
 from numpy.testing import assert_array_equal
-from enum import Enum
 from unittest.mock import Mock, patch
-from firedrake import Function, FunctionSpace, Mesh
+from ufl.form import Form
 from ufl.geometry import SpatialCoordinate
+from enum import Enum
 from spyro.utils.error_management import (
     enum_parameter_error, mutually_exclusive_parameter_error, sanitize_num_array,
-    type_data_structure_error, type_firedrake_error, value_model_dimension_error,
-    value_numerical_error, value_parameter_error, value_string_error)
+    type_data_structure_error, type_firedrake_error, value_file_error,
+    value_model_dimension_error, value_numerical_error,
+    value_parameter_error, value_string_error)
 
 
 class ExampleEnum(Enum):
@@ -498,6 +501,89 @@ class TestTypeDataStructureError:
                                            expected_type_element=("int", "NoneType"))
         assert result == [1, None, 3]
 
+    def test_valid_array2D(self):
+        """Test with valid 2D numpy array."""
+        arr = array([[1, 2], [3, 4]])
+        result = type_data_structure_error("test_param", arr, "array2D")
+        assert_array_equal(result, arr)
+
+    def test_valid_array3D(self):
+        """Test with valid 3D numpy array."""
+        arr = array([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
+        result = type_data_structure_error("test_param", arr, "array3D")
+        assert_array_equal(result, arr)
+
+    def test_array2D_wrong_dimensions(self):
+        """Test with array2D but 3D array provided."""
+        arr = array([[[1, 2], [3, 4]]])
+        with raises(ValueError) as exc_info:
+            type_data_structure_error("test_param", arr, "array2D")
+        assert "'test_param' must be a 2D array" in str(exc_info.value)
+
+    def test_array3D_wrong_dimensions(self):
+        """Test with array3D but 2D array provided."""
+        arr = array([[1, 2], [3, 4]])
+        with raises(ValueError) as exc_info:
+            type_data_structure_error("test_param", arr, "array3D")
+        assert "'test_param' must be a 3D array" in str(exc_info.value)
+
+    def test_shape_check_match(self):
+        """Test with matching shape."""
+        arr = array([[1, 2], [3, 4]])
+        result = type_data_structure_error("test_param", arr, "array2D",
+                                           expected_shape=(2, 2))
+        assert_array_equal(result, arr)
+
+    def test_shape_check_with_none_dimension(self):
+        """Test with shape containing None dimension."""
+        arr = array([[1, 2, 3], [4, 5, 6]])
+        result = type_data_structure_error("test_param", arr, "array2D",
+                                           expected_shape=(2, None))
+        assert_array_equal(result, arr)
+
+    def test_shape_check_mismatch(self):
+        """Test with shape mismatch."""
+        arr = array([[1, 2], [3, 4]])
+        with raises(ValueError) as exc_info:
+            type_data_structure_error("test_param", arr, "array2D",
+                                      expected_shape=(3, 2))
+        assert "'test_param' must have shape (3, 2)" in str(exc_info.value)
+
+    def test_element_type_check_for_array(self):
+        """Test element type check for numpy array."""
+        arr = array([1, 2, 3])
+        result = type_data_structure_error("test_param", arr, "array",
+                                           expected_type_element="int")
+        assert_array_equal(result, arr)
+
+    def test_element_type_check_for_array_failure(self):
+        """Test element type check failure for numpy array."""
+        arr = array([1, 2.5, 3])
+        with raises(TypeError) as exc_info:
+            type_data_structure_error("test_param", arr, "array",
+                                      expected_type_element="int")
+        assert "All elements of 'test_param' must be of type: 'int'" in str(exc_info.value)
+
+    def test_element_type_check_single_string(self):
+        """Test with single element type check as string (not tuple)."""
+        result = type_data_structure_error("test_param", ["a", "b", "c"], "list",
+                                           expected_type_element="str")
+        assert result == ["a", "b", "c"]
+
+    def test_invalid_expected_type_element(self):
+        """Test with invalid expected_type_element."""
+        with raises(ValueError) as exc_info:
+            type_data_structure_error("test_param", [1, 2, 3], "list",
+                                      expected_type_element="invalid")
+        assert "Invalid expected_type_element: 'invalid'" in str(exc_info.value)
+
+    def test_mixed_element_types_valid(self):
+        """Test with mixed valid element types."""
+        result = type_data_structure_error(
+            "test_param", [1, "two", 3.0, None], "list",
+            expected_type_element=("int", "str", "float", "NoneType"))
+        assert result == [1, "two", 3.0, None]
+
 
 class TestTypeFiredrakeError:
     """Tests for type_firedrake_error function."""
@@ -509,6 +595,23 @@ class TestTypeFiredrakeError:
         result = type_firedrake_error("test_param", mock_func, "Function")
         assert result == mock_func
 
+    def test_none_without_default_for_function(self):
+        """Test with None when none_default is False for Function."""
+        with raises(TypeError) as exc_info:
+            type_firedrake_error("test_param", None, "Function")
+        assert "'test_param' must be of type:" in str(exc_info.value)
+
+    def test_none_with_default_for_function(self):
+        """Test with None when none_default is True for Function."""
+        result = type_firedrake_error("test_param", None, "Function", none_default=True)
+        assert result is None
+
+    def test_function_invalid_type(self):
+        """Test with invalid type for Mesh."""
+        with raises(TypeError) as exc_info:
+            type_firedrake_error("test_param", "not a function", "Function")
+        assert "'test_param' must be of type:" in str(exc_info.value)
+
     @patch('firedrake.FunctionSpace')
     def test_valid_functionspace(self, mock_fs):
         """Test with valid FunctionSpace."""
@@ -516,12 +619,37 @@ class TestTypeFiredrakeError:
         result = type_firedrake_error("test_param", mock_fs_instance, "FunctionSpace")
         assert result == mock_fs_instance
 
-    @patch('firedrake.functionspaceimpl.WithGeometry')
-    def test_functionspace_with_geometry(self, mock_fs):
-        """Test with valid FunctionSpace."""
-        mock_fs_instance = Mock(spec=FunctionSpace)
-        result = type_firedrake_error("test_param", mock_fs_instance, "FunctionSpace")
-        assert result == mock_fs_instance
+    def test_functionspace_with_geometry_instance(self):
+        """Test that WithGeometry instances are accepted for FunctionSpace."""
+        mock_with_geom = Mock(spec=WithGeometry)
+        result = type_firedrake_error("test_param", mock_with_geom, "FunctionSpace")
+        assert result == mock_with_geom
+
+    def test_functionspace_with_invalid_type(self):
+        """Test with invalid type for FunctionSpace."""
+        with raises(TypeError) as exc_info:
+            type_firedrake_error("test_param", "not a functionspace", "FunctionSpace")
+        assert "'test_param' must be of type:" in str(exc_info.value)
+
+    def test_none_without_default_for_functionspace(self):
+        """Test with None when none_default is False for FunctionSpace."""
+        with raises(TypeError) as exc_info:
+            type_firedrake_error("test_param", None, "FunctionSpace")
+        assert "'test_param' must be of type:" in str(exc_info.value)
+
+    def test_none_with_default_for_functionspace(self):
+        """Test with None when none_default is True for FunctionSpace."""
+        result = type_firedrake_error(
+            "test_param", None, "FunctionSpace", none_default=True)
+        assert result is None
+
+    def test_error_message_format_for_functionspace(self):
+        """Test that error message correctly shows both FunctionSpace and WithGeometry."""
+        with raises(TypeError) as exc_info:
+            type_firedrake_error("test_param", "invalid", "FunctionSpace")
+        error_msg = str(exc_info.value)
+        assert "'test_param' must be of type:" in error_msg
+        assert "FunctionSpace" in error_msg or "WithGeometry" in error_msg
 
     @patch('firedrake.Mesh')
     def test_valid_mesh(self, mock_mesh):
@@ -530,6 +658,23 @@ class TestTypeFiredrakeError:
         result = type_firedrake_error("test_param", mock_mesh_instance, "Mesh")
         assert result == mock_mesh_instance
 
+    def test_mesh_invalid_type(self):
+        """Test with invalid type for Mesh."""
+        with raises(TypeError) as exc_info:
+            type_firedrake_error("test_param", "not a mesh", "Mesh")
+        assert "'test_param' must be of type:" in str(exc_info.value)
+
+    def test_none_without_default_for_mesh(self):
+        """Test with None when none_default is False for Mesh."""
+        with raises(TypeError) as exc_info:
+            type_firedrake_error("test_param", None, "Mesh")
+        assert "'test_param' must be of type:" in str(exc_info.value)
+
+    def test_none_with_default_for_mesh(self):
+        """Test with None when none_default is True for Mesh."""
+        result = type_firedrake_error("test_param", None, "Mesh", none_default=True)
+        assert result is None
+
     @patch('ufl.geometry.SpatialCoordinate')
     def test_valid_spatial_coordinate(self, mock_sc_instance):
         """Test with valid SpatialCoordinate."""
@@ -537,25 +682,134 @@ class TestTypeFiredrakeError:
         result = type_firedrake_error("test_param", mock_sc_instance, "SpatialCoordinate")
         assert result == mock_sc_instance
 
-    def test_valid_none_default(self):
-        """Test with None when none_default is True."""
-        result = type_firedrake_error("test_param", None, "Function", none_default=True)
+    def test_spatial_coordinate_invalid_type(self):
+        """Test with invalid type for SpatialCoordinate."""
+        with raises(TypeError) as exc_info:
+            type_firedrake_error("test_param", "not a coordinate", "SpatialCoordinate")
+        assert "'test_param' must be of type:" in str(exc_info.value)
+
+    def test_none_without_default_for_spatial_coordinate(self):
+        """Test with None when none_default is False for SpatialCoordinate."""
+        with raises(TypeError) as exc_info:
+            type_firedrake_error("test_param", None, "SpatialCoordinate")
+        assert "'test_param' must be of type:" in str(exc_info.value)
+
+    def test_none_with_default_for_spatial_coordinate(self):
+        """Test with None when none_default is True for SpatialCoordinate."""
+        result = type_firedrake_error("test_param", None, "SpatialCoordinate",
+                                      none_default=True)
         assert result is None
 
-    def test_valid_none_not_default(self):
-        """Test with None when none_default is False."""
+    def test_form_type(self):
+        """Test with valid Form."""
+        mock_form = Mock(spec=Form)
+        result = type_firedrake_error("test_param", mock_form, "Form")
+        assert result == mock_form
+
+    def test_form_invalid_type(self):
+        """Test with invalid type for Form."""
         with raises(TypeError) as exc_info:
-            type_firedrake_error("test_param", None, "Function")
+            type_firedrake_error("test_param", "not a form", "Form")
         assert "'test_param' must be of type:" in str(exc_info.value)
 
-    def test_invalid_type(self):
-        """Test with invalid type."""
+    def test_none_without_default_for_form(self):
+        """Test with None when none_default is False for Form."""
         with raises(TypeError) as exc_info:
-            type_firedrake_error("test_param", "not a function", "Function")
+            type_firedrake_error("test_param", None, "Form")
         assert "'test_param' must be of type:" in str(exc_info.value)
+
+    def test_none_with_default_for_form(self):
+        """Test with None when none_default is True for Form."""
+        result = type_firedrake_error("test_param", None, "Form", none_default=True)
+        assert result is None
 
     def test_invalid_expected_type(self):
         """Test with invalid expected_type."""
         with raises(ValueError) as exc_info:
-            type_firedrake_error("test_param", Mock(), "Invalid")
+            type_firedrake_error("test_param", "anything", "Invalid")
         assert "Invalid expected_type: 'Invalid'" in str(exc_info.value)
+
+
+class TestValueFileError:
+    """Tests for type_firedrake_error function."""
+
+    def test_valid_file_extension(self):
+        """Test with valid file extension."""
+        result = value_file_error("test_param", "file.txt", [".txt", ".csv"])
+        assert result == "file.txt"
+
+    def test_valid_file_extension_lowercase(self):
+        """Test with lowercase file extension."""
+        result = value_file_error("test_param", "file.txt", [".txt", ".csv"])
+        assert result == "file.txt"
+
+    def test_valid_file_extension_uppercase(self):
+        """Test with uppercase file extension."""
+        result = value_file_error("test_param", "file.TXT", [".TXT", ".csv"])
+        assert result == "file.TXT"
+
+    def test_valid_file_extension_case_sensitive_fail(self):
+        """Test that case-sensitive extension matching fails."""
+        with raises(ValueError) as exc_info:
+            value_file_error("test_param", "file.TXT", [".txt", ".csv"])
+        assert "extension_type" in str(exc_info.value)
+
+    def test_valid_file_extension_mixed_case(self):
+        """Test with mixed case file extension."""
+        result = value_file_error("test_param", "file.TxT", [".TxT", ".csv"])
+        assert result == "file.TxT"
+
+    def test_invalid_file_extension(self):
+        """Test with invalid file extension."""
+        with raises(ValueError) as exc_info:
+            value_file_error("test_param", "file.pdf", [".txt", ".csv"])
+        assert "extension_type" in str(exc_info.value)
+
+    def test_none_not_allowed(self):
+        """Test with None value when none_default=False."""
+        with raises(TypeError) as exc_info:
+            value_file_error("test_param", None, [".txt"])
+        assert "'test_param' must be a string, got NoneType." in str(exc_info.value)
+
+    def test_none_allowed(self):
+        """Test with None value when none_default=True."""
+        result = value_file_error("test_param", None, [".txt"], none_default=True)
+        assert result is None
+
+    def test_non_string_value(self):
+        """Test with non-string value."""
+        with raises(TypeError) as exc_info:
+            value_file_error("test_param", 123, [".txt"])
+        assert "'test_param' must be a string, got int." in str(exc_info.value)
+
+    @patch('os.path.exists')
+    def test_file_exists(self, mock_exists):
+        """Test with file existence check when file exists."""
+        mock_exists.return_value = True
+        result = value_file_error("test_param", "file.txt", [".txt"], check_file_existance=True)
+        assert result == "file.txt"
+
+    @patch('os.path.exists')
+    def test_file_does_not_exist(self, mock_exists):
+        """Test with file existence check when file does not exist."""
+        mock_exists.return_value = False
+        with raises(FileNotFoundError) as exc_info:
+            value_file_error("test_param", "missing.txt", [".txt"], check_file_existance=True)
+        assert "does not exist" in str(exc_info.value)
+
+    def test_empty_string(self):
+        """Test with empty string value."""
+        with raises(ValueError) as exc_info:
+            value_file_error("test_param", "", [".txt"])
+        assert "extension_type" in str(exc_info.value)
+
+    def test_file_without_extension(self):
+        """Test with a file name that has no extension."""
+        with raises(ValueError) as exc_info:
+            value_file_error("test_param", "file", [".txt", ".csv"])
+        assert "extension_type" in str(exc_info.value)
+
+    def test_multiple_valid_extensions(self):
+        """Test with multiple valid extensions."""
+        result = value_file_error("data", "data.csv", [".txt", ".csv", ".json"])
+        assert result == "data.csv"
