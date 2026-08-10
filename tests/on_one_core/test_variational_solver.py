@@ -85,6 +85,21 @@ def test_initialize_model_parameters_preserves_initial_acoustic_model():
     assert np.allclose(velocity.dat.data_ro, 2.0)
 
 
+def test_initialize_model_parameters_preserves_dg_initial_model():
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    conditional = fire.conditional(wave.mesh_x < 0.5, 3.0, 1.5)
+
+    wave.initialize_model_parameters(conditional=conditional)
+
+    initial_space = wave.initial_velocity_model.function_space()
+    assert initial_space.ufl_element().degree() == 0
+    assert initial_space != wave.c.function_space()
+    assert np.all(
+        np.isin(wave.initial_velocity_model.dat.data_ro, (1.5, 3.0))
+    )
+
+
 def test_initialize_model_parameters_without_new_input_is_noop(monkeypatch):
     wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})

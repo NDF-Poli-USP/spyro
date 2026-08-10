@@ -103,16 +103,16 @@ class AcousticWave(Wave):
                 fast_interpolate=fast_interpolate,
             )
 
+        if self.initial_velocity_model is None:
+            self.initial_velocity_model = fire.Function(
+                velocity.function_space(),
+                name="initial_velocity_model",
+            )
+            self.initial_velocity_model.assign(velocity)
         if velocity.function_space() == self.c.function_space():
             self.c.assign(velocity)
         else:
             self.c.interpolate(velocity)
-        if self.initial_velocity_model is None:
-            self.initial_velocity_model = fire.Function(
-                self.c.function_space(),
-                name="initial_velocity_model",
-            )
-            self.initial_velocity_model.assign(self.c)
         self._model_parameters_initialized = True
 
         if output or self.debug_output:
