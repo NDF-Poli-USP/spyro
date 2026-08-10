@@ -368,9 +368,11 @@ class Meshing_parameter_calculator:
                 wave, file_name="test_shot_record" + str(cpw)
             )
 
+            # TODO: Use MeasureError class from spyro.tools.error_measure instead of this.
             error = error_calc(
                 p_receivers, self.reference_solution, wave.dt
             )
+
             print("Error is ", error, flush=True)
             cpws.append(cpw)
             dts.append(wave.dt)

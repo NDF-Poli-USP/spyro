@@ -109,7 +109,7 @@ class Model_parameters(Read_options, Read_boundary_layer,
         Options: 'LayerSizeRefFrequency.SOURCE' or 'LayerSizeRefFrequency.BOUNDARY'.
         Default is 'LayerSizeRefFrequency.SOURCE'.
     abc_type : `typing.AbsorbingBCsType`
-        Type of the boundary layer. Options: `AbsorbingBCsType.NRBC`,
+        Type of the absorbing boundary condition. Options: `AbsorbingBCsType.NRBC`,
         `AbsorbingBCsType.HYBRID`, `AbsorbingBCsType.PML` or `AbsorbingBCsType.NOABCS`.
         Default is `AbsorbingBCsType.NOABCS` where no absorbing BCs are applied.
         Option `AbsorbingBCsType.HYBRID` is based on paper of Salas et al. (2022).
