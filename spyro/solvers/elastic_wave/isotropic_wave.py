@@ -74,9 +74,6 @@ class IsotropicWave(ElasticWave):
 
     def initialize_model_parameters(self, synthetic_data=None):
         """Initialize isotropic-elastic material parameters."""
-        if self.mesh is None:
-            self.set_mesh()
-
         parameterization = self._control_parameterization
         if parameterization is None:
             data = synthetic_data
@@ -126,6 +123,9 @@ class IsotropicWave(ElasticWave):
                     "{density, lambda, mu} or "
                     "{density, p_wave_velocity, s_wave_velocity}."
                 )
+
+            if self.mesh is None:
+                self.set_mesh()
 
             fields = {
                 ElasticMaterialParameter.DENSITY: self.rho,
