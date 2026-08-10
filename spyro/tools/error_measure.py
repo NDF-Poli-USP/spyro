@@ -1,5 +1,6 @@
 from os import getcwd
-from numpy import concatenate, inf, load, save, savetxt, trapezoid, zeros
+from numpy import inf, load, pad, save, savetxt, trapezoid, zeros
+from numpy.linalg import norm
 from scipy.signal import find_peaks
 from ..io.basicio import parallel_print as pprint
 from ..utils.error_management import (type_data_structure_error, value_file_error,
@@ -32,12 +33,20 @@ class MeasureError():
 
     Methods
     -------
-    error_measures_habc()
-        Compute the error measures at the receivers for the HABC scheme
+    check_signal_lengths()
+        Check if the lengths of the model and reference signals are equal.
+    error_measures()
+        Compute the error measures at the receivers for comparison between models.
     get_reference_signal()
-        Acquire the reference signal to compare with the HABC scheme
+        Acquire the reference signal for comparison between models.
+    integral_error()
+        Compute the integral error between the model and reference signals.
+    normalized_root_mean_square_error()
+        Compute the normalized RMS error between the model and reference signals.
+    peak_error()
+        Compute the peak error between the model and reference signals.
     save_reference_signal()
-        Save the reference signal for the HABC scheme
+        Save the reference signal for comparison between models.
     comparison_plots()
         Plot the comparison between the HABC scheme and the reference model
     get_xCR_candidates()
@@ -173,6 +182,41 @@ class MeasureError():
         return receivers_reference, receivers_ref_fft
 
     @staticmethod
+    def check_signal_lengths(signal_model, signal_reference):
+        """Check if the lengths of the model and reference signals are equal.
+
+        Parameters
+        ----------
+        signal_model : `array`
+            Transient response at the receiver for the model.
+        signal_reference : `array`
+            Transient response at the receiver for the reference model.
+
+        Returns
+        -------
+        signal_model : `array`
+            Modified transient response at the receiver for the model.
+        signal_reference : `array`
+            Modified transient response at the receiver for the reference model.
+        """
+
+        # Getting the maximum length
+        max_len = max(len(signal_model), len(signal_reference))
+
+        # Completing with zeros if arrays lengths are different
+        if len(signal_model) < max_len:
+            delta_len = max_len - len(signal_model)
+            signal_model = pad(signal_model, (0, delta_len),
+                               'constant', constant_values=0)
+
+        if len(signal_reference) < max_len:
+            delta_len = max_len - len(signal_reference)
+            signal_reference = pad(signal_reference, (0, delta_len),
+                                   'constant', constant_values=0)
+
+        return signal_model, signal_reference
+
+    @staticmethod
     def peak_error(signal_model, signal_reference):
         """Compute the peak error between the model and reference signals.
 
@@ -218,8 +262,7 @@ class MeasureError():
 
         return peak_error, peak_reference
 
-    @staticmethod
-    def integral_error(signal_model, signal_reference, dt):
+    def integral_error(self, signal_model, signal_reference, dt):
         """Compute the integral error between the model and reference signals.
 
         Error measures used in Salas et al. (2022) Sec. 2.5.
@@ -251,13 +294,8 @@ class MeasureError():
         value_numerical_error("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
 
         # Completing with zeros if arrays lengths are different
-        model_len = len(signal_model)
-        reference_len = len(signal_reference)
-        delta_len = abs(model_len - reference_len)
-        if reference_len < model_len:
-            signal_reference = concatenate([signal_reference, zeros(delta_len)])
-        elif reference_len > model_len:
-            signal_model = concatenate([signal_model, zeros(delta_len)])
+        signal_model, signal_reference = self.check_signal_lengths(signal_model,
+                                                                   signal_reference)
 
         # Integral error
         numerator = trapezoid((signal_model - signal_reference)**2, dx=dt)
@@ -394,6 +432,42 @@ class MeasureError():
             savetxt(f, scalar_values, delimiter='\t')
 
         return error_measures
+
+    def normalized_root_mean_square_error(self, signal_model, signal_reference):
+        """Compute the normalized RMS error between the model and reference signals.
+
+        Takem from https://www.statisticshowto.com/nrmse/
+        TODO: add citation
+
+        Parameters
+        ----------
+        signal_model : `array`
+            Transient response at the receiver for the model.
+        signal_reference : `array`
+            Transient response at the receiver for the reference model.
+
+        Returns
+        -------
+        nrms_error : `float`
+            Normalized RMS error between the model and reference signals.
+        """
+
+        # Check the input parameters
+        type_data_structure_error("signal_model", signal_model, "array",
+                                  expected_type_element="float")
+        type_data_structure_error("signal_reference", signal_reference, "array",
+                                  expected_type_element="float")
+
+        # Completing with zeros if arrays lengths are different
+        signal_model, signal_reference = self.check_signal_lengths(signal_model,
+                                                                   signal_reference)
+
+        # Normalized RMS error
+        numerator = norm(signal_model - signal_reference)
+        denominator = norm(signal_reference)
+        nrms_error = numerator / denominator if denominator != 0 else inf
+
+        return nrms_error
 
     # def comparison_plots(self, regression_xCR=False, data_regr_xCR=None):
     #     """
