@@ -27,6 +27,11 @@ CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
     ),
 }
 
+_MATERIAL_PARAMETER_ALIASES = {
+    ElasticMaterialParameter.LAMBDA: ("lmbda", "lame_first"),
+    ElasticMaterialParameter.MU: ("lame_second",),
+}
+
 
 class IsotropicWave(ElasticWave):
     '''Isotropic elastic wave propagator'''
@@ -66,6 +71,87 @@ class IsotropicWave(ElasticWave):
         self.mechanical_energy = None
         self.field_logger.add_functional("mechanical_energy",
                                          lambda: assemble(self.mechanical_energy))
+
+    @override
+    def initialize_model_parameters(self, synthetic_data=None):
+        """Initialize isotropic-elastic material parameters."""
+        if self.mesh is None:
+            self.set_mesh()
+
+        parameterization = self._control_parameterization
+        if parameterization is None:
+            data = synthetic_data
+            if data is None:
+                data = self.input_dictionary.get("synthetic_data")
+            if not isinstance(data, dict) or "type" not in data:
+                raise ValueError(
+                    "Input dictionary must contain ['synthetic_data']['type']."
+                )
+            if data["type"] == "file":
+                raise NotImplementedError(
+                    "File-based isotropic-elastic material initialization is "
+                    "not implemented."
+                )
+            if data["type"] != "object":
+                raise ValueError(f"Invalid synthetic data type: {data['type']}")
+
+            values = {}
+            for parameter in ElasticMaterialParameter:
+                names = (
+                    parameter.value,
+                    *_MATERIAL_PARAMETER_ALIASES.get(parameter, ()),
+                )
+                for name in names:
+                    if name in data:
+                        values[parameter] = data[name]
+                        break
+
+            lame_parameters = {
+                ElasticMaterialParameter.DENSITY,
+                ElasticMaterialParameter.LAMBDA,
+                ElasticMaterialParameter.MU,
+            }
+            velocity_parameters = {
+                ElasticMaterialParameter.DENSITY,
+                ElasticMaterialParameter.P_WAVE_VELOCITY,
+                ElasticMaterialParameter.S_WAVE_VELOCITY,
+            }
+            if set(values) == lame_parameters:
+                parameterization = ElasticMaterialParameterization.LAME
+            elif set(values) == velocity_parameters:
+                parameterization = ElasticMaterialParameterization.VELOCITY
+            else:
+                raise ValueError(
+                    "Inconsistent selection of isotropic elastic wave "
+                    f"parameters: {set(values)}. The valid options are "
+                    "{density, lambda, mu} or "
+                    "{density, p_wave_velocity, s_wave_velocity}."
+                )
+
+            fields = {
+                ElasticMaterialParameter.DENSITY: self.rho,
+                ElasticMaterialParameter.LAMBDA: self.lmbda,
+                ElasticMaterialParameter.MU: self.mu,
+                ElasticMaterialParameter.P_WAVE_VELOCITY: self.c,
+                ElasticMaterialParameter.S_WAVE_VELOCITY: self.c_s,
+            }
+            for parameter, value in values.items():
+                source = self.set_material_property(
+                    parameter.value,
+                    "scalar",
+                    value=value,
+                )
+                fields[parameter].assign(source)
+
+            self._control_parameterization = parameterization
+
+        if parameterization is ElasticMaterialParameterization.LAME:
+            self.c.interpolate(((self.lmbda + 2*self.mu)/self.rho)**0.5)
+            self.c_s.interpolate((self.mu/self.rho)**0.5)
+        else:
+            self.mu.interpolate(self.rho*self.c_s**2)
+            self.lmbda.interpolate(self.rho*self.c**2 - 2*self.mu)
+        self._model_parameters_initialized = True
 
     @override
     def _create_function_space(self):

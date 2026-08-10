@@ -41,6 +41,77 @@ class AcousticWave(Wave):
         self.field_logger.add_functional(
             "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))
 
+    @override
+    def initialize_model_parameters(
+        self,
+        *,
+        constant=None,
+        conditional=None,
+        velocity_model_function=None,
+        expression=None,
+        new_file=None,
+        output=False,
+        dg_velocity_model=True,
+        fast_interpolate=False,
+    ):
+        """Initialize the acoustic velocity model."""
+        if self.mesh is None:
+            self.set_mesh()
+
+        sources = {
+            "constant": constant,
+            "conditional": conditional,
+            "expression": expression,
+            "fire_function": velocity_model_function,
+            "from_file": new_file,
+        }
+        velocity = None
+        if any(value is not None for value in sources.values()):
+            velocity = self.set_material_property(
+                "velocity",
+                "scalar",
+                dg_property=(
+                    dg_velocity_model if conditional is not None else False
+                ),
+                fast_interpolate=fast_interpolate,
+                **sources,
+            )
+            self.initial_velocity_model_file = new_file
+        elif not self._model_parameters_initialized:
+            velocity_source = self.initial_velocity_model
+            if velocity_source is None:
+                velocity_source = self.initial_velocity_model_file
+            if velocity_source is None:
+                velocity_source = self.mesh_parameters.grid_velocity_data
+            if velocity_source is None:
+                raise ValueError("No velocity model or velocity file to load.")
+            velocity = self.set_material_property(
+                "velocity",
+                "scalar",
+                value=velocity_source,
+                fast_interpolate=fast_interpolate,
+            )
+
+        if velocity is None:
+            return
+        if velocity.function_space() == self.c.function_space():
+            self.c.assign(velocity)
+        else:
+            self.c.interpolate(velocity)
+        if self.initial_velocity_model is None:
+            self.initial_velocity_model = fire.Function(
+                self.c.function_space(),
+                name="initial_velocity_model",
+            )
+            self.initial_velocity_model.assign(self.c)
+        self._model_parameters_initialized = True
+
+        if output or self.debug_output:
+            fire.VTKFile("initial_velocity_model.pvd").write(
+                self.c,
+                name="velocity",
+            )
+
     def save_current_velocity_model(self, file_name=None):
         if self.c is None:
             raise ValueError("C not loaded")
