@@ -131,7 +131,7 @@ jobs:
     - name: Running serial slow tests
       run: |
         make clean
-        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/  --only-slow --skip-newer-firedrake
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/  --only-slow --skip-newer-firedrake --durations=15
 
     - name: Running parallel tests for forward problem only
       run: |
