@@ -305,7 +305,7 @@ class MeasureError():
         return integral_error
 
     def error_measures(self, forward_solution_receivers, receivers_reference, dt,
-                       number_of_receivers, final_energy=None,
+                       number_of_receivers, final_energy=None, save_file=True,
                        final_energy_reference=None, save_in_case_folder=True):
         """Compute the error measures at the receivers for comparison between models.
 
@@ -329,6 +329,8 @@ class MeasureError():
             Energy of the model in the last time step. Default is `None`.
         final_energy_reference : `float`, optional
             Energy of the reference model in the last time step. Default is `None`.
+        save_file : `bool`, optional
+            If `True`, save the error measures in a text file. Default is `True`.
         save_in_case_folder : `bool`, optional
             If `True`, save the error measures in the current case folder. Otherwise,
             save the error measures in the reference folder. Default is `True`.
@@ -410,9 +412,11 @@ class MeasureError():
         pprint(f"Maximum Peak Error: {max_errPK:.2%}", comm=self.comm)
 
         # Save error measures
-        pth_str = self.path_save_err_case if save_in_case_folder else self.path_reference
-        err_str = pth_str + "measure_errs.txt"
-        savetxt(err_str, error_measures, delimiter='\t')
+        if save_file:
+            pth_str = self.path_save_err_case if save_in_case_folder \
+                else self.path_reference
+            err_str = pth_str + "measure_errs.txt"
+            savetxt(err_str, error_measures, delimiter='\t')
 
         # Final energy
         if final_energy is not None:
@@ -428,8 +432,9 @@ class MeasureError():
         error_measures.extend(scalar_values)
 
         # Append scalar values to the error measures list
-        with open(err_str, 'a') as f:
-            savetxt(f, scalar_values, delimiter='\t')
+        if save_file:
+            with open(err_str, 'a') as f:
+                savetxt(f, scalar_values, delimiter='\t')
 
         return error_measures
 
