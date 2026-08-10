@@ -72,7 +72,6 @@ class IsotropicWave(ElasticWave):
         self.field_logger.add_functional("mechanical_energy",
                                          lambda: assemble(self.mechanical_energy))
 
-    @override
     def initialize_model_parameters(self, synthetic_data=None):
         """Initialize isotropic-elastic material parameters."""
         if self.mesh is None:
@@ -158,7 +157,6 @@ class IsotropicWave(ElasticWave):
         return create_function_space(self.mesh, self.method, self.degree,
                                      dim=self.dimension)
 
-    @override
     def _build_function_space(self):
         super()._build_function_space()
         V = create_function_space(self.mesh, self.method, self.degree)

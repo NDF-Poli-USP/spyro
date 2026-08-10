@@ -41,7 +41,6 @@ class AcousticWave(Wave):
         self.field_logger.add_functional(
             "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))
 
-    @override
     def initialize_model_parameters(
         self,
         *,
@@ -368,7 +367,6 @@ class AcousticWave(Wave):
     def _create_function_space(self):
         return create_function_space(self.mesh, self.method, self.degree)
 
-    @override
     def _build_function_space(self):
         super()._build_function_space()
         self.c = fire.Function(self.scalar_function_space, name="velocity")
