@@ -75,7 +75,7 @@ class IsotropicWave(ElasticWave):
     def initialize_model_parameters(self, synthetic_data=None):
         """Initialize isotropic-elastic material parameters."""
         parameterization = self._control_parameterization
-        if parameterization is None:
+        if synthetic_data is not None or parameterization is None:
             data = synthetic_data
             if data is None:
                 data = self.input_dictionary.get("synthetic_data")
@@ -102,30 +102,29 @@ class IsotropicWave(ElasticWave):
                         values[parameter] = data[name]
                         break
 
-            lame_parameters = {
-                ElasticMaterialParameter.DENSITY,
-                ElasticMaterialParameter.LAMBDA,
-                ElasticMaterialParameter.MU,
-            }
-            velocity_parameters = {
-                ElasticMaterialParameter.DENSITY,
-                ElasticMaterialParameter.P_WAVE_VELOCITY,
-                ElasticMaterialParameter.S_WAVE_VELOCITY,
-            }
-            if set(values) == lame_parameters:
+            provided_parameters = set(values)
+            lame_parameters = set(CONTROL_PARAMETERS_BY_PARAMETERIZATION[
+                ElasticMaterialParameterization.LAME
+            ])
+            velocity_parameters = set(CONTROL_PARAMETERS_BY_PARAMETERIZATION[
+                ElasticMaterialParameterization.VELOCITY
+            ])
+            if provided_parameters == lame_parameters:
                 parameterization = ElasticMaterialParameterization.LAME
-            elif set(values) == velocity_parameters:
+            elif provided_parameters == velocity_parameters:
                 parameterization = ElasticMaterialParameterization.VELOCITY
             else:
                 raise ValueError(
                     "Inconsistent selection of isotropic elastic wave "
-                    f"parameters: {set(values)}. The valid options are "
+                    f"parameters: {provided_parameters}. The valid options are "
                     "{density, lambda, mu} or "
                     "{density, p_wave_velocity, s_wave_velocity}."
                 )
 
             if self.mesh is None:
                 self.set_mesh()
+            elif self.function_space is None:
+                self.force_rebuild_function_space()
 
             fields = {
                 ElasticMaterialParameter.DENSITY: self.rho,
@@ -135,12 +134,12 @@ class IsotropicWave(ElasticWave):
                 ElasticMaterialParameter.S_WAVE_VELOCITY: self.c_s,
             }
             for parameter, value in values.items():
-                source = self.set_material_property(
+                material_field = self.set_material_property(
                     parameter.value,
                     "scalar",
                     value=value,
                 )
-                fields[parameter].assign(source)
+                fields[parameter].assign(material_field)
 
             self._control_parameterization = parameterization
 
@@ -346,58 +345,20 @@ class IsotropicWave(ElasticWave):
                 "enum values.",
             )
 
-        lame_controls = CONTROL_PARAMETERS_BY_PARAMETERIZATION[
-            ElasticMaterialParameterization.LAME
-        ]
-        velocity_controls = CONTROL_PARAMETERS_BY_PARAMETERIZATION[
-            ElasticMaterialParameterization.VELOCITY
-        ]
-        option_1 = set(controls) == set(lame_controls)
-        option_2 = set(controls) == set(velocity_controls)
-        if not (option_1 or option_2):
-            raise ValueError(
-                "Elastic controls must define either {density, lambda, mu} "
-                "or {density, p_wave_velocity, s_wave_velocity}.",
-            )
-
-        if self.function_space is None:
-            self.force_rebuild_function_space()
-
-        fields = {
-            ElasticMaterialParameter.DENSITY: self.rho,
-            ElasticMaterialParameter.LAMBDA: self.lmbda,
-            ElasticMaterialParameter.MU: self.mu,
-            ElasticMaterialParameter.P_WAVE_VELOCITY: self.c,
-            ElasticMaterialParameter.S_WAVE_VELOCITY: self.c_s,
-        }
-        for parameter, value in controls.items():
-            source = self.set_material_property(
-                parameter.value,
-                "scalar",
-                value=value,
-            )
-            fields[parameter].assign(source)
-
         synthetic_data = {
             "type": "object",
-            ElasticMaterialParameter.DENSITY.value: self.rho,
+            **{parameter.value: value for parameter, value in controls.items()},
             "real_velocity_file": None,
         }
-        if option_1:
-            self._control_parameterization = ElasticMaterialParameterization.LAME
-            synthetic_data[ElasticMaterialParameter.LAMBDA.value] = self.lmbda
-            synthetic_data[ElasticMaterialParameter.MU.value] = self.mu
-        else:
-            self._control_parameterization = ElasticMaterialParameterization.VELOCITY
-            synthetic_data[
-                ElasticMaterialParameter.P_WAVE_VELOCITY.value
-            ] = self.c
-            synthetic_data[
-                ElasticMaterialParameter.S_WAVE_VELOCITY.value
-            ] = self.c_s
-
-        self.initialize_model_parameters()
-        self.input_dictionary["synthetic_data"] = synthetic_data
+        self.initialize_model_parameters(synthetic_data=synthetic_data)
+        self.input_dictionary["synthetic_data"] = {
+            "type": "object",
+            **{
+                parameter.value: value
+                for parameter, value in self.get_control_parameters().items()
+            },
+            "real_velocity_file": None,
+        }
 
     @override
     def matrix_building(self):

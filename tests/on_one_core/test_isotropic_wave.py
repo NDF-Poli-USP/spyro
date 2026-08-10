@@ -64,14 +64,19 @@ def test_initialize_model_parameters_lame_parameterization(monkeypatch):
     wave.initialize_model_parameters(synthetic_data=synthetic_dict)
 
     assert calls == ["density", "lambda", "mu"]
+    assert np.allclose(wave.rho.dat.data_ro, 1.0)
+    assert np.allclose(wave.lmbda.dat.data_ro, 2.0)
+    assert np.allclose(wave.mu.dat.data_ro, 3.0)
+    assert np.allclose(wave.c.dat.data_ro, np.sqrt(8.0))
+    assert np.allclose(wave.c_s.dat.data_ro, np.sqrt(3.0))
 
 
 def test_initialize_model_parameters_velocity_parameterization(monkeypatch):
     synthetic_dict = {
         "type": "object",
         "density": 1,
-        "p_wave_velocity": 2,
-        "s_wave_velocity": 3,
+        "p_wave_velocity": 3,
+        "s_wave_velocity": 1,
     }
     wave = IsotropicWave(dummy_dict)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.2})
@@ -86,6 +91,72 @@ def test_initialize_model_parameters_velocity_parameterization(monkeypatch):
     wave.initialize_model_parameters(synthetic_data=synthetic_dict)
 
     assert calls == ["density", "p_wave_velocity", "s_wave_velocity"]
+    assert np.allclose(wave.rho.dat.data_ro, 1.0)
+    assert np.allclose(wave.c.dat.data_ro, 3.0)
+    assert np.allclose(wave.c_s.dat.data_ro, 1.0)
+    assert np.allclose(wave.mu.dat.data_ro, 1.0)
+    assert np.allclose(wave.lmbda.dat.data_ro, 7.0)
+
+
+def test_initialize_model_parameters_accepts_aliases_and_ufl_values():
+    wave = IsotropicWave(dummy_dict)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.2})
+    z, x, _ = fire.SpatialCoordinate(wave.mesh)
+    synthetic_dict = {
+        "type": "object",
+        "density": 1.0 + 0.0*z,
+        "lame_first": 2.0 + 0.0*x,
+        "lame_second": fire.Constant(3.0),
+    }
+
+    wave.initialize_model_parameters(synthetic_data=synthetic_dict)
+
+    assert np.allclose(wave.rho.dat.data_ro, 1.0)
+    assert np.allclose(wave.lmbda.dat.data_ro, 2.0)
+    assert np.allclose(wave.mu.dat.data_ro, 3.0)
+    assert np.allclose(wave.c.dat.data_ro, np.sqrt(8.0))
+    assert np.allclose(wave.c_s.dat.data_ro, np.sqrt(3.0))
+
+
+def test_initialize_model_parameters_reinitializes_existing_fields():
+    wave = IsotropicWave(dummy_dict)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.2})
+    wave.initialize_model_parameters(
+        synthetic_data={
+            "type": "object",
+            "density": 1.0,
+            "lambda": 2.0,
+            "mu": 3.0,
+        },
+    )
+    material_fields = (wave.rho, wave.lmbda, wave.mu, wave.c, wave.c_s)
+
+    wave.initialize_model_parameters(
+        synthetic_data={
+            "type": "object",
+            "density": 2.0,
+            "p_wave_velocity": 4.0,
+            "s_wave_velocity": 2.0,
+        },
+    )
+
+    assert all(
+        before is after
+        for before, after in zip(
+            material_fields,
+            (wave.rho, wave.lmbda, wave.mu, wave.c, wave.c_s),
+        )
+    )
+    assert set(wave.get_control_parameters()) == {
+        ElasticMaterialParameter.DENSITY,
+        ElasticMaterialParameter.P_WAVE_VELOCITY,
+        ElasticMaterialParameter.S_WAVE_VELOCITY,
+    }
+    assert np.allclose(wave.rho.dat.data_ro, 2.0)
+    assert np.allclose(wave.c.dat.data_ro, 4.0)
+    assert np.allclose(wave.c_s.dat.data_ro, 2.0)
+    assert np.allclose(wave.mu.dat.data_ro, 8.0)
+    assert np.allclose(wave.lmbda.dat.data_ro, 16.0)
 
 
 def test_initialize_model_parameters_redundant():

@@ -520,7 +520,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Create a material field, optionally normalizing a single value."""
         value = kwargs.pop("value", None)
         if value is not None:
-            sources = (
+            input_names = (
                 "constant",
                 "conditional",
                 "expression",
@@ -528,9 +528,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 "fire_function",
                 "from_file",
             )
-            if any(kwargs.get(source) is not None for source in sources):
+            if any(kwargs.get(name) is not None for name in input_names):
                 raise ValueError(
-                    "value cannot be combined with another material source."
+                    "value cannot be combined with another material input."
                 )
             if np.isscalar(value):
                 kwargs["constant"] = value
