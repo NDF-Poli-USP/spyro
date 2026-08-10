@@ -51,7 +51,7 @@ def test_initialize_model_parameters_from_velocity_function(monkeypatch):
     )
 
 
-def test_initialize_model_parameters_from_file_records_source(monkeypatch):
+def test_initialize_model_parameters_from_file_records_input(monkeypatch):
     wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
     model = wave.set_material_property("velocity", "scalar", constant=1.5)
@@ -83,6 +83,47 @@ def test_initialize_model_parameters_preserves_initial_acoustic_model():
     assert wave.c is velocity
     assert np.allclose(initial_model.dat.data_ro, 1.5)
     assert np.allclose(velocity.dat.data_ro, 2.0)
+
+
+def test_initialize_model_parameters_without_new_input_is_noop(monkeypatch):
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    wave.initialize_model_parameters(constant=1.5)
+
+    def fail_if_called(*args, **kwargs):
+        pytest.fail("an initialized model should not be loaded again")
+
+    monkeypatch.setattr(wave, "set_material_property", fail_if_called)
+
+    wave.initialize_model_parameters()
+
+    assert np.allclose(wave.c.dat.data_ro, 1.5)
+
+
+def test_initialize_model_parameters_uses_output_filename(monkeypatch):
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    written = {}
+
+    class VTKFile:
+        def __init__(self, filename):
+            written["filename"] = filename
+
+        def write(self, field, *, name):
+            written["field"] = field
+            written["name"] = name
+
+    monkeypatch.setattr(fire, "VTKFile", VTKFile)
+
+    wave.initialize_model_parameters(
+        constant=1.5,
+        output=True,
+        output_filename="custom_initial_velocity.pvd",
+    )
+
+    assert written["filename"] == "custom_initial_velocity.pvd"
+    assert written["field"] is wave.c
+    assert written["name"] == "velocity"
 
 
 def test_set_material_properties_deprecated_forwards(monkeypatch):

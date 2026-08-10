@@ -50,22 +50,33 @@ class AcousticWave(Wave):
         expression=None,
         new_file=None,
         output=False,
+        output_filename="initial_velocity_model.pvd",
         dg_velocity_model=True,
         fast_interpolate=False,
     ):
-        """Initialize the acoustic velocity model."""
+        """Initialize the acoustic velocity model.
+
+        ``new_file`` is an input model.  When ``output`` is enabled,
+        ``output_filename`` selects the separate PVD output path.  A call with
+        no new input after initialization is an idempotent no-op.
+        """
         if self.mesh is None:
             self.set_mesh()
 
-        sources = {
+        velocity_inputs = {
             "constant": constant,
             "conditional": conditional,
             "expression": expression,
             "fire_function": velocity_model_function,
             "from_file": new_file,
         }
-        velocity = None
-        if any(value is not None for value in sources.values()):
+        has_explicit_input = any(
+            value is not None for value in velocity_inputs.values()
+        )
+        if not has_explicit_input and self._model_parameters_initialized:
+            return
+
+        if has_explicit_input:
             velocity = self.set_material_property(
                 "velocity",
                 "scalar",
@@ -73,26 +84,25 @@ class AcousticWave(Wave):
                     dg_velocity_model if conditional is not None else False
                 ),
                 fast_interpolate=fast_interpolate,
-                **sources,
+                **velocity_inputs,
             )
             self.initial_velocity_model_file = new_file
-        elif not self._model_parameters_initialized:
-            velocity_source = self.initial_velocity_model
-            if velocity_source is None:
-                velocity_source = self.initial_velocity_model_file
-            if velocity_source is None:
-                velocity_source = self.mesh_parameters.grid_velocity_data
-            if velocity_source is None:
+        else:
+            if self.initial_velocity_model is not None:
+                velocity_input = self.initial_velocity_model
+            elif self.initial_velocity_model_file is not None:
+                velocity_input = self.initial_velocity_model_file
+            elif self.mesh_parameters.grid_velocity_data is not None:
+                velocity_input = self.mesh_parameters.grid_velocity_data
+            else:
                 raise ValueError("No velocity model or velocity file to load.")
             velocity = self.set_material_property(
                 "velocity",
                 "scalar",
-                value=velocity_source,
+                value=velocity_input,
                 fast_interpolate=fast_interpolate,
             )
 
-        if velocity is None:
-            return
         if velocity.function_space() == self.c.function_space():
             self.c.assign(velocity)
         else:
@@ -106,7 +116,7 @@ class AcousticWave(Wave):
         self._model_parameters_initialized = True
 
         if output or self.debug_output:
-            fire.VTKFile("initial_velocity_model.pvd").write(
+            fire.VTKFile(output_filename).write(
                 self.c,
                 name="velocity",
             )
