@@ -15,7 +15,7 @@ from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
-from .solver_parameters import get_default_linear_solver_parameters
+from .solver_parameters import get_default_parameters_for_method
 from ..utils.error_management import enum_parameter_error
 from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
                             LayerShapeType, WaveType)
@@ -42,8 +42,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Function space for the wave equation.
     current_time: float
         Current time of the simulation.
-    solver_parameters: `dict` or `None`
-        PETSc/KSP options passed to Firedrake's linear solver.
+    solver_parameters: Python object
+        Contains solver parameters.
     real_shot_record: `Firedrake.Function`
         Real shot record.
     mesh: `Firedrake.Mesh`
@@ -83,6 +83,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Sets or loads the material parameters required by the wave equation.
     set_last_solve_as_real_shot_record()
         Sets last solve as real shot record.
+    set_solver_parameters()
+        Sets new or default solver parameters.
+
     Notes
     -----
     New attributes added to the wave object in mesh_parameters:
@@ -145,15 +148,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.misfit = None
         self.current_time = 0.0
         self.source_expression = None  # Expression for sources using UFL (less efficient)
-        self.solver_parameters = get_default_linear_solver_parameters(
-            self.method
-        )
+        self.set_solver_parameters()
 
         # Create or get the mesh
         self.mesh = self.get_mesh()
         self.c = None
         self.sources = None
         self.real_shot_record = None
+
+        self.set_solver_parameters()
 
         # Mesh manager
         self.mesh_manager()
@@ -291,6 +294,23 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         self.mesh = self.get_mesh()
         self.building_mesh_derived_paramenters()
+
+    def set_solver_parameters(self, parameters=None):
+        """
+        Set the solver parameters.
+
+        Args:
+            parameters (dict): A dictionary containing the solver parameters.
+
+        Returns:
+            None
+        """
+        if parameters is not None:
+            self.solver_parameters = parameters
+        elif parameters is None:
+            self.solver_parameters = get_default_parameters_for_method(
+                self.method
+            )
 
     def get_spatial_coordinates(self):
         """

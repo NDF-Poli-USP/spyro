@@ -1,21 +1,30 @@
-def get_default_linear_solver_parameters(method):
-    """Return default PETSc/KSP options for a finite-element method.
+def get_default_parameters_for_method(method):
+    """Get the default solver parameters for a given method.
 
     Parameters
     ----------
-    method : `str` or `None`
+    value : `str` or `None`
         The finite element method to use. Must be one of:
         'mass_lumped_triangle' or 'spectral_quadrilateral'.
 
     Returns
     -------
-    solver_parameters : `dict` or `None`
-        Solver options if the method is recognized, otherwise ``None``.
+    solver_parameters : `dict`or `None`
+        A dictionary of solver parameters if the method is recognized, otherwise `None`.
     """
-    if method in {"mass_lumped_triangle", "spectral_quadrilateral"}:
-        return {
+    solver_parameters = None
+
+    if method == "mass_lumped_triangle":
+        solver_parameters = {
             "ksp_type": "preonly",
             "pc_type": "jacobi",
         }
+    elif method == "spectral_quadrilateral":
+        solver_parameters = {
+            "ksp_type": "preonly",
+            "pc_type": "jacobi",
+        }
+    else:
+        solver_parameters = None
 
-    return None
+    return solver_parameters
