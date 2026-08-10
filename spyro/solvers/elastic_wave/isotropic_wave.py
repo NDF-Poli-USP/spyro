@@ -28,27 +28,6 @@ CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
 }
 
 
-def _format_control_parameters(parameters):
-    """Format material-parameter enum values for error messages.
-
-    Parameters
-    ----------
-    parameters : iterable of ElasticMaterialParameter
-        Material-parameter enum values to display.
-
-    Returns
-    -------
-    str
-        Human-readable set-like representation using public parameter names.
-
-    Examples
-    --------
-    ``(ElasticMaterialParameter.DENSITY, ElasticMaterialParameter.MU)``
-    becomes ``"{density, mu}"``.
-    """
-    return "{" + ", ".join(parameter.value for parameter in parameters) + "}"
-
-
 class IsotropicWave(ElasticWave):
     '''Isotropic elastic wave propagator'''
 
@@ -292,11 +271,9 @@ class IsotropicWave(ElasticWave):
         option_1 = set(controls) == set(lame_controls)
         option_2 = set(controls) == set(velocity_controls)
         if not (option_1 or option_2):
-            lame_names = _format_control_parameters(lame_controls)
-            velocity_names = _format_control_parameters(velocity_controls)
             raise ValueError(
-                "Elastic controls must define either "
-                f"{lame_names} or {velocity_names}.",
+                "Elastic controls must define either {density, lambda, mu} "
+                "or {density, p_wave_velocity, s_wave_velocity}.",
             )
 
         if self.function_space is None:
@@ -310,7 +287,11 @@ class IsotropicWave(ElasticWave):
             ElasticMaterialParameter.S_WAVE_VELOCITY: self.c_s,
         }
         for parameter, value in controls.items():
-            source = self._material_parameter_field(value, parameter)
+            source = self.set_material_property(
+                parameter.value,
+                "scalar",
+                value=value,
+            )
             fields[parameter].assign(source)
 
         synthetic_data = {

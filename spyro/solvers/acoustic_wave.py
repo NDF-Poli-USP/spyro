@@ -380,7 +380,11 @@ class AcousticWave(Wave):
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        velocity = self._material_parameter_field(controls, "velocity")
+        velocity = self.set_material_property(
+            "velocity",
+            "scalar",
+            value=controls,
+        )
         if velocity.function_space() == self.c.function_space():
             self.c.assign(velocity)
         else:
