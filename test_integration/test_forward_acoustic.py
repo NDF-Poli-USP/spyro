@@ -92,7 +92,7 @@ def test_forward_3_shots():
     pprint(f"Error for shot {wave.current_sources} is {eNRMS} and test "
            f"has passed equals {abs(eNRMS) < 0.01}", comm=comm)
 
-    error_all = COMM_WORLD.allreduce(error, op=MPI.SUM)
+    error_all = COMM_WORLD.allreduce(eNRMS, op=MPI.SUM)
     error_all /= 3
 
     test = abs(error_all) < 0.01
