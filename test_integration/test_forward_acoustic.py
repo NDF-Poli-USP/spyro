@@ -1,5 +1,5 @@
 from pytest import mark
-from mpi4py.MPI import COMM_WORLD as comm
+from mpi4py.MPI import COMM_WORLD
 from mpi4py import MPI
 from numpy.linalg import norm
 from firedrake import conditional
@@ -86,16 +86,13 @@ def test_forward_3_shots():
     arr0 = arr[:, rec_id]
     arr0 = arr0.flatten()
 
-    error = error_calc()
-
     errPk = MeasureError().peak_error(arr0[:430], analytical_p[:430])[0]
     errIt = MeasureError().integral_error(arr0[:430], analytical_p[:430], wave.dt)
     eNRMS = MeasureError().normalized_root_mean_square_error(arr0[:430], analytical_p[:430])
-
     pprint(f"Error for shot {wave.current_sources} is {eNRMS} and test "
            f"has passed equals {abs(eNRMS) < 0.01}", comm=comm)
 
-    error_all = comm.allreduce(eNRMS, op=MPI.SUM)
+    error_all = COMM_WORLD.allreduce(error, op=MPI.SUM)
     error_all /= 3
 
     test = abs(error_all) < 0.01
