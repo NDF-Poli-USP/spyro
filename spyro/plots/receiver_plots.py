@@ -11,6 +11,7 @@ from .plot_helpers import _finalize_figure
 if TYPE_CHECKING:  # Avoinding circular imports lazily
     from ..solvers.wave import Wave
 
+
 def plot_receiver_response(
     receiver_data: np.ndarray | list[float] | tuple[float, ...],
     final_time: float,
@@ -215,11 +216,11 @@ def plot_displacement_components(
 
 
 def plot_comparison_of_receivers_to_reference(
-        wave: "Wave",
-        reference_array: np.array,
-        show: bool = False,
-        filename: str | Path | None = None,
-    ):
+    wave: "Wave",
+    reference_array: np.array,
+    show: bool = False,
+    filename: str | Path | None = None,
+):
     """Plot receiver time-domain comparisons from a Wave object.
 
     This is a convenience wrapper around

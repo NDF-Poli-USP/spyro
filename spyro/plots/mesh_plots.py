@@ -8,6 +8,7 @@ from firedrake import (
     triplot,
 )
 import matplotlib.pyplot as plt
+from pathlib import Path
 from ..domains.space import create_function_space
 from ..tools.version_control import is_firedrake_new
 from .plot_helpers import _finalize_figure
@@ -19,12 +20,11 @@ else:
 
 
 def plot_mesh_sizes(
-    mesh_filename=None,
-    firedrake_mesh=None,
-    title_str=None,
-    output_filename=None,
-    show=False,
-    show_size_contour=True,
+    mesh: Mesh,
+    title_str: str | None = None,
+    output_filename: str | Path | None = None,
+    show: bool = False,
+    show_size_contour: bool = True,
 ):
     """
     Plot mesh cell sizes with optional contour visualization.
@@ -35,10 +35,8 @@ def plot_mesh_sizes(
 
     Parameters
     ----------
-    mesh_filename : str, optional
-        Path to the mesh file to load. If None, firedrake_mesh must be provided.
-    firedrake_mesh : firedrake.Mesh, optional
-        A Firedrake mesh object. If None, mesh_filename must be provided.
+    firedrake_mesh : firedrake.Mesh,
+        A Firedrake mesh object.
     title_str : str, optional
         Title for the plot. Default is None.
     output_filename : str, optional
@@ -64,13 +62,6 @@ def plot_mesh_sizes(
     restores them afterwards to avoid side effects.
     """
     plt.rcParams["font.size"] = 12
-
-    if mesh_filename is not None:
-        mesh = Mesh(mesh_filename)
-    elif firedrake_mesh is not None:
-        mesh = firedrake_mesh
-    else:
-        raise ValueError("Please specify mesh")
 
     coordinates = mesh.coordinates.dat.data.copy()
 
