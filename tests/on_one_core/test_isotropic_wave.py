@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
+from spyro.utils.typing import ElasticMaterialParameter
 
 dummy_dict = {
     "options": {
@@ -160,18 +161,15 @@ def test_elastic_file_material_parameters_notimplemented():
 def test_initialize_model_parameters_preserves_material_properties():
     wave = IsotropicWave(dummy_dict)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.2})
-    wave.rho = wave.set_material_property(
-        "density", "scalar", constant=1.0,
-    )
-    wave.lmbda = wave.set_material_property(
-        "lambda", "scalar", constant=2.0,
-    )
-    wave.mu = wave.set_material_property(
-        "mu", "scalar", constant=3.0,
-    )
-
-    wave.initialize_model_parameters()
     parameters = (wave.rho, wave.lmbda, wave.mu, wave.c, wave.c_s)
+    assert all(isinstance(parameter, fire.Function) for parameter in parameters)
+    wave.set_control_parameters(
+        {
+            ElasticMaterialParameter.DENSITY: 1.0,
+            ElasticMaterialParameter.LAMBDA: 2.0,
+            ElasticMaterialParameter.MU: 3.0,
+        }
+    )
 
     wave.initialize_model_parameters()
 
@@ -187,15 +185,24 @@ def test_initialize_model_parameters_preserves_material_properties():
 def test_initialize_model_parameters_recomputes_after_change():
     wave = IsotropicWave(dummy_dict)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.2})
-    wave.rho = wave.set_material_property("density", "scalar", constant=1.0)
-    wave.lmbda = wave.set_material_property("lambda", "scalar", constant=2.0)
-    wave.mu = wave.set_material_property("mu", "scalar", constant=3.0)
+    wave.set_control_parameters(
+        {
+            ElasticMaterialParameter.DENSITY: 1.0,
+            ElasticMaterialParameter.LAMBDA: 2.0,
+            ElasticMaterialParameter.MU: 3.0,
+        }
+    )
+    material_fields = (wave.rho, wave.lmbda, wave.mu, wave.c, wave.c_s)
 
+    wave.mu.assign(5.0)
     wave.initialize_model_parameters()
-    c_before, c_s_before = wave.c, wave.c_s
 
-    wave.mu = wave.set_material_property("mu", "scalar", constant=5.0)
-    wave.initialize_model_parameters()
-
-    assert wave.c is not c_before
-    assert wave.c_s is not c_s_before
+    assert all(
+        before is after
+        for before, after in zip(
+            material_fields,
+            (wave.rho, wave.lmbda, wave.mu, wave.c, wave.c_s),
+        )
+    )
+    assert np.allclose(wave.c.dat.data_ro, np.sqrt(12.0))
+    assert np.allclose(wave.c_s.dat.data_ro, np.sqrt(5.0))

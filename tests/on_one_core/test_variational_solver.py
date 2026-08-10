@@ -42,7 +42,13 @@ def test_initialize_model_parameters_from_velocity_function(monkeypatch):
     wave.initialize_model_parameters(velocity_model_function=velocity)
 
     assert captured["fire_function"] is velocity
-    assert wave.c is velocity
+    assert wave.c is not velocity
+    assert wave.initial_velocity_model is not velocity
+    assert np.allclose(wave.c.dat.data_ro, velocity.dat.data_ro)
+    assert np.allclose(
+        wave.initial_velocity_model.dat.data_ro,
+        velocity.dat.data_ro,
+    )
 
 
 def test_initialize_model_parameters_from_file_records_source(monkeypatch):
@@ -60,24 +66,23 @@ def test_initialize_model_parameters_from_file_records_source(monkeypatch):
 
     assert captured["from_file"] == "velocity.hdf5"
     assert wave.initial_velocity_model_file == "velocity.hdf5"
-    assert wave.c is model
+    assert wave.c is not model
+    assert np.allclose(wave.c.dat.data_ro, model.dat.data_ro)
 
 
-def test_set_initial_velocity_model_deprecated_forwards(monkeypatch):
+def test_initialize_model_parameters_preserves_initial_acoustic_model():
     wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
-    forwarded = {}
+    wave.initialize_model_parameters(constant=1.5)
+    initial_model = wave.initial_velocity_model
+    velocity = wave.c
 
-    def record(*args, **kwargs):
-        forwarded["args"] = args
-        forwarded["kwargs"] = kwargs
+    wave.initialize_model_parameters(constant=2.0)
 
-    monkeypatch.setattr(wave, "initialize_model_parameters", record)
-
-    with pytest.warns(DeprecationWarning):
-        wave.set_initial_velocity_model(constant=1.5)
-
-    assert forwarded["kwargs"]["constant"] == 1.5
+    assert wave.initial_velocity_model is initial_model
+    assert wave.c is velocity
+    assert np.allclose(initial_model.dat.data_ro, 1.5)
+    assert np.allclose(velocity.dat.data_ro, 2.0)
 
 
 def test_set_material_properties_deprecated_forwards(monkeypatch):

@@ -298,6 +298,12 @@ class AcousticWave(Wave):
         return create_function_space(self.mesh, self.method, self.degree)
 
     @override
+    def _build_function_space(self):
+        super()._build_function_space()
+        self.c = fire.Function(self.scalar_function_space, name="velocity")
+        self._model_parameters_initialized = False
+
+    @override
     def rhs_no_pml(self):
         if self.abc_type == AbsorbingBCsType.PML:
             return self.B.sub(0)
@@ -332,8 +338,9 @@ class AcousticWave(Wave):
     def get_control_parameters(self):
         """Return the acoustic inversion control.
 
-        For acoustic FWI the control is the velocity model stored in
-        ``initial_velocity_model``.
+        For acoustic FWI the control is the mutable velocity field ``c``.
+        ``initial_velocity_model`` remains a snapshot of the first initialized
+        model.
 
         Returns
         -------
@@ -345,7 +352,9 @@ class AcousticWave(Wave):
         After ``initialize_model_parameters(constant=2.0)``, this method returns
         the velocity ``Function`` filled with ``2.0``.
         """
-        return self.initial_velocity_model
+        if not self._model_parameters_initialized:
+            return None
+        return self.c
 
     def set_control_parameters(self, controls):
         """Assign the acoustic inversion control.
@@ -359,7 +368,8 @@ class AcousticWave(Wave):
         Returns
         -------
         None
-            The method updates ``initial_velocity_model`` and ``c`` and clears
+            The method updates ``c`` in place, preserves the first model in
+            ``initial_velocity_model``, and clears
             ``initial_velocity_model_file``.
 
         Examples
@@ -370,20 +380,19 @@ class AcousticWave(Wave):
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        if isinstance(controls, fire.Function):
-            name = controls.name()
-            velocity = fire.Function(self.function_space, name=name)
-            if controls.function_space() == self.function_space:
-                velocity.assign(controls)
-            else:
-                velocity.interpolate(controls)
+        velocity = self._material_parameter_field(controls, "velocity")
+        if velocity.function_space() == self.c.function_space():
+            self.c.assign(velocity)
         else:
-            velocity = fire.Function(self.function_space, name="velocity")
-            velocity.interpolate(controls)
-
-        self.initial_velocity_model = velocity
+            self.c.interpolate(velocity)
+        if self.initial_velocity_model is None:
+            self.initial_velocity_model = fire.Function(
+                self.c.function_space(),
+                name="initial_velocity_model",
+            )
+            self.initial_velocity_model.assign(self.c)
+        self._model_parameters_initialized = True
         self.initial_velocity_model_file = None
-        self.c = self.initial_velocity_model
 
     def get_control_parameter_function_space(self):
         """Return the function space used by acoustic controls.
