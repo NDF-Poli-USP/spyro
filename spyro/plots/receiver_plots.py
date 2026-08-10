@@ -111,7 +111,6 @@ def plot_displacement_components(
         np.ndarray | list[float] | tuple[float, ...],
     ],
     source_type: str = "Unknown",
-    save_plots: bool = False,
     output_dir: str | Path | None = None,
     show: bool = False,
 ):
@@ -194,7 +193,7 @@ def plot_displacement_components(
     combined_ax.legend()
     combined_ax.grid(True, alpha=0.3)
 
-    if save_plots:
+    if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
         basename = source_type.replace(" ", "_")
 
@@ -274,7 +273,6 @@ def plot_compare_receivers_array(
     receiver_data_first: np.ndarray,
     receiver_data_second: np.ndarray,
     time_values: np.ndarray,
-    *,
     first_label: str = "Solution",
     second_label: str = "Reference",
     output_path: str | Path | None = None,
