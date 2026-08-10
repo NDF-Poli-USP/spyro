@@ -1,16 +1,11 @@
 from mpi4py.MPI import COMM_WORLD
 from mpi4py import MPI
-import numpy as np
-import firedrake as fire
-import spyro
+from firedrake import conditional
+from numpy import linspace
 import matplotlib.pyplot as plt
-
-
-def error_calc(p_numerical, p_analytical, nt):
-    norm = np.linalg.norm(p_numerical, 2) / np.sqrt(nt)
-    error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
-    div_error_time = error_time / norm
-    return div_error_time
+import spyro
+from spyro.io.basicio import parallel_print as pprint
+from spyro.tools.error_measure import MeasureError
 
 
 def test_forward_3_shots():
@@ -64,7 +59,7 @@ def test_forward_3_shots():
     wave.store_forward_time_steps = True
 
     mesh_z = wave.mesh_z
-    cond = fire.conditional(mesh_z < -1.5, 3.5, 1.5)
+    cond = conditional(mesh_z < -1.5, 3.5, 1.5)
     wave.set_initial_velocity_model(conditional=cond, output=True)
 
     wave.forward_solve()
@@ -79,9 +74,11 @@ def test_forward_3_shots():
         analytical_p = None
     analytical_p = comm.comm.bcast(analytical_p, root=0)
 
-    time_vector = np.linspace(0.0, 1.0, 2001)
+    time_vector = linspace(0.0, 1.0, 2001)
     cutoff = 830
-    errors = []
+    eNRMS = []
+    errIt = []
+    errPk = []
 
     for i in range(wave.number_of_sources):
         plt.close()
@@ -98,21 +95,42 @@ def test_forward_3_shots():
         plt.title(f"Source {i}")
         plt.legend()
         plt.savefig(f"test{i}.png")
-        error_core = error_calc(rec0[:cutoff], analytical_p[:cutoff], cutoff)
-        error = COMM_WORLD.allreduce(error_core, op=MPI.SUM)
-        error /= comm.comm.size
-        errors.append(error)
-        print(f"Shot {i} produced error of {error}", flush=True)
 
-    error_all = (errors[0] + errors[1] + errors[2]) / 3
+        # Computing errors
+        eNRMS_core = MeasureError().normalized_root_mean_square_error(
+            rec0[:cutoff], analytical_p[:cutoff])
+        errIt_core = MeasureError().integral_error(
+            rec0[:cutoff], analytical_p[:cutoff], wave.dt)
+        errPk_core = MeasureError().peak_error(
+            rec0[:cutoff], analytical_p[:cutoff])[0]
+
+        eNRMS_shot = COMM_WORLD.allreduce(eNRMS_core, op=MPI.SUM) / comm.comm.size
+        errIt_shot = COMM_WORLD.allreduce(errIt_core, op=MPI.SUM) / comm.comm.size
+        errPk_shot = COMM_WORLD.allreduce(errPk_core, op=MPI.SUM) / comm.comm.size
+
+        eNRMS.append(eNRMS_shot)
+        errIt.append(errIt_shot)
+        errPk.append(errPk_shot)
+
+        pprint(f"Shot {i} produced NRMS error of {eNRMS_shot:.4e}", comm=comm)
+        pprint(f"Shot {i} produced Integral error of {errIt_shot:.4e}", comm=comm)
+        pprint(f"Shot {i} produced Peak error of {errPk_shot:.4e}", comm=comm)
+
+    eNRMS = sum(eNRMS) / 3
+    errIt = sum(errIt) / 3
+    errPk = sum(errPk) / 3
+
     comm.comm.barrier()
 
-    if comm.comm.rank == 0:
-        print(f"Combined error for all shots is {error_all} and test has passed equals {np.abs(error_all) < 0.01}", flush=True)
+    assert abs(eNRMS) < 0.01 and abs(errIt) < 0.01 and abs(errPk) < 0.01, \
+        f"Error is too high for forward test with multiple shots."
 
-    test = np.abs(error_all) < 0.01
-
-    assert test
+    pprint(f"Combined NRMS error for all shots is {eNRMS:.4e} and test "
+           f"has passed equals {abs(eNRMS) < 0.01}", comm=comm)
+    pprint(f"Combined Integral error for all shots is {errIt:.4e} and test "
+           f"has passed equals {abs(errIt) < 0.01}", comm=comm)
+    pprint(f"Combined Peak error for all shots is {errPk:.4e} and test "
+           f"has passed equals {abs(errPk) < 0.01}", comm=comm)
 
 
 if __name__ == "__main__":

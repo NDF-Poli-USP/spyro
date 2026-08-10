@@ -52,11 +52,11 @@ def test_analytical_solution(use_vertex_only_mesh):
 
     vom_label = "VOM" if use_vertex_only_mesh else "NO VOM"
     pprint(f"NRMS Error ({vom_label}) = {eNRMS:.4e}", comm=comm)
-    pprint(f"Integral Error ({vom_label}) = {errPk:.4e}", comm=comm)
+    pprint(f"Integral Error ({vom_label}) = {errIt:.4e}", comm=comm)
     pprint(f"Peak Error ({vom_label}) = {errPk:.4e}", comm=comm)
 
     assert eNRMS < 1e-3 and errIt < 1e-3 and errPk < 1e-3,\
-        "Error is too high for analytical solution test"
+        "Error is too high for analytical solution test."
 
 
 if __name__ == "__main__":

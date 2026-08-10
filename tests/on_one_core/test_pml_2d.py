@@ -1,22 +1,18 @@
+from pytest import mark
 import spyro
-import numpy as np
-import time as timer
-import firedrake as fire
-import pickle
-import pytest
-
-
-def error_calc(p_numerical, p_analytical, nt):
-    norm = np.linalg.norm(p_numerical, 2) / np.sqrt(nt)
-    error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
-    div_error_time = error_time / norm
-    return div_error_time
+from firedrake import COMM_WORLD as comm, conditional
+from numpy import asarray
+from pickle import load
+from spyro.tools.error_measure import MeasureError
+from spyro.utils.cost import comp_cost
+from spyro.io.basicio import parallel_print as pprint
 
 
 def run_forward():
     dt = 0.0001
 
-    t0 = timer.time()
+    # Reference to resource usage
+    tRef = comp_cost("tini")
 
     final_time = 1.4
 
@@ -98,28 +94,35 @@ def run_forward():
     wave.set_initial_velocity_model(conditional=cond)
     wave.forward_solve()
 
-    t1 = timer.time()
-    print("Time elapsed: ", t1 - t0)
-    nt = int(final_time / dt) + 1
+    # Estimating computational resource usage
+    comp_cost("tfin", tRef=tRef, save_time=False)
+
     p_r = wave.forward_solution_receivers
 
-    return p_r, nt
+    return p_r, wave.dt
 
 
-@pytest.mark.slow
-@pytest.mark.skip(reason="Ruben is implementing a right PML formulation")
+@mark.slow
+@mark.skip(reason="Ruben is implementing a right PML formulation")
 def test_pml():
     """Test that the second order time convergence
     of the central difference method is achieved"""
 
-    p_r, nt = run_forward()
+    p_r, dt = run_forward()
     with open("tests/inputfiles/extended_pml_receveirs.pck", "rb") as f:
-        array = np.asarray(pickle.load(f), dtype=float)
+        array = asarray(load(f), dtype=float)
         extended_p_r = array
 
-    error = error_calc(extended_p_r, p_r, nt)
-    print(f"Error of {error}")
-    assert np.abs(error) < 0.05
+    # Computing errors
+    errPk = MeasureError().peak_error(p_r, extended_p_r)[0]
+    errIt = MeasureError().integral_error(p_r, extended_p_r, dt)
+    eNRMS = MeasureError().normalized_root_mean_square_error(p_r, extended_p_r)
+
+    pprint(f"NRMS Error = {eNRMS:.4e}", comm=comm)
+    pprint(f"Integral Error = {errIt:.4e}", comm=comm)
+    pprint(f"Peak Error = {errPk:.4e}", comm=comm)
+
+    assert eNRMS < 0.05 and errIt < 0.05 and errPk < 0.05, "Error is too high for PML test."
 
 
 if __name__ == "__main__":

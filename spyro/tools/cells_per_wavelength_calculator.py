@@ -368,10 +368,8 @@ class Meshing_parameter_calculator:
                 wave, file_name="test_shot_record" + str(cpw)
             )
 
-            # TODO: Use MeasureError class from spyro.tools.error_measure instead of this.
-            error = error_calc(
-                p_receivers, self.reference_solution, wave.dt
-            )
+            # Computing errors
+            error = error_calc(p_receivers, self.reference_solution, wave.dt)
 
             print("Error is ", error, flush=True)
             cpws.append(cpw)
@@ -491,7 +489,7 @@ def error_calc(receivers, analytical, dt):
     error : float
         the error between the numerical and analytical solutions
     """
-    rec_len, num_rec = np.shape(receivers)
+    rec_len, number_of_receivers = np.shape(receivers)
 
     # Interpolate analytical solution into numerical dts
     final_time = dt * (rec_len - 1)
@@ -499,22 +497,9 @@ def error_calc(receivers, analytical, dt):
     time_vector_ana = np.linspace(0.0, final_time, len(analytical[:, 0]))
     ana = np.zeros(np.shape(receivers))
     for i in range(num_rec):
-        ana[:, i] = np.interp(
-            time_vector_rec, time_vector_ana, analytical[:, i]
-        )
+        ana[:, i] = np.interp(time_vector_rec, time_vector_ana, analytical[:, i])
 
-    total_numerator = 0.0
-    total_denumenator = 0.0
-    for i in range(num_rec):
-        diff = receivers[:, i] - ana[:, i]
-        diff_squared = np.power(diff, 2)
-        numerator = np.trapezoid(diff_squared, dx=dt)
-        ref_squared = np.power(ana[:, i], 2)
-        denominator = np.trapezoid(ref_squared, dx=dt)
-        total_numerator += numerator
-        total_denumenator += denominator
+    error = spyro.tools.error_measure.MeasureError().error_measures(
+        receivers, ana, dt, number_of_receivers, save_file=False)[3]
 
-    squared_error = total_numerator / total_denumenator
-
-    error = np.sqrt(squared_error)
     return error

@@ -1,12 +1,9 @@
 import numpy as np
+from firedrake import COMM_WORLD as comm
+from numpy import pi, save, sqrt
 import spyro
-
-
-def error_calc(p_numerical, p_analytical, nt):
-    norm = np.linalg.norm(p_numerical, 2) / np.sqrt(nt)
-    error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
-    div_error_time = error_time / norm
-    return div_error_time
+from spyro.io.basicio import parallel_print as pprint
+from spyro.tools.error_measure import MeasureError
 
 
 def run_forward_hexahedral(dt, final_time, offset):
@@ -88,20 +85,19 @@ def run_forward_hexahedral(dt, final_time, offset):
 
     wave.set_initial_velocity_model(constant=1.5)
     wave.forward_solve()
-    # time_vector = np.linspace(0.0, final_time, int(final_time/dt)+1)
 
     rec_out = wave.forward_solution_receivers
     output = rec_out.flatten()
     my_ensemble = wave.comm
     if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:
-        np.save("dofs_3D_quads_rec_out"+str(dt)+".npy", output)
+        save("dofs_3D_quads_rec_out"+str(dt)+".npy", output)
 
     return output
 
 
 def analytical_solution(dt, final_time, offset):
-    amplitude = 1/(4*np.pi*offset)
-    delay = offset/1.5 + 1.5 * np.sqrt(6.0) / (np.pi * 5.0)
+    amplitude = 1 / (4 * pi * offset)
+    delay = offset / 1.5 + 1.5 * sqrt(6.0) / (pi * 5.0)
     p_analytic = amplitude * spyro.full_ricker_wavelet(
         dt, final_time,
         5.0,
@@ -119,13 +115,16 @@ def test_3d_hexa_one_source_propagation():
     p_numeric = run_forward_hexahedral(dt, final_time, offset)
     p_analytic = analytical_solution(dt, final_time, offset)
 
-    error_time = error_calc(p_numeric, p_analytic, len(p_numeric))
+    eNRMS = MeasureError().normalized_root_mean_square_error(p_numeric, p_analytic)
+    errIt = MeasureError().integral_error(p_numeric, p_analytic, dt)
+    errPk = MeasureError().peak_error(p_numeric, p_analytic)[0]
 
-    small_error = error_time < 0.02
+    assert abs(eNRMS) < 0.02 and abs(errIt) < 0.02 and abs(errPk) < 0.02, \
+        f"Error is too high for forward test with hexahedral mesh."
 
-    print(f"Error is smaller than necessary: {small_error}", flush=True)
-
-    assert small_error
+    pprint(f"NRMS Error = {eNRMS:.4e}", comm=comm)
+    pprint(f"Integral Error = {errIt:.4e}", comm=comm)
+    pprint(f"Peak Error = {errPk:.4e}", comm=comm)
 
 
 if __name__ == "__main__":
