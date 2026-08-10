@@ -2,12 +2,14 @@
 
 from pathlib import Path
 from random import choice
-
+from typing import TYPE_CHECKING
 import matplotlib.pyplot as plt
 import numpy as np
 
 from .plot_helpers import _finalize_figure
 
+if TYPE_CHECKING:  # Avoinding circular imports lazily
+    from ..solvers.wave import Wave
 
 def plot_receiver_response(
     receiver_data: np.ndarray | list[float] | tuple[float, ...],
@@ -93,7 +95,11 @@ def plot_receiver_response(
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
-    _finalize_figure(fig, filename=filename, show=show)
+    if hold:
+        if show:
+            plt.show()
+    else:
+        _finalize_figure(fig, filename=filename, show=show)
 
 
 def plot_displacement_components(
@@ -106,6 +112,7 @@ def plot_displacement_components(
     source_type: str = "Unknown",
     save_plots: bool = False,
     output_dir: str | Path | None = None,
+    show: bool = False,
 ):
     """Plot displacement components over time.
 
@@ -122,6 +129,8 @@ def plot_displacement_components(
     output_dir : str or pathlib.Path, optional
         Directory to save plots if ``save_plots`` is True. Defaults to the
         current directory.
+    show : bool, optional
+        Whether to display the plot interactively. Default is False.
 
     Returns
     -------
@@ -199,12 +208,18 @@ def plot_displacement_components(
             bbox_inches="tight",
         )
 
-    plt.show()
+    if show:
+        plt.show()
     plt.close(separated_fig)
     plt.close(combined_fig)
 
 
-def plot_comparison_of_receivers_to_reference(wave_object, reference_array, show=False):
+def plot_comparison_of_receivers_to_reference(
+        wave: "Wave",
+        reference_array: np.array,
+        show: bool = False,
+        filename: str | Path | None = None,
+    ):
     """Plot receiver time-domain comparisons from a Wave object.
 
     This is a convenience wrapper around
@@ -213,7 +228,7 @@ def plot_comparison_of_receivers_to_reference(wave_object, reference_array, show
 
     Parameters
     ----------
-    Wave_object : wave
+    wave : Wave
         Wave object containing the receiver data and simulation metadata.
         The following attributes are used:
 
@@ -234,19 +249,22 @@ def plot_comparison_of_receivers_to_reference(wave_object, reference_array, show
     plot_compare_receivers_array
         Generic plotting function that compares two receiver arrays.
     """
-    dt = wave_object.dt
-    final_time = wave_object.final_time
+    dt = wave.dt
+    final_time = wave.final_time
     num_timesteps = int(round(final_time / dt)) + 1
 
     time_values = np.linspace(0.0, final_time, num_timesteps)
 
+    if filename is None and hasattr(wave, "path_case_abc"):
+        filename = Path(wave.path_case_abc) / "time_comparison"
+
     plot_compare_receivers_array(
-        receiver_data_first=wave_object.forward_solution_receivers,
+        receiver_data_first=wave.forward_solution_receivers,
         receiver_data_second=reference_array,
         time_values=time_values,
         first_label="Simulation",
         second_label="Reference",
-        output_path="output/time_comparion",
+        output_path=filename,
         show=show,
     )
 
@@ -358,9 +376,5 @@ def plot_compare_receivers_array(
     receiver_axes[0].legend()
 
     _finalize_figure(
-        plt.gcf(),
-        output_path,
-        formats=("png", "pdf"),
-        show=show,
-        bbox_inches="tight"
+        plt.gcf(), output_path, formats=("png", "pdf"), show=show, bbox_inches="tight"
     )
