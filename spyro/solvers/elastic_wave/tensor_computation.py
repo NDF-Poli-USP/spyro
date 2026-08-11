@@ -16,8 +16,6 @@ def C_computation(self):
     elif self.wave_type == WaveType.ANISOTROPIC_VTI_ELASTIC:
         Elastic_C = C_vti_tensor(self, dim)
     elif self.wave_type == WaveType.ANISOTROPIC_TTI_ELASTIC:
-
-        print(self.wave_type)
         c_vti = C_vti_tensor(self, dim)
         Elastic_C = C_tti_tensor(self, c_vti, dim)
     
@@ -106,7 +104,6 @@ def C_vti_tensor(self, dim):
     C66 = C44 * (1. + 2. * gamma)
     C12 = C11 - 2 * C66
 
-    print(anisotropy)
     # C13 is calculated based on the type of anisotropy
     dC = C33 - C44
     if anisotropy == 'weak':
