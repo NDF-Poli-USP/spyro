@@ -134,12 +134,12 @@ class IsotropicWave(ElasticWave):
                 ElasticMaterialParameter.S_WAVE_VELOCITY: self.c_s,
             }
             for parameter, value in values.items():
-                material_field = self.set_material_property(
+                self.set_material_property(
                     parameter.value,
                     "scalar",
                     value=value,
+                    target=fields[parameter],
                 )
-                fields[parameter].assign(material_field)
 
             self._control_parameterization = parameterization
 

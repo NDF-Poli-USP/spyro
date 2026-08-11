@@ -36,6 +36,7 @@ def test_initialize_model_parameters_from_velocity_function(monkeypatch):
 
     def fake(*args, **kwargs):
         captured.update(kwargs)
+        kwargs["target"].assign(velocity)
         return velocity
 
     monkeypatch.setattr(wave, "set_material_property", fake)
@@ -59,6 +60,7 @@ def test_initialize_model_parameters_from_file_records_input(monkeypatch):
 
     def fake(*args, **kwargs):
         captured.update(kwargs)
+        kwargs["target"].assign(model)
         return model
 
     monkeypatch.setattr(wave, "set_material_property", fake)

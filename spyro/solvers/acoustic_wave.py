@@ -80,6 +80,7 @@ class AcousticWave(Wave):
             velocity = self.set_material_property(
                 "velocity",
                 "scalar",
+                target=self.c,
                 dg_property=(
                     dg_velocity_model if conditional is not None else False
                 ),
@@ -100,6 +101,7 @@ class AcousticWave(Wave):
                 "velocity",
                 "scalar",
                 value=velocity_input,
+                target=self.c,
                 fast_interpolate=fast_interpolate,
             )
 
@@ -109,10 +111,6 @@ class AcousticWave(Wave):
                 name="initial_velocity_model",
             )
             self.initial_velocity_model.assign(velocity)
-        if velocity.function_space() == self.c.function_space():
-            self.c.assign(velocity)
-        else:
-            self.c.interpolate(velocity)
         self._model_parameters_initialized = True
 
         if output or self.debug_output:
@@ -459,15 +457,12 @@ class AcousticWave(Wave):
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        velocity = self.set_material_property(
+        self.set_material_property(
             "velocity",
             "scalar",
             value=controls,
+            target=self.c,
         )
-        if velocity.function_space() == self.c.function_space():
-            self.c.assign(velocity)
-        else:
-            self.c.interpolate(velocity)
         if self.initial_velocity_model is None:
             self.initial_velocity_model = fire.Function(
                 self.c.function_space(),

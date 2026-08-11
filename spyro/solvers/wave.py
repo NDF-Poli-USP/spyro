@@ -516,8 +516,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         pass
 
-    def set_material_property(self, *args, **kwargs):
-        """Create a material field, optionally normalizing a single value."""
+    def set_material_property(self, *args, target=None, **kwargs):
+        """Materialize a property and optionally assign it to a stable field.
+
+        The materialized field is returned even when ``target`` is provided,
+        allowing callers to preserve the original input space when needed.
+        """
         value = kwargs.pop("value", None)
         if value is not None:
             input_names = (
@@ -541,11 +545,17 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             else:
                 kwargs["conditional"] = value
 
-        return material_properties_io.set_material_property(
+        material_field = material_properties_io.set_material_property(
             self,
             *args,
             **kwargs
         )
+        if target is not None and target is not material_field:
+            if material_field.function_space() == target.function_space():
+                target.assign(material_field)
+            else:
+                target.interpolate(material_field)
+        return material_field
 
     def set_material_properties(self, *args, **kwargs):
         """Deprecated alias for :meth:`set_material_property`.
