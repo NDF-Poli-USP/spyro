@@ -1,6 +1,5 @@
 from pytest import mark
 from firedrake import COMM_WORLD as comm
-from numpy import linspace
 import spyro
 from spyro.io.basicio import parallel_print as pprint
 from spyro.tools.error_measure import MeasureError
