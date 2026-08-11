@@ -2,6 +2,7 @@ from os import getcwd
 from numpy import inf, load, pad, save, savetxt, trapezoid
 from numpy.linalg import norm
 from scipy.signal import find_peaks
+from warnings import warn
 from ..io.basicio import parallel_print as pprint
 from ..utils.error_management import (type_data_structure_error, value_file_error,
                                       value_numerical_error, value_string_error)
@@ -121,7 +122,7 @@ class MeasureError():
                                   expected_type_element="tuple",
                                   expected_length=number_of_receivers)
         type_data_structure_error("forward_solution_receivers", forward_solution_receivers,
-                                  "array2D", expected_type_element="float",
+                                  "array2D", expected_type_element=("float", "int"),
                                   expected_shape=(None, number_of_receivers))
         value_numerical_error("freq_Nyquist", freq_Nyquist, float_num=True,
                               integer_num=True, lower_bound=0.)
@@ -143,7 +144,7 @@ class MeasureError():
             signal = forward_solution_receivers[:, rec]
             yf = freq_response(signal, freq_Nyquist)
             receivers_ref_fft.append(yf)
-            save(pth_str + "fft.npy", receivers_ref_fft)
+        save(pth_str + "fft.npy", receivers_ref_fft)
 
     def get_reference_signal(self):
         """Acquire the reference signal for comparison between models.
@@ -243,15 +244,15 @@ class MeasureError():
 
         # Check the input parameters
         type_data_structure_error("signal_model", signal_model, "array",
-                                  expected_type_element="float")
+                                  expected_type_element=("float", "int"))
         type_data_structure_error("signal_reference", signal_reference, "array",
-                                  expected_type_element="float")
+                                  expected_type_element=("float", "int"))
 
         # Finding peaks in transient response
         peaks_in_signal = find_peaks(signal_model)
         if peaks_in_signal[0].size == 0:
-            UserWarning("No peak observed in the transient response. "
-                        "Increase the transient time of the simulation.")
+            warn("No peak observed in the transient response. "
+                 "Increase the transient time of the simulation.")
 
         # Maximum peak value
         peak_model = max(abs(signal_model))
@@ -288,9 +289,9 @@ class MeasureError():
 
         # Check the input parameters
         type_data_structure_error("signal_model", signal_model, "array",
-                                  expected_type_element="float")
+                                  expected_type_element=("float", "int"))
         type_data_structure_error("signal_reference", signal_reference, "array",
-                                  expected_type_element="float")
+                                  expected_type_element=("float", "int"))
         value_numerical_error("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
 
         # Completing with zeros if arrays lengths are different
@@ -305,7 +306,7 @@ class MeasureError():
         return integral_error
 
     def error_measures(self, forward_solution_receivers, receivers_reference, dt,
-                       number_of_receivers, final_energy=None, save_file=True,
+                       number_of_receivers, save_file=True, final_energy=None,
                        final_energy_reference=None, save_in_case_folder=True):
         """Compute the error measures at the receivers for comparison between models.
 
@@ -325,12 +326,12 @@ class MeasureError():
             Time step used in the simulation.
         number_of_receivers: `int`
             Number of receivers used in the simulation.
+        save_file : `bool`, optional
+            If `True`, save the error measures in a text file. Default is `True`.
         final_energy : `float`, optional
             Energy of the model in the last time step. Default is `None`.
         final_energy_reference : `float`, optional
             Energy of the reference model in the last time step. Default is `None`.
-        save_file : `bool`, optional
-            If `True`, save the error measures in a text file. Default is `True`.
         save_in_case_folder : `bool`, optional
             If `True`, save the error measures in the current case folder. Otherwise,
             save the error measures in the reference folder. Default is `True`.
@@ -377,9 +378,10 @@ class MeasureError():
                                   expected_shape=(None, number_of_receivers))
         value_numerical_error("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
         value_numerical_error("final_energy", final_energy, float_num=True,
-                              integer_num=False, lower_bound=0.)
+                              integer_num=False, none_default=True, lower_bound=0.)
         value_numerical_error("final_energy_reference", final_energy_reference,
-                              float_num=True, integer_num=False, lower_bound=0.)
+                              float_num=True, integer_num=False,
+                              none_default=True, lower_bound=0.)
 
         pprint("\nComputing Error Measures", comm=self.comm)
 
@@ -459,9 +461,9 @@ class MeasureError():
 
         # Check the input parameters
         type_data_structure_error("signal_model", signal_model, "array",
-                                  expected_type_element="float")
+                                  expected_type_element=("float", "int"))
         type_data_structure_error("signal_reference", signal_reference, "array",
-                                  expected_type_element="float")
+                                  expected_type_element=("float", "int"))
 
         # Completing with zeros if arrays lengths are different
         signal_model, signal_reference = self.check_signal_lengths(signal_model,
