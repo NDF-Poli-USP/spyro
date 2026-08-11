@@ -8,7 +8,7 @@ from numpy import arange, array, inf, newaxis, pi, sin, tile, zeros_like
 from numpy.random import randn
 from numpy.testing import assert_array_equal
 from pytest import fixture, mark, raises, warns
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from spyro.tools.error_measure import MeasureError
 
 
@@ -240,7 +240,7 @@ class TestMeasureError:
             # Create mock reference files
             with patch('spyro.tools.error_measure.load') as mock_load:
                 mock_load.return_value = receiver_data
-                with patch('spyro.tools.error_measure.save') as mock_save:
+                with patch('spyro.tools.error_measure.save'):
                     # Mock path.exists where it's actually used
                     with patch('spyro.utils.error_management.path.exists', return_value=True):
                         # First save the reference
