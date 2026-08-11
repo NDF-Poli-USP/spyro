@@ -111,6 +111,7 @@ def run_taylor_test(
     control_attributes,
     *,
     seed,
+    direction_scale=0.01,
     minimum_rate=1.9,
 ):
     """Record a forward solve and verify all active material gradients."""
@@ -148,7 +149,10 @@ def run_taylor_test(
         direction = [
             fire.Function(
                 control.function_space(),
-                val=0.01 * rng.random(control.function_space().dim()),
+                val=(
+                    direction_scale
+                    * rng.random(control.function_space().dim())
+                ),
             )
             for control in controls
         ]
@@ -305,7 +309,9 @@ def test_elastic_automated_adjoint_boundary_conditions(
     })
     dictionary["time_axis"].update({
         "final_time": 0.4,
-        "dt": 0.001,
+        # The mesh is twice as coarse as the periodic case, so this preserves
+        # its CFL ratio while halving the cost of every Taylor replay.
+        "dt": 0.002,
     })
 
     number_of_steps = int(
@@ -322,6 +328,9 @@ def test_elastic_automated_adjoint_boundary_conditions(
         observed_data,
         control_attributes,
         seed=84,
+        # With the short/coarse problem, the old 0.01 scale pushed the
+        # quadratic Taylor remainder down to the solver tolerance.
+        direction_scale=1.0,
     )
 
 
