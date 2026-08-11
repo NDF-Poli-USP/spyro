@@ -183,14 +183,11 @@ def test_gradient_auto_adjoint_parallel():
         reduced_functional, fire_ad.EnsembleReducedFunctional
     ), "Reduced functional must be an EnsembleReducedFunctional."
 
-    # Gradients always follow the list-shaped controls API, including a
-    # one-control acoustic problem.
-    gradients = Wave_obj_guess.gradient_solve(
+    # Controls stay list-shaped internally, but the public acoustic API returns
+    # the gradient for its single velocity control directly.
+    dJ = Wave_obj_guess.gradient_solve(
         adjoint_type=AdjointType.AUTOMATED_ADJOINT,
     )
-    assert isinstance(gradients, list)
-    assert len(gradients) == 1
-    dJ = gradients[0]
     assert isinstance(dJ, fire.Function)
     assert dJ.dat.data.shape == Wave_obj_guess.c.dat.data.shape
 
@@ -201,8 +198,8 @@ def test_gradient_auto_adjoint_parallel():
     # EnsembleReducedFunctional itself so the ensemble reduction stays
     # consistent (do not pass dJdm here).
     rate = Wave_obj_guess.automated_adjoint.verify_gradient(
-        Wave_obj_guess.automated_adjoint.controls,
-        direction=[direction],
+        Wave_obj_guess.c,
+        direction=direction,
     )
     print(f"Automated-adjoint Taylor convergence rate: {rate}", flush=True)
     assert rate > 1.9, (

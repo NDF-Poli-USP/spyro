@@ -3,11 +3,12 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from pyadjoint import AdjFloat
 
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.solvers.automatic_differentiation_solver import AutomatedAdjoint
 from spyro.solvers.wave import Wave
-from spyro.utils.typing import FunctionalEvaluationMode
+from spyro.utils.typing import FunctionalEvaluationMode, RieszMapType
 
 
 class DummyWave(Wave):
@@ -137,6 +138,47 @@ def test_get_automated_adjoint_controls_requires_initialized_controls():
 
     with pytest.raises(ValueError):
         wave._get_automated_adjoint_controls()
+
+
+def test_acoustic_automated_adjoint_returns_its_single_gradient():
+    wave = AcousticWave.__new__(AcousticWave)
+    gradient = object()
+    wave.functional_value = AdjFloat(1.0)
+    wave.automated_adjoint = SimpleNamespace(
+        reduced_functional=object(),
+        compute_gradient=lambda: [gradient],
+    )
+
+    result = wave._automated_adjoint_gradient(riesz_map=RieszMapType.L2)
+
+    assert result is gradient
+
+
+def test_verify_gradient_normalizes_single_control_and_direction(monkeypatch):
+    automated_adjoint = AutomatedAdjoint(None)
+    automated_adjoint.reduced_functional = object()
+    control = object()
+    direction = object()
+    captured = {}
+
+    def fake_taylor_test(functional, controls, directions, dJdm=None):
+        captured["arguments"] = (functional, controls, directions, dJdm)
+        return 2.0
+
+    monkeypatch.setattr(
+        "spyro.solvers.automatic_differentiation_solver.taylor_test",
+        fake_taylor_test,
+    )
+
+    rate = automated_adjoint.verify_gradient(control, direction=direction)
+
+    assert rate == 2.0
+    assert captured["arguments"] == (
+        automated_adjoint.reduced_functional,
+        [control],
+        [direction],
+        None,
+    )
 
 
 def _base_functional_dictionary():

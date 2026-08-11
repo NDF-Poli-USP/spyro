@@ -58,7 +58,7 @@ def make_dictionary(material_parameters):
         },
         "time_axis": {
             "initial_time": 0.0,
-            "final_time": 1.0,
+            "final_time": 0.8,
             "dt": 0.001,
             "output_frequency": 100,
             "gradient_sampling_frequency": 1,
@@ -247,6 +247,7 @@ BOUNDARY_CASES = [
         LAME_GUESS,
         {},
         ("rho", "lmbda", "mu"),
+        0.002,
         id="natural-traction-free",
     ),
     pytest.param(
@@ -257,30 +258,35 @@ BOUNDARY_CASES = [
             ]
         },
         ("rho", "lmbda", "mu"),
+        0.002,
         id="homogeneous-dirichlet",
     ),
     pytest.param(
         VELOCITY_GUESS,
         nrbc_settings("Stacey", "backward"),
         ("rho", "c", "c_s"),
+        0.002,
         id="stacey-backward",
     ),
     pytest.param(
         VELOCITY_GUESS,
         nrbc_settings("CE_A1", "backward"),
         ("rho", "c", "c_s"),
+        0.002,
         id="clayton-engquist-a1-backward",
     ),
     pytest.param(
         VELOCITY_GUESS,
         nrbc_settings("Stacey", "central"),
         ("rho", "c", "c_s"),
+        0.002,
         id="stacey-central",
     ),
     pytest.param(
         VELOCITY_GUESS,
         nrbc_settings("Stacey", "backward_2nd"),
         ("rho", "c", "c_s"),
+        0.001,
         id="stacey-backward-2nd",
     ),
 ]
@@ -288,13 +294,19 @@ BOUNDARY_CASES = [
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    ("guess_material", "boundary_settings", "control_attributes"),
+    (
+        "guess_material",
+        "boundary_settings",
+        "control_attributes",
+        "time_step",
+    ),
     BOUNDARY_CASES,
 )
 def test_elastic_automated_adjoint_boundary_conditions(
     guess_material,
     boundary_settings,
     control_attributes,
+    time_step,
 ):
     """Taylor-test supported elastic boundary formulations and time schemes."""
     dictionary = make_dictionary(guess_material)
@@ -308,10 +320,11 @@ def test_elastic_automated_adjoint_boundary_conditions(
         ),
     })
     dictionary["time_axis"].update({
-        "final_time": 0.4,
+        "final_time": 0.8,
         # The mesh is twice as coarse as the periodic case, so this preserves
-        # its CFL ratio while halving the cost of every Taylor replay.
-        "dt": 0.002,
+        # its CFL ratio while reducing the cost of most Taylor replays. The
+        # second-order backward ABC needs the smaller step for stability.
+        "dt": time_step,
     })
 
     number_of_steps = int(
@@ -328,9 +341,9 @@ def test_elastic_automated_adjoint_boundary_conditions(
         observed_data,
         control_attributes,
         seed=84,
-        # With the short/coarse problem, the old 0.01 scale pushed the
-        # quadratic Taylor remainder down to the solver tolerance.
-        direction_scale=1.0,
+        # Keep the first perturbation inside the quadratic regime over the
+        # longer propagation, without approaching the solver tolerance.
+        direction_scale=0.5,
     )
 
 

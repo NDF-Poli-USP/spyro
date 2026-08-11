@@ -424,8 +424,12 @@ def ensemble_functional(func):
     """Decorator for gradient to distribute shots for ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
+        # Import lazily to keep this low-level I/O module out of the
+        # ``utils`` package's import cycle.
+        from ..utils.typing import AdjointType
+
         comm = args[0].comm
-        if args[0].adjoint_type.name == "AUTOMATED_ADJOINT":
+        if args[0].adjoint_type is AdjointType.AUTOMATED_ADJOINT:
             # pyadjoint needs the annotated Firedrake object, not a numpy scalar
             # produced by the ensemble reduction path below.
             return func(*args, **kwargs)
@@ -459,11 +463,6 @@ def ensemble_gradient(func):
 
     def wrapper(*args, **kwargs):
         comm = args[0].comm
-        adjoint_type = kwargs.get("adjoint_type", args[0].adjoint_type)
-        if adjoint_type.name == "AUTOMATED_ADJOINT":
-            # EnsembleReducedFunctional already sums every control gradient
-            # across ensemble members and returns the list-shaped controls API.
-            return func(*args, **kwargs)
         if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
             shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
             for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):

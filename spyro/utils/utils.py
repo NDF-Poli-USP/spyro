@@ -645,7 +645,8 @@ def get_real_shot_record(wave):
     """Get the real shot record for the active sources.
 
     The returned object is typically an array with shape
-    ``(n_timesteps, n_receivers)`` for a single active shot.
+    ``(n_timesteps, n_receivers)`` for a scalar wave or
+    ``(n_timesteps, n_receivers, dimension)`` for a single elastic shot.
     """
     real_shot_record = wave.real_shot_record
 
@@ -666,6 +667,12 @@ def get_real_shot_record(wave):
 
     if isinstance(real_shot_record, np.ndarray):
         if real_shot_record.ndim == 3:
+            # A rank-three record is ambiguous: scalar multishot data uses
+            # (shots, timesteps, receivers), whereas a single elastic shot
+            # uses (timesteps, receivers, displacement components). For the
+            # elastic solver, a final axis matching the spatial dimension
+            # identifies vector components, so the array is already the
+            # active shot record and must not be indexed by source number.
             if (
                 wave.wave_type == WaveType.ISOTROPIC_ELASTIC
                 and real_shot_record.shape[-1] == wave.dimension

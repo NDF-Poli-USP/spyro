@@ -43,7 +43,7 @@ def make_dictionary(density, lmbda, mu):
         },
         "time_axis": {
             "initial_time": 0.0,
-            "final_time": 1.0,
+            "final_time": 0.8,
             "dt": 0.0005,
             "output_frequency": 100,
             "gradient_sampling_frequency": 1,

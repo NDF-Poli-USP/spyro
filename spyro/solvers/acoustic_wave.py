@@ -80,7 +80,6 @@ class AcousticWave(Wave):
 
         self.acoustic_energy = acoustic_energy(self)
 
-    @ensemble_gradient
     def gradient_solve(
         self, misfit=None, forward_solution=None,
         adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
@@ -108,14 +107,28 @@ class AcousticWave(Wave):
 
         Returns:
         --------
-        dJ: Firedrake object or list of Firedrake objects
-            Implemented adjoint returns one ``Function``. Automated adjoint
-            returns a list of ``Function`` or ``Cofunction`` objects, even for
-            the single acoustic velocity control.
+        dJ: Firedrake Function or Cofunction
+            Gradient with respect to the acoustic velocity control. The
+            ``L2`` Riesz map returns a ``Function`` and the discrete ``l2``
+            map returns a ``Cofunction``.
         """
-        if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+        if adjoint_type is AdjointType.AUTOMATED_ADJOINT:
             return self._automated_adjoint_gradient(riesz_map=riesz_map)
 
+        return self._implemented_adjoint_gradient(
+            misfit=misfit,
+            forward_solution=forward_solution,
+            riesz_map=riesz_map,
+        )
+
+    @ensemble_gradient
+    def _implemented_adjoint_gradient(
+        self,
+        misfit=None,
+        forward_solution=None,
+        riesz_map=RieszMapType.L2,
+    ):
+        """Compute and aggregate the manually implemented gradient."""
         self.enable_implemented_adjoint()
         if misfit is not None:
             self.misfit = misfit
@@ -163,9 +176,9 @@ class AcousticWave(Wave):
 
         Returns:
         --------
-        dJ: list of Firedrake 'Function' or Firedrake 'Cofunction'
-            Gradients (Functions) or derivatives (Cofunctions) with respect to
-            the controls, depending on the chosen Riesz map.
+        dJ: Firedrake 'Function' or Firedrake 'Cofunction'
+            Gradient (Function) or derivative (Cofunction) with respect to the
+            acoustic velocity control, depending on the chosen Riesz map.
         """
         if not isinstance(self.functional_value, AdjFloat):
             raise ValueError(
@@ -188,13 +201,20 @@ class AcousticWave(Wave):
             )
 
         if riesz_map == RieszMapType.L2:
-            return self.automated_adjoint.compute_gradient()
+            derivatives = self.automated_adjoint.compute_gradient()
         elif riesz_map == RieszMapType.l2:
-            return self.automated_adjoint.compute_derivative()
+            derivatives = self.automated_adjoint.compute_derivative()
         else:
             raise NotImplementedError(
                 f"Riesz map {riesz_map} not implemented for automated adjoint."
             )
+
+        if len(derivatives) != 1:
+            raise RuntimeError(
+                "The acoustic automated adjoint must return exactly one "
+                f"velocity derivative, got {len(derivatives)}."
+            )
+        return derivatives[0]
 
     def reset_pressure(self):
         if self.abc_type == AbsorbingBCsType.PML:

@@ -48,7 +48,7 @@ class AutomatedAdjoint:
             wave.forward_solve()          # forward run recorded on the tape
         wave.automated_adjoint.create_reduced_functional(wave.functional_value)
         dJ = wave.automated_adjoint.compute_gradient()
-        rate = wave.automated_adjoint.verify_gradient([wave.c])  # Taylor test
+        rate = wave.automated_adjoint.verify_gradient(wave.c)  # Taylor test
 
     Parameters
     ----------
@@ -265,20 +265,22 @@ pyadjoint.ReducedFunctional or None
 
         Parameters
         ----------
-        control_var : sequence of firedrake.Function
-            The controls about which the gradient is verified.
-        direction : sequence of firedrake.Function, optional
-            Perturbation directions. Defaults to constant ``0.01`` fields in
-            the controls' function spaces.
-        dJdm : float or sequence of firedrake.Function or \
-firedrake.Cofunction, optional
+        control_var : firedrake.Function or sequence of firedrake.Function
+            Control or controls about which the gradient is verified. A single
+            control is normalized to a one-item list.
+        direction : firedrake.Function or sequence of firedrake.Function, optional
+            Perturbation direction or directions. A single direction is
+            normalized to a one-item list. Defaults to constant ``0.01`` fields
+            in the controls' function spaces.
+        dJdm : float, firedrake.Function, firedrake.Cofunction, or sequence, optional
             The directional derivative ``J'(m)(direction)``. pyadjoint expects a
             scalar here, so if a gradient ``Function`` (Riesz representer) or a
             ``Cofunction`` (raw derivative) is supplied it is first paired with
-            ``direction`` to reduce it to a scalar. If left as ``None`` (the
-            recommended choice under ensemble parallelism) pyadjoint computes
-            the directional derivative itself from the reduced functional, which
-            keeps the ensemble reduction consistent.
+            the corresponding ``direction`` to reduce it to a scalar. A single
+            object is accepted for a one-control problem. If left as ``None``
+            (the recommended choice under ensemble parallelism) pyadjoint
+            computes the directional derivative itself from the reduced
+            functional, which keeps the ensemble reduction consistent.
 
         Returns
         -------
@@ -292,6 +294,17 @@ firedrake.Cofunction, optional
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
+
+        if isinstance(control_var, (list, tuple)):
+            control_var = list(control_var)
+        else:
+            control_var = [control_var]
+        if direction is not None:
+            if isinstance(direction, (list, tuple)):
+                direction = list(direction)
+            else:
+                direction = [direction]
+
         if direction is None:
             direction = [
                 fire.Function(control.function_space()).interpolate(0.01)
@@ -305,6 +318,13 @@ firedrake.Cofunction, optional
         # dJdm`` inside pyadjoint becomes a UFL expression and the comparison
         # ``min(residuals) < 1E-15`` raises ``UFL conditions cannot be
         # evaluated as bool in a Python context``.
+        if isinstance(dJdm, (fire.Function, fire.Cofunction)):
+            if len(direction) != 1:
+                raise ValueError(
+                    "A single derivative requires exactly one direction."
+                )
+            dJdm = [dJdm]
+
         if isinstance(dJdm, (list, tuple)):
             if len(dJdm) != len(direction):
                 raise ValueError(
