@@ -1,5 +1,5 @@
 import spyro
-from numpy import isclose, linspace, load, log
+from numpy import isclose, load, log
 from pytest import mark
 from spyro.tools.error_measure import MeasureError
 
@@ -110,7 +110,6 @@ def test_second_order_time_convergence(with_pml):
         dt = dts[i]
         rec_out = run_forward(dt, with_pml=with_pml)
         rec_anal = load(analytical_files[i])
-        time = linspace(0.0, 1.0, int(1.0 / dts[i]) + 1)
         numerical_results.append(rec_out.flatten())
         errors.append(MeasureError().normalized_root_mean_square_error(
             rec_out.flatten(), rec_anal))
