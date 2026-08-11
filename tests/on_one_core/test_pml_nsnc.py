@@ -245,10 +245,6 @@
 #     # Mesh
 #     wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
-#     # Initial velocity model
-#     cond = fire.conditional(wave.mesh_x < 0.5, 3.0, 1.5)
-#     wave.set_initial_velocity_model(conditional=cond)
-
 #     # Preamble mesh operations
 #     wave.mesh_ops.preamble_mesh_operations(wave, f_est=f_est)
 

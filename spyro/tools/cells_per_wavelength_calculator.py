@@ -348,7 +348,7 @@ class Meshing_parameter_calculator:
 
             # Running forward model
             wave = self.build_current_object(cpw)
-            wave._initialize_model_parameters()  # TO REVIEW: call to protected method
+            wave.initialize_model_parameters()
 
             # Setting up time-step
             if self.timestep_calculation != "float":
@@ -412,7 +412,7 @@ class Meshing_parameter_calculator:
             lba = self.minimum_velocity / self.source_frequency
             edge_length = lba / cpw
             wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
-            wave.set_initial_velocity_model(constant=self.minimum_velocity)
+            wave.initialize_model_parameters(constant=self.minimum_velocity)
         elif self.velocity_profile_type == "heterogeneous":
             wave.set_mesh(input_mesh_parameters={"cells_per_wavelength": cpw})
         return wave

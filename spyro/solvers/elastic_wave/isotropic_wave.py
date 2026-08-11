@@ -1,14 +1,16 @@
-import numpy as np
-
-from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
+from firedrake import (assemble, curl, DirichletBC, div, Function,
                        project)
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
-from ...utils.typing import (ElasticMaterialParameter, ElasticMaterialParameterization,
-                             AbsorbingBCsType, override)
+from ...utils.typing import (
+    AbsorbingBCsType,
+    ElasticMaterialParameter,
+    ElasticMaterialParameterization,
+    override,
+)
 from ...domains.space import create_function_space
 
 
@@ -25,39 +27,23 @@ CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
     ),
 }
 
-
-def _format_control_parameters(parameters):
-    """Format material-parameter enum values for error messages.
-
-    Parameters
-    ----------
-    parameters : iterable of ElasticMaterialParameter
-        Material-parameter enum values to display.
-
-    Returns
-    -------
-    str
-        Human-readable set-like representation using public parameter names.
-
-    Examples
-    --------
-    ``(ElasticMaterialParameter.DENSITY, ElasticMaterialParameter.MU)``
-    becomes ``"{density, mu}"``.
-    """
-    return "{" + ", ".join(parameter.value for parameter in parameters) + "}"
+_MATERIAL_PARAMETER_ALIASES = {
+    ElasticMaterialParameter.LAMBDA: ("lmbda", "lame_first"),
+    ElasticMaterialParameter.MU: ("lame_second",),
+}
 
 
 class IsotropicWave(ElasticWave):
     '''Isotropic elastic wave propagator'''
 
     def __init__(self, dictionary, comm=None):
-        super().__init__(dictionary, comm=comm)
         self.rho = None   # Density
         self.lmbda = None  # First Lame parameter
         self.mu = None    # Second Lame parameter
         self.c_s = None   # Secondary wave velocity
         self._control_parameterization = None
         self._material_parameter_function_space = None
+        super().__init__(dictionary, comm=comm)
 
         self.u_n = None   # Current displacement field
         self.u_nm1 = None  # Displacement field in previous iteration
@@ -86,122 +72,165 @@ class IsotropicWave(ElasticWave):
         self.field_logger.add_functional("mechanical_energy",
                                          lambda: assemble(self.mechanical_energy))
 
-    @override
-    def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
-        """Initialize isotropic elastic material parameters from a dictionary.
+    def initialize_model_parameters(self, synthetic_data=None):
+        """Initialize or update isotropic-elastic material parameters.
 
-        The dictionary must define exactly one supported material
-        parameterization: either density with Lame parameters, or density with
-        P- and S-wave velocities. The missing derived parameters are computed
-        from the provided set, and the active control parameterization is stored
-        for FWI.
+        The input must select exactly one control parameterization: density
+        with the two Lame parameters, or density with P- and S-wave velocities.
+        Within the current function space, all five material fields remain
+        stable Firedrake ``Function`` objects; supplied controls are assigned
+        in place and the complementary fields are derived from them.
 
         Parameters
         ----------
-        synthetic_data_dict : dict
-            Material parameter dictionary using the public Spyro model schema.
-            Valid combinations are ``density``, ``lambda`` (or ``lame_first``),
-            and ``mu`` (or ``lame_second``); or ``density``,
-            ``p_wave_velocity``, and ``s_wave_velocity``. Values may be
-            scalars, Firedrake ``Constant`` objects, Firedrake ``Function``
-            objects, or UFL expressions.
+        synthetic_data : dict, optional
+            Public Spyro material declaration. It must contain
+            ``type="object"`` and either ``density``, ``lambda``, ``mu`` or
+            ``density``, ``p_wave_velocity``, ``s_wave_velocity``. Supported
+            aliases are ``lmbda`` and ``lame_first`` for ``lambda``, and
+            ``lame_second`` for ``mu``. Values may be scalars, Firedrake
+            ``Constant`` or ``Function`` objects, or UFL expressions. When
+            omitted, the declaration from ``input_dictionary`` is used on the
+            first call; later calls recompute complementary parameters from
+            the current controls.
 
         Returns
         -------
         None
-            The method assigns ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s``, and
-            the active control parameterization on ``self``.
+            The method updates ``rho``, ``lmbda``, ``mu``, ``c``, and ``c_s``
+            in place and records the active control parameterization.
+
+        Raises
+        ------
+        ValueError
+            If the declaration is missing, has an invalid type, or does not
+            define exactly one supported parameterization.
+        NotImplementedError
+            If ``synthetic_data`` requests file-based elastic initialization.
+
+        Notes
+        -----
+        An explicit ``synthetic_data`` always replaces the current controls,
+        while a call without it preserves the controls and only recomputes the
+        complementary fields.
         """
-        def material_parameter(value):
-            """Normalize model-dictionary values for elastic parameters.
-
-            Parameters
-            ----------
-            value : scalar, firedrake.Constant, firedrake.Function, or UFL expression
-                Material parameter read from ``synthetic_data_dict``.
-
-            Returns
-            -------
-            firedrake.Constant, firedrake.Function, or object
-                Scalars and ``Constant`` values are converted to scalar
-                material ``Function`` objects once a mesh exists. Before mesh
-                creation, scalar values remain as ``Constant`` values so the
-                regular model initialization flow can continue.
-
-            Examples
-            --------
-            ``density=1.0`` becomes ``Constant(1.0)`` before the mesh exists,
-            and becomes a scalar material ``Function`` after the mesh has been
-            created.
-            """
-            if np.isscalar(value) or isinstance(value, Constant):
-                if self.mesh is None:
-                    return Constant(value) if np.isscalar(value) else value
-                V = create_function_space(
-                    self.mesh, self.method, self.degree, dim=1,
+        parameterization = self._control_parameterization
+        # Explicit data is a replacement request. Without it, an initialized
+        # model only needs its derived fields refreshed after control updates.
+        if synthetic_data is not None or parameterization is None:
+            data = synthetic_data
+            if data is None:
+                data = self.input_dictionary.get("synthetic_data")
+            if not isinstance(data, dict) or "type" not in data:
+                raise ValueError(
+                    "Input dictionary must contain ['synthetic_data']['type']."
                 )
-                return Function(V).interpolate(value)
-            return value
+            if data["type"] == "file":
+                raise NotImplementedError(
+                    "File-based isotropic-elastic material initialization is "
+                    "not implemented."
+                )
+            if data["type"] != "object":
+                raise ValueError(f"Invalid synthetic data type: {data['type']}")
 
-        def get_value(parameter, *aliases):
-            for key in (parameter.value, *aliases):
-                if key in synthetic_data_dict:
-                    return material_parameter(synthetic_data_dict[key])
-            return None
+            values = {}
+            # Resolve the public canonical names and backward-compatible aliases
+            # before validating the selected physical parameterization.
+            for parameter in ElasticMaterialParameter:
+                names = (
+                    parameter.value,
+                    *_MATERIAL_PARAMETER_ALIASES.get(parameter, ()),
+                )
+                for name in names:
+                    if name in data:
+                        values[parameter] = data[name]
+                        break
 
-        self.rho = get_value(ElasticMaterialParameter.DENSITY)
-        self.lmbda = get_value(
-            ElasticMaterialParameter.LAMBDA,
-            "lame_first",
-        )
-        self.mu = get_value(
-            ElasticMaterialParameter.MU,
-            "lame_second",
-        )
-        self.c = get_value(ElasticMaterialParameter.P_WAVE_VELOCITY)
-        self.c_s = get_value(ElasticMaterialParameter.S_WAVE_VELOCITY)
+            provided_parameters = set(values)
+            lame_parameters = set(CONTROL_PARAMETERS_BY_PARAMETERIZATION[
+                ElasticMaterialParameterization.LAME
+            ])
+            velocity_parameters = set(CONTROL_PARAMETERS_BY_PARAMETERIZATION[
+                ElasticMaterialParameterization.VELOCITY
+            ])
+            if provided_parameters == lame_parameters:
+                parameterization = ElasticMaterialParameterization.LAME
+            elif provided_parameters == velocity_parameters:
+                parameterization = ElasticMaterialParameterization.VELOCITY
+            else:
+                raise ValueError(
+                    "Inconsistent selection of isotropic elastic wave "
+                    f"parameters: {provided_parameters}. The valid options are "
+                    "{density, lambda, mu} or "
+                    "{density, p_wave_velocity, s_wave_velocity}."
+                )
 
-        # Check if {rho, lambda, mu} is set and {c, c_s} are not
-        option_1 = bool(self.rho) and \
-            bool(self.lmbda) and \
-            bool(self.mu) and \
-            not bool(self.c) and \
-            not bool(self.c_s)
-        # Check if {rho, c, c_s} is set and {lambda, mu} are not
-        option_2 = bool(self.rho) and \
-            bool(self.c) and \
-            bool(self.c_s) and \
-            not bool(self.lmbda) and \
-            not bool(self.mu)
+            if self.mesh is None:
+                self.set_mesh()
+            elif self.function_space is None:
+                self.force_rebuild_function_space()
 
-        if option_1:
-            self._control_parameterization = ElasticMaterialParameterization.LAME
-            self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
-            self.c_s = (self.mu/self.rho)**0.5
-        elif option_2:
-            self._control_parameterization = ElasticMaterialParameterization.VELOCITY
-            self.mu = self.rho*self.c_s**2
-            self.lmbda = self.rho*self.c**2 - 2*self.mu
+            # These targets are created with the function space and assigned in
+            # place so forms and external control references remain valid.
+            fields = {
+                ElasticMaterialParameter.DENSITY: self.rho,
+                ElasticMaterialParameter.LAMBDA: self.lmbda,
+                ElasticMaterialParameter.MU: self.mu,
+                ElasticMaterialParameter.P_WAVE_VELOCITY: self.c,
+                ElasticMaterialParameter.S_WAVE_VELOCITY: self.c_s,
+            }
+            for parameter, value in values.items():
+                self.set_material_property(
+                    parameter.value,
+                    "scalar",
+                    value=value,
+                    target=fields[parameter],
+                )
+
+            self._control_parameterization = parameterization
+
+        if parameterization is ElasticMaterialParameterization.LAME:
+            # Lame controls determine the two wave-speed fields.
+            self.c.interpolate(((self.lmbda + 2*self.mu)/self.rho)**0.5)
+            self.c_s.interpolate((self.mu/self.rho)**0.5)
         else:
-            raise ValueError(
-                "Inconsistent selection of isotropic elastic wave parameters:\n"
-                f"    Density        : {bool(self.rho)}\n"
-                f"    Lame first     : {bool(self.lmbda)}\n"
-                f"    Lame second    : {bool(self.mu)}\n"
-                f"    P-wave velocity: {bool(self.c)}\n"
-                f"    S-wave velocity: {bool(self.c_s)}\n"
-                "The valid options are {Density, Lame first, Lame second} "
-                "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
-            )
-
-    @override
-    def initialize_model_parameters_from_file(self, synthetic_data_dict):
-        raise NotImplementedError
+            # Velocity controls determine the two Lame-parameter fields.
+            self.mu.interpolate(self.rho*self.c_s**2)
+            self.lmbda.interpolate(self.rho*self.c**2 - 2*self.mu)
+        self._model_parameters_initialized = True
 
     @override
     def _create_function_space(self):
         return create_function_space(self.mesh, self.method, self.degree,
                                      dim=self.dimension)
+
+    def _build_function_space(self):
+        """Build displacement and scalar elastic-material spaces.
+
+        Returns
+        -------
+        None
+            The method creates stable zero-valued fields for density, Lame
+            parameters, and P- and S-wave velocities, then clears the active
+            parameterization.
+        """
+        super()._build_function_space()
+        V = create_function_space(self.mesh, self.method, self.degree)
+        self.scalar_function_space = V
+        self._material_parameter_function_space = V
+        self.rho = Function(V, name=ElasticMaterialParameter.DENSITY.value)
+        self.lmbda = Function(V, name=ElasticMaterialParameter.LAMBDA.value)
+        self.mu = Function(V, name=ElasticMaterialParameter.MU.value)
+        self.c = Function(
+            V,
+            name=ElasticMaterialParameter.P_WAVE_VELOCITY.value,
+        )
+        self.c_s = Function(
+            V,
+            name=ElasticMaterialParameter.S_WAVE_VELOCITY.value,
+        )
+        self._control_parameterization = None
+        self._model_parameters_initialized = False
 
     @override
     def _set_vstate(self, vstate):
@@ -272,52 +301,11 @@ class IsotropicWave(ElasticWave):
             raise ValueError(
                 "Mesh must be set before creating elastic control parameter spaces.",
             )
-        self._material_parameter_function_space = create_function_space(
-            self.mesh, self.method, self.degree,
-        )
+        if self._material_parameter_function_space is None:
+            self._material_parameter_function_space = create_function_space(
+                self.mesh, self.method, self.degree,
+            )
         return self._material_parameter_function_space
-
-    def _as_control_field(self, value, name):
-        """Return a material control as a scalar Firedrake Function.
-
-        Elastic material parameters are scalar fields, while the elastic
-        displacement solution lives in a vector function space. This helper
-        keeps the inversion controls in the scalar space returned by
-        ``get_control_parameter_function_space()`` so density, Lame
-        parameters, and velocity controls can be flattened, rebuilt, written,
-        and reassigned consistently during FWI.
-
-        Accepted values are Firedrake ``Function`` objects, constants, scalar
-        values, or UFL expressions. Functions already in the target space are
-        copied with ``assign``; all other values are interpolated into a new
-        named scalar ``Function``.
-
-        Parameters
-        ----------
-        value : firedrake.Function, firedrake.Constant, scalar, or UFL expression
-            Material control value to represent in the scalar control space.
-        name : str
-            Name assigned to the returned Firedrake ``Function``.
-
-        Returns
-        -------
-        firedrake.Function or None
-            Scalar control field in the material-parameter function space. If
-            ``value`` is ``None``, returns ``None``.
-        """
-        if value is None:
-            return None
-
-        V = self.get_control_parameter_function_space()
-        field = Function(V, name=name)
-        if isinstance(value, Function):
-            if value.function_space() == V:
-                field.assign(value)
-            else:
-                field.interpolate(value)
-        else:
-            field.interpolate(value)
-        return field
 
     def get_control_parameters(self):
         """Return the active isotropic elastic material controls.
@@ -342,27 +330,18 @@ class IsotropicWave(ElasticWave):
         """
         parameterization = self._control_parameterization
         if parameterization is None:
-            if self.rho is None:
-                return None
-            parameterization = ElasticMaterialParameterization.LAME
-
-        parameters = {}
-        for parameter in CONTROL_PARAMETERS_BY_PARAMETERIZATION[parameterization]:
-            if parameter is ElasticMaterialParameter.DENSITY:
-                parameters[parameter] = self.rho
-            elif parameter is ElasticMaterialParameter.LAMBDA:
-                parameters[parameter] = self.lmbda
-            elif parameter is ElasticMaterialParameter.MU:
-                parameters[parameter] = self.mu
-            elif parameter is ElasticMaterialParameter.P_WAVE_VELOCITY:
-                parameters[parameter] = self.c
-            elif parameter is ElasticMaterialParameter.S_WAVE_VELOCITY:
-                parameters[parameter] = self.c_s
-            else:
-                raise ValueError(
-                    f"Unsupported elastic control parameter '{parameter.value}'.",
-                )
-        return parameters
+            return None
+        if parameterization is ElasticMaterialParameterization.LAME:
+            return {
+                ElasticMaterialParameter.DENSITY: self.rho,
+                ElasticMaterialParameter.LAMBDA: self.lmbda,
+                ElasticMaterialParameter.MU: self.mu,
+            }
+        return {
+            ElasticMaterialParameter.DENSITY: self.rho,
+            ElasticMaterialParameter.P_WAVE_VELOCITY: self.c,
+            ElasticMaterialParameter.S_WAVE_VELOCITY: self.c_s,
+        }
 
     def set_control_parameters(self, controls):
         """Assign isotropic elastic material controls.
@@ -423,62 +402,20 @@ class IsotropicWave(ElasticWave):
                 "enum values.",
             )
 
-        lame_controls = CONTROL_PARAMETERS_BY_PARAMETERIZATION[
-            ElasticMaterialParameterization.LAME
-        ]
-        velocity_controls = CONTROL_PARAMETERS_BY_PARAMETERIZATION[
-            ElasticMaterialParameterization.VELOCITY
-        ]
-        option_1 = set(controls) == set(lame_controls)
-        option_2 = set(controls) == set(velocity_controls)
-        if not (option_1 or option_2):
-            lame_names = _format_control_parameters(lame_controls)
-            velocity_names = _format_control_parameters(velocity_controls)
-            raise ValueError(
-                "Elastic controls must define either "
-                f"{lame_names} or {velocity_names}.",
-            )
-
-        self.rho = self._as_control_field(
-            controls[ElasticMaterialParameter.DENSITY],
-            ElasticMaterialParameter.DENSITY.value,
-        )
-
         synthetic_data = {
             "type": "object",
-            "density": self.rho,
+            **{parameter.value: value for parameter, value in controls.items()},
             "real_velocity_file": None,
         }
-        if option_1:
-            self.lmbda = self._as_control_field(
-                controls[ElasticMaterialParameter.LAMBDA],
-                ElasticMaterialParameter.LAMBDA.value,
-            )
-            self.mu = self._as_control_field(
-                controls[ElasticMaterialParameter.MU],
-                ElasticMaterialParameter.MU.value,
-            )
-            self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
-            self.c_s = (self.mu/self.rho)**0.5
-            self._control_parameterization = ElasticMaterialParameterization.LAME
-            synthetic_data["lambda"] = self.lmbda
-            synthetic_data["mu"] = self.mu
-        else:
-            self.c = self._as_control_field(
-                controls[ElasticMaterialParameter.P_WAVE_VELOCITY],
-                ElasticMaterialParameter.P_WAVE_VELOCITY.value,
-            )
-            self.c_s = self._as_control_field(
-                controls[ElasticMaterialParameter.S_WAVE_VELOCITY],
-                ElasticMaterialParameter.S_WAVE_VELOCITY.value,
-            )
-            self.mu = self.rho*self.c_s**2
-            self.lmbda = self.rho*self.c**2 - 2*self.mu
-            self._control_parameterization = ElasticMaterialParameterization.VELOCITY
-            synthetic_data["p_wave_velocity"] = self.c
-            synthetic_data["s_wave_velocity"] = self.c_s
-
-        self.input_dictionary["synthetic_data"] = synthetic_data
+        self.initialize_model_parameters(synthetic_data=synthetic_data)
+        self.input_dictionary["synthetic_data"] = {
+            "type": "object",
+            **{
+                parameter.value: value
+                for parameter, value in self.get_control_parameters().items()
+            },
+            "real_velocity_file": None,
+        }
 
     @override
     def matrix_building(self):

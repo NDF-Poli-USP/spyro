@@ -15,7 +15,7 @@ class DummyWave(Wave):
     def matrix_building(self):
         pass
 
-    def _initialize_model_parameters(self):
+    def initialize_model_parameters(self):
         pass
 
     def _create_function_space(self):
@@ -150,7 +150,7 @@ def _base_functional_dictionary():
 def _build_acoustic_wave(model_dictionary, velocity, *, real_shot_record=None):
     wave = AcousticWave(dictionary=deepcopy(model_dictionary))
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.2})
-    wave.set_initial_velocity_model(constant=velocity)
+    wave.initialize_model_parameters(constant=velocity)
     if real_shot_record is not None:
         wave.real_shot_record = real_shot_record
     return wave

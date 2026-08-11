@@ -3,7 +3,6 @@ import firedrake as fire
 from .wave import Wave
 from pyadjoint import Tape, AdjFloat
 from ..io.parallelism_wrappers import ensemble_gradient
-from ..io import interpolate
 from .acoustic_solver_construction_no_pml import (
     construct_solver_or_matrix_no_pml,
 )
@@ -17,7 +16,6 @@ from ..domains.space import create_function_space
 from ..utils.typing import (
     AdjointType, RieszMapType, override, WaveType, AbsorbingBCsType,
 )
-from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
 
 
@@ -42,6 +40,130 @@ class AcousticWave(Wave):
         self.acoustic_energy = None
         self.field_logger.add_functional(
             "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))
+
+    def initialize_model_parameters(
+        self,
+        *,
+        constant=None,
+        conditional=None,
+        velocity_model_function=None,
+        expression=None,
+        new_file=None,
+        output=False,
+        output_filename="initial_velocity_model.pvd",
+        dg_velocity_model=True,
+        fast_interpolate=False,
+    ):
+        """Initialize or update the acoustic velocity model.
+
+        Exactly one explicit velocity input may be provided. If no input is
+        given on the first call, the method uses the configured in-memory
+        model, velocity-model file, or mesh grid data, in that order. Calls
+        without a new input after initialization leave the current model
+        unchanged.
+
+        Parameters
+        ----------
+        constant : float, optional
+            Constant acoustic velocity.
+        conditional : ufl.core.expr.Expr, optional
+            UFL conditional or expression defining the velocity field.
+        velocity_model_function : firedrake.Function, optional
+            Existing velocity field to materialize on this wave object.
+        expression : str, optional
+            Mathematical expression accepted by Spyro's UFL expression
+            parser.
+        new_file : str, optional
+            SEGY, HDF5, or H5 velocity-model file used as input.
+        output : bool, optional
+            Write the initialized solver velocity to ``output_filename``.
+        output_filename : str, optional
+            PVD path used when ``output`` or ``debug_output`` is enabled.
+        dg_velocity_model : bool, optional
+            Materialize ``conditional`` in DG0 when ``True``. Other input
+            types use their regular target spaces.
+        fast_interpolate : bool, optional
+            For file or grid inputs, sample values directly at target nodes
+            instead of using the regular projection-based transfer.
+
+        Returns
+        -------
+        None
+            The method updates ``c`` in place and preserves the first
+            materialized model in ``initial_velocity_model``.
+
+        Raises
+        ------
+        ValueError
+            If the first call has no configured model, if multiple explicit
+            inputs are supplied, or if a file input is invalid.
+        """
+        if self.mesh is None:
+            self.set_mesh()
+
+        # Translate the acoustic convenience API to the shared material I/O
+        # vocabulary without coupling that engine to acoustic-specific names.
+        velocity_inputs = {
+            "constant": constant,
+            "conditional": conditional,
+            "expression": expression,
+            "fire_function": velocity_model_function,
+            "from_file": new_file,
+        }
+        has_explicit_input = any(
+            value is not None for value in velocity_inputs.values()
+        )
+        # ``forward_solve`` calls this method without arguments. Once a model
+        # exists, that call must preserve the current mutable velocity.
+        if not has_explicit_input and self._model_parameters_initialized:
+            return
+
+        if has_explicit_input:
+            velocity = self.set_material_property(
+                "velocity",
+                "scalar",
+                target=self.c,
+                dg_property=(
+                    dg_velocity_model if conditional is not None else False
+                ),
+                fast_interpolate=fast_interpolate,
+                **velocity_inputs,
+            )
+            self.initial_velocity_model_file = new_file
+        else:
+            # Preserve the fallback order supported before the API unification.
+            if self.initial_velocity_model is not None:
+                velocity_input = self.initial_velocity_model
+            elif self.initial_velocity_model_file is not None:
+                velocity_input = self.initial_velocity_model_file
+            elif self.mesh_parameters.grid_velocity_data is not None:
+                velocity_input = self.mesh_parameters.grid_velocity_data
+            else:
+                raise ValueError("No velocity model or velocity file to load.")
+            velocity = self.set_material_property(
+                "velocity",
+                "scalar",
+                value=velocity_input,
+                target=self.c,
+                fast_interpolate=fast_interpolate,
+            )
+
+        # Keep the original material space in the snapshot. In particular, a
+        # DG0 discontinuity must not be smoothed through the solver space before
+        # HABC tools consume ``initial_velocity_model``.
+        if self.initial_velocity_model is None:
+            self.initial_velocity_model = fire.Function(
+                velocity.function_space(),
+                name="initial_velocity_model",
+            )
+            self.initial_velocity_model.assign(velocity)
+        self._model_parameters_initialized = True
+
+        if output or self.debug_output:
+            fire.VTKFile(output_filename).write(
+                self.c,
+                name="velocity",
+            )
 
     def save_current_velocity_model(self, file_name=None):
         if self.c is None:
@@ -204,42 +326,6 @@ class AcousticWave(Wave):
             self.u_n.assign(0.0)
 
     @override
-    def _initialize_model_parameters(self, fast_interpolate=False):
-        if self.initial_velocity_model is None:
-            if self.initial_velocity_model_file is None:
-                if getattr(self.mesh_parameters, "grid_velocity_data", None) is not None:
-                    self.initial_velocity_model = interpolate(
-                        self,
-                        self.mesh_parameters.grid_velocity_data,
-                        self.function_space.sub(0),
-                    )
-                    if self.debug_output:
-                        fire.VTKFile("initial_velocity_model.pvd").write(
-                            self.initial_velocity_model, name="velocity"
-                        )
-                    self.c = self.initial_velocity_model
-                    return
-                raise ValueError("No velocity model or velocity file to load.")
-
-            if self.initial_velocity_model_file.endswith(".segy"):
-                self.initial_velocity_model_file = write_hdf5_velocity_model(self, self.initial_velocity_model_file)
-
-            if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
-                self.initial_velocity_model = interpolate(
-                    self,
-                    self.initial_velocity_model_file,
-                    self.function_space.sub(0),
-                    fast_interpolate=fast_interpolate,
-                )
-
-            if self.debug_output:
-                fire.VTKFile("initial_velocity_model.pvd").write(
-                    self.initial_velocity_model, name="velocity"
-                )
-
-        self.c = self.initial_velocity_model
-
-    @override
     def _set_vstate(self, vstate):
         if self.abc_type == AbsorbingBCsType.PML:
             self.X_n.assign(vstate)
@@ -335,6 +421,19 @@ class AcousticWave(Wave):
     def _create_function_space(self):
         return create_function_space(self.mesh, self.method, self.degree)
 
+    def _build_function_space(self):
+        """Build the acoustic space and its mutable velocity field.
+
+        Returns
+        -------
+        None
+            The method replaces ``c`` with a zero-valued field in the new
+            scalar space and marks the model parameters as uninitialized.
+        """
+        super()._build_function_space()
+        self.c = fire.Function(self.scalar_function_space, name="velocity")
+        self._model_parameters_initialized = False
+
     @override
     def rhs_no_pml(self):
         if self.abc_type == AbsorbingBCsType.PML:
@@ -370,8 +469,9 @@ class AcousticWave(Wave):
     def get_control_parameters(self):
         """Return the acoustic inversion control.
 
-        For acoustic FWI the control is the velocity model stored in
-        ``initial_velocity_model``.
+        For acoustic FWI the control is the mutable velocity field ``c``.
+        ``initial_velocity_model`` remains a snapshot of the first initialized
+        model.
 
         Returns
         -------
@@ -380,10 +480,12 @@ class AcousticWave(Wave):
 
         Examples
         --------
-        After ``set_initial_velocity_model(constant=2.0)``, this method returns
+        After ``initialize_model_parameters(constant=2.0)``, this method returns
         the velocity ``Function`` filled with ``2.0``.
         """
-        return self.initial_velocity_model
+        if not self._model_parameters_initialized:
+            return None
+        return self.c
 
     def set_control_parameters(self, controls):
         """Assign the acoustic inversion control.
@@ -397,7 +499,8 @@ class AcousticWave(Wave):
         Returns
         -------
         None
-            The method updates ``initial_velocity_model`` and ``c`` and clears
+            The method updates ``c`` in place, preserves the first model in
+            ``initial_velocity_model``, and clears
             ``initial_velocity_model_file``.
 
         Examples
@@ -408,20 +511,20 @@ class AcousticWave(Wave):
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        if isinstance(controls, fire.Function):
-            name = controls.name()
-            velocity = fire.Function(self.function_space, name=name)
-            if controls.function_space() == self.function_space:
-                velocity.assign(controls)
-            else:
-                velocity.interpolate(controls)
-        else:
-            velocity = fire.Function(self.function_space, name="velocity")
-            velocity.interpolate(controls)
-
-        self.initial_velocity_model = velocity
+        self.set_material_property(
+            "velocity",
+            "scalar",
+            value=controls,
+            target=self.c,
+        )
+        if self.initial_velocity_model is None:
+            self.initial_velocity_model = fire.Function(
+                self.c.function_space(),
+                name="initial_velocity_model",
+            )
+            self.initial_velocity_model.assign(self.c)
+        self._model_parameters_initialized = True
         self.initial_velocity_model_file = None
-        self.c = self.initial_velocity_model
 
     def get_control_parameter_function_space(self):
         """Return the function space used by acoustic controls.

@@ -2,10 +2,163 @@ from copy import deepcopy
 
 import firedrake as fire
 import numpy as np
+import pytest
 import spyro
 
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 from .model import dictionary as acoustic_model
+
+
+def test_initialize_model_parameters_uses_material_property(monkeypatch):
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    calls = []
+    set_material_property = wave.set_material_property
+
+    def record_material_property(*args, **kwargs):
+        calls.append((args, kwargs))
+        return set_material_property(*args, **kwargs)
+
+    monkeypatch.setattr(wave, "set_material_property", record_material_property)
+
+    wave.initialize_model_parameters(constant=1.5)
+
+    assert len(calls) == 1
+    assert calls[0][0] == ("velocity", "scalar")
+    assert calls[0][1]["constant"] == 1.5
+
+
+def test_initialize_model_parameters_from_velocity_function(monkeypatch):
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    velocity = wave.set_material_property("velocity", "scalar", constant=1.5)
+    captured = {}
+
+    def fake(*args, **kwargs):
+        captured.update(kwargs)
+        kwargs["target"].assign(velocity)
+        return velocity
+
+    monkeypatch.setattr(wave, "set_material_property", fake)
+    wave.initialize_model_parameters(velocity_model_function=velocity)
+
+    assert captured["fire_function"] is velocity
+    assert wave.c is not velocity
+    assert wave.initial_velocity_model is not velocity
+    assert np.allclose(wave.c.dat.data_ro, velocity.dat.data_ro)
+    assert np.allclose(
+        wave.initial_velocity_model.dat.data_ro,
+        velocity.dat.data_ro,
+    )
+
+
+def test_initialize_model_parameters_from_file_records_input(monkeypatch):
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    model = wave.set_material_property("velocity", "scalar", constant=1.5)
+    captured = {}
+
+    def fake(*args, **kwargs):
+        captured.update(kwargs)
+        kwargs["target"].assign(model)
+        return model
+
+    monkeypatch.setattr(wave, "set_material_property", fake)
+    wave.initialize_model_parameters(new_file="velocity.hdf5")
+
+    assert captured["from_file"] == "velocity.hdf5"
+    assert wave.initial_velocity_model_file == "velocity.hdf5"
+    assert wave.c is not model
+    assert np.allclose(wave.c.dat.data_ro, model.dat.data_ro)
+
+
+def test_initialize_model_parameters_preserves_initial_acoustic_model():
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    wave.initialize_model_parameters(constant=1.5)
+    initial_model = wave.initial_velocity_model
+    velocity = wave.c
+
+    wave.initialize_model_parameters(constant=2.0)
+
+    assert wave.initial_velocity_model is initial_model
+    assert wave.c is velocity
+    assert np.allclose(initial_model.dat.data_ro, 1.5)
+    assert np.allclose(velocity.dat.data_ro, 2.0)
+
+
+def test_initialize_model_parameters_preserves_dg_initial_model():
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    conditional = fire.conditional(wave.mesh_x < 0.5, 3.0, 1.5)
+
+    wave.initialize_model_parameters(conditional=conditional)
+
+    initial_space = wave.initial_velocity_model.function_space()
+    assert initial_space.ufl_element().degree() == 0
+    assert initial_space != wave.c.function_space()
+    assert np.all(
+        np.isin(wave.initial_velocity_model.dat.data_ro, (1.5, 3.0))
+    )
+
+
+def test_initialize_model_parameters_without_new_input_is_noop(monkeypatch):
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    wave.initialize_model_parameters(constant=1.5)
+
+    def fail_if_called(*args, **kwargs):
+        pytest.fail("an initialized model should not be loaded again")
+
+    monkeypatch.setattr(wave, "set_material_property", fail_if_called)
+
+    wave.initialize_model_parameters()
+
+    assert np.allclose(wave.c.dat.data_ro, 1.5)
+
+
+def test_initialize_model_parameters_uses_output_filename(monkeypatch):
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    written = {}
+
+    class VTKFile:
+        def __init__(self, filename):
+            written["filename"] = filename
+
+        def write(self, field, *, name):
+            written["field"] = field
+            written["name"] = name
+
+    monkeypatch.setattr(fire, "VTKFile", VTKFile)
+
+    wave.initialize_model_parameters(
+        constant=1.5,
+        output=True,
+        output_filename="custom_initial_velocity.pvd",
+    )
+
+    assert written["filename"] == "custom_initial_velocity.pvd"
+    assert written["field"] is wave.c
+    assert written["name"] == "velocity"
+
+
+def test_set_material_properties_deprecated_forwards(monkeypatch):
+    wave = spyro.AcousticWave(dictionary=deepcopy(acoustic_model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    forwarded = {}
+
+    def record(*args, **kwargs):
+        forwarded["args"] = args
+        forwarded["kwargs"] = kwargs
+
+    monkeypatch.setattr(wave, "set_material_property", record)
+
+    with pytest.warns(DeprecationWarning):
+        wave.set_material_properties("velocity", "scalar", constant=1.5)
+
+    assert forwarded["args"] == ("velocity", "scalar")
+    assert forwarded["kwargs"]["constant"] == 1.5
 
 
 def test_mass_matrix_diagonal_from_lhs():
@@ -16,8 +169,7 @@ def test_mass_matrix_diagonal_from_lhs():
 
     wave = spyro.AcousticWave(dictionary=model)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
-    wave.set_initial_velocity_model(constant=1.5)
-    wave._initialize_model_parameters()
+    wave.initialize_model_parameters(constant=1.5)
     wave.matrix_building()
 
     diagonal = wave.get_mass_matrix_diagonal()
@@ -79,8 +231,7 @@ def test_pml_3d_matrix_building_variational_setup():
     wave.length_x = wave.mesh_parameters.length_x
     wave.length_y = wave.mesh_parameters.length_y
     wave.length_z = wave.mesh_parameters.length_z
-    wave.set_initial_velocity_model(constant=1.5)
-    wave._initialize_model_parameters()
+    wave.initialize_model_parameters(constant=1.5)
     wave.matrix_building()
 
     assert isinstance(wave.solver, fire.LinearVariationalSolver)
@@ -135,7 +286,7 @@ def test_isotropic_rhs_source_accessor():
 
     wave = IsotropicWave(model)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
-    wave._initialize_model_parameters()
+    wave.initialize_model_parameters()
     wave.matrix_building()
 
     assert wave.rhs_no_pml_source() is wave.source_function

@@ -935,7 +935,7 @@ class FullWaveformInversion:
         Only one of the parameters (constant, conditional, velocity_model_function,
         expression, or new_file) should be provided.
         """
-        self.wave.set_initial_velocity_model(
+        self.wave.initialize_model_parameters(
             constant=constant,
             conditional=conditional,
             velocity_model_function=velocity_model_function,
@@ -995,7 +995,7 @@ class FullWaveformInversion:
         expression, or new_file) should be provided. Setting a new guess model
         will reset the misfit to None.
         """
-        self.wave.set_initial_velocity_model(
+        self.wave.initialize_model_parameters(
             constant=constant,
             conditional=conditional,
             velocity_model_function=velocity_model_function,

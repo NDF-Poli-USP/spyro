@@ -248,7 +248,7 @@ wave.set_mesh(dx=0.01)
 z = wave.mesh_z
 import firedrake as fire
 velocity_conditional = fire.conditional(z > -0.35, 1.5, 3.0)
-wave.set_initial_velocity_model(conditional=velocity_conditional, output=True)
+wave.initialize_model_parameters(conditional=velocity_conditional, output=True)
 
 # And now we simulate the shot using a 2nd order central time-stepping scheme
 # Note: simulation results are stored in the folder `~/results/` by default

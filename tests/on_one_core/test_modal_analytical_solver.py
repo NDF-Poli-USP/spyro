@@ -181,11 +181,11 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
 
     # Initial velocity model
     if homogeneous:
-        wave.set_initial_velocity_model(constant=1.5)
+        wave.initialize_model_parameters(constant=1.5)
 
     else:
         cond = conditional(wave.mesh_x < 0.5, 3.0, 1.5)
-        wave.set_initial_velocity_model(conditional=cond)
+        wave.initialize_model_parameters(conditional=cond)
 
     # Preamble mesh operations
     wave.mesh_ops.preamble_mesh_operations(wave, f_est=f_est)

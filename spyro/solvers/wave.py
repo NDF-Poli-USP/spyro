@@ -1,11 +1,13 @@
 from abc import abstractmethod, ABCMeta
 import warnings
+
+import numpy as np
 import firedrake as fire
 
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
 from ..domains.quadrature import quadrature_rules
-from ..domains.space import check_function_space_type, create_function_space
+from ..domains.space import check_function_space_type
 from ..io import Model_parameters
 from ..io import material_properties_io
 from ..io.parallelism_wrappers import ensemble_propagator
@@ -14,7 +16,6 @@ from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from .solver_parameters import get_default_parameters_for_method
-from ..utils import eval_functions_to_ufl
 from ..utils.error_management import enum_parameter_error
 from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
                             LayerShapeType, WaveType)
@@ -36,7 +37,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     boundary_idx_map: dict
         Mapping of boundary IDs for applying absorbing boundary conditions.
     initial_velocity_model: `Firedrake.Function`
-        Initial velocity model.
+        Snapshot of the first initialized acoustic velocity model.
     function_space: firedrake function space
         Function space for the wave equation.
     current_time: float
@@ -78,8 +79,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Get the coordinates of the mesh.
     set_mesh()
         Sets or calculates new mesh.
-    set_initial_velocity_model()
-        Sets initial velocity model.
+    initialize_model_parameters()
+        Sets or loads the material parameters required by the wave equation.
     set_last_solve_as_real_shot_record()
         Sets last solve as real shot record.
     set_solver_parameters()
@@ -124,6 +125,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         super().__init__(dictionary=dictionary, comm=comm)
         self.initial_velocity_model = None
+        self._model_parameters_initialized = False
         self.gradient_mask_available = False
 
         # Setting wave type
@@ -188,7 +190,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.force_rebuild_function_space()
 
         if self.abc_type in [AbsorbingBCsType.NOABCS, AbsorbingBCsType.NRBC]:
-            self._initialize_model_parameters()
+            self.initialize_model_parameters()
+
         self.matrix_building()
         self.wave_propagator()
 
@@ -244,9 +247,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Build the boundary ID mapping
         # TODO: Include the logic for hypershape layer from HABC
         # TODO: Create a flag for other domains that are not of type box
-        if not (hasattr(self, 'abc_boundary_layer_shape')
-                and hasattr(self.mesh_parameters, 'boundary_ids_map')
-                and self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE):
+        if not (
+            self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE
+            and self.mesh_parameters.boundary_ids_map is not None
+        ):
             self.mesh_parameters.boundary_ids_map, \
                 self.mesh_parameters.boundary_nodes_ids = \
                 self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
@@ -254,8 +258,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                                    get_boundary_node_ids=True)
 
         # Get geometry parameters from mesh
-        if self.mesh_ops.func_space_type == 'scalar' \
-                and not hasattr(self.mesh_parameters, 'diam_mesh'):
+        if (
+            self.mesh_ops.func_space_type == 'scalar'
+            and self.mesh_parameters.diam_mesh is None
+        ):
             data_mesh = self.mesh_ops.representative_mesh_dimensions(self.mesh,
                                                                      self.function_space)
             self.mesh_parameters.diam_mesh = data_mesh[0]
@@ -328,82 +334,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         elif self.dimension == 3:
             return self.mesh_z, self.mesh_x, self.mesh_y
 
-    def set_initial_velocity_model(
-        self,
-        constant=None,
-        conditional=None,
-        velocity_model_function=None,
-        expression=None,
-        new_file=None,
-        output=False,
-        dg_velocity_model=True,
-        fast_interpolate=False,
-    ):
-        """Method to define new user velocity model or file. It is optional.
-
-        Parameters:
-        -----------
-        conditional:  (optional)
-            Firedrake conditional object.
-        velocity_model_function: Firedrake function (optional)
-            Firedrake function to be used as the velocity model. Has to be in the same function space as the object.
-        expression:  str (optional)
-            If you use an expression, you can use the following variables:
-            x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
-            It will be interpoalte into either the same function space as the object or a DG0 function space
-            in the same mesh.
-        new_file:  str (optional)
-            Name of the file containing the velocity model.
-        output:  bool (optional)
-            If True, outputs the velocity model to a pvd file for visualization.
-        """
-        # Resseting old velocity model
-        self.initial_velocity_model = None
-        self.initial_velocity_model_file = None
-        if new_file is not None:
-            self.initial_velocity_model_file = new_file
-        # If no mesh is set, we have to do it beforehand
-        if self.mesh is None:
-            self.set_mesh()
-
-        if self.debug_output:
-            output = True
-
-        if conditional is not None:
-            if dg_velocity_model:
-                V = create_function_space(self.mesh, "DG0", 0)
-            else:
-                V = self.function_space
-            vp = fire.Function(V, name="velocity")
-            vp.interpolate(conditional)
-            self.initial_velocity_model = vp
-        elif expression is not None:
-            V = self.function_space
-            vp = eval_functions_to_ufl.generate_ufl_functions(
-                self.mesh, expression, self.dimension)
-            self.initial_velocity_model = fire.Function(
-                V, name="velocity").interpolate(vp)
-
-        elif velocity_model_function is not None:
-            self.initial_velocity_model = velocity_model_function
-        elif new_file is not None:
-            self.initial_velocity_model_file = new_file
-            self._initialize_model_parameters(fast_interpolate=fast_interpolate)  # TODO in PR206
-        elif constant is not None:
-            V = self.function_space
-            vp = fire.Function(V, name="velocity")
-            vp.interpolate(fire.Constant(constant))
-            self.initial_velocity_model = vp
-        else:
-            raise ValueError(
-                "Please specify either a conditional, expression, "
-                "firedrake function or new file name (segy or hdf5)."
-            )
-        if output:
-            fire.VTKFile("initial_velocity_model.pvd").write(
-                self.initial_velocity_model, name="velocity"
-            )
-
     def _map_sources_and_receivers(self):
         if self.source_type == "ricker":
             self.sources = Sources(self)
@@ -412,7 +342,17 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.receivers.wave_type = self.wave_type
 
     @abstractmethod
-    def _initialize_model_parameters(self):
+    def initialize_model_parameters(self):
+        """Initialize the material parameters required by the wave solver.
+
+        Concrete wave classes define their accepted inputs and physical
+        parameterizations.
+
+        Returns
+        -------
+        None
+            Implementations update their material fields in place.
+        """
         pass
 
     @abstractmethod
@@ -585,17 +525,107 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         pass
 
-    def set_material_properties(self, *args, **kwargs):
-        """Wrapper for material_properties_io.set_material_property."""
-        return material_properties_io.set_material_property(
+    def set_material_property(self, *args, target=None, **kwargs):
+        """Materialize a property and optionally assign it to a stable field.
+
+        The materialized field is returned even when ``target`` is provided,
+        allowing callers to preserve the original input space when needed.
+
+        Parameters
+        ----------
+        *args : object
+            Positional arguments forwarded to
+            :func:`spyro.io.material_properties_io.set_material_property`.
+            They normally identify the property name and function-space type.
+        target : firedrake.Function, optional
+            Existing field updated in place with the materialized property.
+            ``assign`` is used for equal spaces and ``interpolate`` otherwise.
+        **kwargs : object
+            Material input forwarded to the I/O engine. The convenience
+            keyword ``value`` accepts a scalar, Firedrake ``Function``, file or
+            grid declaration, or UFL expression, and is translated to the
+            corresponding engine input.
+
+        Returns
+        -------
+        firedrake.Function
+            Materialized field before transfer to ``target``. This preserves
+            the input function space when the I/O engine creates one.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is combined with another material input or the I/O
+            engine receives an invalid input combination.
+        """
+        value = kwargs.pop("value", None)
+        if value is not None:
+            input_names = (
+                "constant",
+                "conditional",
+                "expression",
+                "random",
+                "fire_function",
+                "from_file",
+            )
+            if any(kwargs.get(name) is not None for name in input_names):
+                raise ValueError(
+                    "value cannot be combined with another material input."
+                )
+            if np.isscalar(value):
+                kwargs["constant"] = value
+            elif isinstance(value, fire.Function):
+                kwargs["fire_function"] = value
+            elif isinstance(value, (str, dict)):
+                kwargs["from_file"] = value
+            else:
+                kwargs["conditional"] = value
+
+        material_field = material_properties_io.set_material_property(
             self,
             *args,
             **kwargs
         )
+        # Preserve the identity of fields already referenced by forms and
+        # inversion controls, while still accepting compatible foreign spaces.
+        if target is not None and target is not material_field:
+            if material_field.function_space() == target.function_space():
+                target.assign(material_field)
+            else:
+                target.interpolate(material_field)
+        return material_field
 
-    def set_material_property(self, *args, **kwargs):
-        """Backward-compatible alias for set_material_properties."""
-        return self.set_material_properties(*args, **kwargs)
+    def set_material_properties(self, *args, **kwargs):
+        """Deprecated alias for :meth:`set_material_property`.
+
+        .. deprecated::
+            Use :meth:`set_material_property` instead. This wrapper forwards
+            every argument unchanged and will be removed in a future release.
+
+        Parameters
+        ----------
+        *args : object
+            Positional arguments forwarded to ``set_material_property``.
+        **kwargs : object
+            Keyword arguments forwarded to ``set_material_property``.
+
+        Returns
+        -------
+        firedrake.Function
+            Materialized property returned by ``set_material_property``.
+
+        Warns
+        -----
+        DeprecationWarning
+            Every call warns that the singular method name is canonical.
+        """
+        warnings.warn(
+            "set_material_properties() is deprecated; use "
+            "set_material_property() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.set_material_property(*args, **kwargs)
 
     @property
     def store_forward_time_steps(self):
@@ -612,11 +642,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         )
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
-        self._initialize_model_parameters()
+        self.initialize_model_parameters()
         if self.c is None:
             raise ValueError(
                 "self.c must be set before enabling automated adjoint."
-                "Please set the velocity model using set_initial_velocity_model()"
+                "Please set the velocity model using initialize_model_parameters()"
                 "or set c directly."
             )
         controls = self.c

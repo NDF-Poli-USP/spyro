@@ -24,7 +24,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
 
         Wave_obj_guess.reset_pressure()
         c_guess = fire.Constant(2.0) + step*dm
-        Wave_obj_guess.initial_velocity_model = c_guess
+        Wave_obj_guess.set_control_parameters(c_guess)
         Wave_obj_guess.forward_solve()
         misfit_plusdm = rec_out_exact - Wave_obj_guess.forward_solution_receivers
         J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
@@ -124,7 +124,7 @@ def get_forward_model(load_true=False):
         Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
         Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
         cond = fire.conditional(Wave_obj_exact.mesh_z > -0.5, 1.5, 3.5)
-        Wave_obj_exact.set_initial_velocity_model(
+        Wave_obj_exact.initialize_model_parameters(
             conditional=cond,
             dg_velocity_model=False,
         )
@@ -141,7 +141,7 @@ def get_forward_model(load_true=False):
 
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
-    Wave_obj_guess.set_initial_velocity_model(constant=2.0)
+    Wave_obj_guess.initialize_model_parameters(constant=2.0)
     Wave_obj_guess.forward_solve()
     rec_out_guess = Wave_obj_guess.forward_solution_receivers
 
@@ -179,13 +179,16 @@ def _gradient_for_sampling_frequency(freq, final_time_override=0.5):
     Wave_obj_exact = spyro.AcousticWave(dictionary=d)
     Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     cond = fire.conditional(Wave_obj_exact.mesh_z > -0.5, 1.5, 3.5)
-    Wave_obj_exact.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
+    Wave_obj_exact.initialize_model_parameters(
+        conditional=cond,
+        dg_velocity_model=False,
+    )
     Wave_obj_exact.forward_solve()
     rec_out_exact = Wave_obj_exact.forward_solution_receivers
 
     Wave_obj_guess = spyro.AcousticWave(dictionary=d)
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
-    Wave_obj_guess.set_initial_velocity_model(constant=2.0)
+    Wave_obj_guess.initialize_model_parameters(constant=2.0)
     Wave_obj_guess.forward_solve()
     rec_out_guess = Wave_obj_guess.forward_solution_receivers
 
