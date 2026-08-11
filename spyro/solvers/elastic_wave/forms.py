@@ -16,9 +16,7 @@ def isotropic_elastic_without_pml(wave):
     u_n = wave.u_n
 
     dt = Constant(wave.dt)
-    rho = wave.rho
-    lmbda = wave.lmbda
-    mu = wave.mu
+    rho, lmbda, mu = wave.get_equation_material_parameters()
 
     F_m = (rho/(dt**2))*dot(u - 2*u_n + u_nm1, v)*dx(**quad_rule)
 

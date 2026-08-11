@@ -26,25 +26,15 @@ CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
 }
 
 
-def _format_control_parameters(parameters):
-    """Format material-parameter enum values for error messages.
-
-    Parameters
-    ----------
-    parameters : iterable of ElasticMaterialParameter
-        Material-parameter enum values to display.
-
-    Returns
-    -------
-    str
-        Human-readable set-like representation using public parameter names.
-
-    Examples
-    --------
-    ``(ElasticMaterialParameter.DENSITY, ElasticMaterialParameter.MU)``
-    becomes ``"{density, mu}"``.
-    """
-    return "{" + ", ".join(parameter.value for parameter in parameters) + "}"
+_CONTROL_PARAMETER_ALIASES = {
+    parameter.value: parameter for parameter in ElasticMaterialParameter
+}
+_CONTROL_PARAMETER_ALIASES.update({
+    "rho": ElasticMaterialParameter.DENSITY,
+    "lmbda": ElasticMaterialParameter.LAMBDA,
+    "c": ElasticMaterialParameter.P_WAVE_VELOCITY,
+    "c_s": ElasticMaterialParameter.S_WAVE_VELOCITY,
+})
 
 
 class IsotropicWave(ElasticWave):
@@ -57,6 +47,7 @@ class IsotropicWave(ElasticWave):
         self.mu = None    # Second Lame parameter
         self.c_s = None   # Secondary wave velocity
         self._control_parameterization = None
+        self._control_parameters = None
         self._material_parameter_function_space = None
 
         self.u_n = None   # Current displacement field
@@ -90,27 +81,25 @@ class IsotropicWave(ElasticWave):
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
         """Initialize isotropic elastic material parameters from a dictionary.
 
-        The dictionary must define exactly one supported material
-        parameterization: either density with Lame parameters, or density with
-        P- and S-wave velocities. The missing derived parameters are computed
-        from the provided set, and the active control parameterization is stored
-        for FWI.
+        The material declaration must define one complete parameterization,
+        while ``control_parameters`` may independently select any non-empty
+        subset from either the Lame or velocity family. Without an explicit
+        selection, all parameters from the material declaration are controls.
 
         Parameters
         ----------
         synthetic_data_dict : dict
             Material parameter dictionary using the public Spyro model schema.
-            Valid combinations are ``density``, ``lambda`` (or ``lame_first``),
-            and ``mu`` (or ``lame_second``); or ``density``,
-            ``p_wave_velocity``, and ``s_wave_velocity``. Values may be
-            scalars, Firedrake ``Constant`` objects, Firedrake ``Function``
-            objects, or UFL expressions.
+            Valid material combinations are ``density``, ``lambda`` (or
+            ``lame_first``), and ``mu`` (or ``lame_second``); or ``density``,
+            ``p_wave_velocity``, and ``s_wave_velocity``. The optional
+            ``control_parameters`` entry must be a list or tuple.
 
         Returns
         -------
         None
-            The method assigns ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s``, and
-            the active control parameterization on ``self``.
+            The method assigns all material fields and records the selected
+            control subset and its parameterization.
         """
         def material_parameter(value):
             """Normalize model-dictionary values for elastic parameters.
@@ -149,50 +138,178 @@ class IsotropicWave(ElasticWave):
                     return material_parameter(synthetic_data_dict[key])
             return None
 
-        self.rho = get_value(ElasticMaterialParameter.DENSITY)
-        self.lmbda = get_value(
+        rho = get_value(ElasticMaterialParameter.DENSITY)
+        lmbda = get_value(
             ElasticMaterialParameter.LAMBDA,
             "lame_first",
         )
-        self.mu = get_value(
+        mu = get_value(
             ElasticMaterialParameter.MU,
             "lame_second",
         )
-        self.c = get_value(ElasticMaterialParameter.P_WAVE_VELOCITY)
-        self.c_s = get_value(ElasticMaterialParameter.S_WAVE_VELOCITY)
+        c = get_value(ElasticMaterialParameter.P_WAVE_VELOCITY)
+        c_s = get_value(ElasticMaterialParameter.S_WAVE_VELOCITY)
 
         # Check if {rho, lambda, mu} is set and {c, c_s} are not
-        option_1 = bool(self.rho) and \
-            bool(self.lmbda) and \
-            bool(self.mu) and \
-            not bool(self.c) and \
-            not bool(self.c_s)
+        option_1 = bool(rho) and bool(lmbda) and bool(mu) \
+            and not bool(c) and not bool(c_s)
         # Check if {rho, c, c_s} is set and {lambda, mu} are not
-        option_2 = bool(self.rho) and \
-            bool(self.c) and \
-            bool(self.c_s) and \
-            not bool(self.lmbda) and \
-            not bool(self.mu)
+        option_2 = bool(rho) and bool(c) and bool(c_s) \
+            and not bool(lmbda) and not bool(mu)
 
         if option_1:
-            self._control_parameterization = ElasticMaterialParameterization.LAME
-            self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
-            self.c_s = (self.mu/self.rho)**0.5
+            equation_parameterization = ElasticMaterialParameterization.LAME
+            self.rho, self.lmbda, self.mu = rho, lmbda, mu
+            self._update_derived_material_parameters(equation_parameterization)
         elif option_2:
-            self._control_parameterization = ElasticMaterialParameterization.VELOCITY
-            self.mu = self.rho*self.c_s**2
-            self.lmbda = self.rho*self.c**2 - 2*self.mu
+            equation_parameterization = ElasticMaterialParameterization.VELOCITY
+            self.rho, self.c, self.c_s = rho, c, c_s
+            self._update_derived_material_parameters(equation_parameterization)
         else:
             raise ValueError(
                 "Inconsistent selection of isotropic elastic wave parameters:\n"
-                f"    Density        : {bool(self.rho)}\n"
-                f"    Lame first     : {bool(self.lmbda)}\n"
-                f"    Lame second    : {bool(self.mu)}\n"
-                f"    P-wave velocity: {bool(self.c)}\n"
-                f"    S-wave velocity: {bool(self.c_s)}\n"
+                f"    Density        : {bool(rho)}\n"
+                f"    Lame first     : {bool(lmbda)}\n"
+                f"    Lame second    : {bool(mu)}\n"
+                f"    P-wave velocity: {bool(c)}\n"
+                f"    S-wave velocity: {bool(c_s)}\n"
                 "The valid options are {Density, Lame first, Lame second} "
                 "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
             )
+
+        control_parameterization, controls = (
+            self._normalize_control_parameter_selection(
+                synthetic_data_dict.get("control_parameters"),
+                equation_parameterization,
+            )
+        )
+        if control_parameterization is not equation_parameterization:
+            self._materialize_parameterization(control_parameterization)
+            self._update_derived_material_parameters(control_parameterization)
+
+        self._control_parameterization = control_parameterization
+        self._control_parameters = controls
+
+    def _normalize_control_parameter_selection(
+        self,
+        parameters,
+        default_parameterization,
+    ):
+        """Normalize a public elastic-control selection to enum values."""
+        if parameters is None:
+            return (
+                default_parameterization,
+                CONTROL_PARAMETERS_BY_PARAMETERIZATION[default_parameterization],
+            )
+        if not isinstance(parameters, (list, tuple)):
+            raise TypeError(
+                "Elastic control_parameters must be a list or tuple.",
+            )
+
+        normalized = []
+        for parameter in parameters:
+            if isinstance(parameter, ElasticMaterialParameter):
+                normalized.append(parameter)
+            elif isinstance(parameter, str):
+                try:
+                    normalized.append(_CONTROL_PARAMETER_ALIASES[parameter])
+                except KeyError as exc:
+                    supported = ", ".join(_CONTROL_PARAMETER_ALIASES)
+                    raise ValueError(
+                        f"Unknown elastic control parameter '{parameter}'. "
+                        f"Supported names are: {supported}.",
+                    ) from exc
+            else:
+                raise TypeError(
+                    "Elastic control parameters must be strings or "
+                    "ElasticMaterialParameter values.",
+                )
+
+        if not normalized:
+            raise ValueError("At least one elastic control parameter is required.")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError(
+                "Elastic control parameters must not contain duplicates."
+            )
+
+        selected = set(normalized)
+        lame_parameters = set(CONTROL_PARAMETERS_BY_PARAMETERIZATION[
+            ElasticMaterialParameterization.LAME
+        ])
+        velocity_parameters = set(CONTROL_PARAMETERS_BY_PARAMETERIZATION[
+            ElasticMaterialParameterization.VELOCITY
+        ])
+        is_lame = selected <= lame_parameters
+        is_velocity = selected <= velocity_parameters
+
+        if is_lame and is_velocity:
+            parameterization = default_parameterization
+        elif is_lame:
+            parameterization = ElasticMaterialParameterization.LAME
+        elif is_velocity:
+            parameterization = ElasticMaterialParameterization.VELOCITY
+        else:
+            raise ValueError(
+                "Elastic controls cannot mix Lame parameters with wave "
+                "velocities."
+            )
+        return parameterization, tuple(normalized)
+
+    @staticmethod
+    def _material_parameter_attribute(parameter):
+        """Return the wave attribute associated with a material parameter."""
+        return {
+            ElasticMaterialParameter.DENSITY: "rho",
+            ElasticMaterialParameter.LAMBDA: "lmbda",
+            ElasticMaterialParameter.MU: "mu",
+            ElasticMaterialParameter.P_WAVE_VELOCITY: "c",
+            ElasticMaterialParameter.S_WAVE_VELOCITY: "c_s",
+        }[parameter]
+
+    def _get_material_parameter(self, parameter):
+        """Return one material field or expression."""
+        return getattr(self, self._material_parameter_attribute(parameter))
+
+    def _set_material_parameter(self, parameter, value):
+        """Set one material field or expression."""
+        setattr(self, self._material_parameter_attribute(parameter), value)
+
+    def _materialize_parameterization(self, parameterization):
+        """Represent one complete primary parameter family as Functions."""
+        if self.mesh is None:
+            return
+        for parameter in CONTROL_PARAMETERS_BY_PARAMETERIZATION[parameterization]:
+            self._set_material_parameter(
+                parameter,
+                self._as_control_field(
+                    self._get_material_parameter(parameter),
+                    parameter.value,
+                ),
+            )
+
+    def _update_derived_material_parameters(self, parameterization):
+        """Update parameters derived from the active primary family."""
+        if parameterization is ElasticMaterialParameterization.LAME:
+            self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
+            self.c_s = (self.mu/self.rho)**0.5
+        else:
+            self.mu = self.rho*self.c_s**2
+            self.lmbda = self.rho*self.c**2 - 2*self.mu
+
+    def get_equation_material_parameters(self):
+        """Return density and elastic moduli from the active control family.
+
+        Building the velocity-to-Lame conversion directly in the variational
+        form keeps the dependency on ``c`` and ``c_s`` visible to pyadjoint.
+        """
+        if (
+            self._control_parameterization
+            is ElasticMaterialParameterization.VELOCITY
+        ):
+            mu = self.rho*self.c_s**2
+            lmbda = self.rho*self.c**2 - 2*mu
+            return self.rho, lmbda, mu
+        return self.rho, self.lmbda, self.mu
 
     @override
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
@@ -323,9 +440,9 @@ class IsotropicWave(ElasticWave):
         """Return the active isotropic elastic material controls.
 
         The returned dictionary is keyed by
-        :class:`ElasticMaterialParameter`. Its contents depend on the active
-        parameterization: density/Lame parameters or density/P- and S-wave
-        velocities.
+        :class:`ElasticMaterialParameter` and contains only the user-selected
+        controls. Without an explicit selection, it contains every parameter
+        from the material-input family.
 
         Returns
         -------
@@ -336,9 +453,7 @@ class IsotropicWave(ElasticWave):
 
         Examples
         --------
-        Lame parameterization returns ``{DENSITY: rho, LAMBDA: lmbda, MU: mu}``.
-        Velocity parameterization returns
-        ``{DENSITY: rho, P_WAVE_VELOCITY: c, S_WAVE_VELOCITY: c_s}``.
+        With ``control_parameters=["mu"]``, only ``{MU: mu}`` is returned.
         """
         parameterization = self._control_parameterization
         if parameterization is None:
@@ -346,44 +461,32 @@ class IsotropicWave(ElasticWave):
                 return None
             parameterization = ElasticMaterialParameterization.LAME
 
-        parameters = {}
-        for parameter in CONTROL_PARAMETERS_BY_PARAMETERIZATION[parameterization]:
-            if parameter is ElasticMaterialParameter.DENSITY:
-                parameters[parameter] = self.rho
-            elif parameter is ElasticMaterialParameter.LAMBDA:
-                parameters[parameter] = self.lmbda
-            elif parameter is ElasticMaterialParameter.MU:
-                parameters[parameter] = self.mu
-            elif parameter is ElasticMaterialParameter.P_WAVE_VELOCITY:
-                parameters[parameter] = self.c
-            elif parameter is ElasticMaterialParameter.S_WAVE_VELOCITY:
-                parameters[parameter] = self.c_s
-            else:
-                raise ValueError(
-                    f"Unsupported elastic control parameter '{parameter.value}'.",
-                )
-        return parameters
+        selected = self._control_parameters
+        if selected is None:
+            selected = CONTROL_PARAMETERS_BY_PARAMETERIZATION[parameterization]
+        return {
+            parameter: self._get_material_parameter(parameter)
+            for parameter in selected
+        }
 
     def set_control_parameters(self, controls):
         """Assign isotropic elastic material controls.
 
-        Control dictionaries must use :class:`ElasticMaterialParameter` keys.
-        Model input dictionaries still use the public Spyro string schema, but
-        the FWI control API is intentionally enum-only.
+        Control dictionaries must use :class:`ElasticMaterialParameter` keys
+        and may contain a non-empty subset from either material family.
+        Parameters omitted from the dictionary retain their current values.
 
         Parameters
         ----------
         controls : dict
-            Dictionary containing either density/Lame controls or density/P-
-            and S-wave velocity controls. Values may be Firedrake ``Function``
-            objects, Firedrake ``Constant`` objects, scalars, or UFL
-            expressions; all stored controls are scalar ``Function`` objects.
+            Dictionary containing a non-empty subset of density/Lame controls
+            or density/P- and S-wave velocity controls.
 
         Returns
         -------
         None
-            The method updates ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s`` and
-            the active material parameterization.
+            The method updates the selected controls, complementary material
+            expressions and active parameterization.
 
         Raises
         ------
@@ -391,24 +494,20 @@ class IsotropicWave(ElasticWave):
             If ``controls`` is not a dictionary or if any key is not an
             ``ElasticMaterialParameter``.
         ValueError
-            If the dictionary does not define one complete supported
-            parameterization.
+            If the dictionary is empty or mixes both parameter families.
 
         Examples
         --------
-        Lame controls are passed as::
+        A subset of Lame controls is passed as::
 
             {
-                ElasticMaterialParameter.DENSITY: rho,
                 ElasticMaterialParameter.LAMBDA: lmbda,
                 ElasticMaterialParameter.MU: mu,
             }
 
-        Velocity controls are passed as::
+        A single velocity control is passed as::
 
             {
-                ElasticMaterialParameter.DENSITY: rho,
-                ElasticMaterialParameter.P_WAVE_VELOCITY: c,
                 ElasticMaterialParameter.S_WAVE_VELOCITY: c_s,
             }
         """
@@ -423,62 +522,56 @@ class IsotropicWave(ElasticWave):
                 "enum values.",
             )
 
-        lame_controls = CONTROL_PARAMETERS_BY_PARAMETERIZATION[
+        lame_family = set(CONTROL_PARAMETERS_BY_PARAMETERIZATION[
             ElasticMaterialParameterization.LAME
-        ]
-        velocity_controls = CONTROL_PARAMETERS_BY_PARAMETERIZATION[
+        ])
+        velocity_family = set(CONTROL_PARAMETERS_BY_PARAMETERIZATION[
             ElasticMaterialParameterization.VELOCITY
-        ]
-        option_1 = set(controls) == set(lame_controls)
-        option_2 = set(controls) == set(velocity_controls)
-        if not (option_1 or option_2):
-            lame_names = _format_control_parameters(lame_controls)
-            velocity_names = _format_control_parameters(velocity_controls)
-            raise ValueError(
-                "Elastic controls must define either "
-                f"{lame_names} or {velocity_names}.",
-            )
+        ])
+        selected_set = set(controls)
+        current_parameterization = self._control_parameterization
+        if current_parameterization is None:
+            if selected_set == lame_family:
+                current_parameterization = ElasticMaterialParameterization.LAME
+            elif selected_set == velocity_family:
+                current_parameterization = (
+                    ElasticMaterialParameterization.VELOCITY
+                )
+            else:
+                self._initialize_model_parameters()
+                current_parameterization = self._control_parameterization
 
-        self.rho = self._as_control_field(
-            controls[ElasticMaterialParameter.DENSITY],
-            ElasticMaterialParameter.DENSITY.value,
+        parameterization, selected = self._normalize_control_parameter_selection(
+            list(controls),
+            current_parameterization,
         )
+        if parameterization is not current_parameterization:
+            self._materialize_parameterization(parameterization)
 
-        synthetic_data = {
+        for parameter, value in controls.items():
+            self._set_material_parameter(
+                parameter,
+                self._as_control_field(value, parameter.value),
+            )
+
+        self._control_parameterization = parameterization
+        self._control_parameters = selected
+        self._update_derived_material_parameters(parameterization)
+
+        primary_parameters = CONTROL_PARAMETERS_BY_PARAMETERIZATION[
+            parameterization
+        ]
+        self.input_dictionary["synthetic_data"] = {
             "type": "object",
-            "density": self.rho,
+            **{
+                parameter.value: self._get_material_parameter(parameter)
+                for parameter in primary_parameters
+            },
             "real_velocity_file": None,
+            "control_parameters": [
+                parameter.value for parameter in selected
+            ],
         }
-        if option_1:
-            self.lmbda = self._as_control_field(
-                controls[ElasticMaterialParameter.LAMBDA],
-                ElasticMaterialParameter.LAMBDA.value,
-            )
-            self.mu = self._as_control_field(
-                controls[ElasticMaterialParameter.MU],
-                ElasticMaterialParameter.MU.value,
-            )
-            self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
-            self.c_s = (self.mu/self.rho)**0.5
-            self._control_parameterization = ElasticMaterialParameterization.LAME
-            synthetic_data["lambda"] = self.lmbda
-            synthetic_data["mu"] = self.mu
-        else:
-            self.c = self._as_control_field(
-                controls[ElasticMaterialParameter.P_WAVE_VELOCITY],
-                ElasticMaterialParameter.P_WAVE_VELOCITY.value,
-            )
-            self.c_s = self._as_control_field(
-                controls[ElasticMaterialParameter.S_WAVE_VELOCITY],
-                ElasticMaterialParameter.S_WAVE_VELOCITY.value,
-            )
-            self.mu = self.rho*self.c_s**2
-            self.lmbda = self.rho*self.c**2 - 2*self.mu
-            self._control_parameterization = ElasticMaterialParameterization.VELOCITY
-            synthetic_data["p_wave_velocity"] = self.c
-            synthetic_data["s_wave_velocity"] = self.c_s
-
-        self.input_dictionary["synthetic_data"] = synthetic_data
 
     @override
     def matrix_building(self):

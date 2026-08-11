@@ -196,6 +196,26 @@ def run_taylor_test(
             ("rho", "c", "c_s"),
             id="velocity",
         ),
+        pytest.param(
+            {
+                "density": 0.12,
+                "lambda": 0.20,
+                "mu": 0.08,
+                "control_parameters": ["c_s"],
+            },
+            ("c_s",),
+            id="only-cs-from-lame",
+        ),
+        pytest.param(
+            {
+                "density": 0.12,
+                "p_wave_velocity": np.sqrt(3.0),
+                "s_wave_velocity": np.sqrt(2.0 / 3.0),
+                "control_parameters": ["lambda", "mu"],
+            },
+            ("lmbda", "mu"),
+            id="lambda-mu-from-velocity",
+        ),
     ],
 )
 def test_elastic_automated_adjoint_2d(
