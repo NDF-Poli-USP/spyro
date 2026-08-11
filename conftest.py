@@ -1,20 +1,37 @@
 import pytest
 import matplotlib
+
 matplotlib.use("Agg")
 
 
 def pytest_addoption(parser):
+    """Register custom pytest command-line options.
+
+    Parameters
+    ----------
+    parser : _pytest.config.argparsing.Parser
+        Pytest argument parser used to define custom options.
+    """
     parser.addoption(
-        "--skip-slow", action="store_true", default=False, help="skip tests marked as slow"
+        "--skip-slow",
+        action="store_true",
+        default=False,
+        help="skip tests marked as slow",
     )
     parser.addoption(
         "--only-slow", action="store_true", default=False, help="run only slow tests"
     )
     parser.addoption(
-        "--skip-high-memory", action="store_true", default=False, help="skip tests marked as high_memory"
+        "--skip-high-memory",
+        action="store_true",
+        default=False,
+        help="skip tests marked as high_memory",
     )
     parser.addoption(
-        "--only-high-memory", action="store_true", default=False, help="run only tests marked as high_memory"
+        "--only-high-memory",
+        action="store_true",
+        default=False,
+        help="run only tests marked as high_memory",
     )
     parser.addoption(
         "--skip-older-firedrake",
@@ -43,17 +60,42 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
+    """Register custom markers used by the test suite.
+
+    Parameters
+    ----------
+    config : _pytest.config.Config
+        Active pytest configuration object.
+    """
     config.addinivalue_line("markers", "slow: mark test as slow")
-    config.addinivalue_line("markers", "high_memory: mark test as requiring high memory")
     config.addinivalue_line(
-        "markers", "older_firedrake: mark test as only compatible with older firedrake versions"
+        "markers", "high_memory: mark test as requiring high memory"
     )
     config.addinivalue_line(
-        "markers", "newer_firedrake: mark test as only compatible with newer firedrake versions"
+        "markers",
+        "older_firedrake: mark test as only compatible with older firedrake versions",
+    )
+    config.addinivalue_line(
+        "markers",
+        "newer_firedrake: mark test as only compatible with newer firedrake versions",
     )
 
 
 def pytest_collection_modifyitems(config, items):
+    """Filter collected tests based on custom selection flags.
+
+    Parameters
+    ----------
+    config : _pytest.config.Config
+        Active pytest configuration object.
+    items : list[_pytest.nodes.Item]
+        Collected test items to keep or deselect in place.
+
+    Raises
+    ------
+    pytest.UsageError
+        Raised when mutually exclusive flag combinations are used.
+    """
     skip_slow = config.getoption("--skip-slow")
     only_slow = config.getoption("--only-slow")
     skip_high_memory = config.getoption("--skip-high-memory")
@@ -66,12 +108,18 @@ def pytest_collection_modifyitems(config, items):
     if skip_slow and only_slow:
         raise pytest.UsageError("Cannot use both --skip-slow and --only-slow")
     if skip_high_memory and only_high_memory:
-        raise pytest.UsageError("Cannot run both --skip and only options for high memory")
+        raise pytest.UsageError(
+            "Cannot run both --skip and only options for high memory"
+        )
 
     if skip_older_firedrake and only_older_firedrake:
-        raise pytest.UsageError("Cannot run both --skip and only options for older firedrake")
+        raise pytest.UsageError(
+            "Cannot run both --skip and only options for older firedrake"
+        )
     if skip_newer_firedrake and only_newer_firedrake:
-        raise pytest.UsageError("Cannot run both --skip and only options for newer firedrake")
+        raise pytest.UsageError(
+            "Cannot run both --skip and only options for newer firedrake"
+        )
 
     selected_items = []
     deselected = []

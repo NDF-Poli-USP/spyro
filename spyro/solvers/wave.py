@@ -188,7 +188,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        if self.abc_type != AbsorbingBCsType.HYBRID:
+        if self.abc_type in [AbsorbingBCsType.NOABCS, AbsorbingBCsType.NRBC]:
             self._initialize_model_parameters()
         if (
             self.adjoint_type == AdjointType.AUTOMATED_ADJOINT

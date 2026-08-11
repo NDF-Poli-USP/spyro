@@ -266,6 +266,11 @@ class PMLLayer(ABCLayer):
         None
         """
 
+        # Check if the velocity model exists
+        # TODO: Delete support for initial_velocity_model
+        if wave.c is None:
+            wave.c = wave.initial_velocity_model
+
         pprint("\nCreating Damping PML Profile", comm=self.comm)
 
         # New geometry with layer if pad_length is provided by the user.
@@ -274,8 +279,7 @@ class PMLLayer(ABCLayer):
             self.abc_new_geometry()
 
         # Compute the maximum damping coefficient
-        abc_pml_cmax = wave.abc_pml_cmax if wave.abc_user_pml_cmax \
-            else wave.c_bnd_max
+        abc_pml_cmax = wave.abc_pml_cmax if wave.abc_user_pml_cmax else wave.c_bnd_max
 
         self.calc_pml_damping(wave.abc_pml_R, abc_pml_cmax,
                               wave.abc_pad_length,
@@ -283,11 +287,8 @@ class PMLLayer(ABCLayer):
 
         # Mesh coordinates including the absorbing layer
         domain_layer = wave.layer_ops.abc_domain_dimensions(full_hyp=False)
-        ufl_coordinates_pml = \
-            wave.mesh_ops.get_spatial_coordinates_abc(
-                wave.mesh,
-                domain_layer,
-            )
+        ufl_coordinates_pml = wave.mesh_ops.get_spatial_coordinates_abc(wave.mesh,
+                                                                        domain_layer)
 
         # Damping fields
         self.pml_sigma_field(wave, ufl_coordinates_pml, wave.function_space,
