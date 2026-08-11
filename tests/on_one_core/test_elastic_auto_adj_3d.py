@@ -11,6 +11,9 @@ import spyro
 from pyadjoint import AdjFloat, Tape
 
 
+pytestmark = pytest.mark.newer_firedrake
+
+
 def make_dictionary(density, lmbda, mu):
     """Build the model dictionary for a small 3D isotropic elastic problem."""
     return {
@@ -90,33 +93,36 @@ def test_elastic_automated_adjoint_3d():
     wave_guess.set_mesh(input_mesh_parameters={"edge_length": 0.25, "periodic": True})
     wave_guess.real_shot_record = rec_out_exact
     wave_guess.enable_automated_adjoint()
-    wave_guess.forward_solve()
 
-    assert isinstance(wave_guess.automated_adjoint._tape, Tape), (
-        "Pyadjoint tape is not a Tape instance after forward solve."
-    )
-    assert isinstance(wave_guess.functional_value, AdjFloat), (
-        f"Expected wave_guess.functional_value to be an AdjFloat, "
-        f"got {type(wave_guess.functional_value)}."
-    )
+    try:
+        wave_guess.forward_solve()
 
-    controls = wave_guess.automated_adjoint.controls
-    assert len(controls) == 3, (
-        f"Expected three elastic controls, got {len(controls)}."
-    )
+        assert isinstance(wave_guess.automated_adjoint._tape, Tape), (
+            "Pyadjoint tape is not a Tape instance after forward solve."
+        )
+        assert isinstance(wave_guess.functional_value, AdjFloat), (
+            f"Expected wave_guess.functional_value to be an AdjFloat, "
+            f"got {type(wave_guess.functional_value)}."
+        )
 
-    wave_guess.automated_adjoint.create_reduced_functional(
-        wave_guess.functional_value
-    )
+        controls = wave_guess.automated_adjoint.controls
+        assert len(controls) == 3, (
+            f"Expected three elastic controls, got {len(controls)}."
+        )
 
-    # Exercise the default construction of one direction per control.
-    conv_rate = wave_guess.automated_adjoint.verify_gradient(controls)
-    assert conv_rate > 1.95, (
-        f"Taylor test convergence rate {conv_rate:.4f} < 1.95. "
-        "The 3D automated adjoint gradient is likely incorrect."
-    )
+        wave_guess.automated_adjoint.create_reduced_functional(
+            wave_guess.functional_value
+        )
 
-    wave_guess.automated_adjoint.clear_tape()
+        # Exercise the default construction of one direction per control.
+        conv_rate = wave_guess.automated_adjoint.verify_gradient(controls)
+        assert conv_rate > 1.95, (
+            f"Taylor test convergence rate {conv_rate:.4f} < 1.95. "
+            "The 3D automated adjoint gradient is likely incorrect."
+        )
+    finally:
+        wave_guess.automated_adjoint.clear_tape()
+
     assert wave_guess.automated_adjoint._tape is None
 
 

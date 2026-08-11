@@ -140,18 +140,28 @@ def test_get_automated_adjoint_controls_requires_initialized_controls():
         wave._get_automated_adjoint_controls()
 
 
-def test_acoustic_automated_adjoint_returns_its_single_gradient():
+@pytest.mark.parametrize(
+    ("riesz_map", "derivative_method"),
+    [
+        pytest.param(RieszMapType.L2, "compute_gradient", id="L2"),
+        pytest.param(RieszMapType.l2, "compute_derivative", id="l2"),
+    ],
+)
+def test_acoustic_automated_adjoint_returns_single_derivative(
+    riesz_map,
+    derivative_method,
+):
     wave = AcousticWave.__new__(AcousticWave)
-    gradient = object()
+    derivative = object()
     wave.functional_value = AdjFloat(1.0)
     wave.automated_adjoint = SimpleNamespace(
         reduced_functional=object(),
-        compute_gradient=lambda: [gradient],
+        **{derivative_method: lambda: [derivative]},
     )
 
-    result = wave._automated_adjoint_gradient(riesz_map=RieszMapType.L2)
+    result = wave._automated_adjoint_gradient(riesz_map=riesz_map)
 
-    assert result is gradient
+    assert result is derivative
 
 
 def test_verify_gradient_normalizes_single_control_and_direction(monkeypatch):

@@ -14,6 +14,9 @@ import spyro
 from pyadjoint import AdjFloat, Tape
 
 
+pytestmark = pytest.mark.newer_firedrake
+
+
 def make_dictionary(material_parameters):
     """Build the model dictionary for the 2D isotropic elastic wave problem.
 
@@ -144,6 +147,9 @@ def run_taylor_test(
         wave_guess.automated_adjoint.create_reduced_functional(
             wave_guess.functional_value
         )
+        gradients = wave_guess.automated_adjoint.compute_gradient()
+        assert len(gradients) == len(controls)
+        assert all(isinstance(gradient, fire.Function) for gradient in gradients)
 
         rng = np.random.default_rng(seed)
         direction = [
@@ -159,6 +165,7 @@ def run_taylor_test(
         convergence_rate = wave_guess.automated_adjoint.verify_gradient(
             controls,
             direction,
+            dJdm=gradients,
         )
         assert convergence_rate > minimum_rate, (
             "Taylor test convergence rate %.4f < %.2f. The automated "
