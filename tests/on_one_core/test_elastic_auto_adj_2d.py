@@ -1,8 +1,8 @@
 """Taylor test for the 2D isotropic elastic wave automated adjoint.
 
 Verifies that the gradient of the L2 misfit functional is correct to second
-order for both supported isotropic elastic parameterizations: (rho, lambda,
-mu) and (rho, P-wave velocity, S-wave velocity).
+order for both supported isotropic elastic parameterizations and for the
+supported natural, essential, and local absorbing boundary formulations.
 
 Based on notebook_tutorials/elastic_forward.ipynb.
 """
@@ -104,6 +104,69 @@ def exact_receiver_data():
     return get_exact_receiver_data()
 
 
+def run_taylor_test(
+    dictionary,
+    mesh_parameters,
+    real_shot_record,
+    control_attributes,
+    *,
+    seed,
+    minimum_rate=1.9,
+):
+    """Record a forward solve and verify all active material gradients."""
+    wave_guess = spyro.IsotropicWave(dictionary)
+    wave_guess.set_mesh(input_mesh_parameters=mesh_parameters)
+    wave_guess.real_shot_record = real_shot_record
+    wave_guess.enable_automated_adjoint()
+
+    try:
+        wave_guess.forward_solve()
+
+        assert isinstance(wave_guess.automated_adjoint._tape, Tape), (
+            "Pyadjoint tape is not a Tape instance after forward solve."
+        )
+        assert isinstance(wave_guess.functional_value, AdjFloat), (
+            f"Expected wave_guess.functional_value to be an AdjFloat, "
+            f"got {type(wave_guess.functional_value)}."
+        )
+
+        controls = wave_guess.automated_adjoint.controls
+        assert len(controls) == len(control_attributes), (
+            f"Expected {len(control_attributes)} elastic controls, "
+            f"got {len(controls)}."
+        )
+        assert all(
+            control is getattr(wave_guess, attribute)
+            for control, attribute in zip(controls, control_attributes)
+        ), "Automated-adjoint controls do not match the active parameterization."
+
+        wave_guess.automated_adjoint.create_reduced_functional(
+            wave_guess.functional_value
+        )
+
+        rng = np.random.default_rng(seed)
+        direction = [
+            fire.Function(
+                control.function_space(),
+                val=0.01 * rng.random(control.function_space().dim()),
+            )
+            for control in controls
+        ]
+        convergence_rate = wave_guess.automated_adjoint.verify_gradient(
+            controls,
+            direction,
+        )
+        assert convergence_rate > minimum_rate, (
+            "Taylor test convergence rate %.4f < %.2f. The automated "
+            "adjoint gradient is likely incorrect."
+            % (convergence_rate, minimum_rate)
+        )
+    finally:
+        wave_guess.automated_adjoint.clear_tape()
+
+    assert wave_guess.automated_adjoint._tape is None
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize(
     ("guess_material", "control_attributes"),
@@ -143,64 +206,123 @@ def test_elastic_automated_adjoint_2d(
     5. Verify the automated-adjoint gradient with a perturbation direction and
        check that the convergence rate exceeds 1.95 (second-order accuracy).
     """
-    # --- Guess model ---
-    wave_guess = spyro.IsotropicWave(
-        make_dictionary(guess_material)
-    )
-    wave_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05, "periodic": True})
-    wave_guess.real_shot_record = exact_receiver_data
-    # Enable automated adjoint and register the controls from the active
-    # material parameterization. This also switches to the vertex-only mesh so
-    # pyadjoint can trace the source/receiver interpolation steps.
-    wave_guess.enable_automated_adjoint()
-
-    # Forward solve: pyadjoint records every Firedrake operation on its tape.
-    # The L2 misfit functional is accumulated at each time step and stored in
-    # wave_guess.functional_value as an AdjFloat.
-    wave_guess.forward_solve()
-
-    assert isinstance(wave_guess.automated_adjoint._tape, Tape), (
-        "Pyadjoint tape is not a Tape instance after forward solve."
-    )
-    assert isinstance(wave_guess.functional_value, AdjFloat), (
-        f"Expected wave_guess.functional_value to be an AdjFloat, "
-        f"got {type(wave_guess.functional_value)}."
+    run_taylor_test(
+        make_dictionary(guess_material),
+        {"edge_length": 0.05, "periodic": True},
+        exact_receiver_data,
+        control_attributes,
+        seed=42,
+        minimum_rate=1.95,
     )
 
-    controls = wave_guess.automated_adjoint.controls
-    assert len(controls) == 3, (
-        f"Expected three elastic controls, got {len(controls)}."
-    )
-    assert all(
-        control is getattr(wave_guess, attribute)
-        for control, attribute in zip(controls, control_attributes)
-    ), "Automated-adjoint controls do not match the active parameterization."
 
-    wave_guess.automated_adjoint.create_reduced_functional(
-        wave_guess.functional_value
-    )
+LAME_GUESS = {"density": 0.12, "lambda": 0.20, "mu": 0.08}
+VELOCITY_GUESS = {
+    "density": 0.12,
+    "p_wave_velocity": np.sqrt(3.0),
+    "s_wave_velocity": np.sqrt(2.0 / 3.0),
+}
 
-    # fixed random seed for reproducibility
-    rng = np.random.default_rng(42)
-    direction = [
-        fire.Function(
-            control.function_space(),
-            val=0.01 * rng.random(control.function_space().dim()),
-        )
-        for control in controls
-    ]
-    conv_rate = wave_guess.automated_adjoint.verify_gradient(
-        controls,
-        direction,
-    )
-    assert conv_rate > 1.95, (
-        f"Taylor test convergence rate {conv_rate:.4f} < 1.95. "
-        "The automated adjoint gradient is likely incorrect."
-    )
 
-    # Clean up the pyadjoint tape.
-    wave_guess.automated_adjoint.clear_tape()
-    assert wave_guess.automated_adjoint._tape is None
+def nrbc_settings(local_abc, time_scheme):
+    """Build the input dictionary section for an elastic local ABC."""
+    return {
+        "absorving_boundary_conditions": {
+            "status": True,
+            "abc_type": "nrbc",
+            "nrbc": {
+                "type": local_abc,
+                "dt_scheme": time_scheme,
+            },
+        },
+    }
+
+
+BOUNDARY_CASES = [
+    pytest.param(
+        LAME_GUESS,
+        {},
+        ("rho", "lmbda", "mu"),
+        id="natural-traction-free",
+    ),
+    pytest.param(
+        LAME_GUESS,
+        {
+            "boundary_conditions": [
+                ("u", "on_boundary", fire.Constant((0.0, 0.0)))
+            ]
+        },
+        ("rho", "lmbda", "mu"),
+        id="homogeneous-dirichlet",
+    ),
+    pytest.param(
+        VELOCITY_GUESS,
+        nrbc_settings("Stacey", "backward"),
+        ("rho", "c", "c_s"),
+        id="stacey-backward",
+    ),
+    pytest.param(
+        VELOCITY_GUESS,
+        nrbc_settings("CE_A1", "backward"),
+        ("rho", "c", "c_s"),
+        id="clayton-engquist-a1-backward",
+    ),
+    pytest.param(
+        VELOCITY_GUESS,
+        nrbc_settings("Stacey", "central"),
+        ("rho", "c", "c_s"),
+        id="stacey-central",
+    ),
+    pytest.param(
+        VELOCITY_GUESS,
+        nrbc_settings("Stacey", "backward_2nd"),
+        ("rho", "c", "c_s"),
+        id="stacey-backward-2nd",
+    ),
+]
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    ("guess_material", "boundary_settings", "control_attributes"),
+    BOUNDARY_CASES,
+)
+def test_elastic_automated_adjoint_boundary_conditions(
+    guess_material,
+    boundary_settings,
+    control_attributes,
+):
+    """Taylor-test supported elastic boundary formulations and time schemes."""
+    dictionary = make_dictionary(guess_material)
+    dictionary.update(boundary_settings)
+    dictionary["acquisition"].update({
+        "frequency": 10.0,
+        "receiver_locations": spyro.create_transect(
+            (-0.2, 0.25),
+            (-0.2, 0.75),
+            5,
+        ),
+    })
+    dictionary["time_axis"].update({
+        "final_time": 0.4,
+        "dt": 0.001,
+    })
+
+    number_of_steps = int(
+        dictionary["time_axis"]["final_time"]
+        / dictionary["time_axis"]["dt"]
+    ) + 1
+    # A zero target still exercises the complete reduced-functional gradient,
+    # while avoiding a second forward solve for every boundary formulation.
+    observed_data = np.zeros((number_of_steps, 5, 2))
+
+    run_taylor_test(
+        dictionary,
+        {"edge_length": 0.1, "periodic": False},
+        observed_data,
+        control_attributes,
+        seed=84,
+    )
 
 
 if __name__ == "__main__":
