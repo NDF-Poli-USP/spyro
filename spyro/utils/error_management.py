@@ -441,6 +441,7 @@ def type_data_structure_error(par_name, par_value, expected_type,
             expected_type_element = (expected_type_element,)
         for etype in expected_type_element:
             value_parameter_error("expected_type_element", etype, element_map.keys())
+
         expected_types = tuple(element_map[etype] for etype in expected_type_element)
         expected_types += (int32, int64,) if "int" in expected_type_element else ()
         expected_types += (float32, float64,) if "float" in expected_type_element else ()
