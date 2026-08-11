@@ -343,7 +343,16 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @abstractmethod
     def initialize_model_parameters(self):
-        """Initialize the material parameters required by the wave solver."""
+        """Initialize the material parameters required by the wave solver.
+
+        Concrete wave classes define their accepted inputs and physical
+        parameterizations.
+
+        Returns
+        -------
+        None
+            Implementations update their material fields in place.
+        """
         pass
 
     @abstractmethod
@@ -521,6 +530,33 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         The materialized field is returned even when ``target`` is provided,
         allowing callers to preserve the original input space when needed.
+
+        Parameters
+        ----------
+        *args : object
+            Positional arguments forwarded to
+            :func:`spyro.io.material_properties_io.set_material_property`.
+            They normally identify the property name and function-space type.
+        target : firedrake.Function, optional
+            Existing field updated in place with the materialized property.
+            ``assign`` is used for equal spaces and ``interpolate`` otherwise.
+        **kwargs : object
+            Material input forwarded to the I/O engine. The convenience
+            keyword ``value`` accepts a scalar, Firedrake ``Function``, file or
+            grid declaration, or UFL expression, and is translated to the
+            corresponding engine input.
+
+        Returns
+        -------
+        firedrake.Function
+            Materialized field before transfer to ``target``. This preserves
+            the input function space when the I/O engine creates one.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is combined with another material input or the I/O
+            engine receives an invalid input combination.
         """
         value = kwargs.pop("value", None)
         if value is not None:
@@ -550,6 +586,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             *args,
             **kwargs
         )
+        # Preserve the identity of fields already referenced by forms and
+        # inversion controls, while still accepting compatible foreign spaces.
         if target is not None and target is not material_field:
             if material_field.function_space() == target.function_space():
                 target.assign(material_field)
@@ -563,6 +601,23 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         .. deprecated::
             Use :meth:`set_material_property` instead. This wrapper forwards
             every argument unchanged and will be removed in a future release.
+
+        Parameters
+        ----------
+        *args : object
+            Positional arguments forwarded to ``set_material_property``.
+        **kwargs : object
+            Keyword arguments forwarded to ``set_material_property``.
+
+        Returns
+        -------
+        firedrake.Function
+            Materialized property returned by ``set_material_property``.
+
+        Warns
+        -----
+        DeprecationWarning
+            Every call warns that the singular method name is canonical.
         """
         warnings.warn(
             "set_material_properties() is deprecated; use "

@@ -73,8 +73,50 @@ class IsotropicWave(ElasticWave):
                                          lambda: assemble(self.mechanical_energy))
 
     def initialize_model_parameters(self, synthetic_data=None):
-        """Initialize isotropic-elastic material parameters."""
+        """Initialize or update isotropic-elastic material parameters.
+
+        The input must select exactly one control parameterization: density
+        with the two Lame parameters, or density with P- and S-wave velocities.
+        Within the current function space, all five material fields remain
+        stable Firedrake ``Function`` objects; supplied controls are assigned
+        in place and the complementary fields are derived from them.
+
+        Parameters
+        ----------
+        synthetic_data : dict, optional
+            Public Spyro material declaration. It must contain
+            ``type="object"`` and either ``density``, ``lambda``, ``mu`` or
+            ``density``, ``p_wave_velocity``, ``s_wave_velocity``. Supported
+            aliases are ``lmbda`` and ``lame_first`` for ``lambda``, and
+            ``lame_second`` for ``mu``. Values may be scalars, Firedrake
+            ``Constant`` or ``Function`` objects, or UFL expressions. When
+            omitted, the declaration from ``input_dictionary`` is used on the
+            first call; later calls recompute complementary parameters from
+            the current controls.
+
+        Returns
+        -------
+        None
+            The method updates ``rho``, ``lmbda``, ``mu``, ``c``, and ``c_s``
+            in place and records the active control parameterization.
+
+        Raises
+        ------
+        ValueError
+            If the declaration is missing, has an invalid type, or does not
+            define exactly one supported parameterization.
+        NotImplementedError
+            If ``synthetic_data`` requests file-based elastic initialization.
+
+        Notes
+        -----
+        An explicit ``synthetic_data`` always replaces the current controls,
+        while a call without it preserves the controls and only recomputes the
+        complementary fields.
+        """
         parameterization = self._control_parameterization
+        # Explicit data is a replacement request. Without it, an initialized
+        # model only needs its derived fields refreshed after control updates.
         if synthetic_data is not None or parameterization is None:
             data = synthetic_data
             if data is None:
@@ -92,6 +134,8 @@ class IsotropicWave(ElasticWave):
                 raise ValueError(f"Invalid synthetic data type: {data['type']}")
 
             values = {}
+            # Resolve the public canonical names and backward-compatible aliases
+            # before validating the selected physical parameterization.
             for parameter in ElasticMaterialParameter:
                 names = (
                     parameter.value,
@@ -126,6 +170,8 @@ class IsotropicWave(ElasticWave):
             elif self.function_space is None:
                 self.force_rebuild_function_space()
 
+            # These targets are created with the function space and assigned in
+            # place so forms and external control references remain valid.
             fields = {
                 ElasticMaterialParameter.DENSITY: self.rho,
                 ElasticMaterialParameter.LAMBDA: self.lmbda,
@@ -144,9 +190,11 @@ class IsotropicWave(ElasticWave):
             self._control_parameterization = parameterization
 
         if parameterization is ElasticMaterialParameterization.LAME:
+            # Lame controls determine the two wave-speed fields.
             self.c.interpolate(((self.lmbda + 2*self.mu)/self.rho)**0.5)
             self.c_s.interpolate((self.mu/self.rho)**0.5)
         else:
+            # Velocity controls determine the two Lame-parameter fields.
             self.mu.interpolate(self.rho*self.c_s**2)
             self.lmbda.interpolate(self.rho*self.c**2 - 2*self.mu)
         self._model_parameters_initialized = True
@@ -157,6 +205,15 @@ class IsotropicWave(ElasticWave):
                                      dim=self.dimension)
 
     def _build_function_space(self):
+        """Build displacement and scalar elastic-material spaces.
+
+        Returns
+        -------
+        None
+            The method creates stable zero-valued fields for density, Lame
+            parameters, and P- and S-wave velocities, then clears the active
+            parameterization.
+        """
         super()._build_function_space()
         V = create_function_space(self.mesh, self.method, self.degree)
         self.scalar_function_space = V
