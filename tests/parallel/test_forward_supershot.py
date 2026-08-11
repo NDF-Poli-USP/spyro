@@ -103,7 +103,7 @@ def test_forward_supershot():
     comm.comm.barrier()
 
     assert abs(error_rm) < 0.01 and abs(error_it) < 0.01 and abs(error_pk) < 0.01, \
-        f"Error is too high for forward test with supershot."
+        "Error is too high for forward test with supershot."
 
     pprint(f"Combined NRMS error for shots {wave.current_sources} is {error_rm} "
            f"and test has passed equals {abs(error_rm) < 0.01}", comm=comm)

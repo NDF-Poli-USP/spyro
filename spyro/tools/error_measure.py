@@ -1,5 +1,5 @@
 from os import getcwd
-from numpy import inf, load, pad, save, savetxt, trapezoid, zeros
+from numpy import inf, load, pad, save, savetxt, trapezoid
 from numpy.linalg import norm
 from scipy.signal import find_peaks
 from ..io.basicio import parallel_print as pprint

@@ -1,7 +1,6 @@
 from pytest import mark
 from mpi4py.MPI import COMM_WORLD
 from mpi4py import MPI
-from numpy.linalg import norm
 from firedrake import conditional
 import spyro
 from spyro.io.basicio import parallel_print as pprint
@@ -102,7 +101,7 @@ def test_forward_3_shots():
     error_pk = COMM_WORLD.allreduce(errPk, op=MPI.SUM) / 3.
 
     assert abs(error_rm) < 0.01 and abs(error_it) < 0.01 and abs(error_pk) < 0.01, \
-        f"Error is too high for forward test."
+        "Error is too high for forward test."
 
 
 if __name__ == "__main__":
