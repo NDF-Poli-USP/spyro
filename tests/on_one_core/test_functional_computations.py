@@ -2,8 +2,10 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from spyro.solvers.acoustic_wave import AcousticWave
+from spyro.solvers.automatic_differentiation_solver import AutomatedAdjoint
 from spyro.solvers.wave import Wave
 from spyro.utils.typing import FunctionalEvaluationMode
 
@@ -96,6 +98,45 @@ def test_compute_functional_accepts_after_solve_mode():
 
     wave.functional_evaluation_mode = FunctionalEvaluationMode.AFTER_SOLVE
     assert wave.functional_evaluation_mode == FunctionalEvaluationMode.AFTER_SOLVE
+
+
+def test_automated_adjoint_normalizes_controls_to_a_list():
+    control = object()
+
+    assert AutomatedAdjoint(None, control).controls == [control]
+    assert AutomatedAdjoint(None, (control,)).controls == [control]
+    assert AutomatedAdjoint(None, [control]).controls == [control]
+
+
+def test_automated_adjoint_rejects_an_empty_control_list():
+    automated_adjoint = AutomatedAdjoint(None)
+
+    with pytest.raises(ValueError, match="At least one control"):
+        automated_adjoint.create_reduced_functional(functional=None)
+
+
+def test_get_automated_adjoint_controls_uses_a_list_for_acoustics():
+    wave = _build_wave()
+    control = object()
+    wave.get_control_parameters = lambda: control
+
+    assert wave._get_automated_adjoint_controls() == [control]
+
+
+def test_get_automated_adjoint_controls_follows_elastic_parameterization():
+    wave = _build_wave()
+    controls = {"density": object(), "p_velocity": object(), "s_velocity": object()}
+    wave.get_control_parameters = lambda: controls
+
+    assert wave._get_automated_adjoint_controls() == list(controls.values())
+
+
+def test_get_automated_adjoint_controls_requires_initialized_controls():
+    wave = _build_wave()
+    wave.get_control_parameters = lambda: None
+
+    with pytest.raises(ValueError):
+        wave._get_automated_adjoint_controls()
 
 
 def _base_functional_dictionary():

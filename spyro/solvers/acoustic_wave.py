@@ -108,9 +108,10 @@ class AcousticWave(Wave):
 
         Returns:
         --------
-        dJ: Firedrake 'Function' or Firedrake 'Cofunction'
-            Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
-            depending on the chosen Riesz map.
+        dJ: Firedrake object or list of Firedrake objects
+            Implemented adjoint returns one ``Function``. Automated adjoint
+            returns a list of ``Function`` or ``Cofunction`` objects, even for
+            the single acoustic velocity control.
         """
         if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
             return self._automated_adjoint_gradient(riesz_map=riesz_map)
@@ -162,9 +163,9 @@ class AcousticWave(Wave):
 
         Returns:
         --------
-        dJ: Firedrake 'Function' or Firedrake 'Cofunction'
-            Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
-            depending on the chosen Riesz map.
+        dJ: list of Firedrake 'Function' or Firedrake 'Cofunction'
+            Gradients (Functions) or derivatives (Cofunctions) with respect to
+            the controls, depending on the chosen Riesz map.
         """
         if not isinstance(self.functional_value, AdjFloat):
             raise ValueError(

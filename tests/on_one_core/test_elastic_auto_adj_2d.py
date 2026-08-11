@@ -1,8 +1,8 @@
 """Taylor test for the 2D isotropic elastic wave automated adjoint.
 
-Verifies that the gradient of the L2 misfit functional with respect to the
-three isotropic elastic material parameters (rho, lambda, mu) computed via
-pyadjoint is correct to second order.
+Verifies that the gradient of the L2 misfit functional is correct to second
+order for both supported isotropic elastic parameterizations: (rho, lambda,
+mu) and (rho, P-wave velocity, S-wave velocity).
 
 Based on notebook_tutorials/elastic_forward.ipynb.
 """
@@ -14,17 +14,14 @@ import spyro
 from pyadjoint import AdjFloat, Tape
 
 
-def make_dictionary(density, lmbda, mu):
+def make_dictionary(material_parameters):
     """Build the model dictionary for the 2D isotropic elastic wave problem.
 
     Parameters
     ----------
-    density : float
-        Material density.
-    lmbda : float
-        First Lame parameter.
-    mu : float
-        Second Lame parameter.
+    material_parameters : dict
+        Either density with the two Lame parameters, or density with P- and
+        S-wave velocities.
 
     Returns
     -------
@@ -79,9 +76,7 @@ def make_dictionary(density, lmbda, mu):
         },
         "synthetic_data": {
             "type": "object",
-            "density": density,
-            "lambda": lmbda,
-            "mu": mu,
+            **material_parameters,
             "real_velocity_file": None,
         },
     }
@@ -90,26 +85,50 @@ def make_dictionary(density, lmbda, mu):
 def get_exact_receiver_data():
     """Run the 'exact' forward model and return the receiver data.
 
-    Parameters
-    ----------
-    edge_length : float
-        Mesh edge length for the exact model.
-
     Returns
     -------
     numpy.ndarray
         Receiver time series from the exact forward solve.
     """
     wave_exact = spyro.IsotropicWave(
-        make_dictionary(density=0.1, lmbda=0.025, mu=0.1)
+        make_dictionary({"density": 0.1, "lambda": 0.025, "mu": 0.1})
     )
     wave_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1, "periodic": True})
     wave_exact.forward_solve()
     return wave_exact.forward_solution_receivers
 
 
+@pytest.fixture(scope="module")
+def exact_receiver_data():
+    """Reuse the observed solve across both control parameterizations."""
+    return get_exact_receiver_data()
+
+
 @pytest.mark.slow
-def test_elastic_automated_adjoint_2d():
+@pytest.mark.parametrize(
+    ("guess_material", "control_attributes"),
+    [
+        pytest.param(
+            {"density": 0.12, "lambda": 0.20, "mu": 0.08},
+            ("rho", "lmbda", "mu"),
+            id="lame",
+        ),
+        pytest.param(
+            {
+                "density": 0.12,
+                "p_wave_velocity": np.sqrt(3.0),
+                "s_wave_velocity": np.sqrt(2.0 / 3.0),
+            },
+            ("rho", "c", "c_s"),
+            id="velocity",
+        ),
+    ],
+)
+def test_elastic_automated_adjoint_2d(
+    exact_receiver_data,
+    guess_material,
+    control_attributes,
+):
     """Taylor test for the automated adjoint of the 2D isotropic elastic wave.
 
     Runs the following workflow:
@@ -120,21 +139,19 @@ def test_elastic_automated_adjoint_2d():
        adjoint so that pyadjoint records the computation on a tape.
     3. Run the guess forward solve; the L2 misfit functional is accumulated
        per time step as a pyadjoint-annotated AdjFloat.
-    4. Build the reduced functional J(rho, lambda, mu).
+    4. Build the reduced functional for the active material controls.
     5. Verify the automated-adjoint gradient with a perturbation direction and
        check that the convergence rate exceeds 1.95 (second-order accuracy).
     """
-    rec_out_exact = get_exact_receiver_data()
-
     # --- Guess model ---
     wave_guess = spyro.IsotropicWave(
-        make_dictionary(density=0.12, lmbda=0.20, mu=0.08)
+        make_dictionary(guess_material)
     )
     wave_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05, "periodic": True})
-    wave_guess.real_shot_record = rec_out_exact
-    # Enable automated adjoint: sets up the pyadjoint tape and registers c as
-    # the control. Also switches to vertex-only mesh for the source/receiver
-    # assembly so that pyadjoint can trace through the interpolation steps.
+    wave_guess.real_shot_record = exact_receiver_data
+    # Enable automated adjoint and register the controls from the active
+    # material parameterization. This also switches to the vertex-only mesh so
+    # pyadjoint can trace the source/receiver interpolation steps.
     wave_guess.enable_automated_adjoint()
 
     # Forward solve: pyadjoint records every Firedrake operation on its tape.
@@ -154,6 +171,10 @@ def test_elastic_automated_adjoint_2d():
     assert len(controls) == 3, (
         f"Expected three elastic controls, got {len(controls)}."
     )
+    assert all(
+        control is getattr(wave_guess, attribute)
+        for control, attribute in zip(controls, control_attributes)
+    ), "Automated-adjoint controls do not match the active parameterization."
 
     wave_guess.automated_adjoint.create_reduced_functional(
         wave_guess.functional_value
@@ -183,4 +204,4 @@ def test_elastic_automated_adjoint_2d():
 
 
 if __name__ == "__main__":
-    test_elastic_automated_adjoint_2d()
+    pytest.main([__file__])

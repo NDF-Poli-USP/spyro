@@ -189,7 +189,10 @@ def test_gradient_auto_adjoint(PML=True):
     direction = fire.Function(
         Wave_obj_guess.c.function_space(), val=np.random.default_rng(0).random(size))
     assert Wave_obj_guess.automated_adjoint.verify_gradient(
-        Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.9, \
+        Wave_obj_guess.automated_adjoint.controls,
+        direction=[direction],
+        dJdm=dJ,
+    ) > 1.9, \
         "Automated adjoint gradient verification failed."
 
     Wave_obj_guess.automated_adjoint.clear_tape()

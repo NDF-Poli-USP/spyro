@@ -7,7 +7,6 @@ mu.
 
 import numpy as np
 import pytest
-import firedrake as fire
 import spyro
 from pyadjoint import AdjFloat, Tape
 
@@ -110,18 +109,8 @@ def test_elastic_automated_adjoint_3d():
         wave_guess.functional_value
     )
 
-    rng = np.random.default_rng(43)
-    direction = [
-        fire.Function(
-            control.function_space(),
-            val=0.1 * rng.random(control.function_space().dim()),
-        )
-        for control in controls
-    ]
-    conv_rate = wave_guess.automated_adjoint.verify_gradient(
-        controls,
-        direction,
-    )
+    # Exercise the default construction of one direction per control.
+    conv_rate = wave_guess.automated_adjoint.verify_gradient(controls)
     assert conv_rate > 1.95, (
         f"Taylor test convergence rate {conv_rate:.4f} < 1.95. "
         "The 3D automated adjoint gradient is likely incorrect."

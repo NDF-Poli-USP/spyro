@@ -1,4 +1,5 @@
 from abc import abstractmethod, ABCMeta
+from collections.abc import Mapping
 import warnings
 import firedrake as fire
 
@@ -189,26 +190,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         if self.abc_type != AbsorbingBCsType.HYBRID:
             self._initialize_model_parameters()
-            if (
-                self.adjoint_type == AdjointType.AUTOMATED_ADJOINT
-                and self.automated_adjoint is not None
-                and self.automated_adjoint.controls is None
-            ):
-                # Only the elastic path gets here: enable_automated_adjoint
-                # already installs the acoustic control (self.c).
-                if (
-                    self.rho is not None
-                    and self.lmbda is not None
-                    and self.mu is not None
-                ):
-                    self.automated_adjoint.controls = [
-                        self.rho, self.lmbda, self.mu,
-                    ]
-                else:
-                    raise ValueError(
-                        "For elastic wave, must provide {rho, lambda, mu} as "
-                        "scalars or Functions to use automated adjoint."
-                    )
+        if (
+            self.adjoint_type == AdjointType.AUTOMATED_ADJOINT
+            and self.automated_adjoint is not None
+        ):
+            # Model initialization may replace scalar inputs with new Function
+            # objects, so refresh the controls before recording every solve.
+            self.automated_adjoint.controls = self._get_automated_adjoint_controls()
         self.matrix_building()
         self.wave_propagator()
 
@@ -633,20 +621,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
         self._initialize_model_parameters()
-        if self.c is None:
-            raise ValueError(
-                "self.c must be set before enabling automated adjoint."
-                "Please set the velocity model using set_initial_velocity_model()"
-                "or set c directly."
-            )
-        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
-            # Elastic inversion controls are the material parameters
-            # {rho, lambda, mu}, not the derived P-wave velocity. They are only
-            # available as Functions once the model parameters are built, so
-            # leave them unset here; forward_solve installs them.
-            controls = None
-        else:
-            controls = self.c
+        controls = self._get_automated_adjoint_controls()
         # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
         # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
         # that the reduced functional is built as an
@@ -655,6 +630,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
         self.functional_value = None
         self.misfit = None
+
+    def _get_automated_adjoint_controls(self):
+        """Return the active model parameters as a list of AD controls."""
+        controls = self.get_control_parameters()
+        if controls is None:
+            raise ValueError(
+                "Control parameters must be initialized before enabling "
+                "automated adjoint."
+            )
+        if isinstance(controls, Mapping):
+            controls = controls.values()
+        elif not isinstance(controls, (list, tuple)):
+            controls = [controls]
+        return list(controls)
 
     def enable_implemented_adjoint(self):
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
