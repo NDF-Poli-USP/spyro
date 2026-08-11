@@ -76,6 +76,12 @@ class TestMeasureError:
         assert_array_equal(result1[:3], signal1)
         assert result1[3] == 0 and result1[4] == 0
 
+        result2, result1 = MeasureError.check_signal_lengths(signal2, signal1)
+        assert len(result1) == len(result2) == 5
+        assert_array_equal(result2, signal2)
+        assert_array_equal(result1[:3], signal1)
+        assert result1[3] == 0 and result1[4] == 0
+
     def test_peak_error_identical_signals(self):
         """Test peak error with identical signals."""
         signal = array([0, 1, 2, 3, 2, 1, 0])
