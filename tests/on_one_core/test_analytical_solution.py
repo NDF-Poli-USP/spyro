@@ -40,7 +40,6 @@ def test_analytical_solution(use_vertex_only_mesh):
         wave, offset, c_value
     )
 
-    time_vector = linspace(0.0, 1.0, int(1.0 / wave.dt) + 1)
     wave.forward_solve()
     numerical_p = wave.forward_solution_receivers
     numerical_p = numerical_p.flatten()
@@ -55,7 +54,7 @@ def test_analytical_solution(use_vertex_only_mesh):
     pprint(f"Integral Error ({vom_label}) = {errIt:.4e}", comm=comm)
     pprint(f"Peak Error ({vom_label}) = {errPk:.4e}", comm=comm)
 
-    assert eNRMS < 1e-3 and errIt < 1e-3 and errPk < 1e-3,\
+    assert eNRMS < 1e-3 and errIt < 1e-3 and errPk < 1e-3, \
         "Error is too high for analytical solution test."
 
 

@@ -123,7 +123,7 @@ def test_forward_3_shots():
     comm.comm.barrier()
 
     assert abs(eNRMS) < 0.01 and abs(errIt) < 0.01 and abs(errPk) < 0.01, \
-        f"Error is too high for forward test with multiple shots."
+        "Error is too high for forward test with multiple shots."
 
     pprint(f"Combined NRMS error for all shots is {eNRMS:.4e} and test "
            f"has passed equals {abs(eNRMS) < 0.01}", comm=comm)

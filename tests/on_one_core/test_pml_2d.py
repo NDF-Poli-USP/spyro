@@ -88,8 +88,8 @@ def run_forward():
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.02})
 
     z = wave.mesh_z
-    cond = fire.conditional(
-        z > -0.333, 1.5, fire.conditional(z > -0.667, 3.0, 4.5)
+    cond = conditional(
+        z > -0.333, 1.5, conditional(z > -0.667, 3.0, 4.5)
     )
     wave.set_initial_velocity_model(conditional=cond)
     wave.forward_solve()

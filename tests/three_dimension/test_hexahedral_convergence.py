@@ -1,4 +1,3 @@
-import numpy as np
 from firedrake import COMM_WORLD as comm
 from numpy import pi, save, sqrt
 import spyro
@@ -120,7 +119,7 @@ def test_3d_hexa_one_source_propagation():
     errPk = MeasureError().peak_error(p_numeric, p_analytic)[0]
 
     assert abs(eNRMS) < 0.02 and abs(errIt) < 0.02 and abs(errPk) < 0.02, \
-        f"Error is too high for forward test with hexahedral mesh."
+        "Error is too high for forward test with hexahedral mesh."
 
     pprint(f"NRMS Error = {eNRMS:.4e}", comm=comm)
     pprint(f"Integral Error = {errIt:.4e}", comm=comm)

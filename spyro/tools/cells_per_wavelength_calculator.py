@@ -496,7 +496,7 @@ def error_calc(receivers, analytical, dt):
     time_vector_rec = np.linspace(0.0, final_time, rec_len)
     time_vector_ana = np.linspace(0.0, final_time, len(analytical[:, 0]))
     ana = np.zeros(np.shape(receivers))
-    for i in range(num_rec):
+    for i in range(number_of_receivers):
         ana[:, i] = np.interp(time_vector_rec, time_vector_ana, analytical[:, i])
 
     error = spyro.tools.error_measure.MeasureError().error_measures(

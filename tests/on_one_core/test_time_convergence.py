@@ -111,7 +111,6 @@ def test_second_order_time_convergence(with_pml):
         rec_out = run_forward(dt, with_pml=with_pml)
         rec_anal = load(analytical_files[i])
         time = linspace(0.0, 1.0, int(1.0 / dts[i]) + 1)
-        nt = len(time)
         numerical_results.append(rec_out.flatten())
         errors.append(MeasureError().normalized_root_mean_square_error(
             rec_out.flatten(), rec_anal))
