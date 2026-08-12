@@ -1,6 +1,13 @@
-# This file contains methods for sizing an absorbing layer
+"""This file contains methods for sizing an absorbing layer.
+
+The criterion for the size of the absorbing layer is based on the reflection
+coefficient and the attenuation amplitude factor. The size of the absorbing
+layer is determined by finding the roots of a function combining these factors.
+"""
+
 from ..io.basicio import parallel_print as pprint
 from numpy import array, ceil, cos, exp, floor, log10, pi, round, sin
+from ..utils.error_management import value_parameter_error, value_numerical_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -11,14 +18,14 @@ from numpy import array, ceil, cos, exp, floor, log10, pi, round, sin
 # With additions by Alexandre Olender.
 
 
-def f_layer(x, a_par, vibration_mode=1, damping_ratio=0.999, function_type='FL'):
-    """
-    Function whose zeros are solution for the parameter size of the layer.
+def f_layer(factor_length_pad, a_par, vibration_mode=1,
+            damping_ratio=0.999, function_type="FL"):
+    """Function whose zeros are solution for the parameter size of the layer.
 
     Parameters
     ----------
-    x : `float`
-        Size  parameter of the absorbing layer (F_L).
+    factor_length_pad : `float`
+        Size parameter of the absorbing layer (F_L).
     a_par : `float`
         Adimensional propagation speed parameter (a = z / f, z = c / l).
         Also, 'z' parameter is the inverse of the minimum Eikonal (1 / phi_min).
@@ -41,7 +48,7 @@ def f_layer(x, a_par, vibration_mode=1, damping_ratio=0.999, function_type='FL')
     -------
     Let c = 1.5 km/s, l = 1.2 km, m=1, s=0.999
 
-    Zeros for  f = 5Hz, a = 0.25
+    Zeros for f = 5Hz, a = 0.25
     Expected: F_L1=0.1917, F_L2=0.2682, F_L3=0.2981, F_L4=0.4130, F_L5=0.4244
     Tol 1e-2: F_L1=0.1917, F_L2=0.2682, F_L3=0.2981, F_L4=0.4131, F_L5=0.4244
     Tol 1e-3: F_L1=0.1917, F_L2=0.2682, F_L3=0.2981, F_L4=0.4131, F_L5=0.4244
@@ -55,6 +62,17 @@ def f_layer(x, a_par, vibration_mode=1, damping_ratio=0.999, function_type='FL')
     Tol 1e-4: F_L1=0.4259, F_L2=0.5959, F_L3=0.6624, F_L4=0.9179, F_L5=0.9431
     Tol 1e-5: F_L1=0.4259, F_L2=0.5959, F_L3=0.6624, F_L4=0.9179, F_L5=0.9431
     """
+
+    # Checking input parameters
+    x = value_numerical_error("factor_length_pad", factor_length_pad, float_num=True,
+                              lower_bound=0., include_lower_bound=True)
+    value_numerical_error("Parameter a", a_par, float_num=True, lower_bound=0.)
+    value_numerical_error("vibration_mode", vibration_mode, float_num=False,
+                          integer_num=True, lower_bound=1, include_lower_bound=True)
+    value_numerical_error("damping_ratio", damping_ratio, float_num=True,
+                          integer_num=False, lower_bound=0., upper_bound=1.,
+                          include_lower_bound=True, include_upper_bound=True)
+    value_parameter_error("function_type", function_type, ["FL", "CR"])
 
     # Reflection coefficient
     s = damping_ratio
@@ -152,6 +170,15 @@ def loop_roots(a_par, lmin, lref, max_roots, tol_rel=1e-3, show_ig=True, monitor
     FLpos : `list`
         Possible size parameters for the absorbing layer without rounding.
     """
+
+    # Checking input parameters
+    value_numerical_error("Parameter a", a_par, float_num=True, lower_bound=0.)
+    value_numerical_error("lmin", lmin, float_num=True, lower_bound=0)
+    value_numerical_error("lref", lref, float_num=True, lower_bound=0)
+    value_numerical_error("max_roots", max_roots, float_num=False,
+                          integer_num=True, lower_bound=1, include_lower_bound=True)
+    value_numerical_error("tol_rel", tol_rel, float_num=True, integer_num=False,
+                          lower_bound=0., upper_bound=0.01)
 
     # Initial guess
     FLmin = 0.5 * lmin / lref
@@ -283,7 +310,7 @@ def roundFL(lmin, lref, factor_length_pad):
     Parameters
     ----------
     factor_length_pad : `float`
-        Size parameter of the absorbing layer.
+        Size parameter of the absorbing layer (F_L).
     lmin : `float`
         Minimum mesh size.
     lref : `float`
@@ -299,6 +326,12 @@ def roundFL(lmin, lref, factor_length_pad):
         Number of elements in the layer of edge length 'lmin'.
     """
 
+    # Checking input parameters
+    value_numerical_error("lmin", lmin, float_num=True, lower_bound=0)
+    value_numerical_error("lref", lref, float_num=True, lower_bound=0)
+    value_numerical_error("factor_length_pad", factor_length_pad, float_num=True,
+                          lower_bound=0., include_lower_bound=True)
+
     # Adjusting the parameter size of the layer
     factor_length_pad = (lmin / lref) * ceil(lref * factor_length_pad / lmin)
 
@@ -306,7 +339,7 @@ def roundFL(lmin, lref, factor_length_pad):
     pad_length = factor_length_pad * lref
 
     # Number of elements in the layer
-    ele_pad = int(pad_length / lmin)
+    ele_pad = int(round(pad_length / lmin, 15))  # Avoid floating point errors
 
     pprint("\nModifying Layer Size Based on the Element Size")
     pprint(f"Modified Parameter Size FL: {factor_length_pad:.4f}")
