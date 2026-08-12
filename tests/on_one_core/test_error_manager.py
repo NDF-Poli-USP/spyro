@@ -834,7 +834,7 @@ class TestValueFileError:
             "file.tXt",
         ],
     )
-    def test_validate_file_case_insensitive(filename):
+    def test_validate_file_case_insensitive(self, filename):
         assert (
             validate_file(
                 "file",
