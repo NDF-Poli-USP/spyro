@@ -7,7 +7,8 @@ layer is determined by finding the roots of a function combining these factors.
 
 from ..io.basicio import parallel_print as pprint
 from numpy import array, ceil, cos, exp, floor, log10, pi, round, sin
-from ..utils.error_management import value_parameter_error, value_numerical_error
+from ..utils.error_management import (sanitize_num_array, type_data_structure_error,
+                                      value_parameter_error, value_numerical_error)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -24,8 +25,10 @@ def f_layer(factor_length_pad, a_par, vibration_mode=1,
 
     Parameters
     ----------
-    factor_length_pad : `float`
-        Size parameter of the absorbing layer (F_L).
+    factor_length_pad : `float` or `array`
+        Size parameter of the absorbing layer (F_L). When an array is provided,
+        the function returns an array of values of the same size. It is useful
+        for creating plots of the function (see spyro.plots.plots_habc).
     a_par : `float`
         Adimensional propagation speed parameter (a = z / f, z = c / l).
         Also, 'z' parameter is the inverse of the minimum Eikonal (1 / phi_min).
@@ -35,14 +38,14 @@ def f_layer(factor_length_pad, a_par, vibration_mode=1,
         Damping ratio (s). Default is 0.999.
     function_type : `str`, optional
         Type of function to be computed. Default is 'FL'.
-        Options: 'FL' (size layer criterion) or 'CR' (reflection coeficient).
+        Options: "FL" (size layer criterion) or "CR"(reflection coeficient).
 
     Returns
     -------
     CritFL: `float`
         Value of the function for the size criterion computed as CritFL = CR - RF.
     CR: `float`
-        Value for the reflection coefficient4
+        Value for the reflection coefficient.
 
     Examples
     -------
@@ -64,8 +67,16 @@ def f_layer(factor_length_pad, a_par, vibration_mode=1,
     """
 
     # Checking input parameters
-    x = value_numerical_error("factor_length_pad", factor_length_pad, float_num=True,
-                              lower_bound=0., include_lower_bound=True)
+    if isinstance(factor_length_pad, float):
+        x = value_numerical_error("factor_length_pad", factor_length_pad, float_num=True,
+                                  lower_bound=0., include_lower_bound=True)
+
+    else:
+        type_data_structure_error("factor_length_pad", factor_length_pad,
+                                  "array", expected_type_element=("float"))
+        x = sanitize_num_array(factor_length_pad, nan_values=True,
+                               inf_values=True, negative_values=True)
+
     value_numerical_error("Parameter a", a_par, float_num=True, lower_bound=0.)
     value_numerical_error("vibration_mode", vibration_mode, float_num=False,
                           integer_num=True, lower_bound=1, include_lower_bound=True)
