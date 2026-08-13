@@ -198,6 +198,7 @@ class Read_boundary_layer:
             value = "no_abcs"
 
         self._abc_type = validate_enum("abc_type", value, AbsorbingBCsType)
+        pprint(f"Absorbing Boundary Condition type: {value}", comm=self.comm)
 
         if value == "PML":
             # PML forces rectangular shape
@@ -227,11 +228,15 @@ class Read_boundary_layer:
 
             self.abc_degree_type = abc_dictionary.get("degree_type", "real")
 
-        # Common parameters for both PML and hybrid
-        self.abc_reference_freq = abc_dictionary.get("abc_reference_freq", "source")
-        self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", 2)
+        if value == "PML" or value == "hybrid":
+            # Common parameters for both PML and hybrid
+            self.abc_reference_freq = abc_dictionary.get("abc_reference_freq", "source")
+            self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", 2)
+            self.abc_extend_properties = abc_dictionary.get("extend_properties",
+                                                            "abc_driven")
+
+        # Get the option for creating the infinite model, default to False
         self.abc_get_ref_model = abc_dictionary.get("get_ref_model", False)
-        self.abc_extend_properties = abc_dictionary.get("extend_properties", "abc_driven")
 
     @property
     def abc_pad_length(self):

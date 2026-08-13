@@ -5,8 +5,7 @@ theoretical value for different mesh sizes, element geometries, and finite eleme
 The results are expected to be within a specified tolerance of the theoretical value.
 """
 from pytest import fail, mark, param
-from firedrake import conditional, ConvergenceError
-from firedrake import COMM_WORLD as comm
+from firedrake import COMM_WORLD as comm, conditional, ConvergenceError
 from numpy import isclose
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
