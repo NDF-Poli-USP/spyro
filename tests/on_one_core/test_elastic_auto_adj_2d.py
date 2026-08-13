@@ -231,9 +231,9 @@ def test_elastic_automated_adjoint_2d(
     different variational forms: the Lame one uses the moduli directly, while
     the velocity one differentiates through the UFL conversion
     ``lambda = rho*(c**2 - 2*c_s**2)`` recorded inside the form. Declaring the
-    material in one family and inverting in the other does not add a third
-    form, so it is covered by the much cheaper checks in ``test_fwi_controls``
-    and by ``test_elastic_change_of_variables_matches_a_directly_taped_gradient``.
+    material in one and rewriting the equation in the other does not add a
+    third form, so it is covered by the much cheaper checks in
+    ``test_fwi_controls``.
 
     Runs the following workflow:
 
@@ -256,74 +256,6 @@ def test_elastic_automated_adjoint_2d(
         control_parameters=control_parameters,
         minimum_rate=1.95,
     )
-
-
-def compute_gradients(dictionary, mesh_parameters, real_shot_record, *,
-                      controls, request):
-    """Return the gradients a fresh solver produces for one control request."""
-    wave = spyro.IsotropicWave(dictionary)
-    wave.set_mesh(input_mesh_parameters=mesh_parameters)
-    wave.real_shot_record = real_shot_record
-    wave.enable_automated_adjoint(controls=controls)
-    try:
-        wave.forward_solve()
-        return {
-            parameter: gradient.copy(deepcopy=True)
-            for parameter, gradient in wave.gradient_solve(
-                controls=request,
-            ).items()
-        }
-    finally:
-        wave.automated_adjoint.clear_tape()
-
-
-@pytest.mark.slow
-def test_elastic_change_of_variables_matches_a_directly_taped_gradient(
-    exact_receiver_data,
-):
-    """Velocity gradients converted from Lame ones need no second solve.
-
-    The equation is recorded once in each family for the same material, and
-    the velocity gradients obtained by the chain rule from the Lame tape must
-    reproduce those differentiated directly with respect to the velocities.
-    """
-    mesh_parameters = {"edge_length": 0.1, "periodic": True}
-    velocity_parameters = [
-        spyro.ElasticMaterialParameter.DENSITY,
-        spyro.ElasticMaterialParameter.P_WAVE_VELOCITY,
-        spyro.ElasticMaterialParameter.S_WAVE_VELOCITY,
-    ]
-
-    converted = compute_gradients(
-        make_dictionary({"density": 0.12, "lambda": 0.20, "mu": 0.08}),
-        mesh_parameters,
-        exact_receiver_data,
-        controls=None,
-        request=velocity_parameters,
-    )
-    # The same material, declared through the velocities it implies.
-    density, lmbda, mu = 0.12, 0.20, 0.08
-    taped = compute_gradients(
-        make_dictionary({
-            "density": density,
-            "p_wave_velocity": np.sqrt((lmbda + 2.0 * mu) / density),
-            "s_wave_velocity": np.sqrt(mu / density),
-        }),
-        mesh_parameters,
-        exact_receiver_data,
-        controls=None,
-        request=velocity_parameters,
-    )
-
-    assert tuple(converted) == tuple(taped)
-    for parameter in taped:
-        reference = taped[parameter].dat.data_ro
-        assert np.allclose(
-            converted[parameter].dat.data_ro,
-            reference,
-            rtol=1e-6,
-            atol=1e-8 * np.abs(reference).max(),
-        ), f"Converted gradient for {parameter.value} does not match."
 
 
 LAME_GUESS = {"density": 0.12, "lambda": 0.20, "mu": 0.08}

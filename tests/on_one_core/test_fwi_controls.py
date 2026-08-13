@@ -268,7 +268,7 @@ def test_elastic_control_selection_is_independent_from_equation_parameters(
     # parameterization, because that is what the variational form depends on.
     controls = wave.automated_adjoint.controls
     assert tuple(controls) == expected_parameters
-    assert wave.control_parameterization is expected_parameterization
+    assert wave.get_control_parameterization() is expected_parameterization
     assert all(isinstance(control, fire.Function) for control in controls.values())
     for control, expected_value in zip(controls.values(), expected_values):
         assert np.allclose(control.dat.data_ro, expected_value)
@@ -280,7 +280,7 @@ def test_elastic_equation_parameterization_is_set_from_the_dictionary():
     )
 
     assert (
-        wave.control_parameterization
+        wave.get_control_parameterization()
         is spyro.ElasticMaterialParameterization.VELOCITY
     )
     assert np.allclose(wave.c.dat.data_ro, 2.5)
@@ -312,7 +312,7 @@ def test_elastic_control_selection_survives_model_reinitialization():
     wave._initialize_model_parameters()
 
     assert (
-        wave.control_parameterization
+        wave.get_control_parameterization()
         is spyro.ElasticMaterialParameterization.VELOCITY
     )
     assert tuple(controls) == (

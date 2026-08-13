@@ -1,15 +1,20 @@
 """Declarative description of the isotropic elastic material parameters.
 
-An isotropic elastic medium is fully determined by three independent scalar
-fields, and Spyro supports two equivalent coordinate systems for them, called
-*parameterizations*:
+Notes
+-----
+**What a parameterization is.** An isotropic elastic medium is fully determined
+by three independent scalar fields, and there is more than one equivalent way
+to choose them. Each such choice is a *parameterization*, listed by
+:class:`~spyro.utils.typing.ElasticMaterialParameterization`:
 
-* :attr:`~spyro.utils.typing.ElasticMaterialParameterization.LAME` --- density
-  with the first and second Lame parameters.
-* :attr:`~spyro.utils.typing.ElasticMaterialParameterization.VELOCITY` ---
-  density with the P- and S-wave velocities.
+``LAME``
+    density :math:`\\rho`, first Lame parameter :math:`\\lambda`, and second
+    Lame parameter :math:`\\mu`.
+``VELOCITY``
+    density :math:`\\rho`, P-wave velocity :math:`c_p`, and S-wave velocity
+    :math:`c_s`.
 
-The two families are related by
+The two are related by
 
 .. math::
 
@@ -21,29 +26,25 @@ and, inversely,
 
     c_p = \\sqrt{(\\lambda + 2\\mu)/\\rho}, \\qquad c_s = \\sqrt{\\mu/\\rho}.
 
-Two independent choices are made on top of that, and Spyro keeps them apart:
+**What "active" means.** Exactly one parameterization is active at a time. Its
+three parameters are stored as independent Firedrake ``Function`` objects, and
+the two parameters of the other one become UFL expressions of them through the
+relations above. Because those expressions sit inside the variational form,
+pyadjoint differentiates through them, and the gradient is taken with respect
+to whichever parameterization is active. Choosing it therefore changes the
+form itself, so it is material state owned by
+:class:`~spyro.solvers.elastic_wave.isotropic_wave.IsotropicWave` and is fixed
+before the forward solve is recorded.
 
-* **The equation parameters.** One family is the *active* one: its three
-  parameters are independent Firedrake ``Function`` objects and the other two
-  are UFL expressions of them, so the conversion above sits inside the
-  variational form and pyadjoint can differentiate through it. The active
-  family is material state, owned by
-  :class:`~spyro.solvers.elastic_wave.isotropic_wave.IsotropicWave`, because it
-  defines the PDE coefficients whether or not an adjoint is being computed.
-* **The control subset.** Any non-empty subset of the active family may be
-  differentiated. That selection is an inversion concern, so it is stored only
-  on :class:`~spyro.solvers.automatic_differentiation_solver.AutomatedAdjoint`.
+**What is chosen separately.** Which subset of the active parameterization is
+actually differentiated is an inversion concern, not a property of the medium,
+and is stored only on
+:class:`~spyro.solvers.automatic_differentiation_solver.AutomatedAdjoint`.
+:class:`ElasticControlSet` is the validated result of such a selection: a
+transient value object used to resolve names into fields, never kept as solver
+state.
 
-:class:`ElasticControlSet` is the validated result of a selection. It is a
-transient value object: it is used to align the active family with a requested
-selection and to resolve names into fields, and is not kept as solver state.
-
-Because the map between the families is an invertible change of variables,
-gradients taken in one of them convert exactly into the other without solving
-again. :data:`DERIVATIVES_BY_PARAMETERIZATION` holds the chain-rule
-coefficients for that conversion.
-
-This module holds only the declarative tables and the conversion rules; the
+This module holds only the declarative tables and the selection rules; the
 Firedrake state itself lives on ``IsotropicWave``.
 """
 
@@ -78,23 +79,18 @@ ATTRIBUTE_BY_PARAMETER = MappingProxyType({
     ElasticMaterialParameter.S_WAVE_VELOCITY: "c_s",
 })
 
-#: Model-dictionary keys accepted for each material parameter, canonical
-#: spelling first. Declaring a material and rewriting one both go through this
-#: table, so the schema is defined in a single place.
-KEYS_BY_PARAMETER = MappingProxyType({
-    ElasticMaterialParameter.DENSITY: ("density",),
-    ElasticMaterialParameter.LAMBDA: ("lambda", "lame_first"),
-    ElasticMaterialParameter.MU: ("mu", "lame_second"),
-    ElasticMaterialParameter.P_WAVE_VELOCITY: ("p_wave_velocity",),
-    ElasticMaterialParameter.S_WAVE_VELOCITY: ("s_wave_velocity",),
+#: Model-dictionary key of each material parameter. Declaring a material and
+#: rewriting one both go through this table, so the schema is defined in a
+#: single place, and each parameter has exactly one accepted spelling.
+KEY_BY_PARAMETER = MappingProxyType({
+    parameter: parameter.value for parameter in ElasticMaterialParameter
 })
 
-#: Every spelling accepted when naming a parameter: the model-dictionary keys
-#: above plus the solver attribute names, so ``"c_s"`` and
-#: ``"s_wave_velocity"`` are interchangeable in a control selection.
+#: Every spelling accepted when naming a parameter in a control selection: the
+#: model-dictionary keys above plus the solver attribute names, so ``"c_s"``
+#: and ``"s_wave_velocity"`` both select the S-wave velocity.
 PARAMETER_BY_ALIAS = MappingProxyType({
-    **{key: parameter
-       for parameter, keys in KEYS_BY_PARAMETER.items() for key in keys},
+    **{key: parameter for parameter, key in KEY_BY_PARAMETER.items()},
     **{attribute: parameter
        for parameter, attribute in ATTRIBUTE_BY_PARAMETER.items()},
 })
@@ -143,85 +139,6 @@ def resolve(parameter):
         ) from exc
 
 
-def _velocity_derivatives_from_lame(rho, c, c_s):
-    """Coefficients building velocity derivatives from Lame ones.
-
-    Differentiating :math:`\\lambda = \\rho(c_p^2 - 2c_s^2)` and
-    :math:`\\mu = \\rho c_s^2` gives the Jacobian of the change of variables,
-    and the chain rule contracts a Lame derivative with its columns. Note that
-    the density derivative differs between the families: holding
-    :math:`(\\lambda, \\mu)` fixed is not the same as holding
-    :math:`(c_p, c_s)` fixed.
-
-    Parameters
-    ----------
-    rho, c, c_s : firedrake.Function or UFL expression
-        Current density, P- and S-wave velocity fields.
-
-    Returns
-    -------
-    dict
-        Maps each velocity-family parameter to the Lame parameters its
-        derivative depends on, and the coefficient of each.
-    """
-    return {
-        ElasticMaterialParameter.DENSITY: {
-            ElasticMaterialParameter.DENSITY: 1.0,
-            ElasticMaterialParameter.LAMBDA: c**2 - 2*c_s**2,
-            ElasticMaterialParameter.MU: c_s**2,
-        },
-        ElasticMaterialParameter.P_WAVE_VELOCITY: {
-            ElasticMaterialParameter.LAMBDA: 2*rho*c,
-        },
-        ElasticMaterialParameter.S_WAVE_VELOCITY: {
-            ElasticMaterialParameter.LAMBDA: -4*rho*c_s,
-            ElasticMaterialParameter.MU: 2*rho*c_s,
-        },
-    }
-
-
-def _lame_derivatives_from_velocity(rho, c, c_s):
-    """Coefficients building Lame derivatives from velocity ones.
-
-    The inverse of :func:`_velocity_derivatives_from_lame`, obtained by
-    differentiating :math:`c_p = \\sqrt{(\\lambda + 2\\mu)/\\rho}` and
-    :math:`c_s = \\sqrt{\\mu/\\rho}`.
-
-    Parameters
-    ----------
-    rho, c, c_s : firedrake.Function or UFL expression
-        Current density, P- and S-wave velocity fields.
-
-    Returns
-    -------
-    dict
-        Maps each Lame parameter to the velocity-family parameters its
-        derivative depends on, and the coefficient of each.
-    """
-    return {
-        ElasticMaterialParameter.DENSITY: {
-            ElasticMaterialParameter.DENSITY: 1.0,
-            ElasticMaterialParameter.P_WAVE_VELOCITY: -c/(2*rho),
-            ElasticMaterialParameter.S_WAVE_VELOCITY: -c_s/(2*rho),
-        },
-        ElasticMaterialParameter.LAMBDA: {
-            ElasticMaterialParameter.P_WAVE_VELOCITY: 1/(2*rho*c),
-        },
-        ElasticMaterialParameter.MU: {
-            ElasticMaterialParameter.P_WAVE_VELOCITY: 1/(rho*c),
-            ElasticMaterialParameter.S_WAVE_VELOCITY: 1/(2*rho*c_s),
-        },
-    }
-
-
-#: Chain-rule coefficients converting a complete set of derivatives into the
-#: other material family, keyed by the family being converted *to*.
-DERIVATIVES_BY_PARAMETERIZATION = MappingProxyType({
-    ElasticMaterialParameterization.VELOCITY: _velocity_derivatives_from_lame,
-    ElasticMaterialParameterization.LAME: _lame_derivatives_from_velocity,
-})
-
-
 def resolve_parameterization(parameterization):
     """Return the enum value denoted by a parameterization name.
 
@@ -268,17 +185,17 @@ def resolve_parameterization(parameterization):
 
 @dataclass(frozen=True)
 class ElasticControlSet:
-    """A validated, non-empty subset of one isotropic parameter family.
+    """A validated, non-empty subset of one isotropic parameterization.
 
     Attributes
     ----------
     parameterization : ElasticMaterialParameterization
-        Family the controls belong to. The solver keeps every parameter of
-        this family as a Firedrake ``Function`` and derives the remaining
-        parameters from them.
+        Parameterization the controls belong to. The solver keeps its three
+        parameters as Firedrake ``Function`` objects and derives the other
+        two from them; see the module Notes.
     parameters : tuple of ElasticMaterialParameter
         The selected controls, in the order given by the user, or in the
-        order of :data:`PARAMETERS_BY_PARAMETERIZATION` for a complete family.
+        order of :data:`PARAMETERS_BY_PARAMETERIZATION` when all are selected.
 
     Examples
     --------
@@ -298,17 +215,17 @@ class ElasticControlSet:
 
     @classmethod
     def complete(cls, parameterization):
-        """Return the control set holding every parameter of one family.
+        """Return the control set holding every parameter of one of them.
 
         Parameters
         ----------
         parameterization : ElasticMaterialParameterization
-            Family whose parameters are all controls.
+            Parameterization whose three parameters are all controls.
 
         Returns
         -------
         ElasticControlSet
-            Control set with the three independent parameters of the family.
+            Control set with its three independent parameters.
         """
         return cls(
             parameterization,
@@ -317,18 +234,18 @@ class ElasticControlSet:
 
     @classmethod
     def select(cls, parameters, *, default):
-        """Validate a user control selection and infer its family.
+        """Validate a user control selection and infer its parameterization.
 
         Parameters
         ----------
         parameters : list, tuple, or None
             Control names or enum values. ``None`` selects every parameter of
             ``default``. Any non-empty, duplicate-free subset of a single
-            family is accepted; a selection that fits both families (only
-            ``density``) keeps ``default``.
+            parameterization is accepted; a selection that fits both of them
+            (only ``density``) keeps ``default``.
         default : ElasticMaterialParameterization
-            Family used when the selection does not determine one, typically
-            the family the material was declared with.
+            Parameterization used when the selection does not determine
+            one, typically the one the material was declared with.
 
         Returns
         -------
@@ -362,17 +279,20 @@ class ElasticControlSet:
                 "Elastic control parameters must not contain duplicates.",
             )
 
-        families = [
+        # A selection determines a parameterization when it fits inside
+        # exactly one of them.
+        candidates = [
             parameterization
-            for parameterization, family in PARAMETERS_BY_PARAMETERIZATION.items()
-            if set(selected) <= set(family)
+            for parameterization, parameters in
+            PARAMETERS_BY_PARAMETERIZATION.items()
+            if set(selected) <= set(parameters)
         ]
-        if not families:
+        if not candidates:
             raise ValueError(
                 "Elastic controls cannot mix Lame parameters with wave "
                 "velocities.",
             )
-        # ``density`` alone belongs to both families, so it cannot change the
+        # ``density`` alone fits both, so it cannot change the
         # parameterization the material was declared with.
-        parameterization = default if len(families) > 1 else families[0]
+        parameterization = default if len(candidates) > 1 else candidates[0]
         return cls(parameterization, selected)

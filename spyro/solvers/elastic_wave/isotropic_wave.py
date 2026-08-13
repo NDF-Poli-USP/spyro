@@ -1,15 +1,15 @@
 import numpy as np
 
-from firedrake import (assemble, Cofunction, Constant, curl, DirichletBC, div,
-                       Function, project)
+from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
+                       project)
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
-from .material import (ATTRIBUTE_BY_PARAMETER, DERIVATIVES_BY_PARAMETERIZATION,
-                       KEYS_BY_PARAMETER, PARAMETERS_BY_PARAMETERIZATION,
-                       ElasticControlSet, resolve_parameterization)
+from .material import (ATTRIBUTE_BY_PARAMETER, KEY_BY_PARAMETER,
+                       PARAMETERS_BY_PARAMETERIZATION, ElasticControlSet,
+                       resolve_parameterization)
 from ...utils.typing import (AdjointType, ElasticMaterialParameter,
                              ElasticMaterialParameterization, AbsorbingBCsType,
                              RieszMapType, override)
@@ -59,20 +59,25 @@ class IsotropicWave(ElasticWave):
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
         """Initialize isotropic elastic material parameters from a dictionary.
 
-        The declaration must define exactly one complete family. The optional
-        ``parameterization`` entry then re-expresses the equation in the other
-        family, which is what makes its parameters differentiable; the subset
-        actually inverted for is chosen later, with
-        ``enable_automated_adjoint(controls=...)``.
+        Notes
+        -----
+        The dictionary must name the three parameters of exactly one
+        parameterization, and each has a single accepted spelling. The
+        optional ``parameterization`` entry then rewrites the equation in the
+        other one, which is what makes *its* parameters the differentiable
+        ones. Which subset of them is actually inverted for is a separate
+        choice, made later through ``enable_automated_adjoint(controls=...)``.
+        See the Notes of :mod:`spyro.solvers.elastic_wave.material` for what a
+        parameterization is.
 
         Parameters
         ----------
         synthetic_data_dict : dict
-            Material parameter dictionary using the public Spyro model schema.
-            Valid material combinations are ``density``, ``lambda`` (or
-            ``lame_first``), and ``mu`` (or ``lame_second``); or ``density``,
-            ``p_wave_velocity``, and ``s_wave_velocity``. The optional
-            ``parameterization`` entry is ``"lame"`` or ``"velocity"``.
+            Material parameter dictionary using the public Spyro model schema:
+            ``density``, ``lambda`` and ``mu``; or ``density``,
+            ``p_wave_velocity`` and ``s_wave_velocity``. The optional
+            ``parameterization`` entry is ``"lame"`` or ``"velocity"``, and
+            defaults to the one that was declared.
 
         Returns
         -------
@@ -83,23 +88,25 @@ class IsotropicWave(ElasticWave):
         Examples
         --------
         Declaring ``{"density": ..., "lambda": ..., "mu": ...,
-        "parameterization": "velocity"}`` builds the equation from Lame input
-        but keeps ``c`` and ``c_s`` as the independent fields.
+        "parameterization": "velocity"}`` builds the material from Lame input
+        but makes ``c`` and ``c_s`` the independent, differentiable fields.
         """
         values = {
-            parameter: next(
-                (synthetic_data_dict[key]
-                 for key in keys if key in synthetic_data_dict),
-                None,
-            )
-            for parameter, keys in KEYS_BY_PARAMETER.items()
+            parameter: synthetic_data_dict.get(key)
+            for parameter, key in KEY_BY_PARAMETER.items()
         }
 
+        # The declaration is valid when the keys present in the dictionary
+        # are exactly the three parameters of one parameterization: a partial
+        # set is under-determined, and one spanning both is contradictory.
+        provided = {
+            parameter for parameter, value in values.items() if value is not None
+        }
         declared = [
             parameterization
-            for parameterization, family in PARAMETERS_BY_PARAMETERIZATION.items()
-            if {parameter for parameter, value in values.items()
-                if value is not None} == set(family)
+            for parameterization, parameters in
+            PARAMETERS_BY_PARAMETERIZATION.items()
+            if provided == set(parameters)
         ]
         if not declared:
             raise ValueError(
@@ -117,48 +124,67 @@ class IsotropicWave(ElasticWave):
         self._control_parameterization = declared[0]
         self._derive_complementary_parameters(declared[0])
 
+        # Without the optional key the equation stays in the parameterization
+        # it was declared with, which is the common case.
         parameterization = synthetic_data_dict.get("parameterization")
         if parameterization is not None:
             self.set_control_parameterization(parameterization)
 
-    @property
-    def control_parameterization(self):
-        """Family of parameters held as independent fields by the equation.
+    def get_control_parameterization(self):
+        """Return the parameterization the equation is currently written in.
+
+        Notes
+        -----
+        Its three parameters are the Firedrake ``Function`` objects appearing
+        in the variational form, and the other two are UFL expressions of them,
+        so a gradient exists only with respect to this one. It is a method
+        rather than a property to stay symmetric with
+        :meth:`set_control_parameterization`, whose assignment is far from a
+        plain attribute write: it rewrites every material field.
 
         Returns
         -------
         ElasticMaterialParameterization or None
-            Family whose parameters are Firedrake ``Function`` objects in the
-            variational form, or ``None`` before the material parameters have
-            been initialized. The two remaining parameters are UFL expressions
-            of this family, so gradients can be taken with respect to it.
+            Active parameterization, or ``None`` before the material
+            parameters have been initialized.
+
+        Examples
+        --------
+        ``wave.get_control_parameterization()`` returns
+        ``ElasticMaterialParameterization.LAME`` for a model declared with
+        ``density``, ``lambda`` and ``mu``.
         """
         return self._control_parameterization
 
     def set_control_parameterization(self, parameterization):
-        """Re-express the equation parameters in another material family.
+        """Rewrite the equation with another set of independent parameters.
 
-        The parameters of ``parameterization`` are currently UFL expressions of
-        the active family; interpolating them into the scalar control space
-        turns them into independent fields, and the previous family is then
-        re-derived from them. This is what allows inverting for wave velocities
-        on a model declared with Lame moduli, and vice versa.
+        Notes
+        -----
+        The requested parameters are currently UFL expressions of the active
+        ones; interpolating them into the scalar control space turns them into
+        independent fields, and the previously active ones are then re-derived
+        from them. Since only independent fields can be differentiated, this is
+        what allows inverting for wave velocities on a model declared with Lame
+        parameters, and vice versa. It must be done before the forward solve is
+        recorded, because it changes the variational form.
 
         Parameters
         ----------
         parameterization : str or ElasticMaterialParameterization
-            Target family, ``"lame"`` or ``"velocity"``.
+            ``"lame"`` or ``"velocity"``.
 
         Returns
         -------
         None
-            Rewrites every material attribute when the family changes.
+            Rewrites every material attribute when the parameterization
+            changes, and does nothing when it is already active.
 
         Raises
         ------
         ValueError
-            If ``parameterization`` is not a supported family, or if the
-            material parameters have not been initialized yet.
+            If ``parameterization`` is not one of the two supported values, or
+            if the material parameters have not been initialized yet.
 
         Examples
         --------
@@ -233,12 +259,12 @@ class IsotropicWave(ElasticWave):
         )
 
     def _derive_complementary_parameters(self, parameterization):
-        """Express the non-control parameters in terms of the control family.
+        """Express the remaining parameters in terms of the active ones.
 
         The complementary parameters are stored as UFL expressions rather than
-        interpolated fields, so the algebraic link between the two families
-        stays inside the variational form and pyadjoint differentiates through
-        it, whichever family the user selected as controls.
+        interpolated fields, so the algebraic link between the two
+        parameterizations stays inside the variational form and pyadjoint
+        differentiates through it, whichever one is active.
 
         Parameters
         ----------
@@ -422,27 +448,31 @@ class IsotropicWave(ElasticWave):
             if self.rho is None:
                 return None
             # Material attributes were assigned directly, bypassing the model
-            # dictionary; fall back to the default Lame family.
+            # dictionary; fall back to the default Lame parameterization.
             parameterization = ElasticMaterialParameterization.LAME
         return {
             parameter: self._get_material_parameter(parameter)
             for parameter in PARAMETERS_BY_PARAMETERIZATION[parameterization]
         }
 
-    @override
     def _align_control_parameterization(self, parameters=None):
-        """Re-express the equation in the family the controls belong to.
+        """Rewrite the equation in the parameterization the controls need.
 
-        Selecting parameters from the family that is not currently active
-        makes them independent ``Function`` objects, which is what pyadjoint
-        needs to differentiate with respect to them. Selecting ``density``
-        alone is ambiguous and keeps the active family unchanged.
+        Notes
+        -----
+        A gradient exists only with respect to the parameterization the
+        equation is currently written in, because only its parameters are
+        independent ``Function`` objects on the tape. Requesting controls from
+        the other one therefore has to rewrite the equation first, and that
+        has to happen before the forward solve is recorded. Requesting
+        ``density`` alone is ambiguous, since it belongs to both, and leaves
+        the equation untouched.
 
         Parameters
         ----------
         parameters : list, tuple, or None, optional
             Control names or :class:`ElasticMaterialParameter` values.
-            ``None`` keeps the active family.
+            ``None`` keeps the current parameterization.
 
         Returns
         -------
@@ -451,7 +481,7 @@ class IsotropicWave(ElasticWave):
         Examples
         --------
         Requesting ``["lambda", "mu"]`` on a model declared with wave
-        velocities switches the equation to the Lame family.
+        velocities rewrites the equation with the Lame parameters.
         """
         if parameters is None:
             return
@@ -465,17 +495,17 @@ class IsotropicWave(ElasticWave):
     def _select_control_parameters(self, parameters=None):
         """Resolve an elastic control selection into labeled fields.
 
-        Only the parameters of the active family can be resolved: the other
-        two are UFL expressions of them, not independent variables. Their
-        gradients are still available after the fact, through the change of
-        variables applied by :meth:`gradient_solve`.
+        Only the parameters of the active parameterization can be resolved:
+        the other two are UFL expressions of them, not independent variables,
+        so no gradient exists for them. Selecting those requires rewriting the
+        equation first, with :meth:`set_control_parameterization`.
 
         Parameters
         ----------
         parameters : list, tuple, or None, optional
             Control names (``"mu"``, ``"c_s"``, ``"lame_first"``, ...) or
             :class:`ElasticMaterialParameter` values. ``None`` selects the
-            three parameters of the active family.
+            three parameters of the active parameterization.
 
         Returns
         -------
@@ -486,9 +516,9 @@ class IsotropicWave(ElasticWave):
         Raises
         ------
         ValueError
-            If the selection is empty, has duplicates, mixes both families,
-            names an unknown parameter, or belongs to the family that is not
-            currently active.
+            If the selection is empty, has duplicates, mixes the two
+            parameterizations, names an unknown parameter, or belongs to the
+            parameterization that is not currently active.
 
         Examples
         --------
@@ -503,7 +533,7 @@ class IsotropicWave(ElasticWave):
                 "Elastic controls "
                 + ", ".join(parameter.value for parameter in selection)
                 + f" belong to the '{selection.parameterization.value}' "
-                "family, but the equation is parameterized with "
+                "parameterization, but the equation is written with "
                 f"'{self._control_parameterization.value}', so they are not "
                 "independent variables of the recorded model. Use "
                 "gradient_solve() to obtain their gradients through the "
@@ -515,7 +545,6 @@ class IsotropicWave(ElasticWave):
             for parameter in selection
         }
 
-    @override
     def gradient_solve(
         self,
         misfit=None,
@@ -528,12 +557,9 @@ class IsotropicWave(ElasticWave):
 
         Only the automated adjoint is available for elastic media: the
         gradient is obtained by replaying the pyadjoint tape recorded during
-        an annotated ``forward_solve()``.
-
-        Controls from the active parameterization are read straight off the
-        tape. Controls from the other family are obtained from the full active
-        family by the exact change of variables in :mod:`.material`, so no
-        second forward solve is needed either way.
+        an annotated ``forward_solve()``. Only the parameters of the active
+        parameterization are on that tape, so only those can be differentiated;
+        see :meth:`set_control_parameterization`.
 
         Parameters
         ----------
@@ -549,12 +575,10 @@ class IsotropicWave(ElasticWave):
             ``L2`` returns gradients (``Function``), ``l2`` returns raw
             derivatives (``Cofunction``). See :class:`RieszMapType`.
         controls : list, tuple, or None, optional
-            Restrict the gradient to a subset of the material parameters, from
-            either family. ``None`` uses the selection made in
-            ``enable_automated_adjoint()``. Passing a selection re-registers it
-            on the automated adjoint, since that is where the choice lives; a
-            request from the other family registers the whole active family,
-            which is what the tape is actually read for.
+            Restrict the gradient to a subset of the active parameterization.
+            ``None`` uses the selection made in ``enable_automated_adjoint()``.
+            Passing a selection re-registers it on the automated adjoint, since
+            that is where the choice lives.
 
         Returns
         -------
@@ -566,92 +590,32 @@ class IsotropicWave(ElasticWave):
         ------
         NotImplementedError
             If a hand-implemented adjoint is requested.
+        ValueError
+            If ``controls`` names a parameter outside the active
+            parameterization.
 
         Examples
         --------
         After ``enable_automated_adjoint(controls=["lambda", "mu"])``,
-        ``gradient_solve(controls=["mu"])`` returns only ``{MU: dJ_dmu}`` and
-        ``gradient_solve(controls=["c_s"])`` returns ``{S_WAVE_VELOCITY: ...}``
-        by converting the Lame gradients, both reusing the same tape.
+        ``gradient_solve(controls=["mu"])`` returns only ``{MU: dJ_dmu}``,
+        reusing the same tape.
         """
         if adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
             raise NotImplementedError(
                 "Elastic media only support the automated adjoint; "
                 f"got {adjoint_type}.",
             )
-        selection = ElasticControlSet.select(
-            controls, default=self._control_parameterization,
+        return self._automated_adjoint_derivatives(
+            riesz_map=riesz_map, controls=controls,
         )
-        if selection.parameterization is self._control_parameterization:
-            return self._automated_adjoint_derivatives(
-                riesz_map=riesz_map, controls=controls,
-            )
-
-        # The requested family is not on the tape. Differentiate the whole
-        # active family, which is, and change variables afterwards.
-        derivatives = self._automated_adjoint_derivatives(
-            riesz_map=RieszMapType.l2,
-            controls=PARAMETERS_BY_PARAMETERIZATION[
-                self._control_parameterization
-            ],
-        )
-        converted = self._change_derivative_variables(
-            derivatives, selection.parameterization,
-        )
-        return {
-            parameter: (
-                converted[parameter]
-                if riesz_map is RieszMapType.l2
-                else converted[parameter].riesz_representation("L2")
-            )
-            for parameter in selection
-        }
-
-    def _change_derivative_variables(self, derivatives, parameterization):
-        """Chain-rule dual derivatives into the other material family.
-
-        The conversion between the two families is applied node by node when
-        the material is re-expressed, so its Jacobian is diagonal and the
-        chain rule is an exact, coefficient-wise operation on the dual vectors.
-        That is why this works on raw derivatives (``Cofunction``) rather than
-        on Riesz representers: scaling coefficients does not commute with
-        inverting the mass matrix, so the Riesz map must be applied afterwards.
-
-        Parameters
-        ----------
-        derivatives : dict
-            Raw derivatives for every parameter of the active family, keyed by
-            :class:`ElasticMaterialParameter`. All three are required, since
-            each converted parameter mixes several of them.
-        parameterization : ElasticMaterialParameterization
-            Family to convert to.
-
-        Returns
-        -------
-        dict
-            Raw derivatives with respect to ``parameterization``, keyed by
-            :class:`ElasticMaterialParameter`.
-        """
-        V = self.get_control_parameter_function_space()
-        coefficients = DERIVATIVES_BY_PARAMETERIZATION[parameterization](
-            self.rho, self.c, self.c_s,
-        )
-        converted = {}
-        for parameter, terms in coefficients.items():
-            dual = Cofunction(V.dual(), name=parameter.value)
-            for source, coefficient in terms.items():
-                nodal = Function(V).interpolate(coefficient).dat.data_ro
-                dual.dat.data[:] += derivatives[source].dat.data_ro * nodal
-            converted[parameter] = dual
-        return converted
 
     def set_control_parameters(self, controls):
         """Assign isotropic elastic material controls.
 
         Control dictionaries must use :class:`ElasticMaterialParameter` keys
-        and may contain any non-empty subset of a single material family.
+        and may contain any non-empty subset of a single parameterization.
         Parameters omitted from the dictionary keep their current values, and
-        the complementary family is re-derived from the result.
+        the remaining two are re-derived from the result.
 
         Parameters
         ----------
@@ -671,7 +635,7 @@ class IsotropicWave(ElasticWave):
             If ``controls`` is not a dictionary or if any key is not an
             ``ElasticMaterialParameter``.
         ValueError
-            If the dictionary is empty or mixes both parameter families.
+            If the dictionary is empty or mixes the two parameterizations.
 
         Examples
         --------
@@ -704,7 +668,7 @@ class IsotropicWave(ElasticWave):
             default=self._control_parameterization,
         )
         if self._control_parameterization is None:
-            # A dictionary covering a complete family fully determines the
+            # A dictionary covering a whole parameterization determines the
             # material; a partial one only makes sense against an existing
             # material, so the model dictionary is used to build one first.
             if len(selection) == len(
@@ -728,9 +692,9 @@ class IsotropicWave(ElasticWave):
 
         ``forward_solve()`` re-initializes the model from ``synthetic_data`` on
         every call, so the dictionary must keep describing the current state:
-        the fields as they stand now, and the family holding them. Keys of the
-        other family are dropped, because a declaration naming both families is
-        rejected as ambiguous.
+        the fields as they stand now, and the parameterization holding them.
+        Keys of the other one are dropped, because a declaration naming both
+        is rejected as contradictory.
 
         Storing the ``Function`` objects themselves — rather than the values
         the model was built from — is also what preserves their identity across
@@ -747,11 +711,11 @@ class IsotropicWave(ElasticWave):
             self._control_parameterization.value
         )
         active = PARAMETERS_BY_PARAMETERIZATION[self._control_parameterization]
-        for parameter, keys in KEYS_BY_PARAMETER.items():
-            for key in keys:
-                synthetic_data.pop(key, None)
+        for parameter, key in KEY_BY_PARAMETER.items():
             if parameter in active:
-                synthetic_data[keys[0]] = self._get_material_parameter(parameter)
+                synthetic_data[key] = self._get_material_parameter(parameter)
+            else:
+                synthetic_data.pop(key, None)
 
     @override
     def matrix_building(self):
