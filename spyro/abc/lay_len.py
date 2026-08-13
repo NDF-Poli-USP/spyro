@@ -7,8 +7,8 @@ layer is determined by finding the roots of a function combining these factors.
 
 from ..io.basicio import parallel_print as pprint
 from numpy import array, ceil, cos, exp, floor, log10, pi, round, sin
-from ..utils.error_management import (sanitize_num_array, type_data_structure_error,
-                                      value_parameter_error, value_numerical_error)
+from ..utils.error_management import (sanitize_num_array, validate_data_structure,
+                                      validate_parameter, validate_numeric)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -68,22 +68,22 @@ def f_layer(factor_length_pad, a_par, vibration_mode=1,
 
     # Checking input parameters
     if isinstance(factor_length_pad, float):
-        x = value_numerical_error("factor_length_pad", factor_length_pad, float_num=True,
-                                  lower_bound=0., include_lower_bound=True)
+        x = validate_numeric("factor_length_pad", factor_length_pad, float_num=True,
+                             lower_bound=0., include_lower_bound=True)
 
     else:
-        type_data_structure_error("factor_length_pad", factor_length_pad,
-                                  "array", expected_type_element=("float"))
+        validate_data_structure("factor_length_pad", factor_length_pad,
+                                "array", expected_type_element=("float"))
         x = sanitize_num_array(factor_length_pad, nan_values=True,
                                inf_values=True, negative_values=True)
 
-    value_numerical_error("Parameter a", a_par, float_num=True, lower_bound=0.)
-    value_numerical_error("vibration_mode", vibration_mode, float_num=False,
-                          integer_num=True, lower_bound=1, include_lower_bound=True)
-    value_numerical_error("damping_ratio", damping_ratio, float_num=True,
-                          integer_num=False, lower_bound=0., upper_bound=1.,
-                          include_lower_bound=True, include_upper_bound=True)
-    value_parameter_error("function_type", function_type, ["FL", "CR"])
+    validate_numeric("Parameter a", a_par, float_num=True, lower_bound=0.)
+    validate_numeric("vibration_mode", vibration_mode, float_num=False,
+                     integer_num=True, lower_bound=1, include_lower_bound=True)
+    validate_numeric("damping_ratio", damping_ratio, float_num=True,
+                     integer_num=False, lower_bound=0., upper_bound=1.,
+                     include_lower_bound=True, include_upper_bound=True)
+    validate_parameter("function_type", function_type, ["FL", "CR"])
 
     # Reflection coefficient
     s = damping_ratio
@@ -183,13 +183,13 @@ def loop_roots(a_par, lmin, lref, max_roots, tol_rel=1e-3, show_ig=True, monitor
     """
 
     # Checking input parameters
-    value_numerical_error("Parameter a", a_par, float_num=True, lower_bound=0.)
-    value_numerical_error("lmin", lmin, float_num=True, lower_bound=0)
-    value_numerical_error("lref", lref, float_num=True, lower_bound=0)
-    value_numerical_error("max_roots", max_roots, float_num=False,
-                          integer_num=True, lower_bound=1, include_lower_bound=True)
-    value_numerical_error("tol_rel", tol_rel, float_num=True, integer_num=False,
-                          lower_bound=0., upper_bound=0.01)
+    validate_numeric("Parameter a", a_par, float_num=True, lower_bound=0.)
+    validate_numeric("lmin", lmin, float_num=True, lower_bound=0)
+    validate_numeric("lref", lref, float_num=True, lower_bound=0)
+    validate_numeric("max_roots", max_roots, float_num=False,
+                     integer_num=True, lower_bound=1, include_lower_bound=True)
+    validate_numeric("tol_rel", tol_rel, float_num=True, integer_num=False,
+                     lower_bound=0., upper_bound=0.01)
 
     # Initial guess
     FLmin = 0.5 * lmin / lref
@@ -338,10 +338,10 @@ def roundFL(lmin, lref, factor_length_pad):
     """
 
     # Checking input parameters
-    value_numerical_error("lmin", lmin, float_num=True, lower_bound=0)
-    value_numerical_error("lref", lref, float_num=True, lower_bound=0)
-    value_numerical_error("factor_length_pad", factor_length_pad, float_num=True,
-                          lower_bound=0., include_lower_bound=True)
+    validate_numeric("lmin", lmin, float_num=True, lower_bound=0)
+    validate_numeric("lref", lref, float_num=True, lower_bound=0)
+    validate_numeric("factor_length_pad", factor_length_pad, float_num=True,
+                     lower_bound=0., include_lower_bound=True)
 
     # Adjusting the parameter size of the layer
     factor_length_pad = (lmin / lref) * ceil(lref * factor_length_pad / lmin)
