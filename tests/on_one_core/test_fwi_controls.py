@@ -94,16 +94,14 @@ def build_elastic_dictionary():
     }
 
 
-def initialize_elastic_wave(material_parameters, control_parameters=None):
-    """Build and initialize an elastic wave with optional control selection."""
+def initialize_elastic_wave(material_parameters):
+    """Build and initialize an elastic wave from a material declaration."""
     dictionary = build_elastic_dictionary()
     dictionary["synthetic_data"] = {
         "type": "object",
         **material_parameters,
         "real_velocity_file": None,
     }
-    if control_parameters is not None:
-        dictionary["synthetic_data"]["control_parameters"] = control_parameters
 
     wave = spyro.IsotropicWave(dictionary=dictionary)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.25})
@@ -186,19 +184,12 @@ def test_acoustic_constant_control_is_converted_to_function():
     assert np.allclose(fwi.guess_control.dat.data_ro, 2.0)
 
 
-def test_elastic_controls_roundtrip_on_isotropic_wave():
-    wave = spyro.IsotropicWave(dictionary=build_elastic_dictionary())
-    wave.set_mesh(input_mesh_parameters={"edge_length": 0.25})
-    controls = make_elastic_controls(wave)
-
-    wave.set_control_parameters(controls)
-
-    assert set(wave.get_control_parameters()) == {
-        spyro.ElasticMaterialParameter.DENSITY,
-        spyro.ElasticMaterialParameter.LAMBDA,
-        spyro.ElasticMaterialParameter.MU,
-    }
-    assert wave.get_control_parameters() is not controls
+LAME_MATERIAL = {"density": 1.0, "lambda": 4.25, "mu": 1.0}
+VELOCITY_MATERIAL = {
+    "density": 1.0,
+    "p_wave_velocity": 2.5,
+    "s_wave_velocity": 1.0,
+}
 
 
 @pytest.mark.parametrize(
@@ -211,7 +202,7 @@ def test_elastic_controls_roundtrip_on_isotropic_wave():
     ),
     [
         pytest.param(
-            {"density": 1.0, "p_wave_velocity": 2.5, "s_wave_velocity": 1.0},
+            VELOCITY_MATERIAL,
             None,
             (
                 spyro.ElasticMaterialParameter.DENSITY,
@@ -223,7 +214,7 @@ def test_elastic_controls_roundtrip_on_isotropic_wave():
             id="default-equation-parameters",
         ),
         pytest.param(
-            {"density": 1.0, "p_wave_velocity": 2.5, "s_wave_velocity": 1.0},
+            VELOCITY_MATERIAL,
             ["c_s"],
             (spyro.ElasticMaterialParameter.S_WAVE_VELOCITY,),
             (1.0,),
@@ -231,7 +222,7 @@ def test_elastic_controls_roundtrip_on_isotropic_wave():
             id="only-cs",
         ),
         pytest.param(
-            {"density": 1.0, "lambda": 4.25, "mu": 1.0},
+            LAME_MATERIAL,
             ["c"],
             (spyro.ElasticMaterialParameter.P_WAVE_VELOCITY,),
             (2.5,),
@@ -239,7 +230,7 @@ def test_elastic_controls_roundtrip_on_isotropic_wave():
             id="only-c-from-lame-equation",
         ),
         pytest.param(
-            {"density": 1.0, "p_wave_velocity": 2.5, "s_wave_velocity": 1.0},
+            VELOCITY_MATERIAL,
             ["lambda", "mu"],
             (
                 spyro.ElasticMaterialParameter.LAMBDA,
@@ -250,7 +241,7 @@ def test_elastic_controls_roundtrip_on_isotropic_wave():
             id="lambda-mu-from-velocity-equation",
         ),
         pytest.param(
-            {"density": 1.0, "lambda": 4.25, "mu": 1.0},
+            LAME_MATERIAL,
             ["c", "c_s"],
             (
                 spyro.ElasticMaterialParameter.P_WAVE_VELOCITY,
@@ -269,14 +260,65 @@ def test_elastic_control_selection_is_independent_from_equation_parameters(
     expected_values,
     expected_parameterization,
 ):
-    wave = initialize_elastic_wave(material_parameters, control_parameters)
+    wave = initialize_elastic_wave(material_parameters)
 
-    controls = wave.get_control_parameters()
+    wave.enable_automated_adjoint(controls=control_parameters)
+
+    # The selection lives only on the automated adjoint; the solver keeps the
+    # parameterization, because that is what the variational form depends on.
+    controls = wave.automated_adjoint.controls
     assert tuple(controls) == expected_parameters
-    assert wave._control_parameterization is expected_parameterization
+    assert wave.control_parameterization is expected_parameterization
     assert all(isinstance(control, fire.Function) for control in controls.values())
     for control, expected_value in zip(controls.values(), expected_values):
         assert np.allclose(control.dat.data_ro, expected_value)
+
+
+def test_elastic_equation_parameterization_is_set_from_the_dictionary():
+    wave = initialize_elastic_wave(
+        {**LAME_MATERIAL, "parameterization": "velocity"},
+    )
+
+    assert (
+        wave.control_parameterization
+        is spyro.ElasticMaterialParameterization.VELOCITY
+    )
+    assert np.allclose(wave.c.dat.data_ro, 2.5)
+    assert np.allclose(wave.c_s.dat.data_ro, 1.0)
+
+
+def test_elastic_model_reinitialization_preserves_control_identity():
+    """The automated adjoint holds references to these exact objects."""
+    wave = initialize_elastic_wave(VELOCITY_MATERIAL)
+    controls = dict(wave.get_control_parameters())
+
+    wave._initialize_model_parameters()
+
+    assert wave.get_control_parameters() == controls
+
+
+def test_elastic_control_selection_survives_model_reinitialization():
+    """``forward_solve()`` re-initializes the model before recording the tape.
+
+    A control selection from the family the material was not declared with
+    re-expresses the equation, and that must outlive the re-initialization:
+    otherwise the recorded controls end up detached from the fields the
+    variational form actually uses, and the gradient is silently wrong.
+    """
+    wave = initialize_elastic_wave(LAME_MATERIAL)
+
+    wave.enable_automated_adjoint(controls=["c_s"])
+    controls = wave.automated_adjoint.controls
+    wave._initialize_model_parameters()
+
+    assert (
+        wave.control_parameterization
+        is spyro.ElasticMaterialParameterization.VELOCITY
+    )
+    assert tuple(controls) == (
+        spyro.ElasticMaterialParameter.S_WAVE_VELOCITY,
+    )
+    assert controls[spyro.ElasticMaterialParameter.S_WAVE_VELOCITY] is wave.c_s
 
 
 @pytest.mark.parametrize(
@@ -304,30 +346,28 @@ def test_elastic_control_selection_rejects_invalid_input(
     exception,
     message,
 ):
+    wave = initialize_elastic_wave(VELOCITY_MATERIAL)
+
     with pytest.raises(exception, match=message):
-        initialize_elastic_wave(
-            {
-                "density": 1.0,
-                "p_wave_velocity": 2.5,
-                "s_wave_velocity": 1.0,
-            },
-            control_parameters,
-        )
+        wave._select_control_parameters(control_parameters)
+
+
+def test_elastic_parameterization_rejects_an_unknown_name():
+    wave = initialize_elastic_wave(VELOCITY_MATERIAL)
+
+    with pytest.raises(ValueError, match="Unknown elastic parameterization"):
+        wave.set_control_parameterization("lame_moduli")
 
 
 def test_set_elastic_control_parameters_updates_only_selected_subset():
-    wave = initialize_elastic_wave(
-        {"density": 1.0, "p_wave_velocity": 2.5, "s_wave_velocity": 1.0},
-    )
+    wave = initialize_elastic_wave(VELOCITY_MATERIAL)
 
     wave.set_control_parameters({
         spyro.ElasticMaterialParameter.S_WAVE_VELOCITY: fire.Constant(1.2),
     })
 
-    controls = wave.get_control_parameters()
-    assert tuple(controls) == (
-        spyro.ElasticMaterialParameter.S_WAVE_VELOCITY,
-    )
+    # Assigning a subset leaves the untouched parameters alone, while the
+    # complementary family is re-derived from the new values.
     assert np.allclose(wave.rho.dat.data_ro, 1.0)
     assert np.allclose(wave.c.dat.data_ro, 2.5)
     assert np.allclose(wave.c_s.dat.data_ro, 1.2)

@@ -2,6 +2,7 @@ from abc import abstractmethod, ABCMeta
 from collections.abc import Mapping
 import warnings
 import firedrake as fire
+from pyadjoint import AdjFloat, Tape
 
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
@@ -18,7 +19,7 @@ from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from ..utils.error_management import enum_parameter_error
 from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
-                            LayerShapeType, WaveType)
+                            LayerShapeType, RieszMapType, WaveType)
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
 
@@ -190,13 +191,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         if self.abc_type in [AbsorbingBCsType.NOABCS, AbsorbingBCsType.NRBC]:
             self._initialize_model_parameters()
-        if (
-            self.adjoint_type == AdjointType.AUTOMATED_ADJOINT
-            and self.automated_adjoint is not None
-        ):
-            # Model initialization may replace scalar inputs with new Function
-            # objects, so refresh the controls before recording every solve.
-            self.automated_adjoint.controls = self._get_automated_adjoint_controls()
         self.matrix_building()
         self.wave_propagator()
 
@@ -613,7 +607,34 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def store_forward_time_steps(self, value):
         self._store_forward_time_steps = value
 
-    def enable_automated_adjoint(self):
+    def enable_automated_adjoint(self, controls=None):
+        """Record the forward solves and differentiate them with pyadjoint.
+
+        The selected controls are stored on the resulting
+        :class:`AutomatedAdjoint` and nowhere else: the solver owns the
+        material fields, while which of them are differentiated is an
+        inversion concern.
+
+        Parameters
+        ----------
+        controls : list, tuple, or None, optional
+            Names (or enum values) of the model parameters to differentiate,
+            interpreted by the concrete solver. ``None`` selects every control
+            the solver exposes. Elastic solvers accept any non-empty subset of
+            one material family and re-express the equation in that family if
+            needed.
+
+        Returns
+        -------
+        None
+            Builds ``self.automated_adjoint`` and resets the recorded
+            functional and misfit.
+
+        Examples
+        --------
+        ``wave.enable_automated_adjoint(controls=["lambda", "mu"])`` inverts
+        for the two Lame moduli while density stays fixed.
+        """
         self.store_forward_time_steps = False
         self.enable_compute_functional(
             mode=FunctionalEvaluationMode.PER_TIMESTEP
@@ -621,29 +642,154 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
         self._initialize_model_parameters()
-        controls = self._get_automated_adjoint_controls()
+        self._align_control_parameterization(controls)
         # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
         # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
         # that the reduced functional is built as an
         # ``EnsembleReducedFunctional``, summing the per-shot functionals and
         # gradients over the ensemble communicator.
-        self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
+        self.automated_adjoint = AutomatedAdjoint(
+            self.comm, self._select_control_parameters(controls),
+        )
         self.functional_value = None
         self.misfit = None
 
-    def _get_automated_adjoint_controls(self):
-        """Return the active model parameters as a list of AD controls."""
+    def _align_control_parameterization(self, parameters=None):
+        """Re-express the model so the requested controls are differentiable.
+
+        Called once, before the forward solve is recorded, because the choice
+        of independent parameters changes the variational form itself. Solvers
+        with a single fixed parameterization do nothing.
+
+        Parameters
+        ----------
+        parameters : list, tuple, or None, optional
+            Requested control names. ``None`` keeps the current model.
+
+        Returns
+        -------
+        None
+        """
+
+    def _select_control_parameters(self, parameters=None):
+        """Return the labeled model parameters to differentiate.
+
+        Solvers expose their controls in the shape that suits their physics:
+        a single ``Function`` for the acoustic velocity, or a dictionary keyed
+        by material parameter for the elastic solver. Both are normalized here
+        into the ordered mapping that :class:`AutomatedAdjoint` differentiates.
+        Subclasses that support several controls override this method to honour
+        ``parameters``.
+
+        This resolution has no side effects, so it is also safe to call after
+        the tape has been recorded, to narrow an existing gradient request.
+
+        Parameters
+        ----------
+        parameters : list, tuple, or None, optional
+            Requested control labels, matched exactly against the solver's own
+            labels. ``None`` selects every control. Solvers exposing a single
+            control ignore this argument.
+
+        Returns
+        -------
+        dict
+            Ordered mapping from control label to Firedrake ``Function``.
+
+        Raises
+        ------
+        ValueError
+            If the solver has no initialized control parameters, or if a
+            requested label is not one of them.
+        """
         controls = self.get_control_parameters()
         if controls is None:
             raise ValueError(
                 "Control parameters must be initialized before enabling "
                 "automated adjoint."
             )
-        if isinstance(controls, Mapping):
-            controls = controls.values()
-        elif not isinstance(controls, (list, tuple)):
-            controls = [controls]
-        return list(controls)
+        if not isinstance(controls, Mapping):
+            name = getattr(controls, "name", None)
+            return {name() if callable(name) else "control": controls}
+        if parameters is None:
+            return dict(controls)
+        unknown = [name for name in parameters if name not in controls]
+        if unknown:
+            raise ValueError(
+                f"Unknown control parameters {unknown}. "
+                f"{type(self).__name__} exposes {list(controls)}."
+            )
+        return {name: controls[name] for name in parameters}
+
+    def _automated_adjoint_derivatives(
+        self, riesz_map=RieszMapType.L2, controls=None,
+    ):
+        """Differentiate the recorded functional with respect to the controls.
+
+        Replays the pyadjoint tape built during the annotated forward solve.
+        The tape and the reduced functional are created on demand, so this can
+        be called right after ``forward_solve()`` or on a solver that has not
+        been annotated yet.
+
+        Parameters
+        ----------
+        riesz_map : RieszMapType, optional
+            ``L2`` returns the Riesz representer of the derivative (a
+            ``Function``); ``l2`` returns the raw dual object (a
+            ``Cofunction``). See :class:`RieszMapType`.
+        controls : list, tuple, or None, optional
+            Narrow the gradient to a subset of the model parameters. Every
+            parameter of the active parameterization is recorded on the tape,
+            so any subset of them can be requested without solving again; the
+            reduced functional is rebuilt when the selection changes. ``None``
+            keeps the selection made in ``enable_automated_adjoint()``.
+
+        Returns
+        -------
+        dict
+            One derivative per control, labeled like
+            ``self.automated_adjoint.controls``.
+
+        Raises
+        ------
+        ValueError
+            If no annotated functional value is available, or if ``controls``
+            names a parameter that is not independent in the recorded model.
+        NotImplementedError
+            If ``riesz_map`` is not supported by the automated adjoint.
+        """
+        if not isinstance(self.functional_value, AdjFloat):
+            raise ValueError(
+                "Functional value must be an AdjFloat for automated adjoint "
+                "gradient computation."
+            )
+
+        if not self.automated_adjoint:
+            self.enable_automated_adjoint(controls=controls)
+            self.automated_adjoint.clear_tape()
+            self.forward_solve()
+        elif controls is not None:
+            selection = self._select_control_parameters(controls)
+            if selection != self.automated_adjoint.controls:
+                # The tape is untouched; only the set of pyadjoint Controls
+                # read out of it changes, so the functional is not re-solved.
+                self.automated_adjoint.controls = selection
+                self.automated_adjoint.reduced_functional = None
+        if (
+            self.automated_adjoint.reduced_functional is None
+            and isinstance(self.automated_adjoint._tape, Tape)
+        ):
+            self.automated_adjoint.create_reduced_functional(
+                self.functional_value
+            )
+
+        if riesz_map == RieszMapType.L2:
+            return self.automated_adjoint.compute_gradient()
+        if riesz_map == RieszMapType.l2:
+            return self.automated_adjoint.compute_derivative()
+        raise NotImplementedError(
+            f"Riesz map {riesz_map} not implemented for automated adjoint."
+        )
 
     def enable_implemented_adjoint(self):
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT

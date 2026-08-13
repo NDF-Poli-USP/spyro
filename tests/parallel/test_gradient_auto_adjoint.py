@@ -145,8 +145,8 @@ def get_forward_model():
     # The control must be a Function for pyadjoint to differentiate it.
     Wave_obj_guess.enable_automated_adjoint()
     assert isinstance(Wave_obj_guess.c, fire.Function)
-    assert len(Wave_obj_guess.automated_adjoint.controls) == 1
-    assert Wave_obj_guess.automated_adjoint.controls[0] is Wave_obj_guess.c
+    controls, = Wave_obj_guess.automated_adjoint.controls.values()
+    assert controls is Wave_obj_guess.c
 
     # The ensemble passed to the EnsembleReducedFunctional is wave.comm.
     assert Wave_obj_guess.automated_adjoint.ensemble is Wave_obj_guess.comm

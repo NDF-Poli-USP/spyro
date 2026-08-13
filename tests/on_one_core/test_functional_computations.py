@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
-from pyadjoint import AdjFloat
+from pyadjoint import AdjFloat, Tape
 
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.solvers.automatic_differentiation_solver import AutomatedAdjoint
@@ -101,43 +101,102 @@ def test_compute_functional_accepts_after_solve_mode():
     assert wave.functional_evaluation_mode == FunctionalEvaluationMode.AFTER_SOLVE
 
 
-def test_automated_adjoint_normalizes_controls_to_a_list():
+def test_automated_adjoint_labels_a_bare_control():
     control = object()
 
-    assert AutomatedAdjoint(None, control).controls == [control]
-    assert AutomatedAdjoint(None, (control,)).controls == [control]
-    assert AutomatedAdjoint(None, [control]).controls == [control]
+    assert AutomatedAdjoint(None, control).controls == {"control": control}
+    assert AutomatedAdjoint(None, {"mu": control}).controls == {"mu": control}
+    assert AutomatedAdjoint(None).controls == {}
 
 
-def test_automated_adjoint_rejects_an_empty_control_list():
+def test_automated_adjoint_rejects_an_empty_control_selection():
     automated_adjoint = AutomatedAdjoint(None)
 
     with pytest.raises(ValueError, match="At least one control"):
         automated_adjoint.create_reduced_functional(functional=None)
 
 
-def test_get_automated_adjoint_controls_uses_a_list_for_acoustics():
+def test_automated_adjoint_labels_derivatives_like_the_controls():
+    automated_adjoint = AutomatedAdjoint(None)
+    gradients = [object(), object()]
+    automated_adjoint.controls = {"lambda": object(), "mu": object()}
+    automated_adjoint.reduced_functional = SimpleNamespace(
+        derivative=lambda apply_riesz: gradients,
+    )
+
+    assert automated_adjoint.compute_gradient() == {
+        "lambda": gradients[0],
+        "mu": gradients[1],
+    }
+
+
+def test_select_control_parameters_labels_a_single_acoustic_control():
     wave = _build_wave()
     control = object()
     wave.get_control_parameters = lambda: control
 
-    assert wave._get_automated_adjoint_controls() == [control]
+    assert wave._select_control_parameters() == {"control": control}
 
 
-def test_get_automated_adjoint_controls_follows_elastic_parameterization():
+def test_select_control_parameters_keeps_elastic_labels():
     wave = _build_wave()
     controls = {"density": object(), "p_velocity": object(), "s_velocity": object()}
     wave.get_control_parameters = lambda: controls
 
-    assert wave._get_automated_adjoint_controls() == list(controls.values())
+    assert wave._select_control_parameters() == controls
 
 
-def test_get_automated_adjoint_controls_requires_initialized_controls():
+def test_select_control_parameters_requires_initialized_controls():
     wave = _build_wave()
     wave.get_control_parameters = lambda: None
 
     with pytest.raises(ValueError):
-        wave._get_automated_adjoint_controls()
+        wave._select_control_parameters()
+
+
+def _build_taped_wave(controls):
+    """Return a wave whose automated adjoint already holds a recorded tape."""
+    wave = _build_wave()
+    wave.functional_value = AdjFloat(1.0)
+    wave.get_control_parameters = lambda: controls
+    wave.automated_adjoint = AutomatedAdjoint(None, controls)
+    wave.automated_adjoint._tape = Tape()
+    wave.automated_adjoint.create_reduced_functional = (
+        lambda functional: setattr(
+            wave.automated_adjoint, "reduced_functional", object(),
+        )
+    )
+    wave.automated_adjoint.compute_gradient = (
+        lambda: dict.fromkeys(wave.automated_adjoint.controls, "dJ")
+    )
+    wave.forward_solve = lambda: pytest.fail(
+        "Narrowing the gradient must not trigger a new forward solve.",
+    )
+    return wave
+
+
+def test_gradient_can_be_narrowed_to_a_subset_of_the_taped_controls():
+    controls = {"lambda": object(), "mu": object()}
+    wave = _build_taped_wave(controls)
+    wave.automated_adjoint.create_reduced_functional(wave.functional_value)
+
+    derivatives = wave._automated_adjoint_derivatives(controls=["mu"])
+
+    assert tuple(derivatives) == ("mu",)
+    # The selection moved to the automated adjoint, and only the read-out of
+    # the existing tape changed.
+    assert tuple(wave.automated_adjoint.controls) == ("mu",)
+
+
+def test_unchanged_gradient_selection_keeps_the_reduced_functional():
+    controls = {"lambda": object(), "mu": object()}
+    wave = _build_taped_wave(controls)
+    wave.automated_adjoint.create_reduced_functional(wave.functional_value)
+    reduced_functional = wave.automated_adjoint.reduced_functional
+
+    wave._automated_adjoint_derivatives(controls=["lambda", "mu"])
+
+    assert wave.automated_adjoint.reduced_functional is reduced_functional
 
 
 @pytest.mark.parametrize(
@@ -156,7 +215,7 @@ def test_acoustic_automated_adjoint_returns_single_derivative(
     wave.functional_value = AdjFloat(1.0)
     wave.automated_adjoint = SimpleNamespace(
         reduced_functional=object(),
-        **{derivative_method: lambda: [derivative]},
+        **{derivative_method: lambda: {"velocity": derivative}},
     )
 
     result = wave._automated_adjoint_gradient(riesz_map=riesz_map)

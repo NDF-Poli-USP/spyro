@@ -1,40 +1,19 @@
 import numpy as np
 
-from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
-                       project)
+from firedrake import (assemble, Cofunction, Constant, curl, DirichletBC, div,
+                       Function, project)
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
-from ...utils.typing import (ElasticMaterialParameter, ElasticMaterialParameterization,
-                             AbsorbingBCsType, override)
+from .material import (ATTRIBUTE_BY_PARAMETER, DERIVATIVES_BY_PARAMETERIZATION,
+                       KEYS_BY_PARAMETER, PARAMETERS_BY_PARAMETERIZATION,
+                       ElasticControlSet, resolve_parameterization)
+from ...utils.typing import (AdjointType, ElasticMaterialParameter,
+                             ElasticMaterialParameterization, AbsorbingBCsType,
+                             RieszMapType, override)
 from ...domains.space import create_function_space
-
-
-CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
-    ElasticMaterialParameterization.LAME: (
-        ElasticMaterialParameter.DENSITY,
-        ElasticMaterialParameter.LAMBDA,
-        ElasticMaterialParameter.MU,
-    ),
-    ElasticMaterialParameterization.VELOCITY: (
-        ElasticMaterialParameter.DENSITY,
-        ElasticMaterialParameter.P_WAVE_VELOCITY,
-        ElasticMaterialParameter.S_WAVE_VELOCITY,
-    ),
-}
-
-
-_CONTROL_PARAMETER_ALIASES = {
-    parameter.value: parameter for parameter in ElasticMaterialParameter
-}
-_CONTROL_PARAMETER_ALIASES.update({
-    "rho": ElasticMaterialParameter.DENSITY,
-    "lmbda": ElasticMaterialParameter.LAMBDA,
-    "c": ElasticMaterialParameter.P_WAVE_VELOCITY,
-    "c_s": ElasticMaterialParameter.S_WAVE_VELOCITY,
-})
 
 
 class IsotropicWave(ElasticWave):
@@ -47,7 +26,6 @@ class IsotropicWave(ElasticWave):
         self.mu = None    # Second Lame parameter
         self.c_s = None   # Secondary wave velocity
         self._control_parameterization = None
-        self._control_parameters = None
         self._material_parameter_function_space = None
 
         self.u_n = None   # Current displacement field
@@ -81,10 +59,11 @@ class IsotropicWave(ElasticWave):
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
         """Initialize isotropic elastic material parameters from a dictionary.
 
-        The material declaration must define one complete parameterization,
-        while ``control_parameters`` may independently select any non-empty
-        subset from either the Lame or velocity family. Without an explicit
-        selection, all parameters from the material declaration are controls.
+        The declaration must define exactly one complete family. The optional
+        ``parameterization`` entry then re-expresses the equation in the other
+        family, which is what makes its parameters differentiable; the subset
+        actually inverted for is chosen later, with
+        ``enable_automated_adjoint(controls=...)``.
 
         Parameters
         ----------
@@ -93,202 +72,184 @@ class IsotropicWave(ElasticWave):
             Valid material combinations are ``density``, ``lambda`` (or
             ``lame_first``), and ``mu`` (or ``lame_second``); or ``density``,
             ``p_wave_velocity``, and ``s_wave_velocity``. The optional
-            ``control_parameters`` entry must be a list or tuple.
+            ``parameterization`` entry is ``"lame"`` or ``"velocity"``.
 
         Returns
         -------
         None
-            The method assigns all material fields and records the selected
-            control subset and its parameterization.
+            The method assigns every material field and records the active
+            parameterization.
+
+        Examples
+        --------
+        Declaring ``{"density": ..., "lambda": ..., "mu": ...,
+        "parameterization": "velocity"}`` builds the equation from Lame input
+        but keeps ``c`` and ``c_s`` as the independent fields.
         """
-        def material_parameter(value):
-            """Normalize model-dictionary values for elastic parameters.
+        values = {
+            parameter: next(
+                (synthetic_data_dict[key]
+                 for key in keys if key in synthetic_data_dict),
+                None,
+            )
+            for parameter, keys in KEYS_BY_PARAMETER.items()
+        }
 
-            Parameters
-            ----------
-            value : scalar, firedrake.Constant, firedrake.Function, or UFL expression
-                Material parameter read from ``synthetic_data_dict``.
-
-            Returns
-            -------
-            firedrake.Constant, firedrake.Function, or object
-                Scalars and ``Constant`` values are converted to scalar
-                material ``Function`` objects once a mesh exists. Before mesh
-                creation, scalar values remain as ``Constant`` values so the
-                regular model initialization flow can continue.
-
-            Examples
-            --------
-            ``density=1.0`` becomes ``Constant(1.0)`` before the mesh exists,
-            and becomes a scalar material ``Function`` after the mesh has been
-            created.
-            """
-            if np.isscalar(value) or isinstance(value, Constant):
-                if self.mesh is None:
-                    return Constant(value) if np.isscalar(value) else value
-                V = create_function_space(
-                    self.mesh, self.method, self.degree, dim=1,
-                )
-                return Function(V).interpolate(value)
-            return value
-
-        def get_value(parameter, *aliases):
-            for key in (parameter.value, *aliases):
-                if key in synthetic_data_dict:
-                    return material_parameter(synthetic_data_dict[key])
-            return None
-
-        rho = get_value(ElasticMaterialParameter.DENSITY)
-        lmbda = get_value(
-            ElasticMaterialParameter.LAMBDA,
-            "lame_first",
-        )
-        mu = get_value(
-            ElasticMaterialParameter.MU,
-            "lame_second",
-        )
-        c = get_value(ElasticMaterialParameter.P_WAVE_VELOCITY)
-        c_s = get_value(ElasticMaterialParameter.S_WAVE_VELOCITY)
-
-        # Check if {rho, lambda, mu} is set and {c, c_s} are not
-        option_1 = bool(rho) and bool(lmbda) and bool(mu) \
-            and not bool(c) and not bool(c_s)
-        # Check if {rho, c, c_s} is set and {lambda, mu} are not
-        option_2 = bool(rho) and bool(c) and bool(c_s) \
-            and not bool(lmbda) and not bool(mu)
-
-        if option_1:
-            equation_parameterization = ElasticMaterialParameterization.LAME
-            self.rho, self.lmbda, self.mu = rho, lmbda, mu
-            self._update_derived_material_parameters(equation_parameterization)
-        elif option_2:
-            equation_parameterization = ElasticMaterialParameterization.VELOCITY
-            self.rho, self.c, self.c_s = rho, c, c_s
-            self._update_derived_material_parameters(equation_parameterization)
-        else:
+        declared = [
+            parameterization
+            for parameterization, family in PARAMETERS_BY_PARAMETERIZATION.items()
+            if {parameter for parameter, value in values.items()
+                if value is not None} == set(family)
+        ]
+        if not declared:
             raise ValueError(
                 "Inconsistent selection of isotropic elastic wave parameters:\n"
-                f"    Density        : {bool(rho)}\n"
-                f"    Lame first     : {bool(lmbda)}\n"
-                f"    Lame second    : {bool(mu)}\n"
-                f"    P-wave velocity: {bool(c)}\n"
-                f"    S-wave velocity: {bool(c_s)}\n"
-                "The valid options are {Density, Lame first, Lame second} "
+                + "".join(
+                    f"    {parameter.value:<16}: {value is not None}\n"
+                    for parameter, value in values.items()
+                )
+                + "The valid options are {Density, Lame first, Lame second} "
                 "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
             )
 
-        control_parameterization, controls = (
-            self._normalize_control_parameter_selection(
-                synthetic_data_dict.get("control_parameters"),
-                equation_parameterization,
-            )
-        )
-        if control_parameterization is not equation_parameterization:
-            self._materialize_parameterization(control_parameterization)
-            self._update_derived_material_parameters(control_parameterization)
+        for parameter in PARAMETERS_BY_PARAMETERIZATION[declared[0]]:
+            self._store_material_parameter(parameter, values[parameter])
+        self._control_parameterization = declared[0]
+        self._derive_complementary_parameters(declared[0])
 
-        self._control_parameterization = control_parameterization
-        self._control_parameters = controls
+        parameterization = synthetic_data_dict.get("parameterization")
+        if parameterization is not None:
+            self.set_control_parameterization(parameterization)
 
-    def _normalize_control_parameter_selection(
-        self,
-        parameters,
-        default_parameterization,
-    ):
-        """Normalize a public elastic-control selection to enum values."""
-        if parameters is None:
-            return (
-                default_parameterization,
-                CONTROL_PARAMETERS_BY_PARAMETERIZATION[default_parameterization],
-            )
-        if not isinstance(parameters, (list, tuple)):
-            raise TypeError(
-                "Elastic control_parameters must be a list or tuple.",
-            )
+    @property
+    def control_parameterization(self):
+        """Family of parameters held as independent fields by the equation.
 
-        normalized = []
-        for parameter in parameters:
-            if isinstance(parameter, ElasticMaterialParameter):
-                normalized.append(parameter)
-            elif isinstance(parameter, str):
-                try:
-                    normalized.append(_CONTROL_PARAMETER_ALIASES[parameter])
-                except KeyError as exc:
-                    supported = ", ".join(_CONTROL_PARAMETER_ALIASES)
-                    raise ValueError(
-                        f"Unknown elastic control parameter '{parameter}'. "
-                        f"Supported names are: {supported}.",
-                    ) from exc
-            else:
-                raise TypeError(
-                    "Elastic control parameters must be strings or "
-                    "ElasticMaterialParameter values.",
-                )
+        Returns
+        -------
+        ElasticMaterialParameterization or None
+            Family whose parameters are Firedrake ``Function`` objects in the
+            variational form, or ``None`` before the material parameters have
+            been initialized. The two remaining parameters are UFL expressions
+            of this family, so gradients can be taken with respect to it.
+        """
+        return self._control_parameterization
 
-        if not normalized:
-            raise ValueError("At least one elastic control parameter is required.")
-        if len(set(normalized)) != len(normalized):
+    def set_control_parameterization(self, parameterization):
+        """Re-express the equation parameters in another material family.
+
+        The parameters of ``parameterization`` are currently UFL expressions of
+        the active family; interpolating them into the scalar control space
+        turns them into independent fields, and the previous family is then
+        re-derived from them. This is what allows inverting for wave velocities
+        on a model declared with Lame moduli, and vice versa.
+
+        Parameters
+        ----------
+        parameterization : str or ElasticMaterialParameterization
+            Target family, ``"lame"`` or ``"velocity"``.
+
+        Returns
+        -------
+        None
+            Rewrites every material attribute when the family changes.
+
+        Raises
+        ------
+        ValueError
+            If ``parameterization`` is not a supported family, or if the
+            material parameters have not been initialized yet.
+
+        Examples
+        --------
+        ``wave.set_control_parameterization("velocity")`` on a model declared
+        with ``lambda`` and ``mu`` makes ``c`` and ``c_s`` the independent
+        fields, so the automated adjoint can differentiate with respect to
+        wave velocities.
+        """
+        parameterization = resolve_parameterization(parameterization)
+        if self._control_parameterization is None:
             raise ValueError(
-                "Elastic control parameters must not contain duplicates."
+                "Material parameters must be initialized before changing the "
+                "elastic parameterization.",
             )
-
-        selected = set(normalized)
-        lame_parameters = set(CONTROL_PARAMETERS_BY_PARAMETERIZATION[
-            ElasticMaterialParameterization.LAME
-        ])
-        velocity_parameters = set(CONTROL_PARAMETERS_BY_PARAMETERIZATION[
-            ElasticMaterialParameterization.VELOCITY
-        ])
-        is_lame = selected <= lame_parameters
-        is_velocity = selected <= velocity_parameters
-
-        if is_lame and is_velocity:
-            parameterization = default_parameterization
-        elif is_lame:
-            parameterization = ElasticMaterialParameterization.LAME
-        elif is_velocity:
-            parameterization = ElasticMaterialParameterization.VELOCITY
-        else:
-            raise ValueError(
-                "Elastic controls cannot mix Lame parameters with wave "
-                "velocities."
-            )
-        return parameterization, tuple(normalized)
-
-    @staticmethod
-    def _material_parameter_attribute(parameter):
-        """Return the wave attribute associated with a material parameter."""
-        return {
-            ElasticMaterialParameter.DENSITY: "rho",
-            ElasticMaterialParameter.LAMBDA: "lmbda",
-            ElasticMaterialParameter.MU: "mu",
-            ElasticMaterialParameter.P_WAVE_VELOCITY: "c",
-            ElasticMaterialParameter.S_WAVE_VELOCITY: "c_s",
-        }[parameter]
-
-    def _get_material_parameter(self, parameter):
-        """Return one material field or expression."""
-        return getattr(self, self._material_parameter_attribute(parameter))
-
-    def _set_material_parameter(self, parameter, value):
-        """Set one material field or expression."""
-        setattr(self, self._material_parameter_attribute(parameter), value)
-
-    def _materialize_parameterization(self, parameterization):
-        """Represent one complete primary parameter family as Functions."""
-        if self.mesh is None:
+        if parameterization is self._control_parameterization:
             return
-        for parameter in CONTROL_PARAMETERS_BY_PARAMETERIZATION[parameterization]:
+        if self.mesh is None:
+            # There is no space to interpolate into yet. The request stays in
+            # the model dictionary and is replayed once the mesh exists.
+            self.input_dictionary["synthetic_data"]["parameterization"] = (
+                parameterization.value
+            )
+            return
+
+        for parameter in PARAMETERS_BY_PARAMETERIZATION[parameterization]:
             self._set_material_parameter(
                 parameter,
                 self._as_control_field(
-                    self._get_material_parameter(parameter),
-                    parameter.value,
+                    self._get_material_parameter(parameter), parameter,
                 ),
             )
+        self._control_parameterization = parameterization
+        self._derive_complementary_parameters(parameterization)
+        self._record_material_parameters()
 
-    def _update_derived_material_parameters(self, parameterization):
-        """Update parameters derived from the active primary family."""
+    def _store_material_parameter(self, parameter, value):
+        """Store one declared material parameter as an equation coefficient.
+
+        Scalars and ``Constant`` values become scalar material ``Function``
+        objects once a mesh exists, and stay as ``Constant`` before that so the
+        regular model initialization flow can continue. Any other value —
+        a ``Function`` or a UFL expression — is stored unchanged.
+
+        An existing compatible ``Function`` is updated in place rather than
+        replaced. ``forward_solve()`` re-initializes the model on every call,
+        and the automated adjoint holds references to these objects; rebuilding
+        them would silently detach the recorded controls from the ones the
+        variational form actually uses.
+
+        Parameters
+        ----------
+        parameter : ElasticMaterialParameter
+            Parameter being stored.
+        value : scalar, firedrake.Constant, firedrake.Function, or UFL expression
+            Value read from the model dictionary.
+
+        Returns
+        -------
+        None
+            Assigns the corresponding material attribute.
+        """
+        if not (np.isscalar(value) or isinstance(value, Constant)):
+            self._set_material_parameter(parameter, value)
+            return
+        if self.mesh is None:
+            self._set_material_parameter(
+                parameter, Constant(value) if np.isscalar(value) else value,
+            )
+            return
+        self._set_material_parameter(
+            parameter, self._as_control_field(value, parameter),
+        )
+
+    def _derive_complementary_parameters(self, parameterization):
+        """Express the non-control parameters in terms of the control family.
+
+        The complementary parameters are stored as UFL expressions rather than
+        interpolated fields, so the algebraic link between the two families
+        stays inside the variational form and pyadjoint differentiates through
+        it, whichever family the user selected as controls.
+
+        Parameters
+        ----------
+        parameterization : ElasticMaterialParameterization
+            Family currently held as independent ``Function`` objects.
+
+        Returns
+        -------
+        None
+            Assigns the two remaining material attributes.
+        """
         if parameterization is ElasticMaterialParameterization.LAME:
             self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
             self.c_s = (self.mu/self.rho)**0.5
@@ -296,20 +257,13 @@ class IsotropicWave(ElasticWave):
             self.mu = self.rho*self.c_s**2
             self.lmbda = self.rho*self.c**2 - 2*self.mu
 
-    def get_equation_material_parameters(self):
-        """Return density and elastic moduli from the active control family.
+    def _get_material_parameter(self, parameter):
+        """Return one material field or expression."""
+        return getattr(self, ATTRIBUTE_BY_PARAMETER[parameter])
 
-        Building the velocity-to-Lame conversion directly in the variational
-        form keeps the dependency on ``c`` and ``c_s`` visible to pyadjoint.
-        """
-        if (
-            self._control_parameterization
-            is ElasticMaterialParameterization.VELOCITY
-        ):
-            mu = self.rho*self.c_s**2
-            lmbda = self.rho*self.c**2 - 2*mu
-            return self.rho, lmbda, mu
-        return self.rho, self.lmbda, self.mu
+    def _set_material_parameter(self, parameter, value):
+        """Set one material field or expression."""
+        setattr(self, ATTRIBUTE_BY_PARAMETER[parameter], value)
 
     @override
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
@@ -389,12 +343,13 @@ class IsotropicWave(ElasticWave):
             raise ValueError(
                 "Mesh must be set before creating elastic control parameter spaces.",
             )
-        self._material_parameter_function_space = create_function_space(
-            self.mesh, self.method, self.degree,
-        )
-        return self._material_parameter_function_space
+        space = self._material_parameter_function_space
+        if space is None or space.mesh() is not self.mesh:
+            space = create_function_space(self.mesh, self.method, self.degree)
+            self._material_parameter_function_space = space
+        return space
 
-    def _as_control_field(self, value, name):
+    def _as_control_field(self, value, parameter):
         """Return a material control as a scalar Firedrake Function.
 
         Elastic material parameters are scalar fields, while the elastic
@@ -406,15 +361,21 @@ class IsotropicWave(ElasticWave):
 
         Accepted values are Firedrake ``Function`` objects, constants, scalar
         values, or UFL expressions. Functions already in the target space are
-        copied with ``assign``; all other values are interpolated into a new
-        named scalar ``Function``.
+        copied with ``assign``; all other values are interpolated.
+
+        The field currently held by the attribute is reused whenever it lives
+        in the control space, so the objects referenced by the variational form
+        and by :class:`AutomatedAdjoint` survive re-initialization. A new
+        ``Function`` is built only when there is nothing compatible to write
+        into.
 
         Parameters
         ----------
         value : firedrake.Function, firedrake.Constant, scalar, or UFL expression
             Material control value to represent in the scalar control space.
-        name : str
-            Name assigned to the returned Firedrake ``Function``.
+        parameter : ElasticMaterialParameter
+            Material parameter being represented; identifies both the field to
+            reuse and the name given to a newly created one.
 
         Returns
         -------
@@ -426,23 +387,23 @@ class IsotropicWave(ElasticWave):
             return None
 
         V = self.get_control_parameter_function_space()
-        field = Function(V, name=name)
-        if isinstance(value, Function):
-            if value.function_space() == V:
-                field.assign(value)
-            else:
-                field.interpolate(value)
+        field = self._get_material_parameter(parameter)
+        if not (isinstance(field, Function) and field.function_space() == V):
+            field = Function(V, name=parameter.value)
+        if isinstance(value, Function) and value.function_space() == V:
+            field.assign(value)
         else:
             field.interpolate(value)
         return field
 
     def get_control_parameters(self):
-        """Return the active isotropic elastic material controls.
+        """Return the isotropic elastic material fields available as controls.
 
-        The returned dictionary is keyed by
-        :class:`ElasticMaterialParameter` and contains only the user-selected
-        controls. Without an explicit selection, it contains every parameter
-        from the material-input family.
+        These are the three independent parameters of the active
+        parameterization: every field the automated adjoint may differentiate
+        with respect to. Which of them are actually differentiated is chosen
+        with ``enable_automated_adjoint(controls=...)`` and stored on
+        :class:`AutomatedAdjoint`, not here.
 
         Returns
         -------
@@ -453,28 +414,244 @@ class IsotropicWave(ElasticWave):
 
         Examples
         --------
-        With ``control_parameters=["mu"]``, only ``{MU: mu}`` is returned.
+        Under the velocity parameterization this returns
+        ``{DENSITY: rho, P_WAVE_VELOCITY: c, S_WAVE_VELOCITY: c_s}``.
         """
         parameterization = self._control_parameterization
         if parameterization is None:
             if self.rho is None:
                 return None
+            # Material attributes were assigned directly, bypassing the model
+            # dictionary; fall back to the default Lame family.
             parameterization = ElasticMaterialParameterization.LAME
-
-        selected = self._control_parameters
-        if selected is None:
-            selected = CONTROL_PARAMETERS_BY_PARAMETERIZATION[parameterization]
         return {
             parameter: self._get_material_parameter(parameter)
-            for parameter in selected
+            for parameter in PARAMETERS_BY_PARAMETERIZATION[parameterization]
         }
+
+    @override
+    def _align_control_parameterization(self, parameters=None):
+        """Re-express the equation in the family the controls belong to.
+
+        Selecting parameters from the family that is not currently active
+        makes them independent ``Function`` objects, which is what pyadjoint
+        needs to differentiate with respect to them. Selecting ``density``
+        alone is ambiguous and keeps the active family unchanged.
+
+        Parameters
+        ----------
+        parameters : list, tuple, or None, optional
+            Control names or :class:`ElasticMaterialParameter` values.
+            ``None`` keeps the active family.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        Requesting ``["lambda", "mu"]`` on a model declared with wave
+        velocities switches the equation to the Lame family.
+        """
+        if parameters is None:
+            return
+        self.set_control_parameterization(
+            ElasticControlSet.select(
+                parameters, default=self._control_parameterization,
+            ).parameterization,
+        )
+
+    @override
+    def _select_control_parameters(self, parameters=None):
+        """Resolve an elastic control selection into labeled fields.
+
+        Only the parameters of the active family can be resolved: the other
+        two are UFL expressions of them, not independent variables. Their
+        gradients are still available after the fact, through the change of
+        variables applied by :meth:`gradient_solve`.
+
+        Parameters
+        ----------
+        parameters : list, tuple, or None, optional
+            Control names (``"mu"``, ``"c_s"``, ``"lame_first"``, ...) or
+            :class:`ElasticMaterialParameter` values. ``None`` selects the
+            three parameters of the active family.
+
+        Returns
+        -------
+        dict
+            Ordered mapping from :class:`ElasticMaterialParameter` to the
+            scalar ``Function`` differentiated for it.
+
+        Raises
+        ------
+        ValueError
+            If the selection is empty, has duplicates, mixes both families,
+            names an unknown parameter, or belongs to the family that is not
+            currently active.
+
+        Examples
+        --------
+        ``wave._select_control_parameters(["mu"])`` under the Lame
+        parameterization returns ``{MU: mu}``.
+        """
+        selection = ElasticControlSet.select(
+            parameters, default=self._control_parameterization,
+        )
+        if selection.parameterization is not self._control_parameterization:
+            raise ValueError(
+                "Elastic controls "
+                + ", ".join(parameter.value for parameter in selection)
+                + f" belong to the '{selection.parameterization.value}' "
+                "family, but the equation is parameterized with "
+                f"'{self._control_parameterization.value}', so they are not "
+                "independent variables of the recorded model. Use "
+                "gradient_solve() to obtain their gradients through the "
+                "change of variables, or set_control_parameterization() "
+                "before recording the forward solve.",
+            )
+        return {
+            parameter: self._get_material_parameter(parameter)
+            for parameter in selection
+        }
+
+    @override
+    def gradient_solve(
+        self,
+        misfit=None,
+        forward_solution=None,
+        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        riesz_map=RieszMapType.L2,
+        controls=None,
+    ):
+        """Compute the adjoint gradient of the elastic misfit functional.
+
+        Only the automated adjoint is available for elastic media: the
+        gradient is obtained by replaying the pyadjoint tape recorded during
+        an annotated ``forward_solve()``.
+
+        Controls from the active parameterization are read straight off the
+        tape. Controls from the other family are obtained from the full active
+        family by the exact change of variables in :mod:`.material`, so no
+        second forward solve is needed either way.
+
+        Parameters
+        ----------
+        misfit : array_like, optional
+            Accepted for signature compatibility with
+            :meth:`AcousticWave.gradient_solve`; the automated adjoint reads
+            the misfit from the recorded tape instead.
+        forward_solution : firedrake.Function, optional
+            Accepted for signature compatibility; unused for the same reason.
+        adjoint_type : AdjointType, optional
+            Must be :attr:`AdjointType.AUTOMATED_ADJOINT`.
+        riesz_map : RieszMapType, optional
+            ``L2`` returns gradients (``Function``), ``l2`` returns raw
+            derivatives (``Cofunction``). See :class:`RieszMapType`.
+        controls : list, tuple, or None, optional
+            Restrict the gradient to a subset of the material parameters, from
+            either family. ``None`` uses the selection made in
+            ``enable_automated_adjoint()``. Passing a selection re-registers it
+            on the automated adjoint, since that is where the choice lives; a
+            request from the other family registers the whole active family,
+            which is what the tape is actually read for.
+
+        Returns
+        -------
+        dict
+            Derivative of the functional with respect to each selected
+            control, keyed by :class:`ElasticMaterialParameter`.
+
+        Raises
+        ------
+        NotImplementedError
+            If a hand-implemented adjoint is requested.
+
+        Examples
+        --------
+        After ``enable_automated_adjoint(controls=["lambda", "mu"])``,
+        ``gradient_solve(controls=["mu"])`` returns only ``{MU: dJ_dmu}`` and
+        ``gradient_solve(controls=["c_s"])`` returns ``{S_WAVE_VELOCITY: ...}``
+        by converting the Lame gradients, both reusing the same tape.
+        """
+        if adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
+            raise NotImplementedError(
+                "Elastic media only support the automated adjoint; "
+                f"got {adjoint_type}.",
+            )
+        selection = ElasticControlSet.select(
+            controls, default=self._control_parameterization,
+        )
+        if selection.parameterization is self._control_parameterization:
+            return self._automated_adjoint_derivatives(
+                riesz_map=riesz_map, controls=controls,
+            )
+
+        # The requested family is not on the tape. Differentiate the whole
+        # active family, which is, and change variables afterwards.
+        derivatives = self._automated_adjoint_derivatives(
+            riesz_map=RieszMapType.l2,
+            controls=PARAMETERS_BY_PARAMETERIZATION[
+                self._control_parameterization
+            ],
+        )
+        converted = self._change_derivative_variables(
+            derivatives, selection.parameterization,
+        )
+        return {
+            parameter: (
+                converted[parameter]
+                if riesz_map is RieszMapType.l2
+                else converted[parameter].riesz_representation("L2")
+            )
+            for parameter in selection
+        }
+
+    def _change_derivative_variables(self, derivatives, parameterization):
+        """Chain-rule dual derivatives into the other material family.
+
+        The conversion between the two families is applied node by node when
+        the material is re-expressed, so its Jacobian is diagonal and the
+        chain rule is an exact, coefficient-wise operation on the dual vectors.
+        That is why this works on raw derivatives (``Cofunction``) rather than
+        on Riesz representers: scaling coefficients does not commute with
+        inverting the mass matrix, so the Riesz map must be applied afterwards.
+
+        Parameters
+        ----------
+        derivatives : dict
+            Raw derivatives for every parameter of the active family, keyed by
+            :class:`ElasticMaterialParameter`. All three are required, since
+            each converted parameter mixes several of them.
+        parameterization : ElasticMaterialParameterization
+            Family to convert to.
+
+        Returns
+        -------
+        dict
+            Raw derivatives with respect to ``parameterization``, keyed by
+            :class:`ElasticMaterialParameter`.
+        """
+        V = self.get_control_parameter_function_space()
+        coefficients = DERIVATIVES_BY_PARAMETERIZATION[parameterization](
+            self.rho, self.c, self.c_s,
+        )
+        converted = {}
+        for parameter, terms in coefficients.items():
+            dual = Cofunction(V.dual(), name=parameter.value)
+            for source, coefficient in terms.items():
+                nodal = Function(V).interpolate(coefficient).dat.data_ro
+                dual.dat.data[:] += derivatives[source].dat.data_ro * nodal
+            converted[parameter] = dual
+        return converted
 
     def set_control_parameters(self, controls):
         """Assign isotropic elastic material controls.
 
         Control dictionaries must use :class:`ElasticMaterialParameter` keys
-        and may contain a non-empty subset from either material family.
-        Parameters omitted from the dictionary retain their current values.
+        and may contain any non-empty subset of a single material family.
+        Parameters omitted from the dictionary keep their current values, and
+        the complementary family is re-derived from the result.
 
         Parameters
         ----------
@@ -485,8 +662,8 @@ class IsotropicWave(ElasticWave):
         Returns
         -------
         None
-            The method updates the selected controls, complementary material
-            expressions and active parameterization.
+            The method updates the assigned fields, the complementary material
+            expressions, and the active parameterization.
 
         Raises
         ------
@@ -522,56 +699,59 @@ class IsotropicWave(ElasticWave):
                 "enum values.",
             )
 
-        lame_family = set(CONTROL_PARAMETERS_BY_PARAMETERIZATION[
-            ElasticMaterialParameterization.LAME
-        ])
-        velocity_family = set(CONTROL_PARAMETERS_BY_PARAMETERIZATION[
-            ElasticMaterialParameterization.VELOCITY
-        ])
-        selected_set = set(controls)
-        current_parameterization = self._control_parameterization
-        if current_parameterization is None:
-            if selected_set == lame_family:
-                current_parameterization = ElasticMaterialParameterization.LAME
-            elif selected_set == velocity_family:
-                current_parameterization = (
-                    ElasticMaterialParameterization.VELOCITY
-                )
+        selection = ElasticControlSet.select(
+            list(controls),
+            default=self._control_parameterization,
+        )
+        if self._control_parameterization is None:
+            # A dictionary covering a complete family fully determines the
+            # material; a partial one only makes sense against an existing
+            # material, so the model dictionary is used to build one first.
+            if len(selection) == len(
+                PARAMETERS_BY_PARAMETERIZATION[selection.parameterization]
+            ):
+                self._control_parameterization = selection.parameterization
             else:
                 self._initialize_model_parameters()
-                current_parameterization = self._control_parameterization
-
-        parameterization, selected = self._normalize_control_parameter_selection(
-            list(controls),
-            current_parameterization,
-        )
-        if parameterization is not current_parameterization:
-            self._materialize_parameterization(parameterization)
+        self.set_control_parameterization(selection.parameterization)
 
         for parameter, value in controls.items():
             self._set_material_parameter(
                 parameter,
-                self._as_control_field(value, parameter.value),
+                self._as_control_field(value, parameter),
             )
+        self._derive_complementary_parameters(selection.parameterization)
+        self._record_material_parameters()
 
-        self._control_parameterization = parameterization
-        self._control_parameters = selected
-        self._update_derived_material_parameters(parameterization)
+    def _record_material_parameters(self):
+        """Write the active material state back to the model dictionary.
 
-        primary_parameters = CONTROL_PARAMETERS_BY_PARAMETERIZATION[
-            parameterization
-        ]
-        self.input_dictionary["synthetic_data"] = {
-            "type": "object",
-            **{
-                parameter.value: self._get_material_parameter(parameter)
-                for parameter in primary_parameters
-            },
-            "real_velocity_file": None,
-            "control_parameters": [
-                parameter.value for parameter in selected
-            ],
-        }
+        ``forward_solve()`` re-initializes the model from ``synthetic_data`` on
+        every call, so the dictionary must keep describing the current state:
+        the fields as they stand now, and the family holding them. Keys of the
+        other family are dropped, because a declaration naming both families is
+        rejected as ambiguous.
+
+        Storing the ``Function`` objects themselves — rather than the values
+        the model was built from — is also what preserves their identity across
+        re-initialization, so the controls recorded by
+        :class:`AutomatedAdjoint` keep pointing at the fields in the form.
+
+        Returns
+        -------
+        None
+            Updates ``self.input_dictionary["synthetic_data"]`` in place.
+        """
+        synthetic_data = self.input_dictionary["synthetic_data"]
+        synthetic_data["parameterization"] = (
+            self._control_parameterization.value
+        )
+        active = PARAMETERS_BY_PARAMETERIZATION[self._control_parameterization]
+        for parameter, keys in KEYS_BY_PARAMETER.items():
+            for key in keys:
+                synthetic_data.pop(key, None)
+            if parameter in active:
+                synthetic_data[keys[0]] = self._get_material_parameter(parameter)
 
     @override
     def matrix_building(self):

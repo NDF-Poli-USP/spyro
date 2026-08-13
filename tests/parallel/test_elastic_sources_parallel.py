@@ -19,22 +19,16 @@ import spyro
 
 
 EXACT_MATERIAL = {"density": 0.1, "lambda": 0.025, "mu": 0.1}
+# The ensemble reduction sums per-shot gradients and is agnostic to how the
+# material is parameterized, so a single family is enough here. The difference
+# between the Lame and velocity forms is covered serially, and much more
+# cheaply, by tests/on_one_core/test_elastic_auto_adj_2d.py.
 MATERIAL_CASES = [
     pytest.param(
         {"density": 0.12, "lambda": 0.20, "mu": 0.08},
         ("rho", "lmbda", "mu"),
         1.0,
         id="lame",
-    ),
-    pytest.param(
-        {
-            "density": 0.12,
-            "p_wave_velocity": np.sqrt(3.0),
-            "s_wave_velocity": np.sqrt(2.0 / 3.0),
-        },
-        ("rho", "c", "c_s"),
-        0.25,
-        id="velocity",
     ),
 ]
 
@@ -115,7 +109,7 @@ def build_directions(wave, controls, relative_scale):
         fire.Function(control.function_space()).interpolate(
             relative_scale * control * common_shape
         )
-        for control in controls
+        for control in controls.values()
     ]
 
 
@@ -171,7 +165,7 @@ def test_elastic_gradient_sources_parallel(
         assert len(controls) == 3
         assert all(
             control is getattr(wave, attribute)
-            for control, attribute in zip(controls, control_attributes)
+            for control, attribute in zip(controls.values(), control_attributes)
         )
 
         reduced_functional = (
@@ -185,10 +179,13 @@ def test_elastic_gradient_sources_parallel(
         )
 
         gradients = wave.automated_adjoint.compute_gradient()
-        assert len(gradients) == len(controls)
-        assert all(isinstance(gradient, fire.Function) for gradient in gradients)
+        assert tuple(gradients) == tuple(controls)
+        assert all(
+            isinstance(gradient, fire.Function)
+            for gradient in gradients.values()
+        )
 
-        for gradient, control in zip(gradients, controls):
+        for gradient, control in zip(gradients.values(), controls.values()):
             assert gradient.function_space() == control.function_space()
             norms = wave.comm.ensemble_comm.allgather(fire.norm(gradient))
             assert np.allclose(norms, norms[0])

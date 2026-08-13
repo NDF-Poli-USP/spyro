@@ -424,12 +424,8 @@ def ensemble_functional(func):
     """Decorator for gradient to distribute shots for ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
-        # Import lazily to keep this low-level I/O module out of the
-        # ``utils`` package's import cycle.
-        from ..utils.typing import AdjointType
-
         comm = args[0].comm
-        if args[0].adjoint_type is AdjointType.AUTOMATED_ADJOINT:
+        if args[0].adjoint_type.name == "AUTOMATED_ADJOINT":
             # pyadjoint needs the annotated Firedrake object, not a numpy scalar
             # produced by the ensemble reduction path below.
             return func(*args, **kwargs)
