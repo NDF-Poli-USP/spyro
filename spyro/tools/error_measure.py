@@ -456,10 +456,10 @@ class MeasureError():
         """
 
         # Check the input parameters
-        type_data_structure_error("signal_model", signal_model, "array",
-                                  expected_type_element="float")
-        type_data_structure_error("signal_reference", signal_reference, "array",
-                                  expected_type_element="float")
+        validate_data_structure("signal_model", signal_model, "array",
+                                expected_type_element="float")
+        validate_data_structure("signal_reference", signal_reference, "array",
+                                expected_type_element="float")
 
         # Completing with zeros if arrays lengths are different
         signal_model, signal_reference = self.check_signal_lengths(signal_model,
