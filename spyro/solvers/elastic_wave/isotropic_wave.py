@@ -4,11 +4,11 @@ from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
                        FunctionSpace, project)
 
 from .elastic_wave import ElasticWave
-from .forms import (elastic_without_pml,
+from .forms import (elastic_without_pml, viscoelastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
 from ...utils.typing import (ElasticMaterialParameter, ElasticMaterialParameterization,
-                             AbsorbingBCsType, override)
+                            ViscoelasticMaterialParameter, AbsorbingBCsType, override)
 from ...domains.space import create_function_space
 from .tensor_computation import *
 
@@ -24,6 +24,8 @@ CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
         ElasticMaterialParameter.S_WAVE_VELOCITY,
     ),
 }
+
+VISCOELASTIC_PARAMETERS = (ViscoelasticMaterialParameter.Q_VP, ViscoelasticMaterialParameter.Q_VS)
 
 
 def _format_control_parameters(parameters):
@@ -134,6 +136,10 @@ class IsotropicWave(ElasticWave):
             and becomes a scalar material ``Function`` after the mesh has been
             created.
             """
+            if callable(value) and not isinstance(value, Constant):
+                if self.mesh is None:
+                    return value(self.mesh)  
+                value = value(self.mesh)
             if np.isscalar(value) or isinstance(value, Constant):
                 if self.mesh is None:
                     return Constant(value) if np.isscalar(value) else value
@@ -174,14 +180,22 @@ class IsotropicWave(ElasticWave):
             not bool(self.lmbda) and \
             not bool(self.mu)
 
+        if option_2:
+            self.Q_vp = get_value(ViscoelasticMaterialParameter.Q_VP)
+            self.Q_vs = get_value(ViscoelasticMaterialParameter.Q_VS)
+
         if option_1:
             self._control_parameterization = ElasticMaterialParameterization.LAME
             self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
             self.c_s = (self.mu/self.rho)**0.5
+            self.Q_lambda = get_value(ViscoelasticMaterialParameter.Q_LAMBDA)
+            self.Q_mu = get_value(ViscoelasticMaterialParameter.Q_MU)
+
         elif option_2:
             self._control_parameterization = ElasticMaterialParameterization.VELOCITY
             self.mu = self.rho*self.c_s**2
             self.lmbda = self.rho*self.c**2 - 2*self.mu
+
         else:
             raise ValueError(
                 "Inconsistent selection of isotropic elastic wave parameters:\n"
@@ -506,54 +520,51 @@ class IsotropicWave(ElasticWave):
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
 
-        print("wavetype", self.wave_type)
-
-        W = FunctionSpace(self.mesh, "CG", 1)
-        
-        self.IsotropicProperties = None
-        self.AnisotropicPropertiesVTI = None
-        self.AnisotropicPropertiesTTI = None
-
-        d = self.input_dictionary.get("synthetic_data")
-        
-        if self.wave_type in ['anisotropic_VTI', 'anisotropic_TTI']:
-            d = self.input_dictionary.get("anisotropy")
-
-            class AnisotropicPropertiesVTI:
-                def __init__(self):
-                    self.epsilon = None
-                    self.gamma = None
-                    self.delta = None
-                    self.anisotropy = None
-
-            def anisotropic_properties_VTI(self):
-                properties = AnisotropicPropertiesVTI()
-                properties.epsilon = Function(W).assign(Constant(d['epsilon']))
-                properties.gamma = Function(W).assign(Constant(d['gamma']))
-                properties.delta = Function(W).assign(Constant(d['delta']))
-                properties.anisotropy = d['anisotropy'] 
-                return properties 
-
-            self.AnisotropicPropertiesVTI =  anisotropic_properties_VTI(self)
-
-            if self.wave_type == 'anisotropic_TTI':
-                class AnisotropicPropertiesTTI:
-                    def __init__(self):
-                        self.theta = None
-                        self.phi = None
-
-                def anisotropic_properties_TTI(self):
-                    properties = AnisotropicPropertiesTTI()
-                    properties.theta = Function(W).assign(Constant(d['theta']))
-                    properties.phi = Function(W).assign(Constant(d['phi']))
-                    return properties 
-
-                self.AnisotropicPropertiesTTI =  anisotropic_properties_TTI(self)
-
         self.Elastic_C = C_computation(self)
 
+        try:
+            d = self.input_dictionary.get("viscoelasticity", False)
+            self.viscoelastic = d["viscoelastic"]
+        except:
+            self.viscoelastic = False
+
+        if self.viscoelastic == True:
+            d = self.input_dictionary.get("viscoelasticity", False)
+            self.visco_type = d["visco_type"]
+            W = TensorFunctionSpace(self.function_space.mesh(), "DG", 0)
+            self.strain_space = W
+            
+            # GSLS parameters
+            self.y_list     = d["y_gsls"]        # list of y_l
+            self.omega_list = d["omega_gsls"]    # list of omega_l
+            dim = self.function_space.mesh().topological_dimension()
+
+            num_branches = d["branches"] 
+            
+            # Memory variables
+            self.zeta_list = [Function(self.strain_space, name=f"Memory variable zeta_{i}")
+                    for i in range(num_branches)]
+
+            for zeta in self.zeta_list:
+                zeta.assign(0.0)
+
+            self.eps_np1 = Function(self.strain_space, name="eps_np1")
+            self.eps_n   = Function(self.strain_space, name="eps_n")
+
+            self.eps_n.assign(0.0)
+
+            self.sigma_np1 = Function(self.strain_space, name="eps_np1")
+            self.sigma_n   = Function(self.strain_space, name="eps_n")
+
+            self.sigma_n.assign(0.0)
+
+            self.Gamma = build_Gamma(self)
+
         if self.abc_type in [AbsorbingBCsType.NRBC, AbsorbingBCsType.NOABCS]:
-            elastic_without_pml(self)
+            if self.viscoelastic == True:
+                viscoelastic_without_pml(self)
+            else:
+                elastic_without_pml(self)
         elif self.abc_type == AbsorbingBCsType.PML:
             isotropic_elastic_with_pml(self)
 

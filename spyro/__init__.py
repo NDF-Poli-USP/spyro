@@ -15,6 +15,8 @@ from .sources.Sources import Sources, ricker_wavelet, full_ricker_wavelet
 from .solvers.wave import Wave
 from .solvers.acoustic_wave import AcousticWave
 from .solvers.elastic_wave.isotropic_wave import IsotropicWave
+from .solvers.elastic_wave.anisotropic_VTI_wave import AnisotropicVTIWave
+from .solvers.elastic_wave.anisotropic_TTI_wave import AnisotropicTTIWave
 from .solvers.inversion import FullWaveformInversion
 from .utils.typing import (ElasticMaterialParameter,
                            ElasticMaterialParameterization, WaveType)
