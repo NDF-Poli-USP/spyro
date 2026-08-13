@@ -86,9 +86,10 @@ def test_forward_3_shots():
     arr0 = arr0.flatten()
 
     # Computing errors
-    errPk = MeasureError().peak_error(arr0[:430], analytical_p[:430])[0]
-    errIt = MeasureError().integral_error(arr0[:430], analytical_p[:430], wave.dt)
-    eNRMS = MeasureError().normalized_root_mean_square_error(arr0[:430], analytical_p[:430])
+    measure_error = MeasureError()
+    errPk = measure_error.peak_error(arr0[:430], analytical_p[:430])[0]
+    errIt = measure_error.integral_error(arr0[:430], analytical_p[:430], wave.dt)
+    eNRMS = measure_error.normalized_root_mean_square_error(arr0[:430], analytical_p[:430])
     pprint(f"NRMS Error for shot {wave.current_sources} is {eNRMS:.4e} and test "
            f"has passed equals {abs(eNRMS) < 0.01}", comm=comm)
     pprint(f"Integral Error for shot {wave.current_sources} is {errIt:.4e} and test "
