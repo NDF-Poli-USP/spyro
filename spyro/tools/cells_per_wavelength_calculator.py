@@ -343,6 +343,7 @@ class Meshing_parameter_calculator:
         # fast_loop = False
         dif = 0.0
         cont = 0
+        measure_error = spyro.tools.error_measure.MeasureError()
         while error > TOL:
             print("Trying cells-per-wavelength = ", cpw, flush=True)
 
@@ -369,7 +370,7 @@ class Meshing_parameter_calculator:
             )
 
             # Computing errors
-            error = error_calc(p_receivers, self.reference_solution, wave.dt)
+            error = error_calc(measure_error, p_receivers, self.reference_solution, wave.dt)
 
             print("Error is ", error, flush=True)
             cpws.append(cpw)
@@ -471,7 +472,7 @@ def calculate_dif(cpw, accuracy, fast_loop=False):
     return dif
 
 
-def error_calc(receivers, analytical, dt):
+def error_calc(measure_error, receivers, analytical, dt):
     """
     Calculates the error between the numerical and analytical solutions.
 
@@ -499,7 +500,7 @@ def error_calc(receivers, analytical, dt):
     for i in range(number_of_receivers):
         ana[:, i] = np.interp(time_vector_rec, time_vector_ana, analytical[:, i])
 
-    error = spyro.tools.error_measure.MeasureError().error_measures(
+    error = measure_error.error_measures(
         receivers, ana, dt, number_of_receivers, save_file=False)[3]
 
     return error

@@ -4,11 +4,11 @@ from numpy.linalg import norm
 from scipy.signal import find_peaks
 from warnings import warn
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import (type_data_structure_error, value_file_error,
-                                      value_numerical_error, value_string_error)
+from ..utils.error_management import (validate_data_structure, validate_file,
+                                      validate_numeric, validate_string)
 from ..utils.freq_tools import freq_response
 # from ..plots.plots_habc import plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
-# from ..utils.error_management import value_parameter_error
+# from ..utils.error_management import validate_parameter
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -78,13 +78,13 @@ class MeasureError():
         if output_folder is None:
             self.path_save_error = getcwd() + "/output/"
         else:
-            self.path_save_error = value_string_error("output_folder", output_folder)
+            self.path_save_error = validate_string("output_folder", output_folder)
 
         # Path to save data
         if output_case is None:
             self.path_save_err_case = self.path_save_error
         else:
-            self.path_save_err_case = value_string_error("output_case", output_case)
+            self.path_save_err_case = validate_string("output_case", output_case)
 
         # Path to save the reference signal
         self.path_reference = self.path_save_error + "preamble/"
@@ -116,21 +116,21 @@ class MeasureError():
         """
 
         # Check the input parameters
-        value_numerical_error("number_of_receivers", number_of_receivers,
-                              float_num=False, integer_num=True, lower_bound=0.)
-        type_data_structure_error("receiver_locations", receiver_locations, "list",
-                                  expected_type_element="tuple",
-                                  expected_length=number_of_receivers)
-        type_data_structure_error("forward_solution_receivers", forward_solution_receivers,
-                                  "array2D", expected_type_element=("float", "int"),
-                                  expected_shape=(None, number_of_receivers))
-        value_numerical_error("freq_Nyquist", freq_Nyquist, float_num=True,
-                              integer_num=True, lower_bound=0.)
+        validate_numeric("number_of_receivers", number_of_receivers,
+                         float_num=False, integer_num=True, lower_bound=0.)
+        validate_data_structure("receiver_locations", receiver_locations,
+                                "list", expected_type_element="tuple",
+                                expected_length=number_of_receivers)
+        validate_data_structure("forward_solution_receivers", forward_solution_receivers,
+                                "array2D", expected_type_element=("float", "int"),
+                                expected_shape=(None, number_of_receivers))
+        validate_numeric("freq_Nyquist", freq_Nyquist, float_num=True,
+                         integer_num=True, lower_bound=0.)
 
         pprint("\nSaving Reference Output", comm=self.comm)
 
         # File name for saving the reference signal
-        self.output_file = value_string_error("output_file", output_file)
+        self.output_file = validate_string("output_file", output_file)
 
         # Path to the reference data folder with reference signals
         pth_str = self.path_reference + self.output_file + "_"
@@ -165,19 +165,17 @@ class MeasureError():
 
         # Path to the reference data folder with reference signals
         pth_str = self.path_reference + self.output_file + "_"
-        extension = [".npy"]
 
         # Time domain signal
-        pth_time = pth_str + "time.npy"
-        receivers_reference_file = value_file_error("pth_time", pth_time, extension,
-                                                    check_file_existance=True)
-
+        receivers_reference_file = validate_file("reference time file",
+                                                 pth_str + "time.npy", [".npy"],
+                                                 check_file_existence=True)
         receivers_reference = load(receivers_reference_file)
 
         # Frequency domain signal
-        pth_freq = pth_str + "fft.npy"
-        receivers_reference_fft_file = value_file_error("pth_freq", pth_freq, extension,
-                                                        check_file_existance=True)
+        receivers_reference_fft_file = validate_file("reference fft file",
+                                                     pth_str + "fft.npy", [".npy"],
+                                                     check_file_existence=True)
         receivers_ref_fft = load(receivers_reference_fft_file).T
 
         return receivers_reference, receivers_ref_fft
@@ -243,10 +241,10 @@ class MeasureError():
         """
 
         # Check the input parameters
-        type_data_structure_error("signal_model", signal_model, "array",
-                                  expected_type_element=("float", "int"))
-        type_data_structure_error("signal_reference", signal_reference, "array",
-                                  expected_type_element=("float", "int"))
+        validate_data_structure("signal_model", signal_model, "array",
+                                expected_type_element=("float", "int"))
+        validate_data_structure("signal_reference", signal_reference, "array",
+                                expected_type_element=("float", "int"))
 
         # Finding peaks in transient response
         peaks_in_signal = find_peaks(signal_model)
@@ -288,11 +286,11 @@ class MeasureError():
         """
 
         # Check the input parameters
-        type_data_structure_error("signal_model", signal_model, "array",
-                                  expected_type_element=("float", "int"))
-        type_data_structure_error("signal_reference", signal_reference, "array",
-                                  expected_type_element=("float", "int"))
-        value_numerical_error("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
+        validate_data_structure("signal_model", signal_model, "array",
+                                expected_type_element=("float", "int"))
+        validate_data_structure("signal_reference", signal_reference, "array",
+                                expected_type_element=("float", "int"))
+        validate_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
 
         # Completing with zeros if arrays lengths are different
         signal_model, signal_reference = self.check_signal_lengths(signal_model,
@@ -370,18 +368,17 @@ class MeasureError():
         """
 
         # Check the input parameters
-        value_numerical_error("number_of_receivers", number_of_receivers,
-                              float_num=False, integer_num=True, lower_bound=0.)
-        type_data_structure_error("forward_solution_receivers", forward_solution_receivers,
-                                  "array2D", expected_shape=(None, number_of_receivers))
-        type_data_structure_error("receivers_reference", receivers_reference, "array2D",
-                                  expected_shape=(None, number_of_receivers))
-        value_numerical_error("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
-        value_numerical_error("final_energy", final_energy, float_num=True,
-                              integer_num=False, none_default=True, lower_bound=0.)
-        value_numerical_error("final_energy_reference", final_energy_reference,
-                              float_num=True, integer_num=False,
-                              none_default=True, lower_bound=0.)
+        validate_numeric("number_of_receivers", number_of_receivers,
+                         float_num=False, integer_num=True, lower_bound=0.)
+        validate_data_structure("forward_solution_receivers", forward_solution_receivers,
+                                "array2D", expected_shape=(None, number_of_receivers))
+        validate_data_structure("receivers_reference", receivers_reference, "array2D",
+                                expected_shape=(None, number_of_receivers))
+        validate_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
+        validate_numeric("final_energy", final_energy, float_num=True,
+                         integer_num=False, none_default=True, lower_bound=0.)
+        validate_numeric("final_energy_reference", final_energy_reference, float_num=True,
+                         integer_num=False, none_default=True, lower_bound=0.)
 
         pprint("\nComputing Error Measures", comm=self.comm)
 
@@ -460,10 +457,10 @@ class MeasureError():
         """
 
         # Check the input parameters
-        type_data_structure_error("signal_model", signal_model, "array",
-                                  expected_type_element=("float", "int"))
-        type_data_structure_error("signal_reference", signal_reference, "array",
-                                  expected_type_element=("float", "int"))
+        validate_data_structure("signal_model", signal_model, "array",
+                                expected_type_element=("float", "int"))
+        validate_data_structure("signal_reference", signal_reference, "array",
+                                expected_type_element=("float", "int"))
 
         # Completing with zeros if arrays lengths are different
         signal_model, signal_reference = self.check_signal_lengths(signal_model,
@@ -476,161 +473,161 @@ class MeasureError():
 
         return nrms_error
 
-    # def comparison_plots(self, regression_xCR=False, data_regr_xCR=None):
-    #     """
-    #     Plot the comparison between the HABC scheme and the reference model.
+# def comparison_plots(self, regression_xCR=False, data_regr_xCR=None):
+#     """
+#     Plot the comparison between the HABC scheme and the reference model.
 
-    #     Parameters
-    #     ----------
-    #     regression_xCR : `bool`, optional
-    #         If True, Plot the regression for the error measure vs xCR
-    #         Default is False.
-    #     data_regr_xCR: `list`
-    #         Data for the regression of the parameter xCR.
-    #         Structure: [xCR, max_errIt, max_errPK, crit_opt]
-    #         - xCR: Values of xCR used in the regression.
-    #           The last value IS the optimal xCR
-    #         - max_errIt: Values of the maximum integral error.
-    #           The last value corresponds to the optimal xCR
-    #         - max_errPK: Values of the maximum peak error.
-    #           The last value corresponds to the optimal xCR
-    #         - crit_opt : Criterion for the optimal heuristic factor.
-    #           * 'err_difference' : Difference between integral and peak errors
-    #           * 'err_integral' : Minimum integral error
+#     Parameters
+#     ----------
+#     regression_xCR : `bool`, optional
+#         If True, Plot the regression for the error measure vs xCR
+#         Default is False.
+#     data_regr_xCR: `list`
+#         Data for the regression of the parameter xCR.
+#         Structure: [xCR, max_errIt, max_errPK, crit_opt]
+#         - xCR: Values of xCR used in the regression.
+#           The last value IS the optimal xCR
+#         - max_errIt: Values of the maximum integral error.
+#           The last value corresponds to the optimal xCR
+#         - max_errPK: Values of the maximum peak error.
+#           The last value corresponds to the optimal xCR
+#         - crit_opt : Criterion for the optimal heuristic factor.
+#           * 'err_difference' : Difference between integral and peak errors
+#           * 'err_integral' : Minimum integral error
 
-    #     Returns
-    #     -------
-    #     None
-    #     """
+#     Returns
+#     -------
+#     None
+#     """
 
-    #     # Time domain comparison
-    #     plot_hist_receivers(self)
+#     # Time domain comparison
+#     plot_hist_receivers(self)
 
-    #     forward_solution_receivers: `array`
-    #     Receiver waveform data in the HABC scheme
-    #     receivers_out_fft: `array`
-    #     Frequency response at the receivers in the HABC scheme
+#     forward_solution_receivers: `array`
+#     Receiver waveform data in the HABC scheme
+#     receivers_out_fft: `array`
+#     Frequency response at the receivers in the HABC scheme
 
-    #     # Compute FFT for output signal at receivers
-    #     self.receivers_out_fft = []
-    #     for rec in range(self.number_of_receivers):
-    #         signal = self.forward_solution_receivers[:, rec]
-    #         yf = freq_response(signal, self.freq_Nyquist)
-    #         self.receivers_out_fft.append(yf)
-    #     self.receivers_out_fft = np.asarray(self.receivers_out_fft).T
+#     # Compute FFT for output signal at receivers
+#     self.receivers_out_fft = []
+#     for rec in range(self.number_of_receivers):
+#         signal = self.forward_solution_receivers[:, rec]
+#         yf = freq_response(signal, self.freq_Nyquist)
+#         self.receivers_out_fft.append(yf)
+#     self.receivers_out_fft = np.asarray(self.receivers_out_fft).T
 
-    #     # Frequency domain comparison
-    #     plot_rfft_receivers(self)
+#     # Frequency domain comparison
+#     plot_rfft_receivers(self)
 
-    #     # Plot the error measures
-    #     if regression_xCR:
-    #         plot_xCR_opt(self, data_regr_xCR)
+#     # Plot the error measures
+#     if regression_xCR:
+#         plot_xCR_opt(self, data_regr_xCR)
 
-    # def get_xCR_candidates(self, n_pts=3):
-    #     """
-    #     Get the heuristic factor candidates for the quadratic regression.
+# def get_xCR_candidates(self, n_pts=3):
+#     """
+#     Get the heuristic factor candidates for the quadratic regression.
 
-    #     Parameters
-    #     ----------
-    #     n_pts : `int`, optional
-    #         Number of candidates for the heuristic factor xCR.
-    #         Default is 3. Must be an odd number
+#     Parameters
+#     ----------
+#     n_pts : `int`, optional
+#         Number of candidates for the heuristic factor xCR.
+#         Default is 3. Must be an odd number
 
-    #     Returns
-    #     -------
-    #     xCR_cand : `list`
-    #         Candidates for the heuristic factor xCR based on the
-    #         current xCR and its bounds. The candidates are sorted
-    #         in ascending order and current xCR is not included
-    #     """
+#     Returns
+#     -------
+#     xCR_cand : `list`
+#         Candidates for the heuristic factor xCR based on the
+#         current xCR and its bounds. The candidates are sorted
+#         in ascending order and current xCR is not included
+#     """
 
-    #     # Setting odd number of points for regression
-    #     n_pts = max(3, n_pts + 1 if n_pts % 2 == 0 else n_pts)
+#     # Setting odd number of points for regression
+#     n_pts = max(3, n_pts + 1 if n_pts % 2 == 0 else n_pts)
 
-    #     # Limits for the heuristic factor
-    #     xCR_inf, xCR_sup = self.xCR_lim
+#     # Limits for the heuristic factor
+#     xCR_inf, xCR_sup = self.xCR_lim
 
-    #     # Estimated intial value
-    #     xCR = self.xCR
+#     # Estimated intial value
+#     xCR = self.xCR
 
-    #     # Determining the xCR candidates for regression
-    #     if xCR in self.xCR_lim:
-    #         xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts))
-    #         xCR_cand.remove(xCR)
-    #     else:
-    #         xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts-1))
+#     # Determining the xCR candidates for regression
+#     if xCR in self.xCR_lim:
+#         xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts))
+#         xCR_cand.remove(xCR)
+#     else:
+#         xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts-1))
 
-    #     format_xCR = ', '.join(['{:.3f}'.format(x) for x in xCR_cand])
-    #     pprint(f"Candidates for Heuristic Factor xCR: [{format_xCR}]", comm=self.comm)
+#     format_xCR = ', '.join(['{:.3f}'.format(x) for x in xCR_cand])
+#     pprint(f"Candidates for Heuristic Factor xCR: [{format_xCR}]", comm=self.comm)
 
-    #     return xCR_cand
+#     return xCR_cand
 
-    # def get_xCR_optimal(self, dat_reg_xCR, crit_opt="err_sum"):
-    #     """
-    #     Get the optimal heuristic factor for the quadratic damping.
+# def get_xCR_optimal(self, dat_reg_xCR, crit_opt="err_sum"):
+#     """
+#     Get the optimal heuristic factor for the quadratic damping.
 
-    #     Parameters
-    #     ----------
-    #     dat_reg_xCR : `list`
-    #         Data for the regression of the parameter xCR.
-    #         Structure: [xCR, max_errIt, max_errPK]
-    #     crit_opt : `string`, optional
-    #         Criterion for the optimal heuristic factor
-    #         Default is 'err_difference'.
-    #         - 'err_difference' : Difference between integral and peak errors
-    #         - 'err_integral' : Minimum integral error
-    #         - 'err_sum' : Sum of integral and peak errors
+#     Parameters
+#     ----------
+#     dat_reg_xCR : `list`
+#         Data for the regression of the parameter xCR.
+#         Structure: [xCR, max_errIt, max_errPK]
+#     crit_opt : `string`, optional
+#         Criterion for the optimal heuristic factor
+#         Default is 'err_difference'.
+#         - 'err_difference' : Difference between integral and peak errors
+#         - 'err_integral' : Minimum integral error
+#         - 'err_sum' : Sum of integral and peak errors
 
-    #     Returns
-    #     -------
-    #     xCR_opt : `float`, optional
-    #         Optimal heuristic factor for the quadratic damping
-    #     """
+#     Returns
+#     -------
+#     xCR_opt : `float`, optional
+#         Optimal heuristic factor for the quadratic damping
+#     """
 
-    #     # Data for regression
-    #     xCR = dat_reg_xCR[0]
-    #     max_errIt = dat_reg_xCR[1]
-    #     max_errPK = dat_reg_xCR[2]
+#     # Data for regression
+#     xCR = dat_reg_xCR[0]
+#     max_errIt = dat_reg_xCR[1]
+#     max_errPK = dat_reg_xCR[2]
 
-    #     value_parameter_error("crit_opt", crit_opt,
-    #                           ["err_difference", "err_integral", "err_sum"])
+#     validate_parameter("crit_opt", crit_opt,
+#                           ["err_difference", "err_integral", "err_sum"])
 
-    #     if crit_opt == "err_difference":
-    #         y_err = [eI - eP for eI, eP in zip(max_errIt, max_errPK)]
+#     if crit_opt == "err_difference":
+#         y_err = [eI - eP for eI, eP in zip(max_errIt, max_errPK)]
 
-    #     elif crit_opt == "err_integral":
-    #         y_err = max_errIt
+#     elif crit_opt == "err_integral":
+#         y_err = max_errIt
 
-    #     elif crit_opt == "err_sum":
-    #         y_err = [eI + eP for eI, eP in zip(max_errIt, max_errPK)]
+#     elif crit_opt == "err_sum":
+#         y_err = [eI + eP for eI, eP in zip(max_errIt, max_errPK)]
 
-    #     # Limits for the heuristic factor
-    #     xCR_inf, xCR_sup = self.xCR_lim
+#     # Limits for the heuristic factor
+#     xCR_inf, xCR_sup = self.xCR_lim
 
-    #     # Coefficients for the quadratic equation
-    #     eq_xCR = np.polyfit(xCR, y_err, 2)
+#     # Coefficients for the quadratic equation
+#     eq_xCR = np.polyfit(xCR, y_err, 2)
 
-    #     if crit_opt == "err_difference":
-    #         # Roots of the quadratic equation
-    #         roots = np.roots(eq_xCR)
-    #         valid_roots = [np.clip(rth, xCR_inf, xCR_sup)
-    #                        for rth in roots if isinstance(rth, float)]
+#     if crit_opt == "err_difference":
+#         # Roots of the quadratic equation
+#         roots = np.roots(eq_xCR)
+#         valid_roots = [np.clip(rth, xCR_inf, xCR_sup)
+#                        for rth in roots if isinstance(rth, float)]
 
-    #         if valid_roots:
-    #             # Real root that provides the absolute minimum error
-    #             min_err = [abs(np.polyval(eq_xCR, rth)) for rth in valid_roots]
-    #             xCR_opt = valid_roots[np.argmin(min_err)]
-    #         else:
-    #             # Vertex when there are no real roots
-    #             vtx = - eq_xCR[1] / (2 * eq_xCR[0])
-    #             xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
+#         if valid_roots:
+#             # Real root that provides the absolute minimum error
+#             min_err = [abs(np.polyval(eq_xCR, rth)) for rth in valid_roots]
+#             xCR_opt = valid_roots[np.argmin(min_err)]
+#         else:
+#             # Vertex when there are no real roots
+#             vtx = - eq_xCR[1] / (2 * eq_xCR[0])
+#             xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
 
-    #     elif crit_opt == "err_integral" or crit_opt == "err_sum":
+#     elif crit_opt == "err_integral" or crit_opt == "err_sum":
 
-    #         # Vertex of the quadratic equation
-    #         vtx = - eq_xCR[1] / (2 * eq_xCR[0])
-    #         xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
+#         # Vertex of the quadratic equation
+#         vtx = - eq_xCR[1] / (2 * eq_xCR[0])
+#         xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
 
-    #     pprint(f"Optimal Heuristic Factor xCR: {xCR_opt:.3f}", comm=self.comm)
+#     pprint(f"Optimal Heuristic Factor xCR: {xCR_opt:.3f}", comm=self.comm)
 
-    #     return xCR_opt
+#     return xCR_opt

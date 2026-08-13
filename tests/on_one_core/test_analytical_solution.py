@@ -44,9 +44,10 @@ def test_analytical_solution(use_vertex_only_mesh):
     numerical_p = numerical_p.flatten()
 
     # Computing errors
-    errPk = MeasureError().peak_error(numerical_p, analytical_p)[0]
-    errIt = MeasureError().integral_error(numerical_p, analytical_p, wave.dt)
-    eNRMS = MeasureError().normalized_root_mean_square_error(numerical_p, analytical_p)
+    measure_error = MeasureError()
+    errPk = measure_error.peak_error(numerical_p, analytical_p)[0]
+    errIt = measure_error.integral_error(numerical_p, analytical_p, wave.dt)
+    eNRMS = measure_error.normalized_root_mean_square_error(numerical_p, analytical_p)
 
     vom_label = "VOM" if use_vertex_only_mesh else "NO VOM"
     pprint(f"NRMS Error ({vom_label}) = {eNRMS:.4e}", comm=comm)
