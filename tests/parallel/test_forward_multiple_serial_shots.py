@@ -79,6 +79,7 @@ def test_forward_3_shots():
     eNRMS = []
     errIt = []
     errPk = []
+    measure_error = MeasureError()
 
     for i in range(wave.number_of_sources):
         plt.close()
@@ -97,12 +98,12 @@ def test_forward_3_shots():
         plt.savefig(f"test{i}.png")
 
         # Computing errors
-        eNRMS_core = MeasureError().normalized_root_mean_square_error(
-            rec0[:cutoff], analytical_p[:cutoff])
-        errIt_core = MeasureError().integral_error(
-            rec0[:cutoff], analytical_p[:cutoff], wave.dt)
-        errPk_core = MeasureError().peak_error(
-            rec0[:cutoff], analytical_p[:cutoff])[0]
+        eNRMS_core = measure_error.normalized_root_mean_square_error(rec0[:cutoff],
+                                                                     analytical_p[:cutoff])
+        errIt_core = measure_error.integral_error(rec0[:cutoff],
+                                                  analytical_p[:cutoff],
+                                                  wave.dt)
+        errPk_core = measure_error.peak_error(rec0[:cutoff], analytical_p[:cutoff])[0]
 
         eNRMS_shot = COMM_WORLD.allreduce(eNRMS_core, op=MPI.SUM) / comm.comm.size
         errIt_shot = COMM_WORLD.allreduce(errIt_core, op=MPI.SUM) / comm.comm.size
