@@ -114,9 +114,11 @@ def test_3d_hexa_one_source_propagation():
     p_numeric = run_forward_hexahedral(dt, final_time, offset)
     p_analytic = analytical_solution(dt, final_time, offset)
 
-    eNRMS = MeasureError().normalized_root_mean_square_error(p_numeric, p_analytic)
-    errIt = MeasureError().integral_error(p_numeric, p_analytic, dt)
-    errPk = MeasureError().peak_error(p_numeric, p_analytic)[0]
+    # Computing errors
+    measure_error = MeasureError()
+    eNRMS = measure_error.normalized_root_mean_square_error(p_numeric, p_analytic)
+    errIt = measure_error.integral_error(p_numeric, p_analytic, dt)
+    errPk = measure_error.peak_error(p_numeric, p_analytic)[0]
 
     assert abs(eNRMS) < 0.02 and abs(errIt) < 0.02 and abs(errPk) < 0.02, \
         "Error is too high for forward test with hexahedral mesh."

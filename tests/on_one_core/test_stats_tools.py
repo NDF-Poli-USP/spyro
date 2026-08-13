@@ -234,5 +234,5 @@ def test_p_is_None():
     y_pred = array([1, 2, 3, 4, 5])
     p = None
 
-    with raises(TypeError, match="'p' must be a integer number"):
+    with raises(TypeError, match="'p' must be a integer"):
         coeff_of_determination(y_true, y_pred, p)
