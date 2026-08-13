@@ -202,7 +202,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         SpyroEnsemble.print("\nSolving Forward Problem")
 
         if self.function_space is None:
-            self.force_rebuild_function_space()
+            self.building_mesh_derived_paramenters()
 
         if self.abc_type in [AbsorbingBCsType.NOABCS, AbsorbingBCsType.NRBC]:
             self._initialize_model_parameters()
@@ -246,6 +246,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def building_mesh_derived_parameters(self, include_model_parameters=False):
         """Build parameters that are derived from the mesh."""
+        if self.mesh is None:
+            self.mesh = self.get_mesh()
+
         coordinates = self.mesh_ops._set_spatial_coordinates(self.mesh)
         self.mesh_z, self.mesh_x = coordinates[0], coordinates[1]
         if self.dimension == 3:
