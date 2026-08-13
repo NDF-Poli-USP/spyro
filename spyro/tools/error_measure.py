@@ -376,9 +376,9 @@ class MeasureError():
                                 expected_shape=(None, number_of_receivers))
         validate_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
         validate_numeric("final_energy", final_energy, float_num=True,
-                         integer_num=False, none_default=True, lower_bound=0.)
+                         integer_num=False, accept_parameter_as_none=True, lower_bound=0.)
         validate_numeric("final_energy_reference", final_energy_reference, float_num=True,
-                         integer_num=False, none_default=True, lower_bound=0.)
+                         integer_num=False, accept_parameter_as_none=True, lower_bound=0.)
 
         pprint("\nComputing Error Measures", comm=self.comm)
 
