@@ -5,7 +5,7 @@ from numpy import abs, asarray, cos, maximum, pi, sign, sqrt, sum
 from numpy.linalg import norm
 from os import getcwd
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import value_parameter_error
+from ..utils.error_management import validate_parameter
 from ..utils.typing import BoundaryConditionsType, LayerShapeType
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -248,9 +248,9 @@ class NRBC():
         """
 
         # Check if the non-reflective BC type is valid
-        self.nrbc = value_parameter_error('non_reflect_bc', non_reflect_bc,
-                                          [BoundaryConditionsType.HIGDON,
-                                           BoundaryConditionsType.SOMMERFELD])
+        self.nrbc = validate_parameter('non_reflect_bc', non_reflect_bc,
+                                       [BoundaryConditionsType.HIGDON,
+                                        BoundaryConditionsType.SOMMERFELD])
 
         pprint(f"Creating Field for NRBC: {non_reflect_bc.value}", comm=self.comm)
 
