@@ -1,6 +1,6 @@
 # from numpy import asarray, clip, cos, isreal, pi, polyfit, roots, sin, tan
 # from ..io.basicio import parallel_print as pprint
-# from spyro.utils.error_management import value_parameter_error
+# from spyro.utils.error_management import validate_parameter
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -208,7 +208,7 @@ class HABC_Damping():
     #         Heuristic factor for the minimum damping ratio.
     #     """
 
-    #     value_parameter_error("type_CR", type_CR, ["CR_PSI", "CR_FEM", "CR_ERR"])
+    #     validate_parameter("type_CR", type_CR, ["CR_PSI", "CR_FEM", "CR_ERR"])
 
     #     if type_CR == "CR_PSI":
     #         # Minimum coefficient reflection
@@ -240,7 +240,7 @@ class HABC_Damping():
     #             Z_fem : `float`
     #                 Parameter for the spurious reflection coefficient in FEM
     #             """
-    #             value_parameter_error("ele_type", ele_type, ["lumped", "consistent"])
+    #             validate_parameter("ele_type", ele_type, ["lumped", "consistent"])
 
     #             if ele_type == "lumped":
     #                 m1 = 1 / 2

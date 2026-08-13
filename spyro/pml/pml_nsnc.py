@@ -2,7 +2,7 @@ from firedrake import as_tensor, conditional, Function, VTKFile
 from numpy import log
 from ..abc.abc_layer import ABCLayer
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import enum_parameter_error, value_numerical_error
+from ..utils.error_management import validate_enum, validate_numeric
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..utils.typing import (BoundaryConditionsType, AbsorbingBCsType,
                             LayerShapeType, LayerSizeRefFrequency)
@@ -115,8 +115,8 @@ class PMLLayer(ABCLayer):
                           output_folder=output_folder, comm=comm)
 
         # Type of boundary condition to apply on the PML boundaries
-        self.bc_boundary_pml = enum_parameter_error('bc_boundary_pml', bc_boundary_pml,
-                                                    BoundaryConditionsType)
+        self.bc_boundary_pml = validate_enum('bc_boundary_pml', bc_boundary_pml,
+                                             BoundaryConditionsType)
 
     def calc_pml_damping(self, abc_pml_R, abc_pml_cmax, abc_pad_length,
                          degree_prof=2, CR_min=1e-8, CR_max=1e-3):
@@ -151,12 +151,12 @@ class PMLLayer(ABCLayer):
         """
 
         # Desired reflection coefficient at outer boundary of PML layer.
-        CR = value_numerical_error(
+        CR = validate_numeric(
             "abc_pml_R", abc_pml_R, float_num=True, integer_num=False, lower_bound=CR_min,
             upper_bound=CR_max, include_lower_bound=True, include_upper_bound=True)
 
         # Degree of the damping profile within the PML layer.
-        degree_prof = value_numerical_error(
+        degree_prof = validate_numeric(
             "degree_prof", degree_prof, float_num=False,
             integer_num=True, lower_bound=1, include_lower_bound=True)
 
