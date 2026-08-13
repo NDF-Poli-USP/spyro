@@ -83,6 +83,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Access to the state variables in previous iteration.
     _set_vstate()
         Access to the state variables in current iteration.
+    abcs_manager()
+        Create the ABCs operations manager for the wave solver.
     building_mesh_derived_paramenters()
         Build parameters that are derived from the mesh.
     enable_automated_adjoint()
@@ -233,9 +235,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         else:
             warnings.warn("No mesh found. Please define a mesh.")
 
-        # Creating absorbing layer manager if needed
+        # Creating ABCs manager if needed
         if self.abc_active:
-            self.layer_manager()
+            self.abcs_manager()
 
         # Logger
         self.field_logger = FieldLogger(self.comm,
@@ -767,11 +769,19 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                     quadrilateral=self.mesh_parameters.quadrilateral,
                                     comm=self.mesh_parameters.comm)
 
-    def layer_manager(self):
-        """Create the layer operations manager for the wave solver."""
+    def layer_manager(self, domain_dim):
+        """Create the layer operations manager for the wave solver.
 
-        # Domain dimensions
-        domain_dim = self.domain_dimensions()
+        Parameters:
+        -----------
+        domain_dim : `tuple`
+            Original domain dimensions: (length_z, length_x) for 2D
+            or (length_z, length_x, length_y) for 3D.
+
+        Returns:
+        --------
+        None
+        """
 
         # Timestep of the simulation. It is `None` if the response is not 'transient'.
         time_step = None if self.analysis != "transient" else self.dt
@@ -798,10 +808,26 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                        output_folder=self.output_folder, comm=self.comm)
 
         # Identifier for the current case study
+        self.case_abc = self.layer_ops.case_abc
+        self.path_save = self.layer_ops.path_save
+        self.path_case_abc = self.layer_ops.path_case_abc
+
+    def abcs_manager(self):
+        """Create the ABCs operations manager for the wave solver."""
+
+        # Domain dimensions
+        domain_dim = self.domain_dimensions()
+
+        # Creating absorbing layer manager if needed
         if self.abc_type in [AbsorbingBCsType.PML, AbsorbingBCsType.HYBRID]:
-            self.case_abc = self.layer_ops.case_abc
-            self.path_save = self.layer_ops.path_save
-            self.path_case_abc = self.layer_ops.path_case_abc
+            self.layer_manager(domain_dim)
+
+        # Creating NRBC manager if needed (when no layer is added).
+        elif self.abc_type == AbsorbingBCsType.NRBC:
+            from ..abc.nrbc import NRBC
+            self.nrbc_ops = NRBC(domain_dim, self.abc_boundary_layer_shape,
+                                 angle_max=pi/4., dimension=self.dimension,
+                                 output_folder=self.output_folder, comm=self.comm)
 
     @abstractmethod
     def get_control_parameters(self):
