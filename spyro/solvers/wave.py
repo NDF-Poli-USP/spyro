@@ -1,6 +1,8 @@
 from abc import abstractmethod, ABCMeta
+from collections.abc import Mapping
 import warnings
 import firedrake as fire
+from pyadjoint import AdjFloat, Tape
 
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
@@ -17,7 +19,7 @@ from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from ..utils.error_management import validate_enum
 from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
-                            LayerShapeType, WaveType)
+                            LayerShapeType, RieszMapType, WaveType)
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
 
@@ -189,6 +191,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         if self.abc_type in [AbsorbingBCsType.NOABCS, AbsorbingBCsType.NRBC]:
             self._initialize_model_parameters()
+        if self.automated_adjoint is not None:
+            # Initialization rebuilds the material fields from the model
+            # dictionary, so the controls recorded when the automated adjoint
+            # was enabled would otherwise point at objects the variational form
+            # no longer uses, and the tape would be differentiated with respect
+            # to fields that never enter the solve.
+            self.automated_adjoint.controls = (
+                self._get_automated_adjoint_controls()
+            )
         self.matrix_building()
         self.wave_propagator()
 
@@ -613,13 +624,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
         self._initialize_model_parameters()
-        if self.c is None:
-            raise ValueError(
-                "self.c must be set before enabling automated adjoint."
-                "Please set the velocity model using set_initial_velocity_model()"
-                "or set c directly."
-            )
-        controls = self.c
+        controls = self._get_automated_adjoint_controls()
         # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
         # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
         # that the reduced functional is built as an
@@ -628,6 +633,93 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
         self.functional_value = None
         self.misfit = None
+
+    def _get_automated_adjoint_controls(self):
+        """Return the model parameters to differentiate, as a list.
+
+        Solvers expose their controls in the shape that suits their physics: a
+        single velocity ``Function`` for acoustic media, a dictionary keyed by
+        material parameter for elastic ones. Both are flattened here into the
+        ordered list :class:`AutomatedAdjoint` differentiates, so the whole
+        adjoint path handles only lists.
+
+        Returns
+        -------
+        list of firedrake.Function
+            Controls in the order reported by ``get_control_parameters()``.
+
+        Raises
+        ------
+        ValueError
+            If the solver has no initialized control parameters.
+        """
+        controls = self.get_control_parameters()
+        if controls is None:
+            raise ValueError(
+                "Control parameters must be initialized before enabling the "
+                "automated adjoint. Set a velocity model with "
+                "set_initial_velocity_model(), or declare the elastic material "
+                "in the model dictionary."
+            )
+        if isinstance(controls, Mapping):
+            controls = controls.values()
+        elif not isinstance(controls, (list, tuple)):
+            controls = [controls]
+        return list(controls)
+
+    def _automated_adjoint_derivatives(self, riesz_map=RieszMapType.L2):
+        """Differentiate the recorded functional with respect to the controls.
+
+        Replays the pyadjoint tape built during the annotated forward solve.
+        The tape and the reduced functional are created on demand, so this can
+        be called right after ``forward_solve()`` or on a solver that has not
+        been annotated yet.
+
+        Parameters
+        ----------
+        riesz_map : RieszMapType, optional
+            ``L2`` returns the Riesz representer of the derivative (a
+            ``Function``); ``l2`` returns the raw dual object (a
+            ``Cofunction``). See :class:`RieszMapType`.
+
+        Returns
+        -------
+        list
+            One derivative per control, in the order reported by
+            ``get_control_parameters()``.
+
+        Raises
+        ------
+        ValueError
+            If no annotated functional value is available.
+        NotImplementedError
+            If ``riesz_map`` is not supported by the automated adjoint.
+        """
+        if not isinstance(self.functional_value, AdjFloat):
+            raise ValueError(
+                "Functional value must be an AdjFloat for automated adjoint "
+                "gradient computation."
+            )
+
+        if not self.automated_adjoint:
+            self.enable_automated_adjoint()
+            self.automated_adjoint.clear_tape()
+            self.forward_solve()
+        if (
+            self.automated_adjoint.reduced_functional is None
+            and isinstance(self.automated_adjoint._tape, Tape)
+        ):
+            self.automated_adjoint.create_reduced_functional(
+                self.functional_value
+            )
+
+        if riesz_map == RieszMapType.L2:
+            return self.automated_adjoint.compute_gradient()
+        if riesz_map == RieszMapType.l2:
+            return self.automated_adjoint.compute_derivative()
+        raise NotImplementedError(
+            f"Riesz map {riesz_map} not implemented for automated adjoint."
+        )
 
     def enable_implemented_adjoint(self):
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
