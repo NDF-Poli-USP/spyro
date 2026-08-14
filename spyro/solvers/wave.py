@@ -808,9 +808,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # Identifier for the current case study
         if self.abc_type in [AbsorbingBCsType.PML, AbsorbingBCsType.HYBRID]:
-            self.case_abc = self.layer_ops.case_abc
+            self.case_abc = self.layer_ops.case_absl
             self.path_save = self.layer_ops.path_save
-            self.path_case_abc = self.layer_ops.path_case_abc
+            self.path_case_abc = self.layer_ops.path_case_absl
 
     @abstractmethod
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
