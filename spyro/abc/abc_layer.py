@@ -281,7 +281,7 @@ class ABCLayer(NRBC, MeasureError):
         """
         self.path_save, self.case_absl, self.path_case_absl = \
             path_to_save_abc_case(self.abc_boundary_layer_type,
-                                  abc_boundary_layer_type=self.abc_boundary_layer_type,
+                                  abc_boundary_layer_shape=self.abc_boundary_layer_shape,
                                   abc_deg_layer=self.abc_deg_layer,
                                   abc_reference_freq=self.abc_reference_freq,
                                   output_folder=output_folder)
