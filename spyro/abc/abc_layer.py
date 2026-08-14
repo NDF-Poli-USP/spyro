@@ -805,20 +805,21 @@ class ABCLayer(NRBC, MeasureError):
         None
         """
 
-        # Getting the boundary type where NRBCs are applied
-        abc_boundary_type = NRBCBoundaryType.HYPERSHAPE \
-            if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE \
-            else NRBCBoundaryType.STRAIGHT
-
-        # Initializing the NRBC class
-        NRBC.__init__(self, self.domain_dim, non_reflect_bc=non_reflect_bc,
-                      abc_boundary_type=abc_boundary_type, dimension=self.dimension,
-                      output_folder=self.path_case_abc, comm=self.comm)
-
         # Applying NRBCs on outer boundary layer
-        crit_source = bnd_nod_ids_nfs = bnd_nodes_nfs = None
-        if non_reflect_bc == BoundaryConditionsType.SOMMERFELD or \
-                non_reflect_bc == BoundaryConditionsType.HIGDON:
+        if non_reflect_bc in [BoundaryConditionsType.SOMMERFELD,
+                              BoundaryConditionsType.HIGDON]:
+
+            crit_source = bnd_nod_ids_nfs = bnd_nodes_nfs = None
+
+            # Getting the boundary type where NRBCs are applied
+            abc_boundary_type = NRBCBoundaryType.HYPERSHAPE \
+                if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE \
+                else NRBCBoundaryType.STRAIGHT
+
+            # Initializing the NRBC class
+            NRBC.__init__(self, self.domain_dim, non_reflect_bc=non_reflect_bc,
+                          abc_boundary_type=abc_boundary_type, dimension=self.dimension,
+                          output_folder=self.path_case_abc, comm=self.comm)
 
             pprint("\nApplying Non-Reflecting Boundary Conditions", comm=self.comm)
 
