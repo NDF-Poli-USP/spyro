@@ -372,7 +372,8 @@ class ABCLayer(AbsorbingBC):
 
             # The layer owns an NRBC object instead of being one
             self.nrbc = NRBC(self.domain_dim, non_reflect_bc=non_reflect_bc,
-                             abc_boundary_type=abc_boundary_type, dimension=self.dimension,
+                             abc_boundary_type=abc_boundary_type,
+                             dimension=self.dimension, nrbc_in_habc=True,
                              output_folder=self.path_case_absl)
 
             SpyroEnsemble.print("\nApplying Non-Reflecting Boundary Conditions")

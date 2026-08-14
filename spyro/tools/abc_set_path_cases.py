@@ -1,10 +1,12 @@
 """Methods to set paths for the case study of the ABC scheme (HABC or PML)."""
+from numpy import pi
 from os import getcwd
 from pathlib import Path
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..utils.error_management import (validate_enum, validate_numeric,
                                       validate_parameter, validate_string)
-from ..utils.typing import AbsorbingBCsType, LayerShapeType, LayerSizeRefFrequency
+from ..utils.typing import (AbsorbingBCsType, BoundaryConditionsType, LayerShapeType,
+                            LayerSizeRefFrequency, NRBCBoundaryType)
 
 
 def formatting_abc_layer_type(str_to_format, abc_type, for_prints=True):
@@ -117,15 +119,69 @@ def identify_abc_layer_case(abc_type, abc_boundary_layer_shape,
     return case_absl
 
 
+def identify_nrbc_case(non_reflect_bc, angle_max, abc_boundary_type):
+    """Generate an identifier for the current type of the NRBC.
+
+    The identifier includes the NRBC type ("HIG" for Higdon BCs or "SOM" for
+    Sommerfeld BCs) and the boundary type where the NRBCs are applied ("STB"
+    for straight boundaries or "HYP" for hypershape boundaries).
+    The identifier can be used for labeling output files and directories.
+    Examples: "HIG_STB", "HIG_HYP", "SOM_STB" or "SOM_HYB".
+
+    Parameters
+    ----------
+    non_reflect_bc : `typing.BoundaryConditionsType`
+        Type of boundary condition to apply on the domain boundaries (for only NRBCs)
+        or the outer absorbing layer boundaries (HABCs: Absorbing Layer aand NRBCs).
+        Options: `BoundaryConditionsType.HIGDON` or `BoundaryConditionsType.SOMMERFELD`.
+    angle_max : `float`, optional
+        Maximum incidence angle considered in the NRBC.
+    abc_boundary_type : `typing.NRBCBoundaryType`
+        Boundary type where NRBCs are applied . Options: `NRBCBoundaryType.STRAIGHT`
+        or `NRBCBoundaryType.HYPERSHAPE`.
+
+    Returns
+    -------
+    case_nrbc : `str`
+        Label for the output files that includes the NRBC type ("HIG" or "SOM")
+        and the boundary type where the NRBCs are applied ("STB" or "HYP").
+        Examples: "HIG_STB", "HIG_HYP", "SOM_STB" or "SOM_HYB".
+    """
+
+    # Labeling for the NRBC type
+    if non_reflect_bc == BoundaryConditionsType.HIGDON:
+        case_nrbc = "HIG"
+
+    elif non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
+        case_nrbc = "SOM"
+
+    # Labeling for the boundary type
+    if abc_boundary_type == NRBCBoundaryType.STRAIGHT:
+        case_nrbc += "_STB"  # Straight Boundary
+
+    elif abc_boundary_type == NRBCBoundaryType.HYPERSHAPE:
+        case_nrbc += "_HYB"  # HyperShape Boundary
+
+    # Printing NRBC info on screen
+    nrbc_str = f"\nNRBC Type: {non_reflect_bc.value.capitalize()}" + \
+        f"\nBoundary Type: {abc_boundary_type.value.capitalize()}" + \
+        (f"\nMaximum Incidence Angle: {180. * angle_max / pi:.1f}°"
+         if non_reflect_bc == BoundaryConditionsType.HIGDON else "")
+    SpyroEnsemble.print(nrbc_str)
+
+    return case_nrbc
+
+
 def path_to_save_abc_case(abc_type, abc_boundary_layer_shape=None, abc_deg_layer=None,
-                          abc_reference_freq=None, output_folder=None):
+                          abc_reference_freq=None, non_reflect_bc=None, angle_max=None,
+                          abc_boundary_type=None, output_folder=None):
     """Create the path to save data for the current case study of the ABC scheme.
 
     Parameters
     ----------
     abc_type : `typing.AbsorbingBCsType`
-        Type of the absorbing boundary condition. Options: `AbsorbingBCsType.HYBRID` or
-        `AbsorbingBCsType.PML`.
+        Type of the absorbing boundary condition. Options: `AbsorbingBCsType.NRBC`,
+        `AbsorbingBCsType.HYBRID` or `AbsorbingBCsType.PML`.
         Option `AbsorbingBCsType.HYBRID` is based on paper of Salas et al. (2022).
         doi: https://doi.org/10.1016/j.apm.2022.09.014
         TODO: Add citation
@@ -139,6 +195,16 @@ def path_to_save_abc_case(abc_type, abc_boundary_layer_shape=None, abc_deg_layer
     abc_deg_layer : `int` or `float` or `None`, optional
             Hypershape degree. For hypershape layers, the degree must be greater than or
             equal to 2. `None` is used only for rectangular layers. Default is `None`.
+    non_reflect_bc : `typing.BoundaryConditionsType`, optional
+        Type of boundary condition to apply on the domain boundaries (for only NRBCs)
+        or the outer absorbing layer boundaries (HABCs: Absorbing Layer aand NRBCs).
+        Options: `BoundaryConditionsType.HIGDON` or `BoundaryConditionsType.SOMMERFELD`.
+        Dafault is `None`.
+    angle_max : `float`, optional
+        Maximum incidence angle considered in the NRBC. Default is `None`.
+    abc_boundary_type : `typing.NRBCBoundaryType`, optional
+        Boundary type where NRBCs are applied . Options: `NRBCBoundaryType.STRAIGHT`
+        or `NRBCBoundaryType.HYPERSHAPE`. Default is `None`.
         output_folder : `str`, optional
         The folder where output data will be saved. Default is `None`.
 
@@ -153,6 +219,12 @@ def path_to_save_abc_case(abc_type, abc_boundary_layer_shape=None, abc_deg_layer
         Examples: "REC_SOU", "REC_BND", "HN2.4_SOU" or "HN2.4_BND"
     path_case_absl : `string`
         Path to save data for the current case study of ABCs based on absorbing layers.
+    case_nrbc : `str`
+        Label for the output files that includes the NRBC type ("HIG" or "SOM")
+        and the boundary type where the NRBCs are applied ("STB" or "HYP").
+        Examples: "HIG_STB", "HIG_HYP", "SOM_STB" or "SOM_HYB".
+    path_case_nrbc : `string`
+        Path to save data for the current case study of NRBCs.
     """
 
     # Checking ABC type (Case `AbsorbingBCsType.NOABCS` is not included)
@@ -174,6 +246,14 @@ def path_to_save_abc_case(abc_type, abc_boundary_layer_shape=None, abc_deg_layer
         path_case_absl = path_save + case_absl + "/"
 
         return path_save, case_absl, path_case_absl
+
+    elif abc_type == AbsorbingBCsType.NRBC:
+
+        # Identify the type of the NRBC for output labeling
+        case_nrbc = identify_nrbc_case(non_reflect_bc, angle_max, abc_boundary_type)
+        path_case_nrbc = path_save + case_nrbc + "/"
+
+        return path_save, case_nrbc, path_case_nrbc
 
 
 def create_folder(folder: str | Path) -> None:
