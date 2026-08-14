@@ -7,8 +7,8 @@ from ..plots.plots_habc import plot_function_layer_size
 from ..tools.abc_set_path_cases import formatting_abc_layer_type, path_to_save_abc_case
 from ..utils.error_management import validate_enum, validate_numeric, validate_parameter
 from ..utils.freq_tools import freq_response
-from ..utils.typing import (BoundaryConditionsType, HyperLayerDegreeType,
-                            AbsorbingBCsType, LayerShapeType, LayerSizeRefFrequency)
+from ..utils.typing import (AbsorbingBCsType, BoundaryConditionsType, HyperLayerDegreeType,
+                            LayerShapeType, LayerSizeRefFrequency, NRBCBoundaryType)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -359,9 +359,15 @@ class ABCLayer(AbsorbingBC):
         None
         """
 
+        # Getting the boundary type where NRBCs are applied
+        abc_boundary_type = NRBCBoundaryType.HYPERSHAPE \
+            if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE \
+            else NRBCBoundaryType.STRAIGHT
+
         # The layer owns an NRBC object instead of being one
-        self.nrbc = NRBC(self.domain_dim, self.abc_boundary_layer_shape,
-                         dimension=self.dimension, output_folder=self.path_case_absl)
+        self.nrbc = NRBC(self.domain_dim, non_reflect_bc=non_reflect_bc,
+                         abc_boundary_type=abc_boundary_type, dimension=self.dimension,
+                         output_folder=self.path_case_absl)
 
         # Applying NRBCs on outer boundary layer
         crit_source = bnd_nod_ids_nfs = bnd_nodes_nfs = None
@@ -388,7 +394,7 @@ class ABCLayer(AbsorbingBC):
 
             # Applying Higdon ABCs
             self.nrbc.cos_ang_HigdonBC(wave.function_space, crit_source, bnd_nod_ids_nfs,
-                                       bnd_nodes_nfs, non_reflect_bc,
-                                       hyp_par=hyp_par, save_file=save_file)
+                                       bnd_nodes_nfs, hyp_par=hyp_par, save_file=save_file)
+
         else:
             SpyroEnsemble.print("\nNot Non-Reflecting Boundary Conditions Prescribed")
