@@ -3,12 +3,12 @@
 from firedrake import Function, VTKFile
 from numpy import abs, asarray, cos, maximum, pi, sign, sqrt, sum
 from numpy.linalg import norm
-from os import getcwd
 from ..io.basicio import parallel_print as pprint
+from ..tools.abc_labeling_cases import path_to_save_abc_case
+from ..tools.error_measure import MeasureError
 from ..utils.error_management import (validate_data_structure, validate_enum,
-                                      validate_numeric, validate_parameter,
-                                      validate_string)
-from ..utils.typing import BoundaryConditionsType, NRBCBoundaryType
+                                      validate_numeric, validate_parameter)
+from ..utils.typing import AbsorbingBCsType, BoundaryConditionsType, NRBCBoundaryType
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -70,7 +70,7 @@ class NRBC():
 
     def __init__(self, domain_dim, non_reflect_bc=BoundaryConditionsType.HIGDON,
                  angle_max=pi/4., abc_boundary_type=NRBCBoundaryType.STRAIGHT,
-                 dimension=2, output_folder=None, comm=None):
+                 dimension=2, nrbc_in_habc=False, output_folder=None, comm=None):
         """Initialize the NRBC class.
 
         Parameters
@@ -81,15 +81,19 @@ class NRBC():
         non_reflect_bc : `typing.BoundaryConditionsType`, optional
             Type of boundary condition to apply on the domain boundaries (for only NRBCs)
             or the outer absorbing layer boundaries (HABCs: Absorbing Layer aand NRBCs).
-            Options:'BoundaryConditionsType.HIGDON' or 'BoundaryConditionsType.SOMMERFELD'.
-            Dafault is 'BoundaryConditionsType.HIGDON'.
+            Options: `BoundaryConditionsType.HIGDON` or `BoundaryConditionsType.SOMMERFELD`.
+            Dafault is `BoundaryConditionsType.HIGDON`.
         angle_max : `float`, optional
-            Maximum incidence angle considered. Default is `numpy.pi/4` (45°).
+            Maximum incidence angle considered in the NRBC. Default is `numpy.pi/4` (45°).
         abc_boundary_type : `typing.NRBCBoundaryType`, optional
-            Boundary typr where NRBCs are applied . Options: `NRBCBoundaryType.STRAIGHT`
+            Boundary type where NRBCs are applied . Options: `NRBCBoundaryType.STRAIGHT`
             or `NRBCBoundaryType.HYPERSHAPE`. Default is `NRBCBoundaryType.STRAIGHT`.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
+        nrbc_in_habc : `bool`, optional
+            If `True`, the NRBCs are applied on the outer absorbing layer boundaries
+            (HABCs: Absorbing Layer and NRBCs). If `False`, the NRBCs are applied on
+            the original domain boundaries. Default is `False`.
         output_folder : `str`, optional
             The folder where output data will be saved. Default is `None`.
         comm : `object`, optional
@@ -130,80 +134,22 @@ class NRBC():
         # Communicator MPI
         self.comm = comm
 
-        # Create the path to save data
-        self.path_to_save_nrbc_case(output_folder=output_folder)
-
-    def identify_nrbc_case(self):
-        """Generate an identifier for the current type of the NRBC.
-
-        The identifier includes the NRBC type ("HIG" for Higdon BCs or "SOM" for
-        Sommerfeld BCs) and the boundary type where the NRBCs are applied ("STB"
-        for straight boundaries or "HYP" for hypershape boundaries).
-        The identifier can be used for labeling output files and directories.
-        Examples: "HIG_STB", "HIG_HYP", "SOM_STB" or "SOM_HYB".
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        case_nrbc : `str`
-            Label for the output files that includes the NRBC type ("HIG" or "SOM")
-            and the boundary type where the NRBCs are applied ("STB" or "HYP").
-            Examples: "HIG_STB", "HIG_HYP", "SOM_STB" or "SOM_HYB".
+        """"
+        Create the path to save data
+        The required abc_type argument from path_to_save_abc_layer_case() method is set
+        to `AbsorbingBCsType.NRBC` since it is an instance of `typing.AbsorbingBCsType`.
         """
+        self.path_save, self.case_nrbc, self.path_case_nrbc = \
+            path_to_save_abc_case(AbsorbingBCsType.NRBC,
+                                  non_reflect_bc=self.non_reflect_bc,
+                                  angle_max=self.angle_max,
+                                  abc_boundary_type=self.abc_boundary_type,
+                                  output_folder=output_folder)
 
-        # Labeling for the NRBC type
-        if self.non_reflect_bc == BoundaryConditionsType.HIGDON:
-            case_nrbc = "HIG"
-
-        elif self.non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
-            case_nrbc = "SOM"
-
-        # Labeling for the boundary type
-        if self.abc_boundary_type == NRBCBoundaryType.STRAIGHT:
-            case_nrbc += "_STB"  # Straight Boundary
-
-        elif self.abc_boundary_type == NRBCBoundaryType.HYPERSHAPE:
-            case_nrbc += "_HYB"  # HyperShape Boundary
-
-        # Printing NRBC info on screen
-        nrbc_str = f"\nNRBC Type: {self.non_reflect_bc.value.capitalize()}" + \
-            f"\nBoundary Type: {self.abc_boundary_type.value.capitalize()}" + \
-            (f"\nMaximum Incidence Angle: {180. * self.angle_max / pi:.1f}°"
-             if self.non_reflect_bc == BoundaryConditionsType.HIGDON else "")
-        pprint(nrbc_str, comm=self.comm)
-
-        return case_nrbc
-
-    def path_to_save_nrbc_case(self, output_folder=None):
-        """Create the path to save data for the current case study of the NRBC scheme.
-
-        Parameters
-        ----------
-        output_folder : `str`, optional
-            The folder where output data will be saved. Default is `None`.
-
-        Returns
-        -------
-        None
-        """
-
-        # Validate the output folder parameter
-        validate_string("output_folder", output_folder, accept_parameter_as_none=True)
-
-        # Identify the type of the NRBC for output labeling
-        self.case_nrbc = self.identify_nrbc_case()
-
-       # Path to save data
-        path_save = getcwd() + "/output/" if output_folder is None \
-            else getcwd() + "/" + output_folder + "/"
-
-        path_case_nrbc = path_save + self.case_nrbc + "/"
-
-        self.path_save = path_save
-        self.path_case_nrbc = path_case_nrbc
+        # Initializing the error measure class if NRBCs are not in HABC scheme
+        if not nrbc_in_habc:
+            MeasureError.__init__(self, output_folder=self.path_save,
+                                  output_case=self.path_case_nrbc, comm=self.comm)
 
     def source_to_bnd_reference_vector(self, source_coord, bnd_nodes_nfs):
         """Compute a unitary direction vector from the source to a boundary point.

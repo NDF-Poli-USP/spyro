@@ -1,6 +1,5 @@
 from firedrake import Function, VTKFile
 from numpy import abs, array, ceil, inf, log10, minimum
-from os import getcwd
 from sympy import divisors
 from .eik_min import Minimum_Eikonal
 from .nrbc import NRBC
@@ -10,10 +9,10 @@ from ..domains.space import create_function_space
 from ..io.basicio import parallel_print as pprint
 from .lay_len import calc_size_lay
 from ..plots.plots_habc import plot_function_layer_size
+from ..tools.abc_labeling_cases import path_to_save_abc_case
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
 from ..utils.error_management import (validate_enum, validate_data_structure,
-                                      validate_numeric, validate_parameter,
-                                      validate_string)
+                                      validate_numeric, validate_parameter)
 from ..utils.freq_tools import freq_response
 from ..utils.typing import (AbsorbingBCsType, BoundaryConditionsType, HyperLayerDegreeType,
                             LayerShapeType, LayerSizeRefFrequency, NRBCBoundaryType)
@@ -56,7 +55,7 @@ class ABCLayer(NRBC, MeasureError):
         Reference frequency for sizing the absorbing layer.
         Options: 'LayerSizeRefFrequency.SOURCE' or 'LayerSizeRefFrequency.BOUNDARY'.
         Default is 'LayerSizeRefFrequency.SOURCE'.
-    case_abc : `str`
+    case_absl : `str`
         Label for the output files that includes the layer shape and degree for
         hypershape layers ("REC", "HNX.Y" with X.Y as the hypershape degree with one
         decimal place precision) and the reference frequency ('SOU' or 'BND').
@@ -119,8 +118,8 @@ class ABCLayer(NRBC, MeasureError):
         Minimum mesh size.
     lref : `float`
         Reference length for the size of the absorbing layer.
-    path_case_abc : `string`
-        Path to save data for the current case study of ABCs.
+    path_case_absl : `string`
+        Path to save data for the current case study of ABCs based on absorbing layers.
     path_save : `string`
         Path to save data.
     quadrilateral : `bool`, optional
@@ -275,8 +274,17 @@ class ABCLayer(NRBC, MeasureError):
         # Communicator MPI
         self.comm = comm
 
-        # Create the path to save data
-        self.path_to_save_abc_layer_case(output_folder=output_folder)
+        """"
+        Create the path to save data
+        The required abc_type argument from path_to_save_abc_layer_case() method is set to
+        self.abc_boundary_layer_type since it is an instance of `typing.AbsorbingBCsType`.
+        """
+        self.path_save, self.case_absl, self.path_case_absl = \
+            path_to_save_abc_case(self.abc_boundary_layer_type,
+                                  abc_boundary_layer_type=self.abc_boundary_layer_type,
+                                  abc_deg_layer=self.abc_deg_layer,
+                                  abc_reference_freq=self.abc_reference_freq,
+                                  output_folder=output_folder)
 
         # Initializing the error measure class
         MeasureError.__init__(self, output_folder=self.path_save,
@@ -314,110 +322,6 @@ class ABCLayer(NRBC, MeasureError):
                                           n_type=self.abc_degree_type,
                                           dimension=self.dimension)
             return Hypershape_layer
-
-    def formatting_abc_layer_type(self, str_to_format, for_prints=True):
-        """Format a string for the ABC layer type.
-
-        The formatted string can be used for printing on screen or to generate paths for
-        output files. The `for_prints` parameter determines whether the formatted string
-        is intended for printing or for labeling purposes.
-
-        Parameters
-        ----------
-        str_to_format : `str`
-            The string to format.
-        for_prints : `bool`, optional
-            Flag to indicate whether the formatted string is for
-            printing (`True`) or for labeling (`False`). Default is `True`.
-
-        Returns
-        -------
-        formatted_str : `str`
-            The formatted string for the ABC layer type.
-        """
-
-        # Layer type
-        if self.abc_boundary_layer_type == AbsorbingBCsType.HYBRID:
-            abc_layer_str = "Absorbing" if for_prints else "habc"
-        elif self.abc_boundary_layer_type == AbsorbingBCsType.PML:
-            abc_layer_str = "PML" if for_prints else "pml"
-
-        formatted_str = str_to_format.format(abc_layer_str)
-
-        return formatted_str
-
-    def identify_abc_layer_case(self):
-        """Generate an identifier for the current layer geometry of the ABC.
-
-        The identifier includes the layer shape ("REC" for rectangular layers or "HN"
-        followed by the degree for hypershape layers) and the reference frequency for
-        sizing the absorbing layer ('SOU': source frequency or 'BND': boundary frequency).
-        The identifier can be used for labeling output files and directories.
-        Examples: "REC_SOU", "REC_BND", "HN2.4_SOU" or "HN2.4_BND".
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        case_abc : `str`
-            Label for the output files that includes the layer shape and degree for
-            hypershape layers ("REC", "HNX.Y" with X.Y as the hypershape degree with one
-            decimal place precision) and the reference frequency ('SOU' or 'BND').
-            Examples: "REC_SOU", "REC_BND", "HN2.4_SOU" or "HN2.4_BND".
-        """
-
-        # Labeling for the layer shape
-        if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
-            case_abc = "REC"
-
-        elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-            case_abc = "HN" + f"{self.abc_deg_layer:.1f}"
-
-        # Labeling for the reference frequency for the absorbing layer
-        if self.abc_reference_freq == LayerSizeRefFrequency.SOURCE:
-            case_abc += "_SOU"
-
-        elif self.abc_reference_freq == LayerSizeRefFrequency.BOUNDARY:
-            case_abc += "_BND"
-
-        # Printing layer info on screen
-        layer_str = self.formatting_abc_layer_type("\n{} Layer Shape: ") + \
-            f"{self.abc_boundary_layer_shape.value.capitalize()}" + \
-            (f" - Degree: {self.abc_deg_layer}"
-             if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else "")
-        pprint(layer_str, comm=self.comm)
-
-        return case_abc
-
-    def path_to_save_abc_layer_case(self, output_folder=None):
-        """Create the path to save data for the current case study of the ABC scheme.
-
-        Parameters
-        ----------
-        output_folder : `str`, optional
-            The folder where output data will be saved. Default is `None`.
-
-        Returns
-        -------
-        None
-        """
-
-        # Validate the output folder parameter
-        validate_string("output_folder", output_folder, accept_parameter_as_none=True)
-
-        # Identify the case of the ABC scheme for output labeling
-        self.case_abc = self.identify_abc_layer_case()
-
-        # Path to save data
-        path_save = getcwd() + "/output/" if output_folder is None \
-            else getcwd() + "/" + output_folder + "/"
-
-        path_case_abc = path_save + self.case_abc + "/"
-
-        self.path_save = path_save
-        self.path_case_abc = path_case_abc
 
     def critical_boundary_points(self, wave):
         """Determine critical boundary points using the Eikonal criterion.
@@ -818,7 +722,8 @@ class ABCLayer(NRBC, MeasureError):
 
             # Initializing the NRBC class
             NRBC.__init__(self, self.domain_dim, non_reflect_bc=non_reflect_bc,
-                          abc_boundary_type=abc_boundary_type, dimension=self.dimension,
+                          abc_boundary_type=abc_boundary_type,
+                          dimension=self.dimension, nrbc_in_habc=True,
                           output_folder=self.path_case_abc, comm=self.comm)
 
             pprint("\nApplying Non-Reflecting Boundary Conditions", comm=self.comm)
