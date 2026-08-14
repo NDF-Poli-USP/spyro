@@ -273,7 +273,7 @@ class NRBC(AbsorbingBC):
         None
         """
 
-        pprint(f"Creating Field for NRBC: {non_reflect_bc.value}", comm=self.comm)
+        pprint(f"Creating Field for NRBC: {self.non_reflect_bc.value}", comm=self.comm)
 
         # Initialize field for the cosine of the incidence angle
         self.cosHig = Function(V, name='cosHig')
