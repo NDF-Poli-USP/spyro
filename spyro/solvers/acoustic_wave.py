@@ -1,7 +1,6 @@
 import firedrake as fire
 
 from .wave import Wave
-from pyadjoint import Tape, AdjFloat
 from ..io.parallelism_wrappers import ensemble_gradient
 from ..io import interpolate
 from .acoustic_solver_construction_no_pml import (
@@ -166,34 +165,13 @@ class AcousticWave(Wave):
             Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
             depending on the chosen Riesz map.
         """
-        if not isinstance(self.functional_value, AdjFloat):
-            raise ValueError(
-                "Functional value must be an AdjFloat for automated adjoint gradient computation."
+        derivatives = self._automated_adjoint_derivatives(riesz_map=riesz_map)
+        if len(derivatives) != 1:
+            raise RuntimeError(
+                "The acoustic automated adjoint must return exactly one "
+                f"velocity derivative, got {len(derivatives)}."
             )
-
-        if not self.automated_adjoint:
-            self.enable_automated_adjoint()
-            self.automated_adjoint.clear_tape()
-            self.forward_solve()
-            self.automated_adjoint.create_reduced_functional(
-                self.functional_value
-            )
-        elif (
-            self.automated_adjoint.reduced_functional is None
-            and isinstance(self.automated_adjoint._tape, Tape)
-        ):
-            self.automated_adjoint.create_reduced_functional(
-                self.functional_value
-            )
-
-        if riesz_map == RieszMapType.L2:
-            return self.automated_adjoint.compute_gradient()
-        elif riesz_map == RieszMapType.l2:
-            return self.automated_adjoint.compute_derivative()
-        else:
-            raise NotImplementedError(
-                f"Riesz map {riesz_map} not implemented for automated adjoint."
-            )
+        return derivatives[0]
 
     def reset_pressure(self):
         if self.abc_type == AbsorbingBCsType.PML:
