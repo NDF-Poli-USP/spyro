@@ -8,29 +8,11 @@ from matplotlib.pyplot import (close, figure, gca, grid, legend, plot,
 from matplotlib.pyplot import show as plt_show
 # from numpy import arange, asarray, ceil, clip, linspace, inf, polyfit, polyval, zeros
 from numpy import arange, ceil, linspace, inf, zeros
-from os import makedirs, path
 from ..abc.lay_len import f_layer, loop_roots
+from ..tools.abc_labeling_cases import create_folder
 # from ..utils.stats_tools import coeff_of_determination
 rcParams.update({"font.family": "serif"})
 rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
-
-
-def create_folder(folder):
-    """Verify if a folder exists, if not, it creates the folder.
-
-    Parameters
-    ----------
-    folder: `str`
-        Path to the folder to be created
-
-    Returns
-    -------
-    None
-    """
-
-    # Create the folder if it does not exist
-    if not path.isdir(folder):
-        makedirs(folder)
 
 
 def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
