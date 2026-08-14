@@ -26,8 +26,7 @@ fire.set_log_level(fire.ERROR)
 
 
 class Wave(Model_parameters, metaclass=ABCMeta):
-    """
-    Base class for wave equation solvers.
+    """Base class for wave equation solvers.
 
     Attributes:
     -----------

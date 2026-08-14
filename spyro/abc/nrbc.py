@@ -3,11 +3,10 @@
 from firedrake import Function, VTKFile
 from numpy import abs, asarray, cos, maximum, pi, sign, sqrt, sum
 from numpy.linalg import norm
+from .abc import AbsorbingBC
 from ..io.basicio import parallel_print as pprint
 from ..tools.abc_labeling_cases import path_to_save_abc_case
-from ..tools.error_measure import MeasureError
-from ..utils.error_management import (validate_data_structure, validate_enum,
-                                      validate_numeric, validate_parameter)
+from ..utils.error_management import validate_enum, validate_numeric, validate_parameter
 from ..utils.typing import AbsorbingBCsType, BoundaryConditionsType, NRBCBoundaryType
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -20,7 +19,7 @@ from ..utils.typing import AbsorbingBCsType, BoundaryConditionsType, NRBCBoundar
 # TODO: Add citation
 
 
-class NRBC():
+class NRBC(AbsorbingBC):
     """Class for Non-Reflective BCs applied to the outer boundary of an absorbing layer.
 
     Attributes
@@ -39,11 +38,6 @@ class NRBC():
         Free surfaces and interior nodes are set to 0.
     cos_min : `float`
         Minimum value of the cosine of the incidence angle.
-    dimension : `int`
-        Model dimension (2D or 3D). Default is 2D.
-    domain_dim : `tuple`
-        Original domain dimensions: (length_z, length_x) for 2D
-        or (length_z, length_x, length_y) for 3D.
     non_reflect_bc : `typing.BoundaryConditionsType`, optional
             Type of boundary condition to apply on the domain boundaries (for only NRBCs)
             or the outer absorbing layer boundaries (HABCs: Absorbing Layer aand NRBCs).
@@ -60,10 +54,6 @@ class NRBC():
         Compute the cosine of the incidence angle for first-order Higdon BC.
     hypershape_normal_vector()
         Compute the normal vector to a hypershape at a boundary point.
-    identify_nrbc_case()
-        Generate an identifier for the current type of the NRBC.
-    path_to_save_nrbc_case()
-        Create the path to save data for the current case study of the NRBC scheme.
     source_to_bnd_reference_vector()
         Compute a unitary direction vector from the source to a boundary point.
     """
@@ -105,12 +95,11 @@ class NRBC():
         None
         """
 
-        # Original domain dimensions
-        self.domain_dim = validate_data_structure("domain_dim", domain_dim, "tuple",
-                                                  expected_type_element=("float", "int"),
-                                                  expected_length=dimension)
+        # Initializing the AbsorbingBC class if NRBCs are not in HABC scheme
+        if not nrbc_in_habc:
+            AbsorbingBC.__init__(self, domain_dim, dimension=dimension, comm=comm)
 
-        # Non-reflective BC type
+            # Non-reflective BC type
         self.non_reflect_bc = validate_parameter('non_reflect_bc', non_reflect_bc,
                                                  [BoundaryConditionsType.HIGDON,
                                                   BoundaryConditionsType.SOMMERFELD])
@@ -128,12 +117,6 @@ class NRBC():
         # Maximum value of the cosine of the incidence angle
         self.cos_min = cos(angle_max)
 
-        # Model dimension
-        self.dimension = validate_parameter("dimension", dimension, [2, 3])
-
-        # Communicator MPI
-        self.comm = comm
-
         """"
         Create the path to save data
         The required abc_type argument from path_to_save_abc_layer_case() method is set
@@ -146,10 +129,10 @@ class NRBC():
                                   abc_boundary_type=self.abc_boundary_type,
                                   output_folder=output_folder)
 
-        # Initializing the error measure class if NRBCs are not in HABC scheme
+        # Initializing the MeasureError class if NRBCs are not in HABC scheme
         if not nrbc_in_habc:
-            MeasureError.__init__(self, output_folder=self.path_save,
-                                  output_case=self.path_case_nrbc, comm=self.comm)
+            self.initialize_paths_for_error(output_folder=self.path_save,
+                                            output_case=self.path_case_nrbc)
 
     def source_to_bnd_reference_vector(self, source_coord, bnd_nodes_nfs):
         """Compute a unitary direction vector from the source to a boundary point.
