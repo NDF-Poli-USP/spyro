@@ -95,6 +95,7 @@ def wave_dict(element_geometry, dimension, dt_usu, get_ref_model):
     dictionary["absorving_boundary_conditions"] = {
         "status": True,  # Activate ABCs
         "abc_type": "nrbc",  # Activate NRBC
+        "degree_eikonal": 2,  # FEM order for the Eikonal analysis
         "get_ref_model": get_ref_model,  # If `True`, the infinite model is created
     }
 
@@ -143,9 +144,11 @@ def wave_instance(element_geometry, dimension, get_ref_model):
 
     # Timestep size (in seconds). Initial guess: edge_length / 100
     if dimension == 2:
+        f_est = 0.06 if element_geometry == "T" else 0.05
         dt_usu = 0.00400 if element_geometry == "T" else 0.00500
 
     if dimension == 3:
+        f_est = 0.05 if element_geometry == "T" else 0.07
         dt_usu = 0.01000 if element_geometry == "T" else 0.01250
 
     # Maximum divisor of the final time
@@ -154,6 +157,7 @@ def wave_instance(element_geometry, dimension, get_ref_model):
     # Get simulation parameters
     pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
     pprint(f"Element Geometry: {element_geometry}", comm=comm)
+    pprint(f"Eikonal Stabilizing Factor: {f_est:.2f}", comm=comm)
     pprint(f"Timestep Size: {1e3 * dt_usu:.3f} ms", comm=comm)
     pprint(f"Maximum Divisor of Final Time: {max_divisor_tf}", comm=comm)
 
@@ -174,6 +178,12 @@ def wave_instance(element_geometry, dimension, get_ref_model):
 
     # Preamble mesh operations
     wave.mesh_ops.preamble_mesh_operations(wave)
+
+    # if calc_eik:
+    #     # ============ EIKONAL ANALYSIS ============
+
+    #     # Finding critical points
+    #     wave.layer_ops.critical_boundary_points(wave)
 
     return wave, max_divisor_tf
 

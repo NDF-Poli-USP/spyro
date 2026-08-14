@@ -1,7 +1,8 @@
 from numpy import pi
 from os import getcwd
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import mutually_exclusive_parameter_error, validate_enum, validate_numeric, validate_parameter, validate_string
+from ..utils.error_management import (mutually_exclusive_parameter_error, validate_enum,
+                                      validate_numeric, validate_parameter, validate_string)
 from ..utils.typing import (AbsorbingBCsType, BoundaryConditionsType, LayerShapeType,
                             LayerSizeRefFrequency, NRBCBoundaryType)
 
@@ -32,7 +33,11 @@ def formatting_abc_layer_type(str_to_format, abc_type, for_prints=True):
             The formatted string for the ABC layer type.
     """
 
+    # Validate input parameters
     validate_string("string to format", str_to_format, accept_parameter_as_none=True)
+
+    # Checking ABC type (Only ABCs based on absorbing layers are included)
+    validate_parameter("abc_type", abc_type, [AbsorbingBCsType.HYBRID, AbsorbingBCsType.PML])
 
     # Layer type
     if abc_type == AbsorbingBCsType.HYBRID:
@@ -45,7 +50,8 @@ def formatting_abc_layer_type(str_to_format, abc_type, for_prints=True):
     return formatted_str
 
 
-def identify_abc_layer_case(abc_type, abc_boundary_layer_shape, abc_deg_layer, abc_reference_freq):
+def identify_abc_layer_case(abc_type, abc_boundary_layer_shape,
+                            abc_deg_layer, abc_reference_freq):
     """Generate an identifier for the current layer geometry of the ABC.
 
     The identifier includes the layer shape ("REC" for rectangular layers or "HN"

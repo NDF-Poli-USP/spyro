@@ -288,7 +288,7 @@ class ABCLayer(NRBC, MeasureError):
 
         # Initializing the error measure class
         MeasureError.__init__(self, output_folder=self.path_save,
-                              output_case=self.path_case_abc, comm=self.comm)
+                              output_case=self.path_case_absl, comm=self.comm)
 
     def _define_layer_shape(self):
         """Define the shape of the absorbing layer.
