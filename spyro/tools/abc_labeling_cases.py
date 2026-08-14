@@ -1,3 +1,4 @@
+"""Methods to label the case study of the ABC scheme."""
 from os import getcwd
 from ..io.basicio import parallel_print as pprint
 from ..utils.error_management import (validate_enum, validate_numeric,
