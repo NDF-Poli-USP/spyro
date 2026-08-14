@@ -160,7 +160,6 @@ class BoundaryConditionsType(Enum):
     NEUMANN: Neumann boundary condition
     HIGDON: 1-st order Higdon boundary condition (NRBC type)
     SOMMERFELD: Sommerfeld (Radiation) boundary condition (NRBC type)
-
     """
     DIRICHLET = "Dirichlet"
     NEUMANN = "Neumann"
@@ -184,3 +183,13 @@ class AbsorbingBCsType(Enum):
     NRBC = "nrbc"
     HYBRID = "hybrid"
     PML = "PML"
+
+
+class NRBCBoundaryType(Enum):
+    """Enum for different types of boundaries where NRBCs can be applied.
+
+    STRAIGHT: Straight boundary.
+    HYPERSHAPE: Hypershape boundary.
+    """
+    STRAIGHT = "straight"
+    HYPERSHAPE = "hypershape"

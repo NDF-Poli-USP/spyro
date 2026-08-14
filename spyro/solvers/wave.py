@@ -807,11 +807,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                        abc_deg_layer=self.abc_deg_layer,
                                        output_folder=self.output_folder, comm=self.comm)
 
-        # Identifier for the current case study
-        self.case_abc = self.layer_ops.case_abc
-        self.path_save = self.layer_ops.path_save
-        self.path_case_abc = self.layer_ops.path_case_abc
-
     def abcs_manager(self):
         """Create the ABCs operations manager for the wave solver."""
 
@@ -822,12 +817,21 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.abc_type in [AbsorbingBCsType.PML, AbsorbingBCsType.HYBRID]:
             self.layer_manager(domain_dim)
 
+            # Identifier for the current case study
+            self.case_abc = self.layer_ops.case_abc
+            self.path_save = self.layer_ops.path_save
+            self.path_case_abc = self.layer_ops.path_case_abc
+
         # Creating NRBC manager if needed (when no layer is added).
         elif self.abc_type == AbsorbingBCsType.NRBC:
             from ..abc.nrbc import NRBC
-            self.nrbc_ops = NRBC(domain_dim, self.abc_boundary_layer_shape,
-                                 angle_max=pi/4., dimension=self.dimension,
+            self.nrbc_ops = NRBC(domain_dim, dimension=self.dimension,
                                  output_folder=self.output_folder, comm=self.comm)
+
+            # Identifier for the current case study
+            self.case_abc = self.nrbc_ops.case_nrbc
+            self.path_save = self.nrbc_ops.path_save
+            self.path_case_abc = self.nrbc_ops.path_case_nrbc
 
     @abstractmethod
     def get_control_parameters(self):

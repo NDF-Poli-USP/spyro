@@ -15,8 +15,8 @@ from ..utils.error_management import (validate_enum, validate_data_structure,
                                       validate_numeric, validate_parameter,
                                       validate_string)
 from ..utils.freq_tools import freq_response
-from ..utils.typing import (BoundaryConditionsType, HyperLayerDegreeType,
-                            AbsorbingBCsType, LayerShapeType, LayerSizeRefFrequency)
+from ..utils.typing import (AbsorbingBCsType, BoundaryConditionsType, HyperLayerDegreeType,
+                            LayerShapeType, LayerSizeRefFrequency, NRBCBoundaryType)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -120,7 +120,7 @@ class ABCLayer(NRBC, MeasureError):
     lref : `float`
         Reference length for the size of the absorbing layer.
     path_case_abc : `string`
-        Path to save data for the current case study.
+        Path to save data for the current case study of ABCs.
     path_save : `string`
         Path to save data.
     quadrilateral : `bool`, optional
@@ -269,11 +269,11 @@ class ABCLayer(NRBC, MeasureError):
                                                   lower_bound=2.,
                                                   include_lower_bound=True)
 
-        # Communicator MPI
-        self.comm = comm
-
         # Define the shape of the absorbing layer.
         self.layer_geometry = self._define_layer_shape()
+
+        # Communicator MPI
+        self.comm = comm
 
         # Create the path to save data
         self.path_to_save_abc_layer_case(output_folder=output_folder)
@@ -352,6 +352,7 @@ class ABCLayer(NRBC, MeasureError):
         The identifier includes the layer shape ("REC" for rectangular layers or "HN"
         followed by the degree for hypershape layers) and the reference frequency for
         sizing the absorbing layer ('SOU': source frequency or 'BND': boundary frequency).
+        The identifier can be used for labeling output files and directories.
         Examples: "REC_SOU", "REC_BND", "HN2.4_SOU" or "HN2.4_BND".
 
         Parameters
@@ -377,6 +378,7 @@ class ABCLayer(NRBC, MeasureError):
         # Labeling for the reference frequency for the absorbing layer
         if self.abc_reference_freq == LayerSizeRefFrequency.SOURCE:
             case_abc += "_SOU"
+
         elif self.abc_reference_freq == LayerSizeRefFrequency.BOUNDARY:
             case_abc += "_BND"
 
@@ -403,16 +405,14 @@ class ABCLayer(NRBC, MeasureError):
         """
 
         # Validate the output folder parameter
-        validate_string("output_folder", output_folder)
+        validate_string("output_folder", output_folder, accept_parameter_as_none=True)
 
         # Identify the case of the ABC scheme for output labeling
         self.case_abc = self.identify_abc_layer_case()
 
         # Path to save data
-        if output_folder is None:
-            path_save = getcwd() + "/output/"
-        else:
-            path_save = getcwd() + "/" + output_folder + "/"
+        path_save = getcwd() + "/output/" if output_folder is None \
+            else getcwd() + "/" + output_folder + "/"
 
         path_case_abc = path_save + self.case_abc + "/"
 
@@ -805,10 +805,15 @@ class ABCLayer(NRBC, MeasureError):
         None
         """
 
+        # Getting the boundary type where NRBCs are applied
+        abc_boundary_type = NRBCBoundaryType.HYPERSHAPE \
+            if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE \
+            else NRBCBoundaryType.STRAIGHT
+
         # Initializing the NRBC class
-        NRBC.__init__(
-            self, self.domain_dim, self.abc_boundary_layer_shape,
-            dimension=self.dimension, output_folder=self.path_case_abc, comm=self.comm)
+        NRBC.__init__(self, self.domain_dim, non_reflect_bc=non_reflect_bc,
+                      abc_boundary_type=abc_boundary_type, dimension=self.dimension,
+                      output_folder=self.path_case_abc, comm=self.comm)
 
         # Applying NRBCs on outer boundary layer
         crit_source = bnd_nod_ids_nfs = bnd_nodes_nfs = None
@@ -836,8 +841,8 @@ class ABCLayer(NRBC, MeasureError):
 
             # Applying Higdon ABCs
             self.cos_ang_HigdonBC(wave.function_space, crit_source, bnd_nod_ids_nfs,
-                                  bnd_nodes_nfs, non_reflect_bc,
-                                  hyp_par=hyp_par, save_file=save_file)
+                                  bnd_nodes_nfs, hyp_par=hyp_par, save_file=save_file)
+
         else:
             pprint("\nNot Non-Reflecting Boundary Conditions Prescribed", comm=self.comm)
 
