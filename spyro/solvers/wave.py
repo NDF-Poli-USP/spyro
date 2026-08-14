@@ -15,7 +15,7 @@ from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
-from ..utils.error_management import enum_parameter_error
+from ..utils.error_management import validate_enum
 from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
                             LayerShapeType, WaveType)
 from .modal.modal_sol import Modal_Solver
@@ -127,7 +127,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.gradient_mask_available = False
 
         # Setting wave type
-        self.wave_type = enum_parameter_error("wave_type", wave_type, WaveType)
+        self.wave_type = validate_enum("wave_type", wave_type, WaveType)
 
         self.function_space = None
         self.dg0_scalar_function_space = None
@@ -187,7 +187,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        if self.abc_type != AbsorbingBCsType.HYBRID:
+        if self.abc_type in [AbsorbingBCsType.NOABCS, AbsorbingBCsType.NRBC]:
             self._initialize_model_parameters()
         self.matrix_building()
         self.wave_propagator()
