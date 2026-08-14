@@ -9,7 +9,7 @@ from ..domains.space import create_function_space
 from ..io.basicio import parallel_print as pprint
 from .lay_len import calc_size_lay
 from ..plots.plots_habc import plot_function_layer_size
-from ..tools.abc_labeling_cases import path_to_save_abc_case
+from ..tools.abc_labeling_cases import formatting_abc_layer_type, path_to_save_abc_case
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
 from ..utils.error_management import (validate_enum, validate_data_structure,
                                       validate_numeric, validate_parameter)
@@ -142,8 +142,6 @@ class ABCLayer(NRBC, MeasureError):
         Determine critical boundary points using the Eikonal criterion.
     det_reference_freq()
         Determine the reference frequency for a new layer size.
-    formatting_abc_layer_type()
-        Format a string for the ABC layer type.
     geometry_infinite_model()
         Determine the geometry for the infinite domain model.
     identify_abc_layer_case()
@@ -504,11 +502,11 @@ class ABCLayer(NRBC, MeasureError):
         plot_function_layer_size([self.a_par, z_par],
                                  [self.freq_ref, self.frequency],
                                  [self.lmin, self.lref], self.FLpossible,
-                                 output_folder=self.path_case_abc)
+                                 output_folder=self.path_case_absl)
 
         # Layer type
         lay_str = "\nDetermining New Geometry with {}"
-        lay_str = self.formatting_abc_layer_type(lay_str)
+        lay_str = formatting_abc_layer_type(lay_str, self.abc_boundary_layer_type)
         pprint(lay_str, comm=self.comm)
 
         # New geometry with layer
@@ -598,9 +596,10 @@ class ABCLayer(NRBC, MeasureError):
             if inf_model:
                 pth_mesh = self.path_save + "preamble/mesh_inf.pvd"
             else:
-                mesh_file_name = self.formatting_abc_layer_type("mesh_{}.pvd",
-                                                                for_prints=False)
-                pth_mesh = self.path_case_abc + mesh_file_name
+                mesh_file_name = formatting_abc_layer_type("mesh_{}.pvd",
+                                                           self.abc_boundary_layer_type,
+                                                           for_prints=False)
+                pth_mesh = self.path_case_absl + mesh_file_name
 
             # Save new mesh
             outfile = VTKFile(pth_mesh)
@@ -680,13 +679,14 @@ class ABCLayer(NRBC, MeasureError):
         # Save new velocity model
         if save_file:
             if inf_model:
-                file_name = "preamble/c_inf.pvd"
+                pth_velocity = self.path_save + "preamble/c_inf.pvd"
             else:
-                c_file_name = self.formatting_abc_layer_type("/c_{}.pvd",
-                                                             for_prints=False)
-                file_name = self.case_abc + c_file_name
+                c_file_name = formatting_abc_layer_type("c_{}.pvd",
+                                                        self.abc_boundary_layer_type,
+                                                        for_prints=False)
+                pth_velocity = self.path_case_absl + c_file_name
 
-            outfile = VTKFile(self.path_save + file_name)
+            outfile = VTKFile(pth_velocity)
             outfile.write(wave.c)
 
     def nrbc_on_boundary_layer(self, wave, non_reflect_bc, save_file=True):
@@ -724,7 +724,7 @@ class ABCLayer(NRBC, MeasureError):
             NRBC.__init__(self, self.domain_dim, non_reflect_bc=non_reflect_bc,
                           abc_boundary_type=abc_boundary_type,
                           dimension=self.dimension, nrbc_in_habc=True,
-                          output_folder=self.path_case_abc, comm=self.comm)
+                          output_folder=self.path_case_absl, comm=self.comm)
 
             pprint("\nApplying Non-Reflecting Boundary Conditions", comm=self.comm)
 
