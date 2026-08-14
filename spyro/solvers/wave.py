@@ -189,7 +189,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.initial_velocity_model = None
         self.gradient_mask_available = False
 
-        # Setting wave type
+        # Setting the wave type
         self.wave_type = validate_enum("wave_type", wave_type, WaveType)
 
         self.function_space = None
@@ -217,6 +217,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.sources = None
         self.real_shot_record = None
 
+        # Setting solver parameters
         self.set_solver_parameters()
 
         # Mesh manager
@@ -226,9 +227,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.mesh is not None:
             self.building_mesh_derived_parameters()
         elif self.mesh_parameters.mesh_type == "firedrake_mesh":
-            warnings.warn(
-                "No mesh file, Firedrake mesh will be automatically generated."
-            )
+            warnings.warn("No mesh file, Firedrake mesh will be automatically generated.")
         else:
             warnings.warn("No mesh found. Please define a mesh.")
 
