@@ -15,7 +15,7 @@ from numpy import isclose, where
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.domains.space import create_function_space
 from spyro.tools.habc_tools import layer_mask_field, point_cloud_field
-from spyro.tools.abc_labeling_cases import path_to_save_abc_case
+from spyro.tools.abc_labeling_cases import create_folder, path_to_save_abc_case
 from spyro.utils.cost import comp_cost
 
 
@@ -358,6 +358,8 @@ def test_habc_tools(element_geometry, dimension):
                                       abc_deg_layer=wave.abc_deg_layer,
                                       abc_reference_freq=wave.abc_reference_freq,
                                       output_folder=output_folder)
+            create_folder(wave.path_save)
+            create_folder(wave.path_case_abc)
 
             # Running the HABC tools
             run_tools(wave, method_extend)
