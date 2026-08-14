@@ -1,6 +1,6 @@
 from os import getcwd
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import validate_string
+from ..utils.error_management import validate_enum, validate_numeric, validate_parameter, validate_string
 from ..utils.typing import AbsorbingBCsType, LayerShapeType, LayerSizeRefFrequency
 
 
@@ -24,6 +24,8 @@ def formatting_abc_layer_type(str_to_format, for_prints=True):
     formatted_str : `str`
             The formatted string for the ABC layer type.
     """
+
+    validate_string("string to format", str_to_format, accept_parameter_as_none=True)
 
     # Layer type
     if abc_boundary_layer_type == AbsorbingBCsType.HYBRID:
@@ -66,6 +68,13 @@ def identify_abc_layer_case(abc_boundary_layer_shape, abc_deg_layer, abc_referen
         Examples: "REC_SOU", "REC_BND", "HN2.4_SOU" or "HN2.4_BND".
     """
 
+    # Checking input parameters
+    validate_enum("abc_boundary_layer_shape", abc_boundary_layer_shape, LayerShapeType)
+    validate_numeric(
+        'abc_deg_layer', abc_deg_layer, float_num=True, integer_num=True,
+        accept_parameter_as_none=True, lower_bound=2., include_lower_bound=True)
+    validate_enum("abc_reference_freq", abc_reference_freq, LayerSizeRefFrequency)
+
     # Labeling for the layer shape
     if abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
         case_absl = "REC"
@@ -90,7 +99,7 @@ def identify_abc_layer_case(abc_boundary_layer_shape, abc_deg_layer, abc_referen
     return case_absl
 
 
-def path_to_save_abc_case(abc_type, abc_boundary_layer_type=None, abc_deg_layer=None,
+def path_to_save_abc_case(abc_type, abc_boundary_layer_shape=None, abc_deg_layer=None,
                           abc_reference_freq=None, output_folder=None):
     """Create the path to save data for the current case study of the ABC scheme.
 
@@ -102,9 +111,9 @@ def path_to_save_abc_case(abc_type, abc_boundary_layer_type=None, abc_deg_layer=
         Option `AbsorbingBCsType.HYBRID` is based on paper of Salas et al. (2022).
         doi: https://doi.org/10.1016/j.apm.2022.09.014
         TODO: Add citation
-    abc_boundary_layer_type : `typing.AbsorbingBCsType`, optional
-        Type of the boundary layer: `AbsorbingBCsType.HYBRID` or AbsorbingBCsType.PML`.
-        Default is `None`.
+    abc_boundary_layer_shape : `typing.LayerShapeType`, optional
+        Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
+        `LayerShapeType.HYPERSHAPE`. Default is `None`.
     abc_reference_freq : `typing.LayerSizeRefFrequency`
         Reference frequency for sizing the absorbing layer.
         Options: 'LayerSizeRefFrequency.SOURCE' or 'LayerSizeRefFrequency.BOUNDARY'.
@@ -127,6 +136,10 @@ def path_to_save_abc_case(abc_type, abc_boundary_layer_type=None, abc_deg_layer=
     path_case_absl : `string`
         Path to save data for the current case study of ABCs based on absorbing layers.
     """
+
+    # Checking ABC type (Case `AbsorbingBCsType.NOABCS` is not included)
+    validate_parameter("abc_type", abc_type, [AbsorbingBCsType.HYBRID,
+                                              AbsorbingBCsType.PML])
 
     # Validate the output folder parameter
     validate_string("output_folder", output_folder, accept_parameter_as_none=True)
