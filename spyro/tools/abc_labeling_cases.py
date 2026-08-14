@@ -1,3 +1,4 @@
+"""Methods to label the case study of the ABC scheme."""
 from numpy import pi
 from os import getcwd
 from ..io.basicio import parallel_print as pprint

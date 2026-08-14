@@ -35,6 +35,9 @@ class MeasureError:
 
     Attributes
     ----------
+    comm : `object`
+        An object representing the communication interface for parallel processing.
+        Default is `None`.
     path_reference : `str`
         Path to save the reference signal.
     path_save_error : `str`
@@ -48,6 +51,8 @@ class MeasureError:
         Compute the error measures at the receivers for comparison between models.
     get_reference_signal()
         Acquire the reference signal for comparison between models.
+    initialize_paths_for_error()
+        Initialize the paths for saving data and reference signals.
     integral_error()
         Compute the integral error between the model and reference signals.
     normalized_root_mean_square_error()
@@ -63,13 +68,23 @@ class MeasureError:
     get_xCR_optimal()
         Get the optimal heuristic factor for the quadratic damping
     """
+    def __init__(self):
+        """Initialize the MeasureError class.
 
-    def __init__(
+        Parameters
+        ----------
+
+        Returns
+        -------
+        None
+        """
+
+    def initialize_paths_for_error(
         self,
         output_folder: Path | str | None = None,
         output_case: Path | str | None = None,
     ):
-        """Initialize the MeasureError class.
+        """Initialize the paths for saving data and reference signals.
 
         Parameters
         ----------

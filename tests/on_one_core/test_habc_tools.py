@@ -9,11 +9,13 @@ the theoretical velocity model and the geometry of the absorbing layer. The test
 measures the computational cost of the operations.
 """
 from pytest import fail, mark, param
+from copy import deepcopy
 from firedrake import conditional, ConvergenceError
 from numpy import isclose, where
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.domains.space import create_function_space
 from spyro.tools.habc_tools import layer_mask_field, point_cloud_field
+from spyro.tools.abc_labeling_cases import path_to_save_abc_case
 from spyro.utils.cost import comp_cost
 
 
@@ -192,7 +194,7 @@ def run_tools(wave, method_extend, n_root=1):
     # Estimating computational resource usage
     ele_str = "Q" if wave.mesh_ops.quadrilateral else "T"
     ext_str = "CLOUD" if method_extend == "point_cloud" else "NEARP"
-    name_cost = wave.layer_ops.path_case_abc + ele_str + "_" + ext_str + "_"
+    name_cost = wave.path_case_abc + ele_str + "_" + ext_str + "_"
     comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
     # Expected values
@@ -212,9 +214,7 @@ def run_tools(wave, method_extend, n_root=1):
         V, type_marker='mask', name_mask='test_mask')
 
     # Extracting nodes from the layer field
-    mask_nodes = wave.mesh_ops.extract_node_positions(
-        wave.mesh, V, output_type="array",
-    )
+    mask_nodes = wave.mesh_ops.extract_node_positions(wave.mesh, V, output_type="array")
     indlay_nodes = where(layer_mask.dat.data_with_halos == 1.)[0]
     pts_layer = mask_nodes[indlay_nodes]  # Inside layer
     pts_layer_xlt = pts_layer[pts_layer[:, 1] < 0.5]
@@ -227,7 +227,6 @@ def run_tools(wave, method_extend, n_root=1):
     # Cloud fields
     layer_cloud_xlt = point_cloud_field(wave.mesh, pts_layer_xlt, wave.c,
                                         wave.mesh_parameters.tol)
-
     layer_cloud_xge = point_cloud_field(wave.mesh, pts_layer_xge, wave.c,
                                         wave.mesh_parameters.tol)
     original_cloud_xlt = point_cloud_field(wave.mesh, pts_original_xlt, wave.c,
@@ -235,8 +234,7 @@ def run_tools(wave, method_extend, n_root=1):
     original_cloud_xge = point_cloud_field(wave.mesh, pts_original_xge, wave.c,
                                            wave.mesh_parameters.tol)
     # Verify cloud values
-    met_str = f"HABC Tools {ele_str}-{ext_str}" + \
-        f" {wave.layer_ops.case_abc[:-4]} {wave.dimension}D. "
+    met_str = f"HABC Tools {ele_str}-{ext_str} {wave.case_abc[:-4]} {wave.dimension}D. "
     expected_values = [expect_xmhalf, expect_xphalf, expect_xmhalf, expect_xphalf]
     mean_val = [layer_cloud_xlt.dat.data_with_halos.mean(),
                 layer_cloud_xge.dat.data_with_halos.mean(),
@@ -353,11 +351,13 @@ def test_habc_tools(element_geometry, dimension):
 
             # Determining the case for the folder name
             str_id = element_geometry + ("CL" if method_extend == "point_cloud" else "NP")
-            wave.layer_ops.path_to_save_abc_layer_case(
-                output_folder=wave.output_folder+f"/ht_test{dimension}d{str_id}")
-            wave.case_abc = wave.layer_ops.case_abc
-            wave.path_save = wave.layer_ops.path_save
-            wave.path_case_abc = wave.layer_ops.path_case_abc
+            output_folder = wave.output_folder + f"/ht_test{dimension}d{str_id}"
+            wave.path_save, wave.case_abc, wave.path_case_abc = \
+                path_to_save_abc_case(wave.abc_type,
+                                      abc_boundary_layer_shape=wave.abc_boundary_layer_shape,
+                                      abc_deg_layer=wave.abc_deg_layer,
+                                      abc_reference_freq=wave.abc_reference_freq,
+                                      output_folder=output_folder)
 
             # Running the HABC tools
             run_tools(wave, method_extend)
