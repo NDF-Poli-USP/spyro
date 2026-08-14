@@ -3,8 +3,8 @@ from numpy import pi
 from os import getcwd
 from pathlib import Path
 from spyro.mpi.spyro_mpi import SpyroEnsemble
-from ..utils.error_management import (validate_enum, validate_numeric,
-                                      validate_parameter, validate_string)
+from ..utils.error_management import (mutually_exclusive_parameter_error, validate_enum,
+                                      validate_numeric, validate_parameter, validate_string)
 from ..utils.typing import (AbsorbingBCsType, BoundaryConditionsType, LayerShapeType,
                             LayerSizeRefFrequency, NRBCBoundaryType)
 
@@ -148,6 +148,13 @@ def identify_nrbc_case(non_reflect_bc, angle_max, abc_boundary_type):
         Examples: "HIG_STB", "HIG_HYP", "SOM_STB" or "SOM_HYB".
     """
 
+    # Checking input parameters (TraditionaL BCs are not inlcuded)
+    validate_parameter('non_reflect_bc', non_reflect_bc,
+                       [BoundaryConditionsType.HIGDON, BoundaryConditionsType.SOMMERFELD])
+    validate_numeric("angle_max", angle_max, float_num=True, integer_num=False,
+                     lower_bound=0., include_lower_bound=True)
+    validate_enum("abc_boundary_type", abc_boundary_type, NRBCBoundaryType)
+
     # Labeling for the NRBC type
     if non_reflect_bc == BoundaryConditionsType.HIGDON:
         case_nrbc = "HIG"
@@ -229,7 +236,8 @@ def path_to_save_abc_case(abc_type, abc_boundary_layer_shape=None, abc_deg_layer
 
     # Checking ABC type (Case `AbsorbingBCsType.NOABCS` is not included)
     validate_parameter("abc_type", abc_type, [AbsorbingBCsType.HYBRID,
-                                              AbsorbingBCsType.PML])
+                                              AbsorbingBCsType.PML,
+                                              AbsorbingBCsType.NRBC])
 
     # Validate the output folder parameter
     validate_string("output_folder", output_folder, accept_parameter_as_none=True)
@@ -240,6 +248,11 @@ def path_to_save_abc_case(abc_type, abc_boundary_layer_shape=None, abc_deg_layer
 
     if abc_type in [AbsorbingBCsType.PML, AbsorbingBCsType.HYBRID]:
 
+        # For absorbing layer cases, ensure NRBC parameters are not provided
+        mutually_exclusive_parameter_error(
+            ["non_reflect_bc", "angle_max", "abc_boundary_type"],
+            [non_reflect_bc, angle_max, abc_boundary_type])
+
         # Identify the Absorbing Layer (HABC ou PML) scheme for output labeling
         case_absl = identify_abc_layer_case(abc_type, abc_boundary_layer_shape,
                                             abc_deg_layer, abc_reference_freq)
@@ -248,6 +261,11 @@ def path_to_save_abc_case(abc_type, abc_boundary_layer_shape=None, abc_deg_layer
         return path_save, case_absl, path_case_absl
 
     elif abc_type == AbsorbingBCsType.NRBC:
+
+        # For NRBC case, ensure ABC layer parameters are not provided
+        mutually_exclusive_parameter_error(
+            ["abc_boundary_layer_shape", "abc_reference_freq", "abc_deg_layer"],
+            [abc_boundary_layer_shape, abc_reference_freq, abc_deg_layer])
 
         # Identify the type of the NRBC for output labeling
         case_nrbc = identify_nrbc_case(non_reflect_bc, angle_max, abc_boundary_type)
