@@ -6,7 +6,7 @@ from ..utils.typing import (AbsorbingBCsType, BoundaryConditionsType, LayerShape
                             LayerSizeRefFrequency, NRBCBoundaryType)
 
 
-def formatting_abc_layer_type(str_to_format, for_prints=True):
+def formatting_abc_layer_type(str_to_format, abc_type, for_prints=True):
     """Format a string for the ABC layer type.
 
     The formatted string can be used for printing on screen or to generate paths for
@@ -17,6 +17,11 @@ def formatting_abc_layer_type(str_to_format, for_prints=True):
     ----------
     str_to_format : `str`
         The string to format.
+    abc_type : `typing.AbsorbingBCsType`
+        Type of the absorbing boundary condition. Options: `AbsorbingBCsType.HYBRID` or
+        `AbsorbingBCsType.PML`. Option `AbsorbingBCsType.HYBRID` is based on paper of
+        Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
+        TODO: Add citation
     for_prints : `bool`, optional
         Flag to indicate whether the formatted string is for
         printing (`True`) or for labeling (`False`). Default is `True`.
@@ -30,9 +35,9 @@ def formatting_abc_layer_type(str_to_format, for_prints=True):
     validate_string("string to format", str_to_format, accept_parameter_as_none=True)
 
     # Layer type
-    if abc_boundary_layer_type == AbsorbingBCsType.HYBRID:
+    if abc_type == AbsorbingBCsType.HYBRID:
         abc_layer_str = "Absorbing" if for_prints else "habc"
-    elif abc_boundary_layer_type == AbsorbingBCsType.PML:
+    elif abc_type == AbsorbingBCsType.PML:
         abc_layer_str = "PML" if for_prints else "pml"
 
     formatted_str = str_to_format.format(abc_layer_str)
@@ -40,7 +45,7 @@ def formatting_abc_layer_type(str_to_format, for_prints=True):
     return formatted_str
 
 
-def identify_abc_layer_case(abc_boundary_layer_shape, abc_deg_layer, abc_reference_freq):
+def identify_abc_layer_case(abc_type, abc_boundary_layer_shape, abc_deg_layer, abc_reference_freq):
     """Generate an identifier for the current layer geometry of the ABC.
 
     The identifier includes the layer shape ("REC" for rectangular layers or "HN"
@@ -51,6 +56,11 @@ def identify_abc_layer_case(abc_boundary_layer_shape, abc_deg_layer, abc_referen
 
     Parameters
     ----------
+    abc_type : `typing.AbsorbingBCsType`
+        Type of the absorbing boundary condition. Options: `AbsorbingBCsType.HYBRID` or
+        `AbsorbingBCsType.PML`. Option `AbsorbingBCsType.HYBRID` is based on paper of
+        Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
+        TODO: Add citation
     abc_boundary_layer_shape : `typing.LayerShapeType`
         Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
         `LayerShapeType.HYPERSHAPE`.
@@ -92,7 +102,7 @@ def identify_abc_layer_case(abc_boundary_layer_shape, abc_deg_layer, abc_referen
         case_absl += "_BND"
 
     # Printing layer info on screen
-    layer_str = formatting_abc_layer_type("\n{} Layer Shape: ") + \
+    layer_str = formatting_abc_layer_type("\n{} Layer Shape: ", abc_type) + \
         f"{abc_boundary_layer_shape.value.capitalize()}" + (
         f" - Degree: {abc_deg_layer}"
         if abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else "")
@@ -236,8 +246,8 @@ def path_to_save_abc_case(abc_type, abc_boundary_layer_shape=None, abc_deg_layer
             [non_reflect_bc, angle_max, abc_boundary_type])
 
         # Identify the Absorbing Layer (HABC ou PML) scheme for output labeling
-        case_absl = identify_abc_layer_case(
-            abc_boundary_layer_shape, abc_deg_layer, abc_reference_freq)
+        case_absl = identify_abc_layer_case(abc_type, abc_boundary_layer_shape,
+                                            abc_deg_layer, abc_reference_freq)
         path_case_absl = path_save + case_absl + "/"
 
         return path_save, case_absl, path_case_absl
