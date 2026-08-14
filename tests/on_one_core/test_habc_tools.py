@@ -9,7 +9,6 @@ the theoretical velocity model and the geometry of the absorbing layer. The test
 measures the computational cost of the operations.
 """
 from pytest import fail, mark, param
-from copy import deepcopy
 from firedrake import conditional, ConvergenceError
 from numpy import isclose, where
 from spyro.solvers.acoustic_wave import AcousticWave
