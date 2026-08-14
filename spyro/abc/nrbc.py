@@ -271,7 +271,7 @@ class NRBC(AbsorbingBC):
         None
         """
 
-        SpyroEnsemble.print(f"Creating Field for NRBC: {non_reflect_bc.value}")
+        SpyroEnsemble.print(f"Creating Field for NRBC: {self.non_reflect_bc.value}")
 
         # Initialize field for the cosine of the incidence angle
         self.cosHig = Function(V, name='cosHig')
