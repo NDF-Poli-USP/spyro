@@ -197,7 +197,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.initial_velocity_model = None
         self.gradient_mask_available = False
 
-        # Setting wave type
+        # Setting the wave type
         self.wave_type = validate_enum("wave_type", wave_type, WaveType)
 
         self.function_space = None
@@ -225,6 +225,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.sources = None
         self.real_shot_record = None
 
+        # Setting solver parameters
         self.set_solver_parameters()
 
         # Mesh manager
@@ -234,9 +235,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.mesh is not None:
             self.building_mesh_derived_parameters()
         elif self.mesh_parameters.mesh_type == "firedrake_mesh":
-            warnings.warn(
-                "No mesh file, Firedrake mesh will be automatically generated."
-            )
+            warnings.warn("No mesh file, Firedrake mesh will be automatically generated.")
         else:
             warnings.warn("No mesh found. Please define a mesh.")
 
@@ -910,9 +909,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.layer_manager(domain_dim)
 
             # Identifier for the current case study
-            self.case_abc = self.layer_ops.case_abc
+            self.case_abc = self.layer_ops.case_absl
             self.path_save = self.layer_ops.path_save
-            self.path_case_abc = self.layer_ops.path_case_abc
+            self.path_case_abc = self.layer_ops.path_case_absl
 
         # Creating NRBC manager if needed (when no layer is added).
         elif self.abc_type == AbsorbingBCsType.NRBC:
