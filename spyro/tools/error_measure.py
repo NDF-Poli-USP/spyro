@@ -4,7 +4,8 @@ from numpy.linalg import norm
 from scipy.signal import find_peaks
 from warnings import warn
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import (validate_data_structure, validate_file,
+from ..utils.error_management import (mutually_exclusive_parameter_error,
+                                      validate_data_structure, validate_file,
                                       validate_numeric, validate_string)
 from ..utils.freq_tools import freq_response
 # from ..plots.plots_habc import plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
@@ -37,7 +38,7 @@ class MeasureError():
 
     Methods
     -------
-    check_signal_lengths()
+    pad_signal_lengths()
         Check if the lengths of the model and reference signals are equal.
     error_measures()
         Compute the error measures at the receivers for comparison between models.
@@ -196,8 +197,9 @@ class MeasureError():
         return receivers_reference, receivers_ref_fft
 
     @staticmethod
-    def check_signal_lengths(signal_model, signal_reference):
-        """Check if the lengths of the model and reference signals are equal.
+    def pad_signal_lengths(signal_model, signal_reference, error_if_different_length=True,
+                           start_padding=False, end_padding=False):
+        """Equalize the signal lengths in comparison by padding with zeros.
 
         Parameters
         ----------
@@ -205,28 +207,75 @@ class MeasureError():
             Transient response at the receiver for the model.
         signal_reference : `array`
             Transient response at the receiver for the reference model.
+        error_if_different_length : `bool`, optional
+            If `True`, raise an error if the lengths of the model and reference
+            signals are different. Default is `True`.
+        start_padding : `bool`, optional
+            If `True`, pad the shorter signal with zeros at the start to match
+            the length of the other signal. Default is `False`.
+        end_padding : `bool`, optional
+            If `True`, pad the shorter signal with zeros at the end to match the
+            length of the other signal. Default is `False`.
 
         Returns
         -------
         signal_model : `array`
-            Modified transient response at the receiver for the model.
+            Transient response at the receiver for the model, modified with a zero pad
+            if shorter than the reference.
         signal_reference : `array`
-            Modified transient response at the receiver for the reference model.
+            Transient response at the receiver for the reference model, modified with
+            a zero pad if shorter than the model signal.
         """
 
-        # Getting the maximum length
-        max_len = max(len(signal_model), len(signal_reference))
+        # Raise an error if signal lengths must be verified and are different
+        if error_if_different_length and len(signal_model) != len(signal_reference):
+            raise ValueError("The lengths of the model and reference signals "
+                             "are different. Please check the simulation time "
+                             " or the time step used in the simulations.")
 
-        # Completing with zeros if arrays lengths are different
-        if len(signal_model) < max_len:
-            delta_len = max_len - len(signal_model)
-            signal_model = pad(signal_model, (0, delta_len),
-                               'constant', constant_values=0)
+        def padding(signal, delta_len, padding_type):
+            """Pad the signal with zeros to match the length of the other signal.
 
-        if len(signal_reference) < max_len:
-            delta_len = max_len - len(signal_reference)
-            signal_reference = pad(signal_reference, (0, delta_len),
-                                   'constant', constant_values=0)
+            Parameters
+            ----------
+            signal : `array`
+                Transient signal that is the shorter of the two signals to compare.
+            delta_len : `int`
+                Difference in length between the two signals to compare.
+            padding_type : `str`
+                Type of padding to apply. Options: "end" or "start".
+
+            Returns
+            -------
+            modified_signal : `array`
+                Transient signal modified with zero padding at the start or end
+                to match the length of the other signal to compare.
+            """
+
+            pad_distribution = (0, delta_len) if padding_type == "end" else (delta_len, 0)
+            return pad(signal, pad_distribution, 'constant', constant_values=0)
+
+        # Pad the shorter signal with zeros if the lengths are different
+        if len(signal_model) != len(signal_reference):
+
+            # Check if both start and end padding are requested, which is not allowed
+            if not (start_padding ^ end_padding):  # Not XOR: both True or both False
+                mutually_exclusive_parameter_error(["end_padding", "start_padding"],
+                                                   [end_padding, start_padding])
+
+            # Getting the maximum length
+            max_length = max(len(signal_model), len(signal_reference))
+
+            # Type of padding to apply
+            padding_type = "end" if end_padding else "start"
+
+            # Completing with zeros if arrays lengths are different
+            if len(signal_model) < max_length:
+                delta_len = max_length - len(signal_model)
+                signal_model = padding(signal_model, delta_len, padding_type)
+            elif len(signal_reference) < max_length:
+                delta_len = max_length - len(signal_reference)
+                signal_reference = padding(signal_reference, delta_len, padding_type)
 
         return signal_model, signal_reference
 
@@ -276,7 +325,9 @@ class MeasureError():
 
         return peak_error, peak_reference
 
-    def integral_error(self, signal_model, signal_reference, dt):
+    def integral_error(self, signal_model, signal_reference, dt,
+                       error_if_different_length=True,
+                       start_padding=False, end_padding=False):
         """Compute the integral error between the model and reference signals.
 
         Error measures used in Salas et al. (2022) Sec. 2.5.
@@ -293,6 +344,15 @@ class MeasureError():
             Transient response at the receiver for the reference model.
         dt : `float`
             Time step used in the simulation.
+        error_if_different_length : `bool`, optional
+            If `True`, raise an error if the lengths of the model and reference
+            signals are different. Default is `True`.
+        start_padding : `bool`, optional
+            If `True`, pad the shorter signal with zeros at the start to match
+            the length of the other signal. Default is `False`.
+        end_padding : `bool`, optional
+            If `True`, pad the shorter signal with zeros at the end to match the
+            length of the other signal. Default is `False`.
 
         Returns
         -------
@@ -307,9 +367,11 @@ class MeasureError():
                                 expected_type_element=("float", "int"))
         validate_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
 
-        # Completing with zeros if arrays lengths are different
-        signal_model, signal_reference = self.check_signal_lengths(signal_model,
-                                                                   signal_reference)
+        # Padding with zeros if arrays lengths are different
+        signal_model, signal_reference = self.pad_signal_lengths(
+            signal_model, signal_reference,
+            error_if_different_length=error_if_different_length,
+            start_padding=start_padding, end_padding=end_padding)
 
         # Integral error
         numerator = trapezoid((signal_model - signal_reference)**2, dx=dt)
@@ -318,9 +380,10 @@ class MeasureError():
 
         return integral_error
 
-    def error_measures(self, forward_solution_receivers, receivers_reference, dt,
-                       number_of_receivers, save_file=True, final_energy=None,
-                       final_energy_reference=None, save_in_case_folder=True):
+    def error_measures(self, forward_solution_receivers, receivers_reference,
+                       dt, number_of_receivers, error_if_different_length=True,
+                       final_energy=None, final_energy_reference=None, save_file=True,
+                       save_in_case_folder=True, start_padding=False, end_padding=False):
         """Compute the error measures at the receivers for comparison between models.
 
         Error measures used in Salas et al. (2022) Sec. 2.5.
@@ -339,8 +402,9 @@ class MeasureError():
             Time step used in the simulation.
         number_of_receivers: `int`
             Number of receivers used in the simulation.
-        save_file : `bool`, optional
-            If `True`, save the error measures in a text file. Default is `True`.
+        error_if_different_length: `bool`, optional
+            If `True`, raise an error if the lengths of the model and reference
+            signals are different. Default is `True`.
         final_energy : `float`, optional
             Energy of the model in the last time step. Default is `None`.
         final_energy_reference : `float`, optional
@@ -348,6 +412,12 @@ class MeasureError():
         save_in_case_folder : `bool`, optional
             If `True`, save the error measures in the current case folder. Otherwise,
             save the error measures in the reference folder. Default is `True`.
+        start_padding: `bool`, optional
+            If `True`, pad the shorter signal with zeros at the start to match
+            the length of the other signal. Default is `False`.
+        end_padding: `bool`, optional
+            If `True`, pad the shorter signal with zeros at the end to match the
+            length of the other signal. Default is `False`.
 
         Returns
         -------
@@ -414,7 +484,9 @@ class MeasureError():
             errPk.append(peak_error)
 
             # Integral error
-            integral_error = self.integral_error(u_abc, u_ref, dt)
+            integral_error = self.integral_error(
+                u_abc, u_ref, dt, error_if_different_length=error_if_different_length,
+                start_padding=start_padding, end_padding=end_padding)
             errIt.append(integral_error)
 
         # Receiver error measures
@@ -452,7 +524,9 @@ class MeasureError():
 
         return error_measures
 
-    def normalized_root_mean_square_error(self, signal_model, signal_reference):
+    def normalized_root_mean_square_error(self, signal_model, signal_reference,
+                                          error_if_different_length=True,
+                                          start_padding=False, end_padding=False):
         """Compute the normalized RMS error between the model and reference signals.
 
         Takem from https://www.statisticshowto.com/nrmse/
@@ -464,6 +538,15 @@ class MeasureError():
             Transient response at the receiver for the model.
         signal_reference : `array`
             Transient response at the receiver for the reference model.
+        error_if_different_length: `bool`, optional
+            If `True`, raise an error if the lengths of the model and reference
+            signals are different. Default is `True`.
+        start_padding: `bool`, optional
+            If `True`, pad the shorter signal with zeros at the start to match
+            the length of the other signal. Default is `False`.
+        end_padding: `bool`, optional
+            If `True`, pad the shorter signal with zeros at the end to match the
+            length of the other signal. Default is `False`.
 
         Returns
         -------
@@ -477,9 +560,11 @@ class MeasureError():
         validate_data_structure("signal_reference", signal_reference, "array",
                                 expected_type_element=("float", "int"))
 
-        # Completing with zeros if arrays lengths are different
-        signal_model, signal_reference = self.check_signal_lengths(signal_model,
-                                                                   signal_reference)
+        # Padding with zeros if arrays lengths are different
+        signal_model, signal_reference = self.pad_signal_lengths(
+            signal_model, signal_reference,
+            error_if_different_length=error_if_different_length,
+            start_padding=start_padding, end_padding=end_padding)
 
         # Normalized RMS error
         numerator = norm(signal_model - signal_reference)
