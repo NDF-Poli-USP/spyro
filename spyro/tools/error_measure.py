@@ -243,7 +243,7 @@ class MeasureError():
         if len(signal_model) != len(signal_reference):
 
             # Check if both start and end padding are requested, which is not allowed
-            if start_padding and end_padding:
+            if not (start_padding ^ end_padding):  # Not XOR: both True or both False
                 mutually_exclusive_parameter_error(["end_padding", "start_padding"],
                                                    [end_padding, start_padding])
 
@@ -256,11 +256,10 @@ class MeasureError():
             # Completing with zeros if arrays lengths are different
             if len(signal_model) < max_length:
                 delta_len = max_length - len(signal_model)
-                padding(signal_model, delta_len, padding_type)
-
+                signal_model = padding(signal_model, delta_len, padding_type)
             elif len(signal_reference) < max_length:
                 delta_len = max_length - len(signal_reference)
-                padding(signal_reference, delta_len, padding_type)
+                signal_reference = padding(signal_reference, delta_len, padding_type)
 
         return signal_model, signal_reference
 
