@@ -57,30 +57,93 @@ class TestMeasureError:
         assert error.path_save_error == "/custom/path"
         assert error.path_save_err_case == "case123"
 
-    def test_check_signal_lengths_equal(self):
+    def test_pad_signal_lengths_equal(self):
         """Test when signals have equal lengths."""
         signal1 = array([1, 2, 3, 4])
         signal2 = array([5, 6, 7, 8])
-        result1, result2 = MeasureError.check_signal_lengths(signal1, signal2)
+        result1, result2 = MeasureError.pad_signal_lengths(signal1, signal2)
         assert len(result1) == len(result2) == 4
         assert_array_equal(result1, signal1)
         assert_array_equal(result2, signal2)
 
-    def test_check_signal_lengths_different(self):
-        """Test when signals have different lengths."""
+    def test_pad_signal_lengths_different_default(self):
+        """Test when signals have different lengths with default behavior."""
         signal1 = array([1, 2, 3])
         signal2 = array([4, 5, 6, 7, 8])
-        result1, result2 = MeasureError.check_signal_lengths(signal1, signal2)
+        # Default is error_if_different_length=True
+        with raises(ValueError, match="The lengths of the model and reference signals"):
+            MeasureError.pad_signal_lengths(signal1, signal2)
+
+    def test_pad_signal_lengths_both_padding_error(self):
+        """Test that both start_padding and end_padding cannot be equal simultaneously."""
+        signal1 = array([1, 2, 3])
+        signal2 = array([4, 5, 6, 7, 8])
+        with raises(ValueError, match="are mutually exclusive."):
+            MeasureError.pad_signal_lengths(
+                signal1, signal2, error_if_different_length=False,
+                start_padding=True, end_padding=True)
+        with raises(ValueError, match="are mutually exclusive"):
+            MeasureError.pad_signal_lengths(
+                signal1, signal2, error_if_different_length=False,
+                start_padding=False, end_padding=False)
+
+    def test_pad_signal_lengths_start_padding(self):
+        """Test padding at the start of the shorter signal."""
+        signal1 = array([1, 2, 3])
+        signal2 = array([4, 5, 6, 7, 8])
+        result1, result2 = MeasureError.pad_signal_lengths(
+            signal1, signal2, error_if_different_length=False,
+            start_padding=True, end_padding=False)
+        assert len(result1) == len(result2) == 5
+        assert_array_equal(result2, signal2)
+        assert result1[0] == 0 and result1[1] == 0
+        assert_array_equal(result1[2:], signal1)
+        result2, result1 = MeasureError.pad_signal_lengths(
+            signal2, signal1, error_if_different_length=False,
+            start_padding=True, end_padding=False)
+        assert len(result1) == len(result2) == 5
+        assert_array_equal(result2, signal2)
+        assert result1[0] == 0 and result1[1] == 0
+        assert_array_equal(result1[2:], signal1)
+
+    def test_pad_signal_lengths_end_padding(self):
+        """Test padding at the end of the shorter signal."""
+        signal1 = array([1, 2, 3])
+        signal2 = array([4, 5, 6, 7, 8])
+        result1, result2 = MeasureError.pad_signal_lengths(
+            signal1, signal2, error_if_different_length=False,
+            start_padding=False, end_padding=True)
+        assert len(result1) == len(result2) == 5
+        assert_array_equal(result2, signal2)
+        assert_array_equal(result1[:3], signal1)
+        assert result1[3] == 0 and result1[4] == 0
+        result2, result1 = MeasureError.pad_signal_lengths(
+            signal2, signal1, error_if_different_length=False,
+            start_padding=False, end_padding=True)
         assert len(result1) == len(result2) == 5
         assert_array_equal(result2, signal2)
         assert_array_equal(result1[:3], signal1)
         assert result1[3] == 0 and result1[4] == 0
 
-        result2, result1 = MeasureError.check_signal_lengths(signal2, signal1)
+    def test_pad_signal_lengths_equal_lengths_with_padding_options(self):
+        """Test that padding options are ignored when signals have equal length."""
+        signal1 = array([1, 2, 3, 4, 5])
+        signal2 = array([6, 7, 8, 9, 10])
+        # The padding options check only runs when lengths are different
+        # Both start_padding and end_padding are False but signals are equal length
+        result1, result2 = MeasureError.pad_signal_lengths(
+            signal1, signal2, error_if_different_length=False,
+            start_padding=False, end_padding=False)
         assert len(result1) == len(result2) == 5
+        assert_array_equal(result1, signal1)
         assert_array_equal(result2, signal2)
-        assert_array_equal(result1[:3], signal1)
-        assert result1[3] == 0 and result1[4] == 0
+        # Both start_padding and end_padding are True but signals are equal length
+        result1, result2 = MeasureError.pad_signal_lengths(
+            signal1, signal2, error_if_different_length=False,
+            start_padding=True, end_padding=True)
+        assert len(result1) == len(result2) == 5
+        assert_array_equal(result1, signal1)
+        assert_array_equal(result2, signal2)
 
     def test_peak_error_identical_signals(self):
         """Test peak error with identical signals."""
