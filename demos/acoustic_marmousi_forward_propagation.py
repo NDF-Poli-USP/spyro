@@ -3,7 +3,7 @@
 This case is without mesh generation. Therefore, we need the mesh file.
 
 This demo has automatic parallelism set up and 1 shots, therefore we need
-a 1n (n positive integer) number of cores in mpiexec -n N_CORES to run. 
+a 1n (n positive integer) number of cores in mpiexec -n N_CORES to run.
 You can experiment with a different number of cores if desired, but you
 will probably only notice an improvement up to 2 cores. In my computer the
 runtimes for each case are:
@@ -22,7 +22,6 @@ The script just runs a single acoustic marmousi forward propagation.
 import spyro
 from copy import deepcopy
 from firedrake import VTKFile
-import sys
 
 degree = 4
 frequency = 5.0
@@ -48,7 +47,7 @@ dictionary["acquisition"] = {
     "source_type": "ricker",
     "source_locations": [(-0.01, 8.0)],
     "frequency": frequency,
-    "delay": 1.0/frequency,
+    "delay": 1.0 / frequency,
     "delay_type": "time",
     "receiver_locations": spyro.create_transect((-0.1, 4.0), (-0.1, 12.0), 100),
 }
@@ -76,7 +75,9 @@ def test_real_shot_record_generation_parallel():
     real_dictionary["mesh"]["mesh_file"] = "meshes/real5hz.msh"
 
     real_wave = spyro.AcousticWave(dictionary=real_dictionary)
-    real_wave.set_initial_velocity_model(new_file="velocity_models/vp_marmousi-ii.segy", fast_interpolate=True)
+    real_wave.set_initial_velocity_model(
+        new_file="velocity_models/vp_marmousi-ii.segy", fast_interpolate=True
+    )
     real_wave.forward_solve()
     VTKFile("vp.pvd").write(real_wave.c)
     spyro.io.save_shots(real_wave)
