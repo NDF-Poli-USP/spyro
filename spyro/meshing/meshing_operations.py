@@ -1,6 +1,6 @@
 from firedrake import as_vector, assemble, CellDiameter, DirichletBC, SpatialCoordinate
 from numpy import allclose, clip, column_stack, linspace, log10, min, max
-from ..utils.error_management import value_parameter_error
+from ..utils.error_management import validate_parameter
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..tools.version_control import is_firedrake_new
 
@@ -219,7 +219,7 @@ class MeshOps():
             coords.append(assemble(interpolate(ufl_input, V)))
 
         # Get the node positions
-        value_parameter_error('output_type', output_type, ["tuple", "array"])
+        validate_parameter('output_type', output_type, ["tuple", "array"])
         if output_type == "tuple":
             z_data = coords[0].dat.data_with_halos[:]
             x_data = coords[1].dat.data_with_halos[:]
