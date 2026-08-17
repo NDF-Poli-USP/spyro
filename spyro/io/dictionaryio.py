@@ -1,3 +1,5 @@
+"""Class for reading option section int he input dictionary."""
+
 from ..utils.error_management import validate_parameter
 
 
@@ -250,6 +252,7 @@ class Read_options:
 
     @property
     def analysis(self):
+        """Analysis type."""
         return self._analysis
 
     @analysis.setter

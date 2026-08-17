@@ -1,3 +1,5 @@
+"""Methods related to intepolating grids or functions."""
+
 import firedrake as fire
 import h5py
 import numpy as np

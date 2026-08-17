@@ -24,7 +24,7 @@ if is_firedrake_new() is False:
 
 
 def write_function_to_grid(function, V, grid_spacing, buffer=False):
-    """Interpolate a Firedrake function to a structured grid
+    """Interpolate a Firedrake function to a structured grid.
 
     Parameters
     ----------

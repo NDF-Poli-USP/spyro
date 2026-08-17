@@ -549,7 +549,10 @@ def point_to_vector_wave_function_space(wave):
         return wave.vector_function_space
     else:
         raise ValueError(
-            f"Should not create a new VectorFunctionSpace from {original_function_space_type}"
+            (
+                "Should not create a new VectorFunctionSpace"
+                f" from {original_function_space_type}"
+            )
         )
 
 
@@ -702,14 +705,3 @@ def set_tensor_function_space(wave, shape_func_space, is_dg):
             shape=shape_func_space,
         )
         return V
-
-
-class VelocityModelFileIO:
-    def __init__(self):
-        """
-        Initialize VelocityModelFileIO.
-        """
-        self.velocity_model_file = None
-        if self.input_dictionary is not None:
-            synthetic_data = self.input_dictionary.get("synthetic_data", {})
-            self.initial_velocity_model_file = synthetic_data.get("real_velocity_file")

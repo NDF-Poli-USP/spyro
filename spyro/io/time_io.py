@@ -1,7 +1,11 @@
+"""Methods that deal with time related io operations."""
+
 import numpy as np
 
 
 class Read_time_axis:
+    """Class that reads time axis related dictionary."""
+
     def __init__(self):
         # some default parameters we might use in the future
         self.input_dictionary["time_axis"].setdefault(
@@ -22,6 +26,7 @@ class Read_time_axis:
 
     @property
     def initial_time(self):
+        """Initial simulation time."""
         return self._initial_time
 
     @initial_time.setter
@@ -32,19 +37,24 @@ class Read_time_axis:
 
     @property
     def final_time(self):
+        """Final simulation time."""
         return self._final_time
 
     @final_time.setter
     def final_time(self, value):
         if value < self.initial_time:
             raise ValueError(
-                f"Final time of {value} lower than initial time of {self.initial_time} not allowed."
+                (
+                    f"Final time of {value} lower than initial"
+                    f"time of {self.initial_time} not allowed."
+                )
             )
 
         self._final_time = value
 
     @property
     def time_integrator(self):
+        """Time integration scheme."""
         return self._time_integrator
 
     @time_integrator.setter

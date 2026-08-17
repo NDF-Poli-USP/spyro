@@ -1,3 +1,5 @@
+"""Parallelism decorators for use in the code base."""
+
 import os
 from mpi4py import MPI
 import glob
@@ -349,7 +351,8 @@ def ensemble_save(func):
                 if is_owner(_comm, propagation_id) and _comm.comm.rank == 0:
                     func(obj, **dict(kwargs, shot_ids=shot_ids_in_propagation))
         else:
-            # For spatial parallelism: load propagation data from tmp files (no file_name) then save wanted data to named files
+            # For spatial parallelism: load propagation data from tmp files
+            # (no file_name) then save wanted data to named files
             for snum in range(obj.number_of_sources):
                 switch_serial_shot(obj, snum, file_name=None)  # Load from tmp files
                 if _comm.comm.rank == 0:
@@ -387,7 +390,8 @@ def ensemble_load(func):
                 if is_owner(_comm, propagation_id):
                     func(obj, **dict(kwargs, shot_ids=shot_ids_in_propagation))
         else:
-            # For spatial parallelism: load data directly from named files (no switch_serial_shot needed)
+            # For spatial parallelism: load data directly from named files
+            # (no switch_serial_shot needed)
             for snum in range(obj.number_of_sources):
                 func(obj, **dict(kwargs, shot_ids=[snum]))
 

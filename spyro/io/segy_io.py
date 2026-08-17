@@ -1,3 +1,5 @@
+"""Methods that deal with io operations of SEGY files."""
+
 import numpy as np
 from pathlib import Path
 import segyio
