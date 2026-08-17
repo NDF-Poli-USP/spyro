@@ -60,8 +60,7 @@ def project_grid_velocity_data(
     grid_velocity_data: dict, V: fire.FunctionSpace, comm=None
 ):
     """Project a structured grid dictionary onto a Firedrake function space."""
-    from ..plots.plots import debug_pvd
-
+    from ..plots.debug_plots import debug_pvd
     source = _grid_velocity_data_to_source_function(grid_velocity_data, comm=comm)
     debug_pvd(source, "check_source.pvd")
     c = fire.Function(V).interpolate(source, allow_missing_dofs=True)
