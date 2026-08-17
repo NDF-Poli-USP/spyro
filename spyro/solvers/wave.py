@@ -204,7 +204,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.function_space is None:
             self.building_mesh_derived_paramenters()
 
-        if self.abc_type in [AbsorbingBCsType.NOABCS, AbsorbingBCsType.NRBC]:
+        # TODO: Delete any dependency on _initialize_model_parameters()
+        if self.abc_type in [AbsorbingBCsType.NOABCS]:
             self._initialize_model_parameters()
         if self.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
             self.automated_adjoint.clear_tape()
@@ -779,7 +780,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.mesh_ops = MeshOps(domain_dim, dimension=self.dimension,
                                     quadrilateral=self.mesh_parameters.quadrilateral)
 
-    def layer_manager(self, domain_dim):
+    def layer_manager(self, domain_dim, time_step):
         """Create the layer operations manager for the wave solver.
 
         Parameters:
@@ -787,14 +788,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
             or (length_z, length_x, length_y) for 3D.
+        time_step : `float`
+            Time step used in the simulation.
 
         Returns:
         --------
         None
         """
-
-        # Timestep of the simulation. It is `None` if the response is not 'transient'.
-        time_step = None if self.analysis != "transient" else self.dt
 
         if self.abc_type == AbsorbingBCsType.PML:  # PML
             from ..pml.pml_nsnc import PMLLayer
@@ -823,9 +823,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Domain dimensions
         domain_dim = self.domain_dimensions()
 
+        # Timestep of the simulation. It is `None` if `analysis` is not 'transient'.
+        time_step = None if self.analysis != "transient" else self.dt
+
         # Creating absorbing layer manager if needed
         if self.abc_type in [AbsorbingBCsType.PML, AbsorbingBCsType.HYBRID]:
-            self.layer_manager(domain_dim)
+            self.layer_manager(domain_dim, time_step)
 
             # Identifier for the current case study
             self.case_abc = self.layer_ops.case_absl
@@ -835,7 +838,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Creating NRBC manager if needed (when no layer is added).
         elif self.abc_type == AbsorbingBCsType.NRBC:
             from ..abc.nrbc import NRBC
-            self.nrbc_ops = NRBC(domain_dim, dimension=self.dimension,
+            self.nrbc_ops = NRBC(domain_dim, dimension=self.dimension, dt=time_step,
                                  output_folder=self.output_folder, comm=self.comm)
 
             # Identifier for the current case study

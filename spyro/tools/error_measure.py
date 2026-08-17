@@ -132,7 +132,7 @@ class MeasureError:
             Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt).
         output_file_prefix : `str`, optional
             Name of the file to save the reference signal without any extension.
-            Default is "ref_rec.npy".
+            Default is "reference.npy".
 
         Returns
         -------
