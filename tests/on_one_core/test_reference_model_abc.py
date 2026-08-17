@@ -296,10 +296,11 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
             wave, max_divisor_tf = wave_instance(element_geometry, dimension,
                                                  abc_type, calc_eik)
 
-            # Computing reference get_reference_signal
+            # Computing reference signal
             wave.layer_ops.infinite_model(wave, check_dt=True,
                                           max_divisor_tf=max_divisor_tf)
 
+            # Acquiring reference signal
             receivers_reference, receivers_ref_fft = wave.layer_ops.get_reference_signal()
 
             # Estimating computational resource usage

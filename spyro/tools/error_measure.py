@@ -124,7 +124,7 @@ class MeasureError():
             Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt).
         output_file : `str`, optional
             Name of the file to save the reference signal without any extension.
-            Default is "ref_rec.npy".
+            Default is "reference.npy".
 
         Returns
         -------
@@ -162,12 +162,14 @@ class MeasureError():
             receivers_ref_fft.append(yf)
         save(pth_str + "fft.npy", receivers_ref_fft)
 
-    def get_reference_signal(self):
+    def get_reference_signal(self, output_file="reference"):
         """Acquire the reference signal for comparison between models.
 
         Parameters
         ----------
-        None
+        output_file : `str`, optional
+            Name of the file to get the reference signal without any extension.
+            Default is "reference.npy".
 
         Returns
         -------
@@ -178,6 +180,10 @@ class MeasureError():
         """
 
         pprint("\nLoading Reference Signal from Reference Model", comm=self.comm)
+
+        if not hasattr(self, 'output_file'):
+            # File name for getting the reference signal if
+            self.output_file = validate_string("output_file", output_file)
 
         # Path to the reference data folder with reference signals
         pth_str = self.path_reference + self.output_file + "_"

@@ -363,7 +363,7 @@ class ABCLayer(AbsorbingBC):
         if non_reflect_bc in [BoundaryConditionsType.SOMMERFELD,
                               BoundaryConditionsType.HIGDON]:
 
-            crit_source = bnd_nod_ids_nfs = bnd_nodes_nfs = None
+            bnd_nod_ids_nfs = bnd_nodes_nfs = None
 
             # Getting the boundary type where NRBCs are applied
             abc_boundary_type = NRBCBoundaryType.HYPERSHAPE \
@@ -375,28 +375,14 @@ class ABCLayer(AbsorbingBC):
                           abc_boundary_type=abc_boundary_type,
                           dimension=self.dimension, nrbc_in_habc=True,
                           output_folder=self.path_case_absl, comm=self.comm)
-
-            pprint("\nApplying Non-Reflecting Boundary Conditions", comm=self.comm)
-
-            # Getting boundary data from the layer boundaries
-            if non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
-                bnd_nod_ids_nfs = wave.mesh_ops.layer_boundary_data(wave.mesh,
-                                                                    wave.function_space,
-                                                                    wave.mesh_parameters)[0]
-
-            if non_reflect_bc == BoundaryConditionsType.HIGDON:
-                crit_source = self.crit_source
-                bnd_nod_ids_nfs, bnd_nodes_nfs = wave.mesh_ops.layer_boundary_data(wave.mesh,
-                                                                                   wave.function_space,
-                                                                                   wave.mesh_parameters)
-
             # Hypershape parameters
             hyp_par = (self.layer_geometry.n_hyp, *self.layer_geometry.hyper_axes) \
                 if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else None
 
-            # Applying Higdon ABCs
-            self.cos_ang_HigdonBC(wave.function_space, crit_source, bnd_nod_ids_nfs,
-                                  bnd_nodes_nfs, hyp_par=hyp_par, save_file=save_file)
+            crit_source = self.crit_source \
+                if non_reflect_bc == BoundaryConditionsType.HIGDON else None
+
+            self.nrbc_on_boundary(wave, source_coord=crit_source, hyp_par=hyp_par, save_file=save_file)
 
         else:
             pprint("\nNot Non-Reflecting Boundary Conditions Prescribed", comm=self.comm)

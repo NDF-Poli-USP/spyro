@@ -1,6 +1,6 @@
 from abc import ABCMeta
 from firedrake import Function, VTKFile
-from numpy import abs, array, ceil, log10, minimum
+from numpy import abs, array, ceil, log10, minimum, where
 from sympy import divisors
 from .eik_min import Minimum_Eikonal
 from ..solvers.modal.modal_sol import Modal_Solver
@@ -473,6 +473,80 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         self.freq_Nyquist = 1. / (2. * wave.dt)
         pprint(f"New Nyquist Frequency: {self.freq_Nyquist:.5f} Hz", comm=self.comm)
 
+    def min_coord_differ_source_boundary(self, source_locations):
+        """Compute the minimum coordinate difference from sources to the nearest boundary.
+
+        Parameters
+        ----------
+        source_locations: `list`, optional
+            List of source locations.
+
+        Returns
+        -------
+        min_dist_to_bnd": `float`
+            minimum coordinate difference from sources to the nearest boundary.
+            It is not an Euclidean distance and is calculates as:
+                min_dist_to_bnd(P, Q) = min_i |x_i − y_i|
+            This distance is the opposite to the Chebyshev distance defined as:
+            (https://en.wikipedia.org/wiki/Chebyshev_distance) TODO: Add citation
+                D_Chebyshev(P, Q) = max_i |x_i − y_i|
+        """
+
+        # Source locations
+        source_loc = array(source_locations)
+
+        # Original  domain dimensions
+        length_z, length_x = self.domain_dim[:2]
+
+        def update_min_value_and_sources(candidate, delta, min_dist_to_bnd, source_cand):
+            """Update candidates to minimum coordinate difference and associated sources.
+
+            Parameters
+            ----------
+            candidate : `float`
+            delta : `arrray`
+            min_dist_to_bnd : `float`
+            source_cand : `set`
+
+            Returns
+            -------
+            min_dist_to_bnd : `float`
+            source_cand : `set`
+            """
+
+            source_update = where(delta == candidate)[0]
+            if candidate < min_dist_to_bnd:
+                min_dist_to_bnd = candidate
+                source_cand = set(source_update)
+            elif candidate_x == min_dist_to_bnd:
+                source_cand.update(source_update)
+
+            return min_dist_to_bnd, source_cand
+
+        # Candidate to minimum coordinate difference to the boundaries
+        delta_z = abs(source_loc[:, 0] - length_z)
+        candidate_z = delta_z.min()
+        min_dist_to_bnd = candidate_z
+        source_cand = set(where(delta_z == candidate_z)[0])
+        delta_x = minimum(abs(source_loc[:, 1]), abs(source_loc[:, 1] - length_x))
+        candidate_x = delta_x.min()
+        min_dist_to_bnd, source_cand = \
+            update_min_value_and_sources(candidate_x, delta_x,
+                                         min_dist_to_bnd, source_cand)
+
+        if self.dimension == 3:  # 3D
+            length_y = self.domain_dim[2]
+            delta_y = minimum(abs(source_loc[:, 2]), abs(source_loc[:, 2] - length_y))
+            candidate_y = delta_y.min()
+            min_dist_to_bnd, source_cand = \
+                update_min_value_and_sources(candidate_y, delta_y,
+                                             min_dist_to_bnd, source_cand)
+
+        # Critical sources
+        critical_sources = source_loc[list(source_cand), :]
+
+        return min_dist_to_bnd
+
     def layer_infinite_model(self, lmin, c_bnd_max, final_time, source_locations=None):
         """Determine the domain extension size for the infinite domain model.
 
@@ -500,8 +574,6 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
                          integer_num=True, lower_bound=0.)
         validate_numeric("final_time", final_time, float_num=True,
                          integer_num=True, lower_bound=0.)
-        validate_data_structure("source_locations", source_locations, "list",
-                                expected_type_element="tuple", accept_parameter_as_none=True)
 
         # Size of the domain extension
         add_dom = c_bnd_max * final_time / 2.
@@ -511,9 +583,9 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         # Distance already travelled by the wave
         if hasattr(self, 'eik_bnd'):
 
+            # If Eikonal analysis was performed (see `critical_boundary_points` method)
             str_pad += "Minimun Eikonal at Critical Boundary Points"
 
-            # If Eikonal analysis was performed (see `critical_boundary_points` method)
             # Structure eikmin: [pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]
             eikmin = self.eik_bnd[0][2]
 
@@ -521,26 +593,15 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
             dist_to_bnd = c_bnd_max * eikmin / 2.
         else:
 
-            str_pad += "Minimum Distance Source-Boundary"
+            # If Eikonal analysis was not performed (see `min_coord_differ_source_boundary`)
+            str_pad += "Minimum Coordinate Difference Source-Boundary"
 
-            # If Eikonal analysis was not performed
-            source_loc = array(source_locations)
+            # Checking source locations
+            validate_data_structure("source_locations", source_locations, "list",
+                                    expected_type_element="tuple")
 
-            # Original  domain dimensions
-            length_z, length_x = self.domain_dim[:2]
-
-            # Candidate to minimum distance to the boundaries
-            delta_z = abs(source_loc[:, 0] - length_z)
-            delta_x = minimum(abs(source_loc[:, 1]), abs(source_loc[:, 1] - length_x))
-            cand_dist = (delta_z, delta_x)
-
-            if self.dimension == 3:  # 3D
-                length_y = self.domain_dim[2]
-                delta_y = minimum(abs(source_loc[:, 2]), abs(source_loc[:, 2] - length_y))
-                cand_dist += (delta_y,)
-
-            # Minimum distance to the nearest boundary
-            dist_to_bnd = float(min(cand_dist))
+            # Minimum distance to the nearest boundary (not Euclidean distance)
+            dist_to_bnd = self.min_coord_differ_source_boundary(source_locations)
 
         pprint(str_pad, comm=self.comm)
 
@@ -629,7 +690,7 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         wave.forward_solve()
 
         # Saving reference signal
-        output_file = self.abc_boundary_layer_type.value + "_ref"
+        output_file = wave.abc_type.value + "_ref"
         self.save_reference_signal(
             wave.receiver_locations, wave.forward_solution_receivers,
             wave.number_of_receivers, self.freq_Nyquist, output_file=output_file)

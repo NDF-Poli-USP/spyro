@@ -7,7 +7,8 @@ from .abc import AbsorbingBC
 from ..io.basicio import parallel_print as pprint
 from ..tools.abc_labeling_cases import path_to_save_abc_case
 from ..utils.error_management import validate_enum, validate_numeric, validate_parameter
-from ..utils.typing import AbsorbingBCsType, BoundaryConditionsType, NRBCBoundaryType
+from ..utils.typing import (AbsorbingBCsType, BoundaryConditionsType,
+                            LayerShapeType, NRBCBoundaryType)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -24,8 +25,12 @@ class NRBC(AbsorbingBC):
 
     Attributes
     ----------
+    abc_boundary_layer_shape : `typing.LayerShapeType`
+        Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
+        `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`
+        in case the infinite model is needed for comparative purposes.
     abc_boundary_type : `typing.NRBCBoundaryType`, optional
-        Boundary typr where NRBCs are applied . Options: `NRBCBoundaryType.STRAIGHT`
+        Boundary type where NRBCs are applied . Options: `NRBCBoundaryType.STRAIGHT`
         or `NRBCBoundaryType.HYPERSHAPE`. Default is `NRBCBoundaryType.STRAIGHT`.
     angle_max : `float`
         Maximum incidence angle considered. Default is `numpy.pi/4`.
@@ -59,7 +64,7 @@ class NRBC(AbsorbingBC):
     """
 
     def __init__(self, domain_dim, non_reflect_bc=BoundaryConditionsType.HIGDON,
-                 angle_max=pi/4., abc_boundary_type=NRBCBoundaryType.STRAIGHT,
+                 angle_max=pi/4., abc_boundary_type=NRBCBoundaryType.STRAIGHT, dt=None,
                  dimension=2, nrbc_in_habc=False, output_folder=None, comm=None):
         """Initialize the NRBC class.
 
@@ -78,6 +83,8 @@ class NRBC(AbsorbingBC):
         abc_boundary_type : `typing.NRBCBoundaryType`, optional
             Boundary type where NRBCs are applied . Options: `NRBCBoundaryType.STRAIGHT`
             or `NRBCBoundaryType.HYPERSHAPE`. Default is `NRBCBoundaryType.STRAIGHT`.
+        dt : `float`, optional
+            Time step used in the simulation. Default is `None`.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
         nrbc_in_habc : `bool`, optional
@@ -97,7 +104,10 @@ class NRBC(AbsorbingBC):
 
         # Initializing the AbsorbingBC class if NRBCs are not in HABC scheme
         if not nrbc_in_habc:
-            AbsorbingBC.__init__(self, domain_dim, dimension=dimension, comm=comm)
+            AbsorbingBC.__init__(self, domain_dim, dt=dt, dimension=dimension, comm=comm)
+
+            # Set sthe pad to rectangular shape in case infinitel model is needed.
+            self.abc_boundary_layer_shape = LayerShapeType.RECTANGULAR
 
             # Non-reflective BC type
         self.non_reflect_bc = validate_parameter('non_reflect_bc', non_reflect_bc,
@@ -326,3 +336,40 @@ class NRBC(AbsorbingBC):
         if save_file:
             outfile = VTKFile(self.path_save_nrbc + "cosHig.pvd")
             outfile.write(self.cosHig)
+
+    def nrbc_on_boundary(self, wave, source_coord=None, hyp_par=None, save_file=True):
+        """Apply Non-Reflective BCs on absorbing boundaries.
+
+        Parameters
+        ----------
+        wave : `acoustic_wave.AcousticWave`
+            An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+        source_coord : `tuple`
+            Source coordinates.
+        save_file : `bool`, optional
+            If `True`, save the velocity model with absorbing layer in a .pvd file.
+            Default is `True`.
+
+        Returns
+        -------
+        None
+        """
+
+        pprint("\nApplying Non-Reflecting Boundary Conditions", comm=self.comm)
+
+        # Getting boundary data from the layer boundaries
+        if self.non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
+            bnd_nod_ids_nfs = wave.meh_ops.layer_boundary_data(wave.mesh,
+                                                               wave.function_space,
+                                                               wave.mesh_parameters)
+            bnd_nodes_nfs = None
+
+        if self.non_reflect_bc == BoundaryConditionsType.HIGDON:
+            bnd_nod_ids_nfs, bnd_nodes_nfs = \
+                wave.mesh_ops.layer_boundary_data(wave.mesh, wave.function_space,
+                                                  wave.mesh_parameters,
+                                                  return_boundary_coord=True)
+
+        # Applying Higdon ABCs
+        self.cos_ang_HigdonBC(wave.function_space, source_coord, bnd_nod_ids_nfs,
+                              bnd_nodes_nfs, hyp_par=hyp_par, save_file=save_file)

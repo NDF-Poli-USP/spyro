@@ -8,7 +8,7 @@ from ..io.basicio import parallel_print as pprint
 from .meshing_functions import AutomaticMesh
 from .meshing_operations import MeshOps
 from ..tools.habc_tools import point_cloud_field
-from ..utils.error_management import validate_parameter
+from ..utils.error_management import validate_file, validate_parameter
 from ..tools.version_control import is_firedrake_new
 
 if is_firedrake_new() is False:
@@ -173,7 +173,8 @@ class HABCMesh(MeshOps):
 
         return c_bnd_min, c_bnd_max, coord_bnd_nodes
 
-    def creating_velocity_profile(self, function_space, initial_velocity_model, path_save):
+    def creating_velocity_profile(self, function_space, initial_velocity_model,
+                                  path_save=None, save_file=True):
         """Create the velocity profile for the original domain.
 
         Parameters
@@ -184,6 +185,9 @@ class HABCMesh(MeshOps):
             Initial velocity model.
         path_save : `str`
             Path to save the velocity model.
+        save_file : `bool`, optional
+            If `True`, save the velocit profile for the original domain in a .pvd file.
+            Default is `True`.
 
         Returns
         -------
@@ -209,8 +213,11 @@ class HABCMesh(MeshOps):
         pprint(cdom_str.format(c_min, c_max), comm=self.comm)
 
         # Save initial velocity model
-        vel_c = fire.VTKFile(path_save + "preamble/c_vel.pvd")
-        vel_c.write(c)
+        if save_file:
+            pth_velocity = validate_file("original velocity profile",
+                                         path_save + "preamble/c_vel.pvd", [".pvd"])
+            vel_c = fire.VTKFile(pth_velocity)
+            vel_c.write(c)
 
         return c, c_min, c_max
 
@@ -1057,7 +1064,7 @@ class HABCMesh(MeshOps):
 
         return mesh_habc
 
-    def layer_boundary_data(self, mesh, V, mesh_parameters):
+    def layer_boundary_data(self, mesh, V, mesh_parameters, return_boundary_coord=False):
         """Generate the boundary data from the domain with the absorbing layer.
 
         Parameters
@@ -1068,6 +1075,8 @@ class HABCMesh(MeshOps):
             Function space for the boundary of the domain with absorbing layer.
         mesh_parameters : `meshing_parameters.MeshingParameters`
             Contains mesh parameters.
+        return_boundary_coord : `bool`, optional
+            If `True`, also return boundary node coordinates. Default is `False`.
 
         Returns
         -------
@@ -1075,6 +1084,7 @@ class HABCMesh(MeshOps):
             Mesh node indices on non-free surfaces of the domain with absorbing layer.
         bnd_nodes_nfs : `tuple`
             Mesh node coordinates on non-free surfaces of the domain with absorbing layer.
+            Only returned if  return_boundary_coord is `True`.
         """
 
         # Boundary nodes indices
@@ -1082,19 +1092,23 @@ class HABCMesh(MeshOps):
             bnd_ids for bnd_ids, status
             in mesh_parameters.boundary_nodes_ids.values() if status]))
 
-        # Extract node positions
-        node_positions = self.extract_node_positions(mesh, V, output_type="array")
-        coord_msh = mesh.coordinates.dat.data_with_halos
-        coord_bnd_nodes = node_positions[bnd_nod_ids_nfs, :]
+        if return_boundary_coord:
 
-        # Identify the boundary nodes
-        tree = cKDTree(coord_msh)
-        indices = tree.query(coord_bnd_nodes, k=1,
-                             distance_upper_bound=mesh_parameters.tol)[1]
-        mask_boundary = indices[indices < len(coord_msh)]
-        bnd_nodes_nfs = mesh.coordinates.dat.data_with_halos[mask_boundary, :]
+            # Extract node positions
+            node_positions = self.extract_node_positions(mesh, V, output_type="array")
+            coord_msh = mesh.coordinates.dat.data_with_halos
+            coord_bnd_nodes = node_positions[bnd_nod_ids_nfs, :]
 
-        return bnd_nod_ids_nfs, bnd_nodes_nfs
+            # Identify the boundary nodes
+            tree = cKDTree(coord_msh)
+            indices = tree.query(coord_bnd_nodes, k=1,
+                                 distance_upper_bound=mesh_parameters.tol)[1]
+            mask_boundary = indices[indices < len(coord_msh)]
+            bnd_nodes_nfs = mesh.coordinates.dat.data_with_halos[mask_boundary, :]
+
+            return bnd_nod_ids_nfs, bnd_nodes_nfs
+
+        return bnd_nod_ids_nfs
 
     def get_spatial_coordinates_abc(self, mesh, domain_layer, return_mesh_limits=False):
         """Get the ufl coordinates of the mesh with absorbing layer.
