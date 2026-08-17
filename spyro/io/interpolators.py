@@ -3,10 +3,11 @@
 import firedrake as fire
 import h5py
 import numpy as np
+from pathlib import Path
 from scipy.interpolate import RegularGridInterpolator
 
 
-def _grid_velocity_data_to_source_function(grid_velocity_data, comm=None):
+def _grid_velocity_data_to_source_function(grid_velocity_data: dict, comm=None):
     """Build a CG1 Firedrake function on a structured mesh from grid data."""
     # Adding imports here to avoid circular imports
     from ..meshing.meshing_parameters import MeshingParameters
@@ -55,7 +56,9 @@ def _grid_velocity_data_to_source_function(grid_velocity_data, comm=None):
     return source
 
 
-def project_grid_velocity_data(grid_velocity_data, V, comm=None):
+def project_grid_velocity_data(
+    grid_velocity_data: dict, V: fire.FunctionSpace, comm=None
+):
     """Project a structured grid dictionary onto a Firedrake function space."""
     from ..plots.plots import debug_pvd
 
@@ -66,7 +69,7 @@ def project_grid_velocity_data(grid_velocity_data, V, comm=None):
     return _check_units(c)
 
 
-def _hdf5_velocity_model_to_grid_velocity_data(Model, fname):
+def _hdf5_velocity_model_to_grid_velocity_data(Model, fname: str | Path):
     """Convert an HDF5 velocity model into a grid velocity dictionary."""
     with h5py.File(fname, "r") as f:
         vp_values = np.asarray(f.get("velocity_model")[()])
@@ -111,7 +114,7 @@ def _hdf5_velocity_model_to_grid_velocity_data(Model, fname):
     return grid_velocity_data
 
 
-def interpolate(Model, fname, V, fast_interpolate=False):
+def interpolate(Model, fname: str | Path, V, fast_interpolate=False):
     """Read and interpolate a seismic velocity model onto a Firedrake space.
 
     Parameters
@@ -235,7 +238,7 @@ def fast_interpolation(Model, fname, V):
     return c
 
 
-def _check_units(c):
+def _check_units(c: fire.Function):
     """Verify and convert velocity units from m/s to km/s if needed.
 
     Parameters

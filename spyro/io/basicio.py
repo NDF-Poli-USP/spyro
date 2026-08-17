@@ -8,6 +8,7 @@ from __future__ import with_statement
 
 import pickle
 import firedrake as fire
+from pathlib import Path
 import h5py
 import numpy as np
 from scipy.interpolate import griddata
@@ -23,7 +24,12 @@ if is_firedrake_new() is False:
     fire.interpolate = interpolate
 
 
-def write_function_to_grid(function, V, grid_spacing, buffer=False):
+def write_function_to_grid(
+    function: fire.Function,
+    V: fire.FunctionSpace,
+    grid_spacing: float,
+    buffer: bool = False,
+):
     """Interpolate a Firedrake function to a structured grid.
 
     Parameters
@@ -104,7 +110,11 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
 
 
 @ensemble_save
-def save_shots(wave, file_name="shots/shot_record_", shot_ids=0):
+def save_shots(
+    wave,
+    file_name: str | Path = "shots/shot_record_",
+    shot_ids: list[int] | int = 0,
+):
     """Save the shot record from last forward solve to a pickle file.
 
     Parameters
@@ -127,7 +137,11 @@ def save_shots(wave, file_name="shots/shot_record_", shot_ids=0):
 
 
 @ensemble_load
-def load_shots(wave, file_name="shots/shot_record_", shot_ids=0):
+def load_shots(
+    wave,
+    file_name: str | Path = "shots/shot_record_",
+    shot_ids: list[int] | int = 0,
+):
     """Load a `pickle` to a `numpy.ndarray`.
 
     Parameters
@@ -208,7 +222,7 @@ def read_mesh(mesh_parameters):
     return mesh
 
 
-def parallel_print(string, comm=None):
+def parallel_print(string: str, comm=None):
     """Print a string once from appropriate rank.
 
     Prints the string only once: from rank 0 if no ensemble_comm, or from
@@ -423,13 +437,13 @@ def _parse_axes_order(axes_order, ndim=3):
 
 
 def read_bin_velocity_model(
-    filename,
-    nz,
-    nx,
-    ny,
-    byte_order="little",
-    axes_order="z x y",
-    axes_order_sort="C",
+    filename: str | Path,
+    nz: int,
+    nx: int,
+    ny: int | None,
+    byte_order: str = "little",
+    axes_order: str = "z x y",
+    axes_order_sort: str = "C",
     dtype=np.float32,
 ):
     """Read a 2D or 3D velocity model from a binary file.

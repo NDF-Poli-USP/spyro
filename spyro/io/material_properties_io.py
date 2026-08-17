@@ -25,7 +25,7 @@ except ImportError:
 
 
 def define_property_function_space(
-    wave, func_space_type, dg_property, shape_func_space=None
+    wave, func_space_type: str, dg_property: bool, shape_func_space=None
 ):
     """Define the function space for a material property.
 
@@ -68,12 +68,12 @@ def define_property_function_space(
 
 def _initialize_material_property_from_ufl(
     wave,
-    property_name,
+    property_name: str,
     func_space_type,
     V,
     shape_func_space=None,
-    constant=None,
-    conditional=None,
+    constant: float = None,
+    conditional: fire.conditional = None,
     expression=None,
 ):
     """Initialize material property from a UFL input.
@@ -149,7 +149,7 @@ def _initialize_material_property_from_ufl(
     return mat_property
 
 
-def _initialize_material_property_from_func(wave, property_name, fire_function, V):
+def _initialize_material_property_from_func(wave, property_name: str, fire_function, V):
     """Initialize material property from a firedrake function.
 
     Parameters
@@ -193,7 +193,7 @@ def _initialize_material_property_from_func(wave, property_name, fire_function, 
     return mat_property
 
 
-def _initialize_random_material_prop(property_name, random, V):
+def _initialize_random_material_prop(property_name: str, random, V):
     """Initialize material property from a random distribution.
 
     Parameters

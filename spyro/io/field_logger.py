@@ -5,6 +5,7 @@ NumPy array persistence to support time-stepped logging during simulations.
 """
 
 import numpy as np
+from pathlib import Path
 import warnings
 
 from firedrake import VTKFile
@@ -25,7 +26,7 @@ class Field:
         Zero-argument callable that returns the field object to be written.
     """
 
-    def __init__(self, name, file, callback):
+    def __init__(self, name: str, file: str | Path, callback):
         """Initialize Field class.
 
         Parameters
@@ -41,7 +42,7 @@ class Field:
         self.file = file
         self.callback = callback
 
-    def write(self, t):
+    def write(self, t: float):
         """Write the current field value at a given time.
 
         Parameters
@@ -63,7 +64,7 @@ class Functional:
         Zero-argument callable that returns the current scalar sample.
     """
 
-    def __init__(self, filename, callback):
+    def __init__(self, filename: str | Path, callback):
         """Initialize Functional class.
 
         Parameters
@@ -93,24 +94,24 @@ class FieldLogger:
     ----------
     comm : object
         Communication wrapper with ``comm`` MPI communicator and rank support.
-    vis_dict : dict
+    visualization_dict : dict
         Visualization and logging configuration dictionary. Keys control which
         outputs are enabled and the associated output filenames.
     """
 
-    def __init__(self, comm, vis_dict):
+    def __init__(self, comm, visualization_dict):
         """Initialize FieldLogger class.
 
         Parameters
         ----------
         comm : object
             Communication wrapper with ``comm`` MPI communicator and rank support.
-        vis_dict : dict
+        visualization_dict : dict
             Visualization and logging configuration dictionary. Keys control which
             outputs are enabled and the associated output filenames.
         """
         self.comm = comm
-        self.vis_dict = vis_dict
+        self.visualization_dict = visualization_dict
 
         self.__source_id = None
         self.__enabled_fields = []
@@ -121,13 +122,15 @@ class FieldLogger:
             self.__func_data = {}
             self.__enabled_functionals = {}
 
-            self.__time_enabled = self.vis_dict.get("time", False)
+            self.__time_enabled = self.visualization_dict.get("time", False)
             if self.__time_enabled:
                 self.__time = []
-                self.__time_filename = self.vis_dict.get("time_filename", "time.npy")
+                self.__time_filename = self.visualization_dict.get(
+                    "time_filename", "time.npy"
+                )
                 print(f"Saving time in: {self.__time_filename}")
 
-    def add_field(self, key, name, callback):
+    def add_field(self, key: str, name: str, callback):
         """Register a field candidate for logging.
 
         Parameters
@@ -141,7 +144,7 @@ class FieldLogger:
         """
         self.__wave_data.append((key, name, callback))
 
-    def add_functional(self, key, callback):
+    def add_functional(self, key: str, callback):
         """Register a scalar functional callback on rank zero.
 
         Parameters
@@ -173,9 +176,11 @@ class FieldLogger:
         self.__source_id = source_id
         self.__enabled_fields = []
         for key, name, callback in self.__wave_data:
-            enabled = self.vis_dict.get(key + "_output", False)
+            enabled = self.visualization_dict.get(key + "_output", False)
             if enabled:
-                fullname = self.vis_dict.get(key + "_output_filename", key + ".pvd")
+                fullname = self.visualization_dict.get(
+                    key + "_output_filename", key + ".pvd"
+                )
                 prefix, extension = fullname.split(".")
                 filename = prefix + "sn" + str(source_id) + "." + extension
 
@@ -189,9 +194,11 @@ class FieldLogger:
                 self.__time = []
 
             for key, callback in self.__func_data.items():
-                enabled = self.vis_dict.get(key, False)
+                enabled = self.visualization_dict.get(key, False)
                 if enabled:
-                    filename = self.vis_dict.get(key + "_filename", key + ".npy")
+                    filename = self.visualization_dict.get(
+                        key + "_filename", key + ".npy"
+                    )
                     print(f"Saving {key} in: {filename}")
                     self.__enabled_functionals[key] = Functional(filename, callback)
 
@@ -206,7 +213,7 @@ class FieldLogger:
             for functional in self.__enabled_functionals.values():
                 functional.save()
 
-    def log(self, t):
+    def log(self, t: float):
         """Write enabled fields and sample enabled functionals.
 
         Parameters
@@ -224,7 +231,7 @@ class FieldLogger:
             for functional in self.__enabled_functionals.values():
                 functional.sample()
 
-    def get(self, key):
+    def get(self, key: str):
         """Return the latest sampled value for an enabled functional.
 
         Parameters

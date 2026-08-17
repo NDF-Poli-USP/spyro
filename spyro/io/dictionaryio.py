@@ -235,7 +235,7 @@ class Read_options:
         return self._degree
 
     @degree.setter
-    def degree(self, value: int):
+    def degree(self, value: int | None):
         self._degree = value
 
     @property
