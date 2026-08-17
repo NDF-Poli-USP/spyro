@@ -1,3 +1,9 @@
+"""IO utilities for spyro wave propagation.
+
+This module provides functions for managing input/output operations related to
+wave propagation, including file I/O for shots, receivers, and mesh data.
+"""
+
 from __future__ import with_statement
 
 import pickle
@@ -11,9 +17,9 @@ from .parallelism_wrappers import ensemble_save, ensemble_load
 from ..tools.version_control import is_firedrake_new
 from .segy_io import read_segy_velocity_model
 
-
 if is_firedrake_new() is False:
     from firedrake.__future__ import interpolate
+
     fire.interpolate = interpolate
 
 
@@ -40,13 +46,15 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
     mesh = V.ufl_domain()
     W = fire.VectorFunctionSpace(mesh, V.ufl_element())
     coords = fire.assemble(fire.interpolate(mesh.coordinates, W))
-    dimension, = coords.ufl_shape
+    (dimension,) = coords.ufl_shape
     if dimension == 2:
         x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
     elif dimension == 3:
         x, y, z = coords.dat.data[:, 0], coords.dat.data[:, 1], coords.dat.data[:, 2]
     else:
-        raise ValueError(f"Dimension of {dimension}, not supported, what are you doing?")
+        raise ValueError(
+            f"Dimension of {dimension}, not supported, what are you doing?"
+        )
 
     # add buffer to avoid NaN when calling griddata
     pad = 0.005 if buffer else 0.0
@@ -69,7 +77,9 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
     try:
         v = function.dat.data[:]
     except AttributeError:
-        warnings.warn("Using numpy array instead of a firedrake function to interpolate.")
+        warnings.warn(
+            "Using numpy array instead of a firedrake function to interpolate."
+        )
         v = function
 
     # target grid to interpolate to
@@ -95,21 +105,20 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
 
 @ensemble_save
 def save_shots(wave, file_name="shots/shot_record_", shot_ids=0):
-    """Save a the shot record from last forward solve to a `pickle`.
+    """Save the shot record from last forward solve to a pickle file.
 
     Parameters
     ----------
-    wave: :class:`spyro.solvers.Wave` object
-        A :class:`spyro.solvers.Wave` object
-    source_id: int, optional by default 0
-        The source number
-    file_name: str, optional by default shot_number_#.dat
-        The filename to save the data as a `pickle`
+    wave : :class:`Wave`
+        A :class:`Wave`  object.
+    file_name : str, optional
+        The filename to save the data to. Default is 'shots/shot_record_'.
+    shot_ids : int, optional
+        The shot number. Default is 0.
 
     Returns
     -------
     None
-
     """
     file_name = file_name + str(shot_ids) + ".dat"
     with open(file_name, "wb") as f:
@@ -146,19 +155,18 @@ def load_shots(wave, file_name="shots/shot_record_", shot_ids=0):
 
 
 def read_mesh(mesh_parameters):
-    """Reads in an external mesh and scatters it between cores.
+    """Read external mesh and distribute across processors.
 
     Parameters
     ----------
-    model_parameters: spyro object
-        Model options and parameters.
+    mesh_parameters : mesh_parameters_obj
+        Mesh parameters object containing method, comm, and mesh_file.
 
     Returns
     -------
-    mesh: Firedrake.Mesh object
-        The distributed mesh across `ens_comm`.
+    mesh : firedrake.Mesh
+        The distributed mesh across ensemble communicator.
     """
-
     method = mesh_parameters.method
     ens_comm = mesh_parameters.comm
     num_propagations = ens_comm.ensemble_comm.size
@@ -201,17 +209,17 @@ def read_mesh(mesh_parameters):
 
 
 def parallel_print(string, comm=None):
-    """
-    Just prints a string once. Without any comm it just prints,
-    without ensemble_comm it prints in comm 0,
-    with ensemble_comm it prints in ensemble 0 and comm 0.
+    """Print a string once from appropriate rank.
+
+    Prints the string only once: from rank 0 if no ensemble_comm, or from
+    ensemble rank 0 and comm rank 0 if ensemble_comm is present.
 
     Parameters
     ----------
-    string: `str`
-        The string to print
-    comm: `Firedrake.ensemble_communicator`, optional
-        An ensemble communicator. Default is None
+    string : str
+        The string to print.
+    comm : Firedrake.ensemble_communicator, optional
+        A Firedrake ensemble communicator or standard MPI communicator.
     """
     if comm is None:
         print(string, flush=True)
@@ -225,15 +233,18 @@ def parallel_print(string, comm=None):
 
 
 def saving_source_and_receiver_location_in_csv(model, folder_name=None):
-    """
-    Saving the source and receiver locations in a csv file
+    """Save source and receiver locations to CSV files.
 
     Parameters
     ----------
-    model: spyro object
-        Model options and parameters.
-    folder_name: str, optional by default None
-        The folder name to save the csv file
+    model : dict
+        Model dictionary with acquisition parameters.
+    folder_name : str, optional
+        Folder to save CSV files. Default is 'results/'.
+
+    Returns
+    -------
+    None
     """
     if folder_name is None:
         folder_name = "results/"
@@ -318,9 +329,7 @@ def _parse_axes_order(axes_order, ndim=3):
         parts = list(axes_order)
 
     else:
-        raise TypeError(
-            "axes_order must be a string, tuple, or list."
-        )
+        raise TypeError("axes_order must be a string, tuple, or list.")
 
     # Integer specification: (0, 1), (1, 0), (2, 0, 1), etc.
     if all(isinstance(axis, (int, np.integer)) for axis in parts):
@@ -335,9 +344,7 @@ def _parse_axes_order(axes_order, ndim=3):
                     )
 
                 # Remove y for a 2D model.
-                integer_axes = [
-                    axis for axis in integer_axes if axis != 2
-                ]
+                integer_axes = [axis for axis in integer_axes if axis != 2]
 
             if sorted(integer_axes) != [0, 1]:
                 raise ValueError(
@@ -356,10 +363,7 @@ def _parse_axes_order(axes_order, ndim=3):
 
     # String specification containing numeric characters:
     # "0 1", "10", "201", etc.
-    if all(
-        isinstance(axis, str) and axis.strip() in ("0", "1", "2")
-        for axis in parts
-    ):
+    if all(isinstance(axis, str) and axis.strip() in ("0", "1", "2") for axis in parts):
         integer_axes = [int(axis.strip()) for axis in parts]
 
         if ndim == 2:
@@ -370,9 +374,7 @@ def _parse_axes_order(axes_order, ndim=3):
                         "0, 1, and 2 exactly once."
                     )
 
-                integer_axes = [
-                    axis for axis in integer_axes if axis != 2
-                ]
+                integer_axes = [axis for axis in integer_axes if axis != 2]
 
             if sorted(integer_axes) != [0, 1]:
                 raise ValueError(
@@ -397,19 +399,15 @@ def _parse_axes_order(axes_order, ndim=3):
             if len(named_axes) == 3:
                 if sorted(named_axes) != ["x", "y", "z"]:
                     raise ValueError(
-                        "A 3-entry axis order must contain x, y, and z "
-                        "exactly once."
+                        "A 3-entry axis order must contain x, y, and z " "exactly once."
                     )
 
                 # Remove y for a 2D model.
-                named_axes = [
-                    axis for axis in named_axes if axis != "y"
-                ]
+                named_axes = [axis for axis in named_axes if axis != "y"]
 
             if sorted(named_axes) != ["x", "z"]:
                 raise ValueError(
-                    "For a 2D model, axes_order must contain "
-                    "z and x exactly once."
+                    "For a 2D model, axes_order must contain " "z and x exactly once."
                 )
 
         else:
@@ -421,9 +419,7 @@ def _parse_axes_order(axes_order, ndim=3):
 
         return tuple(named_axes)
 
-    raise TypeError(
-        "axes_order must contain either only integers or only strings."
-    )
+    raise TypeError("axes_order must contain either only integers or only strings.")
 
 
 def read_bin_velocity_model(
@@ -487,8 +483,7 @@ def read_bin_velocity_model(
     """
     if nz is None or nx is None or ny is None:
         raise ValueError(
-            "Please specify nz, nx, and ny. "
-            "Use ny=0 for a 2D binary velocity model."
+            "Please specify nz, nx, and ny. " "Use ny=0 for a 2D binary velocity model."
         )
 
     nz = int(nz)
@@ -579,9 +574,7 @@ def read_bin_velocity_model(
 
     if invalid_count > 0:
         vp_other = np.fromfile(filename, dtype=other_dtype)
-        other_invalid_count = int(
-            np.sum(~np.isfinite(vp_other))
-        )
+        other_invalid_count = int(np.sum(~np.isfinite(vp_other)))
 
         if other_invalid_count < invalid_count:
             warnings.warn(
@@ -624,9 +617,7 @@ def read_bin_velocity_model(
 
     vp = vp.reshape(raw_shape, order=axes_order_sort)
 
-    transpose_order = tuple(
-        raw_axes.index(axis) for axis in final_axes
-    )
+    transpose_order = tuple(raw_axes.index(axis) for axis in final_axes)
 
     vp = vp.transpose(transpose_order)
     vp = np.flipud(vp)
@@ -681,9 +672,7 @@ def write_velocity_model(
     model_type = model_type.lower()
 
     if ofname is None:
-        warnings.warn(
-            "No output filename specified, name will be `filename`"
-        )
+        warnings.warn("No output filename specified, name will be `filename`")
         ofname = filename
 
     if model_type == "bin":

@@ -6,7 +6,16 @@ from .parallelism_wrappers import run_in_one_core_kwarg_comm
 import matplotlib.pyplot as plt
 
 
-def segy_to_png(segy_filename, output_file='debug.png', cmap='seismic', vmin=None, vmax=None, dpi=150, flip=True, show=False):
+def segy_to_png(
+    segy_filename,
+    output_file="debug.png",
+    cmap="seismic",
+    vmin=None,
+    vmax=None,
+    dpi=150,
+    flip=True,
+    show=False,
+):
     """Read a SEGY file and return a PNG image (bytes) or save to disk.
 
     Parameters
@@ -44,19 +53,19 @@ def segy_to_png(segy_filename, output_file='debug.png', cmap='seismic', vmin=Non
         data = np.flipud(data)
 
     fig, ax = plt.subplots()
-    ax.imshow(data, cmap=cmap, aspect='auto', origin='lower', vmin=vmin, vmax=vmax)
+    ax.imshow(data, cmap=cmap, aspect="auto", origin="lower", vmin=vmin, vmax=vmax)
     ax.set_axis_off()
 
     if show:
         plt.show()
 
     if output_file is not None:
-        fig.savefig(output_file, bbox_inches='tight', dpi=dpi)
+        fig.savefig(output_file, bbox_inches="tight", dpi=dpi)
         plt.close(fig)
         return output_file
     else:
         buf = BytesIO()
-        fig.savefig(buf, format='png', bbox_inches='tight', dpi=dpi)
+        fig.savefig(buf, format="png", bbox_inches="tight", dpi=dpi)
         plt.close(fig)
         buf.seek(0)
         return buf.getvalue()
@@ -123,24 +132,25 @@ def create_segy_from_grid(velocity, filename, rotate=False):
 
 
 def create_segy(function, V, grid_spacing, filename):
-    """Write the velocity data into a segy file named filename
+    """Write velocity data to a SEG-Y file.
 
     Parameters
     ----------
     function : firedrake.Function
-        Function to interpolate
+        Function to interpolate.
     V : firedrake.FunctionSpace
-        Function space of function
+        Function space of the function.
     grid_spacing : float
-        Spacing of grid points
-    filename: str
-        Name of the segy file to save
+        Spacing of grid points.
+    filename : str
+        Name of the SEG-Y file to save.
 
     Returns
     -------
     None
     """
     from ..io import write_function_to_grid  # Here to avoid circular import
+
     velocity_grid_data = write_function_to_grid(function, V, grid_spacing, buffer=True)
 
     return create_segy_from_grid(velocity_grid_data, filename)
@@ -181,9 +191,7 @@ def read_segy_velocity_model(fname):
     return vp, nz, nx
 
 
-def create_grid_dictionary_from_segy(
-    filename: str, length_z: float, length_x: float
-):
+def create_grid_dictionary_from_segy(filename: str, length_z: float, length_x: float):
     """Read a SEG-Y file and return a grid velocity dictionary.
 
     Parameters
@@ -270,7 +278,10 @@ def export_scalar_field(function, grid_spacing, output_filename, comm=None):
         create_segy(function, V, grid_spacing, segy_filename)
         segy_to_png(segy_filename, output_file=output_filename)
     else:
-        from ..utils.error_management import validate_parameter  # Avoinding circular import
+        from ..utils.error_management import (
+            validate_parameter,
+        )  # Avoinding circular import
+
         valid_extensions = [".segy", ".sgy", ".png"]
         extension = Path(output_filename).suffix.lower()
         validate_parameter("extension_type", extension, valid_extensions)
