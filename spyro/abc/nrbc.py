@@ -5,7 +5,7 @@ from numpy import abs, asarray, cos, maximum, pi, sign, sqrt, sum
 from numpy.linalg import norm
 from .abc import AbsorbingBC
 from ..io.basicio import parallel_print as pprint
-from ..tools.abc_labeling_cases import path_to_save_abc_case
+from ..tools.abc_set_path_cases import path_to_save_abc_case
 from ..utils.error_management import validate_enum, validate_numeric, validate_parameter
 from ..utils.typing import AbsorbingBCsType, BoundaryConditionsType, NRBCBoundaryType
 
