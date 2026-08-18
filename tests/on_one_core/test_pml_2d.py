@@ -1,4 +1,4 @@
-from pytest import mark
+import pytest
 import spyro
 from firedrake import COMM_WORLD as comm, conditional
 from numpy import asarray
