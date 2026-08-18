@@ -62,26 +62,6 @@ class KSPWrapper:
         self._ksp.solve(b, x)
 ```
 
-RIGHT — Declare a boolean attribute that describes the state directly, and check that instead:
-
-```python
-class KSPWrapper:
-    def __init__(self):
-        self._initialized = False
-
-    def solve(self, pc, b, x):
-        if not self._initialized:
-            self._ksp = PETSc.KSP().create(comm=pc.comm)
-            self._ksp.setOperators(*pc.getOperators())
-            self._initialized = True
-        self._ksp.solve(b, x)
-```
-
-This is exactly the pattern used by `PCSNESBase` (`firedrake/preconditioners/base.py`), the base class
-every Firedrake `PCBase`/`SNESBase` preconditioner inherits: its `__init__` sets
-`self.initialized = False`, and `setUp()` dispatches to `initialize()` or `update()` based on that flag
-rather than probing for the presence of state built by `initialize()`. A boolean records intent and is
-trivially greppable; `hasattr` is indistinguishable from "I forgot to initialize this" until it fails.
-
+RIGHT — Declare a boolean attribute that describes the state directly, and check that instead
 
 # TODO: most of these topics come from the Firedrake repo and we need to ask them and cite it before merging in main
