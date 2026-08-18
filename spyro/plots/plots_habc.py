@@ -1,23 +1,27 @@
-# This file contains methods for plotting results from the HABC scheme
-# from matplotlib.pyplot import (close, figure, gca, grid, legend, plot,
-#                                rcParams, savefig, scatter, setp, subplots,
-#                                tight_layout, xlabel, xlim, xticks, ylabel, ylim)
-from matplotlib.pyplot import (close, figure, gca, grid, legend, plot,
-                               rcParams, savefig, scatter,
-                               xlabel, xlim, xticks, ylabel, ylim)
-from matplotlib.pyplot import show as plt_show
-# from numpy import arange, asarray, ceil, clip, linspace, inf, polyfit, polyval, zeros
-from numpy import arange, ceil, linspace, inf, zeros
+"""HABC-related plotting routines."""
+
+from pathlib import Path
+from typing import Sequence
+
+import matplotlib.pyplot as plt
+import numpy as np
+
 from ..abc.lay_len import f_layer, loop_roots
-from ..tools.abc_labeling_cases import create_folder
-# from ..utils.stats_tools import coeff_of_determination
-rcParams.update({"font.family": "serif"})
-rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
+from .plot_helpers import _finalize_figure
+from ..tools.abc_set_path_cases import create_folder
+
+plt.rcParams.update({"font.family": "serif"})
+plt.rcParams["text.latex.preamble"] = r"\usepackage{bm} \usepackage{amsmath}"
 
 
-def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
-                             output_folder="output/", show=False):
-    """Plot the function of the layer size criterion for the HABC scheme.
+def plot_function_layer_size(
+        layer_parameters: Sequence[float],
+        frequency_parameters: Sequence[float],
+        geometry_parameters: Sequence[float],
+        reference_frequency_layer_sizes: Sequence[float],
+        output_folder: str | Path = "output/",
+        show: bool = False,) -> None:
+    """Plot the layer-size criterion for the HABC scheme.
 
     Parameters
     ----------
