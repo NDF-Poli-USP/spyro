@@ -14,7 +14,7 @@ from numpy import isclose, where
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.domains.space import create_function_space
 from spyro.tools.habc_tools import layer_mask_field, point_cloud_field
-from spyro.tools.abc_labeling_cases import create_folder, path_to_save_abc_case
+from spyro.tools.abc_set_path_cases import create_folder, path_to_save_abc_case
 from spyro.utils.cost import comp_cost
 
 
