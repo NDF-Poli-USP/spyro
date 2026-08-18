@@ -81,8 +81,8 @@ def build_solver(local_abc, dt_scheme):
     if local_abc is not None:
         d["absorving_boundary_conditions"] = {
             "status": True,
-            "damping_type": "local",
-            "local": {
+            "abc_type": "nrbc",
+            "nrbc": {
                 "type": local_abc,
                 "dt_scheme": dt_scheme,
             },

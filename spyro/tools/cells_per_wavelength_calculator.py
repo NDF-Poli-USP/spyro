@@ -253,10 +253,10 @@ class Meshing_parameter_calculator:
         np.ndarray
             the reference solution
         """
-        Wave_obj = self.build_current_object(self.cpw_reference, degree=self.reference_degree)
+        wave = self.build_current_object(self.cpw_reference, degree=self.reference_degree)
 
-        Wave_obj.forward_solve()
-        p_receivers = Wave_obj.forward_solution_receivers
+        wave.forward_solve()
+        p_receivers = wave.forward_solution_receivers
 
         if self.save_reference:
             np.save("reference_solution.npy", p_receivers)
@@ -273,16 +273,16 @@ class Meshing_parameter_calculator:
             the reference solution
         """
         # Initializing array
-        Wave_obj = self.initial_guess_object
-        number_of_receivers = Wave_obj.number_of_receivers
-        dt = Wave_obj.dt
-        final_time = Wave_obj.final_time
+        wave = self.initial_guess_object
+        number_of_receivers = wave.number_of_receivers
+        dt = wave.dt
+        final_time = wave.final_time
         num_t = int(final_time / dt + 1)
         analytical_solution = np.zeros((num_t, number_of_receivers))
 
         # Solving analytical solution for each receiver
-        receiver_locations = Wave_obj.receiver_locations
-        source_locations = Wave_obj.source_locations
+        receiver_locations = wave.receiver_locations
+        source_locations = wave.source_locations
         source_location = source_locations[0]
         sz, sx = source_location
         i = 0
@@ -290,7 +290,7 @@ class Meshing_parameter_calculator:
             rz, rx = receiver
             offset = np.sqrt((rz - sz) ** 2 + (rx - sx) ** 2)
             r_sol = spyro.utils.nodal_homogeneous_analytical(
-                Wave_obj, offset, self.minimum_velocity
+                wave, offset, self.minimum_velocity
             )
             analytical_solution[:, i] = r_sol
             print(i)
@@ -347,33 +347,35 @@ class Meshing_parameter_calculator:
             print("Trying cells-per-wavelength = ", cpw, flush=True)
 
             # Running forward model
-            Wave_obj = self.build_current_object(cpw)
-            Wave_obj._initialize_model_parameters()  # TO REVIEW: call to protected method
+            wave = self.build_current_object(cpw)
+            wave._initialize_model_parameters()  # TO REVIEW: call to protected method
 
             # Setting up time-step
             if self.timestep_calculation != "float":
-                Wave_obj.get_and_set_maximum_dt(
+                wave.get_and_set_maximum_dt(
                     fraction=0.2,
                     estimate_max_eigenvalue=self.estimate_timestep
                 )
             else:
-                Wave_obj.dt = self.fixed_timestep
-            print("Maximum dt is ", Wave_obj.dt, flush=True)
+                wave.dt = self.fixed_timestep
+            print("Maximum dt (seconds) is", wave.dt, flush=True)
 
             t0 = timinglib.time()
-            Wave_obj.forward_solve()
+            wave.forward_solve()
             t1 = timinglib.time()
-            p_receivers = Wave_obj.forward_solution_receivers
+            p_receivers = wave.forward_solution_receivers
             spyro.io.save_shots(
-                Wave_obj, file_name="test_shot_record" + str(cpw)
+                wave, file_name="test_shot_record" + str(cpw)
             )
 
+            # TODO: Use MeasureError class from spyro.tools.error_measure instead of this.
             error = error_calc(
-                p_receivers, self.reference_solution, Wave_obj.dt
+                p_receivers, self.reference_solution, wave.dt
             )
+
             print("Error is ", error, flush=True)
             cpws.append(cpw)
-            dts.append(Wave_obj.dt)
+            dts.append(wave.dt)
             errors.append(error)
             runtimes.append(t1 - t0)
 
@@ -405,15 +407,15 @@ class Meshing_parameter_calculator:
         dictionary["mesh"]["cells_per_wavelength"] = cpw
         if degree is not None:
             dictionary["options"]["degree"] = degree
-        Wave_obj = spyro.AcousticWave(dictionary)
+        wave = spyro.AcousticWave(dictionary)
         if self.velocity_profile_type == "homogeneous":
             lba = self.minimum_velocity / self.source_frequency
             edge_length = lba / cpw
-            Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
-            Wave_obj.set_initial_velocity_model(constant=self.minimum_velocity)
+            wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+            wave.set_initial_velocity_model(constant=self.minimum_velocity)
         elif self.velocity_profile_type == "heterogeneous":
-            Wave_obj.set_mesh(input_mesh_parameters={"cells_per_wavelength": cpw})
-        return Wave_obj
+            wave.set_mesh(input_mesh_parameters={"cells_per_wavelength": cpw})
+        return wave
 
     def _saving_file(self, savetxt, info):
         """

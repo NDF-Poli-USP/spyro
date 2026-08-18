@@ -59,22 +59,22 @@ def test_forward_3_shots():
         "gradient_filename": None,
     }
 
-    Wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    wave = spyro.AcousticWave(dictionary=dictionary)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.1})
 
-    mesh_z = Wave_obj.mesh_z
+    mesh_z = wave.mesh_z
     cond = fire.conditional(mesh_z < -1.5, 3.5, 1.5)
-    Wave_obj.set_initial_velocity_model(conditional=cond, output=True)
+    wave.set_initial_velocity_model(conditional=cond, output=True)
 
-    Wave_obj.forward_solve()
+    wave.forward_solve()
 
-    comm = Wave_obj.comm
+    comm = wave.comm
 
-    arr = Wave_obj.forward_solution_receivers
+    arr = wave.forward_solution_receivers
 
     if comm.ensemble_comm.rank == 0:
         analytical_p = spyro.utils.nodal_homogeneous_analytical(
-            Wave_obj, 0.2, 1.5, n_extra=100
+            wave, 0.2, 1.5, n_extra=100
         )
     else:
         analytical_p = None
@@ -91,9 +91,14 @@ def test_forward_3_shots():
     arr0 = arr[:, rec_id]
     arr0 = arr0.flatten()
 
+    # TODO: Use MeasureError class from spyro.tools.error_measure instead of this.
     error = error_calc(arr0[:430], analytical_p[:430], 430)
+
     if comm.comm.rank == 0:
-        print(f"Error for shot {Wave_obj.current_sources} is {error} and test has passed equals {np.abs(error) < 0.01}", flush=True)
+        print(
+            f"Error for shot {wave.current_sources} is {error} and test has passed equals {np.abs(error) < 0.01}",
+            flush=True,
+        )
     error_all = COMM_WORLD.allreduce(error, op=MPI.SUM)
     error_all /= 3
 

@@ -1,0 +1,60 @@
+name: Test Demos. Notebook support incoming
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  demo-tests:
+    name: Demo tests
+    runs-on: self-hosted
+    # Runs on all pushes and pull requests for quick feedback
+
+    container:
+      image: firedrakeproject/firedrake:2025.4.1
+      options: --user root  # Ensures it can install packages if needed
+
+    steps:
+
+    - name: Pre-run cleanup
+        # Make sure the current directory is empty
+      run: find . -delete
+
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        apt-get update \
+        && apt-get -y install git python3 \
+        && apt-get -y install gmsh patchelf \
+        && pip3 install segyio \
+        && apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk \
+        && pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
+        && pip3 install pyamg \
+        && pip3 install meshio \
+        && pip3 install -U memory_profiler \
+        && pip3 install pytest pytest-cov \
+        && pip3 install pytest-sugar
+
+    - name: Clear all firedrake-related caches
+      run: |
+        rm -rf ~/.cache/loopy \
+               ~/.loopy_kernel_cache \
+               ~/.cache/pyop2 \
+               ~/.cache/tsfc \
+               .pytest_cache
+        find . -name '*.pkl' -delete || true
+
+    - name: Running demo tests
+      run: |
+        make clean
+        mpiexec -n 6 pytest tests/demo_tests/test_acoustic_camembert_demo.py
+        mpiexec -n 6 pytest tests/demo_tests/test_acoustic_layer_demo.py
+        pytest tests/demo_tests/test_acoustic_marmousi_forward_propagation.py
+
+    - name: Post-run cleanup
+      if: always()
+      run: find . -delete

@@ -59,20 +59,21 @@ def test_forward_3_shots():
         "gradient_filename": None,
     }
 
-    Wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    wave = spyro.AcousticWave(dictionary=dictionary)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    wave.store_forward_time_steps = True
 
-    mesh_z = Wave_obj.mesh_z
+    mesh_z = wave.mesh_z
     cond = fire.conditional(mesh_z < -1.5, 3.5, 1.5)
-    Wave_obj.set_initial_velocity_model(conditional=cond, output=True)
+    wave.set_initial_velocity_model(conditional=cond, output=True)
 
-    Wave_obj.forward_solve()
+    wave.forward_solve()
 
-    comm = Wave_obj.comm
+    comm = wave.comm
 
     if comm.comm.rank == 0:
         analytical_p = spyro.utils.nodal_homogeneous_analytical(
-            Wave_obj, 0.2, 1.5, n_extra=100
+            wave, 0.2, 1.5, n_extra=100
         )
     else:
         analytical_p = None
@@ -82,11 +83,11 @@ def test_forward_3_shots():
     cutoff = 830
     errors = []
 
-    for i in range(Wave_obj.number_of_sources):
+    for i in range(wave.number_of_sources):
         plt.close()
         plt.plot(time_vector[:cutoff], analytical_p[:cutoff], "--", label="analyt")
-        spyro.io.switch_serial_shot(Wave_obj, i)
-        rec_out = Wave_obj.forward_solution_receivers
+        spyro.io.switch_serial_shot(wave, i)
+        rec_out = wave.forward_solution_receivers
         if i == 0:
             rec0 = rec_out[:, 0].flatten()
         elif i == 1:

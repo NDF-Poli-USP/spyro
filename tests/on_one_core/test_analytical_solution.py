@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 import spyro
-
 # import matplotlib.pyplot as plt
 
 
@@ -20,7 +19,7 @@ def test_analytical_solution(use_vertex_only_mesh):
     dictionary = {}
     dictionary["absorving_boundary_conditions"] = {
         "status": False,
-        "damping_type": None,
+        "abc_type": None,
         "exponent": None,
         "cmax": None,
         "R": None,
@@ -38,17 +37,17 @@ def test_analytical_solution(use_vertex_only_mesh):
         "receiver_locations": [(-1.5 - offset, 1.5)],
         "use_vertex_only_mesh": use_vertex_only_mesh,
     }
-    Wave_obj = spyro.examples.Rectangle_acoustic(
+    wave = spyro.examples.Rectangle_acoustic(
         dictionary=dictionary, periodic=True
     )
-    Wave_obj.set_initial_velocity_model(constant=c_value)
+    wave.set_initial_velocity_model(constant=c_value)
     analytical_p = spyro.utils.nodal_homogeneous_analytical(
-        Wave_obj, offset, c_value
+        wave, offset, c_value
     )
 
-    time_vector = np.linspace(0.0, 1.0, int(1.0 / Wave_obj.dt) + 1)
-    Wave_obj.forward_solve()
-    numerical_p = Wave_obj.forward_solution_receivers
+    time_vector = np.linspace(0.0, 1.0, int(1.0 / wave.dt) + 1)
+    wave.forward_solve()
+    numerical_p = wave.forward_solution_receivers
     numerical_p = numerical_p.flatten()
 
     nt = len(time_vector)

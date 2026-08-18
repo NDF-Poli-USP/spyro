@@ -79,20 +79,20 @@ def run_forward_hexahedral(dt, final_time, offset):
         "gradient_filename": None,
     }
 
-    Wave_obj = spyro.AcousticWave(dictionary=dictionary)
+    wave = spyro.AcousticWave(dictionary=dictionary)
     mesh_parameters = {
         "edge_length": 0.02,
         "periodic": True,
     }
-    Wave_obj.set_mesh(input_mesh_parameters=mesh_parameters)
+    wave.set_mesh(input_mesh_parameters=mesh_parameters)
 
-    Wave_obj.set_initial_velocity_model(constant=1.5)
-    Wave_obj.forward_solve()
+    wave.set_initial_velocity_model(constant=1.5)
+    wave.forward_solve()
     # time_vector = np.linspace(0.0, final_time, int(final_time/dt)+1)
 
-    rec_out = Wave_obj.forward_solution_receivers
+    rec_out = wave.forward_solution_receivers
     output = rec_out.flatten()
-    my_ensemble = Wave_obj.comm
+    my_ensemble = wave.comm
     if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:
         np.save("dofs_3D_quads_rec_out"+str(dt)+".npy", output)
 

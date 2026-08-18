@@ -14,7 +14,7 @@ import os
 import tempfile
 import firedrake as fire
 from spyro.meshing.meshing_parameters import MeshingParameters
-from spyro.meshing.meshing_functions import build_big_rect_with_inner_element_group
+from spyro.meshing.gmsh_based_methods import build_big_rect_with_inner_element_group
 
 
 @pytest.fixture
@@ -154,7 +154,7 @@ def test_spyro_acoustic_solver_compatibility(test_mesh_with_tags):
     u = fire.TrialFunction(V)
     v = fire.TestFunction(V)
 
-    # Simulate Wave_object parameters
+    # Simulate wave parameters
     c = fire.Function(V)
     c.assign(fire.Constant(1500.0))
     dt_val = 0.001

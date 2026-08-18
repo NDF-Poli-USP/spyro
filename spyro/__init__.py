@@ -1,3 +1,12 @@
+"""Expose the public spyro API.
+This module re-exports the most commonly used classes, functions, and
+subpackages so users can access them directly from :mod:`spyro`.
+Notes
+-----
+The symbols listed in ``__all__`` define the supported public interface for
+``from spyro import *`` and are intended to remain stable for users.
+"""
+
 from . import plots
 from . import domains
 from . import pml
@@ -7,6 +16,8 @@ from .solvers.wave import Wave
 from .solvers.acoustic_wave import AcousticWave
 from .solvers.elastic_wave.isotropic_wave import IsotropicWave
 from .solvers.inversion import FullWaveformInversion
+from .utils.typing import (ElasticMaterialParameter,
+                           ElasticMaterialParameterization, WaveType)
 
 # from .solvers.dg_wave import DG_Wave
 from .solvers.mms_acoustic import AcousticWaveMMS
@@ -19,9 +30,9 @@ from . import tools
 from . import examples
 from . import sources
 from .meshing import (
-    RectangleMesh,
-    PeriodicRectangleMesh,
-    BoxMesh,
+    rectangle_mesh,
+    periodic_rectangle_mesh,
+    box_mesh,
 )
 
 __all__ = [
@@ -46,9 +57,12 @@ __all__ = [
     "sources",
     "AcousticWave",
     "FullWaveformInversion",
+    "ElasticMaterialParameter",
+    "ElasticMaterialParameterization",
+    "WaveType",
     "AcousticWaveMMS",
-    "RectangleMesh",
-    "PeriodicRectangleMesh",
-    "BoxMesh",
+    "rectangle_mesh",
+    "periodic_rectangle_mesh",
+    "box_mesh",
     "IsotropicWave",
 ]
