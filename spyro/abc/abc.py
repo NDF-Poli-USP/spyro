@@ -7,7 +7,7 @@ from ..solvers.modal.modal_sol import Modal_Solver
 from ..tools.error_measure import MeasureError
 from ..domains.space import create_function_space
 from ..io.basicio import parallel_print as pprint
-from ..tools.abc_labeling_cases import formatting_abc_layer_type
+from ..tools.abc_set_path_cases import formatting_abc_layer_type
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
 from ..utils.error_management import (validate_data_structure, validate_numeric,
                                       validate_parameter)

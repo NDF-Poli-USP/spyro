@@ -1,5 +1,6 @@
-"""Methods to label the case study of the ABC scheme."""
-from os import getcwd, makedirs, path
+"""Methods to set paths for the case study of the ABC scheme (HABC or PML)."""
+from os import getcwd
+from pathlib import Path
 from ..io.basicio import parallel_print as pprint
 from ..utils.error_management import (validate_enum, validate_numeric,
                                       validate_parameter, validate_string)
@@ -175,19 +176,19 @@ def path_to_save_abc_case(abc_type, abc_boundary_layer_shape=None, abc_deg_layer
         return path_save, case_absl, path_case_absl
 
 
-def create_folder(folder):
-    """Verify if a folder exists, if not, it creates the folder.
+def create_folder(folder: str | Path) -> None:
+    """Ensure a directory exists, creating it if needed.
 
     Parameters
     ----------
-    folder: `str`
-        Path to the folder to be created
+    folder : str or pathlib.Path
+        Path to the directory to create.
 
     Returns
     -------
     None
     """
-
-    # Create the folder if it does not exist
-    if not path.isdir(folder):
-        makedirs(folder)
+    # TODO: replace with the validation method to come
+    folder_path = Path(folder)
+    if not folder_path.is_dir():
+        folder_path.mkdir(parents=True, exist_ok=True)
