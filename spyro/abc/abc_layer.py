@@ -382,7 +382,8 @@ class ABCLayer(AbsorbingBC):
             crit_source = self.crit_source \
                 if non_reflect_bc == BoundaryConditionsType.HIGDON else None
 
-            self.nrbc_on_boundary(wave, source_coord=crit_source, hyp_par=hyp_par, save_file=save_file)
+            self.nrbc_on_boundary(wave, source_coord=crit_source,
+                                  hyp_par=hyp_par, save_file=save_file)
 
         else:
             pprint("\nNot Non-Reflecting Boundary Conditions Prescribed", comm=self.comm)

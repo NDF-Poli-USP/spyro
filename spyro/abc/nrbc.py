@@ -6,7 +6,8 @@ from numpy.linalg import norm
 from .abc import AbsorbingBC
 from ..io.basicio import parallel_print as pprint
 from ..tools.abc_set_path_cases import path_to_save_abc_case
-from ..utils.error_management import validate_enum, validate_numeric, validate_parameter
+from ..utils.error_management import (validate_enum, validate_numeric,
+                                      validate_parameter, validate_string)
 from ..utils.typing import (AbsorbingBCsType, BoundaryConditionsType,
                             LayerShapeType, NRBCBoundaryType)
 
@@ -109,40 +110,103 @@ class NRBC(AbsorbingBC):
             # Set sthe pad to rectangular shape in case infinitel model is needed.
             self.abc_boundary_layer_shape = LayerShapeType.RECTANGULAR
 
-            # Non-reflective BC type
-        self.non_reflect_bc = validate_parameter('non_reflect_bc', non_reflect_bc,
-                                                 [BoundaryConditionsType.HIGDON,
-                                                  BoundaryConditionsType.SOMMERFELD])
+        # Flag to indicate if NRBCs are used in HABC scheme
+        self.nrbc_in_habc = nrbc_in_habc
+
+        # Non-reflective BC type
+        self.non_reflect_bc = non_reflect_bc
 
         # Boundary type where NRBCs are applied
-        self.abc_boundary_type = validate_enum("abc_boundary_type",
-                                               abc_boundary_type,
-                                               NRBCBoundaryType)
+        self.abc_boundary_type = abc_boundary_type
 
         # Maximum incidence angle considered
-        self.angle_max = validate_numeric("angle_max", angle_max, float_num=True,
-                                          integer_num=False, lower_bound=0.,
-                                          include_lower_bound=True)
+        self.angle_max = angle_max
 
-        # Maximum value of the cosine of the incidence angle
-        self.cos_min = cos(angle_max)
+        # Output folder
+        self.output_folder = output_folder
 
-        """"
-        Create the path to save data
-        The required abc_type argument from path_to_save_abc_layer_case() method is set
-        to `AbsorbingBCsType.NRBC` since it is an instance of `typing.AbsorbingBCsType`.
+    @property
+    def non_reflect_bc(self):
+        return self._non_reflect_bc
+
+    @non_reflect_bc.setter
+    def non_reflect_bc(self, value):
+        """Set the non-reflective BC type with validation."""
+        self._non_reflect_bc = validate_parameter('non_reflect_bc', value,
+                                                  [BoundaryConditionsType.HIGDON,
+                                                   BoundaryConditionsType.SOMMERFELD])
+
+        # Non-reflective BC type changes should update paths
+        self._create_or_update_paths()
+
+    @property
+    def abc_boundary_type(self):
+        return self._abc_boundary_type
+
+    @abc_boundary_type.setter
+    def abc_boundary_type(self, value):
+        """Set the boundary type where NRBCs are applied with validation."""
+        self._abc_boundary_type = validate_enum("abc_boundary_type", value, NRBCBoundaryType)
+
+        # Boundary type changes should update paths
+        self._create_or_update_paths()
+
+    @property
+    def angle_max(self):
+        return self._angle_max
+
+    @angle_max.setter
+    def angle_max(self, value):
+        """Set the maximum incidence angle with validation."""
+        self._angle_max = validate_numeric("angle_max", value, float_num=True,
+                                           integer_num=False, lower_bound=0.,
+                                           include_lower_bound=True)
+
+        # Minimum value of the cosine of the incidence angle
+        self.cos_min = cos(self._angle_max)
+
+        # Angle changes should update paths
+        self._create_or_update_paths()
+
+    @property
+    def output_folder(self):
+        return self._output_folder
+
+    @output_folder.setter
+    def output_folder(self, value):
+        """Set the output folder with validation."""
+        self._output_folder = validate_string("output_folder", value,
+                                              accept_parameter_as_none=True)
+
+        # Output folder changes should update paths
+        self._create_or_update_paths()
+
+    def _create_or_update_paths(self):
+        """Create or update the path folders for the NRBC case.
+
+        This method is called whenever non_reflect_bc, abc_boundary_type,
+        angle_max, or output_folder changes. The required abc_type argument from
+        path_to_save_abc_layer_case() method is set to `AbsorbingBCsType.NRBC`
+        since it is an instance of `typing.AbsorbingBCsType`.
         """
-        self.path_save, self.case_nrbc, self.path_case_nrbc = \
-            path_to_save_abc_case(AbsorbingBCsType.NRBC,
-                                  non_reflect_bc=self.non_reflect_bc,
-                                  angle_max=self.angle_max,
-                                  abc_boundary_type=self.abc_boundary_type,
-                                  output_folder=output_folder)
 
-        # Initializing the MeasureError class if NRBCs are not in HABC scheme
-        if not nrbc_in_habc:
-            self.initialize_paths_for_error(output_folder=self.path_save,
-                                            output_case=self.path_case_nrbc)
+        # Check that all required attributes exist AND are not None
+        required_attrs = ['_non_reflect_bc', '_abc_boundary_type',
+                          '_angle_max', '_output_folder']
+
+        # Only update paths if all parameters have been set and avoid infinite recursion
+        if all(hasattr(self, attr) and getattr(self, attr) for attr in required_attrs):
+            self.path_save, self.case_nrbc, self.path_case_nrbc = \
+                path_to_save_abc_case(AbsorbingBCsType.NRBC,
+                                      non_reflect_bc=self._non_reflect_bc,
+                                      angle_max=self._angle_max,
+                                      abc_boundary_type=self._abc_boundary_type,
+                                      output_folder=self._output_folder)
+
+            # Initializing the error paths if NRBCs are not in HABC scheme
+            if not self.nrbc_in_habc:
+                self.initialize_paths_for_error(output_folder=self.path_save,
+                                                output_case=self.path_case_nrbc)
 
     def source_to_bnd_reference_vector(self, source_coord, bnd_nodes_nfs):
         """Compute a unitary direction vector from the source to a boundary point.
@@ -334,7 +398,7 @@ class NRBC(AbsorbingBC):
 
         # Save boundary profile of cosine of incidence angle
         if save_file:
-            outfile = VTKFile(self.path_save_nrbc + "cosHig.pvd")
+            outfile = VTKFile(self.path_case_nrbc + "cosHig.pvd")
             outfile.write(self.cosHig)
 
     def nrbc_on_boundary(self, wave, source_coord=None, hyp_par=None, save_file=True):
@@ -359,9 +423,9 @@ class NRBC(AbsorbingBC):
 
         # Getting boundary data from the layer boundaries
         if self.non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
-            bnd_nod_ids_nfs = wave.meh_ops.layer_boundary_data(wave.mesh,
-                                                               wave.function_space,
-                                                               wave.mesh_parameters)
+            bnd_nod_ids_nfs = wave.mesh_ops.layer_boundary_data(wave.mesh,
+                                                                wave.function_space,
+                                                                wave.mesh_parameters)
             bnd_nodes_nfs = None
 
         if self.non_reflect_bc == BoundaryConditionsType.HIGDON:

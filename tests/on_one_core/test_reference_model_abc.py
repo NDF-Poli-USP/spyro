@@ -300,30 +300,25 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
             wave.layer_ops.infinite_model(wave, check_dt=True,
                                           max_divisor_tf=max_divisor_tf)
 
-            # Acquiring reference signal
-            receivers_reference, receivers_ref_fft = wave.layer_ops.get_reference_signal()
-
             # Estimating computational resource usage
             comp_cost("tfin", tRef=tRef, user_name=wave.path_save + "preamble/INF_")
 
-            if abc_type == "hybrid":
-                hybrid_signal = receivers_reference
+            if abc_type == "hybrid":  # Hybrid is the reference
+                hybrid_signal = wave.layer_ops.get_reference_signal()[0]
                 hybrid_energy = wave.field_logger.get("acoustic_energy")
-            else:
-                pml_signal = receivers_reference
+            else:  # PML is the comparison
+                pml_signal = wave.forward_solution_receivers
                 pml_energy = wave.field_logger.get("acoustic_energy")
 
         # Checking both signals
+        dt = wave.get_dt()
         assert hybrid_signal is not None, "Hybrid signal not found"
         assert pml_signal is not None, "PML signal not found"
-
-        dt = wave.get_dt()
         error_measures = wave.layer_ops.error_measures(pml_signal, hybrid_signal, dt,
                                                        wave.number_of_receivers,
                                                        final_energy=pml_energy,
                                                        final_energy_reference=hybrid_energy,
                                                        save_in_case_folder=False)
-
         errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener = error_measures
 
         assert sum(errIt) == 0. and max_errIt == 0., \

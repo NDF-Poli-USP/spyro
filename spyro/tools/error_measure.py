@@ -99,11 +99,10 @@ class MeasureError():
         validate_string("output_case", output_case, accept_parameter_as_none=True)
 
         # Path to save data
-        self.path_save_error = output_folder + "/" if output_folder else getcwd() + "/output/"
+        self.path_save_error = output_folder if output_folder else getcwd() + "/output/"
 
         # Path to save data for specific case
-        self.path_save_err_case = self.path_save_error + output_case + "/" \
-            if output_case else self.path_save_error
+        self.path_save_err_case = output_case if output_case else self.path_save_error
 
         # Path to save the reference signal
         self.path_reference = self.path_save_error + "preamble/"

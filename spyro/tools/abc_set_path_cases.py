@@ -155,12 +155,14 @@ def identify_nrbc_case(non_reflect_bc, angle_max, abc_boundary_type):
                      lower_bound=0., include_lower_bound=True)
     validate_enum("abc_boundary_type", abc_boundary_type, NRBCBoundaryType)
 
+    ang_degrees = round(180. * angle_max / pi, 0)
+
     # Labeling for the NRBC type
     if non_reflect_bc == BoundaryConditionsType.HIGDON:
-        case_nrbc = "HIG"
+        case_nrbc = "HIG_" + f"{ang_degrees:.0f}"
 
     elif non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
-        case_nrbc = "SOM"
+        case_nrbc = "SOM_" + f"{ang_degrees:.0f}"
 
     # Labeling for the boundary type
     if abc_boundary_type == NRBCBoundaryType.STRAIGHT:
@@ -172,7 +174,7 @@ def identify_nrbc_case(non_reflect_bc, angle_max, abc_boundary_type):
     # Printing NRBC info on screen
     nrbc_str = f"\nNRBC Type: {non_reflect_bc.value.capitalize()}" + \
         f"\nBoundary Type: {abc_boundary_type.value.capitalize()}" + \
-        (f"\nMaximum Incidence Angle: {180. * angle_max / pi:.1f}°"
+        (f"\nMaximum Incidence Angle: {ang_degrees}°"
          if non_reflect_bc == BoundaryConditionsType.HIGDON else "")
     pprint(nrbc_str)
 

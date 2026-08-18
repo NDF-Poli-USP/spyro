@@ -308,7 +308,7 @@ class HABCMesh(MeshOps):
         pprint(f"Original Mesh with {wave.mesh.num_vertices()} Nodes and "
                f"{wave.mesh.num_cells()} Volume Elements", comm=self.comm)
 
-        # Save a copy of the original mesh
+        # Save a copy of the original mesh and function space
         wave.mesh_original = wave.mesh
         mesh_orig = fire.VTKFile(wave.path_save + "preamble/mesh_orig.pvd")
         mesh_orig.write(wave.mesh_original)
