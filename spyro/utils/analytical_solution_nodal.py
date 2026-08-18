@@ -276,25 +276,25 @@ def analytical_force_source(
     .. math::
 
         u_i =
-        \\frac{A}{4\\pi\\rho}
-        (3\\gamma_i\\gamma_j - \\delta_{ij})
-        \\frac{1}{r^3}
-        \\int_{r/\\alpha}^{r/\\beta}
-        \\tau X_0(t-\\tau)\\,d\\tau
+        \frac{A}{4\pi\rho}
+        (3\gamma_i\gamma_j - \delta_{ij})
+        \frac{1}{r^3}
+        \int_{r/\alpha}^{r/\beta}
+        \tau X_0(t-\tau)\,d\tau
 
-        + \\frac{A}{4\\pi\\rho\\alpha^2}
-        \\gamma_i\\gamma_j
-        \\frac{1}{r}
-        X_0\\left(t-\\frac{r}{\\alpha}\\right)
+        + \frac{A}{4\pi\rho\alpha^2}
+        \gamma_i\gamma_j
+        \frac{1}{r}
+        X_0\left(t-\frac{r}{\alpha}\right)
 
-        - \\frac{A}{4\\pi\\rho\\beta^2}
-        (\\gamma_i\\gamma_j-\\delta_{ij})
-        \\frac{1}{r}
-        X_0\\left(t-\\frac{r}{\\beta}\\right),
+        - \frac{A}{4\pi\rho\beta^2}
+        (\gamma_i\gamma_j-\delta_{ij})
+        \frac{1}{r}
+        X_0\left(t-\frac{r}{\beta}\right),
 
     where :math:`r` is the source-receiver distance,
-    :math:`\\gamma_i = x_i/r`, :math:`\\delta_{ij}` is the Kronecker delta,
-    :math:`\\alpha` is the P-wave velocity, and :math:`\\beta` is the
+    :math:`\gamma_i = x_i/r`, :math:`\delta_{ij}` is the Kronecker delta,
+    :math:`\alpha` is the P-wave velocity, and :math:`\beta` is the
     S-wave velocity.
 
     The source time function used here is
@@ -302,13 +302,13 @@ def analytical_force_source(
     .. math::
 
         X_0(t) =
-        \\left(1 - 2a^2\\right)e^{-a^2},
+        \left(1 - 2a^2\right)e^{-a^2},
 
     with
 
     .. math::
 
-        a = \\pi f (t-t_0),
+        a = \pi f (t-t_0),
 
     where :math:`f` is the source frequency and :math:`t_0` is the time delay.
     """
@@ -420,29 +420,29 @@ def analytical_explosive_source(
     .. math::
 
         u_i =
-        \\frac{A\\gamma_i}{4\\pi\\rho\\alpha^2 r^2}
-        w\\left(t-\\frac{r}{\\alpha}\\right)
+        \frac{A\gamma_i}{4\pi\rho\alpha^2 r^2}
+        w\left(t-\frac{r}{\alpha}\right)
         +
-        \\frac{A\\gamma_i}{4\\pi\\rho\\alpha^3 r}
-        \\dot{w}\\left(t-\\frac{r}{\\alpha}\\right),
+        \frac{A\gamma_i}{4\pi\rho\alpha^3 r}
+        \dot{w}\left(t-\frac{r}{\alpha}\right),
 
     where :math:`r` is the source-receiver distance and
-    :math:`\\gamma_i = x_i/r`.
+    :math:`\gamma_i = x_i/r`.
 
     The source time function is
 
     .. math::
 
         w(t) = (t-t_0)
-        \\exp\\left[-\\left(\\pi f(t-t_0)\\right)^2\\right],
+        \exp\left[-\left(\pi f(t-t_0)\right)^2\right],
 
     and its derivative is
 
     .. math::
 
-        \\dot{w}(t) =
-        \\left[1 - 2\\left(\\pi f(t-t_0)\\right)^2\\right]
-        \\exp\\left[-\\left(\\pi f(t-t_0)\\right)^2\\right].
+        \dot{w}(t) =
+        \left[1 - 2\left(\pi f(t-t_0)\right)^2\right]
+        \exp\left[-\left(\pi f(t-t_0)\right)^2\right].
     """
     nt = len(time_vector)
     i = displacement_direction
