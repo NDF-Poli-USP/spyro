@@ -110,7 +110,7 @@ def test_second_order_time_convergence(with_pml):
     for i in range(len(dts)):
         dt = dts[i]
         rec_out = run_forward(dt, with_pml=with_pml)
-        rec_anal = load(analytical_files[i])
+        rec_anal = np.load(analytical_files[i])
         numerical_results.append(rec_out.flatten())
         errors.append(measure_error.normalized_root_mean_square_error(rec_out.flatten(),
                                                                       rec_anal))
