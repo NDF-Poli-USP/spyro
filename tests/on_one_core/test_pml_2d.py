@@ -1,4 +1,4 @@
-from pytest import mark
+import pytest
 import spyro
 from firedrake import COMM_WORLD as comm, conditional
 from numpy import asarray
@@ -102,8 +102,8 @@ def run_forward():
     return p_r, wave.dt
 
 
-@mark.slow
-@mark.skip(reason="Ruben is implementing a right PML formulation")
+@pytest.mark.slow
+@pytest.mark.skip(reason="Ruben is implementing a right PML formulation")
 def test_pml():
     """Test that the second order time convergence
     of the central difference method is achieved"""
