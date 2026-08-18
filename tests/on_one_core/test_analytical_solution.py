@@ -5,7 +5,7 @@ from spyro.io.basicio import parallel_print as pprint
 from spyro.tools.error_measure import MeasureError
 
 
-@mark.parametrize("use_vertex_only_mesh", [False, True])
+@pytest.mark.parametrize("use_vertex_only_mesh", [False, True])
 def test_analytical_solution(use_vertex_only_mesh):
     frequency = 5.0
     offset = 0.5
