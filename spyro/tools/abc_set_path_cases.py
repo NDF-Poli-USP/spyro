@@ -1,4 +1,4 @@
-"""Methods to set paths for the case study of the ABC scheme (HABC or PML)."""
+"""Methods to set paths for the case study of the ABC scheme (HABC, PML or NRBC)."""
 from numpy import pi
 from os import getcwd
 from pathlib import Path
