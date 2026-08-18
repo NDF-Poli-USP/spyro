@@ -1,6 +1,6 @@
 import spyro
-from numpy import isclose, load, log
-from pytest import mark
+import numpy as np
+import pytest
 from spyro.tools.error_measure import MeasureError
 
 
