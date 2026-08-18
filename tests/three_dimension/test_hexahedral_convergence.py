@@ -95,8 +95,8 @@ def run_forward_hexahedral(dt, final_time, offset):
 
 
 def analytical_solution(dt, final_time, offset):
-    amplitude = 1 / (4 * pi * offset)
-    delay = offset / 1.5 + 1.5 * sqrt(6.0) / (pi * 5.0)
+    amplitude = 1 / (4 * np.pi * offset)
+    delay = offset / 1.5 + 1.5 * np.sqrt(6.0) / (np.pi * 5.0)
     p_analytic = amplitude * spyro.full_ricker_wavelet(
         dt, final_time,
         5.0,
