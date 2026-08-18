@@ -1,5 +1,6 @@
 import pytest
 import firedrake as fire
+import ufl
 import numpy as np
 from spyro.solvers.elastic_wave.anisotropy import AnisotropyTensor
 
@@ -187,7 +188,7 @@ class TestAnisotropyTensor:
         C_vti = AnisotropyTensor.c_vti_tensor(iso_props, vti_props)
 
         # Both formulations should produce valid tensors
-        assert isinstance(C_vti, fire.ufl.tensors.ListTensor)
+        assert isinstance(C_vti, ufl.tensors.ListTensor)
 
         # Check that C13 is computed (not NaN or infinite)
         C13_func = fire.Function(W).interpolate(C_vti[0, 2])
@@ -290,7 +291,7 @@ class TestAnisotropyTensor:
 
         # Physically meaningless
         C_vti = AnisotropyTensor.c_vti_tensor(iso_props_zero_rho, vti_props)
-        assert isinstance(C_vti, fire.ufl.tensors.ListTensor)
+        assert isinstance(C_vti, ufl.tensors.ListTensor)
 
         # Zero velocity case
         iso_props_zero_v = MockPropISO(
