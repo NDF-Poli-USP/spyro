@@ -1,124 +1,48 @@
-import pytest
-import warnings
-import firedrake as fire
-import spyro.habc.eik as eik
+"""Unit tests for the Nonlinear Eikonal analysis for 2D and 3D cases.
+
+The test compares the minimum Eikonal value obtained from the simulation with the
+theoretical value for different mesh sizes, element geometries, and finite element types.
+The results are expected to be within a specified tolerance of the theoretical value.
+"""
+from pytest import fail, mark, param
+from firedrake import conditional, ConvergenceError
+from firedrake import COMM_WORLD as comm
 from numpy import isclose
-from os import getcwd
 from spyro.solvers.acoustic_wave import AcousticWave
-from spyro.meshing.meshing_habc import HABC_Mesh
 from spyro.utils.cost import comp_cost
-fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
-warnings.filterwarnings("ignore", category=RuntimeWarning)
+from spyro.io.basicio import parallel_print as pprint
 
 
-def wave_dict_2d(element_type):
-    '''
-    Create a dictionary with parameters for the model
+def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
+    """Create a dictionary with parameters for the model.
 
     Parameters
     ----------
-    element_type : `str`
-        Type of finite element. 'T' for triangles or 'Q' for quadrilaterals
-
-    Returns
-    -------
-    dictionary : `dict`
-        Dictionary containing the parameters for the model
-    '''
-
-    dictionary = {}
-    dictionary["options"] = {
-        # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
-        "cell_type": element_type,
-        "variant": "lumped",  # Options: lumped, equispaced or DG.
-        # Default is lumped "method":"MLT"
-        # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
-        # You can either specify a cell_type+variant or a method
-        # accepted_variants = ["lumped", "equispaced", "DG"]
-        "degree": 4,  # p order p<=4 for 2D
-        "dimension": 2,  # dimension
-    }
-
-    # Number of cores for the shot. For simplicity, we keep things serial.
-    # spyro however supports both spatial parallelism and "shot" parallelism.
-    # Options: automatic (same number of cores for evey processor) or spatial
-    dictionary["parallelism"] = {
-        "type": "automatic",
-    }
-
-    # Define the domain size without the PML or AL. Here we'll assume a
-    # 1 x 1 km domain and compute the size for the Absorbing Layer (AL)
-    # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
-    Lz, Lx, Ly = [1., 1., 0.]
-    dictionary["mesh"] = {
-        "length_z": Lz,  # depth in km - always positive
-        "length_x": Lx,  # width in km - always positive
-        "length_y": Ly,  # thickness in km - always positive
-        "mesh_type": "firedrake_mesh",
-    }
-
-    # Create a source injection operator. Here we use a single source with a
-    # Ricker wavelet that has a peak frequency of 5 Hz injected at a specified
-    # point of the mesh. We also specify to record the solution at the corners
-    # of the domain to verify the efficiency of the absorbing layer.
-    dictionary["acquisition"] = {
-        "source_type": "ricker",
-        "source_locations": [(-0.5, 0.25)],  # (0.5 * Lz, 0.25 * Lx)
-        "frequency": 5.,  # in Hz
-        "delay": 1.5,
-        "receiver_locations": [(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)]
-    }
-
-    # Simulate for 2. seconds.
-    dictionary["time_axis"] = {
-        "initial_time": 0.,  # Initial time for event
-        "final_time": 2.,    # Final time for event
-        "dt": 0.001,  # timestep size in seconds
-        "amplitude": 1.,  # The Ricker has an amplitude of 1.
-        "output_frequency": 100,  # How frequently to output solution to pvds
-        "gradient_sampling_frequency": 100,  # How frequently to save to RAM
-    }
-
-    # Define Parameters for absorbing boundary conditions
-    dictionary["absorving_boundary_conditions"] = {
-        "status": True,  # Activate ABCs
-        "damping_type": "hybrid",  # Activate HABC
-    }
-
-    # Define parameters for visualization
-    dictionary["visualization"] = {}
-
-    return dictionary
-
-
-def wave_dict_3d(element_type, degree_eikonal):
-    '''
-    Create a dictionary with parameters for the model
-
-    Parameters
-    ----------
-    element_type : `str`
-        Type of finite element. 'T' for triangles or 'Q' for quadrilaterals
+    element_geometry : `str`
+        Geometry of the finite element. Options: "T" for triangles/tetrahedra or
+        "Q" for quadrilaterals/hexahedra.
+    dimension : `int`
+        Dimension of the problem. 2 for 2D and 3 for 3D.
     degree_eikonal : `int`
-        Finite element order for the Eikonal equation. Should be 1 or 2.
+        Finite element order for the Eikonal equation.
+    element_type : `str`
+        Finite element type. Options: "consistent" or "underintegrated".
 
     Returns
     -------
     dictionary : `dict`
-        Dictionary containing the parameters for the model
-    '''
+        Dictionary containing the parameters for the model.
+    """
 
     dictionary = {}
+    # Define options for the model. We specify the cell type, variant,
+    # degree, dimension and analysis type.
     dictionary["options"] = {
-        # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
-        "cell_type": element_type,
+        "cell_type": element_geometry,  # Options: tri/tetra(T) or quad/hexa(Q)
         "variant": "lumped",  # Options: lumped, equispaced or DG.
-        # Default is lumped "method":"MLT"
-        # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
-        # You can either specify a cell_type+variant or a method
-        # accepted_variants = ["lumped", "equispaced", "DG"]
-        "degree": 3,  # p order p<=3 for 3D
-        "dimension": 3,  # dimension
+        "degree": 4 if dimension == 2 else 3,  # p <= 4 for 2D and p <= 3 for 3D
+        "dimension": dimension,  # Model dimension
+        "analysis": "eikonal",  # Options: transient, modal or eikonal
     }
 
     # Number of cores for the shot. For simplicity, we keep things serial.
@@ -128,14 +52,16 @@ def wave_dict_3d(element_type, degree_eikonal):
         "type": "automatic",
     }
 
-    # Define the domain size without the PML or AL. Here we'll assume a
-    # 1 x 1 x 1 km domain and compute the size for the Absorbing Layer (AL)
-    # to absorb outgoing waves on boundries (-z, +-x, +-y sides) of the domain.
-    Lz, Lx, Ly = [1., 1., 1.]  # in km
+    # Define the domain size without the PML or AL. Here we'll assume a domain
+    # with a width and depth of 1 km, and a thickness of 1 km for the 3D case.
+    if dimension == 2:
+        length_z, length_x, length_y = [1., 1., 0.]
+    elif dimension == 3:
+        length_z, length_x, length_y = [1., 1., 1.]  # in km
     dictionary["mesh"] = {
-        "length_z": Lz,  # depth in km - always positive
-        "length_x": Lx,  # width in km - always positive
-        "length_y": Ly,  # thickness in km - always positive
+        "length_z": length_z,  # depth in km - always positive
+        "length_x": length_x,  # width in km - always positive
+        "length_y": length_y,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -144,147 +70,58 @@ def wave_dict_3d(element_type, degree_eikonal):
     # point of the mesh. We also specify to record the solution at the corners
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
-        "source_type": "ricker",
-        "source_locations": [(-0.5, 0.25, 0.5)],  # (0.5*Lz, 0.25*Lx, 0.25*Ly)
+        "source_locations": ([(-length_z / 2., length_x / 4.)] if dimension == 2
+                             else [(-length_z / 2., length_x / 4., length_y / 2.)]),
         "frequency": 5.,  # in Hz
-        "delay": 1.5,
-        "receiver_locations": [(-Lz, 0., 0.), (-Lz, Lx, 0.),
-                               (0., 0., 0), (0., Lx, 0.),
-                               (-Lz, 0., Ly), (-Lz, Lx, Ly),
-                               (0., 0., Ly), (0., Lx, Ly)]
-    }
-
-    # Simulate for 1.5 seconds.
-    dictionary["time_axis"] = {
-        "initial_time": 0.,  # Initial time for event
-        "final_time": 1.5,    # Final time for event
-        "dt": 0.001,  # timestep size in seconds
-        "amplitude": 1.,  # The Ricker has an amplitude of 1.
-        "output_frequency": 100,  # How frequently to output solution to pvds
-        "gradient_sampling_frequency": 100,  # How frequently to save to RAM
+        "receiver_locations": ([(-length_z, 0.),
+                                (-length_z, length_x),
+                                (0., 0.), (0., length_x)]
+                               if dimension == 2
+                               else [(-length_z, 0., 0.),
+                                     (-length_z, length_x, 0.),
+                                     (0., 0., 0),
+                                     (0., length_x, 0.),
+                                     (-length_z, 0., length_y),
+                                     (-length_z, length_x, length_y),
+                                     (0., 0., length_y),
+                                     (0., length_x, length_y)])
     }
 
     # Define Parameters for absorbing boundary conditions
     dictionary["absorving_boundary_conditions"] = {
         "status": True,  # Activate ABCs
-        "damping_type": "hybrid",  # Activate HABC
+        "abc_type": "hybrid",  # Activate HABC
         "degree_eikonal": degree_eikonal,  # FEM order for the Eikonal analysis
     }
 
     # Define parameters for visualization
-    dictionary["visualization"] = {}
+    str_ele = element_geometry + ("C" if element_type == 'consistent' else "U")
+    dictionary["visualization"] = {  # Output folder
+        "output_folder": f"output/eikonal_test{dimension}d/eik_test{dimension}d" + str_ele
+    }
 
     return dictionary
 
 
-class HABC_Wave(AcousticWave, HABC_Mesh):
-    '''
-    Class HABC that determines absorbing layer size and parameters to be used
-
-    Attributes
-    ----------
-    path_save : `string`
-        Path to save data
-
-    Methods
-    -------
-    None added to the ones inherited from AcousticWave and HABC_Mesh
-    '''
-
-    def __init__(self, dictionary=None, comm=None):
-        '''
-        Initialize the HABC class
-
-        Parameters
-        ----------
-        dictionary : `dict`, optional
-            A dictionary containing the input parameters for the HABC class
-        comm : `object`, optional
-            An object representing the communication interface
-            for parallel processing. Default is None
-
-        Returns
-        -------
-        None
-        '''
-
-        # Initializing the Wave class
-        AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
-
-        # Path to save data
-        self.path_save = getcwd() + "/output/eikonal_test"
-
-        # Original domain dimensions
-        dom_dim = (self.mesh_parameters.length_x,
-                   self.mesh_parameters.length_z)
-
-        if self.dimension == 2:  # 2D
-            self.path_save += "2d/"
-
-        if self.dimension == 3:  # 3D
-            self.path_save += "3d/"
-        dom_dim += (self.mesh_parameters.length_y,)
-
-        # Initializing the Mesh class
-        HABC_Mesh.__init__(
-            self, dom_dim, dimension=self.dimension,
-            quadrilateral=self.mesh_parameters.quadrilateral,
-            comm=self.comm)
-
-
-def critical_boundary_points(Wave_obj):
-    '''
-    Determine the critical points on domain boundaries of the original
-    model to size an absorbing layer using the Eikonal criterion for HABCs.
-    See Salas et al (2022) for details.
-
-    Parameters
-    ----------
-    Wave_obj : `habc.HABC_Wave`
-        An instance of the HABC_Wave class
-
-    Returns
-    -------
-    eik_bnd : `list`
-        Properties on boundaries according to minimum values of Eikonal
-        Structure sublist: [pt_cr, c_bnd, eikmin, z_par, lref, sou_cr]
-        - pt_cr : Critical point coordinates
-        - c_bnd : Propagation speed at critical point
-        - eikmin : Eikonal value in seconds
-        - z_par : Inverse of minimum Eikonal (Equivalent to c_bound / lref)
-        - lref : Distance to the closest source
-    '''
-
-    # Initializing Eikonal object
-    Eikonal = eik.HABC_Eikonal(Wave_obj)
-
-    # Solving Eikonal
-    Eikonal.solve_eik()
-
-    # Identifying critical points
-    eik_bnd = Eikonal.ident_crit_eik()
-
-    return eik_bnd
-
-
-def eikonal_analysis(dictionary, edge_length, f_est):
-    '''
-    Run the the Eikonal analysis
+def eikonal_analysis(dictionary, edge_length, f_est, element_type):
+    """Run the the Eikonal analysis.
 
     Parameters
     ----------
     dictionary : `dict`
-        Dictionary containing the parameters for the model
+        Dictionary containing the parameters for the model.
     edge_length : `float`
-        Mesh size in km
-    f_est : `float`, optional
+        Mesh size in km.
+    f_est : `float`
         Factor for the stabilizing term in Eikonal Eq.
+    element_type : `string`
+        Finite element type. Options: "consistent" or "underintegrated".
 
     Returns
     -------
     min_eik : `float`
-        Minimum Eikonal value in miliseconds
-    '''
+        Minimum Eikonal value in miliseconds.
+    """
 
     # ============ MESH FEATURES ============
 
@@ -292,44 +129,76 @@ def eikonal_analysis(dictionary, edge_length, f_est):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = HABC_Wave(dictionary=dictionary)
+    wave = AcousticWave(dictionary=dictionary)
 
     # Mesh
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+    wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
-    cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
-    Wave_obj.set_initial_velocity_model(conditional=cond)
+    cond = conditional(wave.mesh_x < 0.5, 3.0, 1.5)
+    wave.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
-    Wave_obj.preamble_mesh_operations(f_est=f_est)
+    wave.mesh_ops.preamble_mesh_operations(
+        wave, ele_type_eik=element_type, f_est=f_est)
 
     # Estimating computational resource usage
-    comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "MSH_")
+    comp_cost("tfin", tRef=tRef, user_name=wave.path_save + "MSH_")
 
     # ============ EIKONAL ANALYSIS ============
     # Reference to resource usage
     tRef = comp_cost("tini")
 
     # Finding critical points
-    eik_bnd = critical_boundary_points(Wave_obj)
+    wave.layer_ops.critical_boundary_points(wave)
 
     # Estimating computational resource usage
-    comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "EIK_")
+    comp_cost("tfin", tRef=tRef, user_name=wave.path_save + "EIK_")
 
     # Extracting  minimum Eikonal
-    min_eik = 1e3 * eik_bnd[0][2]
+    min_eik = 1e3 * wave.layer_ops.eik_bnd[0][2]
 
     return min_eik
 
 
-@pytest.mark.slow
-def test_loop_eikonal_2d():
-    '''
-    Loop for testing eikonal solver in 2D with the model
-    in Fig. 8 of Salas et al. (2022)
+@mark.older_firedrake
+@mark.parametrize("element_geometry, dimension, element_type",
+                  [("T", 2, "consistent"),
+                   ("T", 2, "underintegrated"),
+                   ("Q", 2, "consistent"),
+                   ("Q", 2, "underintegrated"),
+                   param("T", 3, "consistent", marks=mark.slow),
+                   param("T", 3, "underintegrated", marks=mark.slow),
+                   param("Q", 3, "consistent", marks=mark.slow),
+                   param("Q", 3, "underintegrated", marks=mark.slow)])
+def test_eikonal(element_geometry, dimension, element_type):
+    """Testing of eikonal for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
+    See Salas et al (2022): Hybrid absorbing scheme based on hyperelliptical
+    layers with non-reflecting boundary conditions in scalar wave equations.
+    doi: https://doi.org/10.1016/j.apm.2022.09.014
+
+    Parameters
+    ----------
+    element_geometry : `str`
+        Geometry of the finite element. Options: "T" for triangles/tetrahedra or
+        "Q" for quadrilaterals/hexahedra.
+    dimension : `int`
+        Dimension of the problem. 2 for 2D and 3 for 3D.
+    element_type : `str`
+        Finite element type. Options: "consistent" or "underintegrated".
+
+    Returns
+    -------
+    None
+
+    ==============================
+    Eikonal for 2D model Δx = 100m
+    ==============================
     eik_min = 83.333 ms (Theoretical value)
+
+    Consistent elements
+    -------------------
     f_est  T-ele   Q-ele
      0.01 66.836  65.002
      0.02 73.308  75.811
@@ -339,59 +208,22 @@ def test_loop_eikonal_2d():
      0.06 82.942* 85.118
      0.07 84.160  86.345
      0.08 85.233  87.480
-    '''
 
-    # ============ SIMULATION PARAMETERS ============
+    Underintegrated elements
+    ------------------------
+    p = 2         p = 4
+    f_est  T-ele  f_est  Q-ele
+     0.07 82.630*  0.03 84.245 *
+     0.08 84.272   0.04 85.593
+     0.09 85.654   0.05 86.887
 
-    # Mesh size (in km)
-    # cpw: cells per wavelength
-    # lba = minimum_velocity / source_frequency
-    # edge_length = lba / cpw
-    edge_length = 0.1
-
-    # Factor for the stabilizing term in Eikonal equation
-
-    for case in range(0, 2):
-
-        # Element type
-        ele_type_lst = ["T", "Q"]
-
-        # Factor for the stabilizing term in Eikonal equation
-        f_est_lst = [0.06, 0.05]
-
-        # Get simulation parameters
-        ele_type = ele_type_lst[case]
-        f_est = f_est_lst[case]
-        print("\nMesh Size: {:.4f} m".format(1e3 * edge_length), flush=True)
-        print("Element type: {}".format(ele_type), flush=True)
-        print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
-
-        try:
-            # ============ MESH AND EIKONAL ============
-
-            # Create dictionary with parameters for the model
-            dict_2d = wave_dict_2d(ele_type)
-
-            # Creating mesh and performing eikonal analysis
-            min_eik = round(eikonal_analysis(dict_2d, edge_length, f_est), 3)
-
-            thr_val = 83.333  # in ms
-            assert isclose(min_eik / thr_val, 1., atol=5e-3), \
-                f"✗ Minimum Eikonal 2D Element-{ele_type} " + \
-                f"→ Expected value {thr_val}, got {min_eik:.3f}"
-            print(f"✓ Minimum Eikonal 2D Verified: expected "
-                  f"{thr_val}, got = {min_eik:.3f}", flush=True)
-
-        except fire.ConvergenceError as e:
-            pytest.fail(f"Checking Eikonal 2D raised an exception: {str(e)}")
-
-
-def test_loop_eikonal_3d():
-    '''
-    Loop for testing eikonal solver in 3D with the model
-    in Fig. 8 of Salas et al. (2022)
-
+    ==============================
+    Eikonal for 3D model Δx = 150m
+    ==============================
     eik_min = 83.333 ms (Theoretical value)
+
+    Consistent elements
+    -------------------
     f_est  T-ele   Q-ele
      0.02  --/--  69.442
      0.03 76.777  70.974
@@ -400,7 +232,31 @@ def test_loop_eikonal_3d():
      0.06 85.347  78.548
      0.07 88.562  81.431*
      0.08 91.876  84.377
-    '''
+
+    Underintegrated elements
+    ------------------------
+    p = 2         p = 3
+    f_est  T-ele  f_est   Q-ele
+     0.07 85.178*  0.03 78.838
+     0.08 87.990   0.04 80.940
+     0.09 90.933   0.05 83.130*
+     0.10 93.988   0.06 85.408
+
+    p = 1-T-full integration
+    f_est  T-ele
+     0.06 96.300
+     0.07 96.845
+     0.08 97.277
+
+    p = 3-T-full integration
+    f_est   T-ele
+     0.03  96.223
+     0.04 101.550
+     0.05 107.164
+    """
+
+    pprint("\n" + 60 * "=" + f"\nTesting Eikonal with {element_geometry}-{element_type} "
+           + f"elements for {dimension}D case\n" + 60 * "=", comm=comm)
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -408,46 +264,52 @@ def test_loop_eikonal_3d():
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length = 0.15
+    edge_length = 0.1 if dimension == 2 else 0.15
 
-    # Factor for the stabilizing term in Eikonal equation
+    # Eikonal degree and factor for the stabilizing term in Eikonal equation
+    if dimension == 2:
+        atol = 5e-3 if element_type == 'consistent' else 1.5e-2
+        if element_geometry == "T":
+            p_eik = 2 if element_type == 'consistent' else 2
+            f_est = 0.06 if element_type == 'consistent' else 0.07
 
-    for case in range(0, 1):
+        else:
+            p_eik = 2 if element_type == 'consistent' else 4
+            f_est = 0.05 if element_type == 'consistent' else 0.03
 
-        # Element type
-        ele_type_lst = ["T", "Q"]
+    if dimension == 3:
+        atol = 3e-2 if element_type == 'consistent' else 2.5e-2
+        if element_geometry == "T":
+            p_eik = 2 if element_type == 'consistent' else 2
+            f_est = 0.05 if element_type == 'consistent' else 0.07
+        else:
+            p_eik = 2 if element_type == 'consistent' else 3
+            f_est = 0.07 if element_type == 'consistent' else 0.05
 
-        # Eikonal degree
-        degree_eikonal_lst = [2, 2]
+    # Get simulation parameters
+    pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
+    pprint(f"Element Geometry: {element_geometry}", comm=comm)
+    pprint(f"Element Type: {element_type}", comm=comm)
+    pprint(f"Eikonal Degree: {p_eik}", comm=comm)
+    pprint(f"Eikonal Stabilizing Factor: {f_est:.2f}", comm=comm)
 
-        # Factor for the stabilizing term in Eikonal equation
-        f_est_lst = [0.05, 0.07]
-
-        # Get simulation parameters
-        ele_type = ele_type_lst[case]
-        p_eik = degree_eikonal_lst[case]
-        f_est = f_est_lst[case]
-        print("\nMesh Size: {:.4f} m".format(1e3 * edge_length), flush=True)
-        print("Element type: {}".format(ele_type), flush=True)
-        print("Eikonal Degree: {}".format(p_eik), flush=True)
-        print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
+    try:
 
         # ============ MESH AND EIKONAL ============
-        try:
 
-            # Create dictionary with parameters for the model
-            dict_3d = wave_dict_3d(ele_type, p_eik)
+        # Create dictionary with parameters for the model
+        dictionary = wave_dict(element_geometry, dimension, p_eik, element_type)
 
-            # Creating mesh and performing eikonal analysis
-            min_eik = round(eikonal_analysis(dict_3d, edge_length, f_est), 3)
+        # Creating mesh and performing eikonal analysis
+        min_eik = round(eikonal_analysis(dictionary, edge_length, f_est, element_type), 3)
 
-            thr_val = 83.333  # in ms
+        thr_val = 83.333  # in ms
+        assert isclose(min_eik / thr_val, 1., atol=atol), \
+            f"✗ Minimum Eikonal {dimension}D Element-{element_geometry}-" + \
+            f"{element_type} → Expected value {thr_val}, got {min_eik:.3f}"
+        pprint(f"✓ Minimum Eikonal {dimension}D Element-{element_geometry}-{element_type}"
+               f" Verified: expected {thr_val}, got {min_eik:.3f}", comm=comm)
 
-            assert isclose(min_eik / thr_val, 1., atol=3e-2), \
-                f"✗ Minimum Eikonal 3D Element-{ele_type} " + \
-                f"→ Expected value {thr_val}, got {min_eik:.3f}"
-            print(f"✓ Minimum Eikonal 3D Verified: expected "
-                  f"{thr_val}, got = {min_eik:.3f}", flush=True)
-
-        except fire.ConvergenceError as e:
-            pytest.fail(f"Checking Eikonal 3D raised an exception: {str(e)}")
+    except ConvergenceError as e:
+        fail(f"Checking Eikonal {dimension}D Element-{element_geometry}-"
+             f"{element_type} raised an exception: {str(e)}")

@@ -70,7 +70,7 @@ rectangle_dictionary["inversion"] = {
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
 rectangle_dictionary["absorving_boundary_conditions"] = {
     "status": True,
-    "damping_type": "PML",
+    "abc_type": "PML",
     "exponent": 2,
     "cmax": 4.5,
     "R": 1e-6,

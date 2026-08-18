@@ -16,17 +16,16 @@ To use spyro, you'll need to have some knowledge of Python and some basic concep
 
 If you want to know more or cite our code please see our open access publication: https://gmd.copernicus.org/articles/15/8639/2022/gmd-15-8639-2022.html
 
-Development branch warning
+Development features warning
 ==========================
 
-**Warning:** this repository state corresponds to a private development branch and may contain interfaces and behaviors that are still being stabilized.
+**Warning:** this repository may contain interfaces and behaviors that are still being stabilized.
 Use with care for research and production workflows.
 
 The following functionalities are available in this branch, have test coverage, but are **not yet completely verified**:
 
-* Isotropic elastic wave solver (`spyro.IsotropicWave`) in 2D and 3D, including elastic examples such as `spyro/examples/camembert_elastic.py` and `spyro/examples/elastic_cube_3D.py`.
-* Elastic local absorbing boundary conditions (for example `Stacey` and `CE_A1`) and related time integration variants exercised in `spyro/examples/elastic_local_abc.py` and `tests/on_one_core/test_elastic_local_abc.py`.
-* Elastic model parameter initialization paths (Lame parameters and velocity-based parameterizations) covered in `tests/on_one_core/test_isotropic_wave.py`.
+* PLease add here
+* Please add here
 
 Installation
 =============
@@ -94,9 +93,16 @@ pip install --no-binary h5py 'firedrake[check,slepc,netgen,vtk]'
 ```
 
 
-8. To install spyro without optional dependencies, inside the Firedrake virtual environment, use:
+8. To install spyro in editable mode with the development extras, inside the Firedrake virtual environment, use:
 ```
 git clone https://github.com/NDF-Poli-USP/spyro.git
+python -m pip install -e "spyro/[dev]"
+```
+
+This development extra installs the testing, profiling, and mesh generation packages including pytest, pytest-cov, pyinstrument, memory-profiler, SeismicMesh, and PakMsh.
+
+For a minimal install without those extras, use:
+```
 python -m pip install -e spyro/
 ```
 
@@ -229,33 +235,33 @@ dictionary["visualization"] = {
 
 
 # Create an AcousticWave object with the above dictionary.
-Wave_obj = spyro.AcousticWave(dictionary=dictionary)
+wave = spyro.AcousticWave(dictionary=dictionary)
 
 # Defines the element size in the automatically generated firedrake mesh.
-Wave_obj.set_mesh(dx=0.01)
+wave.set_mesh(dx=0.01)
 
 
 # Manually create a simple two layer seismic velocity model.
 # Note: the user can specify their own velocity model in a HDF5 or SEG-Y file format.
 # The HDF5 file has to contain an array with
 # the velocity data and it is linearly interpolated onto the mesh nodes at run-time.
-z = Wave_obj.mesh_z
+z = wave.mesh_z
 import firedrake as fire
 velocity_conditional = fire.conditional(z > -0.35, 1.5, 3.0)
-Wave_obj.set_initial_velocity_model(conditional=velocity_conditional, output=True)
+wave.set_initial_velocity_model(conditional=velocity_conditional, output=True)
 
 # And now we simulate the shot using a 2nd order central time-stepping scheme
 # Note: simulation results are stored in the folder `~/results/` by default
-Wave_obj.forward_solve()
+wave.forward_solve()
 
 # Visualize the shot record
-spyro.plots.plot_shots(Wave_obj, show=True)
+spyro.plots.plot_shots(wave, show=True)
 
 # Save the shot (a Numpy array) as a pickle for other use.
-spyro.io.save_shots(Wave_obj)
+spyro.io.save_shots(wave)
 
 # can be loaded back via
-my_shot = spyro.io.load_shots(Wave_obj)
+my_shot = spyro.io.load_shots(wave)
 ```
 
 ### Testing

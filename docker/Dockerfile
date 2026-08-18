@@ -1,4 +1,5 @@
-FROM firedrakeproject/firedrake:2025.4.2 AS spyro_base
+ARG FIREDRAKE_VERSION=2025.4.1
+FROM firedrakeproject/firedrake:${FIREDRAKE_VERSION} AS spyro_base
 
 USER root
 RUN apt-get update \
@@ -8,22 +9,22 @@ RUN apt-get update \
 
 RUN pip3 install segyio
 
-# spyro dependencies
 USER root
 RUN apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk
-RUN pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git
-RUN pip3 install pyamg
-RUN pip3 install meshio
+RUN pip3 install --no-cache-dir  meshio
+RUN pip3 install --no-cache-dir  pyamg
 
 FROM spyro_base AS spyro_release
 
-RUN pip install git+https://github.com/NDF-Poli-USP/spyro.git
+RUN pip install --no-cache-dir git+https://github.com/NDF-Poli-USP/spyro.git
 
 FROM spyro_base AS spyro_development
+# spyro dependencies
+# I install some here instead of the devcontainers.json 
+# to reduce time rebuilding containers in vs code
 
-# Profiling tools
+RUN pip3 install --no-dependencies --no-cache-dir git+https://github.com/NDF-Poli-USP/SeismicMesh.git
+RUN pip3 install --no-cache-dir "pakmsh[examples] @ git+https://github.com/NDF-Poli-USP/PakMsh.git"
 RUN pip3 install -U memory_profiler
 
-RUN pip3 install pytest pytest-cov
-WORKDIR /home/
-RUN echo "/home/shared/spyro" >> /usr/local/lib/python3.12/site-packages/shared.pth
+WORKDIR /workspace

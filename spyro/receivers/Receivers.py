@@ -1,8 +1,13 @@
 from firedrake import *  # noqa: F403
-from firedrake.__future__ import interpolate
 from spyro.receivers.dirac_delta_projector import Delta_projector
+from ..domains.space import create_function_space
 from ..utils.typing import WaveType
 import numpy as np
+from ..tools.version_control import is_firedrake_new
+
+
+if is_firedrake_new() is False:
+    from firedrake.__future__ import interpolate
 
 
 class Receivers(Delta_projector):
@@ -48,28 +53,28 @@ class Receivers(Delta_projector):
         in timestep IT, for usage with adjoint propagation
     """
 
-    def __init__(self, wave_object):
+    def __init__(self, wave):
         """Initializes class and gets all receiver parameters from
         input file.
         Parameters
         ----------
-        wave_object: :class: 'Wave' object
+        wave: :class: 'Wave' object
             Waveform object that contains all simulation parameters
         Returns
         -------
         Receivers: :class: 'Receiver' object
         """
-        super().__init__(wave_object)
-        self.point_locations = wave_object.receiver_locations
+        super().__init__(wave)
+        self.point_locations = wave.receiver_locations
 
-        if self.dimension == 3 and wave_object.automatic_adjoint:
+        if self.dimension == 3 and wave.automatic_adjoint:
             # self.column_x = model["acquisition"]["num_rec_x_columns"]
             # self.column_y = model["acquisition"]["num_rec_y_columns"]
             # self.column_z = model["acquisition"]["num_rec_z_columns"]
             # self.number_of_points = self.column_x*self.column_y
             raise ValueError("Implement this later")
         else:
-            self.number_of_points = wave_object.number_of_receivers
+            self.number_of_points = wave.number_of_receivers
 
         self.is_local = [0] * self.number_of_points
         if not self.automatic_adjoint:
@@ -158,9 +163,9 @@ class Receivers(Delta_projector):
             redundant=vom_redundant,
             name=vom_name)
         if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
-            V_r = VectorFunctionSpace(vom, "DG", 0)
+            V_r = create_function_space(vom, "DG0", 0, dim=self.dimension)
         elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
-            V_r = FunctionSpace(vom, "DG", 0)
+            V_r = create_function_space(vom, "DG0", 0)
         else:
             raise ValueError("Invalid wave type")
         return interpolate(f, V_r)

@@ -1,3 +1,4 @@
+from ..utils.error_management import validate_numeric, validate_parameter
 
 
 class Read_options:
@@ -6,20 +7,22 @@ class Read_options:
 
     Attributes
     ----------
-    options_dictionary : dict
+    options_dictionary : `dict`
         Dictionary containing the options information.
-    cell_type : str
+    cell_type : `str`
         The cell type to be used.
-    method : str
+    method : `str`
         The FEM method to be used.
-    variant : str
+    variant : `str`
         The quadrature variant to be used.
-    degree : int
+    degree : `int`
         The polynomial degree of the FEM method.
-    dimension : int
+    dimension : `int`
         The spatial dimension of the problem.
     automatic_adjoint : bool
         Whether to automatically compute the adjoint.
+    analysis : `str`
+        The type of analysis to be performed. Can be 'transient', 'modal' or 'eikonal'.
 
     Methods
     -------
@@ -43,14 +46,15 @@ class Read_options:
         options_dictionary.setdefault("degree", None)
         options_dictionary.setdefault("dimension", None)
         options_dictionary.setdefault("automatic_adjoint", False)
+        options_dictionary.setdefault("analysis", "transient")
         self.options_dictionary = options_dictionary
 
         self.variant = options_dictionary["variant"]
         self.method = options_dictionary["method"]
-        if options_dictionary["cell_type"] is not None:
-            self.cell_type = options_dictionary["cell_type"]
+        self.cell_type = options_dictionary["cell_type"]
         self.degree = options_dictionary["degree"]
         self.dimension = options_dictionary["dimension"]
+        self.analysis = options_dictionary["analysis"]
 
     @property
     def variant(self):
@@ -59,9 +63,7 @@ class Read_options:
     @variant.setter
     def variant(self, value):
         accepted_variants = ["lumped", "equispaced", "DG", None]
-        if value not in accepted_variants:
-            raise ValueError(f"Variant of {value} is not valid.")
-        self._variant = value
+        self._variant = validate_parameter("variant", value, accepted_variants)
 
     @property
     def method(self):
@@ -86,6 +88,14 @@ class Read_options:
             "DGQ",
             "discontinuous_galerkin_quadrilateral",
         ]
+
+        # Check if the provided value is in any of the accepted methods
+        validate_parameter(
+            "method",
+            value,
+            mlt_equivalents + sem_equivalents + dg_t_equivalents + dg_q_equivalents + ["CG", None],
+        )
+
         if value in mlt_equivalents:
             self._method = "mass_lumped_triangle"
             self.cell_type = "triangle"
@@ -98,21 +108,13 @@ class Read_options:
         elif value in dg_q_equivalents:
             self._method = "DG_quadrilateral"
             self.cell_type = "quadrilateral"
-        elif value == "DG":
-            raise ValueError(
-                "DG is not a valid method. Please specify \
-                either DG_triangle or DG_quadrilateral."
-            )
         elif value == "CG":
-            if "variant" in self.input_dictionary["options"] and "cell_type" \
-                    in self.input_dictionary["options"]:
-                self._method = "CG"
-            else:
+            options = self.input_dictionary["options"]
+            if not ("variant" in options and "cell_type" in options):
                 raise ValueError("Cant use CG without specifying cell type and variant.")
+            self._method = "CG"
         elif value is None:
             self._method = None
-        else:
-            raise ValueError(f"Method of {value} is not valid.")
 
     @property
     def cell_type(self):
@@ -178,9 +180,11 @@ class Read_options:
 
     @degree.setter
     def degree(self, value):
-        if not isinstance(value, int):
-            raise ValueError("Degree has to be integer")
-        self._degree = value
+        self._degree = validate_numeric(
+            'degree', value, float_num=False,
+            integer_num=True, lower_bound=0,
+            include_lower_bound=False,
+        )
 
     @property
     def dimension(self):
@@ -188,33 +192,56 @@ class Read_options:
 
     @dimension.setter
     def dimension(self, value):
-        if value not in {2, 3}:
-            raise ValueError(f"Dimension of {value} not 2 or 3.")
-        self._dimension = value
+        self._dimension = validate_parameter('dimension', value, [2, 3])
+
+    @property
+    def analysis(self):
+        return self._analysis
+
+    @analysis.setter
+    def analysis(self, value):
+        allowed_analyses = ["transient", "modal", "eikonal"]
+        self._analysis = validate_parameter('analysis', value, allowed_analyses)
 
 
 class Read_outputs:
     def __init__(self):
+        """"Read the 'visualization' section of the input dictionary."""
 
         v_str = "visualization"
         self.input_dictionary.setdefault(v_str, {})
+
+        # Forward output
         self.input_dictionary[v_str].setdefault("forward_output", False)
         self.forward_output = self.input_dictionary[v_str]["forward_output"]
+
         self.input_dictionary[v_str].setdefault("forward_output_filename",
                                                 "results/forward.pvd")
         self.forward_output_filename = self.input_dictionary[
             v_str]["forward_output_filename"]
+
+        # General output folder
+        self.input_dictionary[v_str].setdefault("output_folder", "output")
+        self.output_folder = self.input_dictionary[v_str]["output_folder"]
+
+        # Gradient output
         self.input_dictionary[v_str].setdefault("gradient_output", False)
         self.gradient_output = self.input_dictionary[v_str]["gradient_output"]
-        self.input_dictionary[v_str].setdefault("gradient_filename",
-                                                "results/gradient.pvd")
+        self.input_dictionary[v_str].setdefault(
+            "gradient_filename", "results/gradient.pvd",
+        )
         self.gradient_filename = self.input_dictionary[
             v_str]["gradient_filename"]
+
+        # Adjoint output
         self.input_dictionary[v_str].setdefault("adjoint_output", False)
         self.adjoint_output = self.input_dictionary[v_str]["adjoint_output"]
-        self.input_dictionary[v_str].setdefault("adjoint_filename",
-                                                "results/adjoint.pvd")
+        self.input_dictionary[v_str].setdefault(
+            "adjoint_filename", "results/adjoint.pvd",
+        )
         self.adjoint_filename = self.input_dictionary[
             v_str]["adjoint_filename"]
+
+        # Debug output
         self.input_dictionary[v_str].setdefault("debug_output", False)
         self.debug_output = self.input_dictionary[v_str]["debug_output"]

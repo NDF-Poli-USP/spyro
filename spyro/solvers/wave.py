@@ -1,23 +1,26 @@
 from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
-import spyro.meshing.meshing_operations as mshops
 
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
 from ..domains.quadrature import quadrature_rules
-from ..domains.space import check_function_space_type
+from ..domains.space import check_function_space_type, create_function_space
 from ..io import Model_parameters
 from ..io import material_properties_io
-from ..io.basicio import ensemble_propagator
+from ..io.parallelism_wrappers import ensemble_propagator
 from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
-from ..utils.typing import FunctionalEvaluationMode, WaveType
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
+from ..utils.error_management import validate_enum
+from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
+                            LayerShapeType, WaveType)
 from .modal.modal_sol import Modal_Solver
+from .automatic_differentiation_solver import AutomatedAdjoint
+
 
 fire.set_log_level(fire.ERROR)
 
@@ -29,65 +32,102 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     Attributes:
     -----------
     comm : `object`
-        An object representing the communication interface
+        An object representing the communication interface.
     boundary_idx_map: dict
-        Mapping of boundary IDs for applying absorbing boundary conditions
-    initial_velocity_model: firedrake function
-        Initial velocity model
+        Mapping of boundary IDs for applying absorbing boundary conditions.
+    initial_velocity_model: `Firedrake.Function`
+        Initial velocity model.
     function_space: firedrake function space
-        Function space for the wave equation
+        Function space for the wave equation.
     current_time: float
-        Current time of the simulation
+        Current time of the simulation.
     solver_parameters: Python object
-        Contains solver parameters
-    real_shot_record: firedrake function
-        Real shot record
-    mesh: firedrake mesh
-        Mesh used in the simulation (2D or 3D)
+        Contains solver parameters.
+    real_shot_record: `Firedrake.Function`
+        Real shot record.
+    mesh: `Firedrake.Mesh`
+        Mesh used in the simulation (2D or 3D).
+    mesh_parameters : `Python object`
+        Contains mesh parameters.
     mesh_x: `ufl.geometry.SpatialCoordinate`
-        Symbolic coordinate x of the mesh object
+        Symbolic coordinate x of the mesh object.
     mesh_y: `ufl.geometry.SpatialCoordinate`
-        Symbolic coordinate y of the mesh object
+        Symbolic coordinate y of the mesh object.
     mesh_z : `ufl.geometry.SpatialCoordinate`
-        Symbolic coordinate z of the mesh object
+        Symbolic coordinate z of the mesh object.
     sources: Sources object
-        Contains information about sources
+        Contains information about sources.
     receivers: Receivers object
-        Contains information about receivers
+        Contains information about receivers.
+    path_case_abc : `string`
+        Path to save data for the abc case study.
+    path_save : `string`
+        Path to save data
+    mesh_ops : `meshing_operations.MeshOps` or `meshing_HABC.HABCMesh`.
+        Mesh operation manager
+    layer_ops : `habc.HABCLayer` or `pml_nsnc.PMLLayer`
+        ABC layer operation manager.
 
     Methods:
     --------
     get_and_set_maximum_dt()
-        Calculates and/or sets maximum dt
+        Calculates and/or sets maximum dt.
     get_mass_matrix_diagonal()
-        Returns diagonal of mass matrix
+        Returns diagonal of mass matrix.
     get_spatial_coordinates()
         Get the coordinates of the mesh.
     set_mesh()
-        Sets or calculates new mesh
+        Sets or calculates new mesh.
     set_initial_velocity_model()
-        Sets initial velocity model
+        Sets initial velocity model.
     set_last_solve_as_real_shot_record()
-        Sets last solve as real shot record
+        Sets last solve as real shot record.
     set_solver_parameters()
-        Sets new or default solver parameters
+        Sets new or default solver parameters.
+
+    Notes
+    -----
+    New attributes added to the wave object in mesh_parameters:
+    mesh_parameters.alpha : `float`
+        Ratio between the representative mesh dimensions.
+    mesh_parameters.diam_mesh : `ufl.geometry.CellDiameter`
+        Mesh cell diameters.
+    mesh_parameters.lmin : `float`
+        Minimum mesh size.
+    mesh_parameters.lmax : `float`
+        Maxmum mesh size.
+    mesh_parameters.tol : `float`
+        Tolerance for searching nodes in the mesh.
     """
 
-    def __init__(self, dictionary=None, comm=None):
+    def __init__(self, dictionary=None, wave_type=WaveType.NONE, comm=None):
         """Wave object solver. Contains both the forward solver
         and gradient calculator methods.
 
-        Parameters:
-        -----------
-        comm: MPI communicator
+        Parameters
+        ----------
+        dictionary : `dict`, optional
+            A dictionary containing the input parameters for the Wave class.
+            Default is None
+        wave_type : `typing.WaveType`, optional
+            The type of wave equation to solve. Default is `WaveType.NONE`
+        comm : `object`, optional
+            MPI communicator for parallel execution. Default is `None`.
 
-        model_parameters: Python object
-            Contains model parameters
+        Returns
+        -------
+        None
+
+        model_parameters : `Python object`
+            Contains model parameters.
         """
+
         super().__init__(dictionary=dictionary, comm=comm)
         self.initial_velocity_model = None
         self.gradient_mask_available = False
-        self.wave_type = WaveType.NONE
+
+        # Setting wave type
+        self.wave_type = validate_enum("wave_type", wave_type, WaveType)
 
         self.function_space = None
         self.dg0_scalar_function_space = None
@@ -96,21 +136,30 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.vector_function_space = None
         self.tensor_function_space0 = None
         self.tensor_function_space1 = None
-        self.forward_solution_receivers = None
+        self._forward_solution_receivers = None
+        self._store_forward_time_steps = False
+        self.forward_solution = None
         self.adjoint_solution = None
+        self.adjoint_type = AdjointType.NONE
+        self.automated_adjoint = None
+        self.functional_value = None
+        self.misfit = None
         self.current_time = 0.0
+        self.source_expression = None  # Expression for sources using UFL (less efficient)
         self.set_solver_parameters()
 
+        # Create or get the mesh
         self.mesh = self.get_mesh()
         self.c = None
         self.sources = None
+        self.real_shot_record = None
 
-        # Creating mesh operations manager
-        self.mesh_ops = mshops.MeshOps(
-            self.domain_dimensions(), dimension=self.dimension,
-            quadrilateral=self.mesh_parameters.quadrilateral,
-            comm=self.mesh_parameters.comm)
+        self.set_solver_parameters()
 
+        # Mesh manager
+        self.mesh_manager()
+
+        # Getting parameters from the mesh
         if self.mesh is not None:
             self.building_mesh_derived_paramenters()
         elif self.mesh_parameters.mesh_type == "firedrake_mesh":
@@ -119,10 +168,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             )
         else:
             warnings.warn("No mesh found. Please define a mesh.")
-        # Expression to define sources through UFL (less efficient)
-        self.source_expression = None
-        self.real_shot_record = None
 
+        # Creating absorbing layer manager if needed
+        if self.abc_active:
+            self.layer_manager()
+
+        # Logger
         self.field_logger = FieldLogger(self.comm,
                                         self.input_dictionary["visualization"])
         self.field_logger.add_field("forward", self.get_function_name(),
@@ -136,7 +187,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        if self.abc_boundary_layer_type != "hybrid":
+        if self.abc_type in [AbsorbingBCsType.NOABCS, AbsorbingBCsType.NRBC]:
             self._initialize_model_parameters()
         self.matrix_building()
         self.wave_propagator()
@@ -151,6 +202,29 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Builds the matrix for the forward problem."""
         pass
 
+    def get_absorbing_boundaries(self):
+        """Get the absorbing boundaries for the problem.
+
+        Parameters:
+        -----------
+        None
+
+        Returns:
+        --------
+        boundaries : `tuple`
+            Tuple containing the boundary boolean labels for applying absorbing BCs.
+            - (absorb_top, absorb_bottom, absorb_right, absorb_left) for 2D
+            - (absorb_top, absorb_bottom, absorb_right,
+                absorb_left, absorb_front, absorb_back) for 3D
+        """
+        boundaries = (self.absorb_top, self.absorb_bottom,
+                      self.absorb_right, self.absorb_left)
+
+        if self.dimension == 3:
+            boundaries += (self.absorb_front, self.absorb_back,)
+
+        return boundaries
+
     def building_mesh_derived_paramenters(self):
         """Build parameters that are derived from the mesh."""
         coordinates = self.mesh_ops._set_spatial_coordinates(self.mesh)
@@ -160,20 +234,35 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._build_function_space()
         self._map_sources_and_receivers()
 
-        # TODO: Create a flag for other domains that are not of type box
-        if self.mesh_ops.func_space_type is None:
-            self.mesh_ops.func_space_type = 'scalar' \
-                if len(self.function_space.value_shape) == 0 else 'vector'
-        boundaries = [self.absorb_top, self.absorb_bottom,
-                      self.absorb_right, self.absorb_left]
-        if self.dimension == 3:
-            boundaries.extend([self.absorb_front,
-                               self.absorb_back])
+        # Function space type for the mesh operations
+        self.mesh_ops.func_space_type = 'scalar' \
+            if self.wave_type == WaveType.ISOTROPIC_ACOUSTIC else 'vector'
+
+        # Get boundaries
+        boundaries = self.get_absorbing_boundaries()
 
         # Build the boundary ID mapping
-        self.mesh_parameters.boundary_idx_map = \
-            self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
-                                               boundaries, box_domain=True)
+        # TODO: Include the logic for hypershape layer from HABC
+        # TODO: Create a flag for other domains that are not of type box
+        if not (hasattr(self, 'abc_boundary_layer_shape')
+                and hasattr(self.mesh_parameters, 'boundary_ids_map')
+                and self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE):
+            self.mesh_parameters.boundary_ids_map, \
+                self.mesh_parameters.boundary_nodes_ids = \
+                self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
+                                                   boundaries, box_domain=True,
+                                                   get_boundary_node_ids=True)
+
+        # Get geometry parameters from mesh
+        if self.mesh_ops.func_space_type == 'scalar' \
+                and not hasattr(self.mesh_parameters, 'diam_mesh'):
+            data_mesh = self.mesh_ops.representative_mesh_dimensions(self.mesh,
+                                                                     self.function_space)
+            self.mesh_parameters.diam_mesh = data_mesh[0]
+            self.mesh_parameters.lmin = data_mesh[1]
+            self.mesh_parameters.lmax = data_mesh[2]
+            self.mesh_parameters.alpha = data_mesh[3]
+            self.mesh_parameters.tol = data_mesh[4]
 
     def set_mesh(
             self,
@@ -248,6 +337,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         new_file=None,
         output=False,
         dg_velocity_model=True,
+        fast_interpolate=False,
     ):
         """Method to define new user velocity model or file. It is optional.
 
@@ -281,7 +371,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         if conditional is not None:
             if dg_velocity_model:
-                V = fire.FunctionSpace(self.mesh, "DG", 0)
+                V = create_function_space(self.mesh, "DG0", 0)
             else:
                 V = self.function_space
             vp = fire.Function(V, name="velocity")
@@ -298,7 +388,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.initial_velocity_model = velocity_model_function
         elif new_file is not None:
             self.initial_velocity_model_file = new_file
-            self._initialize_model_parameters()  # TODO in PR206
+            self._initialize_model_parameters(fast_interpolate=fast_interpolate)  # TODO in PR206
         elif constant is not None:
             V = self.function_space
             vp = fire.Function(V, name="velocity")
@@ -317,7 +407,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def _map_sources_and_receivers(self):
         if self.source_type == "ricker":
             self.sources = Sources(self)
+            self.sources.wave_type = self.wave_type
         self.receivers = Receivers(self)
+        self.receivers.wave_type = self.wave_type
 
     @abstractmethod
     def _initialize_model_parameters(self):
@@ -330,6 +422,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def _build_function_space(self):
         self.function_space = self._create_function_space()
         function_space_type = check_function_space_type(self.function_space)
+
         if function_space_type == "scalar":
             self.scalar_function_space = self.function_space
         elif function_space_type == "mixed":
@@ -368,10 +461,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # Maximum timestep size
         method = 'ANALYTICAL' if estimate_max_eigenvalue else 'ARNOLDI'
-        dt_solver = Modal_Solver(self.dimension, method=method,
-                                 calc_max_dt=True)
-        max_dt = dt_solver.estimate_timestep(c, self.function_space,
-                                             self.final_time,
+        dt_solver = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
+        max_dt = dt_solver.estimate_timestep(c, self.function_space, self.final_time,
                                              quad_rule=self.quadrature_rule,
                                              fraction=fraction)
         self.dt = max_dt
@@ -506,6 +597,50 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Backward-compatible alias for set_material_properties."""
         return self.set_material_properties(*args, **kwargs)
 
+    @property
+    def store_forward_time_steps(self):
+        return self._store_forward_time_steps
+
+    @store_forward_time_steps.setter
+    def store_forward_time_steps(self, value):
+        self._store_forward_time_steps = value
+
+    def enable_automated_adjoint(self):
+        self.store_forward_time_steps = False
+        self.enable_compute_functional(
+            mode=FunctionalEvaluationMode.PER_TIMESTEP
+        )
+        self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
+        self.use_vertex_only_mesh = True
+        self._initialize_model_parameters()
+        if self.c is None:
+            raise ValueError(
+                "self.c must be set before enabling automated adjoint."
+                "Please set the velocity model using set_initial_velocity_model()"
+                "or set c directly."
+            )
+        controls = self.c
+        # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
+        # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
+        # that the reduced functional is built as an
+        # ``EnsembleReducedFunctional``, summing the per-shot functionals and
+        # gradients over the ensemble communicator.
+        self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
+        self.functional_value = None
+        self.misfit = None
+
+    def enable_implemented_adjoint(self):
+        self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
+        self.store_forward_time_steps = True
+
+    @property
+    def forward_solution_receivers(self):
+        return self._forward_solution_receivers
+
+    @forward_solution_receivers.setter
+    def forward_solution_receivers(self, value):
+        self._forward_solution_receivers = value
+
     def enable_compute_functional(
         self, mode=FunctionalEvaluationMode.AFTER_SOLVE
     ):
@@ -519,7 +654,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         # Create the Wave attributes required to compute functional.
         self.functional_evaluation_mode = mode
-        self.functional_value = None
 
     @property
     def functional_evaluation_mode(self):
@@ -537,3 +671,174 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 f"Expected an instance of FunctionalEvaluationMode enum."
             )
         self._functional_evaluation_mode = mode
+        self.functional_value = None
+        self.misfit = None
+
+    def mesh_manager(self):
+        """Create the mesh operations manager for the wave solver."""
+
+        # Domain dimensions
+        domain_dim = self.domain_dimensions()
+
+        if self.abc_active:  # If ABC scheme is used
+            from ..meshing.meshing_habc import HABCMesh
+            self.mesh_ops = HABCMesh(domain_dim, dimension=self.dimension,
+                                     quadrilateral=self.mesh_parameters.quadrilateral,
+                                     comm=self.mesh_parameters.comm)
+
+        else:  # If no ABC scheme is used
+            from ..meshing.meshing_operations import MeshOps
+            self.mesh_ops = MeshOps(domain_dim, dimension=self.dimension,
+                                    quadrilateral=self.mesh_parameters.quadrilateral,
+                                    comm=self.mesh_parameters.comm)
+
+    def layer_manager(self):
+        """Return the layer operations manager for the wave solver."""
+
+        # Domain dimensions
+        domain_dim = self.domain_dimensions()
+
+        # Timestep of the simulation. It is `None` if the response is not 'transient'.
+        time_step = None if self.analysis != "transient" else self.dt
+
+        if self.abc_type == AbsorbingBCsType.PML:  # PML
+            from ..pml.pml_nsnc import PMLLayer
+            self.layer_ops = PMLLayer(domain_dim, frequency=self.frequency,
+                                      dt=time_step, dimension=self.dimension,
+                                      quadrilateral=self.mesh_parameters.quadrilateral,
+                                      func_space_type=self.mesh_ops.func_space_type,
+                                      abc_reference_freq=self.abc_reference_freq,
+                                      output_folder=self.output_folder, comm=self.comm)
+
+        if self.abc_type == AbsorbingBCsType.HYBRID:  # HABC
+            from ..habc.habc import HABCLayer
+            self.layer_ops = HABCLayer(domain_dim, frequency=self.frequency,
+                                       dt=time_step, dimension=self.dimension,
+                                       quadrilateral=self.mesh_parameters.quadrilateral,
+                                       func_space_type=self.mesh_ops.func_space_type,
+                                       abc_boundary_layer_shape=self.abc_boundary_layer_shape,
+                                       abc_reference_freq=self.abc_reference_freq,
+                                       abc_degree_type=self.abc_degree_type,
+                                       abc_deg_layer=self.abc_deg_layer,
+                                       output_folder=self.output_folder, comm=self.comm)
+
+        # Identifier for the current case study
+        if self.abc_type in [AbsorbingBCsType.PML, AbsorbingBCsType.HYBRID]:
+            self.case_abc = self.layer_ops.case_abc
+            self.path_save = self.layer_ops.path_save
+            self.path_case_abc = self.layer_ops.path_case_abc
+
+    @abstractmethod
+    def get_control_parameters(self):
+        """Return inversion controls exposed by a concrete wave solver.
+
+        Subclasses override this method when they can participate in inversion
+        workflows. The base class raises because a generic ``spyro.solvers.Wave`` does not
+        know which physical parameters should be optimized.
+
+        Returns
+        -------
+        object
+            Solver-specific control structure.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+
+        Examples
+        --------
+        ``AcousticWave.get_control_parameters()`` returns the velocity model;
+        an elastic solver may return a dictionary of material parameters.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not expose inversion control parameters.",
+        )
+
+    @abstractmethod
+    def set_control_parameters(self, controls):
+        """Assign inversion controls on a concrete wave solver.
+
+        Parameters
+        ----------
+        controls : object
+            Solver-specific control structure.
+
+        Returns
+        -------
+        None
+            Concrete subclasses assign the controls in-place.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+
+        Examples
+        --------
+        ``AcousticWave.set_control_parameters(vp)`` assigns a velocity model;
+        elastic solvers expect a dictionary keyed by material-parameter enums.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot assign inversion control parameters.",
+        )
+
+    @abstractmethod
+    def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
+        """Compute an adjoint gradient for inversion.
+
+        Concrete wave solvers override this method when they provide the
+        adjoint-state machinery required by FWI. The base implementation raises
+        because a generic ``Wave`` does not define the physical model-specific
+        gradient equation.
+
+        Parameters
+        ----------
+        guess : firedrake.Function, optional
+            Control value used by solvers that accept an explicit guess.
+        misfit : array_like, optional
+            Difference between observed and simulated receiver data.
+        forward_solution : firedrake.Function, optional
+            Forward wavefield used by adjoint solvers that need it explicitly.
+
+        Returns
+        -------
+        firedrake.Function
+            Gradient of the objective functional with respect to the active
+            control.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement gradient_solve().",
+        )
+
+    @abstractmethod
+    def get_control_parameter_function_space(self):
+        """Return the function space used by inversion controls.
+
+        Subclasses override this method to tell the FWI driver where scalar
+        controls should live when constants or expressions need to be converted
+        to Firedrake ``Function`` objects.
+
+        Returns
+        -------
+        firedrake.FunctionSpace
+            Solver-specific control function space.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+
+        Examples
+        --------
+        Acoustic controls use the acoustic pressure/velocity function space;
+        elastic material controls use a scalar material-parameter space.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not define a control parameter function space.",
+        )
