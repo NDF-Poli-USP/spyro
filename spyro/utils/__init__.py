@@ -1,3 +1,5 @@
+"""Utility methods."""
+
 from . import geometry_creation
 from .utils import (
     mpi_init,
