@@ -1,4 +1,4 @@
-from pytest import mark
+import pytest
 from firedrake import COMM_WORLD as comm
 import spyro
 from spyro.io.basicio import parallel_print as pprint
