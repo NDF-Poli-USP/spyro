@@ -120,7 +120,7 @@ def test_3d_hexa_one_source_propagation():
     errIt = measure_error.integral_error(p_numeric, p_analytic, dt)
     errPk = measure_error.peak_error(p_numeric, p_analytic)[0]
 
-    assert abs(eNRMS) < 0.02 and abs(errIt) < 0.02 and abs(errPk) < 0.02, \
+    assert np.abs(eNRMS) < 0.02 and np.abs(errIt) < 0.02 and np.abs(errPk) < 0.02, \
         "Error is too high for forward test with hexahedral mesh."
 
     pprint(f"NRMS Error = {eNRMS:.4e}", comm=comm)
