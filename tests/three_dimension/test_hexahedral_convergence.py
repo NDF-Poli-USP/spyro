@@ -89,7 +89,7 @@ def run_forward_hexahedral(dt, final_time, offset):
     output = rec_out.flatten()
     my_ensemble = wave.comm
     if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:
-        save("dofs_3D_quads_rec_out"+str(dt)+".npy", output)
+        np.save("dofs_3D_quads_rec_out"+str(dt)+".npy", output)
 
     return output
 
