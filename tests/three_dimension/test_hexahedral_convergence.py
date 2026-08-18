@@ -1,5 +1,5 @@
 from firedrake import COMM_WORLD as comm
-from numpy import pi, save, sqrt
+import numpy as np
 import spyro
 from spyro.io.basicio import parallel_print as pprint
 from spyro.tools.error_measure import MeasureError
@@ -89,14 +89,14 @@ def run_forward_hexahedral(dt, final_time, offset):
     output = rec_out.flatten()
     my_ensemble = wave.comm
     if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:
-        save("dofs_3D_quads_rec_out"+str(dt)+".npy", output)
+        np.save("dofs_3D_quads_rec_out"+str(dt)+".npy", output)
 
     return output
 
 
 def analytical_solution(dt, final_time, offset):
-    amplitude = 1 / (4 * pi * offset)
-    delay = offset / 1.5 + 1.5 * sqrt(6.0) / (pi * 5.0)
+    amplitude = 1 / (4 * np.pi * offset)
+    delay = offset / 1.5 + 1.5 * np.sqrt(6.0) / (np.pi * 5.0)
     p_analytic = amplitude * spyro.full_ricker_wavelet(
         dt, final_time,
         5.0,
@@ -120,7 +120,7 @@ def test_3d_hexa_one_source_propagation():
     errIt = measure_error.integral_error(p_numeric, p_analytic, dt)
     errPk = measure_error.peak_error(p_numeric, p_analytic)[0]
 
-    assert abs(eNRMS) < 0.02 and abs(errIt) < 0.02 and abs(errPk) < 0.02, \
+    assert np.abs(eNRMS) < 0.02 and np.abs(errIt) < 0.02 and np.abs(errPk) < 0.02, \
         "Error is too high for forward test with hexahedral mesh."
 
     pprint(f"NRMS Error = {eNRMS:.4e}", comm=comm)

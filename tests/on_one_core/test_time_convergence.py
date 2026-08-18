@@ -1,6 +1,6 @@
 import spyro
-from numpy import isclose, load, log
-from pytest import mark
+import numpy as np
+import pytest
 from spyro.tools.error_measure import MeasureError
 
 
@@ -87,8 +87,8 @@ def run_forward(dt, with_pml=False):
     return rec_out
 
 
-@mark.slow
-@mark.parametrize("with_pml", [False, True])
+@pytest.mark.slow
+@pytest.mark.parametrize("with_pml", [False, True])
 def test_second_order_time_convergence(with_pml):
     """Test that the second order time convergence
     of the central difference method is achieved"""
@@ -110,7 +110,7 @@ def test_second_order_time_convergence(with_pml):
     for i in range(len(dts)):
         dt = dts[i]
         rec_out = run_forward(dt, with_pml=with_pml)
-        rec_anal = load(analytical_files[i])
+        rec_anal = np.load(analytical_files[i])
         numerical_results.append(rec_out.flatten())
         errors.append(measure_error.normalized_root_mean_square_error(rec_out.flatten(),
                                                                       rec_anal))
@@ -118,7 +118,7 @@ def test_second_order_time_convergence(with_pml):
     theory = [t**2 for t in dts]
     theory = [errors[0] * th / theory[0] for th in theory]
 
-    assert isclose(log(theory[-1]), log(errors[-1]), rtol=3e-2), \
+    assert np.isclose(np.log(theory[-1]), np.log(errors[-1]), rtol=3e-2), \
         "Second order time convergence not achieved."
 
 
