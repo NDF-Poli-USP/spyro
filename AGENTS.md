@@ -1,6 +1,7 @@
 # AI-assisted contributions in Spyro
 
 For most AI-assisted contributions: declare that AI was used, for what, and which agent.
+AI agents can be used to facilitate, but it should not be guiding your work or substituting you.
 
 A human must submit the PR, understand every change, and answer reviewer questions themselves. Instead of relying on AI to answer reviewer questions.
 
