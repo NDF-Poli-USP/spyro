@@ -1,4 +1,4 @@
-from pytest import mark
+import pytest
 from mpi4py.MPI import COMM_WORLD
 from mpi4py import MPI
 from firedrake import conditional
@@ -7,7 +7,7 @@ from spyro.io.basicio import parallel_print as pprint
 from spyro.tools.error_measure import MeasureError
 
 
-@mark.parallel(6)
+@pytest.mark.parallel(6)
 def test_forward_3_shots():
     final_time = 1.0
 
