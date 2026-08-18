@@ -318,7 +318,7 @@ class HABCMesh(MeshOps):
         SpyroEnsemble.print(f"Original Mesh with {wave.mesh.num_vertices()} Nodes "
                             f"and {wave.mesh.num_cells()} Volume Elements")
 
-        # Save a copy of the original mesh
+        # Save a copy of the original mesh and function space
         wave.mesh_original = wave.mesh
         SpyroEnsemble.write_vtk(
             wave.path_save + "preamble/mesh_orig.pvd", wave.mesh_original

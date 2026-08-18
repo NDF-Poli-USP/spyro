@@ -1,9 +1,10 @@
 from pytest import fail, mark, param
 from firedrake import COMM_WORLD as comm, conditional, ConvergenceError
-from numpy import isclose
+from numpy import isclose, load
+from spyro.io.basicio import parallel_print as pprint
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
-from spyro.io.basicio import parallel_print as pprint
+from spyro.utils.typing import BoundaryConditionsType
 
 
 def wave_dict(element_geometry, dimension, dt_usu, get_ref_model):
@@ -88,7 +89,7 @@ def wave_dict(element_geometry, dimension, dt_usu, get_ref_model):
         "final_time": 2. if dimension == 2 else 1.5,  # Final time for event
         "dt": dt_usu,  # timestep size in seconds
         "amplitude": 1.,  # the Ricker has an amplitude of 1.
-        "output_frequency": 50,  # how frequently to output solution to pvds
+        "output_frequency": 10,  # how frequently to output solution to pvds
     }
 
     # Define Parameters for absorbing boundary conditions
@@ -103,6 +104,7 @@ def wave_dict(element_geometry, dimension, dt_usu, get_ref_model):
     output_folder = f"output/nrbc_test{dimension}d/nrbc_test{dimension}d{element_geometry}"
     dictionary["visualization"] = {  # Output folder
         "output_folder": output_folder,
+        "acoustic_energy": True,  # Activate energy calculation
     }
 
     return dictionary
@@ -134,6 +136,8 @@ def wave_instance(element_geometry, dimension, calc_eik, get_ref_model):
         timestep size is set to the divisor, given by the index in descending
         order, less than or equal to the user's timestep size. If the value is 1,
         the timestep size is set as the maximum divisor. Default is 1.
+    dictionary : `dict`
+        Dictionary containing the parameters for the model.
     """
 
     # ============ SIMULATION PARAMETERS ============
@@ -142,7 +146,7 @@ def wave_instance(element_geometry, dimension, calc_eik, get_ref_model):
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length = 0.25 if dimension == 2 else 0.5
+    edge_length = 0.25 if dimension == 2 else 0.3
 
     # f_est: Factor for the stabilizing term in Eikonal equation
     if dimension == 2:
@@ -192,18 +196,18 @@ def wave_instance(element_geometry, dimension, calc_eik, get_ref_model):
         # Finding critical points
         wave.nrbc_ops.critical_boundary_points(wave)
 
-    return wave, max_divisor_tf
+    return wave, max_divisor_tf, dictionary
 
 
 @mark.parametrize("element_geometry, dimension, calc_eik", [
-    ("T", 2, True),
-    # ("T", 2, False),
+    # ("T", 2, True),
+    ("T", 2, False),
     # ("Q", 2, True),
-    # ("Q", 2, False),
+    ("Q", 2, False),
     # ("T", 3, True),
-    # ("T", 3, False),
+    ("T", 3, False),
     # ("Q", 3, True),
-    # ("Q", 3, False),
+    ("Q", 3, False),
 ])
 def test_nrbc(element_geometry, dimension, calc_eik):
     """Testing NRBCs for 2D and 3D case in Fig. 8 of Salas et al (2022).
@@ -232,12 +236,13 @@ def test_nrbc(element_geometry, dimension, calc_eik):
            + f"elements and {dimension}D case\n"
            + 60 * "=", comm=comm)
 
-    get_ref_model = False
+    get_ref_model = True
     get_nrbc_model = True
 
     # Create an instance of the acoustic wave solver
-    wave, max_divisor_tf = wave_instance(element_geometry, dimension,
-                                         calc_eik, get_ref_model)
+    wave, max_divisor_tf, dictionary = wave_instance(element_geometry, dimension,
+                                                     calc_eik, get_ref_model)
+    energy_file = wave.path_save + "preamble/acoustic_ref_energy"
 
     try:
         # ============ REFERENCE MODEL ============
@@ -246,6 +251,9 @@ def test_nrbc(element_geometry, dimension, calc_eik):
 
             # Reference to resource usage
             tRef = comp_cost("tini")
+
+            # Updating visualization dictionary with acoustic energy filename
+            dictionary["visualization"].update({"acoustic_energy_filename": energy_file})
 
             # Computing reference signal
             wave.nrbc_ops.infinite_model(wave, check_dt=True,
@@ -263,28 +271,47 @@ def test_nrbc(element_geometry, dimension, calc_eik):
             receivers_reference, receivers_ref_fft = \
                 wave.nrbc_ops.get_reference_signal(output_file=output_file)
 
-            # Velocity profile model
-            wave.c = wave.mesh_ops.creating_velocity_profile(
-                wave.function_space, wave.initial_velocity_model, wave.path_save)[0]
+            # Acquiring reference acoustic energy
+            energy_ref = load(energy_file + ".npy").T
+            final_energy_reference = energy_ref[-1]
 
-        # if abc_type == "hybrid":
-        #     hybrid_signal = receivers_reference
-        #     hybrid_energy = wave.field_logger.get("acoustic_energy")
-        # else:
-        #     pml_signal = receivers_reference
-        #     pml_energy = wave.field_logger.get("acoustic_energy")
+            if get_ref_model:
+                # Returning to the original mesh nad velocity profile
+                wave.set_mesh(user_mesh=wave.mesh_original)
+                wave.c = wave.mesh_ops.creating_velocity_profile(
+                    wave.function_space, wave.initial_velocity_model, wave.path_save)[0]
 
-        # # Checking both signals
-        # assert hybrid_signal is not None, "Hybrid signal not found"
-        # assert pml_signal is not None, "PML signal not found"
+            # Time step size for the transient response
+            dt = wave.get_dt()
 
-        # dt = wave.get_dt()
-        # error_measures = wave.nrbc_ops.error_measures(pml_signal, hybrid_signal, dt,
-        #                                                wave.number_of_receivers,
-        #                                                final_energy=pml_energy,
-        #                                                final_energy_reference=hybrid_energy,
-        #                                                save_in_case_folder=False)
-        # errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener = error_measures
+            # for nrbc_type in [BoundaryConditionsType.HIGDON,
+            #                   BoundaryConditionsType.SOMMERFELD]:
+
+            for nrbc_type in [BoundaryConditionsType.SOMMERFELD]:
+
+                # Updating NRBC type in the wave object
+                wave.nrbc_ops.non_reflect_bc = nrbc_type
+                energy_nrbc = wave.nrbc_ops.path_case_nrbc + "acoustic_energy"
+
+                # Updating visualization dictionary with acoustic energy filename
+                dictionary["visualization"].update({"acoustic_energy_filename": energy_nrbc})
+
+                # Applying NRBCs on original domain boundary
+                wave.nrbc_ops.nrbc_on_boundary(wave, source_coord=None)
+
+                # Solving the forward problem
+                wave.forward_solve()
+
+                # Acquiring final acoustic energy
+                final_energy = wave.field_logger.get("acoustic_energy")
+                energy = load(energy_nrbc + ".npy").T
+
+                # Calculating error measures between the NRB and the reference models
+                error_measures = wave.nrbc_ops.error_measures(
+                    wave.forward_solution_receivers, receivers_reference, dt,
+                    wave.number_of_receivers, final_energy=final_energy,
+                    final_energy_reference=final_energy_reference)
+                errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener = error_measures
 
         # assert sum(errIt) == 0. and max_errIt == 0., \
         #     "✗ Integral Error check for 'hybrid' and 'PML' solvers in Reference Model " \
