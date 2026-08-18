@@ -118,8 +118,7 @@ def test_second_order_time_convergence(with_pml):
     theory = [t**2 for t in dts]
     theory = [errors[0] * th / theory[0] for th in theory]
 
-    assert isclose(log(theory[-1]), log(errors[-1]), rtol=3e-2), \
-        "Second order time convergence not achieved."
+    assert np.isclose(np.log(theory[-1]), np.log(errors[-1]), rtol=3e-2),
 
 
 if __name__ == "__main__":
