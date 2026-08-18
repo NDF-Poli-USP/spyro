@@ -1,4 +1,4 @@
-from pytest import mark
+import pytest
 from mpi4py.MPI import COMM_WORLD
 from mpi4py import MPI
 from firedrake import conditional
