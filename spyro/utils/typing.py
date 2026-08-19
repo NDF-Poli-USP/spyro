@@ -1,6 +1,6 @@
 """This module defines the enums and decorators used for typing in Spyro."""
 
-from enum import Enum
+from enum import Enum, StrEnum
 
 
 def override(func):
@@ -95,7 +95,7 @@ class ElasticMaterialParameter(Enum):
     S_WAVE_VELOCITY = "s_wave_velocity"
 
 
-class ElasticMaterialParameterization(Enum):
+class ElasticMaterialParameterization(StrEnum):
     """Supported isotropic elastic inversion control parameterizations."""
 
     LAME = "lame"
@@ -111,7 +111,7 @@ class FunctionalType(Enum):
     L2Norm = 0
 
 
-class FunctionalEvaluationMode(Enum):
+class FunctionalEvaluationMode(StrEnum):
     """The mode in which to evaluate the functional.
 
     PER_TIMESTEP: Evaluate the functional at every time step during the time integration.
@@ -121,7 +121,7 @@ class FunctionalEvaluationMode(Enum):
     AFTER_SOLVE = "after_solve"
 
 
-class LayerShapeType(Enum):
+class LayerShapeType(StrEnum):
     """Enum for different types of absorbing layer shapes for ABCs.
 
     NOLAYER: No absorbing layer, i.e., no ABCs applied.
@@ -133,7 +133,7 @@ class LayerShapeType(Enum):
     HYPERSHAPE = "hypershape"
 
 
-class LayerSizeRefFrequency(Enum):
+class LayerSizeRefFrequency(StrEnum):
     """Enum for different reference frequencies for sizing the absorbing layer.
 
     SOURCE: Size based on dominant source frequency.
@@ -143,7 +143,7 @@ class LayerSizeRefFrequency(Enum):
     BOUNDARY = "boundary"
 
 
-class HyperLayerDegreeType(Enum):
+class HyperLayerDegreeType(StrEnum):
     """Enum for different types of hypershape degrees for HABCs.
 
     REAL: Hypershape degree can take real values >= 2.0 with one decimal place precision.
@@ -153,7 +153,7 @@ class HyperLayerDegreeType(Enum):
     INTEGER = "integer"
 
 
-class BoundaryConditionsType(Enum):
+class BoundaryConditionsType(StrEnum):
     """Enum for different types of boundary conditions including Non-Reflecting BCs.
 
     DIRICHLET: Dirichlet boundary condition
@@ -168,7 +168,7 @@ class BoundaryConditionsType(Enum):
     SOMMERFELD = "Sommerfeld"
 
 
-class AbsorbingBCsType(Enum):
+class AbsorbingBCsType(StrEnum):
     """Enum for different types of Absorbing Boundary Conditions (ABCs).
 
     NOABCS: No absorbing boundary conditions applied.
