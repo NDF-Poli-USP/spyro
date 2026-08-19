@@ -1,14 +1,7 @@
 import spyro
 import numpy as np
-import math
 import pytest
-
-
-def error_calc(p_numerical, p_analytical, nt):
-    norm = np.linalg.norm(p_numerical, 2) / np.sqrt(nt)
-    error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
-    div_error_time = error_time / norm
-    return div_error_time
+from spyro.tools.error_measure import MeasureError
 
 
 def run_forward(dt, with_pml=False):
@@ -112,20 +105,21 @@ def test_second_order_time_convergence(with_pml):
 
     numerical_results = []
     errors = []
+    measure_error = MeasureError()
 
     for i in range(len(dts)):
         dt = dts[i]
         rec_out = run_forward(dt, with_pml=with_pml)
         rec_anal = np.load(analytical_files[i])
-        time = np.linspace(0.0, 1.0, int(1.0 / dts[i]) + 1)
-        nt = len(time)
         numerical_results.append(rec_out.flatten())
-        errors.append(error_calc(rec_out.flatten(), rec_anal, nt))
+        errors.append(measure_error.normalized_root_mean_square_error(rec_out.flatten(),
+                                                                      rec_anal))
 
     theory = [t**2 for t in dts]
     theory = [errors[0] * th / theory[0] for th in theory]
 
-    assert math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=3e-2)
+    assert np.isclose(np.log(theory[-1]), np.log(errors[-1]), rtol=3e-2), \
+        "Second order time convergence not achieved."
 
 
 if __name__ == "__main__":
