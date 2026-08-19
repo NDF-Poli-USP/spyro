@@ -199,39 +199,6 @@ class AcousticWave(Wave):
                 f"Riesz map {riesz_map} not implemented for automated adjoint."
             )
 
-    def physical_parameter_function_space(self):
-        """Return the function space the velocity model lives in.
-
-        Returns
-        -------
-        firedrake.FunctionSpace
-            Acoustic function space. Under a PML the solver space is mixed and
-            the velocity lives in its first component, which is what is
-            returned.
-        """
-        if self.function_space is None:
-            self.force_rebuild_function_space()
-        if self.abc_type == AbsorbingBCsType.PML:
-            return self.function_space.sub(0)
-        return self.function_space
-
-    def _assign_physical_parameter(self, name, field):
-        """Store the velocity model built by ``set_physical_parameter``."""
-        self.c = field
-
-    def _refresh_dependent_parameters(self):
-        """Keep the initial velocity model pointing at the velocity field.
-
-        ``_initialize_model_parameters()`` rebuilds ``c`` from
-        ``initial_velocity_model`` on every forward solve, so a velocity set
-        through :meth:`set_physical_parameter` has to become the initial model
-        as well, or it would be discarded at the next solve.
-        """
-        if self.c is None:
-            return
-        self.initial_velocity_model = self.c
-        self.initial_velocity_model_file = None
-
     def reset_pressure(self):
         if self.abc_type == AbsorbingBCsType.PML:
             self.X_n.assign(0.0)

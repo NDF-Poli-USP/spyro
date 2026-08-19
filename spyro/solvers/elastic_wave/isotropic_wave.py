@@ -202,87 +202,11 @@ class IsotropicWave(ElasticWave):
                 "The valid options are {Density, Lame first, Lame second} "
                 "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
             )
-        self._register_physical_parameters()
-
-    def physical_parameter_function_space(self):
-        """Return the scalar space the elastic material fields live in.
-
-        Elastic displacement is vector-valued, but density, the Lame
-        parameters and the wave speeds are scalar material fields, so they do
-        not live in the solver function space.
-
-        Returns
-        -------
-        firedrake.FunctionSpace
-            Scalar material-parameter function space.
-
-        Raises
-        ------
-        ValueError
-            If the mesh has not been created yet.
-        """
-        if self.mesh is None:
-            raise ValueError(
-                "Mesh must be set before creating elastic material parameter "
-                "spaces.",
-            )
-        self._material_parameter_function_space = create_function_space(
-            self.mesh, self.method, self.degree,
-        )
-        return self._material_parameter_function_space
-
-    def _assign_physical_parameter(self, name, field):
-        """Store a material field built by ``set_physical_parameter``."""
-        if name == DENSITY:
-            self.rho = field
-        elif name == LAMBDA:
-            self.lmbda = field
-        elif name == MU:
-            self.mu = field
-        elif name == P_WAVE_VELOCITY:
-            self.c = field
-        else:
-            self.c_s = field
-
-    def _register_physical_parameters(self):
-        """Declare the five isotropic elastic parameters of the medium."""
         self._physical_parameters.add(DENSITY, self.rho)
         self._physical_parameters.add(LAMBDA, self.lmbda)
         self._physical_parameters.add(MU, self.mu)
         self._physical_parameters.add(P_WAVE_VELOCITY, self.c)
         self._physical_parameters.add(S_WAVE_VELOCITY, self.c_s)
-
-    def _refresh_dependent_parameters(self):
-        """Recompute the parameter pair the medium was not declared with.
-
-        The medium is described by density and either the Lame parameters or
-        the wave speeds. The other pair is a UFL expression of the declared
-        fields, so it follows them without being rebuilt; it is recomputed
-        here only when the declared fields themselves are replaced.
-        """
-        declared = {
-            name
-            for name, value in (
-                (DENSITY, self.rho),
-                (LAMBDA, self.lmbda),
-                (MU, self.mu),
-                (P_WAVE_VELOCITY, self.c),
-                (S_WAVE_VELOCITY, self.c_s),
-            )
-            if isinstance(value, Function)
-        }
-        for parameterization, parameters in PHYSICAL_PARAMETERIZATION.items():
-            if declared != {parameter.value for parameter in parameters}:
-                continue
-            self._physical_parameterization = parameterization
-            if parameterization is ElasticMaterialParameterization.LAME:
-                self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
-                self.c_s = (self.mu/self.rho)**0.5
-            else:
-                self.mu = self.rho*self.c_s**2
-                self.lmbda = self.rho*self.c**2 - 2*self.mu
-            self._register_physical_parameters()
-            return
 
     @override
     def initialize_model_parameters_from_file(self, synthetic_data_dict):

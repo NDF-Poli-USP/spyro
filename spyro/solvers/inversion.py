@@ -12,8 +12,7 @@ from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..utils.typing import WaveType, AdjointType
-from ..utils.physical_parameters import (PhysicalParameters, parameter_name,
-                                         P_WAVE_VELOCITY)
+from ..utils.physical_parameters import PhysicalParameters, parameter_name
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import parallel_print
 from ..io.basicio import load_shots, save_shots
@@ -301,10 +300,6 @@ class FullWaveformInversion:
 
     supported_wave_types = (WaveType.ISOTROPIC_ACOUSTIC,)
 
-    #: Physical parameters inverted for when the caller does not choose.
-    #: Acoustic FWI inverts for the pressure wave velocity.
-    default_control_parameters = (P_WAVE_VELOCITY,)
-
     def __init__(
         self, dictionary=None, comm=None, wave_class=AcousticWave, wave=None,
         control_parameters=None,
@@ -330,8 +325,9 @@ class FullWaveformInversion:
             :attr:`WaveType.ISOTROPIC_ACOUSTIC`.
         control_parameters : iterable of str or enum.Enum, optional
             Physical parameters to invert for. They must be a subset of the
-            ones the wave solver models. Defaults to
-            :attr:`default_control_parameters`.
+            ones the wave solver models, which is also the default: with no
+            choice made, the inversion controls every physical parameter of
+            the wave equation.
         """
         if wave is not None:
             if not isinstance(wave, Wave):
@@ -393,7 +389,7 @@ class FullWaveformInversion:
         self.guess_mesh = None
         self._control_parameters = ()
         self.control_parameters = (
-            self.default_control_parameters
+            sorted(self._wave_physical_parameters())
             if control_parameters is None
             else control_parameters
         )
@@ -637,8 +633,52 @@ class FullWaveformInversion:
         control : mapping
             Control values keyed by canonical parameter name.
         """
+        try:
+            parameters = wave.physical_parameters
+        except ValueError:
+            parameters = self._build_wave_material_fields(wave, control)
         for name, value in control.items():
-            wave.set_physical_parameter(name, value)
+            parameters.update(name, value)
+
+    def _build_wave_material_fields(self, wave, control):
+        """Give the controls somewhere to be written, on a fresh solver.
+
+        A control is written into the field of the physical parameter it
+        controls, so that field has to exist first. On a solver that has not
+        been initialized, it is created through the solver's own public model
+        API rather than by reaching into how it initializes itself.
+
+        Parameters
+        ----------
+        wave : Wave
+            Solver whose material fields are missing.
+        control : mapping
+            Control values keyed by canonical parameter name.
+
+        Returns
+        -------
+        PhysicalParameters
+            The solver's initialized physical parameters.
+        """
+        name = self._control_parameters[0]
+        velocity = fire.Function(self._control_function_space(wave), name=name)
+        velocity.interpolate(control[name])
+        wave.set_initial_velocity_model(velocity_model_function=velocity)
+        return wave.initialize_physical_parameters()
+
+    def _control_function_space(self, wave=None):
+        """Return the function space FWI controls live in.
+
+        Returns
+        -------
+        firedrake.FunctionSpace
+            The solver function space, built if it does not exist yet. FWI
+            is acoustic-only, so this is the space of the velocity model.
+        """
+        wave = self.wave if wave is None else wave
+        if wave.function_space is None:
+            wave.force_rebuild_function_space()
+        return wave.function_space
 
     def _capture_control_from_wave(self, wave):
         """Copy the current values of the controlled parameters out of a solver.
@@ -687,10 +727,7 @@ class FullWaveformInversion:
             copied.assign(control)
             return copied
         if isinstance(control, fire.Constant):
-            copied = fire.Function(
-                self.wave.physical_parameter_function_space(),
-                name="control",
-            )
+            copied = fire.Function(self._control_function_space(), name="control")
             copied.interpolate(control)
             return copied
         raise TypeError(
