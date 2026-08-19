@@ -522,14 +522,9 @@ class IsotropicWave(ElasticWave):
 
         self.Elastic_C = C_computation(self)
 
-        try:
-            d = self.input_dictionary.get("viscoelasticity", False)
-            self.viscoelastic = d["viscoelastic"]
-        except:
-            self.viscoelastic = False
+        is_viscoelastic = self.input_dictionary.get("viscoelasticity", False)
 
-        if self.viscoelastic == True:
-            d = self.input_dictionary.get("viscoelasticity", False)
+        if is_viscoelastic:
             self.visco_type = d["visco_type"]
             W = TensorFunctionSpace(self.function_space.mesh(), "DG", 0)
             self.strain_space = W
@@ -561,12 +556,11 @@ class IsotropicWave(ElasticWave):
             self.Gamma = build_Gamma(self)
 
         if self.abc_type in [AbsorbingBCsType.NRBC, AbsorbingBCsType.NOABCS]:
-            if self.viscoelastic == True:
-                viscoelastic_without_pml(self)
-            else:
-                elastic_without_pml(self)
+            viscoelastic_without_pml(self)
         elif self.abc_type == AbsorbingBCsType.PML:
             isotropic_elastic_with_pml(self)
+        else:
+            elastic_without_pml
 
     @override
     def rhs_no_pml(self):
