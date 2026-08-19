@@ -1,12 +1,10 @@
-from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
-                       FunctionSpace, project, VectorFunctionSpace, TensorFunctionSpace, sym, grad,
-                       as_matrix, as_vector)
+from firedrake import as_matrix
+import firedrake as fire
+import numpy as np
 
 from ufl import conditional, lt
 import ufl
 from ...utils.typing import  WaveType
-
-from .anisotropy import *
 
 def C_computation(self):
     dim = self.function_space.mesh().topological_dimension()
@@ -275,7 +273,7 @@ def Gamma_VTI(self, IsotropicProperties, AnisotropicPropertiesVTI, C, dim):
 
 def Gamma_TTI(self, dim, C):
 
-    C_vti_real = c_vti_tensor(dim)
+    C_vti_real = C_vti_tensor(dim)
 
     Q_vti = Gamma_VTI(self, C, dim)
 
@@ -332,8 +330,8 @@ def Gamma_TTI(self, dim, C):
             [0.0, 0.0, C44*Q44]
         ])
 
-    C_tti_real = c_tti_tensor(C_vti_real, dim)
-    C_tti_imag = c_tti_tensor(C_imag, dim)
+    C_tti_real = C_tti_tensor(C_vti_real, dim)
+    C_tti_imag = C_tti_tensor(C_imag, dim)
 
     eps = 1e-12
     Gamma = fire.as_tensor([
