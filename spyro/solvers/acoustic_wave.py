@@ -15,16 +15,16 @@ from .backward_time_integration import (
 )
 from ..domains.space import create_function_space
 from ..utils.typing import (
-    AdjointType, RieszMapType, override, WaveType, AbsorbingBCsType,
+    AcousticMaterialParameter, AdjointType, RieszMapType, override,
+    WaveType, AbsorbingBCsType,
 )
 from ..utils import write_hdf5_velocity_model
-from ..utils.physical_parameters import P_WAVE_VELOCITY
 from .functionals import acoustic_energy
 
 
 class AcousticWave(Wave):
     #: An acoustic medium is described by its pressure wave velocity alone.
-    _physical_parameter_names = frozenset({P_WAVE_VELOCITY})
+    _physical_parameter_names = frozenset(AcousticMaterialParameter)
 
     def __init__(self, dictionary, comm=None):
         """Wave Acoustic object solver.
@@ -222,7 +222,9 @@ class AcousticWave(Wave):
                             self.initial_velocity_model, name="velocity"
                         )
                     self.c = self.initial_velocity_model
-                    self._physical_parameters.add(P_WAVE_VELOCITY, self.c)
+                    self._physical_parameters.add(
+                        AcousticMaterialParameter.P_WAVE_VELOCITY, self.c,
+                    )
                     return
                 raise ValueError("No velocity model or velocity file to load.")
 
@@ -243,7 +245,9 @@ class AcousticWave(Wave):
                 )
 
         self.c = self.initial_velocity_model
-        self._physical_parameters.add(P_WAVE_VELOCITY, self.c)
+        self._physical_parameters.add(
+            AcousticMaterialParameter.P_WAVE_VELOCITY, self.c,
+        )
 
     @override
     def _set_vstate(self, vstate):

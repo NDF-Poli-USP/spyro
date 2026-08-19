@@ -12,7 +12,7 @@ from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..utils.typing import AdjointType
-from ..utils.physical_parameters import PhysicalParameters, parameter_name
+from ..utils.physical_parameters import PhysicalParameters
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import parallel_print
 from ..io.basicio import load_shots, save_shots
@@ -30,6 +30,22 @@ except ImportError:
     RObjective = object
 
 # ROL = None
+
+
+def _names(parameters):
+    """Return the public names of material parameters, sorted, for messages.
+
+    Parameters
+    ----------
+    parameters : iterable of enum.Enum
+        Material parameters.
+
+    Returns
+    -------
+    list of str
+        Their public names.
+    """
+    return sorted(parameter.value for parameter in parameters)
 
 
 def get_peak_memory():
@@ -386,7 +402,7 @@ class FullWaveformInversion:
         self.guess_mesh = None
         self._control_parameters = ()
         self.control_parameters = (
-            sorted(self._wave_physical_parameters())
+            sorted(self._wave_physical_parameters(), key=lambda p: p.value)
             if control_parameters is None
             else control_parameters
         )
@@ -515,7 +531,7 @@ class FullWaveformInversion:
             If the requested parameters are empty, or are not a subset of the
             physical parameters the wave solver models.
         """
-        names = tuple(dict.fromkeys(parameter_name(name) for name in names))
+        names = tuple(dict.fromkeys(names))
         if not names:
             raise ValueError(
                 "An inversion must control at least one physical parameter.",
@@ -523,11 +539,11 @@ class FullWaveformInversion:
         physical = self._wave_physical_parameters()
         unknown = [name for name in names if name not in physical]
         if unknown:
-            known = "{" + ", ".join(sorted(physical)) + "}"
+            known = "{" + ", ".join(_names(physical)) + "}"
             raise ValueError(
                 "Control parameters must be a subset of the physical "
                 f"parameters of {type(self.wave).__name__}. "
-                f"{sorted(unknown)} are not among {known}.",
+                f"{unknown} are not among {known}.",
             )
         self._control_parameters = names
 
@@ -575,15 +591,12 @@ class FullWaveformInversion:
         except AttributeError:
             items = None
         if items is not None:
-            values = {
-                parameter_name(name): value
-                for name, value in items
-            }
+            values = dict(items)
             unknown = set(values) - set(self._control_parameters)
             if unknown:
                 raise ValueError(
-                    f"{sorted(unknown)} are not controlled by this inversion. "
-                    f"Controls: {sorted(self._control_parameters)}.",
+                    f"{_names(unknown)} are not controlled by this "
+                    f"inversion. Controls: {_names(self._control_parameters)}.",
                 )
             return values
         return {self._control_parameters[0]: control}
@@ -653,7 +666,9 @@ class FullWaveformInversion:
             The solver's initialized physical parameters.
         """
         name = self._control_parameters[0]
-        velocity = fire.Function(self._control_function_space(wave), name=name)
+        velocity = fire.Function(
+            self._control_function_space(wave), name=name.value,
+        )
         velocity.interpolate(control[name])
         wave.set_initial_velocity_model(velocity_model_function=velocity)
         return wave.initialize_physical_parameters()

@@ -10,8 +10,6 @@ from .functionals import mechanical_energy_form
 from ...utils.typing import (ElasticMaterialParameter, ElasticMaterialParameterization,
                              AbsorbingBCsType, override)
 from ...domains.space import create_function_space
-from ...utils.physical_parameters import (DENSITY, LAMBDA, MU,
-                                          P_WAVE_VELOCITY, S_WAVE_VELOCITY)
 
 
 PHYSICAL_PARAMETERIZATION = {
@@ -55,9 +53,7 @@ class IsotropicWave(ElasticWave):
     #: An isotropic elastic medium is described by density plus either the
     #: two Lame parameters or the two wave speeds; whichever pair is not
     #: declared is computed from the other.
-    _physical_parameter_names = frozenset({
-        DENSITY, LAMBDA, MU, P_WAVE_VELOCITY, S_WAVE_VELOCITY,
-    })
+    _physical_parameter_names = frozenset(ElasticMaterialParameter)
 
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
@@ -202,11 +198,12 @@ class IsotropicWave(ElasticWave):
                 "The valid options are {Density, Lame first, Lame second} "
                 "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
             )
-        self._physical_parameters.add(DENSITY, self.rho)
-        self._physical_parameters.add(LAMBDA, self.lmbda)
-        self._physical_parameters.add(MU, self.mu)
-        self._physical_parameters.add(P_WAVE_VELOCITY, self.c)
-        self._physical_parameters.add(S_WAVE_VELOCITY, self.c_s)
+        add = self._physical_parameters.add
+        add(ElasticMaterialParameter.DENSITY, self.rho)
+        add(ElasticMaterialParameter.LAMBDA, self.lmbda)
+        add(ElasticMaterialParameter.MU, self.mu)
+        add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
+        add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
 
     @override
     def initialize_model_parameters_from_file(self, synthetic_data_dict):

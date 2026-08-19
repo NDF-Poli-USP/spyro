@@ -3,6 +3,8 @@ import firedrake as fire
 import pytest
 
 import spyro
+from spyro.utils.typing import (AcousticMaterialParameter,
+                                ElasticMaterialParameter)
 
 
 def build_acoustic_dictionary():
@@ -94,13 +96,7 @@ def build_elastic_dictionary():
     }
 
 
-ELASTIC_PARAMETERS = {
-    "density",
-    "lambda",
-    "mu",
-    "p_wave_velocity",
-    "s_wave_velocity",
-}
+VELOCITY = AcousticMaterialParameter.P_WAVE_VELOCITY
 
 
 def build_elastic_wave():
@@ -141,22 +137,29 @@ def test_acoustic_wave_declares_its_physical_parameters():
 
     parameters = wave.initialize_physical_parameters()
 
-    assert set(parameters) == {"p_wave_velocity"}
-    assert parameters["p_wave_velocity"] is wave.c
+    assert set(parameters) == {VELOCITY}
+    assert parameters[VELOCITY] is wave.c
 
 
 def test_isotropic_wave_declares_its_physical_parameters():
     wave = build_elastic_wave()
 
-    assert set(wave.physical_parameters) == ELASTIC_PARAMETERS
+    assert set(wave.physical_parameters) == set(ElasticMaterialParameter)
 
 
 def test_physical_parameters_compare_as_a_set_of_names():
     wave = build_elastic_wave()
 
-    assert {"density", "mu"} <= wave.physical_parameters
-    assert wave.physical_parameters.issuperset({"p_wave_velocity"})
-    assert "porosity" not in wave.physical_parameters
+    assert {
+        ElasticMaterialParameter.DENSITY,
+        ElasticMaterialParameter.MU,
+    } <= wave.physical_parameters
+    assert wave.physical_parameters.issuperset(
+        {ElasticMaterialParameter.S_WAVE_VELOCITY},
+    )
+    # An acoustic medium names its wave speed with its own enum, so the
+    # elastic solver does not model that parameter.
+    assert VELOCITY not in wave.physical_parameters
 
 
 def test_physical_parameters_raise_before_initialization():
@@ -168,13 +171,15 @@ def test_physical_parameters_raise_before_initialization():
 
 def test_updating_a_physical_parameter_writes_into_the_field():
     wave = build_elastic_wave()
-    density = wave.physical_parameters["density"]
+    density = wave.physical_parameters[ElasticMaterialParameter.DENSITY]
 
-    wave.physical_parameters.update("density", fire.Constant(2.0))
+    wave.physical_parameters.update(
+        ElasticMaterialParameter.DENSITY, fire.Constant(2.0),
+    )
 
     # Writing into the field is what keeps the assembled forms, and the
     # parameters computed from this one, valid without being rebuilt.
-    assert wave.physical_parameters["density"] is density
+    assert wave.physical_parameters[ElasticMaterialParameter.DENSITY] is density
     assert wave.rho is density
     assert np.allclose(density.dat.data_ro, 2.0)
 
@@ -182,11 +187,11 @@ def test_updating_a_physical_parameter_writes_into_the_field():
 def test_unknown_physical_parameter_is_rejected():
     wave = build_elastic_wave()
 
-    with pytest.raises(KeyError, match="porosity"):
-        wave.physical_parameters.update("porosity", 1.0)
+    with pytest.raises(KeyError, match="p_wave_velocity"):
+        wave.physical_parameters.update(VELOCITY, 1.0)
 
 
-def test_physical_parameters_accept_enum_names():
+def test_physical_parameters_are_keyed_by_material_parameter_enums():
     wave = build_elastic_wave()
 
     assert (
@@ -228,11 +233,11 @@ def test_guess_control_updates_the_wave_physical_parameter():
     fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
     fwi.set_guess_control(fire.Constant(2.0))
-    velocity = fwi.wave.physical_parameters["p_wave_velocity"]
+    velocity = fwi.wave.physical_parameters[VELOCITY]
 
     fwi.set_guess_control(fire.Constant(3.0))
 
-    assert fwi.wave.physical_parameters["p_wave_velocity"] is velocity
+    assert fwi.wave.physical_parameters[VELOCITY] is velocity
     assert np.allclose(velocity.dat.data_ro, 3.0)
 
 
@@ -241,7 +246,7 @@ def test_guess_control_is_independent_of_the_wave_field():
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
     fwi.set_guess_control(fire.Constant(2.0))
 
-    fwi.wave.physical_parameters["p_wave_velocity"].assign(9.0)
+    fwi.wave.physical_parameters[VELOCITY].assign(9.0)
 
     assert np.allclose(fwi.guess_control.dat.data_ro, 2.0)
 
@@ -250,10 +255,10 @@ def test_guess_control_accepts_a_mapping_keyed_by_parameter_name():
     fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
 
-    fwi.set_guess_control({"p_wave_velocity": fire.Constant(2.5)})
+    fwi.set_guess_control({VELOCITY: fire.Constant(2.5)})
 
     assert np.allclose(
-        fwi.wave.physical_parameters["p_wave_velocity"].dat.data_ro,
+        fwi.wave.physical_parameters[VELOCITY].dat.data_ro,
         2.5,
     )
 
@@ -263,7 +268,9 @@ def test_guess_control_rejects_uncontrolled_parameters():
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
 
     with pytest.raises(ValueError, match="not controlled by this inversion"):
-        fwi.set_guess_control({"density": fire.Constant(1.0)})
+        fwi.set_guess_control(
+            {ElasticMaterialParameter.DENSITY: fire.Constant(1.0)},
+        )
 
 
 def test_velocity_model_setters_capture_the_control():

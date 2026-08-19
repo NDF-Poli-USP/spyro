@@ -6,46 +6,33 @@ from enum import Enum
 import firedrake as fire
 
 
-DENSITY = "density"
-LAMBDA = "lambda"
-MU = "mu"
-P_WAVE_VELOCITY = "p_wave_velocity"
-S_WAVE_VELOCITY = "s_wave_velocity"
+def _as_parameter(name):
+    """Return ``name`` if it is a material parameter enum member.
 
-
-def parameter_name(name):
-    """Return the canonical string name of a physical parameter.
-
-    Parameters are named by the strings above, which are also the values of
-    :class:`ElasticMaterialParameter`, so both spellings may be used
-    interchangeably by callers.
+    Parameters are keyed by the enum members of the medium they belong to:
+    :class:`AcousticMaterialParameter` for acoustic media,
+    :class:`ElasticMaterialParameter` for elastic ones.
 
     Parameters
     ----------
-    name : str or enum.Enum
-        Parameter name, or an enum member whose value is that name.
+    name : enum.Enum
+        Material parameter.
 
     Returns
     -------
-    str
-        Canonical parameter name.
+    enum.Enum
+        The parameter itself.
 
     Raises
     ------
     TypeError
-        If ``name`` is neither a string nor an enum member.
-
-    Examples
-    --------
-    ``parameter_name(ElasticMaterialParameter.DENSITY)`` and
-    ``parameter_name("density")`` both return ``"density"``.
+        If ``name`` is not an enum member.
     """
     if isinstance(name, Enum):
-        return name.value
-    if isinstance(name, str):
         return name
     raise TypeError(
-        "Physical parameter names must be strings or enum members. "
+        "Physical parameters are keyed by material parameter enum members, "
+        "such as ElasticMaterialParameter.DENSITY. "
         f"Received {type(name).__name__}.",
     )
 
@@ -53,9 +40,10 @@ def parameter_name(name):
 class PhysicalParameters(Set):
     """The physical parameters a wave equation is written in terms of.
 
-    The container is a set of parameter names, so an inversion can check that
-    the parameters it controls are a subset of the ones the solver actually
-    models, and it maps each name to the field the variational form uses.
+    The container is a set of material parameters, so an inversion can check
+    that the parameters it controls are a subset of the ones the solver
+    actually models, and it maps each parameter to the field the variational
+    form uses.
 
     Some parameters are independent fields (Firedrake ``Function`` objects)
     and others are UFL expressions computed from them: an isotropic elastic
@@ -66,18 +54,18 @@ class PhysicalParameters(Set):
 
     Parameters
     ----------
-    fields : mapping or iterable of (name, value), optional
+    fields : mapping or iterable of (parameter, value), optional
         Initial parameters.
 
     Examples
     --------
     >>> parameters = PhysicalParameters()
-    >>> parameters.add("density", rho)
-    >>> "density" in parameters
+    >>> parameters.add(ElasticMaterialParameter.DENSITY, rho)
+    >>> ElasticMaterialParameter.DENSITY in parameters
     True
-    >>> {"density"} <= parameters
+    >>> {ElasticMaterialParameter.DENSITY} <= parameters
     True
-    >>> parameters["density"] is rho
+    >>> parameters[ElasticMaterialParameter.DENSITY] is rho
     True
     """
 
@@ -92,12 +80,12 @@ class PhysicalParameters(Set):
         for name, value in items:
             self.add(name, value)
 
-    # Set behaviour, over the parameter names.
+    # Set behaviour, over the material parameters.
 
     def __contains__(self, name):
-        if not isinstance(name, (str, Enum)):
+        if not isinstance(name, Enum):
             return False
-        return parameter_name(name) in self._fields
+        return name in self._fields
 
     def __iter__(self):
         return iter(self._fields)
@@ -109,30 +97,30 @@ class PhysicalParameters(Set):
     def _from_iterable(cls, iterable):
         """Build the result of a set operation.
 
-        Set algebra (``|``, ``&``, ``-``, ``^``) combines names alone, so the
-        result carries no fields and is returned as a plain ``set`` rather
+        Set algebra (``|``, ``&``, ``-``, ``^``) combines parameters alone, so
+        the result carries no fields and is returned as a plain ``set`` rather
         than as a half-populated container.
         """
         return set(iterable)
 
     def issubset(self, other):
-        """Return whether every parameter name is also present in ``other``."""
+        """Return whether every parameter is also present in ``other``."""
         return self <= other
 
     def issuperset(self, other):
-        """Return whether ``other`` holds only names present here."""
+        """Return whether ``other`` holds only parameters present here."""
         return self >= other
 
-    # Mapping behaviour, from a parameter name to its field.
+    # Mapping behaviour, from a material parameter to its field.
 
     def __getitem__(self, name):
-        key = parameter_name(name)
+        key = _as_parameter(name)
         try:
             return self._fields[key]
         except KeyError:
             raise KeyError(
-                f"'{key}' is not a physical parameter of this wave equation. "
-                f"Known parameters: {self._format_names()}.",
+                f"'{key.value}' is not a physical parameter of this wave "
+                f"equation. Known parameters: {self._format_names()}.",
             ) from None
 
     def get(self, name, default=None):
@@ -146,7 +134,7 @@ class PhysicalParameters(Set):
         return self._fields.values()
 
     def items(self):
-        """Return the ``(name, field)`` pairs."""
+        """Return the ``(parameter, field)`` pairs."""
         return self._fields.items()
 
     def add(self, name, value):
@@ -154,21 +142,21 @@ class PhysicalParameters(Set):
 
         Solvers call this while initializing their material properties, which
         happens again on every forward solve, so re-declaring a parameter is
-        expected and simply rebinds the name.
+        expected and simply rebinds it.
 
         Parameters
         ----------
-        name : str or enum.Enum
-            Parameter name.
+        name : enum.Enum
+            Material parameter.
         value : firedrake.Function or ufl.core.expr.Expr
             Independent field, or expression computed from the independent
             ones.
         """
-        self._fields[parameter_name(name)] = value
+        self._fields[_as_parameter(name)] = value
 
     def discard(self, name):
         """Remove one parameter, if it is present."""
-        self._fields.pop(parameter_name(name), None)
+        self._fields.pop(_as_parameter(name), None)
 
     def update(self, name, value):
         """Overwrite one parameter's field in place.
@@ -179,7 +167,7 @@ class PhysicalParameters(Set):
 
         Parameters
         ----------
-        name : str or enum.Enum
+        name : enum.Enum
             Parameter to update.
         value : firedrake.Function, firedrake.Constant, scalar, or UFL expression
             New value. Anything that is not a ``Function`` in the same
@@ -201,9 +189,9 @@ class PhysicalParameters(Set):
         field = self[name]
         if not isinstance(field, fire.Function):
             raise TypeError(
-                f"'{parameter_name(name)}' is computed from the other physical "
-                "parameters and cannot be updated on its own. Update the "
-                "parameters it is computed from instead.",
+                f"'{_as_parameter(name).value}' is computed from the other "
+                "physical parameters and cannot be updated on its own. Update "
+                "the parameters it is computed from instead.",
             )
         if (
             isinstance(value, fire.Function)
@@ -219,7 +207,7 @@ class PhysicalParameters(Set):
 
         Parameters
         ----------
-        names : iterable of str or enum.Enum, optional
+        names : iterable of enum.Enum, optional
             Parameters to copy. Defaults to all of them.
 
         Returns
@@ -242,7 +230,7 @@ class PhysicalParameters(Set):
         return copied
 
     def _format_names(self):
-        return "{" + ", ".join(self._fields) + "}"
+        return "{" + ", ".join(name.value for name in self._fields) + "}"
 
     def __repr__(self):
         return f"{type(self).__name__}({self._format_names()})"
