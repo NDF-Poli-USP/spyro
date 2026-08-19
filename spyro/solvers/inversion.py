@@ -12,6 +12,8 @@ from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..utils.typing import WaveType, AdjointType
+from ..utils.physical_parameters import (PhysicalParameters, parameter_name,
+                                         P_WAVE_VELOCITY)
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import parallel_print
 from ..io.basicio import load_shots, save_shots
@@ -237,7 +239,7 @@ class Objective(RObjective):
         iteration : int
             Current iteration number.
         """
-        control_reference = self.inversion_obj._guess_control_reference()
+        control_reference = self.inversion_obj._control_reference()
         updated_control = fire.Function(
             control_reference.function_space(),
             x.vec,
@@ -299,8 +301,13 @@ class FullWaveformInversion:
 
     supported_wave_types = (WaveType.ISOTROPIC_ACOUSTIC,)
 
+    #: Physical parameters inverted for when the caller does not choose.
+    #: Acoustic FWI inverts for the pressure wave velocity.
+    default_control_parameters = (P_WAVE_VELOCITY,)
+
     def __init__(
-        self, dictionary=None, comm=None, wave_class=AcousticWave, wave=None
+        self, dictionary=None, comm=None, wave_class=AcousticWave, wave=None,
+        control_parameters=None,
     ):
         """Initialize the full waveform inversion driver.
 
@@ -321,6 +328,10 @@ class FullWaveformInversion:
             driver uses this instance directly and infers ``wave_class`` from
             its type. The instance must be a :class:`Wave` with
             :attr:`WaveType.ISOTROPIC_ACOUSTIC`.
+        control_parameters : iterable of str or enum.Enum, optional
+            Physical parameters to invert for. They must be a subset of the
+            ones the wave solver models. Defaults to
+            :attr:`default_control_parameters`.
         """
         if wave is not None:
             if not isinstance(wave, Wave):
@@ -380,8 +391,14 @@ class FullWaveformInversion:
 
         self.real_mesh = None
         self.guess_mesh = None
-        self.real_control = None
-        self.guess_control = None
+        self._control_parameters = ()
+        self.control_parameters = (
+            self.default_control_parameters
+            if control_parameters is None
+            else control_parameters
+        )
+        self.real_control = PhysicalParameters()
+        self.guess_control = PhysicalParameters()
 
         self.control_out = fire.VTKFile(inversion_dictionary["control_output_file"])
         self.gradient_out = fire.VTKFile(inversion_dictionary["gradient_output_file"])
@@ -454,60 +471,228 @@ class FullWaveformInversion:
         if self.real_shot_record is not None:
             self.wave.real_shot_record = self.real_shot_record
 
-    def _copy_control_value(self, value, name=None):
-        """Copy one FWI control parameter.
+    @property
+    def control_parameters(self):
+        """Return the physical parameters this inversion inverts for.
 
-        Parameters
-        ----------
-        value : firedrake.Function or firedrake.Constant
-            Control parameter to copy. ``Function`` values are duplicated into
-            a new ``Function``; ``Constant`` values are interpolated into the
-            solver control function space and returned as a ``Function``.
-        name : str, optional
-            Name for the ``Function`` created from a ``Constant``.  Defaults
-            to ``"control"``.
+        The wave solver knows only which physical parameters its equation is
+        written in terms of. Which of those are unknowns of the optimization
+        is a property of the inversion, and is held here. The two are tied
+        together by one rule: the controls must be a subset of the physical
+        parameters the solver models.
 
         Returns
         -------
-        firedrake.Function
-            Independent copy of the control parameter.
+        frozenset of str
+            Canonical names of the controlled parameters.
+
+        Examples
+        --------
+        >>> fwi.control_parameters
+        frozenset({'p_wave_velocity'})
+        >>> fwi.control_parameters <= fwi.wave.physical_parameters
+        True
+        """
+        return frozenset(self._control_parameters)
+
+    @control_parameters.setter
+    def control_parameters(self, names):
+        """Choose the physical parameters to invert for.
+
+        Parameters
+        ----------
+        names : iterable of str or enum.Enum
+            Parameters to control.
+
+        Raises
+        ------
+        ValueError
+            If the requested parameters are empty, or are not a subset of the
+            physical parameters the wave solver models.
+        """
+        names = tuple(dict.fromkeys(parameter_name(name) for name in names))
+        if not names:
+            raise ValueError(
+                "An inversion must control at least one physical parameter.",
+            )
+        physical = self._wave_physical_parameters()
+        unknown = [name for name in names if name not in physical]
+        if unknown:
+            known = "{" + ", ".join(sorted(physical)) + "}"
+            raise ValueError(
+                "Control parameters must be a subset of the physical "
+                f"parameters of {type(self.wave).__name__}. "
+                f"{sorted(unknown)} are not among {known}.",
+            )
+        self._control_parameters = names
+
+    def _wave_physical_parameters(self):
+        """Return the names of the physical parameters the solver models.
+
+        The solver only populates ``physical_parameters`` once its material
+        properties are initialized, which happens on the first forward solve.
+        Before that, the parameters the solver class declares are the same
+        set, and are what the control choice is validated against.
+
+        Returns
+        -------
+        set of str
+            Physical parameter names.
+        """
+        try:
+            return set(self.wave.physical_parameters)
+        except ValueError:
+            return set(type(self.wave)._physical_parameter_attributes)
+
+    def _as_control_mapping(self, control):
+        """Normalize a control value into a ``name -> value`` mapping.
+
+        Parameters
+        ----------
+        control : mapping, firedrake.Function, firedrake.Constant, scalar, or UFL expression
+            Control values, keyed by parameter name. A bare value is accepted
+            when the inversion controls a single parameter.
+
+        Returns
+        -------
+        dict
+            Control values keyed by canonical parameter name.
 
         Raises
         ------
         TypeError
-            If ``value`` is neither a ``Function`` nor a ``Constant``.
+            If a bare value is given while several parameters are controlled.
+        ValueError
+            If a key is not one of the controlled parameters.
         """
-        if isinstance(value, fire.Function):
-            copied = fire.Function(value.function_space(), name=value.name())
-            copied.assign(value)
-            return copied
-        if isinstance(value, fire.Constant):
-            control = fire.Function(
-                self.wave.get_control_parameter_function_space(),
-                name=name or "control",
+        if control is None:
+            return {}
+        if isinstance(control, PhysicalParameters) or hasattr(control, "items"):
+            values = {
+                parameter_name(name): value
+                for name, value in control.items()
+            }
+            unknown = set(values) - set(self._control_parameters)
+            if unknown:
+                raise ValueError(
+                    f"{sorted(unknown)} are not controlled by this inversion. "
+                    f"Controls: {sorted(self._control_parameters)}.",
+                )
+            return values
+        if len(self._control_parameters) != 1:
+            raise TypeError(
+                "This inversion controls "
+                f"{sorted(self._control_parameters)}, so controls must be "
+                "given as a mapping keyed by parameter name.",
             )
-            control.interpolate(value)
-            return control
-        raise TypeError(
-            "FWI control must be a firedrake Function or Constant. "
-            f"Received {type(value).__name__}.",
-        )
+        return {self._control_parameters[0]: control}
 
-    def _copy_control_structure(self, control):
-        """Return an independent copy of the current control structure.
-
-        Parameters
-        ----------
-        control : firedrake.Function, firedrake.Constant, or None
-            Control parameter to copy.
+    def _control_reference(self):
+        """Return the guess control used as the optimizer reference.
 
         Returns
         -------
-        firedrake.Function or None
+        firedrake.Function
+            Active guess control field.
+
+        Raises
+        ------
+        NotImplementedError
+            If more than one parameter is controlled. The optimizer path
+            still flattens a single scalar field.
+        ValueError
+            If no guess control has been configured.
+        """
+        if len(self._control_parameters) != 1:
+            raise NotImplementedError(
+                "The optimizer path supports a single control parameter, but "
+                f"this inversion controls {sorted(self._control_parameters)}.",
+            )
+        name = self._control_parameters[0]
+        control = self.guess_control.get(name)
+        if control is None:
+            try:
+                control = self.wave.physical_parameters.get(name)
+            except ValueError:
+                control = None
+        if control is None:
+            raise ValueError("No guess control parameter has been configured.")
+        return control
+
+    def _push_control_to_wave(self, wave, control):
+        """Write control values into a solver's physical parameters.
+
+        This is the one place where a control becomes a physical parameter.
+        The solver is only asked to set a parameter of its own equation; it is
+        never told that the value came from an inversion.
+
+        Parameters
+        ----------
+        wave : Wave
+            Solver to update.
+        control : mapping
+            Control values keyed by canonical parameter name.
+        """
+        for name, value in control.items():
+            wave.set_physical_parameter(name, value)
+
+    def _capture_control_from_wave(self, wave):
+        """Copy the current values of the controlled parameters out of a solver.
+
+        Parameters
+        ----------
+        wave : Wave
+            Solver to read the physical parameters from. Its material fields
+            are built first if they do not exist yet.
+
+        Returns
+        -------
+        PhysicalParameters
+            Independent copies of the controlled parameter fields.
+        """
+        try:
+            parameters = wave.physical_parameters
+        except ValueError:
+            parameters = wave.initialize_physical_parameters()
+        return parameters.copy(self._control_parameters)
+
+    def _copy_control_structure(self, control):
+        """Return an independent copy of a control value or container.
+
+        Parameters
+        ----------
+        control : PhysicalParameters, firedrake.Function, firedrake.Constant, or None
+            Control to copy.
+
+        Returns
+        -------
+        PhysicalParameters, firedrake.Function, or None
+            A copy of the same kind as the input.
+
+        Raises
+        ------
+        TypeError
+            If ``control`` is not one of the supported types.
         """
         if control is None:
             return None
-        return self._copy_control_value(control)
+        if isinstance(control, PhysicalParameters):
+            return control.copy()
+        if isinstance(control, fire.Function):
+            copied = fire.Function(control.function_space(), name=control.name())
+            copied.assign(control)
+            return copied
+        if isinstance(control, fire.Constant):
+            copied = fire.Function(
+                self.wave.physical_parameter_function_space(),
+                name="control",
+            )
+            copied.interpolate(control)
+            return copied
+        raise TypeError(
+            "FWI control must be a firedrake Function or Constant. "
+            f"Received {type(control).__name__}.",
+        )
 
     def _flatten_control(self, control):
         """Flatten a control ``Function`` into an optimizer vector.
@@ -578,27 +763,6 @@ class FullWaveformInversion:
             control_reference.function_space(), name=control_reference.name(),
             val=flat_vector.reshape(reference_shape))
 
-    def _guess_control_reference(self):
-        """Return the current guess control used as optimizer reference.
-
-        Returns
-        -------
-        firedrake.Function
-            Active guess control parameter.
-
-        Raises
-        ------
-        ValueError
-            If neither the FWI driver nor the wave solver has a configured
-            guess control.
-        """
-        control_reference = self.guess_control
-        if control_reference is None:
-            control_reference = self.wave.get_control_parameters()
-        if control_reference is None:
-            raise ValueError("No guess control parameter has been configured.")
-        return control_reference
-
     def _expand_bound(self, bound, control_reference):
         """Expand one bound specification to match a control component.
 
@@ -661,11 +825,10 @@ class FullWaveformInversion:
         ``Function``. ``set_guess_control(fire.Constant(2.0))`` creates a
         uniform control ``Function`` filled with ``2.0``.
         """
-        self.wave.set_control_parameters(self._copy_control_structure(control))
+        control = self._as_control_mapping(control)
+        self._push_control_to_wave(self.wave, control)
         self.guess_mesh = self.wave.get_mesh()
-        self.guess_control = self._copy_control_structure(
-            self.wave.get_control_parameters(),
-        )
+        self.guess_control = self.wave.physical_parameters.copy(control)
         self.misfit = None
 
     @property
@@ -739,7 +902,7 @@ class FullWaveformInversion:
         if value is not None:
             self.load_real_shot_record(file_name=value)
 
-    def calculate_misfit(self, c=None):
+    def calculate_misfit(self, c=None, save_output=False):
         """
         Calculate the misfit between observed and simulated data.
 
@@ -771,28 +934,28 @@ class FullWaveformInversion:
 
         if c is not None:
             updated_control = self._rebuild_control_from_vector(
-                self._guess_control_reference(),
+                self._control_reference(),
                 c,
             )
             self.set_guess_control(updated_control)
-        elif self.guess_control is not None:
-            self.wave.set_control_parameters(
-                self._copy_control_structure(self.guess_control),
-            )
-        elif self.wave.get_control_parameters() is None:
-            raise ValueError("No guess control parameter has been configured.")
+        elif self.guess_control:
+            self._push_control_to_wave(self.wave, self.guess_control)
+        else:
+            # Raises unless the solver itself already carries a control value.
+            self._control_reference()
 
         self._sync_wave_real_shot_record()
         if self.wave.adjoint_type == AdjointType.IMPLEMENTED_ADJOINT:
             self.wave.enable_implemented_adjoint()
         self.wave.forward_solve()
-        # self.guess_forward_solution = self.wave.f
-        current_control = self.wave.get_control_parameters()
-        fire.VTKFile(f"control_{self.current_iteration}.pvd").write(current_control)
-        np.save(
-            f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
-            self._flatten_control(current_control),
-        )
+        # TODO(save_output): melhorar isso. Usar CheckpointFile para salvar o
+        # controle e continuar com VTKFile para a saida em pvd:
+        #     control = self._control_reference()
+        #     fire.VTKFile(f"control_{self.current_iteration}.pvd").write(control)
+        #     np.save(
+        #         f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
+        #         self._flatten_control(control),
+        #     )
 
         if self.wave.parallelism_type == "spatial" and self.wave.number_of_sources > 1:
             misfit_list = []
@@ -853,8 +1016,8 @@ class FullWaveformInversion:
         if self.real_mesh is not None:
             real_wave.set_mesh(user_mesh=self.real_mesh, input_mesh_parameters={})
 
-        if self.real_control is not None:
-            real_wave.set_control_parameters(self._copy_control_structure(self.real_control))
+        if self.real_control:
+            self._push_control_to_wave(real_wave, self.real_control)
         elif self.real_velocity_model_file is not None:
             try:
                 real_wave.initial_velocity_model_file
@@ -945,9 +1108,7 @@ class FullWaveformInversion:
             dg_velocity_model=dg_velocity_model,
         )
         self.real_mesh = self.wave.get_mesh()
-        self.real_control = self._copy_control_structure(
-            self.wave.get_control_parameters(),
-        )
+        self.real_control = self._capture_control_from_wave(self.wave)
         if new_file is not None:
             self.real_velocity_model_file = new_file
 
@@ -1005,9 +1166,7 @@ class FullWaveformInversion:
             dg_velocity_model=dg_velocity_model,
         )
         self.guess_mesh = self.wave.get_mesh()
-        self.guess_control = self._copy_control_structure(
-            self.wave.get_control_parameters(),
-        )
+        self.guess_control = self._capture_control_from_wave(self.wave)
         self.misfit = None
 
     def set_real_mesh(self, user_mesh=None, input_mesh_parameters=None):
@@ -1147,7 +1306,7 @@ class FullWaveformInversion:
             self.get_functional(c=c)
         elif c is not None:
             updated_control = self._rebuild_control_from_vector(
-                self._guess_control_reference(),
+                self._control_reference(),
                 c,
             )
             self.set_guess_control(updated_control)
@@ -1238,7 +1397,7 @@ class FullWaveformInversion:
             self.adjoint_type = kwargs.pop("adjoint_type")
         parameters.update(kwargs)
 
-        control_reference = self._guess_control_reference()
+        control_reference = self._control_reference()
         lower = self._expand_bound(parameters["vmin"], control_reference)
         upper = self._expand_bound(parameters["vmax"], control_reference)
         bounds = list(zip(lower, upper))
@@ -1307,7 +1466,7 @@ class FullWaveformInversion:
         """
         if ROL is None:
             raise ImportError("The ROL module is not available.")
-        control_reference = self._guess_control_reference()
+        control_reference = self._control_reference()
         if not isinstance(control_reference, fire.Function):
             raise NotImplementedError(
                 "The deprecated ROL inversion path only supports a single "

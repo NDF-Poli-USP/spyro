@@ -12,7 +12,7 @@ from ..io.parallelism_wrappers import (
     run_in_one_core_and_broadcast,
 )
 from ..domains.space import create_function_space
-from .typing import FunctionalEvaluationMode, FunctionalType, WaveType
+from .typing import FunctionalEvaluationMode, FunctionalType
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
@@ -665,18 +665,9 @@ def get_real_shot_record(wave):
         )
 
     if isinstance(real_shot_record, np.ndarray):
-        # A single shot is (n_timesteps, n_receivers) for a scalar wave and
-        # (n_timesteps, n_receivers, dimension) for a vector one. Multishot
-        # data prepends a shot axis, so only a record one rank above the
-        # single-shot rank may be indexed by source number. Comparing ranks
-        # avoids guessing from axis lengths, which are ambiguous whenever the
-        # number of receivers happens to match the spatial dimension.
-        single_shot_ndim = (
-            2 if wave.wave_type == WaveType.ISOTROPIC_ACOUSTIC else 3
-        )
-        if real_shot_record.ndim == single_shot_ndim + 1:
+        if real_shot_record.ndim == 3:
             return real_shot_record[wave.current_sources[0]]
-        if real_shot_record.ndim == single_shot_ndim:
+        if real_shot_record.ndim == 2:
             return real_shot_record
 
     if isinstance(real_shot_record, (list, tuple)):

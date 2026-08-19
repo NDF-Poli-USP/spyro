@@ -10,9 +10,11 @@ from .functionals import mechanical_energy_form
 from ...utils.typing import (ElasticMaterialParameter, ElasticMaterialParameterization,
                              AbsorbingBCsType, override)
 from ...domains.space import create_function_space
+from ...utils.physical_parameters import (DENSITY, LAMBDA, MU,
+                                          P_WAVE_VELOCITY, S_WAVE_VELOCITY)
 
 
-CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
+PHYSICAL_PARAMETERIZATION = {
     ElasticMaterialParameterization.LAME: (
         ElasticMaterialParameter.DENSITY,
         ElasticMaterialParameter.LAMBDA,
@@ -26,7 +28,7 @@ CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
 }
 
 
-def _format_control_parameters(parameters):
+def _format_physical_parameters(parameters):
     """Format material-parameter enum values for error messages.
 
     Parameters
@@ -50,13 +52,24 @@ def _format_control_parameters(parameters):
 class IsotropicWave(ElasticWave):
     '''Isotropic elastic wave propagator'''
 
+    #: An isotropic elastic medium is described by density plus either the
+    #: two Lame parameters or the two wave speeds; whichever pair is not
+    #: declared is derived from the other.
+    _physical_parameter_attributes = {
+        DENSITY: "rho",
+        LAMBDA: "lmbda",
+        MU: "mu",
+        P_WAVE_VELOCITY: "c",
+        S_WAVE_VELOCITY: "c_s",
+    }
+
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
         self.rho = None   # Density
         self.lmbda = None  # First Lame parameter
         self.mu = None    # Second Lame parameter
         self.c_s = None   # Secondary wave velocity
-        self._control_parameterization = None
+        self._physical_parameterization = None
         self._material_parameter_function_space = None
 
         self.u_n = None   # Current displacement field
@@ -175,11 +188,11 @@ class IsotropicWave(ElasticWave):
             not bool(self.mu)
 
         if option_1:
-            self._control_parameterization = ElasticMaterialParameterization.LAME
+            self._physical_parameterization = ElasticMaterialParameterization.LAME
             self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
             self.c_s = (self.mu/self.rho)**0.5
         elif option_2:
-            self._control_parameterization = ElasticMaterialParameterization.VELOCITY
+            self._physical_parameterization = ElasticMaterialParameterization.VELOCITY
             self.mu = self.rho*self.c_s**2
             self.lmbda = self.rho*self.c**2 - 2*self.mu
         else:
@@ -193,6 +206,70 @@ class IsotropicWave(ElasticWave):
                 "The valid options are {Density, Lame first, Lame second} "
                 "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
             )
+        self._register_physical_parameters()
+
+    @override
+    def physical_parameter_function_space(self):
+        """Return the scalar space the elastic material fields live in.
+
+        Elastic displacement is vector-valued, but density, the Lame
+        parameters and the wave speeds are scalar material fields, so they do
+        not live in the solver function space.
+
+        Returns
+        -------
+        firedrake.FunctionSpace
+            Scalar material-parameter function space.
+
+        Raises
+        ------
+        ValueError
+            If the mesh has not been created yet.
+        """
+        if self.mesh is None:
+            raise ValueError(
+                "Mesh must be set before creating elastic material parameter "
+                "spaces.",
+            )
+        self._material_parameter_function_space = create_function_space(
+            self.mesh, self.method, self.degree,
+        )
+        return self._material_parameter_function_space
+
+    def _register_physical_parameters(self):
+        """Declare the five isotropic elastic parameters of the medium."""
+        self._physical_parameters.add(DENSITY, self.rho)
+        self._physical_parameters.add(LAMBDA, self.lmbda)
+        self._physical_parameters.add(MU, self.mu)
+        self._physical_parameters.add(P_WAVE_VELOCITY, self.c)
+        self._physical_parameters.add(S_WAVE_VELOCITY, self.c_s)
+
+    @override
+    def _refresh_derived_parameters(self):
+        """Recompute the parameter pair the medium was not declared with.
+
+        The medium is described by density and either the Lame parameters or
+        the wave speeds. The other pair is a UFL expression of the declared
+        fields, so it follows them without being rebuilt; it is recomputed
+        here only when the declared fields themselves are replaced.
+        """
+        declared = {
+            name
+            for name, attribute in self._physical_parameter_attributes.items()
+            if isinstance(getattr(self, attribute), Function)
+        }
+        for parameterization, parameters in PHYSICAL_PARAMETERIZATION.items():
+            if declared != {parameter.value for parameter in parameters}:
+                continue
+            self._physical_parameterization = parameterization
+            if parameterization is ElasticMaterialParameterization.LAME:
+                self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
+                self.c_s = (self.mu/self.rho)**0.5
+            else:
+                self.mu = self.rho*self.c_s**2
+                self.lmbda = self.rho*self.c**2 - 2*self.mu
+            self._register_physical_parameters()
+            return
 
     @override
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
@@ -244,241 +321,6 @@ class IsotropicWave(ElasticWave):
     @override
     def get_function_name(self):
         return "Displacement"
-
-    def get_control_parameter_function_space(self):
-        """Return the scalar space used for elastic material controls.
-
-        Elastic displacement is vector-valued, but density, Lame parameters,
-        and wave speeds are scalar material fields. This method creates and
-        returns the scalar space used for those controls.
-
-        Returns
-        -------
-        firedrake.FunctionSpace
-            Scalar material-parameter function space.
-
-        Raises
-        ------
-        ValueError
-            If the mesh has not been created yet.
-
-        Examples
-        --------
-        ``Function(wave.get_control_parameter_function_space())`` creates a
-        scalar density or Lame-parameter control compatible with
-        ``set_control_parameters``.
-        """
-        if self.mesh is None:
-            raise ValueError(
-                "Mesh must be set before creating elastic control parameter spaces.",
-            )
-        self._material_parameter_function_space = create_function_space(
-            self.mesh, self.method, self.degree,
-        )
-        return self._material_parameter_function_space
-
-    def _as_control_field(self, value, name):
-        """Return a material control as a scalar Firedrake Function.
-
-        Elastic material parameters are scalar fields, while the elastic
-        displacement solution lives in a vector function space. This helper
-        keeps the inversion controls in the scalar space returned by
-        ``get_control_parameter_function_space()`` so density, Lame
-        parameters, and velocity controls can be flattened, rebuilt, written,
-        and reassigned consistently during FWI.
-
-        Accepted values are Firedrake ``Function`` objects, constants, scalar
-        values, or UFL expressions. Functions already in the target space are
-        copied with ``assign``; all other values are interpolated into a new
-        named scalar ``Function``.
-
-        Parameters
-        ----------
-        value : firedrake.Function, firedrake.Constant, scalar, or UFL expression
-            Material control value to represent in the scalar control space.
-        name : str
-            Name assigned to the returned Firedrake ``Function``.
-
-        Returns
-        -------
-        firedrake.Function or None
-            Scalar control field in the material-parameter function space. If
-            ``value`` is ``None``, returns ``None``.
-        """
-        if value is None:
-            return None
-
-        V = self.get_control_parameter_function_space()
-        field = Function(V, name=name)
-        if isinstance(value, Function):
-            if value.function_space() == V:
-                field.assign(value)
-            else:
-                field.interpolate(value)
-        else:
-            field.interpolate(value)
-        return field
-
-    def get_control_parameters(self):
-        """Return the active isotropic elastic material controls.
-
-        The returned dictionary is keyed by
-        :class:`ElasticMaterialParameter`. Its contents depend on the active
-        parameterization: density/Lame parameters or density/P- and S-wave
-        velocities.
-
-        Returns
-        -------
-        dict or None
-            Dictionary mapping material-parameter enum values to scalar
-            Firedrake ``Function`` controls. Returns ``None`` if material
-            parameters have not been initialized.
-
-        Examples
-        --------
-        Lame parameterization returns ``{DENSITY: rho, LAMBDA: lmbda, MU: mu}``.
-        Velocity parameterization returns
-        ``{DENSITY: rho, P_WAVE_VELOCITY: c, S_WAVE_VELOCITY: c_s}``.
-        """
-        parameterization = self._control_parameterization
-        if parameterization is None:
-            if self.rho is None:
-                return None
-            parameterization = ElasticMaterialParameterization.LAME
-
-        parameters = {}
-        for parameter in CONTROL_PARAMETERS_BY_PARAMETERIZATION[parameterization]:
-            if parameter is ElasticMaterialParameter.DENSITY:
-                parameters[parameter] = self.rho
-            elif parameter is ElasticMaterialParameter.LAMBDA:
-                parameters[parameter] = self.lmbda
-            elif parameter is ElasticMaterialParameter.MU:
-                parameters[parameter] = self.mu
-            elif parameter is ElasticMaterialParameter.P_WAVE_VELOCITY:
-                parameters[parameter] = self.c
-            elif parameter is ElasticMaterialParameter.S_WAVE_VELOCITY:
-                parameters[parameter] = self.c_s
-            else:
-                raise ValueError(
-                    f"Unsupported elastic control parameter '{parameter.value}'.",
-                )
-        return parameters
-
-    def set_control_parameters(self, controls):
-        """Assign isotropic elastic material controls.
-
-        Control dictionaries must use :class:`ElasticMaterialParameter` keys.
-        Model input dictionaries still use the public Spyro string schema, but
-        the FWI control API is intentionally enum-only.
-
-        Parameters
-        ----------
-        controls : dict
-            Dictionary containing either density/Lame controls or density/P-
-            and S-wave velocity controls. Values may be Firedrake ``Function``
-            objects, Firedrake ``Constant`` objects, scalars, or UFL
-            expressions; all stored controls are scalar ``Function`` objects.
-
-        Returns
-        -------
-        None
-            The method updates ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s`` and
-            the active material parameterization.
-
-        Raises
-        ------
-        TypeError
-            If ``controls`` is not a dictionary or if any key is not an
-            ``ElasticMaterialParameter``.
-        ValueError
-            If the dictionary does not define one complete supported
-            parameterization.
-
-        Examples
-        --------
-        Lame controls are passed as::
-
-            {
-                ElasticMaterialParameter.DENSITY: rho,
-                ElasticMaterialParameter.LAMBDA: lmbda,
-                ElasticMaterialParameter.MU: mu,
-            }
-
-        Velocity controls are passed as::
-
-            {
-                ElasticMaterialParameter.DENSITY: rho,
-                ElasticMaterialParameter.P_WAVE_VELOCITY: c,
-                ElasticMaterialParameter.S_WAVE_VELOCITY: c_s,
-            }
-        """
-        if not isinstance(controls, dict):
-            raise TypeError(
-                "IsotropicWave controls must be provided as a dictionary.",
-            )
-
-        if not all(isinstance(key, ElasticMaterialParameter) for key in controls):
-            raise TypeError(
-                "IsotropicWave control keys must be ElasticMaterialParameter "
-                "enum values.",
-            )
-
-        lame_controls = CONTROL_PARAMETERS_BY_PARAMETERIZATION[
-            ElasticMaterialParameterization.LAME
-        ]
-        velocity_controls = CONTROL_PARAMETERS_BY_PARAMETERIZATION[
-            ElasticMaterialParameterization.VELOCITY
-        ]
-        option_1 = set(controls) == set(lame_controls)
-        option_2 = set(controls) == set(velocity_controls)
-        if not (option_1 or option_2):
-            lame_names = _format_control_parameters(lame_controls)
-            velocity_names = _format_control_parameters(velocity_controls)
-            raise ValueError(
-                "Elastic controls must define either "
-                f"{lame_names} or {velocity_names}.",
-            )
-
-        self.rho = self._as_control_field(
-            controls[ElasticMaterialParameter.DENSITY],
-            ElasticMaterialParameter.DENSITY.value,
-        )
-
-        synthetic_data = {
-            "type": "object",
-            "density": self.rho,
-            "real_velocity_file": None,
-        }
-        if option_1:
-            self.lmbda = self._as_control_field(
-                controls[ElasticMaterialParameter.LAMBDA],
-                ElasticMaterialParameter.LAMBDA.value,
-            )
-            self.mu = self._as_control_field(
-                controls[ElasticMaterialParameter.MU],
-                ElasticMaterialParameter.MU.value,
-            )
-            self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
-            self.c_s = (self.mu/self.rho)**0.5
-            self._control_parameterization = ElasticMaterialParameterization.LAME
-            synthetic_data["lambda"] = self.lmbda
-            synthetic_data["mu"] = self.mu
-        else:
-            self.c = self._as_control_field(
-                controls[ElasticMaterialParameter.P_WAVE_VELOCITY],
-                ElasticMaterialParameter.P_WAVE_VELOCITY.value,
-            )
-            self.c_s = self._as_control_field(
-                controls[ElasticMaterialParameter.S_WAVE_VELOCITY],
-                ElasticMaterialParameter.S_WAVE_VELOCITY.value,
-            )
-            self.mu = self.rho*self.c_s**2
-            self.lmbda = self.rho*self.c**2 - 2*self.mu
-            self._control_parameterization = ElasticMaterialParameterization.VELOCITY
-            synthetic_data["p_wave_velocity"] = self.c
-            synthetic_data["s_wave_velocity"] = self.c_s
-
-        self.input_dictionary["synthetic_data"] = synthetic_data
 
     @override
     def matrix_building(self):

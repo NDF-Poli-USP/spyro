@@ -1,8 +1,6 @@
 from abc import abstractmethod, ABCMeta
-from collections.abc import Mapping
 import warnings
 import firedrake as fire
-from pyadjoint import AdjFloat, Tape
 
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
@@ -17,9 +15,10 @@ from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
+from ..utils.physical_parameters import PhysicalParameters, parameter_name
 from ..utils.error_management import validate_enum
 from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
-                            LayerShapeType, RieszMapType, WaveType)
+                            LayerShapeType, WaveType)
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
 
@@ -102,6 +101,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Tolerance for searching nodes in the mesh.
     """
 
+    #: Physical parameter name -> the attribute holding its field. Solvers
+    #: override this with the material parameters their equation is written
+    #: in terms of.
+    _physical_parameter_attributes = {}
+
     def __init__(self, dictionary=None, wave_type=WaveType.NONE, comm=None):
         """Wave object solver. Contains both the forward solver
         and gradient calculator methods.
@@ -181,6 +185,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.field_logger.add_field("forward", self.get_function_name(),
                                     lambda: self.get_function())
 
+        self._physical_parameters = PhysicalParameters()
+
     def forward_solve(self):
         """Solves the forward problem."""
 
@@ -191,15 +197,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         if self.abc_type in [AbsorbingBCsType.NOABCS, AbsorbingBCsType.NRBC]:
             self._initialize_model_parameters()
-        if self.automated_adjoint is not None:
-            # Initialization rebuilds the material fields from the model
-            # dictionary, so the controls recorded when the automated adjoint
-            # was enabled would otherwise point at objects the variational form
-            # no longer uses, and the tape would be differentiated with respect
-            # to fields that never enter the solve.
-            self.automated_adjoint.controls = (
-                self._get_automated_adjoint_controls()
-            )
         self.matrix_building()
         self.wave_propagator()
 
@@ -624,7 +621,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
         self._initialize_model_parameters()
-        controls = self._get_automated_adjoint_controls()
+        if self.c is None:
+            raise ValueError(
+                "self.c must be set before enabling automated adjoint."
+                "Please set the velocity model using set_initial_velocity_model()"
+                "or set c directly."
+            )
+        controls = self.c
         # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
         # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
         # that the reduced functional is built as an
@@ -633,93 +636,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
         self.functional_value = None
         self.misfit = None
-
-    def _get_automated_adjoint_controls(self):
-        """Return the model parameters to differentiate, as a list.
-
-        Solvers expose their controls in the shape that suits their physics: a
-        single velocity ``Function`` for acoustic media, a dictionary keyed by
-        material parameter for elastic ones. Both are flattened here into the
-        ordered list :class:`AutomatedAdjoint` differentiates, so the whole
-        adjoint path handles only lists.
-
-        Returns
-        -------
-        list of firedrake.Function
-            Controls in the order reported by ``get_control_parameters()``.
-
-        Raises
-        ------
-        ValueError
-            If the solver has no initialized control parameters.
-        """
-        controls = self.get_control_parameters()
-        if controls is None:
-            raise ValueError(
-                "Control parameters must be initialized before enabling the "
-                "automated adjoint. Set a velocity model with "
-                "set_initial_velocity_model(), or declare the elastic material "
-                "in the model dictionary."
-            )
-        if isinstance(controls, Mapping):
-            controls = controls.values()
-        elif not isinstance(controls, (list, tuple)):
-            controls = [controls]
-        return list(controls)
-
-    def _automated_adjoint_derivatives(self, riesz_map=RieszMapType.L2):
-        """Differentiate the recorded functional with respect to the controls.
-
-        Replays the pyadjoint tape built during the annotated forward solve.
-        The tape and the reduced functional are created on demand, so this can
-        be called right after ``forward_solve()`` or on a solver that has not
-        been annotated yet.
-
-        Parameters
-        ----------
-        riesz_map : RieszMapType, optional
-            ``L2`` returns the Riesz representer of the derivative (a
-            ``Function``); ``l2`` returns the raw dual object (a
-            ``Cofunction``). See :class:`RieszMapType`.
-
-        Returns
-        -------
-        list
-            One derivative per control, in the order reported by
-            ``get_control_parameters()``.
-
-        Raises
-        ------
-        ValueError
-            If no annotated functional value is available.
-        NotImplementedError
-            If ``riesz_map`` is not supported by the automated adjoint.
-        """
-        if not isinstance(self.functional_value, AdjFloat):
-            raise ValueError(
-                "Functional value must be an AdjFloat for automated adjoint "
-                "gradient computation."
-            )
-
-        if not self.automated_adjoint:
-            self.enable_automated_adjoint()
-            self.automated_adjoint.clear_tape()
-            self.forward_solve()
-        if (
-            self.automated_adjoint.reduced_functional is None
-            and isinstance(self.automated_adjoint._tape, Tape)
-        ):
-            self.automated_adjoint.create_reduced_functional(
-                self.functional_value
-            )
-
-        if riesz_map == RieszMapType.L2:
-            return self.automated_adjoint.compute_gradient()
-        if riesz_map == RieszMapType.l2:
-            return self.automated_adjoint.compute_derivative()
-        raise NotImplementedError(
-            f"Riesz map {riesz_map} not implemented for automated adjoint."
-        )
 
     def enable_implemented_adjoint(self):
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
@@ -821,61 +737,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.path_case_abc = self.layer_ops.path_case_abc
 
     @abstractmethod
-    def get_control_parameters(self):
-        """Return inversion controls exposed by a concrete wave solver.
-
-        Subclasses override this method when they can participate in inversion
-        workflows. The base class raises because a generic ``spyro.solvers.Wave`` does not
-        know which physical parameters should be optimized.
-
-        Returns
-        -------
-        object
-            Solver-specific control structure.
-
-        Raises
-        ------
-        NotImplementedError
-            Always raised by the base class.
-
-        Examples
-        --------
-        ``AcousticWave.get_control_parameters()`` returns the velocity model;
-        an elastic solver may return a dictionary of material parameters.
-        """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not expose inversion control parameters.",
-        )
-
-    @abstractmethod
-    def set_control_parameters(self, controls):
-        """Assign inversion controls on a concrete wave solver.
-
-        Parameters
-        ----------
-        controls : object
-            Solver-specific control structure.
-
-        Returns
-        -------
-        None
-            Concrete subclasses assign the controls in-place.
-
-        Raises
-        ------
-        NotImplementedError
-            Always raised by the base class.
-
-        Examples
-        --------
-        ``AcousticWave.set_control_parameters(vp)`` assigns a velocity model;
-        elastic solvers expect a dictionary keyed by material-parameter enums.
-        """
-        raise NotImplementedError(
-            f"{type(self).__name__} cannot assign inversion control parameters.",
-        )
-
-    @abstractmethod
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
         """Compute an adjoint gradient for inversion.
 
@@ -908,29 +769,156 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             f"{type(self).__name__} does not implement gradient_solve().",
         )
 
-    @abstractmethod
-    def get_control_parameter_function_space(self):
-        """Return the function space used by inversion controls.
+    @property
+    def physical_parameters(self):
+        """Return the physical parameters of the wave equation being solved.
 
-        Subclasses override this method to tell the FWI driver where scalar
-        controls should live when constants or expressions need to be converted
-        to Firedrake ``Function`` objects.
+        The parameters are the material fields the variational form is written
+        in terms of: the velocity model for an acoustic medium, density and a
+        pair of elastic moduli or wave speeds for an isotropic elastic one.
+        Solvers declare them while initializing their material properties.
+
+        A wave solver knows only about physical parameters. Which of them an
+        inversion treats as unknowns is a property of the inversion, not of
+        the wave equation, and is held by
+        :class:`~spyro.solvers.inversion.FullWaveformInversion`.
+
+        Returns
+        -------
+        PhysicalParameters
+            Set of parameter names, mapping each name to its field.
+
+        Raises
+        ------
+        ValueError
+            If the solver has not initialized its material properties yet.
+
+        Examples
+        --------
+        >>> wave.physical_parameters
+        PhysicalParameters({p_wave_velocity})
+        >>> {"p_wave_velocity"} <= wave.physical_parameters
+        True
+        """
+        parameters = getattr(self, "_physical_parameters", None)
+        if not parameters:
+            raise ValueError(
+                "Physical parameters have not been set. Please ensure that "
+                "the wave solver has been properly initialized and that "
+                "physical parameters have been defined."
+            )
+        return parameters
+
+    def initialize_physical_parameters(self):
+        """Build the material fields of the wave equation from the model input.
+
+        The forward solve does this on its own, so this is only needed to read
+        the physical parameters of a solver that has not run yet.
+
+        Returns
+        -------
+        PhysicalParameters
+            The initialized physical parameters.
+        """
+        self._initialize_model_parameters()
+        return self.physical_parameters
+
+    def physical_parameter_function_space(self):
+        """Return the function space the physical parameter fields live in.
 
         Returns
         -------
         firedrake.FunctionSpace
-            Solver-specific control function space.
-
-        Raises
-        ------
-        NotImplementedError
-            Always raised by the base class.
+            Function space used for material fields. It is built if it does
+            not exist yet.
 
         Examples
         --------
-        Acoustic controls use the acoustic pressure/velocity function space;
-        elastic material controls use a scalar material-parameter space.
+        ``fire.Function(wave.physical_parameter_function_space())`` creates a
+        field compatible with :meth:`set_physical_parameter`.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not define a control parameter function space.",
-        )
+        if self.function_space is None:
+            self.force_rebuild_function_space()
+        return self.function_space
+
+    def set_physical_parameter(self, name, value):
+        """Define or overwrite the field of one physical parameter.
+
+        A parameter that already has a field is written into rather than
+        replaced, so variational forms already built from it, and any
+        parameter derived from it, use the new values without being rebuilt.
+        A parameter that has no field yet gets one in
+        :meth:`physical_parameter_function_space`.
+
+        Parameters
+        ----------
+        name : str or enum.Enum
+            Parameter to set. It must be one the solver models.
+        value : firedrake.Function, firedrake.Constant, scalar, or UFL expression
+            New value, interpolated into the parameter field unless it is
+            already a ``Function`` in the same function space.
+
+        Returns
+        -------
+        firedrake.Function
+            The parameter field.
+
+        Raises
+        ------
+        KeyError
+            If ``name`` is not a physical parameter of this wave equation.
+        TypeError
+            If ``name`` is derived from the other parameters, and so cannot be
+            assigned on its own.
+
+        Examples
+        --------
+        ``wave.set_physical_parameter("p_wave_velocity", fire.Constant(2.0))``
+        fills the acoustic velocity model with ``2.0``.
+        """
+        key = parameter_name(name)
+        attributes = type(self)._physical_parameter_attributes
+        if key not in attributes:
+            known = "{" + ", ".join(attributes) + "}"
+            raise KeyError(
+                f"'{key}' is not a physical parameter of "
+                f"{type(self).__name__}. Known parameters: {known}.",
+            )
+
+        parameters = getattr(self, "_physical_parameters", None)
+        if parameters is None:
+            parameters = self._physical_parameters = PhysicalParameters()
+
+        field = parameters.get(key)
+        if isinstance(field, fire.Function):
+            return parameters.update(key, value)
+        if field is not None and not isinstance(field, fire.Constant):
+            # A parameter that is neither a field nor a constant is a UFL
+            # expression of the others, and has no independent value to set.
+            raise TypeError(
+                f"'{key}' is derived from the other physical parameters and "
+                "cannot be set on its own. Set the parameters it is computed "
+                "from instead.",
+            )
+
+        function_space = self.physical_parameter_function_space()
+        field = fire.Function(function_space, name=key)
+        if (
+            isinstance(value, fire.Function)
+            and value.function_space() == function_space
+        ):
+            field.assign(value)
+        else:
+            field.interpolate(value)
+        setattr(self, attributes[key], field)
+        parameters.add(key, field)
+        self._refresh_derived_parameters()
+        return field
+
+    def _refresh_derived_parameters(self):
+        """Recompute the parameters derived from the independent fields.
+
+        Called after a parameter field is created. The base implementation
+        does nothing; solvers whose material description carries dependent
+        parameters override it.
+        """

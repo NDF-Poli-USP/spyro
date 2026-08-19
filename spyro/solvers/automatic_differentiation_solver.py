@@ -6,36 +6,6 @@ import firedrake as fire
 import firedrake.adjoint as fire_ad
 
 
-def _as_list(value):
-    """Return ``value`` as a list, one entry per control.
-
-    Controls, perturbation directions and derivatives are all handled as
-    per-control sequences, but the single-control APIs pass bare objects. This
-    keeps both spellings valid without duplicating the branch at each call
-    site.
-
-    Parameters
-    ----------
-    value : object, list, tuple, or None
-        Value to normalize. ``None`` yields an empty list.
-
-    Returns
-    -------
-    list
-        ``value`` as a list, or a one-item list wrapping it.
-
-    Examples
-    --------
-    ``_as_list(control)`` and ``_as_list([control])`` both return
-    ``[control]``.
-    """
-    if value is None:
-        return []
-    if isinstance(value, (list, tuple)):
-        return list(value)
-    return [value]
-
-
 class AutomatedAdjoint:
     """Automated adjoint driver for spyro using firedrake.adjoint.
 
@@ -82,13 +52,10 @@ class AutomatedAdjoint:
 
     Parameters
     ----------
-    controls : firedrake.Function or list of firedrake.Function, optional
-        The controls with respect to which the functional is differentiated,
-        each wrapped in a :class:`pyadjoint.Control` when the reduced
-        functional is created. Acoustic media are inverted for a single
-        velocity field, elastic ones for the three fields of their material
-        parameterization, so a lone control is normalized to a one-item list
-        and everything downstream handles only lists.
+    controls : firedrake.Function, optional
+        The control with respect to which the functional is differentiated.
+        It is wrapped in a :class:`pyadjoint.Control` when the reduced functional is
+        created.
     ensemble : firedrake.ensemble.Ensemble, optional
         The Firedrake ensemble communicator used to sum the per-shot
         functionals and gradients across ensemble members. In practice this is
@@ -97,8 +64,8 @@ class AutomatedAdjoint:
 
     Attributes
     ----------
-    controls : list of firedrake.Function
-        The controls passed at construction time.
+    controls : firedrake.Function
+        The control passed at construction time.
     ensemble : firedrake.ensemble.Ensemble or None
         The ensemble communicator used by the reduced functional.
     reduced_functional : firedrake.adjoint.EnsembleReducedFunctional or \
@@ -108,11 +75,7 @@ pyadjoint.ReducedFunctional or None
     """
 
     def __init__(self, ensemble, controls=None):
-        if controls is None:
-            controls = []
-        elif not isinstance(controls, (list, tuple)):
-            controls = [controls]
-        self.controls = list(controls)
+        self.controls = controls
         self.ensemble = ensemble
         self.reduced_functional = None
         self._tape = None
@@ -202,9 +165,7 @@ pyadjoint.ReducedFunctional or None
             The reduced functional, also stored on
             :attr:`reduced_functional`.
         """
-        if not self.controls:
-            raise ValueError("At least one control is required.")
-        control = [fire_ad.Control(value) for value in self.controls]
+        control = fire_ad.Control(self.controls)
 
         self.reduced_functional = fire_ad.EnsembleReducedFunctional(
             functional,
@@ -323,69 +284,26 @@ pyadjoint.ReducedFunctional or None
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
-
-        control_var = _as_list(control_var)
         if direction is None:
-            direction = [
-                fire.Function(control.function_space()).interpolate(0.01)
-                for control in control_var
-            ]
-        else:
-            direction = _as_list(direction)
-
-        if not isinstance(dJdm, (int, float, type(None))):
-            dJdm = self._directional_derivative(_as_list(dJdm), direction)
-        return taylor_test(self.reduced_functional, control_var, direction, dJdm=dJdm)
-
-    @staticmethod
-    def _directional_derivative(derivatives, direction):
-        """Contract per-control derivatives with the perturbation directions.
-
-        pyadjoint's ``taylor_test`` expects ``dJdm`` to be the scalar
-        directional derivative :math:`J'(m)(h) = \\sum_i \\langle dJ/dm_i,
-        h_i \\rangle`, not the derivative objects themselves. Passing a
-        ``Function`` or ``Cofunction`` straight through would make ``eps *
-        dJdm`` a UFL expression inside pyadjoint, and the subsequent
-        ``min(residuals) < 1E-15`` comparison would raise "UFL conditions
-        cannot be evaluated as bool in a Python context".
-
-        Parameters
-        ----------
-        derivatives : list
-            One derivative per control. ``Function`` entries are Riesz
-            representers of the gradient and are paired with the direction in
-            :math:`L^2`; ``Cofunction`` entries are dual objects and are
-            applied to the direction through the duality pairing.
-        direction : list of firedrake.Function
-            Perturbation direction of each control.
-
-        Returns
-        -------
-        float or None
-            The directional derivative, or ``None`` when an entry has an
-            unsupported type, which tells pyadjoint to compute it itself.
-
-        Raises
-        ------
-        ValueError
-            If the two sequences have different lengths.
-        """
-        if len(derivatives) != len(direction):
-            raise ValueError(
-                "The derivative and direction must have the same length."
-            )
-
-        directional_derivative = 0.0
-        for derivative, perturbation in zip(derivatives, direction):
-            if isinstance(derivative, fire.Function):
-                directional_derivative += fire.assemble(
-                    fire.inner(derivative, perturbation) * fire.dx
+            direction = fire.Function(control_var.function_space())
+            direction.interpolate(0.01)
+        # pyadjoint's ``taylor_test`` expects ``dJdm`` to be the scalar
+        # directional derivative ``J'(m)(h)``, not the gradient itself. When a
+        # Firedrake ``Function`` (Riesz representer of the gradient) or a
+        # ``Cofunction`` (raw derivative) is supplied, reduce it to a scalar by
+        # pairing it with the perturbation ``direction``. Otherwise ``eps *
+        # dJdm`` inside pyadjoint becomes a UFL expression and the comparison
+        # ``min(residuals) < 1E-15`` raises ``UFL conditions cannot be
+        # evaluated as bool in a Python context``.
+        if dJdm is not None and not isinstance(dJdm, (int, float)):
+            if isinstance(dJdm, fire.Function):
+                dJdm = fire.assemble(
+                    fire.inner(dJdm, direction) * fire.dx
                 )
-            elif isinstance(derivative, fire.Cofunction):
-                directional_derivative += fire.assemble(
-                    fire.action(derivative, perturbation)
-                )
+            elif isinstance(dJdm, fire.Cofunction):
+                # Apply the cofunction to the direction (duality pairing).
+                dJdm = fire.assemble(fire.action(dJdm, direction))
             else:
                 # Unknown type, fall back to pyadjoint's internal computation.
-                return None
-        return directional_derivative
+                dJdm = None
+        return taylor_test(self.reduced_functional, control_var, direction, dJdm=dJdm)

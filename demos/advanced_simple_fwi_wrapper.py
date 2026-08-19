@@ -64,7 +64,7 @@ class MyFWI(spyro.FullWaveformInversion):
         }
         parameters.update(kwargs)
 
-        control_reference = self._guess_control_reference()
+        control_reference = self._control_reference()
         lower = self._expand_bound(parameters["vmin"], control_reference)
         upper = self._expand_bound(parameters["vmax"], control_reference)
         bounds = list(zip(lower, upper))

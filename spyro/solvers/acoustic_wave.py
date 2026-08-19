@@ -1,6 +1,7 @@
 import firedrake as fire
 
 from .wave import Wave
+from pyadjoint import Tape, AdjFloat
 from ..io.parallelism_wrappers import ensemble_gradient
 from ..io import interpolate
 from .acoustic_solver_construction_no_pml import (
@@ -17,10 +18,14 @@ from ..utils.typing import (
     AdjointType, RieszMapType, override, WaveType, AbsorbingBCsType,
 )
 from ..utils import write_hdf5_velocity_model
+from ..utils.physical_parameters import P_WAVE_VELOCITY
 from .functionals import acoustic_energy
 
 
 class AcousticWave(Wave):
+    #: An acoustic medium is described by its pressure wave velocity alone.
+    _physical_parameter_attributes = {P_WAVE_VELOCITY: "c"}
+
     def __init__(self, dictionary, comm=None):
         """Wave Acoustic object solver.
 
@@ -165,13 +170,65 @@ class AcousticWave(Wave):
             Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
             depending on the chosen Riesz map.
         """
-        derivatives = self._automated_adjoint_derivatives(riesz_map=riesz_map)
-        if len(derivatives) != 1:
-            raise RuntimeError(
-                "The acoustic automated adjoint must return exactly one "
-                f"velocity derivative, got {len(derivatives)}."
+        if not isinstance(self.functional_value, AdjFloat):
+            raise ValueError(
+                "Functional value must be an AdjFloat for automated adjoint gradient computation."
             )
-        return derivatives[0]
+
+        if not self.automated_adjoint:
+            self.enable_automated_adjoint()
+            self.automated_adjoint.clear_tape()
+            self.forward_solve()
+            self.automated_adjoint.create_reduced_functional(
+                self.functional_value
+            )
+        elif (
+            self.automated_adjoint.reduced_functional is None
+            and isinstance(self.automated_adjoint._tape, Tape)
+        ):
+            self.automated_adjoint.create_reduced_functional(
+                self.functional_value
+            )
+
+        if riesz_map == RieszMapType.L2:
+            return self.automated_adjoint.compute_gradient()
+        elif riesz_map == RieszMapType.l2:
+            return self.automated_adjoint.compute_derivative()
+        else:
+            raise NotImplementedError(
+                f"Riesz map {riesz_map} not implemented for automated adjoint."
+            )
+
+    @override
+    def physical_parameter_function_space(self):
+        """Return the function space the velocity model lives in.
+
+        Returns
+        -------
+        firedrake.FunctionSpace
+            Acoustic function space. Under a PML the solver space is mixed and
+            the velocity lives in its first component, which is what is
+            returned.
+        """
+        if self.function_space is None:
+            self.force_rebuild_function_space()
+        if self.abc_type == AbsorbingBCsType.PML:
+            return self.function_space.sub(0)
+        return self.function_space
+
+    @override
+    def _refresh_derived_parameters(self):
+        """Keep the initial velocity model pointing at the velocity field.
+
+        ``_initialize_model_parameters()`` rebuilds ``c`` from
+        ``initial_velocity_model`` on every forward solve, so a velocity set
+        through :meth:`set_physical_parameter` has to become the initial model
+        as well, or it would be discarded at the next solve.
+        """
+        if self.c is None:
+            return
+        self.initial_velocity_model = self.c
+        self.initial_velocity_model_file = None
 
     def reset_pressure(self):
         if self.abc_type == AbsorbingBCsType.PML:
@@ -196,6 +253,7 @@ class AcousticWave(Wave):
                             self.initial_velocity_model, name="velocity"
                         )
                     self.c = self.initial_velocity_model
+                    self._physical_parameters.add(P_WAVE_VELOCITY, self.c)
                     return
                 raise ValueError("No velocity model or velocity file to load.")
 
@@ -216,6 +274,7 @@ class AcousticWave(Wave):
                 )
 
         self.c = self.initial_velocity_model
+        self._physical_parameters.add(P_WAVE_VELOCITY, self.c)
 
     @override
     def _set_vstate(self, vstate):
@@ -321,7 +380,7 @@ class AcousticWave(Wave):
             return self.B
 
     def rhs_no_pml_source(self):
-        """Return the source cofunction added to the variational right-hand
+        """ Return the source cofunction added to the variational right-hand
         side.
         """
         if self.abc_type == AbsorbingBCsType.PML:
@@ -344,77 +403,3 @@ class AcousticWave(Wave):
         if self.abc_type == AbsorbingBCsType.PML:
             return fire.split(self.X_n)[0]
         return self.u_n
-
-    def get_control_parameters(self):
-        """Return the acoustic inversion control.
-
-        For acoustic FWI the control is the velocity model stored in
-        ``initial_velocity_model``.
-
-        Returns
-        -------
-        firedrake.Function or None
-            Current acoustic velocity model.
-
-        Examples
-        --------
-        After ``set_initial_velocity_model(constant=2.0)``, this method returns
-        the velocity ``Function`` filled with ``2.0``.
-        """
-        return self.initial_velocity_model
-
-    def set_control_parameters(self, controls):
-        """Assign the acoustic inversion control.
-
-        Parameters
-        ----------
-        controls : firedrake.Function, firedrake.Constant, scalar, or UFL expression
-            Velocity model control. Non-``Function`` values are interpolated
-            into the acoustic function space.
-
-        Returns
-        -------
-        None
-            The method updates ``initial_velocity_model`` and ``c`` and clears
-            ``initial_velocity_model_file``.
-
-        Examples
-        --------
-        ``set_control_parameters(fire.Constant(2.0))`` creates a velocity
-        ``Function`` in the acoustic function space and fills it with ``2.0``.
-        """
-        if self.function_space is None:
-            self.force_rebuild_function_space()
-
-        if isinstance(controls, fire.Function):
-            name = controls.name()
-            velocity = fire.Function(self.function_space, name=name)
-            if controls.function_space() == self.function_space:
-                velocity.assign(controls)
-            else:
-                velocity.interpolate(controls)
-        else:
-            velocity = fire.Function(self.function_space, name="velocity")
-            velocity.interpolate(controls)
-
-        self.initial_velocity_model = velocity
-        self.initial_velocity_model_file = None
-        self.c = self.initial_velocity_model
-
-    def get_control_parameter_function_space(self):
-        """Return the function space used by acoustic controls.
-
-        Returns
-        -------
-        firedrake.FunctionSpace
-            Acoustic solver function space. If it has not been built yet, it is
-            created before being returned.
-
-        Examples
-        --------
-        ``fire.Function(wave.get_control_parameter_function_space())`` creates
-        a velocity control compatible with ``set_control_parameters``.
-        """
-        if self.function_space is None:
-            self.force_rebuild_function_space()
-        return self.function_space
