@@ -11,7 +11,7 @@ from .wave import Wave
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
-from ..utils.typing import WaveType, AdjointType
+from ..utils.typing import AdjointType
 from ..utils.physical_parameters import PhysicalParameters, parameter_name
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import parallel_print
@@ -298,8 +298,6 @@ class FullWaveformInversion:
     >>> fwi.run_fwi(maxiter=50, vmin=1.5, vmax=4.5)
     """
 
-    supported_wave_types = (WaveType.ISOTROPIC_ACOUSTIC,)
-
     def __init__(
         self, dictionary=None, comm=None, wave_class=AcousticWave, wave=None,
         control_parameters=None,
@@ -349,7 +347,6 @@ class FullWaveformInversion:
                 )
             self.wave = self.wave_class(dictionary=dictionary, comm=comm)
         self.wave_type = self.wave.wave_type
-        self._validate_supported_wave()
 
         self.input_dictionary = self.wave.input_dictionary
         self.comm = self.wave.comm
@@ -393,8 +390,8 @@ class FullWaveformInversion:
             if control_parameters is None
             else control_parameters
         )
-        self.real_control = PhysicalParameters()
-        self.guess_control = PhysicalParameters()
+        self._real_control = PhysicalParameters()
+        self._guess_control = PhysicalParameters()
 
         self.control_out = fire.VTKFile(inversion_dictionary["control_output_file"])
         self.gradient_out = fire.VTKFile(inversion_dictionary["gradient_output_file"])
@@ -417,39 +414,6 @@ class FullWaveformInversion:
         self.gradient_mask_available = False
         self.functional_history = []
 
-    def _validate_supported_wave(self):
-        """Validate that the composed wave solver can be used for FWI.
-
-        Full waveform inversion requires an adjoint/gradient solve. At the
-        moment, Spyro only provides that workflow for acoustic waves, so the
-        driver checks the solver ``wave_type`` before any inversion state is
-        used.
-
-        Raises
-        ------
-        NotImplementedError
-            If the internal wave solver is not one of
-            ``supported_wave_types``.
-
-        Examples
-        --------
-        ``AcousticWave`` sets ``wave_type`` to
-        ``WaveType.ISOTROPIC_ACOUSTIC`` and is accepted. ``IsotropicWave`` sets
-        ``wave_type`` to ``WaveType.ISOTROPIC_ELASTIC`` and raises here because
-        the elastic adjoint is not implemented yet.
-        """
-        if self.wave_type in self.supported_wave_types:
-            return
-        supported_names = ", ".join(
-            wave_type.name
-            for wave_type in self.supported_wave_types
-        )
-        raise NotImplementedError(
-            "FullWaveformInversion currently supports only acoustic wave "
-            "solvers because adjoint-based gradients are implemented only for "
-            f"{supported_names}. Received {self.wave_type.name}.",
-        )
-
     def _sync_wave_real_shot_record(self):
         """Copy observed data from the FWI driver to the wave solver.
 
@@ -466,6 +430,51 @@ class FullWaveformInversion:
         """
         if self.real_shot_record is not None:
             self.wave.real_shot_record = self.real_shot_record
+
+    @property
+    def guess_control(self):
+        """Return the current guess control.
+
+        Controls are held internally as a mapping keyed by physical parameter
+        name, because an inversion may in principle control more than one.
+        Acoustic inversion controls only the velocity model, so it is exposed
+        as that ``Function``, which is the API acoustic FWI has always had.
+
+        Returns
+        -------
+        firedrake.Function or None
+            Guess control field, or ``None`` if none is configured.
+        """
+        return self._single_control(self._guess_control)
+
+    @property
+    def real_control(self):
+        """Return the control of the model used to generate observed data.
+
+        Returns
+        -------
+        firedrake.Function or None
+            Real control field, or ``None`` if none is configured.
+        """
+        return self._single_control(self._real_control)
+
+    def _single_control(self, control):
+        """Return the one control field held by ``control``.
+
+        Parameters
+        ----------
+        control : PhysicalParameters
+            Internal control mapping.
+
+        Returns
+        -------
+        firedrake.Function or None
+            The control field, or ``None`` if the mapping is empty.
+
+        """
+        if not control:
+            return None
+        return next(iter(control.values()))
 
     @property
     def control_parameters(self):
@@ -556,8 +565,6 @@ class FullWaveformInversion:
 
         Raises
         ------
-        TypeError
-            If a bare value is given while several parameters are controlled.
         ValueError
             If a key is not one of the controlled parameters.
         """
@@ -579,12 +586,6 @@ class FullWaveformInversion:
                     f"Controls: {sorted(self._control_parameters)}.",
                 )
             return values
-        if len(self._control_parameters) != 1:
-            raise TypeError(
-                "This inversion controls "
-                f"{sorted(self._control_parameters)}, so controls must be "
-                "given as a mapping keyed by parameter name.",
-            )
         return {self._control_parameters[0]: control}
 
     def _control_reference(self):
@@ -597,22 +598,13 @@ class FullWaveformInversion:
 
         Raises
         ------
-        NotImplementedError
-            If more than one parameter is controlled. The optimizer path
-            still flattens a single scalar field.
         ValueError
             If no guess control has been configured.
         """
-        if len(self._control_parameters) != 1:
-            raise NotImplementedError(
-                "The optimizer path supports a single control parameter, but "
-                f"this inversion controls {sorted(self._control_parameters)}.",
-            )
-        name = self._control_parameters[0]
-        control = self.guess_control.get(name)
+        control = self.guess_control
         if control is None:
             try:
-                control = self.wave.physical_parameters.get(name)
+                control = self._single_control(self.wave.physical_parameters)
             except ValueError:
                 control = None
         if control is None:
@@ -869,7 +861,7 @@ class FullWaveformInversion:
         control = self._as_control_mapping(control)
         self._push_control_to_wave(self.wave, control)
         self.guess_mesh = self.wave.get_mesh()
-        self.guess_control = self.wave.physical_parameters.copy(control)
+        self._guess_control = self.wave.physical_parameters.copy(control)
         self.misfit = None
 
     @property
@@ -979,8 +971,8 @@ class FullWaveformInversion:
                 c,
             )
             self.set_guess_control(updated_control)
-        elif self.guess_control:
-            self._push_control_to_wave(self.wave, self.guess_control)
+        elif self._guess_control:
+            self._push_control_to_wave(self.wave, self._guess_control)
         else:
             # Raises unless the solver itself already carries a control value.
             self._control_reference()
@@ -1057,8 +1049,8 @@ class FullWaveformInversion:
         if self.real_mesh is not None:
             real_wave.set_mesh(user_mesh=self.real_mesh, input_mesh_parameters={})
 
-        if self.real_control:
-            self._push_control_to_wave(real_wave, self.real_control)
+        if self._real_control:
+            self._push_control_to_wave(real_wave, self._real_control)
         elif self.real_velocity_model_file is not None:
             try:
                 real_wave.initial_velocity_model_file
@@ -1149,7 +1141,7 @@ class FullWaveformInversion:
             dg_velocity_model=dg_velocity_model,
         )
         self.real_mesh = self.wave.get_mesh()
-        self.real_control = self._capture_control_from_wave(self.wave)
+        self._real_control = self._capture_control_from_wave(self.wave)
         if new_file is not None:
             self.real_velocity_model_file = new_file
 
@@ -1207,7 +1199,7 @@ class FullWaveformInversion:
             dg_velocity_model=dg_velocity_model,
         )
         self.guess_mesh = self.wave.get_mesh()
-        self.guess_control = self._capture_control_from_wave(self.wave)
+        self._guess_control = self._capture_control_from_wave(self.wave)
         self.misfit = None
 
     def set_real_mesh(self, user_mesh=None, input_mesh_parameters=None):

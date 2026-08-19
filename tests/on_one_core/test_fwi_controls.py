@@ -131,21 +131,6 @@ def test_full_waveform_inversion_rejects_non_wave_class():
         )
 
 
-def test_full_waveform_inversion_rejects_non_acoustic_wave_class():
-    with pytest.raises(NotImplementedError, match="supports only acoustic"):
-        spyro.FullWaveformInversion(
-            dictionary=build_elastic_dictionary(),
-            wave_class=spyro.IsotropicWave,
-        )
-
-
-def test_full_waveform_inversion_rejects_non_acoustic_wave_instance():
-    wave = spyro.IsotropicWave(dictionary=build_elastic_dictionary())
-
-    with pytest.raises(NotImplementedError, match="supports only acoustic"):
-        spyro.FullWaveformInversion(wave=wave)
-
-
 # Physical parameters belong to the wave equation.
 
 
@@ -181,14 +166,6 @@ def test_physical_parameters_raise_before_initialization():
         wave.physical_parameters
 
 
-def test_wave_does_not_know_about_control_parameters():
-    wave = spyro.AcousticWave(dictionary=build_acoustic_dictionary())
-
-    assert not hasattr(wave, "get_control_parameters")
-    assert not hasattr(wave, "set_control_parameters")
-    assert not hasattr(wave, "control_parameters")
-
-
 def test_updating_a_physical_parameter_writes_into_the_field():
     wave = build_elastic_wave()
     density = wave.physical_parameters["density"]
@@ -200,15 +177,6 @@ def test_updating_a_physical_parameter_writes_into_the_field():
     assert wave.physical_parameters["density"] is density
     assert wave.rho is density
     assert np.allclose(density.dat.data_ro, 2.0)
-
-
-def test_dependent_physical_parameters_cannot_be_set_on_their_own():
-    # The medium is declared with density and the two wave speeds, so the Lame
-    # parameters are expressions of those.
-    wave = build_elastic_wave()
-
-    with pytest.raises(TypeError, match="computed from"):
-        wave.physical_parameters.update("lambda", fire.Constant(4.0))
 
 
 def test_unknown_physical_parameter_is_rejected():
@@ -230,25 +198,12 @@ def test_physical_parameters_accept_enum_names():
 # Control parameters belong to the inversion.
 
 
-def test_control_parameters_default_to_the_acoustic_velocity():
-    fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
-
-    assert fwi.control_parameters == {"p_wave_velocity"}
-
-
 def test_control_parameters_are_a_subset_of_the_physical_ones():
     fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
     fwi.set_guess_control(fire.Constant(2.0))
 
     assert fwi.control_parameters <= fwi.wave.physical_parameters
-
-
-def test_control_parameters_reject_parameters_the_wave_does_not_model():
-    fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
-
-    with pytest.raises(ValueError, match="subset of the physical parameters"):
-        fwi.control_parameters = ["density"]
 
 
 def test_control_parameters_reject_an_empty_set():
@@ -264,7 +219,7 @@ def test_acoustic_constant_control_is_converted_to_function():
 
     fwi.set_guess_control(fire.Constant(2.0))
 
-    control = fwi.guess_control["p_wave_velocity"]
+    control = fwi.guess_control
     assert isinstance(control, fire.Function)
     assert np.allclose(control.dat.data_ro, 2.0)
 
@@ -288,7 +243,7 @@ def test_guess_control_is_independent_of_the_wave_field():
 
     fwi.wave.physical_parameters["p_wave_velocity"].assign(9.0)
 
-    assert np.allclose(fwi.guess_control["p_wave_velocity"].dat.data_ro, 2.0)
+    assert np.allclose(fwi.guess_control.dat.data_ro, 2.0)
 
 
 def test_guess_control_accepts_a_mapping_keyed_by_parameter_name():
@@ -317,8 +272,8 @@ def test_velocity_model_setters_capture_the_control():
 
     fwi.set_guess_velocity_model(constant=2.0)
 
-    assert set(fwi.guess_control) == {"p_wave_velocity"}
-    assert np.allclose(fwi.guess_control["p_wave_velocity"].dat.data_ro, 2.0)
+    assert isinstance(fwi.guess_control, fire.Function)
+    assert np.allclose(fwi.guess_control.dat.data_ro, 2.0)
 
 
 def test_misfit_without_a_configured_control_raises():

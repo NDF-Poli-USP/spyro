@@ -735,7 +735,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.path_save = self.layer_ops.path_save
             self.path_case_abc = self.layer_ops.path_case_abc
 
-    @abstractmethod
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
         """Compute an adjoint gradient for inversion.
 
@@ -762,7 +761,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Raises
         ------
         NotImplementedError
-            Always raised by the base class.
+            Unless a solver provides an adjoint gradient.
         """
         raise NotImplementedError(
             f"{type(self).__name__} does not implement gradient_solve().",
