@@ -542,7 +542,7 @@ class FullWaveformInversion:
         try:
             return set(self.wave.physical_parameters)
         except ValueError:
-            return set(type(self.wave)._physical_parameter_attributes)
+            return set(type(self.wave)._physical_parameter_names)
 
     def _as_control_mapping(self, control):
         """Normalize a control value into a ``name -> value`` mapping.
@@ -567,10 +567,14 @@ class FullWaveformInversion:
         """
         if control is None:
             return {}
-        if isinstance(control, PhysicalParameters) or hasattr(control, "items"):
+        try:
+            items = control.items()
+        except AttributeError:
+            items = None
+        if items is not None:
             values = {
                 parameter_name(name): value
-                for name, value in control.items()
+                for name, value in items
             }
             unknown = set(values) - set(self._control_parameters)
             if unknown:

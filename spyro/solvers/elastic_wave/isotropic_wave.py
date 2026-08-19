@@ -54,14 +54,10 @@ class IsotropicWave(ElasticWave):
 
     #: An isotropic elastic medium is described by density plus either the
     #: two Lame parameters or the two wave speeds; whichever pair is not
-    #: declared is derived from the other.
-    _physical_parameter_attributes = {
-        DENSITY: "rho",
-        LAMBDA: "lmbda",
-        MU: "mu",
-        P_WAVE_VELOCITY: "c",
-        S_WAVE_VELOCITY: "c_s",
-    }
+    #: declared is computed from the other.
+    _physical_parameter_names = frozenset({
+        DENSITY, LAMBDA, MU, P_WAVE_VELOCITY, S_WAVE_VELOCITY,
+    })
 
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
@@ -105,7 +101,7 @@ class IsotropicWave(ElasticWave):
 
         The dictionary must define exactly one supported material
         parameterization: either density with Lame parameters, or density with
-        P- and S-wave velocities. The missing derived parameters are computed
+        P- and S-wave velocities. The missing dependent parameters are computed
         from the provided set, and the active control parameterization is stored
         for FWI.
 
@@ -208,7 +204,6 @@ class IsotropicWave(ElasticWave):
             )
         self._register_physical_parameters()
 
-    @override
     def physical_parameter_function_space(self):
         """Return the scalar space the elastic material fields live in.
 
@@ -236,6 +231,19 @@ class IsotropicWave(ElasticWave):
         )
         return self._material_parameter_function_space
 
+    def _assign_physical_parameter(self, name, field):
+        """Store a material field built by ``set_physical_parameter``."""
+        if name == DENSITY:
+            self.rho = field
+        elif name == LAMBDA:
+            self.lmbda = field
+        elif name == MU:
+            self.mu = field
+        elif name == P_WAVE_VELOCITY:
+            self.c = field
+        else:
+            self.c_s = field
+
     def _register_physical_parameters(self):
         """Declare the five isotropic elastic parameters of the medium."""
         self._physical_parameters.add(DENSITY, self.rho)
@@ -244,8 +252,7 @@ class IsotropicWave(ElasticWave):
         self._physical_parameters.add(P_WAVE_VELOCITY, self.c)
         self._physical_parameters.add(S_WAVE_VELOCITY, self.c_s)
 
-    @override
-    def _refresh_derived_parameters(self):
+    def _refresh_dependent_parameters(self):
         """Recompute the parameter pair the medium was not declared with.
 
         The medium is described by density and either the Lame parameters or
@@ -255,8 +262,14 @@ class IsotropicWave(ElasticWave):
         """
         declared = {
             name
-            for name, attribute in self._physical_parameter_attributes.items()
-            if isinstance(getattr(self, attribute), Function)
+            for name, value in (
+                (DENSITY, self.rho),
+                (LAMBDA, self.lmbda),
+                (MU, self.mu),
+                (P_WAVE_VELOCITY, self.c),
+                (S_WAVE_VELOCITY, self.c_s),
+            )
+            if isinstance(value, Function)
         }
         for parameterization, parameters in PHYSICAL_PARAMETERIZATION.items():
             if declared != {parameter.value for parameter in parameters}:

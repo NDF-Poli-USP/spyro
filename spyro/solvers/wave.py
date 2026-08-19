@@ -101,10 +101,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Tolerance for searching nodes in the mesh.
     """
 
-    #: Physical parameter name -> the attribute holding its field. Solvers
-    #: override this with the material parameters their equation is written
-    #: in terms of.
-    _physical_parameter_attributes = {}
+    #: The physical parameters the equation is written in terms of. Solvers
+    #: override this with the material parameters of their own equation.
+    _physical_parameter_names = frozenset()
 
     def __init__(self, dictionary=None, wave_type=WaveType.NONE, comm=None):
         """Wave object solver. Contains both the forward solver
@@ -800,7 +799,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         >>> {"p_wave_velocity"} <= wave.physical_parameters
         True
         """
-        parameters = getattr(self, "_physical_parameters", None)
+        try:
+            parameters = self._physical_parameters
+        except AttributeError:
+            parameters = PhysicalParameters()
         if not parameters:
             raise ValueError(
                 "Physical parameters have not been set. Please ensure that "
@@ -846,7 +848,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         A parameter that already has a field is written into rather than
         replaced, so variational forms already built from it, and any
-        parameter derived from it, use the new values without being rebuilt.
+        parameter computed from it, use the new values without being rebuilt.
         A parameter that has no field yet gets one in
         :meth:`physical_parameter_function_space`.
 
@@ -868,7 +870,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         KeyError
             If ``name`` is not a physical parameter of this wave equation.
         TypeError
-            If ``name`` is derived from the other parameters, and so cannot be
+            If ``name`` is computed from the other parameters, and so cannot be
             assigned on its own.
 
         Examples
@@ -877,16 +879,17 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         fills the acoustic velocity model with ``2.0``.
         """
         key = parameter_name(name)
-        attributes = type(self)._physical_parameter_attributes
-        if key not in attributes:
-            known = "{" + ", ".join(attributes) + "}"
+        names = type(self)._physical_parameter_names
+        if key not in names:
+            known = "{" + ", ".join(sorted(names)) + "}"
             raise KeyError(
                 f"'{key}' is not a physical parameter of "
                 f"{type(self).__name__}. Known parameters: {known}.",
             )
 
-        parameters = getattr(self, "_physical_parameters", None)
-        if parameters is None:
+        try:
+            parameters = self._physical_parameters
+        except AttributeError:
             parameters = self._physical_parameters = PhysicalParameters()
 
         field = parameters.get(key)
@@ -896,7 +899,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             # A parameter that is neither a field nor a constant is a UFL
             # expression of the others, and has no independent value to set.
             raise TypeError(
-                f"'{key}' is derived from the other physical parameters and "
+                f"'{key}' is computed from the other physical parameters and "
                 "cannot be set on its own. Set the parameters it is computed "
                 "from instead.",
             )
@@ -910,13 +913,31 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             field.assign(value)
         else:
             field.interpolate(value)
-        setattr(self, attributes[key], field)
+        self._assign_physical_parameter(key, field)
         parameters.add(key, field)
-        self._refresh_derived_parameters()
+        self._refresh_dependent_parameters()
         return field
 
-    def _refresh_derived_parameters(self):
-        """Recompute the parameters derived from the independent fields.
+    def _assign_physical_parameter(self, name, field):
+        """Store a newly created parameter field on the solver.
+
+        Solvers keep their material parameters in named attributes of their
+        own, so each one binds the new field to the right attribute.
+
+        Parameters
+        ----------
+        name : str
+            Canonical parameter name, one of
+            :attr:`_physical_parameter_names`.
+        field : firedrake.Function
+            Field to store.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not store physical parameters.",
+        )
+
+    def _refresh_dependent_parameters(self):
+        """Recompute the parameters computed from the independent fields.
 
         Called after a parameter field is created. The base implementation
         does nothing; solvers whose material description carries dependent

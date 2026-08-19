@@ -24,7 +24,7 @@ from .functionals import acoustic_energy
 
 class AcousticWave(Wave):
     #: An acoustic medium is described by its pressure wave velocity alone.
-    _physical_parameter_attributes = {P_WAVE_VELOCITY: "c"}
+    _physical_parameter_names = frozenset({P_WAVE_VELOCITY})
 
     def __init__(self, dictionary, comm=None):
         """Wave Acoustic object solver.
@@ -199,7 +199,6 @@ class AcousticWave(Wave):
                 f"Riesz map {riesz_map} not implemented for automated adjoint."
             )
 
-    @override
     def physical_parameter_function_space(self):
         """Return the function space the velocity model lives in.
 
@@ -216,8 +215,11 @@ class AcousticWave(Wave):
             return self.function_space.sub(0)
         return self.function_space
 
-    @override
-    def _refresh_derived_parameters(self):
+    def _assign_physical_parameter(self, name, field):
+        """Store the velocity model built by ``set_physical_parameter``."""
+        self.c = field
+
+    def _refresh_dependent_parameters(self):
         """Keep the initial velocity model pointing at the velocity field.
 
         ``_initialize_model_parameters()`` rebuilds ``c`` from

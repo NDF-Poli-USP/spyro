@@ -58,10 +58,10 @@ class PhysicalParameters(Set):
     models, and it maps each name to the field the variational form uses.
 
     Some parameters are independent fields (Firedrake ``Function`` objects)
-    and others are UFL expressions derived from them: an isotropic elastic
+    and others are UFL expressions computed from them: an isotropic elastic
     medium declared with density and the Lame parameters carries the two wave
     speeds as expressions of those three. Only the independent ones can be
-    updated, and because they are updated in place, the derived expressions
+    updated, and because they are updated in place, the dependent expressions
     and the assembled variational forms follow automatically.
 
     Parameters
@@ -85,7 +85,10 @@ class PhysicalParameters(Set):
         self._fields = {}
         if fields is None:
             return
-        items = fields.items() if hasattr(fields, "items") else fields
+        try:
+            items = fields.items()
+        except AttributeError:
+            items = fields
         for name, value in items:
             self.add(name, value)
 
@@ -158,7 +161,7 @@ class PhysicalParameters(Set):
         name : str or enum.Enum
             Parameter name.
         value : firedrake.Function or ufl.core.expr.Expr
-            Independent field, or expression derived from the independent
+            Independent field, or expression computed from the independent
             ones.
         """
         self._fields[parameter_name(name)] = value
@@ -171,7 +174,7 @@ class PhysicalParameters(Set):
         """Overwrite one parameter's field in place.
 
         The field is written into rather than replaced, so the variational
-        forms already built from it, and any parameter derived from it, use
+        forms already built from it, and any parameter computed from it, use
         the new values without being rebuilt.
 
         Parameters
@@ -192,13 +195,13 @@ class PhysicalParameters(Set):
         KeyError
             If ``name`` is not one of the modelled parameters.
         TypeError
-            If ``name`` is a derived parameter, which cannot be assigned
+            If ``name`` is a dependent parameter, which cannot be assigned
             independently of the fields it is computed from.
         """
         field = self[name]
         if not isinstance(field, fire.Function):
             raise TypeError(
-                f"'{parameter_name(name)}' is derived from the other physical "
+                f"'{parameter_name(name)}' is computed from the other physical "
                 "parameters and cannot be updated on its own. Update the "
                 "parameters it is computed from instead.",
             )
@@ -222,7 +225,7 @@ class PhysicalParameters(Set):
         Returns
         -------
         PhysicalParameters
-            Container holding duplicated ``Function`` fields. Derived
+            Container holding duplicated ``Function`` fields. Dependent
             parameters are UFL expressions, which are immutable, and are
             shared rather than duplicated.
         """

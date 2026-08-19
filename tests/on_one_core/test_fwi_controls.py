@@ -196,18 +196,18 @@ def test_setting_a_physical_parameter_updates_the_field_in_place():
     wave.set_physical_parameter("density", fire.Constant(2.0))
 
     # Updating in place is what keeps the assembled forms, and the parameters
-    # derived from this one, valid without being rebuilt.
+    # computed from this one, valid without being rebuilt.
     assert wave.physical_parameters["density"] is density
     assert wave.rho is density
     assert np.allclose(density.dat.data_ro, 2.0)
 
 
-def test_derived_physical_parameters_cannot_be_set_on_their_own():
+def test_dependent_physical_parameters_cannot_be_set_on_their_own():
     # The medium is declared with density and the two wave speeds, so the Lame
     # parameters are expressions of those.
     wave = build_elastic_wave()
 
-    with pytest.raises(TypeError, match="derived"):
+    with pytest.raises(TypeError, match="computed from"):
         wave.set_physical_parameter("lambda", fire.Constant(4.0))
 
 
