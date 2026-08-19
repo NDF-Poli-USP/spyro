@@ -1,14 +1,8 @@
-import numpy as np
 import pytest
+from firedrake import COMM_WORLD as comm
 import spyro
-# import matplotlib.pyplot as plt
-
-
-def error_calc(p_numerical, p_analytical, nt):
-    norm = np.linalg.norm(p_numerical, 2) / np.sqrt(nt)
-    error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
-    div_error_time = error_time / norm
-    return div_error_time
+from spyro.io.basicio import parallel_print as pprint
+from spyro.tools.error_measure import MeasureError
 
 
 @pytest.mark.parametrize("use_vertex_only_mesh", [False, True])
@@ -45,25 +39,23 @@ def test_analytical_solution(use_vertex_only_mesh):
         wave, offset, c_value
     )
 
-    time_vector = np.linspace(0.0, 1.0, int(1.0 / wave.dt) + 1)
     wave.forward_solve()
     numerical_p = wave.forward_solution_receivers
     numerical_p = numerical_p.flatten()
 
-    nt = len(time_vector)
-    error = error_calc(numerical_p, analytical_p, nt)
+    # Computing errors
+    measure_error = MeasureError()
+    errPk = measure_error.peak_error(numerical_p, analytical_p)[0]
+    errIt = measure_error.integral_error(numerical_p, analytical_p, wave.dt)
+    eNRMS = measure_error.normalized_root_mean_square_error(numerical_p, analytical_p)
+
     vom_label = "VOM" if use_vertex_only_mesh else "NO VOM"
-    print("Error ({}) = {:.4e}".format(vom_label, error))
+    pprint(f"NRMS Error ({vom_label}) = {eNRMS:.4e}", comm=comm)
+    pprint(f"Integral Error ({vom_label}) = {errIt:.4e}", comm=comm)
+    pprint(f"Peak Error ({vom_label}) = {errPk:.4e}", comm=comm)
 
-    # plt.plot(time_vector, analytical_p, label="Analytical", color="black", linestyle="--")
-    # plt.plot(time_vector, numerical_p, label="Numerical", color="red")
-    # plt.legend()
-    # # plt.plot(time, -(p_analytical - p_numerical))
-    # plt.xlabel("Time (s)")
-    # plt.ylabel("Pressure (Pa)")
-    # plt.show()
-
-    assert error < 1e-3
+    assert eNRMS < 1e-3 and errIt < 1e-3 and errPk < 1e-3, \
+        "Error is too high for analytical solution test."
 
 
 if __name__ == "__main__":
