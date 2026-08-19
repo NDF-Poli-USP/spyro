@@ -1,3 +1,5 @@
+"""Source generation and injection helpers."""
+
 from . import Sources
 from .Sources import (
     full_ricker_wavelet,
