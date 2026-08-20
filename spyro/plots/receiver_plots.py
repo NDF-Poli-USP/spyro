@@ -228,7 +228,8 @@ def plot_comparison_of_receivers_to_reference(
 
     Parameters
     ----------
-    wave : Wave
+    wave : `wave.Wave`
+        An instance of the :class:`~spyro.solvers.wave.Wave`.
         Wave object containing the receiver data and simulation metadata.
         The following attributes are used:
 
@@ -236,9 +237,15 @@ def plot_comparison_of_receivers_to_reference(
         - ``final_time``: final simulation time.
         - ``forward_solution_receivers``: receiver data from the simulation.
         - ``path_case_habc``: output directory for the generated figures.
-    reference_array: reference receiver data.
-    show : bool, optional
+    reference_array: `array`
+        reference receiver data.
+    show : `bool`, optional
         Whether to display the figure interactively. Defaults to ``False``.
+    filename : `str` or `pathlib.Path`, optional
+        Path (without extension) where the figure should be saved.
+        If ``None``, the figure is not saved. If the ``wave`` object has
+        a ``path_case_abc`` attribute, the figure will be saved in that directory
+        with the default filename ``time_comparison``.
 
     Returns
     -------
@@ -309,9 +316,11 @@ def plot_compare_receivers_array(
 
     num_receivers = receiver_data_first.shape[1]
 
+    # Setting fonts
     plt.rcParams["font.size"] = 7
     plt.rcParams["axes.grid"] = True
 
+    # Setting subplots
     figure, receiver_axes = plt.subplots(
         nrows=num_receivers,
         ncols=1,
@@ -323,8 +332,9 @@ def plot_compare_receivers_array(
 
     figure.subplots_adjust(hspace=0.6)
 
-    first_color = (0.0, 1.0, 0.0, 1.0)
-    second_color = (1.0, 0.0, 0.0, 1.0)
+    # Setting colormap
+    first_color = (0.0, 1.0, 0.0, 1.0)  # RGB-alpha (Green)
+    second_color = (1.0, 0.0, 0.0, 1.0)  # RGB-alpha (Red)
 
     final_time = time_values[-1]
 
@@ -333,6 +343,7 @@ def plot_compare_receivers_array(
         first_receiver_trace = receiver_data_first[:, receiver_index]
         second_receiver_trace = receiver_data_second[:, receiver_index]
 
+        # Plot the receiver first_data
         receiver_axes[receiver_index].plot(
             time_values,
             first_receiver_trace,
@@ -341,6 +352,7 @@ def plot_compare_receivers_array(
             label=first_label,
         )
 
+        # Plot the receiver second_data
         receiver_axes[receiver_index].plot(
             time_values,
             second_receiver_trace,
@@ -350,6 +362,7 @@ def plot_compare_receivers_array(
             label=second_label,
         )
 
+        # Adding the receiver number label
         receiver_axes[receiver_index].text(
             0.995,
             0.9,
@@ -361,9 +374,11 @@ def plot_compare_receivers_array(
             horizontalalignment="right",
         )
 
+        # Centered title
         if receiver_index == num_receivers // 2:
             receiver_axes[receiver_index].set_ylabel(r"$sol \; recs$")
 
+        # Axis format
         receiver_axes[receiver_index].set_xlim(0.0, final_time)
         receiver_axes[receiver_index].ticklabel_format(
             axis="y",
@@ -371,8 +386,9 @@ def plot_compare_receivers_array(
             scilimits=(-2, 2),
         )
 
+    # Axis and legend format
     receiver_axes[-1].set_xlabel(r"$t \; (s)$")
-    receiver_axes[0].legend()
+    receiver_axes[0].legend(ncol=2, fontsize=6, loc='best')
 
     _finalize_figure(
         plt.gcf(), output_path, formats=("png", "pdf"), show=show, bbox_inches="tight"

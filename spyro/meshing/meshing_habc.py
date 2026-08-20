@@ -1064,46 +1064,6 @@ class HABCMesh(MeshOps):
 
         return mesh_habc
 
-    def layer_boundary_data(self, mesh, V, mesh_parameters, return_boundary_coord=False):
-        """Generate the boundary data from the domain with the absorbing layer.
-
-        Parameters
-        ----------
-        mesh : `Firedrake.Mesh`
-            Current mesh.
-        V : `Firedrake.FunctionSpace`
-            Function space for the boundary of the domain with absorbing layer.
-        mesh_parameters : `meshing_parameters.MeshingParameters`
-            Contains mesh parameters.
-        return_boundary_coord : `bool`, optional
-            If `True`, also return boundary node coordinates. Default is `False`.
-
-        Returns
-        -------
-        bnd_nod_ids_nfs : 'array'
-            Mesh node indices on non-free surfaces of the domain with absorbing layer.
-        bnd_nodes_nfs : `tuple`
-            Mesh node coordinates on non-free surfaces of the domain with absorbing layer.
-            Only returned if  return_boundary_coord is `True`.
-        """
-
-        # Boundary nodes indices
-        bnd_nod_ids_nfs = np.unique(np.concatenate([
-            bnd_ids for bnd_ids, status
-            in mesh_parameters.boundary_nodes_ids.values() if status]))
-
-        if return_boundary_coord:
-
-            # Extract node positions
-            node_positions = self.extract_node_positions(mesh, V, output_type="array")
-
-            # Extract the boundary nodes
-            bnd_nodes_nfs = node_positions[bnd_nod_ids_nfs, :]
-
-            return bnd_nod_ids_nfs, bnd_nodes_nfs
-
-        return bnd_nod_ids_nfs
-
     def get_spatial_coordinates_abc(self, mesh, domain_layer, return_mesh_limits=False):
         """Get the ufl coordinates of the mesh with absorbing layer.
 

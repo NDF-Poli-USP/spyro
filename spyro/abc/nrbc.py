@@ -65,8 +65,9 @@ class NRBC(AbsorbingBC):
     """
 
     def __init__(self, domain_dim, non_reflect_bc=BoundaryConditionsType.HIGDON,
-                 angle_max=pi/4., abc_boundary_type=NRBCBoundaryType.STRAIGHT, dt=None,
-                 dimension=2, nrbc_in_habc=False, output_folder=None, comm=None):
+                 angle_max=pi/4., abc_boundary_type=NRBCBoundaryType.STRAIGHT,
+                 dt=None, dimension=2, quadrilateral=False, nrbc_in_habc=False,
+                 output_folder=None, comm=None):
         """Initialize the NRBC class.
 
         Parameters
@@ -88,6 +89,9 @@ class NRBC(AbsorbingBC):
             Time step used in the simulation. Default is `None`.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
+        quadrilateral : `bool`, optional
+            Flag to indicate whether to use quadrilateral/hexahedral elements.
+            Default is `False` (triangular/tetrahedral elements).
         nrbc_in_habc : `bool`, optional
             If `True`, the NRBCs are applied on the outer absorbing layer boundaries
             (HABCs: Absorbing Layer and NRBCs). If `False`, the NRBCs are applied on
@@ -105,7 +109,8 @@ class NRBC(AbsorbingBC):
 
         # Initializing the AbsorbingBC class if NRBCs are not in HABC scheme
         if not nrbc_in_habc:
-            AbsorbingBC.__init__(self, domain_dim, dt=dt, dimension=dimension, comm=comm)
+            AbsorbingBC.__init__(self, domain_dim, dt=dt, dimension=dimension,
+                                 quadrilateral=quadrilateral, comm=comm)
 
             # Set sthe pad to rectangular shape in case infinitel model is needed.
             self.abc_boundary_layer_shape = LayerShapeType.RECTANGULAR
@@ -432,7 +437,11 @@ class NRBC(AbsorbingBC):
             bnd_nod_ids_nfs, bnd_nodes_nfs = \
                 wave.mesh_ops.layer_boundary_data(wave.mesh, wave.function_space,
                                                   wave.mesh_parameters,
-                                                  return_boundary_coord=True)
+                                                  return_boundary_coords=True)
+
+        if source_coord is None:
+            source_coord = self.min_coord_differ_source_boundary(wave.source_locations,
+                                                                 get_crit_source=True)[1]
 
         # Applying Higdon ABCs
         self.cos_ang_HigdonBC(wave.function_space, source_coord, bnd_nod_ids_nfs,

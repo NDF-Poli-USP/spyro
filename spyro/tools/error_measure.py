@@ -599,55 +599,6 @@ class MeasureError():
 
         return nrms_error
 
-# def comparison_plots(self, regression_xCR=False, data_regr_xCR=None):
-#     """
-#     Plot the comparison between the HABC scheme and the reference model.
-
-#     Parameters
-#     ----------
-#     regression_xCR : `bool`, optional
-#         If True, Plot the regression for the error measure vs xCR
-#         Default is False.
-#     data_regr_xCR: `list`
-#         Data for the regression of the parameter xCR.
-#         Structure: [xCR, max_errIt, max_errPK, crit_opt]
-#         - xCR: Values of xCR used in the regression.
-#           The last value IS the optimal xCR
-#         - max_errIt: Values of the maximum integral error.
-#           The last value corresponds to the optimal xCR
-#         - max_errPK: Values of the maximum peak error.
-#           The last value corresponds to the optimal xCR
-#         - crit_opt : Criterion for the optimal heuristic factor.
-#           * 'err_difference' : Difference between integral and peak errors
-#           * 'err_integral' : Minimum integral error
-
-#     Returns
-#     -------
-#     None
-#     """
-
-#     # Time domain comparison
-#     plot_hist_receivers(self)
-
-#     forward_solution_receivers: `array`
-#     Receiver waveform data in the HABC scheme
-#     receivers_out_fft: `array`
-#     Frequency response at the receivers in the HABC scheme
-
-#     # Compute FFT for output signal at receivers
-#     self.receivers_out_fft = []
-#     for rec in range(self.number_of_receivers):
-#         signal = self.forward_solution_receivers[:, rec]
-#         yf = freq_response(signal, self.freq_Nyquist)
-#         self.receivers_out_fft.append(yf)
-#     self.receivers_out_fft = np.asarray(self.receivers_out_fft).T
-
-#     # Frequency domain comparison
-#     plot_rfft_receivers(self)
-
-#     # Plot the error measures
-#     if regression_xCR:
-#         plot_xCR_opt(self, data_regr_xCR)
 
 # def get_xCR_candidates(self, n_pts=3):
 #     """

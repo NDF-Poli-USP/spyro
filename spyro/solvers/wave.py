@@ -804,6 +804,45 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                        abc_deg_layer=self.abc_deg_layer,
                                        output_folder=self.output_folder, comm=self.comm)
 
+    @property
+    def abc_ops(self):
+        """Return the active ABC operations object."""
+        if self.abc_type == AbsorbingBCsType.NRBC and hasattr(self, 'nrbc_ops'):
+            return self.nrbc_ops
+        elif hasattr(self, 'layer_ops'):
+            return self.layer_ops
+        return None
+
+    @property
+    def case_abc(self):
+        """Get the current ABC case identifier."""
+        ops = self.abc_ops
+        if ops is not None:
+            if self.abc_type == AbsorbingBCsType.NRBC:
+                return ops.case_nrbc
+            else:
+                return ops.case_absl
+        return None
+
+    @property
+    def path_save(self):
+        """Get the current ABC save path."""
+        ops = self.abc_ops
+        if ops is not None:
+            return ops.path_save
+        return None
+
+    @property
+    def path_case_abc(self):
+        """Get the current ABC case path."""
+        ops = self.abc_ops
+        if ops is not None:
+            if self.abc_type == AbsorbingBCsType.NRBC:
+                return ops.path_case_nrbc
+            else:
+                return ops.path_case_absl
+        return None
+
     def abcs_manager(self):
         """Create the ABCs operations manager for the wave solver."""
 
@@ -817,21 +856,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.abc_type in [AbsorbingBCsType.PML, AbsorbingBCsType.HYBRID]:
             self.layer_manager(domain_dim, time_step)
 
-            # Identifier for the current case study
-            self.case_abc = self.layer_ops.case_absl
-            self.path_save = self.layer_ops.path_save
-            self.path_case_abc = self.layer_ops.path_case_absl
-
         # Creating NRBC manager if needed (when no layer is added).
         elif self.abc_type == AbsorbingBCsType.NRBC:
             from ..abc.nrbc import NRBC
             self.nrbc_ops = NRBC(domain_dim, dimension=self.dimension, dt=time_step,
+                                 quadrilateral=self.mesh_parameters.quadrilateral,
                                  output_folder=self.output_folder, comm=self.comm)
-
-            # Identifier for the current case study
-            self.case_abc = self.nrbc_ops.case_nrbc
-            self.path_save = self.nrbc_ops.path_save
-            self.path_case_abc = self.nrbc_ops.path_case_nrbc
 
     @abstractmethod
     def get_control_parameters(self):

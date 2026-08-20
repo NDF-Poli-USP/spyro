@@ -1,5 +1,6 @@
 from firedrake import as_vector, assemble, CellDiameter, DirichletBC, SpatialCoordinate
-from numpy import allclose, clip, column_stack, linspace, log10, min, max
+from numpy import (allclose, clip, column_stack, concatenate,
+                   linspace, log10, min, max, unique)
 from ..utils.error_management import validate_parameter
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..tools.version_control import is_firedrake_new
@@ -155,7 +156,7 @@ class MeshOps():
 
         return (diam, lmin, lmax, alpha, tol)
 
-    @staticmethod
+    @ staticmethod
     def extract_extreme_coordinates(mesh):
         """Extract the minimum and maximum coordinates from a mesh.
 
@@ -369,3 +370,43 @@ class MeshOps():
                                       "domains is not implemented yet. Only box "
                                       "domains are supported. The numbering the "
                                       "future boundary ids must start at 7.")
+
+    def layer_boundary_data(self, mesh, V, mesh_parameters, return_boundary_coords=False):
+        """Generate the boundary data from any domain.
+
+        Parameters
+        ----------
+        mesh : `Firedrake.Mesh`
+            Current mesh.
+        V : `Firedrake.FunctionSpace`
+            Function space for the state variable.
+        mesh_parameters : `meshing_parameters.MeshingParameters`
+            Contains mesh parameters.
+        return_boundary_coords : `bool`, optional
+            If `True`, also return boundary node coordinates. Default is `False`.
+
+        Returns
+        -------
+        bnd_nod_ids_nfs : 'array'
+            Mesh node indices on non-free surfaces of the domain.
+        bnd_nodes_nfs : `tuple`
+            Mesh node coordinates on non-free surfaces of the domain.
+            Only returned if `return_boundary_coords` is `True`.
+        """
+
+        # Boundary nodes indices
+        bnd_nod_ids_nfs = unique(
+            concatenate([bnd_ids for bnd_ids, status in
+                         mesh_parameters.boundary_nodes_ids.values() if status]))
+
+        if return_boundary_coords:
+
+            # Extract node positions
+            node_positions = self.extract_node_positions(mesh, V, output_type="array")
+
+            # Extract the boundary nodes
+            bnd_nodes_nfs = node_positions[bnd_nod_ids_nfs, :]
+
+            return bnd_nod_ids_nfs, bnd_nodes_nfs
+
+        return bnd_nod_ids_nfs

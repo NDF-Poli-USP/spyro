@@ -1,9 +1,8 @@
 """Constructs Firedrake solver for the acosutic wave with a PML."""
 
-from firedrake import (Cofunction, DirichletBC, div, dot, ds as fire_ds,
-                       ds_b as quad_dsbottom, ds_t as quad_dstop, ds_v as quad_ds,
-                       dx as fire_dx, Function, grad, inner, lhs, LinearVariationalProblem,
-                       LinearVariationalSolver, rhs, split, TestFunctions, TrialFunctions)
+from firedrake import (Cofunction, DirichletBC, div, dot, dx as fire_dx, Function, grad,
+                       inner, lhs, LinearVariationalProblem, LinearVariationalSolver,
+                       rhs, split, TestFunctions, TrialFunctions)
 from ..domains.space import create_function_space
 from ..utils.typing import BoundaryConditionsType
 
@@ -78,7 +77,6 @@ def forms_pml(wave, W, X_n, X_nm1):
     bc_surf = tuple([non_free_surf for non_free_surf, status in
                      wave.mesh_parameters.boundary_ids_map.items() if status])
     bc_bndr = wave.layer_ops.bc_boundary_pml
-
     include_bcs = not wave.abc_get_ref_model
     if wave.abc_active and include_bcs:
 
@@ -125,43 +123,17 @@ def forms_pml(wave, W, X_n, X_nm1):
         # Apply NRBCs (Higdon or Sommerfeld) at PML boundaries
         if bc_bndr in [BoundaryConditionsType.HIGDON, BoundaryConditionsType.SOMMERFELD]:
 
-            # exterior_markers = set(wave.mesh.exterior_facets.unique_markers)
-            # print("Available boundary markers:", exterior_markers)
-
-            # Initializing load term for NRBCs
-            le = 0.
-
             # General weak form for NRBCs
-            weak_expr_nrbc = wave.layer_ops.cosHig * (1 / c) * ((u_n - u_nm1) / dt) * v
+            c_inv = 1. / c
+            weak_expr_nrbc = wave.layer_ops.cosHig * c_inv * ((u_n - u_nm1) / dt) * v
 
-            if wave.mesh_parameters.quadrilateral:
-
-                # Integer boundary IDs for quadrilaterals/hexahedra meshes
-                int_ids = tuple(filter(lambda k: isinstance(k, int),
-                                       wave.mesh_parameters.boundary_ids_map.keys()))
-
-                # Top boundary for quadrilaterals/hexahedra meshes
-                if wave.mesh_parameters.boundary_ids_map.get("top", False):
-                    le += weak_expr_nrbc * quad_dstop  # (Do not support quadrature)
-
-                # Bottom boundary for quadrilaterals/hexahedra meshes
-                if wave.mesh_parameters.boundary_ids_map.get("bottom", False):
-                    le += weak_expr_nrbc * quad_dsbottom  # (Do not support quadrature)
-
-                ds = quad_ds(int_ids, **quad_surf) if quad_surf else quad_ds(int_ids)
-
-            else:
-
-                # Integration measure for triangles/tetrahedra
-                ds = fire_ds(bc_surf, **quad_surf) if quad_rule else fire_ds(bc_surf)
-
-            # Load term for NRBCs
-            le += weak_expr_nrbc * ds
-            FF += le
+            # include NRBC terms in the load term
+            le_nrbc = wave.layer_ops.forms_acoustic_NRBCs(wave, weak_expr_nrbc, bc_surf)
+            FF += le_nrbc
 
     # Dirichlet BCs for PML model or Neumann BCs for the reference model
-    fix_bnd = DirichletBC(W.sub(0), 0., bc_surf) if \
-        bc_bndr == BoundaryConditionsType.DIRICHLET and include_bcs else None
+    bc_fix = (bc_bndr == BoundaryConditionsType.DIRICHLET and include_bcs)
+    fix_bnd = DirichletBC(W.sub(0), 0., bc_surf) if bc_fix else None
 
     return FF, fix_bnd
 

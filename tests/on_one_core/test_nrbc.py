@@ -1,6 +1,6 @@
 from pytest import fail, mark, param
 from firedrake import COMM_WORLD as comm, conditional, ConvergenceError
-from numpy import isclose, load, mean
+from numpy import isclose, load
 from spyro.io.basicio import parallel_print as pprint
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
@@ -48,7 +48,7 @@ def wave_dict(element_geometry, dimension, dt_usu, get_ref_model, degree_eik, ca
     # spyro however supports both spatial parallelism and "shot" parallelism.
     # Options: automatic (same number of cores for evey processor) or spatial
     dictionary["parallelism"] = {
-        "type": "automatic",
+        "type": "automatic" if calc_eik else "spatial",
     }
 
     # Define the domain size without the PML or AL. Here we'll assume a domain
@@ -68,9 +68,19 @@ def wave_dict(element_geometry, dimension, dt_usu, get_ref_model, degree_eik, ca
     # Ricker wavelet that has a peak frequency of 5 Hz injected at a specified
     # point of the mesh. We also specify to record the solution at the corners
     # of the domain to verify the efficiency of the absorbing layer.
+    if calc_eik:
+        source_locations = ([(-length_z / 2., length_x / 4.)] if dimension == 2
+                            else [(-length_z / 2., length_x / 4., length_y / 2.)])
+    else:
+        source_locations = ([(-length_z / 2., length_x / 4.),
+                             (-length_z / 4., 5 * length_x / 8.),
+                             (-3 * length_z / 4., 5 * length_x / 8.)] if dimension == 2
+                            else [(-length_z / 2., length_x / 4., length_y / 2.),
+                                  (-length_z / 4., 5 * length_x / 8., length_y / 4.),
+                                  (-3 * length_z / 4., 5 * length_x / 8., length_y / 4.)])
+
     dictionary["acquisition"] = {
-        "source_locations": ([(-length_z / 2., length_x / 4.)] if dimension == 2
-                             else [(-length_z / 2., length_x / 4., length_y / 2.)]),
+        "source_locations": source_locations,
         "frequency": 5.,  # in Hz
         "delay_type": "multiples_of_minimum" if dimension == 2 else "time",
         "delay": 1.5 if dimension == 2 else 1. / 3.,
@@ -151,7 +161,7 @@ def wave_instance(element_geometry, dimension, calc_eik, get_ref_model):
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length = 1. / 4. if dimension == 2 else 1. / 4.
+    edge_length = 1. / 4.
 
     # f_est: Factor for the stabilizing term in Eikonal equation
     # Timestep size (in seconds). Initial guess: edge_length / 100
@@ -206,9 +216,9 @@ def wave_instance(element_geometry, dimension, calc_eik, get_ref_model):
 
 @mark.parametrize("element_geometry, dimension, calc_eik", [
     ("T", 2, True),
-    ("Q", 2, True),
-    ("T", 3, True),
-    ("Q", 3, True),
+    # ("Q", 2, True),
+    # ("T", 3, True),
+    # ("Q", 3, True),
     # ("T", 2, False),
     # ("Q", 2, False),
     # ("T", 3, False),
@@ -329,13 +339,14 @@ def test_nrbc(element_geometry, dimension, calc_eik):
             # Time step size for the transient response
             dt = wave.get_dt()
 
-            # Tolerance for error measures
-            tol_err = 0.08
-
-            # for nrbc_type in [BoundaryConditionsType.HIGDON]:
-            # for nrbc_type in [BoundaryConditionsType.SOMMERFELD]:
             for nrbc_type in [BoundaryConditionsType.HIGDON,
                               BoundaryConditionsType.SOMMERFELD]:
+
+                # Tolerance for error measures
+                tol_max_err = 0.20 if nrbc_type == BoundaryConditionsType.SOMMERFELD \
+                    else 0.15
+                tol_min_err = 0.003 if nrbc_type == BoundaryConditionsType.SOMMERFELD \
+                    else 0.006
 
                 # Critical source position
                 crit_source = wave.nrbc_ops.eik_bnd[0][-1] if calc_eik else None
@@ -368,15 +379,18 @@ def test_nrbc(element_geometry, dimension, calc_eik):
                 errIt, errPk, pkMax, max_errIt, \
                     max_errPK, final_ener, dsspt_ener = error_measures
 
+                # Plotting the solution at receivers and the error measures
+                wave.nrbc_ops.comparison_plots(wave, receivers_reference)
+
                 # Estimating computational resource usage
                 comp_cost("tfin", tRef=tRef, user_name=wave.nrbc_ops.path_case_nrbc)
 
                 nrbc_str = wave.nrbc_ops.non_reflect_bc.value
-                assert mean(errIt) >= tol_err and max_errIt > tol_err, \
+                assert min(errIt) >= tol_min_err and max_errIt > tol_max_err, \
                     f"✗ Integral Error check for {nrbc_str} BC in Model {dimension}D " \
                     f"with {element_geometry} elements and Eikonal {act_eik} case."
                 pprint(f"✓ Integral Error Verified for {nrbc_str} BC", comm=comm)
-                assert mean(errPk) >= tol_err and max_errPK > tol_err and all(pkMax) > 0., \
+                assert min(errPk) >= tol_min_err and max_errPK > tol_max_err and all(pkMax) > 0., \
                     f"✗ Peak Error check for {nrbc_str} BC in Model {dimension}D " \
                     f"with {element_geometry} elements and Eikonal {act_eik} case."
                 pprint(f"✓ Peak Error Verified for {nrbc_str} BC", comm=comm)

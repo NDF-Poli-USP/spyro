@@ -363,8 +363,6 @@ class ABCLayer(AbsorbingBC):
         if non_reflect_bc in [BoundaryConditionsType.SOMMERFELD,
                               BoundaryConditionsType.HIGDON]:
 
-            bnd_nod_ids_nfs = bnd_nodes_nfs = None
-
             # Getting the boundary type where NRBCs are applied
             abc_boundary_type = NRBCBoundaryType.HYPERSHAPE \
                 if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE \
@@ -372,9 +370,10 @@ class ABCLayer(AbsorbingBC):
 
             # Initializing the NRBC class
             NRBC.__init__(self, self.domain_dim, non_reflect_bc=non_reflect_bc,
-                          abc_boundary_type=abc_boundary_type,
-                          dimension=self.dimension, nrbc_in_habc=True,
+                          abc_boundary_type=abc_boundary_type, dimension=self.dimension,
+                          dt=self.dt, quadrilateral=self.quadrilateral, nrbc_in_habc=True,
                           output_folder=self.path_case_absl, comm=self.comm)
+
             # Hypershape parameters
             hyp_par = (self.layer_geometry.n_hyp, *self.layer_geometry.hyper_axes) \
                 if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else None
