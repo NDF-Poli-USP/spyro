@@ -1,9 +1,66 @@
+from collections.abc import Mapping
 from contextlib import contextmanager
 
 from pyadjoint import Tape, continue_annotation, pause_annotation, taylor_test
 
 import firedrake as fire
 import firedrake.adjoint as fire_ad
+
+
+def _as_list(value):
+    """Return ``value`` as a list, one entry per control.
+
+    Controls, perturbation directions and derivatives are handled uniformly as
+    per-control sequences, but the single-control APIs (the acoustic velocity
+    model, in practice) pass bare objects, and the labeled collections used
+    here are mappings. This keeps every spelling valid without duplicating the
+    branch at each call site.
+
+    Parameters
+    ----------
+    value : object, mapping, list, tuple, or None
+        Value to normalize. Mappings contribute their values, ``None`` yields
+        an empty list.
+
+    Returns
+    -------
+    list
+        ``value`` as a list, or a one-item list wrapping it.
+
+    Examples
+    --------
+    ``_as_list(control)``, ``_as_list([control])`` and
+    ``_as_list({"velocity": control})`` all return ``[control]``.
+    """
+    if value is None:
+        return []
+    if isinstance(value, Mapping):
+        return list(value.values())
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value]
+
+
+def _as_controls(controls):
+    """Return a control collection as an ordered ``{label: control}`` mapping.
+
+    Parameters
+    ----------
+    controls : mapping, object, or None
+        Labeled controls, a single unlabeled control, or ``None`` for an empty
+        selection.
+
+    Returns
+    -------
+    dict
+        Mapping preserving the caller's order. A bare control is labeled
+        ``"control"``.
+    """
+    if controls is None:
+        return {}
+    if isinstance(controls, Mapping):
+        return dict(controls)
+    return {"control": controls}
 
 
 class AutomatedAdjoint:
@@ -52,10 +109,13 @@ class AutomatedAdjoint:
 
     Parameters
     ----------
-    controls : firedrake.Function, optional
-        The control with respect to which the functional is differentiated.
-        It is wrapped in a :class:`pyadjoint.Control` when the reduced functional is
-        created.
+    controls : mapping or firedrake.Function, optional
+        The controls with respect to which the functional is differentiated,
+        as an ordered ``{label: Function}`` mapping. Each value is wrapped in a
+        :class:`pyadjoint.Control` when the reduced functional is created, and
+        the labels are carried through to the computed derivatives. Labels are
+        opaque here: the owning solver chooses them, typically a material
+        parameter enum. A bare control is accepted and labeled ``"control"``.
     ensemble : firedrake.ensemble.Ensemble, optional
         The Firedrake ensemble communicator used to sum the per-shot
         functionals and gradients across ensemble members. In practice this is
@@ -64,8 +124,10 @@ class AutomatedAdjoint:
 
     Attributes
     ----------
-    controls : firedrake.Function
-        The control passed at construction time.
+    controls : dict
+        The labeled controls being differentiated. This is the single place
+        where the inversion's control selection is stored; the solver owns the
+        fields themselves, not the choice of which are inverted for.
     ensemble : firedrake.ensemble.Ensemble or None
         The ensemble communicator used by the reduced functional.
     reduced_functional : firedrake.adjoint.EnsembleReducedFunctional or \
@@ -75,7 +137,7 @@ pyadjoint.ReducedFunctional or None
     """
 
     def __init__(self, ensemble, controls=None):
-        self.controls = controls
+        self.controls = _as_controls(controls)
         self.ensemble = ensemble
         self.reduced_functional = None
         self._tape = None
@@ -165,7 +227,11 @@ pyadjoint.ReducedFunctional or None
             The reduced functional, also stored on
             :attr:`reduced_functional`.
         """
-        control = fire_ad.Control(self.controls)
+        if not self.controls:
+            raise ValueError("At least one control is required.")
+        control = [
+            fire_ad.Control(value) for value in self.controls.values()
+        ]
 
         self.reduced_functional = fire_ad.EnsembleReducedFunctional(
             functional,
@@ -181,8 +247,8 @@ pyadjoint.ReducedFunctional or None
 
         Parameters
         ----------
-        control_value : firedrake.Function
-            The control at which to evaluate the functional.
+        control_value : sequence of firedrake.Function
+            The controls at which to evaluate the functional.
 
         Returns
         -------
@@ -209,17 +275,15 @@ pyadjoint.ReducedFunctional or None
 
         Returns
         -------
-        firedrake.Function
-            The gradient of the functional with respect to the control.
+        dict
+            The gradients of the functional, labeled like :attr:`controls`.
 
         Raises
         ------
         ValueError
             If the reduced functional has not been created yet.
         """
-        if self.reduced_functional is None:
-            raise ValueError("Reduced functional not created.")
-        return self.reduced_functional.derivative(apply_riesz=True)
+        return self._labeled_derivative(apply_riesz=True)
 
     def compute_derivative(self):
         """Return the raw derivative of the functional.
@@ -233,8 +297,32 @@ pyadjoint.ReducedFunctional or None
 
         Returns
         -------
-        firedrake.Cofunction
-            The derivative of the functional with respect to the control.
+        dict
+            The derivatives of the functional, labeled like :attr:`controls`.
+
+        Raises
+        ------
+        ValueError
+            If the reduced functional has not been created yet.
+        """
+        return self._labeled_derivative(apply_riesz=False)
+
+    def _labeled_derivative(self, apply_riesz):
+        """Differentiate the reduced functional and label the result.
+
+        pyadjoint returns derivatives as a list positionally matching the
+        controls it was built with, so zipping with :attr:`controls` restores
+        the labels the owning solver assigned.
+
+        Parameters
+        ----------
+        apply_riesz : bool
+            Whether to map the derivative back to the primal space.
+
+        Returns
+        -------
+        dict
+            One derivative per control, labeled like :attr:`controls`.
 
         Raises
         ------
@@ -243,7 +331,10 @@ pyadjoint.ReducedFunctional or None
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
-        return self.reduced_functional.derivative(apply_riesz=False)
+        derivatives = self.reduced_functional.derivative(
+            apply_riesz=apply_riesz,
+        )
+        return dict(zip(self.controls, _as_list(derivatives)))
 
     def verify_gradient(self, control_var, direction=None, dJdm=None):
         """Run a Taylor test to validate the automated-adjoint gradient.
@@ -258,19 +349,24 @@ pyadjoint.ReducedFunctional or None
 
         Parameters
         ----------
-        control_var : firedrake.Function
-            The control about which the gradient is verified.
-        direction : firedrake.Function, optional
-            Perturbation direction. Defaults to a constant ``0.01`` field in the
-            control's function space.
-        dJdm : float, firedrake.Function, or firedrake.Cofunction, optional
+        control_var : firedrake.Function, sequence, or mapping
+            Control or controls about which the gradient is verified. A bare
+            control is normalized to a one-item list, and a labeled mapping —
+            such as :attr:`controls` itself — contributes its values in order.
+        direction : firedrake.Function or sequence of firedrake.Function, optional
+            Perturbation direction or directions. A single direction is
+            normalized to a one-item list. Defaults to constant ``0.01`` fields
+            in the controls' function spaces.
+        dJdm : float, firedrake.Function, firedrake.Cofunction, sequence, or \
+mapping, optional
             The directional derivative ``J'(m)(direction)``. pyadjoint expects a
-            scalar here, so if a gradient ``Function`` (Riesz representer) or a
-            ``Cofunction`` (raw derivative) is supplied it is first paired with
-            ``direction`` to reduce it to a scalar. If left as ``None`` (the
-            recommended choice under ensemble parallelism) pyadjoint computes
-            the directional derivative itself from the reduced functional, which
-            keeps the ensemble reduction consistent.
+            scalar here, so gradient ``Function`` objects (Riesz representers)
+            and ``Cofunction`` objects (raw derivatives) are first paired with
+            the corresponding ``direction`` and summed. The labeled mapping
+            returned by :meth:`compute_gradient` is accepted directly. If left
+            as ``None`` (the recommended choice under ensemble parallelism)
+            pyadjoint computes the directional derivative itself from the
+            reduced functional, which keeps the ensemble reduction consistent.
 
         Returns
         -------
@@ -284,26 +380,69 @@ pyadjoint.ReducedFunctional or None
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
+
+        control_var = _as_list(control_var)
         if direction is None:
-            direction = fire.Function(control_var.function_space())
-            direction.interpolate(0.01)
-        # pyadjoint's ``taylor_test`` expects ``dJdm`` to be the scalar
-        # directional derivative ``J'(m)(h)``, not the gradient itself. When a
-        # Firedrake ``Function`` (Riesz representer of the gradient) or a
-        # ``Cofunction`` (raw derivative) is supplied, reduce it to a scalar by
-        # pairing it with the perturbation ``direction``. Otherwise ``eps *
-        # dJdm`` inside pyadjoint becomes a UFL expression and the comparison
-        # ``min(residuals) < 1E-15`` raises ``UFL conditions cannot be
-        # evaluated as bool in a Python context``.
-        if dJdm is not None and not isinstance(dJdm, (int, float)):
-            if isinstance(dJdm, fire.Function):
-                dJdm = fire.assemble(
-                    fire.inner(dJdm, direction) * fire.dx
+            direction = [
+                fire.Function(control.function_space()).interpolate(0.01)
+                for control in control_var
+            ]
+        else:
+            direction = _as_list(direction)
+
+        if not isinstance(dJdm, (int, float, type(None))):
+            dJdm = self._directional_derivative(_as_list(dJdm), direction)
+        return taylor_test(self.reduced_functional, control_var, direction, dJdm=dJdm)
+
+    @staticmethod
+    def _directional_derivative(derivatives, direction):
+        """Contract per-control derivatives with the perturbation directions.
+
+        pyadjoint's ``taylor_test`` expects ``dJdm`` to be the scalar
+        directional derivative :math:`J'(m)(h) = \\sum_i \\langle dJ/dm_i,
+        h_i \\rangle`, not the derivative objects themselves. Passing a
+        ``Function`` or ``Cofunction`` straight through would make ``eps *
+        dJdm`` a UFL expression inside pyadjoint, and the subsequent
+        ``min(residuals) < 1E-15`` comparison would raise "UFL conditions
+        cannot be evaluated as bool in a Python context".
+
+        Parameters
+        ----------
+        derivatives : list
+            One derivative per control. ``Function`` entries are the Riesz
+            representers of the gradient and are paired with the direction in
+            :math:`L^2`; ``Cofunction`` entries are dual objects and are
+            applied to the direction through the duality pairing.
+        direction : list of firedrake.Function
+            Perturbation direction of each control.
+
+        Returns
+        -------
+        float or None
+            The directional derivative, or ``None`` when an entry has an
+            unsupported type, which tells pyadjoint to compute it itself.
+
+        Raises
+        ------
+        ValueError
+            If the two sequences have different lengths.
+        """
+        if len(derivatives) != len(direction):
+            raise ValueError(
+                "The derivative and direction must have the same length."
+            )
+
+        directional_derivative = 0.0
+        for derivative, perturbation in zip(derivatives, direction):
+            if isinstance(derivative, fire.Function):
+                directional_derivative += fire.assemble(
+                    fire.inner(derivative, perturbation) * fire.dx
                 )
-            elif isinstance(dJdm, fire.Cofunction):
-                # Apply the cofunction to the direction (duality pairing).
-                dJdm = fire.assemble(fire.action(dJdm, direction))
+            elif isinstance(derivative, fire.Cofunction):
+                directional_derivative += fire.assemble(
+                    fire.action(derivative, perturbation)
+                )
             else:
                 # Unknown type, fall back to pyadjoint's internal computation.
-                dJdm = None
-        return taylor_test(self.reduced_functional, control_var, direction, dJdm=dJdm)
+                return None
+        return directional_derivative

@@ -183,13 +183,17 @@ def test_gradient_auto_adjoint(PML=True):
         misfit=misfit, forward_solution=forward_solution_guess,
         adjoint_type=AdjointType.AUTOMATED_ADJOINT,
     )
+    assert isinstance(dJ, fire.Function)
 
     Wave_obj_guess.automated_adjoint.create_reduced_functional(Wave_obj_guess.functional_value)
     size, = np.shape(Wave_obj_guess.c.dat.data[:])
     direction = fire.Function(
         Wave_obj_guess.c.function_space(), val=np.random.default_rng(0).random(size))
     assert Wave_obj_guess.automated_adjoint.verify_gradient(
-        Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.9, \
+        Wave_obj_guess.c,
+        direction=direction,
+        dJdm=dJ,
+    ) > 1.9, \
         "Automated adjoint gradient verification failed."
 
     Wave_obj_guess.automated_adjoint.clear_tape()
