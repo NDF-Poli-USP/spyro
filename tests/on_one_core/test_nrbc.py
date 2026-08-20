@@ -1,13 +1,13 @@
 from pytest import fail, mark, param
 from firedrake import COMM_WORLD as comm, conditional, ConvergenceError
-from numpy import isclose, load
+from numpy import isclose, load, mean
 from spyro.io.basicio import parallel_print as pprint
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
 from spyro.utils.typing import BoundaryConditionsType
 
 
-def wave_dict(element_geometry, dimension, dt_usu, get_ref_model):
+def wave_dict(element_geometry, dimension, dt_usu, get_ref_model, degree_eik, calc_eik):
     """Create a dictionary with parameters for the model.
 
     Parameters
@@ -18,10 +18,14 @@ def wave_dict(element_geometry, dimension, dt_usu, get_ref_model):
     dimension : `int`
         Dimension of the problem. 2 for 2D and 3 for 3D.
     dt_usu: `float`
-        Time step of the simulation
+        Time step of the simulation.
     get_ref_model : `bool`
         If `True`, the infinite ou refercne model is created. If `False`, Non-Reflective
         BCs (NRBCs) are applied to the model.
+    degree_eik : `int`
+        Finite element order for the Eikonal equation.
+    calc_eik : `bool`
+        If `True`, eikonal analysis is performed; otherwise, it is skipped.
 
     Returns
     -------
@@ -89,19 +93,20 @@ def wave_dict(element_geometry, dimension, dt_usu, get_ref_model):
         "final_time": 2. if dimension == 2 else 1.5,  # Final time for event
         "dt": dt_usu,  # timestep size in seconds
         "amplitude": 1.,  # the Ricker has an amplitude of 1.
-        "output_frequency": 10,  # how frequently to output solution to pvds
+        "output_frequency": 15,  # how frequently to output solution to pvds
     }
 
     # Define Parameters for absorbing boundary conditions
     dictionary["absorving_boundary_conditions"] = {
         "status": True,  # Activate ABCs
         "abc_type": "nrbc",  # Activate NRBC
-        "degree_eikonal": 2,  # FEM order for the Eikonal analysis
+        "degree_eikonal": degree_eik,  # Order for the Eikonal FEM
         "get_ref_model": get_ref_model,  # If `True`, the infinite model is created
     }
 
     # Define parameters for visualization
-    output_folder = f"output/nrbc_test{dimension}d/nrbc_test{dimension}d{element_geometry}"
+    str_ele = element_geometry + "_" + ("Eik" if calc_eik else "NoEik")
+    output_folder = f"output/nrbc_test{dimension}d/nrbc_test{dimension}d" + str_ele
     dictionary["visualization"] = {  # Output folder
         "output_folder": output_folder,
         "acoustic_energy": True,  # Activate energy calculation
@@ -146,34 +151,34 @@ def wave_instance(element_geometry, dimension, calc_eik, get_ref_model):
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length = 0.25 if dimension == 2 else 0.3
+    edge_length = 1. / 4. if dimension == 2 else 1. / 4.
 
     # f_est: Factor for the stabilizing term in Eikonal equation
-    if dimension == 2:
-        f_est = 0.03 if element_geometry == "T" else 0.05
-
-    if dimension == 3:
-        f_est = 0.67 if element_geometry == "T" else 0.07
-
     # Timestep size (in seconds). Initial guess: edge_length / 100
     if dimension == 2:
-        dt_usu = 0.00400 if element_geometry == "T" else 0.00500
+        f_est = 0.03 if element_geometry == "T" else 0.02
+        degree_eik = 2 if element_geometry == "T" else 3
+        dt_usu = 0.00250 if element_geometry == "T" else 0.00320
 
     if dimension == 3:
-        dt_usu = 0.01000 if element_geometry == "T" else 0.01250
+        f_est = 0.20 if element_geometry == "T" else 0.10
+        degree_eik = 1
+        dt_usu = 0.00300 if element_geometry == "T" else 0.00400
 
     # Maximum divisor of the final time
-    max_divisor_tf = 3 if dimension == 2 else 4
+    max_divisor_tf = 5 if dimension == 2 else 7
 
     # Get simulation parameters
     pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
     pprint(f"Element Geometry: {element_geometry}", comm=comm)
+    pprint(f"Eikonal Degree: {degree_eik}", comm=comm)
     pprint(f"Eikonal Stabilizing Factor: {f_est:.2f}", comm=comm)
     pprint(f"Timestep Size: {1e3 * dt_usu:.3f} ms", comm=comm)
     pprint(f"Maximum Divisor of Final Time: {max_divisor_tf}", comm=comm)
 
     # Create dictionary with parameters for the model
-    dictionary = wave_dict(element_geometry, dimension, dt_usu, get_ref_model)
+    dictionary = wave_dict(
+        element_geometry, dimension, dt_usu, get_ref_model, degree_eik, calc_eik)
 
     # ============ MESH FEATURES ============
 
@@ -188,7 +193,7 @@ def wave_instance(element_geometry, dimension, calc_eik, get_ref_model):
     wave.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
-    wave.mesh_ops.preamble_mesh_operations(wave)
+    wave.mesh_ops.preamble_mesh_operations(wave, f_est=f_est)
 
     if calc_eik:
         # ============ EIKONAL ANALYSIS ============
@@ -200,18 +205,17 @@ def wave_instance(element_geometry, dimension, calc_eik, get_ref_model):
 
 
 @mark.parametrize("element_geometry, dimension, calc_eik", [
-    # ("T", 2, True),
-    ("T", 2, False),
-    # ("Q", 2, True),
-    ("Q", 2, False),
-    # ("T", 3, True),
-    ("T", 3, False),
-    # ("Q", 3, True),
-    ("Q", 3, False),
+    ("T", 2, True),
+    ("Q", 2, True),
+    ("T", 3, True),
+    ("Q", 3, True),
+    # ("T", 2, False),
+    # ("Q", 2, False),
+    # ("T", 3, False),
+    # ("Q", 3, False),
 ])
 def test_nrbc(element_geometry, dimension, calc_eik):
     """Testing NRBCs for 2D and 3D case in Fig. 8 of Salas et al (2022).
-
 
     See Salas et al (2022): Hybrid absorbing scheme based on hyperelliptical
     layers with non-reflecting boundary conditions in scalar wave equations.
@@ -230,21 +234,61 @@ def test_nrbc(element_geometry, dimension, calc_eik):
     Returns
     -------
     None
+
+    ==============================
+    Eikonal for 2D model Δx = 250m
+    ==============================
+    eik_min = 83.333 ms
+
+    f_est T-ele(p=2) Q-ele(p=3)
+     0.02     --/--     85.187*
+     0.03   84.586*     90.411
+     0.04   87.945       --/--
+
+    =================================
+    Eikonal for 3D model Δx = 333.33m
+    =================================
+    eik_min = 83.333 ms
+
+    f_est   T-ele   Q-ele
+     0.02  60.886   --/--
+     0.03  61.715  69.911
+     0.04  62.513  71.755
+     0.05  63.256  73.351
+     0.10  67.891  81.172
+     0.11   --/--  82.943*
+     0.12   --/--  84.783
+     0.15  75.965   --/--
+     0.18  81.912   --/--
+     0.19  83.969*  --/--
+     0.20  86.037   --/--
+
+    f_est T-ele(p=1) Q-ele(p=1)
+     0.09     --/--     78.507
+     0.10     --/--     87.870*
+     0.11     --/--     97.539
+     0.19    80.596      --/--
+     0.20    83.374*     --/--
+     0.21    86.079      --/--
     """
 
-    pprint("\n" + 60 * "=" + f"\nTesting NRBCs with {element_geometry} "
-           + f"elements and {dimension}D case\n"
-           + 60 * "=", comm=comm)
+    act_eik = "Activated" if calc_eik else "Deactivated"
+    pprint("\n" + 75 * "=" + f"\nTesting NRBCs with {element_geometry} elements and "
+           + f"{dimension}D case. Eikonal analysis: {act_eik}\n" + 75 * "=", comm=comm)
 
     get_ref_model = True
     get_nrbc_model = True
 
-    # Create an instance of the acoustic wave solver
-    wave, max_divisor_tf, dictionary = wave_instance(element_geometry, dimension,
-                                                     calc_eik, get_ref_model)
-    energy_file = wave.path_save + "preamble/acoustic_ref_energy"
-
     try:
+
+        # ============ MODEL PARAMETERS AND EIKONAL ============
+
+        # Create an instance of the acoustic wave solver
+        wave, max_divisor_tf, dictionary = wave_instance(element_geometry, dimension,
+                                                         calc_eik, get_ref_model)
+        energy_name = "acoustic_ref_energy"
+        energy_file = wave.path_save + "preamble/" + energy_name
+
         # ============ REFERENCE MODEL ============
 
         if get_ref_model:
@@ -256,8 +300,10 @@ def test_nrbc(element_geometry, dimension, calc_eik):
             dictionary["visualization"].update({"acoustic_energy_filename": energy_file})
 
             # Computing reference signal
-            wave.nrbc_ops.infinite_model(wave, check_dt=True,
-                                         max_divisor_tf=max_divisor_tf)
+            wave.nrbc_ops.infinite_model(wave, check_dt=True, max_divisor_tf=max_divisor_tf)
+
+            # Set model parameters for the NRBC scheme
+            wave.abc_get_ref_model = False
 
             # Estimating computational resource usage
             comp_cost("tfin", tRef=tRef, user_name=wave.path_save + "preamble/INF_")
@@ -266,14 +312,13 @@ def test_nrbc(element_geometry, dimension, calc_eik):
 
         if get_nrbc_model:
 
-            # Acquiring reference signal
+            # Acquiring reference for signal and acoustic energy
             output_file = wave.abc_type.value + "_ref"
-            receivers_reference, receivers_ref_fft = \
-                wave.nrbc_ops.get_reference_signal(output_file=output_file)
-
-            # Acquiring reference acoustic energy
-            energy_ref = load(energy_file + ".npy").T
-            final_energy_reference = energy_ref[-1]
+            receivers_reference, receivers_ref_fft, energy_reference = \
+                wave.nrbc_ops.get_reference_signal(output_file=output_file,
+                                                   get_energy_reference=True,
+                                                   energy_reference_file=energy_name)
+            final_energy_reference = energy_reference[-1]
 
             if get_ref_model:
                 # Returning to the original mesh nad velocity profile
@@ -284,10 +329,19 @@ def test_nrbc(element_geometry, dimension, calc_eik):
             # Time step size for the transient response
             dt = wave.get_dt()
 
-            # for nrbc_type in [BoundaryConditionsType.HIGDON,
-            #                   BoundaryConditionsType.SOMMERFELD]:
+            # Tolerance for error measures
+            tol_err = 0.08
 
-            for nrbc_type in [BoundaryConditionsType.SOMMERFELD]:
+            # for nrbc_type in [BoundaryConditionsType.HIGDON]:
+            # for nrbc_type in [BoundaryConditionsType.SOMMERFELD]:
+            for nrbc_type in [BoundaryConditionsType.HIGDON,
+                              BoundaryConditionsType.SOMMERFELD]:
+
+                # Critical source position
+                crit_source = wave.nrbc_ops.eik_bnd[0][-1] if calc_eik else None
+
+                # Reference to resource usage
+                tRef = comp_cost("tini")
 
                 # Updating NRBC type in the wave object
                 wave.nrbc_ops.non_reflect_bc = nrbc_type
@@ -297,7 +351,7 @@ def test_nrbc(element_geometry, dimension, calc_eik):
                 dictionary["visualization"].update({"acoustic_energy_filename": energy_nrbc})
 
                 # Applying NRBCs on original domain boundary
-                wave.nrbc_ops.nrbc_on_boundary(wave, source_coord=None)
+                wave.nrbc_ops.nrbc_on_boundary(wave, source_coord=crit_source)
 
                 # Solving the forward problem
                 wave.forward_solve()
@@ -311,20 +365,25 @@ def test_nrbc(element_geometry, dimension, calc_eik):
                     wave.forward_solution_receivers, receivers_reference, dt,
                     wave.number_of_receivers, final_energy=final_energy,
                     final_energy_reference=final_energy_reference)
-                errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener = error_measures
+                errIt, errPk, pkMax, max_errIt, \
+                    max_errPK, final_ener, dsspt_ener = error_measures
 
-        # assert sum(errIt) == 0. and max_errIt == 0., \
-        #     "✗ Integral Error check for 'hybrid' and 'PML' solvers in Reference Model " \
-        #     f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
-        # pprint("✓ Integral Error Verified for 'hybrid' and 'PML' solvers", comm=comm)
-        # assert sum(errPk) == 0. and max_errPK == 0. and all(pkMax) > 0., \
-        #     "✗ Peak Error check for 'hybrid' and 'PML' solvers in Reference Model " \
-        #     f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
-        # pprint("✓ Peak Error Verified for 'hybrid' and 'PML' solvers", comm=comm)
-        # assert final_ener > 0. and dsspt_ener == 0., \
-        #     "✗ Final Energy check for 'hybrid' and 'PML' solvers in Reference Model " \
-        #     f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
-        # pprint("✓ Final Energy Verified for 'hybrid' and 'PML' solvers", comm=comm)
+                # Estimating computational resource usage
+                comp_cost("tfin", tRef=tRef, user_name=wave.nrbc_ops.path_case_nrbc)
+
+                nrbc_str = wave.nrbc_ops.non_reflect_bc.value
+                assert mean(errIt) >= tol_err and max_errIt > tol_err, \
+                    f"✗ Integral Error check for {nrbc_str} BC in Model {dimension}D " \
+                    f"with {element_geometry} elements and Eikonal {act_eik} case."
+                pprint(f"✓ Integral Error Verified for {nrbc_str} BC", comm=comm)
+                assert mean(errPk) >= tol_err and max_errPK > tol_err and all(pkMax) > 0., \
+                    f"✗ Peak Error check for {nrbc_str} BC in Model {dimension}D " \
+                    f"with {element_geometry} elements and Eikonal {act_eik} case."
+                pprint(f"✓ Peak Error Verified for {nrbc_str} BC", comm=comm)
+                assert final_ener > 0. and dsspt_ener > 0., \
+                    f"✗ Final Energy check for {nrbc_str} BC in Model {dimension}D " \
+                    f"with {element_geometry} elements and Eikonal {act_eik} case."
+                pprint(f"✓ Final Energy Verified for {nrbc_str} BC", comm=comm)
 
     except ConvergenceError as e:
         fail(f"Checking NRBCs with {element_geometry} elements for "
