@@ -208,14 +208,9 @@ def test_control_parameters_are_a_subset_of_the_physical_ones():
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
     fwi.set_guess_control(fire.Constant(2.0))
 
-    assert fwi.control_parameters <= fwi.wave.physical_parameters
-
-
-def test_control_parameters_reject_an_empty_set():
-    fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
-
-    with pytest.raises(ValueError, match="at least one physical parameter"):
-        fwi.control_parameters = []
+    # Which parameters are inverted for is recorded by the keys of the control
+    # dictionary, and nowhere else.
+    assert set(fwi._control_parameters) <= fwi.wave.physical_parameters
 
 
 def test_acoustic_constant_control_is_converted_to_function():
@@ -224,12 +219,12 @@ def test_acoustic_constant_control_is_converted_to_function():
 
     fwi.set_guess_control(fire.Constant(2.0))
 
-    control = fwi.guess_controls
+    control = fwi.control_parameters
     assert isinstance(control, fire.Function)
     assert np.allclose(control.dat.data_ro, 2.0)
 
 
-def test_guess_controls_update_the_wave_physical_parameter():
+def test_control_parameters_update_the_wave_physical_parameter():
     fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
     fwi.set_guess_control(fire.Constant(2.0))
@@ -241,17 +236,17 @@ def test_guess_controls_update_the_wave_physical_parameter():
     assert np.allclose(velocity.dat.data_ro, 3.0)
 
 
-def test_guess_controls_are_independent_of_the_wave_field():
+def test_control_parameters_are_independent_of_the_wave_field():
     fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
     fwi.set_guess_control(fire.Constant(2.0))
 
     fwi.wave.physical_parameters[VELOCITY].assign(9.0)
 
-    assert np.allclose(fwi.guess_controls.dat.data_ro, 2.0)
+    assert np.allclose(fwi.control_parameters.dat.data_ro, 2.0)
 
 
-def test_guess_controls_accept_a_mapping_keyed_by_parameter_name():
+def test_control_parameters_accept_a_mapping_keyed_by_parameter_name():
     fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
 
@@ -263,7 +258,7 @@ def test_guess_controls_accept_a_mapping_keyed_by_parameter_name():
     )
 
 
-def test_guess_controls_reject_uncontrolled_parameters():
+def test_control_parameters_reject_uncontrolled_parameters():
     fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
 
@@ -279,8 +274,8 @@ def test_velocity_model_setters_capture_the_control():
 
     fwi.set_guess_velocity_model(constant=2.0)
 
-    assert isinstance(fwi.guess_controls, fire.Function)
-    assert np.allclose(fwi.guess_controls.dat.data_ro, 2.0)
+    assert isinstance(fwi.control_parameters, fire.Function)
+    assert np.allclose(fwi.control_parameters.dat.data_ro, 2.0)
 
 
 def test_misfit_without_a_configured_control_raises():
