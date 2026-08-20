@@ -161,7 +161,9 @@ class MeasureError():
             receivers_ref_fft.append(yf)
         save(pth_str + "fft.npy", receivers_ref_fft)
 
-    def get_reference_signal(self, output_file="reference"):
+    def get_reference_signal(self, output_file="reference",
+                             get_energy_reference=False,
+                             energy_reference_file=None):
         """Acquire the reference signal for comparison between models.
 
         Parameters
@@ -169,6 +171,12 @@ class MeasureError():
         output_file : `str`, optional
             Name of the file to get the reference signal without any extension.
             Default is "reference.npy".
+        get_energy_reference : `bool`, optional
+            If `True`, return the energy of the reference model during along the
+            transient response. Default is `False`.
+        energy_reference_file : `str`, optional
+            Name of the file to get the energy of the reference model without any
+            extension. Default is `None`.
 
         Returns
         -------
@@ -176,6 +184,9 @@ class MeasureError():
             Receiver waveform data in the reference model
         receivers_ref_fft : `array`
           Frequency response at the receivers in the reference model.
+        energy_reference : `array`
+            Energy of the reference model in the last time step. Only returned
+            if `get_energy_reference` is `True`.
         """
 
         pprint("\nLoading Reference Signal from Reference Model", comm=self.comm)
@@ -198,6 +209,16 @@ class MeasureError():
                                                      pth_str + "fft.npy", [".npy"],
                                                      check_file_existence=True)
         receivers_ref_fft = load(receivers_reference_fft_file).T
+
+        if get_energy_reference:
+
+            # Energy of the reference model
+            energy_ref_file = validate_file("reference energy file",
+                                            self.path_reference + energy_reference_file
+                                            + ".npy", [".npy"], check_file_existence=True)
+            energy_reference = load(energy_ref_file).T
+
+            return receivers_reference, receivers_ref_fft, energy_reference
 
         return receivers_reference, receivers_ref_fft
 

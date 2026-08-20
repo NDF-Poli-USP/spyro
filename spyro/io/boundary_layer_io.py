@@ -231,9 +231,11 @@ class Read_boundary_layer:
         if value == "PML" or value == "hybrid":
             # Common parameters for both PML and hybrid
             self.abc_reference_freq = abc_dictionary.get("abc_reference_freq", "source")
-            self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", 2)
             self.abc_extend_properties = abc_dictionary.get("extend_properties",
                                                             "abc_driven")
+
+        # Degree for the Eikonal analysis to identify critical points on boundary for ABCs
+        self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", 2)
 
         # Get the option for creating the infinite model, default to False
         self.abc_get_ref_model = abc_dictionary.get("get_ref_model", False)

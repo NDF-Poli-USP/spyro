@@ -227,7 +227,7 @@ class NRBC(AbsorbingBC):
         """
 
         # Boundary node data
-        bnd_z, bnd_x = bnd_nodes_nfs[:2]
+        bnd_z, bnd_x = bnd_nodes_nfs[:, 0], bnd_nodes_nfs[:, 1]
 
         # Source coordinates
         psouz = source_coord[0]
@@ -241,7 +241,7 @@ class NRBC(AbsorbingBC):
         if self.dimension == 3:  # 3D
 
             # Third component of the vector pointing to the boundary point
-            bnd_y = bnd_nodes_nfs[2]
+            bnd_y = bnd_nodes_nfs[:, 2]
             psouy = source_coord[2]
             ref_y = bnd_y - psouy
             ref_vct.append(ref_y)

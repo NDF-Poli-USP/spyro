@@ -1096,15 +1096,9 @@ class HABCMesh(MeshOps):
 
             # Extract node positions
             node_positions = self.extract_node_positions(mesh, V, output_type="array")
-            coord_msh = mesh.coordinates.dat.data_with_halos
-            coord_bnd_nodes = node_positions[bnd_nod_ids_nfs, :]
 
-            # Identify the boundary nodes
-            tree = cKDTree(coord_msh)
-            indices = tree.query(coord_bnd_nodes, k=1,
-                                 distance_upper_bound=mesh_parameters.tol)[1]
-            mask_boundary = indices[indices < len(coord_msh)]
-            bnd_nodes_nfs = mesh.coordinates.dat.data_with_halos[mask_boundary, :]
+            # Extract the boundary nodes
+            bnd_nodes_nfs = node_positions[bnd_nod_ids_nfs, :]
 
             return bnd_nod_ids_nfs, bnd_nodes_nfs
 
