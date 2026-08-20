@@ -479,9 +479,12 @@ class FullWaveformInversion:
     def _controlled_parameters(self):
         """Return the parameters being inverted for.
 
-        They are the keys of the control dictionary once controls have been
+        They are the members of the control set once controls have been
         configured. Before that there is nothing to read them from, so the
-        inversion controls every physical parameter the solver models.
+        inversion controls every physical parameter the solver models. The
+        solver only populates ``physical_parameters`` once its material
+        properties are initialized, which happens on the first forward solve;
+        until then, the parameters its class declares are the same set.
 
         Returns
         -------
@@ -490,27 +493,11 @@ class FullWaveformInversion:
         """
         if self._control_parameters:
             return tuple(self._control_parameters)
-        return tuple(
-            sorted(self._wave_physical_parameters(), key=lambda p: p.value),
-        )
-
-    def _wave_physical_parameters(self):
-        """Return the names of the physical parameters the solver models.
-
-        The solver only populates ``physical_parameters`` once its material
-        properties are initialized, which happens on the first forward solve.
-        Before that, the parameters the solver class declares are the same
-        set, and are what the control choice is validated against.
-
-        Returns
-        -------
-        set of str
-            Physical parameter names.
-        """
         try:
-            return set(self.wave.physical_parameters)
+            physical = self.wave.physical_parameters
         except ValueError:
-            return set(type(self.wave)._physical_parameter_names)
+            physical = type(self.wave)._physical_parameter_names
+        return tuple(sorted(physical, key=lambda p: p.value))
 
     def _as_control_mapping(self, control):
         """Normalize a control value into a ``name -> value`` mapping.
