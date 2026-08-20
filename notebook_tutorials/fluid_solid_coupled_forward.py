@@ -62,7 +62,6 @@ dictionary["visualization"] = {
 
 dictionary["synthetic_data"] = {
     "type": "object",
-    "density_fluid": 1.0,
     "velocity_fluid": 1.5,
     "density_solid": 1.0,
     "p_wave_velocity": 1.5,
