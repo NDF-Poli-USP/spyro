@@ -244,7 +244,7 @@ class PMLLayer(ABCLayer):
 
         # Save damping profile
         if not wave.abc_get_ref_model and save_file:
-            outfile = VTKFile(self.path_case_abc + "sigma_pml.pvd")
+            outfile = VTKFile(self.path_case_absl + "sigma_pml.pvd")
             if self.dimension == 2:  # 2D
                 outfile.write(self.sigma_z, self.sigma_x)
             if self.dimension == 3:  # 3D

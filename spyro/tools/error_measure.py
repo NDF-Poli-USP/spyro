@@ -26,6 +26,9 @@ class MeasureError():
 
     Attributes
     ----------
+    comm : `object`
+        An object representing the communication interface for parallel processing.
+        Default is `None`.
     path_reference : `str`
         Path to save the reference signal.
     path_save_error : `str`
@@ -41,6 +44,8 @@ class MeasureError():
         Compute the error measures at the receivers for comparison between models.
     get_reference_signal()
         Acquire the reference signal for comparison between models.
+    initialize_paths_for_error()
+        Initialize the paths for saving data and reference signals.
     integral_error()
         Compute the integral error between the model and reference signals.
     normalized_root_mean_square_error()
@@ -57,15 +62,11 @@ class MeasureError():
         Get the optimal heuristic factor for the quadratic damping
     """
 
-    def __init__(self, output_folder=None, output_case=None, comm=None):
+    def __init__(self, comm=None):
         """Initialize the MeasureError class.
 
         Parameters
         ----------
-        output_folder : `str`, optional
-            The folder where output data will be saved. Default is `None`.
-        output_case : `str`, optional
-            The folder for the current case study. Default is `None`.
         comm : `object`, optional
             An object representing the communication interface for parallel processing.
             Default is `None`.
@@ -75,23 +76,37 @@ class MeasureError():
         None
         """
 
-        # Path to save data
-        if output_folder is None:
-            self.path_save_error = getcwd() + "/output/"
-        else:
-            self.path_save_error = validate_string("output_folder", output_folder)
+        # Communicator MPI
+        self.comm = comm
+
+    def initialize_paths_for_error(self, output_folder=None, output_case=None):
+        """Initialize the paths for saving data and reference signals.
+
+        Parameters
+        ----------
+        output_folder : `str`, optional
+            The folder where output data will be saved. Default is `None`.
+        output_case : `str`, optional
+            The folder for the current case study. Default is `None`.
+
+        Returns
+        -------
+        None
+        """
+
+        # Check the input parameters
+        validate_string("output_folder", output_folder, accept_parameter_as_none=True)
+        validate_string("output_case", output_case, accept_parameter_as_none=True)
 
         # Path to save data
-        if output_case is None:
-            self.path_save_err_case = self.path_save_error
-        else:
-            self.path_save_err_case = validate_string("output_case", output_case)
+        self.path_save_error = output_folder + "/" if output_folder else getcwd() + "/output/"
+
+        # Path to save data for specific case
+        self.path_save_err_case = self.path_save_error + output_case + "/" \
+            if output_case else self.path_save_error
 
         # Path to save the reference signal
         self.path_reference = self.path_save_error + "preamble/"
-
-        # Communicator MPI
-        self.comm = comm
 
     def save_reference_signal(self, receiver_locations, forward_solution_receivers,
                               number_of_receivers, freq_Nyquist, output_file="reference"):

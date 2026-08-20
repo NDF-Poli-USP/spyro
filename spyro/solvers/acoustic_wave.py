@@ -406,7 +406,7 @@ class AcousticWave(Wave):
         ``Function`` in the acoustic function space and fills it with ``2.0``.
         """
         if self.function_space is None:
-            self.force_rebuild_function_space()
+            self.building_mesh_derived_paramenters()
 
         if isinstance(controls, fire.Function):
             name = controls.name()
@@ -438,5 +438,5 @@ class AcousticWave(Wave):
         a velocity control compatible with ``set_control_parameters``.
         """
         if self.function_space is None:
-            self.force_rebuild_function_space()
+            self.building_mesh_derived_paramenters()
         return self.function_space
