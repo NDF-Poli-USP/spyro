@@ -322,6 +322,7 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
                                                        final_energy=pml_energy,
                                                        final_energy_reference=hybrid_energy,
                                                        save_in_case_folder=False)
+
         errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener = error_measures
 
         assert sum(errIt) == 0. and max_errIt == 0., \

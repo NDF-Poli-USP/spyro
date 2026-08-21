@@ -1,16 +1,10 @@
-import firedrake as fire
 import pytest
 from mpi4py.MPI import COMM_WORLD
 from mpi4py import MPI
-import numpy as np
+from firedrake import conditional
 import spyro
-
-
-def error_calc(p_numerical, p_analytical, nt):
-    norm = np.linalg.norm(p_numerical, 2) / np.sqrt(nt)
-    error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
-    div_error_time = error_time / norm
-    return div_error_time
+from spyro.io.basicio import parallel_print as pprint
+from spyro.tools.error_measure import MeasureError
 
 
 @pytest.mark.parallel(6)
@@ -63,7 +57,7 @@ def test_forward_3_shots():
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.1})
 
     mesh_z = wave.mesh_z
-    cond = fire.conditional(mesh_z < -1.5, 3.5, 1.5)
+    cond = conditional(mesh_z < -1.5, 3.5, 1.5)
     wave.set_initial_velocity_model(conditional=cond, output=True)
 
     wave.forward_solve()
@@ -91,15 +85,24 @@ def test_forward_3_shots():
     arr0 = arr[:, rec_id]
     arr0 = arr0.flatten()
 
-    error = error_calc(arr0[:430], analytical_p[:430], 430)
-    if comm.comm.rank == 0:
-        print(f"Error for shot {wave.current_sources} is {error} and test has passed equals {np.abs(error) < 0.01}", flush=True)
-    error_all = COMM_WORLD.allreduce(error, op=MPI.SUM)
-    error_all /= 3
+    # Computing errors
+    measure_error = MeasureError()
+    errPk = measure_error.peak_error(arr0[:430], analytical_p[:430])[0]
+    errIt = measure_error.integral_error(arr0[:430], analytical_p[:430], wave.dt)
+    eNRMS = measure_error.normalized_root_mean_square_error(arr0[:430], analytical_p[:430])
+    pprint(f"NRMS Error for shot {wave.current_sources} is {eNRMS:.4e} and test "
+           f"has passed equals {abs(eNRMS) < 0.01}", comm=comm)
+    pprint(f"Integral Error for shot {wave.current_sources} is {errIt:.4e} and test "
+           f"has passed equals {abs(errIt) < 0.01}", comm=comm)
+    pprint(f"Peak Error for shot {wave.current_sources} is {errPk:.4e} and test "
+           f"has passed equals {abs(errPk) < 0.01}", comm=comm)
 
-    test = np.abs(error_all) < 0.01
+    error_rm = COMM_WORLD.allreduce(eNRMS, op=MPI.SUM) / 3.
+    error_it = COMM_WORLD.allreduce(errIt, op=MPI.SUM) / 3.
+    error_pk = COMM_WORLD.allreduce(errPk, op=MPI.SUM) / 3.
 
-    assert test
+    assert abs(error_rm) < 0.01 and abs(error_it) < 0.01 and abs(error_pk) < 0.01, \
+        "Error is too high for forward test."
 
 
 if __name__ == "__main__":
