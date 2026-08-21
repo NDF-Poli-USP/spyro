@@ -40,7 +40,7 @@ def nodal_homogeneous_analytical(
     # Generating extended ricker wavelet
     dt = wave.dt
     final_time = wave.final_time
-    num_t = int(final_time / dt + 1)
+    num_t = int(final_time / dt) + 1
 
     extended_final_time = n_extra * final_time
 
@@ -184,7 +184,7 @@ def analytical_solution_elastic(
     final_time = dt * (nt - 1)
     time_vector = np.linspace(0.0, final_time, nt)
     u = np.zeros((nt, 3))
-    if source_type == "force_source":
+    if source_type == SourceType.FORCE:
         for i in range(dimension):
             u[:, i] = analytical_force_source(
                 offsets,
@@ -198,7 +198,7 @@ def analytical_solution_elastic(
                 force_direction,
                 i,
             )
-    elif source_type == "explosive_source":
+    elif source_type == SourceType.EXPLOSIVE:
         for i in range(dimension):
             u[:, i] = analytical_explosive_source(
                 offsets,
@@ -332,7 +332,7 @@ def analytical_force_source(
     for k in range(nt):
         t = time_vector[k]
 
-        # Near field contribution (integral term)
+        # Near field contribution (convolution integral term)
         res = quad(lambda tau: tau * X0(t - tau), r / alpha, r / beta)
         u_near = (
             amplitude
