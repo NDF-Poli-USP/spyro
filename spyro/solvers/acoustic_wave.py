@@ -191,9 +191,9 @@ class AcousticWave(Wave):
             )
 
         if riesz_map == RieszMapType.L2:
-            return self.automated_adjoint.compute_gradient()
+            return self.automated_adjoint.compute_gradient()[0]
         elif riesz_map == RieszMapType.l2:
-            return self.automated_adjoint.compute_derivative()
+            return self.automated_adjoint.compute_derivative()[0]
         else:
             raise NotImplementedError(
                 f"Riesz map {riesz_map} not implemented for automated adjoint."

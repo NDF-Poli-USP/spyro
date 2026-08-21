@@ -2,13 +2,16 @@ import numpy as np
 
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
                        project)
+from pyadjoint import AdjFloat, Tape
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
-from ...utils.typing import (ElasticMaterialParameter, ElasticMaterialParameterization,
-                             AbsorbingBCsType, override)
+from ...utils.physical_parameters import PhysicalParameters
+from ...utils.typing import (AdjointType, ElasticMaterialParameter,
+                             ElasticMaterialParameterization, AbsorbingBCsType,
+                             RieszMapType, override)
 from ...domains.space import create_function_space
 
 
@@ -23,6 +26,14 @@ PHYSICAL_PARAMETERIZATION = {
         ElasticMaterialParameter.P_WAVE_VELOCITY,
         ElasticMaterialParameter.S_WAVE_VELOCITY,
     ),
+}
+
+ATTRIBUTE_BY_PARAMETER = {
+    ElasticMaterialParameter.DENSITY: "rho",
+    ElasticMaterialParameter.LAMBDA: "lmbda",
+    ElasticMaterialParameter.MU: "mu",
+    ElasticMaterialParameter.P_WAVE_VELOCITY: "c",
+    ElasticMaterialParameter.S_WAVE_VELOCITY: "c_s",
 }
 
 
@@ -198,12 +209,304 @@ class IsotropicWave(ElasticWave):
                 "The valid options are {Density, Lame first, Lame second} "
                 "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
             )
-        add = self._physical_parameters.add
-        add(ElasticMaterialParameter.DENSITY, self.rho)
-        add(ElasticMaterialParameter.LAMBDA, self.lmbda)
-        add(ElasticMaterialParameter.MU, self.mu)
-        add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
-        add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
+        self._register_physical_parameters()
+
+    def get_control_parameter_function_space(self) -> object:
+        """Return the scalar space used for material controls.
+
+        Returns
+        -------
+        firedrake.FunctionSpace
+            Scalar finite-element space on the elastic mesh.
+
+        Raises
+        ------
+        ValueError
+            If the mesh has not been created.
+        """
+        if self.mesh is None:
+            raise ValueError(
+                "Mesh must be set before creating elastic control fields.",
+            )
+        space = self._material_parameter_function_space
+        if space is None or space.mesh() is not self.mesh:
+            space = create_function_space(
+                self.mesh, self.method, self.degree, dim=1,
+            )
+            self._material_parameter_function_space = space
+        return space
+
+    def _get_material_parameter(
+        self, parameter: ElasticMaterialParameter,
+    ) -> object:
+        """Return one elastic physical field or expression.
+
+        Parameters
+        ----------
+        parameter : ElasticMaterialParameter
+            Physical parameter to retrieve.
+
+        Returns
+        -------
+        object
+            Firedrake field or dependent UFL expression.
+        """
+        return getattr(self, ATTRIBUTE_BY_PARAMETER[parameter])
+
+    def _set_material_parameter(
+        self, parameter: ElasticMaterialParameter, value: object,
+    ) -> None:
+        """Assign one elastic physical field or expression.
+
+        Parameters
+        ----------
+        parameter : ElasticMaterialParameter
+            Physical parameter to assign.
+        value : object
+            Firedrake field or dependent UFL expression.
+
+        Returns
+        -------
+        None
+        """
+        setattr(self, ATTRIBUTE_BY_PARAMETER[parameter], value)
+
+    def _derive_complementary_parameters(
+        self, parameterization: ElasticMaterialParameterization,
+    ) -> None:
+        """Express dependent parameters using one independent family.
+
+        Parameters
+        ----------
+        parameterization : ElasticMaterialParameterization
+            Family whose three parameters are independent fields.
+
+        Returns
+        -------
+        None
+        """
+        if parameterization is ElasticMaterialParameterization.LAME:
+            self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
+            self.c_s = (self.mu/self.rho)**0.5
+        else:
+            self.mu = self.rho*self.c_s**2
+            self.lmbda = self.rho*self.c**2 - 2*self.mu
+
+    def _register_physical_parameters(self) -> None:
+        """Register the current elastic fields and expressions.
+
+        Returns
+        -------
+        None
+        """
+        for parameter in ElasticMaterialParameter:
+            self._physical_parameters.add(
+                parameter, self._get_material_parameter(parameter),
+            )
+
+    def _record_parameterization(
+        self, parameterization: ElasticMaterialParameterization,
+    ) -> None:
+        """Persist independent fields for the next forward initialization.
+
+        ``forward_solve`` reads the material dictionary again. Storing the
+        actual independent ``Function`` objects preserves their identity, so
+        the fields in the variational form remain the controls registered on
+        the pyadjoint tape.
+
+        Parameters
+        ----------
+        parameterization : ElasticMaterialParameterization
+            Independent family to write to ``synthetic_data``.
+
+        Returns
+        -------
+        None
+        """
+        synthetic_data = self.input_dictionary["synthetic_data"]
+        for parameter in ElasticMaterialParameter:
+            synthetic_data.pop(parameter.value, None)
+        synthetic_data.pop("lame_first", None)
+        synthetic_data.pop("lame_second", None)
+        for parameter in PHYSICAL_PARAMETERIZATION[parameterization]:
+            synthetic_data[parameter.value] = self._get_material_parameter(
+                parameter,
+            )
+
+    def _set_physical_parameterization(
+        self, parameterization: ElasticMaterialParameterization,
+    ) -> None:
+        """Materialize one independent elastic parameter family.
+
+        This change of variables occurs before tape recording. The target
+        family becomes three scalar ``Function`` objects and the complementary
+        family remains algebraically linked through UFL expressions.
+
+        Parameters
+        ----------
+        parameterization : ElasticMaterialParameterization
+            Independent family required by the selected controls.
+
+        Returns
+        -------
+        None
+        """
+        if parameterization is self._physical_parameterization:
+            # Model dictionaries often contain scalars. Replace them with the
+            # initialized fields so forward_solve() does not create new
+            # Functions and detach the registered pyadjoint controls.
+            self._record_parameterization(parameterization)
+            return
+
+        space = self.get_control_parameter_function_space()
+        for parameter in PHYSICAL_PARAMETERIZATION[parameterization]:
+            value = self._get_material_parameter(parameter)
+            if isinstance(value, Function):
+                field = value
+            else:
+                field = Function(space, name=parameter.value).interpolate(value)
+            self._set_material_parameter(parameter, field)
+
+        self._physical_parameterization = parameterization
+        self._derive_complementary_parameters(parameterization)
+        self._register_physical_parameters()
+        self._record_parameterization(parameterization)
+
+    @override
+    def _select_control_parameters(
+        self, parameters: object = None,
+    ) -> PhysicalParameters:
+        """Resolve an independent elastic control subset.
+
+        Parameters
+        ----------
+        parameters : ElasticMaterialParameter or iterable, optional
+            Non-empty subset of the Lame or velocity parameterization. ``None``
+            selects all three parameters of the current parameterization.
+
+        Returns
+        -------
+        PhysicalParameters
+            Selected enum names mapped to the fields used by the equation.
+
+        Raises
+        ------
+        TypeError
+            If a selection contains anything other than
+            :class:`ElasticMaterialParameter` values.
+        ValueError
+            If the selection is empty, duplicated, or mixes parameterizations.
+        """
+        current = self._physical_parameterization
+        if parameters is None:
+            selected_names = list(PHYSICAL_PARAMETERIZATION[current])
+        elif isinstance(parameters, ElasticMaterialParameter):
+            selected_names = [parameters]
+        else:
+            selected_names = list(parameters)
+
+        if not selected_names:
+            raise ValueError("At least one elastic control parameter is required.")
+        if not all(
+            isinstance(name, ElasticMaterialParameter)
+            for name in selected_names
+        ):
+            raise TypeError(
+                "Elastic controls must be ElasticMaterialParameter enum "
+                "members.",
+            )
+        if len(set(selected_names)) != len(selected_names):
+            raise ValueError("Elastic control parameters must be unique.")
+
+        selected = set(selected_names)
+        candidates = [
+            parameterization
+            for parameterization, family in PHYSICAL_PARAMETERIZATION.items()
+            if selected <= set(family)
+        ]
+        if not candidates:
+            raise ValueError(
+                "Elastic controls must be a subset of either "
+                "{density, lambda, mu} or "
+                "{density, p_wave_velocity, s_wave_velocity}; got "
+                f"{_format_physical_parameters(selected_names)}.",
+            )
+        target = current if current in candidates else candidates[0]
+        self._set_physical_parameterization(target)
+
+        controls = PhysicalParameters()
+        for parameter in PHYSICAL_PARAMETERIZATION[target]:
+            if parameter in selected:
+                controls.add(parameter, self._get_material_parameter(parameter))
+        return controls
+
+    @override
+    def gradient_solve(
+        self,
+        misfit=None,
+        forward_solution=None,
+        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        riesz_map=RieszMapType.L2,
+    ) -> PhysicalParameters:
+        """Compute automated-adjoint elastic material derivatives.
+
+        Parameters
+        ----------
+        misfit : array_like, optional
+            Accepted for compatibility; the recorded functional owns the
+            elastic misfit.
+        forward_solution : firedrake.Function, optional
+            Accepted for compatibility; the automated adjoint replays its tape.
+        adjoint_type : AdjointType, optional
+            Must be :attr:`AdjointType.AUTOMATED_ADJOINT`.
+        riesz_map : RieszMapType, optional
+            ``L2`` returns primal gradients and ``l2`` raw derivatives.
+
+        Returns
+        -------
+        PhysicalParameters
+            Derivatives keyed by the selected elastic parameter enums.
+
+        Raises
+        ------
+        NotImplementedError
+            If a hand-implemented adjoint or unsupported Riesz map is requested.
+        ValueError
+            If no valid annotated functional is available.
+        """
+        if adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
+            raise NotImplementedError(
+                "Elastic gradients only support the automated adjoint.",
+            )
+        if not isinstance(self.functional_value, AdjFloat):
+            raise ValueError(
+                "Functional value must be an AdjFloat for automated adjoint "
+                "gradient computation.",
+            )
+        if self.automated_adjoint is None:
+            raise ValueError(
+                "Enable the automated adjoint before the elastic forward solve.",
+            )
+        if (
+            self.automated_adjoint.reduced_functional is None
+            and isinstance(self.automated_adjoint._tape, Tape)
+        ):
+            self.automated_adjoint.create_reduced_functional(
+                self.functional_value,
+            )
+
+        if riesz_map is RieszMapType.L2:
+            derivatives = self.automated_adjoint.compute_gradient()
+        elif riesz_map is RieszMapType.l2:
+            derivatives = self.automated_adjoint.compute_derivative()
+        else:
+            raise NotImplementedError(
+                f"Riesz map {riesz_map} not implemented for automated adjoint.",
+            )
+        return PhysicalParameters(zip(
+            self.automated_adjoint.control_parameter_names,
+            derivatives,
+        ))
 
     @override
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
