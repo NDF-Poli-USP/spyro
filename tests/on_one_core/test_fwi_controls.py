@@ -258,11 +258,11 @@ def test_control_parameters_accept_a_mapping_keyed_by_parameter_name():
     )
 
 
-def test_control_parameters_reject_uncontrolled_parameters():
+def test_control_parameters_reject_parameters_the_wave_does_not_model():
     fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
 
-    with pytest.raises(ValueError, match="not controlled by this inversion"):
+    with pytest.raises(KeyError, match="not a physical parameter"):
         fwi.set_guess_control(
             {ElasticMaterialParameter.DENSITY: fire.Constant(1.0)},
         )

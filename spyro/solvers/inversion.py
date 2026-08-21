@@ -32,22 +32,6 @@ except ImportError:
 # ROL = None
 
 
-def _names(parameters):
-    """Return the public names of material parameters, sorted, for messages.
-
-    Parameters
-    ----------
-    parameters : iterable of enum.Enum
-        Material parameters.
-
-    Returns
-    -------
-    list of str
-        Their public names.
-    """
-    return sorted(parameter.value for parameter in parameters)
-
-
 def get_peak_memory():
     """
     Get the peak memory usage of the current process.
@@ -405,7 +389,6 @@ class FullWaveformInversion:
 
         self.guess_shot_record = None
         self.gradient = None
-        self.control_result = None
         self.control_parameter_result = None
         self.current_iteration = 0
         self.mesh_iteration = 0
@@ -518,33 +501,33 @@ class FullWaveformInversion:
             physical = type(self.wave)._physical_parameter_names
         return tuple(sorted(physical, key=lambda p: p.value))
 
-    def _as_control_mapping(self, control):
-        """Normalize a control value into a ``parameter -> value`` mapping.
+    def _control_by_parameter(self, control):
+        """Return control values keyed by the parameter each one belongs to.
 
-        Everything downstream works with controls keyed by material
-        parameter, but callers may pass them in two shapes, and this is where
-        the two meet:
+        Callers pass controls in two shapes, and this is where the two meet:
 
         1. A **mapping**, which already says which parameter each value
-           belongs to. Its keys are checked against the controlled parameters
-           and it is used as given. This is how an inversion with several
-           controls is fed, and how a single one is narrowed on purpose.
+           belongs to, and is used as given.
         2. A **bare value** — a ``Function``, a ``Constant``, a number — which
-           says nothing about which parameter it is. It is paired with the
-           controlled parameter, and there has to be exactly one for that to
-           be unambiguous. This is the acoustic API,
-           ``set_guess_control(velocity)``, and it is also how the optimizer
-           feeds back each iterate: ``_rebuild_control_from_vector`` builds a
-           ``Function`` out of a plain array of numbers, which carries no
-           parameter name at all.
+           says nothing about which parameter it is, so it is paired with the
+           controlled parameter, of which there has to be exactly one. This is
+           the acoustic API, ``set_guess_control(velocity)``, and also how the
+           optimizer feeds back each iterate: ``_rebuild_control_from_vector``
+           builds a ``Function`` out of a plain array of numbers, which
+           carries no parameter name at all.
 
-        ``None`` normalizes to an empty mapping, so callers can pass "no
-        control given" without a special case.
+        ``None`` gives an empty mapping, so callers can pass "no control
+        given" without a special case.
+
+        The parameters are not checked here. Applying a control reaches
+        ``PhysicalParameters.update``, which already rejects anything the wave
+        equation does not model, and names the known parameters while doing
+        so.
 
         Parameters
         ----------
         control : mapping, firedrake.Function, firedrake.Constant, scalar, UFL expression, or None
-            Control values to normalize.
+            Control values to key.
 
         Returns
         -------
@@ -555,11 +538,8 @@ class FullWaveformInversion:
         Raises
         ------
         ValueError
-            If a mapping names a parameter this inversion does not control.
-            Passing a physical parameter the solver models but that is not
-            being inverted for is an error, not a silent no-op. Also if a bare
-            value is given while several parameters are controlled, since
-            there is then no way to tell which one it means.
+            If a bare value is given while several parameters are controlled,
+            since there is then no way to tell which one it means.
 
         Examples
         --------
@@ -580,14 +560,7 @@ class FullWaveformInversion:
         except AttributeError:
             items = None
         if items is not None:
-            values = dict(items)
-            unknown = set(values) - set(self._controlled_parameters())
-            if unknown:
-                raise ValueError(
-                    f"{_names(unknown)} are not controlled by this "
-                    f"inversion. Controls: {_names(self._controlled_parameters())}.",
-                )
-            return values
+            return dict(items)
         # Unpacking, rather than taking the first entry, so that a bare value
         # on a multi-parameter inversion fails instead of being assigned to
         # whichever parameter happens to sort first.
@@ -664,26 +637,6 @@ class FullWaveformInversion:
         except ValueError:
             parameters = wave.initialize_physical_parameters()
         return parameters.copy(self._controlled_parameters())
-
-    def _copy_control_structure(self, control):
-        """Return an independent copy of a control field.
-
-        Used to record the inversion result without keeping a reference to the
-        field the solver goes on using.
-
-        Parameters
-        ----------
-        control : firedrake.Function
-            Control field to copy.
-
-        Returns
-        -------
-        firedrake.Function
-            A copy holding the same values.
-        """
-        copied = fire.Function(control.function_space(), name=control.name())
-        copied.assign(control)
-        return copied
 
     def _flatten_control(self, control):
         """Flatten a control ``Function`` into an optimizer vector.
@@ -816,7 +769,7 @@ class FullWaveformInversion:
         ``Function``. ``set_guess_control(fire.Constant(2.0))`` creates a
         uniform control ``Function`` filled with ``2.0``.
         """
-        control = self._as_control_mapping(control)
+        control = self._control_by_parameter(control)
         self._push_control_to_wave(self.wave, control)
         self.guess_mesh = self.wave.get_mesh()
         self._control_parameters = self.wave.physical_parameters.copy(control)
@@ -938,14 +891,12 @@ class FullWaveformInversion:
         if self.wave.adjoint_type == AdjointType.IMPLEMENTED_ADJOINT:
             self.wave.enable_implemented_adjoint()
         self.wave.forward_solve()
-        # TODO(save_output): melhorar isso. Usar CheckpointFile para salvar o
-        # controle e continuar com VTKFile para a saida em pvd:
-        #     control = self.control_parameters
-        #     fire.VTKFile(f"control_{self.current_iteration}.pvd").write(control)
-        #     np.save(
-        #         f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
-        #         self._flatten_control(control),
-        #     )
+        current_control = self.control_parameters
+        fire.VTKFile(f"control_{self.current_iteration}.pvd").write(current_control)
+        np.save(
+            f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
+            self._flatten_control(current_control),
+        )
 
         if self.wave.parallelism_type == "spatial" and self.wave.number_of_sources > 1:
             misfit_list = []
@@ -1404,15 +1355,12 @@ class FullWaveformInversion:
             options=options,
         )
 
-        self.control_result = self._rebuild_control_from_vector(
+        self.control_parameter_result = self._rebuild_control_from_vector(
             control_reference,
             result.x,
         )
-        self.set_guess_control(self.control_result)
+        self.set_guess_control(self.control_parameter_result)
 
-        self.control_parameter_result = self._copy_control_structure(
-            self.control_result,
-        )
         fire.VTKFile("control_end.pvd").write(self.control_parameter_result)
 
         np.save("result", result.x)
