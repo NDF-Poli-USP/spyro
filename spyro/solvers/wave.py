@@ -1,5 +1,4 @@
 from abc import abstractmethod, ABCMeta
-from numpy import inf
 import warnings
 import firedrake as fire
 
@@ -16,8 +15,8 @@ from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
-from ..utils.error_management import enum_parameter_error
-from ..utils.typing import (AdjointType, FunctionalEvaluationMode, LayerDampingType,
+from ..utils.error_management import validate_enum
+from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
                             LayerShapeType, WaveType)
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
@@ -128,7 +127,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.gradient_mask_available = False
 
         # Setting wave type
-        self.wave_type = enum_parameter_error("wave_type", wave_type, WaveType)
+        self.wave_type = validate_enum("wave_type", wave_type, WaveType)
 
         self.function_space = None
         self.dg0_scalar_function_space = None
@@ -188,7 +187,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        if self.abc_boundary_layer_type != LayerDampingType.HYBRID:
+        if self.abc_type in [AbsorbingBCsType.NOABCS, AbsorbingBCsType.NRBC]:
             self._initialize_model_parameters()
         self.matrix_building()
         self.wave_propagator()
@@ -338,6 +337,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         new_file=None,
         output=False,
         dg_velocity_model=True,
+        fast_interpolate=False,
     ):
         """Method to define new user velocity model or file. It is optional.
 
@@ -388,7 +388,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.initial_velocity_model = velocity_model_function
         elif new_file is not None:
             self.initial_velocity_model_file = new_file
-            self._initialize_model_parameters()  # TODO in PR206
+            self._initialize_model_parameters(fast_interpolate=fast_interpolate)  # TODO in PR206
         elif constant is not None:
             V = self.function_space
             vp = fire.Function(V, name="velocity")
@@ -461,10 +461,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # Maximum timestep size
         method = 'ANALYTICAL' if estimate_max_eigenvalue else 'ARNOLDI'
-        dt_solver = Modal_Solver(self.dimension, method=method,
-                                 calc_max_dt=True)
-        max_dt = dt_solver.estimate_timestep(c, self.function_space,
-                                             self.final_time,
+        dt_solver = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
+        max_dt = dt_solver.estimate_timestep(c, self.function_space, self.final_time,
                                              quad_rule=self.quadrature_rule,
                                              fraction=fraction)
         self.dt = max_dt
@@ -700,31 +698,32 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Domain dimensions
         domain_dim = self.domain_dimensions()
 
-        # Nyquist frequency
-        freq_Nyquist = inf if self.analysis != "transient" else 1. / (2. * self.dt)
+        # Timestep of the simulation. It is `None` if the response is not 'transient'.
+        time_step = None if self.analysis != "transient" else self.dt
 
-        if self.abc_boundary_layer_type == LayerDampingType.PML:
+        if self.abc_type == AbsorbingBCsType.PML:  # PML
             from ..pml.pml_nsnc import PMLLayer
-            self.layer_ops = PMLLayer(domain_dim, self.frequency, freq_Nyquist,
-                                      dimension=self.dimension,
+            self.layer_ops = PMLLayer(domain_dim, frequency=self.frequency,
+                                      dt=time_step, dimension=self.dimension,
                                       quadrilateral=self.mesh_parameters.quadrilateral,
                                       func_space_type=self.mesh_ops.func_space_type,
                                       abc_reference_freq=self.abc_reference_freq,
                                       output_folder=self.output_folder, comm=self.comm)
 
-        if self.abc_boundary_layer_type == LayerDampingType.HYBRID:
+        if self.abc_type == AbsorbingBCsType.HYBRID:  # HABC
             from ..habc.habc import HABCLayer
-            self.layer_ops = HABCLayer(domain_dim, self.frequency, freq_Nyquist,
-                                       self.abc_deg_layer, dimension=self.dimension,
+            self.layer_ops = HABCLayer(domain_dim, frequency=self.frequency,
+                                       dt=time_step, dimension=self.dimension,
                                        quadrilateral=self.mesh_parameters.quadrilateral,
                                        func_space_type=self.mesh_ops.func_space_type,
                                        abc_boundary_layer_shape=self.abc_boundary_layer_shape,
                                        abc_reference_freq=self.abc_reference_freq,
                                        abc_degree_type=self.abc_degree_type,
+                                       abc_deg_layer=self.abc_deg_layer,
                                        output_folder=self.output_folder, comm=self.comm)
 
         # Identifier for the current case study
-        if self.abc_boundary_layer_type in [LayerDampingType.PML, LayerDampingType.HYBRID]:
+        if self.abc_type in [AbsorbingBCsType.PML, AbsorbingBCsType.HYBRID]:
             self.case_abc = self.layer_ops.case_abc
             self.path_save = self.layer_ops.path_save
             self.path_case_abc = self.layer_ops.path_case_abc
@@ -734,7 +733,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Return inversion controls exposed by a concrete wave solver.
 
         Subclasses override this method when they can participate in inversion
-        workflows. The base class raises because a generic ``Wave`` does not
+        workflows. The base class raises because a generic ``spyro.solvers.Wave`` does not
         know which physical parameters should be optimized.
 
         Returns

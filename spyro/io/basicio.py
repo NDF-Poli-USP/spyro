@@ -94,13 +94,13 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
 
 
 @ensemble_save
-def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
+def save_shots(wave, file_name="shots/shot_record_", shot_ids=0):
     """Save a the shot record from last forward solve to a `pickle`.
 
     Parameters
     ----------
-    Wave_obj: :class:`Wave` object
-        A :class:`Wave` object
+    wave: :class:`spyro.solvers.Wave` object
+        A :class:`spyro.solvers.Wave` object
     source_id: int, optional by default 0
         The source number
     file_name: str, optional by default shot_number_#.dat
@@ -113,18 +113,18 @@ def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
     """
     file_name = file_name + str(shot_ids) + ".dat"
     with open(file_name, "wb") as f:
-        pickle.dump(Wave_obj.forward_solution_receivers, f)
+        pickle.dump(wave.forward_solution_receivers, f)
     return None
 
 
 @ensemble_load
-def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
+def load_shots(wave, file_name="shots/shot_record_", shot_ids=0):
     """Load a `pickle` to a `numpy.ndarray`.
 
     Parameters
     ----------
-    Wave_obj: :class:`Wave` object
-        A :class:`Wave` object
+    wave: :class:`spyro.solvers.Wave` object
+        A :class:`spyro.solvers.Wave` object
     source_id: int, optional by default 0
         The source number
     filename: str, optional by default shot_number_#.dat
@@ -141,160 +141,8 @@ def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
 
     with open(file_name, "rb") as f:
         array = np.asarray(pickle.load(f), dtype=float)
-        Wave_obj.forward_solution_receivers = array
+        wave.forward_solution_receivers = array
     return None
-
-
-def _check_units(c):
-    if min(c.dat.data[:]) > 100.0:
-        # data is in m/s but must be in km/s
-        if fire.COMM_WORLD.rank == 0:
-            print("INFO: converting from m/s to km/s", flush=True)
-        c.assign(c / 1000.0)  # meters to kilometers
-    return c
-
-
-def _grid_velocity_data_to_source_function(grid_velocity_data, comm=None):
-    """Build a CG1 Firedrake function on a structured mesh from grid data."""
-
-    # Adding imports here to avoid circular imports
-    from ..meshing.meshing_parameters import MeshingParameters
-    from ..meshing.meshing_functions import AutomaticMesh
-
-    vp_values = np.asarray(grid_velocity_data["vp_values"])
-    length_z = grid_velocity_data["length_z"]
-    length_x = grid_velocity_data["length_x"]
-    length_y = grid_velocity_data.get("length_y")
-    grid_spacing = grid_velocity_data.get("grid_spacing")
-    grid_spacing_z = grid_velocity_data.get("grid_spacing_z", grid_spacing)
-    grid_spacing_x = grid_velocity_data.get("grid_spacing_x", grid_spacing)
-    grid_spacing_y = grid_velocity_data.get("grid_spacing_y", grid_spacing)
-
-    source_mesh_parameters = {
-        "dimension": vp_values.ndim,
-        "length_z": length_z,
-        "length_x": length_x,
-        "length_y": length_y,
-        "mesh_type": "firedrake_mesh",
-        "edge_length": grid_spacing,
-        "edge_length_z": grid_spacing_z,
-        "edge_length_x": grid_spacing_x,
-        "edge_length_y": grid_spacing_y,
-        "abc_pad_length": grid_velocity_data.get("abc_pad_length"),
-    }
-    source_mesh = AutomaticMesh(
-        MeshingParameters(input_mesh_dictionary=source_mesh_parameters, comm=comm)
-    ).create_mesh()
-
-    source_space = fire.FunctionSpace(source_mesh, "CG", 1)
-    source = fire.Function(source_space)
-    source_coords = source_mesh.coordinates.dat.data
-
-    if vp_values.ndim == 2:
-        z_nodes = np.unique(source_coords[:, 0])
-        x_nodes = np.unique(source_coords[:, 1])
-        z_index = np.searchsorted(z_nodes, source_coords[:, 0])
-        x_index = np.searchsorted(x_nodes, source_coords[:, 1])
-        source.dat.data[:] = vp_values[z_index, x_index]
-    else:
-        z_nodes = np.unique(source_coords[:, 0])
-        x_nodes = np.unique(source_coords[:, 1])
-        y_nodes = np.unique(source_coords[:, 2])
-        z_index = np.searchsorted(z_nodes, source_coords[:, 0])
-        x_index = np.searchsorted(x_nodes, source_coords[:, 1])
-        y_index = np.searchsorted(y_nodes, source_coords[:, 2])
-        source.dat.data[:] = vp_values[z_index, x_index, y_index]
-
-    return source
-
-
-def project_grid_velocity_data(grid_velocity_data, V, comm=None):
-    """Project a structured grid dictionary onto a Firedrake function space."""
-    from ..plots.plots import debug_pvd
-    source = _grid_velocity_data_to_source_function(grid_velocity_data, comm=comm)
-    debug_pvd(source, "check_source.pvd")
-    c = fire.Function(V).interpolate(source, allow_missing_dofs=True)
-    debug_pvd(c, "check_c.pvd")
-    return _check_units(c)
-
-
-def _hdf5_velocity_model_to_grid_velocity_data(Model, fname):
-    """Convert an HDF5 velocity model into a grid velocity dictionary."""
-    with h5py.File(fname, "r") as f:
-        vp_values = np.asarray(f.get("velocity_model")[()])
-
-    pad_length = Model.mesh_parameters.abc_pad_length
-    pad_length = 0.0 if pad_length is None else pad_length
-
-    if vp_values.ndim == 2:
-        z_extent = Model.mesh_parameters.length_z + pad_length
-        x_extent = Model.mesh_parameters.length_x + 2.0 * pad_length
-        spacing_z = z_extent / float(vp_values.shape[0] - 1)
-        spacing_x = x_extent / float(vp_values.shape[1] - 1)
-        grid_spacing = spacing_z if np.isclose(spacing_z, spacing_x) else None
-        length_y = None
-    elif vp_values.ndim == 3:
-        if Model.mesh_parameters.length_y is None:
-            raise ValueError("3D HDF5 velocity model requires length_y.")
-
-        z_extent = Model.mesh_parameters.length_z + pad_length
-        x_extent = Model.mesh_parameters.length_x + 2.0 * pad_length
-        y_extent = Model.mesh_parameters.length_y + 2.0 * pad_length
-        spacing_z = z_extent / float(vp_values.shape[0] - 1)
-        spacing_x = x_extent / float(vp_values.shape[1] - 1)
-        spacing_y = y_extent / float(vp_values.shape[2] - 1)
-        grid_spacing = (
-            spacing_z
-            if np.isclose(spacing_z, spacing_x) and np.isclose(spacing_z, spacing_y)
-            else None
-        )
-        length_y = Model.mesh_parameters.length_y
-    else:
-        raise NotImplementedError("Only 2D and 3D HDF5 velocity models are supported.")
-
-    grid_velocity_data = {
-        "vp_values": vp_values,
-        "grid_spacing": grid_spacing,
-        "grid_spacing_z": spacing_z,
-        "grid_spacing_x": spacing_x,
-        "length_z": Model.mesh_parameters.length_z,
-        "length_x": Model.mesh_parameters.length_x,
-        "length_y": length_y,
-        "abc_pad_length": pad_length,
-    }
-    if vp_values.ndim == 3:
-        grid_velocity_data["grid_spacing_y"] = spacing_y
-    return grid_velocity_data
-
-
-def interpolate(Model, fname, V):
-    """Read and interpolate a seismic velocity model onto a Firedrake space.
-
-    Parameters
-    ----------
-    Model: spyro object
-        Model options and parameters.
-    fname: str or dict
-        The name of the HDF5 file containing the seismic velocity model, or
-        a grid dictionary with keys such as ``vp_values``, ``length_z`` and
-        ``length_x``.
-    V: Firedrake.FunctionSpace object
-        The space of the finite elements.
-
-    Returns
-    -------
-    c: Firedrake.Function
-        P-wave seismic velocity interpolated onto the nodes
-        of the finite elements.
-
-    """
-    if isinstance(fname, dict):
-        return project_grid_velocity_data(fname, V, comm=Model.comm)
-    elif isinstance(fname, str) and fname.endswith((".hdf5", ".h5")):
-        grid_velocity_data = _hdf5_velocity_model_to_grid_velocity_data(Model, fname)
-        return project_grid_velocity_data(grid_velocity_data, V, comm=Model.comm)
-    else:
-        raise NotImplementedError
 
 
 def read_mesh(mesh_parameters):

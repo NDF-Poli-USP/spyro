@@ -1,26 +1,31 @@
 """Demo script for running a small full waveform inversion example.
 
 This demo has automatic parallelism set up and 8 shots, therefore we need
-a 6n (n positive integer) number of cores in mpiexec -n N_CORES to run. 
+a 6n (n positive integer) number of cores in mpiexec -n N_CORES to run.
 You can experiment with a different number of cores if desired, but you
 would need to change the parallelism dicionary setting.
 
 The script builds a synthetic "true" model, generates a shot record, and then
 runs a simple inversion loop against that record. It uses a simple layer model.
 """
+
 # from mpi4py.MPI import COMM_WORLD
 # import debugpy
 # debugpy.listen(3000 + COMM_WORLD.rank)
 # debugpy.wait_for_client()
 
 from copy import deepcopy
-import numpy as np
 import firedrake as fire
 import spyro
-import pytest
 
 
-def run_forward_real_model(input_dictionary, shot_filename="shots/shot_record_", dt=None, save_vp_as_segy=False, segy_filename="real_vp.segy"):
+def run_forward_real_model(
+    input_dictionary,
+    shot_filename="shots/shot_record_",
+    dt=None,
+    save_vp_as_segy=False,
+    segy_filename="real_vp.segy",
+):
     """Generate and save a synthetic shot record for the chosen demo case.
 
     Parameters
@@ -51,7 +56,9 @@ def run_forward_real_model(input_dictionary, shot_filename="shots/shot_record_",
     layer_vps = [2.5, 3.0]  # List of vp values
     cond = multiple_layer_velocity_model(fwi_obj, z_switch, layer_vps)
 
-    fwi_obj.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
+    fwi_obj.set_real_velocity_model(
+        conditional=cond, output=True, dg_velocity_model=False
+    )
     fwi_obj.generate_real_shot_record(
         plot_model=True,
         model_filename="True_experiment.png",
@@ -64,7 +71,8 @@ def run_forward_real_model(input_dictionary, shot_filename="shots/shot_record_",
         export_grid_spacing = 0.01
         spyro.io.export_scalar_field(
             fwi_obj.wave.initial_velocity_model,
-            export_grid_spacing, segy_filename,
+            export_grid_spacing,
+            segy_filename,
             comm=fwi_obj.wave.comm,
         )
 
@@ -85,10 +93,8 @@ def multiple_layer_velocity_model(fwi_obj, z_switch, layers):
         List of velocity values for each layer.
     """
     if len(z_switch) != (len(layers) - 1):
-        raise ValueError(
-            "Float list of z_switch has to have length exactly one less \
-                            than list of layer values"
-        )
+        raise ValueError("Float list of z_switch has to have length exactly one less \
+                            than list of layer values")
     if len(z_switch) == 0:
         raise ValueError("Float list of z_switch cannot be empty")
     for i in range(len(z_switch)):
@@ -131,11 +137,11 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.05, 0.5), (-0.05, 1.5), 8),
+    "source_locations": spyro.create_transect((-0.05, 0.5), (-0.05, 1.5), 6),
     "frequency": frequency,
     "delay": 0.2,
     "delay_type": "time",
-    "receiver_locations": spyro.create_transect((-.05, 0.5), (-0.05, 1.5), 200),
+    "receiver_locations": spyro.create_transect((-0.05, 0.5), (-0.05, 1.5), 200),
     "use_vertex_only_mesh": True,
 }
 dictionary["time_axis"] = {
@@ -166,7 +172,7 @@ dictionary["inversion"] = {
 
 def setting_up_fwi():
 
-    shots_filenames="shots/shot_record_"
+    shots_filenames = "shots/shot_record_"
 
     # Setting up to run synthetic real problem
     wave_obj = run_forward_real_model(
@@ -206,7 +212,7 @@ def run_fwi():
         The inversion is run for its side effects.
     """
     dictionary["time_axis"]["dt"] = simulation_dt
-    shots_filenames="shots/shot_record_"
+    shots_filenames = "shots/shot_record_"
     dictionary["inversion"]["real_shot_record_file"] = shots_filenames
     fwi_obj = spyro.FullWaveformInversion(dictionary=dictionary)
 
@@ -248,18 +254,23 @@ def run_fwi():
         "cells_per_wavelength": 3.0,
         "frequency": frequency,
         "grid_velocity_data": grid_vp_data,
-
     }
     fwi_obj.set_guess_mesh(input_mesh_parameters=meshing_dictionary)
 
     # Let us set the initial guess velocity
     # fwi_obj.set_guess_velocity_model(new_file="initial_guess.hdf5")
     fwi_obj.set_guess_velocity_model(constant=2.5)
-    fwi_obj.run_fwi(vmin=2.0, vmax=3.5, maxiter=20, )
+    fwi_obj.run_fwi(
+        vmin=2.0,
+        vmax=3.5,
+        maxiter=20,
+    )
 
     # Let us have a look at our solution
     export_grid_spacing = 0.01
-    spyro.io.export_scalar_field(fwi_obj.wave.c, export_grid_spacing, "layers.png", comm=fwi_obj.wave.comm)
+    spyro.io.export_scalar_field(
+        fwi_obj.wave.c, export_grid_spacing, "layers.png", comm=fwi_obj.wave.comm
+    )
 
     print("END", flush=True)
 

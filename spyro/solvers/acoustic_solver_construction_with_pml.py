@@ -14,13 +14,12 @@ from ..utils.typing import BoundaryConditionsType
 #   "A Modified PML Acoustic Wave Equation". Kim (2019)
 # TODO: Add citations
 
-def forms_pml(Wave_object, W, X_n, X_nm1):
-    """
-    Build the variational form for the wave equation with a PML.
+def forms_pml(wave, W, X_n, X_nm1):
+    """Build the variational form for the wave equation with a PML.
 
     Parameters
     ----------
-    Wave_object : `acoustic_wave.AcousticWave`
+    wave : `acoustic_wave.AcousticWave`
         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
     W : `Firedrake.MixedFunctionSpace`
         Mixed function space for the wave equation with PML
@@ -48,21 +47,21 @@ def forms_pml(Wave_object, W, X_n, X_nm1):
     """
 
     # Simulation parameters for PML formulation
-    dt = Wave_object.dt
-    c = Wave_object.c
+    wave.layer_ops.pml_layer(wave)
+    dt = wave.dt
+    c = wave.c
     c_sqr_inv = 1. / (c * c)
-    q_rule = Wave_object.quadrature_rule
-    dx = fire_dx(**q_rule) if q_rule else fire_dx
-    Wave_object.layer_ops.pml_layer(Wave_object)
+    quad_rule = wave.quadrature_rule
+    dx = fire_dx(**quad_rule) if quad_rule else fire_dx
 
     # Trial and test functions, and state variables
-    if Wave_object.dimension == 2:
+    if wave.dimension == 2:
         u, pp = TrialFunctions(W)
         v, qq = TestFunctions(W)
         u_n, pp_n = split(X_n)
         u_nm1, _ = split(X_nm1)
 
-    elif Wave_object.dimension == 3:
+    elif wave.dimension == 3:
         u, psi, pp = TrialFunctions(W)
         v, phi, qq = TestFunctions(W)
         u_n, psi_n, pp_n = split(X_n)
@@ -73,36 +72,36 @@ def forms_pml(Wave_object, W, X_n, X_nm1):
     a = dot(grad(u_n), grad(v))
     FF = (m1 + a) * dx
 
-    # Common PML forms (Backward difference for first time derivative)
-    pml3 = -div(pp_n) * v
-    # -------------------------------------------------------
-    mm1 = dot((pp - pp_n) / dt, qq)  # 1st order in error
-
     # Surfaces to apply boundary conditions (NRBCs or Traditional BCs)
     bc_surf = tuple([non_free_surf for non_free_surf, status in
-                     Wave_object.mesh_parameters.boundary_ids_map.items() if status])
-    abc_type = Wave_object.layer_ops.bc_boundary_pml
+                     wave.mesh_parameters.boundary_ids_map.items() if status])
+    bc_bndr = wave.layer_ops.bc_boundary_pml
 
-    if not Wave_object.abc_get_ref_model:
+    if not wave.abc_get_ref_model:
+
+        # Common PML forms (Backward difference for first time derivative)
+        pml3 = -div(pp_n) * v
+        # -------------------------------------------------------
+        mm1 = dot((pp - pp_n) / dt, qq)  # 1st order in error
 
         # Damping profiles and matrices
-        sigma_x, sigma_z = Wave_object.layer_ops.sigma_x, Wave_object.layer_ops.sigma_z
-        if Wave_object.dimension == 2:
-            Gamma_1, Gamma_2 = Wave_object.layer_ops.damping_pml_2d()
+        sigma_x, sigma_z = wave.layer_ops.sigma_x, wave.layer_ops.sigma_z
+        if wave.dimension == 2:
+            Gamma_1, Gamma_2 = wave.layer_ops.damping_pml_2d()
 
-        elif Wave_object.dimension == 3:
-            sigma_y = Wave_object.layer_ops.sigma_y
-            Gamma_1, Gamma_2, Gamma_3 = Wave_object.layer_ops.damping_pml_3d()
+        elif wave.dimension == 3:
+            sigma_y = wave.layer_ops.sigma_y
+            Gamma_1, Gamma_2, Gamma_3 = wave.layer_ops.damping_pml_3d()
 
         # PML forms (Backward difference for first time derivative)
         mm2 = inner(dot(Gamma_1, pp_n), qq)
         dd1 = inner(dot(Gamma_2, grad(u_n)), qq)
         # -------------------------------------------------------
-        if Wave_object.dimension == 2:
+        if wave.dimension == 2:
             pml1 = (sigma_z + sigma_x) * ((u_n - u_nm1) / dt) * v
             pml2 = sigma_z * sigma_x * u_n * v
 
-        elif Wave_object.dimension == 3:
+        elif wave.dimension == 3:
             pml1 = (sigma_z + sigma_x + sigma_y) * ((u_n - u_nm1) / dt) * v
             pml2 = (sigma_z * sigma_x + sigma_x * sigma_y + sigma_z * sigma_y) * u_n * v
             pml4 = (sigma_z * sigma_x * sigma_y) * psi_n * v
@@ -120,32 +119,32 @@ def forms_pml(Wave_object, W, X_n, X_nm1):
         # -------------------------------------------------------
         FF += (mm1 + mm2 + c * c * dd1) * dx
 
-        # exterior_markers = set(Wave_object.mesh.exterior_facets.unique_markers)
+        # exterior_markers = set(wave.mesh.exterior_facets.unique_markers)
         # print("Available boundary markers:", exterior_markers)
 
         # Apply NRBCs (Higdon or Sommerfeld) at PML boundaries
-        if abc_type in [BoundaryConditionsType.HIGDON, BoundaryConditionsType.SOMMERFELD]:
-            ds = fire_ds(bc_surf, **q_rule) if q_rule else fire_ds(bc_surf)
+        if bc_bndr in [BoundaryConditionsType.HIGDON, BoundaryConditionsType.SOMMERFELD]:
+            ds = fire_ds(bc_surf, **quad_rule) if quad_rule else fire_ds(bc_surf)
             f_abc = c * ((u_n - u_nm1) / dt) * v
-            le = Wave_object.layer_ops.cosHig * f_abc * ds
+            le = wave.layer_ops.cosHig * f_abc * ds
             FF += le
 
     # Dirichlet BCs for PML model or Neumann BCs for the reference model
-    get_ref_model_negat = not Wave_object.abc_get_ref_model
-    fix_bnd = DirichletBC(W.sub(0), 0., bc_surf) \
-        if abc_type == BoundaryConditionsType.DIRICHLET and get_ref_model_negat else None
+    get_ref_model_negat = not wave.abc_get_ref_model
+    fix_bnd = DirichletBC(W.sub(0), 0., bc_surf) if \
+        bc_bndr == BoundaryConditionsType.DIRICHLET and get_ref_model_negat else None
 
     return FF, fix_bnd
 
 
-def construct_solver_or_matrix_with_pml(Wave_object):
+def construct_solver_or_matrix_with_pml(wave):
     """Build solver operators for wave propagator with a PML.
 
     Doesn't create mass matrices if matrix_free option is on, which it is by default.
 
     Parameters
     ----------
-    Wave_object : `acoustic_wave.AcousticWave`
+    wave : `acoustic_wave.AcousticWave`
         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
 
     Returns
@@ -160,46 +159,44 @@ def construct_solver_or_matrix_with_pml(Wave_object):
     """
 
     # Build mixed function space
-    V = Wave_object.function_space
-    Z = create_function_space(Wave_object.mesh, V.ufl_element(),
-                              dim=Wave_object.dimension)
-    Wave_object.vector_function_space = Z
-    if Wave_object.dimension == 2:
+    V = wave.function_space
+    Z = create_function_space(wave.mesh, V.ufl_element(),
+                              dim=wave.dimension)
+    wave.vector_function_space = Z
+    if wave.dimension == 2:
         W = V * Z
-    elif Wave_object.dimension == 3:
+    elif wave.dimension == 3:
         W = V * V * Z
-    Wave_object.mixed_function_space = W
+    wave.mixed_function_space = W
 
     # State variables
     X_np1 = Function(W)
     X_n = Function(W)
     X_nm1 = Function(W)
 
-    if Wave_object.dimension == 2:
+    if wave.dimension == 2:
         u_n_func, pp_n_func = X_n.subfunctions
         u_nm1_func, _ = X_nm1.subfunctions
 
-    elif Wave_object.dimension == 3:
+    elif wave.dimension == 3:
         u_n_func, psi_n_func, pp_n_func = X_n.subfunctions
         u_nm1_func, psi_nm1_func, _ = X_nm1.subfunctions
 
-    Wave_object.u_n = u_n_func
-    Wave_object.X_np1 = X_np1
-    Wave_object.X_n = X_n
-    Wave_object.X_nm1 = X_nm1
+    wave.u_n = u_n_func
+    wave.X_np1 = X_np1
+    wave.X_n = X_n
+    wave.X_nm1 = X_nm1
 
     # Build variational forms
-    FF, fix_bnd = forms_pml(Wave_object, W, X_n, X_nm1)
-    Wave_object.lhs = lhs(FF)
-    Wave_object.rhs = rhs(FF)
-    Wave_object.source_function = Cofunction(W.dual())
-    Wave_object.B = Cofunction(W.dual())
+    FF, fix_bnd = forms_pml(wave, W, X_n, X_nm1)
+    wave.lhs = lhs(FF)
+    wave.rhs = rhs(FF)
+    wave.source_function = Cofunction(W.dual())
+    wave.B = Cofunction(W.dual())
 
     # Build solver
-    lin_var = LinearVariationalProblem(
-        Wave_object.lhs, Wave_object.rhs + Wave_object.source_function,
-        X_np1, bcs=fix_bnd, constant_jacobian=True)
-    solver_parameters = dict(Wave_object.solver_parameters)
+    lin_var = LinearVariationalProblem(wave.lhs, wave.rhs + wave.source_function,
+                                       X_np1, bcs=fix_bnd, constant_jacobian=True)
+    solver_parameters = dict(wave.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
-    Wave_object.solver = \
-        LinearVariationalSolver(lin_var, solver_parameters=solver_parameters)
+    wave.solver = LinearVariationalSolver(lin_var, solver_parameters=solver_parameters)

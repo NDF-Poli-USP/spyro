@@ -1,6 +1,6 @@
 from firedrake import as_vector, assemble, CellDiameter, DirichletBC, SpatialCoordinate
 from numpy import allclose, clip, column_stack, linspace, log10, min, max
-from ..utils.error_management import value_parameter_error
+from ..utils.error_management import validate_parameter
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..tools.version_control import is_firedrake_new
 
@@ -54,7 +54,7 @@ class MeshOps():
             or (length_z, length_x, length_y) for 3D
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
-        quadrilateral : bool, optional
+        quadrilateral : `bool`, optional
             Flag to indicate whether to use quadrilateral/hexahedral elements.
             Default is `False` (triangular/tetrahedral elements).
         func_space_type, `str`, optional
@@ -219,7 +219,7 @@ class MeshOps():
             coords.append(assemble(interpolate(ufl_input, V)))
 
         # Get the node positions
-        value_parameter_error('output_type', output_type, ["tuple", "array"])
+        validate_parameter('output_type', output_type, ["tuple", "array"])
         if output_type == "tuple":
             z_data = coords[0].dat.data_with_halos[:]
             x_data = coords[1].dat.data_with_halos[:]

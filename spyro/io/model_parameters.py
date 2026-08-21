@@ -82,12 +82,6 @@ class Model_parameters(Read_options, Read_boundary_layer,
     abc_boundary_layer_shape : `typing.LayerShapeType`
         Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
         `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
-    abc_boundary_layer_type : `typing.LayerDampingType`
-        Type of the boundary layer. Options: `LayerDampingType.LOCAL`,
-        `LayerDampingType.HYBRID`, `LayerDampingType.PML` or `LayerDampingType.NOABCS`.
-        Default is `LayerDampingType.NOABCS` where no absorbing BCs are applied.
-        Option `LayerDampingType.HYBRID` is based on paper of Salas et al. (2022).
-        doi: https://doi.org/10.1016/j.apm.2022.09.014
         TODo: Add citation
     abc_deg_eikonal : `int`
         Finite element order for the Eikonal analysis
@@ -114,6 +108,12 @@ class Model_parameters(Read_options, Read_boundary_layer,
         Reference frequency for sizing the absorbing layer.
         Options: 'LayerSizeRefFrequency.SOURCE' or 'LayerSizeRefFrequency.BOUNDARY'.
         Default is 'LayerSizeRefFrequency.SOURCE'.
+    abc_type : `typing.AbsorbingBCsType`
+        Type of the absorbing boundary condition. Options: `AbsorbingBCsType.NRBC`,
+        `AbsorbingBCsType.HYBRID`, `AbsorbingBCsType.PML` or `AbsorbingBCsType.NOABCS`.
+        Default is `AbsorbingBCsType.NOABCS` where no absorbing BCs are applied.
+        Option `AbsorbingBCsType.HYBRID` is based on paper of Salas et al. (2022).
+        doi: https://doi.org/10.1016/j.apm.2022.09.014
     abc_user_pad_length : `bool`
         If True, the pad length is provided by the user. If False,
         the pad length is determined with the HABC criterion.
@@ -465,11 +465,15 @@ class Model_parameters(Read_options, Read_boundary_layer,
                 abc_pad_length=pad_length,
             )
 
-        autoMeshing = None if not self.mesh_parameters.automatic_mesh else \
-            meshing.AutomaticMesh(mesh_parameters=self.mesh_parameters)
-
-        self.user_mesh = user_mesh if user_mesh is not None \
-            else autoMeshing.create_mesh()
+        if self.mesh_parameters.automatic_mesh:
+            automatic_mesh = meshing.AutomaticMesh(
+                mesh_parameters=self.mesh_parameters
+            )
+            self.user_mesh = (
+                user_mesh if user_mesh is not None else automatic_mesh.create_mesh()
+            )
+        else:
+            self.user_mesh = user_mesh
 
     def _set_mesh_length(self,
                          length_z=None,

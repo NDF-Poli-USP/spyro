@@ -8,7 +8,7 @@ from ..io.basicio import parallel_print as pprint
 from .meshing_functions import AutomaticMesh
 from .meshing_operations import MeshOps
 from ..tools.habc_tools import point_cloud_field
-from ..utils.error_management import value_parameter_error
+from ..utils.error_management import validate_parameter
 from ..tools.version_control import is_firedrake_new
 
 if is_firedrake_new() is False:
@@ -95,7 +95,7 @@ class HABCMesh(MeshOps):
             or (length_z, length_x, length_y) for 3D.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
-        quadrilateral : bool, optional
+        quadrilateral : `bool`, optional
             Flag to indicate whether to use quadrilateral/hexahedral elements.
         func_space_type, `str`, optional
             Type of function space for the state variable.
@@ -236,7 +236,7 @@ class HABCMesh(MeshOps):
         pprint("Setting Mesh Properties for Eikonal Analysis", comm=self.comm)
 
         allowed_ele_types = ["consistent", "underintegrated"]
-        value_parameter_error('ele_type_eik', ele_type_eik, allowed_ele_types)
+        validate_parameter('ele_type_eik', ele_type_eik, allowed_ele_types)
 
         # Function space for the Eikonal modeling
         if ele_type_eik == "consistent":
@@ -250,12 +250,12 @@ class HABCMesh(MeshOps):
 
         return funct_space_eik
 
-    def preamble_mesh_operations(self, Wave, ele_type_eik='consistent', f_est=0.03):
+    def preamble_mesh_operations(self, wave, ele_type_eik='consistent', f_est=0.03):
         """Perform mesh operations previous to size an absorbing layer.
 
         Parameters
         ----------
-        Wave : `wave.Wave`
+        wave : `wave.Wave`
             An instance of the :class:`~spyro.solvers.wave.Wave` with attributes:
             abc_deg_eikonal : `int`
                 Finite element order for the Eikonal analysis.
@@ -298,35 +298,35 @@ class HABCMesh(MeshOps):
         pprint("\nCreating Mesh and Initial Velocity Model", comm=self.comm)
 
         # Mesh data
-        pprint(f"Original Mesh with {Wave.mesh.num_vertices()} Nodes "
-               f"and {Wave.mesh.num_cells()} Volume Elements", comm=self.comm)
+        pprint(f"Original Mesh with {wave.mesh.num_vertices()} Nodes and "
+               f"{wave.mesh.num_cells()} Volume Elements", comm=self.comm)
 
         # Save a copy of the original mesh
-        Wave.mesh_original = Wave.mesh
-        mesh_orig = fire.VTKFile(Wave.path_save + "preamble/mesh_orig.pvd")
-        mesh_orig.write(Wave.mesh_original)
+        wave.mesh_original = wave.mesh
+        mesh_orig = fire.VTKFile(wave.path_save + "preamble/mesh_orig.pvd")
+        mesh_orig.write(wave.mesh_original)
 
         # Velocity profile model
-        Wave.c, Wave.c_min, Wave.c_max = self.creating_velocity_profile(
-            Wave.function_space, Wave.initial_velocity_model, Wave.path_save)
+        wave.c, wave.c_min, wave.c_max = self.creating_velocity_profile(
+            wave.function_space, wave.initial_velocity_model, wave.path_save)
 
         # Generating boundary data from the original domain mesh
-        Wave.c_bnd_min, Wave.c_bnd_max, \
+        wave.c_bnd_min, wave.c_bnd_max, \
             self.coord_bnd_nodes = self.original_boundary_data(
-                Wave.mesh, Wave.function_space,
-                Wave.mesh_parameters, Wave.initial_velocity_model)
+                wave.mesh, wave.function_space,
+                wave.mesh_parameters, wave.initial_velocity_model)
 
         # Setting the properties of the mesh used to solve the Eikonal equation
-        Wave.mesh_parameters.degree_eik = Wave.degree if not hasattr(
-            Wave, 'abc_deg_eikonal') else Wave.abc_deg_eikonal
-        Wave.mesh_parameters.ele_type_eik = ele_type_eik
+        wave.mesh_parameters.degree_eik = wave.degree if not hasattr(
+            wave, 'abc_deg_eikonal') else wave.abc_deg_eikonal
+        wave.mesh_parameters.ele_type_eik = ele_type_eik
 
         # Factor for the stabilizing term in Eikonal equation
-        Wave.mesh_parameters.f_est = f_est
+        wave.mesh_parameters.f_est = f_est
 
         # Function space for Eikonal modeling
-        Wave.mesh_parameters.funct_space_eik = self.create_function_space_eik(
-            Wave.mesh, Wave.mesh_parameters.degree_eik, ele_type_eik=ele_type_eik)
+        wave.mesh_parameters.funct_space_eik = self.create_function_space_eik(
+            wave.mesh, wave.mesh_parameters.degree_eik, ele_type_eik=ele_type_eik)
 
     @staticmethod
     def bnd_pnts_hyp_2D(a, b, n, num_pts):
@@ -1096,7 +1096,7 @@ class HABCMesh(MeshOps):
 
         return bnd_nod_ids_nfs, bnd_nodes_nfs
 
-    def get_spatial_coordinates_abc(self, mesh, domain_layer):
+    def get_spatial_coordinates_abc(self, mesh, domain_layer, return_mesh_limits=False):
         """Get the ufl coordinates of the mesh with absorbing layer.
 
         Parameters
@@ -1104,19 +1104,23 @@ class HABCMesh(MeshOps):
         mesh : `Firedrake.Mesh`
             Current mesh.
         domain_layer : `tuple`
-            Domain dimensions with layer. For rectangular layers, truncation
-            due to the free surface is included (n = 1). For hypershape layers,
-            truncation by free surface is not included (n = 2) if 'full_hyp' is
-            True; otherwise, it is included (n = 1). Dimensions are defined as:
-            2D: (length_z + n * pad_len, length_x + 2 * pad_len).
-            3D: (length_x + 2 * pad_len, length_z + n * pad_len, length_y + 2 * pad_len).
+            Domain dimensions with layer:
+            2D: (length_z + pad_len, length_x + 2 * pad_len).
+            3D: (length_z + n * pad_len, length_x + 2 * pad_len, length_y + 2 * pad_len).
+        return_mesh_limits : `bool`, optional
+            Flag to indicate whether to return the mesh limits (min and max coordinates).
 
         Returns
         -------
         ufl_coordinates_abc : `ufl.geometry.SpatialCoordinate`
-            Domain Coordinates including the absorbing layer.
+            Domain coordinates including the absorbing layer.
+        min_coordinates : `array`
+            Array containing the minimum coordinates in each dimension (z, x, y).
+        max_coordinates : `array`
+            Array containing the maximum coordinates in each dimension (z, x, y).
         """
 
+        # Mesh limits
         min_coordinates, max_coordinates = self.extract_extreme_coordinates(mesh)
         domain_abc = np.asarray(domain_layer)
         domain_to_check = abs(max_coordinates - min_coordinates)
@@ -1126,6 +1130,10 @@ class HABCMesh(MeshOps):
             f"domain with absorbing layer. Expected: {np.round(domain_abc, 3)}, " \
             f"Got: {np.round(domain_to_check, 3)}."
 
+        # UFL coordinates for the mesh with absorbing layer
         ufl_coordinates_abc = fire.SpatialCoordinate(mesh)
 
-        return ufl_coordinates_abc
+        if return_mesh_limits:
+            return ufl_coordinates_abc, min_coordinates, max_coordinates
+        else:
+            return ufl_coordinates_abc

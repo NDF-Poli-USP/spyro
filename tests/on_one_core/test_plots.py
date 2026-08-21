@@ -17,7 +17,7 @@ def get_wave_obj():
     dictionary = {}
     dictionary["absorving_boundary_conditions"] = {
         "status": True,
-        "damping_type": "PML",
+        "abc_type": "PML",
         "exponent": 2,
         "cmax": 4.5,
         "R": 1e-6,
@@ -41,22 +41,22 @@ def test_plot():
     rectangle_dictionary["time_axis"] = {
         "final_time": 1.5,  # Final time for event
     }
-    Wave_obj = spyro.examples.Rectangle_acoustic(
+    wave = spyro.examples.Rectangle_acoustic(
         dictionary=rectangle_dictionary
     )
     layer_values = [1.5, 3.0]
     z_switches = [-0.5]
-    Wave_obj.multiple_layer_velocity_model(z_switches, layer_values)
-    Wave_obj.forward_solve()
-    spyro.plots.plot_shots(Wave_obj, show=False, file_name="test_plot", file_format="png")
+    wave.multiple_layer_velocity_model(z_switches, layer_values)
+    wave.forward_solve()
+    spyro.plots.plot_shots(wave, show=False, file_name="test_plot", file_format="png")
     expected_file = "test_plot[0].png"
     assert os.path.exists(expected_file)
 
-    spyro.plots.debug_plot(Wave_obj.u_n, filename="test_debug_plot.png")
+    spyro.plots.debug_plot(wave.u_n, filename="test_debug_plot.png")
     expected_file = "test_debug_plot.png"
     assert os.path.exists(expected_file)
 
-    spyro.plots.debug_pvd(Wave_obj.u_n, filename="test_debug_plot1.pvd")
+    spyro.plots.debug_pvd(wave.u_n, filename="test_debug_plot1.pvd")
     expected_file = "test_debug_plot1.pvd"
     assert os.path.exists(expected_file)
 
@@ -107,9 +107,9 @@ def test_plot_mesh_sizes():
 
 
 def test_plot_model_in_p1():
-    wave_obj = get_wave_obj()
+    wave = get_wave_obj()
     filename = "model_p1.png"
-    spyro.plots.plot_model_in_p1(wave_obj, filename=str(filename), show=False)
+    spyro.plots.plot_model_in_p1(wave, filename=str(filename), show=False)
     assert os.path.exists(str(filename))
 
 

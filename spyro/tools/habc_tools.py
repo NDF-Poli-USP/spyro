@@ -5,7 +5,7 @@ from firedrake import sqrt as fire_sqrt
 from numpy import clip, where
 from ..domains.space import create_function_space
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import value_numerical_error, value_parameter_error
+from ..utils.error_management import validate_numeric, validate_parameter
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..tools.version_control import is_firedrake_new
 
@@ -29,7 +29,7 @@ def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
     dimension : `int`
         Model dimension (2D or 3D).
     ufl_coordinates_habc : `ufl.geometry.SpatialCoordinate`
-        Domain Coordinates including the absorbing layer.
+        Domain coordinates including the absorbing layer.
     type_marker : `string`, optional
         Type of marker for the absorbing layer. Default is 'mask'.
         - 'damping' : Get the reference distance to the original boundary.
@@ -107,7 +107,7 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
     dimension : `int`, optional
         Model dimension (2D or 3D).
     ufl_coordinates_habc : `ufl.geometry.SpatialCoordinate`
-        Domain Coordinates including the absorbing layer.
+        Domain coordinates including the absorbing layer.
     V : `Firedrake.FunctionSpace`
         Function space for the mask field.
     damp_par : `tuple`, optional
@@ -143,7 +143,7 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
                                                      dimension, ufl_coordinates_habc,
                                                      type_marker=type_marker)
 
-    value_parameter_error('type_marker', type_marker, ["damping", "mask"])
+    validate_parameter('type_marker', type_marker, ["damping", "mask"])
 
     if type_marker == "damping":
 
@@ -158,10 +158,11 @@ def layer_mask_field(domain_dim, mesh, dimension, ufl_coordinates_habc, V,
         # Damping parameters
         pad_length, eta_crt, aq, bq = damp_par
 
-        value_numerical_error("pad_length", pad_length, float_num=True,
-                              integer_num=True, lower_bound=0.)
+        validate_numeric("pad_length", pad_length, float_num=True,
+                         integer_num=True, lower_bound=0.)
 
-        value_numerical_error("eta_crt", eta_crt, float_num=True, lower_bound=0.)
+        validate_numeric("eta_crt", eta_crt, float_num=True,
+                         integer_num=False, lower_bound=0.)
 
         # Reference distance to the original boundary
         ref_funct = fire_sqrt(ref_funct) / pad_length
@@ -197,10 +198,10 @@ def clipping_coordinates_lay_field(domain_dim, mesh, dimension,
     dimension : `int`
         Model dimension (2D or 3D).
     ufl_coordinates_habc : `ufl.geometry.SpatialCoordinate`
-        Domain Coordinates including the absorbing layer.
+        Domain coordinates including the absorbing layer.
     V : `Firedrake.FunctionSpace`
         Function space for the mask field.
-    quadrilateral : bool, optional
+    quadrilateral : `bool`, optional
         Flag to indicate whether to use quadrilateral/hexahedral elements.
 
     Returns
@@ -327,7 +328,7 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
     pts_to_extend = lay_nodes[ind_nodes]
 
     # Set the property of the nearest point on the original boundary
-    value_parameter_error('method', method, ["point_cloud", "nearest_point"])
+    validate_parameter('method', method, ["point_cloud", "nearest_point"])
     if method == "point_cloud":
 
         pprint(f"Using Cloud Points Method to Extend {name_prop} Profile")

@@ -5,7 +5,7 @@ import firedrake as fire
 from numpy import log10, ones
 from numpy.random import uniform
 
-from .basicio import interpolate
+from .interpolators import interpolate
 from ..utils import error_management
 from ..utils import eval_functions_to_ufl
 from ..domains.space import check_function_space_type, create_function_space
@@ -43,8 +43,8 @@ def define_property_function_space(wave, func_space_type, dg_property,
 
     # Checking input arguments
     opts_func_space_type = ["scalar", "vector", "tensor"]
-    error_management.value_parameter_error("func_space_type", func_space_type,
-                                           opts_func_space_type)
+    error_management.validate_parameter("func_space_type", func_space_type,
+                                        opts_func_space_type)
 
     if dg_property is False and func_space_type == "scalar":
         return point_to_scalar_wave_function_space(wave)
