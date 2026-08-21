@@ -531,9 +531,12 @@ class FullWaveformInversion:
            controls is fed, and how a single one is narrowed on purpose.
         2. A **bare value** — a ``Function``, a ``Constant``, a number — which
            says nothing about which parameter it is. It is paired with the
-           first controlled parameter. This is the acoustic API,
-           ``set_guess_control(velocity)``, where there is only one parameter
-           it could possibly mean.
+           controlled parameter, and there has to be exactly one for that to
+           be unambiguous. This is the acoustic API,
+           ``set_guess_control(velocity)``, and it is also how the optimizer
+           feeds back each iterate: ``_rebuild_control_from_vector`` builds a
+           ``Function`` out of a plain array of numbers, which carries no
+           parameter name at all.
 
         ``None`` normalizes to an empty mapping, so callers can pass "no
         control given" without a special case.
@@ -554,7 +557,9 @@ class FullWaveformInversion:
         ValueError
             If a mapping names a parameter this inversion does not control.
             Passing a physical parameter the solver models but that is not
-            being inverted for is an error, not a silent no-op.
+            being inverted for is an error, not a silent no-op. Also if a bare
+            value is given while several parameters are controlled, since
+            there is then no way to tell which one it means.
 
         Examples
         --------
@@ -583,7 +588,11 @@ class FullWaveformInversion:
                     f"inversion. Controls: {_names(self._controlled_parameters())}.",
                 )
             return values
-        return {self._controlled_parameters()[0]: control}
+        # Unpacking, rather than taking the first entry, so that a bare value
+        # on a multi-parameter inversion fails instead of being assigned to
+        # whichever parameter happens to sort first.
+        (parameter,) = self._controlled_parameters()
+        return {parameter: control}
 
     def _push_control_to_wave(self, wave, control):
         """Write control values into a solver's physical parameters.
@@ -619,14 +628,20 @@ class FullWaveformInversion:
         wave : Wave
             Solver whose material fields are missing.
         control : mapping
-            Control values keyed by canonical parameter name.
+            Control values keyed by material parameter.
 
         Returns
         -------
         PhysicalParameters
             The solver's initialized physical parameters.
+
+        Raises
+        ------
+        ValueError
+            If several parameters are controlled. Only the acoustic velocity
+            model can be built this way.
         """
-        name = self._controlled_parameters()[0]
+        (name,) = self._controlled_parameters()
         velocity = fire.Function(
             self._control_function_space(wave), name=name.value,
         )
