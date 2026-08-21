@@ -645,7 +645,7 @@ class FullWaveformInversion:
             wave.force_rebuild_function_space()
         return wave.function_space
 
-    def _capture_control_from_wave(self, wave):
+    def _copy_control_from_wave(self, wave):
         """Copy the current values of the controlled parameters out of a solver.
 
         Parameters
@@ -666,39 +666,24 @@ class FullWaveformInversion:
         return parameters.copy(self._controlled_parameters())
 
     def _copy_control_structure(self, control):
-        """Return an independent copy of a control value or container.
+        """Return an independent copy of a control field.
+
+        Used to record the inversion result without keeping a reference to the
+        field the solver goes on using.
 
         Parameters
         ----------
-        control : PhysicalParameters, firedrake.Function, firedrake.Constant, or None
-            Control to copy.
+        control : firedrake.Function
+            Control field to copy.
 
         Returns
         -------
-        PhysicalParameters, firedrake.Function, or None
-            A copy of the same kind as the input.
-
-        Raises
-        ------
-        TypeError
-            If ``control`` is not one of the supported types.
+        firedrake.Function
+            A copy holding the same values.
         """
-        if control is None:
-            return None
-        if isinstance(control, PhysicalParameters):
-            return control.copy()
-        if isinstance(control, fire.Function):
-            copied = fire.Function(control.function_space(), name=control.name())
-            copied.assign(control)
-            return copied
-        if isinstance(control, fire.Constant):
-            copied = fire.Function(self._control_function_space(), name="control")
-            copied.interpolate(control)
-            return copied
-        raise TypeError(
-            "FWI control must be a firedrake Function or Constant. "
-            f"Received {type(control).__name__}.",
-        )
+        copied = fire.Function(control.function_space(), name=control.name())
+        copied.assign(control)
+        return copied
 
     def _flatten_control(self, control):
         """Flatten a control ``Function`` into an optimizer vector.
@@ -1113,7 +1098,7 @@ class FullWaveformInversion:
             dg_velocity_model=dg_velocity_model,
         )
         self.real_mesh = self.wave.get_mesh()
-        self._real_controls = self._capture_control_from_wave(self.wave)
+        self._real_controls = self._copy_control_from_wave(self.wave)
         if new_file is not None:
             self.real_velocity_model_file = new_file
 
@@ -1171,7 +1156,7 @@ class FullWaveformInversion:
             dg_velocity_model=dg_velocity_model,
         )
         self.guess_mesh = self.wave.get_mesh()
-        self._control_parameters = self._capture_control_from_wave(self.wave)
+        self._control_parameters = self._copy_control_from_wave(self.wave)
         self.misfit = None
 
     def set_real_mesh(self, user_mesh=None, input_mesh_parameters=None):
