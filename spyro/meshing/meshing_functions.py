@@ -1,20 +1,25 @@
 import numpy as np
 from firedrake import Mesh as FireMeshReader
+
 from ..io.basicio import parallel_print
 from ..io.segy_io import create_segy_from_grid
-from .meshing_gmsh2d import build_gmsh_geometry_and_groups, apply_structured_winslow_smoothing2d
-from .meshing_utils import create_sizing_function, calculate_edge_length
-from .firedrake_based_wrappers import rectangle_mesh, periodic_rectangle_mesh, box_mesh
-from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_with_velocity_model
-from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_homogeneous
+from .firedrake_based_wrappers import box_mesh, periodic_rectangle_mesh, rectangle_mesh
 from .gmsh_based_methods import build_big_rect_with_inner_element_group
-
+from .meshing_gmsh2d import (
+    apply_structured_winslow_smoothing2d,
+    build_gmsh_geometry_and_groups,
+)
 from .meshing_gmsh3D import (
+    apply_structured_winslow_smoothing3D,
     build_gmsh_geometry_and_groups3D,
     configure_gmsh_mesh_size3D,
-    apply_structured_winslow_smoothing3D,
 )
+from .meshing_utils import calculate_edge_length, create_sizing_function
 from .meshing_utils3D import create_sizing_function3D
+from .seismic_mesh_based_wrappers import (
+    create_seismicmesh_2D_mesh_homogeneous,
+    create_seismicmesh_2D_mesh_with_velocity_model,
+)
 
 try:
     import gmsh
@@ -826,6 +831,8 @@ class AutomaticMesh:
                     axes_order=axes_order,
                     axes_order_sort=axes_order_sort,
                     dtype=binary_dtype,
+                    comm=self.comm,
+                    parallel_print=parallel_print,
                 )
 
                 configure_gmsh_mesh_size3D(
@@ -847,6 +854,8 @@ class AutomaticMesh:
                     nz=nz,
                     nx=nx,
                     ny=ny,
+                    comm=self.comm,
+                    parallel_print=parallel_print,
                 )
 
                 if structured_mesh:
