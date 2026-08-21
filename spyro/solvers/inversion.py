@@ -519,26 +519,57 @@ class FullWaveformInversion:
         return tuple(sorted(physical, key=lambda p: p.value))
 
     def _as_control_mapping(self, control):
-        """Normalize a control value into a ``name -> value`` mapping.
+        """Normalize a control value into a ``parameter -> value`` mapping.
+
+        Everything downstream works with controls keyed by material
+        parameter, but callers may pass them in two shapes, and this is where
+        the two meet:
+
+        1. A **mapping**, which already says which parameter each value
+           belongs to. Its keys are checked against the controlled parameters
+           and it is used as given. This is how an inversion with several
+           controls is fed, and how a single one is narrowed on purpose.
+        2. A **bare value** — a ``Function``, a ``Constant``, a number — which
+           says nothing about which parameter it is. It is paired with the
+           first controlled parameter. This is the acoustic API,
+           ``set_guess_control(velocity)``, where there is only one parameter
+           it could possibly mean.
+
+        ``None`` normalizes to an empty mapping, so callers can pass "no
+        control given" without a special case.
 
         Parameters
         ----------
-        control : mapping, firedrake.Function, firedrake.Constant, scalar, or UFL expression
-            Control values, keyed by parameter name. A bare value is accepted
-            when the inversion controls a single parameter.
+        control : mapping, firedrake.Function, firedrake.Constant, scalar, UFL expression, or None
+            Control values to normalize.
 
         Returns
         -------
         dict
-            Control values keyed by canonical parameter name.
+            Control values keyed by material parameter. Empty if ``control``
+            is ``None``.
 
         Raises
         ------
         ValueError
-            If a key is not one of the controlled parameters.
+            If a mapping names a parameter this inversion does not control.
+            Passing a physical parameter the solver models but that is not
+            being inverted for is an error, not a silent no-op.
+
+        Examples
+        --------
+        On an acoustic inversion, both spellings give the same result::
+
+            fwi.set_guess_control(velocity)
+            fwi.set_guess_control(
+                {AcousticMaterialParameter.P_WAVE_VELOCITY: velocity},
+            )
         """
         if control is None:
             return {}
+        # A mapping is told apart from a bare value by whether it has items():
+        # asking is cheaper and safer than testing against a list of types the
+        # caller might legitimately pass.
         try:
             items = control.items()
         except AttributeError:
