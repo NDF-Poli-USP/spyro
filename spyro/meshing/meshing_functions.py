@@ -640,6 +640,8 @@ class AutomaticMesh:
                     axes_order=axes_order,
                     axes_order_sort=axes_order_sort,
                     dtype=binary_dtype,
+                    comm=self.comm,
+                    parallel_print=parallel_print,
                 )
 
                 configure_gmsh_mesh_size3D(
@@ -661,6 +663,8 @@ class AutomaticMesh:
                     nz=nz,
                     nx=nx,
                     ny=ny,
+                    comm=self.comm,
+                    parallel_print=parallel_print,
                 )
 
                 if structured_mesh:
