@@ -9,6 +9,95 @@ except ImportError:
     SeismicMesh = None
 
 
+def sizing_function_xyz(
+    X,
+    Y,
+    Z,
+    ef_segy,
+    length_x,
+    length_y,
+    depth_z,
+):
+    """Evaluate structured Winslow sizing using nearest-edge extension.
+
+    Parameters
+    ----------
+    X : numpy.ndarray
+        X coordinates of the structured mesh nodes.
+    Y : numpy.ndarray
+        Y coordinates of the structured mesh nodes.
+    Z : numpy.ndarray
+        Z coordinates of the structured mesh nodes.
+    ef_segy : callable
+        Mesh-sizing function evaluated in ``(z, x, y)`` coordinates.
+    length_x : float
+        Physical domain length in the x direction.
+    length_y : float
+        Physical domain length in the y direction.
+    depth_z : float
+        Physical domain depth.
+
+    Returns
+    -------
+    numpy.ndarray
+        Positive sizing values with the same shape as the input coordinate arrays.
+
+    Notes
+    -----
+    Queries outside the physical model are projected to the nearest model edge before
+    evaluating the sizing field.
+    """
+    X = np.asarray(X, dtype=float)
+    Y = np.asarray(Y, dtype=float)
+    Z = np.asarray(Z, dtype=float)
+
+    if X.shape != Y.shape or X.shape != Z.shape:
+        raise ValueError(
+            "Winslow sizing coordinates X, Y and Z must have matching shapes."
+        )
+
+    finite_coordinates = np.isfinite(X) & np.isfinite(Y) & np.isfinite(Z)
+    if not np.all(finite_coordinates):
+        bad_count = int(
+            finite_coordinates.size - np.count_nonzero(finite_coordinates)
+        )
+        raise FloatingPointError(
+            "Winslow generated NaN or infinite coordinates before "
+            f"sizing evaluation ({bad_count} invalid nodes). Reduce "
+            "winslow_omega or inspect the structured topology."
+        )
+
+    X_edge = np.clip(X.reshape(-1), 0.0, length_x)
+    Y_edge = np.clip(Y.reshape(-1), 0.0, length_y)
+    Z_edge = np.clip(Z.reshape(-1), -abs(depth_z), 0.0)
+
+    queries_zxy = np.column_stack((Z_edge, X_edge, Y_edge))
+
+    sizes = np.asarray(
+        ef_segy(queries_zxy),
+        dtype=float,
+    ).reshape(X.shape)
+
+    if not np.all(np.isfinite(sizes)):
+        invalid = np.flatnonzero(~np.isfinite(sizes))
+        first = int(invalid[0])
+        raise ValueError(
+            "The structured edge-extended sizing function returned "
+            "NaN or infinity. First projected query "
+            f"(z, x, y)={queries_zxy[first].tolist()}. Check the "
+            "velocity binary metadata and sizing-function construction."
+        )
+
+    if np.any(sizes <= 0.0):
+        minimum = float(np.min(sizes))
+        raise ValueError(
+            "The structured Winslow sizing function must be positive; "
+            f"minimum value is {minimum}."
+        )
+
+    return sizes
+
+
 def _read_velocity_binary3D(
     fname,
     nz,
@@ -19,7 +108,32 @@ def _read_velocity_binary3D(
     axes_order_sort="F",
     dtype="float32",
 ):
-    """Read the volumetric model using Spyro ``(z, x, y)`` convention."""
+    """Read a three-dimensional velocity model using Spyro ``(z, x, y)`` ordering.
+
+    Parameters
+    ----------
+    fname : str or pathlib.Path
+        Path to the binary velocity model.
+    nz : int
+        Number of velocity samples in the z direction.
+    nx : int
+        Number of velocity samples in the x direction.
+    ny : int
+        Number of velocity samples in the y direction.
+    byte_order : {"big", "little"}
+        Byte order of the velocity-model binary file.
+    axes_order : tuple of int
+        Permutation mapping binary axes to Spyro ``(z, x, y)`` order.
+    axes_order_sort : {"C", "F"}
+        Memory order used to reshape the binary velocity data.
+    dtype : str or numpy.dtype
+        Numeric data type stored in the velocity-model file.
+
+    Returns
+    -------
+    numpy.ndarray
+        Velocity array in canonical ``(z, x, y)`` ordering.
+    """
     path = Path(fname)
     if not path.exists():
         raise FileNotFoundError(f"Velocity model not found: {path}")
@@ -68,9 +182,51 @@ def create_sizing_function3D(
     axes_order_sort="F",
     dtype="float32",
 ):
-    """Create a finite, positive 3-D wavelength sizing function.
+    """Create a finite positive wavelength-based sizing function for three-dimensional meshing.
 
-    Coordinates are accepted in Spyro's ``(z, x, y)`` order.
+    Parameters
+    ----------
+    fname : str or pathlib.Path
+        Path to the binary velocity model.
+    hmin : float or None
+        Requested minimum element size.
+    bbox : sequence of float
+        Bounding box ordered as ``(zmin, zmax, xmin, xmax, ymin, ymax)``.
+    wl : float
+        Number of mesh points per wavelength.
+    freq : float
+        Reference frequency used to convert velocity to element size.
+    pad_type : str or None
+        Padding type forwarded to the sizing-field construction.
+    pad_size_x : float
+        Padding extent in x used by the sizing function.
+    pad_size_y : float
+        Padding extent in y used by the sizing function.
+    pad_size_z : float
+        Padding extent in z used by the sizing function.
+    grade : float
+        Maximum sizing-field grading parameter.
+    vp_water : float or None
+        Velocity assigned to water or zero-valued cells.
+    nz : int
+        Number of velocity samples in the z direction.
+    nx : int
+        Number of velocity samples in the x direction.
+    ny : int
+        Number of velocity samples in the y direction.
+    byte_order : {"big", "little"}
+        Byte order of the velocity-model binary file.
+    axes_order : tuple of int
+        Permutation mapping binary axes to Spyro ``(z, x, y)`` order.
+    axes_order_sort : {"C", "F"}
+        Memory order used to reshape the binary velocity data.
+    dtype : str or numpy.dtype
+        Numeric data type stored in the velocity-model file.
+
+    Returns
+    -------
+    tuple
+        Sizing callable, minimum size, maximum size when available, and grid dimensions.
     """
     if any(value is None for value in (nz, nx, ny)):
         raise ValueError("3-D sizing requires nz, nx and ny.")
@@ -106,8 +262,31 @@ def create_sizing_function3D(
         )
 
     def edge_extended_callable(base_callable):
-        """Wrap any core interpolator with true nearest-edge extension."""
+        """Wrap a core interpolator with nearest-edge extension outside the model bounds.
+
+        Parameters
+        ----------
+        base_callable : callable
+            Core sizing interpolator defined inside the velocity-model bounds.
+
+        Returns
+        -------
+        callable
+            Sizing function that clamps queries to the velocity-model bounds.
+        """
         def evaluate(coordinates):
+            """Evaluate the edge-extended sizing function at one or more coordinates.
+
+            Parameters
+            ----------
+            coordinates : numpy.ndarray
+                Coordinates with shape ``(N, 3)`` in ``(z, x, y)`` order.
+
+            Returns
+            -------
+            float or numpy.ndarray
+                Positive sizing values corresponding to the supplied coordinates.
+            """
             points = np.asarray(coordinates, dtype=np.float64)
             scalar_input = points.ndim == 1
 
@@ -275,3 +454,225 @@ def create_sizing_function3D(
         int(nx),
         int(ny),
     )
+
+
+def define_winslow_points_3d(
+    gmsh,
+    points_3d,
+    tag_to_index,
+    length_x,
+    length_y,
+    depth_z,
+    padding_type,
+    padding_x,
+    padding_y,
+    padding_z,
+    water_interface,
+    tol=2.0,
+):
+    """Classify structured-mesh nodes by the coordinates they may move during Winslow smoothing.
+
+    Parameters
+    ----------
+    gmsh : module
+        Initialized Gmsh Python module used to build or query the mesh.
+    points_3d : numpy.ndarray
+        Mesh-node coordinates with shape ``(N, 3)``.
+    tag_to_index : dict
+        Mapping from Gmsh node tags to zero-based point indices.
+    length_x : float
+        Physical domain length in the x direction.
+    length_y : float
+        Physical domain length in the y direction.
+    depth_z : float
+        Physical domain depth; the model occupies negative z.
+    padding_type : str or None
+        Padding geometry, either ``None`` or ``"rectangular"`` for Winslow.
+    padding_x : float
+        Padding thickness in the x direction.
+    padding_y : float
+        Padding thickness in the y direction.
+    padding_z : float
+        Bottom padding thickness in the z direction.
+    water_interface : bool
+        Whether the water/subsurface interface is geometrically delimited.
+    tol : float
+        Coordinate tolerance used to identify boundary planes.
+
+    Returns
+    -------
+    dict
+        Sets of locked, directionally movable, fully movable, water, and union movable
+        nodes.
+
+    Notes
+    -----
+    Water nodes are locked when a delimited water volume is present. Boundary
+    intersections are constrained so corners are fixed, edges move tangentially, faces
+    move in-plane, and interior nodes move freely.
+    """
+    points_3d = np.asarray(points_3d, dtype=float)
+    if points_3d.ndim != 2 or points_3d.shape[1] != 3:
+        raise ValueError("points_3d must have shape (N, 3).")
+
+    if padding_type not in (None, "rectangular"):
+        raise ValueError(
+            "3-D Winslow point selection supports only padding_type=None "
+            "or padding_type='rectangular'; 'hyperelliptical' is not "
+            "supported for structured Winslow smoothing."
+        )
+
+    tol = float(tol)
+    if not np.isfinite(tol) or tol <= 0.0:
+        raise ValueError("Winslow point-selection tolerance must be positive.")
+
+    locked = set()
+    move_X_only = set()
+    move_Y_only = set()
+    move_Z_only = set()
+    move_all = set()
+    water_nodes = set()
+
+    if water_interface:
+        water_group_name = (
+            "Water_with_padding"
+            if padding_type == "rectangular"
+            else "Water"
+        )
+
+        group_found = False
+        for dim, physical_tag in gmsh.model.getPhysicalGroups(dim=3):
+            if gmsh.model.getPhysicalName(dim, physical_tag) != water_group_name:
+                continue
+
+            group_found = True
+            entities = gmsh.model.getEntitiesForPhysicalGroup(dim, physical_tag)
+            for entity_tag in entities:
+                node_tags, _, _ = gmsh.model.mesh.getNodes(
+                    dim,
+                    entity_tag,
+                    includeBoundary=True,
+                )
+                for node_tag in node_tags:
+                    node_index = tag_to_index.get(int(node_tag))
+                    if node_index is not None:
+                        water_nodes.add(node_index)
+
+        if not group_found:
+            raise RuntimeError(
+                f"Physical volume group {water_group_name!r} was not found "
+                "while selecting 3-D Winslow nodes."
+            )
+
+        if not water_nodes:
+            raise RuntimeError(
+                f"Physical volume group {water_group_name!r} contains no "
+                "mesh nodes for 3-D Winslow smoothing."
+            )
+
+        if len(water_nodes) == len(points_3d):
+            raise RuntimeError(
+                f"Every mesh node was classified as {water_group_name}. "
+                "No subsurface nodes remain available for Winslow smoothing."
+            )
+
+    x_planes = [0.0, float(length_x)]
+    y_planes = [0.0, float(length_y)]
+    z_planes = [-abs(float(depth_z))]
+
+    if padding_type == "rectangular":
+        x_planes.extend(
+            [
+                -float(padding_x),
+                float(length_x) + float(padding_x),
+            ]
+        )
+        y_planes.extend(
+            [
+                -float(padding_y),
+                float(length_y) + float(padding_y),
+            ]
+        )
+        z_planes.append(
+            -abs(float(depth_z)) - float(padding_z)
+        )
+
+    if not water_interface:
+        z_planes.append(0.0)
+
+    def on_any_plane(value, planes):
+        """Test whether a coordinate lies on any constrained plane within tolerance.
+
+        Parameters
+        ----------
+        value : float
+            Coordinate to classify.
+        planes : sequence of float
+            Candidate plane coordinates.
+
+        Returns
+        -------
+        bool
+            ``True`` when the coordinate is within tolerance of any supplied plane.
+        """
+        return any(abs(value - plane) < tol for plane in planes)
+
+    for node_index, (x_coord, y_coord, z_coord) in enumerate(points_3d):
+        if node_index in water_nodes:
+            locked.add(node_index)
+            continue
+
+        on_x_plane = on_any_plane(x_coord, x_planes)
+        on_y_plane = on_any_plane(y_coord, y_planes)
+        on_z_plane = on_any_plane(z_coord, z_planes)
+
+        contact_count = int(on_x_plane) + int(on_y_plane) + int(on_z_plane)
+
+        if contact_count == 3:
+            locked.add(node_index)
+            continue
+
+        if contact_count == 2:
+            if on_x_plane and on_y_plane:
+                move_Z_only.add(node_index)
+            elif on_x_plane and on_z_plane:
+                move_Y_only.add(node_index)
+            elif on_y_plane and on_z_plane:
+                move_X_only.add(node_index)
+            continue
+
+        if contact_count == 1:
+            if on_x_plane:
+                move_Y_only.add(node_index)
+                move_Z_only.add(node_index)
+            elif on_y_plane:
+                move_X_only.add(node_index)
+                move_Z_only.add(node_index)
+            elif on_z_plane:
+                move_X_only.add(node_index)
+                move_Y_only.add(node_index)
+            continue
+
+        move_all.add(node_index)
+
+    movable_nodes = (
+        move_all
+        | move_X_only
+        | move_Y_only
+        | move_Z_only
+    )
+
+    if not movable_nodes:
+        raise RuntimeError(
+            "No movable nodes were found for 3-D Winslow smoothing."
+        )
+
+    return {
+        "locked": locked,
+        "move_all": move_all,
+        "move_X_only": move_X_only,
+        "move_Y_only": move_Y_only,
+        "move_Z_only": move_Z_only,
+        "water_nodes": water_nodes,
+        "movable_nodes": movable_nodes,
+    }
