@@ -3,29 +3,37 @@ import numpy as np
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
                        FunctionSpace, project)
 
-from .elastic_wave import ElasticWave
-from .forms import (elastic_without_pml, viscoelastic_without_pml,
+from .elastic_wave import IsotropicElasticWave
+from .forms import (elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
 from ...utils.typing import (ElasticMaterialParameter, ElasticMaterialParameterization,
-                            ViscoelasticMaterialParameter, AbsorbingBCsType, override)
+                             AbsorbingBCsType, override, WaveType)
 from ...domains.space import create_function_space
-from .tensor_computation import *
+from .tensor_computation import C_computation
 
 CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
     ElasticMaterialParameterization.LAME: (
         ElasticMaterialParameter.DENSITY,
         ElasticMaterialParameter.LAMBDA,
         ElasticMaterialParameter.MU,
+        ElasticMaterialParameter.DELTA,
+        ElasticMaterialParameter.EPSILON,
+        ElasticMaterialParameter.GAMMA,
+        ElasticMaterialParameter.THETA,
+        ElasticMaterialParameter.PHI,
     ),
     ElasticMaterialParameterization.VELOCITY: (
         ElasticMaterialParameter.DENSITY,
         ElasticMaterialParameter.P_WAVE_VELOCITY,
         ElasticMaterialParameter.S_WAVE_VELOCITY,
+        ElasticMaterialParameter.DELTA,
+        ElasticMaterialParameter.EPSILON,
+        ElasticMaterialParameter.GAMMA,
+        ElasticMaterialParameter.THETA,
+        ElasticMaterialParameter.PHI,
     ),
 }
-
-VISCOELASTIC_PARAMETERS = (ViscoelasticMaterialParameter.Q_VP, ViscoelasticMaterialParameter.Q_VS)
 
 
 def _format_control_parameters(parameters):
@@ -49,46 +57,17 @@ def _format_control_parameters(parameters):
     return "{" + ", ".join(parameter.value for parameter in parameters) + "}"
 
 
-class IsotropicWave(ElasticWave):
-    '''Isotropic elastic wave propagator'''
+class AnisotropicTTIWave(IsotropicElasticWave):
+    '''Anisotropic elastic wave propagator'''
 
     def __init__(self, dictionary, comm=None):
-        super().__init__(dictionary, comm=comm)
-        self.rho = None   # Density
-        self.lmbda = None  # First Lame parameter
-        self.mu = None    # Second Lame parameter
-        self.c_s = None   # Secondary wave velocity
-        self._control_parameterization = None
-        self._material_parameter_function_space = None
+        super().__init__(dictionary, anisotropy = WaveType.ANISOTROPIC_TTI_ELASTIC, comm=comm)
+        self.delta = None
+        self.epsilon = None
+        self.gamma = None
+        self.theta = None
+        self.phi = None
 
-        self.u_n = None   # Current displacement field
-        self.u_nm1 = None  # Displacement field in previous iteration
-        self.u_nm2 = None  # Displacement field at iteration n-2
-        self.u_np1 = None  # Displacement field in next iteration
-
-        # Volumetric sources (defined through UFL)
-        self.body_forces = None
-
-        # Boundary conditions
-        self.bcs = []
-
-        # Variables for logging the P-wave
-        self.p_wave = None
-        self.D_h = None
-        self.field_logger.add_field("p-wave", "P-wave",
-                                    lambda: self.update_p_wave())
-
-        # Variables for logging the S-wave
-        self.s_wave = None
-        self.C_h = None
-        self.field_logger.add_field("s-wave", "S-wave",
-                                    lambda: self.update_s_wave())
-
-        self.mechanical_energy = None
-        self.field_logger.add_functional("mechanical_energy",
-                                         lambda: assemble(self.mechanical_energy))
-
-    @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
         """Initialize isotropic elastic material parameters from a dictionary.
 
@@ -136,10 +115,6 @@ class IsotropicWave(ElasticWave):
             and becomes a scalar material ``Function`` after the mesh has been
             created.
             """
-            if callable(value) and not isinstance(value, Constant):
-                if self.mesh is None:
-                    return value(self.mesh)  
-                value = value(self.mesh)
             if np.isscalar(value) or isinstance(value, Constant):
                 if self.mesh is None:
                     return Constant(value) if np.isscalar(value) else value
@@ -166,6 +141,12 @@ class IsotropicWave(ElasticWave):
         )
         self.c = get_value(ElasticMaterialParameter.P_WAVE_VELOCITY)
         self.c_s = get_value(ElasticMaterialParameter.S_WAVE_VELOCITY)
+        self.delta = get_value(ElasticMaterialParameter.DELTA)
+        self.gamma = get_value(ElasticMaterialParameter.GAMMA)
+        self.epsilon = get_value(ElasticMaterialParameter.EPSILON)
+        self.theta = get_value(ElasticMaterialParameter.THETA)
+        self.phi = get_value(ElasticMaterialParameter.PHI)
+        self.anisotropy_type = synthetic_data_dict["anisotropy"]
 
         # Check if {rho, lambda, mu} is set and {c, c_s} are not
         option_1 = bool(self.rho) and \
@@ -180,22 +161,14 @@ class IsotropicWave(ElasticWave):
             not bool(self.lmbda) and \
             not bool(self.mu)
 
-        if option_2:
-            self.Q_vp = get_value(ViscoelasticMaterialParameter.Q_VP)
-            self.Q_vs = get_value(ViscoelasticMaterialParameter.Q_VS)
-
         if option_1:
             self._control_parameterization = ElasticMaterialParameterization.LAME
             self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
             self.c_s = (self.mu/self.rho)**0.5
-            self.Q_lambda = get_value(ViscoelasticMaterialParameter.Q_LAMBDA)
-            self.Q_mu = get_value(ViscoelasticMaterialParameter.Q_MU)
-
         elif option_2:
             self._control_parameterization = ElasticMaterialParameterization.VELOCITY
             self.mu = self.rho*self.c_s**2
             self.lmbda = self.rho*self.c**2 - 2*self.mu
-
         else:
             raise ValueError(
                 "Inconsistent selection of isotropic elastic wave parameters:\n"
@@ -207,131 +180,6 @@ class IsotropicWave(ElasticWave):
                 "The valid options are {Density, Lame first, Lame second} "
                 "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
             )
-
-    @override
-    def initialize_model_parameters_from_file(self, synthetic_data_dict):
-        raise NotImplementedError
-
-    @override
-    def _create_function_space(self):
-        return create_function_space(self.mesh, self.method, self.degree,
-                                     dim=self.dimension)
-
-    @override
-    def _set_vstate(self, vstate):
-        self.u_n.assign(vstate)
-
-    @override
-    def _get_vstate(self):
-        return self.u_n
-
-    @override
-    def _set_prev_vstate(self, vstate):
-        if self.u_nm2 is not None:
-            self.u_nm2.assign(self.u_nm1)
-        self.u_nm1.assign(vstate)
-
-    @override
-    def _get_prev_vstate(self):
-        return self.u_nm1
-
-    @override
-    def _set_next_vstate(self, vstate):
-        self.u_np1.assign(vstate)
-
-    @override
-    def _get_next_vstate(self):
-        return self.u_np1
-
-    @override
-    def get_forward_solution_receivers(self):
-        if self.abc_type == AbsorbingBCsType.PML:
-            raise NotImplementedError
-        else:
-            data_with_halos = self.u_n.dat.data_ro_with_halos[:]
-        return self.receivers.interpolate(data_with_halos)
-
-    @override
-    def get_function(self):
-        return self.u_n
-
-    @override
-    def get_function_name(self):
-        return "Displacement"
-
-    def get_control_parameter_function_space(self):
-        """Return the scalar space used for elastic material controls.
-
-        Elastic displacement is vector-valued, but density, Lame parameters,
-        and wave speeds are scalar material fields. This method creates and
-        returns the scalar space used for those controls.
-
-        Returns
-        -------
-        firedrake.FunctionSpace
-            Scalar material-parameter function space.
-
-        Raises
-        ------
-        ValueError
-            If the mesh has not been created yet.
-
-        Examples
-        --------
-        ``Function(wave.get_control_parameter_function_space())`` creates a
-        scalar density or Lame-parameter control compatible with
-        ``set_control_parameters``.
-        """
-        if self.mesh is None:
-            raise ValueError(
-                "Mesh must be set before creating elastic control parameter spaces.",
-            )
-        self._material_parameter_function_space = create_function_space(
-            self.mesh, self.method, self.degree,
-        )
-        return self._material_parameter_function_space
-
-    def _as_control_field(self, value, name):
-        """Return a material control as a scalar Firedrake Function.
-
-        Elastic material parameters are scalar fields, while the elastic
-        displacement solution lives in a vector function space. This helper
-        keeps the inversion controls in the scalar space returned by
-        ``get_control_parameter_function_space()`` so density, Lame
-        parameters, and velocity controls can be flattened, rebuilt, written,
-        and reassigned consistently during FWI.
-
-        Accepted values are Firedrake ``Function`` objects, constants, scalar
-        values, or UFL expressions. Functions already in the target space are
-        copied with ``assign``; all other values are interpolated into a new
-        named scalar ``Function``.
-
-        Parameters
-        ----------
-        value : firedrake.Function, firedrake.Constant, scalar, or UFL expression
-            Material control value to represent in the scalar control space.
-        name : str
-            Name assigned to the returned Firedrake ``Function``.
-
-        Returns
-        -------
-        firedrake.Function or None
-            Scalar control field in the material-parameter function space. If
-            ``value`` is ``None``, returns ``None``.
-        """
-        if value is None:
-            return None
-
-        V = self.get_control_parameter_function_space()
-        field = Function(V, name=name)
-        if isinstance(value, Function):
-            if value.function_space() == V:
-                field.assign(value)
-            else:
-                field.interpolate(value)
-        else:
-            field.interpolate(value)
-        return field
 
     def get_control_parameters(self):
         """Return the active isotropic elastic material controls.
@@ -372,6 +220,18 @@ class IsotropicWave(ElasticWave):
                 parameters[parameter] = self.c
             elif parameter is ElasticMaterialParameter.S_WAVE_VELOCITY:
                 parameters[parameter] = self.c_s
+            elif parameter is ElasticMaterialParameter.DELTA:
+                parameters[parameter] = self.delta
+            elif parameter is ElasticMaterialParameter.EPSILON:
+                parameters[parameter] = self.epsilon
+            elif parameter is ElasticMaterialParameter.GAMMA:
+                parameters[parameter] = self.gamma
+            elif parameter is ElasticMaterialParameter.THETA:
+                parameters[parameter] = self.theta
+            elif parameter is ElasticMaterialParameter.PHI:
+                parameters[parameter] = self.phi
+            elif parameter is ElasticMaterialParameter.ANISOTROPY_TYPE:
+                parameters[parameter] = self.anisotropy_type
             else:
                 raise ValueError(
                     f"Unsupported elastic control parameter '{parameter.value}'.",
@@ -477,6 +337,12 @@ class IsotropicWave(ElasticWave):
             self._control_parameterization = ElasticMaterialParameterization.LAME
             synthetic_data["lambda"] = self.lmbda
             synthetic_data["mu"] = self.mu
+            synthetic_data["delta"] = self.delta
+            synthetic_data["epsilon"] = self.epsilon
+            synthetic_data["gamma"] = self.gamma
+            synthetic_data["theta"] = self.theta
+            synthetic_data["phi"] = self.phi
+            synthetic_data["anisotropy"] = self.anisotropy_type
         else:
             self.c = self._as_control_field(
                 controls[ElasticMaterialParameter.P_WAVE_VELOCITY],
@@ -491,6 +357,12 @@ class IsotropicWave(ElasticWave):
             self._control_parameterization = ElasticMaterialParameterization.VELOCITY
             synthetic_data["p_wave_velocity"] = self.c
             synthetic_data["s_wave_velocity"] = self.c_s
+            synthetic_data["delta"] = self.delta
+            synthetic_data["epsilon"] = self.epsilon
+            synthetic_data["gamma"] = self.gamma
+            synthetic_data["theta"] = self.theta
+            synthetic_data["phi"] = self.phi
+            synthetic_data["anisotropy"] = self.anisotropy_type
 
         self.input_dictionary["synthetic_data"] = synthetic_data
 
@@ -522,108 +394,7 @@ class IsotropicWave(ElasticWave):
 
         self.Elastic_C = C_computation(self)
 
-        is_viscoelastic = self.input_dictionary.get("viscoelasticity", False)
-
-        if is_viscoelastic:
-            self.visco_type = d["visco_type"]
-            W = TensorFunctionSpace(self.function_space.mesh(), "DG", 0)
-            self.strain_space = W
-            
-            # GSLS parameters
-            self.y_list     = d["y_gsls"]        # list of y_l
-            self.omega_list = d["omega_gsls"]    # list of omega_l
-            dim = self.function_space.mesh().topological_dimension()
-
-            num_branches = d["branches"] 
-            
-            # Memory variables
-            self.zeta_list = [Function(self.strain_space, name=f"Memory variable zeta_{i}")
-                    for i in range(num_branches)]
-
-            for zeta in self.zeta_list:
-                zeta.assign(0.0)
-
-            self.eps_np1 = Function(self.strain_space, name="eps_np1")
-            self.eps_n   = Function(self.strain_space, name="eps_n")
-
-            self.eps_n.assign(0.0)
-
-            self.sigma_np1 = Function(self.strain_space, name="eps_np1")
-            self.sigma_n   = Function(self.strain_space, name="eps_n")
-
-            self.sigma_n.assign(0.0)
-
-            self.Gamma = build_Gamma(self)
-
         if self.abc_type in [AbsorbingBCsType.NRBC, AbsorbingBCsType.NOABCS]:
-            viscoelastic_without_pml(self)
+            elastic_without_pml(self)
         elif self.abc_type == AbsorbingBCsType.PML:
             isotropic_elastic_with_pml(self)
-        else:
-            elastic_without_pml
-
-    @override
-    def rhs_no_pml(self):
-        if self.abc_type == AbsorbingBCsType.PML:
-            raise NotImplementedError
-        else:
-            return self.B
-
-    def rhs_no_pml_source(self):
-        if self.abc_type == AbsorbingBCsType.PML:
-            raise NotImplementedError
-        else:
-            return self.source_function
-
-    def parse_initial_conditions(self):
-        time_dict = self.input_dictionary["time_axis"]
-        initial_condition = time_dict.get("initial_condition", None)
-        if initial_condition is not None:
-            x_vec = self.get_spatial_coordinates()
-            self.u_n.interpolate(initial_condition(x_vec, 0 - self.dt))
-            self.u_nm1.interpolate(initial_condition(x_vec, 0 - 2*self.dt))
-
-    def parse_boundary_conditions(self):
-        bc_list = self.input_dictionary.get("boundary_conditions", [])
-        for tag, idbc, value in bc_list:
-            if tag == "u":
-                subspace = self.function_space
-            elif tag == "uz":
-                subspace = self.function_space.sub(0)
-            elif tag == "ux":
-                subspace = self.function_space.sub(1)
-            elif tag == "uy":
-                subspace = self.function_space.sub(2)
-            else:
-                raise Exception(
-                    f"Unsupported boundary condition with tag: {tag}")
-            self.bcs.append(DirichletBC(subspace, value, idbc))
-
-    def parse_volumetric_forces(self):
-        acquisition_dict = self.input_dictionary["acquisition"]
-        body_forces_data = acquisition_dict.get("body_forces", None)
-        if body_forces_data is not None:
-            x_vec = self.get_spatial_coordinates()
-            self.body_forces = body_forces_data(x_vec, self.time)
-
-    def update_p_wave(self):
-        if self.p_wave is None:
-            self.D_h = create_function_space(self.mesh, "DG0", 0)
-            self.p_wave = Function(self.D_h)
-
-        self.p_wave.assign(project(div(self.get_function()), self.D_h))
-
-        return self.p_wave
-
-    def update_s_wave(self):
-        if self.s_wave is None:
-            if self.dimension == 2:
-                self.C_h = create_function_space(self.mesh, "DG0", 0)
-            else:
-                self.C_h = create_function_space(self.mesh, "DG0", 0,
-                                                 dim=self.dimension)
-            self.s_wave = Function(self.C_h)
-
-        self.s_wave.assign(project(curl(self.get_function()), self.C_h))
-
-        return self.s_wave

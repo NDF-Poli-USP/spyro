@@ -4,11 +4,11 @@ from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
                        FunctionSpace, project)
 
 from .elastic_wave import ElasticWave
-from .forms import (elastic_without_pml, viscoelastic_without_pml,
+from .forms import (elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
 from ...utils.typing import (ElasticMaterialParameter, ElasticMaterialParameterization,
-                            ViscoelasticMaterialParameter, AbsorbingBCsType, override)
+                             AbsorbingBCsType, override)
 from ...domains.space import create_function_space
 from .tensor_computation import *
 
@@ -17,15 +17,19 @@ CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
         ElasticMaterialParameter.DENSITY,
         ElasticMaterialParameter.LAMBDA,
         ElasticMaterialParameter.MU,
+        ElasticMaterialParameter.DELTA,
+        ElasticMaterialParameter.EPSILON,
+        ElasticMaterialParameter.GAMMA,
     ),
     ElasticMaterialParameterization.VELOCITY: (
         ElasticMaterialParameter.DENSITY,
         ElasticMaterialParameter.P_WAVE_VELOCITY,
         ElasticMaterialParameter.S_WAVE_VELOCITY,
+        ElasticMaterialParameter.DELTA,
+        ElasticMaterialParameter.EPSILON,
+        ElasticMaterialParameter.GAMMA,
     ),
 }
-
-VISCOELASTIC_PARAMETERS = (ViscoelasticMaterialParameter.Q_VP, ViscoelasticMaterialParameter.Q_VS)
 
 
 def _format_control_parameters(parameters):
@@ -49,15 +53,18 @@ def _format_control_parameters(parameters):
     return "{" + ", ".join(parameter.value for parameter in parameters) + "}"
 
 
-class IsotropicWave(ElasticWave):
-    '''Isotropic elastic wave propagator'''
+class AnisotropicVTIWave(ElasticWave):
+    '''Anisotropic elastic wave propagator'''
 
     def __init__(self, dictionary, comm=None):
-        super().__init__(dictionary, comm=comm)
+        super().__init__(dictionary, anisotropy = WaveType.ANISOTROPIC_VTI_ELASTIC, comm=comm)
         self.rho = None   # Density
         self.lmbda = None  # First Lame parameter
         self.mu = None    # Second Lame parameter
         self.c_s = None   # Secondary wave velocity
+        self.delta = None
+        self.epsilon = None
+        self.gamma = None
         self._control_parameterization = None
         self._material_parameter_function_space = None
 
@@ -136,10 +143,6 @@ class IsotropicWave(ElasticWave):
             and becomes a scalar material ``Function`` after the mesh has been
             created.
             """
-            if callable(value) and not isinstance(value, Constant):
-                if self.mesh is None:
-                    return value(self.mesh)  
-                value = value(self.mesh)
             if np.isscalar(value) or isinstance(value, Constant):
                 if self.mesh is None:
                     return Constant(value) if np.isscalar(value) else value
@@ -166,6 +169,10 @@ class IsotropicWave(ElasticWave):
         )
         self.c = get_value(ElasticMaterialParameter.P_WAVE_VELOCITY)
         self.c_s = get_value(ElasticMaterialParameter.S_WAVE_VELOCITY)
+        self.delta = get_value(ElasticMaterialParameter.DELTA)
+        self.gamma = get_value(ElasticMaterialParameter.GAMMA)
+        self.epsilon = get_value(ElasticMaterialParameter.EPSILON)
+        self.anisotropy_type = synthetic_data_dict["anisotropy"]
 
         # Check if {rho, lambda, mu} is set and {c, c_s} are not
         option_1 = bool(self.rho) and \
@@ -180,22 +187,14 @@ class IsotropicWave(ElasticWave):
             not bool(self.lmbda) and \
             not bool(self.mu)
 
-        if option_2:
-            self.Q_vp = get_value(ViscoelasticMaterialParameter.Q_VP)
-            self.Q_vs = get_value(ViscoelasticMaterialParameter.Q_VS)
-
         if option_1:
             self._control_parameterization = ElasticMaterialParameterization.LAME
             self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
             self.c_s = (self.mu/self.rho)**0.5
-            self.Q_lambda = get_value(ViscoelasticMaterialParameter.Q_LAMBDA)
-            self.Q_mu = get_value(ViscoelasticMaterialParameter.Q_MU)
-
         elif option_2:
             self._control_parameterization = ElasticMaterialParameterization.VELOCITY
             self.mu = self.rho*self.c_s**2
             self.lmbda = self.rho*self.c**2 - 2*self.mu
-
         else:
             raise ValueError(
                 "Inconsistent selection of isotropic elastic wave parameters:\n"
@@ -372,6 +371,14 @@ class IsotropicWave(ElasticWave):
                 parameters[parameter] = self.c
             elif parameter is ElasticMaterialParameter.S_WAVE_VELOCITY:
                 parameters[parameter] = self.c_s
+            elif parameter is ElasticMaterialParameter.DELTA:
+                parameters[parameter] = self.delta
+            elif parameter is ElasticMaterialParameter.EPSILON:
+                parameters[parameter] = self.epsilon
+            elif parameter is ElasticMaterialParameter.GAMMA:
+                parameters[parameter] = self.gamma
+            elif parameter is ElasticMaterialParameter.ANISOTROPY_TYPE:
+                parameters[parameter] = self.anisotropy_type
             else:
                 raise ValueError(
                     f"Unsupported elastic control parameter '{parameter.value}'.",
@@ -477,6 +484,10 @@ class IsotropicWave(ElasticWave):
             self._control_parameterization = ElasticMaterialParameterization.LAME
             synthetic_data["lambda"] = self.lmbda
             synthetic_data["mu"] = self.mu
+            synthetic_data["delta"] = self.delta
+            synthetic_data["epsilon"] = self.epsilon
+            synthetic_data["gamma"] = self.gamma
+            synthetic_data["anisotropy"] = self.anisotropy_type
         else:
             self.c = self._as_control_field(
                 controls[ElasticMaterialParameter.P_WAVE_VELOCITY],
@@ -491,6 +502,10 @@ class IsotropicWave(ElasticWave):
             self._control_parameterization = ElasticMaterialParameterization.VELOCITY
             synthetic_data["p_wave_velocity"] = self.c
             synthetic_data["s_wave_velocity"] = self.c_s
+            synthetic_data["delta"] = self.delta
+            synthetic_data["epsilon"] = self.epsilon
+            synthetic_data["gamma"] = self.gamma
+            synthetic_data["anisotropy"] = self.anisotropy_type
 
         self.input_dictionary["synthetic_data"] = synthetic_data
 
@@ -522,45 +537,10 @@ class IsotropicWave(ElasticWave):
 
         self.Elastic_C = C_computation(self)
 
-        is_viscoelastic = self.input_dictionary.get("viscoelasticity", False)
-
-        if is_viscoelastic:
-            self.visco_type = d["visco_type"]
-            W = TensorFunctionSpace(self.function_space.mesh(), "DG", 0)
-            self.strain_space = W
-            
-            # GSLS parameters
-            self.y_list     = d["y_gsls"]        # list of y_l
-            self.omega_list = d["omega_gsls"]    # list of omega_l
-            dim = self.function_space.mesh().topological_dimension()
-
-            num_branches = d["branches"] 
-            
-            # Memory variables
-            self.zeta_list = [Function(self.strain_space, name=f"Memory variable zeta_{i}")
-                    for i in range(num_branches)]
-
-            for zeta in self.zeta_list:
-                zeta.assign(0.0)
-
-            self.eps_np1 = Function(self.strain_space, name="eps_np1")
-            self.eps_n   = Function(self.strain_space, name="eps_n")
-
-            self.eps_n.assign(0.0)
-
-            self.sigma_np1 = Function(self.strain_space, name="eps_np1")
-            self.sigma_n   = Function(self.strain_space, name="eps_n")
-
-            self.sigma_n.assign(0.0)
-
-            self.Gamma = build_Gamma(self)
-
         if self.abc_type in [AbsorbingBCsType.NRBC, AbsorbingBCsType.NOABCS]:
-            viscoelastic_without_pml(self)
+            elastic_without_pml(self)
         elif self.abc_type == AbsorbingBCsType.PML:
             isotropic_elastic_with_pml(self)
-        else:
-            elastic_without_pml
 
     @override
     def rhs_no_pml(self):

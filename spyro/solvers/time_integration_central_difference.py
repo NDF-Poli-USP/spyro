@@ -1,5 +1,6 @@
 import firedrake as fire
 import numpy as np
+from firedrake import *
 
 from . import helpers
 from .. import utils
@@ -111,6 +112,28 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.solver.solve()
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
+        
+        if hasattr(wave, "viscoelastic"):
+            if wave.viscoelastic == True:
+                dt = wave.dt
+                V = wave.function_space
+                W = wave.strain_space
+
+                zeta_list    = wave.zeta_list
+                omega_list = wave.omega_list
+                def epsilon(u):
+                    return sym(grad(u))
+                    
+                # Strain rate
+                eps = project(epsilon(wave.vstate), W)
+
+                # Update memory variables
+                for i in range(len(zeta_list)):
+                    zeta_old = Function(W)
+                    zeta_old.assign(zeta_list[i])
+                    omega = omega_list[i]
+                    zeta_np1 = project(zeta_old + dt * omega * (eps - zeta_old), W)
+                    zeta_list[i].assign(zeta_np1)
 
         if wave.use_vertex_only_mesh:
             if receiver_buffer is None:
