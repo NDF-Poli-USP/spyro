@@ -200,3 +200,235 @@ def plot_function_layer_size(
         show=show,
         bbox_inches="tight",
     )
+
+
+def plot_frequency_domain_receiver_responses(
+        wave, factor_xlim: float = 4.0, show: bool = False,
+    ):
+    """Plot the frequency-domain receiver responses.
+
+    Creates a multi-panel figure comparing the real FFT (RFFT) response of
+    each receiver between the computed and reference solutions. Vertical
+    lines indicate the source and reference frequencies.
+
+    Parameters
+    ----------
+    wave : object
+        Wave object containing the simulation results. It must provide the
+        following attributes:
+
+        - ``receivers_out_fft`` : ndarray
+            RFFT of the computed receiver data. The first dimension
+            corresponds to frequency and the second to receivers.
+        - ``receivers_ref_fft`` : ndarray
+            RFFT of the reference receiver data, with the same shape as
+            ``receivers_out_fft``.
+        - ``dt`` : float
+            Time step used in the simulation, in seconds.
+        - ``frequency`` : float
+            Source frequency in Hz.
+        - ``freq_ref`` : float
+            Reference frequency in Hz.
+        - ``number_of_receivers`` : int
+            Number of receivers.
+        - ``path_case_abc`` : str or path-like
+            Output filename prefix. ``"freq.png"`` and ``"freq.pdf"``
+            are appended to this path.
+
+    factor_xlim : float, optional
+        Factor used to determine the upper frequency limit. The x-axis
+        extends to ``factor_xlim * frequency``, constrained to the range
+        ``[2 * frequency, freq_Nyq]``, where ``freq_Nyq`` is the Nyquist
+        frequency associated with ``wave.dt``. Must be greater than or
+        equal to 2. Default is 4.0.
+
+    show : bool, optional
+        If ``True``, display the figure after saving it. Default is ``False``.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If ``factor_xlim`` is smaller than 2, if the number of receivers is
+        invalid, or if the computed and reference FFT arrays have
+        incompatible shapes.
+
+    Notes
+    -----
+    Two files are saved:
+
+    - ``{path_case_abc}freq.png``
+    - ``{path_case_abc}freq.pdf``
+
+    The computed and reference solutions use consecutive colors from
+    Matplotlib's default color cycle. The computed solution is plotted as a
+    solid line and the reference solution as a dashed line. Vertical lines
+    mark the source and reference frequencies.
+    """
+    if factor_xlim < 2:
+        raise ValueError("factor_xlim must be greater than or equal to 2.")
+
+    num_receivers = wave.number_of_receivers
+    if num_receivers < 1:
+        raise ValueError("number_of_receivers must be greater than zero.")
+
+    receivers_out_fft = wave.receivers_out_fft
+    receivers_ref_fft = wave.receivers_ref_fft
+
+    if receivers_out_fft.shape != receivers_ref_fft.shape:
+        raise ValueError(
+            "Computed and reference FFT arrays must have the same shape."
+        )
+
+    if receivers_out_fft.ndim != 2:
+        raise ValueError("Receiver FFT data must be a two-dimensional array.")
+
+    if receivers_out_fft.shape[1] != num_receivers:
+        raise ValueError(
+            "The number of receivers does not match the FFT data."
+        )
+
+    freq_source = wave.frequency
+    freq_ref = wave.freq_ref
+
+    # Construct the frequency axis directly from the simulation time step.
+    num_time_samples = 2 * (receivers_out_fft.shape[0] - 1)
+    frequencies = np.fft.rfftfreq(num_time_samples, d=wave.dt)
+
+    freq_nyq = frequencies[-1]
+
+    # Determine the displayed frequency range.
+    freq_limit = min(
+        max(factor_xlim * freq_source, 2.0 * freq_source),
+        freq_nyq,
+    )
+
+    # Include only FFT bins within the displayed frequency range.
+    frequency_mask = frequencies <= freq_limit
+    frequencies = frequencies[frequency_mask]
+
+    computed_frequency_data = receivers_out_fft[frequency_mask]
+    reference_frequency_data = receivers_ref_fft[frequency_mask]
+
+    same_frequency = np.isclose(freq_source, freq_ref)
+
+    if same_frequency:
+        reference_label = r"$f_{ref} = f_{sou}$"
+    else:
+        reference_label = r"$f_{ref}$"
+
+    fig, axes = plt.subplots(
+        nrows=num_receivers,
+        ncols=1,
+        squeeze=False,
+        sharex=True,
+        figsize=(6.4, 2.5 * num_receivers),
+    )
+    axes = axes[:, 0]
+
+    fig.subplots_adjust(hspace=0.6)
+
+    # Use the Matplotlib color cycle instead of hard-coding colors.
+    color_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    computed_color = color_cycle[0]
+    reference_color = color_cycle[1]
+
+    for receiver, ax in enumerate(axes):
+        computed = computed_frequency_data[:, receiver]
+        reference = reference_frequency_data[:, receiver]
+
+        ax.plot(
+            frequencies,
+            computed,
+            color=computed_color,
+            linestyle="-",
+            linewidth=2,
+            label="Computed",
+        )
+        ax.plot(
+            frequencies,
+            reference,
+            color=reference_color,
+            linestyle="--",
+            linewidth=2,
+            label="Reference",
+        )
+
+        ax.axvline(
+            freq_ref,
+            color="black",
+            linestyle="-",
+            linewidth=1.25,
+        )
+
+        if not same_frequency:
+            ax.axvline(
+                freq_source,
+                color="black",
+                linestyle="-",
+                linewidth=1.25,
+            )
+
+        ax.text(
+            0.995,
+            0.9,
+            f"R{receiver + 1}",
+            transform=ax.transAxes,
+            fontsize=8.5,
+            fontweight="bold",
+            verticalalignment="top",
+            horizontalalignment="right",
+        )
+
+        ax.set_xlim(0, freq_limit)
+        ax.grid(True)
+        ax.ticklabel_format(
+            axis="y",
+            style="scientific",
+            scilimits=(-2, 2),
+        )
+
+    for ax in axes[:-1]:
+        ax.tick_params(axis="x", labelbottom=False)
+
+    axes[num_receivers // 2].set_ylabel(r"$FFT \; recs_{norm}$")
+
+    bottom_axis = axes[-1]
+    bottom_axis.set_xlabel(r"$f \; (Hz)$")
+
+    y_min, _ = bottom_axis.get_ylim()
+    label_y = y_min * 1.05
+
+    bottom_axis.text(
+        freq_ref - freq_limit / 500.0,
+        label_y,
+        reference_label,
+        fontsize=8,
+        fontweight="bold",
+        horizontalalignment="right",
+        verticalalignment="bottom",
+    )
+
+    if not same_frequency:
+        bottom_axis.text(
+            freq_source + freq_limit / 500.0,
+            label_y,
+            r"$f_{sou}$",
+            fontsize=8,
+            fontweight="bold",
+            horizontalalignment="left",
+            verticalalignment="bottom",
+        )
+
+    output_prefix = str(wave.path_case_abc) + "freq"
+
+    fig.savefig(output_prefix + ".png", bbox_inches="tight")
+    fig.savefig(output_prefix + ".pdf", bbox_inches="tight")
+
+    if show:
+        plt.show()
+
+    plt.close(fig)
