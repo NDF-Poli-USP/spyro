@@ -15,6 +15,7 @@ from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
+from ..utils.physical_parameters import PhysicalParameters
 from ..utils.error_management import validate_enum
 from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
                             LayerShapeType, WaveType)
@@ -100,6 +101,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Tolerance for searching nodes in the mesh.
     """
 
+    #: The physical parameters the equation is written in terms of. Solvers
+    #: override this with the material parameters of their own equation.
+    _physical_parameter_names = frozenset()
+
     def __init__(self, dictionary=None, wave_type=WaveType.NONE, comm=None):
         """Wave object solver. Contains both the forward solver
         and gradient calculator methods.
@@ -178,6 +183,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                         self.input_dictionary["visualization"])
         self.field_logger.add_field("forward", self.get_function_name(),
                                     lambda: self.get_function())
+
+        self._physical_parameters = PhysicalParameters()
 
     def forward_solve(self):
         """Solves the forward problem."""
@@ -360,6 +367,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Resseting old velocity model
         self.initial_velocity_model = None
         self.initial_velocity_model_file = None
+        # The registered physical parameters describe the model being replaced,
+        # so they are dropped along with it. Whoever needs them next rebuilds
+        # them, either through a forward solve or through
+        # initialize_physical_parameters(); leaving them in place would hand
+        # out the previous model's values.
+        self._physical_parameters = PhysicalParameters()
         if new_file is not None:
             self.initial_velocity_model_file = new_file
         # If no mesh is set, we have to do it beforehand
@@ -729,61 +742,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.path_case_abc = self.layer_ops.path_case_abc
 
     @abstractmethod
-    def get_control_parameters(self):
-        """Return inversion controls exposed by a concrete wave solver.
-
-        Subclasses override this method when they can participate in inversion
-        workflows. The base class raises because a generic ``spyro.solvers.Wave`` does not
-        know which physical parameters should be optimized.
-
-        Returns
-        -------
-        object
-            Solver-specific control structure.
-
-        Raises
-        ------
-        NotImplementedError
-            Always raised by the base class.
-
-        Examples
-        --------
-        ``AcousticWave.get_control_parameters()`` returns the velocity model;
-        an elastic solver may return a dictionary of material parameters.
-        """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not expose inversion control parameters.",
-        )
-
-    @abstractmethod
-    def set_control_parameters(self, controls):
-        """Assign inversion controls on a concrete wave solver.
-
-        Parameters
-        ----------
-        controls : object
-            Solver-specific control structure.
-
-        Returns
-        -------
-        None
-            Concrete subclasses assign the controls in-place.
-
-        Raises
-        ------
-        NotImplementedError
-            Always raised by the base class.
-
-        Examples
-        --------
-        ``AcousticWave.set_control_parameters(vp)`` assigns a velocity model;
-        elastic solvers expect a dictionary keyed by material-parameter enums.
-        """
-        raise NotImplementedError(
-            f"{type(self).__name__} cannot assign inversion control parameters.",
-        )
-
-    @abstractmethod
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
         """Compute an adjoint gradient for inversion.
 
@@ -816,29 +774,59 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             f"{type(self).__name__} does not implement gradient_solve().",
         )
 
-    @abstractmethod
-    def get_control_parameter_function_space(self):
-        """Return the function space used by inversion controls.
+    @property
+    def physical_parameters(self):
+        """Return the physical parameters of the wave equation being solved.
 
-        Subclasses override this method to tell the FWI driver where scalar
-        controls should live when constants or expressions need to be converted
-        to Firedrake ``Function`` objects.
+        The parameters are the material fields the variational form is written
+        in terms of: the velocity model for an acoustic medium, density and a
+        pair of elastic moduli or wave speeds for an isotropic elastic one.
+        Solvers declare them while initializing their material properties.
+
+        A wave solver knows only about physical parameters. Which of them an
+        inversion treats as unknowns is a property of the inversion, not of
+        the wave equation, and is held by
+        :class:`~spyro.solvers.inversion.FullWaveformInversion`.
 
         Returns
         -------
-        firedrake.FunctionSpace
-            Solver-specific control function space.
+        PhysicalParameters
+            Set of parameter names, mapping each name to its field.
 
         Raises
         ------
-        NotImplementedError
-            Always raised by the base class.
+        ValueError
+            If the solver has not initialized its material properties yet.
 
         Examples
         --------
-        Acoustic controls use the acoustic pressure/velocity function space;
-        elastic material controls use a scalar material-parameter space.
+        >>> wave.physical_parameters
+        PhysicalParameters({p_wave_velocity})
+        >>> {"p_wave_velocity"} <= wave.physical_parameters
+        True
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not define a control parameter function space.",
-        )
+        try:
+            parameters = self._physical_parameters
+        except AttributeError:
+            parameters = PhysicalParameters()
+        if not parameters:
+            raise ValueError(
+                "Physical parameters have not been set. Please ensure that "
+                "the wave solver has been properly initialized and that "
+                "physical parameters have been defined."
+            )
+        return parameters
+
+    def initialize_physical_parameters(self):
+        """Build the material fields of the wave equation from the model input.
+
+        The forward solve does this on its own, so this is only needed to read
+        the physical parameters of a solver that has not run yet.
+
+        Returns
+        -------
+        PhysicalParameters
+            The initialized physical parameters.
+        """
+        self._initialize_model_parameters()
+        return self.physical_parameters
