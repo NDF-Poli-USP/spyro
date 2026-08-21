@@ -367,6 +367,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Resseting old velocity model
         self.initial_velocity_model = None
         self.initial_velocity_model_file = None
+        # The registered physical parameters describe the model being replaced,
+        # so they are dropped along with it. Whoever needs them next rebuilds
+        # them, either through a forward solve or through
+        # initialize_physical_parameters(); leaving them in place would hand
+        # out the previous model's values.
+        self._physical_parameters = PhysicalParameters()
         if new_file is not None:
             self.initial_velocity_model_file = new_file
         # If no mesh is set, we have to do it beforehand

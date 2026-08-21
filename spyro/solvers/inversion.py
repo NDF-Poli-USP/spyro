@@ -239,6 +239,8 @@ class Objective(RObjective):
             Current iteration number.
         """
         control_reference = self.inversion_obj.control_parameters
+        if control_reference is None:
+            raise ValueError("No guess control parameter has been configured.")
         updated_control = fire.Function(
             control_reference.function_space(),
             x.vec,
@@ -379,7 +381,7 @@ class FullWaveformInversion:
         self.real_mesh = None
         self.guess_mesh = None
         self._control_parameters = PhysicalParameters()
-        self._real_controls = PhysicalParameters()
+        self._real_model_parameters = PhysicalParameters()
 
         self.control_out = fire.VTKFile(inversion_dictionary["control_output_file"])
         self.gradient_out = fire.VTKFile(inversion_dictionary["gradient_output_file"])
@@ -567,19 +569,21 @@ class FullWaveformInversion:
         (parameter,) = self._controlled_parameters()
         return {parameter: control}
 
-    def _push_control_to_wave(self, wave, control):
-        """Write control values into a solver's physical parameters.
+    def _write_parameters_into_wave(self, wave, values):
+        """Write material values into a solver's physical parameters.
 
-        This is the one place where a control becomes a physical parameter.
-        The solver is only asked to set a parameter of its own equation; it is
-        never told that the value came from an inversion.
+        This is the one place where an inversion value becomes a physical
+        parameter. The solver is only asked to set a parameter of its own
+        equation; it is never told where the value came from, which is why
+        this serves both the controls being optimized and the true model that
+        generates the observed data.
 
         Parameters
         ----------
         wave : Wave
             Solver to update.
-        control : mapping
-            Control values keyed by material parameter.
+        values : mapping
+            Values keyed by material parameter.
 
         Raises
         ------
@@ -590,8 +594,8 @@ class FullWaveformInversion:
         try:
             parameters = wave.physical_parameters
         except ValueError:
-            # A control is applied by writing into the field of the parameter
-            # it controls, so a solver that has never been given a model has
+            # A value is applied by writing into the field of the parameter
+            # it belongs to, so a solver that has never been given a model has
             # nothing to write into. Create that field, empty, through the
             # solver's own public model API; the loop below fills it in, the
             # same way it writes every later iterate.
@@ -601,7 +605,7 @@ class FullWaveformInversion:
             )
             wave.set_initial_velocity_model(velocity_model_function=field)
             parameters = wave.initialize_physical_parameters()
-        for name, value in control.items():
+        for name, value in values.items():
             parameters.update(name, value)
 
     def _control_function_space(self, wave=None):
@@ -618,8 +622,12 @@ class FullWaveformInversion:
             wave.force_rebuild_function_space()
         return wave.function_space
 
-    def _copy_control_from_wave(self, wave):
-        """Copy the current values of the controlled parameters out of a solver.
+    def _copy_parameters_from_wave(self, wave):
+        """Copy the controlled parameters' current values out of a solver.
+
+        The counterpart of :meth:`_write_parameters_into_wave`. Only the
+        parameters being inverted for are copied, whether the solver holds a
+        guess model or the true one.
 
         Parameters
         ----------
@@ -763,6 +771,11 @@ class FullWaveformInversion:
             Updates ``control_parameters`` and ``guess_mesh``. The cached misfit is
             reset.
 
+        Raises
+        ------
+        ValueError
+            If ``control`` holds no value.
+
         Examples
         --------
         ``set_guess_control(control)`` stores a defensive copy of the control
@@ -770,7 +783,14 @@ class FullWaveformInversion:
         uniform control ``Function`` filled with ``2.0``.
         """
         control = self._control_by_parameter(control)
-        self._push_control_to_wave(self.wave, control)
+        if not control:
+            # Storing an empty mapping would drop the selection and leave the
+            # inversion looking unconfigured, several calls away from here.
+            raise ValueError(
+                "A guess control value is required. Received "
+                f"{control!r}.",
+            )
+        self._write_parameters_into_wave(self.wave, control)
         self.guess_mesh = self.wave.get_mesh()
         self._control_parameters = self.wave.physical_parameters.copy(control)
         self.misfit = None
@@ -883,7 +903,7 @@ class FullWaveformInversion:
             )
             self.set_guess_control(updated_control)
         elif self._control_parameters:
-            self._push_control_to_wave(self.wave, self._control_parameters)
+            self._write_parameters_into_wave(self.wave, self._control_parameters)
         else:
             raise ValueError("No guess control parameter has been configured.")
 
@@ -957,8 +977,8 @@ class FullWaveformInversion:
         if self.real_mesh is not None:
             real_wave.set_mesh(user_mesh=self.real_mesh, input_mesh_parameters={})
 
-        if self._real_controls:
-            self._push_control_to_wave(real_wave, self._real_controls)
+        if self._real_model_parameters:
+            self._write_parameters_into_wave(real_wave, self._real_model_parameters)
         elif self.real_velocity_model_file is not None:
             try:
                 real_wave.initial_velocity_model_file
@@ -1049,7 +1069,7 @@ class FullWaveformInversion:
             dg_velocity_model=dg_velocity_model,
         )
         self.real_mesh = self.wave.get_mesh()
-        self._real_controls = self._copy_control_from_wave(self.wave)
+        self._real_model_parameters = self._copy_parameters_from_wave(self.wave)
         if new_file is not None:
             self.real_velocity_model_file = new_file
 
@@ -1107,7 +1127,7 @@ class FullWaveformInversion:
             dg_velocity_model=dg_velocity_model,
         )
         self.guess_mesh = self.wave.get_mesh()
-        self._control_parameters = self._copy_control_from_wave(self.wave)
+        self._control_parameters = self._copy_parameters_from_wave(self.wave)
         self.misfit = None
 
     def set_real_mesh(self, user_mesh=None, input_mesh_parameters=None):

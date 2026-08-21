@@ -209,7 +209,9 @@ def test_control_parameters_are_a_subset_of_the_physical_ones():
     fwi.set_guess_control(fire.Constant(2.0))
 
     # Which parameters are inverted for is recorded by the keys of the control
-    # dictionary, and nowhere else.
+    # set, and nowhere else. An acoustic medium is described by its velocity
+    # model alone, so that is the whole selection.
+    assert set(fwi._control_parameters) == {VELOCITY}
     assert set(fwi._control_parameters) <= fwi.wave.physical_parameters
 
 
@@ -275,6 +277,38 @@ def test_velocity_model_setters_capture_the_control():
     fwi.set_guess_velocity_model(constant=2.0)
 
     assert isinstance(fwi.control_parameters, fire.Function)
+    assert np.allclose(fwi.control_parameters.dat.data_ro, 2.0)
+
+
+@pytest.mark.parametrize("real_first", [True, False])
+def test_velocity_model_setters_capture_each_model_separately(real_first):
+    # Both models are configured on the same solver, one after the other, which
+    # is how every synthetic inversion is set up. Whichever runs second must
+    # not read back the values the first one left registered.
+    fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
+    fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
+
+    if real_first:
+        fwi.set_real_velocity_model(constant=3.0)
+        fwi.set_guess_velocity_model(constant=2.0)
+    else:
+        fwi.set_guess_velocity_model(constant=2.0)
+        fwi.set_real_velocity_model(constant=3.0)
+
+    assert np.allclose(fwi.control_parameters.dat.data_ro, 2.0)
+    (real,) = fwi._real_model_parameters.values()
+    assert np.allclose(real.dat.data_ro, 3.0)
+
+
+def test_guess_control_rejects_an_empty_value():
+    fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
+    fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
+    fwi.set_guess_control(fire.Constant(2.0))
+
+    with pytest.raises(ValueError, match="guess control value is required"):
+        fwi.set_guess_control(None)
+
+    # The configured control survives the rejected call.
     assert np.allclose(fwi.control_parameters.dat.data_ro, 2.0)
 
 
