@@ -606,48 +606,30 @@ class FullWaveformInversion:
         wave : Wave
             Solver to update.
         control : mapping
-            Control values keyed by canonical parameter name.
-        """
-        try:
-            parameters = wave.physical_parameters
-        except ValueError:
-            parameters = self._build_wave_material_fields(wave, control)
-        for name, value in control.items():
-            parameters.update(name, value)
-
-    def _build_wave_material_fields(self, wave, control):
-        """Give the controls somewhere to be written, on a fresh solver.
-
-        A control is written into the field of the physical parameter it
-        controls, so that field has to exist first. On a solver that has not
-        been initialized, it is created through the solver's own public model
-        API rather than by reaching into how it initializes itself.
-
-        Parameters
-        ----------
-        wave : Wave
-            Solver whose material fields are missing.
-        control : mapping
             Control values keyed by material parameter.
-
-        Returns
-        -------
-        PhysicalParameters
-            The solver's initialized physical parameters.
 
         Raises
         ------
         ValueError
-            If several parameters are controlled. Only the acoustic velocity
-            model can be built this way.
+            If the solver has no fields yet and several parameters are
+            controlled. Only the acoustic velocity model can be created here.
         """
-        (name,) = self._controlled_parameters()
-        velocity = fire.Function(
-            self._control_function_space(wave), name=name.value,
-        )
-        velocity.interpolate(control[name])
-        wave.set_initial_velocity_model(velocity_model_function=velocity)
-        return wave.initialize_physical_parameters()
+        try:
+            parameters = wave.physical_parameters
+        except ValueError:
+            # A control is applied by writing into the field of the parameter
+            # it controls, so a solver that has never been given a model has
+            # nothing to write into. Create that field, empty, through the
+            # solver's own public model API; the loop below fills it in, the
+            # same way it writes every later iterate.
+            (parameter,) = self._controlled_parameters()
+            field = fire.Function(
+                self._control_function_space(wave), name=parameter.value,
+            )
+            wave.set_initial_velocity_model(velocity_model_function=field)
+            parameters = wave.initialize_physical_parameters()
+        for name, value in control.items():
+            parameters.update(name, value)
 
     def _control_function_space(self, wave=None):
         """Return the function space FWI controls live in.
