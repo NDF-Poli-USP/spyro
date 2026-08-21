@@ -892,16 +892,7 @@ class FullWaveformInversion:
             self.real_shot_record = real_wave.forward_solution_receivers
         self._sync_wave_real_shot_record()
 
-    def set_real_velocity_model(
-        self,
-        constant=None,
-        conditional=None,
-        velocity_model_function=None,
-        expression=None,
-        new_file=None,
-        output=False,
-        dg_velocity_model=True,
-    ):
+    def set_real_velocity_model(self, **kwargs):
         """
         Set the true velocity model for synthetic test cases.
 
@@ -911,56 +902,25 @@ class FullWaveformInversion:
 
         Parameters
         ----------
-        constant : float, optional
-            Constant velocity value for a homogeneous model.
-        conditional : firedrake.Conditional, optional
-            Firedrake conditional object defining the velocity distribution.
-        velocity_model_function : firedrake.Function, optional
-            Firedrake function to use as the velocity model. Must be in the
-            same function space as the object.
-        expression : str, optional
-            Mathematical expression string for the velocity model. Can use
-            variables: x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
-            Will be interpolated into the function space.
-        new_file : str, optional
-            Path to file containing the velocity model.
-        output : bool, optional
-            If True, output the velocity model to a pvd file for visualization.
-            Default is False.
-        dg_velocity_model : bool, optional
-            If True, use DG0 function space. Default is True.
+        **kwargs
+            Keyword arguments accepted by
+            ``self.wave.set_initial_velocity_model``.
 
         Notes
         -----
         Only one of the parameters (constant, conditional, velocity_model_function,
         expression, or new_file) should be provided.
         """
-        self.wave.set_initial_velocity_model(
-            constant=constant,
-            conditional=conditional,
-            velocity_model_function=velocity_model_function,
-            expression=expression,
-            new_file=new_file,
-            output=output,
-            dg_velocity_model=dg_velocity_model,
-        )
+        self.wave.set_initial_velocity_model(**kwargs)
         self.real_mesh = self.wave.get_mesh()
         self.real_control = self._copy_control_structure(
             self.wave.get_control_parameters(),
         )
+        new_file = kwargs.get("new_file", None)
         if new_file is not None:
             self.real_velocity_model_file = new_file
 
-    def set_guess_velocity_model(
-        self,
-        constant=None,
-        conditional=None,
-        velocity_model_function=None,
-        expression=None,
-        new_file=None,
-        output=False,
-        dg_velocity_model=True,
-    ):
+    def set_guess_velocity_model(self, **kwargs):
         """
         Set the initial guess velocity model for inversion.
 
@@ -970,24 +930,9 @@ class FullWaveformInversion:
 
         Parameters
         ----------
-        constant : float, optional
-            Constant velocity value for a homogeneous initial model.
-        conditional : firedrake.Conditional, optional
-            Firedrake conditional object defining the velocity distribution.
-        velocity_model_function : firedrake.Function, optional
-            Firedrake function to use as the velocity model. Must be in the
-            same function space as the object.
-        expression : str, optional
-            Mathematical expression string for the velocity model. Can use
-            variables: x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
-            Will be interpolated into the function space.
-        new_file : str, optional
-            Path to file containing the velocity model.
-        output : bool, optional
-            If True, output the velocity model to a pvd file for visualization.
-            Default is False.
-        dg_velocity_model : bool, optional
-            If True, use DG0 function space. Default is True.
+        **kwargs
+            Keyword arguments accepted by
+            ``self.wave.set_initial_velocity_model``.
 
         Notes
         -----
@@ -995,15 +940,7 @@ class FullWaveformInversion:
         expression, or new_file) should be provided. Setting a new guess model
         will reset the misfit to None.
         """
-        self.wave.set_initial_velocity_model(
-            constant=constant,
-            conditional=conditional,
-            velocity_model_function=velocity_model_function,
-            expression=expression,
-            new_file=new_file,
-            output=output,
-            dg_velocity_model=dg_velocity_model,
-        )
+        self.wave.set_initial_velocity_model(**kwargs)
         self.guess_mesh = self.wave.get_mesh()
         self.guess_control = self._copy_control_structure(
             self.wave.get_control_parameters(),
