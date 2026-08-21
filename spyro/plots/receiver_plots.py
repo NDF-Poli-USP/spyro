@@ -236,7 +236,7 @@ def plot_comparison_of_receivers_to_reference(
         - ``final_time``: final simulation time.
         - ``forward_solution_receivers``: receiver data from the simulation.
         - ``path_case_habc``: output directory for the generated figures.
-    reference_array: reference receiver data.
+    reference_array : reference receiver data.
     show : bool, optional
         Whether to display the figure interactively. Defaults to ``False``.
 

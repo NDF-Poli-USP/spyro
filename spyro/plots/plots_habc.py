@@ -269,7 +269,10 @@ def plot_frequency_domain_receiver_responses(
     here.
     """
     validate_numeric(
-        "frequency_limit_factor", frequency_limit_factor, lower_bound=2, include_lower_bound=True,
+        "frequency_limit_factor",
+        frequency_limit_factor,
+        lower_bound=2,
+        include_lower_bound=True,
     )
 
     number_of_receivers = wave.number_of_receivers
@@ -281,14 +284,10 @@ def plot_frequency_domain_receiver_responses(
         raise ValueError("Receiver FFT data must be a two-dimensional array.")
 
     if computed_receiver_fft.shape != reference_receiver_fft.shape:
-        raise ValueError(
-            "Computed and reference FFT arrays must have the same shape."
-        )
+        raise ValueError("Computed and reference FFT arrays must have the same shape.")
 
     if computed_receiver_fft.shape[1] != number_of_receivers:
-        raise ValueError(
-            "The number of receivers does not match the FFT data."
-        )
+        raise ValueError("The number of receivers does not match the FFT data.")
 
     source_frequency = wave.frequency
     reference_frequency = wave.freq_ref
@@ -327,9 +326,7 @@ def plot_frequency_domain_receiver_responses(
     )
 
     if frequencies_are_equal:
-        reference_frequency_label = (
-            r"$f_{\mathrm{ref}} = f_{\mathrm{source}}$"
-        )
+        reference_frequency_label = r"$f_{\mathrm{ref}} = f_{\mathrm{source}}$"
     else:
         reference_frequency_label = r"$f_{\mathrm{ref}}$"
 
@@ -409,9 +406,7 @@ def plot_frequency_domain_receiver_responses(
     for axis in axes[:-1]:
         axis.tick_params(axis="x", labelbottom=False)
 
-    axes[number_of_receivers // 2].set_ylabel(
-        r"$FFT\; recs_{norm}$"
-    )
+    axes[number_of_receivers // 2].set_ylabel(r"$FFT\; recs_{norm}$")
 
     bottom_axis = axes[-1]
     bottom_axis.set_xlabel(r"$f\; (Hz)$")
