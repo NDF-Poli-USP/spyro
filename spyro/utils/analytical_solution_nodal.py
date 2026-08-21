@@ -1,15 +1,15 @@
 """Methods that calculate analytical solutions for implementation verification."""
 
-from math import pi as PI
 import numpy as np
 from scipy.integrate import quad
 from scipy.special import hankel2
 
 from ..sources import full_ricker_wavelet
+from .typing import SourceType
 
 
 def nodal_homogeneous_analytical(
-    wave, offset: float, c_value: float, n_extra: float = 5000
+    wave, offset: float, c_value: float, n_extra: int = 5000
 ):
     """Calculate the acoustic analytical solution for a homogeneous medium.
 
@@ -115,7 +115,7 @@ def _analytical_solution(
 
 
 def analytical_solution_elastic(
-    source_type: str,
+    source_type: SourceType,
     offsets: np.ndarray | float,
     alpha: float,
     beta: float,
@@ -323,7 +323,7 @@ def analytical_force_source(
 
     def X0(t):
         """Source time function (Ricker wavelet derivative)."""
-        a = PI * frequency * (t - time_delay)
+        a = np.pi * frequency * (t - time_delay)
         return (1 - 2 * a**2) * np.exp(-(a**2))
 
     # Initialize displacement components
@@ -336,7 +336,7 @@ def analytical_force_source(
         res = quad(lambda tau: tau * X0(t - tau), r / alpha, r / beta)
         u_near = (
             amplitude
-            * (1.0 / (4 * PI * rho))
+            * (1.0 / (4 * np.pi * rho))
             * (3 * gamma_i * gamma_j - delta_ij)
             * (1.0 / r**3)
             * res[0]
@@ -345,7 +345,7 @@ def analytical_force_source(
         # P-wave far-field
         P_far = (
             amplitude
-            * (1.0 / (4 * PI * rho * alpha**2))
+            * (1.0 / (4 * np.pi * rho * alpha**2))
             * gamma_i
             * gamma_j
             * (1.0 / r)
@@ -355,7 +355,7 @@ def analytical_force_source(
         # S-wave far field
         S_far = (
             amplitude
-            * (1.0 / (4 * PI * rho * beta**2))
+            * (1.0 / (4 * np.pi * rho * beta**2))
             * (gamma_i * gamma_j - delta_ij)
             * (1.0 / r)
             * X0(t - r / beta)
@@ -451,12 +451,12 @@ def analytical_explosive_source(
 
     def w(t):
         """Get source time function (integral of Ricker wavelet)."""
-        a = PI * frequency * (t - time_delay)
+        a = np.pi * frequency * (t - time_delay)
         return (t - time_delay) * np.exp(-(a**2))
 
     def w_dot(t):
         """Get derivative of source time function (Ricker wavelet)."""
-        a = PI * frequency * (t - time_delay)
+        a = np.pi * frequency * (t - time_delay)
         return (1 - 2 * a**2) * np.exp(-(a**2))
 
     # Initialize displacement components
@@ -468,7 +468,7 @@ def analytical_explosive_source(
         # P wave intermediate field
         P_mid = (
             amplitude
-            * (gamma_i / (4 * PI * rho * alpha**2))
+            * (gamma_i / (4 * np.pi * rho * alpha**2))
             * (1.0 / r**2)
             * w(t - r / alpha)
         )
@@ -476,7 +476,7 @@ def analytical_explosive_source(
         # P wave far field
         P_far = (
             amplitude
-            * (gamma_i / (4 * PI * rho * alpha**3))
+            * (gamma_i / (4 * np.pi * rho * alpha**3))
             * (1.0 / r)
             * w_dot(t - r / alpha)
         )
