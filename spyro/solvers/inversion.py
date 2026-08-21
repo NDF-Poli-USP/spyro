@@ -479,17 +479,36 @@ class FullWaveformInversion:
     def _controlled_parameters(self):
         """Return the parameters being inverted for.
 
-        They are the members of the control set once controls have been
-        configured. Before that there is nothing to read them from, so the
-        inversion controls every physical parameter the solver models. The
-        solver only populates ``physical_parameters`` once its material
-        properties are initialized, which happens on the first forward solve;
-        until then, the parameters its class declares are the same set.
+        Three sources are tried in turn, each one answering the case where the
+        previous is not available yet:
+
+        1. The control set, once ``set_guess_control`` has established it.
+           This is the normal case.
+        2. The solver's physical parameters, when no controls have been set:
+           an inversion that has not been told otherwise inverts for
+           everything the wave equation is written in terms of.
+        3. The parameters the solver *class* declares, when the solver has not
+           built its material fields either. Those fields only exist after the
+           first forward solve, but their names are known from the start, and
+           they are the same set.
+
+        Cases 2 and 3 are what lets ``set_guess_control`` work on a fresh
+        inversion: it is handed a bare ``Function`` that carries no indication
+        of which parameter it belongs to, and the answer has to come from
+        somewhere.
 
         Returns
         -------
         tuple of enum.Enum
-            Controlled material parameters, in a stable order.
+            Controlled material parameters, ordered by name. A tuple rather
+            than a set because callers take the first entry to name the single
+            acoustic control.
+
+        Examples
+        --------
+        On an acoustic inversion, all three cases give
+        ``(AcousticMaterialParameter.P_WAVE_VELOCITY,)``, since an acoustic
+        medium has that one parameter and nothing else to choose from.
         """
         if self._control_parameters:
             return tuple(self._control_parameters)
