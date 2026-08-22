@@ -7,8 +7,8 @@ from ..io.basicio import parallel_print as pprint
 from ..utils.error_management import (mutually_exclusive_parameter_error,
                                       validate_data_structure, validate_file,
                                       validate_numeric, validate_string)
-from ..utils.freq_tools import freq_response
-# from ..plots.plots_habc import plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
+from ..utils.freq_tools import fft_at_receivers
+# from ..plots.plots_habc import plot_xCR_opt
 # from ..utils.error_management import validate_parameter
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -139,8 +139,7 @@ class MeasureError():
         validate_data_structure("forward_solution_receivers", forward_solution_receivers,
                                 "array2D", expected_type_element=("float", "int"),
                                 expected_shape=(None, number_of_receivers))
-        validate_numeric("freq_Nyquist", freq_Nyquist, float_num=True,
-                         integer_num=True, lower_bound=0.)
+        validate_numeric("freq_Nyquist", freq_Nyquist, lower_bound=0.)
 
         pprint("\nSaving Reference Output", comm=self.comm)
 
@@ -154,11 +153,9 @@ class MeasureError():
         save(pth_str + "time.npy", forward_solution_receivers)
 
         # Computing and saving FFT of the reference signal at receivers
-        receivers_ref_fft = []
-        for rec in range(number_of_receivers):
-            signal = forward_solution_receivers[:, rec]
-            yf = freq_response(signal, freq_Nyquist)
-            receivers_ref_fft.append(yf)
+        receivers_ref_fft = fft_at_receivers(
+            number_of_receivers, forward_solution_receivers, freq_Nyquist)
+
         save(pth_str + "fft.npy", receivers_ref_fft)
 
     def get_reference_signal(self, output_file="reference",
@@ -208,7 +205,7 @@ class MeasureError():
         receivers_reference_fft_file = validate_file("reference fft file",
                                                      pth_str + "fft.npy", [".npy"],
                                                      check_file_existence=True)
-        receivers_ref_fft = load(receivers_reference_fft_file).T
+        receivers_ref_fft = load(receivers_reference_fft_file)
 
         if get_energy_reference:
 

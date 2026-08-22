@@ -69,7 +69,7 @@ def f_layer(factor_length_pad, a_par, vibration_mode=1,
     # Checking input parameters
     if isinstance(factor_length_pad, float):
         x = validate_numeric("factor_length_pad", factor_length_pad, float_num=True,
-                             lower_bound=0., include_lower_bound=True)
+                             integer_num=False, lower_bound=0., include_lower_bound=True)
 
     else:
         validate_data_structure("factor_length_pad", factor_length_pad,
@@ -183,11 +183,12 @@ def loop_roots(a_par, lmin, lref, max_roots, tol_rel=1e-3, show_ig=True, monitor
     """
 
     # Checking input parameters
-    validate_numeric("Parameter a", a_par, float_num=True, lower_bound=0.)
-    validate_numeric("lmin", lmin, float_num=True, lower_bound=0)
-    validate_numeric("lref", lref, float_num=True, lower_bound=0)
-    validate_numeric("max_roots", max_roots, float_num=False,
-                     integer_num=True, lower_bound=1, include_lower_bound=True)
+    validate_numeric("Parameter a", a_par, float_num=True,
+                     integer_num=False, lower_bound=0.)
+    validate_numeric("lmin", lmin, float_num=True, integer_num=False, lower_bound=0)
+    validate_numeric("lref", lref, float_num=True, integer_num=False, lower_bound=0)
+    validate_numeric("max_roots", max_roots, float_num=False, integer_num=True,
+                     lower_bound=1, include_lower_bound=True)
     validate_numeric("tol_rel", tol_rel, float_num=True, integer_num=False,
                      lower_bound=0., upper_bound=0.01)
 
@@ -265,6 +266,12 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
         Possible size parameters for the absorbing layer without rounding.
     """
 
+    #  Checking input parameters
+    validate_numeric("Reference frequency", fref, float_num=True,
+                     integer_num=False, lower_bound=0.)
+    validate_numeric("Parameter z", z_par, float_num=True,
+                     integer_num=False, lower_bound=0.)
+
     # Visualizing parameters for computing layer size
     pprint("\nComputing Size for Absorbing Layer")
 
@@ -338,10 +345,10 @@ def roundFL(lmin, lref, factor_length_pad):
     """
 
     # Checking input parameters
-    validate_numeric("lmin", lmin, float_num=True, lower_bound=0)
-    validate_numeric("lref", lref, float_num=True, lower_bound=0)
+    validate_numeric("lmin", lmin, float_num=True, integer_num=False, lower_bound=0)
+    validate_numeric("lref", lref, float_num=True, integer_num=False, lower_bound=0)
     validate_numeric("factor_length_pad", factor_length_pad, float_num=True,
-                     lower_bound=0., include_lower_bound=True)
+                     integer_num=False, lower_bound=0., include_lower_bound=True)
 
     # Adjusting the parameter size of the layer
     factor_length_pad = (lmin / lref) * ceil(lref * factor_length_pad / lmin)

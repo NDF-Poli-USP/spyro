@@ -48,7 +48,7 @@ class NRBC(AbsorbingBC):
             Type of boundary condition to apply on the domain boundaries (for only NRBCs)
             or the outer absorbing layer boundaries (HABCs: Absorbing Layer aand NRBCs).
             Options:'BoundaryConditionsType.HIGDON' or 'BoundaryConditionsType.SOMMERFELD'.
-            Dafault is 'BoundaryConditionsType.HIGDON'.
+            Default is 'BoundaryConditionsType.HIGDON'.
     path_case_nrbc : `string`
         Path to save data for the current case study of NRBCs.
     path_save : `string`
@@ -64,10 +64,11 @@ class NRBC(AbsorbingBC):
         Compute a unitary direction vector from the source to a boundary point.
     """
 
-    def __init__(self, domain_dim, non_reflect_bc=BoundaryConditionsType.HIGDON,
-                 angle_max=pi/4., abc_boundary_type=NRBCBoundaryType.STRAIGHT,
-                 dt=None, dimension=2, quadrilateral=False, nrbc_in_habc=False,
-                 output_folder=None, comm=None):
+    def __init__(self, domain_dim, frequency=None, dt=None,
+                 abc_boundary_type=NRBCBoundaryType.STRAIGHT,
+                 non_reflect_bc=BoundaryConditionsType.HIGDON,
+                 angle_max=pi/4., dimension=2, quadrilateral=False,
+                 nrbc_in_habc=False, output_folder=None, comm=None):
         """Initialize the NRBC class.
 
         Parameters
@@ -75,18 +76,20 @@ class NRBC(AbsorbingBC):
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
             or (length_z, length_x, length_y) for 3D.
+        frequency: `float`, optional
+            Frequency of the source.
+        dt : `float`, optional
+            Time step used in the simulation. Default is `None`.
+        abc_boundary_type : `typing.NRBCBoundaryType`, optional
+            Boundary type where NRBCs are applied . Options: `NRBCBoundaryType.STRAIGHT`
+            or `NRBCBoundaryType.HYPERSHAPE`. Default is `NRBCBoundaryType.STRAIGHT`.
         non_reflect_bc : `typing.BoundaryConditionsType`, optional
             Type of boundary condition to apply on the domain boundaries (for only NRBCs)
             or the outer absorbing layer boundaries (HABCs: Absorbing Layer aand NRBCs).
             Options: `BoundaryConditionsType.HIGDON` or `BoundaryConditionsType.SOMMERFELD`.
-            Dafault is `BoundaryConditionsType.HIGDON`.
+            Default is `BoundaryConditionsType.HIGDON`.
         angle_max : `float`, optional
             Maximum incidence angle considered in the NRBC. Default is `numpy.pi/4` (45°).
-        abc_boundary_type : `typing.NRBCBoundaryType`, optional
-            Boundary type where NRBCs are applied . Options: `NRBCBoundaryType.STRAIGHT`
-            or `NRBCBoundaryType.HYPERSHAPE`. Default is `NRBCBoundaryType.STRAIGHT`.
-        dt : `float`, optional
-            Time step used in the simulation. Default is `None`.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
         quadrilateral : `bool`, optional
@@ -109,10 +112,11 @@ class NRBC(AbsorbingBC):
 
         # Initializing the AbsorbingBC class if NRBCs are not in HABC scheme
         if not nrbc_in_habc:
-            AbsorbingBC.__init__(self, domain_dim, dt=dt, dimension=dimension,
+            AbsorbingBC.__init__(self, domain_dim, frequency=frequency,
+                                 dt=dt, dimension=dimension,
                                  quadrilateral=quadrilateral, comm=comm)
 
-            # Set sthe pad to rectangular shape in case infinitel model is needed.
+            # Set sthe pad to rectangular shape in case the infinite model is needed.
             self.abc_boundary_layer_shape = LayerShapeType.RECTANGULAR
 
         # Flag to indicate if NRBCs are used in HABC scheme

@@ -654,6 +654,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Time step used in the simulation.
         """
         self._dt = dt
+        self.num_timesteps = int(round(self.final_time / dt)) + 1
+
         if self.sources is not None:
             self.sources.update_wavelet(self)
 
@@ -859,7 +861,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Creating NRBC manager if needed (when no layer is added).
         elif self.abc_type == AbsorbingBCsType.NRBC:
             from ..abc.nrbc import NRBC
-            self.nrbc_ops = NRBC(domain_dim, dimension=self.dimension, dt=time_step,
+            self.nrbc_ops = NRBC(domain_dim, frequency=self.frequency,
+                                 dt=time_step, dimension=self.dimension,
                                  quadrilateral=self.mesh_parameters.quadrilateral,
                                  output_folder=self.output_folder, comm=self.comm)
 

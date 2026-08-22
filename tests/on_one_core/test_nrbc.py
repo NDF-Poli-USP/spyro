@@ -380,7 +380,7 @@ def test_nrbc(element_geometry, dimension, calc_eik):
                     max_errPK, final_ener, dsspt_ener = error_measures
 
                 # Plotting the solution at receivers and the error measures
-                wave.nrbc_ops.comparison_plots(wave, receivers_reference)
+                wave.nrbc_ops.comparison_plots(wave, receivers_reference, receivers_ref_fft)
 
                 # Estimating computational resource usage
                 comp_cost("tfin", tRef=tRef, user_name=wave.nrbc_ops.path_case_nrbc)

@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from .plot_helpers import _finalize_figure
+from ..utils.error_management import (validate_data_structure,
+                                      validate_equal_lengths_for_two_sequences)
 
 if TYPE_CHECKING:  # Avoinding circular imports lazily
     from ..solvers.wave import Wave
@@ -121,13 +123,13 @@ def plot_displacement_components(
     time_vector : array_like
         Time samples.
     displacement_tuple : tuple of array_like
-        Displacement components ``(ux, uy, uz)``.
+        Displacement components `(ux, uy, uz)`.
     source_type : str, optional
         Type of source used in plot titles and output filenames.
     save_plots : bool, optional
         Whether to save plots to files.
     output_dir : str or pathlib.Path, optional
-        Directory to save plots if ``save_plots`` is True. Defaults to the
+        Directory to save plots if `save_plots` is True. Defaults to the
         current directory.
     show : bool, optional
         Whether to display the plot interactively. Default is False.
@@ -216,7 +218,7 @@ def plot_displacement_components(
 
 def plot_comparison_of_receivers_to_reference(
     wave: "Wave",
-    reference_array: np.array,
+    reference_data: np.array,
     show: bool = False,
     filename: str | Path | None = None,
 ):
@@ -224,7 +226,7 @@ def plot_comparison_of_receivers_to_reference(
 
     This is a convenience wrapper around
     :func:`plot_compare_receivers_array` that extracts the receiver data
-    and time vector from a ``Wave_object`` before generating the plot.
+    and time vector from a `Wave_object` before generating the plot.
 
     Parameters
     ----------
@@ -232,20 +234,22 @@ def plot_comparison_of_receivers_to_reference(
         An instance of the :class:`~spyro.solvers.wave.Wave`.
         Wave object containing the receiver data and simulation metadata.
         The following attributes are used:
-
-        - ``dt``: simulation time step.
-        - ``final_time``: final simulation time.
-        - ``forward_solution_receivers``: receiver data from the simulation.
-        - ``path_case_habc``: output directory for the generated figures.
-    reference_array: `array`
-        reference receiver data.
+        - `dt` : `float`
+            Time step used in the simulation, in seconds.
+        - `final_time` : `float`
+            Final simulation time.
+        - `forward_solution_receivers` : `ndarray`
+            Receiver data from the simulation.
+        - `path_case_habc`: output directory for the generated figures.
+    reference_data : `ndarray`
+        Reference receiver data.
     show : `bool`, optional
-        Whether to display the figure interactively. Defaults to ``False``.
+        Whether to display the figure interactively. Defaults to `False`.
     filename : `str` or `pathlib.Path`, optional
         Path (without extension) where the figure should be saved.
-        If ``None``, the figure is not saved. If the ``wave`` object has
-        a ``path_case_abc`` attribute, the figure will be saved in that directory
-        with the default filename ``time_comparison``.
+        If `None`, the figure is not saved. If the `wave` object has
+        a `path_case_abc` attribute, the figure will be saved in that directory
+        with the default filename `time_comparison`.
 
     Returns
     -------
@@ -258,16 +262,27 @@ def plot_comparison_of_receivers_to_reference(
     """
     dt = wave.dt
     final_time = wave.final_time
-    num_timesteps = int(round(final_time / dt)) + 1
-
+    num_timesteps = wave.num_timesteps
     time_values = np.linspace(0.0, final_time, num_timesteps)
+    number_of_receivers = wave.number_of_receivers
 
     if filename is None and hasattr(wave, "path_case_abc"):
         filename = Path(wave.path_case_abc) / "time_comparison"
 
+    # Validate arrays of the computed and reference solution arrays
+    validate_data_structure("Receiver solution", wave.forward_solution_receivers,
+                            "array2D", expected_type_element=("float"),
+                            expected_shape=(None, number_of_receivers))
+    validate_data_structure("Reference solution", reference_data,
+                            "array2D", expected_type_element=("float"),
+                            expected_shape=(None, number_of_receivers))
+    validate_equal_lengths_for_two_sequences("Receiver solution",
+                                             wave.forward_solution_receivers,
+                                             "Reference solution", reference_data)
+
     plot_compare_receivers_array(
         receiver_data_first=wave.forward_solution_receivers,
-        receiver_data_second=reference_array,
+        receiver_data_second=reference_data,
         time_values=time_values,
         first_label="Simulation",
         second_label="Reference",
@@ -289,21 +304,21 @@ def plot_compare_receivers_array(
 
     Parameters
     ----------
-    receiver_data_first
-        Receiver data with shape ``(n_timesteps, n_receivers)``.
-    receiver_data_second
-        Receiver data with shape ``(n_timesteps, n_receivers)``.
-    time_values
+    receiver_data_first : `ndarray`
+        Receiver data with shape `(n_timesteps, n_receivers)`.
+    receiver_data_second : `ndarray`
+        Receiver data with shape `(n_timesteps, n_receivers)`.
+    time_values : `ndarray`
         Time corresponding to each sample.
-    first_label
-        Legend label for the first receiver array.
-    second_label
-        Legend label for the second receiver array.
-    output_path
+    first_label : `str`
+        Legend label for the first receiver array. Defaults to "Solution".
+    second_label : `str`, optional
+        Legend label for the second receiver array. Defaults to "Reference".
+    output_path : `pathlib.Path`, optional
         Path (without extension) where the figure should be saved.
-        If ``None``, the figure is not saved.
-    show
-        Whether to display the figure.
+        If `None`, the figure is not saved.
+    show : `bool`, optional
+        Whether to display the figure. Defaults to `False`.
 
     Returns
     -------

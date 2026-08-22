@@ -283,7 +283,7 @@ def plot_shots(
     else:
         arr = wave.forward_solution_receivers[:, :, out_index]
 
-    nt = int(tf / dt) + 1  # number of timesteps
+    nt = wave.num_timesteps  # number of timesteps
 
     if end_index == 0:
         end_index = num_recvs

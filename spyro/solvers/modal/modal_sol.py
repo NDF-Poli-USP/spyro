@@ -503,7 +503,7 @@ class Modal_Solver():
                f"(ms): {1e3 * max_dt:.3f}", comm=self.comm)
 
         max_dt *= fraction
-        nt = int(final_time / max_dt) + 1
+        nt = int(round(final_time / max_dt)) + 1
         max_dt = final_time / (nt - 1)
 
         return max_dt

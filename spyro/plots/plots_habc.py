@@ -9,6 +9,9 @@ import numpy as np
 from ..abc.lay_len import f_layer, loop_roots
 from .plot_helpers import _finalize_figure
 from ..tools.abc_set_path_cases import create_folder
+from ..utils.error_management import (validate_data_structure,
+                                      validate_equal_lengths_for_two_sequences,
+                                      validate_numeric)
 
 plt.rcParams.update({"font.family": "serif"})
 plt.rcParams["text.latex.preamble"] = r"\usepackage{bm} \usepackage{amsmath}"
@@ -27,38 +30,57 @@ def plot_function_layer_size(
     ----------
     layer_parameters : sequence of float
         Parameters of the absorbing layer:
-        - ``a`` : float
-            Dimensionless propagation speed parameter (``a = z / f``).
-        - ``z_par`` : float
+        - `a` : `float`
+            Dimensionless propagation speed parameter (`a = z / f`).
+        - `z_par` : `float`
             Inverse of the minimum Eikonal parameter.
-    frequency_parameters : sequence of float
+    frequency_parameters : sequence of `float`
         Parameters of the frequency:
-        - ``reference_frequency`` : float
+        - `reference_frequency` : `float`
             Reference frequency of the wave.
-        - ``source_frequency`` : float
+        - `source_frequency` : `float`
             Source frequency.
-    geometry_parameters : sequence of float
+    geometry_parameters : sequence of `float`
         Parameters of the domain geometry:
-        - ``lmin`` : float
+        - `lmin` : `float`
             Minimal dimension of the finite element in the mesh.
-        - ``lref`` : float
+        - `lref` : `float`
             Reference length for the absorbing layer.
-    reference_frequency_layer_sizes : sequence of float
+    reference_frequency_layer_sizes : sequence of `float`
         Layer-size values associated with the reference frequency.
-    output_folder : str or pathlib.Path, optional
-        Folder used to save the output plots. Default is ``"output/"``.
-    show : bool, optional
-        Whether to show the plot interactively. Default is ``False``.
+    output_folder : `str` or `pathlib.Path`, optional
+        Folder used to save the output plots. Default is `"output/"`.
+    show : `bool`, optional
+        Whether to show the plot interactively. Default is `False`.
 
     Returns
     -------
     None
     """
-    create_folder(output_folder)
 
-    a, z = layer_parameters
-    reference_frequency, source_frequency = frequency_parameters
-    minimum_element_size, reference_length = geometry_parameters
+    # Check the input data structures and extract the parameters
+    a, z = validate_data_structure("layer_parameters", layer_parameters, "sequence",
+                                   expected_type_element="float", expected_length=2)
+    validate_numeric("Parameter a", a, lower_bound=0.)
+    validate_numeric("Parameter z", z, lower_bound=0.)
+
+    reference_frequency, source_frequency = validate_data_structure(
+        "frequency_parameters", frequency_parameters, "sequence",
+        expected_type_element="float", expected_length=2)
+    validate_numeric("reference_frequency", reference_frequency, lower_bound=0.)
+    validate_numeric("source_frequency", source_frequency, lower_bound=0.)
+
+    minimum_element_size, reference_length = validate_data_structure(
+        "geometry_parameters", geometry_parameters, "sequence",
+        expected_type_element="float", expected_length=2)
+    validate_data_structure("reference_frequency_layer_sizes",
+                            reference_frequency_layer_sizes, "sequence",
+                            expected_type_element="float")
+    validate_numeric("minimum_element_size", minimum_element_size, lower_bound=0)
+    validate_numeric("reference_length", reference_length, lower_bound=0)
+
+    # Create the output folder if it does not exist
+    create_folder(output_folder)
 
     layer_size_values = [a]
     layer_size_samples = [reference_frequency_layer_sizes]
@@ -178,6 +200,248 @@ def plot_function_layer_size(
     _finalize_figure(
         plt.gcf(),
         output_path,
+        formats=("png", "pdf"),
+        show=show,
+        bbox_inches="tight",
+    )
+
+
+def plot_frequency_domain_receiver_responses(
+    wave,
+    reference_receiver_fft: np.array,
+    frequency_parameters: Sequence[float],
+    frequency_limit_factor: float | int = 4.0,
+    output_folder: str | Path = "output/",
+    show: bool = False,
+):
+    """Plot the frequency-domain receiver responses.
+
+    Creates a multi-panel figure comparing the frequency response magnitude
+    obtained via FFT of each receiver between the computed and reference
+    solutions. Vertical lines indicate the source and reference frequencies.
+
+    Parameters
+    ----------
+    wave : `wave.Wave`
+        An instance of the :class:`~spyro.solvers.wave.Wave`.
+        Wave object containing the simulation results. It must provide the
+        following attributes:
+        - `receivers_out_fft` : `ndarray`
+            Frequency response magnitude of the computed receiver data. The first
+            dimension corresponds to frequency response and the second to receivers.
+        - `dt` : `float`
+            Time step used in the simulation, in seconds.
+        - `frequency` : `float`
+            Source frequency in Hz.
+        - `freq_ref` : `float`
+            Reference frequency in Hz.
+        - `number_of_receivers` : `int`
+            Number of receivers.
+        - `receivers_ref_fft` : `ndarray`
+    reference_receiver_fft : `ndarray`
+        Frequency response magnitude of the reference receiver data
+        with the same shape as ``receivers_out_fft``
+    frequency_parameters : sequence of `float`
+        Parameters of the frequency:
+        - `reference_frequency` : `float`
+            Reference frequency of the wave.
+        - `source_frequency` : `float`
+            Source frequency.
+        - `freq_Nyquist` : `float`
+            Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt).
+    frequency_limit_factor : `float`, optional
+        Factor applied to the source frequency to determine the upper
+        frequency limit of the plot. The upper limit is constrained to
+        `[2 * source_frequency, nyquist_frequency]`. Must be greater
+        than or equal to 2. Default is 4.0.
+    output_folder : `str` or `pathlib.Path`, optional
+        Directory where the figure is saved. The files `freq.png` and
+        `freq.pdf` are created in this directory. The directory is
+        created if it does not already exist. Default is `"output/"`.
+    show : `bool`, optional
+        If `True`, display the figure after saving it. Default is `False`.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If `frequency_limit_factor` is smaller than 2, if the number of receivers is
+        invalid, or if the computed and reference FFT arrays have incompatible shapes.
+
+    Notes
+    -----
+    The frequency axis is reconstructed from the FFT size and `wave.dt`. This
+    assumes that the original time-domain signal contained an even number of
+    samples, which is the standard case for the FFT data used here.
+    """
+
+    # Validate the input parameters
+    reference_frequency, source_frequency, freq_Nyquist = validate_data_structure(
+        "frequency_parameters", frequency_parameters, "sequence",
+        expected_type_element="float", expected_length=3)
+    validate_numeric("reference_frequency", reference_frequency, lower_bound=0.)
+    validate_numeric("source_frequency", source_frequency, lower_bound=0.)
+    validate_numeric("Nyquist_frequency", freq_Nyquist, lower_bound=0.)
+    validate_numeric("frequency_limit_factor", frequency_limit_factor,
+                     lower_bound=2, include_lower_bound=True)
+
+    number_of_receivers = wave.number_of_receivers
+    computed_receiver_fft = wave.receivers_out_fft
+
+    # Validate arrays of the computed and reference FFT arrays
+    validate_data_structure("Receiver FFT data", computed_receiver_fft,
+                            "array2D", expected_type_element=("float"),
+                            expected_shape=(None, number_of_receivers))
+    validate_data_structure("Reference FFT data", reference_receiver_fft,
+                            "array2D", expected_type_element=("float"),
+                            expected_shape=(None, number_of_receivers))
+    validate_equal_lengths_for_two_sequences("Receiver FFT data", computed_receiver_fft,
+                                             "Reference FFT data", reference_receiver_fft)
+
+    # Am RFFT of an N even-length signal contains N // 2 + 1 frequency bins.
+    # Ensuring even number of samples to get the correct Nyquist frequency.
+    number_of_time_samples = wave.num_timesteps - wave.num_timesteps % 2
+    frequencies = np.fft.rfftfreq(number_of_time_samples, d=wave.dt)
+
+    # Determine the displayed frequency range.
+    maximum_display_frequency = np.clip(frequency_limit_factor * source_frequency,
+                                        2.0 * source_frequency, freq_Nyquist)
+
+    # Include only FFT bins within the displayed frequency range.
+    frequency_mask = frequencies <= maximum_display_frequency
+
+    displayed_frequencies = frequencies[frequency_mask]
+    computed_receiver_spectra = computed_receiver_fft[frequency_mask]
+    reference_receiver_spectra = reference_receiver_fft[frequency_mask]
+
+    frequencies_are_equal = np.isclose(source_frequency, reference_frequency)
+
+    if frequencies_are_equal:
+        reference_frequency_label = r"$f_{\mathrm{ref}} = f_{\mathrm{source}}$"
+    else:
+        reference_frequency_label = r"$f_{\mathrm{ref}}$"
+
+    figure, axes = plt.subplots(
+        nrows=number_of_receivers,
+        ncols=1,
+        squeeze=False,
+        sharex=True,
+        figsize=(6.4, 2.5 * number_of_receivers),
+    )
+
+    axes = axes[:, 0]
+
+    figure.subplots_adjust(hspace=0.6)
+
+    color_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    computed_color = color_cycle[0]
+    reference_color = color_cycle[1]
+
+    for receiver_index, axis in enumerate(axes):
+        computed_spectrum = computed_receiver_spectra[:, receiver_index]
+        reference_spectrum = reference_receiver_spectra[:, receiver_index]
+
+        axis.plot(
+            displayed_frequencies,
+            computed_spectrum,
+            color=computed_color,
+            linestyle="-",
+            linewidth=2,
+            label="Computed",
+        )
+
+        axis.plot(
+            displayed_frequencies,
+            reference_spectrum,
+            color=reference_color,
+            linestyle="--",
+            linewidth=2,
+            label="Reference",
+        )
+
+        # Let Matplotlib determine the color so the function respects
+        # the active plotting style.
+        axis.axvline(
+            reference_frequency,
+            linestyle="-",
+            linewidth=1.25,
+        )
+
+        if not frequencies_are_equal:
+            axis.axvline(
+                source_frequency,
+                linestyle="-",
+                linewidth=1.25,
+            )
+
+        axis.text(
+            0.995,
+            0.9,
+            f"R{receiver_index + 1}",
+            transform=axis.transAxes,
+            fontsize=8.5,
+            fontweight="bold",
+            verticalalignment="top",
+            horizontalalignment="right",
+        )
+
+        axis.set_xlim(0, maximum_display_frequency)
+        axis.grid(True)
+
+        axis.ticklabel_format(
+            axis="y",
+            style="scientific",
+            scilimits=(-2, 2),
+        )
+
+    for axis in axes[:-1]:
+        axis.tick_params(axis="x", labelbottom=False)
+
+    axes[number_of_receivers // 2].set_ylabel(r"$FFT\; recs_{norm}$")
+
+    bottom_axis = axes[-1]
+    bottom_axis.set_xlabel(r"$f\; (Hz)$")
+
+    y_minimum, _ = bottom_axis.get_ylim()
+    frequency_label_y = y_minimum * 1.05
+
+    bottom_axis.text(
+        reference_frequency - maximum_display_frequency / 500.0,
+        frequency_label_y,
+        reference_frequency_label,
+        fontsize=8,
+        fontweight="bold",
+        horizontalalignment="right",
+        verticalalignment="bottom",
+    )
+
+    if not frequencies_are_equal:
+        bottom_axis.text(
+            source_frequency + maximum_display_frequency / 500.0,
+            frequency_label_y,
+            r"$f_{\mathrm{source}}$",
+            fontsize=8,
+            fontweight="bold",
+            horizontalalignment="left",
+            verticalalignment="bottom",
+        )
+
+    # Determine the output folder and filename for saving the figure.
+    if hasattr(wave, "path_case_abc"):
+        output_folder = Path(wave.path_case_abc)
+    else:
+        output_folder = Path(output_folder)
+    filename = output_folder / "freq_comparison"
+
+    # Create the output folder if it does not exist
+    create_folder(output_folder)
+
+    _finalize_figure(
+        figure,
+        filename,
         formats=("png", "pdf"),
         show=show,
         bbox_inches="tight",

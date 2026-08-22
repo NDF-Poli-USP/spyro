@@ -208,7 +208,7 @@ def path_to_save_abc_case(abc_type, abc_boundary_layer_shape=None, abc_deg_layer
         Type of boundary condition to apply on the domain boundaries (for only NRBCs)
         or the outer absorbing layer boundaries (HABCs: Absorbing Layer aand NRBCs).
         Options: `BoundaryConditionsType.HIGDON` or `BoundaryConditionsType.SOMMERFELD`.
-        Dafault is `None`.
+        Default is `None`.
     angle_max : `float`, optional
         Maximum incidence angle considered in the NRBC. Default is `None`.
     abc_boundary_type : `typing.NRBCBoundaryType`, optional

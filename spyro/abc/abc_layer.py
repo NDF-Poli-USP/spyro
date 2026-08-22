@@ -62,7 +62,7 @@ class ABCLayer(AbsorbingBC):
     factor_length_pad : `float`
         Size parameter of the absorbing layer.
     freq_ref : `float`
-        Reference frequency of the wave at the critical poin on boundary.
+        Reference frequency of the wave at the critical point on boundary.
     FLpossible : `list`
         Possible size parameters for the absorbing layer without rounding.
     layer_geometry : `rec_lay.RectangLayer` or `hyp_lay.HyperLayer`
@@ -369,9 +369,10 @@ class ABCLayer(AbsorbingBC):
                 else NRBCBoundaryType.STRAIGHT
 
             # Initializing the NRBC class
-            NRBC.__init__(self, self.domain_dim, non_reflect_bc=non_reflect_bc,
-                          abc_boundary_type=abc_boundary_type, dimension=self.dimension,
-                          dt=self.dt, quadrilateral=self.quadrilateral, nrbc_in_habc=True,
+            NRBC.__init__(self, self.domain_dim, frequency=self.frequency,
+                          dt=self.dt, abc_boundary_type=abc_boundary_type,
+                          non_reflect_bc=non_reflect_bc, dimension=self.dimension,
+                          quadrilateral=self.quadrilateral, nrbc_in_habc=True,
                           output_folder=self.path_case_absl, comm=self.comm)
 
             # Hypershape parameters

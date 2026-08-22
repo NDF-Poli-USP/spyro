@@ -8,12 +8,14 @@ from ..solvers.modal.modal_sol import Modal_Solver
 from ..tools.error_measure import MeasureError
 from ..domains.space import create_function_space
 from ..io.basicio import parallel_print as pprint
+from ..plots.plots_habc import plot_frequency_domain_receiver_responses
 from ..plots.receiver_plots import plot_comparison_of_receivers_to_reference
 from ..tools.abc_set_path_cases import formatting_abc_layer_type
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
 from ..utils.error_management import (validate_data_structure, validate_numeric,
                                       validate_parameter)
-from ..utils.typing import LayerShapeType
+from ..utils.freq_tools import fft_at_receivers
+from ..utils.typing import AbsorbingBCsType, LayerShapeType
 
 
 class AbsorbingBC(MeasureError, metaclass=ABCMeta):
@@ -83,6 +85,8 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         Create a reference model for the ABC scheme for comparative purposes.
     layer_infinite_model()
         Determine the domain extension size for the infinite domain model.
+    comparison_plots()
+        Plot the comparison between the ABC scheme and the reference model.
     velocity_abc()
         Set the velocity profile for the model with absorbing layer.
     """
@@ -783,7 +787,7 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
 
         return le_nrbc
 
-    def comparison_plots(self, wave, receivers_reference,
+    def comparison_plots(self, wave, receivers_reference, reference_receiver_fft,
                          regression_xCR=False, data_regr_xCR=None):
         """Plot the comparison between the ABC scheme and the reference model.
 
@@ -793,6 +797,8 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
             An instance of the :class:`~spyro.solvers.wave.Wave`.
         receivers_reference : `array`
             Receiver waveform data in the reference model
+        reference_receiver_fft : `ndarray`
+            Frequency response magnitude of the reference receiver data.
         regression_xCR : `bool`, optional
             If `True`, Plot the regression for the error measure vs xCR. Default is `False`.
         data_regr_xCR: `list`
@@ -816,8 +822,20 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         # Time domain comparison
         plot_comparison_of_receivers_to_reference(wave, receivers_reference)
 
-        # # Frequency domain comparison
-        # plot_rfft_receivers(self)
+        # Compute FFT for output signal at receivers
+        wave.receivers_out_fft = fft_at_receivers(
+            wave.number_of_receivers, wave.forward_solution_receivers, self.freq_Nyquist)
+
+        # For NRBCs the source frequency is set as reference
+        if wave.abc_type == AbsorbingBCsType.NRBC:
+            self.freq_ref = self.frequency
+
+        # Frequency parameters for plotting
+        frequency_parameters = (self.freq_ref, self.frequency, self.freq_Nyquist)
+
+        # Frequency domain comparison
+        plot_frequency_domain_receiver_responses(wave, reference_receiver_fft,
+                                                 frequency_parameters)
 
         # # Plot the error measures
         # if regression_xCR:

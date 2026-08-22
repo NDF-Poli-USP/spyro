@@ -33,7 +33,7 @@ def _propagate_forward_central_difference(wave, source_ids):
     compute_functional = functional_mode is not None
 
     t = wave.current_time
-    nt = int(wave.final_time / wave.dt) + 1  # number of timesteps
+    nt = wave.num_timesteps  # number of timesteps
     usol = None
     if wave.store_forward_time_steps:
         # Snapshots are appended as the solve advances rather than allocated

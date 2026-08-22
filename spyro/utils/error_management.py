@@ -8,6 +8,7 @@ from firedrake import Function, FunctionSpace, Mesh
 from firedrake.functionspaceimpl import WithGeometry
 from numpy import float32, float64, inf, int32, int64, isinf, isnan, ndarray
 from os import path
+from typing import Sequence
 from ufl.form import Form
 from ufl.geometry import SpatialCoordinate
 
@@ -397,8 +398,8 @@ def validate_data_structure(
     parameter_value : `object`
         Value of the parameter to be validated.
     expected_type : `str`
-        Expected type of the data structure parameter as a `str`. The validation
-        supports the types `dict`, `list`, `tuple`, or `ndarray` (NumPy arrays).
+        Expected type of the data structure parameter as a `str`. The validation supports
+        the types `dict`, `list`, `tuple`, `sequence`, or `ndarray` (NumPy arrays).
     expected_type_element : `tuple`, optional
         Expected type of the data structure elements passed as a `str`. The validation
         supports the types `float`, `int`, `str` or `NoneType`. Exs: ("float", "int")
@@ -439,6 +440,7 @@ def validate_data_structure(
         "dict": dict,
         "list": list,
         "tuple": tuple,
+        "sequence": Sequence,
         "array": ndarray,
         "array2D": ndarray,
         "array3D": ndarray,
@@ -456,12 +458,25 @@ def validate_data_structure(
     }
 
     # Checking the parameter type
-    if not isinstance(parameter_value, parameter_map[expected_type]):
-        raise TypeError(
-            f"'{parameter_name}' must be a {expected_type}, "
-            f"got {type(parameter_value).__name__}."
-        )
+    if expected_type == "sequence":
+        # Check for sequence protocol (supports len and getitem)
+        # Exclude dict and string to avoid false positives
+        not_a_sequence = not (hasattr(parameter_value, '__len__')
+                              and hasattr(parameter_value, '__getitem__')
+                              and not isinstance(parameter_value, (dict, str)))
 
+        if not_a_sequence:
+            raise TypeError(f"'{parameter_name}' must be a sequence, "
+                            f"got {type(parameter_value).__name__}.")
+
+    else:
+        # Regular type checking for non-sequence types
+        if not isinstance(parameter_value, parameter_map[expected_type]):
+            raise TypeError(
+                f"'{parameter_name}' must be a {expected_type}, "
+                f"got {type(parameter_value).__name__}.")
+
+    # Checking array shape
     if expected_type in ["array2D", "array3D"]:
         expected_dimension = 2 if expected_type == "array2D" else 3
         if parameter_value.ndim != expected_dimension:
@@ -664,3 +679,42 @@ def _join_options(values, conjunction="or"):
         return values[0]
 
     return f"{', '.join(values[:-1])} {conjunction} {values[-1]}"
+
+
+def validate_equal_lengths_for_two_sequences(parameter1_name, parameter1_value,
+                                             parameter2_name, parameter2_value):
+    """Validate that two sequences have equal lengths.
+
+    Parameters
+    ----------
+    parameter1_name : `str`
+        Name of the first parameter to be validated (used in error messages).
+    parameter1_value : `object`
+        Value of the first parameter to be validated.
+    parameter2_name : `str`
+        Name of the second parameter to be validated (used in error messages).
+    parameter2_value : `object`
+        Value of the second parameter to be validated.
+
+    Raises
+    ------
+    TypeError
+        If the parameter value is not `Sequence`.
+    ValueError
+        If the two sequences do not have equal lengths.
+    """
+
+    validate_data_structure(parameter1_name, parameter1_value, "sequence")
+    validate_data_structure(parameter2_name, parameter2_value, "sequence")
+
+    len_parameter1 = len(parameter1_value)
+    len_parameter2 = len(parameter2_value)
+
+    if len_parameter1 == 0 and len_parameter2 == 0:
+        raise ValueError(f"{parameter1_value} and {parameter2_value} "
+                         "cannot both be empty sequences")
+
+    if len_parameter1 != len_parameter2:
+        raise ValueError(f"{parameter1_value} (length: {len_parameter1}) and "
+                         f"{parameter2_value} (length: {len_parameter2}) "
+                         "must have same length")
