@@ -233,7 +233,8 @@ def test_elastic_automated_adjoint_defaults_to_current_parameterization():
 def test_elastic_automated_adjoint_accepts_one_control():
     wave = build_elastic_wave()
 
-    wave.enable_automated_adjoint(
+    wave.enable_automated_adjoint()
+    wave.automated_adjoint.set_control_parameters(
         {ElasticMaterialParameter.S_WAVE_VELOCITY},
     )
 
@@ -246,7 +247,10 @@ def test_elastic_automated_adjoint_accepts_one_control():
 def test_elastic_controls_can_change_the_equation_parameterization():
     wave = build_elastic_wave()
 
-    wave.enable_automated_adjoint({ElasticMaterialParameter.LAMBDA})
+    wave.enable_automated_adjoint()
+    wave.automated_adjoint.set_control_parameters(
+        {ElasticMaterialParameter.LAMBDA},
+    )
     control = wave.automated_adjoint.controls[0]
 
     assert isinstance(wave.lmbda, fire.Function)
@@ -266,9 +270,10 @@ def test_elastic_controls_can_change_the_equation_parameterization():
 
 def test_elastic_controls_reject_mixed_parameterizations():
     wave = build_elastic_wave()
+    wave.enable_automated_adjoint()
 
     with pytest.raises(ValueError, match="subset of either"):
-        wave.enable_automated_adjoint({
+        wave.automated_adjoint.set_control_parameters({
             ElasticMaterialParameter.LAMBDA,
             ElasticMaterialParameter.S_WAVE_VELOCITY,
         })
@@ -276,9 +281,10 @@ def test_elastic_controls_reject_mixed_parameterizations():
 
 def test_elastic_controls_reject_string_names():
     wave = build_elastic_wave()
+    wave.enable_automated_adjoint()
 
     with pytest.raises(TypeError, match="ElasticMaterialParameter"):
-        wave.enable_automated_adjoint({"s_wave_velocity"})
+        wave.automated_adjoint.set_control_parameters({"s_wave_velocity"})
 
 
 # Control parameters belong to the inversion.

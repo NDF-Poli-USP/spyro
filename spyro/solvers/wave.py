@@ -1,5 +1,4 @@
 from abc import abstractmethod, ABCMeta
-from enum import Enum
 import warnings
 import firedrake as fire
 
@@ -619,80 +618,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def store_forward_time_steps(self, value):
         self._store_forward_time_steps = value
 
-    def _select_control_parameters(
-        self, parameters: object = None,
-    ) -> PhysicalParameters:
-        """Resolve physical parameters into independent adjoint controls.
-
-        Parameters
-        ----------
-        parameters : enum.Enum or iterable of enum.Enum, optional
-            Physical parameters selected as controls. ``None`` selects every
-            independent physical field.
-
-        Returns
-        -------
-        PhysicalParameters
-            Selected parameter names and the fields used by the wave equation.
-
-        Raises
-        ------
-        TypeError
-            If a selected name is not a material-parameter enum member or its
-            value is not an independent Firedrake ``Function``.
-        ValueError
-            If the selection is empty or contains a parameter not modelled by
-            this wave equation.
-        """
-        physical_parameters = self.physical_parameters
-        if parameters is None:
-            selected_names = [
-                name for name, value in physical_parameters.items()
-                if isinstance(value, fire.Function)
-            ]
-        elif isinstance(parameters, Enum):
-            selected_names = [parameters]
-        else:
-            selected_names = list(parameters)
-
-        if not selected_names:
-            raise ValueError("At least one control parameter is required.")
-        if not all(isinstance(name, Enum) for name in selected_names):
-            raise TypeError(
-                "Control parameters must be material-parameter enum members.",
-            )
-
-        unknown = set(selected_names) - set(physical_parameters)
-        if unknown:
-            names = ", ".join(name.value for name in unknown)
-            raise ValueError(
-                f"Control parameters {{{names}}} are not physical "
-                "parameters of this wave equation.",
-            )
-
-        selected = PhysicalParameters()
-        for name in physical_parameters:
-            if name not in selected_names:
-                continue
-            field = physical_parameters[name]
-            if not isinstance(field, fire.Function):
-                raise TypeError(
-                    f"'{name.value}' is a dependent physical parameter and "
-                    "cannot be used directly as a control.",
-                )
-            selected.add(name, field)
-        return selected
-
-    def enable_automated_adjoint(
-        self, control_parameters: object = None,
-    ) -> None:
-        """Enable automated differentiation for selected physical parameters.
-
-        Parameters
-        ----------
-        control_parameters : enum.Enum or iterable of enum.Enum, optional
-            Non-empty subset of physical parameters to differentiate. The
-            default selects all independent parameters of the wave equation.
+    def enable_automated_adjoint(self) -> None:
+        """Enable the automated-adjoint solver.
 
         Returns
         -------
@@ -705,13 +632,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
         self._initialize_model_parameters()
-        controls = self._select_control_parameters(control_parameters)
         # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
         # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
         # that the reduced functional is built as an
         # ``EnsembleReducedFunctional``, summing the per-shot functionals and
         # gradients over the ensemble communicator.
-        self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
+        self.automated_adjoint = AutomatedAdjoint(self.comm, wave=self)
         self.functional_value = None
         self.misfit = None
 

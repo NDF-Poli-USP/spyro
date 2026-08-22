@@ -8,54 +8,12 @@ from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
-from ...utils.physical_parameters import PhysicalParameters
+from ...utils.physical_parameters import (ELASTIC_PARAMETERIZATIONS,
+                                          PhysicalParameters)
 from ...utils.typing import (AdjointType, ElasticMaterialParameter,
                              ElasticMaterialParameterization, AbsorbingBCsType,
-                             RieszMapType, override)
+                             RieszMapType)
 from ...domains.space import create_function_space
-
-
-PHYSICAL_PARAMETERIZATION = {
-    ElasticMaterialParameterization.LAME: (
-        ElasticMaterialParameter.DENSITY,
-        ElasticMaterialParameter.LAMBDA,
-        ElasticMaterialParameter.MU,
-    ),
-    ElasticMaterialParameterization.VELOCITY: (
-        ElasticMaterialParameter.DENSITY,
-        ElasticMaterialParameter.P_WAVE_VELOCITY,
-        ElasticMaterialParameter.S_WAVE_VELOCITY,
-    ),
-}
-
-ATTRIBUTE_BY_PARAMETER = {
-    ElasticMaterialParameter.DENSITY: "rho",
-    ElasticMaterialParameter.LAMBDA: "lmbda",
-    ElasticMaterialParameter.MU: "mu",
-    ElasticMaterialParameter.P_WAVE_VELOCITY: "c",
-    ElasticMaterialParameter.S_WAVE_VELOCITY: "c_s",
-}
-
-
-def _format_physical_parameters(parameters):
-    """Format material-parameter enum values for error messages.
-
-    Parameters
-    ----------
-    parameters : iterable of ElasticMaterialParameter
-        Material-parameter enum values to display.
-
-    Returns
-    -------
-    str
-        Human-readable set-like representation using public parameter names.
-
-    Examples
-    --------
-    ``(ElasticMaterialParameter.DENSITY, ElasticMaterialParameter.MU)``
-    becomes ``"{density, mu}"``.
-    """
-    return "{" + ", ".join(parameter.value for parameter in parameters) + "}"
 
 
 class IsotropicWave(ElasticWave):
@@ -102,15 +60,14 @@ class IsotropicWave(ElasticWave):
         self.field_logger.add_functional("mechanical_energy",
                                          lambda: assemble(self.mechanical_energy))
 
-    @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
         """Initialize isotropic elastic material parameters from a dictionary.
 
         The dictionary must define exactly one supported material
         parameterization: either density with Lame parameters, or density with
         P- and S-wave velocities. The missing dependent parameters are computed
-        from the provided set, and the active control parameterization is stored
-        for FWI.
+        from the provided set, and the active physical parameterization is
+        stored.
 
         Parameters
         ----------
@@ -126,7 +83,7 @@ class IsotropicWave(ElasticWave):
         -------
         None
             The method assigns ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s``, and
-            the active control parameterization on ``self``.
+            the active physical parameterization on ``self``.
         """
         def material_parameter(value):
             """Normalize model-dictionary values for elastic parameters.
@@ -209,10 +166,15 @@ class IsotropicWave(ElasticWave):
                 "The valid options are {Density, Lame first, Lame second} "
                 "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
             )
-        self._register_physical_parameters()
+        add = self._physical_parameters.add
+        add(ElasticMaterialParameter.DENSITY, self.rho)
+        add(ElasticMaterialParameter.LAMBDA, self.lmbda)
+        add(ElasticMaterialParameter.MU, self.mu)
+        add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
+        add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
 
-    def get_control_parameter_function_space(self) -> object:
-        """Return the scalar space used for material controls.
+    def _material_parameter_space(self) -> object:
+        """Return the scalar space used for material parameters.
 
         Returns
         -------
@@ -226,7 +188,7 @@ class IsotropicWave(ElasticWave):
         """
         if self.mesh is None:
             raise ValueError(
-                "Mesh must be set before creating elastic control fields.",
+                "Mesh must be set before creating elastic material fields.",
             )
         space = self._material_parameter_function_space
         if space is None or space.mesh() is not self.mesh:
@@ -251,7 +213,17 @@ class IsotropicWave(ElasticWave):
         object
             Firedrake field or dependent UFL expression.
         """
-        return getattr(self, ATTRIBUTE_BY_PARAMETER[parameter])
+        if parameter is ElasticMaterialParameter.DENSITY:
+            return self.rho
+        if parameter is ElasticMaterialParameter.LAMBDA:
+            return self.lmbda
+        if parameter is ElasticMaterialParameter.MU:
+            return self.mu
+        if parameter is ElasticMaterialParameter.P_WAVE_VELOCITY:
+            return self.c
+        if parameter is ElasticMaterialParameter.S_WAVE_VELOCITY:
+            return self.c_s
+        raise ValueError(f"Unsupported elastic material parameter: {parameter}.")
 
     def _set_material_parameter(
         self, parameter: ElasticMaterialParameter, value: object,
@@ -269,7 +241,20 @@ class IsotropicWave(ElasticWave):
         -------
         None
         """
-        setattr(self, ATTRIBUTE_BY_PARAMETER[parameter], value)
+        if parameter is ElasticMaterialParameter.DENSITY:
+            self.rho = value
+        elif parameter is ElasticMaterialParameter.LAMBDA:
+            self.lmbda = value
+        elif parameter is ElasticMaterialParameter.MU:
+            self.mu = value
+        elif parameter is ElasticMaterialParameter.P_WAVE_VELOCITY:
+            self.c = value
+        elif parameter is ElasticMaterialParameter.S_WAVE_VELOCITY:
+            self.c_s = value
+        else:
+            raise ValueError(
+                f"Unsupported elastic material parameter: {parameter}.",
+            )
 
     def _derive_complementary_parameters(
         self, parameterization: ElasticMaterialParameterization,
@@ -310,9 +295,8 @@ class IsotropicWave(ElasticWave):
         """Persist independent fields for the next forward initialization.
 
         ``forward_solve`` reads the material dictionary again. Storing the
-        actual independent ``Function`` objects preserves their identity, so
-        the fields in the variational form remain the controls registered on
-        the pyadjoint tape.
+        actual independent ``Function`` objects preserves their identity across
+        model initialization.
 
         Parameters
         ----------
@@ -328,7 +312,7 @@ class IsotropicWave(ElasticWave):
             synthetic_data.pop(parameter.value, None)
         synthetic_data.pop("lame_first", None)
         synthetic_data.pop("lame_second", None)
-        for parameter in PHYSICAL_PARAMETERIZATION[parameterization]:
+        for parameter in ELASTIC_PARAMETERIZATIONS[parameterization]:
             synthetic_data[parameter.value] = self._get_material_parameter(
                 parameter,
             )
@@ -345,7 +329,7 @@ class IsotropicWave(ElasticWave):
         Parameters
         ----------
         parameterization : ElasticMaterialParameterization
-            Independent family required by the selected controls.
+            Independent physical parameter family to materialize.
 
         Returns
         -------
@@ -354,12 +338,12 @@ class IsotropicWave(ElasticWave):
         if parameterization is self._physical_parameterization:
             # Model dictionaries often contain scalars. Replace them with the
             # initialized fields so forward_solve() does not create new
-            # Functions and detach the registered pyadjoint controls.
+            # Functions and invalidate external references to these fields.
             self._record_parameterization(parameterization)
             return
 
-        space = self.get_control_parameter_function_space()
-        for parameter in PHYSICAL_PARAMETERIZATION[parameterization]:
+        space = self._material_parameter_space()
+        for parameter in ELASTIC_PARAMETERIZATIONS[parameterization]:
             value = self._get_material_parameter(parameter)
             if isinstance(value, Function):
                 field = value
@@ -372,75 +356,6 @@ class IsotropicWave(ElasticWave):
         self._register_physical_parameters()
         self._record_parameterization(parameterization)
 
-    @override
-    def _select_control_parameters(
-        self, parameters: object = None,
-    ) -> PhysicalParameters:
-        """Resolve an independent elastic control subset.
-
-        Parameters
-        ----------
-        parameters : ElasticMaterialParameter or iterable, optional
-            Non-empty subset of the Lame or velocity parameterization. ``None``
-            selects all three parameters of the current parameterization.
-
-        Returns
-        -------
-        PhysicalParameters
-            Selected enum names mapped to the fields used by the equation.
-
-        Raises
-        ------
-        TypeError
-            If a selection contains anything other than
-            :class:`ElasticMaterialParameter` values.
-        ValueError
-            If the selection is empty, duplicated, or mixes parameterizations.
-        """
-        current = self._physical_parameterization
-        if parameters is None:
-            selected_names = list(PHYSICAL_PARAMETERIZATION[current])
-        elif isinstance(parameters, ElasticMaterialParameter):
-            selected_names = [parameters]
-        else:
-            selected_names = list(parameters)
-
-        if not selected_names:
-            raise ValueError("At least one elastic control parameter is required.")
-        if not all(
-            isinstance(name, ElasticMaterialParameter)
-            for name in selected_names
-        ):
-            raise TypeError(
-                "Elastic controls must be ElasticMaterialParameter enum "
-                "members.",
-            )
-        if len(set(selected_names)) != len(selected_names):
-            raise ValueError("Elastic control parameters must be unique.")
-
-        selected = set(selected_names)
-        candidates = [
-            parameterization
-            for parameterization, family in PHYSICAL_PARAMETERIZATION.items()
-            if selected <= set(family)
-        ]
-        if not candidates:
-            raise ValueError(
-                "Elastic controls must be a subset of either "
-                "{density, lambda, mu} or "
-                "{density, p_wave_velocity, s_wave_velocity}; got "
-                f"{_format_physical_parameters(selected_names)}.",
-            )
-        target = current if current in candidates else candidates[0]
-        self._set_physical_parameterization(target)
-
-        controls = PhysicalParameters()
-        for parameter in PHYSICAL_PARAMETERIZATION[target]:
-            if parameter in selected:
-                controls.add(parameter, self._get_material_parameter(parameter))
-        return controls
-
-    @override
     def gradient_solve(
         self,
         misfit=None,
@@ -503,47 +418,35 @@ class IsotropicWave(ElasticWave):
             raise NotImplementedError(
                 f"Riesz map {riesz_map} not implemented for automated adjoint.",
             )
-        return PhysicalParameters(zip(
-            self.automated_adjoint.control_parameter_names,
-            derivatives,
-        ))
+        return self.automated_adjoint.label_derivatives(derivatives)
 
-    @override
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
         raise NotImplementedError
 
-    @override
     def _create_function_space(self):
         return create_function_space(self.mesh, self.method, self.degree,
                                      dim=self.dimension)
 
-    @override
     def _set_vstate(self, vstate):
         self.u_n.assign(vstate)
 
-    @override
     def _get_vstate(self):
         return self.u_n
 
-    @override
     def _set_prev_vstate(self, vstate):
         if self.u_nm2 is not None:
             self.u_nm2.assign(self.u_nm1)
         self.u_nm1.assign(vstate)
 
-    @override
     def _get_prev_vstate(self):
         return self.u_nm1
 
-    @override
     def _set_next_vstate(self, vstate):
         self.u_np1.assign(vstate)
 
-    @override
     def _get_next_vstate(self):
         return self.u_np1
 
-    @override
     def get_forward_solution_receivers(self):
         if self.abc_type == AbsorbingBCsType.PML:
             raise NotImplementedError
@@ -551,15 +454,12 @@ class IsotropicWave(ElasticWave):
             data_with_halos = self.u_n.dat.data_ro_with_halos[:]
         return self.receivers.interpolate(data_with_halos)
 
-    @override
     def get_function(self):
         return self.u_n
 
-    @override
     def get_function_name(self):
         return "Displacement"
 
-    @override
     def matrix_building(self):
         self.current_time = 0.0
 
@@ -590,7 +490,6 @@ class IsotropicWave(ElasticWave):
         elif self.abc_type == AbsorbingBCsType.PML:
             isotropic_elastic_with_pml(self)
 
-    @override
     def rhs_no_pml(self):
         if self.abc_type == AbsorbingBCsType.PML:
             raise NotImplementedError

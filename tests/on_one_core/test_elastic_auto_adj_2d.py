@@ -140,9 +140,9 @@ def test_elastic_automated_adjoint_controls(
         input_mesh_parameters={"edge_length": 0.05, "periodic": True},
     )
     wave.real_shot_record = exact_receiver_data
-    wave.enable_automated_adjoint(
-        control_parameters=control_parameters,
-    )
+    wave.enable_automated_adjoint()
+    if control_parameters is not None:
+        wave.automated_adjoint.set_control_parameters(control_parameters)
 
     try:
         wave.forward_solve()
