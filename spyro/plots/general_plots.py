@@ -408,7 +408,7 @@ def plot_shots(
         scale = float(np.max(np.abs(arr)))
         vmin, vmax = -scale, scale
 
-    nt = int(tf / dt) + 1  # number of timesteps
+    nt = wave.num_timesteps  # number of timesteps
 
     if end_index == 0:
         end_index = num_recvs

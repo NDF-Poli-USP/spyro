@@ -1,18 +1,38 @@
 """Utilities for calculating the frequency response of a signal."""
 
-from numpy import abs, hanning, linspace, mean, pad
-from scipy.fft import fft
+from numpy import abs, empty, hanning, mean, pad
+from scipy.fft import rfft
+from scipy.signal import detrend
+from ..utils.error_management import validate_data_structure, validate_numeric
 
 
-def freq_response(signal, f_Nyq, fpad=0, get_dominant_freq=False):
+def ensure_even_length(signal):
+    """Ensure that the signal has an even length by trimming the last sample if necessary.
+
+    Parameters
+    ----------
+    signal : `array`
+        Input signal data.
+
+    Returns
+    -------
+    signal_even : `array`
+        Signal with even length.
+    """
+    if len(signal) % 2 != 0:
+        signal = signal[:-1]  # Trim the last sample to ensure even length
+    return signal
+
+
+def freq_response(signal, freq_Nyquist, fpad=0, get_dominant_freq=False):
     """Calculate the response in frequency domain of a time signal via FFT.
 
     Parameters
     ----------
     signal : `array`
         Signal data.
-    f_Nyq : `float`
-        Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt).
+    freq_Nyquist : `float`
+        Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt).
     fpad : `int`, optional
         Padding factor for FFT. Default is 0, which means no padding.
     get_dominant_freq : `bool`, optional
@@ -31,40 +51,46 @@ def freq_response(signal, f_Nyq, fpad=0, get_dominant_freq=False):
         raise ValueError("Input signal is empty. Cannot compute frequency response.")
 
     # Check if the Nyquist frequency is positive
-    if f_Nyq <= 0:
-        raise ValueError("Nyquist frequency is invalid. "
-                         "Cannot compute frequency response.")
+    validate_numeric("freq_Nyquist", freq_Nyquist, lower_bound=0.)
 
     # Remove DC offset
-    signal = signal - mean(signal)
+    signal -= mean(signal)
+
+    # Remove linear trend so ends are closer to zero
+    signal = detrend(signal)
 
     # Apply window to taper ends to zero
     window = hanning(len(signal))
-    signal_windowed = signal * window
+    signal *= window
 
     # Zero padding for increasing smoothing in FFT
-    signal_with_padding = pad(signal_windowed, (0, fpad * len(signal)), 'constant')
+    signal = pad(signal, (0, fpad * len(signal)), 'constant')
 
-    # Number of sample points
-    N_samples = len(signal_with_padding)
-
-    # Determine the number of samples of the spectrum
-    samples_fft = N_samples // 2 + 1
+    # Ensure even number of samples for FFT
+    signal = ensure_even_length(signal)
 
     # Calculate the response in frequency domain of the signal (FFT)
-    norm_magnitude = abs(fft(signal_with_padding)[0:samples_fft])
-    del signal_with_padding
-
-    # Frequency vector
-    xf = linspace(0.0, f_Nyq, samples_fft)
-
-    # Get the Dominant frequency of the spectrum
-    dominant_freq = xf[norm_magnitude.argmax()]
+    #  N // 2 + 1 samples for real input, where N is the length of the input array.
+    norm_magnitude = abs(rfft(signal))
+    del signal
 
     if get_dominant_freq:
 
-        # Return the Dominant frequency only
+        # Number of sample points
+        N_samples = len(signal_with_padding)
+
+        # Sample spacing
+        d_sample = 1. / (2. * freq_Nyquist)
+
+        # Frequency vector
+        frequencies = rfftfreq(N_samples, d=d_sample)
+
+        # Get the Dominant frequency of the spectrum
+        dominant_freq = frequencies[norm_magnitude.argmax()]
+
+        # Return the dominant frequency only
         return dominant_freq
+
     else:
 
         # Normalized frequency spectrum
@@ -72,3 +98,41 @@ def freq_response(signal, f_Nyq, fpad=0, get_dominant_freq=False):
 
         # Return the normalized spectrum
         return norm_magnitude
+
+
+def fft_at_receivers(number_of_receivers, forward_solution_receivers, freq_Nyquist):
+    """Compute the FFT for output signals at receivers.
+
+    Parameters
+    ----------
+    number_of_receivers : `int`
+        Number of receivers.
+    forward_solution_receivers : `array`
+        Receiver waveform data acquired from forward proeblem.
+    freq_Nyquist : `float`
+        Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt).
+
+    Returns
+    -------
+    receivers_out_fft : `array`
+        Frequency response magnitude of the computed receiver data. The first
+        dimension corresponds to frequency response and the second to receivers.
+    """
+
+    # Check the input parameters
+    validate_numeric("number_of_receivers", number_of_receivers,
+                     float_num=False, integer_num=True, lower_bound=0.)
+    validate_data_structure("forward_solution_receivers", forward_solution_receivers,
+                            "array2D", expected_shape=(None, number_of_receivers))
+
+    # Compute the length of the FFT output
+    length_fft = (forward_solution_receivers.shape[0]
+                  - forward_solution_receivers.shape[0] % 2) // 2 + 1
+
+    # Compute FFT for output signal at receivers
+    receivers_out_fft = empty((length_fft, number_of_receivers))
+    for rec in range(number_of_receivers):
+        signal = forward_solution_receivers[:, rec]
+        receivers_out_fft[:, rec] = freq_response(signal, freq_Nyquist)
+
+    return receivers_out_fft

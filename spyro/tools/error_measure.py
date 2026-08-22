@@ -13,7 +13,7 @@ from ..utils.error_management import (
     validate_numeric,
     validate_string,
 )
-from ..utils.freq_tools import freq_response
+from ..utils.freq_tools import fft_at_receivers
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -182,11 +182,9 @@ class MeasureError:
         )
 
         # Computing and saving FFT of the reference signal at receivers
-        receivers_ref_fft = []
-        for rec in range(number_of_receivers):
-            signal = forward_solution_receivers[:, rec]
-            yf = freq_response(signal, nyquist_frequency)
-            receivers_ref_fft.append(yf)
+        receivers_ref_fft = fft_at_receivers(
+            number_of_receivers, forward_solution_receivers, nyquist_frequency
+        )
         np.save(
             str(output_file_prefix) + "fft.npy",
             receivers_ref_fft,
@@ -246,7 +244,7 @@ class MeasureError:
             [".npy"],
             check_file_existence=True,
         )
-        receivers_ref_fft = np.load(receivers_reference_fft_file).T
+        receivers_ref_fft = np.load(receivers_reference_fft_file)
 
         if get_energy_reference:
 
