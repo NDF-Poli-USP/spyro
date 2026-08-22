@@ -1,7 +1,7 @@
 """Utilities for calculating the frequency response of a signal."""
 
 from numpy import abs, empty, hanning, mean, pad
-from scipy.fft import rfft
+from scipy.fft import rfft, rfftfreq
 from scipy.signal import detrend
 from ..utils.error_management import validate_data_structure, validate_numeric
 
@@ -69,15 +69,14 @@ def freq_response(signal, freq_Nyquist, fpad=0, get_dominant_freq=False):
     # Ensure even number of samples for FFT
     signal = ensure_even_length(signal)
 
+    # Number of sample points for FFT
+    N_samples = len(signal)
+
     # Calculate the response in frequency domain of the signal (FFT)
     #  N // 2 + 1 samples for real input, where N is the length of the input array.
     norm_magnitude = abs(rfft(signal))
-    del signal
 
     if get_dominant_freq:
-
-        # Number of sample points
-        N_samples = len(signal_with_padding)
 
         # Sample spacing
         d_sample = 1. / (2. * freq_Nyquist)
