@@ -182,8 +182,9 @@ def test_gradient_auto_adjoint_parallel():
 
     # The ensemble-summed gradient is a Function in the control space.
     dJ = Wave_obj_guess.automated_adjoint.compute_gradient()
-    assert isinstance(dJ, fire.Function)
-    assert dJ.dat.data.shape == Wave_obj_guess.c.dat.data.shape
+    assert len(dJ) == 1
+    assert isinstance(dJ[0], fire.Function)
+    assert dJ[0].dat.data.shape == Wave_obj_guess.c.dat.data.shape
 
     # Deterministic perturbation direction, identical on both ensemble members.
     direction = build_direction(Wave_obj_guess)

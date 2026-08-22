@@ -48,7 +48,13 @@ def build_acoustic_dictionary():
     }
 
 
-def build_elastic_dictionary():
+def build_elastic_dictionary(material_parameters=None):
+    if material_parameters is None:
+        material_parameters = {
+            "density": 1.0,
+            "p_wave_velocity": 2.5,
+            "s_wave_velocity": 1.0,
+        }
     return {
         "options": {
             "cell_type": "T",
@@ -75,9 +81,7 @@ def build_elastic_dictionary():
         },
         "synthetic_data": {
             "type": "object",
-            "density": 1.0,
-            "p_wave_velocity": 2.5,
-            "s_wave_velocity": 1.0,
+            **material_parameters,
             "real_velocity_file": None,
         },
         "time_axis": {
@@ -198,6 +202,89 @@ def test_physical_parameters_are_keyed_by_material_parameter_enums():
         wave.physical_parameters[spyro.ElasticMaterialParameter.DENSITY]
         is wave.rho
     )
+
+
+def test_elastic_automated_adjoint_defaults_to_current_parameterization():
+    wave = build_elastic_wave()
+
+    wave.enable_automated_adjoint()
+
+    assert wave.automated_adjoint.control_parameter_names == [
+        ElasticMaterialParameter.DENSITY,
+        ElasticMaterialParameter.P_WAVE_VELOCITY,
+        ElasticMaterialParameter.S_WAVE_VELOCITY,
+    ]
+    assert all(
+        control is field
+        for control, field in zip(
+            wave.automated_adjoint.controls,
+            (wave.rho, wave.c, wave.c_s),
+        )
+    )
+
+    controls = list(wave.automated_adjoint.controls)
+    wave.initialize_physical_parameters()
+    assert all(
+        control is field
+        for control, field in zip(controls, (wave.rho, wave.c, wave.c_s))
+    )
+
+
+def test_elastic_automated_adjoint_accepts_one_control():
+    wave = build_elastic_wave()
+
+    wave.enable_automated_adjoint()
+    wave.automated_adjoint.set_control_parameters(
+        {ElasticMaterialParameter.S_WAVE_VELOCITY},
+    )
+
+    assert wave.automated_adjoint.control_parameter_names == [
+        ElasticMaterialParameter.S_WAVE_VELOCITY,
+    ]
+    assert wave.automated_adjoint.controls[0] is wave.c_s
+
+
+def test_elastic_controls_can_change_the_equation_parameterization():
+    wave = build_elastic_wave()
+
+    wave.enable_automated_adjoint()
+    wave.automated_adjoint.set_control_parameters(
+        {ElasticMaterialParameter.LAMBDA},
+    )
+    control = wave.automated_adjoint.controls[0]
+
+    assert isinstance(wave.lmbda, fire.Function)
+    assert isinstance(wave.mu, fire.Function)
+    assert control is wave.lmbda
+    assert set(wave.input_dictionary["synthetic_data"]) >= {
+        "density", "lambda", "mu",
+    }
+    assert "p_wave_velocity" not in wave.input_dictionary["synthetic_data"]
+    assert "s_wave_velocity" not in wave.input_dictionary["synthetic_data"]
+
+    # The forward solve initializes from this dictionary again. It must retain
+    # the exact field registered as a pyadjoint control.
+    wave.initialize_physical_parameters()
+    assert wave.lmbda is control
+
+
+def test_elastic_controls_reject_mixed_parameterizations():
+    wave = build_elastic_wave()
+    wave.enable_automated_adjoint()
+
+    with pytest.raises(ValueError, match="subset of either"):
+        wave.automated_adjoint.set_control_parameters({
+            ElasticMaterialParameter.LAMBDA,
+            ElasticMaterialParameter.S_WAVE_VELOCITY,
+        })
+
+
+def test_elastic_controls_reject_string_names():
+    wave = build_elastic_wave()
+    wave.enable_automated_adjoint()
+
+    with pytest.raises(TypeError, match="ElasticMaterialParameter"):
+        wave.automated_adjoint.set_control_parameters({"s_wave_velocity"})
 
 
 # Control parameters belong to the inversion.
