@@ -1,13 +1,25 @@
 import numpy as np
 from firedrake import Mesh as FireMeshReader
+
 from ..io.basicio import parallel_print
 from ..io.segy_io import create_segy_from_grid
-from .meshing_gmsh2d import build_gmsh_geometry_and_groups, apply_structured_winslow_smoothing2d
-from .meshing_utils import create_sizing_function, calculate_edge_length
-from .firedrake_based_wrappers import rectangle_mesh, periodic_rectangle_mesh, box_mesh
-from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_with_velocity_model
-from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_homogeneous
+from .firedrake_based_wrappers import box_mesh, periodic_rectangle_mesh, rectangle_mesh
 from .gmsh_based_methods import build_big_rect_with_inner_element_group
+from .meshing_gmsh2d import (
+    apply_structured_winslow_smoothing2d,
+    build_gmsh_geometry_and_groups,
+)
+from .meshing_gmsh3D import (
+    apply_structured_winslow_smoothing3D,
+    build_gmsh_geometry_and_groups3D,
+    configure_gmsh_mesh_size3D,
+)
+from .meshing_utils import calculate_edge_length, create_sizing_function
+from .meshing_utils3D import create_sizing_function3D
+from .seismic_mesh_based_wrappers import (
+    create_seismicmesh_2D_mesh_homogeneous,
+    create_seismicmesh_2D_mesh_with_velocity_model,
+)
 
 try:
     import gmsh
@@ -183,7 +195,10 @@ class AutomaticMesh:
             else:
                 return FireMeshReader(self.output_file_name)
         elif self.mesh_type == "gmsh_mesh":
-            return self.create_gmsh_2D_mesh()
+            if self.dimension == 2:
+                return self.create_gmsh_2D_mesh()
+            elif self.dimension == 3:
+                return self.create_gmsh_3D_mesh()
         else:
             raise ValueError("mesh_type is not supported")
 
@@ -539,7 +554,7 @@ class AutomaticMesh:
                 domain_xmax = box_xmax + padding_x
 
             # Interpolating sizing function from segy file
-            ef_segy2, f_min, f_max, n_samples, n_traces = create_sizing_function(
+            ef_segy2, f_min, f_max, n_samples, n_traces = create_sizing_function(  # noqa: RUF059
                 fname=fname, hmin=hmin_segy, bbox=segy_bbox, wl=wl, freq=freq,
                 pad_type=padding_type, pad_size_x=padding_x, pad_size_z=padding_z,
                 grade=grade, vp_water=vp_water
@@ -639,3 +654,279 @@ class AutomaticMesh:
             return FireMeshReader(self.output_file_name, comm=self.comm.comm)
         else:
             return FireMeshReader(self.output_file_name)
+
+    def create_gmsh_3D_mesh(self):
+        """Create a 3-D Gmsh mesh with the supplied volumetric logic."""
+        if gmsh is None:
+            raise ImportError("gmsh is not available. Please install it.")
+
+        if self.dimension != 3:
+            raise ValueError(
+                "create_gmsh_3D_mesh requires dimension=3, "
+                f"not {self.dimension}."
+            )
+
+        mesh_parameters = self.mesh_parameters
+        depth_z = -abs(self.length_z)
+        length_x = self.length_x
+        length_y = self.length_y
+        padding_z = mesh_parameters.padding_z
+        padding_x = mesh_parameters.padding_x
+        padding_y = getattr(mesh_parameters, "padding_y", padding_x)
+        hyper_n = mesh_parameters.hyper_n
+        hmin_segy = mesh_parameters.hmin_segy
+        wl = self.cpw
+        freq = self.source_frequency
+        grade = mesh_parameters.grade
+        water_search_value = mesh_parameters.water_search_value
+        padding_type = mesh_parameters.padding_type
+        output_file = self.output_file_name
+        water_interface = mesh_parameters.water_interface
+        vp_water = mesh_parameters.vp_water
+        structured_mesh = mesh_parameters.structured_mesh
+        minElementSize = mesh_parameters.min_element_size
+        winslow_implementation = mesh_parameters.winslow_implementation
+        apply_winslow = mesh_parameters.apply_winslow
+        winslow_iterations = mesh_parameters.winslow_iterations
+        winslow_omega = mesh_parameters.winslow_omega
+        extend_segy = mesh_parameters.extend_segy
+        h_padding = mesh_parameters.h_padding
+        parallel = getattr(mesh_parameters, "gmsh_parallel", False)
+
+        byte_order = getattr(mesh_parameters, "segy_byte_order", "big")
+        axes_order = tuple(
+            getattr(mesh_parameters, "segy_axes_order", (0, 1, 2))
+        )
+        axes_order_sort = getattr(
+            mesh_parameters, "segy_axes_order_sort", "F"
+        )
+        binary_dtype = getattr(mesh_parameters, "segy_dtype", "float32")
+
+        if mesh_parameters.segy_velocity_model is not None:
+            self.velocity_model = mesh_parameters.segy_velocity_model
+            fname = self.velocity_model
+            nz = getattr(mesh_parameters, "segy_nz", None)
+            nx = getattr(mesh_parameters, "segy_nx", None)
+            ny = getattr(mesh_parameters, "segy_ny", None)
+            dz = getattr(mesh_parameters, "segy_dz", None)
+            dx = getattr(mesh_parameters, "segy_dx", None)
+            dy = getattr(mesh_parameters, "segy_dy", None)
+            if any(value is None for value in (nz, nx, ny, dz, dx, dy)):
+                raise ValueError(
+                    "3-D binary Gmsh meshing requires segy_nz, segy_nx, "
+                    "segy_ny, segy_dz, segy_dx and segy_dy."
+                )
+
+        elif mesh_parameters.velocity_model is not None:
+            velocity_model = mesh_parameters.velocity_model
+            if not isinstance(velocity_model, dict):
+                raise TypeError(
+                    "velocity_model must be a grid dictionary when "
+                    "segy_velocity_model is not provided."
+                )
+            if "vp_values" not in velocity_model:
+                raise ValueError(
+                    "Grid velocity_model must contain the key 'vp_values'."
+                )
+            vp = np.asarray(velocity_model["vp_values"])
+            if vp.ndim != 3:
+                raise ValueError(
+                    "Grid velocity_model['vp_values'] must be a 3-D array, "
+                    f"but received shape {vp.shape}."
+                )
+            nz, nx, ny = vp.shape
+            dz = abs(depth_z) / max(nz - 1, 1)
+            dx = length_x / max(nx - 1, 1)
+            dy = length_y / max(ny - 1, 1)
+            fname = "tmp_velocity_model3D.bin"
+            dtype = np.dtype(binary_dtype).newbyteorder(
+                ">" if byte_order == "big" else "<"
+            )
+            np.asarray(vp, dtype=dtype).ravel(
+                order=axes_order_sort
+            ).tofile(fname)
+            self.velocity_model = fname
+        else:
+            raise ValueError(
+                "Gmsh 3-D meshing requires either 'segy_velocity_model' "
+                "or a grid 'velocity_model'."
+            )
+
+        if self.comm is None or self.comm.ensemble_comm.rank == 0:
+            parallel_print("Generating 3D Gmsh mesh...", comm=self.comm)
+
+            segy_bbox = (
+                depth_z, 0.0,
+                0.0, length_x,
+                0.0, length_y,
+            )
+
+            if padding_type is None:
+                domain_xmin, domain_xmax = 0.0, length_x
+                domain_ymin, domain_ymax = 0.0, length_y
+                domain_zmin, domain_zmax = depth_z, 0.0
+            elif padding_type in ("rectangular", "hyperelliptical"):
+                domain_xmin, domain_xmax = -padding_x, length_x + padding_x
+                domain_ymin, domain_ymax = -padding_y, length_y + padding_y
+                domain_zmin, domain_zmax = depth_z - padding_z, 0.0
+            else:
+                raise ValueError(
+                    "padding_type must be None, 'rectangular', or "
+                    "'hyperelliptical'."
+                )
+
+            ef_segy3, f_min, f_max, n_samples, n_traces_x, n_traces_y = (  # noqa: RUF059
+                create_sizing_function3D(
+                    fname=fname,
+                    hmin=hmin_segy,
+                    bbox=segy_bbox,
+                    wl=wl,
+                    freq=freq,
+                    pad_type=padding_type,
+                    pad_size_x=padding_x,
+                    pad_size_y=padding_y,
+                    pad_size_z=padding_z,
+                    grade=grade,
+                    vp_water=vp_water,
+                    nz=nz,
+                    nx=nx,
+                    ny=ny,
+                    byte_order=byte_order,
+                    axes_order=axes_order,
+                    axes_order_sort=axes_order_sort,
+                    dtype=binary_dtype,
+                )
+            )
+
+            gmsh.initialize()
+            gmsh.clear()
+            gmsh.option.setNumber("Geometry.Tolerance", 1e-16)
+            gmsh.option.setNumber("Geometry.OCCSewFaces", 1)
+            gmsh.model.add("3d_Velocity_Model_Water_Interface")
+
+            try:
+                geom_params = build_gmsh_geometry_and_groups3D(
+                    gmsh=gmsh,
+                    fname=fname,
+                    length_x=length_x,
+                    length_y=length_y,
+                    depth_z=depth_z,
+                    padding_type=padding_type,
+                    padding_x=padding_x,
+                    padding_y=padding_y,
+                    padding_z=padding_z,
+                    hyper_n=hyper_n,
+                    water_interface=water_interface,
+                    water_search_value=water_search_value,
+                    structured_mesh=structured_mesh,
+                    minElementSize=minElementSize,
+                    nz=nz,
+                    nx=nx,
+                    ny=ny,
+                    dz=dz,
+                    dx=dx,
+                    dy=dy,
+                    byte_order=byte_order,
+                    axes_order=axes_order,
+                    axes_order_sort=axes_order_sort,
+                    dtype=binary_dtype,
+                    comm=self.comm,
+                    parallel_print=parallel_print,
+                )
+
+                configure_gmsh_mesh_size3D(
+                    gmsh=gmsh,
+                    ef_segy3=ef_segy3,
+                    bbox=segy_bbox,
+                    structured_mesh=structured_mesh,
+                    parallel=parallel,
+                    extend_segy=extend_segy,
+                    padding_type=padding_type,
+                    padding_x=padding_x,
+                    padding_y=padding_y,
+                    padding_z=padding_z,
+                    hyper_n=hyper_n,
+                    h_padding=h_padding,
+                    length_x=length_x,
+                    length_y=length_y,
+                    depth_z=depth_z,
+                    nz=nz,
+                    nx=nx,
+                    ny=ny,
+                    comm=self.comm,
+                    parallel_print=parallel_print,
+                )
+
+                if structured_mesh:
+                    gmsh.option.setNumber("Mesh.MeshSizeMin", minElementSize)
+                    gmsh.option.setNumber("Mesh.MeshSizeMax", minElementSize)
+                    gmsh.model.mesh.setTransfiniteAutomatic()
+
+                gmsh.option.setNumber("Mesh.SaveWithoutOrphans", 1)
+                gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
+                gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
+                gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
+                gmsh.option.setNumber("Mesh.Algorithm3D", 10)
+                gmsh.option.setNumber("Mesh.OptimizeThreshold", 0.5)
+                gmsh.option.setNumber("Mesh.Optimize", 1)
+                gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
+                gmsh.model.mesh.generate(3)
+
+                if structured_mesh:
+                    apply_structured_winslow_smoothing3D(
+                        gmsh=gmsh,
+                        comm=self.comm,
+                        geom_params=geom_params,
+                        length_x=length_x,
+                        length_y=length_y,
+                        depth_z=depth_z,
+                        padding_type=padding_type,
+                        padding_x=padding_x,
+                        padding_y=padding_y,
+                        padding_z=padding_z,
+                        water_interface=water_interface,
+                        hyper_n=hyper_n,
+                        winslow_implementation=winslow_implementation,
+                        apply_winslow=apply_winslow,
+                        winslow_iterations=winslow_iterations,
+                        winslow_omega=winslow_omega,
+                        n_samples=n_samples,
+                        n_traces_x=n_traces_x,
+                        n_traces_y=n_traces_y,
+                        domain_xmin=domain_xmin,
+                        domain_xmax=domain_xmax,
+                        domain_ymin=domain_ymin,
+                        domain_ymax=domain_ymax,
+                        domain_zmin=domain_zmin,
+                        domain_zmax=domain_zmax,
+                        ef_segy3=ef_segy3,
+                        parallel_print=parallel_print,
+                    )
+
+                if padding_type in ("rectangular", "hyperelliptical"):
+                    z_translation = 0.0
+                else:
+                    z_translation = -domain_zmin
+
+                rotate_xyz_to_zxy = [
+                    0.0, 0.0, 1.0, z_translation,
+                    -1.0, 0.0, 0.0, domain_xmax,
+                    0.0, -1.0, 0.0, domain_ymax,
+                    0.0, 0.0, 0.0, 1.0,
+                ]
+                gmsh.model.mesh.affineTransform(rotate_xyz_to_zxy)
+                gmsh.write(output_file)
+                parallel_print(
+                    f"Gmsh 3D mesh written to {output_file}",
+                    comm=self.comm,
+                )
+            finally:
+                gmsh.finalize()
+
+        if self.comm is not None:
+            if hasattr(self.comm, "ensemble_comm"):
+                self.comm.ensemble_comm.barrier()
+            self.comm.comm.barrier()
+            parallel_print("Loading 3D mesh into Firedrake.", comm=self.comm)
+            return FireMeshReader(self.output_file_name, comm=self.comm.comm)
+        return FireMeshReader(self.output_file_name)
