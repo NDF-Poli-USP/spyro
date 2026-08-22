@@ -73,7 +73,17 @@ def test_acoustic_local_abc():
         "acoustic_energy_filename": "results/acoustic_potential_energy.npy",
     }
     wave = spyro.examples.Camembert_acoustic(dictionary=dictionary)
+
+    # Assign the initial velocity model to the wave object
+    wave.c = wave.initial_velocity_model
+
+    # Applying NRBCs on original domain boundary
+    wave.nrbc_ops.nrbc_on_boundary(wave)
+
+    # Solving the forward problem
     wave.forward_solve()
+
+    # Acquiring final acoustic energy
     last_acoustic_energy = wave.field_logger.get("acoustic_energy")
     assert last_acoustic_energy < 7e-7  # The expected value was found empirically
 

@@ -813,7 +813,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             return self.nrbc_ops
         elif hasattr(self, 'layer_ops'):
             return self.layer_ops
-        return None
 
     @property
     def case_abc(self):
@@ -824,7 +823,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 return ops.case_nrbc
             else:
                 return ops.case_absl
-        return None
 
     @property
     def path_save(self):
@@ -832,7 +830,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         ops = self.abc_ops
         if ops is not None:
             return ops.path_save
-        return None
 
     @property
     def path_case_abc(self):
@@ -843,7 +840,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 return ops.path_case_nrbc
             else:
                 return ops.path_case_absl
-        return None
 
     def abcs_manager(self):
         """Create the ABCs operations manager for the wave solver."""

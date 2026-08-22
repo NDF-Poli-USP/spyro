@@ -351,12 +351,20 @@ def test_habc_tools(element_geometry, dimension):
             # Determining the case for the folder name
             str_id = element_geometry + ("CL" if method_extend == "point_cloud" else "NP")
             output_folder = wave.output_folder + f"/ht_test{dimension}d{str_id}"
-            wave.path_save, wave.case_abc, wave.path_case_abc = \
-                path_to_save_abc_case(wave.abc_type,
-                                      abc_boundary_layer_shape=wave.abc_boundary_layer_shape,
-                                      abc_deg_layer=wave.abc_deg_layer,
-                                      abc_reference_freq=wave.abc_reference_freq,
-                                      output_folder=output_folder)
+
+            # Updating the paths for saving the results
+            wave.layer_ops.path_save, wave.layer_ops.case_absl, \
+                wave.layer_ops.path_case_absl = path_to_save_abc_case(
+                    wave.abc_type, abc_boundary_layer_shape=wave.abc_boundary_layer_shape,
+                    abc_deg_layer=wave.abc_deg_layer,
+                    abc_reference_freq=wave.abc_reference_freq,
+                    output_folder=output_folder)
+
+            # The general paths are implicitly updated in the wave object. That is,
+            # wave.path_save, wave.path_case_abc, and wave.case_abc are updated with
+            # the new values returned by path_to_save_abc_case method for the ABC
+            # current manager (PML, HABC or NRBC). This ensures that the results
+            # of the HABC tools are saved in the correct folder for each test case.
             create_folder(wave.path_save)
             create_folder(wave.path_case_abc)
 

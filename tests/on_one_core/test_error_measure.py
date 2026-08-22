@@ -49,7 +49,7 @@ class TestMeasureError:
         """Test default initialization."""
         error = MeasureError()
         error.initialize_paths_for_error()
-        assert error.path_save_error.endswith("/output/")
+        assert error.path_save_error.endswith("/output")
         assert error.path_save_err_case == error.path_save_error
         assert error.path_reference.endswith("/output/preamble/")
         assert error.comm is None
@@ -61,8 +61,8 @@ class TestMeasureError:
         error = MeasureError()
         error.initialize_paths_for_error(output_folder=output_folder,
                                          output_case=output_case)
-        assert error.path_save_error == "/custom/path/"
-        assert error.path_save_err_case == "/custom/path/case123/"
+        assert error.path_save_error == "/custom/path"
+        assert error.path_save_err_case == "case123"
         assert error.path_reference == "/custom/path/preamble/"
 
     def test_pad_signal_lengths_equal(self):
