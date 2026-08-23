@@ -8,8 +8,7 @@ from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
-from ...utils.physical_parameters import (ELASTIC_PARAMETERIZATIONS,
-                                          PhysicalParameters)
+from ...utils.physical_parameters import PhysicalParameters
 from ...utils.typing import (AdjointType, ElasticMaterialParameter,
                              ElasticMaterialParameterization, AbsorbingBCsType,
                              RieszMapType)
@@ -198,97 +197,6 @@ class IsotropicWave(ElasticWave):
             self._material_parameter_function_space = space
         return space
 
-    def _get_material_parameter(
-        self, parameter: ElasticMaterialParameter,
-    ) -> object:
-        """Return one elastic physical field or expression.
-
-        Parameters
-        ----------
-        parameter : ElasticMaterialParameter
-            Physical parameter to retrieve.
-
-        Returns
-        -------
-        object
-            Firedrake field or dependent UFL expression.
-        """
-        if parameter is ElasticMaterialParameter.DENSITY:
-            return self.rho
-        if parameter is ElasticMaterialParameter.LAMBDA:
-            return self.lmbda
-        if parameter is ElasticMaterialParameter.MU:
-            return self.mu
-        if parameter is ElasticMaterialParameter.P_WAVE_VELOCITY:
-            return self.c
-        if parameter is ElasticMaterialParameter.S_WAVE_VELOCITY:
-            return self.c_s
-        raise ValueError(f"Unsupported elastic material parameter: {parameter}.")
-
-    def _set_material_parameter(
-        self, parameter: ElasticMaterialParameter, value: object,
-    ) -> None:
-        """Assign one elastic physical field or expression.
-
-        Parameters
-        ----------
-        parameter : ElasticMaterialParameter
-            Physical parameter to assign.
-        value : object
-            Firedrake field or dependent UFL expression.
-
-        Returns
-        -------
-        None
-        """
-        if parameter is ElasticMaterialParameter.DENSITY:
-            self.rho = value
-        elif parameter is ElasticMaterialParameter.LAMBDA:
-            self.lmbda = value
-        elif parameter is ElasticMaterialParameter.MU:
-            self.mu = value
-        elif parameter is ElasticMaterialParameter.P_WAVE_VELOCITY:
-            self.c = value
-        elif parameter is ElasticMaterialParameter.S_WAVE_VELOCITY:
-            self.c_s = value
-        else:
-            raise ValueError(
-                f"Unsupported elastic material parameter: {parameter}.",
-            )
-
-    def _derive_complementary_parameters(
-        self, parameterization: ElasticMaterialParameterization,
-    ) -> None:
-        """Express dependent parameters using one independent family.
-
-        Parameters
-        ----------
-        parameterization : ElasticMaterialParameterization
-            Family whose three parameters are independent fields.
-
-        Returns
-        -------
-        None
-        """
-        if parameterization is ElasticMaterialParameterization.LAME:
-            self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
-            self.c_s = (self.mu/self.rho)**0.5
-        else:
-            self.mu = self.rho*self.c_s**2
-            self.lmbda = self.rho*self.c**2 - 2*self.mu
-
-    def _register_physical_parameters(self) -> None:
-        """Register the current elastic fields and expressions.
-
-        Returns
-        -------
-        None
-        """
-        for parameter in ElasticMaterialParameter:
-            self._physical_parameters.add(
-                parameter, self._get_material_parameter(parameter),
-            )
-
     def _record_parameterization(
         self, parameterization: ElasticMaterialParameterization,
     ) -> None:
@@ -312,9 +220,22 @@ class IsotropicWave(ElasticWave):
             synthetic_data.pop(parameter.value, None)
         synthetic_data.pop("lame_first", None)
         synthetic_data.pop("lame_second", None)
-        for parameter in ELASTIC_PARAMETERIZATIONS[parameterization]:
-            synthetic_data[parameter.value] = self._get_material_parameter(
-                parameter,
+        if parameterization is ElasticMaterialParameterization.LAME:
+            synthetic_data[ElasticMaterialParameter.DENSITY.value] = self.rho
+            synthetic_data[ElasticMaterialParameter.LAMBDA.value] = self.lmbda
+            synthetic_data[ElasticMaterialParameter.MU.value] = self.mu
+        elif parameterization is ElasticMaterialParameterization.VELOCITY:
+            synthetic_data[ElasticMaterialParameter.DENSITY.value] = self.rho
+            synthetic_data[
+                ElasticMaterialParameter.P_WAVE_VELOCITY.value
+            ] = self.c
+            synthetic_data[
+                ElasticMaterialParameter.S_WAVE_VELOCITY.value
+            ] = self.c_s
+        else:
+            raise ValueError(
+                "Unsupported elastic material parameterization: "
+                f"{parameterization}.",
             )
 
     def _set_physical_parameterization(
@@ -343,17 +264,51 @@ class IsotropicWave(ElasticWave):
             return
 
         space = self._material_parameter_space()
-        for parameter in ELASTIC_PARAMETERIZATIONS[parameterization]:
-            value = self._get_material_parameter(parameter)
-            if isinstance(value, Function):
-                field = value
-            else:
-                field = Function(space, name=parameter.value).interpolate(value)
-            self._set_material_parameter(parameter, field)
+        if parameterization is ElasticMaterialParameterization.LAME:
+            if not isinstance(self.rho, Function):
+                self.rho = Function(
+                    space, name=ElasticMaterialParameter.DENSITY.value,
+                ).interpolate(self.rho)
+            if not isinstance(self.lmbda, Function):
+                self.lmbda = Function(
+                    space, name=ElasticMaterialParameter.LAMBDA.value,
+                ).interpolate(self.lmbda)
+            if not isinstance(self.mu, Function):
+                self.mu = Function(
+                    space, name=ElasticMaterialParameter.MU.value,
+                ).interpolate(self.mu)
+            self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
+            self.c_s = (self.mu/self.rho)**0.5
+        elif parameterization is ElasticMaterialParameterization.VELOCITY:
+            if not isinstance(self.rho, Function):
+                self.rho = Function(
+                    space, name=ElasticMaterialParameter.DENSITY.value,
+                ).interpolate(self.rho)
+            if not isinstance(self.c, Function):
+                self.c = Function(
+                    space,
+                    name=ElasticMaterialParameter.P_WAVE_VELOCITY.value,
+                ).interpolate(self.c)
+            if not isinstance(self.c_s, Function):
+                self.c_s = Function(
+                    space,
+                    name=ElasticMaterialParameter.S_WAVE_VELOCITY.value,
+                ).interpolate(self.c_s)
+            self.mu = self.rho*self.c_s**2
+            self.lmbda = self.rho*self.c**2 - 2*self.mu
+        else:
+            raise ValueError(
+                "Unsupported elastic material parameterization: "
+                f"{parameterization}.",
+            )
 
         self._physical_parameterization = parameterization
-        self._derive_complementary_parameters(parameterization)
-        self._register_physical_parameters()
+        add = self._physical_parameters.add
+        add(ElasticMaterialParameter.DENSITY, self.rho)
+        add(ElasticMaterialParameter.LAMBDA, self.lmbda)
+        add(ElasticMaterialParameter.MU, self.mu)
+        add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
+        add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
         self._record_parameterization(parameterization)
 
     def gradient_solve(
