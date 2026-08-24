@@ -211,7 +211,7 @@ def test_elastic_parameters_stay_constants_without_a_mesh():
 
     parameters = wave.initialize_physical_parameters()
 
-    # The declared family stays as Constants: there is no space to build
+    # The declared set stays as Constants: there is no space to build
     # Functions in yet, and initialization must still be able to complete.
     assert isinstance(wave.rho, fire.Constant)
     assert isinstance(wave.c, fire.Constant)
@@ -222,7 +222,7 @@ def test_elastic_parameters_stay_constants_without_a_mesh():
 
 
 def test_elastic_automated_adjoint_defaults_to_current_parameterization():
-    """Unasked, the controls are the family in use, and survive a rebuild."""
+    """Unasked, the controls are the set in use, and survive a rebuild."""
     wave = build_elastic_wave()
 
     wave.enable_automated_adjoint()
@@ -249,7 +249,7 @@ def test_elastic_automated_adjoint_defaults_to_current_parameterization():
 
 
 def test_elastic_automated_adjoint_accepts_one_control():
-    """A subset of the family in use is a valid selection."""
+    """A subset of the set in use is a valid selection."""
     wave = build_elastic_wave()
 
     wave.enable_automated_adjoint(
@@ -263,7 +263,7 @@ def test_elastic_automated_adjoint_accepts_one_control():
 
 
 def test_elastic_controls_follow_the_equation_parameterization():
-    """Changing the family is the equation's decision, made before selecting."""
+    """Changing the set is the equation's decision, made before selecting."""
     wave = build_elastic_wave()
     assert set(wave.physical_parameters.select()) == {
         ElasticMaterialParameter.DENSITY,
@@ -297,7 +297,7 @@ def test_elastic_controls_follow_the_equation_parameterization():
     assert wave.lmbda is control
 
 
-def test_elastic_controls_reject_the_other_family():
+def test_elastic_controls_reject_the_other_set():
     """Selecting a parameter the equation is not written in is an error."""
     wave = build_elastic_wave()
 
@@ -308,10 +308,10 @@ def test_elastic_controls_reject_the_other_family():
 
 
 def test_elastic_controls_reject_mixed_parameterizations():
-    """No selection spans both families: one is expressions of the other."""
+    """No selection spans both sets: one is expressions of the other."""
     wave = build_elastic_wave()
 
-    # Half of this selection is in the velocity family the equation uses; the
+    # Half of this selection is in the velocity set the equation uses; the
     # other half never can be at the same time.
     with pytest.raises(TypeError, match="computed from the other physical"):
         wave.enable_automated_adjoint(control_parameters={

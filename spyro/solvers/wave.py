@@ -185,16 +185,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                     lambda: self.get_function())
 
         self._physical_parameters = PhysicalParameters()
-        #: Whether the physical parameters already exist as the ``Function``
-        #: objects this solver goes on using.
-        #:
-        #: Solvers that rebuild their parameters from the model input on
-        #: every forward solve must stop once this is set: by then the
-        #: adjoint is posed with respect to those exact objects, and an
-        #: inversion has written its current iterate into them. Rebuilding
-        #: would differentiate with respect to objects the forward solve no
-        #: longer uses, and reset the iterate to the model's initial values.
-        self._physical_parameters_are_built = False
 
     def forward_solve(self):
         """Solves the forward problem."""
@@ -662,9 +652,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Resolve the selection first: an invalid one must fail before any
         # adjoint state exists to be left half-built.
         controls = self.physical_parameters.select(control_parameters)
-        # These fields are controls now, so whatever builds the physical
-        # parameters must stop replacing them.
-        self._physical_parameters_are_built = True
         # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
         # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
         # that the reduced functional is built as an
@@ -850,24 +837,30 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         return parameters
 
     def set_physical_parameterization(self, parameterization) -> None:
-        """Write the equation in one of its physical parameter families.
+        """Set which physical parameters the equation is solved in terms of.
 
-        Some media can be described by more than one set of physical
-        parameters -- an isotropic elastic one by density with the Lame
-        parameters, or by density with the two wave speeds -- carrying
-        whichever set it is not written in as expressions of the other. Only
-        the set in use can be controlled, so choosing between them is a
-        decision about the equation, made before anything selects parameters
-        to differentiate with respect to.
+        Some media admit more than one set of physical parameters -- an
+        isotropic elastic one is described by density with the Lame
+        parameters, or by density with the two wave speeds -- and carry the
+        set they are not solved in terms of as expressions of the other.
+        Only the set in use can be differentiated with respect to, so this
+        choice belongs to the equation and is made before any parameter is
+        selected as a control.
 
-        The choice is deliberate, so it also pins the fields: the model input
-        declares one family, and letting the next initialization read it
-        again would silently undo this call.
+        Initializing the material properties already picks a set, by reading
+        whichever one the model input declares. This method is public because
+        that first choice is worth revising: an inversion is not obliged to
+        invert in the parameters its model happens to be stored in, and which
+        set it uses changes the conditioning of the problem and the cross-talk
+        between parameters. Exposing the change of variables keeps it in the
+        solver, where it is the same one initialization performs, rather than
+        leaving callers to convert their model input by hand and get a factor
+        or a sign wrong.
 
         Parameters
         ----------
         parameterization : enum.Enum
-            Family to write the equation in.
+            Set of physical parameters to solve in terms of.
 
         Returns
         -------
@@ -876,34 +869,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Raises
         ------
         NotImplementedError
-            If this equation is written in a single set of parameters.
+            If this equation admits a single set of physical parameters.
         ValueError
-            If the family is not one this solver supports.
-        """
-        self._build_physical_parameterization(parameterization)
-        self._physical_parameters_are_built = True
-
-    def _build_physical_parameterization(self, parameterization) -> None:
-        """Materialize one physical parameter family.
-
-        Subclasses whose medium admits more than one family implement this
-        with the change of variables between them. It is separate from
-        :meth:`set_physical_parameterization` because initialization builds
-        the declared family on every solve, and must not pin it.
-
-        Parameters
-        ----------
-        parameterization : enum.Enum
-            Family to write the equation in.
-
-        Returns
-        -------
-        None
-
-        Raises
-        ------
-        NotImplementedError
-            Always, unless a subclass implements it.
+            If the set of parameters is not one this solver supports.
         """
         raise NotImplementedError(
             f"{type(self).__name__} is written in a single set of physical "

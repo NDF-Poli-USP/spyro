@@ -156,7 +156,7 @@ def test_elastic_automated_adjoint_controls(
     )
     wave.real_shot_record = exact_receiver_data
     if parameterization is not None:
-        # Which family the equation is written in is decided on the wave,
+        # Which parameters the equation is solved in terms of is decided
         # before anything selects controls within it.
         wave.initialize_physical_parameters()
         wave.set_physical_parameterization(parameterization)

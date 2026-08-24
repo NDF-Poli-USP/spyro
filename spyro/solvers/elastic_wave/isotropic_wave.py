@@ -97,14 +97,15 @@ class IsotropicWave(ElasticWave):
 
         The dictionary must define exactly one supported material
         parameterization: either density with Lame parameters, or density with
-        P- and S-wave velocities. The missing dependent parameters are computed
-        from the provided set, and the active physical parameterization is
-        stored.
+        P- and S-wave velocities. The missing dependent parameters are
+        computed from the provided set.
 
-        Every forward solve calls this method again. Once
-        :meth:`set_physical_parameterization` has built the physical
-        parameters the rebuild is skipped, so the objects the adjoint and any
-        inversion depend on survive; see ``_physical_parameters_are_built``.
+        Every forward solve calls this method again, so it only reads the
+        model once: the parameters it built the first time are the objects
+        the assembled forms, the adjoint and any inversion refer to, and
+        rebuilding them would replace those objects and reset an inversion's
+        current iterate to the model's initial values. Replacing the model
+        clears the parameters, which is what allows them to be built again.
 
         Parameters
         ----------
@@ -122,7 +123,7 @@ class IsotropicWave(ElasticWave):
             The method assigns ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s``, and
             the active physical parameterization on ``self``.
         """
-        if self._physical_parameters_are_built:
+        if self._physical_parameters:
             return
 
         def declared(parameter, *aliases):
@@ -139,8 +140,9 @@ class IsotropicWave(ElasticWave):
         self.c = declared(ElasticMaterialParameter.P_WAVE_VELOCITY)
         self.c_s = declared(ElasticMaterialParameter.S_WAVE_VELOCITY)
 
-        # Exactly one family must be declared, and it names the family the
-        # equation is written in. ``is not None`` rather than truthiness:
+        # Exactly one set must be declared, and it names the parameters
+        # the equation is solved in terms of. ``is not None`` rather than
+        # truthiness:
         # every UFL object is unconditionally true, so ``bool`` would only
         # ever be testing whether the key was present.
         lame = (
@@ -165,9 +167,9 @@ class IsotropicWave(ElasticWave):
                 ElasticMaterialParameterization.VELOCITY
             )
         else:
-            families = " or (exclusive) ".join(
-                _format_physical_parameters(family)
-                for family in PHYSICAL_PARAMETERIZATION.values()
+            options = " or (exclusive) ".join(
+                _format_physical_parameters(parameters)
+                for parameters in PHYSICAL_PARAMETERIZATION.values()
             )
             raise ValueError(
                 "Inconsistent selection of isotropic elastic wave "
@@ -177,31 +179,29 @@ class IsotropicWave(ElasticWave):
                 f"    Lame second    : {self.mu is not None}\n"
                 f"    P-wave velocity: {self.c is not None}\n"
                 f"    S-wave velocity: {self.c_s is not None}\n"
-                f"The valid options are {families}",
+                f"The valid options are {options}",
             )
-        self._build_physical_parameterization(declared_parameterization)
+        self.set_physical_parameterization(declared_parameterization)
 
-    def _build_physical_parameterization(
+    def set_physical_parameterization(
         self, parameterization: ElasticMaterialParameterization,
     ) -> None:
-        """Materialize one independent elastic parameter family.
+        """Set which elastic parameters the equation is solved in terms of.
 
-        The target family becomes three scalar ``Function`` objects and the
-        complementary family is relinked to them through UFL expressions, so
-        updating an independent field carries through to the dependent ones
-        and to the assembled variational forms.
+        The chosen set becomes three scalar ``Function`` objects and the
+        complementary set is relinked to them through UFL expressions, so
+        updating one of the chosen parameters carries through to the ones
+        computed from it and to the assembled variational forms.
 
-        Once a family has been materialized the fields belong to this object
-        rather than to the model dictionary: the adjoint equation may already
-        be posed with respect to them, and rebuilding them from the
-        dictionary would both discard the current values and leave that
-        adjoint differentiating unused fields, which is why this sets
-        ``_physical_parameters_are_built``.
+        This is a change of variables on the solver, not an edit of the
+        model: the input dictionary is left as the user wrote it, and the
+        set chosen here survives because initialization does not read the
+        model a second time.
 
         Parameters
         ----------
         parameterization : ElasticMaterialParameterization
-            Independent physical parameter family to materialize.
+            Set of elastic parameters to solve in terms of.
 
         Returns
         -------
@@ -210,8 +210,8 @@ class IsotropicWave(ElasticWave):
         Raises
         ------
         ValueError
-            If the mesh has not been created, or the family is not one this
-            solver supports.
+            If the mesh has not been created, or the set of parameters is
+            not one this solver supports.
         """
         space = None if self.mesh is None else create_function_space(
             self.mesh, self.method, self.degree, dim=1,
@@ -222,7 +222,7 @@ class IsotropicWave(ElasticWave):
 
             Before a mesh exists there is no space to build a ``Function``
             in, so the value is left as the scalar or ``Constant`` it came
-            in as and the equation is still written in this family.
+            in as, and the equation is still solved in terms of this set.
             """
             if space is None or isinstance(value, Function):
                 return value
