@@ -177,7 +177,7 @@ def analytical_solution_elastic(
     """
     if isinstance(source_type, str):
         source_type = SourceType(source_type)
-    if dimension in [2, 3]:
+    if dimension not in [2, 3]:
         raise ValueError("Weird dimensions not yet supported")
     if force_direction is None and source_type == "force_source":
         raise ValueError(f"Can not use {source_type} with no force_direction")
@@ -234,7 +234,10 @@ def analytical_solution_elastic(
     else:
         raise ValueError(f"Source type of {source_type} not valid")
 
-    return (u[:, 0], u[:, 1], u[:, 2])
+    if dimension == 2:
+        return (u[:, 0], u[:, 1])
+    else:
+        return (u[:, 0], u[:, 1], u[:, 2])
 
 
 def analytical_force_source_3d(
@@ -510,8 +513,8 @@ def analytical_explosive_source(
 def analytical_force_source_2d(
     offsets: np.ndarray,
     time_vector: np.ndarray,
-    p_wave_velocity: float,
-    s_wave_velocity: float,
+    alpha: float,
+    beta: float,
     rho: float,
     amplitude: float,
     frequency: float,
@@ -519,35 +522,33 @@ def analytical_force_source_2d(
     force_direction: int,
     displacement_direction: int,
 ):
-    r"""Calculate the 2D analytical displacement solution for a point force.
+    r"""Calculate the 2D analytical displacement from a point force.
 
-    The solution corresponds to a homogeneous isotropic elastic medium under
-    plane-strain conditions.
+    The solution is the frequency-domain elastodynamic Green tensor for an
+    unbounded, homogeneous, isotropic medium under plane-strain conditions.
 
     Parameters
     ----------
     offsets : numpy.ndarray
-        Vector from the source to the receiver. The two components follow
-        Spyro's 2D coordinate convention.
+        Source-to-receiver offset vector.
     time_vector : numpy.ndarray
-        Time vector.
-    p_wave_velocity : float
+        Time samples.
+    alpha : float
         P-wave velocity.
-    s_wave_velocity : float
+    beta : float
         S-wave velocity.
     rho : float
         Medium density.
     amplitude : float
-        Source amplitude.
+        Force amplitude.
     frequency : float
         Source frequency.
     time_delay : float
         Source time delay.
     force_direction : int
-        Direction of the applied force. Valid values are 0 and 1.
+        Direction of the applied force. Must be 0 or 1.
     displacement_direction : int
-        Direction of the displacement component being calculated. Valid
-        values are 0 and 1.
+        Direction of the displacement component. Must be 0 or 1.
 
     Returns
     -------
@@ -566,69 +567,89 @@ def analytical_force_source_2d(
     radius = np.linalg.norm(offsets)
 
     if radius == 0.0:
-        raise ValueError("Source and receiver cannot occupy the same location.")
+        raise ValueError("Source and receiver cannot have the same location.")
 
-    i = displacement_direction
-    j = force_direction
+    # Direction cosines.
+    gamma_i = offsets[displacement_direction] / radius
+    gamma_j = offsets[force_direction] / radius
 
-    gamma_i = offsets[i] / radius
-    gamma_j = offsets[j] / radius
+    delta_ij = float(displacement_direction == force_direction)
 
-    delta_ij = 1.0 if i == j else 0.0
+    # Number of time samples and corresponding postive frequencies.
+    num_t = len(time_vector)
+    final_time = time_vector[-1]
 
-    def X0(t):
-        """Ricker wavelet."""
-        a = np.pi * frequency * (t - time_delay)
-        return (1.0 - 2.0 * a**2) * np.exp(-a**2)
+    num_frequencies = num_t // 2 + 1
+    frequency_axis = np.fft.rfftfreq(num_t, d=time_vector[1] - time_vector[0])
 
-    displacement = np.zeros(len(time_vector))
+    # Source spectrum.
+    source_wavelet = (
+        1.0
+        - 2.0
+        * (np.pi * frequency * (time_vector - time_delay)) ** 2
+    ) * np.exp(
+        -(np.pi * frequency * (time_vector - time_delay)) ** 2
+    )
 
-    for k, time in enumerate(time_vector):
-        # P-wave arrival time
-        p_delay = radius / p_wave_velocity
+    source_spectrum = np.fft.rfft(source_wavelet)
 
-        # S-wave arrival time
-        s_delay = radius / s_wave_velocity
+    displacement_spectrum = np.zeros(num_frequencies, dtype=complex)
 
-        # 2D elastodynamic Green's-function intermediate field.
+    shear_modulus = rho * beta**2
+
+    for frequency_index in range(1, num_frequencies):
+        angular_frequency = 2.0 * np.pi * frequency_axis[frequency_index]
+
+        k_p = angular_frequency / alpha
+        k_s = angular_frequency / beta
+
+        k_p_radius = k_p * radius
+        k_s_radius = k_s * radius
+
+        hankel_p = hankel2(0, k_p_radius)
+        hankel_s = hankel2(0, k_s_radius)
+
+        hankel_p_1 = hankel2(1, k_p_radius)
+        hankel_s_1 = hankel2(1, k_s_radius)
+
+        # Radial derivative of
         #
-        # The integral contains contributions between the P- and S-wave
-        # arrival times.
-        integral, _ = quad(
-            lambda tau: (
-                (
-                    gamma_i * gamma_j / (p_wave_velocity**2)
-                    + (delta_ij - gamma_i * gamma_j) / (s_wave_velocity**2)
+        # H_0^(2)(k_s r) - H_0^(2)(k_p r).
+        radial_derivative = (
+            -k_s * hankel_s_1
+            + k_p * hankel_p_1
+        )
+
+        second_derivative_radial = (
+            -k_s**2 * hankel_s
+            + k_p**2 * hankel_p
+        )
+
+        green_tensor_component = (
+            -1j
+            / (4.0 * shear_modulus)
+            * (
+                hankel_s * delta_ij
+                + (
+                    second_derivative_radial * gamma_i * gamma_j
+                    + (
+                        radial_derivative / radius
+                    )
+                    * delta_ij
                 )
-                * tau
-                * X0(time - tau)
-                / np.sqrt(
-                    tau**2 - (radius / p_wave_velocity) ** 2
-                )
-            ),
-            p_delay,
-            s_delay,
+                / k_s**2
+            )
         )
 
-        # P-wave contribution.
-        p_far = (
-            amplitude
-            / (2.0 * np.pi * rho * p_wave_velocity**2)
-            * gamma_i
-            * gamma_j
-            * X0(time - p_delay)
-            / np.sqrt(radius)
+        displacement_spectrum[frequency_index] = (
+            green_tensor_component
+            * amplitude
+            * source_spectrum[frequency_index]
         )
 
-        # S-wave contribution.
-        s_far = (
-            amplitude
-            / (2.0 * np.pi * rho * s_wave_velocity**2)
-            * (delta_ij - gamma_i * gamma_j)
-            * X0(time - s_delay)
-            / np.sqrt(radius)
-        )
-
-        displacement[k] = integral + p_far + s_far
+    displacement = np.fft.irfft(
+        displacement_spectrum,
+        n=num_t,
+    )
 
     return displacement

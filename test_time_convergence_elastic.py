@@ -63,7 +63,7 @@ dictionary["acquisition"]["amplitude"] = np.array([0.0, 1.0])
 wave = spyro.IsotropicWave(dictionary)
 wave.set_mesh(input_mesh_parameters={"edge_length": edge_length, "periodic": False})
 
-spyro.utils.analytical_solution_elastic(
+anal_sol = spyro.utils.analytical_solution_elastic(
     "force_source",
     wave.source_locations[0] - wave.receiver_locations[0],
     p_wave_velocity=1.5,
@@ -78,12 +78,20 @@ spyro.utils.analytical_solution_elastic(
     dimension=2,
 )
 
-# wave.forward_solve()
+wave.forward_solve()
 
-# nt = int(final_time/0.001) + 1
-# time_vector = np.linspace(0.0, final_time, nt)
+nt = int(final_time/0.001) + 1
+time_vector = np.linspace(0.0, final_time, nt)
+import matplotlib.pyplot as plt
 
-# fig = spyro.plots.plot_displacement_components(
-#     time_vector, wave.forward_solution_receivers[:, 0], show=False, hold=True,
-# )
+fig = spyro.plots.plot_displacement_components(
+    time_vector, wave.forward_solution_receivers[:, 0], show=False, hold=True,
+)
+
+axes = fig.get_axes()
+axes[0].plot(time_vector, anal_sol[0], label="analitical")
+axes[0].legend()
+axes[1].plot(time_vector, anal_sol[1], label="analitical")
+axes[1].legend()
+plt.savefig("test.png")
 print("END")
