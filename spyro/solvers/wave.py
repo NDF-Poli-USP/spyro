@@ -185,10 +185,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                     lambda: self.get_function())
 
         self._physical_parameters = PhysicalParameters()
-        #: Family of physical parameters the equation is written in, for
-        #: equations that admit more than one. ``None`` when there is only
-        #: one, so there is nothing to choose.
-        self._physical_parameterization = None
         #: Whether the physical parameters already exist as the ``Function``
         #: objects this solver goes on using.
         #:

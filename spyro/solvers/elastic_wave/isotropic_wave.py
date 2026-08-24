@@ -250,7 +250,6 @@ class IsotropicWave(ElasticWave):
                 f"{parameterization}.",
             )
 
-        self._physical_parameterization = parameterization
         add = self._physical_parameters.add
         add(ElasticMaterialParameter.DENSITY, self.rho)
         add(ElasticMaterialParameter.LAMBDA, self.lmbda)
