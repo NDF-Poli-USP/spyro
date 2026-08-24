@@ -266,16 +266,29 @@ class IsotropicWave(ElasticWave):
     ) -> PhysicalParameters:
         """Compute automated-adjoint elastic material derivatives.
 
+        Only the automated adjoint is available for the elastic wave so far.
+        The implemented adjoint -- the backward integration written out by
+        hand, which the acoustic solver already offers -- is intended to
+        follow, and ``misfit`` and ``forward_solution`` are the two inputs it
+        needs. They are part of the signature so that callers written against
+        :meth:`~spyro.solvers.acoustic_wave.AcousticWave.gradient_solve` keep
+        working once it lands, and are unused until then.
+
         Parameters
         ----------
         misfit : array_like, optional
-            Accepted for compatibility; the recorded functional owns the
-            elastic misfit.
+            Difference between observed and simulated receiver data. The
+            implemented adjoint drives the backward equation with it. The
+            automated adjoint does not need it: it differentiates the
+            functional recorded during the forward solve, which already
+            accumulated the misfit.
         forward_solution : firedrake.Function, optional
-            Accepted for compatibility; the automated adjoint recovers the
-            forward wavefield on its own.
+            Forward wavefield. The implemented adjoint integrates the adjoint
+            equation backwards against it, so passing it saves a forward
+            solve. The automated adjoint recovers the wavefield on its own.
         adjoint_type : AdjointType, optional
-            Must be :attr:`AdjointType.AUTOMATED_ADJOINT`.
+            Must be :attr:`AdjointType.AUTOMATED_ADJOINT` until the
+            implemented adjoint is available for elastic waves.
         riesz_map : RieszMapType, optional
             ``L2`` returns primal gradients and ``l2`` raw derivatives.
 

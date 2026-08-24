@@ -14,9 +14,9 @@ def _as_list(value: object) -> list:
 
     Parameters
     ----------
-    value : object, mapping, list, tuple, or None
-        Value to normalize. Mappings contribute their values and ``None``
-        produces an empty list.
+    value : object, mapping, PhysicalParameters, list, tuple, or None
+        Value to normalize. Anything keyed by name contributes its values,
+        and ``None`` produces an empty list.
 
     Returns
     -------
@@ -25,7 +25,7 @@ def _as_list(value: object) -> list:
     """
     if value is None:
         return []
-    if isinstance(value, Mapping) or hasattr(value, "items"):
+    if isinstance(value, (Mapping, PhysicalParameters)):
         return list(value.values())
     if isinstance(value, (list, tuple)):
         return list(value)
@@ -70,11 +70,18 @@ class AutomatedAdjoint:
     .. code-block:: python
 
         wave.enable_automated_adjoint(control_parameters=parameters)
-        with wave.automated_adjoint.fresh_tape():
-            wave.forward_solve()          # forward run recorded on the tape
+        wave.forward_solve()          # the time integrator starts recording
+        dJ = wave.gradient_solve()    # one derivative per selected parameter
+        wave.automated_adjoint.clear_tape()
+
+    ``gradient_solve`` builds the reduced functional from the recorded tape
+    on its first call. Building it here is only needed to hold on to it, or
+    to run a Taylor test against it:
+
+    .. code-block:: python
+
         wave.automated_adjoint.create_reduced_functional(wave.functional_value)
-        dJ = wave.automated_adjoint.compute_gradient()
-        rate = wave.automated_adjoint.verify_gradient(wave.c)  # Taylor test
+        rate = wave.automated_adjoint.verify_gradient(wave.c)
 
     Parameters
     ----------
@@ -106,33 +113,17 @@ pyadjoint.ReducedFunctional or None
     """
 
     def __init__(self, ensemble: object, controls: object = None) -> None:
-        self.controls = []
-        self.control_parameter_names = []
         self.ensemble = ensemble
         self.reduced_functional = None
         self._tape = None
-        self._set_controls(controls)
-
-    def _set_controls(self, controls: object) -> None:
-        """Store labeled or unlabeled control fields as ordered lists.
-
-        Parameters
-        ----------
-        controls : object or iterable
-            Control fields, optionally exposed through an ``items`` method.
-
-        Returns
-        -------
-        None
-        """
-        try:
-            control_items = list(controls.items())
-        except AttributeError:
+        if isinstance(controls, (Mapping, PhysicalParameters)):
+            # Keyed by material parameter: keep the labels, so the
+            # derivatives can be handed back under the same names.
+            self.control_parameter_names = list(controls)
+            self.controls = list(controls.values())
+        else:
             self.controls = _as_list(controls)
             self.control_parameter_names = [None] * len(self.controls)
-        else:
-            self.control_parameter_names = [name for name, _ in control_items]
-            self.controls = [value for _, value in control_items]
 
     @contextmanager
     def fresh_tape(self):

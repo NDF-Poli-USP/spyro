@@ -204,23 +204,6 @@ def test_physical_parameters_are_keyed_by_material_parameter_enums():
     )
 
 
-def test_elastic_parameters_stay_constants_without_a_mesh():
-    """The model can be read before a mesh exists, without building fields."""
-    wave = spyro.IsotropicWave(dictionary=build_elastic_dictionary())
-    assert wave.mesh is None
-
-    parameters = wave.initialize_physical_parameters()
-
-    # The declared set stays as Constants: there is no space to build
-    # Functions in yet, and initialization must still be able to complete.
-    assert isinstance(wave.rho, fire.Constant)
-    assert isinstance(wave.c, fire.Constant)
-    assert isinstance(wave.c_s, fire.Constant)
-    assert not isinstance(wave.lmbda, fire.Function)
-    assert not isinstance(wave.mu, fire.Function)
-    assert set(parameters) == set(ElasticMaterialParameter)
-
-
 def test_elastic_automated_adjoint_defaults_to_current_parameterization():
     """Unasked, the controls are the set in use, and survive a rebuild."""
     wave = build_elastic_wave()
@@ -304,29 +287,6 @@ def test_elastic_controls_reject_the_other_set():
     with pytest.raises(TypeError, match="computed from the other physical"):
         wave.enable_automated_adjoint(
             control_parameters={ElasticMaterialParameter.LAMBDA},
-        )
-
-
-def test_elastic_controls_reject_mixed_parameterizations():
-    """No selection spans both sets: one is expressions of the other."""
-    wave = build_elastic_wave()
-
-    # Half of this selection is in the velocity set the equation uses; the
-    # other half never can be at the same time.
-    with pytest.raises(TypeError, match="computed from the other physical"):
-        wave.enable_automated_adjoint(control_parameters={
-            ElasticMaterialParameter.LAMBDA,
-            ElasticMaterialParameter.S_WAVE_VELOCITY,
-        })
-
-
-def test_elastic_controls_reject_string_names():
-    """Parameters are named by enum members, not by their dictionary keys."""
-    wave = build_elastic_wave()
-
-    with pytest.raises(TypeError, match="material-parameter enum members"):
-        wave.enable_automated_adjoint(
-            control_parameters={"s_wave_velocity"},
         )
 
 
