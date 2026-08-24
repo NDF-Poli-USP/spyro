@@ -2,7 +2,11 @@ import pytest
 from firedrake import COMM_WORLD as comm
 import spyro
 from spyro.io.basicio import parallel_print as pprint
-from spyro.tools.error_measure import MeasureError
+from spyro.tools.error_measure import (
+    calculate_peak_error,
+    calculate_normalized_L2_error,
+    calculate_integral_error,
+)
 
 
 @pytest.mark.parametrize("use_vertex_only_mesh", [False, True])
@@ -44,18 +48,16 @@ def test_analytical_solution(use_vertex_only_mesh):
     numerical_p = numerical_p.flatten()
 
     # Computing errors
-    measure_error = MeasureError()
-    errPk = measure_error.peak_error(numerical_p, analytical_p)[0]
-    errIt = measure_error.integral_error(numerical_p, analytical_p, wave.dt)
-    eNRMS = measure_error.normalized_root_mean_square_error(numerical_p, analytical_p)
+    peak_error = calculate_peak_error(numerical_p, analytical_p)[0]
+    integral_error = calculate_integral_error(numerical_p, analytical_p, wave.dt)
+    normalized_l2_error = calculate_normalized_L2_error(numerical_p, analytical_p)
 
     vom_label = "VOM" if use_vertex_only_mesh else "NO VOM"
-    pprint(f"NRMS Error ({vom_label}) = {eNRMS:.4e}", comm=comm)
-    pprint(f"Integral Error ({vom_label}) = {errIt:.4e}", comm=comm)
-    pprint(f"Peak Error ({vom_label}) = {errPk:.4e}", comm=comm)
+    pprint(f"Normalized L2 Error ({vom_label}) = {normalized_l2_error:.4e}", comm=comm)
+    pprint(f"Integral Error ({vom_label}) = {integral_error:.4e}", comm=comm)
+    pprint(f"Peak Error ({vom_label}) = {peak_error:.4e}", comm=comm)
 
-    assert eNRMS < 1e-3 and errIt < 1e-3 and errPk < 1e-3, \
-        "Error is too high for analytical solution test."
+    assert normalized_l2_error < 1e-3 and integral_error < 1e-3 and peak_error < 1e-3
 
 
 if __name__ == "__main__":
