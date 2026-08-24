@@ -277,7 +277,11 @@ pyadjoint.ReducedFunctional or None
         """
         if not self.controls:
             raise ValueError("At least one control is required.")
-        control = [fire_ad.Control(value) for value in self.controls]
+        controls = [fire_ad.Control(value) for value in self.controls]
+        # pyadjoint mirrors the shape it is given: a bare control comes back
+        # as a bare derivative, a list as a list. Handing it a one-item list
+        # would make every single-control caller unwrap by hand.
+        control = controls[0] if len(controls) == 1 else controls
 
         self.reduced_functional = fire_ad.EnsembleReducedFunctional(
             functional,
@@ -311,7 +315,7 @@ pyadjoint.ReducedFunctional or None
             raise ValueError("Reduced functional not created.")
         return self.reduced_functional(_as_list(control_value))
 
-    def compute_gradient(self) -> list:
+    def compute_gradient(self) -> object:
         """Return the gradient of the functional.
 
         Computes the gradient via reverse-mode differentiation of the tape and maps
@@ -321,8 +325,9 @@ pyadjoint.ReducedFunctional or None
 
         Returns
         -------
-        list of firedrake.Function
-            One gradient for each control.
+        firedrake.Function or list of firedrake.Function
+            The gradient, or one for each control when there is more than
+            one.
 
         Raises
         ------
@@ -331,11 +336,9 @@ pyadjoint.ReducedFunctional or None
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
-        return _as_list(
-            self.reduced_functional.derivative(apply_riesz=True),
-        )
+        return self.reduced_functional.derivative(apply_riesz=True)
 
-    def compute_derivative(self) -> list:
+    def compute_derivative(self) -> object:
         """Return the raw derivative of the functional.
 
         Similar to :meth:`compute_gradient` but without the Riesz map
@@ -347,8 +350,9 @@ pyadjoint.ReducedFunctional or None
 
         Returns
         -------
-        list of firedrake.Cofunction
-            One derivative for each control.
+        firedrake.Cofunction or list of firedrake.Cofunction
+            The derivative, or one for each control when there is more than
+            one.
 
         Raises
         ------
@@ -357,9 +361,7 @@ pyadjoint.ReducedFunctional or None
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
-        return _as_list(
-            self.reduced_functional.derivative(apply_riesz=False),
-        )
+        return self.reduced_functional.derivative(apply_riesz=False)
 
     def label_derivatives(self, derivatives: object) -> PhysicalParameters:
         """Associate computed derivatives with selected physical parameters.

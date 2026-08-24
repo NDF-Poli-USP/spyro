@@ -226,6 +226,7 @@ def test_elastic_parameters_stay_constants_without_a_mesh():
 
 
 def test_elastic_automated_adjoint_defaults_to_current_parameterization():
+    """Unasked, the controls are the family in use, and survive a rebuild."""
     wave = build_elastic_wave()
 
     wave.enable_automated_adjoint()
@@ -252,6 +253,7 @@ def test_elastic_automated_adjoint_defaults_to_current_parameterization():
 
 
 def test_elastic_automated_adjoint_accepts_one_control():
+    """A subset of the family in use is a valid selection."""
     wave = build_elastic_wave()
 
     wave.enable_automated_adjoint()
@@ -311,6 +313,7 @@ def test_elastic_controls_reject_the_other_family():
 
 
 def test_elastic_controls_reject_mixed_parameterizations():
+    """No selection spans both families: one is expressions of the other."""
     wave = build_elastic_wave()
     wave.enable_automated_adjoint()
 
@@ -324,6 +327,7 @@ def test_elastic_controls_reject_mixed_parameterizations():
 
 
 def test_elastic_controls_reject_string_names():
+    """Parameters are named by enum members, not by their dictionary keys."""
     wave = build_elastic_wave()
     wave.enable_automated_adjoint()
 

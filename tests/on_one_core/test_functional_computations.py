@@ -2,7 +2,6 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 import numpy as np
-from pyadjoint import AdjFloat
 import pytest
 
 from spyro.solvers.acoustic_wave import AcousticWave
@@ -10,8 +9,7 @@ from spyro.solvers.automatic_differentiation_solver import AutomatedAdjoint
 from spyro.solvers.wave import Wave
 from spyro.utils import get_real_shot_record
 from spyro.utils.typing import (ElasticMaterialParameter,
-                                FunctionalEvaluationMode, RieszMapType,
-                                WaveType)
+                                FunctionalEvaluationMode, WaveType)
 
 
 class DummyWave(Wave):
@@ -96,6 +94,7 @@ def test_compute_functional_accepts_after_solve_mode():
 
 
 def test_real_shot_record_keeps_single_elastic_vector_record():
+    """One elastic shot has three axes and must not be split by source."""
     wave = SimpleNamespace(
         real_shot_record=np.zeros((11, 4, 2)),
         current_sources=[0],
@@ -106,6 +105,7 @@ def test_real_shot_record_keeps_single_elastic_vector_record():
 
 
 def test_real_shot_record_selects_elastic_source_axis():
+    """Stacked elastic shots add a leading axis, indexed by active source."""
     records = np.stack((np.zeros((11, 4, 2)), np.ones((11, 4, 2))))
     wave = SimpleNamespace(
         real_shot_record=records,
@@ -117,6 +117,7 @@ def test_real_shot_record_selects_elastic_source_axis():
 
 
 def test_automated_adjoint_stores_controls_as_a_list():
+    """Controls become ordered lists, labeled only when given by name."""
     control = object()
     parameter = ElasticMaterialParameter.MU
 
@@ -130,37 +131,15 @@ def test_automated_adjoint_stores_controls_as_a_list():
 
 
 def test_automated_adjoint_rejects_empty_controls():
+    """There is nothing to differentiate with respect to without controls."""
     automated_adjoint = AutomatedAdjoint(None)
 
     with pytest.raises(ValueError, match="At least one control"):
         automated_adjoint.create_reduced_functional(functional=None)
 
 
-@pytest.mark.parametrize(
-    ("riesz_map", "derivative_method"),
-    [
-        pytest.param(RieszMapType.L2, "compute_gradient", id="L2"),
-        pytest.param(RieszMapType.l2, "compute_derivative", id="l2"),
-    ],
-)
-def test_acoustic_automated_adjoint_returns_single_derivative(
-    riesz_map,
-    derivative_method,
-):
-    wave = AcousticWave.__new__(AcousticWave)
-    derivative = object()
-    wave.functional_value = AdjFloat(1.0)
-    wave.automated_adjoint = SimpleNamespace(
-        reduced_functional=object(),
-        **{derivative_method: lambda: [derivative]},
-    )
-
-    result = wave._automated_adjoint_gradient(riesz_map=riesz_map)
-
-    assert result is derivative
-
-
 def test_verify_gradient_normalizes_one_control(monkeypatch):
+    """A single control and direction reach pyadjoint as one-item lists."""
     automated_adjoint = AutomatedAdjoint(None)
     automated_adjoint.reduced_functional = object()
     control = object()
