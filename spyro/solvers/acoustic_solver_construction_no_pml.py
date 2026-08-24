@@ -64,7 +64,7 @@ def build_acoustic_form(wave, u_trial, v_test, u_n,
     return m1 + a + le
 
 
-def construct_solver_no_pml(wave):
+def construct_solver_or_matrix_no_pml(wave):
     """Builds solver operators for wave propagator with typical BCs, NRBCs or HABCs.
 
     Doesn't create mass matrices if matrix_free option is on, which it is by default.
