@@ -521,7 +521,7 @@ def analytical_force_source_2d(
     time_delay: float,
     force_direction: int,
     displacement_direction: int,
-    n_extra: int = 10,
+    n_extra: int = 100,
 ):
     r"""Calculate the 2D analytical displacement from a point force.
 
@@ -626,20 +626,31 @@ def analytical_force_source_2d(
         # Radial derivative of
         #
         # H_0^(2)(k_s r) - H_0^(2)(k_p r).
-        radial_derivative = -k_s * hankel_s_1 + k_p * hankel_p_1
+        radial_derivative = (
+            -k_s * hankel_s_1
+            + k_p * hankel_p_1
+        )
 
-        second_derivative_radial = -(k_s**2) * hankel_s + k_p**2 * hankel_p
+        radial_second_derivative = (
+            -(k_s**2) * hankel_s
+            + (k_s / radius) * hankel_s_1
+            + (k_p**2) * hankel_p
+            - (k_p / radius) * hankel_p_1
+        )
+
+        hessian_radial_coefficient = (
+            radial_second_derivative
+            - radial_derivative / radius
+        )
 
         green_tensor_component = (
-            -1j
-            / (4.0 * shear_modulus)
+            -1j / (4.0 * shear_modulus)
             * (
                 hankel_s * delta_ij
                 + (
-                    second_derivative_radial * gamma_i * gamma_j
+                    hessian_radial_coefficient * gamma_i * gamma_j
                     + (radial_derivative / radius) * delta_ij
-                )
-                / k_s**2
+                ) / k_s**2
             )
         )
 
