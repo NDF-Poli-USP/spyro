@@ -11,11 +11,11 @@ def construct_acoustic_elastic(Wave_obj):
     p_n, u_n     = fire.split(Wave_obj.X_n)
 
     p_trial, u_trial = TrialFunctions(Wave_obj.function_space)
-    v_f, v_s         = TestFunctions(Wave_obj.functio_space)
+    v_f, v_s         = TestFunctions(Wave_obj.function_space)
 
     F_acoustic = build_acoustic_form(
         Wave_obj, p_trial, v_f, p_n, p_nm1,
-        Wave_obj.quadratrure_rule_fluid, c=Wave_obj.c, implicit=True
+        Wave_obj.quadrature_rule_fluid, c=Wave_obj.c, implicit=True
     )
 
     F_elastic = build_elastic_form(

@@ -104,17 +104,22 @@ class Sources(Delta_projector):
         rhs_forcing : Firedrake.Function
             The right hand side of the wave equation with the source applied
         """
+        target = rhs_forcing
+        if hasattr(rhs_forcing.function_space(), "num_sub_spaces") and \
+        rhs_forcing.function_space().num_sub_spaces() > 1:
+            target = rhs_forcing.sub(0)
+        
         for source_id in range(self.number_of_points):
             if self.is_local[source_id] and source_id in self.current_sources:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    rhs_forcing.dat.data_with_halos[
+                    target.dat.data_with_halos[
                         int(self.cellNodeMaps[source_id][i])
                     ] = self.wavelet[step] * np.dot(
                         self.amplitude, self.cell_tabulations[source_id][i]
                     )
             else:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841
+                    tmp = target.dat.data_with_halos[0]  # noqa: F841
 
         return rhs_forcing
 

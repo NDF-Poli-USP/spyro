@@ -3,11 +3,16 @@ import warnings
 import os
 
 from .wave import Wave
-from .acoustic_elastic_solver_no_pml import construct_acoustic_elastic # to implement
+from .acoustic_elastic_solver_no_pml import construct_acoustic_elastic
 from ..utils.typing import override, WaveType
 from ..domains.space import create_function_space
 from ..domains.quadrature import quadrature_rules
-from ..plots.general_plots import plot acoustic_elastic_snapshot # to implement
+# from ..plots.general_plots import plot acoustic_elastic_snapshot # to implement
+
+def _extract_interface_markers(parent_mesh, child_mesh):
+    parent_exterior = {int(m) for m in parent_mesh.exterior_facets.unique_markers}
+    child_exterior  = {int(m) for m in child_mesh.exterior_facets.unique_markers}
+    return tuple(sorted(child_exterior - parent_exterior))
 
 class AcousticElasticWave(Wave):
     def __init__(self, dictionary, comm=None):
@@ -16,7 +21,7 @@ class AcousticElasticWave(Wave):
         self.interface_x = dictionary["mesh"].get("interface_x", None)
 
         super().__init__(dictionary, comm=comm)
-        self.wave_type = WaveType.ISOTROPIC_ACOUSTIC_ELASTIC # to implement
+        self.wave_type = WaveType.NONE
         self.field_logger.add_field("displacement", "SolidDisplacement", lambda: self.X_n.sub(1))
 
         self.c           = None # fluid
@@ -26,12 +31,12 @@ class AcousticElasticWave(Wave):
         self.body_forces = None # solid
 
         self._save_pressure_only = True
-        self._use.mixed_source   = True
+        self._use_mixed_source   = True
 
         self._setup_snapshots(dictionary)
 
     def _mark_mesh_regions(self):
-        if self.interface_x in None:
+        if self.interface_x is None:
             raise ValueError(
                 "dictionary['mesh']['interface_x'] must be set when "
                 "using an automatically-generated mesh (mesh_filen=None) "
@@ -42,7 +47,7 @@ class AcousticElasticWave(Wave):
         indicator_fluid = fire.Function(dq0).interpolate(
             fire.conditional(self.mesh_x >= self.interface_x, 1, 0)
         )
-        self.mesh_mark_entities(indicator_fluid, self.fluid_id)
+        self.mesh.mark_entities(indicator_fluid, self.fluid_id)
         indicator_solid = fire.Function(dq0).interpolate(
             fire.conditional(self.mesh_x < self.interface_x, 1, 0)
         )
@@ -57,10 +62,27 @@ class AcousticElasticWave(Wave):
         self.submesh_fluid.coordinates.dat.data[:, 0] *= -1.0
         self.submesh_solid.coordinates.dat.data[:, 0] *= -1.0
 
+        iface_fluid = _extract_interface_markers(self.mesh, self.submesh_fluid)
+        iface_solid = _extract_interface_markers(self.mesh, self.submesh_solid)
+        assert iface_fluid == iface_solid, (
+            f"Inconsistent interface markers: {iface_fluid} vs {iface_solid}"
+        )
+        self.interface_id = iface_solid[0] if len(iface_solid) == 1 else iface_solid
+
     def _build_measures(self):
         self.dx_fluid = fire.Measure("dx", domain=self.submesh_fluid)
         self.dx_solid = fire.Measure("dx", domain=self.submesh_solid)
-        self.
+        self.ds_int   = fire.Measure(
+            "ds", domain=self.submesh_fluid,
+            intersect_measures=(fire.Measure("ds", self.submesh_solid),)
+        )
+        self.n_f = fire.FacetNormal(self.submesh_fluid)
+        self.n_s = fire.FacetNormal(self.submesh_solid)
+        check = fire.assemble(
+            fire.dot(self.n_s + self.n_f, self.n_s + self.n_f)
+            * self.ds_int(self.interface_id)
+        )
+        assert check < 1e-12, f"Inconsistent interface normals: {check}"
     
     @override
     def _create_function_space(self):
@@ -72,7 +94,7 @@ class AcousticElasticWave(Wave):
             pass
 
         self._build_submeshes()
-        self._build_interface_measures()
+        self._build_measures()
 
         self.scalar_function_space = create_function_space(
             self.submesh_fluid, self.method, self.degree, dim=1
@@ -85,11 +107,11 @@ class AcousticElasticWave(Wave):
 
     # =====BEGIN TEMPORARY=====
     @override
-    def building_mesh_derived_parameters(self):
+    def building_mesh_derived_paramenters(self):
         coodinates = self.mesh_ops._set_spatial_coordinates(self.mesh)
-        self.mesh_z, self.mesh_x = coordinates[0], coordinates[1]
+        self.mesh_z, self.mesh_x = coodinates[0], coodinates[1]
         if self.dimension ==3:
-            self.mesh_y = coordinates[2]
+            self.mesh_y = coodinates[2]
         self._build_function_space()
         self._map_sources_and_receivers()
         self.mesh_ops.func_space_type = 'mixed'
@@ -109,9 +131,9 @@ class AcousticElasticWave(Wave):
         self.c.interpolate(fire.Constant(velocity_fluid_value))
         self.rho    = fire.Constant(rho_value)
         mu_value    = rho_value * s_wave_velocity_value**2
-        lmbda_value = rho_valuev * p_wave_velocity_value**2 - 2.0 * mu_value
+        lmbda_value = rho_value * p_wave_velocity_value**2 - 2.0 * mu_value
         self.mu     = fire.Constant(mu_value)
-        self.lmda   = fire.Constant(lmbda_value)
+        self.lmbda   = fire.Constant(lmbda_value)
 
     @override
     def matrix_building(self):
@@ -126,7 +148,7 @@ class AcousticElasticWave(Wave):
         return self.X_n
 
     @override
-    def _set_vstate(self):
+    def _set_vstate(self, vstate):
         self.X_n.assign(vstate)
 
     @override
@@ -151,7 +173,7 @@ class AcousticElasticWave(Wave):
         return self.receivers.interpolate(data_with_halos)
 
     @override
-    def get_functions(self):
+    def get_function(self):
         return self.X_n.sub(0)
 
     @override
@@ -188,18 +210,38 @@ class AcousticElasticWave(Wave):
 
     @override
     def update_source_expression(self, t):
-        self._handle_snapshot()
+        # self._handle_snapshot()
+        pass
 
-    def _handle_snapshot(self):
-        if self._snapshot_every is not None and self._snapshot_step % self._snapshot_every == 0:
-            os.makedirs(self._snapshot_dir, exist_ok=True)
-            plot_acoustic_elastic_snapshot(
-                self, filename=f"{self._snapshot_dir}/snapshot_{self._snapshot_step:04d}.png"
-            )
-        self._snapshot_step += 1
+    # def _handle_snapshot(self):
+    #     if self._snapshot_every is not None and self._snapshot_step % self._snapshot_every == 0:
+    #         os.makedirs(self._snapshot_dir, exist_ok=True)
+    #         plot_acoustic_elastic_snapshot(
+    #             self, filename=f"{self._snapshot_dir}/snapshot_{self._snapshot_step:04d}.png"
+    #         )
+    #     self._snapshot_step += 1
+
+    @override
+    def get_control_parameters(self):
+        raise NotImplementedError
+
+    @override
+    def set_control_parameters(self, controls):
+        raise NotImplementedError
+
+    @override
+    def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
+        raise NotImplementedError
+
+    @override
+    def get_control_parameter_function_space(self):
+        raise NotImplementedError
         
-        
-        
+    def _setup_snapshots(self, dictionary):
+        vis = dictionary.get("visualization", {})
+        self._snapshot_every = vis.get("snapshot_frequency", None)
+        self._snapshot_dir = vis.get("snapshot_output_dir", "results/snapshots")
+        self._snapshot_step = 0
 
 
 
