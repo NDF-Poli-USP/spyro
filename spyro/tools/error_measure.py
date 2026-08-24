@@ -325,55 +325,6 @@ class MeasureError():
 
         return error_measures
 
-    def normalized_root_mean_square_error(self, signal_model, signal_reference,
-                                          error_if_different_length=True,
-                                          start_padding=False, end_padding=False):
-        """Compute the normalized RMS error between the model and reference signals.
-
-        Takem from https://www.statisticshowto.com/nrmse/
-        TODO: add citation
-
-        Parameters
-        ----------
-        signal_model : `array`
-            Transient response at the receiver for the model.
-        signal_reference : `array`
-            Transient response at the receiver for the reference model.
-        error_if_different_length: `bool`, optional
-            If `True`, raise an error if the lengths of the model and reference
-            signals are different. Default is `True`.
-        start_padding: `bool`, optional
-            If `True`, pad the shorter signal with zeros at the start to match
-            the length of the other signal. Default is `False`.
-        end_padding: `bool`, optional
-            If `True`, pad the shorter signal with zeros at the end to match the
-            length of the other signal. Default is `False`.
-
-        Returns
-        -------
-        nrms_error : `float`
-            Normalized RMS error between the model and reference signals.
-        """
-
-        # Check the input parameters
-        validate_data_structure("signal_model", signal_model, "array",
-                                expected_type_element="float")
-        validate_data_structure("signal_reference", signal_reference, "array",
-                                expected_type_element="float")
-
-        # Padding with zeros if arrays lengths are different
-        signal_model, signal_reference = self.pad_signal_lengths(
-            signal_model, signal_reference,
-            error_if_different_length=error_if_different_length,
-            start_padding=start_padding, end_padding=end_padding)
-
-        # Normalized RMS error
-        numerator = norm(signal_model - signal_reference)
-        denominator = norm(signal_reference)
-        nrms_error = numerator / denominator if denominator != 0 else inf
-
-        return nrms_error
-
 
 def pad_signal_lengths(
     signal_model: np.ndarray,
@@ -578,7 +529,7 @@ def calculate_integral_error(
     validate_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
 
     # Padding with zeros if arrays lengths are different
-    signal_model, signal_reference = self.pad_signal_lengths(
+    signal_model, signal_reference = pad_signal_lengths(
         signal_model, signal_reference,
         error_if_different_length=error_if_different_length,
         start_padding=start_padding, end_padding=end_padding)
@@ -590,3 +541,56 @@ def calculate_integral_error(
 
     return integral_error
 
+
+def normalized_root_mean_square_error(
+    signal_model: np.ndarray,
+    signal_reference: np.ndarray,
+    error_if_different_length=True,
+    start_padding=False,
+    end_padding=False,
+):
+    """Compute the normalized RMS error between the model and reference signals.
+
+    Takem from https://www.statisticshowto.com/nrmse/
+    TODO: add citation
+
+    Parameters
+    ----------
+    signal_model : `array`
+        Transient response at the receiver for the model.
+    signal_reference : `array`
+        Transient response at the receiver for the reference model.
+    error_if_different_length: `bool`, optional
+        If `True`, raise an error if the lengths of the model and reference
+        signals are different. Default is `True`.
+    start_padding: `bool`, optional
+        If `True`, pad the shorter signal with zeros at the start to match
+        the length of the other signal. Default is `False`.
+    end_padding: `bool`, optional
+        If `True`, pad the shorter signal with zeros at the end to match the
+        length of the other signal. Default is `False`.
+
+    Returns
+    -------
+    nrms_error : `float`
+        Normalized RMS error between the model and reference signals.
+    """
+
+    # Check the input parameters
+    validate_data_structure("signal_model", signal_model, "array",
+                            expected_type_element="float")
+    validate_data_structure("signal_reference", signal_reference, "array",
+                            expected_type_element="float")
+
+    # Padding with zeros if arrays lengths are different
+    signal_model, signal_reference = pad_signal_lengths(
+        signal_model, signal_reference,
+        error_if_different_length=error_if_different_length,
+        start_padding=start_padding, end_padding=end_padding)
+
+    # Normalized RMS error
+    numerator = norm(signal_model - signal_reference)
+    denominator = norm(signal_reference)
+    nrms_error = numerator / denominator if denominator != 0 else inf
+
+    return nrms_error
