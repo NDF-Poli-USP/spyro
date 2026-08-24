@@ -65,10 +65,20 @@ class IsotropicWave(ElasticWave):
         self.mu = None    # Second Lame parameter
         self.c_s = None   # Secondary wave velocity
         self._physical_parameterization = None
-        #: Family whose independent fields already exist as ``Function``
-        #: objects owned by this solver rather than by the model dictionary.
-        self._materialized_parameterization = None
-        self._material_parameter_function_space = None
+        #: Whether the physical parameters already exist as the ``Function``
+        #: objects this solver goes on using.
+        #:
+        #: Every forward solve re-reads the model dictionary and builds new
+        #: ``Function`` objects from it. While the dictionary is the source
+        #: of truth, that is harmless: the same numbers go in and come back
+        #: out. It stops being harmless once the automated adjoint has run,
+        #: because by then two things live inside those particular objects.
+        #: The pyadjoint controls refer to them by identity, and an
+        #: inversion has written its current iterate into them. A rebuild
+        #: would leave the controls pointing at objects the solve no longer
+        #: uses, and reset the iterate to the model's initial values. So
+        #: from that point on the rebuild is skipped.
+        self._physical_parameters_are_built = False
 
         self.u_n = None   # Current displacement field
         self.u_nm1 = None  # Displacement field in previous iteration
@@ -106,12 +116,10 @@ class IsotropicWave(ElasticWave):
         from the provided set, and the active physical parameterization is
         stored.
 
-        Every forward solve calls this method again. Once a family has been
-        materialized by :meth:`_set_physical_parameterization` the independent
-        fields are owned by this solver, so they are kept as they are rather
-        than rebuilt from the dictionary: they hold the current values, and
-        rebuilding them would break the identity that pyadjoint controls and
-        already assembled forms rely on.
+        Every forward solve calls this method again. Once
+        :meth:`_set_physical_parameterization` has built the physical
+        parameters the rebuild is skipped, so the objects the adjoint and any
+        inversion depend on survive; see ``_physical_parameters_are_built``.
 
         Parameters
         ----------
@@ -129,7 +137,7 @@ class IsotropicWave(ElasticWave):
             The method assigns ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s``, and
             the active physical parameterization on ``self``.
         """
-        if self._materialized_parameterization is not None:
+        if self._physical_parameters_are_built:
             return
 
         def material_parameter(value):
@@ -220,31 +228,6 @@ class IsotropicWave(ElasticWave):
         add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
         add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
 
-    def _material_parameter_space(self) -> object:
-        """Return the scalar space used for material parameters.
-
-        Returns
-        -------
-        firedrake.FunctionSpace
-            Scalar finite-element space on the elastic mesh.
-
-        Raises
-        ------
-        ValueError
-            If the mesh has not been created.
-        """
-        if self.mesh is None:
-            raise ValueError(
-                "Mesh must be set before creating elastic material fields.",
-            )
-        space = self._material_parameter_function_space
-        if space is None or space.mesh() is not self.mesh:
-            space = create_function_space(
-                self.mesh, self.method, self.degree, dim=1,
-            )
-            self._material_parameter_function_space = space
-        return space
-
     def _set_physical_parameterization(
         self, parameterization: ElasticMaterialParameterization,
     ) -> None:
@@ -258,9 +241,8 @@ class IsotropicWave(ElasticWave):
         Once a family has been materialized the fields belong to this object
         rather than to the model dictionary: they may be registered as
         pyadjoint controls, and rebuilding them from the dictionary would
-        both discard the current values and orphan those controls. This is
-        why ``_materialized_parameterization`` makes
-        :meth:`initialize_model_parameters_from_object` keep them.
+        both discard the current values and orphan those controls, which is
+        why this sets ``_physical_parameters_are_built``.
 
         Parameters
         ----------
@@ -274,9 +256,17 @@ class IsotropicWave(ElasticWave):
         Raises
         ------
         ValueError
-            If the family is not one this solver supports.
+            If the mesh has not been created, or the family is not one this
+            solver supports.
         """
-        space = self._material_parameter_space()
+        if self.mesh is None:
+            raise ValueError(
+                "Mesh must be set before creating elastic physical "
+                "parameters.",
+            )
+        space = create_function_space(
+            self.mesh, self.method, self.degree, dim=1,
+        )
 
         def as_field(value, parameter):
             """Return ``value`` as an independent field of ``parameter``."""
@@ -307,7 +297,7 @@ class IsotropicWave(ElasticWave):
             )
 
         self._physical_parameterization = parameterization
-        self._materialized_parameterization = parameterization
+        self._physical_parameters_are_built = True
         add = self._physical_parameters.add
         add(ElasticMaterialParameter.DENSITY, self.rho)
         add(ElasticMaterialParameter.LAMBDA, self.lmbda)

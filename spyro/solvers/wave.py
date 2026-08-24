@@ -778,9 +778,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def physical_parameters(self):
         """Return the physical parameters of the wave equation being solved.
 
-        The parameters are the material fields the variational form is written
-        in terms of: the velocity model for an acoustic medium, density and a
-        pair of elastic moduli or wave speeds for an isotropic elastic one.
+        These are the fields the variational form is written in terms of:
+        the velocity model for an acoustic medium, density and a pair of
+        elastic moduli or wave speeds for an isotropic elastic one.
         Solvers declare them while initializing their material properties.
 
         A wave solver knows only about physical parameters. Which of them an
@@ -901,7 +901,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         return selected
 
     def initialize_physical_parameters(self):
-        """Build the material fields of the wave equation from the model input.
+        """Build the physical parameters of the wave equation from the model input.
 
         The forward solve does this on its own, so this is only needed to read
         the physical parameters of a solver that has not run yet.
