@@ -35,7 +35,6 @@ def nodal_homogeneous_analytical(
     -------
     numpy.ndarray
         Analytical wavefield evaluated at the time steps of ``wave``.
-
     """
     # Generating extended ricker wavelet
     dt = wave.dt
@@ -91,7 +90,6 @@ def _analytical_solution(
     -------
     numpy.ndarray
         Analytical solution in the time domain.
-
     """
     num_t = len(ricker_wavelet)
 
@@ -357,7 +355,9 @@ def analytical_force_source_3d(
         t = time_vector[k]
 
         # Near field contribution (convolution integral term)
-        res = quad(lambda tau: tau * X0(t - tau), r / p_wave_velocity, r / s_wave_velocity)
+        res = quad(
+            lambda tau: tau * X0(t - tau), r / p_wave_velocity, r / s_wave_velocity
+        )
         u_near = (
             amplitude
             * (1.0 / (4 * np.pi * density))
@@ -566,17 +566,18 @@ def analytical_force_source_2d(
     if displacement_direction not in (0, 1):
         raise ValueError("2D displacement_direction must be 0 or 1.")
 
-
     dt = time_vector[1] - time_vector[0]
     num_t = len(time_vector)
 
     extended_num_t = n_extra * num_t
-    extended_final_time = dt * (extended_num_t - 1)
 
-    extended_time_vector = np.arange(
-        extended_num_t,
-        dtype=float,
-    ) * dt
+    extended_time_vector = (
+        np.arange(
+            extended_num_t,
+            dtype=float,
+        )
+        * dt
+    )
     radius = np.linalg.norm(offsets)
 
     if radius == 0.0:
@@ -590,19 +591,16 @@ def analytical_force_source_2d(
 
     # Number of time samples and corresponding postive frequencies.
     extended_num_t = len(extended_time_vector)
-    final_time = extended_time_vector[-1]
 
     num_frequencies = extended_num_t // 2 + 1
-    frequency_axis = np.fft.rfftfreq(extended_num_t, d=extended_time_vector[1] - extended_time_vector[0])
+    frequency_axis = np.fft.rfftfreq(
+        extended_num_t, d=extended_time_vector[1] - extended_time_vector[0]
+    )
 
     # Source spectrum.
     source_wavelet = (
-        1.0
-        - 2.0
-        * (np.pi * frequency * (extended_time_vector - time_delay)) ** 2
-    ) * np.exp(
-        -(np.pi * frequency * (extended_time_vector - time_delay)) ** 2
-    )
+        1.0 - 2.0 * (np.pi * frequency * (extended_time_vector - time_delay)) ** 2
+    ) * np.exp(-((np.pi * frequency * (extended_time_vector - time_delay)) ** 2))
 
     source_spectrum = np.fft.rfft(source_wavelet)
 
@@ -628,15 +626,9 @@ def analytical_force_source_2d(
         # Radial derivative of
         #
         # H_0^(2)(k_s r) - H_0^(2)(k_p r).
-        radial_derivative = (
-            -k_s * hankel_s_1
-            + k_p * hankel_p_1
-        )
+        radial_derivative = -k_s * hankel_s_1 + k_p * hankel_p_1
 
-        second_derivative_radial = (
-            -k_s**2 * hankel_s
-            + k_p**2 * hankel_p
-        )
+        second_derivative_radial = -(k_s**2) * hankel_s + k_p**2 * hankel_p
 
         green_tensor_component = (
             -1j
@@ -645,19 +637,14 @@ def analytical_force_source_2d(
                 hankel_s * delta_ij
                 + (
                     second_derivative_radial * gamma_i * gamma_j
-                    + (
-                        radial_derivative / radius
-                    )
-                    * delta_ij
+                    + (radial_derivative / radius) * delta_ij
                 )
                 / k_s**2
             )
         )
 
         displacement_spectrum[frequency_index] = (
-            green_tensor_component
-            * amplitude
-            * source_spectrum[frequency_index]
+            green_tensor_component * amplitude * source_spectrum[frequency_index]
         )
 
     displacement = np.fft.irfft(
