@@ -827,13 +827,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         parameters it wants, but only the wave equation knows how they are
         related: which ones it carries as independent
         :class:`firedrake.Function` fields and which ones it computes from
-        those. Resolving a selection is therefore its responsibility, and
-        subclasses whose parameters admit more than one independent family
-        override this method to reconcile the selection with the family in use.
+        those. Resolving a selection is therefore its responsibility. A
+        selection is valid when every name in it is carried by an independent
+        field, which for an equation that can be written in more than one
+        family means the family it is currently written in.
 
-        This base implementation covers wave equations whose parameters are
-        independent of one another, so a selection is valid exactly when every
-        name in it is carried by an independent field.
+        Deciding *which* parameters an inversion or an adjoint controls is
+        not this method's business; it only answers whether the equation, as
+        currently written, can offer them.
 
         Parameters
         ----------
@@ -894,8 +895,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             field = physical_parameters[name]
             if not isinstance(field, fire.Function):
                 raise TypeError(
-                    f"'{name.value}' is a dependent physical parameter and "
-                    "cannot be used directly as a control.",
+                    f"'{name.value}' is computed from the other physical "
+                    "parameters of this wave equation, so it cannot be "
+                    "controlled on its own. If the equation can be written "
+                    "in terms of it instead, change its physical "
+                    "parameterization first.",
                 )
             selected.add(name, field)
         return selected

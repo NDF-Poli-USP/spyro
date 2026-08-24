@@ -116,7 +116,7 @@ class IsotropicWave(ElasticWave):
         stored.
 
         Every forward solve calls this method again. Once
-        :meth:`_set_physical_parameterization` has built the physical
+        :meth:`set_physical_parameterization` has built the physical
         parameters the rebuild is skipped, so the objects the adjoint and any
         inversion depend on survive; see ``_physical_parameters_are_built``.
 
@@ -193,9 +193,9 @@ class IsotropicWave(ElasticWave):
                 f"    S-wave velocity: {self.c_s is not None}\n"
                 f"The valid options are {families}",
             )
-        self._set_physical_parameterization(declared_parameterization)
+        self._build_physical_parameterization(declared_parameterization)
 
-    def _set_physical_parameterization(
+    def _build_physical_parameterization(
         self, parameterization: ElasticMaterialParameterization,
     ) -> None:
         """Materialize one independent elastic parameter family.
@@ -272,18 +272,50 @@ class IsotropicWave(ElasticWave):
         add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
         add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
 
+    def set_physical_parameterization(
+        self, parameterization: ElasticMaterialParameterization,
+    ) -> None:
+        """Write the equation in one of its physical parameter families.
+
+        An isotropic elastic medium can be written in terms of
+        ``{density, lambda, mu}`` or of
+        ``{density, p_wave_velocity, s_wave_velocity}``, carrying whichever
+        family it is not written in as expressions of the other. Choosing
+        between them is a decision about the equation, so it belongs here
+        rather than to whatever differentiates it, and it has to be made
+        before parameters are selected as controls.
+
+        The choice is deliberate, so it also pins the fields: the model
+        dictionary declares one family, and letting the next initialization
+        read it again would silently undo this call.
+
+        Parameters
+        ----------
+        parameterization : ElasticMaterialParameterization
+            Family to write the equation in.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        ValueError
+            If the family is not one this solver supports.
+        """
+        self._build_physical_parameterization(parameterization)
+        self._physical_parameters_are_built = True
+
     def select_physical_parameters(
         self, names: object = None,
     ) -> PhysicalParameters:
-        """Resolve an independent isotropic-elastic selection.
+        """Select controls from the family the equation is written in.
 
-        An isotropic elastic medium is written either in terms of
-        ``{density, lambda, mu}`` or of
-        ``{density, p_wave_velocity, s_wave_velocity}``, and carries the family
-        it is not written in as expressions of the other. A selection is
-        therefore valid when it fits inside one family, and asking for names
-        from the family currently held as expressions changes the equation over
-        to it.
+        The equation is written in one family and carries the other as
+        expressions of it, so only the family in use can be controlled.
+        Changing that is :meth:`set_physical_parameterization`, a decision
+        about the equation rather than about the inversion, and it has to be
+        made before parameters are selected.
 
         Parameters
         ----------
@@ -294,70 +326,26 @@ class IsotropicWave(ElasticWave):
         Returns
         -------
         PhysicalParameters
-            Selected names, mapped to the independent fields carrying them.
+            Selected names, mapped to the fields carrying them.
 
         Raises
         ------
         ValueError
-            If the selection is empty, repeats a name, or spans both families.
+            If no mesh exists yet, or the selection is empty.
         TypeError
-            If a name is not an :class:`ElasticMaterialParameter` member.
+            If a name is not an :class:`ElasticMaterialParameter` member, or
+            belongs to the family the equation is not written in.
         """
-        current = self._physical_parameterization
-        if current is None:
-            raise ValueError(
-                "Elastic material parameters have not been initialized. "
-                "Call initialize_physical_parameters() first.",
-            )
-        if names is None:
-            selected_names = list(PHYSICAL_PARAMETERIZATION[current])
-        elif isinstance(names, ElasticMaterialParameter):
-            selected_names = [names]
-        else:
-            selected_names = list(names)
-
-        if not selected_names:
-            raise ValueError("At least one elastic control parameter is required.")
-        if not all(
-            isinstance(name, ElasticMaterialParameter)
-            for name in selected_names
-        ):
-            raise TypeError(
-                "Elastic controls must be ElasticMaterialParameter enum "
-                "members.",
-            )
-        if len(set(selected_names)) != len(selected_names):
-            raise ValueError("Elastic control parameters must be unique.")
-
-        wanted = set(selected_names)
-        candidates = [
-            parameterization
-            for parameterization, family in PHYSICAL_PARAMETERIZATION.items()
-            if wanted <= set(family)
-        ]
-        if not candidates:
-            families = " or ".join(
-                _format_physical_parameters(family)
-                for family in PHYSICAL_PARAMETERIZATION.values()
-            )
-            raise ValueError(
-                f"Elastic controls must be a subset of either {families}; "
-                f"got {_format_physical_parameters(selected_names)}.",
-            )
-        target = current if current in candidates else candidates[0]
         if self.mesh is None:
             raise ValueError(
                 "Mesh must be set before selecting elastic physical "
                 "parameters: a control has to be a field.",
             )
-        self._set_physical_parameterization(target)
-        # From here on the fields are this solver's own; see the attribute.
+        selected = super().select_physical_parameters(names)
+        # The selected fields are about to be differentiated with respect to,
+        # or written into by an inversion. Either way the model dictionary
+        # must stop rebuilding them; see ``_physical_parameters_are_built``.
         self._physical_parameters_are_built = True
-
-        selected = PhysicalParameters()
-        for parameter in PHYSICAL_PARAMETERIZATION[target]:
-            if parameter in wanted:
-                selected.add(parameter, self.physical_parameters[parameter])
         return selected
 
     def gradient_solve(

@@ -92,15 +92,22 @@ def exact_receiver_data():
     return wave.forward_solution_receivers
 
 
+LAME = spyro.ElasticMaterialParameterization.LAME
+VELOCITY = spyro.ElasticMaterialParameterization.VELOCITY
+
+# guess material, parameterization to write the equation in, controls to
+# select within it, controls expected on the adjoint.
 CASES = [
     pytest.param(
         LAME_MATERIAL,
+        None,
         None,
         (Parameter.DENSITY, Parameter.LAMBDA, Parameter.MU),
         id="lame-default",
     ),
     pytest.param(
         VELOCITY_MATERIAL,
+        None,
         None,
         (
             Parameter.DENSITY,
@@ -111,35 +118,48 @@ CASES = [
     ),
     pytest.param(
         LAME_MATERIAL,
+        VELOCITY,
         {Parameter.S_WAVE_VELOCITY},
         (Parameter.S_WAVE_VELOCITY,),
-        id="lame-to-single-s-velocity",
+        id="lame-model-rewritten-in-velocity",
     ),
     pytest.param(
         VELOCITY_MATERIAL,
+        LAME,
         {Parameter.LAMBDA, Parameter.MU},
         (Parameter.LAMBDA, Parameter.MU),
-        id="velocity-to-lame-subset",
+        id="velocity-model-rewritten-in-lame",
     ),
 ]
 
 
 @pytest.mark.parametrize(
-    ("guess_material", "control_parameters", "expected_parameters"),
+    (
+        "guess_material",
+        "parameterization",
+        "control_parameters",
+        "expected_parameters",
+    ),
     CASES,
 )
 def test_elastic_automated_adjoint_controls(
     exact_receiver_data,
     guess_material,
+    parameterization,
     control_parameters,
     expected_parameters,
 ):
-    """Taylor-test full, subset, and cross-family elastic controls."""
+    """Taylor-test full and subset controls, in either parameterization."""
     wave = spyro.IsotropicWave(make_dictionary(guess_material))
     wave.set_mesh(
         input_mesh_parameters={"edge_length": 0.05, "periodic": True},
     )
     wave.real_shot_record = exact_receiver_data
+    if parameterization is not None:
+        # Which family the equation is written in is decided on the wave,
+        # before anything selects controls within it.
+        wave.initialize_physical_parameters()
+        wave.set_physical_parameterization(parameterization)
     wave.enable_automated_adjoint()
     if control_parameters is not None:
         wave.automated_adjoint.set_control_parameters(control_parameters)
