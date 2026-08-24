@@ -130,7 +130,6 @@ class IsotropicWave(ElasticWave):
             the active physical parameterization on ``self``.
         """
         if self._materialized_parameterization is not None:
-            self._register_physical_parameters()
             return
 
         def material_parameter(value):
@@ -214,7 +213,12 @@ class IsotropicWave(ElasticWave):
                 "The valid options are {Density, Lame first, Lame second} "
                 "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
             )
-        self._register_physical_parameters()
+        add = self._physical_parameters.add
+        add(ElasticMaterialParameter.DENSITY, self.rho)
+        add(ElasticMaterialParameter.LAMBDA, self.lmbda)
+        add(ElasticMaterialParameter.MU, self.mu)
+        add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
+        add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
 
     def _material_parameter_space(self) -> object:
         """Return the scalar space used for material parameters.
@@ -240,24 +244,6 @@ class IsotropicWave(ElasticWave):
             )
             self._material_parameter_function_space = space
         return space
-
-    def _register_physical_parameters(self) -> None:
-        """Publish the material fields under their parameter names.
-
-        Both independent fields and the expressions computed from them are
-        registered, so callers can read any elastic parameter regardless of
-        which family the equation is currently written in.
-
-        Returns
-        -------
-        None
-        """
-        add = self._physical_parameters.add
-        add(ElasticMaterialParameter.DENSITY, self.rho)
-        add(ElasticMaterialParameter.LAMBDA, self.lmbda)
-        add(ElasticMaterialParameter.MU, self.mu)
-        add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
-        add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
 
     def _set_physical_parameterization(
         self, parameterization: ElasticMaterialParameterization,
@@ -322,7 +308,12 @@ class IsotropicWave(ElasticWave):
 
         self._physical_parameterization = parameterization
         self._materialized_parameterization = parameterization
-        self._register_physical_parameters()
+        add = self._physical_parameters.add
+        add(ElasticMaterialParameter.DENSITY, self.rho)
+        add(ElasticMaterialParameter.LAMBDA, self.lmbda)
+        add(ElasticMaterialParameter.MU, self.mu)
+        add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
+        add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
 
     def select_physical_parameters(
         self, names: object = None,
