@@ -1,13 +1,16 @@
 from os import getcwd
 import numpy as np
-from numpy import inf, load, pad, save, savetxt, trapezoid
 from numpy.linalg import norm
 from pathlib import Path
 from scipy.signal import find_peaks
 from ..io.basicio import parallel_print as pprint
-from ..utils.error_management import (mutually_exclusive_parameter_error,
-                                      validate_data_structure, validate_file,
-                                      validate_numeric, validate_string)
+from ..utils.error_management import (
+    mutually_exclusive_parameter_error,
+    validate_data_structure,
+    validate_file,
+    validate_numeric,
+    validate_string,
+)
 from ..utils.freq_tools import freq_response
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -20,7 +23,7 @@ from ..utils.freq_tools import freq_response
 # With additions by Alexandre Olender
 
 
-class MeasureError():
+class MeasureError:
     """Manage reference data and error calculations for wave simulations.
 
     This class is responsible primarily for managing output paths,
@@ -81,21 +84,16 @@ class MeasureError():
         -------
         None
         """
-
         # Path to save data
         if output_folder is None:
             output_folder = Path(getcwd()) / "output"
         elif isinstance(output_folder, str):
-            output_folder = Path(
-                validate_string("output_folder", output_folder)
-            )
+            output_folder = Path(validate_string("output_folder", output_folder))
         # Path to save data
         if output_case is None:
             output_case = output_folder
         elif isinstance(output_case, str):
-            output_case = Path(
-                validate_string("output_case", output_case)
-            )
+            output_case = Path(validate_string("output_case", output_case))
 
         self.path_save_error = output_folder
         self.path_save_err_case = output_case
@@ -114,11 +112,11 @@ class MeasureError():
 
         Parameters
         ----------
-        receiver_locations: `list`
+        receiver_locations : `list`
             List of receiver locations.
         forward_solution_receivers : `array`
             Receiver waveform data acquired from forward proeblem.
-        number_of_receivers: `int`
+        number_of_receivers : `int`
             Number of receivers used in the simulation.
         freq_Nyquist : `float`
             Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt).
@@ -130,18 +128,35 @@ class MeasureError():
         -------
         None
         """
-
         # Check the input parameters
-        validate_numeric("number_of_receivers", number_of_receivers,
-                         float_num=False, integer_num=True, lower_bound=0.)
-        validate_data_structure("receiver_locations", receiver_locations, "list",
-                                expected_type_element="tuple",
-                                expected_length=number_of_receivers)
-        validate_data_structure("forward_solution_receivers", forward_solution_receivers,
-                                "array2D", expected_type_element="float",
-                                expected_shape=(None, number_of_receivers))
-        validate_numeric("nyquist_frequency", nyquist_frequency, float_num=True,
-                         integer_num=True, lower_bound=0.)
+        validate_numeric(
+            "number_of_receivers",
+            number_of_receivers,
+            float_num=False,
+            integer_num=True,
+            lower_bound=0.0,
+        )
+        validate_data_structure(
+            "receiver_locations",
+            receiver_locations,
+            "list",
+            expected_type_element="tuple",
+            expected_length=number_of_receivers,
+        )
+        validate_data_structure(
+            "forward_solution_receivers",
+            forward_solution_receivers,
+            "array2D",
+            expected_type_element="float",
+            expected_shape=(None, number_of_receivers),
+        )
+        validate_numeric(
+            "nyquist_frequency",
+            nyquist_frequency,
+            float_num=True,
+            integer_num=True,
+            lower_bound=0.0,
+        )
 
         pprint("\nSaving Reference Output", comm=self.comm)
 
@@ -150,7 +165,7 @@ class MeasureError():
 
         output_file_prefix = self.path_reference / f"{output_file}_"
 
-        save(
+        np.save(
             str(output_file_prefix) + "time.npy",
             forward_solution_receivers,
         )
@@ -161,7 +176,7 @@ class MeasureError():
             signal = forward_solution_receivers[:, rec]
             yf = freq_response(signal, nyquist_frequency)
             receivers_ref_fft.append(yf)
-            save(
+            np.save(
                 str(output_file_prefix) + "fft.npy",
                 receivers_ref_fft,
             )
@@ -180,23 +195,28 @@ class MeasureError():
         receivers_ref_fft : `array`
           Frequency response at the receivers in the reference model.
         """
-
         pprint("\nLoading Reference Signal from Reference Model", comm=self.comm)
 
         # Path to the reference data folder with reference signals
         pth_str = self.path_reference + self.output_file + "_"
 
         # Time domain signal
-        receivers_reference_file = validate_file("reference time file",
-                                                 pth_str + "time.npy", [".npy"],
-                                                 check_file_existence=True)
-        receivers_reference = load(receivers_reference_file)
+        receivers_reference_file = validate_file(
+            "reference time file",
+            pth_str + "time.npy",
+            [".npy"],
+            check_file_existence=True,
+        )
+        receivers_reference = np.load(receivers_reference_file)
 
         # Frequency domain signal
-        receivers_reference_fft_file = validate_file("reference fft file",
-                                                     pth_str + "fft.npy", [".npy"],
-                                                     check_file_existence=True)
-        receivers_ref_fft = load(receivers_reference_fft_file).T
+        receivers_reference_fft_file = validate_file(
+            "reference fft file",
+            pth_str + "fft.npy",
+            [".npy"],
+            check_file_existence=True,
+        )
+        receivers_ref_fft = np.load(receivers_reference_fft_file).T
 
         return receivers_reference, receivers_ref_fft
 
@@ -206,13 +226,13 @@ class MeasureError():
         receivers_reference: np.ndarray,
         dt: float,
         number_of_receivers: int,
-        error_if_different_length: bool =True,
-        final_energy: float =None,
-        final_energy_reference: float =None,
-        save_file: bool =True,
-        save_in_case_folder: bool =True,
-        start_padding: bool =False,
-        end_padding: bool =False,
+        error_if_different_length: bool = True,
+        final_energy: float = None,
+        final_energy_reference: float = None,
+        save_file: bool = True,
+        save_in_case_folder: bool = True,
+        start_padding: bool = False,
+        end_padding: bool = False,
     ):
         """Compute the error measures at the receivers for comparison between models.
 
@@ -230,9 +250,9 @@ class MeasureError():
             Receiver waveform data in the reference model
         dt : `float`
             Time step used in the simulation.
-        number_of_receivers: `int`
+        number_of_receivers : `int`
             Number of receivers used in the simulation.
-        error_if_different_length: `bool`, optional
+        error_if_different_length : `bool`, optional
             If `True`, raise an error if the lengths of the model and reference
             signals are different. Default is `True`.
         final_energy : `float`, optional
@@ -244,10 +264,10 @@ class MeasureError():
         save_in_case_folder : `bool`, optional
             If `True`, save the error measures in the current case folder. Otherwise,
             save the error measures in the reference folder. Default is `True`.
-        start_padding: `bool`, optional
+        start_padding : `bool`, optional
             If `True`, pad the shorter signal with zeros at the start to match
             the length of the other signal. Default is `False`.
-        end_padding: `bool`, optional
+        end_padding : `bool`, optional
             If `True`, pad the shorter signal with zeros at the end to match the
             length of the other signal. Default is `False`.
 
@@ -284,19 +304,41 @@ class MeasureError():
         - The total energy dissipated by an ABC scheme can be calculated as the
             difference of the final energies with respect to an infinite model.
         """
-
         # Check the input parameters
-        validate_numeric("number_of_receivers", number_of_receivers,
-                         float_num=False, integer_num=True, lower_bound=0.)
-        validate_data_structure("forward_solution_receivers", forward_solution_receivers,
-                                "array2D", expected_shape=(None, number_of_receivers))
-        validate_data_structure("receivers_reference", receivers_reference, "array2D",
-                                expected_shape=(None, number_of_receivers))
-        validate_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
-        validate_numeric("final_energy", final_energy, float_num=True,
-                         integer_num=False, lower_bound=0.)
-        validate_numeric("final_energy_reference", final_energy_reference,
-                         float_num=True, integer_num=False, lower_bound=0.)
+        validate_numeric(
+            "number_of_receivers",
+            number_of_receivers,
+            float_num=False,
+            integer_num=True,
+            lower_bound=0.0,
+        )
+        validate_data_structure(
+            "forward_solution_receivers",
+            forward_solution_receivers,
+            "array2D",
+            expected_shape=(None, number_of_receivers),
+        )
+        validate_data_structure(
+            "receivers_reference",
+            receivers_reference,
+            "array2D",
+            expected_shape=(None, number_of_receivers),
+        )
+        validate_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.0)
+        validate_numeric(
+            "final_energy",
+            final_energy,
+            float_num=True,
+            integer_num=False,
+            lower_bound=0.0,
+        )
+        validate_numeric(
+            "final_energy_reference",
+            final_energy_reference,
+            float_num=True,
+            integer_num=False,
+            lower_bound=0.0,
+        )
 
         pprint("\nComputing Error Measures", comm=self.comm)
 
@@ -360,9 +402,7 @@ class MeasureError():
 
             # Dissipated energy
             if final_energy_reference is not None:
-                dissipated_energy = (
-                    1 - final_energy / final_energy_reference
-                )
+                dissipated_energy = 1 - final_energy / final_energy_reference
                 scalar_values.append(dissipated_energy)
                 pprint(
                     f"Dissipated Energy: {dissipated_energy:.2%}",
@@ -380,13 +420,13 @@ class MeasureError():
             output_directory.mkdir(parents=True, exist_ok=True)
             error_file = output_directory / "measure_errs.txt"
 
-            savetxt(
+            np.savetxt(
                 error_file,
                 error_measures[:3],
                 delimiter="\t",
             )
             with error_file.open("a") as file_handle:
-                savetxt(
+                np.savetxt(
                     file_handle,
                     scalar_values,
                     delimiter="\t",
@@ -437,12 +477,13 @@ def pad_signal_lengths(
         Also raised if both or neither of `start_padding` and
         `end_padding` are `True` when padding is required.
     """
-
     # Raise an error if signal lengths must be verified and are different
     if error_if_different_length and len(signal_model) != len(signal_reference):
-        raise ValueError("The lengths of the model and reference signals "
-                            "are different. Please check the simulation time "
-                            " or the time step used in the simulations.")
+        raise ValueError(
+            "The lengths of the model and reference signals "
+            "are different. Please check the simulation time "
+            " or the time step used in the simulations."
+        )
 
     if len(signal_model) == len(signal_reference):
         return signal_model, signal_reference
@@ -465,16 +506,16 @@ def pad_signal_lengths(
             Transient signal modified with zero padding at the start or end
             to match the length of the other signal to compare.
         """
-
         pad_distribution = (0, delta_len) if padding_type == "end" else (delta_len, 0)
-        return pad(signal, pad_distribution, 'constant', constant_values=0)
+        return np.pad(signal, pad_distribution, "constant", constant_values=0)
 
     # Pad the shorter signal with zeros if the lengths are different
 
     # Check if both start and end padding are requested, which is not allowed
     if not (start_padding ^ end_padding):  # Not XOR: both True or both False
-        mutually_exclusive_parameter_error(["end_padding", "start_padding"],
-                                            [end_padding, start_padding])
+        mutually_exclusive_parameter_error(
+            ["end_padding", "start_padding"], [end_padding, start_padding]
+        )
 
     # Getting the maximum length
     max_length = max(len(signal_model), len(signal_reference))
@@ -519,7 +560,6 @@ def calculate_peak_error(
     peak_reference : `float`
         Maximum peak value of the reference signal.
     """
-
     # Check the input parameters
     validate_data_structure(
         "signal_model",
@@ -537,8 +577,10 @@ def calculate_peak_error(
     # Finding peaks in transient response
     peaks_in_signal = find_peaks(signal_model)
     if peaks_in_signal[0].size == 0:
-        UserWarning("No peak observed in the transient response. "
-                    "Increase the transient time of the simulation.")
+        UserWarning(
+            "No peak observed in the transient response. "
+            "Increase the transient time of the simulation."
+        )
 
     # Maximum peak value
     peak_model = max(abs(signal_model))
@@ -552,7 +594,7 @@ def calculate_peak_error(
 
 def calculate_integral_error(
     signal_model: np.ndarray,
-    signal_reference: np.ndarray, 
+    signal_reference: np.ndarray,
     dt: float,
     error_if_different_length: bool = True,
     start_padding: bool = False,
@@ -589,24 +631,28 @@ def calculate_integral_error(
     integral_error : `float`
         Integral error between the model and reference signals.
     """
-
     # Check the input parameters
-    validate_data_structure("signal_model", signal_model, "array",
-                            expected_type_element="float")
-    validate_data_structure("signal_reference", signal_reference, "array",
-                            expected_type_element="float")
-    validate_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
+    validate_data_structure(
+        "signal_model", signal_model, "array", expected_type_element="float"
+    )
+    validate_data_structure(
+        "signal_reference", signal_reference, "array", expected_type_element="float"
+    )
+    validate_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.0)
 
     # Padding with zeros if arrays lengths are different
     signal_model, signal_reference = pad_signal_lengths(
-        signal_model, signal_reference,
+        signal_model,
+        signal_reference,
         error_if_different_length=error_if_different_length,
-        start_padding=start_padding, end_padding=end_padding)
+        start_padding=start_padding,
+        end_padding=end_padding,
+    )
 
     # Integral error
-    numerator = trapezoid((signal_model - signal_reference)**2, dx=dt)
-    denominator = trapezoid(signal_reference**2, dx=dt)
-    integral_error = numerator / denominator if denominator != 0 else inf
+    numerator = np.trapezoid((signal_model - signal_reference) ** 2, dx=dt)
+    denominator = np.trapezoid(signal_reference**2, dx=dt)
+    integral_error = numerator / denominator if denominator != 0 else np.inf
 
     return integral_error
 
@@ -626,13 +672,13 @@ def calculate_normalized_L2_error(
         Transient response at the receiver for the model.
     signal_reference : `array`
         Transient response at the receiver for the reference model.
-    error_if_different_length: `bool`, optional
+    error_if_different_length : `bool`, optional
         If `True`, raise an error if the lengths of the model and reference
         signals are different. Default is `True`.
-    start_padding: `bool`, optional
+    start_padding : `bool`, optional
         If `True`, pad the shorter signal with zeros at the start to match
         the length of the other signal. Default is `False`.
-    end_padding: `bool`, optional
+    end_padding : `bool`, optional
         If `True`, pad the shorter signal with zeros at the end to match the
         length of the other signal. Default is `False`.
 
@@ -641,25 +687,30 @@ def calculate_normalized_L2_error(
     nrms_error : `float`
         Normalized L2 error between the model and reference signals.
     """
-
     # Check the input parameters
-    validate_data_structure("signal_model", signal_model, "array",
-                            expected_type_element="float")
-    validate_data_structure("signal_reference", signal_reference, "array",
-                            expected_type_element="float")
+    validate_data_structure(
+        "signal_model", signal_model, "array", expected_type_element="float"
+    )
+    validate_data_structure(
+        "signal_reference", signal_reference, "array", expected_type_element="float"
+    )
 
     # Padding with zeros if arrays lengths are different
     signal_model, signal_reference = pad_signal_lengths(
-        signal_model, signal_reference,
+        signal_model,
+        signal_reference,
         error_if_different_length=error_if_different_length,
-        start_padding=start_padding, end_padding=end_padding)
+        start_padding=start_padding,
+        end_padding=end_padding,
+    )
 
     # Normalized L2 error
     numerator = norm(signal_model - signal_reference)
     denominator = norm(signal_reference)
-    nrms_error = numerator / denominator if denominator != 0 else inf
+    nrms_error = numerator / denominator if denominator != 0 else np.inf
 
     return nrms_error
+
 
 #     """
 #     Plot the comparison between the HABC scheme and the reference model.

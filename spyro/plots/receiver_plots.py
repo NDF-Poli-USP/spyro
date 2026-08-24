@@ -161,7 +161,7 @@ def plot_displacement_components(
         raise ValueError("time_vector must be one-dimensional")
     if not len(time_vector) == timestep_number:
         raise ValueError(
-            "time_vector and receiver results must have the same length in the first axis."
+            "time_vector and receiver results must have the same length in 1st axis."
         )
 
     if combined is False:
@@ -175,9 +175,9 @@ def plot_displacement_components(
 
         if dimension == 2:
             component_data = (
-                    (ux, "b", "Ux (displacement in x)", "Displacement Component Ux"),
-                    (uy, "r", "Uy (displacement in y)", "Displacement Component Uy"),
-                )
+                (ux, "b", "Ux (displacement in x)", "Displacement Component Ux"),
+                (uy, "r", "Uy (displacement in y)", "Displacement Component Uy"),
+            )
         elif dimension == 3:
             component_data = (
                 (ux, "b", "Ux (displacement in x)", "Displacement Component Ux"),
@@ -185,7 +185,9 @@ def plot_displacement_components(
                 (uz, "g", "Uz (displacement in z)", "Displacement Component Uz"),
             )
 
-        for axis, (component, color, label, title) in zip(separated_axes, component_data):
+        for axis, (component, color, label, title) in zip(
+            separated_axes, component_data
+        ):
             axis.plot(time_vector, component, color=color, linewidth=2, label=label)
             axis.set_ylabel("Amplitude")
             axis.set_title(f"{title} - {source_type}")
@@ -237,7 +239,7 @@ def plot_comparison_of_receivers_to_reference(
         - ``final_time``: final simulation time.
         - ``forward_solution_receivers``: receiver data from the simulation.
         - ``path_case_habc``: output directory for the generated figures.
-    reference_array: reference receiver data.
+    reference_array : reference receiver data.
     show : bool, optional
         Whether to display the figure interactively. Defaults to ``False``.
 
