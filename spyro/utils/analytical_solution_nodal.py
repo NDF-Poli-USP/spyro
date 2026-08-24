@@ -521,6 +521,7 @@ def analytical_force_source_2d(
     time_delay: float,
     force_direction: int,
     displacement_direction: int,
+    n_extra: int = 10,
 ):
     r"""Calculate the 2D analytical displacement from a point force.
 
@@ -549,6 +550,7 @@ def analytical_force_source_2d(
         Direction of the applied force. Must be 0 or 1.
     displacement_direction : int
         Direction of the displacement component. Must be 0 or 1.
+    n_extra: int = 10
 
     Returns
     -------
@@ -564,6 +566,17 @@ def analytical_force_source_2d(
     if displacement_direction not in (0, 1):
         raise ValueError("2D displacement_direction must be 0 or 1.")
 
+
+    dt = time_vector[1] - time_vector[0]
+    num_t = len(time_vector)
+
+    extended_num_t = n_extra * num_t
+    extended_final_time = dt * (extended_num_t - 1)
+
+    extended_time_vector = np.arange(
+        extended_num_t,
+        dtype=float,
+    ) * dt
     radius = np.linalg.norm(offsets)
 
     if radius == 0.0:
@@ -576,19 +589,19 @@ def analytical_force_source_2d(
     delta_ij = float(displacement_direction == force_direction)
 
     # Number of time samples and corresponding postive frequencies.
-    num_t = len(time_vector)
-    final_time = time_vector[-1]
+    extended_num_t = len(extended_time_vector)
+    final_time = extended_time_vector[-1]
 
-    num_frequencies = num_t // 2 + 1
-    frequency_axis = np.fft.rfftfreq(num_t, d=time_vector[1] - time_vector[0])
+    num_frequencies = extended_num_t // 2 + 1
+    frequency_axis = np.fft.rfftfreq(extended_num_t, d=extended_time_vector[1] - extended_time_vector[0])
 
     # Source spectrum.
     source_wavelet = (
         1.0
         - 2.0
-        * (np.pi * frequency * (time_vector - time_delay)) ** 2
+        * (np.pi * frequency * (extended_time_vector - time_delay)) ** 2
     ) * np.exp(
-        -(np.pi * frequency * (time_vector - time_delay)) ** 2
+        -(np.pi * frequency * (extended_time_vector - time_delay)) ** 2
     )
 
     source_spectrum = np.fft.rfft(source_wavelet)
@@ -649,7 +662,7 @@ def analytical_force_source_2d(
 
     displacement = np.fft.irfft(
         displacement_spectrum,
-        n=num_t,
+        n=extended_num_t,
     )
 
-    return displacement
+    return displacement[:num_t]
