@@ -1,4 +1,5 @@
 from os import getcwd
+import numpy as np
 from numpy import inf, load, pad, save, savetxt, trapezoid
 from numpy.linalg import norm
 from scipy.signal import find_peaks
@@ -34,8 +35,6 @@ class MeasureError():
 
     Methods
     -------
-    pad_signal_lengths()
-        Check if the lengths of the model and reference signals are equal.
     error_measures()
         Compute the error measures at the receivers for comparison between models.
     get_reference_signal()
@@ -179,190 +178,6 @@ class MeasureError():
         receivers_ref_fft = load(receivers_reference_fft_file).T
 
         return receivers_reference, receivers_ref_fft
-
-    @staticmethod
-    def pad_signal_lengths(signal_model, signal_reference, error_if_different_length=True,
-                           start_padding=False, end_padding=False):
-        """Equalize the signal lengths in comparison by padding with zeros.
-
-        Parameters
-        ----------
-        signal_model : `array`
-            Transient response at the receiver for the model.
-        signal_reference : `array`
-            Transient response at the receiver for the reference model.
-        error_if_different_length : `bool`, optional
-            If `True`, raise an error if the lengths of the model and reference
-            signals are different. Default is `True`.
-        start_padding : `bool`, optional
-            If `True`, pad the shorter signal with zeros at the start to match
-            the length of the other signal. Default is `False`.
-        end_padding : `bool`, optional
-            If `True`, pad the shorter signal with zeros at the end to match the
-            length of the other signal. Default is `False`.
-
-        Returns
-        -------
-        signal_model : `array`
-            Transient response at the receiver for the model, modified with a zero pad
-            if shorter than the reference.
-        signal_reference : `array`
-            Transient response at the receiver for the reference model, modified with
-            a zero pad if shorter than the model signal.
-        """
-
-        # Raise an error if signal lengths must be verified and are different
-        if error_if_different_length and len(signal_model) != len(signal_reference):
-            raise ValueError("The lengths of the model and reference signals "
-                             "are different. Please check the simulation time "
-                             " or the time step used in the simulations.")
-
-        def padding(signal, delta_len, padding_type):
-            """Pad the signal with zeros to match the length of the other signal.
-
-            Parameters
-            ----------
-            signal : `array`
-                Transient signal that is the shorter of the two signals to compare.
-            delta_len : `int`
-                Difference in length between the two signals to compare.
-            padding_type : `str`
-                Type of padding to apply. Options: "end" or "start".
-
-            Returns
-            -------
-            modified_signal : `array`
-                Transient signal modified with zero padding at the start or end
-                to match the length of the other signal to compare.
-            """
-
-            pad_distribution = (0, delta_len) if padding_type == "end" else (delta_len, 0)
-            return pad(signal, pad_distribution, 'constant', constant_values=0)
-
-        # Pad the shorter signal with zeros if the lengths are different
-        if len(signal_model) != len(signal_reference):
-
-            # Check if both start and end padding are requested, which is not allowed
-            if not (start_padding ^ end_padding):  # Not XOR: both True or both False
-                mutually_exclusive_parameter_error(["end_padding", "start_padding"],
-                                                   [end_padding, start_padding])
-
-            # Getting the maximum length
-            max_length = max(len(signal_model), len(signal_reference))
-
-            # Type of padding to apply
-            padding_type = "end" if end_padding else "start"
-
-            # Completing with zeros if arrays lengths are different
-            if len(signal_model) < max_length:
-                delta_len = max_length - len(signal_model)
-                signal_model = padding(signal_model, delta_len, padding_type)
-            elif len(signal_reference) < max_length:
-                delta_len = max_length - len(signal_reference)
-                signal_reference = padding(signal_reference, delta_len, padding_type)
-
-        return signal_model, signal_reference
-
-    @staticmethod
-    def peak_error(signal_model, signal_reference):
-        """Compute the peak error between the model and reference signals.
-
-        Error measures used in Salas et al. (2022) Sec. 2.5.
-        Hybrid absorbing scheme based on hyperelliptical layers with non-reflecting
-        boundary conditions in scalar wave equations. Applied Mathematical Modelling.
-        doi: https://doi.org/10.1016/j.apm.2022.09.014
-        TODO: add citation
-
-        Parameters
-        ----------
-        signal_model : `array`
-            Transient response ar the receiver for the model.
-        signal_reference : `array`
-            Transient response at the receiver for the reference model.
-
-        Returns
-        -------
-        peak_error : `float`
-            Peak error between the model and reference signals.
-        peak_reference : `float`
-            Maximum peak value of the reference signal.
-        """
-
-        # Check the input parameters
-        validate_data_structure("signal_model", signal_model, "array",
-                                expected_type_element="float")
-        validate_data_structure("signal_reference", signal_reference, "array",
-                                expected_type_element="float")
-
-        # Finding peaks in transient response
-        peaks_in_signal = find_peaks(signal_model)
-        if peaks_in_signal[0].size == 0:
-            UserWarning("No peak observed in the transient response. "
-                        "Increase the transient time of the simulation.")
-
-        # Maximum peak value
-        peak_model = max(abs(signal_model))
-        peak_reference = max(abs(signal_reference))
-
-        # Peak error
-        peak_error = abs(peak_model / peak_reference - 1)
-
-        return peak_error, peak_reference
-
-    def integral_error(self, signal_model, signal_reference, dt,
-                       error_if_different_length=True,
-                       start_padding=False, end_padding=False):
-        """Compute the integral error between the model and reference signals.
-
-        Error measures used in Salas et al. (2022) Sec. 2.5.
-        Hybrid absorbing scheme based on hyperelliptical layers with non-reflecting
-        boundary conditions in scalar wave equations. Applied Mathematical Modelling.
-        doi: https://doi.org/10.1016/j.apm.2022.09.014
-        TODO: add citation
-
-        Parameters
-        ----------
-        signal_model : `array`
-            Transient response at the receiver for the model.
-        signal_reference : `array`
-            Transient response at the receiver for the reference model.
-        dt : `float`
-            Time step used in the simulation.
-        error_if_different_length : `bool`, optional
-            If `True`, raise an error if the lengths of the model and reference
-            signals are different. Default is `True`.
-        start_padding : `bool`, optional
-            If `True`, pad the shorter signal with zeros at the start to match
-            the length of the other signal. Default is `False`.
-        end_padding : `bool`, optional
-            If `True`, pad the shorter signal with zeros at the end to match the
-            length of the other signal. Default is `False`.
-
-        Returns
-        -------
-        integral_error : `float`
-            Integral error between the model and reference signals.
-        """
-
-        # Check the input parameters
-        validate_data_structure("signal_model", signal_model, "array",
-                                expected_type_element="float")
-        validate_data_structure("signal_reference", signal_reference, "array",
-                                expected_type_element="float")
-        validate_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
-
-        # Padding with zeros if arrays lengths are different
-        signal_model, signal_reference = self.pad_signal_lengths(
-            signal_model, signal_reference,
-            error_if_different_length=error_if_different_length,
-            start_padding=start_padding, end_padding=end_padding)
-
-        # Integral error
-        numerator = trapezoid((signal_model - signal_reference)**2, dx=dt)
-        denominator = trapezoid(signal_reference**2, dx=dt)
-        integral_error = numerator / denominator if denominator != 0 else inf
-
-        return integral_error
 
     def error_measures(self, forward_solution_receivers, receivers_reference,
                        dt, number_of_receivers, error_if_different_length=True,
@@ -559,161 +374,219 @@ class MeasureError():
 
         return nrms_error
 
-    # def comparison_plots(self, regression_xCR=False, data_regr_xCR=None):
-    #     """
-    #     Plot the comparison between the HABC scheme and the reference model.
 
-    #     Parameters
-    #     ----------
-    #     regression_xCR : `bool`, optional
-    #         If True, Plot the regression for the error measure vs xCR
-    #         Default is False.
-    #     data_regr_xCR: `list`
-    #         Data for the regression of the parameter xCR.
-    #         Structure: [xCR, max_errIt, max_errPK, crit_opt]
-    #         - xCR: Values of xCR used in the regression.
-    #           The last value IS the optimal xCR
-    #         - max_errIt: Values of the maximum integral error.
-    #           The last value corresponds to the optimal xCR
-    #         - max_errPK: Values of the maximum peak error.
-    #           The last value corresponds to the optimal xCR
-    #         - crit_opt : Criterion for the optimal heuristic factor.
-    #           * 'err_difference' : Difference between integral and peak errors
-    #           * 'err_integral' : Minimum integral error
+def pad_signal_lengths(
+    signal_model: np.ndarray,
+    signal_reference: np.ndarray,
+    error_if_different_length: bool = True,
+    start_padding: bool = False,
+    end_padding: bool = False,
+):
+    """Equalize the signal lengths in comparison by padding with zeros.
 
-    #     Returns
-    #     -------
-    #     None
-    #     """
+    Parameters
+    ----------
+    signal_model : `np.ndarray`
+        Transient response at the receiver for the model.
+    signal_reference : `np.ndarray`
+        Transient response at the receiver for the reference model.
+    error_if_different_length : `bool`, optional
+        If `True`, raise an error if the lengths of the model and reference
+        signals are different. Default is `True`.
+    start_padding : `bool`, optional
+        If `True`, pad the shorter signal with zeros at the start to match
+        the length of the other signal. Default is `False`.
+    end_padding : `bool`, optional
+        If `True`, pad the shorter signal with zeros at the end to match the
+        length of the other signal. Default is `False`.
 
-    #     # Time domain comparison
-    #     plot_hist_receivers(self)
+    Returns
+    -------
+    signal_model : `np.ndarray`
+        Transient response at the receiver for the model, modified with a zero pad
+        if shorter than the reference.
+    signal_reference : `np.ndarray`
+        Transient response at the receiver for the reference model, modified with
+        a zero pad if shorter than the model signal.
 
-    #     forward_solution_receivers: `array`
-    #     Receiver waveform data in the HABC scheme
-    #     receivers_out_fft: `array`
-    #     Frequency response at the receivers in the HABC scheme
+    Raises
+    ------
+    ValueError
+        If the signals have different lengths and
+        `error_if_different_length` is `True`.
+        Also raised if both or neither of `start_padding` and
+        `end_padding` are `True` when padding is required.
+    """
 
-    #     # Compute FFT for output signal at receivers
-    #     self.receivers_out_fft = []
-    #     for rec in range(self.number_of_receivers):
-    #         signal = self.forward_solution_receivers[:, rec]
-    #         yf = freq_response(signal, self.freq_Nyquist)
-    #         self.receivers_out_fft.append(yf)
-    #     self.receivers_out_fft = np.asarray(self.receivers_out_fft).T
+    # Raise an error if signal lengths must be verified and are different
+    if error_if_different_length and len(signal_model) != len(signal_reference):
+        raise ValueError("The lengths of the model and reference signals "
+                            "are different. Please check the simulation time "
+                            " or the time step used in the simulations.")
 
-    #     # Frequency domain comparison
-    #     plot_rfft_receivers(self)
+    if len(signal_model) == len(signal_reference):
+        return signal_model, signal_reference
 
-    #     # Plot the error measures
-    #     if regression_xCR:
-    #         plot_xCR_opt(self, data_regr_xCR)
+    def _pad_signal(signal, delta_len, padding_type):
+        """Pad the signal with zeros to match the length of the other signal.
 
-    # def get_xCR_candidates(self, n_pts=3):
-    #     """
-    #     Get the heuristic factor candidates for the quadratic regression.
+        Parameters
+        ----------
+        signal : `array`
+            Transient signal that is the shorter of the two signals to compare.
+        delta_len : `int`
+            Difference in length between the two signals to compare.
+        padding_type : `str`
+            Type of padding to apply. Options: "end" or "start".
 
-    #     Parameters
-    #     ----------
-    #     n_pts : `int`, optional
-    #         Number of candidates for the heuristic factor xCR.
-    #         Default is 3. Must be an odd number
+        Returns
+        -------
+        modified_signal : `array`
+            Transient signal modified with zero padding at the start or end
+            to match the length of the other signal to compare.
+        """
 
-    #     Returns
-    #     -------
-    #     xCR_cand : `list`
-    #         Candidates for the heuristic factor xCR based on the
-    #         current xCR and its bounds. The candidates are sorted
-    #         in ascending order and current xCR is not included
-    #     """
+        pad_distribution = (0, delta_len) if padding_type == "end" else (delta_len, 0)
+        return pad(signal, pad_distribution, 'constant', constant_values=0)
 
-    #     # Setting odd number of points for regression
-    #     n_pts = max(3, n_pts + 1 if n_pts % 2 == 0 else n_pts)
+    # Pad the shorter signal with zeros if the lengths are different
 
-    #     # Limits for the heuristic factor
-    #     xCR_inf, xCR_sup = self.xCR_lim
+    # Check if both start and end padding are requested, which is not allowed
+    if not (start_padding ^ end_padding):  # Not XOR: both True or both False
+        mutually_exclusive_parameter_error(["end_padding", "start_padding"],
+                                            [end_padding, start_padding])
 
-    #     # Estimated intial value
-    #     xCR = self.xCR
+    # Getting the maximum length
+    max_length = max(len(signal_model), len(signal_reference))
 
-    #     # Determining the xCR candidates for regression
-    #     if xCR in self.xCR_lim:
-    #         xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts))
-    #         xCR_cand.remove(xCR)
-    #     else:
-    #         xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts-1))
+    # Type of padding to apply
+    padding_type = "end" if end_padding else "start"
 
-    #     format_xCR = ', '.join(['{:.3f}'.format(x) for x in xCR_cand])
-    #     pprint(f"Candidates for Heuristic Factor xCR: [{format_xCR}]", comm=self.comm)
+    # Completing with zeros if arrays lengths are different
+    if len(signal_model) < max_length:
+        delta_len = max_length - len(signal_model)
+        signal_model = _pad_signal(signal_model, delta_len, padding_type)
+    elif len(signal_reference) < max_length:
+        delta_len = max_length - len(signal_reference)
+        signal_reference = _pad_signal(signal_reference, delta_len, padding_type)
 
-    #     return xCR_cand
+    return signal_model, signal_reference
 
-    # def get_xCR_optimal(self, dat_reg_xCR, crit_opt="err_sum"):
-    #     """
-    #     Get the optimal heuristic factor for the quadratic damping.
 
-    #     Parameters
-    #     ----------
-    #     dat_reg_xCR : `list`
-    #         Data for the regression of the parameter xCR.
-    #         Structure: [xCR, max_errIt, max_errPK]
-    #     crit_opt : `string`, optional
-    #         Criterion for the optimal heuristic factor
-    #         Default is 'err_difference'.
-    #         - 'err_difference' : Difference between integral and peak errors
-    #         - 'err_integral' : Minimum integral error
-    #         - 'err_sum' : Sum of integral and peak errors
+def calculate_peak_error(
+    signal_model: np.ndarray,
+    signal_reference: np.ndarray,
+):
+    """Compute the peak error between the model and reference signals.
 
-    #     Returns
-    #     -------
-    #     xCR_opt : `float`, optional
-    #         Optimal heuristic factor for the quadratic damping
-    #     """
+    Error measures used in Salas et al. (2022) Sec. 2.5.
+    Hybrid absorbing scheme based on hyperelliptical layers with non-reflecting
+    boundary conditions in scalar wave equations. Applied Mathematical Modelling.
+    doi: https://doi.org/10.1016/j.apm.2022.09.014
+    TODO: add citation
 
-    #     # Data for regression
-    #     xCR = dat_reg_xCR[0]
-    #     max_errIt = dat_reg_xCR[1]
-    #     max_errPK = dat_reg_xCR[2]
+    Parameters
+    ----------
+    signal_model : `np.ndarray`
+        Transient response ar the receiver for the model.
+    signal_reference : `np.ndarray`
+        Transient response at the receiver for the reference model.
 
-    #     validate_parameter("crit_opt", crit_opt,
-    #                           ["err_difference", "err_integral", "err_sum"])
+    Returns
+    -------
+    peak_error : `float`
+        Peak error between the model and reference signals.
+    peak_reference : `float`
+        Maximum peak value of the reference signal.
+    """
 
-    #     if crit_opt == "err_difference":
-    #         y_err = [eI - eP for eI, eP in zip(max_errIt, max_errPK)]
+    # Check the input parameters
+    validate_data_structure(
+        "signal_model",
+        signal_model,
+        "array",
+        expected_type_element="float",
+    )
+    validate_data_structure(
+        "signal_reference",
+        signal_reference,
+        "array",
+        expected_type_element="float",
+    )
 
-    #     elif crit_opt == "err_integral":
-    #         y_err = max_errIt
+    # Finding peaks in transient response
+    peaks_in_signal = find_peaks(signal_model)
+    if peaks_in_signal[0].size == 0:
+        UserWarning("No peak observed in the transient response. "
+                    "Increase the transient time of the simulation.")
 
-    #     elif crit_opt == "err_sum":
-    #         y_err = [eI + eP for eI, eP in zip(max_errIt, max_errPK)]
+    # Maximum peak value
+    peak_model = max(abs(signal_model))
+    peak_reference = max(abs(signal_reference))
 
-    #     # Limits for the heuristic factor
-    #     xCR_inf, xCR_sup = self.xCR_lim
+    # Peak error
+    peak_error = abs(peak_model / peak_reference - 1)
 
-    #     # Coefficients for the quadratic equation
-    #     eq_xCR = np.polyfit(xCR, y_err, 2)
+    return peak_error, peak_reference
 
-    #     if crit_opt == "err_difference":
-    #         # Roots of the quadratic equation
-    #         roots = np.roots(eq_xCR)
-    #         valid_roots = [np.clip(rth, xCR_inf, xCR_sup)
-    #                        for rth in roots if isinstance(rth, float)]
 
-    #         if valid_roots:
-    #             # Real root that provides the absolute minimum error
-    #             min_err = [abs(np.polyval(eq_xCR, rth)) for rth in valid_roots]
-    #             xCR_opt = valid_roots[np.argmin(min_err)]
-    #         else:
-    #             # Vertex when there are no real roots
-    #             vtx = - eq_xCR[1] / (2 * eq_xCR[0])
-    #             xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
+def calculate_integral_error(
+    signal_model: np.ndarray,
+    signal_reference: np.ndarray, 
+    dt: float,
+    error_if_different_length: bool = True,
+    start_padding: bool = False,
+    end_padding: bool = False,
+):
+    """Compute the integral error between the model and reference signals.
 
-    #     elif crit_opt == "err_integral" or crit_opt == "err_sum":
+    Error measures used in Salas et al. (2022) Sec. 2.5.
+    Hybrid absorbing scheme based on hyperelliptical layers with non-reflecting
+    boundary conditions in scalar wave equations. Applied Mathematical Modelling.
+    doi: https://doi.org/10.1016/j.apm.2022.09.014
+    TODO: add citation
 
-    #         # Vertex of the quadratic equation
-    #         vtx = - eq_xCR[1] / (2 * eq_xCR[0])
-    #         xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
+    Parameters
+    ----------
+    signal_model : `np.ndarray`
+        Transient response at the receiver for the model.
+    signal_reference : `np.ndarray`
+        Transient response at the receiver for the reference model.
+    dt : `float`
+        Time step used in the simulation.
+    error_if_different_length : `bool`, optional
+        If `True`, raise an error if the lengths of the model and reference
+        signals are different. Default is `True`.
+    start_padding : `bool`, optional
+        If `True`, pad the shorter signal with zeros at the start to match
+        the length of the other signal. Default is `False`.
+    end_padding : `bool`, optional
+        If `True`, pad the shorter signal with zeros at the end to match the
+        length of the other signal. Default is `False`.
 
-    #     pprint(f"Optimal Heuristic Factor xCR: {xCR_opt:.3f}", comm=self.comm)
+    Returns
+    -------
+    integral_error : `float`
+        Integral error between the model and reference signals.
+    """
 
-    #     return xCR_opt
+    # Check the input parameters
+    validate_data_structure("signal_model", signal_model, "array",
+                            expected_type_element="float")
+    validate_data_structure("signal_reference", signal_reference, "array",
+                            expected_type_element="float")
+    validate_numeric("dt", dt, float_num=True, integer_num=True, lower_bound=0.)
+
+    # Padding with zeros if arrays lengths are different
+    signal_model, signal_reference = self.pad_signal_lengths(
+        signal_model, signal_reference,
+        error_if_different_length=error_if_different_length,
+        start_padding=start_padding, end_padding=end_padding)
+
+    # Integral error
+    numerator = trapezoid((signal_model - signal_reference)**2, dx=dt)
+    denominator = trapezoid(signal_reference**2, dx=dt)
+    integral_error = numerator / denominator if denominator != 0 else inf
+
+    return integral_error
+
