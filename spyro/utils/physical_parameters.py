@@ -5,23 +5,6 @@ from enum import Enum
 
 import firedrake as fire
 
-from .typing import (ElasticMaterialParameter,
-                     ElasticMaterialParameterization)
-
-
-ELASTIC_PARAMETERIZATIONS = {
-    ElasticMaterialParameterization.LAME: (
-        ElasticMaterialParameter.DENSITY,
-        ElasticMaterialParameter.LAMBDA,
-        ElasticMaterialParameter.MU,
-    ),
-    ElasticMaterialParameterization.VELOCITY: (
-        ElasticMaterialParameter.DENSITY,
-        ElasticMaterialParameter.P_WAVE_VELOCITY,
-        ElasticMaterialParameter.S_WAVE_VELOCITY,
-    ),
-}
-
 
 def _as_parameter(name):
     """Return ``name`` if it is a material parameter enum member.

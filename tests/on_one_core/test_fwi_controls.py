@@ -256,14 +256,17 @@ def test_elastic_controls_can_change_the_equation_parameterization():
     assert isinstance(wave.lmbda, fire.Function)
     assert isinstance(wave.mu, fire.Function)
     assert control is wave.lmbda
-    assert set(wave.input_dictionary["synthetic_data"]) >= {
-        "density", "lambda", "mu",
-    }
-    assert "p_wave_velocity" not in wave.input_dictionary["synthetic_data"]
-    assert "s_wave_velocity" not in wave.input_dictionary["synthetic_data"]
 
-    # The forward solve initializes from this dictionary again. It must retain
-    # the exact field registered as a pyadjoint control.
+    # Changing the equation over to the Lame family is a change of variables on
+    # the solver, not an edit of the model the user handed in.
+    assert set(wave.input_dictionary["synthetic_data"]) >= {
+        "density", "p_wave_velocity", "s_wave_velocity",
+    }
+    assert "lambda" not in wave.input_dictionary["synthetic_data"]
+    assert "mu" not in wave.input_dictionary["synthetic_data"]
+
+    # The forward solve initializes the material parameters again. It must
+    # retain the exact field registered as a pyadjoint control.
     wave.initialize_physical_parameters()
     assert wave.lmbda is control
 

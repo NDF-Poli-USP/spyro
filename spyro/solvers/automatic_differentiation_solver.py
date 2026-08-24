@@ -1,15 +1,12 @@
 from contextlib import contextmanager
 from collections.abc import Mapping
-from enum import Enum
 
 from pyadjoint import Tape, continue_annotation, pause_annotation, taylor_test
 
 import firedrake as fire
 import firedrake.adjoint as fire_ad
 
-from ..utils.physical_parameters import (ELASTIC_PARAMETERIZATIONS,
-                                         PhysicalParameters)
-from ..utils.typing import ElasticMaterialParameter
+from ..utils.physical_parameters import PhysicalParameters
 
 
 def _as_list(value: object) -> list:
@@ -150,11 +147,15 @@ pyadjoint.ReducedFunctional or None
     def set_control_parameters(self, parameters: object = None) -> None:
         """Select physical parameters for automated differentiation.
 
-        Control selection belongs to the adjoint solver. For isotropic elastic
-        waves, the selected parameters must form a non-empty subset of either
-        the Lame or velocity parameterization. Selecting the other family asks
-        the wave equation to change its physical parameterization before tape
-        recording.
+        Deciding *which* parameters to invert for belongs to the adjoint
+        solver; resolving them to independent fields belongs to the wave
+        equation, which is the only object that knows how its material
+        parameters are related. This method therefore forwards the selection
+        to :meth:`~spyro.solvers.wave.Wave.select_physical_parameters`, whose
+        subclasses raise on selections they cannot model.
+
+        The resolution may change the wave equation's physical
+        parameterization, which is why it must happen before tape recording.
 
         Parameters
         ----------
@@ -184,131 +185,8 @@ pyadjoint.ReducedFunctional or None
                 "Control parameters must be selected before tape recording.",
             )
 
-        physical_parameters = self.wave.physical_parameters
-        if all(
-            isinstance(name, ElasticMaterialParameter)
-            for name in physical_parameters
-        ):
-            selected = self._select_elastic_parameters(parameters)
-        else:
-            selected = self._select_independent_parameters(parameters)
-        self._set_controls(selected)
+        self._set_controls(self.wave.select_physical_parameters(parameters))
         self.reduced_functional = None
-
-    def _select_independent_parameters(
-        self, parameters: object,
-    ) -> PhysicalParameters:
-        """Resolve controls for a wave without coupled parameterizations.
-
-        Parameters
-        ----------
-        parameters : enum.Enum or iterable of enum.Enum, optional
-            Requested physical parameter names.
-
-        Returns
-        -------
-        PhysicalParameters
-            Selected names mapped to independent physical fields.
-        """
-        physical_parameters = self.wave.physical_parameters
-        if parameters is None:
-            selected_names = [
-                name for name, value in physical_parameters.items()
-                if isinstance(value, fire.Function)
-            ]
-        elif isinstance(parameters, Enum):
-            selected_names = [parameters]
-        else:
-            selected_names = list(parameters)
-
-        if not selected_names:
-            raise ValueError("At least one control parameter is required.")
-        if not all(isinstance(name, Enum) for name in selected_names):
-            raise TypeError(
-                "Control parameters must be material-parameter enum members.",
-            )
-        unknown = set(selected_names) - set(physical_parameters)
-        if unknown:
-            names = ", ".join(name.value for name in unknown)
-            raise ValueError(
-                f"Control parameters {{{names}}} are not physical "
-                "parameters of this wave equation.",
-            )
-
-        selected = PhysicalParameters()
-        for name in physical_parameters:
-            if name not in selected_names:
-                continue
-            field = physical_parameters[name]
-            if not isinstance(field, fire.Function):
-                raise TypeError(
-                    f"'{name.value}' is a dependent physical parameter and "
-                    "cannot be used directly as a control.",
-                )
-            selected.add(name, field)
-        return selected
-
-    def _select_elastic_parameters(
-        self, parameters: object,
-    ) -> PhysicalParameters:
-        """Resolve an independent isotropic-elastic control subset.
-
-        Parameters
-        ----------
-        parameters : ElasticMaterialParameter or iterable, optional
-            Requested elastic physical parameter names.
-
-        Returns
-        -------
-        PhysicalParameters
-            Selected names mapped to independent physical fields.
-        """
-        current = self.wave._physical_parameterization
-        if parameters is None:
-            selected_names = list(ELASTIC_PARAMETERIZATIONS[current])
-        elif isinstance(parameters, ElasticMaterialParameter):
-            selected_names = [parameters]
-        else:
-            selected_names = list(parameters)
-
-        if not selected_names:
-            raise ValueError("At least one elastic control parameter is required.")
-        if not all(
-            isinstance(name, ElasticMaterialParameter)
-            for name in selected_names
-        ):
-            raise TypeError(
-                "Elastic controls must be ElasticMaterialParameter enum "
-                "members.",
-            )
-        if len(set(selected_names)) != len(selected_names):
-            raise ValueError("Elastic control parameters must be unique.")
-
-        names = set(selected_names)
-        candidates = [
-            parameterization
-            for parameterization, family in ELASTIC_PARAMETERIZATIONS.items()
-            if names <= set(family)
-        ]
-        if not candidates:
-            formatted = ", ".join(name.value for name in selected_names)
-            raise ValueError(
-                "Elastic controls must be a subset of either "
-                "{density, lambda, mu} or "
-                "{density, p_wave_velocity, s_wave_velocity}; got "
-                f"{{{formatted}}}.",
-            )
-        target = current if current in candidates else candidates[0]
-        self.wave._set_physical_parameterization(target)
-
-        selected = PhysicalParameters()
-        for parameter in ELASTIC_PARAMETERIZATIONS[target]:
-            if parameter in names:
-                selected.add(
-                    parameter,
-                    self.wave.physical_parameters[parameter],
-                )
-        return selected
 
     @contextmanager
     def fresh_tape(self):

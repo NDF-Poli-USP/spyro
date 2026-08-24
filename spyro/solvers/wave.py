@@ -1,4 +1,5 @@
 from abc import abstractmethod, ABCMeta
+from enum import Enum
 import warnings
 import firedrake as fire
 
@@ -815,6 +816,89 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 "physical parameters have been defined."
             )
         return parameters
+
+    def select_physical_parameters(
+        self, names: object = None,
+    ) -> PhysicalParameters:
+        """Resolve ``names`` to the independent fields they are carried by.
+
+        Anything that differentiates the wave equation with respect to its
+        material properties -- an inversion, the automated adjoint -- names the
+        parameters it wants, but only the wave equation knows how they are
+        related: which ones it carries as independent
+        :class:`firedrake.Function` fields and which ones it computes from
+        those. Resolving a selection is therefore its responsibility, and
+        subclasses whose parameters admit more than one independent family
+        override this method to reconcile the selection with the family in use.
+
+        This base implementation covers wave equations whose parameters are
+        independent of one another, so a selection is valid exactly when every
+        name in it is carried by an independent field.
+
+        Parameters
+        ----------
+        names : enum.Enum or iterable of enum.Enum, optional
+            Material parameters to resolve. ``None`` selects every independent
+            parameter of the wave equation.
+
+        Returns
+        -------
+        PhysicalParameters
+            Selected names, mapped to the independent fields carrying them.
+
+        Raises
+        ------
+        ValueError
+            If the selection is empty, or names a parameter this wave equation
+            does not model.
+        TypeError
+            If a name is not a material-parameter enum member, or names a
+            parameter computed from the independent ones.
+        """
+        physical_parameters = self.physical_parameters
+        if names is None:
+            selected_names = [
+                name for name, value in physical_parameters.items()
+                if isinstance(value, fire.Function)
+            ]
+            if not selected_names:
+                raise ValueError(
+                    f"{type(self).__name__} carries no independent physical "
+                    "parameter to differentiate with respect to. Set its "
+                    "material properties first, for instance through "
+                    "set_initial_velocity_model().",
+                )
+        elif isinstance(names, Enum):
+            selected_names = [names]
+        else:
+            selected_names = list(names)
+
+        if not selected_names:
+            raise ValueError("At least one control parameter is required.")
+        if not all(isinstance(name, Enum) for name in selected_names):
+            raise TypeError(
+                "Control parameters must be material-parameter enum members.",
+            )
+        unknown = set(selected_names) - set(physical_parameters)
+        if unknown:
+            formatted = ", ".join(name.value for name in unknown)
+            raise ValueError(
+                f"Control parameters {{{formatted}}} are not physical "
+                "parameters of this wave equation.",
+            )
+
+        selected = PhysicalParameters()
+        for name in physical_parameters:
+            if name not in selected_names:
+                continue
+            field = physical_parameters[name]
+            if not isinstance(field, fire.Function):
+                raise TypeError(
+                    f"'{name.value}' is a dependent physical parameter and "
+                    "cannot be used directly as a control.",
+                )
+            selected.add(name, field)
+        return selected
 
     def initialize_physical_parameters(self):
         """Build the material fields of the wave equation from the model input.

@@ -15,6 +15,41 @@ from ...utils.typing import (AdjointType, ElasticMaterialParameter,
 from ...domains.space import create_function_space
 
 
+PHYSICAL_PARAMETERIZATION = {
+    ElasticMaterialParameterization.LAME: (
+        ElasticMaterialParameter.DENSITY,
+        ElasticMaterialParameter.LAMBDA,
+        ElasticMaterialParameter.MU,
+    ),
+    ElasticMaterialParameterization.VELOCITY: (
+        ElasticMaterialParameter.DENSITY,
+        ElasticMaterialParameter.P_WAVE_VELOCITY,
+        ElasticMaterialParameter.S_WAVE_VELOCITY,
+    ),
+}
+
+
+def _format_physical_parameters(parameters):
+    """Format material-parameter enum values for error messages.
+
+    Parameters
+    ----------
+    parameters : iterable of ElasticMaterialParameter
+        Material-parameter enum values to display.
+
+    Returns
+    -------
+    str
+        Human-readable set-like representation using public parameter names.
+
+    Examples
+    --------
+    ``(ElasticMaterialParameter.DENSITY, ElasticMaterialParameter.MU)``
+    becomes ``"{density, mu}"``.
+    """
+    return "{" + ", ".join(parameter.value for parameter in parameters) + "}"
+
+
 class IsotropicWave(ElasticWave):
     '''Isotropic elastic wave propagator'''
 
@@ -30,6 +65,9 @@ class IsotropicWave(ElasticWave):
         self.mu = None    # Second Lame parameter
         self.c_s = None   # Secondary wave velocity
         self._physical_parameterization = None
+        #: Family whose independent fields already exist as ``Function``
+        #: objects owned by this solver rather than by the model dictionary.
+        self._materialized_parameterization = None
         self._material_parameter_function_space = None
 
         self.u_n = None   # Current displacement field
@@ -68,6 +106,13 @@ class IsotropicWave(ElasticWave):
         from the provided set, and the active physical parameterization is
         stored.
 
+        Every forward solve calls this method again. Once a family has been
+        materialized by :meth:`_set_physical_parameterization` the independent
+        fields are owned by this solver, so they are kept as they are rather
+        than rebuilt from the dictionary: they hold the current values, and
+        rebuilding them would break the identity that pyadjoint controls and
+        already assembled forms rely on.
+
         Parameters
         ----------
         synthetic_data_dict : dict
@@ -76,7 +121,7 @@ class IsotropicWave(ElasticWave):
             and ``mu`` (or ``lame_second``); or ``density``,
             ``p_wave_velocity``, and ``s_wave_velocity``. Values may be
             scalars, Firedrake ``Constant`` objects, Firedrake ``Function``
-            objects, or UFL expressions.
+            objects, or UFL expressions. The dictionary is only read from.
 
         Returns
         -------
@@ -84,6 +129,10 @@ class IsotropicWave(ElasticWave):
             The method assigns ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s``, and
             the active physical parameterization on ``self``.
         """
+        if self._materialized_parameterization is not None:
+            self._register_physical_parameters()
+            return
+
         def material_parameter(value):
             """Normalize model-dictionary values for elastic parameters.
 
@@ -165,12 +214,7 @@ class IsotropicWave(ElasticWave):
                 "The valid options are {Density, Lame first, Lame second} "
                 "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
             )
-        add = self._physical_parameters.add
-        add(ElasticMaterialParameter.DENSITY, self.rho)
-        add(ElasticMaterialParameter.LAMBDA, self.lmbda)
-        add(ElasticMaterialParameter.MU, self.mu)
-        add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
-        add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
+        self._register_physical_parameters()
 
     def _material_parameter_space(self) -> object:
         """Return the scalar space used for material parameters.
@@ -197,55 +241,40 @@ class IsotropicWave(ElasticWave):
             self._material_parameter_function_space = space
         return space
 
-    def _record_parameterization(
-        self, parameterization: ElasticMaterialParameterization,
-    ) -> None:
-        """Persist independent fields for the next forward initialization.
+    def _register_physical_parameters(self) -> None:
+        """Publish the material fields under their parameter names.
 
-        ``forward_solve`` reads the material dictionary again. Storing the
-        actual independent ``Function`` objects preserves their identity across
-        model initialization.
-
-        Parameters
-        ----------
-        parameterization : ElasticMaterialParameterization
-            Independent family to write to ``synthetic_data``.
+        Both independent fields and the expressions computed from them are
+        registered, so callers can read any elastic parameter regardless of
+        which family the equation is currently written in.
 
         Returns
         -------
         None
         """
-        synthetic_data = self.input_dictionary["synthetic_data"]
-        for parameter in ElasticMaterialParameter:
-            synthetic_data.pop(parameter.value, None)
-        synthetic_data.pop("lame_first", None)
-        synthetic_data.pop("lame_second", None)
-        if parameterization is ElasticMaterialParameterization.LAME:
-            synthetic_data[ElasticMaterialParameter.DENSITY.value] = self.rho
-            synthetic_data[ElasticMaterialParameter.LAMBDA.value] = self.lmbda
-            synthetic_data[ElasticMaterialParameter.MU.value] = self.mu
-        elif parameterization is ElasticMaterialParameterization.VELOCITY:
-            synthetic_data[ElasticMaterialParameter.DENSITY.value] = self.rho
-            synthetic_data[
-                ElasticMaterialParameter.P_WAVE_VELOCITY.value
-            ] = self.c
-            synthetic_data[
-                ElasticMaterialParameter.S_WAVE_VELOCITY.value
-            ] = self.c_s
-        else:
-            raise ValueError(
-                "Unsupported elastic material parameterization: "
-                f"{parameterization}.",
-            )
+        add = self._physical_parameters.add
+        add(ElasticMaterialParameter.DENSITY, self.rho)
+        add(ElasticMaterialParameter.LAMBDA, self.lmbda)
+        add(ElasticMaterialParameter.MU, self.mu)
+        add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
+        add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
 
     def _set_physical_parameterization(
         self, parameterization: ElasticMaterialParameterization,
     ) -> None:
         """Materialize one independent elastic parameter family.
 
-        This change of variables occurs before tape recording. The target
-        family becomes three scalar ``Function`` objects and the complementary
-        family remains algebraically linked through UFL expressions.
+        The target family becomes three scalar ``Function`` objects and the
+        complementary family is relinked to them through UFL expressions, so
+        updating an independent field carries through to the dependent ones
+        and to the assembled variational forms.
+
+        Once a family has been materialized the fields belong to this object
+        rather than to the model dictionary: they may be registered as
+        pyadjoint controls, and rebuilding them from the dictionary would
+        both discard the current values and orphan those controls. This is
+        why ``_materialized_parameterization`` makes
+        :meth:`initialize_model_parameters_from_object` keep them.
 
         Parameters
         ----------
@@ -255,45 +284,34 @@ class IsotropicWave(ElasticWave):
         Returns
         -------
         None
-        """
-        if parameterization is self._physical_parameterization:
-            # Model dictionaries often contain scalars. Replace them with the
-            # initialized fields so forward_solve() does not create new
-            # Functions and invalidate external references to these fields.
-            self._record_parameterization(parameterization)
-            return
 
+        Raises
+        ------
+        ValueError
+            If the family is not one this solver supports.
+        """
         space = self._material_parameter_space()
+
+        def as_field(value, parameter):
+            """Return ``value`` as an independent field of ``parameter``."""
+            if isinstance(value, Function):
+                return value
+            return Function(space, name=parameter.value).interpolate(value)
+
         if parameterization is ElasticMaterialParameterization.LAME:
-            if not isinstance(self.rho, Function):
-                self.rho = Function(
-                    space, name=ElasticMaterialParameter.DENSITY.value,
-                ).interpolate(self.rho)
-            if not isinstance(self.lmbda, Function):
-                self.lmbda = Function(
-                    space, name=ElasticMaterialParameter.LAMBDA.value,
-                ).interpolate(self.lmbda)
-            if not isinstance(self.mu, Function):
-                self.mu = Function(
-                    space, name=ElasticMaterialParameter.MU.value,
-                ).interpolate(self.mu)
+            self.rho = as_field(self.rho, ElasticMaterialParameter.DENSITY)
+            self.lmbda = as_field(self.lmbda, ElasticMaterialParameter.LAMBDA)
+            self.mu = as_field(self.mu, ElasticMaterialParameter.MU)
             self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
             self.c_s = (self.mu/self.rho)**0.5
         elif parameterization is ElasticMaterialParameterization.VELOCITY:
-            if not isinstance(self.rho, Function):
-                self.rho = Function(
-                    space, name=ElasticMaterialParameter.DENSITY.value,
-                ).interpolate(self.rho)
-            if not isinstance(self.c, Function):
-                self.c = Function(
-                    space,
-                    name=ElasticMaterialParameter.P_WAVE_VELOCITY.value,
-                ).interpolate(self.c)
-            if not isinstance(self.c_s, Function):
-                self.c_s = Function(
-                    space,
-                    name=ElasticMaterialParameter.S_WAVE_VELOCITY.value,
-                ).interpolate(self.c_s)
+            self.rho = as_field(self.rho, ElasticMaterialParameter.DENSITY)
+            self.c = as_field(
+                self.c, ElasticMaterialParameter.P_WAVE_VELOCITY,
+            )
+            self.c_s = as_field(
+                self.c_s, ElasticMaterialParameter.S_WAVE_VELOCITY,
+            )
             self.mu = self.rho*self.c_s**2
             self.lmbda = self.rho*self.c**2 - 2*self.mu
         else:
@@ -303,13 +321,89 @@ class IsotropicWave(ElasticWave):
             )
 
         self._physical_parameterization = parameterization
-        add = self._physical_parameters.add
-        add(ElasticMaterialParameter.DENSITY, self.rho)
-        add(ElasticMaterialParameter.LAMBDA, self.lmbda)
-        add(ElasticMaterialParameter.MU, self.mu)
-        add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
-        add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
-        self._record_parameterization(parameterization)
+        self._materialized_parameterization = parameterization
+        self._register_physical_parameters()
+
+    def select_physical_parameters(
+        self, names: object = None,
+    ) -> PhysicalParameters:
+        """Resolve an independent isotropic-elastic selection.
+
+        An isotropic elastic medium is written either in terms of
+        ``{density, lambda, mu}`` or of
+        ``{density, p_wave_velocity, s_wave_velocity}``, and carries the family
+        it is not written in as expressions of the other. A selection is
+        therefore valid when it fits inside one family, and asking for names
+        from the family currently held as expressions changes the equation over
+        to it.
+
+        Parameters
+        ----------
+        names : ElasticMaterialParameter or iterable, optional
+            Elastic parameters to resolve. ``None`` selects the whole family
+            the equation is currently written in.
+
+        Returns
+        -------
+        PhysicalParameters
+            Selected names, mapped to the independent fields carrying them.
+
+        Raises
+        ------
+        ValueError
+            If the selection is empty, repeats a name, or spans both families.
+        TypeError
+            If a name is not an :class:`ElasticMaterialParameter` member.
+        """
+        current = self._physical_parameterization
+        if current is None:
+            raise ValueError(
+                "Elastic material parameters have not been initialized. "
+                "Call initialize_physical_parameters() first.",
+            )
+        if names is None:
+            selected_names = list(PHYSICAL_PARAMETERIZATION[current])
+        elif isinstance(names, ElasticMaterialParameter):
+            selected_names = [names]
+        else:
+            selected_names = list(names)
+
+        if not selected_names:
+            raise ValueError("At least one elastic control parameter is required.")
+        if not all(
+            isinstance(name, ElasticMaterialParameter)
+            for name in selected_names
+        ):
+            raise TypeError(
+                "Elastic controls must be ElasticMaterialParameter enum "
+                "members.",
+            )
+        if len(set(selected_names)) != len(selected_names):
+            raise ValueError("Elastic control parameters must be unique.")
+
+        wanted = set(selected_names)
+        candidates = [
+            parameterization
+            for parameterization, family in PHYSICAL_PARAMETERIZATION.items()
+            if wanted <= set(family)
+        ]
+        if not candidates:
+            families = " or ".join(
+                _format_physical_parameters(family)
+                for family in PHYSICAL_PARAMETERIZATION.values()
+            )
+            raise ValueError(
+                f"Elastic controls must be a subset of either {families}; "
+                f"got {_format_physical_parameters(selected_names)}.",
+            )
+        target = current if current in candidates else candidates[0]
+        self._set_physical_parameterization(target)
+
+        selected = PhysicalParameters()
+        for parameter in PHYSICAL_PARAMETERIZATION[target]:
+            if parameter in wanted:
+                selected.add(parameter, self.physical_parameters[parameter])
+        return selected
 
     def gradient_solve(
         self,
