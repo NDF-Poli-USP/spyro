@@ -204,6 +204,27 @@ def test_physical_parameters_are_keyed_by_material_parameter_enums():
     )
 
 
+def test_elastic_parameters_stay_constants_without_a_mesh():
+    """The model can be read before a mesh exists, without building fields."""
+    wave = spyro.IsotropicWave(dictionary=build_elastic_dictionary())
+    assert wave.mesh is None
+
+    parameters = wave.initialize_physical_parameters()
+
+    # The declared family stays as Constants: there is no space to build
+    # Functions in yet, and initialization must still be able to complete.
+    assert isinstance(wave.rho, fire.Constant)
+    assert isinstance(wave.c, fire.Constant)
+    assert isinstance(wave.c_s, fire.Constant)
+    assert not isinstance(wave.lmbda, fire.Function)
+    assert not isinstance(wave.mu, fire.Function)
+
+    assert wave._physical_parameterization is (
+        spyro.ElasticMaterialParameterization.VELOCITY
+    )
+    assert set(parameters) == set(ElasticMaterialParameter)
+
+
 def test_elastic_automated_adjoint_defaults_to_current_parameterization():
     wave = build_elastic_wave()
 
