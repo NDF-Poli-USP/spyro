@@ -115,11 +115,11 @@ def _analytical_solution(
 
 
 def analytical_solution_elastic(
-    source_type: SourceType,
+    source_type: SourceType | str,
     offsets: np.ndarray | float,
-    alpha: float,
-    beta: float,
-    rho: float,
+    p_wave_velocity: float,
+    s_wave_velocity: float,
+    density: float,
     amplitude: float,
     frequency: float,
     time_delay: float,
@@ -135,16 +135,16 @@ def analytical_solution_elastic(
 
     Parameters
     ----------
-    source_type : str
+    source_type : enum or str
         Type of source. Supported values are ``"force_source"`` and
         ``"explosive_source"``.
     offsets : numpy.ndarray
         Vector from the source to the receiver.
-    alpha : float
+    p_wave_velocity : float
         P-wave velocity.
-    beta : float
+    s_wave_velocity : float
         S-wave velocity. Required for a force source.
-    rho : float
+    density : float
         Medium density.
     amplitude : float
         Source amplitude.
@@ -175,6 +175,8 @@ def analytical_solution_elastic(
         If ``dimension`` is not 3, if a force source is specified without a
         force direction, or if an unsupported source type is provided.
     """
+    if isinstance(source_type, str):
+        source_type = SourceType(source_type)
     if dimension != 3:
         raise ValueError("2D or weird dimensions not yet supported")
     if force_direction is None and source_type == "force_source":
@@ -189,9 +191,9 @@ def analytical_solution_elastic(
             u[:, i] = analytical_force_source(
                 offsets,
                 time_vector,
-                alpha,
-                beta,
-                rho,
+                p_wave_velocity,
+                s_wave_velocity,
+                density,
                 amplitude,
                 frequency,
                 time_delay,
@@ -203,8 +205,8 @@ def analytical_solution_elastic(
             u[:, i] = analytical_explosive_source(
                 offsets,
                 time_vector,
-                alpha,
-                rho,
+                p_wave_velocity,
+                density,
                 amplitude,
                 frequency,
                 time_delay,
@@ -219,9 +221,9 @@ def analytical_solution_elastic(
 def analytical_force_source(
     offsets: float,
     time_vector: np.ndarray,
-    alpha: float,
-    beta: float,
-    rho: float,
+    p_wave_velocity: float,
+    s_wave_velocity: float,
+    density: float,
     amplitude: float,
     frequency: float,
     time_delay: float,
@@ -242,11 +244,11 @@ def analytical_force_source(
         Distance between source and receiver
     time_vector : numpy array
         Time vector
-    alpha : float
+    p_wave_velocity : float
         P-wave velocity
-    beta : float
+    s_wave_velocity : float
         S-wave velocity
-    rho : float
+    density : float
         Density
     amplitude : float
         Source amplitude
@@ -333,10 +335,10 @@ def analytical_force_source(
         t = time_vector[k]
 
         # Near field contribution (convolution integral term)
-        res = quad(lambda tau: tau * X0(t - tau), r / alpha, r / beta)
+        res = quad(lambda tau: tau * X0(t - tau), r / p_wave_velocity, r / s_wave_velocity)
         u_near = (
             amplitude
-            * (1.0 / (4 * np.pi * rho))
+            * (1.0 / (4 * np.pi * density))
             * (3 * gamma_i * gamma_j - delta_ij)
             * (1.0 / r**3)
             * res[0]
@@ -345,20 +347,20 @@ def analytical_force_source(
         # P-wave far-field
         P_far = (
             amplitude
-            * (1.0 / (4 * np.pi * rho * alpha**2))
+            * (1.0 / (4 * np.pi * density * p_wave_velocity**2))
             * gamma_i
             * gamma_j
             * (1.0 / r)
-            * X0(t - r / alpha)
+            * X0(t - r / p_wave_velocity)
         )
 
         # S-wave far field
         S_far = (
             amplitude
-            * (1.0 / (4 * np.pi * rho * beta**2))
+            * (1.0 / (4 * np.pi * density * s_wave_velocity**2))
             * (gamma_i * gamma_j - delta_ij)
             * (1.0 / r)
-            * X0(t - r / beta)
+            * X0(t - r / s_wave_velocity)
         )
 
         ui[k] = u_near + P_far - S_far
@@ -369,8 +371,8 @@ def analytical_force_source(
 def analytical_explosive_source(
     offsets: np.ndarray,
     time_vector: np.ndarray,
-    alpha: float,
-    rho: float,
+    p_wave_velocity: float,
+    density: float,
     amplitude: float,
     frequency: float,
     time_delay: float,
@@ -392,9 +394,9 @@ def analytical_explosive_source(
         Vector representing distance from the source to the receiver.
     time_vector : numpy array
         Time vector
-    alpha : float
+    p_wave_velocity : float
         P-wave velocity
-    rho : float
+    density : float
         Density
     amplitude : float
         Source amplitude
@@ -468,19 +470,146 @@ def analytical_explosive_source(
         # P wave intermediate field
         P_mid = (
             amplitude
-            * (gamma_i / (4 * np.pi * rho * alpha**2))
+            * (gamma_i / (4 * np.pi * density * p_wave_velocity**2))
             * (1.0 / r**2)
-            * w(t - r / alpha)
+            * w(t - r / p_wave_velocity)
         )
 
         # P wave far field
         P_far = (
             amplitude
-            * (gamma_i / (4 * np.pi * rho * alpha**3))
+            * (gamma_i / (4 * np.pi * density * p_wave_velocity**3))
             * (1.0 / r)
-            * w_dot(t - r / alpha)
+            * w_dot(t - r / p_wave_velocity)
         )
 
         ui[k] = P_mid + P_far
 
     return ui
+
+
+def analytical_force_source_2d(
+    offsets: np.ndarray,
+    time_vector: np.ndarray,
+    p_wave_velocity: float,
+    s_wave_velocity: float,
+    rho: float,
+    amplitude: float,
+    frequency: float,
+    time_delay: float,
+    force_direction: int,
+    displacement_direction: int,
+):
+    r"""Calculate the 2D analytical displacement solution for a point force.
+
+    The solution corresponds to a homogeneous isotropic elastic medium under
+    plane-strain conditions.
+
+    Parameters
+    ----------
+    offsets : numpy.ndarray
+        Vector from the source to the receiver. The two components follow
+        Spyro's 2D coordinate convention.
+    time_vector : numpy.ndarray
+        Time vector.
+    p_wave_velocity : float
+        P-wave velocity.
+    s_wave_velocity : float
+        S-wave velocity.
+    rho : float
+        Medium density.
+    amplitude : float
+        Source amplitude.
+    frequency : float
+        Source frequency.
+    time_delay : float
+        Source time delay.
+    force_direction : int
+        Direction of the applied force. Valid values are 0 and 1.
+    displacement_direction : int
+        Direction of the displacement component being calculated. Valid
+        values are 0 and 1.
+
+    Returns
+    -------
+    numpy.ndarray
+        Analytical displacement component.
+    """
+    if len(offsets) != 2:
+        raise ValueError("2D offsets must contain exactly two components.")
+
+    if force_direction not in (0, 1):
+        raise ValueError("2D force_direction must be 0 or 1.")
+
+    if displacement_direction not in (0, 1):
+        raise ValueError("2D displacement_direction must be 0 or 1.")
+
+    radius = np.linalg.norm(offsets)
+
+    if radius == 0.0:
+        raise ValueError("Source and receiver cannot occupy the same location.")
+
+    i = displacement_direction
+    j = force_direction
+
+    gamma_i = offsets[i] / radius
+    gamma_j = offsets[j] / radius
+
+    delta_ij = 1.0 if i == j else 0.0
+
+    def X0(t):
+        """Ricker wavelet."""
+        a = np.pi * frequency * (t - time_delay)
+        return (1.0 - 2.0 * a**2) * np.exp(-a**2)
+
+    displacement = np.zeros(len(time_vector))
+
+    for k, time in enumerate(time_vector):
+        # P-wave arrival time
+        p_delay = radius / p_wave_velocity
+
+        # S-wave arrival time
+        s_delay = radius / s_wave_velocity
+
+        # 2D elastodynamic Green's-function intermediate field.
+        #
+        # The integral contains contributions between the P- and S-wave
+        # arrival times.
+        integral, _ = quad(
+            lambda tau: (
+                (
+                    gamma_i * gamma_j / (p_wave_velocity**2)
+                    + (delta_ij - gamma_i * gamma_j) / (s_wave_velocity**2)
+                )
+                * tau
+                * X0(time - tau)
+                / np.sqrt(
+                    tau**2 - (radius / p_wave_velocity) ** 2
+                )
+            ),
+            p_delay,
+            s_delay,
+        )
+
+        # P-wave contribution.
+        p_far = (
+            amplitude
+            / (2.0 * np.pi * rho * p_wave_velocity**2)
+            * gamma_i
+            * gamma_j
+            * X0(time - p_delay)
+            / np.sqrt(radius)
+        )
+
+        # S-wave contribution.
+        s_far = (
+            amplitude
+            / (2.0 * np.pi * rho * s_wave_velocity**2)
+            * (delta_ij - gamma_i * gamma_j)
+            * X0(time - s_delay)
+            / np.sqrt(radius)
+        )
+
+        displacement[k] = integral + p_far + s_far
+
+    return displacement
