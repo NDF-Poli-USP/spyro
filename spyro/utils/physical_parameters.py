@@ -202,6 +202,79 @@ class PhysicalParameters(Set):
             field.interpolate(value)
         return field
 
+    def select(self, names=None):
+        """Return the independent fields carrying ``names``.
+
+        Only independent parameters can be differentiated with respect to or
+        updated, so a selection is valid exactly when every name in it is
+        carried by a ``Function`` rather than computed from the others.
+
+        The fields are shared, not duplicated: writing into a selected field
+        writes into this container's. Use :meth:`copy` for a detached one.
+
+        Parameters
+        ----------
+        names : enum.Enum or iterable of enum.Enum, optional
+            Parameters to select. ``None`` selects every independent one.
+
+        Returns
+        -------
+        PhysicalParameters
+            Selected names, mapped to the fields carrying them.
+
+        Raises
+        ------
+        ValueError
+            If the selection is empty, or names a parameter not modelled
+            here.
+        TypeError
+            If a name is not a material parameter enum member, or is
+            computed from the independent ones.
+        """
+        if names is None:
+            selected_names = [
+                name for name, value in self._fields.items()
+                if isinstance(value, fire.Function)
+            ]
+            if not selected_names:
+                raise ValueError(
+                    "No independent physical parameter to select: none of "
+                    f"{self._format_names()} has been built as a field yet.",
+                )
+        elif isinstance(names, Enum):
+            selected_names = [names]
+        else:
+            selected_names = list(names)
+
+        if not selected_names:
+            raise ValueError("At least one physical parameter is required.")
+        if not all(isinstance(name, Enum) for name in selected_names):
+            raise TypeError(
+                "Physical parameters are selected by material-parameter "
+                "enum members.",
+            )
+        unknown = set(selected_names) - set(self._fields)
+        if unknown:
+            formatted = "{" + ", ".join(name.value for name in unknown) + "}"
+            raise ValueError(
+                f"{formatted} is not a physical parameter of this wave "
+                f"equation. Known parameters: {self._format_names()}.",
+            )
+
+        selected = PhysicalParameters()
+        for name, field in self._fields.items():
+            if name not in selected_names:
+                continue
+            if not isinstance(field, fire.Function):
+                raise TypeError(
+                    f"'{name.value}' is computed from the other physical "
+                    "parameters, so it cannot be selected on its own. If "
+                    "the wave equation can be written in terms of it "
+                    "instead, change its physical parameterization first.",
+                )
+            selected.add(name, field)
+        return selected
+
     def copy(self, names=None):
         """Return an independent copy of some or all parameters.
 

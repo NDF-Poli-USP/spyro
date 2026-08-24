@@ -1,5 +1,4 @@
 from abc import abstractmethod, ABCMeta
-from enum import Enum
 import warnings
 import firedrake as fire
 
@@ -659,14 +658,23 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
         self._initialize_model_parameters()
+        if self.mesh is None:
+            raise ValueError(
+                "Mesh must be set before enabling the automated adjoint: "
+                "a control has to be a field.",
+            )
+        # Resolve the selection first: an invalid one must fail before any
+        # adjoint state exists to be left half-built.
+        controls = self.physical_parameters.select(control_parameters)
+        # These fields are controls now, so whatever builds the physical
+        # parameters must stop replacing them.
+        self._physical_parameters_are_built = True
         # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
         # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
         # that the reduced functional is built as an
         # ``EnsembleReducedFunctional``, summing the per-shot functionals and
         # gradients over the ensemble communicator.
-        self.automated_adjoint = AutomatedAdjoint(
-            self.comm, self._select_physical_parameters(control_parameters),
-        )
+        self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
         self.functional_value = None
         self.misfit = None
 
@@ -905,102 +913,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             f"{type(self).__name__} is written in a single set of physical "
             "parameters, so there is no parameterization to choose.",
         )
-
-    def _select_physical_parameters(
-        self, names: object = None,
-    ) -> PhysicalParameters:
-        """Resolve ``names`` to the independent fields they are carried by.
-
-        Anything that differentiates the wave equation with respect to its
-        material properties -- an inversion, the automated adjoint -- names the
-        parameters it wants, but only the wave equation knows how they are
-        related: which ones it carries as independent
-        :class:`firedrake.Function` fields and which ones it computes from
-        those. Resolving a selection is therefore its responsibility. A
-        selection is valid when every name in it is carried by an independent
-        field, which for an equation that can be written in more than one
-        family means the family it is currently written in.
-
-        Deciding *which* parameters an inversion or an adjoint controls is
-        not this method's business; it only answers whether the equation, as
-        currently written, can offer them.
-
-        Parameters
-        ----------
-        names : enum.Enum or iterable of enum.Enum, optional
-            Material parameters to resolve. ``None`` selects every independent
-            parameter of the wave equation.
-
-        Returns
-        -------
-        PhysicalParameters
-            Selected names, mapped to the independent fields carrying them.
-
-        Raises
-        ------
-        ValueError
-            If the selection is empty, or names a parameter this wave equation
-            does not model.
-        TypeError
-            If a name is not a material-parameter enum member, or names a
-            parameter computed from the independent ones.
-        """
-        if self.mesh is None:
-            raise ValueError(
-                "Mesh must be set before selecting physical parameters: "
-                "a control has to be a field.",
-            )
-        physical_parameters = self.physical_parameters
-        if names is None:
-            selected_names = [
-                name for name, value in physical_parameters.items()
-                if isinstance(value, fire.Function)
-            ]
-            if not selected_names:
-                raise ValueError(
-                    f"{type(self).__name__} carries no independent physical "
-                    "parameter to differentiate with respect to. Set its "
-                    "material properties first, for instance through "
-                    "set_initial_velocity_model().",
-                )
-        elif isinstance(names, Enum):
-            selected_names = [names]
-        else:
-            selected_names = list(names)
-
-        if not selected_names:
-            raise ValueError("At least one control parameter is required.")
-        if not all(isinstance(name, Enum) for name in selected_names):
-            raise TypeError(
-                "Control parameters must be material-parameter enum members.",
-            )
-        unknown = set(selected_names) - set(physical_parameters)
-        if unknown:
-            formatted = ", ".join(name.value for name in unknown)
-            raise ValueError(
-                f"Control parameters {{{formatted}}} are not physical "
-                "parameters of this wave equation.",
-            )
-
-        selected = PhysicalParameters()
-        for name in physical_parameters:
-            if name not in selected_names:
-                continue
-            field = physical_parameters[name]
-            if not isinstance(field, fire.Function):
-                raise TypeError(
-                    f"'{name.value}' is computed from the other physical "
-                    "parameters of this wave equation, so it cannot be "
-                    "controlled on its own. If the equation can be written "
-                    "in terms of it instead, change its physical "
-                    "parameterization first.",
-                )
-            selected.add(name, field)
-        # The selected fields are about to be differentiated with respect to,
-        # or written into by an inversion. Either way whatever builds the
-        # physical parameters must stop replacing them.
-        self._physical_parameters_are_built = True
-        return selected
 
     def initialize_physical_parameters(self):
         """Build the physical parameters of the wave equation from the model input.
