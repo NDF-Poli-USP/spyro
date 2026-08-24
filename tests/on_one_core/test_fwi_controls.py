@@ -256,9 +256,8 @@ def test_elastic_automated_adjoint_accepts_one_control():
     """A subset of the family in use is a valid selection."""
     wave = build_elastic_wave()
 
-    wave.enable_automated_adjoint()
-    wave.automated_adjoint.set_control_parameters(
-        {ElasticMaterialParameter.S_WAVE_VELOCITY},
+    wave.enable_automated_adjoint(
+        control_parameters={ElasticMaterialParameter.S_WAVE_VELOCITY},
     )
 
     assert wave.automated_adjoint.control_parameter_names == [
@@ -277,9 +276,8 @@ def test_elastic_controls_follow_the_equation_parameterization():
     wave.set_physical_parameterization(
         spyro.ElasticMaterialParameterization.LAME,
     )
-    wave.enable_automated_adjoint()
-    wave.automated_adjoint.set_control_parameters(
-        {ElasticMaterialParameter.LAMBDA},
+    wave.enable_automated_adjoint(
+        control_parameters={ElasticMaterialParameter.LAMBDA},
     )
     control = wave.automated_adjoint.controls[0]
 
@@ -304,23 +302,21 @@ def test_elastic_controls_follow_the_equation_parameterization():
 def test_elastic_controls_reject_the_other_family():
     """Selecting a parameter the equation is not written in is an error."""
     wave = build_elastic_wave()
-    wave.enable_automated_adjoint()
 
     with pytest.raises(TypeError, match="computed from the other physical"):
-        wave.automated_adjoint.set_control_parameters(
-            {ElasticMaterialParameter.LAMBDA},
+        wave.enable_automated_adjoint(
+            control_parameters={ElasticMaterialParameter.LAMBDA},
         )
 
 
 def test_elastic_controls_reject_mixed_parameterizations():
     """No selection spans both families: one is expressions of the other."""
     wave = build_elastic_wave()
-    wave.enable_automated_adjoint()
 
     # Half of this selection is in the velocity family the equation uses; the
     # other half never can be at the same time.
     with pytest.raises(TypeError, match="computed from the other physical"):
-        wave.automated_adjoint.set_control_parameters({
+        wave.enable_automated_adjoint(control_parameters={
             ElasticMaterialParameter.LAMBDA,
             ElasticMaterialParameter.S_WAVE_VELOCITY,
         })
@@ -329,10 +325,11 @@ def test_elastic_controls_reject_mixed_parameterizations():
 def test_elastic_controls_reject_string_names():
     """Parameters are named by enum members, not by their dictionary keys."""
     wave = build_elastic_wave()
-    wave.enable_automated_adjoint()
 
     with pytest.raises(TypeError, match="material-parameter enum members"):
-        wave.automated_adjoint.set_control_parameters({"s_wave_velocity"})
+        wave.enable_automated_adjoint(
+            control_parameters={"s_wave_velocity"},
+        )
 
 
 # Control parameters belong to the inversion.

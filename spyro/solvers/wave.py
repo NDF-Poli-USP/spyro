@@ -633,8 +633,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def store_forward_time_steps(self, value):
         self._store_forward_time_steps = value
 
-    def enable_automated_adjoint(self) -> None:
+    def enable_automated_adjoint(self, control_parameters=None) -> None:
         """Enable the automated-adjoint solver.
+
+        The parameters to differentiate with respect to are resolved here,
+        against the physical parameters the equation is currently written in,
+        so an invalid selection fails before any adjoint state exists.
+
+        Parameters
+        ----------
+        control_parameters : enum.Enum or iterable of enum.Enum, optional
+            Physical parameters to differentiate with respect to. ``None``
+            takes every parameter the equation offers. Names the equation
+            does not carry as independent fields are rejected; changing which
+            ones it does is :meth:`set_physical_parameterization`.
 
         Returns
         -------
@@ -653,7 +665,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # ``EnsembleReducedFunctional``, summing the per-shot functionals and
         # gradients over the ensemble communicator.
         self.automated_adjoint = AutomatedAdjoint(
-            self.comm, select_parameters=self._select_physical_parameters,
+            self.comm, self._select_physical_parameters(control_parameters),
         )
         self.functional_value = None
         self.misfit = None

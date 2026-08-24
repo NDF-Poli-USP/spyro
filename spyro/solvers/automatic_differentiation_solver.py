@@ -69,8 +69,7 @@ class AutomatedAdjoint:
     ----------------
     .. code-block:: python
 
-        wave.enable_automated_adjoint()
-        wave.automated_adjoint.set_control_parameters(parameters)
+        wave.enable_automated_adjoint(control_parameters=parameters)
         with wave.automated_adjoint.fresh_tape():
             wave.forward_solve()          # forward run recorded on the tape
         wave.automated_adjoint.create_reduced_functional(wave.functional_value)
@@ -79,19 +78,17 @@ class AutomatedAdjoint:
 
     Parameters
     ----------
-    controls : object or iterable, optional
-        Existing fields with respect to which the functional is differentiated.
-        This low-level argument is used when no wave is supplied.
+    controls : object, mapping, or iterable, optional
+        Fields with respect to which the functional is differentiated. A
+        mapping keyed by material parameters labels its controls, so the
+        derivatives can be handed back under the same names; anything else is
+        taken as unlabeled fields. The wave equation resolves parameter names
+        to these fields before constructing the adjoint solver.
     ensemble : firedrake.ensemble.Ensemble, optional
         The Firedrake ensemble communicator used to sum the per-shot
         functionals and gradients across ensemble members. In practice this is
         ``wave.comm``. If ``None``, a non-ensemble
         :class:`pyadjoint.ReducedFunctional` is used instead.
-    select_parameters : callable, optional
-        Resolves selected physical parameter names to the fields carrying
-        them, normally
-        the wave equation's own parameter selection. When supplied, every parameter the
-        equation offers is selected by default.
 
     Attributes
     ----------
@@ -108,22 +105,12 @@ pyadjoint.ReducedFunctional or None
         :meth:`create_reduced_functional`.
     """
 
-    def __init__(
-        self, ensemble: object, controls: object = None,
-        select_parameters: object = None,
-    ) -> None:
+    def __init__(self, ensemble: object, controls: object = None) -> None:
         self.controls = []
         self.control_parameter_names = []
         self.ensemble = ensemble
         self.reduced_functional = None
         self._tape = None
-        #: Resolves parameter names to fields. This is all the adjoint solver
-        #: needs from the equation it differentiates, so it holds the one
-        #: function rather than the whole solver.
-        self._select_parameters = select_parameters
-        if select_parameters is not None:
-            self.set_control_parameters()
-            return
         self._set_controls(controls)
 
     def _set_controls(self, controls: object) -> None:
@@ -146,50 +133,6 @@ pyadjoint.ReducedFunctional or None
         else:
             self.control_parameter_names = [name for name, _ in control_items]
             self.controls = [value for _, value in control_items]
-
-    def set_control_parameters(self, parameters: object = None) -> None:
-        """Select physical parameters for automated differentiation.
-
-        Deciding *which* parameters to invert for belongs to the adjoint
-        solver; resolving them to independent fields belongs to the wave
-        equation, which is the only object that knows how its material
-        parameters are related. This method therefore forwards the selection
-        to the equation's ``select_parameters``, which raises on selections
-        it cannot offer.
-
-        The resolution may change the wave equation's physical
-        parameterization, which is why it must happen before tape recording.
-
-        Parameters
-        ----------
-        parameters : enum.Enum or iterable of enum.Enum, optional
-            Physical parameters selected as controls. ``None`` selects every
-            independent parameter of the active physical parameterization.
-
-        Returns
-        -------
-        None
-
-        Raises
-        ------
-        RuntimeError
-            If recording has already started.
-        ValueError
-            If no wave is attached or the selection is empty or inconsistent.
-        TypeError
-            If a selected name is not a material-parameter enum member.
-        """
-        if self._select_parameters is None:
-            raise ValueError(
-                "A wave equation is required to select control parameters.",
-            )
-        if self._tape is not None:
-            raise RuntimeError(
-                "Control parameters must be selected before tape recording.",
-            )
-
-        self._set_controls(self._select_parameters(parameters))
-        self.reduced_functional = None
 
     @contextmanager
     def fresh_tape(self):

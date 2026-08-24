@@ -160,9 +160,7 @@ def test_elastic_automated_adjoint_controls(
         # before anything selects controls within it.
         wave.initialize_physical_parameters()
         wave.set_physical_parameterization(parameterization)
-    wave.enable_automated_adjoint()
-    if control_parameters is not None:
-        wave.automated_adjoint.set_control_parameters(control_parameters)
+    wave.enable_automated_adjoint(control_parameters=control_parameters)
 
     try:
         wave.forward_solve()
