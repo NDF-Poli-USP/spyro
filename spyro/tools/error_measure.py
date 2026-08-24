@@ -2,6 +2,7 @@ from os import getcwd
 import numpy as np
 from numpy import inf, load, pad, save, savetxt, trapezoid
 from numpy.linalg import norm
+from pathlib import Path
 from scipy.signal import find_peaks
 from ..io.basicio import parallel_print as pprint
 from ..utils.error_management import (mutually_exclusive_parameter_error,
@@ -22,7 +23,12 @@ from ..utils.freq_tools import freq_response
 
 
 class MeasureError():
-    """Class for the error calculation for comparison purposes between models.
+    """Manage reference data and error calculations for wave simulations.
+
+    This class is responsible primarily for managing output paths,
+    reference signals, MPI communication, and orchestration of error
+    calculations. Individual error measures are implemented as standalone
+    functions so that they can also be used independently.
 
     Attributes
     ----------
@@ -55,14 +61,19 @@ class MeasureError():
         Get the optimal heuristic factor for the quadratic damping
     """
 
-    def __init__(self, output_folder=None, output_case=None, comm=None):
+    def __init__(
+        self,
+        output_folder: Path | str | None = None,
+        output_case: Path | str | None = None,
+        comm=None,
+    ):
         """Initialize the MeasureError class.
 
         Parameters
         ----------
-        output_folder : `str`, optional
+        output_folder : pathlib.Path or `str`, optional
             The folder where output data will be saved. Default is `None`.
-        output_case : `str`, optional
+        output_case : pathlib.Path or `str`, optional
             The folder for the current case study. Default is `None`.
         comm : `object`, optional
             An object representing the communication interface for parallel processing.
@@ -75,24 +86,32 @@ class MeasureError():
 
         # Path to save data
         if output_folder is None:
-            self.path_save_error = getcwd() + "/output/"
-        else:
-            self.path_save_error = validate_string("output_folder", output_folder)
-
+            output_folder = Path(getcwd()) / "output"
+        elif isinstance(output_folder, str):
+            output_folder = Path(
+                validate_string("output_folder", output_folder)
+            )
         # Path to save data
         if output_case is None:
-            self.path_save_err_case = self.path_save_error
-        else:
-            self.path_save_err_case = validate_string("output_case", output_case)
+            output_case = output_folder
+        elif isinstance(output_case, str):
+            output_case = Path(
+                validate_string("output_case", output_case)
+            )
 
-        # Path to save the reference signal
-        self.path_reference = self.path_save_error + "preamble/"
-
-        # Communicator MPI
+        self.path_save_error = output_folder
+        self.path_save_err_case = output_case
+        self.path_reference = output_folder / "preamble"
         self.comm = comm
 
-    def save_reference_signal(self, receiver_locations, forward_solution_receivers,
-                              number_of_receivers, freq_Nyquist, output_file="reference"):
+    def save_reference_signal(
+        self,
+        receiver_locations,
+        forward_solution_receivers: np.ndarray,
+        number_of_receivers,
+        nyquist_frequency: float,
+        output_file="reference",
+    ):
         """Save the reference signal for comparison between models.
 
         Parameters
@@ -123,27 +142,31 @@ class MeasureError():
         validate_data_structure("forward_solution_receivers", forward_solution_receivers,
                                 "array2D", expected_type_element="float",
                                 expected_shape=(None, number_of_receivers))
-        validate_numeric("freq_Nyquist", freq_Nyquist, float_num=True,
+        validate_numeric("nyquist_frequency", nyquist_frequency, float_num=True,
                          integer_num=True, lower_bound=0.)
 
         pprint("\nSaving Reference Output", comm=self.comm)
 
         # File name for saving the reference signal
-        self.output_file = validate_string("output_file", output_file)
+        self.path_reference.mkdir(parents=True, exist_ok=True)
 
-        # Path to the reference data folder with reference signals
-        pth_str = self.path_reference + self.output_file + "_"
+        output_file_prefix = self.path_reference / f"{output_file}_"
 
-        # Saving reference signal
-        save(pth_str + "time.npy", forward_solution_receivers)
+        save(
+            str(output_file_prefix) + "time.npy",
+            forward_solution_receivers,
+        )
 
         # Computing and saving FFT of the reference signal at receivers
         receivers_ref_fft = []
         for rec in range(number_of_receivers):
             signal = forward_solution_receivers[:, rec]
-            yf = freq_response(signal, freq_Nyquist)
+            yf = freq_response(signal, nyquist_frequency)
             receivers_ref_fft.append(yf)
-            save(pth_str + "fft.npy", receivers_ref_fft)
+            save(
+                str(output_file_prefix) + "fft.npy",
+                receivers_ref_fft,
+            )
 
     def get_reference_signal(self):
         """Acquire the reference signal for comparison between models.
@@ -179,10 +202,20 @@ class MeasureError():
 
         return receivers_reference, receivers_ref_fft
 
-    def error_measures(self, forward_solution_receivers, receivers_reference,
-                       dt, number_of_receivers, error_if_different_length=True,
-                       final_energy=None, final_energy_reference=None, save_file=True,
-                       save_in_case_folder=True, start_padding=False, end_padding=False):
+    def calculate_error_measures(
+        self,
+        forward_solution_receivers: np.ndarray,
+        receivers_reference: np.ndarray,
+        dt: float,
+        number_of_receivers: int,
+        error_if_different_length: bool =True,
+        final_energy: float =None,
+        final_energy_reference: float =None,
+        save_file: bool =True,
+        save_in_case_folder: bool =True,
+        start_padding: bool =False,
+        end_padding: bool =False,
+    ):
         """Compute the error measures at the receivers for comparison between models.
 
         Error measures used in Salas et al. (2022) Sec. 2.5.
@@ -223,21 +256,22 @@ class MeasureError():
         Returns
         -------
         error_measures : `list`
-            Error measures at the receivers with respect to a reference model.
-            Structure: [errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener]
-            - errIt : `list`
+            Error measures at the receivers with respect to a reference model,
+            in the following order:
+            Structure: [integral_error, peak_errors,...]
+            - integral_error : `list`
                 Integral error.
-            - errPk : `list`
+            - peak_error : `list`
                 Peak error.
-            - pkMax : `list`
+            - maximum_reference_peak : `list`
                 Maximum reference peak.
-            - max_errIt : `float`
+            - maximum_integral_error : `float`
                 Maximum integral error.
-            - max_errPK : `float`
+            - maximum_peak_error : `float`
                 Maximum peak error
-            - final_ener : `float`
+            - final_energy : `float`
                 Final energy of the model. Only available if `final_energy` is provided.
-            - dsspt_ener : `float`
+            - dissipated_energy : `float`
                 Total energy dissipated with respect to a reference model.
                 Only available if `final_energy_reference` is provided.
 
@@ -245,7 +279,7 @@ class MeasureError():
         -----
         - An error during execution in `find_peaks` means that the simulation
             transient time should be increased in order to observe a peak.
-        - The `final_ener` value correspond to the mechanical energy in the
+        - The `final_energy` value correspond to the mechanical energy in the
             last step of the simulation. If the model has an ABC scheme, the
             value should be close to zero. Otherwise, the value is constant
             during the simulation due to the law of conservation of energy.
@@ -269,59 +303,96 @@ class MeasureError():
         pprint("\nComputing Error Measures", comm=self.comm)
 
         # Initializing error measures
-        pkMax = []  # Maximum reference peak
-        errPk = []  # Peak error
-        errIt = []  # Integral error
+        reference_peak_values = []
+        peak_errors = []
+        integral_errors = []
 
         for i in range(number_of_receivers):
 
             # Transient response at receiver
-            u_abc = forward_solution_receivers[:, i]
-            u_ref = receivers_reference[:, i]
+            model_receiver_signal = forward_solution_receivers[:, i]
+            reference_receiver_signal = receivers_reference[:, i]
 
             # Peak error and Maximum peak
-            peak_error, peak_reference = self.peak_error(u_abc, u_ref)
-            pkMax.append(peak_reference)
-            errPk.append(peak_error)
+            peak_error, reference_peak = calculate_peak_error(
+                model_receiver_signal,
+                reference_receiver_signal,
+            )
+            reference_peak_values.append(reference_peak)
+            peak_errors.append(peak_error)
 
             # Integral error
-            integral_error = self.integral_error(
-                u_abc, u_ref, dt, error_if_different_length=error_if_different_length,
-                start_padding=start_padding, end_padding=end_padding)
-            errIt.append(integral_error)
+            integral_error = calculate_integral_error(
+                model_receiver_signal,
+                reference_receiver_signal,
+                dt,
+                error_if_different_length=error_if_different_length,
+                start_padding=start_padding,
+                end_padding=end_padding,
+            )
+            integral_errors.append(integral_error)
 
         # Receiver error measures
-        error_measures = [errIt, errPk, pkMax]
-        max_errIt = max(errIt)
-        max_errPK = max(errPk)
-        scalar_values = [max_errIt, max_errPK]
-        pprint(f"Maximum Integral Error: {max_errIt:.2%}", comm=self.comm)
-        pprint(f"Maximum Peak Error: {max_errPK:.2%}", comm=self.comm)
-
-        # Save error measures
-        if save_file:
-            pth_str = self.path_save_err_case if save_in_case_folder \
-                else self.path_reference
-            err_str = pth_str + "measure_errs.txt"
-            savetxt(err_str, error_measures, delimiter='\t')
-
+        error_measures = [
+            integral_errors,
+            peak_errors,
+            reference_peak_values,
+        ]
+        maximum_integral_error = max(integral_errors)
+        maximum_peak_error = max(peak_errors)
+        scalar_values = [
+            maximum_integral_error,
+            maximum_peak_error,
+        ]
+        pprint(
+            f"Maximum Integral Error: {maximum_integral_error:.2%}",
+            comm=self.comm,
+        )
+        pprint(
+            f"Maximum Peak Error: {maximum_peak_error:.2%}",
+            comm=self.comm,
+        )
         # Final energy
         if final_energy is not None:
             scalar_values.append(final_energy)
-            pprint(f"Final Energy (J): {final_energy:.2e}", comm=self.comm)
+            pprint(
+                f"Final Energy (J): {final_energy:.2e}",
+                comm=self.comm,
+            )
 
             # Dissipated energy
             if final_energy_reference is not None:
-                dsspt_ener = 1 - final_energy / final_energy_reference
-                scalar_values.append(dsspt_ener)
-                pprint(f"Dissipated Energy: {dsspt_ener:.2%}", comm=self.comm)
+                dissipated_energy = (
+                    1 - final_energy / final_energy_reference
+                )
+                scalar_values.append(dissipated_energy)
+                pprint(
+                    f"Dissipated Energy: {dissipated_energy:.2%}",
+                    comm=self.comm,
+                )
 
         error_measures.extend(scalar_values)
 
-        # Append scalar values to the error measures list
+        # Save error measures
         if save_file:
-            with open(err_str, 'a') as f:
-                savetxt(f, scalar_values, delimiter='\t')
+            if save_in_case_folder:
+                output_directory = self.path_save_err_case
+            else:
+                output_directory = self.path_reference
+            output_directory.mkdir(parents=True, exist_ok=True)
+            error_file = output_directory / "measure_errs.txt"
+
+            savetxt(
+                error_file,
+                error_measures[:3],
+                delimiter="\t",
+            )
+            with error_file.open("a") as file_handle:
+                savetxt(
+                    file_handle,
+                    scalar_values,
+                    delimiter="\t",
+                )
 
         return error_measures
 
