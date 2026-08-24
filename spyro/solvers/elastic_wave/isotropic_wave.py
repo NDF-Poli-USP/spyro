@@ -64,20 +64,6 @@ class IsotropicWave(ElasticWave):
         self.lmbda = None  # First Lame parameter
         self.mu = None    # Second Lame parameter
         self.c_s = None   # Secondary wave velocity
-        self._physical_parameterization = None
-        #: Whether the physical parameters already exist as the ``Function``
-        #: objects this solver goes on using.
-        #:
-        #: Every forward solve re-reads the model dictionary and builds new
-        #: ``Function`` objects from it. While the dictionary is the source
-        #: of truth, that is harmless: the same numbers go in and come back
-        #: out. It stops being harmless once the adjoint equation has been
-        #: set up, because the adjoint is posed with respect to those exact
-        #: objects, and an inversion has written its current iterate into
-        #: them. A rebuild would differentiate with respect to objects the
-        #: forward solve no longer uses, and reset the iterate to the
-        #: model's initial values. So from that point on it is skipped.
-        self._physical_parameters_are_built = False
 
         self.u_n = None   # Current displacement field
         self.u_nm1 = None  # Displacement field in previous iteration
@@ -271,82 +257,6 @@ class IsotropicWave(ElasticWave):
         add(ElasticMaterialParameter.MU, self.mu)
         add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
         add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
-
-    def set_physical_parameterization(
-        self, parameterization: ElasticMaterialParameterization,
-    ) -> None:
-        """Write the equation in one of its physical parameter families.
-
-        An isotropic elastic medium can be written in terms of
-        ``{density, lambda, mu}`` or of
-        ``{density, p_wave_velocity, s_wave_velocity}``, carrying whichever
-        family it is not written in as expressions of the other. Choosing
-        between them is a decision about the equation, so it belongs here
-        rather than to whatever differentiates it, and it has to be made
-        before parameters are selected as controls.
-
-        The choice is deliberate, so it also pins the fields: the model
-        dictionary declares one family, and letting the next initialization
-        read it again would silently undo this call.
-
-        Parameters
-        ----------
-        parameterization : ElasticMaterialParameterization
-            Family to write the equation in.
-
-        Returns
-        -------
-        None
-
-        Raises
-        ------
-        ValueError
-            If the family is not one this solver supports.
-        """
-        self._build_physical_parameterization(parameterization)
-        self._physical_parameters_are_built = True
-
-    def select_physical_parameters(
-        self, names: object = None,
-    ) -> PhysicalParameters:
-        """Select controls from the family the equation is written in.
-
-        The equation is written in one family and carries the other as
-        expressions of it, so only the family in use can be controlled.
-        Changing that is :meth:`set_physical_parameterization`, a decision
-        about the equation rather than about the inversion, and it has to be
-        made before parameters are selected.
-
-        Parameters
-        ----------
-        names : ElasticMaterialParameter or iterable, optional
-            Elastic parameters to resolve. ``None`` selects the whole family
-            the equation is currently written in.
-
-        Returns
-        -------
-        PhysicalParameters
-            Selected names, mapped to the fields carrying them.
-
-        Raises
-        ------
-        ValueError
-            If no mesh exists yet, or the selection is empty.
-        TypeError
-            If a name is not an :class:`ElasticMaterialParameter` member, or
-            belongs to the family the equation is not written in.
-        """
-        if self.mesh is None:
-            raise ValueError(
-                "Mesh must be set before selecting elastic physical "
-                "parameters: a control has to be a field.",
-            )
-        selected = super().select_physical_parameters(names)
-        # The selected fields are about to be differentiated with respect to,
-        # or written into by an inversion. Either way the model dictionary
-        # must stop rebuilding them; see ``_physical_parameters_are_built``.
-        self._physical_parameters_are_built = True
-        return selected
 
     def gradient_solve(
         self,

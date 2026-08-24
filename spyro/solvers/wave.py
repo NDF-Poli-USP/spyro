@@ -186,6 +186,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                     lambda: self.get_function())
 
         self._physical_parameters = PhysicalParameters()
+        #: Family of physical parameters the equation is written in, for
+        #: equations that admit more than one. ``None`` when there is only
+        #: one, so there is nothing to choose.
+        self._physical_parameterization = None
+        #: Whether the physical parameters already exist as the ``Function``
+        #: objects this solver goes on using.
+        #:
+        #: Solvers that rebuild their parameters from the model input on
+        #: every forward solve must stop once this is set: by then the
+        #: adjoint is posed with respect to those exact objects, and an
+        #: inversion has written its current iterate into them. Rebuilding
+        #: would differentiate with respect to objects the forward solve no
+        #: longer uses, and reset the iterate to the model's initial values.
+        self._physical_parameters_are_built = False
 
     def forward_solve(self):
         """Solves the forward problem."""
@@ -817,6 +831,79 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             )
         return parameters
 
+    @property
+    def physical_parameterization(self):
+        """Return the family of physical parameters the equation uses.
+
+        Returns
+        -------
+        enum.Enum or None
+            Active family, or ``None`` for an equation written in a single
+            set of physical parameters.
+        """
+        return self._physical_parameterization
+
+    def set_physical_parameterization(self, parameterization) -> None:
+        """Write the equation in one of its physical parameter families.
+
+        Some media can be described by more than one set of physical
+        parameters -- an isotropic elastic one by density with the Lame
+        parameters, or by density with the two wave speeds -- carrying
+        whichever set it is not written in as expressions of the other. Only
+        the set in use can be controlled, so choosing between them is a
+        decision about the equation, made before anything selects parameters
+        to differentiate with respect to.
+
+        The choice is deliberate, so it also pins the fields: the model input
+        declares one family, and letting the next initialization read it
+        again would silently undo this call.
+
+        Parameters
+        ----------
+        parameterization : enum.Enum
+            Family to write the equation in.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        NotImplementedError
+            If this equation is written in a single set of parameters.
+        ValueError
+            If the family is not one this solver supports.
+        """
+        self._build_physical_parameterization(parameterization)
+        self._physical_parameters_are_built = True
+
+    def _build_physical_parameterization(self, parameterization) -> None:
+        """Materialize one physical parameter family.
+
+        Subclasses whose medium admits more than one family implement this
+        with the change of variables between them. It is separate from
+        :meth:`set_physical_parameterization` because initialization builds
+        the declared family on every solve, and must not pin it.
+
+        Parameters
+        ----------
+        parameterization : enum.Enum
+            Family to write the equation in.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        NotImplementedError
+            Always, unless a subclass implements it.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} is written in a single set of physical "
+            "parameters, so there is no parameterization to choose.",
+        )
+
     def select_physical_parameters(
         self, names: object = None,
     ) -> PhysicalParameters:
@@ -856,6 +943,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             If a name is not a material-parameter enum member, or names a
             parameter computed from the independent ones.
         """
+        if self.mesh is None:
+            raise ValueError(
+                "Mesh must be set before selecting physical parameters: "
+                "a control has to be a field.",
+            )
         physical_parameters = self.physical_parameters
         if names is None:
             selected_names = [
@@ -902,6 +994,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                     "parameterization first.",
                 )
             selected.add(name, field)
+        # The selected fields are about to be differentiated with respect to,
+        # or written into by an inversion. Either way whatever builds the
+        # physical parameters must stop replacing them.
+        self._physical_parameters_are_built = True
         return selected
 
     def initialize_physical_parameters(self):
