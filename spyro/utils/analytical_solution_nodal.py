@@ -177,18 +177,23 @@ def analytical_solution_elastic(
     """
     if isinstance(source_type, str):
         source_type = SourceType(source_type)
-    if dimension != 3:
-        raise ValueError("2D or weird dimensions not yet supported")
+    if dimension in [2, 3]:
+        raise ValueError("Weird dimensions not yet supported")
     if force_direction is None and source_type == "force_source":
         raise ValueError(f"Can not use {source_type} with no force_direction")
+    if dimension == 2 and source_type == "explosive_source":
+        raise ValueError("Explosive source only supported for 3D simulations.")
 
     nt = int(final_time / dt + 1)
     final_time = dt * (nt - 1)
     time_vector = np.linspace(0.0, final_time, nt)
-    u = np.zeros((nt, 3))
-    if source_type == SourceType.FORCE:
+    if dimension == 2:
+        u = np.zeros((nt, 2))
+    elif dimension == 3:
+        u = np.zeros((nt, 3))
+    if source_type == SourceType.FORCE and dimension == 3:
         for i in range(dimension):
-            u[:, i] = analytical_force_source(
+            u[:, i] = analytical_force_source_3d(
                 offsets,
                 time_vector,
                 p_wave_velocity,
@@ -212,13 +217,27 @@ def analytical_solution_elastic(
                 time_delay,
                 i,
             )
+    elif source_type == SourceType.FORCE and dimension == 2:
+        for i in range(dimension):
+            u[:, i] = analytical_force_source_2d(
+                offsets,
+                time_vector,
+                p_wave_velocity,
+                s_wave_velocity,
+                density,
+                amplitude,
+                frequency,
+                time_delay,
+                force_direction,
+                i,
+            )
     else:
         raise ValueError(f"Source type of {source_type} not valid")
 
     return (u[:, 0], u[:, 1], u[:, 2])
 
 
-def analytical_force_source(
+def analytical_force_source_3d(
     offsets: float,
     time_vector: np.ndarray,
     p_wave_velocity: float,
