@@ -652,7 +652,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # that the reduced functional is built as an
         # ``EnsembleReducedFunctional``, summing the per-shot functionals and
         # gradients over the ensemble communicator.
-        self.automated_adjoint = AutomatedAdjoint(self.comm, wave=self)
+        self.automated_adjoint = AutomatedAdjoint(
+            self.comm, select_parameters=self._select_physical_parameters,
+        )
         self.functional_value = None
         self.misfit = None
 
@@ -831,18 +833,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             )
         return parameters
 
-    @property
-    def physical_parameterization(self):
-        """Return the family of physical parameters the equation uses.
-
-        Returns
-        -------
-        enum.Enum or None
-            Active family, or ``None`` for an equation written in a single
-            set of physical parameters.
-        """
-        return self._physical_parameterization
-
     def set_physical_parameterization(self, parameterization) -> None:
         """Write the equation in one of its physical parameter families.
 
@@ -904,7 +894,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             "parameters, so there is no parameterization to choose.",
         )
 
-    def select_physical_parameters(
+    def _select_physical_parameters(
         self, names: object = None,
     ) -> PhysicalParameters:
         """Resolve ``names`` to the independent fields they are carried by.

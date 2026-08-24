@@ -219,7 +219,7 @@ def test_elastic_parameters_stay_constants_without_a_mesh():
     assert not isinstance(wave.lmbda, fire.Function)
     assert not isinstance(wave.mu, fire.Function)
 
-    assert wave.physical_parameterization is (
+    assert wave._physical_parameterization is (
         spyro.ElasticMaterialParameterization.VELOCITY
     )
     assert set(parameters) == set(ElasticMaterialParameter)
@@ -270,7 +270,7 @@ def test_elastic_automated_adjoint_accepts_one_control():
 def test_elastic_controls_follow_the_equation_parameterization():
     """Changing the family is the equation's decision, made before selecting."""
     wave = build_elastic_wave()
-    assert wave.physical_parameterization is (
+    assert wave._physical_parameterization is (
         spyro.ElasticMaterialParameterization.VELOCITY
     )
 

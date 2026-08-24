@@ -87,10 +87,11 @@ class AutomatedAdjoint:
         functionals and gradients across ensemble members. In practice this is
         ``wave.comm``. If ``None``, a non-ensemble
         :class:`pyadjoint.ReducedFunctional` is used instead.
-    wave : Wave, optional
-        Wave equation whose physical parameters are available for selection.
-        When supplied, the adjoint solver selects the independent parameters
-        of the active physical parameterization by default.
+    select_parameters : callable, optional
+        Resolves selected physical parameter names to the fields carrying
+        them, normally
+        the wave equation's own parameter selection. When supplied, every parameter the
+        equation offers is selected by default.
 
     Attributes
     ----------
@@ -99,8 +100,6 @@ class AutomatedAdjoint:
     control_parameter_names : list
         Labels supplied by a control container, or ``None`` for unlabeled
         controls.
-    wave : Wave or None
-        Wave equation providing physical fields to the adjoint solver.
     ensemble : firedrake.ensemble.Ensemble or None
         The ensemble communicator used by the reduced functional.
     reduced_functional : firedrake.adjoint.EnsembleReducedFunctional or \
@@ -110,15 +109,19 @@ pyadjoint.ReducedFunctional or None
     """
 
     def __init__(
-        self, ensemble: object, controls: object = None, wave: object = None,
+        self, ensemble: object, controls: object = None,
+        select_parameters: object = None,
     ) -> None:
-        self.wave = wave
         self.controls = []
         self.control_parameter_names = []
         self.ensemble = ensemble
         self.reduced_functional = None
         self._tape = None
-        if wave is not None:
+        #: Resolves parameter names to fields. This is all the adjoint solver
+        #: needs from the equation it differentiates, so it holds the one
+        #: function rather than the whole solver.
+        self._select_parameters = select_parameters
+        if select_parameters is not None:
             self.set_control_parameters()
             return
         self._set_controls(controls)
@@ -151,8 +154,8 @@ pyadjoint.ReducedFunctional or None
         solver; resolving them to independent fields belongs to the wave
         equation, which is the only object that knows how its material
         parameters are related. This method therefore forwards the selection
-        to :meth:`~spyro.solvers.wave.Wave.select_physical_parameters`, whose
-        subclasses raise on selections they cannot model.
+        to the equation's ``select_parameters``, which raises on selections
+        it cannot offer.
 
         The resolution may change the wave equation's physical
         parameterization, which is why it must happen before tape recording.
@@ -176,7 +179,7 @@ pyadjoint.ReducedFunctional or None
         TypeError
             If a selected name is not a material-parameter enum member.
         """
-        if self.wave is None:
+        if self._select_parameters is None:
             raise ValueError(
                 "A wave equation is required to select control parameters.",
             )
@@ -185,7 +188,7 @@ pyadjoint.ReducedFunctional or None
                 "Control parameters must be selected before tape recording.",
             )
 
-        self._set_controls(self.wave.select_physical_parameters(parameters))
+        self._set_controls(self._select_parameters(parameters))
         self.reduced_functional = None
 
     @contextmanager
