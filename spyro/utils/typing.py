@@ -197,5 +197,5 @@ class AbsorbingBCsType(StrEnum):
 class SourceType(StrEnum):
     """Supported source types."""
 
-    FORCE = "fource_source"
+    FORCE = "force_source"
     EXPLOSIVE = "explosive_source"
