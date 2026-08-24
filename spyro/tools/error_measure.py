@@ -542,14 +542,14 @@ def calculate_integral_error(
     return integral_error
 
 
-def normalized_root_mean_square_error(
+def calculate_normalized_L2_error(
     signal_model: np.ndarray,
     signal_reference: np.ndarray,
     error_if_different_length=True,
     start_padding=False,
     end_padding=False,
 ):
-    """Compute the normalized RMS error between the model and reference signals.
+    """Compute the normalized L2 error between the model and reference signals.
 
     Takem from https://www.statisticshowto.com/nrmse/
     TODO: add citation
@@ -573,7 +573,7 @@ def normalized_root_mean_square_error(
     Returns
     -------
     nrms_error : `float`
-        Normalized RMS error between the model and reference signals.
+        Normalized L2 error between the model and reference signals.
     """
 
     # Check the input parameters
