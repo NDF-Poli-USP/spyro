@@ -178,11 +178,19 @@ def test_elastic_automated_adjoint_controls(
             for gradient in gradients.values()
         )
 
+        # A Taylor test only means anything in the asymptotic regime, where
+        # the residual goes as the square of the perturbation. Perturbing by
+        # a full multiple of the control leaves it: the measured rates spread
+        # from 1.93 to 2.43, both directions away from the second order the
+        # test is checking for. A tenth of that brings every case to within
+        # 0.02 of 2.0.
         rng = np.random.default_rng(42)
         directions = [
             fire.Function(
                 control.function_space(),
-                val=control.dat.data_ro * rng.random(control.dat.data_ro.shape),
+                val=0.1 * control.dat.data_ro * rng.random(
+                    control.dat.data_ro.shape,
+                ),
             )
             for control in wave.automated_adjoint.controls
         ]

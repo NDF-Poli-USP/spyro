@@ -100,12 +100,15 @@ class IsotropicWave(ElasticWave):
         P- and S-wave velocities. The missing dependent parameters are
         computed from the provided set.
 
-        Every forward solve calls this method again, so it only reads the
-        model once: the parameters it built the first time are the objects
-        the assembled forms, the adjoint and any inversion refer to, and
-        rebuilding them would replace those objects and reset an inversion's
-        current iterate to the model's initial values. Replacing the model
-        clears the parameters, which is what allows them to be built again.
+        This runs more than once: :meth:`enable_automated_adjoint` and
+        :meth:`initialize_physical_parameters` both call it, and so does the
+        forward solve itself for absorbing-boundary settings that rebuild
+        the material properties. It reads the model only on the first of
+        those. The parameters built then are the objects the assembled
+        forms, the adjoint and any inversion refer to, so rebuilding them
+        would replace those objects and reset an inversion's current iterate
+        to the model's initial values. Replacing the model clears the
+        parameters, which is what allows them to be built again.
 
         Parameters
         ----------
