@@ -3,13 +3,11 @@
 This module provides lightweight wrappers around Firedrake VTK output and
 NumPy array persistence to support time-stepped logging during simulations.
 """
-
 import numpy as np
 from pathlib import Path
 import warnings
 
 from firedrake import VTKFile
-
 from .basicio import parallel_print
 
 
@@ -122,12 +120,12 @@ class FieldLogger:
             self.__func_data = {}
             self.__enabled_functionals = {}
 
-            self.__time_enabled = self.visualization_dict.get("time", False)
+            self.__time_enabled = (
+                self.visualization_dict.get("time_filename", None) is not None
+            )
             if self.__time_enabled:
                 self.__time = []
-                self.__time_filename = self.visualization_dict.get(
-                    "time_filename", "time.npy"
-                )
+                self.__time_filename = self.visualization_dict["time_filename"]
                 print(f"Saving time in: {self.__time_filename}")
 
     def add_field(self, key: str, name: str, callback):

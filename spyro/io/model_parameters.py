@@ -13,10 +13,9 @@ from .. import utils
 from .. import meshing
 
 
-class Model_parameters(
-    Read_options, Read_boundary_layer, Read_time_axis, Read_outputs, VelocityModelFileIO
-):
-    """Class that reads and sanitizes input parameters.
+class Model_parameters(Read_boundary_layer, VelocityModelFileIO, Read_time_axis):
+    """
+    Class that reads and sanitizes input parameters.
 
     Attributes
     ----------
@@ -209,16 +208,17 @@ class Model_parameters(
         self.equation_type = self.input_dictionary["equation_type"]
 
         # Get options
-        Read_options.__init__(self, dictionary=self.input_dictionary)
+        self.read_options = Read_options(**self.input_dictionary["options"])
+
+        self.read_outputs = Read_outputs(
+            **self.input_dictionary.get("visualization", {})
+        )
 
         self.sources = None
 
         # Checks time inputs
         if self.analysis == "transient":
             Read_time_axis.__init__(self)
-
-        # Checks outputs
-        Read_outputs.__init__(self)
 
         # Check velocity model file io
         VelocityModelFileIO.__init__(self)
@@ -556,6 +556,20 @@ class Model_parameters(
             domain_dim += (self.mesh_parameters.length_y,)
 
         return domain_dim
+
+    # This is a temporary approach to no break the current API. This way it is still possible to call
+    # self.method instead of self.read_options.method.
+    def __getattr__(self, name):
+        if name in ("read_options", "read_outputs"):
+            return object.__getattribute__(self, name)
+
+        for component in (self, self.read_options, self.read_outputs):
+            try:
+                return object.__getattribute__(component, name)
+            except AttributeError:
+                pass
+
+        raise AttributeError(f"{type(self).__name__!s} has no attribute {name!r}")
 
 
 def _validate_enum(value, accepted_values, name):
