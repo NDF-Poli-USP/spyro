@@ -1,5 +1,3 @@
-from contextlib import contextmanager
-
 from pyadjoint import Tape, continue_annotation, pause_annotation, taylor_test
 
 import firedrake as fire
@@ -43,12 +41,12 @@ class AutomatedAdjoint:
     ----------------
     .. code-block:: python
 
-        wave.enable_automated_adjoint()   # builds AutomatedAdjoint(wave.comm)
-        with wave.automated_adjoint.fresh_tape():
-            wave.forward_solve()          # forward run recorded on the tape
+        wave.enable_automated_adjoint()
+        wave.forward_solve()          # clears the tape, then records
         wave.automated_adjoint.create_reduced_functional(wave.functional_value)
         dJ = wave.automated_adjoint.compute_gradient()
         rate = wave.automated_adjoint.verify_gradient(wave.c)  # Taylor test
+        wave.automated_adjoint.clear_tape()
 
     Parameters
     ----------
@@ -80,36 +78,15 @@ pyadjoint.ReducedFunctional or None
         self.reduced_functional = None
         self._tape = None
 
-    @contextmanager
-    def fresh_tape(self):
-        """Context manager that records the forward solve on a brand new tape.
-
-        Clears any previous tape, installs a fresh :class:`pyadjoint.Tape` as
-        the working tape and turns annotation on for the duration of the
-        ``with`` block. Annotation is always paused again on exit, even if an
-        exception is raised, so the caller cannot accidentally leave taping
-        enabled.
-
-        Yields
-        ------
-        pyadjoint.Tape
-            The freshly created working tape.
-        """
-        self.clear_tape()
-        self._tape = Tape()
-        fire_ad.set_working_tape(self._tape)
-        continue_annotation()
-        try:
-            yield self._tape
-        finally:
-            pause_annotation()
-
     def start_recording(self):
         """Start recording operations on the tape.
 
         Creates a tape and registers it as the working tape if one does not
-        already exist, then enables annotation. Unlike :meth:`fresh_tape`, an
-        existing tape is reused rather than discarded.
+        already exist, then enables annotation. An existing tape is reused,
+        which is what lets the shots of one forward solve accumulate on a
+        single tape: the functional sums over them, so the gradient has to be
+        the gradient of that sum. Dropping the previous recording is the
+        forward solve's job, and it does it before the first shot.
 
         Returns
         -------
