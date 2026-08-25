@@ -38,8 +38,14 @@ SCHEDULES = {
 }
 
 
-def build_dictionary():
-    """Return the model dictionary shared by every test in this module."""
+def build_dictionary() -> dict:
+    """Build the model dictionary shared by every test in this module.
+
+    Returns
+    -------
+    dict
+        A spyro model dictionary describing a small 2D acoustic problem.
+    """
     return {
         "options": {
             "cell_type": "T",
@@ -89,7 +95,16 @@ def build_dictionary():
 
 @pytest.fixture(scope="module")
 def observed_record():
-    """Receiver data from a two-layer 'exact' model, used as the shot record."""
+    """Run the two-layer 'exact' model once and return its receiver data.
+
+    Module scoped: every test compares against the same shot record, and the
+    forward solve is the expensive part.
+
+    Returns
+    -------
+    numpy.ndarray
+        Receiver time series used as the real shot record.
+    """
     wave = spyro.AcousticWave(dictionary=build_dictionary())
     wave.set_mesh(input_mesh_parameters={"edge_length": EDGE_LENGTH})
     wave.set_initial_velocity_model(
@@ -100,8 +115,21 @@ def observed_record():
     return wave.forward_solution_receivers
 
 
-def taped_guess(observed_record, schedule):
-    """Return a guess model whose forward solve is recorded under ``schedule``."""
+def taped_guess(observed_record, schedule: str) -> spyro.AcousticWave:
+    """Record a guess-model forward solve under the named schedule.
+
+    Parameters
+    ----------
+    observed_record : numpy.ndarray
+        Receiver data used as the real shot record.
+    schedule : str
+        Key into :data:`SCHEDULES` selecting the checkpointing settings.
+
+    Returns
+    -------
+    spyro.AcousticWave
+        The wave object, with the tape recorded and annotation stopped.
+    """
     wave = spyro.AcousticWave(dictionary=build_dictionary())
     wave.real_shot_record = observed_record
     wave.set_mesh(input_mesh_parameters={"edge_length": EDGE_LENGTH})
@@ -115,8 +143,16 @@ def taped_guess(observed_record, schedule):
 @pytest.mark.slow
 @pytest.mark.newer_firedrake
 @pytest.mark.parametrize("schedule", list(SCHEDULES))
-def test_taylor_test(observed_record, schedule):
-    """Every schedule must reach second-order Taylor convergence."""
+def test_taylor_test(observed_record, schedule: str) -> None:
+    """Check that every schedule reaches second-order Taylor convergence.
+
+    Parameters
+    ----------
+    observed_record : numpy.ndarray
+        Receiver data used as the real shot record.
+    schedule : str
+        Key into :data:`SCHEDULES` selecting the checkpointing settings.
+    """
     wave = taped_guess(observed_record, schedule)
     wave.automated_adjoint.create_reduced_functional(wave.functional_value)
 
@@ -132,8 +168,18 @@ def test_taylor_test(observed_record, schedule):
 
 @pytest.mark.slow
 @pytest.mark.newer_firedrake
-def test_gradient_matches_across_schedules(observed_record):
-    """The three schedules must return the same gradient, to round-off."""
+def test_gradient_matches_across_schedules(observed_record) -> None:
+    """Check that the three schedules return the same gradient, to round-off.
+
+    A schedule changes how the tape is stored, not what it computes, so this
+    is a sharper check than the Taylor test: it catches an adjoint that is
+    wrong by a few percent, which a convergence rate would not.
+
+    Parameters
+    ----------
+    observed_record : numpy.ndarray
+        Receiver data used as the real shot record.
+    """
     gradients = {}
     for schedule in SCHEDULES:
         wave = taped_guess(observed_record, schedule)

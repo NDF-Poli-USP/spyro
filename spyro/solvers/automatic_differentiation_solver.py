@@ -6,6 +6,7 @@ import firedrake as fire
 import firedrake.adjoint as fire_ad
 
 from checkpoint_schedules import (
+    CheckpointSchedule,
     MixedCheckpointSchedule,
     SingleMemoryStorageSchedule,
     StorageType,
@@ -77,17 +78,16 @@ class AutomatedAdjoint:
     after the adjoint is enabled. A schedule is also consumed by the run that
     executes it, so a fresh one is built per forward solve.
 
-    .. warning::
-
-        With the currently installed pyadjoint and ``checkpoint_schedules``,
-        ``snapshots=N`` returns an **incorrect gradient** for spyro's
-        second-order central-difference stepping, whose restart state spans
-        two time levels. The functional replays exactly; only the adjoint is
-        wrong, and it is wrong silently. It reproduces in plain Firedrake with
-        no spyro code, affects ``Revolve`` too, and disappears once the budget
-        is large enough that nothing is recomputed. Only ``snapshots=None`` is
-        verified against the reference gradient; see
-        ``tests/on_one_core/test_gradient_checkpointing.py``.
+    Notes
+    -----
+    The time integrator closes each time step immediately after the solve
+    rather than at the end of the loop body. That placement matters: the state
+    rotation ``u_n <- u_np1`` at the end of a step makes the solve output look
+    disposable to pyadjoint, which drops its checkpoint. The adjoint then reads
+    a stale value through ``BlockVariable.saved_output``, which silently falls
+    back to the live ``Function``, and a recomputing schedule returns a wrong
+    gradient. Ending the step right after the solve keeps that output in the
+    restart state. See ``_propagate_forward_central_difference``.
 
     Parameters
     ----------
@@ -120,8 +120,9 @@ pyadjoint.ReducedFunctional or None
         :meth:`create_reduced_functional`.
     """
 
-    def __init__(self, ensemble, controls=None, checkpointing=False,
-                 snapshots=None):
+    def __init__(self, ensemble: fire.Ensemble | None,
+                 controls: fire.Function | None = None,
+                 checkpointing: bool = False, snapshots: int | None = None):
         self.controls = controls
         self.ensemble = ensemble
         self.reduced_functional = None
@@ -132,20 +133,31 @@ pyadjoint.ReducedFunctional or None
         self._checkpointing_schedule = None
 
     @property
-    def checkpointing_schedule(self):
+    def checkpointing_schedule(self) -> CheckpointSchedule | None:
         """Schedule of the current tape, or ``None`` if it is not checkpointed.
 
-        :meth:`start_recording` builds a new one per forward solve, so this
-        reflects the latest solve rather than a persistent object.
+        Returns
+        -------
+        checkpoint_schedules.CheckpointSchedule or None
+            The schedule installed by the most recent :meth:`start_recording`.
+            A new one is built per forward solve, so this reflects the latest
+            solve rather than a persistent object.
         """
         return self._checkpointing_schedule
 
     @property
-    def checkpointing_enabled(self):
-        """``True`` when the current tape is managed by a checkpoint schedule."""
+    def checkpointing_enabled(self) -> bool:
+        """Whether the current tape is managed by a checkpoint schedule.
+
+        Returns
+        -------
+        bool
+            ``True`` once :meth:`start_recording` has installed a schedule on
+            the tape, ``False`` when checkpointing is off.
+        """
         return self._checkpointing_schedule is not None
 
-    def _build_schedule(self, total_steps):
+    def _build_schedule(self, total_steps: int) -> CheckpointSchedule:
         """Build a schedule for a forward run of ``total_steps`` steps.
 
         Parameters
@@ -193,7 +205,7 @@ pyadjoint.ReducedFunctional or None
         finally:
             pause_annotation()
 
-    def start_recording(self, total_steps=None):
+    def start_recording(self, total_steps: int | None = None) -> Tape:
         """Start recording operations on the tape.
 
         Creates a tape and registers it as the working tape if one does not

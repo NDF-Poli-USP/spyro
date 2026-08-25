@@ -618,7 +618,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def store_forward_time_steps(self, value):
         self._store_forward_time_steps = value
 
-    def enable_automated_adjoint(self, checkpointing=False, snapshots=None):
+    def enable_automated_adjoint(
+        self, checkpointing: bool = False, snapshots: int | None = None
+    ) -> None:
         """Enable algorithmic differentiation for this solver.
 
         Sets the solver up to record its forward solve on a pyadjoint tape, so
@@ -638,21 +640,24 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             turning :math:`O(n_t)` memory into :math:`O(\\text{snapshots})` at
             the cost of extra forward work. Requires ``checkpointing=True``.
 
-        Notes
-        -----
-        The checkpoint schedule is *not* created here. It has to know the total
-        number of forward steps, and at this point ``dt`` may still be replaced
-        by :meth:`get_and_set_maximum_dt`. Only the intent is stored; the
-        schedule is built at the start of each forward solve, where ``nt`` is
-        known. :class:`~spyro.solvers.automatic_differentiation_solver.\
-AutomatedAdjoint` also documents a correctness limitation of the recomputing
-        schedule with the currently installed pyadjoint.
+        Returns
+        -------
+        None
+            The solver is configured in place.
 
         Raises
         ------
         ValueError
             If the velocity model has not been set, so there is no control to
             differentiate with respect to.
+
+        Notes
+        -----
+        The checkpoint schedule is *not* created here. It has to know the total
+        number of forward steps, and at this point ``dt`` may still be replaced
+        by :meth:`get_and_set_maximum_dt`. Only the intent is stored; the
+        schedule is built at the start of each forward solve, where ``nt`` is
+        known.
         """
         self.store_forward_time_steps = False
         self.enable_compute_functional(

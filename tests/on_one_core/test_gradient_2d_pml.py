@@ -139,8 +139,10 @@ def set_dictionary(PML=False):
     return dictionary
 
 
-def get_forward_model(dictionary=None, adjoint_type=AdjointType.NONE,
-                      checkpointing=False, snapshots=None):
+def get_forward_model(dictionary: dict = None,
+                      adjoint_type: AdjointType = AdjointType.NONE,
+                      checkpointing: bool = False,
+                      snapshots: int | None = None):
     """Run the exact and guess forward models.
 
     Parameters
@@ -204,11 +206,18 @@ def get_forward_model(dictionary=None, adjoint_type=AdjointType.NONE,
 @pytest.mark.newer_firedrake
 @pytest.mark.parametrize("checkpointing", [False, True],
                          ids=["no_checkpointing", "checkpointing"])
-def test_gradient_auto_adjoint(checkpointing, PML=True):
+def test_gradient_auto_adjoint(checkpointing: bool, PML: bool = True) -> None:
     """Taylor-test the automated-adjoint gradient, with and without checkpointing.
 
     Checkpointing changes how the tape is stored, not what it computes, so the
     same second-order Taylor convergence is required either way.
+
+    Parameters
+    ----------
+    checkpointing : bool
+        Whether to manage the tape with a checkpoint schedule.
+    PML : bool, optional
+        Whether to enable the perfectly matched layer. Defaults to ``True``.
     """
     dictionary = set_dictionary(PML=PML)
     _, _, Wave_obj_guess = get_forward_model(
@@ -259,7 +268,14 @@ def test_gradient_implemented_adjoint(PML=False):
 @pytest.mark.newer_firedrake
 @pytest.mark.parametrize("checkpointing", [False, True],
                          ids=["no_checkpointing", "checkpointing"])
-def test_gradient_pml_auto_adjoint(checkpointing):
+def test_gradient_pml_auto_adjoint(checkpointing: bool) -> None:
+    """Run :func:`test_gradient_auto_adjoint` with the PML enabled.
+
+    Parameters
+    ----------
+    checkpointing : bool
+        Whether to manage the tape with a checkpoint schedule.
+    """
     test_gradient_auto_adjoint(checkpointing, PML=True)
 
 

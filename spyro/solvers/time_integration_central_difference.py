@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import firedrake as fire
 import numpy as np
 
@@ -5,8 +7,14 @@ from . import helpers
 from .. import utils
 from ..utils.typing import FunctionalEvaluationMode, AdjointType, AbsorbingBCsType
 
+if TYPE_CHECKING:
+    # Import only for annotations: ``wave`` imports this module at runtime.
+    from .wave import Wave
 
-def _propagate_forward_central_difference(wave, source_ids):
+
+def _propagate_forward_central_difference(
+    wave: "Wave", source_ids: list[int]
+) -> None:
     """Advance the forward solve with the central-difference scheme.
 
     This is an internal helper used by :meth:`wave.wave_propagator`. It updates
@@ -19,6 +27,11 @@ def _propagate_forward_central_difference(wave, source_ids):
         the forward solve.
     source_ids: list of int
         List of source IDs to simulate.
+
+    Returns
+    -------
+    None
+        The solver state, receiver data and functional are updated in place.
     """
     if wave.sources is not None:
         wave.sources.current_sources = source_ids
