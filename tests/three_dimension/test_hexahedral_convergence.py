@@ -1,7 +1,5 @@
-from firedrake import COMM_WORLD as comm
 import numpy as np
 import spyro
-from spyro.io.basicio import parallel_print as pprint
 from spyro.tools.error_measure import calculate_normalized_L2_error
 
 
