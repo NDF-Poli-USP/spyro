@@ -268,9 +268,9 @@ class PhysicalParameters(Set):
             if not isinstance(field, fire.Function):
                 raise TypeError(
                     f"'{name.value}' is computed from the other physical "
-                    "parameters, so it cannot be selected on its own. If "
-                    "the wave equation can be written in terms of it "
-                    "instead, change its physical parameterization first.",
+                    "parameters, so it has no data of its own to select. "
+                    "If it can carry the data instead, change the wave "
+                    "equation's physical parameterization first.",
                 )
             selected.add(name, field)
         return selected

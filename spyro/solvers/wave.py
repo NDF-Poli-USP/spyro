@@ -797,10 +797,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def physical_parameters(self):
         """Return the physical parameters of the wave equation being solved.
 
-        These are the fields the variational form is written in terms of:
-        the velocity model for an acoustic medium, density and a pair of
-        elastic moduli or wave speeds for an isotropic elastic one.
-        Solvers declare them while initializing their material properties.
+        These are the material fields the solver reads: the velocity model
+        for an acoustic medium; density, the Lame parameters and the two
+        wave speeds for an isotropic elastic one, where the variational form
+        reads the moduli and the absorbing boundary conditions read the
+        speeds. Solvers declare them while initializing their material
+        properties.
 
         A wave solver knows only about physical parameters. Which of them an
         inversion treats as unknowns is a property of the inversion, not of
@@ -837,15 +839,19 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         return parameters
 
     def set_physical_parameterization(self, parameterization) -> None:
-        """Set which physical parameters the equation is solved in terms of.
+        """Set which physical parameters carry the material data.
 
         Some media admit more than one set of physical parameters -- an
         isotropic elastic one is described by density with the Lame
-        parameters, or by density with the two wave speeds -- and carry the
-        set they are not solved in terms of as expressions of the other.
-        Only the set in use can be differentiated with respect to, so this
-        choice belongs to the equation and is made before any parameter is
-        selected as a control.
+        parameters, or by density with the two wave speeds. The solver reads
+        all of them whatever this is set to; what it chooses is which ones
+        hold the data as fields, the rest being expressions computed from
+        those.
+
+        Only a field has degrees of freedom to perturb, so this decides what
+        can be differentiated with respect to, not what the equation is
+        solved for. It is a decision about the equation, made before any
+        parameter is selected as a control.
 
         Initializing the material properties already picks a set, by reading
         whichever one the model input declares. This method is public because
@@ -860,7 +866,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Parameters
         ----------
         parameterization : enum.Enum
-            Set of physical parameters to solve in terms of.
+            Set of physical parameters to carry the data.
 
         Returns
         -------

@@ -141,7 +141,7 @@ class IsotropicWave(ElasticWave):
         self.c_s = declared(ElasticMaterialParameter.S_WAVE_VELOCITY)
 
         # Exactly one set must be declared, and it names the parameters
-        # the equation is solved in terms of. ``is not None`` rather than
+        # that carry the material data. ``is not None`` rather than
         # truthiness:
         # every UFL object is unconditionally true, so ``bool`` would only
         # ever be testing whether the key was present.
@@ -186,12 +186,15 @@ class IsotropicWave(ElasticWave):
     def set_physical_parameterization(
         self, parameterization: ElasticMaterialParameterization,
     ) -> None:
-        """Set which elastic parameters the equation is solved in terms of.
+        """Set which elastic parameters carry the material data.
 
-        The chosen set becomes three scalar ``Function`` objects and the
-        complementary set is relinked to them through UFL expressions, so
-        updating one of the chosen parameters carries through to the ones
-        computed from it and to the assembled variational forms.
+        All five are read whatever this is set to: the variational form is
+        written in density and the Lame parameters, while the absorbing
+        boundary conditions and the stable timestep estimate are written in
+        the two wave speeds. The chosen three become scalar ``Function``
+        objects and the other two become UFL expressions of them, recomputed
+        wherever they appear, so updating one of the chosen parameters
+        carries through to the computed ones and to the assembled forms.
 
         This is a change of variables on the solver, not an edit of the
         model: the input dictionary is left as the user wrote it, and the
@@ -201,7 +204,7 @@ class IsotropicWave(ElasticWave):
         Parameters
         ----------
         parameterization : ElasticMaterialParameterization
-            Set of elastic parameters to solve in terms of.
+            Set of elastic parameters to carry the data.
 
         Returns
         -------
@@ -222,7 +225,7 @@ class IsotropicWave(ElasticWave):
 
             Before a mesh exists there is no space to build a ``Function``
             in, so the value is left as the scalar or ``Constant`` it came
-            in as, and the equation is still solved in terms of this set.
+            in as, and this set still carries the data.
             """
             if space is None or isinstance(value, Function):
                 return value
