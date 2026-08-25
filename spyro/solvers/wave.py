@@ -21,6 +21,7 @@ from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsT
                             LayerShapeType, WaveType)
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
+from .adjoint_checkpointing import CheckpointingConfig
 
 
 fire.set_log_level(fire.ERROR)
@@ -618,7 +619,42 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def store_forward_time_steps(self, value):
         self._store_forward_time_steps = value
 
-    def enable_automated_adjoint(self):
+    def enable_automated_adjoint(self, checkpointing=False, snapshots=None):
+        """Enable algorithmic differentiation for this solver.
+
+        Sets the solver up to record its forward solve on a pyadjoint tape, so
+        the gradient can be obtained by reverse-mode differentiation instead of
+        a hand-written adjoint.
+
+        Parameters
+        ----------
+        checkpointing : bool, optional
+            Whether to manage the tape with a checkpoint schedule. ``False``
+            (the default) keeps every forward step on the tape, as before.
+        snapshots : int, optional
+            How many checkpointing units to keep in RAM, which is also how
+            spyro chooses the schedule. ``None`` (the default) keeps every
+            time step in memory and never recomputes. An integer budget keeps
+            only that many checkpoints and recomputes the forward in between,
+            turning :math:`O(n_t)` memory into :math:`O(\\text{snapshots})` at
+            the cost of extra forward work. Requires ``checkpointing=True``.
+
+        Notes
+        -----
+        The checkpoint schedule is *not* created here. It has to know the total
+        number of forward steps, and at this point ``dt`` may still be replaced
+        by :meth:`get_and_set_maximum_dt`. Only the intent is stored; the
+        schedule is built at the start of each forward solve, where ``nt`` is
+        known. See :mod:`spyro.solvers.adjoint_checkpointing`, which also
+        documents a correctness limitation of the recomputing schedule with the
+        currently installed pyadjoint.
+
+        Raises
+        ------
+        ValueError
+            If the velocity model has not been set, so there is no control to
+            differentiate with respect to.
+        """
         self.store_forward_time_steps = False
         self.enable_compute_functional(
             mode=FunctionalEvaluationMode.PER_TIMESTEP
@@ -638,7 +674,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # that the reduced functional is built as an
         # ``EnsembleReducedFunctional``, summing the per-shot functionals and
         # gradients over the ensemble communicator.
-        self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
+        self.automated_adjoint = AutomatedAdjoint(
+            self.comm,
+            controls,
+            checkpointing=CheckpointingConfig(
+                enabled=checkpointing, snapshots=snapshots
+            ),
+        )
         self.functional_value = None
         self.misfit = None
 

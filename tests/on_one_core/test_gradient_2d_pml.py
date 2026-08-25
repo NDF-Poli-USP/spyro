@@ -139,8 +139,28 @@ def set_dictionary(PML=False):
     return dictionary
 
 
-def get_forward_model(dictionary=None, adjoint_type=AdjointType.NONE):
+def get_forward_model(dictionary=None, adjoint_type=AdjointType.NONE,
+                      checkpointing=False, snapshots=None):
+    """Run the exact and guess forward models.
 
+    Parameters
+    ----------
+    dictionary : dict
+        Model dictionary, from :func:`set_dictionary`.
+    adjoint_type : AdjointType
+        Which adjoint machinery to enable on the guess model.
+    checkpointing : bool, optional
+        Whether the automated adjoint should checkpoint its tape. Only
+        meaningful for :attr:`AdjointType.AUTOMATED_ADJOINT`.
+    snapshots : int, optional
+        Snapshot budget passed on to ``enable_automated_adjoint``. ``None``
+        keeps every time step in memory.
+
+    Returns
+    -------
+    tuple
+        ``(rec_out_exact, rec_out_guess, Wave_obj_guess)``.
+    """
     # Exact model
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.05})
@@ -159,12 +179,22 @@ def get_forward_model(dictionary=None, adjoint_type=AdjointType.NONE):
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-        Wave_obj_guess.enable_automated_adjoint()
+        Wave_obj_guess.enable_automated_adjoint(
+            checkpointing=checkpointing, snapshots=snapshots)
         assert isinstance(Wave_obj_guess.c, fire.Function)
+        # The schedule cannot exist yet: nt is only known inside the
+        # integrator, once dt and final_time are settled.
+        assert Wave_obj_guess.automated_adjoint.checkpoint_schedule is None
     Wave_obj_guess.forward_solve()
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         assert Wave_obj_guess.automated_adjoint._tape is not None
         Wave_obj_guess.automated_adjoint.stop_recording()
+        if checkpointing:
+            nt = int(Wave_obj_guess.final_time / Wave_obj_guess.dt) + 1
+            schedule = Wave_obj_guess.automated_adjoint.checkpoint_schedule
+            assert schedule is not None
+            # An online schedule has no max_n; a budgeted one must match nt.
+            assert schedule.max_n in (None, nt)
     rec_out_guess = Wave_obj_guess.forward_solution_receivers
 
     return rec_out_exact, rec_out_guess, Wave_obj_guess
@@ -172,10 +202,18 @@ def get_forward_model(dictionary=None, adjoint_type=AdjointType.NONE):
 
 @pytest.mark.slow
 @pytest.mark.newer_firedrake
-def test_gradient_auto_adjoint(PML=True):
+@pytest.mark.parametrize("checkpointing", [False, True],
+                         ids=["no_checkpointing", "checkpointing"])
+def test_gradient_auto_adjoint(checkpointing, PML=True):
+    """Taylor-test the automated-adjoint gradient, with and without checkpointing.
+
+    Checkpointing changes how the tape is stored, not what it computes, so the
+    same second-order Taylor convergence is required either way.
+    """
     dictionary = set_dictionary(PML=PML)
     _, _, Wave_obj_guess = get_forward_model(
-        dictionary=dictionary, adjoint_type=AdjointType.AUTOMATED_ADJOINT)
+        dictionary=dictionary, adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        checkpointing=checkpointing)
     forward_solution_guess = None
     misfit = None
     # compute the gradient of the control (to be verified)
@@ -219,8 +257,10 @@ def test_gradient_implemented_adjoint(PML=False):
 
 @pytest.mark.slow
 @pytest.mark.newer_firedrake
-def test_gradient_pml_auto_adjoint():
-    test_gradient_auto_adjoint(PML=True)
+@pytest.mark.parametrize("checkpointing", [False, True],
+                         ids=["no_checkpointing", "checkpointing"])
+def test_gradient_pml_auto_adjoint(checkpointing):
+    test_gradient_auto_adjoint(checkpointing, PML=True)
 
 
 @pytest.mark.slow

@@ -82,10 +82,16 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.misfit = None
         wave.misfit = []
 
+    steps = range(nt)
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-        wave.automated_adjoint.start_recording()
+        # ``nt`` is only settled here: ``dt`` may have been replaced by
+        # ``get_and_set_maximum_dt`` after the adjoint was enabled. The
+        # checkpoint schedule is built for exactly this many steps, and the
+        # loop is wrapped so the tape records where each time step ends.
+        wave.automated_adjoint.start_recording(total_steps=nt)
+        steps = wave.automated_adjoint.timestep_iterator(steps)
 
-    for step in range(nt):
+    for step in steps:
         # Basic way of applying sources
         wave.update_source_expression(t)
 
