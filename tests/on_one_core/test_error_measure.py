@@ -70,7 +70,9 @@ class TestMeasureError:
         signal1 = np.array([1, 2, 3])
         signal2 = np.array([4, 5, 6, 7, 8])
         # Default is error_if_different_length=True
-        with pytest.raises(ValueError, match="The lengths of the model and reference signals"):
+        with pytest.raises(
+            ValueError, match="The lengths of the model and reference signals"
+        ):
             MeasureError.pad_signal_lengths(signal1, signal2)
 
     def test_pad_signal_lengths_both_padding_error(self):
