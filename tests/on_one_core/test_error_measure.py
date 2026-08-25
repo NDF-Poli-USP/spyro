@@ -4,9 +4,7 @@ These tests cover the MeasureError class and its methods, ensuring
 that error calculations and file operations work as expected.
 """
 
-from numpy import arange, array, inf, newaxis, pi, sin, tile, zeros_like
-from numpy.random import randn
-from numpy.testing import assert_array_equal
+import numpy as np
 from pytest import fixture, mark, raises, warns
 from unittest.mock import patch
 from spyro.tools.error_measure import MeasureError
@@ -32,11 +30,11 @@ class TestMeasureError:
     def sample_signals(self):
         """Create sample signals for testing."""
         dt = 0.01
-        t = arange(0, 1, dt)
+        t = np.arange(0, 1, dt)
         # Create a simple sine wave as reference
-        reference = sin(2 * pi * 5 * t)
+        reference = np.sin(2 * np.pi * 5 * t)
         # Create a slightly different signal as model
-        model = sin(2 * pi * 5 * t + 0.1)
+        model = np.sin(2 * np.pi * 5 * t + 0.1)
         return model, reference, dt
 
     @fixture
@@ -44,7 +42,7 @@ class TestMeasureError:
         """Create sample receiver data for testing."""
         n_time = 100
         n_receivers = 3
-        receivers = randn(n_time, n_receivers)
+        receivers = np.random.randn(n_time, n_receivers)
         return receivers
 
     def test_initialization_default(self):
@@ -66,25 +64,25 @@ class TestMeasureError:
 
     def test_pad_signal_lengths_equal(self):
         """Test when signals have equal lengths."""
-        signal1 = array([1, 2, 3, 4])
-        signal2 = array([5, 6, 7, 8])
+        signal1 = np.array([1, 2, 3, 4])
+        signal2 = np.array([5, 6, 7, 8])
         result1, result2 = pad_signal_lengths(signal1, signal2)
         assert len(result1) == len(result2) == 4
-        assert_array_equal(result1, signal1)
-        assert_array_equal(result2, signal2)
+        np.testing.assert_array_equal(result1, signal1)
+        np.testing.assert_array_equal(result2, signal2)
 
     def test_pad_signal_lengths_different_default(self):
         """Test when signals have different lengths with default behavior."""
-        signal1 = array([1, 2, 3])
-        signal2 = array([4, 5, 6, 7, 8])
+        signal1 = np.array([1, 2, 3])
+        signal2 = np.array([4, 5, 6, 7, 8])
         # Default is error_if_different_length=True
         with raises(ValueError, match="The lengths of the model and reference signals"):
             pad_signal_lengths(signal1, signal2)
 
     def test_pad_signal_lengths_both_padding_error(self):
         """Test that both start_padding and end_padding cannot be equal simultaneously."""
-        signal1 = array([1, 2, 3])
-        signal2 = array([4, 5, 6, 7, 8])
+        signal1 = np.array([1, 2, 3])
+        signal2 = np.array([4, 5, 6, 7, 8])
         with raises(ValueError, match="are mutually exclusive."):
             pad_signal_lengths(
                 signal1,
@@ -104,8 +102,8 @@ class TestMeasureError:
 
     def test_pad_signal_lengths_start_padding(self):
         """Test padding at the start of the shorter signal."""
-        signal1 = array([1, 2, 3])
-        signal2 = array([4, 5, 6, 7, 8])
+        signal1 = np.array([1, 2, 3])
+        signal2 = np.array([4, 5, 6, 7, 8])
         result1, result2 = pad_signal_lengths(
             signal1,
             signal2,
@@ -114,9 +112,9 @@ class TestMeasureError:
             end_padding=False,
         )
         assert len(result1) == len(result2) == 5
-        assert_array_equal(result2, signal2)
+        np.testing.assert_array_equal(result2, signal2)
         assert result1[0] == 0 and result1[1] == 0
-        assert_array_equal(result1[2:], signal1)
+        np.testing.assert_array_equal(result1[2:], signal1)
         result2, result1 = pad_signal_lengths(
             signal2,
             signal1,
@@ -125,14 +123,14 @@ class TestMeasureError:
             end_padding=False,
         )
         assert len(result1) == len(result2) == 5
-        assert_array_equal(result2, signal2)
+        np.testing.assert_array_equal(result2, signal2)
         assert result1[0] == 0 and result1[1] == 0
-        assert_array_equal(result1[2:], signal1)
+        np.testing.assert_array_equal(result1[2:], signal1)
 
     def test_pad_signal_lengths_end_padding(self):
         """Test padding at the end of the shorter signal."""
-        signal1 = array([1, 2, 3])
-        signal2 = array([4, 5, 6, 7, 8])
+        signal1 = np.array([1, 2, 3])
+        signal2 = np.array([4, 5, 6, 7, 8])
         result1, result2 = pad_signal_lengths(
             signal1,
             signal2,
@@ -141,8 +139,8 @@ class TestMeasureError:
             end_padding=True,
         )
         assert len(result1) == len(result2) == 5
-        assert_array_equal(result2, signal2)
-        assert_array_equal(result1[:3], signal1)
+        np.testing.assert_array_equal(result2, signal2)
+        np.testing.assert_array_equal(result1[:3], signal1)
         assert result1[3] == 0 and result1[4] == 0
         result2, result1 = pad_signal_lengths(
             signal2,
@@ -152,14 +150,14 @@ class TestMeasureError:
             end_padding=True,
         )
         assert len(result1) == len(result2) == 5
-        assert_array_equal(result2, signal2)
-        assert_array_equal(result1[:3], signal1)
+        np.testing.assert_array_equal(result2, signal2)
+        np.testing.assert_array_equal(result1[:3], signal1)
         assert result1[3] == 0 and result1[4] == 0
 
     def test_pad_signal_lengths_equal_lengths_with_padding_options(self):
         """Test that padding options are ignored when signals have equal length."""
-        signal1 = array([1, 2, 3, 4, 5])
-        signal2 = array([6, 7, 8, 9, 10])
+        signal1 = np.array([1, 2, 3, 4, 5])
+        signal2 = np.array([6, 7, 8, 9, 10])
         # The padding options check only runs when lengths are different
         # Both start_padding and end_padding are False but signals are equal length
         result1, result2 = pad_signal_lengths(
@@ -170,8 +168,8 @@ class TestMeasureError:
             end_padding=False,
         )
         assert len(result1) == len(result2) == 5
-        assert_array_equal(result1, signal1)
-        assert_array_equal(result2, signal2)
+        np.testing.assert_array_equal(result1, signal1)
+        np.testing.assert_array_equal(result2, signal2)
         # Both start_padding and end_padding are True but signals are equal length
         result1, result2 = pad_signal_lengths(
             signal1,
@@ -181,27 +179,27 @@ class TestMeasureError:
             end_padding=True,
         )
         assert len(result1) == len(result2) == 5
-        assert_array_equal(result1, signal1)
-        assert_array_equal(result2, signal2)
+        np.testing.assert_array_equal(result1, signal1)
+        np.testing.assert_array_equal(result2, signal2)
 
     def test_peak_error_identical_signals(self):
         """Test peak error with identical signals."""
-        signal = array([0, 1, 2, 3, 2, 1, 0])
+        signal = np.array([0, 1, 2, 3, 2, 1, 0])
         peak_error, peak_reference = calculate_peak_error(signal, signal)
         assert peak_error == 0.0
         assert peak_reference == 3.0
 
     def test_peak_error_different_signals(self):
         """Test peak error with different signals."""
-        signal1 = array([0, 1, 2, 3, 2, 1, 0])
-        signal2 = array([0, 0.5, 1, 1.5, 1, 0.5, 0])
+        signal1 = np.array([0, 1, 2, 3, 2, 1, 0])
+        signal2 = np.array([0, 0.5, 1, 1.5, 1, 0.5, 0])
         peak_error, peak_reference = calculate_peak_error(signal1, signal2)
         assert peak_error == 1.0  # (3/1.5 - 1) = 1
         assert peak_reference == 1.5
 
     def test_peak_error_empty_signal_warning(self):
         """Test peak error with signal without peaks."""
-        signal = array([0, 0, 0, 0])
+        signal = np.array([0, 0, 0, 0])
         with warns(UserWarning, match="No peak observed"):
             calculate_peak_error(signal, signal)
 
@@ -220,9 +218,9 @@ class TestMeasureError:
     def test_integral_error_zero_reference(self, sample_signals):
         """Test integral error when reference signal is zero."""
         signal, _, dt = sample_signals
-        zero_signal = zeros_like(signal)
+        zero_signal = np.zeros_like(signal)
         integral_error = calculate_integral_error(signal, zero_signal, dt)
-        assert integral_error == inf
+        assert integral_error == np.inf
 
     def test_normalized_L2_error_identical(self, sample_signals):
         """Test NRMSE with identical signals."""
@@ -261,13 +259,13 @@ class TestMeasureError:
         dt = 0.01
 
         # Create reference signal (sine wave)
-        t = arange(0, n_time * dt, dt)
-        ref = sin(2 * pi * 5 * t)[:, newaxis]
-        ref = tile(ref, (1, n_rec))
+        t = np.arange(0, n_time * dt, dt)
+        ref = np.sin(2 * np.pi * 5 * t)[:, np.newaxis]
+        ref = np.tile(ref, (1, n_rec))
 
         # Create model signal (slightly different)
-        model = sin(2 * pi * 5 * t + 0.1)[:, newaxis]
-        model = tile(model, (1, n_rec))
+        model = np.sin(2 * np.pi * 5 * t + 0.1)[:, np.newaxis]
+        model = np.tile(model, (1, n_rec))
 
         error_measures = measure_error.calculate_error_measures(
             forward_solution_receivers=model,
@@ -291,9 +289,9 @@ class TestMeasureError:
         n_time = 100
         n_rec = 1
         dt = 0.01
-        t = arange(0, n_time * dt, dt)
-        ref = sin(2 * pi * 5 * t)[:, newaxis]
-        model = sin(2 * pi * 5 * t + 0.1)[:, newaxis]
+        t = np.arange(0, n_time * dt, dt)
+        ref = np.sin(2 * np.pi * 5 * t)[:, np.newaxis]
+        model = np.sin(2 * np.pi * 5 * t + 0.1)[:, np.newaxis]
 
         error_measures = measure_error.calculate_error_measures(
             forward_solution_receivers=model,
@@ -316,9 +314,9 @@ class TestMeasureError:
             n_time = 100
             n_rec = 1
             dt = 0.01
-            t = arange(0, n_time * dt, dt)
-            ref = sin(2 * pi * 5 * t)[:, newaxis]
-            model = sin(2 * pi * 5 * t + 0.1)[:, newaxis]
+            t = np.arange(0, n_time * dt, dt)
+            ref = np.sin(2 * np.pi * 5 * t)[:, np.newaxis]
+            model = np.sin(2 * np.pi * 5 * t + 0.1)[:, np.newaxis]
 
             # Mock savetxt to avoid actual file writing
             with patch("numpy.savetxt") as mock_savetxt:
@@ -389,4 +387,4 @@ class TestMeasureError:
 
                         # Check that load was called twice (time and fft)
                         assert mock_load.call_count == 2
-                        assert_array_equal(ref, receiver_data)
+                        np.testing.assert_array_equal(ref, receiver_data)
