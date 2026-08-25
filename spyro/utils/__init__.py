@@ -1,3 +1,5 @@
+"""Utility methods."""
+
 from . import geometry_creation
 from .utils import (
     mpi_init,
@@ -7,7 +9,9 @@ from .utils import (
     write_hdf5_velocity_model,
     get_real_shot_record,
 )
+from .physical_parameters import PhysicalParameters
 from .analytical_solution_nodal import nodal_homogeneous_analytical
+from .analytical_solution_nodal import analytical_solution_elastic
 from .velocity_to_grid import velocity_to_grid, change_scalar_field_resolution, scalar_conditional_to_grid
 
 
@@ -22,6 +26,8 @@ __all__ = [
     "velocity_to_grid",
     "change_scalar_field_resolution",
     "write_hdf5_velocity_model",
+    "analytical_solution_elastic",
     "get_real_shot_record",
+    "PhysicalParameters",
     "scalar_conditional_to_grid",
 ]
