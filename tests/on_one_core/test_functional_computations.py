@@ -51,16 +51,7 @@ class DummyWave(Wave):
     def rhs_no_pml(self):
         return None
 
-    def get_control_parameters(self):
-        raise NotImplementedError
-
-    def set_control_parameters(self, controls):
-        raise NotImplementedError
-
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
-        raise NotImplementedError
-
-    def get_control_parameter_function_space(self):
         raise NotImplementedError
 
 

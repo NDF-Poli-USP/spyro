@@ -53,7 +53,6 @@ class ElasticWave(Wave, metaclass=ABCMeta):
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
         pass
 
-    @override
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
         raise NotImplementedError(
             "Elastic adjoint gradients are not implemented yet.",
