@@ -317,11 +317,15 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
         assert pml_signal is not None, "PML signal not found"
 
         dt = wave.get_dt()
-        error_measures = wave.layer_ops.error_measures(pml_signal, hybrid_signal, dt,
-                                                       wave.number_of_receivers,
-                                                       final_energy=pml_energy,
-                                                       final_energy_reference=hybrid_energy,
-                                                       save_in_case_folder=False)
+        error_measures = wave.layer_ops.calculate_error_measures(
+            pml_signal,
+            hybrid_signal,
+            dt,
+            wave.number_of_receivers,
+            final_energy=pml_energy,
+            final_energy_reference=hybrid_energy,
+            save_in_case_folder=False,
+        )
 
         errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener = error_measures
 
