@@ -179,10 +179,10 @@ class MeasureError:
             signal = forward_solution_receivers[:, rec]
             yf = freq_response(signal, nyquist_frequency)
             receivers_ref_fft.append(yf)
-            np.save(
-                str(output_file_prefix) + "fft.npy",
-                receivers_ref_fft,
-            )
+        np.save(
+            str(output_file_prefix) + "fft.npy",
+            receivers_ref_fft,
+        )
 
     def get_reference_signal(self, input_file=None):
         """Acquire the reference signal for comparison between models.
