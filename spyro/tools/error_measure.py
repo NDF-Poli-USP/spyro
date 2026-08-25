@@ -98,6 +98,7 @@ class MeasureError:
         self.path_save_error = output_folder
         self.path_save_err_case = output_case
         self.path_reference = output_folder / "preamble"
+        self.output_file_prefix = self.path_reference / "reference_"
         self.comm = comm
 
     def save_reference_signal(
@@ -106,7 +107,7 @@ class MeasureError:
         forward_solution_receivers: np.ndarray,
         number_of_receivers,
         nyquist_frequency: float,
-        output_file="reference",
+        output_file_prefix="reference",
     ):
         """Save the reference signal for comparison between models.
 
@@ -120,7 +121,7 @@ class MeasureError:
             Number of receivers used in the simulation.
         freq_Nyquist : `float`
             Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt).
-        output_file : `str`, optional
+        output_file_prefix : `str`, optional
             Name of the file to save the reference signal without any extension.
             Default is "ref_rec.npy".
 
@@ -163,7 +164,8 @@ class MeasureError:
         # File name for saving the reference signal
         self.path_reference.mkdir(parents=True, exist_ok=True)
 
-        output_file_prefix = self.path_reference / f"{output_file}_"
+        output_file_prefix = self.path_reference / f"{output_file_prefix}_"
+        self.output_file_prefix = output_file_prefix
 
         np.save(
             str(output_file_prefix) + "time.npy",
@@ -181,12 +183,15 @@ class MeasureError:
                 receivers_ref_fft,
             )
 
-    def get_reference_signal(self):
+    def get_reference_signal(self, input_file=None):
         """Acquire the reference signal for comparison between models.
 
         Parameters
         ----------
-        None
+        input_file : `str`, optional
+            Name of the file to save the reference signal without any extension.
+            Default is "ref_rec.npy".
+
 
         Returns
         -------
@@ -198,12 +203,15 @@ class MeasureError:
         pprint("\nLoading Reference Signal from Reference Model", comm=self.comm)
 
         # Path to the reference data folder with reference signals
-        pth_str = self.path_reference + self.output_file + "_"
+        if input_file is not None:
+            pth = self.path_reference / (input_file + "_")
+        else:
+            pth = self.output_file_prefix
 
         # Time domain signal
         receivers_reference_file = validate_file(
             "reference time file",
-            pth_str + "time.npy",
+            str(pth) + "time.npy",
             [".npy"],
             check_file_existence=True,
         )
@@ -212,7 +220,7 @@ class MeasureError:
         # Frequency domain signal
         receivers_reference_fft_file = validate_file(
             "reference fft file",
-            pth_str + "fft.npy",
+            str(pth) + "fft.npy",
             [".npy"],
             check_file_existence=True,
         )
