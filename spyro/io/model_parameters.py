@@ -12,8 +12,7 @@ from .. import utils
 from .. import meshing
 
 
-class Model_parameters(Read_options, Read_boundary_layer,
-                       Read_time_axis, Read_outputs, VelocityModelFileIO):
+class Model_parameters(Read_boundary_layer, Read_time_axis, VelocityModelFileIO):
     """
     Class that reads and sanitizes input parameters.
 
@@ -195,15 +194,13 @@ class Model_parameters(Read_options, Read_boundary_layer,
         self.equation_type = self.input_dictionary["equation_type"]
 
         # Get options
-        Read_options.__init__(self, dictionary=self.input_dictionary)
+        self.read_options = Read_options(**self.input_dictionary["options"])
+        self.read_outputs = Read_outputs(**self.input_dictionary["visualization"])
 
         self.sources = None
 
         # Checks time inputs
         Read_time_axis.__init__(self)
-
-        # Checks outputs
-        Read_outputs.__init__(self)
 
         # Check velocity model file io
         VelocityModelFileIO.__init__(self)
@@ -568,3 +565,20 @@ def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
             # For other dimensions, domain is [0, length]
             if not (0 <= coord <= length):
                 raise ValueError(coo_str + f"[0, {length}].")
+
+    # This is a temporary approach to no break the current API. This way it is still possible to call
+    # self.method instead of self.read_options.method.
+    def __getattr__(self, name):
+        for component in (
+            self,
+            self.read_options,
+            self.read_outputs
+        ):
+            try:
+                return getattr(component, name)
+            except AttributeError:
+                pass
+
+        raise AttributeError(
+            f"{type(self).__name__!s} has no attribute {name!r}"
+        )
