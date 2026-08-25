@@ -185,10 +185,7 @@ def analytical_solution_elastic(
     nt = int(final_time / dt + 1)
     final_time = dt * (nt - 1)
     time_vector = np.linspace(0.0, final_time, nt)
-    if dimension == 2:
-        u = np.zeros((nt, 2))
-    elif dimension == 3:
-        u = np.zeros((nt, 3))
+    u = np.zeros((nt, dimension))
     if source_type == SourceType.FORCE and dimension == 3:
         for i in range(dimension):
             u[:, i] = analytical_force_source_3d(
