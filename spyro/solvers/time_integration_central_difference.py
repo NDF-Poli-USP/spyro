@@ -82,18 +82,16 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.misfit = None
         wave.misfit = []
 
-    steps = range(nt)
+    tape = None
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         # ``nt`` is only settled here: ``dt`` may have been replaced by
         # ``get_and_set_maximum_dt`` after the adjoint was enabled, so this is
         # where the checkpoint schedule can finally be built.
         tape = wave.automated_adjoint.start_recording(total_steps=nt)
-        if wave.automated_adjoint.checkpointing_enabled:
-            # A schedule addresses the tape in time steps, so the loop has to
-            # mark where each one ends.
-            steps = tape.timestepper(iter(steps))
+        if not wave.automated_adjoint.checkpointing_enabled:
+            tape = None
 
-    for step in steps:
+    for step in range(nt):
         # Basic way of applying sources
         wave.update_source_expression(t)
 
@@ -117,6 +115,14 @@ def _propagate_forward_central_difference(wave, source_ids):
                     wave.sources.apply_source(rhs_forcing, step))
 
         wave.solver.solve()
+
+        if tape is not None and step < nt - 1:
+            # Close the time step right after the solve, so the state the
+            # schedule stores to restart step ``k+1`` is the one the solve just
+            # produced. Ending it after the rotation instead leaves the solve
+            # output looking disposable, and its checkpoint gets dropped.
+            tape.end_timestep()
+
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
 

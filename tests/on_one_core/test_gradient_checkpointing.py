@@ -34,7 +34,7 @@ DT = 0.004
 SCHEDULES = {
     "none": {"checkpointing": False, "snapshots": None},
     "single_memory": {"checkpointing": True, "snapshots": None},
-    "mixed": {"checkpointing": True, "snapshots": 10},
+    "mixed": {"checkpointing": True, "snapshots": 50},
 }
 
 
