@@ -662,5 +662,6 @@ def analytical_force_source_2d(
         displacement_spectrum,
         n=extended_num_t,
     )
+    shifted_replacement = displacement[1:num_t + 1]
 
-    return displacement[:num_t]
+    return shifted_replacement

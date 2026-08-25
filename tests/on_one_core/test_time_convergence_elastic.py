@@ -1,25 +1,50 @@
+"""Test second order time convergence on the isotropic elastic wave."""
+
 import numpy as np
-from matplotlib import use
-use("agg")
+from scipy.signal import correlate
 
 import spyro
 from spyro.tools.error_measure import calculate_normalized_L2_error
 
+source_z = -2.0
+receiver_z = -3.0
+edge_length = 0.05
+source_locations = [(source_z, -source_z)]
+receiver_locations = [(receiver_z, -receiver_z)]
+final_time = 1.5
+time_delay = 0.2
+frequency = 5.0
+amplitude = np.array([0.0, 1.0])
+
+rho = 0.1
+vp = 1.5
+vs = 1.0
+
+
+def estimate_time_shift(
+    time_vector,
+    numerical,
+    reference,
+):
+    """Estimate the time shift between numerical and reference signals."""
+    numerical = numerical - np.mean(numerical)
+    reference = reference - np.mean(reference)
+
+    correlation = correlate(
+        numerical,
+        reference,
+        mode="full",
+    )
+
+    lag_samples = np.argmax(correlation) - (len(reference) - 1)
+
+    dt = time_vector[1] - time_vector[0]
+
+    return lag_samples * dt
+
+
 def run_elastic_forward(dt):
-    source_z = -2.0
-    receiver_z = -3.0
-    edge_length = 0.1
-    source_locations = [(source_z, -source_z)]
-    receiver_locations = [(receiver_z, -receiver_z)]
-    final_time = 1.5
-    time_delay = 0.2
-    frequency = 5.0
-    amplitude = np.array([0.0, 1.0])
-
-    rho = 0.1
-    vp = 1.5
-    vs = 1.0
-
+    """Run forward isotropic elastic case."""
     dictionary = {
         "options": {
             "cell_type": "Q",
@@ -88,36 +113,18 @@ def run_elastic_forward(dt):
     )
 
     wave.forward_solve()
-
-    nt = int(final_time/dt) + 1
-    time_vector = np.linspace(0.0, final_time, nt)
-    import matplotlib.pyplot as plt
-
-    fig = spyro.plots.plot_displacement_components(
-        time_vector, wave.forward_solution_receivers[:, 0], show=False, hold=True,
+    l2_error = calculate_normalized_L2_error(
+        wave.forward_solution_receivers[:, 0, 0], anal_sol[0]
     )
 
-    axes = fig.get_axes()
-    axes[0].plot(time_vector, anal_sol[0], label="analitical")
-    axes[0].legend()
-    axes[1].plot(time_vector, anal_sol[1], label="analitical")
-    axes[1].legend()
-    plt.savefig("test.png")
-    l2_error = calculate_normalized_L2_error(wave.forward_solution_receivers[:, 0, 0], anal_sol[0])
-    print(f"Normalized L2 error of {l2_error}")
-    peak_fraction = np.max(wave.forward_solution_receivers[:, 0, 0]) / np.max(anal_sol[0])
-    print(f"Peak fraction of {peak_fraction}")
-    print("END")
-    plt.close(fig)
     return l2_error
 
-def test_second_order_time_convergence():
-    """Test that the second order time convergence
-    of the central difference method is achieved"""
 
+def test_second_order_time_convergence():
+    """Test that the second order time convergence is achieved."""
     dts = [
-        5e-3,
-        1e-3,
+        2.5e-3,
+        1.25e-3,
     ]
 
     errors = []
