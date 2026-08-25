@@ -178,21 +178,26 @@ def test_gradient_auto_adjoint(PML=True):
         dictionary=dictionary, adjoint_type=AdjointType.AUTOMATED_ADJOINT)
     forward_solution_guess = None
     misfit = None
-    # compute the gradient of the control (to be verified)
-    dJ = Wave_obj_guess.gradient_solve(
-        misfit=misfit, forward_solution=forward_solution_guess,
-        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
-    )
+    try:
+        # compute the gradient of the control (to be verified)
+        dJ = Wave_obj_guess.gradient_solve(
+            misfit=misfit, forward_solution=forward_solution_guess,
+            adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        )
 
-    Wave_obj_guess.automated_adjoint.create_reduced_functional(Wave_obj_guess.functional_value)
-    size, = np.shape(Wave_obj_guess.c.dat.data[:])
-    direction = fire.Function(
-        Wave_obj_guess.c.function_space(), val=np.random.default_rng(0).random(size))
-    assert Wave_obj_guess.automated_adjoint.verify_gradient(
-        Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.9, \
-        "Automated adjoint gradient verification failed."
-
-    Wave_obj_guess.automated_adjoint.clear_tape()
+        Wave_obj_guess.automated_adjoint.create_reduced_functional(
+            Wave_obj_guess.functional_value)
+        size, = np.shape(Wave_obj_guess.c.dat.data[:])
+        direction = fire.Function(
+            Wave_obj_guess.c.function_space(),
+            val=np.random.default_rng(0).random(size))
+        assert Wave_obj_guess.automated_adjoint.verify_gradient(
+            Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.9, \
+            "Automated adjoint gradient verification failed."
+    finally:
+        # Clear on the failing path too, so a failure here does not leave a
+        # tape for the next test in this process to annotate on top of.
+        Wave_obj_guess.automated_adjoint.clear_tape()
     assert Wave_obj_guess.automated_adjoint._tape is None
 
 
