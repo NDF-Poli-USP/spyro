@@ -632,15 +632,6 @@ def write_hdf5_velocity_model(obj_with_comm, segy_filename):
     return output_filename
 
 
-# def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
-#     degree = model["opts"]["degree"]
-#     V = FunctionSpace(mesh, "CG", degree)  # noqa: F405
-#     z, x = SpatialCoordinate(mesh)  # noqa: F405
-#     p = Function(V).interpolate(  # noqa: F405
-#         (time**2) * sin(pi * z) * sin(pi * x)  # noqa: F405
-#     )
-#     return p
-
 def get_real_shot_record(wave):
     """Get the real shot record for the active sources.
 
@@ -680,3 +671,9 @@ def get_real_shot_record(wave):
                 return source_record
 
     return real_shot_record
+
+
+def get_time_vector(wave):
+    """Get a time vector representing the time axis of a wave object."""
+    number_timesteps = int(wave.final_time/wave.dt) + 1
+    return np.linspace(0.0, wave.final_time, number_timesteps)
