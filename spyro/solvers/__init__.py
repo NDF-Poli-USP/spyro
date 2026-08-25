@@ -4,7 +4,6 @@ from .mms_acoustic import AcousticWaveMMS
 from .inversion import FullWaveformInversion
 from .elastic_wave import elastic_wave
 from .automatic_differentiation_solver import AutomatedAdjoint
-from .adjoint_checkpointing import CheckpointingConfig, CheckpointingMode
 
 __all__ = [
     "Wave",
@@ -14,6 +13,4 @@ __all__ = [
     "ForwardSolver",
     "elastic_wave",
     "AutomatedAdjoint",
-    "CheckpointingConfig",
-    "CheckpointingMode",
 ]

@@ -21,7 +21,6 @@ from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsT
                             LayerShapeType, WaveType)
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
-from .adjoint_checkpointing import CheckpointingConfig
 
 
 fire.set_log_level(fire.ERROR)
@@ -645,9 +644,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         number of forward steps, and at this point ``dt`` may still be replaced
         by :meth:`get_and_set_maximum_dt`. Only the intent is stored; the
         schedule is built at the start of each forward solve, where ``nt`` is
-        known. See :mod:`spyro.solvers.adjoint_checkpointing`, which also
-        documents a correctness limitation of the recomputing schedule with the
-        currently installed pyadjoint.
+        known. :class:`~spyro.solvers.automatic_differentiation_solver.\
+AutomatedAdjoint` also documents a correctness limitation of the recomputing
+        schedule with the currently installed pyadjoint.
 
         Raises
         ------
@@ -677,9 +676,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.automated_adjoint = AutomatedAdjoint(
             self.comm,
             controls,
-            checkpointing=CheckpointingConfig(
-                enabled=checkpointing, snapshots=snapshots
-            ),
+            checkpointing=checkpointing,
+            snapshots=snapshots,
         )
         self.functional_value = None
         self.misfit = None

@@ -184,14 +184,14 @@ def get_forward_model(dictionary=None, adjoint_type=AdjointType.NONE,
         assert isinstance(Wave_obj_guess.c, fire.Function)
         # The schedule cannot exist yet: nt is only known inside the
         # integrator, once dt and final_time are settled.
-        assert Wave_obj_guess.automated_adjoint.checkpoint_schedule is None
+        assert Wave_obj_guess.automated_adjoint.checkpointing_schedule is None
     Wave_obj_guess.forward_solve()
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         assert Wave_obj_guess.automated_adjoint._tape is not None
         Wave_obj_guess.automated_adjoint.stop_recording()
         if checkpointing:
             nt = int(Wave_obj_guess.final_time / Wave_obj_guess.dt) + 1
-            schedule = Wave_obj_guess.automated_adjoint.checkpoint_schedule
+            schedule = Wave_obj_guess.automated_adjoint.checkpointing_schedule
             assert schedule is not None
             # An online schedule has no max_n; a budgeted one must match nt.
             assert schedule.max_n in (None, nt)
