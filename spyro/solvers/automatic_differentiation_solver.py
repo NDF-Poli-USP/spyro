@@ -92,6 +92,11 @@ class AutomatedAdjoint:
     snapshots : int, optional
         How many checkpoints to keep in RAM, which is also what selects the
         schedule. ``None`` (the default) keeps every step.
+    gc_timestep_frequency : int, optional
+        Run a garbage collection every this many time steps. Reference cycles
+        can keep checkpoints alive past the point the schedule intended, so
+        collecting periodically lowers the peak. ``None`` (the default)
+        disables it.
 
     Attributes
     ----------
@@ -107,13 +112,15 @@ pyadjoint.ReducedFunctional or None
 
     def __init__(self, ensemble: fire.Ensemble | None,
                  controls: fire.Function | None = None,
-                 checkpointing: bool = False, snapshots: int | None = None):
+                 checkpointing: bool = False, snapshots: int | None = None,
+                 gc_timestep_frequency: int | None = None):
         self.controls = controls
         self.ensemble = ensemble
         self.reduced_functional = None
         self._tape = None
         self._checkpointing = bool(checkpointing)
         self._snapshots = snapshots
+        self._gc_timestep_frequency = gc_timestep_frequency
         # Schedule of the tape being recorded; ``None`` when not checkpointed.
         self._checkpointing_schedule = None
 
@@ -220,7 +227,10 @@ pyadjoint.ReducedFunctional or None
 
         if self._checkpointing:
             self._checkpointing_schedule = self._build_schedule(total_steps)
-            self._tape.enable_checkpointing(self._checkpointing_schedule)
+            self._tape.enable_checkpointing(
+                self._checkpointing_schedule,
+                gc_timestep_frequency=self._gc_timestep_frequency,
+            )
 
         continue_annotation()
         return self._tape

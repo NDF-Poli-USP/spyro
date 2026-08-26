@@ -201,27 +201,36 @@ def get_forward_model(dictionary: dict = None,
     return rec_out_exact, rec_out_guess, Wave_obj_guess
 
 
+# (checkpointing, snapshots) -> which schedule spyro selects.
+SCHEDULE_CASES = [(False, None), (True, None), (True, 50)]
+SCHEDULE_IDS = ["no_checkpointing", "single_memory", "mixed"]
+
+
 @pytest.mark.slow
 @pytest.mark.newer_firedrake
-@pytest.mark.parametrize("checkpointing", [False, True],
-                         ids=["no_checkpointing", "checkpointing"])
-def test_gradient_auto_adjoint(checkpointing: bool, PML: bool = True) -> None:
-    """Taylor-test the automated-adjoint gradient, with and without checkpointing.
+@pytest.mark.parametrize("checkpointing, snapshots", SCHEDULE_CASES,
+                         ids=SCHEDULE_IDS)
+def test_gradient_auto_adjoint(checkpointing: bool, snapshots: int | None,
+                               PML: bool = True) -> None:
+    """Taylor-test the automated-adjoint gradient under each schedule.
 
     Checkpointing changes how the tape is stored, not what it computes, so the
-    same second-order Taylor convergence is required either way.
+    same second-order Taylor convergence is required in every case, including
+    the recomputing schedule selected by a snapshot budget.
 
     Parameters
     ----------
     checkpointing : bool
         Whether to manage the tape with a checkpoint schedule.
+    snapshots : int or None
+        Snapshot budget. ``None`` keeps every step in memory.
     PML : bool, optional
         Whether to enable the perfectly matched layer. Defaults to ``True``.
     """
     dictionary = set_dictionary(PML=PML)
     _, _, Wave_obj_guess = get_forward_model(
         dictionary=dictionary, adjoint_type=AdjointType.AUTOMATED_ADJOINT,
-        checkpointing=checkpointing)
+        checkpointing=checkpointing, snapshots=snapshots)
     forward_solution_guess = None
     misfit = None
     # compute the gradient of the control (to be verified)
@@ -265,17 +274,20 @@ def test_gradient_implemented_adjoint(PML=False):
 
 @pytest.mark.slow
 @pytest.mark.newer_firedrake
-@pytest.mark.parametrize("checkpointing", [False, True],
-                         ids=["no_checkpointing", "checkpointing"])
-def test_gradient_pml_auto_adjoint(checkpointing: bool) -> None:
+@pytest.mark.parametrize("checkpointing, snapshots", SCHEDULE_CASES,
+                         ids=SCHEDULE_IDS)
+def test_gradient_pml_auto_adjoint(checkpointing: bool,
+                                   snapshots: int | None) -> None:
     """Run :func:`test_gradient_auto_adjoint` with the PML enabled.
 
     Parameters
     ----------
     checkpointing : bool
         Whether to manage the tape with a checkpoint schedule.
+    snapshots : int or None
+        Snapshot budget. ``None`` keeps every step in memory.
     """
-    test_gradient_auto_adjoint(checkpointing, PML=True)
+    test_gradient_auto_adjoint(checkpointing, snapshots, PML=True)
 
 
 @pytest.mark.slow

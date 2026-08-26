@@ -619,7 +619,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._store_forward_time_steps = value
 
     def enable_automated_adjoint(
-        self, checkpointing: bool = False, snapshots: int | None = None
+        self, checkpointing: bool = False, snapshots: int | None = None,
+        gc_timestep_frequency: int | None = None
     ) -> None:
         """Enable algorithmic differentiation for this solver.
 
@@ -639,6 +640,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             only that many checkpoints and recomputes the forward in between,
             turning :math:`O(n_t)` memory into :math:`O(\\text{snapshots})` at
             the cost of extra forward work. Requires ``checkpointing=True``.
+        gc_timestep_frequency : int, optional
+            Run a garbage collection every this many time steps. Reference
+            cycles can keep checkpoints alive past the point the schedule
+            intended, so collecting periodically lowers the peak memory.
+            ``None`` (the default) disables it.
 
         Returns
         -------
@@ -680,6 +686,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             controls,
             checkpointing=checkpointing,
             snapshots=snapshots,
+            gc_timestep_frequency=gc_timestep_frequency,
         )
         self.functional_value = None
         self.misfit = None
