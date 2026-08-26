@@ -72,22 +72,7 @@ class AutomatedAdjoint:
         checkpoints are kept in RAM and the forward is recomputed in between,
         turning :math:`O(n_t)` memory into :math:`O(N)`.
 
-    The schedule is built by :meth:`start_recording`, not here. It needs the
-    total number of forward steps, which is only settled inside the time
-    integrator: ``dt`` may still be replaced by ``get_and_set_maximum_dt``
-    after the adjoint is enabled. A schedule is also consumed by the run that
-    executes it, so a fresh one is built per forward solve.
-
-    Notes
-    -----
-    The time integrator closes each time step immediately after the solve
-    rather than at the end of the loop body. That placement matters: the state
-    rotation ``u_n <- u_np1`` at the end of a step makes the solve output look
-    disposable to pyadjoint, which drops its checkpoint. The adjoint then reads
-    a stale value through ``BlockVariable.saved_output``, which silently falls
-    back to the live ``Function``, and a recomputing schedule returns a wrong
-    gradient. Ending the step right after the solve keeps that output in the
-    restart state. See ``_propagate_forward_central_difference``.
+    The schedule is built by :meth:`start_recording`, not here.
 
     Parameters
     ----------
@@ -140,8 +125,6 @@ pyadjoint.ReducedFunctional or None
         -------
         checkpoint_schedules.CheckpointSchedule or None
             The schedule installed by the most recent :meth:`start_recording`.
-            A new one is built per forward solve, so this reflects the latest
-            solve rather than a persistent object.
         """
         return self._checkpointing_schedule
 
@@ -163,9 +146,7 @@ pyadjoint.ReducedFunctional or None
         Parameters
         ----------
         total_steps : int
-            Number of forward time steps about to be taped. The mixed schedule
-            is built for exactly this many: too few raises ``CheckpointError``
-            during taping, too many silently wastes recomputation.
+            The total number of time steps used in the forward solver.
 
         Returns
         -------
@@ -206,23 +187,13 @@ pyadjoint.ReducedFunctional or None
             pause_annotation()
 
     def start_recording(self, total_steps: int | None = None) -> Tape:
-        """Start recording operations on the tape.
-
-        Creates a tape and registers it as the working tape if one does not
-        already exist, then enables annotation. Unlike :meth:`fresh_tape`, an
-        existing *empty* tape is reused rather than discarded.
-
-        When checkpointing is enabled this is also where the schedule is built
-        and installed, which is why ``total_steps`` becomes mandatory. A tape
-        that already holds blocks is replaced: pyadjoint refuses to enable
-        checkpointing on a non-empty tape, and a schedule is consumed by the
-        run that executes it.
+        """Install a fresh tape and start recording operations on it.
 
         Parameters
         ----------
         total_steps : int, optional
-            Number of forward time steps about to be taped. Required when
-            checkpointing is enabled, ignored otherwise.
+            The total number of time steps used in the forward solver.
+            Required when checkpointing is enabled, ignored otherwise.
 
         Returns
         -------
@@ -234,25 +205,39 @@ pyadjoint.ReducedFunctional or None
         ValueError
             If checkpointing is enabled and ``total_steps`` was not supplied.
         """
+        if self._checkpointing and total_steps is None:
+            raise ValueError(
+                "start_recording() needs total_steps when checkpointing "
+                "is enabled: the schedule is built for a specific number "
+                "of forward time steps. Spyro's time integrator passes it "
+                "automatically."
+            )
+
+        self._tape = Tape()
+        fire_ad.set_working_tape(self._tape)
+        self.reduced_functional = None
+        self._checkpointing_schedule = None
+
         if self._checkpointing:
-            if total_steps is None:
-                raise ValueError(
-                    "start_recording() needs total_steps when checkpointing "
-                    "is enabled: the schedule is built for a specific number "
-                    "of forward time steps. Spyro's time integrator passes it "
-                    "automatically."
-                )
-            if self._tape is None or len(self._tape.get_blocks()) > 0:
-                self._tape = Tape()
-                fire_ad.set_working_tape(self._tape)
-                self.reduced_functional = None
             self._checkpointing_schedule = self._build_schedule(total_steps)
             self._tape.enable_checkpointing(self._checkpointing_schedule)
-        elif self._tape is None:
-            self._tape = Tape()
-            fire_ad.set_working_tape(self._tape)
+
         continue_annotation()
         return self._tape
+
+    def end_timestep(self) -> None:
+        """Mark the end of one forward time step on the tape.
+
+        A no-op when the tape is not checkpointed, since only a schedule cares
+        where the time steps are.
+
+        Returns
+        -------
+        None
+            The tape is advanced in place.
+        """
+        if self._checkpointing_schedule is not None:
+            self._tape.end_timestep()
 
     def stop_recording(self):
         """Pause annotation, stopping further operations from being taped."""

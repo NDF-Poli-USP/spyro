@@ -184,8 +184,7 @@ def get_forward_model(dictionary: dict = None,
         Wave_obj_guess.enable_automated_adjoint(
             checkpointing=checkpointing, snapshots=snapshots)
         assert isinstance(Wave_obj_guess.c, fire.Function)
-        # The schedule cannot exist yet: nt is only known inside the
-        # integrator, once dt and final_time are settled.
+        # The schedule is built per forward solve, so none exists yet.
         assert Wave_obj_guess.automated_adjoint.checkpointing_schedule is None
     Wave_obj_guess.forward_solve()
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:

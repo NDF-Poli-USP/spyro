@@ -1,5 +1,3 @@
-from typing import TYPE_CHECKING
-
 import firedrake as fire
 import numpy as np
 
@@ -7,14 +5,8 @@ from . import helpers
 from .. import utils
 from ..utils.typing import FunctionalEvaluationMode, AdjointType, AbsorbingBCsType
 
-if TYPE_CHECKING:
-    # Import only for annotations: ``wave`` imports this module at runtime.
-    from .wave import Wave
 
-
-def _propagate_forward_central_difference(
-    wave: "Wave", source_ids: list[int]
-) -> None:
+def _propagate_forward_central_difference(wave, source_ids):
     """Advance the forward solve with the central-difference scheme.
 
     This is an internal helper used by :meth:`wave.wave_propagator`. It updates
@@ -95,14 +87,10 @@ def _propagate_forward_central_difference(
         wave.misfit = None
         wave.misfit = []
 
-    tape = None
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-        # ``nt`` is only settled here: ``dt`` may have been replaced by
-        # ``get_and_set_maximum_dt`` after the adjoint was enabled, so this is
-        # where the checkpoint schedule can finally be built.
-        tape = wave.automated_adjoint.start_recording(total_steps=nt)
-        if not wave.automated_adjoint.checkpointing_enabled:
-            tape = None
+        # A schedule is consumed as it executes, so each forward solve needs a
+        # fresh one, sized by this loop's ``nt``.
+        wave.automated_adjoint.start_recording(total_steps=nt)
 
     for step in range(nt):
         # Basic way of applying sources
@@ -129,12 +117,12 @@ def _propagate_forward_central_difference(
 
         wave.solver.solve()
 
-        if tape is not None and step < nt - 1:
-            # Close the time step right after the solve, so the state the
-            # schedule stores to restart step ``k+1`` is the one the solve just
-            # produced. Ending it after the rotation instead leaves the solve
-            # output looking disposable, and its checkpoint gets dropped.
-            tape.end_timestep()
+        # The time step has to close right after the solve: closing it after
+        # the state rotation below makes the solve output look disposable, and
+        # its checkpoint is dropped. The final step is closed by pyadjoint
+        # itself when taping ends, hence ``nt - 1``.
+        if adjoint_type == AdjointType.AUTOMATED_ADJOINT and step < nt - 1:
+            wave.automated_adjoint.end_timestep()
 
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate

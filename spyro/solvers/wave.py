@@ -653,11 +653,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         Notes
         -----
-        The checkpoint schedule is *not* created here. It has to know the total
-        number of forward steps, and at this point ``dt`` may still be replaced
-        by :meth:`get_and_set_maximum_dt`. Only the intent is stored; the
-        schedule is built at the start of each forward solve, where ``nt`` is
-        known.
+        The checkpoint schedule is *not* created here; only the intent is
+        stored. It is built at the start of each forward solve.
         """
         self.store_forward_time_steps = False
         self.enable_compute_functional(
