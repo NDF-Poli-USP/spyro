@@ -57,9 +57,12 @@ def _env(name: str, default, cast):
 def settings() -> dict:
     smoke = os.environ.get("FWI3D_SMOKE", "0") == "1"
     source_count = _env("FWI3D_SOURCES", 1 if smoke else 8, int)
-    grid = int(round(source_count**0.5))
-    if grid * grid != source_count:
-        raise ValueError("FWI3D_SOURCES must be a perfect square (1, 4, 9, ...).")
+    if source_count < 1:
+        raise ValueError("FWI3D_SOURCES must be positive.")
+    source_rows = int(math.sqrt(source_count))
+    while source_count % source_rows:
+        source_rows -= 1
+    source_columns = source_count // source_rows
     method = os.environ.get("FWI3D_METHOD", "qn_latent").strip().lower()
     if method not in METHODS:
         raise ValueError(f"FWI3D_METHOD must be one of {sorted(METHODS)}")
@@ -67,7 +70,7 @@ def settings() -> dict:
         "method": method,
         "smoke": smoke,
         "sources": source_count,
-        "source_grid": grid,
+        "source_grid": [source_rows, source_columns],
         "receivers_per_axis": _env("FWI3D_RECEIVERS_PER_AXIS", 3 if smoke else 9, int),
         "edge": _env("FWI3D_EDGE", 0.25 if smoke else 0.10, float),
         "degree": _env("FWI3D_DEGREE", 2 if smoke else 3, int),
@@ -88,16 +91,25 @@ def settings() -> dict:
     }
 
 
-def _surface_grid(count: int, z: float, inset: float) -> list[tuple[float, ...]]:
-    axis = np.linspace(inset, 1.0 - inset, count)
-    return [(z, float(x), float(y)) for x in axis for y in axis]
+def _surface_grid(
+    rows: int, columns: int, z: float, inset: float,
+) -> list[tuple[float, ...]]:
+    x_axis = np.linspace(inset, 1.0 - inset, columns)
+    y_axis = np.linspace(inset, 1.0 - inset, rows)
+    return [(z, float(x), float(y)) for x in x_axis for y in y_axis]
 
 
 def model_dictionary(config: dict, *, source_count: int | None = None) -> dict:
     count = config["sources"] if source_count is None else source_count
-    source_grid = int(round(count**0.5))
-    sources = _surface_grid(source_grid, -0.05, 0.18)
-    receivers = _surface_grid(config["receivers_per_axis"], -0.05, 0.08)
+    source_rows = int(math.sqrt(count))
+    while count % source_rows:
+        source_rows -= 1
+    source_columns = count // source_rows
+    sources = _surface_grid(source_rows, source_columns, -0.05, 0.18)
+    receiver_count = config["receivers_per_axis"]
+    receivers = _surface_grid(
+        receiver_count, receiver_count, -0.05, 0.08
+    )
     return {
         "options": {
             "cell_type": "T",
