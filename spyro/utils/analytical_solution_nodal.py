@@ -4,7 +4,12 @@ import numpy as np
 from scipy.integrate import quad
 from scipy.special import hankel2
 
-from ..sources import full_ricker_wavelet
+from ..sources import (
+    full_ricker_wavelet,
+    ricker_wavelet,
+    ricker_integral,
+    ricker_derivative,
+)
 from .typing import SourceType
 
 
@@ -471,14 +476,12 @@ def analytical_explosive_source(
     gamma_i = offsets[i] / r
 
     def w(t):
-        """Get source time function (integral of Ricker wavelet)."""
-        a = np.pi * frequency * (t - time_delay)
-        return (t - time_delay) * np.exp(-(a**2))
+        """Wrap source time function (integral of Ricker wavelet)."""
+        return ricker_integral(frequency, t, time_delay)
 
     def w_dot(t):
-        """Get derivative of source time function (Ricker wavelet)."""
-        a = np.pi * frequency * (t - time_delay)
-        return (1 - 2 * a**2) * np.exp(-(a**2))
+        """Wrap derivative of source time function (Ricker wavelet)."""
+        return ricker_derivative(frequency, t, time_delay)
 
     # Initialize displacement components
     ui = np.zeros(nt)
@@ -510,8 +513,8 @@ def analytical_explosive_source(
 def analytical_force_source_2d(
     offsets: np.ndarray,
     time_vector: np.ndarray,
-    alpha: float,
-    beta: float,
+    vp: float,
+    vs: float,
     rho: float,
     amplitude: float,
     frequency: float,
@@ -533,9 +536,9 @@ def analytical_force_source_2d(
         Source-to-receiver offset vector.
     time_vector : numpy.ndarray
         Time samples.
-    alpha : float
+    vp : float
         P-wave velocity.
-    beta : float
+    vs : float
         S-wave velocity.
     rho : float
         Medium density.
@@ -597,21 +600,24 @@ def analytical_force_source_2d(
     )
 
     # Source spectrum.
-    source_wavelet = (
-        1.0 - 2.0 * (np.pi * frequency * (extended_time_vector - time_delay)) ** 2
-    ) * np.exp(-((np.pi * frequency * (extended_time_vector - time_delay)) ** 2))
+    source_wavelet = ricker_wavelet(
+        extended_time_vector,
+        frequency,
+        delay=time_delay,
+        delay_type="time",
+    )
 
     source_spectrum = np.fft.rfft(source_wavelet)
 
     displacement_spectrum = np.zeros(num_frequencies, dtype=complex)
 
-    shear_modulus = rho * beta**2
+    shear_modulus = rho * vs**2
 
     for frequency_index in range(1, num_frequencies):
         angular_frequency = 2.0 * np.pi * frequency_axis[frequency_index]
 
-        k_p = angular_frequency / alpha
-        k_s = angular_frequency / beta
+        k_p = angular_frequency / vp
+        k_s = angular_frequency / vs
 
         k_p_radius = k_p * radius
         k_s_radius = k_s * radius
