@@ -619,17 +619,24 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._store_forward_time_steps = value
 
     def enable_automated_adjoint(
-        self, checkpointing: bool = False, snapshots: int | None = None,
+        self, control_parameters=None, checkpointing: bool = False,
+        snapshots: int | None = None,
         gc_timestep_frequency: int | None = None
     ) -> None:
-        """Enable algorithmic differentiation for this solver.
+        """Enable the automated-adjoint solver.
 
-        Sets the solver up to record its forward solve on a pyadjoint tape, so
-        the gradient can be obtained by reverse-mode differentiation instead of
-        a hand-written adjoint.
+        The parameters to differentiate with respect to are resolved here,
+        against the physical parameters the equation is currently written in,
+        so an invalid selection fails before any adjoint state exists.
 
         Parameters
         ----------
+        control_parameters : enum.Enum or iterable of enum.Enum, optional
+            Physical parameters to differentiate with respect to. ``None``
+            takes every parameter the equation offers. Names the equation
+            does not carry as independent fields are rejected. Solvers whose
+            medium admits more than one set of parameters offer
+            ``set_physical_parameterization`` to change which ones do.
         checkpointing : bool, optional
             Whether to manage the tape with a checkpoint schedule. ``False``
             (the default) keeps every forward step on the tape, as before.
@@ -654,8 +661,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Raises
         ------
         ValueError
-            If the velocity model has not been set, so there is no control to
-            differentiate with respect to.
+            If the mesh has not been set, so a control cannot be a field.
 
         Notes
         -----
@@ -669,13 +675,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
         self._initialize_model_parameters()
-        if self.c is None:
+        if self.mesh is None:
             raise ValueError(
-                "self.c must be set before enabling automated adjoint."
-                "Please set the velocity model using set_initial_velocity_model()"
-                "or set c directly."
+                "Mesh must be set before enabling the automated adjoint: "
+                "a control has to be a field.",
             )
-        controls = self.c
+        # Resolve the selection first: an invalid one must fail before any
+        # adjoint state exists to be left half-built.
+        controls = self.physical_parameters.select(control_parameters)
         # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
         # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
         # that the reduced functional is built as an
@@ -827,10 +834,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def physical_parameters(self):
         """Return the physical parameters of the wave equation being solved.
 
-        The parameters are the material fields the variational form is written
-        in terms of: the velocity model for an acoustic medium, density and a
-        pair of elastic moduli or wave speeds for an isotropic elastic one.
-        Solvers declare them while initializing their material properties.
+        These are the material fields the solver reads: the velocity model
+        for an acoustic medium; density, the Lame parameters and the two
+        wave speeds for an isotropic elastic one, where the variational form
+        reads the moduli and the absorbing boundary conditions read the
+        speeds. Solvers declare them while initializing their material
+        properties.
 
         A wave solver knows only about physical parameters. Which of them an
         inversion treats as unknowns is a property of the inversion, not of
@@ -867,7 +876,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         return parameters
 
     def initialize_physical_parameters(self):
-        """Build the material fields of the wave equation from the model input.
+        """Build the physical parameters of the wave equation from the model input.
 
         The forward solve does this on its own, so this is only needed to read
         the physical parameters of a solver that has not run yet.
