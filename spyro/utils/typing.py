@@ -85,6 +85,16 @@ class RieszMapType(Enum):
     l2 = 2
 
 
+class AcousticMaterialParameter(Enum):
+    """Supported acoustic material parameter names.
+
+    An acoustic medium is described by its wave speed alone, which is the
+    pressure wave velocity.
+    """
+
+    P_WAVE_VELOCITY = "p_wave_velocity"
+
+
 class ElasticMaterialParameter(Enum):
     """Supported isotropic elastic material parameter names."""
 

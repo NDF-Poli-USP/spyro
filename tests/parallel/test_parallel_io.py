@@ -29,5 +29,4 @@ def test_saving_and_loading_shot_record():
 
 
 if __name__ == "__main__":
-    test_saving_and_loading_supershot_record()
-    test_saving_and_loading_shot_records_in_ensemble_serial_with_spatial_parallelism()
+    test_saving_and_loading_shot_record()
