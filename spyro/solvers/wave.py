@@ -752,13 +752,16 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Domain dimensions
         domain_dim = self.domain_dimensions()
 
-        if self.abc_active:  # If ABC scheme is used
+        if self.abc_type in {
+            AbsorbingBCsType.PML,
+            AbsorbingBCsType.HYBRID,
+        }:
             from ..meshing.meshing_habc import HABCMesh
             self.mesh_ops = HABCMesh(domain_dim, dimension=self.dimension,
                                      quadrilateral=self.mesh_parameters.quadrilateral,
                                      comm=self.mesh_parameters.comm)
 
-        else:  # If no ABC scheme is used
+        else:  # No layer is required for NRBC or a closed boundary.
             from ..meshing.meshing_operations import MeshOps
             self.mesh_ops = MeshOps(domain_dim, dimension=self.dimension,
                                     quadrilateral=self.mesh_parameters.quadrilateral,
