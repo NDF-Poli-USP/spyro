@@ -1,7 +1,6 @@
 """Test second order time convergence on the isotropic elastic wave."""
 
 import numpy as np
-from scipy.signal import correlate
 
 import spyro
 from spyro.tools.error_measure import MeasureError
