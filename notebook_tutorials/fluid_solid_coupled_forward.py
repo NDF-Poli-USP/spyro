@@ -35,6 +35,7 @@ dictionary["acquisition"] = {
     "delay": 1.0/25.0,
     "delay_type": "time",
     "receiver_locations": [(-0.51, 0.51)],
+    "solid_receiver_locations": [(-0,49, 0,49)], 
     "user_vertex_only_mesh": True,
 }
 
@@ -48,14 +49,14 @@ dictionary["time_axis"] = {
 
 dictionary["visualization"] = {
     "forward_output": True,
-    "forward_output_filename": "results/forward_outpu_fluid_solid_coupled.pvd",
+    "forward_output_filename": "results/pressure.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "graadient_output": False,
     "gradient_filename": None,
     "debug_output": False,
     "displacement_output": True,
-    "displacement_output_filename": "results/displacement_output.pvd",
+    "displacement_output_filename": "results/displacement.pvd",
     "snapshot_frequency": 20,
     "snapshot_output_dir": "results/snapshots",
 }

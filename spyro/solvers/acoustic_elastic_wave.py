@@ -16,8 +16,8 @@ def _extract_interface_markers(parent_mesh, child_mesh):
 
 class AcousticElasticWave(Wave):
     def __init__(self, dictionary, comm=None):
-        self.fluid_id = dictionary["mesh"].get("fluid_id", 1)
-        self.solid_id  = dictionary["mesh"].get("solid_id", 2)
+        self.fluid_id    = 1
+        self.solid_id    = 2
         self.interface_x = dictionary["mesh"].get("interface_x", None)
 
         super().__init__(dictionary, comm=comm)
@@ -29,9 +29,6 @@ class AcousticElasticWave(Wave):
         self.lmbda       = None # solid
         self.mu          = None # solid
         self.body_forces = None # solid
-
-        self._save_pressure_only = True
-        self._use_mixed_source   = True
 
         self._setup_snapshots(dictionary)
 
@@ -127,13 +124,12 @@ class AcousticElasticWave(Wave):
         p_wave_velocity_value = synthetic_data["p_wave_velocity"] # solid
         s_wave_velocity_value = synthetic_data["s_wave_velocity"] # solid
 
-        self.c      = fire.Function(self.scalar_function_space)
-        self.c.interpolate(fire.Constant(velocity_fluid_value))
+        self.c      = fire.Constant(velocity_fluid_value)
         self.rho    = fire.Constant(rho_value)
         mu_value    = rho_value * s_wave_velocity_value**2
         lmbda_value = rho_value * p_wave_velocity_value**2 - 2.0 * mu_value
         self.mu     = fire.Constant(mu_value)
-        self.lmbda   = fire.Constant(lmbda_value)
+        self.lmbda  = fire.Constant(lmbda_value)
 
     @override
     def matrix_building(self):
