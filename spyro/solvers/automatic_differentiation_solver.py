@@ -106,7 +106,7 @@ class AutomatedAdjoint:
 
     The schedule is built by :meth:`start_recording`, not here.
 
-    Why not Revolve
+    Schedule choice
     ~~~~~~~~~~~~~~~
     Spyro deliberately exposes no other schedule. :mod:`checkpoint_schedules`
     also offers ``Revolve`` [2]_, the classical binomial strategy, but for the
