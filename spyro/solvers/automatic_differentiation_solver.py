@@ -93,8 +93,8 @@ class AutomatedAdjoint:
     -------------
     Storing every forward step on the tape costs memory linear in the number
     of steps. Passing ``checkpointing=True`` hands the tape to a
-    :mod:`checkpoint_schedules` schedule instead. Spyro uses two of them and
-    picks between them from the snapshot budget:
+    :mod:`checkpoint_schedules` schedule [1]_ instead. Spyro uses two of them,
+    picking between them from the snapshot budget:
 
     ``snapshots=None``
         :class:`~checkpoint_schedules.SingleMemoryStorageSchedule` - every
@@ -105,6 +105,44 @@ class AutomatedAdjoint:
         turning :math:`O(n_t)` memory into :math:`O(N)`.
 
     The schedule is built by :meth:`start_recording`, not here.
+
+    Choosing between them
+    ~~~~~~~~~~~~~~~~~~~~~
+    Leave ``snapshots`` unset whenever the tape fits in memory: nothing is
+    recomputed, so it is the fastest option, and the schedule still lets the
+    manager drop variables the adjoint will never read. Reach for a budget
+    only when the run does not fit - long time axes, fine meshes, 3D - and
+    make it well below :math:`n_t`, because the saving comes from the ratio.
+    A budget close to :math:`n_t` pays the recomputation without buying much
+    memory back.
+
+    Spyro deliberately exposes no other schedule. :mod:`checkpoint_schedules`
+    also offers ``Revolve`` [2]_, the classical binomial strategy, but for the
+    same number of checkpointing units the mixed schedule of [3]_ recomputes
+    less. Revolve stores only forward restart data, so the non-linear
+    dependency data of each reversed step has to be regenerated; the mixed
+    schedule spends the same budget on whichever of the two is cheaper for a
+    given step, assuming - as spyro's wave solvers do - that the two are of
+    comparable size. In [3]_ (Fig. 7) the mixed schedule takes fewer total
+    forward steps than Revolve across the whole range of checkpointing units,
+    and in its barotropic vorticity example, 17520 timesteps with 200
+    checkpointing units, Revolve takes 52358 forward steps against 34965 for
+    the mixed schedule, with reverse-mode runtimes of 5091.7 s and 3762.0 s.
+
+    References
+    ----------
+    .. [1] Dolci, D. I., Maddison, J. R., Ham, D. A., Pallez, G., &
+           Herrmann, J. (2024). checkpoint_schedules: schedules for
+           incremental checkpointing of adjoint simulations. Journal of Open
+           Source Software 9(95), 6148. DOI: 10.21105/joss.06148
+    .. [2] Griewank, A., & Walther, A. (2000). Algorithm 799: revolve: an
+           implementation of checkpointing for the reverse or adjoint mode of
+           computational differentiation. ACM Transactions on Mathematical
+           Software 26(1), 19-45. DOI: 10.1145/347837.347846
+    .. [3] Maddison, J. R. (2024). Step-based checkpointing with high-level
+           algorithmic differentiation. Journal of Computational Science 82,
+           102405. DOI: 10.1016/j.jocs.2024.102405. Preprint:
+           arXiv:2305.09568 (2023).
 
     Parameters
     ----------

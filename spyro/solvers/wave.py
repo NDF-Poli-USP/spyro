@@ -653,6 +653,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             intended, so collecting periodically lowers the peak memory.
             ``None`` (the default) disables it.
 
+        See Also
+        --------
+        spyro.solvers.automatic_differentiation_solver.AutomatedAdjoint :
+            Which schedule each setting selects, when to prefer one over the
+            other, and the references behind them.
+
         Returns
         -------
         None
