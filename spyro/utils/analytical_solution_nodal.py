@@ -525,6 +525,8 @@ def analytical_force_source_2d(
     The solution is the frequency-domain elastodynamic Green tensor for an
     unbounded, homogeneous, isotropic medium under plane-strain conditions.
 
+    Based on: Achenbach, 1973 #TODO: citation
+
     Parameters
     ----------
     offsets : numpy.ndarray
