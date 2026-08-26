@@ -8,12 +8,6 @@ import numpy as np
 from pytest import fixture, mark, raises, warns
 from unittest.mock import patch
 from spyro.tools.error_measure import MeasureError
-from spyro.tools.error_measure import (
-    pad_signal_lengths,
-    calculate_peak_error,
-    calculate_integral_error,
-    calculate_normalized_L2_error,
-)
 
 
 class TestMeasureError:
@@ -66,7 +60,7 @@ class TestMeasureError:
         """Test when signals have equal lengths."""
         signal1 = np.array([1, 2, 3, 4])
         signal2 = np.array([5, 6, 7, 8])
-        result1, result2 = pad_signal_lengths(signal1, signal2)
+        result1, result2 = MeasureError.pad_signal_lengths(signal1, signal2)
         assert len(result1) == len(result2) == 4
         np.testing.assert_array_equal(result1, signal1)
         np.testing.assert_array_equal(result2, signal2)
@@ -77,14 +71,14 @@ class TestMeasureError:
         signal2 = np.array([4, 5, 6, 7, 8])
         # Default is error_if_different_length=True
         with raises(ValueError, match="The lengths of the model and reference signals"):
-            pad_signal_lengths(signal1, signal2)
+            MeasureError.pad_signal_lengths(signal1, signal2)
 
     def test_pad_signal_lengths_both_padding_error(self):
         """Test that both start_padding and end_padding cannot be equal simultaneously."""
         signal1 = np.array([1, 2, 3])
         signal2 = np.array([4, 5, 6, 7, 8])
         with raises(ValueError, match="are mutually exclusive."):
-            pad_signal_lengths(
+            MeasureError.pad_signal_lengths(
                 signal1,
                 signal2,
                 error_if_different_length=False,
@@ -92,7 +86,7 @@ class TestMeasureError:
                 end_padding=True,
             )
         with raises(ValueError, match="are mutually exclusive"):
-            pad_signal_lengths(
+            MeasureError.pad_signal_lengths(
                 signal1,
                 signal2,
                 error_if_different_length=False,
@@ -104,7 +98,7 @@ class TestMeasureError:
         """Test padding at the start of the shorter signal."""
         signal1 = np.array([1, 2, 3])
         signal2 = np.array([4, 5, 6, 7, 8])
-        result1, result2 = pad_signal_lengths(
+        result1, result2 = MeasureError.pad_signal_lengths(
             signal1,
             signal2,
             error_if_different_length=False,
@@ -115,7 +109,7 @@ class TestMeasureError:
         np.testing.assert_array_equal(result2, signal2)
         assert result1[0] == 0 and result1[1] == 0
         np.testing.assert_array_equal(result1[2:], signal1)
-        result2, result1 = pad_signal_lengths(
+        result2, result1 = MeasureError.pad_signal_lengths(
             signal2,
             signal1,
             error_if_different_length=False,
@@ -131,7 +125,7 @@ class TestMeasureError:
         """Test padding at the end of the shorter signal."""
         signal1 = np.array([1, 2, 3])
         signal2 = np.array([4, 5, 6, 7, 8])
-        result1, result2 = pad_signal_lengths(
+        result1, result2 = MeasureError.pad_signal_lengths(
             signal1,
             signal2,
             error_if_different_length=False,
@@ -142,7 +136,7 @@ class TestMeasureError:
         np.testing.assert_array_equal(result2, signal2)
         np.testing.assert_array_equal(result1[:3], signal1)
         assert result1[3] == 0 and result1[4] == 0
-        result2, result1 = pad_signal_lengths(
+        result2, result1 = MeasureError.pad_signal_lengths(
             signal2,
             signal1,
             error_if_different_length=False,
@@ -160,7 +154,7 @@ class TestMeasureError:
         signal2 = np.array([6, 7, 8, 9, 10])
         # The padding options check only runs when lengths are different
         # Both start_padding and end_padding are False but signals are equal length
-        result1, result2 = pad_signal_lengths(
+        result1, result2 = MeasureError.pad_signal_lengths(
             signal1,
             signal2,
             error_if_different_length=False,
@@ -171,7 +165,7 @@ class TestMeasureError:
         np.testing.assert_array_equal(result1, signal1)
         np.testing.assert_array_equal(result2, signal2)
         # Both start_padding and end_padding are True but signals are equal length
-        result1, result2 = pad_signal_lengths(
+        result1, result2 = MeasureError.pad_signal_lengths(
             signal1,
             signal2,
             error_if_different_length=False,
@@ -185,7 +179,7 @@ class TestMeasureError:
     def test_peak_error_identical_signals(self):
         """Test peak error with identical signals."""
         signal = np.array([0, 1, 2, 3, 2, 1, 0])
-        peak_error, peak_reference = calculate_peak_error(signal, signal)
+        peak_error, peak_reference = MeasureError.calculate_peak_error(signal, signal)
         assert peak_error == 0.0
         assert peak_reference == 3.0
 
@@ -193,7 +187,7 @@ class TestMeasureError:
         """Test peak error with different signals."""
         signal1 = np.array([0, 1, 2, 3, 2, 1, 0])
         signal2 = np.array([0, 0.5, 1, 1.5, 1, 0.5, 0])
-        peak_error, peak_reference = calculate_peak_error(signal1, signal2)
+        peak_error, peak_reference = MeasureError.calculate_peak_error(signal1, signal2)
         assert peak_error == 1.0  # (3/1.5 - 1) = 1
         assert peak_reference == 1.5
 
@@ -201,37 +195,37 @@ class TestMeasureError:
         """Test peak error with signal without peaks."""
         signal = np.array([0, 0, 0, 0])
         with warns(UserWarning, match="No peak observed"):
-            calculate_peak_error(signal, signal)
+            MeasureError.calculate_peak_error(signal, signal)
 
     def test_integral_error_identical_signals(self, sample_signals):
         """Test integral error with identical signals."""
         signal, _, dt = sample_signals
-        integral_error = calculate_integral_error(signal, signal, dt)
+        integral_error = MeasureError.calculate_integral_error(signal, signal, dt)
         assert integral_error == 0.0
 
     def test_integral_error_different_signals(self, sample_signals):
         """Test integral error with slightly different signals."""
         model, reference, dt = sample_signals
-        integral_error = calculate_integral_error(model, reference, dt)
+        integral_error = MeasureError.calculate_integral_error(model, reference, dt)
         assert 0.0 < integral_error < 1.0
 
     def test_integral_error_zero_reference(self, sample_signals):
         """Test integral error when reference signal is zero."""
         signal, _, dt = sample_signals
         zero_signal = np.zeros_like(signal)
-        integral_error = calculate_integral_error(signal, zero_signal, dt)
+        integral_error = MeasureError.calculate_integral_error(signal, zero_signal, dt)
         assert integral_error == np.inf
 
     def test_normalized_L2_error_identical(self, sample_signals):
         """Test NRMSE with identical signals."""
         signal, _, _ = sample_signals
-        nrms_error = calculate_normalized_L2_error(signal, signal)
+        nrms_error = MeasureError.calculate_normalized_L2_error(signal, signal)
         assert nrms_error == 0.0
 
     def test_normalized_L2_error_different(self, sample_signals):
         """Test NRMSE with different signals."""
         model, reference, _ = sample_signals
-        nrms_error = calculate_normalized_L2_error(model, reference)
+        nrms_error = MeasureError.calculate_normalized_L2_error(model, reference)
         assert nrms_error > 0.0
         assert nrms_error < 1.0
 
