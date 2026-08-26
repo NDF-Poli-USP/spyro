@@ -1,16 +1,19 @@
+"""Constructs Firedrake solver for the acosutic wave with typical BCs, NRBCs or HABCs."""
+
 import firedrake as fire
 from firedrake import ds, dx, dot, grad
 from ..utils.typing import AbsorbingBCsType
 
 
 def construct_solver_or_matrix_no_pml(wave):
-    """Builds solver operators for wave object without a PML. Doesn't create mass matrices if
-    matrix_free option is on, which it is by default.
+    """Builds solver operators for wave propagator with typical BCs, NRBCs or HABCs.
+
+    Doesn't create mass matrices if matrix_free option is on, which it is by default.
 
     Parameters
     ----------
-    wave: :class: 'Wave' object
-        Waveform object that contains all simulation parameters
+    wave : `acoustic_wave.AcousticWave`
+        An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
     """
     V = wave.function_space
     quad_rule = wave.quadrature_rule
@@ -43,7 +46,7 @@ def construct_solver_or_matrix_no_pml(wave):
     if q is not None:
         le += - q * v * dx(**quad_rule)
 
-    if wave.abc_active:
+    if wave.abc_active and not wave.abc_get_ref_model:
         weak_expr_abc = dot((u_n - u_nm1) / dt, v)
 
         f_abc = (1 / wave.c) * weak_expr_abc
@@ -81,7 +84,6 @@ def construct_solver_or_matrix_no_pml(wave):
     form = m1 + a + le
     wave.rhs = fire.rhs(form)
     wave.lhs = fire.lhs(form)
-
     wave.source_function = fire.Cofunction(V.dual())
 
     lin_var = fire.LinearVariationalProblem(

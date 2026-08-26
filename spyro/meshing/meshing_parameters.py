@@ -7,7 +7,7 @@ generation based on wavelength constraints.
 
 from os import path
 from warnings import warn
-from ..utils.error_management import value_parameter_error
+from ..utils.error_management import validate_parameter
 
 
 def cells_per_wavelength(method, degree, dimension):
@@ -696,7 +696,7 @@ class MeshingParameters():  # noqa: UP039
             None,
         ]
 
-        self._method = value_parameter_error("method", value, allowed_types)
+        self._method = validate_parameter("method", value, allowed_types)
 
     @property
     def mesh_file(self):
@@ -765,7 +765,7 @@ class MeshingParameters():  # noqa: UP039
         """
         allowed_types = ["firedrake_mesh", "user_mesh", "SeismicMesh", "file", "spyro_mesh", "gmsh_mesh"]
         if value is not None and value not in allowed_types:
-            value_parameter_error("mesh_type", value, allowed_types)
+            validate_parameter("mesh_type", value, allowed_types)
 
         if value == "SeismicMesh" and self.quadrilateral:
             raise ValueError("SeismicMesh does not work with quads.")
@@ -1091,7 +1091,7 @@ class MeshingParameters():  # noqa: UP039
     def padding_type(self, value):
         allowed_types = [None, "rectangular", "hyperelliptical"]
         if value not in allowed_types:
-            value_parameter_error("padding_type", value, allowed_types)
+            validate_parameter("padding_type", value, allowed_types)
         self._padding_type = value
 
     @property
@@ -1112,7 +1112,7 @@ class MeshingParameters():  # noqa: UP039
     def winslow_implementation(self, value):
         allowed_types = ["default", "fast", "numba"]
         if value is not None and value not in allowed_types:
-            value_parameter_error("winslow_implementation", value, allowed_types)
+            validate_parameter("winslow_implementation", value, allowed_types)
         self._winslow_implementation = value
 
     @property

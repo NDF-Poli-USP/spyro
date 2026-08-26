@@ -1,20 +1,19 @@
 from firedrake import Function, VTKFile
-# from numpy import abs, array, ceil, inf, log10, minimum
-from numpy import inf
+from numpy import abs, array, ceil, inf, log10, minimum
 from os import getcwd
-# from sympy import divisors
-from ..domains.space import create_function_space
+from sympy import divisors
 from .eik_min import Minimum_Eikonal
-from ..habc.error_measure import HABCError
+from .nrbc import NRBC
+from ..solvers.modal.modal_sol import Modal_Solver
+from ..tools.error_measure import MeasureError
+from ..domains.space import create_function_space
 from ..io.basicio import parallel_print as pprint
 from .lay_len import calc_size_lay
-from .nrbc import NRBC
 from ..plots.plots_habc import plot_function_layer_size
-# from ..solvers.modal.modal_sol import Modal_Solver
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
-from ..utils.error_management import (enum_parameter_error, type_data_structure_error,
-                                      value_numerical_error, value_parameter_error,
-                                      value_string_error)
+from ..utils.error_management import (validate_enum, validate_data_structure,
+                                      validate_numeric, validate_parameter,
+                                      validate_string)
 from ..utils.freq_tools import freq_response
 from ..utils.typing import (BoundaryConditionsType, HyperLayerDegreeType,
                             AbsorbingBCsType, LayerShapeType, LayerSizeRefFrequency)
@@ -29,7 +28,7 @@ from ..utils.typing import (BoundaryConditionsType, HyperLayerDegreeType,
 # TODO: Add reference
 
 
-class ABCLayer(NRBC):
+class ABCLayer(NRBC, MeasureError):
     """Class for ABCs based on absorbing layers.
 
     Attributes
@@ -41,10 +40,8 @@ class ABCLayer(NRBC):
         Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
         `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
     abc_boundary_layer_type : `typing.AbsorbingBCsType`
-        Type of the boundary layer. Options: `AbsorbingBCsType.NRBC`,
-        `AbsorbingBCsType.HYBRID`, `AbsorbingBCsType.PML` or `AbsorbingBCsType.NOABCS`.
-        Default is `AbsorbingBCsType.NOABCS` where no absorbing BCs are applied.
-        Option `AbsorbingBCsType.HYBRID` is based on paper of Salas et al. (2022).
+        Type of the boundary layer: `AbsorbingBCsType.HYBRID` or AbsorbingBCsType.PML`.
+        Default is `AbsorbingBCsType.HYBRID`  based on paper of Salas et al. (2022).
         doi: https://doi.org/10.1016/j.apm.2022.09.014
         TODO: Add citation
     abc_deg_layer : `int` or `float` or `None`
@@ -196,10 +193,8 @@ class ABCLayer(NRBC):
             Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
             `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`.
         abc_boundary_layer_type : `typing.AbsorbingBCsType`
-            Type of the boundary layer. Options: `AbsorbingBCsType.NRBC`,
-            `AbsorbingBCsType.HYBRID`, `AbsorbingBCsType.PML` or `AbsorbingBCsType.NOABCS`.
-            Default is `AbsorbingBCsType.NOABCS` where no absorbing BCs are applied.
-            Option `AbsorbingBCsType.HYBRID` is based on paper of Salas et al. (2022).
+            Type of the boundary layer: `AbsorbingBCsType.HYBRID` or AbsorbingBCsType.PML`.
+            Default is `AbsorbingBCsType.HYBRID` based on paper of Salas et al. (2022).
             doi: https://doi.org/10.1016/j.apm.2022.09.014
             TODO: Add citation
         abc_reference_freq : `typing.LayerSizeRefFrequency`, optional
@@ -224,20 +219,20 @@ class ABCLayer(NRBC):
         """
 
         # Model dimension
-        self.dimension = value_parameter_error("dimension", dimension, [2, 3])
+        self.dimension = validate_parameter("dimension", dimension, [2, 3])
 
         # Original domain dimensions
-        self.domain_dim = type_data_structure_error("domain_dim", domain_dim, "tuple",
-                                                    expected_type_element=("float", "int"),
-                                                    expected_length=dimension)
+        self.domain_dim = validate_data_structure("domain_dim", domain_dim, "tuple",
+                                                  expected_type_element=("float", "int"),
+                                                  expected_length=dimension)
         # Source frequency
-        self.frequency = value_numerical_error("frequency", frequency,
-                                               float_num=True, integer_num=True,
-                                               lower_bound=0., none_default=True)
+        self.frequency = validate_numeric("frequency", frequency,
+                                          float_num=True, integer_num=True,
+                                          lower_bound=0., accept_parameter_as_none=True)
 
         # Timestep for the transient simulation
-        self.dt = value_numerical_error("dt", dt, float_num=True, integer_num=True,
-                                        lower_bound=0., none_default=True)
+        self.dt = validate_numeric("dt", dt, float_num=True, integer_num=True,
+                                   lower_bound=0., accept_parameter_as_none=True)
 
         # Nyquist frequency
         self.freq_Nyquist = None if self.dt is None else 1. / (2. * self.dt)
@@ -249,30 +244,30 @@ class ABCLayer(NRBC):
         self.func_space_type = func_space_type
 
         # ABC layer parameters
-        self.abc_boundary_layer_type = enum_parameter_error("abc_boundary_layer_type",
-                                                            abc_boundary_layer_type,
-                                                            AbsorbingBCsType)
-        if abc_boundary_layer_type == AbsorbingBCsType.NOABCS:
-            value_parameter_error("abc_boundary_layer_type", abc_boundary_layer_type,
-                                  [AbsorbingBCsType.HYBRID, AbsorbingBCsType.PML])
+        self.abc_boundary_layer_type = validate_enum("abc_boundary_layer_type",
+                                                     abc_boundary_layer_type,
+                                                     AbsorbingBCsType)
+        if abc_boundary_layer_type not in [AbsorbingBCsType.HYBRID, AbsorbingBCsType.PML]:
+            validate_parameter("abc_boundary_layer_type", abc_boundary_layer_type,
+                               [AbsorbingBCsType.HYBRID, AbsorbingBCsType.PML])
 
-        self.abc_boundary_layer_shape = enum_parameter_error("abc_boundary_layer_shape",
-                                                             abc_boundary_layer_shape,
-                                                             LayerShapeType)
-        self.abc_reference_freq = enum_parameter_error("abc_reference_freq",
-                                                       abc_reference_freq,
-                                                       LayerSizeRefFrequency)
-        self.abc_degree_type = enum_parameter_error("abc_degree_type", abc_degree_type,
-                                                    HyperLayerDegreeType)
+        self.abc_boundary_layer_shape = validate_enum("abc_boundary_layer_shape",
+                                                      abc_boundary_layer_shape,
+                                                      LayerShapeType)
+        self.abc_reference_freq = validate_enum("abc_reference_freq",
+                                                abc_reference_freq,
+                                                LayerSizeRefFrequency)
+        self.abc_degree_type = validate_enum("abc_degree_type", abc_degree_type,
+                                             HyperLayerDegreeType)
 
         # Layer degree
         if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
             self.abc_deg_layer = None
         elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-            self.abc_deg_layer = value_numerical_error('abc_deg_layer', abc_deg_layer,
-                                                       float_num=True, integer_num=True,
-                                                       lower_bound=2.,
-                                                       include_lower_bound=True)
+            self.abc_deg_layer = validate_numeric('abc_deg_layer', abc_deg_layer,
+                                                  float_num=True, integer_num=True,
+                                                  lower_bound=2.,
+                                                  include_lower_bound=True)
 
         # Communicator MPI
         self.comm = comm
@@ -284,10 +279,8 @@ class ABCLayer(NRBC):
         self.path_to_save_abc_layer_case(output_folder=output_folder)
 
         # Initializing the error measure class
-        HABCError.__init__(self, dt=self.dt,
-                           freq_Nyquist=self.freq_Nyquist,
-                           output_folder=self.path_save,
-                           output_case=self.path_case_abc, comm=self.comm)
+        MeasureError.__init__(self, output_folder=self.path_save,
+                              output_case=self.path_case_abc, comm=self.comm)
 
     def _define_layer_shape(self):
         """Define the shape of the absorbing layer.
@@ -410,7 +403,7 @@ class ABCLayer(NRBC):
         """
 
         # Validate the output folder parameter
-        value_string_error("output_folder", output_folder)
+        validate_string("output_folder", output_folder)
 
         # Identify the case of the ABC scheme for output labeling
         self.case_abc = self.identify_abc_layer_case()
@@ -446,16 +439,16 @@ class ABCLayer(NRBC):
         """
 
         # Initializing Eikonal object
-        Eik = Minimum_Eikonal(wave)
+        eik = Minimum_Eikonal(wave)
 
         # Solving Eikonal
-        Eik.solve_eik()
+        eik.solve_eik()
 
         # Identifying critical points
-        self.eik_bnd = Eik.ident_crit_eik()
+        self.eik_bnd = eik.ident_crit_eik()
 
         # Critical point coordinates as receivers
-        pcrit = [bnd[0] for bnd in self.eik_bnd]
+        pcrit = [tuple(bnd[0]) for bnd in self.eik_bnd]
         wave.receiver_locations = pcrit + wave.receiver_locations
         wave.number_of_receivers = len(wave.receiver_locations)
 
@@ -848,210 +841,237 @@ class ABCLayer(NRBC):
         else:
             pprint("\nNot Non-Reflecting Boundary Conditions Prescribed", comm=self.comm)
 
-    # def check_timestep_abc(self, wave, max_divisor_tf=1,
-    #                        set_max_dt=True, method='ANALYTICAL', mag_add=3):
-    #     """Check if the timestep size is appropriate for the transient response.
+    def check_timestep_abc(self, wave, max_divisor_tf=1,
+                           set_max_dt=True, method='ANALYTICAL', mag_add=3):
+        """Check if the timestep size is appropriate for the transient response.
 
-    #     Parameters
-    #     ----------
-    #     wave : `acoustic_wave.AcousticWave`
-    #         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
-    #     max_divisor_tf : `int`, optional
-    #         Index to select the maximum divisor of the final time, converted to an
-    #         integer according to the order of magnitude of the timestep size. The
-    #         timestep size is set to the divisor, given by the index in descending
-    #         order, less than or equal to the user's timestep size. If the value is 1,
-    #         the timestep size is set as the maximum divisor. Default is 1.
-    #     set_max_dt : `bool`, optional
-    #         If `True`, set the timestep size to the selected divisor. Default is `True`.
-    #     method : `str`, optional
-    #         Method to use for solving the eigenvalue problem. Default is 'ANALYTICAL'
-    #         method that estimates the maximum eigenvalue using the Gershgorin Circle
-    #         Theorem. Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS' or 'LOBPCG'.
-    #     mag_add : `int`, optional
-    #         Additional magnitude order to adjust the rounding of the timestep.
+        Parameters
+        ----------
+        wave : `acoustic_wave.AcousticWave`
+            An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+        max_divisor_tf : `int`, optional
+            Index to select the maximum divisor of the final time, converted to an
+            integer according to the order of magnitude of the timestep size. The
+            timestep size is set to the divisor, given by the index in descending
+            order, less than or equal to the user's timestep size. If the value is 1,
+            the timestep size is set as the maximum divisor. Default is 1.
+        set_max_dt : `bool`, optional
+            If `True`, set the timestep size to the selected divisor. Default is `True`.
+        method : `str`, optional
+            Method to use for solving the eigenvalue problem. Default is 'ANALYTICAL'
+            method that estimates the maximum eigenvalue using the Gershgorin Circle
+            Theorem. Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS' or 'LOBPCG'.
+        mag_add : `int`, optional
+            Additional magnitude order to adjust the rounding of the timestep.
 
-    #     Returns
-    #     -------
-    #     None
-    #     """
+        Returns
+        -------
+        None
+        """
 
-    #     pprint("\nChecking Timestep Size", comm=self.comm)
+        # Cheking input parameters
+        validate_numeric("max_divisor_tf", max_divisor_tf,
+                         float_num=False, integer_num=True, lower_bound=0.)
+        validate_numeric("mag_add", mag_add, float_num=False, integer_num=True,
+                         lower_bound=0., include_lower_bound=True)
 
-    #     # User timestep
-    #     usr_dt = wave.get_dt()
+        pprint("\nChecking Timestep Size", comm=self.comm)
 
-    #     # Maximum timestep size
-    #     dt_sol = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
-    #     max_dt = dt_sol.estimate_timestep(wave.c, wave.function_space, wave.final_time,
-    #                                       shift=1e-8, quad_rule=wave.quadrature_rule,
-    #                                       fraction=1.)
+        # User timestep
+        usr_dt = wave.get_dt()
+        pprint(f"Current Nyquist Frequency: {self.freq_Nyquist:.5f} Hz", comm=self.comm)
+        pprint(f"Current Timestep Size: {1e3 * usr_dt:.{mag_add}f} ms", comm=self.comm)
 
-    #     # Rounding power
-    #     pot = int(abs(ceil(log10(max_dt))) + mag_add)
+        # Maximum timestep size
+        dt_sol = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
+        max_dt = dt_sol.estimate_timestep(wave.c, wave.function_space, wave.final_time,
+                                          shift=1e-8, quad_rule=wave.quadrature_rule,
+                                          fraction=1.)
 
-    #     # Maximum timestep size according to divisors of the final time
-    #     val_int_tf = int(10**pot * wave.final_time)
-    #     val_int_dt = int(10**pot * max_dt)
-    #     max_div = [d for d in divisors(val_int_tf) if d < val_int_dt]
-    #     n_div = len(max_div)
-    #     index_div = min(max_divisor_tf, n_div)
-    #     max_dt = round(10**(-pot) * max_div[-index_div], pot)
+        # Rounding power
+        pot = int(abs(ceil(log10(max_dt))) + mag_add)
 
-    #     # Set the timestep size
-    #     dt = max_dt if set_max_dt else min(usr_dt, max_dt)
-    #     wave.set_dt(dt)
-    #     dt_ms = 1e3 * wave.dt
-    #     if set_max_dt:
-    #         case_div = f"{min(max_divisor_tf, n_div)} of {n_div}"
-    #         str_dt = f"Selected Timestep Size ({case_div}): {dt_ms:.{mag_add}f} ms"
-    #     else:
-    #         str_dt = f"Selected Timestep Size: {dt_ms:.{mag_add}f} ms"
+        # Maximum timestep size according to divisors of the final time
+        val_int_tf = int(10**pot * wave.final_time)
+        val_int_dt = int(10**pot * max_dt)
+        max_div = [d for d in divisors(val_int_tf) if d < val_int_dt]
+        n_div = len(max_div)
+        index_div = min(max_divisor_tf, n_div)
+        max_dt = round(10**(-pot) * max_div[-index_div], pot)
 
-    #     pprint(str_dt, comm=self.comm)
+        # Set the timestep size
+        dt = max_dt if set_max_dt else min(usr_dt, max_dt)
+        wave.set_dt(dt)
+        dt_ms = 1e3 * wave.dt
+        if set_max_dt:
+            case_div = f"{min(max_divisor_tf, n_div)} of {n_div}"
+            str_dt = f"Selected Timestep Size ({case_div}): {dt_ms:.{mag_add}f} ms"
+        else:
+            str_dt = f"Selected Timestep Size: {dt_ms:.{mag_add}f} ms"
 
-    #     # Updating Nyquist frequency
-    #     self.freq_Nyquist = 1. / (2. * wave.dt)
+        pprint(str_dt, comm=self.comm)
 
-    # def layer_infinite_model(self, wave):
-    #     """Determine the domain extension size for the infinite domain model.
+        # Updating Nyquist frequency
+        self.freq_Nyquist = 1. / (2. * wave.dt)
+        pprint(f"New Nyquist Frequency: {self.freq_Nyquist:.5f} Hz", comm=self.comm)
 
-    #     Parameters
-    #     ----------
-    #     wave : `acoustic_wave.AcousticWave`
-    #         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+    def layer_infinite_model(self, lmin, c_bnd_max, final_time, source_locations=None):
+        """Determine the domain extension size for the infinite domain model.
 
-    #     Returns
-    #     -------
-    #     infinite_pad_len : `float`
-    #         Size of the domain extension for the infinite domain model.
-    #     """
+        Parameters
+        ----------
+        lmin : `float`
+            Minimum mesh size.
+        c_bnd_max : `float`
+            Maximum velocity value on the boundary of the original domain.
+        final_time : `float`
+            Final time of the simulation.
+        source_locations: `list`, optional
+            List of source locations.
 
-    #     # Size of the domain extension
-    #     add_dom = wave.c_bnd_max * wave.final_time / 2.
+        Returns
+        -------
+        infinite_pad_len : `float`
+            Size of the domain extension for the infinite domain model.
+        """
 
-    #     # Distance already travelled by the wave
-    #     if hasattr(self, 'eik_bnd'):
+        # Cheking input parameters
+        validate_numeric("lmin", lmin, float_num=True,
+                         integer_num=True, lower_bound=0.)
+        validate_numeric("c_bnd_max", c_bnd_max, float_num=True,
+                         integer_num=True, lower_bound=0.)
+        validate_numeric("final_time", final_time, float_num=True,
+                         integer_num=True, lower_bound=0.)
+        validate_data_structure("source_locations", source_locations, "list",
+                                expected_type_element="tuple", accept_parameter_as_none=True)
 
-    #         # If Eikonal analysis was performed
-    #         eikmin = self.eik_bnd[0][2]
+        # Size of the domain extension
+        add_dom = c_bnd_max * final_time / 2.
 
-    #         # Minimum distance to the nearest boundary
-    #         dist_to_bnd = wave.c_bnd_max * eikmin / 2.
-    #     else:
+        str_pad = "Infinite Domain Extension Based on "
 
-    #         # If Eikonal analysis was not performed
-    #         sources_loc = array(wave.source_locations)
+        # Distance already travelled by the wave
+        if hasattr(self, 'eik_bnd'):
 
-    #         # Candidate to minimum distance to the boundaries
-    #         delta_z = abs(sources_loc[:, 0] - wave.mesh_parameters.length_z)
-    #         delta_x = minimum(abs(sources_loc[:, 1]),
-    #                           abs(sources_loc[:, 1] - wave.mesh_parameters.length_x))
-    #         cand_dist = (delta_z, delta_x)
+            str_pad += "Minimun Eikonal at Critical Boundary Points"
 
-    #         if self.dimension == 3:  # 3D
-    #             delta_y = minimum(abs(sources_loc[:, 2]),
-    #                               abs(sources_loc[:, 2] - wave.mesh_parameters.length_y))
-    #             cand_dist += (delta_y,)
+            # If Eikonal analysis was performed (see `critical_boundary_points` method)
+            # Structure eikmin: [pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]
+            eikmin = self.eik_bnd[0][2]
 
-    #         # Minimum distance to the nearest boundary
-    #         dist_to_bnd = min(cand_dist)
+            # Minimum distance to the nearest boundary
+            dist_to_bnd = c_bnd_max * eikmin / 2.
+        else:
 
-    #     # Subtracting the distance already travelled by the wave
-    #     add_dom -= dist_to_bnd
+            str_pad += "Minimum Distance Source-Boundary"
 
-    #     # Pad length for the infinite domain extension
-    #     infinite_pad_len = self.lmin * ceil(add_dom / self.lmin)
+            # If Eikonal analysis was not performed
+            source_loc = array(source_locations)
 
-    #     return infinite_pad_len
+            # Original  domain dimensions
+            length_z, length_x = self.domain_dim[:2]
 
-    # def geometry_infinite_model(self):
-    #     """Determine the geometry for the infinite domain model.
+            # Candidate to minimum distance to the boundaries
+            delta_z = abs(source_loc[:, 0] - length_z)
+            delta_x = minimum(abs(source_loc[:, 1]), abs(source_loc[:, 1] - length_x))
+            cand_dist = (delta_z, delta_x)
 
-    #     Parameters
-    #     ----------
-    #     None
+            if self.dimension == 3:  # 3D
+                length_y = self.domain_dim[2]
+                delta_y = minimum(abs(source_loc[:, 2]), abs(source_loc[:, 2] - length_y))
+                cand_dist += (delta_y,)
 
-    #     Returns
-    #     -------
-    #     None
-    #     """
+            # Minimum distance to the nearest boundary
+            dist_to_bnd = float(min(cand_dist))
 
-    #     # Size of the domain extension
-    #     self.abc_pad_length = self.layer_infinite_model()
-    #     pprint(f"Infinite Domain Extension (km): {self.abc_pad_length:.4f}", comm=self.comm)
+        pprint(str_pad, comm=self.comm)
 
-    #     # New dimensions
-    #     self.abc_new_geometry()
+        # Subtracting the distance already travelled by the wave
+        add_dom -= dist_to_bnd
 
-    # def infinite_model(self, wave, check_dt=False, max_divisor_tf=1,
-    #                    method='ANALYTICAL', mag_add=3):
-    #     """Create a reference model for the ABC scheme for comparative purposes.
+        # Pad length for the infinite domain extension
+        infinite_pad_len = lmin * ceil(add_dom / lmin)
 
-    #     Parameters
-    #     ----------
-    #     wave : `acoustic_wave.AcousticWave`
-    #         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
-    #     check_dt : `bool`, optional
-    #         If `True`, check if the timestep size is appropriate for the transient
-    #         response. Default is `False`.
-    #     max_divisor_tf : `int`, optional
-    #         Index to select the maximum divisor of the final time, converted to an
-    #         integer according to the order of magnitude of the timestep size. The
-    #         timestep size is set to the divisor, given by the index in descending
-    #         order, less than or equal to the user's timestep size. If the value is 1,
-    #         the timestep size is set as the maximum divisor. Default is 1.
-    #     method : `str`, optional
-    #         Method to use for solving the eigenvalue problem. Default is 'ANALYTICAL'
-    #         method that estimates the maximum eigenvalue using the Gershgorin Circle
-    #         Theorem. Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS' or 'LOBPCG'.
-    #     mag_add : `int`, optional
-    #         Additional magnitude order to adjust the rounding of the timestep.
+        return infinite_pad_len
 
-    #     Returns
-    #     -------
-    #     None
-    #     """
+    def geometry_infinite_model(self, wave):
+        """Determine the geometry for the infinite domain model.
 
-    #     # Check the timestep size
-    #     if check_dt:
-    #         self.check_timestep_abc(max_divisor_tf=max_divisor_tf,
-    #                                 method=method, mag_add=mag_add)
+        Parameters
+        ----------
+        wave : `acoustic_wave.AcousticWave`
+            An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
 
-    #     pprint("\nBuilding Infinite Domain Model", comm=self.comm)
+        Returns
+        -------
+        None
+        """
 
-    #     # Defining geometry for infinite domain
-    #     self.geometry_infinite_model()
+        lmin = wave.mesh_parameters.lmin if not hasattr(self, 'lmin') else self.lmin
+        c_bnd_max = wave.c_bnd_max
+        final_time = wave.final_time
+        source_locations = wave.source_locations
 
-    #     # Creating mesh for infinite domain
-    #     self.create_mesh_with_layer(wave, inf_model=True)
+        # Size of the domain extension
+        self.abc_pad_length = self.layer_infinite_model(lmin, c_bnd_max, final_time,
+                                                        source_locations=source_locations)
+        pprint(f"Infinite Domain Extension (km): {self.abc_pad_length:.4f}", comm=self.comm)
 
-    #     # Updating velocity model
-    #     self.velocity_abc(self, wave, inf_model=True)
+        # New dimensions
+        self.abc_new_geometry()
 
-    #     # Setting no damping
-    #     if self.abc_boundary_layer_type == "hybrid":
-    #         self.cosHig = self.eta_mask = self.eta_habc = 0.
-    #     elif self.abc_boundary_layer_type == "PML":
-    #         self.sigma_z = self.sigma_x = 0.
-    #         if self.dimension == 3:
-    #             self.sigma_y = 0.
+    def infinite_model(self, wave, check_dt=False, max_divisor_tf=1,
+                       method='ANALYTICAL', mag_add=3):
+        """Create a reference model for the ABC scheme for comparative purposes.
 
-    #     pprint("\nSolving Infinite Model", comm=self.comm)
+        Parameters
+        ----------
+        wave : `acoustic_wave.AcousticWave`
+            An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+        check_dt : `bool`, optional
+            If `True`, check if the timestep size is appropriate for the transient
+            response. Default is `False`.
+        max_divisor_tf : `int`, optional
+            Index to select the maximum divisor of the final time, converted to an
+            integer according to the order of magnitude of the timestep size. The
+            timestep size is set to the divisor, given by the index in descending
+            order, less than or equal to the user's timestep size. If the value is 1,
+            the timestep size is set as the maximum divisor. Default is 1.
+        method : `str`, optional
+            Method to use for solving the eigenvalue problem. Default is 'ANALYTICAL'
+            method that estimates the maximum eigenvalue using the Gershgorin Circle
+            Theorem. Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS' or 'LOBPCG'.
+        mag_add : `int`, optional
+            Additional magnitude order to adjust the rounding of the timestep.
 
-    #     # Solving the forward problem
-    #     self.forward_solve()
+        Returns
+        -------
+        None
+        """
 
-    #     # Saving reference signal
-    #     self.save_reference_signal()
+        # Check the timestep size
+        if check_dt:
+            self.check_timestep_abc(wave, max_divisor_tf=max_divisor_tf,
+                                    method=method, mag_add=mag_add)
 
-    #     # Deleting variables to be computed for the ABC scheme
-    #     del self.abc_pad_length, self.length_xabc, self.length_zabc
-    #     if self.dimension == 3:
-    #         del self.length_yabc
-    #     if self.abc_boundary_layer_type == "hybrid":
-    #         del self.cosHig, self.eta_mask, self.eta_habc
-    #     elif self.abc_boundary_layer_type == "PML":
-    #         del self.sigma_z, self.sigma_x
-    #         if self.dimension == 3:
-    #             del self.sigma_y
+        pprint("\nBuilding Infinite Domain Model", comm=self.comm)
+
+        # Defining geometry for infinite domain
+        self.geometry_infinite_model(wave)
+
+        # Creating mesh for infinite domain
+        self.create_mesh_with_layer(wave, inf_model=True)
+
+        # Updating velocity model
+        self.velocity_abc(wave, inf_model=True)
+
+        pprint("\nSolving Infinite Model", comm=self.comm)
+
+        # Solving the forward problem
+        wave.forward_solve()
+
+        # Saving reference signal
+        output_file = self.abc_boundary_layer_type.value + "_ref"
+        self.save_reference_signal(
+            wave.receiver_locations, wave.forward_solution_receivers,
+            wave.number_of_receivers, self.freq_Nyquist, output_file=output_file)

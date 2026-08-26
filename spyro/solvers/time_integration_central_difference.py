@@ -36,11 +36,12 @@ def _propagate_forward_central_difference(wave, source_ids):
     nt = int(wave.final_time / wave.dt) + 1  # number of timesteps
     usol = None
     if wave.store_forward_time_steps:
-        usol = [
-            fire.Function(wave.function_space, name=wave.get_function_name())
-            for t in range(nt)
-            if t % wave.gradient_sampling_frequency == 0
-        ]
+        # Snapshots are appended as the solve advances rather than allocated
+        # up front. The final footprint is the same, but nothing is reserved
+        # before it is needed: a solve that aborts early (e.g. the numerical
+        # instability check below) no longer has to first allocate the whole
+        # nt-step wavefield, which for fine meshes/small dt is many GB.
+        usol = []
     source_cof = None
     interpolate_receivers = None
     master_source_W = None
@@ -67,6 +68,10 @@ def _propagate_forward_central_difference(wave, source_ids):
     usol_recv = []
     receiver_array = None
     receiver_buffer = None
+    # Reused accumulator for the point-source cofunction, so the per-timestep
+    # source assembly writes into an existing tensor instead of allocating a
+    # fresh Cofunction on every step.
+    source_buffer = None
     save_step = 0
     real_shot_record = None
     if compute_functional:
@@ -91,8 +96,14 @@ def _propagate_forward_central_difference(wave, source_ids):
                         wave.sources.wavelet[step] * master_source_W
                     )
                 else:
-                    wave.rhs_no_pml_source().assign(fire.assemble(
-                        wave.sources.wavelet[step] * source_cof))
+                    if source_buffer is None:
+                        source_buffer = fire.assemble(
+                            wave.sources.wavelet[step] * source_cof)
+                    else:
+                        fire.assemble(
+                            wave.sources.wavelet[step] * source_cof,
+                            tensor=source_buffer)
+                    wave.rhs_no_pml_source().assign(source_buffer)
             else:
                 wave.rhs_no_pml_source().assign(
                     wave.sources.apply_source(rhs_forcing, step))
@@ -118,7 +129,11 @@ def _propagate_forward_central_difference(wave, source_ids):
             wave.store_forward_time_steps
             and step % wave.gradient_sampling_frequency == 0
         ):
-            usol[save_step].assign(wave.get_function())
+            snapshot = fire.Function(
+                wave.function_space, name=wave.get_function_name()
+            )
+            snapshot.assign(wave.get_function())
+            usol.append(snapshot)
             save_step += 1
 
         if (step - 1) % wave.output_frequency == 0:

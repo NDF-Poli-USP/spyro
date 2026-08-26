@@ -8,7 +8,7 @@ from ..io.basicio import parallel_print as pprint
 from .meshing_functions import AutomaticMesh
 from .meshing_operations import MeshOps
 from ..tools.habc_tools import point_cloud_field
-from ..utils.error_management import value_parameter_error
+from ..utils.error_management import validate_parameter
 from ..tools.version_control import is_firedrake_new
 
 if is_firedrake_new() is False:
@@ -236,7 +236,7 @@ class HABCMesh(MeshOps):
         pprint("Setting Mesh Properties for Eikonal Analysis", comm=self.comm)
 
         allowed_ele_types = ["consistent", "underintegrated"]
-        value_parameter_error('ele_type_eik', ele_type_eik, allowed_ele_types)
+        validate_parameter('ele_type_eik', ele_type_eik, allowed_ele_types)
 
         # Function space for the Eikonal modeling
         if ele_type_eik == "consistent":
@@ -298,8 +298,8 @@ class HABCMesh(MeshOps):
         pprint("\nCreating Mesh and Initial Velocity Model", comm=self.comm)
 
         # Mesh data
-        pprint(f"Original Mesh with {wave.mesh.num_vertices()} Nodes "
-               f"and {wave.mesh.num_cells()} Volume Elements", comm=self.comm)
+        pprint(f"Original Mesh with {wave.mesh.num_vertices()} Nodes and "
+               f"{wave.mesh.num_cells()} Volume Elements", comm=self.comm)
 
         # Save a copy of the original mesh
         wave.mesh_original = wave.mesh

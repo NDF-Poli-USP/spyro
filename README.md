@@ -93,9 +93,16 @@ pip install --no-binary h5py 'firedrake[check,slepc,netgen,vtk]'
 ```
 
 
-8. To install spyro without optional dependencies, inside the Firedrake virtual environment, use:
+8. To install spyro in editable mode with the development extras, inside the Firedrake virtual environment, use:
 ```
 git clone https://github.com/NDF-Poli-USP/spyro.git
+python -m pip install -e "spyro/[dev]"
+```
+
+This development extra installs the testing, profiling, and mesh generation packages including pytest, pytest-cov, pyinstrument, memory-profiler, SeismicMesh, and PakMsh.
+
+For a minimal install without those extras, use:
+```
 python -m pip install -e spyro/
 ```
 
