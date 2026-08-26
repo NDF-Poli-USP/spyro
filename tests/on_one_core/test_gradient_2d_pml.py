@@ -155,7 +155,7 @@ def get_forward_model(dictionary: dict = None,
         Whether the automated adjoint should checkpoint its tape. Only
         meaningful for :attr:`AdjointType.AUTOMATED_ADJOINT`.
     snapshots : int, optional
-        Snapshot budget passed on to ``enable_automated_adjoint``. ``None``
+        Number of snapshots passed on to ``enable_automated_adjoint``. ``None``
         keeps every time step in memory.
 
     Returns
@@ -194,7 +194,7 @@ def get_forward_model(dictionary: dict = None,
             nt = int(Wave_obj_guess.final_time / Wave_obj_guess.dt) + 1
             schedule = Wave_obj_guess.automated_adjoint.checkpointing_schedule
             assert schedule is not None
-            # An online schedule has no max_n; a budgeted one must match nt.
+            # An online schedule has no max_n; a bounded one must match nt.
             assert schedule.max_n in (None, nt)
     rec_out_guess = Wave_obj_guess.forward_solution_receivers
 
@@ -216,14 +216,14 @@ def test_gradient_auto_adjoint(checkpointing: bool, snapshots: int | None,
 
     Checkpointing changes how the tape is stored, not what it computes, so the
     same second-order Taylor convergence is required in every case, including
-    the recomputing schedule selected by a snapshot budget.
+    the recomputing schedule selected by a number of snapshots.
 
     Parameters
     ----------
     checkpointing : bool
         Whether to manage the tape with a checkpoint schedule.
     snapshots : int or None
-        Snapshot budget. ``None`` keeps every step in memory.
+        Number of snapshots. ``None`` keeps every step in memory.
     PML : bool, optional
         Whether to enable the perfectly matched layer. Defaults to ``True``.
     """
@@ -285,7 +285,7 @@ def test_gradient_pml_auto_adjoint(checkpointing: bool,
     checkpointing : bool
         Whether to manage the tape with a checkpoint schedule.
     snapshots : int or None
-        Snapshot budget. ``None`` keeps every step in memory.
+        Number of snapshots. ``None`` keeps every step in memory.
     """
     test_gradient_auto_adjoint(checkpointing, snapshots, PML=True)
 

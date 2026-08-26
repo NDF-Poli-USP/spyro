@@ -643,7 +643,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         snapshots : int, optional
             How many checkpointing units to keep in RAM, which is also how
             spyro chooses the schedule. ``None`` (the default) keeps every
-            time step in memory and never recomputes. An integer budget keeps
+            time step in memory and never recomputes. An integer keeps
             only that many checkpoints and recomputes the forward in between,
             turning :math:`O(n_t)` memory into :math:`O(\\text{snapshots})` at
             the cost of extra forward work. Requires ``checkpointing=True``.

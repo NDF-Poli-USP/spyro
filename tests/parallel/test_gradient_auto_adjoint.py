@@ -125,7 +125,7 @@ def get_forward_model(checkpointing=False, snapshots=None):
     checkpointing : bool, optional
         Whether to manage each member's tape with a checkpoint schedule.
     snapshots : int, optional
-        Snapshot budget. ``None`` keeps every time step in memory.
+        Number of snapshots. ``None`` keeps every time step in memory.
 
     Returns
     -------

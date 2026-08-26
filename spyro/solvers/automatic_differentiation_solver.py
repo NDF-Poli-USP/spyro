@@ -94,7 +94,7 @@ class AutomatedAdjoint:
     Storing every forward step on the tape costs memory linear in the number
     of steps. Passing ``checkpointing=True`` hands the tape to a
     :mod:`checkpoint_schedules` schedule [1]_ instead. Spyro uses two of them,
-    picking between them from the snapshot budget:
+    picking between them from the number of snapshots:
 
     ``snapshots=None``
         :class:`~checkpoint_schedules.SingleMemoryStorageSchedule` - every
@@ -106,28 +106,12 @@ class AutomatedAdjoint:
 
     The schedule is built by :meth:`start_recording`, not here.
 
-    Choosing between them
-    ~~~~~~~~~~~~~~~~~~~~~
-    Leave ``snapshots`` unset whenever the tape fits in memory: nothing is
-    recomputed, so it is the fastest option, and the schedule still lets the
-    manager drop variables the adjoint will never read. Reach for a budget
-    only when the run does not fit - long time axes, fine meshes, 3D - and
-    make it well below :math:`n_t`, because the saving comes from the ratio.
-    A budget close to :math:`n_t` pays the recomputation without buying much
-    memory back.
-
+    Why not Revolve
+    ~~~~~~~~~~~~~~~
     Spyro deliberately exposes no other schedule. :mod:`checkpoint_schedules`
     also offers ``Revolve`` [2]_, the classical binomial strategy, but for the
     same number of checkpointing units the mixed schedule of [3]_ recomputes
-    less. Revolve stores only forward restart data, so the non-linear
-    dependency data of each reversed step has to be regenerated; the mixed
-    schedule spends the same budget on whichever of the two is cheaper for a
-    given step, assuming - as spyro's wave solvers do - that the two are of
-    comparable size. In [3]_ (Fig. 7) the mixed schedule takes fewer total
-    forward steps than Revolve across the whole range of checkpointing units,
-    and in its barotropic vorticity example, 17520 timesteps with 200
-    checkpointing units, Revolve takes 52358 forward steps against 34965 for
-    the mixed schedule, with reverse-mode runtimes of 5091.7 s and 3762.0 s.
+    less.
 
     References
     ----------

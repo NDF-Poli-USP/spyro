@@ -1,7 +1,7 @@
 """Serial gradient tests for the checkpointed automated adjoint.
 
 Spyro drives the tape with two :mod:`checkpoint_schedules` schedules, chosen
-from the snapshot budget given to
+from the number of snapshots given to
 :meth:`~spyro.solvers.wave.Wave.enable_automated_adjoint`:
 
 ``checkpointing=False``
