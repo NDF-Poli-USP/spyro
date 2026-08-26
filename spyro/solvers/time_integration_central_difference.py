@@ -161,19 +161,14 @@ def _propagate_forward_central_difference(wave, source_ids):
 
         if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
             if wave.use_vertex_only_mesh:
-                if isinstance(real_shot_record[step], np.ndarray):
-                    real_shot = fire.Function(
-                        usol_recv[-1].function_space(),
-                        val=real_shot_record[step],
-                    )
-                    misfit_step = real_shot - usol_recv[-1]
-                elif isinstance(real_shot_record[step], fire.Function):
+                if isinstance(real_shot_record[step], fire.Function):
                     misfit_step = real_shot_record[step] - usol_recv[-1]
                 else:
-                    raise ValueError(
-                        "Unsupported type for real_shot_record. Must be "
-                        "either a numpy array or a Firedrake Function."
+                    real_shot = helpers._global_receiver_step_to_vom(
+                        real_shot_record[step],
+                        usol_recv[-1].function_space(),
                     )
+                    misfit_step = real_shot - usol_recv[-1]
             else:
                 misfit_step = real_shot_record[step] - usol_recv[-1]
             wave.misfit.append(misfit_step)
@@ -189,11 +184,18 @@ def _propagate_forward_central_difference(wave, source_ids):
     helpers.display_progress(wave.comm, t)
     if receiver_array is not None and functional_mode is not FunctionalEvaluationMode.PER_TIMESTEP:
         usol_recv = receiver_array
-    usol_recv = helpers.fill(
-        usol_recv, wave.receivers.is_local, nt, wave.receivers.number_of_points
-    )
-
-    usol_recv = utils.utils.communicate(usol_recv, wave.comm)
+    if wave.use_vertex_only_mesh:
+        usol_recv = helpers._global_receiver_values_from_vom(
+            usol_recv, receiver_buffer.function_space(), wave.comm
+        )
+    else:
+        usol_recv = helpers.fill(
+            usol_recv,
+            wave.receivers.is_local,
+            nt,
+            wave.receivers.number_of_points,
+        )
+        usol_recv = utils.utils.communicate(usol_recv, wave.comm)
 
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         wave.automated_adjoint.stop_recording()

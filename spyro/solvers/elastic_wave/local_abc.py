@@ -19,12 +19,20 @@ def _boundary_measures(wave, qr_s):
         5: ds_b,
         6: ds_t,
     }
-    status_keys = {1: 2, 2: 1, 3: 3, 4: 4, 5: "bottom", 6: "top"}
-    status = wave.mesh_parameters.boundary_ids_map
+    # These flags are global configuration. Do not use boundary_ids_map here:
+    # it is built from locally owned boundary nodes and can therefore differ
+    # across spatial MPI ranks, which would produce mismatched UFL forms.
+    status = (
+        wave.absorb_bottom,
+        wave.absorb_top,
+        wave.absorb_left,
+        wave.absorb_right,
+        wave.absorb_front,
+        wave.absorb_back,
+    )
     return tuple(
         marker_measures[marker]
-        if status.get(status_keys[marker], True) else 0
-        for marker in range(1, 7)
+        if status[marker - 1] else 0 for marker in range(1, 7)
     )
 
 

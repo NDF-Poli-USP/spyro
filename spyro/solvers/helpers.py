@@ -1,7 +1,8 @@
 import os
 
 import numpy as np
-from firedrake import VTKFile, Function
+from firedrake import VTKFile, Function, FunctionSpace, assemble, interpolate
+from pyadjoint import stop_annotating
 
 from .. import io
 
@@ -46,6 +47,53 @@ def fill(usol_recv, is_local, nt, nr):
             if is_local[rn] is None:
                 usol_recv[ti][rn] = -99999.0
     return usol_recv
+
+
+def _input_ordering_function_space(function_space):
+    """Create the matching space on a VOM input-ordering mesh."""
+    mesh = function_space.mesh()
+    return FunctionSpace(mesh.input_ordering, function_space.ufl_element())
+
+
+def _global_receiver_values_from_vom(
+    receiver_values, receiver_function_space, comm,
+):
+    """Gather distributed VOM values in the user-provided receiver order."""
+    if len(receiver_values) == 0:
+        return np.asarray(receiver_values)
+
+    input_space = _input_ordering_function_space(receiver_function_space)
+    local_function = Function(receiver_function_space)
+    ordered_values = []
+    with stop_annotating():
+        for value in receiver_values:
+            if isinstance(value, Function):
+                local_function.assign(value)
+            else:
+                local_function.dat.data_wo[:] = value
+            input_ordered = assemble(interpolate(local_function, input_space))
+            local_ordered = np.array(input_ordered.dat.data_ro, copy=True)
+            ordered_values.append(np.concatenate(
+                comm.comm.allgather(local_ordered), axis=0
+            ))
+    return np.asarray(ordered_values)
+
+
+def _global_receiver_step_to_vom(observed_step, receiver_function_space):
+    """Project one globally ordered receiver record onto the local VOM."""
+    input_space = _input_ordering_function_space(receiver_function_space)
+    observed_step = np.asarray(observed_step)
+    with stop_annotating():
+        observed_input_ordering = Function(input_space)
+        local_count = observed_input_ordering.dat.data_wo.shape[0]
+        all_counts = input_space.comm.allgather(local_count)
+        offset = sum(all_counts[:input_space.comm.rank])
+        observed_input_ordering.dat.data_wo[:] = observed_step[
+            offset:offset + local_count
+        ]
+        return assemble(interpolate(
+            observed_input_ordering, receiver_function_space
+        ))
 
 
 def create_output_file(name, comm, source_num):

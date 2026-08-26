@@ -4,8 +4,8 @@
 #SBATCH --job-name=fwi3d-mesh
 #SBATCH --partition=amd_large_2
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --ntasks-per-node=1
+#SBATCH --ntasks=4
+#SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=96G
 #SBATCH --time=08:00:00
@@ -39,4 +39,4 @@ fi
 
 export OMP_NUM_THREADS=1
 export PYTHONPATH="$HERE/../../..:${PYTHONPATH:-}"
-python3 "$HERE/validate_spectral_mesh_3d.py"
+mpiexec --bind-to core -n 4 python3 "$HERE/validate_spectral_mesh_3d.py"

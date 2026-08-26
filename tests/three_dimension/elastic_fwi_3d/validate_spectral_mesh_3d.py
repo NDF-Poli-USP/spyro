@@ -35,8 +35,8 @@ def _edge_config(base: dict, edge: float) -> dict:
 
 
 def main():
-    if MPI.COMM_WORLD.size != 1:
-        raise RuntimeError("The mesh gate must run with exactly one MPI rank.")
+    if MPI.COMM_WORLD.size != 4:
+        raise RuntimeError("The mesh gate must run with four spatial MPI ranks.")
 
     started = time.time()
     base = settings()
@@ -57,6 +57,8 @@ def main():
 
     peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     peak_rss_gib = peak_rss / (1024**3 if sys.platform == "darwin" else 1024**2)
+    peak_rss_gib = MPI.COMM_WORLD.allreduce(peak_rss_gib, op=MPI.MAX)
+    wall_time = MPI.COMM_WORLD.allreduce(time.time() - started, op=MPI.MAX)
     report = {
         "element": "structured_extruded_spectral",
         "degree": base["degree"],
@@ -71,16 +73,17 @@ def main():
         "relative_trace_error": relative_trace_error,
         "tolerance": tolerance,
         "passed": relative_trace_error <= tolerance,
-        "wall_time_s": time.time() - started,
+        "wall_time_s": wall_time,
         "peak_rss_gib": peak_rss_gib,
     }
 
     output = Path(os.environ.get(
         "FWI3D_MESH_GATE_OUTPUT", "spectral_mesh_gate.json"
     ))
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(report, indent=2), encoding="ascii")
-    print(json.dumps(report, indent=2), flush=True)
+    if MPI.COMM_WORLD.rank == 0:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(report, indent=2), encoding="ascii")
+        print(json.dumps(report, indent=2), flush=True)
     if not report["passed"]:
         raise RuntimeError(
             "Production mesh failed the trace comparison: "

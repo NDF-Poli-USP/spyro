@@ -51,8 +51,10 @@ with hexahedral fourth-order spectral elements and GLL quadrature. With
 wavelength at 5 Hz using the lower Vs bound. The acquisition has a 4x4 source
 grid and a 9x9 receiver grid on the top surface.
 
-The array has four tasks, one method per node and 16 MPI ranks. With 16
-sources, automatic parallelism assigns one source to each rank. Override the
+The array has four tasks, one method per node and 64 MPI ranks. With 16
+sources, automatic parallelism assigns four spatial ranks to each source. The
+distributed VertexOnlyMesh receiver path restores all 81 vector traces in the
+original acquisition order before objective evaluation. Override the
 production discretization or checkpoint budget at submission time, for
 example:
 

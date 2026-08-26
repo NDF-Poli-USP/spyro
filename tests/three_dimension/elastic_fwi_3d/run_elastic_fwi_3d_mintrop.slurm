@@ -4,8 +4,8 @@
 #SBATCH --job-name=fwi3d-elastic
 #SBATCH --partition=intel_large
 #SBATCH --nodes=1
-#SBATCH --ntasks=16
-#SBATCH --ntasks-per-node=16
+#SBATCH --ntasks=64
+#SBATCH --ntasks-per-node=64
 #SBATCH --cpus-per-task=1
 #SBATCH --exclusive
 #SBATCH --mem=0
@@ -39,7 +39,7 @@ if [[ -n "${SLURM_JOB_ID:-}" && -z "${APPTAINER_CONTAINER:-}" ]]; then
         --env "SLURM_ARRAY_TASK_ID=${SLURM_ARRAY_TASK_ID}"
         --env "SLURM_ARRAY_JOB_ID=${SLURM_ARRAY_JOB_ID}"
         --env "SLURM_JOB_ID=${SLURM_JOB_ID}"
-        --env "SLURM_NTASKS=${SLURM_NTASKS:-16}"
+        --env "SLURM_NTASKS=${SLURM_NTASKS:-64}"
         --env "FWI3D_RESULTS_ROOT=${FWI3D_RESULTS_ROOT:-$HERE/fwi_3d_results/elastic_inclusion}"
     )
     while IFS='=' read -r name value; do
@@ -65,6 +65,6 @@ export FWI3D_METHOD="$METHOD"
 export FWI3D_RUN_ID="${FWI3D_RUN_ID:-${SLURM_ARRAY_JOB_ID:-manual}_${METHOD}}"
 export PYTHONPATH="$HERE/../../..:${PYTHONPATH:-}"
 
-echo "method=$METHOD ranks=${SLURM_NTASKS:-16} snapshots=${FWI3D_CHECKPOINT_SNAPSHOTS:-32}"
-mpiexec --bind-to core -n "${SLURM_NTASKS:-16}" \
+echo "method=$METHOD ranks=${SLURM_NTASKS:-64} snapshots=${FWI3D_CHECKPOINT_SNAPSHOTS:-32}"
+mpiexec --bind-to core -n "${SLURM_NTASKS:-64}" \
     python3 "$HERE/driver_elastic_fwi_3d.py"
