@@ -1,9 +1,35 @@
 from contextlib import contextmanager
+from collections.abc import Mapping
 
 from pyadjoint import Tape, continue_annotation, pause_annotation, taylor_test
 
 import firedrake as fire
 import firedrake.adjoint as fire_ad
+
+from ..utils.physical_parameters import PhysicalParameters
+
+
+def _as_list(value: object) -> list:
+    """Return one value or collection as a list.
+
+    Parameters
+    ----------
+    value : object, mapping, PhysicalParameters, list, tuple, or None
+        Value to normalize. Anything keyed by name contributes its values,
+        and ``None`` produces an empty list.
+
+    Returns
+    -------
+    list
+        Normalized values.
+    """
+    if value is None:
+        return []
+    if isinstance(value, (Mapping, PhysicalParameters)):
+        return list(value.values())
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value]
 
 
 class AutomatedAdjoint:
@@ -43,19 +69,28 @@ class AutomatedAdjoint:
     ----------------
     .. code-block:: python
 
-        wave.enable_automated_adjoint()   # builds AutomatedAdjoint(wave.comm)
-        with wave.automated_adjoint.fresh_tape():
-            wave.forward_solve()          # forward run recorded on the tape
+        wave.enable_automated_adjoint(control_parameters=parameters)
+        wave.forward_solve()          # the time integrator starts recording
+        dJ = wave.gradient_solve()    # one derivative per selected parameter
+        wave.automated_adjoint.clear_tape()
+
+    ``gradient_solve`` builds the reduced functional from the recorded tape
+    on its first call. Building it here is only needed to hold on to it, or
+    to run a Taylor test against it:
+
+    .. code-block:: python
+
         wave.automated_adjoint.create_reduced_functional(wave.functional_value)
-        dJ = wave.automated_adjoint.compute_gradient()
-        rate = wave.automated_adjoint.verify_gradient(wave.c)  # Taylor test
+        rate = wave.automated_adjoint.verify_gradient(wave.c)
 
     Parameters
     ----------
-    controls : firedrake.Function, optional
-        The control with respect to which the functional is differentiated.
-        It is wrapped in a :class:`pyadjoint.Control` when the reduced functional is
-        created.
+    controls : object, mapping, or iterable, optional
+        Fields with respect to which the functional is differentiated. A
+        mapping keyed by material parameters labels its controls, so the
+        derivatives can be handed back under the same names; anything else is
+        taken as unlabeled fields. The wave equation resolves parameter names
+        to these fields before constructing the adjoint solver.
     ensemble : firedrake.ensemble.Ensemble, optional
         The Firedrake ensemble communicator used to sum the per-shot
         functionals and gradients across ensemble members. In practice this is
@@ -64,8 +99,11 @@ class AutomatedAdjoint:
 
     Attributes
     ----------
-    controls : firedrake.Function
-        The control passed at construction time.
+    controls : list
+        Controls passed at construction time.
+    control_parameter_names : list
+        Labels supplied by a control container, or ``None`` for unlabeled
+        controls.
     ensemble : firedrake.ensemble.Ensemble or None
         The ensemble communicator used by the reduced functional.
     reduced_functional : firedrake.adjoint.EnsembleReducedFunctional or \
@@ -74,11 +112,18 @@ pyadjoint.ReducedFunctional or None
         :meth:`create_reduced_functional`.
     """
 
-    def __init__(self, ensemble, controls=None):
-        self.controls = controls
+    def __init__(self, ensemble: object, controls: object = None) -> None:
         self.ensemble = ensemble
         self.reduced_functional = None
         self._tape = None
+        if isinstance(controls, (Mapping, PhysicalParameters)):
+            # Keyed by material parameter: keep the labels, so the
+            # derivatives can be handed back under the same names.
+            self.control_parameter_names = list(controls)
+            self.controls = list(controls.values())
+        else:
+            self.controls = _as_list(controls)
+            self.control_parameter_names = [None] * len(self.controls)
 
     @contextmanager
     def fresh_tape(self):
@@ -139,7 +184,9 @@ pyadjoint.ReducedFunctional or None
         fire_ad.set_working_tape(Tape())
         pause_annotation()
 
-    def create_reduced_functional(self, functional, ensemble=None):
+    def create_reduced_functional(
+        self, functional: object, ensemble: object = None,
+    ) -> object:
         """Build the reduced functional for the recorded forward problem.
 
         The reduced functional ties the (local) functional value to the control
@@ -165,7 +212,13 @@ pyadjoint.ReducedFunctional or None
             The reduced functional, also stored on
             :attr:`reduced_functional`.
         """
-        control = fire_ad.Control(self.controls)
+        if not self.controls:
+            raise ValueError("At least one control is required.")
+        controls = [fire_ad.Control(value) for value in self.controls]
+        # pyadjoint mirrors the shape it is given: a bare control comes back
+        # as a bare derivative, a list as a list. Handing it a one-item list
+        # would make every single-control caller unwrap by hand.
+        control = controls[0] if len(controls) == 1 else controls
 
         self.reduced_functional = fire_ad.EnsembleReducedFunctional(
             functional,
@@ -176,13 +229,13 @@ pyadjoint.ReducedFunctional or None
         )
         return self.reduced_functional
 
-    def recompute_functional(self, control_value):
+    def recompute_functional(self, control_value: object) -> object:
         """Re-evaluate the reduced functional at a new control value.
 
         Parameters
         ----------
-        control_value : firedrake.Function
-            The control at which to evaluate the functional.
+        control_value : firedrake.Function or iterable of firedrake.Function
+            Controls at which to evaluate the functional.
 
         Returns
         -------
@@ -197,9 +250,9 @@ pyadjoint.ReducedFunctional or None
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
-        return self.reduced_functional(control_value)
+        return self.reduced_functional(_as_list(control_value))
 
-    def compute_gradient(self):
+    def compute_gradient(self) -> object:
         """Return the gradient of the functional.
 
         Computes the gradient via reverse-mode differentiation of the tape and maps
@@ -209,8 +262,9 @@ pyadjoint.ReducedFunctional or None
 
         Returns
         -------
-        firedrake.Function
-            The gradient of the functional with respect to the control.
+        firedrake.Function or list of firedrake.Function
+            The gradient, or one for each control when there is more than
+            one.
 
         Raises
         ------
@@ -221,7 +275,7 @@ pyadjoint.ReducedFunctional or None
             raise ValueError("Reduced functional not created.")
         return self.reduced_functional.derivative(apply_riesz=True)
 
-    def compute_derivative(self):
+    def compute_derivative(self) -> object:
         """Return the raw derivative of the functional.
 
         Similar to :meth:`compute_gradient` but without the Riesz map
@@ -233,8 +287,9 @@ pyadjoint.ReducedFunctional or None
 
         Returns
         -------
-        firedrake.Cofunction
-            The derivative of the functional with respect to the control.
+        firedrake.Cofunction or list of firedrake.Cofunction
+            The derivative, or one for each control when there is more than
+            one.
 
         Raises
         ------
@@ -245,7 +300,38 @@ pyadjoint.ReducedFunctional or None
             raise ValueError("Reduced functional not created.")
         return self.reduced_functional.derivative(apply_riesz=False)
 
-    def verify_gradient(self, control_var, direction=None, dJdm=None):
+    def label_derivatives(self, derivatives: object) -> PhysicalParameters:
+        """Associate computed derivatives with selected physical parameters.
+
+        Parameters
+        ----------
+        derivatives : object or iterable
+            Derivatives positionally matching :attr:`controls`.
+
+        Returns
+        -------
+        PhysicalParameters
+            Derivatives keyed by their selected physical parameter enums.
+
+        Raises
+        ------
+        ValueError
+            If the controls were supplied without physical parameter labels.
+        """
+        if any(name is None for name in self.control_parameter_names):
+            raise ValueError(
+                "Physical parameter labels are required for labeled "
+                "derivatives.",
+            )
+        return PhysicalParameters(zip(
+            self.control_parameter_names,
+            _as_list(derivatives),
+        ))
+
+    def verify_gradient(
+        self, control_var: object, direction: object = None,
+        dJdm: object = None,
+    ) -> float:
         """Run a Taylor test to validate the automated-adjoint gradient.
 
         Performs pyadjoint's :func:`~pyadjoint.taylor_test`, which perturbs the
@@ -258,12 +344,12 @@ pyadjoint.ReducedFunctional or None
 
         Parameters
         ----------
-        control_var : firedrake.Function
-            The control about which the gradient is verified.
-        direction : firedrake.Function, optional
-            Perturbation direction. Defaults to a constant ``0.01`` field in the
-            control's function space.
-        dJdm : float, firedrake.Function, or firedrake.Cofunction, optional
+        control_var : firedrake.Function or iterable of firedrake.Function
+            Controls about which the gradient is verified.
+        direction : firedrake.Function or iterable of firedrake.Function, optional
+            Perturbation directions. Each defaults to a constant ``0.01``
+            field in the corresponding control's function space.
+        dJdm : float or iterable, optional
             The directional derivative ``J'(m)(direction)``. pyadjoint expects a
             scalar here, so if a gradient ``Function`` (Riesz representer) or a
             ``Cofunction`` (raw derivative) is supplied it is first paired with
@@ -284,9 +370,19 @@ pyadjoint.ReducedFunctional or None
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
+        control_var = _as_list(control_var)
         if direction is None:
-            direction = fire.Function(control_var.function_space())
-            direction.interpolate(0.01)
+            direction = []
+            for control in control_var:
+                perturbation = fire.Function(control.function_space())
+                perturbation.interpolate(0.01)
+                direction.append(perturbation)
+        else:
+            direction = _as_list(direction)
+        if len(control_var) != len(direction):
+            raise ValueError(
+                "Each control requires exactly one perturbation direction.",
+            )
         # pyadjoint's ``taylor_test`` expects ``dJdm`` to be the scalar
         # directional derivative ``J'(m)(h)``, not the gradient itself. When a
         # Firedrake ``Function`` (Riesz representer of the gradient) or a
@@ -296,14 +392,26 @@ pyadjoint.ReducedFunctional or None
         # ``min(residuals) < 1E-15`` raises ``UFL conditions cannot be
         # evaluated as bool in a Python context``.
         if dJdm is not None and not isinstance(dJdm, (int, float)):
-            if isinstance(dJdm, fire.Function):
-                dJdm = fire.assemble(
-                    fire.inner(dJdm, direction) * fire.dx
+            derivatives = _as_list(dJdm)
+            if len(derivatives) != len(direction):
+                raise ValueError(
+                    "Each control requires exactly one derivative.",
                 )
-            elif isinstance(dJdm, fire.Cofunction):
-                # Apply the cofunction to the direction (duality pairing).
-                dJdm = fire.assemble(fire.action(dJdm, direction))
+            directional_derivatives = []
+            for derivative, perturbation in zip(derivatives, direction):
+                if isinstance(derivative, fire.Function):
+                    directional_derivatives.append(
+                        fire.assemble(
+                            fire.inner(derivative, perturbation) * fire.dx,
+                        ),
+                    )
+                elif isinstance(derivative, fire.Cofunction):
+                    directional_derivatives.append(
+                        fire.assemble(fire.action(derivative, perturbation)),
+                    )
+                else:
+                    dJdm = None
+                    break
             else:
-                # Unknown type, fall back to pyadjoint's internal computation.
-                dJdm = None
+                dJdm = sum(directional_derivatives)
         return taylor_test(self.reduced_functional, control_var, direction, dJdm=dJdm)
