@@ -56,7 +56,7 @@ def _env(name: str, default, cast):
 
 def settings() -> dict:
     smoke = os.environ.get("FWI3D_SMOKE", "0") == "1"
-    source_count = _env("FWI3D_SOURCES", 1 if smoke else 8, int)
+    source_count = _env("FWI3D_SOURCES", 1 if smoke else 16, int)
     if source_count < 1:
         raise ValueError("FWI3D_SOURCES must be positive.")
     source_rows = int(math.sqrt(source_count))
@@ -69,17 +69,23 @@ def settings() -> dict:
     model_save_every = _env("FWI3D_MODEL_SAVE_EVERY", 1, int)
     if model_save_every < 1:
         raise ValueError("FWI3D_MODEL_SAVE_EVERY must be positive.")
+    edge = _env("FWI3D_EDGE", 0.25 if smoke else 0.05, float)
+    frequency = _env("FWI3D_FREQUENCY", 4.0 if smoke else 5.0, float)
+    degree = _env("FWI3D_DEGREE", 2 if smoke else 4, int)
+    minimum_cells_per_wavelength = VS_MIN / (frequency * edge)
     return {
         "method": method,
         "smoke": smoke,
         "sources": source_count,
         "source_grid": [source_rows, source_columns],
         "receivers_per_axis": _env("FWI3D_RECEIVERS_PER_AXIS", 3 if smoke else 9, int),
-        "edge": _env("FWI3D_EDGE", 0.25 if smoke else 0.10, float),
-        "degree": _env("FWI3D_DEGREE", 2 if smoke else 3, int),
-        "dt": _env("FWI3D_DT", 0.002 if smoke else 0.001, float),
+        "edge": edge,
+        "minimum_cells_per_wavelength": minimum_cells_per_wavelength,
+        "minimum_gll_intervals_per_wavelength": degree * minimum_cells_per_wavelength,
+        "degree": degree,
+        "dt": _env("FWI3D_DT", 0.002 if smoke else 0.00025, float),
         "final_time": _env("FWI3D_FINAL_TIME", 0.30 if smoke else 1.0, float),
-        "frequency": _env("FWI3D_FREQUENCY", 4.0 if smoke else 5.0, float),
+        "frequency": frequency,
         "snapshots": _env("FWI3D_CHECKPOINT_SNAPSHOTS", 8 if smoke else 32, int),
         "gc_frequency": _env("FWI3D_GC_TIMESTEP_FREQUENCY", 25 if smoke else 50, int),
         "max_iterations": _env("FWI3D_MAX_ITERATIONS", 2 if smoke else 50, int),
@@ -98,8 +104,8 @@ def settings() -> dict:
 def _surface_grid(
     rows: int, columns: int, z: float, inset: float,
 ) -> list[tuple[float, ...]]:
-    x_axis = np.linspace(inset, 1.0 - inset, columns)
-    y_axis = np.linspace(inset, 1.0 - inset, rows)
+    x_axis = np.array([0.5]) if columns == 1 else np.linspace(inset, 1.0 - inset, columns)
+    y_axis = np.array([0.5]) if rows == 1 else np.linspace(inset, 1.0 - inset, rows)
     return [(z, float(x), float(y)) for x in x_axis for y in y_axis]
 
 
@@ -116,7 +122,7 @@ def model_dictionary(config: dict, *, source_count: int | None = None) -> dict:
     )
     return {
         "options": {
-            "cell_type": "T",
+            "cell_type": "Q",
             "variant": "lumped",
             "degree": config["degree"],
             "dimension": 3,
@@ -608,6 +614,16 @@ def main():
         (directory / "configuration.json").write_text(
             json.dumps(configuration, indent=2),
             encoding="ascii",
+        )
+        print(
+            "3D setup: "
+            f"SEM{config['degree']} extruded edge={config['edge']:.4f} km "
+            f"cpw_min={config['minimum_cells_per_wavelength']:.3f} "
+            f"gll_ppw_min={config['minimum_gll_intervals_per_wavelength']:.3f} "
+            f"dt={config['dt']:.6f} s sources={config['sources']} "
+            f"source_grid={config['source_grid']} "
+            f"receivers={config['receivers_per_axis'] ** 2}",
+            flush=True,
         )
     MPI.COMM_WORLD.Barrier()
     observed, energy = _observed(config)

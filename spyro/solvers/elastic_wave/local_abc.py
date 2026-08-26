@@ -1,4 +1,31 @@
-from firedrake import (Constant, ds, TestFunction, TrialFunction)
+from firedrake import (Constant, ds, ds_b, ds_t, ds_v, TestFunction,
+                       TrialFunction)
+
+
+def _boundary_measures(wave, qr_s):
+    """Return coordinate-ordered exterior measures for box meshes."""
+    if not getattr(wave.mesh, "extruded", False):
+        return tuple(ds(marker, **qr_s) for marker in range(1, 7))
+
+    # The base rectangle is (z, x), with its z coordinate negated by Spyro.
+    # Firedrake markers 1/2 are therefore z=max/z=min, while extrusion is y.
+    marker_measures = {
+        1: ds_v(2, **qr_s),
+        2: ds_v(1, **qr_s),
+        3: ds_v(3, **qr_s),
+        4: ds_v(4, **qr_s),
+        # Top/bottom extrusion facets have a different tensor factorization;
+        # Firedrake builds the appropriate quadrature for these measures.
+        5: ds_b,
+        6: ds_t,
+    }
+    status_keys = {1: 2, 2: 1, 3: 3, 4: 4, 5: "bottom", 6: "top"}
+    status = wave.mesh_parameters.boundary_ids_map
+    return tuple(
+        marker_measures[marker]
+        if status.get(status_keys[marker], True) else 0
+        for marker in range(1, 7)
+    )
 
 
 def local_abc_form(wave):
@@ -28,6 +55,7 @@ def local_abc_form(wave):
     c_s = wave.c_s
 
     qr_s = wave.surface_quadrature_rule
+    boundary_measures = _boundary_measures(wave, qr_s)
 
     # Index of each coordinate
     iz = 0
@@ -81,7 +109,7 @@ def local_abc_form(wave):
         raise NotImplementedError(f"Unsupported local ABC: {abc_type}")
 
     return callback(wave.dimension, rho, c_p, c_s,
-                    v, iz, ix, iy, qr_s,
+                    v, iz, ix, iy, boundary_measures,
                     uz_dt, ux_dt, uy_dt,
                     uz_dz, ux_dz, uy_dz,
                     uz_dx, ux_dx, uy_dx,
@@ -89,7 +117,7 @@ def local_abc_form(wave):
 
 
 def clayton_engquist_A1_terms(ndim, rho, c_p, c_s,
-                              v, iz, ix, iy, qr_s,
+                              v, iz, ix, iy, boundary_measures,
                               uz_dt, ux_dt, uy_dt,
                               uz_dz, ux_dz, uy_dz,
                               uz_dx, ux_dx, uy_dx,
@@ -102,59 +130,59 @@ def clayton_engquist_A1_terms(ndim, rho, c_p, c_s,
     if ndim == 3:
         sig_zz += rho*(c_p**2 - 2*c_s**2)*uy_dy
     sig_xz = rho*c_s*ux_dt + rho*(c_s**2)*uz_dx
-    F_t += -(sig_zz*v[iz] + sig_xz*v[ix])*ds(1, **qr_s)
+    F_t += -(sig_zz*v[iz] + sig_xz*v[ix])*boundary_measures[0]
     if ndim == 3:
         sig_yz = rho*c_s*uy_dt + rho*(c_s**2)*uz_dy
-        F_t += -sig_yz*v[iy]*ds(1, **qr_s)
+        F_t += -sig_yz*v[iy]*boundary_measures[0]
 
     # Plane z = 0
     sig_zz = -rho*c_p*uz_dt + rho*(c_p**2 - 2*c_s**2)*ux_dx
     if ndim == 3:
         sig_zz += rho*(c_p**2 - 2*c_s**2)*uy_dy
     sig_xz = -rho*c_s*ux_dt + rho*(c_s**2)*uz_dx
-    F_t += (sig_zz*v[iz] + sig_xz*v[ix])*ds(2, **qr_s)
+    F_t += (sig_zz*v[iz] + sig_xz*v[ix])*boundary_measures[1]
     if ndim == 3:
         sig_yz = -rho*c_s*uy_dt + rho*(c_s**2)*uz_dy
-        F_t += sig_yz*v[iy]*ds(2, **qr_s)
+        F_t += sig_yz*v[iy]*boundary_measures[1]
 
     # Plane x = -pad
     sig_zx = rho*c_s*uz_dt + rho*(c_s**2)*ux_dz
     sig_xx = rho*c_p*ux_dt + rho*(c_p**2 - 2*c_s**2)*uz_dz
     if ndim == 3:
         sig_xx += rho*(c_p**2 - 2*c_s**2)*uy_dy
-    F_t += -(sig_zx*v[iz] + sig_xx*v[ix])*ds(3, **qr_s)
+    F_t += -(sig_zx*v[iz] + sig_xx*v[ix])*boundary_measures[2]
     if ndim == 3:
         sig_yx = rho*c_s*uy_dt + rho*(c_s**2)*ux_dy
-        F_t += -sig_yx*v[iy]*ds(3, **qr_s)
+        F_t += -sig_yx*v[iy]*boundary_measures[2]
 
     # Plane x = Lx + pad
     sig_zx = -rho*c_s*uz_dt + rho*(c_s**2)*ux_dz
     sig_xx = -rho*c_p*ux_dt + rho*(c_p**2 - 2*c_s**2)*uz_dz
     if ndim == 3:
         sig_xx += rho*(c_p**2 - 2*c_s**2)*uy_dy
-    F_t += (sig_zx*v[iz] + sig_xx*v[ix])*ds(4, **qr_s)
+    F_t += (sig_zx*v[iz] + sig_xx*v[ix])*boundary_measures[3]
     if ndim == 3:
         sig_yx = -rho*c_s*uy_dt + rho*(c_s**2)*ux_dy
-        F_t += sig_yx*v[iy]*ds(4, **qr_s)
+        F_t += sig_yx*v[iy]*boundary_measures[3]
 
     if ndim == 3:
         # Plane y = 0
         sig_zy = rho*c_s*uz_dt + rho*(c_s**2)*uy_dz
         sig_xy = rho*c_s*ux_dt + rho*(c_s**2)*uy_dx
         sig_yy = rho*c_p*uy_dt + rho*(c_p**2 - 2*c_s**2)*(uz_dz + ux_dx)
-        F_t += -(sig_zy*v[iz] + sig_xy*v[ix] + sig_yy*v[iy])*ds(5, **qr_s)
+        F_t += -(sig_zy*v[iz] + sig_xy*v[ix] + sig_yy*v[iy])*boundary_measures[4]
 
         # Plane y = L_y + 2*pad
         sig_zy = -rho*c_s*uz_dt + rho*(c_s**2)*uy_dz
         sig_xy = -rho*c_s*ux_dt + rho*(c_s**2)*uy_dx
         sig_yy = -rho*c_p*uy_dt + rho*(c_p**2 - 2*c_s**2)*(uz_dz + ux_dx)
-        F_t += (sig_zy*v[iz] + sig_xy*v[ix] + sig_yy*v[iy])*ds(6, **qr_s)
+        F_t += (sig_zy*v[iz] + sig_xy*v[ix] + sig_yy*v[iy])*boundary_measures[5]
 
     return F_t
 
 
 def stacey_terms(ndim, rho, c_p, c_s,
-                 v, iz, ix, iy, qr_s,
+                 v, iz, ix, iy, boundary_measures,
                  uz_dt, ux_dt, uy_dt,
                  uz_dz, ux_dz, uy_dz,
                  uz_dx, ux_dx, uy_dx,
@@ -167,52 +195,52 @@ def stacey_terms(ndim, rho, c_p, c_s,
     if ndim == 3:
         sig_zz += rho*c_s*(c_p - 2*c_s)*uy_dy
     sig_xz = rho*c_s*ux_dt - rho*c_s*(c_p - 2*c_s)*uz_dx
-    F_t += -(sig_zz*v[iz] + sig_xz*v[ix])*ds(1, **qr_s)
+    F_t += -(sig_zz*v[iz] + sig_xz*v[ix])*boundary_measures[0]
     if ndim == 3:
         sig_yz = rho*c_s*uy_dt - rho*c_s*(c_p - 2*c_s)*uz_dy
-        F_t += -sig_yz*v[iy]*ds(1, **qr_s)
+        F_t += -sig_yz*v[iy]*boundary_measures[0]
 
     # Plane z = 0
     sig_zz = -rho*c_p*uz_dt + rho*c_s*(c_p - 2*c_s)*ux_dx
     if ndim == 3:
         sig_zz += rho*c_s*(c_p - 2*c_s)*uy_dy
     sig_xz = -rho*c_s*ux_dt - rho*c_s*(c_p - 2*c_s)*uz_dx
-    F_t += (sig_zz*v[iz] + sig_xz*v[ix])*ds(2, **qr_s)
+    F_t += (sig_zz*v[iz] + sig_xz*v[ix])*boundary_measures[1]
     if ndim == 3:
         sig_yz = -rho*c_s*uy_dt - rho*c_s*(c_p - 2*c_s)*uz_dy
-        F_t += sig_yz*v[iy]*ds(2, **qr_s)
+        F_t += sig_yz*v[iy]*boundary_measures[1]
 
     # Plane x = -pad
     sig_zx = rho*c_s*uz_dt - rho*c_s*(c_p - 2*c_s)*ux_dz
     sig_xx = rho*c_p*ux_dt + rho*c_s*(c_p - 2*c_s)*uz_dz
     if ndim == 3:
         sig_xx += rho*c_s*(c_p - 2*c_s)*uy_dy
-    F_t += -(sig_zx*v[iz] + sig_xx*v[ix])*ds(3, **qr_s)
+    F_t += -(sig_zx*v[iz] + sig_xx*v[ix])*boundary_measures[2]
     if ndim == 3:
         sig_yx = rho*c_s*uy_dt - rho*c_s*(c_p - 2*c_s)*ux_dy
-        F_t += -sig_yx*v[iy]*ds(3, **qr_s)
+        F_t += -sig_yx*v[iy]*boundary_measures[2]
 
     # Plane x = Lx + pad
     sig_zx = -rho*c_s*uz_dt - rho*c_s*(c_p - 2*c_s)*ux_dz
     sig_xx = -rho*c_p*ux_dt + rho*c_s*(c_p - 2*c_s)*uz_dz
     if ndim == 3:
         sig_xx += rho*c_s*(c_p - 2*c_s)*uy_dy
-    F_t += (sig_zx*v[iz] + sig_xx*v[ix])*ds(4, **qr_s)
+    F_t += (sig_zx*v[iz] + sig_xx*v[ix])*boundary_measures[3]
     if ndim == 3:
         sig_yx = -rho*c_s*uy_dt - rho*c_s*(c_p - 2*c_s)*ux_dy
-        F_t += sig_yx*v[iy]*ds(4, **qr_s)
+        F_t += sig_yx*v[iy]*boundary_measures[3]
 
     if ndim == 3:
         # Plane y = 0
         sig_zy = rho*c_s*uz_dt - rho*c_s*(c_p - 2*c_s)*uy_dz
         sig_xy = rho*c_s*ux_dt - rho*c_s*(c_p - 2*c_s)*uy_dx
         sig_yy = rho*c_p*uy_dt + rho*c_s*(c_p - 2*c_s)*(uz_dz + ux_dx)
-        F_t += -(sig_zy*v[iz] + sig_xy*v[ix] + sig_yy*v[iy])*ds(5, **qr_s)
+        F_t += -(sig_zy*v[iz] + sig_xy*v[ix] + sig_yy*v[iy])*boundary_measures[4]
 
         # Plane y = L_y + 2*pad
         sig_zy = -rho*c_s*uz_dt - rho*c_s*(c_p - 2*c_s)*uy_dz
         sig_xy = -rho*c_s*ux_dt - rho*c_s*(c_p - 2*c_s)*uy_dx
         sig_yy = -rho*c_p*uy_dt + rho*c_s*(c_p - 2*c_s)*(uz_dz + ux_dx)
-        F_t += (sig_zy*v[iz] + sig_xy*v[ix] + sig_yy*v[iy])*ds(6, **qr_s)
+        F_t += (sig_zy*v[iz] + sig_xy*v[ix] + sig_yy*v[iy])*boundary_measures[5]
 
     return F_t

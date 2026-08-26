@@ -23,27 +23,42 @@ python tests/three_dimension/elastic_fwi_3d/driver_elastic_fwi_3d.py
 
 ## Mintrop
 
-Submit from this directory after checking out the integration branch:
+Submit from this directory after checking out the integration branch. First,
+compare the production mesh against a finer one using one source:
+
+```bash
+sbatch --partition=amd_large_2 --nodelist=n19 \
+  run_spectral_mesh_gate_mintrop.slurm
+```
+
+Then run one complete-acquisition BLMVM+H1 iteration as the checkpointing and
+memory gate:
 
 ```bash
 cd tests/three_dimension/elastic_fwi_3d
-sbatch --array=4 --export=ALL,FWI3D_MAX_ITERATIONS=1 \
+sbatch --array=2 --export=ALL,FWI3D_MAX_ITERATIONS=1 \
   run_elastic_fwi_3d_mintrop.slurm
 ```
 
 That first submission is the production-resolution memory gate: it uses all
-eight sources but stops after one QN iteration. Inspect `MaxRSS` and the saved
+16 sources but stops after one BLMVM+H1 iteration. Inspect `MaxRSS` and the saved
 `summary.json`; only then submit the complete array with
 `sbatch run_elastic_fwi_3d_mintrop.slurm`.
 
-The array has four tasks, one method per node and eight MPI ranks. With eight
+The production mesh is a structured quadrilateral base extruded in depth,
+with hexahedral fourth-order spectral elements and GLL quadrature. With
+`edge=0.05 km`, it has 2.88 elements and 11.52 GLL intervals per minimum
+wavelength at 5 Hz using the lower Vs bound. The acquisition has a 4x4 source
+grid and a 9x9 receiver grid on the top surface.
+
+The array has four tasks, one method per node and 16 MPI ranks. With 16
 sources, automatic parallelism assigns one source to each rank. Override the
 production discretization or checkpoint budget at submission time, for
 example:
 
 ```bash
-sbatch --partition=amd_large \
-  --export=ALL,FWI3D_EDGE=0.10,FWI3D_CHECKPOINT_SNAPSHOTS=24 \
+sbatch --partition=amd_large_2 --nodelist=n19 \
+  --export=ALL,FWI3D_EDGE=0.05,FWI3D_CHECKPOINT_SNAPSHOTS=32 \
   run_elastic_fwi_3d_mintrop.slurm
 ```
 
