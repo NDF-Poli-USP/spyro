@@ -49,7 +49,11 @@ sbatch --partition=amd_large \
 
 Results are written incrementally under
 `fwi_3d_results/elastic_inclusion/<method>/<run-id>/`. Each run contains
-`configuration.json`, `convergence.csv`, `summary.json`, and `models.h5`.
+`configuration.json`, `convergence.csv`, `summary.json`, `models.h5`, and
+`models.latest.json`. By default, every accepted iteration atomically replaces
+`models.h5`; an interrupted write therefore leaves the preceding checkpoint
+intact. `models.latest.json` records which iteration the HDF5 file contains.
+Set `FWI3D_MODEL_SAVE_EVERY=N` only when checkpoint I/O needs to be reduced.
 
 Before the full array, run the gradient parity test:
 

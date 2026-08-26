@@ -66,6 +66,9 @@ def settings() -> dict:
     method = os.environ.get("FWI3D_METHOD", "qn_latent").strip().lower()
     if method not in METHODS:
         raise ValueError(f"FWI3D_METHOD must be one of {sorted(METHODS)}")
+    model_save_every = _env("FWI3D_MODEL_SAVE_EVERY", 1, int)
+    if model_save_every < 1:
+        raise ValueError("FWI3D_MODEL_SAVE_EVERY must be positive.")
     return {
         "method": method,
         "smoke": smoke,
@@ -80,6 +83,7 @@ def settings() -> dict:
         "snapshots": _env("FWI3D_CHECKPOINT_SNAPSHOTS", 8 if smoke else 32, int),
         "gc_frequency": _env("FWI3D_GC_TIMESTEP_FREQUENCY", 25 if smoke else 50, int),
         "max_iterations": _env("FWI3D_MAX_ITERATIONS", 2 if smoke else 50, int),
+        "model_save_every": model_save_every,
         "gradient_rtol": _env("FWI3D_GRADIENT_RTOL", 1.0e-4, float),
         "h1_weight": _env("FWI3D_H1_WEIGHT", 4.0e-6, float),
         "qn_memory": _env("FWI3D_QN_MEMORY", 10, int),
@@ -278,6 +282,22 @@ class Tracker:
         }
         self.rows.append(row)
         self.flush()
+        if iteration % self.config["model_save_every"] == 0:
+            _save_models(
+                self.directory,
+                controls,
+                self.config["method"],
+            )
+            if self.root:
+                _atomic_json_write(
+                    self.directory / "models.latest.json",
+                    {
+                        "iteration": int(iteration),
+                        "objective": float(objective),
+                        "gradient_norm": float(gradient_norm),
+                        "wall_time_s": row["wall_time_s"],
+                    },
+                )
 
     def flush(self):
         if not self.root or not self.rows:
@@ -523,6 +543,12 @@ def _solve_external_qn(reduced, controls, config: dict, tracker: Tracker):
     return controls, termination
 
 
+def _atomic_json_write(path: Path, payload: dict):
+    temporary = path.with_name(f".{path.name}.tmp")
+    temporary.write_text(json.dumps(payload, indent=2), encoding="ascii")
+    os.replace(temporary, path)
+
+
 def _save_models(directory: Path, controls, method: str):
     vp, vs = _physical(controls, method)
     mesh = controls[0].function_space().mesh()
@@ -537,11 +563,16 @@ def _save_models(directory: Path, controls, method: str):
     ]
     # One source group writes collectively; other ensemble groups hold the
     # same distributed model and only wait at the world barrier.
+    output = directory / "models.h5"
+    temporary = directory / ".models.tmp.h5"
     if MPI.COMM_WORLD.rank < mesh.comm.size:
-        with fire.CheckpointFile(str(directory / "models.h5"), "w", comm=mesh.comm) as chk:
+        with fire.CheckpointFile(str(temporary), "w", comm=mesh.comm) as chk:
             chk.save_mesh(mesh)
             for field in fields:
                 chk.save_function(field, name=field.name())
+        mesh.comm.barrier()
+        if MPI.COMM_WORLD.rank == 0:
+            os.replace(temporary, output)
     MPI.COMM_WORLD.Barrier()
 
 
