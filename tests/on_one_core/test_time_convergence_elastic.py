@@ -4,7 +4,7 @@ import numpy as np
 from scipy.signal import correlate
 
 import spyro
-from spyro.tools.error_measure import calculate_normalized_L2_error
+from spyro.tools.error_measure import MeasureError
 
 source_z = -2.0
 receiver_z = -3.0
@@ -113,7 +113,7 @@ def run_elastic_forward(dt):
     )
 
     wave.forward_solve()
-    l2_error = calculate_normalized_L2_error(
+    l2_error = MeasureError.calculate_normalized_L2_error(
         wave.forward_solution_receivers[:, 0, 0], anal_sol[0]
     )
 

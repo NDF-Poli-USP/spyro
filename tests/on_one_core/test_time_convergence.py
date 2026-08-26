@@ -1,7 +1,7 @@
 import spyro
 import numpy as np
 import pytest
-from spyro.tools.error_measure import calculate_normalized_L2_error
+from spyro.tools.error_measure import MeasureError
 
 
 def run_forward(dt, with_pml=False):
@@ -112,7 +112,7 @@ def test_second_order_time_convergence(with_pml):
         rec_anal = np.load(analytical_files[i])
         numerical_results.append(rec_out.flatten())
         errors.append(
-            calculate_normalized_L2_error(rec_out.flatten(), rec_anal)
+            MeasureError.calculate_normalized_L2_error(rec_out.flatten(), rec_anal)
         )
 
     theory = [t**2 for t in dts]
