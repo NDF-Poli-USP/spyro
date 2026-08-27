@@ -135,6 +135,7 @@ def elastic_without_pml(wave):
     )
 
 def viscoelastic_without_pml(wave):
+    print("Viscoelastic Maxwell GSLS")
 
     V = wave.function_space
     quad_rule = wave.quadrature_rule
@@ -147,22 +148,15 @@ def viscoelastic_without_pml(wave):
 
     dt = Constant(wave.dt)
     rho = wave.rho
-    lmbda = wave.lmbda
-    mu = wave.mu
-
-    if wave.viscoelastic == True:
-        zeta_list = wave.zeta_list
-        y_list = wave.y_list
-    else:
-        zeta_list = []
-        y_list = []
-        
+    
+    zeta_list = wave.zeta_list
+    y_list = wave.y_list
+    
     dim = V.mesh().topological_dimension()
     voigt_size = 3 if dim == 2 else 6
 
     Elastic_C = wave.Elastic_C
     Gamma = wave.Gamma
-
 
     def strain_vector_from_displacement(w):
         g = grad(w)
@@ -191,6 +185,7 @@ def viscoelastic_without_pml(wave):
     e_v = strain_vector_from_displacement(v)
 
     e_mem_components = [0.0] * voigt_size
+        
     if len(zeta_list) > 0:
         for i in range(len(zeta_list)):
             zeta_voigt = tensor_to_voigt(zeta_list[i])

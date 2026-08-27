@@ -1,7 +1,7 @@
 import numpy as np
 
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
-                       FunctionSpace, project)
+                       FunctionSpace, project, TensorFunctionSpace)
 
 from .elastic_wave import ElasticWave
 from .forms import (elastic_without_pml, viscoelastic_without_pml,
@@ -180,9 +180,8 @@ class IsotropicWave(ElasticWave):
             not bool(self.lmbda) and \
             not bool(self.mu)
 
-        if option_2:
-            self.Q_vp = get_value(ViscoelasticMaterialParameter.Q_VP)
-            self.Q_vs = get_value(ViscoelasticMaterialParameter.Q_VS)
+        self.Q_vp = get_value(ViscoelasticMaterialParameter.Q_VP)
+        self.Q_vs = get_value(ViscoelasticMaterialParameter.Q_VS)
 
         if option_1:
             self._control_parameterization = ElasticMaterialParameterization.LAME
@@ -522,9 +521,10 @@ class IsotropicWave(ElasticWave):
 
         self.Elastic_C = C_computation(self)
 
-        is_viscoelastic = self.input_dictionary.get("viscoelasticity", False)
+        self.viscoelastic = self.input_dictionary.get("viscoelastic", False) #Dictionary dentro de dictionary
 
-        if is_viscoelastic:
+        if self.viscoelastic:
+            d = self.input_dictionary.get("viscoelasticity", False)
             self.visco_type = d["visco_type"]
             W = TensorFunctionSpace(self.function_space.mesh(), "DG", 0)
             self.strain_space = W
@@ -555,12 +555,15 @@ class IsotropicWave(ElasticWave):
 
             self.Gamma = build_Gamma(self)
 
-        if self.abc_type in [AbsorbingBCsType.NRBC, AbsorbingBCsType.NOABCS]:
-            viscoelastic_without_pml(self)
-        elif self.abc_type == AbsorbingBCsType.PML:
-            isotropic_elastic_with_pml(self)
+            if self.abc_type in [AbsorbingBCsType.NRBC, AbsorbingBCsType.NOABCS]:
+                viscoelastic_without_pml(self)
+            elif self.abc_type == AbsorbingBCsType.PML:
+                viscoelastic_with_pml(self)
         else:
-            elastic_without_pml
+            if self.abc_type in [AbsorbingBCsType.NRBC, AbsorbingBCsType.NOABCS]:
+                elastic_without_pml(self)
+            elif self.abc_type == AbsorbingBCsType.PML:
+                elastic_with_pml(self)
 
     @override
     def rhs_no_pml(self):

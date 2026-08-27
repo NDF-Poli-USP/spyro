@@ -3,7 +3,7 @@ import numpy as np
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
                        FunctionSpace, project)
 
-from .elastic_wave import IsotropicElasticWave
+from .isotropic_wave import IsotropicWave
 from .forms import (elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
@@ -57,7 +57,7 @@ def _format_control_parameters(parameters):
     return "{" + ", ".join(parameter.value for parameter in parameters) + "}"
 
 
-class AnisotropicTTIWave(IsotropicElasticWave):
+class AnisotropicTTIWave(IsotropicWave):
     '''Anisotropic elastic wave propagator'''
 
     def __init__(self, dictionary, comm=None):
