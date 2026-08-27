@@ -631,7 +631,62 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def store_forward_time_steps(self, value):
         self._store_forward_time_steps = value
 
-    def enable_automated_adjoint(self):
+    def enable_automated_adjoint(
+        self, control_parameters=None, checkpointing: bool = False,
+        snapshots: int | None = None,
+        gc_timestep_frequency: int | None = None
+    ) -> None:
+        """Enable the automated-adjoint solver.
+
+        The parameters to differentiate with respect to are resolved here,
+        against the physical parameters the equation is currently written in,
+        so an invalid selection fails before any adjoint state exists.
+
+        Parameters
+        ----------
+        control_parameters : enum.Enum or iterable of enum.Enum, optional
+            Physical parameters to differentiate with respect to. ``None``
+            takes every parameter the equation offers. Names the equation
+            does not carry as independent fields are rejected. Solvers whose
+            medium admits more than one set of parameters offer
+            ``set_physical_parameterization`` to change which ones do.
+        checkpointing : bool, optional
+            Whether to manage the tape with a checkpoint schedule. ``False``
+            (the default) keeps every forward step on the tape, as before.
+        snapshots : int, optional
+            How many checkpointing units to keep in RAM, which is also how
+            spyro chooses the schedule. ``None`` (the default) keeps every
+            time step in memory and never recomputes. An integer keeps
+            only that many checkpoints and recomputes the forward in between,
+            turning :math:`O(n_t)` memory into :math:`O(\\text{snapshots})` at
+            the cost of extra forward work. Requires ``checkpointing=True``.
+        gc_timestep_frequency : int, optional
+            Run a garbage collection every this many time steps. Reference
+            cycles can keep checkpoints alive past the point the schedule
+            intended, so collecting periodically lowers the peak memory.
+            ``None`` (the default) disables it.
+
+        See Also
+        --------
+        spyro.solvers.automatic_differentiation_solver.AutomatedAdjoint :
+            Which schedule each setting selects, when to prefer one over the
+            other, and the references behind them.
+
+        Returns
+        -------
+        None
+            The solver is configured in place.
+
+        Raises
+        ------
+        ValueError
+            If the mesh has not been set, so a control cannot be a field.
+
+        Notes
+        -----
+        The checkpoint schedule is *not* created here; only the intent is
+        stored. It is built at the start of each forward solve.
+        """
         self.store_forward_time_steps = False
         self.enable_compute_functional(
             mode=FunctionalEvaluationMode.PER_TIMESTEP
@@ -639,19 +694,26 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
         self._initialize_model_parameters()
-        if self.c is None:
+        if self.mesh is None:
             raise ValueError(
-                "self.c must be set before enabling automated adjoint."
-                "Please set the velocity model using set_initial_velocity_model()"
-                "or set c directly."
+                "Mesh must be set before enabling the automated adjoint: "
+                "a control has to be a field.",
             )
-        controls = self.c
+        # Resolve the selection first: an invalid one must fail before any
+        # adjoint state exists to be left half-built.
+        controls = self.physical_parameters.select(control_parameters)
         # ``self.comm`` is the Firedrake ``Ensemble`` distributing the shots
         # across ensemble members. It is forwarded to ``AutomatedAdjoint`` so
         # that the reduced functional is built as an
         # ``EnsembleReducedFunctional``, summing the per-shot functionals and
         # gradients over the ensemble communicator.
-        self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
+        self.automated_adjoint = AutomatedAdjoint(
+            self.comm,
+            controls,
+            checkpointing=checkpointing,
+            snapshots=snapshots,
+            gc_timestep_frequency=gc_timestep_frequency,
+        )
         self.functional_value = None
         self.misfit = None
 
@@ -791,10 +853,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def physical_parameters(self):
         """Return the physical parameters of the wave equation being solved.
 
-        The parameters are the material fields the variational form is written
-        in terms of: the velocity model for an acoustic medium, density and a
-        pair of elastic moduli or wave speeds for an isotropic elastic one.
-        Solvers declare them while initializing their material properties.
+        These are the material fields the solver reads: the velocity model
+        for an acoustic medium; density, the Lame parameters and the two
+        wave speeds for an isotropic elastic one, where the variational form
+        reads the moduli and the absorbing boundary conditions read the
+        speeds. Solvers declare them while initializing their material
+        properties.
 
         A wave solver knows only about physical parameters. Which of them an
         inversion treats as unknowns is a property of the inversion, not of
@@ -831,7 +895,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         return parameters
 
     def initialize_physical_parameters(self):
-        """Build the material fields of the wave equation from the model input.
+        """Build the physical parameters of the wave equation from the model input.
 
         The forward solve does this on its own, so this is only needed to read
         the physical parameters of a solver that has not run yet.

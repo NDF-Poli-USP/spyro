@@ -1,7 +1,40 @@
+from collections.abc import Mapping
+
 from pyadjoint import Tape, continue_annotation, pause_annotation, taylor_test
 
 import firedrake as fire
 import firedrake.adjoint as fire_ad
+
+from checkpoint_schedules import (
+    CheckpointSchedule,
+    MixedCheckpointSchedule,
+    SingleMemoryStorageSchedule,
+    StorageType,
+)
+from ..utils.physical_parameters import PhysicalParameters
+
+
+def _as_list(value: object) -> list:
+    """Return one value or collection as a list.
+
+    Parameters
+    ----------
+    value : object, mapping, PhysicalParameters, list, tuple, or None
+        Value to normalize. Anything keyed by name contributes its values,
+        and ``None`` produces an empty list.
+
+    Returns
+    -------
+    list
+        Normalized values.
+    """
+    if value is None:
+        return []
+    if isinstance(value, (Mapping, PhysicalParameters)):
+        return list(value.values())
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value]
 
 
 class AutomatedAdjoint:
@@ -41,29 +74,92 @@ class AutomatedAdjoint:
     ----------------
     .. code-block:: python
 
-        wave.enable_automated_adjoint()
-        wave.forward_solve()          # clears the tape, then records
-        wave.automated_adjoint.create_reduced_functional(wave.functional_value)
-        dJ = wave.automated_adjoint.compute_gradient()
-        rate = wave.automated_adjoint.verify_gradient(wave.c)  # Taylor test
+        wave.enable_automated_adjoint(control_parameters=parameters)
+        wave.forward_solve()          # drops any previous tape, then records
+        dJ = wave.gradient_solve()    # one derivative per selected parameter
         wave.automated_adjoint.clear_tape()
+
+    ``gradient_solve`` builds the reduced functional from the recorded tape
+    on its first call. Building it here is only needed to hold on to it, or
+    to run a Taylor test against it:
+
+    .. code-block:: python
+
+        wave.automated_adjoint.create_reduced_functional(wave.functional_value)
+        rate = wave.automated_adjoint.verify_gradient(wave.c)
+
+    Checkpointing
+    -------------
+    Storing every forward step on the tape costs memory linear in the number
+    of steps. Passing ``checkpointing=True`` hands the tape to a
+    :mod:`checkpoint_schedules` schedule [1]_ instead. Spyro uses two of them,
+    picking between them from the number of snapshots:
+
+    ``snapshots=None``
+        :class:`~checkpoint_schedules.SingleMemoryStorageSchedule` - every
+        adjoint dependency stays in RAM, nothing is recomputed.
+    ``snapshots=N``
+        :class:`~checkpoint_schedules.MixedCheckpointSchedule` - only ``N``
+        checkpoints are kept in RAM and the forward is recomputed in between,
+        turning :math:`O(n_t)` memory into :math:`O(N)`.
+
+    The schedule is built by :meth:`start_recording`, not here.
+
+    Schedule choice
+    ~~~~~~~~~~~~~~~
+    Spyro deliberately exposes no other schedule. :mod:`checkpoint_schedules`
+    also offers ``Revolve`` [2]_, the classical binomial strategy, but for the
+    same number of checkpointing units the mixed schedule of [3]_ recomputes
+    less.
+
+    References
+    ----------
+    .. [1] Dolci, D. I., Maddison, J. R., Ham, D. A., Pallez, G., &
+           Herrmann, J. (2024). checkpoint_schedules: schedules for
+           incremental checkpointing of adjoint simulations. Journal of Open
+           Source Software 9(95), 6148. DOI: 10.21105/joss.06148
+    .. [2] Griewank, A., & Walther, A. (2000). Algorithm 799: revolve: an
+           implementation of checkpointing for the reverse or adjoint mode of
+           computational differentiation. ACM Transactions on Mathematical
+           Software 26(1), 19-45. DOI: 10.1145/347837.347846
+    .. [3] Maddison, J. R. (2024). Step-based checkpointing with high-level
+           algorithmic differentiation. Journal of Computational Science 82,
+           102405. DOI: 10.1016/j.jocs.2024.102405. Preprint:
+           arXiv:2305.09568 (2023).
 
     Parameters
     ----------
-    controls : firedrake.Function, optional
-        The control with respect to which the functional is differentiated.
-        It is wrapped in a :class:`pyadjoint.Control` when the reduced functional is
-        created.
+    controls : object, mapping, or iterable, optional
+        Fields with respect to which the functional is differentiated. A
+        mapping keyed by material parameters labels its controls, so the
+        derivatives can be handed back under the same names; anything else is
+        taken as unlabeled fields. The wave equation resolves parameter names
+        to these fields before constructing the adjoint solver.
     ensemble : firedrake.ensemble.Ensemble, optional
         The Firedrake ensemble communicator used to sum the per-shot
         functionals and gradients across ensemble members. In practice this is
         ``wave.comm``. If ``None``, a non-ensemble
         :class:`pyadjoint.ReducedFunctional` is used instead.
+    checkpointing : bool, optional
+        Whether to manage the tape with a checkpoint schedule. Defaults to
+        ``False``, which keeps the tape exactly as it was before checkpointing
+        existed.
+    snapshots : int, optional
+        How many checkpoints to keep in RAM, which is also what selects the
+        schedule. ``None`` (the default) keeps every step.
+    gc_timestep_frequency : int, optional
+        Run a garbage collection every this many time steps. Reference cycles
+        can keep checkpoints alive past the point the schedule intended, so
+        collecting periodically lowers the peak. ``None`` (the default)
+        disables it.
 
     Attributes
     ----------
-    controls : firedrake.Function
-        The control passed at construction time.
+    controls : list
+        Controls passed at construction time.
+    control_parameter_names : list
+        Labels supplied by a control container, or ``None`` for unlabeled
+        controls.
     ensemble : firedrake.ensemble.Ensemble or None
         The ensemble communicator used by the reduced functional.
     reduced_functional : firedrake.adjoint.EnsembleReducedFunctional or \
@@ -72,32 +168,154 @@ pyadjoint.ReducedFunctional or None
         :meth:`create_reduced_functional`.
     """
 
-    def __init__(self, ensemble, controls=None):
-        self.controls = controls
+    def __init__(self, ensemble: object, controls: object = None,
+                 checkpointing: bool = False, snapshots: int | None = None,
+                 gc_timestep_frequency: int | None = None) -> None:
         self.ensemble = ensemble
         self.reduced_functional = None
         self._tape = None
+        if isinstance(controls, (Mapping, PhysicalParameters)):
+            # Keyed by material parameter: keep the labels, so the
+            # derivatives can be handed back under the same names.
+            self.control_parameter_names = list(controls)
+            self.controls = list(controls.values())
+        else:
+            self.controls = _as_list(controls)
+            self.control_parameter_names = [None] * len(self.controls)
+        self._checkpointing = bool(checkpointing)
+        self._snapshots = snapshots
+        self._gc_timestep_frequency = gc_timestep_frequency
+        # Schedule of the tape being recorded; ``None`` when not checkpointed.
+        self._checkpointing_schedule = None
 
-    def start_recording(self):
-        """Start recording operations on the tape.
+    @property
+    def checkpointing_schedule(self) -> CheckpointSchedule | None:
+        """Schedule of the current tape, or ``None`` if it is not checkpointed.
 
-        Creates a tape and registers it as the working tape if one does not
-        already exist, then enables annotation. An existing tape is reused,
-        which is what lets the shots of one forward solve accumulate on a
-        single tape: the functional sums over them, so the gradient has to be
-        the gradient of that sum. Dropping the previous recording is the
-        forward solve's job, and it does it before the first shot.
+        Returns
+        -------
+        checkpoint_schedules.CheckpointSchedule or None
+            The schedule installed by the most recent :meth:`start_recording`.
+        """
+        return self._checkpointing_schedule
+
+    @property
+    def checkpointing_enabled(self) -> bool:
+        """Whether the current tape is managed by a checkpoint schedule.
+
+        Returns
+        -------
+        bool
+            ``True`` once :meth:`start_recording` has installed a schedule on
+            the tape, ``False`` when checkpointing is off.
+        """
+        return self._checkpointing_schedule is not None
+
+    def _build_schedule(self, total_steps: int) -> CheckpointSchedule:
+        """Build a schedule for a forward run of ``total_steps`` steps.
+
+        Parameters
+        ----------
+        total_steps : int
+            The total number of time steps used in the forward solver.
+
+        Returns
+        -------
+        checkpoint_schedules.CheckpointSchedule
+            A single-use schedule.
+        """
+        if self._snapshots is None:
+            return SingleMemoryStorageSchedule()
+        # A mixed schedule cannot hold more checkpoints than it has steps to
+        # place them in.
+        snapshots = max(1, min(self._snapshots, total_steps - 1))
+        return MixedCheckpointSchedule(
+            total_steps, snapshots, storage=StorageType.RAM
+        )
+
+    def start_recording(self, total_steps: int | None = None) -> Tape:
+        """Start recording operations on the tape, installing one if needed.
+
+        A forward solve propagates one shot per call, so this runs once per
+        shot. An existing tape is reused, which is what lets the shots of a
+        single solve accumulate on it: the functional sums over them, so the
+        gradient has to be the gradient of that sum. Dropping the previous
+        recording is the forward solve's job, and it does it before the first
+        shot.
+
+        Checkpointing is the exception. Its schedule is built for the time
+        steps of one propagation, so it cannot describe a tape that goes on
+        to hold further shots, and the combination is refused rather than
+        silently checkpointed against the wrong step count.
+
+        Parameters
+        ----------
+        total_steps : int, optional
+            The total number of time steps used in the forward solver.
+            Required when checkpointing is enabled, ignored otherwise.
 
         Returns
         -------
         pyadjoint.Tape
             The active working tape.
+
+        Raises
+        ------
+        ValueError
+            If checkpointing is enabled and ``total_steps`` was not supplied.
+        NotImplementedError
+            If checkpointing is enabled and this solve propagates more than
+            one shot.
         """
+        if self._checkpointing and total_steps is None:
+            raise ValueError(
+                "start_recording() needs total_steps when checkpointing "
+                "is enabled: the schedule is built for a specific number "
+                "of forward time steps. Spyro's time integrator passes it "
+                "automatically."
+            )
+
         if self._tape is None:
             self._tape = Tape()
             fire_ad.set_working_tape(self._tape)
+            self.reduced_functional = None
+            self._checkpointing_schedule = None
+
+            if self._checkpointing:
+                self._checkpointing_schedule = self._build_schedule(total_steps)
+                self._tape.enable_checkpointing(
+                    self._checkpointing_schedule,
+                    gc_timestep_frequency=self._gc_timestep_frequency,
+                )
+        elif self._checkpointing:
+            # A tape is already open, so this is not the first shot of this
+            # forward solve, and the schedule built for the first one does
+            # not describe what the tape will hold.
+            raise NotImplementedError(
+                "Checkpointing a forward solve that propagates more than "
+                "one shot is not supported: the schedule is built for the "
+                "time steps of a single propagation, while the shots of one "
+                "solve share a tape so that the gradient is the gradient of "
+                "their summed functional. Use one source per propagation, "
+                "or disable checkpointing."
+            )
+
         continue_annotation()
         return self._tape
+
+    def end_timestep(self) -> None:
+        """Mark the end of one forward time step on the tape.
+
+        A no-op when the tape is not checkpointed, since only a schedule cares
+        where the time steps are.
+
+        Returns
+        -------
+        None
+            The tape is advanced in place.
+        """
+        if self._checkpointing_schedule is not None:
+            self._tape.end_timestep()
 
     def stop_recording(self):
         """Pause annotation, stopping further operations from being taped."""
@@ -106,17 +324,21 @@ pyadjoint.ReducedFunctional or None
     def clear_tape(self):
         """Reset the adjoint state.
 
-        Drops the cached reduced functional and tape, installs a clean working
-        tape and pauses annotation. Call this between independent gradient
-        computations to make sure no stale operations leak from one tape onto
-        the next.
+        Drops the cached reduced functional, tape and checkpoint schedule,
+        installs a clean working tape and pauses annotation. Call this between
+        independent gradient computations to make sure no stale operations leak
+        from one tape onto the next. The checkpointing *settings* survive, so
+        the next forward solve is checkpointed the same way.
         """
         self.reduced_functional = None
         self._tape = None
+        self._checkpointing_schedule = None
         fire_ad.set_working_tape(Tape())
         pause_annotation()
 
-    def create_reduced_functional(self, functional, ensemble=None):
+    def create_reduced_functional(
+        self, functional: object, ensemble: object = None,
+    ) -> object:
         """Build the reduced functional for the recorded forward problem.
 
         The reduced functional ties the (local) functional value to the control
@@ -142,7 +364,13 @@ pyadjoint.ReducedFunctional or None
             The reduced functional, also stored on
             :attr:`reduced_functional`.
         """
-        control = fire_ad.Control(self.controls)
+        if not self.controls:
+            raise ValueError("At least one control is required.")
+        controls = [fire_ad.Control(value) for value in self.controls]
+        # pyadjoint mirrors the shape it is given: a bare control comes back
+        # as a bare derivative, a list as a list. Handing it a one-item list
+        # would make every single-control caller unwrap by hand.
+        control = controls[0] if len(controls) == 1 else controls
 
         self.reduced_functional = fire_ad.EnsembleReducedFunctional(
             functional,
@@ -153,13 +381,13 @@ pyadjoint.ReducedFunctional or None
         )
         return self.reduced_functional
 
-    def recompute_functional(self, control_value):
+    def recompute_functional(self, control_value: object) -> object:
         """Re-evaluate the reduced functional at a new control value.
 
         Parameters
         ----------
-        control_value : firedrake.Function
-            The control at which to evaluate the functional.
+        control_value : firedrake.Function or iterable of firedrake.Function
+            Controls at which to evaluate the functional.
 
         Returns
         -------
@@ -174,9 +402,9 @@ pyadjoint.ReducedFunctional or None
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
-        return self.reduced_functional(control_value)
+        return self.reduced_functional(_as_list(control_value))
 
-    def compute_gradient(self):
+    def compute_gradient(self) -> object:
         """Return the gradient of the functional.
 
         Computes the gradient via reverse-mode differentiation of the tape and maps
@@ -186,8 +414,9 @@ pyadjoint.ReducedFunctional or None
 
         Returns
         -------
-        firedrake.Function
-            The gradient of the functional with respect to the control.
+        firedrake.Function or list of firedrake.Function
+            The gradient, or one for each control when there is more than
+            one.
 
         Raises
         ------
@@ -198,7 +427,7 @@ pyadjoint.ReducedFunctional or None
             raise ValueError("Reduced functional not created.")
         return self.reduced_functional.derivative(apply_riesz=True)
 
-    def compute_derivative(self):
+    def compute_derivative(self) -> object:
         """Return the raw derivative of the functional.
 
         Similar to :meth:`compute_gradient` but without the Riesz map
@@ -210,8 +439,9 @@ pyadjoint.ReducedFunctional or None
 
         Returns
         -------
-        firedrake.Cofunction
-            The derivative of the functional with respect to the control.
+        firedrake.Cofunction or list of firedrake.Cofunction
+            The derivative, or one for each control when there is more than
+            one.
 
         Raises
         ------
@@ -222,7 +452,38 @@ pyadjoint.ReducedFunctional or None
             raise ValueError("Reduced functional not created.")
         return self.reduced_functional.derivative(apply_riesz=False)
 
-    def verify_gradient(self, control_var, direction=None, dJdm=None):
+    def label_derivatives(self, derivatives: object) -> PhysicalParameters:
+        """Associate computed derivatives with selected physical parameters.
+
+        Parameters
+        ----------
+        derivatives : object or iterable
+            Derivatives positionally matching :attr:`controls`.
+
+        Returns
+        -------
+        PhysicalParameters
+            Derivatives keyed by their selected physical parameter enums.
+
+        Raises
+        ------
+        ValueError
+            If the controls were supplied without physical parameter labels.
+        """
+        if any(name is None for name in self.control_parameter_names):
+            raise ValueError(
+                "Physical parameter labels are required for labeled "
+                "derivatives.",
+            )
+        return PhysicalParameters(zip(
+            self.control_parameter_names,
+            _as_list(derivatives),
+        ))
+
+    def verify_gradient(
+        self, control_var: object, direction: object = None,
+        dJdm: object = None,
+    ) -> float:
         """Run a Taylor test to validate the automated-adjoint gradient.
 
         Performs pyadjoint's :func:`~pyadjoint.taylor_test`, which perturbs the
@@ -235,12 +496,12 @@ pyadjoint.ReducedFunctional or None
 
         Parameters
         ----------
-        control_var : firedrake.Function
-            The control about which the gradient is verified.
-        direction : firedrake.Function, optional
-            Perturbation direction. Defaults to a constant ``0.01`` field in the
-            control's function space.
-        dJdm : float, firedrake.Function, or firedrake.Cofunction, optional
+        control_var : firedrake.Function or iterable of firedrake.Function
+            Controls about which the gradient is verified.
+        direction : firedrake.Function or iterable of firedrake.Function, optional
+            Perturbation directions. Each defaults to a constant ``0.01``
+            field in the corresponding control's function space.
+        dJdm : float or iterable, optional
             The directional derivative ``J'(m)(direction)``. pyadjoint expects a
             scalar here, so if a gradient ``Function`` (Riesz representer) or a
             ``Cofunction`` (raw derivative) is supplied it is first paired with
@@ -261,9 +522,19 @@ pyadjoint.ReducedFunctional or None
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
+        control_var = _as_list(control_var)
         if direction is None:
-            direction = fire.Function(control_var.function_space())
-            direction.interpolate(0.01)
+            direction = []
+            for control in control_var:
+                perturbation = fire.Function(control.function_space())
+                perturbation.interpolate(0.01)
+                direction.append(perturbation)
+        else:
+            direction = _as_list(direction)
+        if len(control_var) != len(direction):
+            raise ValueError(
+                "Each control requires exactly one perturbation direction.",
+            )
         # pyadjoint's ``taylor_test`` expects ``dJdm`` to be the scalar
         # directional derivative ``J'(m)(h)``, not the gradient itself. When a
         # Firedrake ``Function`` (Riesz representer of the gradient) or a
@@ -273,14 +544,26 @@ pyadjoint.ReducedFunctional or None
         # ``min(residuals) < 1E-15`` raises ``UFL conditions cannot be
         # evaluated as bool in a Python context``.
         if dJdm is not None and not isinstance(dJdm, (int, float)):
-            if isinstance(dJdm, fire.Function):
-                dJdm = fire.assemble(
-                    fire.inner(dJdm, direction) * fire.dx
+            derivatives = _as_list(dJdm)
+            if len(derivatives) != len(direction):
+                raise ValueError(
+                    "Each control requires exactly one derivative.",
                 )
-            elif isinstance(dJdm, fire.Cofunction):
-                # Apply the cofunction to the direction (duality pairing).
-                dJdm = fire.assemble(fire.action(dJdm, direction))
+            directional_derivatives = []
+            for derivative, perturbation in zip(derivatives, direction):
+                if isinstance(derivative, fire.Function):
+                    directional_derivatives.append(
+                        fire.assemble(
+                            fire.inner(derivative, perturbation) * fire.dx,
+                        ),
+                    )
+                elif isinstance(derivative, fire.Cofunction):
+                    directional_derivatives.append(
+                        fire.assemble(fire.action(derivative, perturbation)),
+                    )
+                else:
+                    dJdm = None
+                    break
             else:
-                # Unknown type, fall back to pyadjoint's internal computation.
-                dJdm = None
+                dJdm = sum(directional_derivatives)
         return taylor_test(self.reduced_functional, control_var, direction, dJdm=dJdm)

@@ -473,7 +473,7 @@ class FullWaveformInversion:
            an inversion that has not been told otherwise inverts for
            everything the wave equation is written in terms of.
         3. The parameters the solver *class* declares, when the solver has not
-           built its material fields either. Those fields only exist after the
+           built its physical parameters either. Those only exist after the
            first forward solve, but their names are known from the start, and
            they are the same set.
 
@@ -632,8 +632,8 @@ class FullWaveformInversion:
         Parameters
         ----------
         wave : Wave
-            Solver to read the physical parameters from. Its material fields
-            are built first if they do not exist yet.
+            Solver to read the physical parameters from. They are built
+            first if they do not exist yet.
 
         Returns
         -------

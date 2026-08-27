@@ -19,6 +19,11 @@ def _propagate_forward_central_difference(wave, source_ids):
         the forward solve.
     source_ids: list of int
         List of source IDs to simulate.
+
+    Returns
+    -------
+    None
+        The solver state, receiver data and functional are updated in place.
     """
     if wave.sources is not None:
         wave.sources.current_sources = source_ids
@@ -83,7 +88,9 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.misfit = []
 
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-        wave.automated_adjoint.start_recording()
+        # A schedule is consumed as it executes, so each forward solve needs a
+        # fresh one, sized by this loop's ``nt``.
+        wave.automated_adjoint.start_recording(total_steps=nt)
 
     for step in range(nt):
         # Basic way of applying sources
@@ -109,6 +116,14 @@ def _propagate_forward_central_difference(wave, source_ids):
                     wave.sources.apply_source(rhs_forcing, step))
 
         wave.solver.solve()
+
+        # The time step has to close right after the solve: closing it after
+        # the state rotation below makes the solve output look disposable, and
+        # its checkpoint is dropped. The final step is closed by pyadjoint
+        # itself when taping ends, hence ``nt - 1``.
+        if adjoint_type == AdjointType.AUTOMATED_ADJOINT and step < nt - 1:
+            wave.automated_adjoint.end_timestep()
+
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
 
