@@ -226,7 +226,11 @@ class AcousticWave(Wave):
                         AcousticMaterialParameter.P_WAVE_VELOCITY, self.c,
                     )
                     return
-                raise ValueError("No velocity model or velocity file to load.")
+                raise ValueError(
+                    "No velocity model or velocity file to load. Set one "
+                    "with set_initial_velocity_model(), or assign the "
+                    "velocity field to self.c directly."
+                )
 
             if self.initial_velocity_model_file.endswith(".segy"):
                 self.initial_velocity_model_file = write_hdf5_velocity_model(self, self.initial_velocity_model_file)
