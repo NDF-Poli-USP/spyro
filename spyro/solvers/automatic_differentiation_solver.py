@@ -6,6 +6,12 @@ from pyadjoint import Tape, continue_annotation, pause_annotation, taylor_test
 import firedrake as fire
 import firedrake.adjoint as fire_ad
 
+from checkpoint_schedules import (
+    CheckpointSchedule,
+    MixedCheckpointSchedule,
+    SingleMemoryStorageSchedule,
+    StorageType,
+)
 from ..utils.physical_parameters import PhysicalParameters
 
 
@@ -83,6 +89,45 @@ class AutomatedAdjoint:
         wave.automated_adjoint.create_reduced_functional(wave.functional_value)
         rate = wave.automated_adjoint.verify_gradient(wave.c)
 
+    Checkpointing
+    -------------
+    Storing every forward step on the tape costs memory linear in the number
+    of steps. Passing ``checkpointing=True`` hands the tape to a
+    :mod:`checkpoint_schedules` schedule [1]_ instead. Spyro uses two of them,
+    picking between them from the number of snapshots:
+
+    ``snapshots=None``
+        :class:`~checkpoint_schedules.SingleMemoryStorageSchedule` - every
+        adjoint dependency stays in RAM, nothing is recomputed.
+    ``snapshots=N``
+        :class:`~checkpoint_schedules.MixedCheckpointSchedule` - only ``N``
+        checkpoints are kept in RAM and the forward is recomputed in between,
+        turning :math:`O(n_t)` memory into :math:`O(N)`.
+
+    The schedule is built by :meth:`start_recording`, not here.
+
+    Schedule choice
+    ~~~~~~~~~~~~~~~
+    Spyro deliberately exposes no other schedule. :mod:`checkpoint_schedules`
+    also offers ``Revolve`` [2]_, the classical binomial strategy, but for the
+    same number of checkpointing units the mixed schedule of [3]_ recomputes
+    less.
+
+    References
+    ----------
+    .. [1] Dolci, D. I., Maddison, J. R., Ham, D. A., Pallez, G., &
+           Herrmann, J. (2024). checkpoint_schedules: schedules for
+           incremental checkpointing of adjoint simulations. Journal of Open
+           Source Software 9(95), 6148. DOI: 10.21105/joss.06148
+    .. [2] Griewank, A., & Walther, A. (2000). Algorithm 799: revolve: an
+           implementation of checkpointing for the reverse or adjoint mode of
+           computational differentiation. ACM Transactions on Mathematical
+           Software 26(1), 19-45. DOI: 10.1145/347837.347846
+    .. [3] Maddison, J. R. (2024). Step-based checkpointing with high-level
+           algorithmic differentiation. Journal of Computational Science 82,
+           102405. DOI: 10.1016/j.jocs.2024.102405. Preprint:
+           arXiv:2305.09568 (2023).
+
     Parameters
     ----------
     controls : object, mapping, or iterable, optional
@@ -96,6 +141,18 @@ class AutomatedAdjoint:
         functionals and gradients across ensemble members. In practice this is
         ``wave.comm``. If ``None``, a non-ensemble
         :class:`pyadjoint.ReducedFunctional` is used instead.
+    checkpointing : bool, optional
+        Whether to manage the tape with a checkpoint schedule. Defaults to
+        ``False``, which keeps the tape exactly as it was before checkpointing
+        existed.
+    snapshots : int, optional
+        How many checkpoints to keep in RAM, which is also what selects the
+        schedule. ``None`` (the default) keeps every step.
+    gc_timestep_frequency : int, optional
+        Run a garbage collection every this many time steps. Reference cycles
+        can keep checkpoints alive past the point the schedule intended, so
+        collecting periodically lowers the peak. ``None`` (the default)
+        disables it.
 
     Attributes
     ----------
@@ -112,7 +169,9 @@ pyadjoint.ReducedFunctional or None
         :meth:`create_reduced_functional`.
     """
 
-    def __init__(self, ensemble: object, controls: object = None) -> None:
+    def __init__(self, ensemble: object, controls: object = None,
+                 checkpointing: bool = False, snapshots: int | None = None,
+                 gc_timestep_frequency: int | None = None) -> None:
         self.ensemble = ensemble
         self.reduced_functional = None
         self._tape = None
@@ -124,6 +183,56 @@ pyadjoint.ReducedFunctional or None
         else:
             self.controls = _as_list(controls)
             self.control_parameter_names = [None] * len(self.controls)
+        self._checkpointing = bool(checkpointing)
+        self._snapshots = snapshots
+        self._gc_timestep_frequency = gc_timestep_frequency
+        # Schedule of the tape being recorded; ``None`` when not checkpointed.
+        self._checkpointing_schedule = None
+
+    @property
+    def checkpointing_schedule(self) -> CheckpointSchedule | None:
+        """Schedule of the current tape, or ``None`` if it is not checkpointed.
+
+        Returns
+        -------
+        checkpoint_schedules.CheckpointSchedule or None
+            The schedule installed by the most recent :meth:`start_recording`.
+        """
+        return self._checkpointing_schedule
+
+    @property
+    def checkpointing_enabled(self) -> bool:
+        """Whether the current tape is managed by a checkpoint schedule.
+
+        Returns
+        -------
+        bool
+            ``True`` once :meth:`start_recording` has installed a schedule on
+            the tape, ``False`` when checkpointing is off.
+        """
+        return self._checkpointing_schedule is not None
+
+    def _build_schedule(self, total_steps: int) -> CheckpointSchedule:
+        """Build a schedule for a forward run of ``total_steps`` steps.
+
+        Parameters
+        ----------
+        total_steps : int
+            The total number of time steps used in the forward solver.
+
+        Returns
+        -------
+        checkpoint_schedules.CheckpointSchedule
+            A single-use schedule.
+        """
+        if self._snapshots is None:
+            return SingleMemoryStorageSchedule()
+        # A mixed schedule cannot hold more checkpoints than it has steps to
+        # place them in.
+        snapshots = max(1, min(self._snapshots, total_steps - 1))
+        return MixedCheckpointSchedule(
+            total_steps, snapshots, storage=StorageType.RAM
+        )
 
     @contextmanager
     def fresh_tape(self):
@@ -149,23 +258,61 @@ pyadjoint.ReducedFunctional or None
         finally:
             pause_annotation()
 
-    def start_recording(self):
-        """Start recording operations on the tape.
+    def start_recording(self, total_steps: int | None = None) -> Tape:
+        """Install a fresh tape and start recording operations on it.
 
-        Creates a tape and registers it as the working tape if one does not
-        already exist, then enables annotation. Unlike :meth:`fresh_tape`, an
-        existing tape is reused rather than discarded.
+        Parameters
+        ----------
+        total_steps : int, optional
+            The total number of time steps used in the forward solver.
+            Required when checkpointing is enabled, ignored otherwise.
 
         Returns
         -------
         pyadjoint.Tape
             The active working tape.
+
+        Raises
+        ------
+        ValueError
+            If checkpointing is enabled and ``total_steps`` was not supplied.
         """
-        if self._tape is None:
-            self._tape = Tape()
-            fire_ad.set_working_tape(self._tape)
+        if self._checkpointing and total_steps is None:
+            raise ValueError(
+                "start_recording() needs total_steps when checkpointing "
+                "is enabled: the schedule is built for a specific number "
+                "of forward time steps. Spyro's time integrator passes it "
+                "automatically."
+            )
+
+        self._tape = Tape()
+        fire_ad.set_working_tape(self._tape)
+        self.reduced_functional = None
+        self._checkpointing_schedule = None
+
+        if self._checkpointing:
+            self._checkpointing_schedule = self._build_schedule(total_steps)
+            self._tape.enable_checkpointing(
+                self._checkpointing_schedule,
+                gc_timestep_frequency=self._gc_timestep_frequency,
+            )
+
         continue_annotation()
         return self._tape
+
+    def end_timestep(self) -> None:
+        """Mark the end of one forward time step on the tape.
+
+        A no-op when the tape is not checkpointed, since only a schedule cares
+        where the time steps are.
+
+        Returns
+        -------
+        None
+            The tape is advanced in place.
+        """
+        if self._checkpointing_schedule is not None:
+            self._tape.end_timestep()
 
     def stop_recording(self):
         """Pause annotation, stopping further operations from being taped."""
@@ -174,13 +321,15 @@ pyadjoint.ReducedFunctional or None
     def clear_tape(self):
         """Reset the adjoint state.
 
-        Drops the cached reduced functional and tape, installs a clean working
-        tape and pauses annotation. Call this between independent gradient
-        computations to make sure no stale operations leak from one tape onto
-        the next.
+        Drops the cached reduced functional, tape and checkpoint schedule,
+        installs a clean working tape and pauses annotation. Call this between
+        independent gradient computations to make sure no stale operations leak
+        from one tape onto the next. The checkpointing *settings* survive, so
+        the next forward solve is checkpointed the same way.
         """
         self.reduced_functional = None
         self._tape = None
+        self._checkpointing_schedule = None
         fire_ad.set_working_tape(Tape())
         pause_annotation()
 
