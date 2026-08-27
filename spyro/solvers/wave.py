@@ -618,7 +618,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def store_forward_time_steps(self, value):
         self._store_forward_time_steps = value
 
-    def enable_automated_adjoint(self, control_parameters=None) -> None:
+    def enable_automated_adjoint(
+        self, control_parameters=None, checkpointing: bool = False,
+        snapshots: int | None = None,
+        gc_timestep_frequency: int | None = None
+    ) -> None:
         """Enable the automated-adjoint solver.
 
         The parameters to differentiate with respect to are resolved here,
@@ -633,10 +637,42 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             does not carry as independent fields are rejected. Solvers whose
             medium admits more than one set of parameters offer
             ``set_physical_parameterization`` to change which ones do.
+        checkpointing : bool, optional
+            Whether to manage the tape with a checkpoint schedule. ``False``
+            (the default) keeps every forward step on the tape, as before.
+        snapshots : int, optional
+            How many checkpointing units to keep in RAM, which is also how
+            spyro chooses the schedule. ``None`` (the default) keeps every
+            time step in memory and never recomputes. An integer keeps
+            only that many checkpoints and recomputes the forward in between,
+            turning :math:`O(n_t)` memory into :math:`O(\\text{snapshots})` at
+            the cost of extra forward work. Requires ``checkpointing=True``.
+        gc_timestep_frequency : int, optional
+            Run a garbage collection every this many time steps. Reference
+            cycles can keep checkpoints alive past the point the schedule
+            intended, so collecting periodically lowers the peak memory.
+            ``None`` (the default) disables it.
+
+        See Also
+        --------
+        spyro.solvers.automatic_differentiation_solver.AutomatedAdjoint :
+            Which schedule each setting selects, when to prefer one over the
+            other, and the references behind them.
 
         Returns
         -------
         None
+            The solver is configured in place.
+
+        Raises
+        ------
+        ValueError
+            If the mesh has not been set, so a control cannot be a field.
+
+        Notes
+        -----
+        The checkpoint schedule is *not* created here; only the intent is
+        stored. It is built at the start of each forward solve.
         """
         self.store_forward_time_steps = False
         self.enable_compute_functional(
@@ -658,7 +694,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # that the reduced functional is built as an
         # ``EnsembleReducedFunctional``, summing the per-shot functionals and
         # gradients over the ensemble communicator.
-        self.automated_adjoint = AutomatedAdjoint(self.comm, controls)
+        self.automated_adjoint = AutomatedAdjoint(
+            self.comm,
+            controls,
+            checkpointing=checkpointing,
+            snapshots=snapshots,
+            gc_timestep_frequency=gc_timestep_frequency,
+        )
         self.functional_value = None
         self.misfit = None
 

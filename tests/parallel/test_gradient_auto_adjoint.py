@@ -25,6 +25,8 @@ import firedrake.adjoint as fire_ad
 import spyro
 import pytest
 
+from checkpoint_schedules import SingleMemoryStorageSchedule
+
 
 final_time = 0.6
 
@@ -110,13 +112,20 @@ def build_direction(wave):
     return direction
 
 
-def get_forward_model():
+def get_forward_model(checkpointing=False, snapshots=None):
     """Build exact and guess models and record the automated-adjoint tape.
 
     The exact model uses a two-layer velocity contrast; the guess model is a
     constant background. Under ensemble parallelism each member only solves and
     records the shot it owns, so ``rec_out_exact`` already corresponds to that
     member's source.
+
+    Parameters
+    ----------
+    checkpointing : bool, optional
+        Whether to manage each member's tape with a checkpoint schedule.
+    snapshots : int, optional
+        Number of snapshots. ``None`` keeps every time step in memory.
 
     Returns
     -------
@@ -142,7 +151,8 @@ def get_forward_model():
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
 
     # The control must be a Function for pyadjoint to differentiate it.
-    Wave_obj_guess.enable_automated_adjoint()
+    Wave_obj_guess.enable_automated_adjoint(
+        checkpointing=checkpointing, snapshots=snapshots)
     assert isinstance(Wave_obj_guess.c, fire.Function)
 
     # The ensemble passed to the EnsembleReducedFunctional is wave.comm.
@@ -159,12 +169,21 @@ def get_forward_model():
 
 @pytest.mark.newer_firedrake
 @pytest.mark.parallel(2)
-def test_gradient_auto_adjoint_parallel():
+@pytest.mark.parametrize("checkpointing", [False, True],
+                         ids=["no_checkpointing", "single_memory"])
+def test_gradient_auto_adjoint_parallel(checkpointing):
     """Taylor-test the ensemble automated-adjoint gradient.
 
     Runs on two cores: two sources (ensemble parallelism), one core per shot.
+    Each member checkpoints its own tape; the ``EnsembleReducedFunctional``
+    still has to sum the per-shot functionals and gradients across members.
+
+    Parameters
+    ----------
+    checkpointing : bool
+        Whether to manage each member's tape with a checkpoint schedule.
     """
-    Wave_obj_guess = get_forward_model()
+    Wave_obj_guess = get_forward_model(checkpointing=checkpointing)
 
     # Sanity check the ensemble (shot) parallelism is active, one core per shot.
     comm = Wave_obj_guess.comm
@@ -179,6 +198,12 @@ def test_gradient_auto_adjoint_parallel():
     assert isinstance(
         reduced_functional, fire_ad.EnsembleReducedFunctional
     ), "Reduced functional must be an EnsembleReducedFunctional."
+
+    if checkpointing:
+        assert isinstance(
+            Wave_obj_guess.automated_adjoint.checkpointing_schedule,
+            SingleMemoryStorageSchedule,
+        )
 
     # The ensemble-summed gradient is a Function in the control space.
     dJ = Wave_obj_guess.automated_adjoint.compute_gradient()
@@ -206,4 +231,4 @@ def test_gradient_auto_adjoint_parallel():
 
 
 if __name__ == "__main__":
-    test_gradient_auto_adjoint_parallel()
+    test_gradient_auto_adjoint_parallel(checkpointing=True)
