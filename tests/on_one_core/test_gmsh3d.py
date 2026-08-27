@@ -6,31 +6,35 @@ import pytest
 from spyro.meshing.meshing_functions import AutomaticMesh
 from spyro.meshing.meshing_parameters import MeshingParameters
 
+
 HAS_NUMBA = importlib.util.find_spec("numba") is not None
+
 
 STRUCTURED_CONFIGURATIONS = [
     # water_interface, padding_type, expected_cells
     (True, None, 26950),
-    (True, 'rectangular', 69629),
+    (True, "rectangular", 69629),
     (False, None, 25725),
-    (False, 'rectangular', 67228),
+    (False, "rectangular", 67228),
 ]
+
 
 UNSTRUCTURED_CONFIGURATIONS = [
     # extend_segy, water_interface, padding_type, expected_cells
     (True, True, None, 21339),
-    (True, True, 'rectangular', 50107),
-    (True, True, 'hyperelliptical', 42372),
+    (True, True, "rectangular", 50107),
+    (True, True, "hyperelliptical", 42372),
     (True, False, None, 21864),
-    (True, False, 'rectangular', 50776),
-    (True, False, 'hyperelliptical', 42960),
+    (True, False, "rectangular", 50776),
+    (True, False, "hyperelliptical", 42960),
     (False, True, None, 21339),
-    (False, True, 'rectangular', 34445),
-    (False, True, 'hyperelliptical', 30356),
+    (False, True, "rectangular", 34445),
+    (False, True, "hyperelliptical", 30356),
     (False, False, None, 21864),
-    (False, False, 'rectangular', 34263),
-    (False, False, 'hyperelliptical', 30731),
+    (False, False, "rectangular", 34263),
+    (False, False, "hyperelliptical", 30731),
 ]
+
 
 STRUCTURED_NO_WINSLOW_CONFIGURATIONS = [
     # water_interface, padding_type, expected_cells
@@ -100,7 +104,7 @@ def _check_or_collect_baseline(
     baseline_row,
     missing_baselines,
 ):
-    """Assert a known baseline"""
+    """Assert a known baseline."""
     print(f" Cells actual: {actual_cells} | Expected: {expected_cells}")
 
     if expected_cells is None:
@@ -131,8 +135,8 @@ def test_gmsh3d_structured(tmp_path):
 
     if not HAS_NUMBA:
         pytest.skip(
-            "3-D structured Winslow currently requires "
-            "winslow_implementation='numba'."
+            "Skipping the accelerated 3-D Winslow regression test because "
+            "Numba is not installed."
         )
 
     missing_baselines = []
@@ -190,7 +194,7 @@ def test_gmsh3d_structured(tmp_path):
 
 @pytest.mark.slow
 def test_gmsh3d_unstructured(tmp_path):
-    """Unstructured tetrahedra"""
+    """Unstructured tetrahedra."""
     print("STARTING 3-D UNSTRUCTURED MESH TESTS")
 
     missing_baselines = []
@@ -225,6 +229,7 @@ def test_gmsh3d_unstructured(tmp_path):
                 "water_interface": water_interface,
                 "structured_mesh": False,
                 "apply_winslow": False,
+                # Ignored because apply_winslow=False.
                 "winslow_implementation": "numba",
                 "extend_segy": extend_segy,
             }
@@ -286,7 +291,7 @@ def test_gmsh3d_structured_no_winslow(tmp_path):
                 "water_interface": water_interface,
                 "structured_mesh": True,
                 "apply_winslow": False,
-                # Ignored when apply_winslow=False.
+                # Ignored because apply_winslow=False.
                 "winslow_implementation": "numba",
                 "extend_segy": False,
             }
