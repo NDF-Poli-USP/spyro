@@ -86,7 +86,7 @@ def test_forward_3_shots():
     arr0 = arr0.flatten()
 
     # Computing errors
-    error_L2 = MeasureError.normalized_root_mean_square_error(arr0[:430], analytical_p[:430])
+    error_L2 = MeasureError.calculate_normalized_L2_error(arr0[:430], analytical_p[:430])
     pprint(f"NRMS Error for shot {wave.current_sources} is {error_L2:.4e} and test "
            f"has passed equals {abs(error_L2) < 0.01}", comm=comm)
 
