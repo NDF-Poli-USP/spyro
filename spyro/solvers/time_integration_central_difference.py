@@ -113,27 +113,24 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
         
-        if hasattr(wave, "viscoelastic"):
-            if wave.viscoelastic == True:
-                dt = wave.dt
-                V = wave.function_space
-                W = wave.strain_space
+        if wave.viscoelastic:
 
-                zeta_list    = wave.zeta_list
-                omega_list = wave.omega_list
-                def epsilon(u):
-                    return sym(grad(u))
+            dt = wave.dt
+            W = wave.strain_space
+
+            zeta_list    = wave.zeta_list
+            omega_list = wave.omega_list
+            def epsilon(u):
+                return sym(grad(u))
                     
-                # Strain rate
-                eps = project(epsilon(wave.vstate), W)
-
-                # Update memory variables
-                for i in range(len(zeta_list)):
-                    zeta_old = Function(W)
-                    zeta_old.assign(zeta_list[i])
-                    omega = omega_list[i]
-                    zeta_np1 = project(zeta_old + dt * omega * (eps - zeta_old), W)
-                    zeta_list[i].assign(zeta_np1)
+            # Strain rate
+            eps = project(epsilon(wave.vstate), W)
+            zeta_old = Function(W)
+            # Update memory variables
+            for i in range(len(zeta_list)):
+                zeta_old.assign(zeta_list[i])
+                omega = omega_list[i]
+                zeta_list[i].assign(zeta_old + dt * omega * (eps - zeta_old))
 
         if wave.use_vertex_only_mesh:
             if receiver_buffer is None:

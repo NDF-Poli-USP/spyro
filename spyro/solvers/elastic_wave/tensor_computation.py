@@ -165,7 +165,7 @@ def build_Gamma(self):
 
     C = self.Elastic_C
 
-    if self.viscoelastic == True:
+    if self.viscoelastic:
         if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
             Gamma = Gamma_isotropic(self)
 
@@ -179,40 +179,34 @@ def build_Gamma(self):
     return Gamma
 
 def Gamma_isotropic(self):
+    dim = self.function_space.mesh().topological_dimension()
 
     vp_sq = self.c**2
     vs_sq = self.c_s**2
 
-    denom = vp_sq - (4.0/3.0) * vs_sq
-    Qkappa_inv = conditional(
-        lt(abs(denom), 1e-12),
-        self.Q_vp,
-        (vp_sq * self.Q_vp - (4.0/3.0) * vs_sq * self.Q_vs) / denom
-    )
+    denom = vp_sq - 2.0 * vs_sq
 
-    lambda_expr = vp_sq - 2.0 * vs_sq
+    ratio = (vp_sq * self.Q_vp - 2 * vs_sq * self.Q_vs) / denom
 
-    ratio = conditional(
-        lt(abs(lambda_expr), 1e-12),
-        0.0,
-        (
-            (vp_sq - (4.0/3.0) * vs_sq) * Qkappa_inv
-            - (2.0/3.0) * vs_sq * self.Q_vs
-        ) / lambda_expr
-    )
-
-    Gamma = as_matrix([
-        [self.Q_vp, ratio,       ratio,       0,            0,            0],
-        [ratio,       self.Q_vp, ratio,       0,            0,            0],
-        [ratio,       ratio,       self.Q_vp, 0,            0,            0],
-        [0,           0,           0,           self.Q_vs,  0,            0],
-        [0,           0,           0,           0,            self.Q_vs,  0],
-        [0,           0,           0,           0,            0,            self.Q_vs],
+    if dim == 2:
+        Gamma = as_matrix([
+        [self.Q_vp, ratio,     0],
+        [ratio,     self.Q_vp, 0],
+        [0,     0,     self.Q_vs]
     ])
-
+    else:
+        Gamma = as_matrix([
+            [self.Q_vp, ratio,     ratio,       0,            0,            0],
+            [ratio,     self.Q_vp, ratio,       0,            0,            0],
+            [ratio,     ratio,     self.Q_vp,   0,            0,            0],
+            [0,           0,           0,        self.Q_vs,  0,            0],
+            [0,           0,           0,           0,            self.Q_vs,  0],
+            [0,           0,           0,           0,            0,            self.Q_vs],
+        ])
+    
     return Gamma
 
-def Gamma_VTI(self, IsotropicProperties, AnisotropicPropertiesVTI, C, dim):
+def Gamma_VTI(self, C, dim):
 
     rho = self.rho
     vP = self.vP
