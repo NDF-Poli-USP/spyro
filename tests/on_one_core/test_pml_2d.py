@@ -115,9 +115,9 @@ def test_pml():
 
     # Computing errors
     measure_error = MeasureError()
-    errPk = measure_error.peak_error(p_r, extended_p_r)[0]
-    errIt = measure_error.integral_error(p_r, extended_p_r, dt)
-    eNRMS = measure_error.normalized_root_mean_square_error(p_r, extended_p_r)
+    errPk = measure_error.calculate_peak_error(p_r, extended_p_r)[0]
+    errIt = measure_error.calculate_integral_error(p_r, extended_p_r, dt)
+    eNRMS = measure_error.calculate_normalized_L2_error(p_r, extended_p_r)
 
     pprint(f"NRMS Error = {eNRMS:.4e}", comm=comm)
     pprint(f"Integral Error = {errIt:.4e}", comm=comm)
