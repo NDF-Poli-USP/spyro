@@ -98,11 +98,12 @@ def test_forward_3_shots():
         plt.savefig(f"test{i}.png")
 
         # Computing errors
-        eNRMS_core = measure_error.calculate_normalized_L2_error(rec0[:cutoff],
-                                                                     analytical_p[:cutoff])
-        errIt_core = measure_error.calculate_integral_error(rec0[:cutoff],
-                                                  analytical_p[:cutoff],
-                                                  wave.dt)
+        eNRMS_core = measure_error.calculate_normalized_L2_error(
+            rec0[:cutoff], analytical_p[:cutoff],
+        )
+        errIt_core = measure_error.calculate_integral_error(
+            rec0[:cutoff], analytical_p[:cutoff], wave.dt,
+        )
         errPk_core = measure_error.calculate_peak_error(rec0[:cutoff], analytical_p[:cutoff])[0]
 
         eNRMS_shot = COMM_WORLD.allreduce(eNRMS_core, op=MPI.SUM) / comm.comm.size
