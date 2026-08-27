@@ -85,10 +85,12 @@ def test_forward_supershot():
 
     # Computing errors
     measure_error = MeasureError()
-    error0_nrms = measure_error.calculate_normalized_L2_error(arr0[:430],
-                                                                  analytical_p[:430])
-    error199_nrms = measure_error.calculate_normalized_L2_error(arr199[:430],
-                                                                    analytical_p[:430])
+    error0_nrms = measure_error.calculate_normalized_L2_error(
+        arr0[:430], analytical_p[:430]
+    )
+    error199_nrms = measure_error.calculate_normalized_L2_error(
+        arr199[:430], analytical_p[:430],
+    )
     error0_it = measure_error.calculate_integral_error(arr0[:430], analytical_p[:430], wave.dt)
     error199_it = measure_error.calculate_integral_error(arr199[:430], analytical_p[:430], wave.dt)
     error0_pk = measure_error.calculate_peak_error(arr0[:430], analytical_p[:430])[0]
