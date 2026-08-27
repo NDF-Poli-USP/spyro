@@ -185,6 +185,30 @@ def test_gradient_auto_adjoint_parallel(checkpointing):
     """
     Wave_obj_guess = get_forward_model(checkpointing=checkpointing)
 
+    try:
+        _verify_ensemble_gradient(Wave_obj_guess, checkpointing)
+    finally:
+        # Clear on the failing path too. A test that leaves a tape behind
+        # makes the next one in this process annotate on top of it, which is
+        # far harder to diagnose than the failure that just happened.
+        Wave_obj_guess.automated_adjoint.clear_tape()
+    assert Wave_obj_guess.automated_adjoint._tape is None
+
+
+def _verify_ensemble_gradient(Wave_obj_guess, checkpointing):
+    """Check the ensemble reduction and Taylor-test its gradient.
+
+    Parameters
+    ----------
+    Wave_obj_guess : spyro.AcousticWave
+        Wave whose forward solve has already been recorded.
+    checkpointing : bool
+        Whether the recording was managed by a checkpoint schedule.
+
+    Returns
+    -------
+    None
+    """
     # Sanity check the ensemble (shot) parallelism is active, one core per shot.
     comm = Wave_obj_guess.comm
     assert comm.ensemble_comm.size == 2, "Expected 2 ensemble members (sources)."
@@ -224,10 +248,6 @@ def test_gradient_auto_adjoint_parallel(checkpointing):
         "Automated adjoint gradient verification failed: Taylor convergence "
         f"rate {rate} is below the expected second-order rate."
     )
-
-    # Clean up the tape so the test leaves no global annotation state behind.
-    Wave_obj_guess.automated_adjoint.clear_tape()
-    assert Wave_obj_guess.automated_adjoint._tape is None
 
 
 if __name__ == "__main__":

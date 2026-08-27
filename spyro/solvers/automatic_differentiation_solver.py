@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 from collections.abc import Mapping
 
 from pyadjoint import Tape, continue_annotation, pause_annotation, taylor_test
@@ -76,7 +75,7 @@ class AutomatedAdjoint:
     .. code-block:: python
 
         wave.enable_automated_adjoint(control_parameters=parameters)
-        wave.forward_solve()          # the time integrator starts recording
+        wave.forward_solve()          # drops any previous tape, then records
         dJ = wave.gradient_solve()    # one derivative per selected parameter
         wave.automated_adjoint.clear_tape()
 
@@ -234,32 +233,20 @@ pyadjoint.ReducedFunctional or None
             total_steps, snapshots, storage=StorageType.RAM
         )
 
-    @contextmanager
-    def fresh_tape(self):
-        """Context manager that records the forward solve on a brand new tape.
-
-        Clears any previous tape, installs a fresh :class:`pyadjoint.Tape` as
-        the working tape and turns annotation on for the duration of the
-        ``with`` block. Annotation is always paused again on exit, even if an
-        exception is raised, so the caller cannot accidentally leave taping
-        enabled.
-
-        Yields
-        ------
-        pyadjoint.Tape
-            The freshly created working tape.
-        """
-        self.clear_tape()
-        self._tape = Tape()
-        fire_ad.set_working_tape(self._tape)
-        continue_annotation()
-        try:
-            yield self._tape
-        finally:
-            pause_annotation()
-
     def start_recording(self, total_steps: int | None = None) -> Tape:
-        """Install a fresh tape and start recording operations on it.
+        """Start recording operations on the tape, installing one if needed.
+
+        A forward solve propagates one shot per call, so this runs once per
+        shot. An existing tape is reused, which is what lets the shots of a
+        single solve accumulate on it: the functional sums over them, so the
+        gradient has to be the gradient of that sum. Dropping the previous
+        recording is the forward solve's job, and it does it before the first
+        shot.
+
+        Checkpointing is the exception. Its schedule is built for the time
+        steps of one propagation, so it cannot describe a tape that goes on
+        to hold further shots, and the combination is refused rather than
+        silently checkpointed against the wrong step count.
 
         Parameters
         ----------
@@ -276,6 +263,9 @@ pyadjoint.ReducedFunctional or None
         ------
         ValueError
             If checkpointing is enabled and ``total_steps`` was not supplied.
+        NotImplementedError
+            If checkpointing is enabled and this solve propagates more than
+            one shot.
         """
         if self._checkpointing and total_steps is None:
             raise ValueError(
@@ -285,16 +275,29 @@ pyadjoint.ReducedFunctional or None
                 "automatically."
             )
 
-        self._tape = Tape()
-        fire_ad.set_working_tape(self._tape)
-        self.reduced_functional = None
-        self._checkpointing_schedule = None
+        if self._tape is None:
+            self._tape = Tape()
+            fire_ad.set_working_tape(self._tape)
+            self.reduced_functional = None
+            self._checkpointing_schedule = None
 
-        if self._checkpointing:
-            self._checkpointing_schedule = self._build_schedule(total_steps)
-            self._tape.enable_checkpointing(
-                self._checkpointing_schedule,
-                gc_timestep_frequency=self._gc_timestep_frequency,
+            if self._checkpointing:
+                self._checkpointing_schedule = self._build_schedule(total_steps)
+                self._tape.enable_checkpointing(
+                    self._checkpointing_schedule,
+                    gc_timestep_frequency=self._gc_timestep_frequency,
+                )
+        elif self._checkpointing:
+            # A tape is already open, so this is not the first shot of this
+            # forward solve, and the schedule built for the first one does
+            # not describe what the tape will hold.
+            raise NotImplementedError(
+                "Checkpointing a forward solve that propagates more than "
+                "one shot is not supported: the schedule is built for the "
+                "time steps of a single propagation, while the shots of one "
+                "solve share a tape so that the gradient is the gradient of "
+                "their summed functional. Use one source per propagation, "
+                "or disable checkpointing."
             )
 
         continue_annotation()

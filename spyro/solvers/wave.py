@@ -187,8 +187,19 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._physical_parameters = PhysicalParameters()
 
     def forward_solve(self):
-        """Solves the forward problem."""
+        """Solve the forward problem.
 
+        Under the automated adjoint this is the unit of recording: one
+        forward solve is one tape. Any previous recording is dropped here,
+        so a solve is never annotated on top of an earlier one, while the
+        shots propagated within this solve accumulate on the tape it starts
+        -- the functional sums over them, so the gradient has to be the
+        gradient of that sum.
+
+        Returns
+        -------
+        None
+        """
         parallel_print("\nSolving Forward Problem", comm=self.comm)
 
         if self.function_space is None:
@@ -196,6 +207,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         if self.abc_type in [AbsorbingBCsType.NOABCS, AbsorbingBCsType.NRBC]:
             self._initialize_model_parameters()
+        if self.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+            self.automated_adjoint.clear_tape()
         self.matrix_building()
         self.wave_propagator()
 
