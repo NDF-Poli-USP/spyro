@@ -1,7 +1,24 @@
 import sys
 
 import numpy as np
-from numba import njit, prange
+
+try:
+    from numba import njit, prange
+    NUMBA_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    NUMBA_AVAILABLE = False
+    prange = range
+
+    def njit(*args, **kwargs):
+        """Return a decorator when Numba is unavailable."""
+        if args and callable(args[0]) and len(args) == 1 and not kwargs:
+            return args[0]
+
+        def decorator(func):
+            return func
+
+        return decorator
+
 
 from .meshing_utils3D import sizing_function_xyz
 
@@ -119,7 +136,16 @@ def run_selected_winslow(
             f"Received {selected_winslow!r}."
         )
 
-    parallel_print("Using winslow_smooth_3d55 (Numba 3D Winslow implementation).", comm=comm)
+    if NUMBA_AVAILABLE:
+        parallel_print(
+            "Using Numba accelerated 3D Winslow implementation.",
+            comm=comm,
+        )
+    else:
+        parallel_print(
+            "Using Winslow implementation without Numba.",
+            comm=comm,
+        )
     smoothed = winslow_smooth_3d55(
         points=points,
         hexes=hexes,
@@ -575,7 +601,7 @@ def winslow_smooth_3d55(
             first_neighbor,
             second_neighbor,
         ):
-            """Return the common neighbor associated with a mixed-direction stencil entry.
+            """Return the common neighbor associated with stencil entry.
 
             Parameters
             ----------
