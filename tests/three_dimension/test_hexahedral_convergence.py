@@ -1,6 +1,6 @@
 import numpy as np
 import spyro
-from spyro.tools.error_measure import calculate_normalized_L2_error
+from spyro.tools.error_measure import MeasureError
 
 
 def run_forward_hexahedral(dt, final_time, offset):
@@ -113,7 +113,7 @@ def test_3d_hexa_one_source_propagation():
     p_analytic = analytical_solution(dt, final_time, offset)
 
     # Computing error
-    error_L2 = calculate_normalized_L2_error(p_numeric, p_analytic)
+    error_L2 = MeasureError.calculate_normalized_L2_error(p_numeric, p_analytic)
 
     assert np.abs(error_L2)
 

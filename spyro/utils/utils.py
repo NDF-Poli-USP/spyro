@@ -12,7 +12,7 @@ from ..io.parallelism_wrappers import (
     run_in_one_core_and_broadcast,
 )
 from ..domains.space import create_function_space
-from .typing import FunctionalEvaluationMode, FunctionalType
+from .typing import FunctionalEvaluationMode, FunctionalType, WaveType
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
@@ -636,7 +636,8 @@ def get_real_shot_record(wave):
     """Get the real shot record for the active sources.
 
     The returned object is typically an array with shape
-    ``(n_timesteps, n_receivers)`` for a single active shot.
+    ``(n_timesteps, n_receivers)`` for a scalar wave or
+    ``(n_timesteps, n_receivers, dimension)`` for a single elastic shot.
     """
     real_shot_record = wave.real_shot_record
 
@@ -655,10 +656,17 @@ def get_real_shot_record(wave):
             "before retrieving the real shot record."
         )
 
+    # Scalar single-shot records have two axes, while vector elastic ones have
+    # three. Multiple shots add exactly one leading axis. Comparing ranks
+    # therefore distinguishes a vector-valued shot from multishot scalar data
+    # without guessing from potentially equal axis lengths.
+    single_shot_ndim = (
+        2 if wave.wave_type is WaveType.ISOTROPIC_ACOUSTIC else 3
+    )
     if isinstance(real_shot_record, np.ndarray):
-        if real_shot_record.ndim == 3:
+        if real_shot_record.ndim == single_shot_ndim + 1:
             return real_shot_record[wave.current_sources[0]]
-        if real_shot_record.ndim == 2:
+        if real_shot_record.ndim == single_shot_ndim:
             return real_shot_record
 
     if isinstance(real_shot_record, (list, tuple)):
@@ -667,7 +675,10 @@ def get_real_shot_record(wave):
             and len(real_shot_record) > wave.current_sources[0]
         ):
             source_record = real_shot_record[wave.current_sources[0]]
-            if isinstance(source_record, np.ndarray) and source_record.ndim == 2:
+            if (
+                isinstance(source_record, np.ndarray)
+                and source_record.ndim == single_shot_ndim
+            ):
                 return source_record
 
     return real_shot_record

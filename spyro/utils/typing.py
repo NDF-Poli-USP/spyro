@@ -205,7 +205,11 @@ class AbsorbingBCsType(StrEnum):
 
 
 class SourceType(StrEnum):
-    """Supported source types."""
+    """Supported source types for analytical equations.
+
+    Source types to be used in analytical solutions. We currently
+    have force sources in 2D and 3D and explosive sources in 3D.
+    """
 
     FORCE = "force_source"
     EXPLOSIVE = "explosive_source"

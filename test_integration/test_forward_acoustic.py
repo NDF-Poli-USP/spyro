@@ -1,10 +1,9 @@
 from pytest import mark
-from mpi4py.MPI import COMM_WORLD
 from mpi4py import MPI
 from firedrake import conditional
 import spyro
 from spyro.io.basicio import parallel_print as pprint
-from spyro.tools.error_measure import calculate_normalized_L2_error
+from spyro.tools.error_measure import MeasureError
 
 
 @mark.parallel(6)
@@ -86,10 +85,10 @@ def test_forward_3_shots():
     arr0 = arr0.flatten()
 
     # Calculating errors
-    error_L2 = calculate_normalized_L2_error(arr0[:430], analytical_p[:430])
+    error_L2 = MeasureError.calculate_normalized_L2_error(arr0[:430], analytical_p[:430])
     pprint(f"L2 Error for shot {wave.current_sources} is {error_L2:.4e} and test "
            f"has passed equals {abs(error_L2) < 0.01}", comm=comm)
-    error_L2_all = COMM_WORLD.allreduce(error_L2, op=MPI.SUM) / 3.
+    error_L2_all = comm.ensemble_comm.allreduce(error_L2, op=MPI.SUM) / 3.
 
     assert abs(error_L2_all) < 0.01
 
