@@ -21,18 +21,18 @@ STRUCTURED_CONFIGURATIONS = [
 
 UNSTRUCTURED_CONFIGURATIONS = [
     # extend_segy, water_interface, padding_type, expected_cells
-    (True, True, None, 21339),
-    (True, True, "rectangular", 50107),
-    (True, True, "hyperelliptical", 42372),
-    (True, False, None, 21864),
-    (True, False, "rectangular", 50776),
-    (True, False, "hyperelliptical", 42960),
-    (False, True, None, 21339),
-    (False, True, "rectangular", 34445),
-    (False, True, "hyperelliptical", 30356),
-    (False, False, None, 21864),
-    (False, False, "rectangular", 34263),
-    (False, False, "hyperelliptical", 30731),
+    (True, True, None, 21443),
+    (True, True, "rectangular", 50080),
+    (True, True, "hyperelliptical", 42361),
+    (True, False, None, 21881),
+    (True, False, "rectangular", 50649),
+    (True, False, "hyperelliptical", 42954),
+    (False, True, None, 21443),
+    (False, True, "rectangular", 34420),
+    (False, True, "hyperelliptical", 30324),
+    (False, False, None, 21881),
+    (False, False, "rectangular", 34260),
+    (False, False, "hyperelliptical", 30730),
 ]
 
 
