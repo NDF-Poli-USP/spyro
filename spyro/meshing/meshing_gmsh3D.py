@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 from .meshing_gmsh_3d_functions import (
     boundary_faces_of_volume,
@@ -10,148 +11,6 @@ from .meshing_gmsh_3d_functions import (
 )
 from .meshing_utils3D import define_winslow_points_3d
 from .meshing_winslow3D import run_selected_winslow
-
-import os
-import platform
-import sys
-
-import gmsh
-import pytest
-
-try:
-    import firedrake
-except ImportError:
-    firedrake = None
-
-try:
-    import numba
-except ImportError:
-    numba = None
-
-try:
-    import scipy
-except ImportError:
-    scipy = None
-
-try:
-    import mpi4py
-    from mpi4py import MPI
-except ImportError:
-    mpi4py = None
-    MPI = None
-
-
-def print_environment_report():
-    print("\n" + "=" * 70)
-    print("ENVIRONMENT REPORT")
-    print("=" * 70)
-
-    print("\n--- SYSTEM ---")
-    print("Python:", sys.version.replace("\n", " "))
-    print("Python executable:", sys.executable)
-    print("Platform:", platform.platform())
-    print("Machine:", platform.machine())
-    print("CPU count:", os.cpu_count())
-
-    if hasattr(os, "sched_getaffinity"):
-        try:
-            affinity = os.sched_getaffinity(0)
-            print("CPU affinity count:", len(affinity))
-            print("CPU affinity:", sorted(affinity))
-        except Exception:
-            pass
-
-    print("\n--- PACKAGE VERSIONS ---")
-    print("NumPy:", np.__version__)
-    print("Pytest:", pytest.__version__)
-    print("Gmsh Python:", gmsh.__version__)
-    print("Gmsh module:", gmsh.__file__)
-
-    if scipy is not None:
-        print("SciPy:", scipy.__version__)
-    else:
-        print("SciPy: NOT INSTALLED")
-
-    if numba is not None:
-        print("Numba:", numba.__version__)
-        try:
-            print("Numba threads:", numba.get_num_threads())
-        except Exception:
-            pass
-    else:
-        print("Numba: NOT INSTALLED")
-
-    if firedrake is not None:
-        print(
-            "Firedrake:",
-            getattr(firedrake, "__version__", "version not defined"),
-        )
-        print("Firedrake module:", firedrake.__file__)
-    else:
-        print("Firedrake: NOT INSTALLED")
-
-    if mpi4py is not None:
-        print("mpi4py:", mpi4py.__version__)
-        print("MPI vendor:", MPI.get_vendor())
-        print("MPI size:", MPI.COMM_WORLD.size)
-        print("MPI rank:", MPI.COMM_WORLD.rank)
-    else:
-        print("mpi4py: NOT INSTALLED")
-
-    print("\n--- THREAD ENVIRONMENT ---")
-
-    thread_variables = [
-        "OMP_NUM_THREADS",
-        "OPENBLAS_NUM_THREADS",
-        "MKL_NUM_THREADS",
-        "NUMBA_NUM_THREADS",
-        "NUMEXPR_NUM_THREADS",
-        "VECLIB_MAXIMUM_THREADS",
-        "BLIS_NUM_THREADS",
-    ]
-
-    for variable in thread_variables:
-        print(
-            f"{variable}:",
-            os.environ.get(variable, "NOT SET"),
-        )
-
-    print("\n--- GMSH OPTIONS ---")
-
-    already_initialized = gmsh.isInitialized()
-
-    if not already_initialized:
-        gmsh.initialize()
-
-    gmsh_options = [
-        "General.NumThreads",
-        "Mesh.MaxNumThreads1D",
-        "Mesh.MaxNumThreads2D",
-        "Mesh.MaxNumThreads3D",
-        "Mesh.Algorithm",
-        "Mesh.Algorithm3D",
-        "Mesh.Reproducible",
-        "Mesh.RandomSeed",
-        "Mesh.RandomFactor",
-        "Mesh.RandomFactor3D",
-        "Mesh.Optimize",
-        "Mesh.OptimizeNetgen",
-        "Mesh.OptimizeThreshold",
-    ]
-
-    for option in gmsh_options:
-        try:
-            print(
-                f"{option}:",
-                gmsh.option.getNumber(option),
-            )
-        except Exception:
-            print(f"{option}: NOT AVAILABLE")
-
-    if not already_initialized:
-        gmsh.finalize()
-
-    print("=" * 70 + "\n")
 
 
 def build_gmsh_geometry_and_groups3D(
@@ -687,9 +546,9 @@ def configure_gmsh_mesh_size3D(
                         return float(graded_size)
 
             gmsh.model.mesh.setSizeCallback(mesh_size_callback3D)
-            print_environment_report()
 
         if parallel:
+            num_threads = os.cpu_count() or 1
             parallel_print("Computing mesh size callback for parallel meshing...", comm=comm)
 
             x_core = np.linspace(bbox[2], bbox[3], nx)
@@ -716,9 +575,17 @@ def configure_gmsh_mesh_size3D(
             zmin_pad = -abs(depth_z) - padding_z
             zmax_pad = 0.0
 
-            x_pad = np.linspace(xmin_pad, xmax_pad, 50)
-            y_pad = np.linspace(ymin_pad, ymax_pad, 50)
-            z_pad = np.linspace(zmin_pad, zmax_pad, 50)
+            dx_core = (bbox[3] - bbox[2]) / max(nx - 1, 1)
+            dy_core = (bbox[5] - bbox[4]) / max(ny - 1, 1)
+            dz_core = (bbox[1] - bbox[0]) / max(nz - 1, 1)
+
+            nx_pad = max(2, int(np.ceil((xmax_pad - xmin_pad) / dx_core)) + 1,)
+            ny_pad = max(2, int(np.ceil((ymax_pad - ymin_pad) / dy_core)) + 1,)
+            nz_pad = max(2, int(np.ceil((zmax_pad - zmin_pad) / dz_core)) + 1,)
+
+            x_pad = np.linspace(xmin_pad, xmax_pad, nx_pad)
+            y_pad = np.linspace(ymin_pad, ymax_pad, ny_pad)
+            z_pad = np.linspace(zmin_pad, zmax_pad, nz_pad)
 
             XX_p, YY_p, ZZ_p = np.meshgrid(x_pad, y_pad, z_pad, indexing="ij")
 
@@ -801,7 +668,12 @@ def configure_gmsh_mesh_size3D(
             gmsh.model.mesh.field.add("PostView", 1)
             gmsh.model.mesh.field.setNumber(1, "ViewIndex", view_tag)
             gmsh.model.mesh.field.setAsBackgroundMesh(1)
-            gmsh.option.setNumber("General.NumThreads", 24)
+            # Parallel HXT in 3D
+            gmsh.option.setNumber("General.NumThreads", np.int64(num_threads/2))
+            gmsh.option.setNumber("Mesh.MaxNumThreads3D", np.int64(num_threads/2))
+            # Serialize the boundary mesh generation for deterministic results
+            gmsh.option.setNumber("Mesh.MaxNumThreads1D", 1)
+            gmsh.option.setNumber("Mesh.MaxNumThreads2D", 1)
 
 
 def apply_structured_winslow_smoothing3D(
