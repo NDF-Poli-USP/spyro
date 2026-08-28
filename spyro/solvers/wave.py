@@ -307,6 +307,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         )
 
         self.mesh = self.get_mesh()
+        self._physical_parameters = PhysicalParameters()
         self.building_mesh_derived_paramenters()
 
     def set_solver_parameters(self, parameters=None):
