@@ -3,7 +3,9 @@ import warnings
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI
 from pyadjoint import MinimizationProblem, TAOSolver
-from pyadjoint.optimization.tao_solver import TAOConvergenceError
+from pyadjoint.optimization.tao_solver import (
+    PETScVecInterface, TAOConvergenceError,
+)
 import numpy as np
 import resource
 import glob
@@ -255,15 +257,16 @@ class FullWaveformInversion:
     """FWI driver composed around a wave solver.
 
     By default, the inversion driver uses :class:`AcousticWave`. The driver is
-    composed around a wave solver so other wave equations can be integrated in
-    the future, but FWI is currently supported only for acoustic waves because
-    the adjoint solver is implemented only for :class:`AcousticWave`.
+    composed around a wave solver, so which media it inverts follows from
+    which of them can be differentiated: an acoustic medium either way, and an
+    isotropic elastic one through the automated adjoint, which is the only
+    adjoint written for it.
 
     Notes
     -----
     The inversion driver composes a wave solver instead of inheriting from one.
-    Pass ``wave_class`` to construct a compatible acoustic solver, or pass
-    ``wave`` to reuse an already initialized acoustic solver instance.
+    Pass ``wave_class`` to construct a compatible solver, or pass ``wave`` to
+    reuse an already initialized solver instance.
 
     The inversion can be run using either ``scipy.optimize.minimize`` (L-BFGS-B)
     via ``run_fwi()`` or the deprecated ROL library via ``run_fwi_rol()``.
@@ -273,7 +276,7 @@ class FullWaveformInversion:
     The gradient driving the optimization comes from one of two adjoints, and
     which one is used decides how ``run_fwi()`` is run:
 
-    Implemented adjoint (the default)
+    Implemented adjoint (the default, acoustic only)
         The hand-written adjoint solver. Every optimizer iterate re-runs the
         forward solve and the backward propagator, and the control is handed
         to :func:`scipy.optimize.minimize` as a flat vector of degrees of
@@ -283,8 +286,26 @@ class FullWaveformInversion:
         with :meth:`enable_automated_adjoint`. The forward solve is recorded on
         a pyadjoint tape *once*; the resulting reduced functional replays it
         for every new control, so the driver does not re-run the forward solve
-        itself. The control stays a ``Function`` and the optimization is done
+        itself. The controls stay ``Function``\\ s and the optimization is done
         by PETSc TAO.
+
+    Controls
+    --------
+    An acoustic inversion has one control, its velocity model, and that single
+    ``Function`` is what :attr:`control_parameters` gives back. An isotropic
+    elastic one is inverted for several parameters at once -- density and the
+    two wave speeds, or density and the Lame parameters, whichever set the
+    equation is written in -- and those come back as a list, in the order
+    :meth:`_controlled_parameters` puts them. Everything the optimizers see is
+    shaped by that: the bounds take one entry per control, the derivatives come
+    back one per control, and ``run_fwi`` returns the controls it converged on.
+
+    Which parameters an elastic inversion runs on is chosen when the automated
+    adjoint is enabled::
+
+        fwi.enable_automated_adjoint(
+            control_parameters={ElasticMaterialParameter.S_WAVE_VELOCITY},
+        )
 
     Methods
     -------
@@ -299,6 +320,12 @@ class FullWaveformInversion:
         Configure the acoustic model used to generate synthetic observations.
     set_guess_velocity_model(constant=None, ...)
         Configure the acoustic model used as the inversion starting point.
+    set_real_control(control)
+        Configure the material values, of any medium, that generate the
+        synthetic observations.
+    set_guess_control(control)
+        Configure the material values, of any medium, the inversion starts
+        from.
     set_real_mesh(user_mesh=None, input_mesh_parameters=None)
         Set the mesh used by the real model.
     set_guess_mesh(user_mesh=None, input_mesh_parameters=None)
@@ -455,35 +482,87 @@ class FullWaveformInversion:
 
         How they are presented depends on the physics: an acoustic medium is
         described by its velocity model alone, so its control is that single
-        ``Function``, which is the API acoustic FWI has always had. An elastic
-        medium is inverted for several parameters at once and needs a
-        different shape, which is not defined yet.
+        ``Function``, which is the API acoustic FWI has always had. An
+        isotropic elastic medium is inverted for several parameters at once --
+        density and the two wave speeds, or density and the Lame parameters,
+        depending on which set the equation is written in -- and those come
+        back as a list, ordered the same way as
+        :meth:`_controlled_parameters`.
 
         Returns
         -------
-        firedrake.Function or None
-            For an acoustic inversion, the velocity model, or ``None`` if none
-            is configured.
-
-        Raises
-        ------
-        NotImplementedError
-            If the wave equation is not acoustic.
+        firedrake.Function or list of firedrake.Function or None
+            The single control field, a list of them when several parameters
+            are inverted for, or ``None`` if none is configured.
 
         Examples
         --------
         >>> set(fwi._control_parameters) <= fwi.wave.physical_parameters
         True
         """
-        if self.wave_type is not WaveType.ISOTROPIC_ACOUSTIC:
-            raise NotImplementedError(
-                "Inversion controls are only defined for acoustic media; "
-                f"{self.wave_type.name} controls are not implemented yet.",
-            )
         if not self._control_parameters:
             return None
-        (field,) = self._control_parameters.values()
-        return field
+        fields = [
+            self._control_parameters[name]
+            for name in self._controlled_parameters()
+        ]
+        if len(fields) == 1:
+            (field,) = fields
+            return field
+        return fields
+
+    def _as_control_list(self, control):
+        """Return control values as a list, however they were presented.
+
+        Parameters
+        ----------
+        control : firedrake.Function, mapping, iterable, or None
+            Controls in any of the shapes this driver hands around: a bare
+            field, one field per controlled parameter, or a container keyed by
+            parameter. ``None`` gives an empty list.
+
+        Returns
+        -------
+        list
+            The values, in the order they were given.
+        """
+        if control is None:
+            return []
+        # A container keyed by parameter is told apart by whether it has
+        # items(), the same way ``_control_by_parameter`` does it.
+        if hasattr(control, "items"):
+            return list(control.values())
+        if isinstance(control, (list, tuple)):
+            return list(control)
+        return [control]
+
+    def _as_control_values(self, values):
+        """Return optimizer output in the shape :meth:`set_guess_control` takes.
+
+        The two optimizers speak different languages. L-BFGS-B works on a flat
+        vector of degrees of freedom and hands one back, which has to be
+        rebuilt into fields. TAO works on the controls themselves and hands
+        those back, already in the right shape.
+
+        Parameters
+        ----------
+        values : array_like, firedrake.Function, mapping, or iterable of firedrake.Function
+            Control values as an optimizer produced them.
+
+        Returns
+        -------
+        firedrake.Function, list of firedrake.Function, or mapping
+            The same values, as fields.
+        """
+        if hasattr(values, "items"):
+            return values
+        fields = values if isinstance(values, (list, tuple)) else [values]
+        if all(
+            isinstance(field, (fire.Function, fire.Constant))
+            for field in fields
+        ):
+            return values
+        return self._rebuild_control_from_vector(self.control_parameters, values)
 
     def _controlled_parameters(self):
         """Return the parameters being inverted for.
@@ -541,6 +620,10 @@ class FullWaveformInversion:
            optimizer feeds back each iterate: ``_rebuild_control_from_vector``
            builds a ``Function`` out of a plain array of numbers, which
            carries no parameter name at all.
+        3. A **sequence** of bare values, one for each controlled parameter,
+           paired with them in order. This is the multi-parameter shape, an
+           elastic medium inverted for density and its two wave speeds at
+           once, and it carries no names either.
 
         ``None`` gives an empty mapping, so callers can pass "no control
         given" without a special case.
@@ -587,10 +670,20 @@ class FullWaveformInversion:
             items = None
         if items is not None:
             return dict(items)
+        parameters = self._controlled_parameters()
+        if isinstance(control, (list, tuple)):
+            if len(control) != len(parameters):
+                names = ", ".join(parameter.value for parameter in parameters)
+                raise ValueError(
+                    f"This inversion controls {len(parameters)} parameters "
+                    f"({names}), so it takes that many values; "
+                    f"{len(control)} were given.",
+                )
+            return dict(zip(parameters, control))
         # Unpacking, rather than taking the first entry, so that a bare value
         # on a multi-parameter inversion fails instead of being assigned to
         # whichever parameter happens to sort first.
-        (parameter,) = self._controlled_parameters()
+        (parameter,) = parameters
         return {parameter: control}
 
     def _write_parameters_into_wave(self, wave, values):
@@ -612,23 +705,30 @@ class FullWaveformInversion:
         Raises
         ------
         ValueError
-            If the solver has no fields yet and several parameters are
-            controlled. Only the acoustic velocity model can be created here.
+            If the solver has no fields yet and no model to build them from,
+            and several parameters are controlled. Only the acoustic velocity
+            model can be created here.
         """
         try:
             parameters = wave.physical_parameters
         except ValueError:
             # A value is applied by writing into the field of the parameter
-            # it belongs to, so a solver that has never been given a model has
-            # nothing to write into. Create that field, empty, through the
-            # solver's own public model API; the loop below fills it in, the
-            # same way it writes every later iterate.
-            (parameter,) = self._controlled_parameters()
-            field = fire.Function(
-                self._control_function_space(wave), name=parameter.value,
-            )
-            wave.set_initial_velocity_model(velocity_model_function=field)
-            parameters = wave.initialize_physical_parameters()
+            # it belongs to, so a solver whose fields have not been built has
+            # nothing to write into. Build them from the model it was given:
+            # an elastic medium carries its materials in the input dictionary,
+            # so this is all it takes.
+            try:
+                parameters = wave.initialize_physical_parameters()
+            except ValueError:
+                # No model at all. Create the field, empty, through the
+                # solver's own public model API; the loop below fills it in,
+                # the same way it writes every later iterate.
+                (parameter,) = self._controlled_parameters()
+                field = fire.Function(
+                    self._control_function_space(wave), name=parameter.value,
+                )
+                wave.set_initial_velocity_model(velocity_model_function=field)
+                parameters = wave.initialize_physical_parameters()
         for name, value in values.items():
             parameters.update(name, value)
 
@@ -671,12 +771,17 @@ class FullWaveformInversion:
         return parameters.copy(self._controlled_parameters())
 
     def _flatten_control(self, control):
-        """Flatten a control ``Function`` into an optimizer vector.
+        """Flatten a control into an optimizer vector.
+
+        Several controls are concatenated in the order they are given, which
+        is the order :meth:`_controlled_parameters` puts them in;
+        :meth:`_rebuild_control_from_vector` splits them apart again the same
+        way.
 
         Parameters
         ----------
-        control : firedrake.Function
-            Control parameter to flatten.
+        control : firedrake.Function or list of firedrake.Function
+            Control parameters to flatten.
 
         Returns
         -------
@@ -688,56 +793,76 @@ class FullWaveformInversion:
         ValueError
             If ``control`` is ``None``.
         TypeError
-            If ``control`` is not a Firedrake ``Function``.
+            If a control is not a Firedrake ``Function``.
         """
         if control is None:
             raise ValueError("No control parameter has been configured.")
-        if not isinstance(control, fire.Function):
-            raise TypeError(
-                "FWI control must be a firedrake Function. "
-                f"Received {type(control).__name__}.",
-            )
-        return np.asarray(control.dat.data_ro, dtype=float).reshape(-1)
+        fields = self._as_control_list(control)
+        for field in fields:
+            if not isinstance(field, fire.Function):
+                raise TypeError(
+                    "FWI control must be a firedrake Function. "
+                    f"Received {type(field).__name__}.",
+                )
+        return np.concatenate([
+            np.asarray(field.dat.data_ro, dtype=float).reshape(-1)
+            for field in fields
+        ])
 
     def _rebuild_control_from_vector(self, control_reference, flat_vector):
-        """Rebuild a control ``Function`` from an optimizer vector.
+        """Rebuild controls from an optimizer vector.
 
-        Inverse of :meth:`_flatten_control`.
+        Inverse of :meth:`_flatten_control`: the vector is split back across
+        the reference controls, in the order they appear there.
 
         Parameters
         ----------
-        control_reference : firedrake.Function
-            Control function used as the reconstruction reference. Its function
-            space, name, and data shape define how the optimizer vector is
-            converted back into a Firedrake ``Function``.
+        control_reference : firedrake.Function or list of firedrake.Function
+            Control functions used as the reconstruction reference. Their
+            function spaces, names, and data shapes define how the optimizer
+            vector is converted back into Firedrake ``Function``.
         flat_vector : array_like
             Optimizer vector.
 
         Returns
         -------
-        firedrake.Function
-            Rebuilt control function.
+        firedrake.Function or list of firedrake.Function
+            Rebuilt controls, shaped like ``control_reference``.
 
         Raises
         ------
         TypeError
-            If ``control_reference`` is not a Firedrake ``Function``.
+            If a control reference is not a Firedrake ``Function``.
         ValueError
-            If the vector size does not match the control reference.
+            If the vector size does not match the control references.
         """
-        if not isinstance(control_reference, fire.Function):
-            raise TypeError(
-                "FWI control reference must be a firedrake Function. "
-                f"Received {type(control_reference).__name__}.",
-            )
+        references = self._as_control_list(control_reference)
+        for reference in references:
+            if not isinstance(reference, fire.Function):
+                raise TypeError(
+                    "FWI control reference must be a firedrake Function. "
+                    f"Received {type(reference).__name__}.",
+                )
         flat_vector = np.asarray(flat_vector, dtype=float).reshape(-1)
-        reference_shape = np.asarray(control_reference.dat.data_ro).shape
-        expected = int(np.prod(reference_shape))
-        if flat_vector.size != expected:
+        shapes = [
+            np.asarray(reference.dat.data_ro).shape for reference in references
+        ]
+        sizes = [int(np.prod(shape)) for shape in shapes]
+        if flat_vector.size != sum(sizes):
             raise ValueError("Control vector size does not match the configured control.")
-        return fire.Function(
-            control_reference.function_space(), name=control_reference.name(),
-            val=flat_vector.reshape(reference_shape))
+        offsets = np.cumsum([0] + sizes)
+        rebuilt = [
+            fire.Function(
+                reference.function_space(), name=reference.name(),
+                val=flat_vector[start:stop].reshape(shape))
+            for reference, shape, start, stop in zip(
+                references, shapes, offsets[:-1], offsets[1:],
+            )
+        ]
+        if len(rebuilt) == 1 and not isinstance(control_reference, (list, tuple)):
+            (single,) = rebuilt
+            return single
+        return rebuilt
 
     def _expand_bound(self, bound, control_reference):
         """Expand one bound specification to match a control component.
@@ -819,6 +944,58 @@ class FullWaveformInversion:
         self.guess_mesh = self.wave.get_mesh()
         self._control_parameters = self.wave.physical_parameters.copy(control)
         self.misfit = None
+
+    def set_real_control(self, control):
+        """Set the material values that generate the observed data.
+
+        The counterpart of :meth:`set_guess_control` for the true model of a
+        synthetic experiment, and the multi-parameter counterpart of
+        :meth:`set_real_velocity_model`, which speaks the acoustic language of
+        a single velocity model. What is set here is read back by
+        :meth:`generate_real_shot_record`, which writes it into a solver of
+        its own before propagating.
+
+        Parameters
+        ----------
+        control : mapping, firedrake.Function, firedrake.Constant, scalar, or iterable
+            True material values, keyed by material parameter or given one per
+            controlled parameter.
+
+        Returns
+        -------
+        None
+            Updates the real model parameters and ``real_mesh``.
+
+        Raises
+        ------
+        ValueError
+            If ``control`` holds no value.
+
+        Examples
+        --------
+        For an isotropic elastic medium::
+
+            fwi.set_real_control({
+                ElasticMaterialParameter.DENSITY: 2.5,
+                ElasticMaterialParameter.P_WAVE_VELOCITY: 3.0,
+                ElasticMaterialParameter.S_WAVE_VELOCITY: 1.7,
+            })
+        """
+        control = self._control_by_parameter(control)
+        if not control:
+            raise ValueError(
+                f"A real control value is required. Received {control!r}.",
+            )
+        # Kept as given, without being written into the driver's own solver.
+        # The true model is propagated by a solver of its own, built by
+        # ``generate_real_shot_record``, which interpolates these values into
+        # its fields. Building them here instead would tie them to whichever
+        # mesh the driver's solver holds at the time, and leave that solver
+        # carrying the true model into the guess it is meant to invert.
+        real_parameters = PhysicalParameters()
+        for name, value in control.items():
+            real_parameters.add(name, value)
+        self._real_model_parameters = real_parameters
 
     @property
     def real_velocity_model_file(self):
@@ -908,12 +1085,21 @@ class FullWaveformInversion:
         the control has to be an existing field before it can be recorded as
         one.
 
+        The selection made here *is* the inversion's set of controls, and
+        replaces whatever was configured before. For an acoustic medium that
+        changes nothing -- there is one parameter to choose from. For an
+        isotropic elastic one it is how the inversion is told which of the
+        parameters the equation is written in to invert for, and the guess
+        values come from the model the solver already holds.
+
         Parameters
         ----------
         control_parameters : enum.Enum or iterable of enum.Enum, optional
             Physical parameters to differentiate with respect to. ``None``
-            takes every parameter the wave equation offers, which for an
-            acoustic medium is the velocity model.
+            takes every parameter the wave equation offers: the velocity model
+            of an acoustic medium, and density with the two wave speeds (or
+            the Lame parameters, whichever set the equation is written in) of
+            an isotropic elastic one.
         checkpointing : bool, optional
             Whether to manage the tape with a checkpoint schedule. ``False``
             (the default) keeps every forward step on the tape.
@@ -960,6 +1146,14 @@ class FullWaveformInversion:
             snapshots=snapshots,
             gc_timestep_frequency=gc_timestep_frequency,
         )
+        # What is differentiated is what is inverted for, and in the same
+        # order: the optimizer hands its iterates back positionally, matched
+        # against the tape's controls. Taking the selection from the adjoint
+        # rather than trusting the two to agree is what keeps the density of
+        # an elastic inversion from being written into its p-wave velocity.
+        self._control_parameters = self.wave.physical_parameters.copy(
+            self.wave.automated_adjoint.control_parameter_names,
+        )
 
     def calculate_misfit(self, c=None, save_output=False):
         """
@@ -994,11 +1188,7 @@ class FullWaveformInversion:
             self.wave.set_mesh(user_mesh=self.guess_mesh, input_mesh_parameters={})
 
         if c is not None:
-            updated_control = self._rebuild_control_from_vector(
-                self.control_parameters,
-                c,
-            )
-            self.set_guess_control(updated_control)
+            self.set_guess_control(self._as_control_values(c))
         elif self._control_parameters:
             self._write_parameters_into_wave(self.wave, self._control_parameters)
         else:
@@ -1009,7 +1199,9 @@ class FullWaveformInversion:
             self.wave.enable_implemented_adjoint()
         self.wave.forward_solve()
         current_control = self.control_parameters
-        fire.VTKFile(f"control_{self.current_iteration}.pvd").write(current_control)
+        fire.VTKFile(f"control_{self.current_iteration}.pvd").write(
+            *self._as_control_list(current_control),
+        )
         np.save(
             f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
             self._flatten_control(current_control),
@@ -1397,16 +1589,16 @@ class FullWaveformInversion:
         adjoint-state method implemented in gradient_solve(), or by
         differentiating the recorded tape when the automated adjoint is
         enabled.
+
+        An inversion controlling several parameters gets one derivative for
+        each, keyed by the parameter it belongs to, which is the shape the
+        elastic solver returns them in.
         """
         comm = self.comm
         if calculate_functional:
             self.get_functional(c=c)
         elif c is not None:
-            updated_control = self._rebuild_control_from_vector(
-                self.control_parameters,
-                c,
-            )
-            self.set_guess_control(updated_control)
+            self.set_guess_control(self._as_control_values(c))
 
         comm.comm.barrier()
         if self.wave.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
@@ -1423,7 +1615,9 @@ class FullWaveformInversion:
             )
         self._apply_gradient_mask()
         if save:
-            fire.VTKFile(f"gradient_{self.current_iteration}.pvd").write(self.gradient)
+            fire.VTKFile(f"gradient_{self.current_iteration}.pvd").write(
+                *self._as_control_list(self.gradient),
+            )
         self.current_iteration += 1
         comm.comm.barrier()
 
@@ -1476,7 +1670,10 @@ class FullWaveformInversion:
             vmin : float or array_like, optional
                 Lower bound for the control parameter. Default is 1.429. A
                 bound given per degree of freedom becomes a pair of arrays
-                for L-BFGS-B, and a pair of fields for TAO.
+                for L-BFGS-B, and a pair of fields for TAO. An inversion
+                controlling several parameters takes one entry per control,
+                since density and a wave speed are not bounded by the same
+                numbers.
             vmax : float or array_like, optional
                 Upper bound for the control parameter. Default is 6.0.
             maxiter : int, optional
@@ -1496,9 +1693,17 @@ class FullWaveformInversion:
 
         Returns
         -------
-        scipy.optimize.OptimizeResult or firedrake.Function
-            The scipy result under the implemented adjoint, and the optimal
-            control field under the automated one, which is what TAO returns.
+        scipy.optimize.OptimizeResult or firedrake.Function or list of firedrake.Function
+            The scipy result under the implemented adjoint. Under the
+            automated one, the controls TAO converged on, shaped like
+            :attr:`control_parameters`: one field for an acoustic inversion,
+            one per parameter for a multi-parameter one.
+
+        Raises
+        ------
+        NotImplementedError
+            If the medium has no hand-implemented adjoint and the automated
+            one was not enabled.
 
         Notes
         -----
@@ -1535,13 +1740,27 @@ class FullWaveformInversion:
                 self.wave.enable_implemented_adjoint()
         parameters.update(kwargs)
 
-        control_reference = self.control_parameters
-        if self.wave.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-            result = self._run_fwi_tao(
-                parameters, control_reference, tao_options=tao_options,
+        if (
+            self.wave.adjoint_type != AdjointType.AUTOMATED_ADJOINT
+            and self.wave_type is not WaveType.ISOTROPIC_ACOUSTIC
+        ):
+            raise NotImplementedError(
+                f"{self.wave_type.name} inversion needs the automated "
+                "adjoint: call enable_automated_adjoint() before run_fwi(). "
+                "The hand-implemented adjoint, and the L-BFGS-B path built "
+                "on it, are only written for acoustic media.",
             )
-            result_vector = self._flatten_control(result)
+
+        if self.wave.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+            # TAO optimizes the control fields themselves, and they come back
+            # keyed by the parameter each one belongs to.
+            self.set_guess_control(
+                self._run_fwi_tao(parameters, tao_options=tao_options),
+            )
+            self.control_parameter_result = self.control_parameters
+            result = self.control_parameter_result
         else:
+            control_reference = self.control_parameters
             lower = self._expand_bound(parameters["vmin"], control_reference)
             upper = self._expand_bound(parameters["vmax"], control_reference)
             bounds = list(zip(lower, upper))
@@ -1556,20 +1775,20 @@ class FullWaveformInversion:
                 bounds=bounds,
                 options=options,
             )
-            result_vector = result.x
+            self.control_parameter_result = self._rebuild_control_from_vector(
+                control_reference,
+                result.x,
+            )
+            self.set_guess_control(self.control_parameter_result)
 
-        self.control_parameter_result = self._rebuild_control_from_vector(
-            control_reference,
-            result_vector,
+        fire.VTKFile("control_end.pvd").write(
+            *self._as_control_list(self.control_parameter_result),
         )
-        self.set_guess_control(self.control_parameter_result)
 
-        fire.VTKFile("control_end.pvd").write(self.control_parameter_result)
-
-        np.save("result", result_vector)
+        np.save("result", self._flatten_control(self.control_parameter_result))
         return result
 
-    def _run_fwi_tao(self, parameters, control_reference, tao_options=None):
+    def _run_fwi_tao(self, parameters, tao_options=None):
         """Optimize the recorded reduced functional with PETSc TAO.
 
         The forward solve is recorded once, here, and every functional value
@@ -1590,15 +1809,13 @@ class FullWaveformInversion:
         parameters : dict
             Optimization parameters assembled by :meth:`run_fwi`. ``vmin``,
             ``vmax`` and ``maxiter`` are read from it.
-        control_reference : firedrake.Function
-            Control whose function space shapes the bounds and the solution.
         tao_options : dict, optional
             PETSc options merged over the defaults.
 
         Returns
         -------
-        firedrake.Function
-            The optimal control.
+        PhysicalParameters
+            The optimal controls, keyed by the parameter each one belongs to.
 
         Warns
         -----
@@ -1621,11 +1838,17 @@ class FullWaveformInversion:
 
         # One bound pair per control, not per degree of freedom: TAO takes the
         # bounds as fields (or scalars broadcast over them), while L-BFGS-B
-        # takes a pair for each entry of the flattened control.
-        lower = self._tao_bound(parameters["vmin"], control_reference)
-        upper = self._tao_bound(parameters["vmax"], control_reference)
-        bounds = [(lower, upper) for _ in reduced_functional.controls]
-        problem = MinimizationProblem(reduced_functional, bounds=bounds)
+        # takes a pair for each entry of the flattened control. The controls
+        # of the reduced functional, rather than this driver's, are what the
+        # pairs are matched against: they are the ones TAO is given.
+        adjoint_controls = [
+            control.control for control in reduced_functional.controls
+        ]
+        lower = self._tao_bounds(parameters["vmin"], adjoint_controls)
+        upper = self._tao_bounds(parameters["vmax"], adjoint_controls)
+        problem = MinimizationProblem(
+            reduced_functional, bounds=list(zip(lower, upper)),
+        )
 
         options = {
             "tao_type": "blmvm",
@@ -1644,11 +1867,60 @@ class FullWaveformInversion:
                 "limit or loosen the tolerances through 'tao_options' if the "
                 "inversion is meant to run to convergence.",
             )
-            solution = self._control_from_tao(solver, control_reference)
-        return solution
+            solution = self._control_from_tao(solver, adjoint_controls)
+        # The tape knows which parameter each control is; the optimizer only
+        # ever saw a vector, and hands back the same order it was given.
+        return automated_adjoint.label_derivatives(solution)
+
+    def _tao_bounds(self, bound, control_reference):
+        """Return one bound per control, in the form TAO takes them.
+
+        A scalar bounds every control the same way, which is what an acoustic
+        inversion needs and all a single control can mean. An inversion
+        controlling several parameters at once takes one entry per control
+        instead -- density, a p-wave velocity and an s-wave velocity are not
+        bounded by the same numbers -- and each entry may itself be a scalar
+        or vary per degree of freedom. For a single control, a sequence longer
+        than one entry is read as varying per degree of freedom, which is how
+        ``vmin``/``vmax`` have always been accepted.
+
+        Parameters
+        ----------
+        bound : scalar or array_like
+            Bound specification, as given to :meth:`run_fwi`.
+        control_reference : list of firedrake.Function
+            The controls being bounded, in the order TAO takes them.
+
+        Returns
+        -------
+        list
+            One bound for each control, each a ``float`` or a ``Function``.
+
+        Raises
+        ------
+        ValueError
+            If a sequence of bounds does not have one entry per control.
+        """
+        fields = self._as_control_list(control_reference)
+        if np.isscalar(bound):
+            return [float(bound)] * len(fields)
+
+        values = list(bound)
+        if len(fields) == 1 and len(values) != 1:
+            # A lone control takes its bounds one per degree of freedom.
+            return [self._tao_bound(bound, fields[0])]
+        if len(values) != len(fields):
+            raise ValueError(
+                f"This inversion controls {len(fields)} parameters, so its "
+                f"bounds take that many entries; {len(values)} were given.",
+            )
+        return [
+            self._tao_bound(value, field)
+            for value, field in zip(values, fields)
+        ]
 
     def _tao_bound(self, bound, control_reference):
-        """Return one bound in the form TAO takes it.
+        """Return one control's bound in the form TAO takes it.
 
         Parameters
         ----------
@@ -1674,37 +1946,31 @@ class FullWaveformInversion:
         """Read the current iterate out of a TAO solver.
 
         Used when TAO stops without converging, where the solver raises before
-        handing the solution back.
+        handing the solution back. TAO holds the iterate as one vector with
+        every control concatenated into it, so it is read back through an
+        interface built from those same controls, which lays them out the same
+        way the solver's own does.
 
         Parameters
         ----------
         solver : pyadjoint.TAOSolver
             Solver whose solution vector is read.
-        control_reference : firedrake.Function
-            Control whose function space the vector is read into.
+        control_reference : list of firedrake.Function
+            Controls, in the order TAO holds them, whose function spaces the
+            vector is read into.
 
         Returns
         -------
-        firedrake.Function
-            The last iterate.
-
-        Raises
-        ------
-        NotImplementedError
-            If the problem has more than one control, where the solution
-            vector is a concatenation that this does not split.
+        list of firedrake.Function
+            The last iterate, one field per control.
         """
-        if len(solver.tao_objective.reduced_functional.controls) != 1:
-            raise NotImplementedError(
-                "Recovering an unconverged iterate is only implemented for a "
-                "single control.",
-            )
-        solution = fire.Function(
-            control_reference.function_space(), name=control_reference.name(),
+        fields = self._as_control_list(control_reference)
+        iterate = [field.copy(deepcopy=True) for field in fields]
+        interface = PETScVecInterface(
+            tuple(fields), comm=self.wave.comm.comm,
         )
-        with solution.dat.vec_wo as vec:
-            solver.tao.getSolution().copy(vec)
-        return solution
+        interface.from_petsc(solver.tao.getSolution(), iterate)
+        return iterate
 
     def _tao_monitor(self, tao):
         """Record one TAO iteration, mirroring what ``get_functional`` logs.
@@ -1910,10 +2176,15 @@ class FullWaveformInversion:
         This method is deprecated since we prefer to use mesh based tags for now. In
         the future we will use the new submesh functionality in Firedrake.
         """
-        if self.has_gradient_mask:
-            self.gradient = self.mask_obj.apply_mask(self.gradient)
+        if not self.has_gradient_mask:
+            return
+        if hasattr(self.gradient, "items"):
+            # One derivative per controlled parameter, keyed by it: each one
+            # lives on the same mesh and is masked the same way.
+            for name, derivative in list(self.gradient.items()):
+                self.gradient.update(name, self.mask_obj.apply_mask(derivative))
         else:
-            pass
+            self.gradient = self.mask_obj.apply_mask(self.gradient)
 
     def load_real_shot_record(self, file_name="shots/shot_record_"):
         """
