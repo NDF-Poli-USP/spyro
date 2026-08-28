@@ -1,5 +1,4 @@
 import pytest
-from firedrake import COMM_WORLD as comm
 import spyro
 from spyro.io.basicio import parallel_print as pprint
 from spyro.tools.error_measure import MeasureError
@@ -49,9 +48,9 @@ def test_analytical_solution(use_vertex_only_mesh):
     normalized_l2_error = MeasureError.calculate_normalized_L2_error(numerical_p, analytical_p)
 
     vom_label = "VOM" if use_vertex_only_mesh else "NO VOM"
-    pprint(f"Normalized L2 Error ({vom_label}) = {normalized_l2_error:.4e}", comm=comm)
-    pprint(f"Integral Error ({vom_label}) = {integral_error:.4e}", comm=comm)
-    pprint(f"Peak Error ({vom_label}) = {peak_error:.4e}", comm=comm)
+    pprint(f"Normalized L2 Error ({vom_label}) = {normalized_l2_error:.4e}", comm=wave.comm)
+    pprint(f"Integral Error ({vom_label}) = {integral_error:.4e}", comm=wave.comm)
+    pprint(f"Peak Error ({vom_label}) = {peak_error:.4e}", comm=wave.comm)
 
     assert normalized_l2_error < 1e-3 and integral_error < 1e-3 and peak_error < 1e-3
 

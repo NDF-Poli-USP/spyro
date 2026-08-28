@@ -1,6 +1,6 @@
 import pytest
 import spyro
-from firedrake import COMM_WORLD as comm, conditional
+from firedrake import conditional
 from numpy import asarray
 from pickle import load
 from spyro.tools.error_measure import MeasureError
@@ -99,7 +99,7 @@ def run_forward():
 
     p_r = wave.forward_solution_receivers
 
-    return p_r, wave.dt
+    return p_r, wave.dt, wave.comm
 
 
 @pytest.mark.slow
@@ -108,7 +108,7 @@ def test_pml():
     """Test that the second order time convergence
     of the central difference method is achieved"""
 
-    p_r, dt = run_forward()
+    p_r, dt, comm = run_forward()
     with open("tests/inputfiles/extended_pml_receveirs.pck", "rb") as f:
         array = asarray(load(f), dtype=float)
         extended_p_r = array

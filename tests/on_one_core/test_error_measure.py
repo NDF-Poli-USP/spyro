@@ -5,7 +5,7 @@ that error calculations and file operations work as expected.
 """
 
 import numpy as np
-from pytest import fixture, mark, raises, warns
+import pytest
 from unittest.mock import patch
 from spyro.tools.error_measure import MeasureError
 
@@ -13,14 +13,14 @@ from spyro.tools.error_measure import MeasureError
 class TestMeasureError:
     """Test suite for MeasureError class."""
 
-    @fixture
+    @pytest.fixture
     def measure_error(self):
         """Create a MeasureError instance for testing."""
         output_folder = "/output/test_output"
         output_case = "test_case"
         return MeasureError(output_folder=output_folder, output_case=output_case)
 
-    @fixture
+    @pytest.fixture
     def sample_signals(self):
         """Create sample signals for testing."""
         dt = 0.01
@@ -31,7 +31,7 @@ class TestMeasureError:
         model = np.sin(2 * np.pi * 5 * t + 0.1)
         return model, reference, dt
 
-    @fixture
+    @pytest.fixture
     def receiver_data(self):
         """Create sample receiver data for testing."""
         n_time = 100
@@ -70,14 +70,14 @@ class TestMeasureError:
         signal1 = np.array([1, 2, 3])
         signal2 = np.array([4, 5, 6, 7, 8])
         # Default is error_if_different_length=True
-        with raises(ValueError, match="The lengths of the model and reference signals"):
+        with pytest.raises(ValueError, match="The lengths of the model and reference signals"):
             MeasureError.pad_signal_lengths(signal1, signal2)
 
     def test_pad_signal_lengths_both_padding_error(self):
         """Test that both start_padding and end_padding cannot be equal simultaneously."""
         signal1 = np.array([1, 2, 3])
         signal2 = np.array([4, 5, 6, 7, 8])
-        with raises(ValueError, match="are mutually exclusive."):
+        with pytest.raises(ValueError, match="are mutually exclusive."):
             MeasureError.pad_signal_lengths(
                 signal1,
                 signal2,
@@ -85,7 +85,7 @@ class TestMeasureError:
                 start_padding=True,
                 end_padding=True,
             )
-        with raises(ValueError, match="are mutually exclusive"):
+        with pytest.raises(ValueError, match="are mutually exclusive"):
             MeasureError.pad_signal_lengths(
                 signal1,
                 signal2,
@@ -194,7 +194,7 @@ class TestMeasureError:
     def test_peak_error_empty_signal_warning(self):
         """Test peak error with signal without peaks."""
         signal = np.array([0, 0, 0, 0])
-        with warns(UserWarning, match="No peak observed"):
+        with pytest.warns(UserWarning, match="No peak observed"):
             MeasureError.calculate_peak_error(signal, signal)
 
     def test_integral_error_identical_signals(self, sample_signals):
@@ -325,13 +325,13 @@ class TestMeasureError:
                 # Check that savetxt was called at least once
                 mock_savetxt.assert_called()
 
-    @mark.parametrize("invalid_value", [-1, -0.5, "dt"])
+    @pytest.mark.parametrize("invalid_value", [-1, -0.5, "dt"])
     def test_error_measures_invalid_dt(
         self, measure_error, receiver_data, invalid_value
     ):
         """Test error measures with invalid dt values."""
         if isinstance(invalid_value, str):
-            with raises(TypeError):  # Strings raise TypeError
+            with pytest.raises(TypeError):  # Strings raise TypeError
                 measure_error.calculate_error_measures(
                     forward_solution_receivers=receiver_data,
                     receivers_reference=receiver_data,
@@ -340,7 +340,7 @@ class TestMeasureError:
                     save_file=False,
                 )
         else:
-            with raises(ValueError):  # Negative numbers raise ValueError
+            with pytest.raises(ValueError):  # Negative numbers raise ValueError
                 measure_error.calculate_error_measures(
                     forward_solution_receivers=receiver_data,
                     receivers_reference=receiver_data,
