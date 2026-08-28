@@ -1,5 +1,4 @@
 from pytest import mark
-from mpi4py.MPI import COMM_WORLD
 from mpi4py import MPI
 from firedrake import conditional
 import spyro
@@ -90,7 +89,7 @@ def test_forward_3_shots():
     pprint(f"Normalized L2 Error for shot {wave.current_sources} is {error_L2:.4e} and test "
            f"has passed equals {abs(error_L2) < 0.01}", comm=comm)
 
-    error_L2_all = COMM_WORLD.allreduce(error_L2, op=MPI.SUM) / 3.
+    error_L2_all = comm.ensemble_comm.allreduce(error_L2, op=MPI.SUM) / 3.
 
     assert abs(error_L2_all) < 0.01
 
