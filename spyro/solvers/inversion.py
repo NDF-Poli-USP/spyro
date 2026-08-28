@@ -1,7 +1,9 @@
 import firedrake as fire
 import warnings
 from scipy.optimize import minimize as scipy_minimize
-from mpi4py import MPI  # noqa: F401
+from mpi4py import MPI
+from pyadjoint import MinimizationProblem, TAOSolver
+from pyadjoint.optimization.tao_solver import TAOConvergenceError
 import numpy as np
 import resource
 import glob
@@ -266,8 +268,29 @@ class FullWaveformInversion:
     The inversion can be run using either ``scipy.optimize.minimize`` (L-BFGS-B)
     via ``run_fwi()`` or the deprecated ROL library via ``run_fwi_rol()``.
 
+    Adjoint types
+    -------------
+    The gradient driving the optimization comes from one of two adjoints, and
+    which one is used decides how ``run_fwi()`` is run:
+
+    Implemented adjoint (the default)
+        The hand-written adjoint solver. Every optimizer iterate re-runs the
+        forward solve and the backward propagator, and the control is handed
+        to :func:`scipy.optimize.minimize` as a flat vector of degrees of
+        freedom.
+    Automated adjoint
+        Algorithmic differentiation through :mod:`firedrake.adjoint`, enabled
+        with :meth:`enable_automated_adjoint`. The forward solve is recorded on
+        a pyadjoint tape *once*; the resulting reduced functional replays it
+        for every new control, so the driver does not re-run the forward solve
+        itself. The control stays a ``Function`` and the optimization is done
+        by PETSc TAO.
+
     Methods
     -------
+    enable_automated_adjoint(control_parameters=None, ...)
+        Differentiate with the automated adjoint instead of the implemented
+        one.
     calculate_misfit(c=None)
         Calculate the receiver-data residual for the current guess model.
     generate_real_shot_record(plot_model=False, ...)
@@ -287,7 +310,8 @@ class FullWaveformInversion:
     return_functional_and_gradient(c)
         Return the functional and flattened gradient for scipy optimizers.
     run_fwi(**kwargs)
-        Run full waveform inversion with scipy L-BFGS-B.
+        Run full waveform inversion with scipy L-BFGS-B, or with PETSc TAO
+        when the automated adjoint is enabled.
     run_fwi_rol(**kwargs)
         Run the deprecated ROL-based inversion path.
 
@@ -760,10 +784,11 @@ class FullWaveformInversion:
 
         Parameters
         ----------
-        control : firedrake.Function or firedrake.Constant
+        control : firedrake.Function or firedrake.Constant or list of firedrake.Function or list of firedrake.Constant
             Starting control parameter for the FWI optimization.
             ``Constant`` inputs are converted to a ``Function`` before being
-            stored. FWI currently accepts a single scalar ``Function`` control.
+            stored. FWI accepts a single control parameter for acoustic inversion,
+            or a list of control parameters for multi-parameter inversion, e. g., for elastic inversion.
 
         Returns
         -------
@@ -866,6 +891,76 @@ class FullWaveformInversion:
         if value is not None:
             self.load_real_shot_record(file_name=value)
 
+    def enable_automated_adjoint(
+        self, control_parameters=None, checkpointing: bool = False,
+        snapshots: int | None = None,
+        gc_timestep_frequency: int | None = None,
+    ):
+        """Differentiate the inversion with the automated adjoint.
+
+        Hands the gradient over to algorithmic differentiation through
+        :mod:`firedrake.adjoint` instead of the hand-written adjoint solver.
+        The choice is recorded on the wave solver, so it holds for every
+        method of this driver that needs a functional or a gradient, and it
+        is what makes :meth:`run_fwi` optimize with PETSc TAO.
+
+        Call this *after* the guess mesh and the guess model are configured:
+        the control has to be an existing field before it can be recorded as
+        one.
+
+        Parameters
+        ----------
+        control_parameters : enum.Enum or iterable of enum.Enum, optional
+            Physical parameters to differentiate with respect to. ``None``
+            takes every parameter the wave equation offers, which for an
+            acoustic medium is the velocity model.
+        checkpointing : bool, optional
+            Whether to manage the tape with a checkpoint schedule. ``False``
+            (the default) keeps every forward step on the tape.
+        snapshots : int, optional
+            How many checkpoints to keep in RAM, which is also what selects
+            the schedule. ``None`` (the default) keeps every time step.
+        gc_timestep_frequency : int, optional
+            Run a garbage collection every this many time steps, lowering the
+            peak memory of a checkpointed tape. ``None`` (the default)
+            disables it.
+
+        Returns
+        -------
+        None
+            The wave solver is configured in place.
+
+        See Also
+        --------
+        spyro.solvers.wave.Wave.enable_automated_adjoint :
+            The solver-side switch this forwards to.
+        spyro.solvers.automatic_differentiation_solver.AutomatedAdjoint :
+            Which schedule each setting selects, and the references behind
+            them.
+
+        Examples
+        --------
+        >>> fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.1})
+        >>> fwi.set_guess_velocity_model(constant=2.5)
+        >>> fwi.enable_automated_adjoint(checkpointing=True, snapshots=10)
+        >>> fwi.run_fwi(vmin=2.5, vmax=3.0, maxiter=10)
+        """
+        # The solver needs a mesh and a model before a control can be a field,
+        # and the driver may still be holding both: mirror what a forward
+        # solve would do, so the call works wherever it is placed after the
+        # guess model is configured.
+        if self.wave.mesh is None and self.guess_mesh is not None:
+            self.wave.set_mesh(user_mesh=self.guess_mesh, input_mesh_parameters={})
+        if self._control_parameters:
+            self._write_parameters_into_wave(self.wave, self._control_parameters)
+
+        self.wave.enable_automated_adjoint(
+            control_parameters=control_parameters,
+            checkpointing=checkpointing,
+            snapshots=snapshots,
+            gc_timestep_frequency=gc_timestep_frequency,
+        )
+
     def calculate_misfit(self, c=None, save_output=False):
         """
         Calculate the misfit between observed and simulated data.
@@ -883,10 +978,12 @@ class FullWaveformInversion:
 
         Returns
         -------
-        misfit : ndarray or list of ndarray
+        misfit : ndarray or list of ndarray or None
             Misfit between real and simulated shot records. Returns a list
             if using spatial parallelism with multiple sources, otherwise
-            returns a single array.
+            returns a single array. ``None`` under the automated adjoint,
+            which accumulates the functional on the tape as the forward solve
+            runs and never forms the residual as an array.
 
         Notes
         -----
@@ -918,6 +1015,26 @@ class FullWaveformInversion:
             self._flatten_control(current_control),
         )
 
+        # The automated adjoint accumulates the functional on the tape, one
+        # time step at a time, so the residual never exists as an array to
+        # subtract here and the whole tape would be discarded by rebuilding
+        # it. Every other adjoint needs the residual computed explicitly.
+        if self.wave.adjoint_type != AdjointType.AUTOMATED_ADJOINT:
+            self._compute_misfit()
+        return self.misfit
+
+    def _compute_misfit(self):
+        """Compute the receiver-data residual left by the last forward solve.
+
+        Sets :attr:`guess_shot_record` and :attr:`misfit` from the forward
+        solution at the receivers, one entry per source under spatial
+        parallelism with more than one source, and a single array otherwise.
+
+        Returns
+        -------
+        None
+            The residual is stored on the driver.
+        """
         if self.wave.parallelism_type == "spatial" and self.wave.number_of_sources > 1:
             misfit_list = []
             guess_shot_record_list = []
@@ -933,7 +1050,6 @@ class FullWaveformInversion:
             self.guess_shot_record = self.wave.forward_solution_receivers
             self.guess_forward_solution = self.wave.forward_solution
             self.misfit = self.real_shot_record - self.guess_shot_record
-        return self.misfit
 
     def generate_real_shot_record(
         self,
@@ -1213,9 +1329,27 @@ class FullWaveformInversion:
         -----
         This method writes the functional value and memory usage to text files
         for tracking convergence and resource consumption.
+
+        Under the automated adjoint the functional is not recomputed here: the
+        forward solve accumulates it on the tape, so the value it left on the
+        solver is the one recorded, and recomputing it from a residual would
+        both duplicate the work and detach the number from the tape it has to
+        be differentiated through.
         """
         self.calculate_misfit(c=c)
-        Jm = compute_functional(self.wave, self.misfit)
+        if self.wave.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+            # Each ensemble member taped its own shots, so the recorded value
+            # is that member's J_i. Summing over the ensemble is what the
+            # reduced functional does when it is differentiated, and what
+            # ``ensemble_functional`` does for the implemented adjoint, so the
+            # number reported here has to mean the same thing. A plain float
+            # besides: the recorded ``AdjFloat`` carries a tape node with it,
+            # and the history would keep the whole tape alive.
+            Jm = self.comm.ensemble_comm.allreduce(
+                float(self.wave.functional_value), op=MPI.SUM,
+            )
+        else:
+            Jm = compute_functional(self.wave, self.misfit)
 
         self.functional_history.append(Jm)
         self.functional = Jm
@@ -1245,7 +1379,7 @@ class FullWaveformInversion:
 
         Parameters
         ----------
-        c : array_like, optional
+        c : array_like or firedrake.Function or list of firedrake.Function, optional
             Control parameter values to use. If provided and
             calculate_functional is True, updates the model before computing
             the functional.
@@ -1260,7 +1394,9 @@ class FullWaveformInversion:
         -----
         This method increments the current_iteration counter and applies any
         gradient mask that has been set. The gradient is computed using the
-        adjoint-state method implemented in gradient_solve().
+        adjoint-state method implemented in gradient_solve(), or by
+        differentiating the recorded tape when the automated adjoint is
+        enabled.
         """
         comm = self.comm
         if calculate_functional:
@@ -1273,10 +1409,18 @@ class FullWaveformInversion:
             self.set_guess_control(updated_control)
 
         comm.comm.barrier()
-        self.gradient = self.wave.gradient_solve(
-            misfit=self.misfit,
-            forward_solution=self.guess_forward_solution,
-        )
+        if self.wave.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+            # The tape holds the forward solve and the residual alike, so
+            # neither is passed: reverse-mode differentiation reads them both
+            # off the recording made by the forward solve above.
+            self.gradient = self.wave.gradient_solve(
+                adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+            )
+        else:
+            self.gradient = self.wave.gradient_solve(
+                misfit=self.misfit,
+                forward_solution=self.guess_forward_solution,
+            )
         self._apply_gradient_mask()
         if save:
             fire.VTKFile(f"gradient_{self.current_iteration}.pvd").write(self.gradient)
@@ -1309,27 +1453,52 @@ class FullWaveformInversion:
 
     def run_fwi(self, **kwargs):
         """
-        Run full waveform inversion using scipy L-BFGS-B optimizer.
+        Run full waveform inversion.
 
-        Performs the complete FWI optimization using scipy.optimize.minimize
-        with the L-BFGS-B method. The optimization minimizes the misfit between
-        observed and simulated data by updating the configured control
-        parameter.
+        The optimization minimizes the misfit between observed and simulated
+        data by updating the configured control parameter. Which optimizer
+        does it follows from the adjoint in use:
+
+        Implemented adjoint (the default)
+            :func:`scipy.optimize.minimize` with the L-BFGS-B method, which
+            calls back into :meth:`return_functional_and_gradient` and so
+            re-runs the forward and adjoint solves for every iterate.
+        Automated adjoint
+            PETSc TAO, driven by the pyadjoint reduced functional built from a
+            single recorded forward solve. Enable it with
+            :meth:`enable_automated_adjoint` before calling this method.
 
         Parameters
         ----------
         **kwargs : dict
             Keyword arguments for customizing the optimization:
 
-            vmin : float, optional
-                Lower bound for the control parameter. Default is 1.429.
-            vmax : float, optional
+            vmin : float or array_like, optional
+                Lower bound for the control parameter. Default is 1.429. A
+                bound given per degree of freedom becomes a pair of arrays
+                for L-BFGS-B, and a pair of fields for TAO.
+            vmax : float or array_like, optional
                 Upper bound for the control parameter. Default is 6.0.
             maxiter : int, optional
                 Maximum number of iterations. Default is 20.
             scipy_options : dict, optional
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
+            tao_options : dict, optional
+                PETSc options for the TAO solver, merged over the defaults
+                ``{"tao_type": "blmvm", "tao_max_it": maxiter}``. Only used
+                under the automated adjoint.
+            adjoint_type : AdjointType, optional
+                Adjoint to run with. Enables it on the wave solver, so
+                ``AdjointType.AUTOMATED_ADJOINT`` here is equivalent to
+                calling :meth:`enable_automated_adjoint` with its defaults
+                beforehand.
+
+        Returns
+        -------
+        scipy.optimize.OptimizeResult or firedrake.Function
+            The scipy result under the implemented adjoint, and the optimal
+            control field under the automated one, which is what TAO returns.
 
         Notes
         -----
@@ -1337,54 +1506,243 @@ class FullWaveformInversion:
         and saved to ``control_end.pvd``. The raw optimizer vector is also
         saved to ``result.npy``.
 
-        This method uses the L-BFGS-B algorithm which is well-suited for
-        large-scale bound-constrained optimization problems.
-
         Examples
         --------
         >>> fwi.run_fwi(maxiter=100, vmin=1.5, vmax=5.0)
         """
+        maxiter = kwargs.pop("maxiter", 20)
         parameters = {
             "vmin": kwargs.pop("vmin", 1.429),
             "vmax": kwargs.pop("vmax", 6.0),
+            "maxiter": maxiter,
             "scipy_options": {
                 "disp": True,
                 "eps": kwargs.pop("eps", 1e-15),
                 "ftol": kwargs.pop("ftol", 1e-11),
-                "maxiter": kwargs.pop("maxiter", 20),
+                "maxiter": maxiter,
             },
         }
-        if kwargs.pop("adjoint_type", None) is not None:
-            self.adjoint_type = kwargs.pop("adjoint_type")
+        tao_options = kwargs.pop("tao_options", None)
+        adjoint_type = kwargs.pop("adjoint_type", None)
+        if adjoint_type is not None:
+            self.adjoint_type = adjoint_type
+            # Naming an adjoint here has to switch it on, or the run would
+            # silently fall back to whichever one the solver already had.
+            if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+                if self.wave.automated_adjoint is None:
+                    self.enable_automated_adjoint()
+            elif adjoint_type == AdjointType.IMPLEMENTED_ADJOINT:
+                self.wave.enable_implemented_adjoint()
         parameters.update(kwargs)
 
         control_reference = self.control_parameters
-        lower = self._expand_bound(parameters["vmin"], control_reference)
-        upper = self._expand_bound(parameters["vmax"], control_reference)
-        bounds = list(zip(lower, upper))
-        control_0 = self._flatten_control(control_reference)
-        options = parameters["scipy_options"]
-
-        result = scipy_minimize(
-            self.return_functional_and_gradient,
-            control_0,
-            method="L-BFGS-B",
-            jac=True,
-            tol=1e-15,
-            bounds=bounds,
-            options=options,
-        )
+        if self.wave.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+            result = self._run_fwi_tao(
+                parameters, control_reference, tao_options=tao_options,
+            )
+            result_vector = self._flatten_control(result)
+        else:
+            lower = self._expand_bound(parameters["vmin"], control_reference)
+            upper = self._expand_bound(parameters["vmax"], control_reference)
+            bounds = list(zip(lower, upper))
+            control_0 = self._flatten_control(control_reference)
+            options = parameters["scipy_options"]
+            result = scipy_minimize(
+                self.return_functional_and_gradient,
+                control_0,
+                method="L-BFGS-B",
+                jac=True,
+                tol=1e-15,
+                bounds=bounds,
+                options=options,
+            )
+            result_vector = result.x
 
         self.control_parameter_result = self._rebuild_control_from_vector(
             control_reference,
-            result.x,
+            result_vector,
         )
         self.set_guess_control(self.control_parameter_result)
 
         fire.VTKFile("control_end.pvd").write(self.control_parameter_result)
 
-        np.save("result", result.x)
+        np.save("result", result_vector)
         return result
+
+    def _run_fwi_tao(self, parameters, control_reference, tao_options=None):
+        """Optimize the recorded reduced functional with PETSc TAO.
+
+        The forward solve is recorded once, here, and every functional value
+        and gradient the optimizer asks for afterwards is a replay of that
+        recording at a new control value. This is what separates the automated
+        adjoint from the implemented one, where each iterate re-runs the
+        forward and backward propagators from this driver.
+
+        Under ensemble (shot) parallelism the reduced functional is an
+        ``EnsembleReducedFunctional``, which sums the per-shot functionals and
+        gradients across ensemble members. TAO is therefore given the
+        *spatial* communicator: the control is replicated on every member, and
+        the default (``COMM_WORLD``) would count each copy as separate degrees
+        of freedom.
+
+        Parameters
+        ----------
+        parameters : dict
+            Optimization parameters assembled by :meth:`run_fwi`. ``vmin``,
+            ``vmax`` and ``maxiter`` are read from it.
+        control_reference : firedrake.Function
+            Control whose function space shapes the bounds and the solution.
+        tao_options : dict, optional
+            PETSc options merged over the defaults.
+
+        Returns
+        -------
+        firedrake.Function
+            The optimal control.
+
+        Warns
+        -----
+        UserWarning
+            If TAO stops without converging, which is what reaching
+            ``maxiter`` amounts to. The last iterate is returned rather than
+            raising, since a fixed iteration budget is a normal way to run
+            FWI.
+        """
+        # Records the tape, and logs the starting functional the same way the
+        # scipy path logs every iterate.
+        self.get_functional()
+
+        automated_adjoint = self.wave.automated_adjoint
+        reduced_functional = automated_adjoint.reduced_functional
+        if reduced_functional is None:
+            reduced_functional = automated_adjoint.create_reduced_functional(
+                self.wave.functional_value,
+            )
+
+        # One bound pair per control, not per degree of freedom: TAO takes the
+        # bounds as fields (or scalars broadcast over them), while L-BFGS-B
+        # takes a pair for each entry of the flattened control.
+        lower = self._tao_bound(parameters["vmin"], control_reference)
+        upper = self._tao_bound(parameters["vmax"], control_reference)
+        bounds = [(lower, upper) for _ in reduced_functional.controls]
+        problem = MinimizationProblem(reduced_functional, bounds=bounds)
+
+        options = {
+            "tao_type": "blmvm",
+            "tao_max_it": parameters["maxiter"],
+        }
+        if tao_options:
+            options.update(tao_options)
+
+        solver = TAOSolver(problem, options, comm=self.wave.comm.comm)
+        solver.tao.setMonitor(self._tao_monitor)
+        try:
+            solution = solver.solve()
+        except TAOConvergenceError as error:
+            warnings.warn(
+                f"{error} Returning the last iterate; raise the iteration "
+                "limit or loosen the tolerances through 'tao_options' if the "
+                "inversion is meant to run to convergence.",
+            )
+            solution = self._control_from_tao(solver, control_reference)
+        return solution
+
+    def _tao_bound(self, bound, control_reference):
+        """Return one bound in the form TAO takes it.
+
+        Parameters
+        ----------
+        bound : scalar or array_like
+            Bound value for one control.
+        control_reference : firedrake.Function
+            Control whose function space an array bound is rebuilt in.
+
+        Returns
+        -------
+        float or firedrake.Function
+            The bound as a scalar, broadcast by TAO over the control, or as a
+            field when it varies per degree of freedom.
+        """
+        if np.isscalar(bound):
+            return float(bound)
+        return self._rebuild_control_from_vector(
+            control_reference,
+            self._expand_bound(bound, control_reference),
+        )
+
+    def _control_from_tao(self, solver, control_reference):
+        """Read the current iterate out of a TAO solver.
+
+        Used when TAO stops without converging, where the solver raises before
+        handing the solution back.
+
+        Parameters
+        ----------
+        solver : pyadjoint.TAOSolver
+            Solver whose solution vector is read.
+        control_reference : firedrake.Function
+            Control whose function space the vector is read into.
+
+        Returns
+        -------
+        firedrake.Function
+            The last iterate.
+
+        Raises
+        ------
+        NotImplementedError
+            If the problem has more than one control, where the solution
+            vector is a concatenation that this does not split.
+        """
+        if len(solver.tao_objective.reduced_functional.controls) != 1:
+            raise NotImplementedError(
+                "Recovering an unconverged iterate is only implemented for a "
+                "single control.",
+            )
+        solution = fire.Function(
+            control_reference.function_space(), name=control_reference.name(),
+        )
+        with solution.dat.vec_wo as vec:
+            solver.tao.getSolution().copy(vec)
+        return solution
+
+    def _tao_monitor(self, tao):
+        """Record one TAO iteration, mirroring what ``get_functional`` logs.
+
+        TAO drives the reduced functional itself, so the per-iterate
+        bookkeeping the scipy path does inside :meth:`get_functional` has to
+        happen here instead.
+
+        Parameters
+        ----------
+        tao : petsc4py.PETSc.TAO
+            The solver being monitored.
+
+        Returns
+        -------
+        None
+            The functional history and iteration counter are updated in place.
+        """
+        iteration, functional = tao.getSolutionStatus()[:2]
+        if iteration == 0:
+            # The starting point is the control the tape was recorded at,
+            # already logged by the functional evaluation that recorded it.
+            return
+        self.current_iteration = iteration
+        self.functional = functional
+        self.functional_history.append(functional)
+        parallel_print(
+            f"Functional: {functional} at iteration: {iteration}",
+            self.comm,
+        )
+        if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
+            with open("functional_values.txt", "a") as file:
+                file.write(
+                    f"Iteration: {iteration}, Functional: {functional}\n",
+                )
+
+            with open("peak_memory.txt", "a") as file:
+                file.write(f"Peak memory usage: {get_peak_memory():.2f} MB \n")
 
     def run_fwi_rol(self, **kwargs):
         """
