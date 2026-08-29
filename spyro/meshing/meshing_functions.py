@@ -606,7 +606,11 @@ class AutomaticMesh:
             if structured_mesh and padding_type != "hyperelliptical":
                 gmsh.option.setNumber('Mesh.MeshSizeMin', minElementSize)
                 gmsh.option.setNumber('Mesh.MeshSizeMax', minElementSize)
-                gmsh.model.mesh.setTransfiniteAutomatic()
+                gmsh.model.mesh.setTransfiniteAutomatic(
+                    [],
+                    np.pi,
+                    True,
+                )
             gmsh.model.mesh.generate(2)
 
             if structured_mesh:
@@ -860,7 +864,11 @@ class AutomaticMesh:
                 if structured_mesh:
                     gmsh.option.setNumber("Mesh.MeshSizeMin", minElementSize)
                     gmsh.option.setNumber("Mesh.MeshSizeMax", minElementSize)
-                    gmsh.model.mesh.setTransfiniteAutomatic()
+                    gmsh.model.mesh.setTransfiniteAutomatic(
+                        [],
+                        np.pi,
+                        True,
+                    )
 
                 gmsh.option.setNumber("Mesh.SaveWithoutOrphans", 1)
                 gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
