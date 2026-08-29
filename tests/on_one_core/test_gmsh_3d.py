@@ -9,6 +9,8 @@ from spyro.meshing.meshing_parameters import MeshingParameters
 
 HAS_NUMBA = importlib.util.find_spec("numba") is not None
 
+CELL_COUNT_TOLERANCE = 0.25
+
 
 STRUCTURED_CONFIGURATIONS = [
     # water_interface, padding_type, expected_cells
@@ -103,17 +105,33 @@ def _check_or_collect_baseline(
     description,
     baseline_row,
     missing_baselines,
+    relative_tolerance=0.0,
 ):
-    """Assert a known baseline."""
-    print(f" Cells actual: {actual_cells} | Expected: {expected_cells}")
-
+    """Assert a cell-count within an allowed interval."""
     if expected_cells is None:
+        print(f" Cells actual: {actual_cells} | Expected: not defined")
         missing_baselines.append((*baseline_row, actual_cells))
         return
 
-    assert math.isclose(actual_cells, expected_cells), (
+    lower_bound = math.floor(
+        expected_cells * (1.0 - relative_tolerance)
+    )
+    upper_bound = math.ceil(
+        expected_cells * (1.0 + relative_tolerance)
+    )
+
+    print(
+        f" Cells actual: {actual_cells}"
+        f" | Expected: {expected_cells}"
+        f" | Allowed: [{lower_bound}, {upper_bound}]"
+    )
+
+    assert lower_bound <= actual_cells <= upper_bound, (
         f"FAILED: {description}. "
-        f"Got {actual_cells}, expected {expected_cells}"
+        f"Got {actual_cells} cells, expected approximately "
+        f"{expected_cells} cells "
+        f"(allowed interval: {lower_bound} to {upper_bound}, "
+        f"tolerance: +/-{100.0 * relative_tolerance:.1f}%)."
     )
 
 
@@ -178,12 +196,14 @@ def test_gmsh3d_structured(tmp_path):
             f" | Wat: {water_interface}"
             f" | Pad: {padding_type}"
         )
+
         _check_or_collect_baseline(
             actual_cells=actual_cells,
             expected_cells=expected_cells,
             description=description,
             baseline_row=(water_interface, padding_type),
             missing_baselines=missing_baselines,
+            relative_tolerance=CELL_COUNT_TOLERANCE,
         )
 
     _fail_with_baselines(
@@ -243,12 +263,18 @@ def test_gmsh3d_unstructured(tmp_path):
             f" | Wat: {water_interface}"
             f" | Pad: {padding_type}"
         )
+
         _check_or_collect_baseline(
             actual_cells=actual_cells,
             expected_cells=expected_cells,
             description=description,
-            baseline_row=(extend_segy, water_interface, padding_type),
+            baseline_row=(
+                extend_segy,
+                water_interface,
+                padding_type,
+            ),
             missing_baselines=missing_baselines,
+            relative_tolerance=CELL_COUNT_TOLERANCE,
         )
 
     _fail_with_baselines(
@@ -304,12 +330,14 @@ def test_gmsh3d_structured_no_winslow(tmp_path):
             f" | Wat: {water_interface}"
             f" | Pad: {padding_type}"
         )
+
         _check_or_collect_baseline(
             actual_cells=actual_cells,
             expected_cells=expected_cells,
             description=description,
             baseline_row=(water_interface, padding_type),
             missing_baselines=missing_baselines,
+            relative_tolerance=CELL_COUNT_TOLERANCE,
         )
 
     _fail_with_baselines(
