@@ -381,7 +381,7 @@ def create_sizing_function3D(
                 seismic_kwargs["hmin"] = requested_hmin
 
             base_ef = SeismicMesh.get_sizing_function_from_segy(
-                fname,
+                str(fname),
                 bbox,
                 **seismic_kwargs,
             )
