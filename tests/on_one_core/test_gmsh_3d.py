@@ -344,3 +344,203 @@ def test_gmsh3d_structured_no_winslow(tmp_path):
         "STRUCTURED_NO_WINSLOW_CONFIGURATIONS",
         missing_baselines,
     )
+
+
+@pytest.mark.slow
+def test_gmsh3d_unstructured_parallel(tmp_path):
+    """Repeat the complete unstructured matrix using parallel Gmsh sizing."""
+    print("STARTING 3-D UNSTRUCTURED PARALLEL MESH TESTS")
+
+    missing_baselines = []
+
+    for (
+        extend_segy,
+        water_interface,
+        padding_type,
+        expected_cells,
+    ) in UNSTRUCTURED_CONFIGURATIONS:
+        print(
+            "\nTesting 3-D Unstruct Parallel"
+            f" | Ext SEGY: {str(extend_segy):<5}"
+            f" | Water: {str(water_interface):<5}"
+            f" | Padding: {padding_type}"
+        )
+
+        output_filename = (
+            tmp_path
+            / (
+                "example3d_unstruct_parallel"
+                f"_ext_{extend_segy}"
+                f"_wat_{water_interface}"
+                f"_pad_{padding_type}.msh"
+            )
+        )
+
+        parameters = _base_gmsh3d_parameters(output_filename)
+        parameters.update(
+            {
+                "padding_type": padding_type,
+                "water_interface": water_interface,
+                "structured_mesh": False,
+                "apply_winslow": False,
+                "winslow_implementation": "numba",
+                "extend_segy": extend_segy,
+                "gmsh_parallel": True,
+            }
+        )
+
+        actual_cells = _create_mesh_and_count_cells(parameters)
+
+        description = (
+            "3-D Unstruct Parallel"
+            f" | Ext: {extend_segy}"
+            f" | Wat: {water_interface}"
+            f" | Pad: {padding_type}"
+        )
+
+        _check_or_collect_baseline(
+            actual_cells=actual_cells,
+            expected_cells=expected_cells,
+            description=description,
+            baseline_row=(
+                extend_segy,
+                water_interface,
+                padding_type,
+            ),
+            missing_baselines=missing_baselines,
+            relative_tolerance=CELL_COUNT_TOLERANCE,
+        )
+
+    _fail_with_baselines(
+        "UNSTRUCTURED_CONFIGURATIONS_PARALLEL",
+        missing_baselines,
+    )
+
+
+@pytest.mark.slow
+def test_gmsh3d_structured_winslow_zero_iterations(tmp_path):
+    """Exercise the 3-D Winslow path without requiring JIT compilation."""
+    print("STARTING 3-D STRUCTURED WINSLOW ZERO-ITERATION COVERAGE TEST")
+
+    expected_cells = 25725
+
+    output_filename = (
+        tmp_path / "example3d_struct_winslow_zero_iterations.msh"
+    )
+
+    parameters = _base_gmsh3d_parameters(output_filename)
+    parameters.update(
+        {
+            "padding_type": None,
+            "water_interface": False,
+            "structured_mesh": True,
+            "apply_winslow": True,
+            "winslow_implementation": "numba",
+            "winslow_iterations": 0,
+            "extend_segy": False,
+            "gmsh_parallel": False,
+        }
+    )
+
+    actual_cells = _create_mesh_and_count_cells(parameters)
+
+    _check_or_collect_baseline(
+        actual_cells=actual_cells,
+        expected_cells=expected_cells,
+        description=(
+            "3-D Struct | Winslow: numba | Iterations: 0"
+            " | Wat: False | Pad: None"
+        ),
+        baseline_row=(False, None),
+        missing_baselines=[],
+        relative_tolerance=CELL_COUNT_TOLERANCE,
+    )
+
+
+@pytest.mark.slow
+def test_gmsh3d_structured_hyperelliptical_rejected(tmp_path):
+    """Check the guard for unsupported structured padding."""
+    print("TESTING 3-D STRUCTURED HYPERELLIPTICAL VALIDATION")
+
+    output_filename = (
+        tmp_path / "example3d_struct_hyperelliptical_invalid.msh"
+    )
+
+    parameters = _base_gmsh3d_parameters(output_filename)
+    parameters.update(
+        {
+            "padding_type": "hyperelliptical",
+            "water_interface": False,
+            "structured_mesh": True,
+            "apply_winslow": False,
+            "winslow_implementation": "numba",
+            "extend_segy": False,
+            "gmsh_parallel": False,
+        }
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Hyperelliptical 3-D padding currently supports only",
+    ):
+        _create_mesh_and_count_cells(parameters)
+
+
+@pytest.mark.slow
+def test_gmsh3d_water_interface_rejects_noncanonical_axes(tmp_path):
+    """Check the real water geometry axis-order validation."""
+    print("TESTING 3-D WATER-INTERFACE AXIS-ORDER VALIDATION")
+
+    output_filename = (
+        tmp_path / "example3d_water_invalid_axes_order.msh"
+    )
+
+    parameters = _base_gmsh3d_parameters(output_filename)
+    parameters.update(
+        {
+            "padding_type": None,
+            "water_interface": True,
+            "structured_mesh": False,
+            "apply_winslow": False,
+            "winslow_implementation": "numba",
+            "extend_segy": False,
+            "gmsh_parallel": False,
+            "segy_axes_order": (1, 0, 2),
+        }
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=r"axes_order must therefore be \(0, 1, 2\)",
+    ):
+        _create_mesh_and_count_cells(parameters)
+
+
+@pytest.mark.slow
+def test_gmsh3d_structured_rejects_non_numba_winslow(tmp_path):
+    """Exercise the 3-D Winslow implementation validation."""
+    print("TESTING 3-D STRUCTURED WINSLOW IMPLEMENTATION VALIDATION")
+
+    output_filename = (
+        tmp_path / "example3d_struct_invalid_winslow.msh"
+    )
+
+    parameters = _base_gmsh3d_parameters(output_filename)
+    parameters.update(
+        {
+            "padding_type": None,
+            "water_interface": False,
+            "structured_mesh": True,
+            "apply_winslow": True,
+            "winslow_implementation": "default",
+            "winslow_iterations": 0,
+            "extend_segy": False,
+            "gmsh_parallel": False,
+        }
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Only winslow_implementation='numba'",
+    ):
+        _create_mesh_and_count_cells(parameters)
