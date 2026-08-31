@@ -38,6 +38,9 @@ clean-root:
 clean-data:
 	@rm -f shots/*.dat
 	@rm -f *.txt
+	@rm -rf property_fields/
+	@rm -rf profilers/
+	@rm -rf test_case/
 
 clean-output:
 	@rm -rf velocity_models/test*
