@@ -144,6 +144,7 @@ jobs:
           mpiexec -n 6 pytest tests/parallel/test_forward_supershot.py
           mpiexec -n 2 pytest tests/parallel/test_parallel_io.py
           mpiexec -n 2 pytest tests/parallel/test_forward_multiple_serial_shots.py
+          mpiexec -n 2 pytest tests/parallel/test_forward_3d_isotropic.py
     
     - name: Running parallel tests for inversion
       run: |
@@ -181,6 +182,10 @@ jobs:
       continue-on-error: true
       run: |
           mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_forward_multiple_serial_shots.py
+    - name: Covering time convergence in forward 3d isotropic
+      continue-on-error: true
+      run: |
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_forward_3d_isotropic.py
     - name: Covering spatially parallelized shots in serial
       continue-on-error: true
       run: |
