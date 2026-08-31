@@ -1,6 +1,5 @@
 """Test second order time convergence on the 3D isotropic elastic wave."""
-from matplotlib import use
-import matplotlib.pyplot as plt
+
 import numpy as np
 import pytest
 
@@ -9,6 +8,7 @@ from spyro.tools.error_measure import MeasureError
 
 
 def run_elastic_forward(dt):
+    """Run a forward 3d isotropic elastic propagation."""
     source_z = -1.0
     receiver_z = -1.2
     edge_length = 0.05
