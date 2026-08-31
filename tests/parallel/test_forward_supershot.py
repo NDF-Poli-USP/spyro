@@ -85,14 +85,16 @@ def test_forward_supershot():
 
     # Computing errors
     measure_error = MeasureError()
-    error0_nrms = measure_error.normalized_root_mean_square_error(arr0[:430],
-                                                                  analytical_p[:430])
-    error199_nrms = measure_error.normalized_root_mean_square_error(arr199[:430],
-                                                                    analytical_p[:430])
-    error0_it = measure_error.integral_error(arr0[:430], analytical_p[:430], wave.dt)
-    error199_it = measure_error.integral_error(arr199[:430], analytical_p[:430], wave.dt)
-    error0_pk = measure_error.peak_error(arr0[:430], analytical_p[:430])[0]
-    error199_pk = measure_error.peak_error(arr199[:430], analytical_p[:430])[0]
+    error0_nrms = measure_error.calculate_normalized_L2_error(
+        arr0[:430], analytical_p[:430]
+    )
+    error199_nrms = measure_error.calculate_normalized_L2_error(
+        arr199[:430], analytical_p[:430],
+    )
+    error0_it = measure_error.calculate_integral_error(arr0[:430], analytical_p[:430], wave.dt)
+    error199_it = measure_error.calculate_integral_error(arr199[:430], analytical_p[:430], wave.dt)
+    error0_pk = measure_error.calculate_peak_error(arr0[:430], analytical_p[:430])[0]
+    error199_pk = measure_error.calculate_peak_error(arr199[:430], analytical_p[:430])[0]
 
     eNRMS = error0_nrms + error199_nrms
     error_rm = COMM_WORLD.allreduce(eNRMS, op=MPI.SUM) / 2

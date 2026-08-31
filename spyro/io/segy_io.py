@@ -245,7 +245,7 @@ def create_grid_dictionary_from_segy(filename: str, length_z: float, length_x: f
 
 
 @run_in_one_core_kwarg_comm
-def export_scalar_field(function, grid_spacing, output_filename, comm=None):
+def export_scalar_field(function, grid_spacing, output_filename, comm=None, show=False):
     """Export a scalar field to SEG-Y or PNG.
 
     Parameters
@@ -257,6 +257,8 @@ def export_scalar_field(function, grid_spacing, output_filename, comm=None):
     output_filename : str
         Destination filename. Supported extensions are ``.segy``/``.sgy`` and
         ``.png``.
+    show : bool (optional)
+        If True shows pyplot
 
     Returns
     -------
@@ -278,7 +280,7 @@ def export_scalar_field(function, grid_spacing, output_filename, comm=None):
     elif output_filename.lower().endswith((".png")):
         segy_filename = Path(output_filename).with_suffix(".segy")
         create_segy(function, V, grid_spacing, segy_filename)
-        segy_to_png(segy_filename, output_file=output_filename)
+        segy_to_png(segy_filename, output_file=output_filename, show=show)
     else:
         from ..utils.error_management import (
             validate_parameter,

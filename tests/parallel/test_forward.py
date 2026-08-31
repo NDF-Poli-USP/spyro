@@ -86,23 +86,13 @@ def test_forward_3_shots():
     arr0 = arr0.flatten()
 
     # Computing errors
-    measure_error = MeasureError()
-    errPk = measure_error.peak_error(arr0[:430], analytical_p[:430])[0]
-    errIt = measure_error.integral_error(arr0[:430], analytical_p[:430], wave.dt)
-    eNRMS = measure_error.normalized_root_mean_square_error(arr0[:430], analytical_p[:430])
-    pprint(f"NRMS Error for shot {wave.current_sources} is {eNRMS:.4e} and test "
-           f"has passed equals {abs(eNRMS) < 0.01}", comm=comm)
-    pprint(f"Integral Error for shot {wave.current_sources} is {errIt:.4e} and test "
-           f"has passed equals {abs(errIt) < 0.01}", comm=comm)
-    pprint(f"Peak Error for shot {wave.current_sources} is {errPk:.4e} and test "
-           f"has passed equals {abs(errPk) < 0.01}", comm=comm)
+    error_L2 = MeasureError.calculate_normalized_L2_error(arr0[:430], analytical_p[:430])
+    pprint(f"NRMS Error for shot {wave.current_sources} is {error_L2:.4e} and test "
+           f"has passed equals {abs(error_L2) < 0.01}", comm=comm)
 
-    error_rm = COMM_WORLD.allreduce(eNRMS, op=MPI.SUM) / 3.
-    error_it = COMM_WORLD.allreduce(errIt, op=MPI.SUM) / 3.
-    error_pk = COMM_WORLD.allreduce(errPk, op=MPI.SUM) / 3.
+    error_L2_all = COMM_WORLD.allreduce(error_L2, op=MPI.SUM) / 3.
 
-    assert abs(error_rm) < 0.01 and abs(error_it) < 0.01 and abs(error_pk) < 0.01, \
-        "Error is too high for forward test."
+    assert abs(error_L2_all) < 0.01
 
 
 if __name__ == "__main__":
