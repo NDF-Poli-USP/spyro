@@ -1,8 +1,4 @@
-"""Test second order time convergence on the isotropic elastic wave."""
-# from mpi4py.MPI import COMM_WORLD
-# import debugpy
-# debugpy.listen(3000 + COMM_WORLD.rank)
-# debugpy.wait_for_client()
+"""Test second order time convergence on the 3D isotropic elastic wave."""
 from matplotlib import use
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,23 +8,21 @@ import spyro
 from spyro.tools.error_measure import MeasureError
 
 
-use("agg")
-source_z = -1.0
-receiver_z = -1.2
-edge_length = 0.05
-source_locations = [(source_z, -source_z, -source_z)]
-receiver_locations = [(receiver_z, -receiver_z, -receiver_z)]
-final_time = 0.8
-time_delay = 0.2
-frequency = 5.0
-amplitude = np.array([0.0, 1.0])
-
-rho = 0.1
-vp = 1.5
-vs = 1.0
-
-
 def run_elastic_forward(dt):
+    source_z = -1.0
+    receiver_z = -1.2
+    edge_length = 0.05
+    source_locations = [(source_z, -source_z, -source_z)]
+    receiver_locations = [(receiver_z, -receiver_z, -receiver_z)]
+    final_time = 0.8
+    time_delay = 0.2
+    frequency = 5.0
+    amplitude = np.array([0.0, 1.0, 0.0])
+
+    rho = 0.1
+    vp = 1.5
+    vs = 1.0
+
     """Run forward isotropic elastic case."""
     dictionary = {
         "options": {
@@ -79,11 +73,11 @@ def run_elastic_forward(dt):
         "s_wave_velocity": vs,
         "real_velocity_file": None,
     }
-    dictionary["acquisition"]["amplitude"] = np.array([0.0, 1.0, 0.0])
+
     wave = spyro.IsotropicWave(dictionary)
     wave.set_mesh(input_mesh_parameters={"edge_length": edge_length, "periodic": False})
 
-    anal_sol = spyro.utils.analytical_solution_elastic(
+    analitical_solution = spyro.utils.analytical_solution_elastic(
         "force_source",
         np.array(source_locations[0]) - np.array(receiver_locations[0]),
         p_wave_velocity=vp,
@@ -102,30 +96,36 @@ def run_elastic_forward(dt):
 
     np.save("forward_elastic.npy", wave.forward_solution_receivers)
     l2_error = MeasureError.calculate_normalized_L2_error(
-        wave.forward_solution_receivers[:, 0, 0], anal_sol[0]
+        wave.forward_solution_receivers[:, 0, 0], analitical_solution[0]
     )
 
-    return l2_error
+    return l2_error, wave.comm
 
 
 @pytest.mark.slow
 def test_second_order_time_convergence():
     """Test that the second order time convergence is achieved."""
     dts = [
-        5e-3,
+        3.2e-3,
+        0.002898550724637681,
+        2.5e-3,
+        2e-3,
     ]
 
     errors = []
 
     for i in range(len(dts)):
         dt = dts[i]
-        error = run_elastic_forward(dt)
+        error, comm = run_elastic_forward(dt)
+        print(f"For dt of {dt}, error is {error}")
         errors.append(error)
 
-    theory = [t**2 for t in dts]
-    theory = [errors[0] * th / theory[0] for th in theory]
+    errors = comm.ensemble_comm.bcast(errors, root=0)
+    log_dts = np.log(dts)
+    log_errors = np.log(errors)
+    p, _ = np.polyfit(log_dts, log_errors, 1)
 
-    assert np.isclose(np.log(theory[-1]), np.log(errors[-1]), rtol=3e-2)
+    assert np.isclose(p, 2.0, rtol=1e-1)
 
 
 if __name__ == "__main__":
