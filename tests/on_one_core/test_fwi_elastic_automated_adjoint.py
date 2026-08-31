@@ -383,15 +383,12 @@ def test_run_fwi_inverts_the_lame_parameters_with_density_held_fixed(
         },
     )
 
-    assert [control.name() for control in fwi.control_parameters] == [
+    result = fwi.run_fwi(vmin=vmin, vmax=vmax, maxiter=3)
+
+    assert [control.name() for control in result] == [
         Parameter.LAMBDA.value,
         Parameter.MU.value,
     ]
-    density_before = np.array(fwi.wave.rho.dat.data_ro)
-
-    result = fwi.run_fwi(vmin=vmin, vmax=vmax, maxiter=3)
-
-    assert len(result) == 2
     for control, low, high, start in zip(
         result, vmin, vmax,
         (LAME_GUESS_MATERIAL["lambda"], LAME_GUESS_MATERIAL["mu"]),
@@ -404,8 +401,11 @@ def test_run_fwi_inverts_the_lame_parameters_with_density_held_fixed(
         )
 
     assert fwi.functional_history[-1] < fwi.functional_history[0]
-    # Not a control, so nothing in the run had any business moving it.
-    assert np.allclose(fwi.wave.rho.dat.data_ro, density_before)
+    # Not a control, so nothing in the run had any business moving it: it has
+    # to come out at the value the guess model gave it.
+    assert np.allclose(
+        fwi.wave.rho.dat.data_ro, LAME_GUESS_MATERIAL["density"],
+    )
 
 
 def test_run_fwi_without_the_automated_adjoint_is_refused(
