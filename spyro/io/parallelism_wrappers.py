@@ -475,10 +475,14 @@ def save_serial_data(wave, propagation_id):
     -------
     None
     """
-    if wave.forward_solution:
-        # There are cases where forward_solution is empty, e.g. when running
-        # forward_solve for the true model. In that case, we skip saving the
-        # solution on the entire domain, which is not needed.
+    # Only the implemented adjoint stores the wavefield step by step, as a
+    # list. There is nothing to save when it was not stored -- the true model
+    # runs without storage, and the automated adjoint leaves a single
+    # ``Function`` here rather than a list. Test the type rather than the
+    # truth value: every UFL object, that ``Function`` included, is
+    # unconditionally true, so a truthiness check reaches the loop below and
+    # fails trying to iterate a scalar-valued expression.
+    if isinstance(wave.forward_solution, (list, tuple)) and wave.forward_solution:
         arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
         stacked_arrays = np.stack(arrays_list, axis=0)
         np.save(_shot_filename(propagation_id, wave, prefix="tmp_shot"), stacked_arrays)

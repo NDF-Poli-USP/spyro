@@ -230,7 +230,7 @@ def plot_shots(
     ----------
     wave : Wave
         Wave simulation object containing the shot record data in the
-        forward_solution_receivers attribute, along with timing and receiver information.
+        forward_solution_receivers attribute, along with timing and receiver info.
     show : bool, optional
         If True, display the plot interactively. Default is False.
     filename : str, optional
@@ -306,7 +306,7 @@ def plot_shots(
     return None
 
 
-def plot_function(function: Function) -> None:
+def plot_function(function: Function, **kwargs) -> None:
     """
     Plot a Firedrake function using filled contour visualization.
 
@@ -316,6 +316,7 @@ def plot_function(function: Function) -> None:
     ----------
     function : firedrake.Function
         The Firedrake function to visualize.
+    kwargs : Same as for matplotlib.tricontourf
 
     Returns
     -------
@@ -331,5 +332,6 @@ def plot_function(function: Function) -> None:
     axes = fig.add_subplot(111)
     fig.set_figwidth = 9.0
     fig.set_figheight = 9.0
-    tricontourf(function, axes=axes)
+    contours = tricontourf(function, axes=axes, **kwargs)
+    plt.colorbar(contours)
     axes.axis("equal")
