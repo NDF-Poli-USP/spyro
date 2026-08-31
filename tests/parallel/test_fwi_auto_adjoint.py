@@ -80,14 +80,16 @@ def build_dictionary():
 def test_fwi_auto_adjoint_parallel():
     """Run FWI with the automated adjoint over two shots."""
     vmin, vmax = 2.0, 3.5
-    fwi = spyro.FullWaveformInversion(dictionary=build_dictionary())
+    fwi = spyro.FullWaveformInversion(
+        dictionary=build_dictionary(),
+        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+    )
     fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.25})
     fwi.set_real_velocity_model(constant=3.0)
     fwi.generate_real_shot_record(save_shot_record=False)
 
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
     fwi.set_guess_velocity_model(constant=2.5)
-    fwi.enable_automated_adjoint()
 
     # One shot per ensemble member, on one spatial core each.
     comm = fwi.wave.comm

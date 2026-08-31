@@ -283,8 +283,8 @@ class FullWaveformInversion:
         to :func:`scipy.optimize.minimize` as a flat vector of degrees of
         freedom.
     Automated adjoint
-        Algorithmic differentiation through :mod:`firedrake.adjoint`, enabled
-        with :meth:`enable_automated_adjoint`. The forward solve is recorded on
+        Algorithmic differentiation through :mod:`firedrake.adjoint`, asked
+        for with ``adjoint_type``. The forward solve is recorded on
         a pyadjoint tape *once*; the resulting reduced functional replays it
         for every new control, so the driver does not re-run the forward solve
         itself. The controls stay ``Function``\\ s and the optimization is done
@@ -307,18 +307,22 @@ class FullWaveformInversion:
     shaped by that: the bounds take one entry per control, the derivatives come
     back one per control, and ``run_fwi`` returns the controls it converged on.
 
-    Which parameters an elastic inversion runs on is chosen when the automated
-    adjoint is enabled::
+    Which parameters an elastic inversion runs on is chosen when it is
+    constructed::
 
-        fwi.enable_automated_adjoint(
-            control_parameters={ElasticMaterialParameter.S_WAVE_VELOCITY},
+        fwi = spyro.FullWaveformInversion(
+            dictionary=config_dict,
+            wave_class=spyro.IsotropicWave,
+            adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+            adjoint_options={
+                "control_parameters": {
+                    ElasticMaterialParameter.S_WAVE_VELOCITY,
+                },
+            },
         )
 
     Methods
     -------
-    enable_automated_adjoint(control_parameters=None, ...)
-        Differentiate with the automated adjoint instead of the implemented
-        one.
     calculate_misfit(c=None)
         Calculate the receiver-data residual for the current guess model.
     generate_real_shot_record(plot_model=False, ...)
@@ -389,10 +393,10 @@ class FullWaveformInversion:
             hand-written adjoint it enables on first use.
         adjoint_options : dict, optional
             Settings for the automated adjoint, taking the keyword arguments
-            of :meth:`enable_automated_adjoint`: ``control_parameters``,
-            ``checkpointing``, ``snapshots`` and ``gc_timestep_frequency``.
-            Rejected here, rather than at the first solve, if a name is not
-            one of those.
+            of the solver's ``enable_automated_adjoint``:
+            ``control_parameters``, ``checkpointing``, ``snapshots`` and
+            ``gc_timestep_frequency``. Rejected here, rather than at the first
+            solve, if a name is not one of those.
 
         Raises
         ------
@@ -406,9 +410,8 @@ class FullWaveformInversion:
         material parameters as controls, and those are fields, which need a
         mesh and a model that a driver being constructed does not have yet.
         What is set here is the intent, and the solver is configured from it
-        on the first forward solve. :meth:`enable_automated_adjoint` does the
-        same thing once the mesh and the model are in place, for a driver
-        that was not told at construction time.
+        on the first forward solve. This is the only way to ask for it: an
+        inversion does not change adjoint halfway through.
 
         Examples
         --------
@@ -440,7 +443,7 @@ class FullWaveformInversion:
             self.wave = self.wave_class(dictionary=dictionary, comm=comm)
         self.wave_type = self.wave.wave_type
 
-        self._adjoint_type = adjoint_type
+        self.adjoint_type = adjoint_type
         self._adjoint_options = self._validated_adjoint_options(
             adjoint_type, adjoint_options,
         )
@@ -528,7 +531,7 @@ class FullWaveformInversion:
         ------
         ValueError
             If settings are given for an adjoint that has none, or a name is
-            not one :meth:`enable_automated_adjoint` takes.
+            not one the solver's ``enable_automated_adjoint`` takes.
         """
         if not adjoint_options:
             return {}
@@ -540,7 +543,7 @@ class FullWaveformInversion:
             )
         accepted = set(
             inspect.signature(
-                FullWaveformInversion.enable_automated_adjoint,
+                Wave.enable_automated_adjoint,
             ).parameters,
         ) - {"self"}
         unknown = sorted(set(adjoint_options) - accepted)
@@ -550,30 +553,6 @@ class FullWaveformInversion:
                 f"takes {sorted(accepted)}.",
             )
         return dict(adjoint_options)
-
-    @property
-    def adjoint_type(self):
-        """The adjoint this inversion differentiates with.
-
-        The driver's own choice, made at construction or by
-        :meth:`enable_automated_adjoint`, and what decides how
-        :meth:`run_fwi` optimizes. Until a choice is made the answer is
-        whatever the solver has configured for itself: the hand-written
-        adjoint switches itself on at its first gradient solve, and that is a
-        state only the solver knows about.
-
-        Returns
-        -------
-        AdjointType
-            The adjoint in use, or the one that will be.
-        """
-        if self._adjoint_type is not AdjointType.NONE:
-            return self._adjoint_type
-        return self.wave.adjoint_type
-
-    @adjoint_type.setter
-    def adjoint_type(self, adjoint_type):
-        self._adjoint_type = adjoint_type
 
     def _sync_wave_real_shot_record(self):
         """Copy observed data from the FWI driver to the wave solver.
@@ -684,9 +663,9 @@ class FullWaveformInversion:
         Two sources are tried in turn, the second answering the case where the
         first is not available yet:
 
-        1. The controls themselves, once ``set_guess_control`` or
-           :meth:`enable_automated_adjoint` has established them. This is the
-           normal case.
+        1. The controls themselves, once ``set_guess_control`` or the
+           automated adjoint's first forward solve has established them. This
+           is the normal case.
         2. The parameters the solver could be inverted for, when no controls
            have been set: an inversion that has not been told otherwise
            inverts for everything the wave equation is written in terms of.
@@ -1166,94 +1145,6 @@ class FullWaveformInversion:
         if value is not None:
             self.load_real_shot_record(file_name=value)
 
-    def enable_automated_adjoint(
-        self, control_parameters=None, checkpointing: bool = False,
-        snapshots: int | None = None,
-        gc_timestep_frequency: int | None = None,
-    ):
-        """Differentiate the inversion with the automated adjoint.
-
-        Hands the gradient over to algorithmic differentiation through
-        :mod:`firedrake.adjoint` instead of the hand-written adjoint solver.
-        The choice is recorded on the wave solver, so it holds for every
-        method of this driver that needs a functional or a gradient, and it
-        is what makes :meth:`run_fwi` optimize with PETSc TAO.
-
-        Call this *after* the guess mesh and the guess model are configured:
-        the control has to be an existing ``Function`` before it can be
-        recorded as one.
-
-        The selection made here *is* the inversion's set of controls, and
-        replaces whatever was configured before. For an acoustic medium that
-        changes nothing -- there is one parameter to choose from. For an
-        isotropic elastic one it is how the inversion is told which of the
-        parameters the equation is written in to invert for, and the guess
-        values come from the model the solver already holds.
-
-        Parameters
-        ----------
-        control_parameters : enum.Enum or iterable of enum.Enum, optional
-            Physical parameters to differentiate with respect to. ``None``
-            takes every parameter the wave equation offers: the velocity model
-            of an acoustic medium, and density with the two wave speeds (or
-            the Lame parameters, whichever set the equation is written in) of
-            an isotropic elastic one.
-        checkpointing : bool, optional
-            Whether to manage the tape with a checkpoint schedule. ``False``
-            (the default) keeps every forward step on the tape.
-        snapshots : int, optional
-            How many checkpoints to keep in RAM, which is also what selects
-            the schedule. ``None`` (the default) keeps every time step.
-        gc_timestep_frequency : int, optional
-            Run a garbage collection every this many time steps, lowering the
-            peak memory of a checkpointed tape. ``None`` (the default)
-            disables it.
-
-        Returns
-        -------
-        None
-            The wave solver is configured in place.
-
-        See Also
-        --------
-        spyro.solvers.wave.Wave.enable_automated_adjoint :
-            The solver-side switch this forwards to.
-        spyro.solvers.automatic_differentiation_solver.AutomatedAdjoint :
-            Which schedule each setting selects, and the references behind
-            them.
-
-        Examples
-        --------
-        >>> fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.1})
-        >>> fwi.set_guess_velocity_model(constant=2.5)
-        >>> fwi.enable_automated_adjoint(checkpointing=True, snapshots=10)
-        >>> fwi.run_fwi(vmin=2.5, vmax=3.0, maxiter=10)
-        """
-        # The solver needs a mesh and a model before a control can exist as
-        # a Function, and the driver may still be holding both: mirror what a
-        # forward solve would do, so the call works wherever it is placed
-        # after the guess model is configured.
-        if self.wave.mesh is None and self.guess_mesh is not None:
-            self.wave.set_mesh(user_mesh=self.guess_mesh, input_mesh_parameters={})
-        if self._control_parameters:
-            self._write_parameters_into_wave(self.wave, self._control_parameters)
-
-        self._adjoint_type = AdjointType.AUTOMATED_ADJOINT
-        self.wave.enable_automated_adjoint(
-            control_parameters=control_parameters,
-            checkpointing=checkpointing,
-            snapshots=snapshots,
-            gc_timestep_frequency=gc_timestep_frequency,
-        )
-        # What is differentiated is what is inverted for, and in the same
-        # order: the optimizer hands its iterates back positionally, matched
-        # against the tape's controls. Taking the selection from the adjoint
-        # rather than trusting the two to agree is what keeps the density of
-        # an elastic inversion from being written into its p-wave velocity.
-        self._control_parameters = self.wave.physical_parameters.copy(
-            self.wave.automated_adjoint.control_parameter_names,
-        )
-
     def calculate_misfit(self, c=None, save_output=False):
         """
         Calculate the misfit between observed and simulated data.
@@ -1337,7 +1228,16 @@ class FullWaveformInversion:
             self.adjoint_type == AdjointType.AUTOMATED_ADJOINT
             and self.wave.automated_adjoint is None
         ):
-            self.enable_automated_adjoint(**self._adjoint_options)
+            self.wave.enable_automated_adjoint(**self._adjoint_options)
+            # What is differentiated is what is inverted for, and in the same
+            # order: the optimizer hands its iterates back positionally,
+            # matched against the tape's controls. Taking the selection from
+            # the adjoint rather than trusting the two to agree is what keeps
+            # the density of an elastic inversion from being written into its
+            # p-wave velocity.
+            self._control_parameters = self.wave.physical_parameters.copy(
+                self.wave.automated_adjoint.control_parameter_names,
+            )
 
         if c is not None:
             updated_control = self._rebuild_control_from_vector(
@@ -1351,7 +1251,7 @@ class FullWaveformInversion:
             raise ValueError("No guess control parameter has been configured.")
 
         self._sync_wave_real_shot_record()
-        if self.adjoint_type == AdjointType.IMPLEMENTED_ADJOINT:
+        if self.wave.adjoint_type == AdjointType.IMPLEMENTED_ADJOINT:
             self.wave.enable_implemented_adjoint()
         self.wave.forward_solve()
 
@@ -1814,8 +1714,8 @@ class FullWaveformInversion:
             re-runs the forward and adjoint solves for every iterate.
         Automated adjoint
             PETSc TAO, driven by the pyadjoint reduced functional built from a
-            single recorded forward solve. Enable it with
-            :meth:`enable_automated_adjoint` before calling this method.
+            single recorded forward solve. Ask for it with ``adjoint_type``
+            when constructing the inversion.
 
         Parameters
         ----------
@@ -1840,13 +1740,6 @@ class FullWaveformInversion:
                 PETSc options for the TAO solver, merged over the defaults
                 ``{"tao_type": "blmvm", "tao_max_it": maxiter}``. Only used
                 under the automated adjoint.
-            adjoint_type : AdjointType, optional
-                Adjoint to run with, for an inversion that was not told at
-                construction time. ``AdjointType.AUTOMATED_ADJOINT`` here is
-                equivalent to constructing with it, and the automated adjoint
-                is configured with its defaults; pass ``adjoint_options`` to
-                the constructor, or call
-                :meth:`enable_automated_adjoint`, to settle its settings.
 
         Returns
         -------
@@ -1885,11 +1778,6 @@ class FullWaveformInversion:
             },
         }
         tao_options = kwargs.pop("tao_options", None)
-        adjoint_type = kwargs.pop("adjoint_type", None)
-        if adjoint_type is not None:
-            # Late, but the same choice the constructor takes: the solver is
-            # configured from it by the first forward solve of the run.
-            self.adjoint_type = adjoint_type
         parameters.update(kwargs)
 
         if (
@@ -1898,9 +1786,10 @@ class FullWaveformInversion:
         ):
             raise NotImplementedError(
                 f"{self.wave_type.name} inversion needs the automated "
-                "adjoint: call enable_automated_adjoint() before run_fwi(). "
-                "The hand-implemented adjoint, and the L-BFGS-B path built "
-                "on it, are only written for acoustic media.",
+                "adjoint: construct the inversion with "
+                "adjoint_type=AdjointType.AUTOMATED_ADJOINT. The "
+                "hand-implemented adjoint, and the L-BFGS-B path built on it, "
+                "are only written for acoustic media.",
             )
 
         if self.adjoint_type == AdjointType.AUTOMATED_ADJOINT:

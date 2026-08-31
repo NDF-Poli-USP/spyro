@@ -121,41 +121,50 @@ def build_inversion(
     return fwi
 
 
-@pytest.mark.newer_firedrake
-def test_enable_automated_adjoint_differentiates_the_wave_control(
-    tmp_path, monkeypatch,
-):
-    """The driver switch reaches the solver and picks up the velocity model.
+def build_automated_inversion(tmp_path, monkeypatch, **adjoint_options):
+    """Build an inversion that differentiates with the automated adjoint.
 
-    The control the tape records has to be the solver's own ``Function``,
-    the one the wave equation is written in terms of, not a copy of it, or
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Directory the inversion runs in.
+    monkeypatch : _pytest.monkeypatch.MonkeyPatch
+        Used to change the working directory.
+    **adjoint_options
+        Settings for the automated adjoint.
+
+    Returns
+    -------
+    spyro.FullWaveformInversion
+        Inversion ready to solve. The solver itself is configured by the
+        first forward solve, not here.
+    """
+    return build_inversion(
+        tmp_path, monkeypatch,
+        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        adjoint_options=adjoint_options or None,
+    )
+
+
+@pytest.mark.newer_firedrake
+def test_the_control_is_the_solvers_own_field(tmp_path, monkeypatch):
+    """The tape records the velocity model the wave equation reads.
+
+    The control has to be the solver's own ``Function``, not a copy of it, or
     the optimizer would be moving something the forward solve never reads.
     """
-    fwi = build_inversion(tmp_path, monkeypatch)
-    fwi.enable_automated_adjoint()
+    fwi = build_automated_inversion(tmp_path, monkeypatch)
+
+    fwi.get_functional()
 
     assert fwi.wave.adjoint_type == AdjointType.AUTOMATED_ADJOINT
     automated_adjoint = fwi.wave.automated_adjoint
-    assert automated_adjoint is not None
     assert automated_adjoint.controls == [fwi.wave.c]
     assert automated_adjoint.control_parameter_names == [
         AcousticMaterialParameter.P_WAVE_VELOCITY,
     ]
     # The ensemble the reduced functional will sum over is the solver's.
     assert automated_adjoint.ensemble is fwi.wave.comm
-
-
-@pytest.mark.newer_firedrake
-def test_enable_automated_adjoint_forwards_the_checkpointing_settings(
-    tmp_path, monkeypatch,
-):
-    """Checkpointing asked for on the driver has to survive to the tape."""
-    fwi = build_inversion(tmp_path, monkeypatch)
-    fwi.enable_automated_adjoint(checkpointing=True, snapshots=3)
-
-    automated_adjoint = fwi.wave.automated_adjoint
-    assert automated_adjoint._checkpointing is True
-    assert automated_adjoint._snapshots == 3
 
 
 @pytest.mark.newer_firedrake
@@ -216,8 +225,7 @@ def test_the_functional_comes_off_the_tape(tmp_path, monkeypatch):
     as an array, and the functional is read off the tape rather than
     recomputed from one.
     """
-    fwi = build_inversion(tmp_path, monkeypatch)
-    fwi.enable_automated_adjoint()
+    fwi = build_automated_inversion(tmp_path, monkeypatch)
 
     functional = fwi.get_functional()
 
@@ -236,8 +244,7 @@ def test_calculate_misfit_is_refused_under_the_automated_adjoint(
     Returning ``None`` from a method named for what it computes would leave
     the caller to discover the difference on their own.
     """
-    fwi = build_inversion(tmp_path, monkeypatch)
-    fwi.enable_automated_adjoint()
+    fwi = build_automated_inversion(tmp_path, monkeypatch)
 
     with pytest.raises(ValueError, match="never exists as an array"):
         fwi.calculate_misfit()
@@ -251,8 +258,7 @@ def test_get_gradient_differentiates_the_recorded_tape(tmp_path, monkeypatch):
     explicitly are both already on the tape, so neither is passed; what has to
     come back is a gradient in the control's own space.
     """
-    fwi = build_inversion(tmp_path, monkeypatch)
-    fwi.enable_automated_adjoint()
+    fwi = build_automated_inversion(tmp_path, monkeypatch)
 
     fwi.get_gradient(save=False)
 
@@ -291,8 +297,7 @@ def test_run_fwi_optimizes_with_tao_under_the_automated_adjoint(
     rather than let the exception through.
     """
     vmin, vmax = 2.0, 3.5
-    fwi = build_inversion(tmp_path, monkeypatch)
-    fwi.enable_automated_adjoint()
+    fwi = build_automated_inversion(tmp_path, monkeypatch)
 
     result = fwi.run_fwi(vmin=vmin, vmax=vmax, maxiter=3)
 

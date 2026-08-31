@@ -122,6 +122,7 @@ def build_dictionary(material):
 def build_inversion(
     tmp_path, monkeypatch, observed_data=True,
     guess_material=None, real_material=None,
+    adjoint_type=AdjointType.AUTOMATED_ADJOINT, adjoint_options=None,
 ):
     """Build an elastic inversion, with observed data if asked for.
 
@@ -142,6 +143,11 @@ def build_inversion(
         Material the inversion starts from. Defaults to the velocity set.
     real_material : dict, optional
         Material generating the observed data, keyed the same way.
+    adjoint_type : AdjointType, optional
+        Adjoint the inversion is built with. Elastic media only have the
+        automated one, which is the default.
+    adjoint_options : dict, optional
+        Settings for it, such as which parameters to invert for.
 
     Returns
     -------
@@ -155,6 +161,8 @@ def build_inversion(
     fwi = spyro.FullWaveformInversion(
         dictionary=build_dictionary(guess_material),
         wave_class=spyro.IsotropicWave,
+        adjoint_type=adjoint_type,
+        adjoint_options=adjoint_options,
     )
     if observed_data:
         fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.25})
@@ -171,15 +179,16 @@ def build_inversion(
 def test_controls_are_the_parameters_the_equation_is_written_in(
     tmp_path, monkeypatch,
 ):
-    """Enabling the adjoint makes its controls the inversion's controls.
+    """The first forward solve makes the adjoint's controls the inversion's.
 
     The elastic guess model comes from the input dictionary rather than from a
     velocity setter, so this is also what gives the inversion its controls in
     the first place. They have to be the solver's own parameters: the
     optimizer moves what the forward solve reads.
     """
-    fwi = build_inversion(tmp_path, monkeypatch, observed_data=False)
-    fwi.enable_automated_adjoint()
+    fwi = build_inversion(tmp_path, monkeypatch)
+
+    fwi.get_functional()
 
     assert fwi.wave.adjoint_type == AdjointType.AUTOMATED_ADJOINT
     assert tuple(
@@ -200,10 +209,14 @@ def test_controls_are_the_parameters_the_equation_is_written_in(
 @pytest.mark.newer_firedrake
 def test_selecting_a_subset_narrows_the_inversion(tmp_path, monkeypatch):
     """Inverting for one parameter leaves the inversion with one control."""
-    fwi = build_inversion(tmp_path, monkeypatch, observed_data=False)
-    fwi.enable_automated_adjoint(
-        control_parameters={Parameter.S_WAVE_VELOCITY},
+    fwi = build_inversion(
+        tmp_path, monkeypatch,
+        adjoint_options={
+            "control_parameters": {Parameter.S_WAVE_VELOCITY},
+        },
     )
+
+    fwi.get_functional()
 
     assert fwi.wave.automated_adjoint.controls[0] is fwi.wave.c_s
     # One control is presented the way an acoustic one always has been.
@@ -223,10 +236,12 @@ def test_controls_follow_the_set_the_equation_is_written_in(
     can be controls.
     """
     fwi = build_inversion(
-        tmp_path, monkeypatch, observed_data=False,
+        tmp_path, monkeypatch,
         guess_material=LAME_GUESS_MATERIAL,
+        real_material=LAME_REAL_MATERIAL,
     )
-    fwi.enable_automated_adjoint()
+
+    fwi.get_functional()
 
     assert tuple(
         fwi.wave.automated_adjoint.control_parameter_names
@@ -246,14 +261,16 @@ def test_a_parameter_computed_from_the_others_cannot_be_a_control(
 ):
     """The two sets are swapped between, never mixed."""
     fwi = build_inversion(
-        tmp_path, monkeypatch, observed_data=False,
+        tmp_path, monkeypatch,
         guess_material=LAME_GUESS_MATERIAL,
+        real_material=LAME_REAL_MATERIAL,
+        adjoint_options={
+            "control_parameters": {Parameter.P_WAVE_VELOCITY},
+        },
     )
 
     with pytest.raises(TypeError, match="computed from the other physical"):
-        fwi.enable_automated_adjoint(
-            control_parameters={Parameter.P_WAVE_VELOCITY},
-        )
+        fwi.get_functional()
 
 
 @pytest.mark.newer_firedrake
@@ -263,8 +280,8 @@ def test_controls_flatten_into_one_vector(tmp_path, monkeypatch):
     Nothing splits that vector apart again -- TAO works on the controls
     themselves -- so this is the whole of what the driver asks of it.
     """
-    fwi = build_inversion(tmp_path, monkeypatch, observed_data=False)
-    fwi.enable_automated_adjoint()
+    fwi = build_inversion(tmp_path, monkeypatch)
+    fwi.get_functional()
     controls = fwi.control_parameters
 
     flat = fwi._flatten_control(controls)
@@ -280,8 +297,8 @@ def test_controls_flatten_into_one_vector(tmp_path, monkeypatch):
 @pytest.mark.newer_firedrake
 def test_bounds_take_one_entry_per_control(tmp_path, monkeypatch):
     """Each parameter is bounded on its own scale, or all of them alike."""
-    fwi = build_inversion(tmp_path, monkeypatch, observed_data=False)
-    fwi.enable_automated_adjoint()
+    fwi = build_inversion(tmp_path, monkeypatch)
+    fwi.get_functional()
     controls = fwi.control_parameters
 
     # One scalar bounds every control the same way.
@@ -299,7 +316,6 @@ def test_get_gradient_returns_one_derivative_per_control(
 ):
     """The derivatives come back keyed by the parameter each belongs to."""
     fwi = build_inversion(tmp_path, monkeypatch)
-    fwi.enable_automated_adjoint()
 
     fwi.get_gradient(save=False)
 
@@ -319,7 +335,6 @@ def test_run_fwi_inverts_every_control(tmp_path, monkeypatch):
     vmin = [1.0, 1.5, 0.5]
     vmax = [3.0, 4.0, 2.5]
     fwi = build_inversion(tmp_path, monkeypatch)
-    fwi.enable_automated_adjoint()
 
     result = fwi.run_fwi(vmin=vmin, vmax=vmax, maxiter=3)
 
@@ -363,9 +378,9 @@ def test_run_fwi_inverts_the_lame_parameters_with_density_held_fixed(
         tmp_path, monkeypatch,
         guess_material=LAME_GUESS_MATERIAL,
         real_material=LAME_REAL_MATERIAL,
-    )
-    fwi.enable_automated_adjoint(
-        control_parameters={Parameter.LAMBDA, Parameter.MU},
+        adjoint_options={
+            "control_parameters": {Parameter.LAMBDA, Parameter.MU},
+        },
     )
 
     assert [control.name() for control in fwi.control_parameters] == [
@@ -401,7 +416,10 @@ def test_run_fwi_without_the_automated_adjoint_is_refused(
     Falling through to L-BFGS-B would run a forward solve per iterate and only
     then fail, deep inside ``gradient_solve``.
     """
-    fwi = build_inversion(tmp_path, monkeypatch, observed_data=False)
+    fwi = build_inversion(
+        tmp_path, monkeypatch, observed_data=False,
+        adjoint_type=AdjointType.NONE,
+    )
 
     with pytest.raises(NotImplementedError, match="automated adjoint"):
         fwi.run_fwi(maxiter=1)
