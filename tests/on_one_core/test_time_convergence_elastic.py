@@ -1,6 +1,7 @@
 """Test second order time convergence on the isotropic elastic wave."""
 
 import numpy as np
+import pytest
 
 import spyro
 from spyro.tools.error_measure import MeasureError
@@ -97,6 +98,7 @@ def run_elastic_forward(dt):
     return l2_error
 
 
+@pytest.mark.slow
 def test_second_order_time_convergence():
     """Test that the second order time convergence is achieved."""
     dts = [
