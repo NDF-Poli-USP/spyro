@@ -9,7 +9,7 @@ different routes, and these tests pin the automated one down:
 * the optimization is done by PETSc TAO rather than by
   :func:`scipy.optimize.minimize`, which changes what the bounds look like
   (one pair per control, not one per degree of freedom) and what ``run_fwi``
-  hands back (the control field itself);
+  hands back (the control itself);
 * enabling it must not disturb the implemented-adjoint path, which stays the
   default.
 
@@ -77,7 +77,10 @@ def build_dictionary():
     }
 
 
-def build_inversion(tmp_path, monkeypatch, real_velocity=3.0, guess_velocity=2.5):
+def build_inversion(
+    tmp_path, monkeypatch, real_velocity=3.0, guess_velocity=2.5,
+    **constructor_options,
+):
     """Build an inversion with synthetic observed data.
 
     Every artefact ``FullWaveformInversion`` writes (control snapshots, the
@@ -94,6 +97,9 @@ def build_inversion(tmp_path, monkeypatch, real_velocity=3.0, guess_velocity=2.5
         Velocity of the model generating the observed data.
     guess_velocity : float, optional
         Velocity the inversion starts from.
+    **constructor_options
+        Passed to :class:`spyro.FullWaveformInversion`, so a test can choose
+        the adjoint there rather than switching it on afterwards.
 
     Returns
     -------
@@ -102,7 +108,9 @@ def build_inversion(tmp_path, monkeypatch, real_velocity=3.0, guess_velocity=2.5
         configured.
     """
     monkeypatch.chdir(tmp_path)
-    fwi = spyro.FullWaveformInversion(dictionary=build_dictionary())
+    fwi = spyro.FullWaveformInversion(
+        dictionary=build_dictionary(), **constructor_options,
+    )
 
     fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.25})
     fwi.set_real_velocity_model(constant=real_velocity)
@@ -119,9 +127,9 @@ def test_enable_automated_adjoint_differentiates_the_wave_control(
 ):
     """The driver switch reaches the solver and picks up the velocity model.
 
-    The control the tape records has to be the field the wave equation is
-    written in terms of, not a copy of it, or the optimizer would be moving
-    something the forward solve never reads.
+    The control the tape records has to be the solver's own ``Function``,
+    the one the wave equation is written in terms of, not a copy of it, or
+    the optimizer would be moving something the forward solve never reads.
     """
     fwi = build_inversion(tmp_path, monkeypatch)
     fwi.enable_automated_adjoint()
@@ -151,24 +159,88 @@ def test_enable_automated_adjoint_forwards_the_checkpointing_settings(
 
 
 @pytest.mark.newer_firedrake
-def test_calculate_misfit_keeps_the_tape_under_the_automated_adjoint(
-    tmp_path, monkeypatch,
-):
+def test_the_adjoint_can_be_chosen_at_construction(tmp_path, monkeypatch):
+    """Choosing the adjoint up front leaves the run looking like any other.
+
+    The automated adjoint cannot be switched on at construction -- its
+    controls are fields, and there is no mesh yet -- so the choice is recorded
+    and the solver is configured from it by the first forward solve. Nothing
+    in between has to know.
+    """
+    fwi = build_inversion(
+        tmp_path, monkeypatch,
+        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        adjoint_options={"checkpointing": True, "snapshots": 3},
+    )
+
+    # Recorded, but nothing built: the solver has no mesh of its own yet.
+    assert fwi.adjoint_type == AdjointType.AUTOMATED_ADJOINT
+    assert fwi.wave.automated_adjoint is None
+
+    fwi.get_functional()
+
+    assert fwi.wave.adjoint_type == AdjointType.AUTOMATED_ADJOINT
+    assert fwi.wave.automated_adjoint._tape is not None
+    # The settings travelled from the constructor to the tape.
+    assert fwi.wave.automated_adjoint._checkpointing is True
+    assert fwi.wave.automated_adjoint._snapshots == 3
+
+
+def test_adjoint_options_are_checked_at_construction(tmp_path, monkeypatch):
+    """A misspelt setting fails where it was written, not at the first solve.
+
+    They are applied a long way from here, and silently ignoring one would
+    show up only as memory that never came down.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(ValueError, match="not settings of the automated"):
+        spyro.FullWaveformInversion(
+            dictionary=build_dictionary(),
+            adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+            adjoint_options={"snapshot": 3},
+        )
+
+    with pytest.raises(ValueError, match="needs adjoint_type"):
+        spyro.FullWaveformInversion(
+            dictionary=build_dictionary(),
+            adjoint_options={"snapshots": 3},
+        )
+
+
+@pytest.mark.newer_firedrake
+def test_the_functional_comes_off_the_tape(tmp_path, monkeypatch):
     """The forward solve records a tape and leaves the functional on it.
 
     The residual is accumulated step by step while taping, so it never exists
-    as an array: asking for one here would mean rebuilding the tape that has
-    just been recorded.
+    as an array, and the functional is read off the tape rather than
+    recomputed from one.
     """
     fwi = build_inversion(tmp_path, monkeypatch)
     fwi.enable_automated_adjoint()
 
-    assert fwi.calculate_misfit() is None
+    functional = fwi.get_functional()
+
     assert fwi.wave.automated_adjoint._tape is not None
     assert isinstance(fwi.wave.functional_value, AdjFloat)
-    assert fwi.get_functional() == pytest.approx(
-        float(fwi.wave.functional_value),
-    )
+    assert functional == pytest.approx(float(fwi.wave.functional_value))
+    assert fwi.functional_history == [functional]
+
+
+@pytest.mark.newer_firedrake
+def test_calculate_misfit_is_refused_under_the_automated_adjoint(
+    tmp_path, monkeypatch,
+):
+    """There is no residual array to hand back, so asking for one is an error.
+
+    Returning ``None`` from a method named for what it computes would leave
+    the caller to discover the difference on their own.
+    """
+    fwi = build_inversion(tmp_path, monkeypatch)
+    fwi.enable_automated_adjoint()
+
+    with pytest.raises(ValueError, match="never exists as an array"):
+        fwi.calculate_misfit()
 
 
 @pytest.mark.newer_firedrake
@@ -194,7 +266,7 @@ def test_tao_bounds_are_one_pair_per_control(tmp_path, monkeypatch):
     """TAO takes bounds per control, L-BFGS-B one per degree of freedom.
 
     A scalar stays a scalar for TAO to broadcast, while a bound that varies
-    over the mesh becomes a field in the control's own space.
+    over the mesh becomes a ``Function`` in the control's own space.
     """
     fwi = build_inversion(tmp_path, monkeypatch)
     control = fwi.control_parameters

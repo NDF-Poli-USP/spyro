@@ -1,12 +1,12 @@
 """Isotropic-elastic FWI driven by the automated adjoint.
 
-An acoustic medium is inverted for one field, its velocity model. An isotropic
-elastic one is inverted for several at once -- density and the two wave speeds,
-or density and the Lame parameters, whichever set the equation is written in --
-and that is what these tests pin down:
+An acoustic medium is inverted for one control, its velocity model. An
+isotropic elastic one is inverted for several at once -- density and the two
+wave speeds, or density and the Lame parameters, whichever set the equation is
+written in -- and that is what these tests pin down:
 
 * the controls are the parameters the automated adjoint differentiates, in the
-  same order, so an iterate is never written back into the wrong field;
+  same order, so an iterate is never written back into the wrong control;
 * selecting a subset of them narrows the inversion to it, and which set they
   are drawn from is whichever one the equation is written in -- the two wave
   speeds or the two Lame parameters -- so density can be held fixed while the
@@ -158,7 +158,7 @@ def build_inversion(
     )
     if observed_data:
         fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.25})
-        fwi.set_real_control({
+        fwi.set_real_model({
             Parameter(name): value for name, value in real_material.items()
         })
         fwi.generate_real_shot_record(save_shot_record=False)
@@ -175,8 +175,8 @@ def test_controls_are_the_parameters_the_equation_is_written_in(
 
     The elastic guess model comes from the input dictionary rather than from a
     velocity setter, so this is also what gives the inversion its controls in
-    the first place. They have to be the solver's own fields: the optimizer
-    moves what the forward solve reads.
+    the first place. They have to be the solver's own parameters: the
+    optimizer moves what the forward solve reads.
     """
     fwi = build_inversion(tmp_path, monkeypatch, observed_data=False)
     fwi.enable_automated_adjoint()
@@ -191,10 +191,10 @@ def test_controls_are_the_parameters_the_equation_is_written_in(
     assert [control.name() for control in controls] == [
         parameter.value for parameter in VELOCITY_PARAMETERS
     ]
-    # The driver holds detached copies, but of the very fields being taped.
-    for control, field in zip(controls, fwi.wave.automated_adjoint.controls):
-        assert control.function_space() == field.function_space()
-        assert np.allclose(control.dat.data_ro, field.dat.data_ro)
+    # The driver holds detached copies, but of the very controls being taped.
+    for control, taped in zip(controls, fwi.wave.automated_adjoint.controls):
+        assert control.function_space() == taped.function_space()
+        assert np.allclose(control.dat.data_ro, taped.dat.data_ro)
 
 
 @pytest.mark.newer_firedrake
@@ -218,8 +218,9 @@ def test_controls_follow_the_set_the_equation_is_written_in(
 ):
     """A model given in Lame parameters is inverted in Lame parameters.
 
-    Which parameters are carried as fields, and which are computed from them,
-    is what the equation is written in. Only the fields can be controls.
+    Which parameters carry their own values, and which are computed from
+    those, is what the equation is written in. Only the ones carrying values
+    can be controls.
     """
     fwi = build_inversion(
         tmp_path, monkeypatch, observed_data=False,
@@ -233,7 +234,7 @@ def test_controls_follow_the_set_the_equation_is_written_in(
     assert [control.name() for control in fwi.control_parameters] == [
         parameter.value for parameter in LAME_PARAMETERS
     ]
-    # The wave speeds are computed from these, not carried as fields of their
+    # The wave speeds are computed from these, carrying no values of their
     # own, which is exactly why they cannot be controls here.
     assert not isinstance(fwi.wave.c, fire.Function)
     assert not isinstance(fwi.wave.c_s, fire.Function)
@@ -256,24 +257,24 @@ def test_a_parameter_computed_from_the_others_cannot_be_a_control(
 
 
 @pytest.mark.newer_firedrake
-def test_controls_round_trip_through_an_optimizer_vector(
-    tmp_path, monkeypatch,
-):
-    """Several controls flatten into one vector and split back out of it."""
+def test_controls_flatten_into_one_vector(tmp_path, monkeypatch):
+    """Several controls concatenate into the vector each iterate is saved as.
+
+    Nothing splits that vector apart again -- TAO works on the controls
+    themselves -- so this is the whole of what the driver asks of it.
+    """
     fwi = build_inversion(tmp_path, monkeypatch, observed_data=False)
     fwi.enable_automated_adjoint()
     controls = fwi.control_parameters
 
     flat = fwi._flatten_control(controls)
-    assert flat.size == sum(
-        control.dat.data_ro.size for control in controls
-    )
 
-    rebuilt = fwi._rebuild_control_from_vector(controls, flat)
-    assert len(rebuilt) == len(controls)
-    for original, copy in zip(controls, rebuilt):
-        assert copy.name() == original.name()
-        assert np.allclose(copy.dat.data_ro, original.dat.data_ro)
+    assert flat.size == sum(control.dat.data_ro.size for control in controls)
+    offset = 0
+    for control in controls:
+        values = control.dat.data_ro
+        assert np.allclose(flat[offset:offset + values.size], values)
+        offset += values.size
 
 
 @pytest.mark.newer_firedrake
@@ -340,9 +341,11 @@ def test_run_fwi_inverts_every_control(tmp_path, monkeypatch):
     assert len(fwi.functional_history) > 1
     assert fwi.functional_history[-1] < fwi.functional_history[0]
 
-    # The optimum is written back into the solver's own material fields.
-    for control, field in zip(result, (fwi.wave.rho, fwi.wave.c, fwi.wave.c_s)):
-        assert np.allclose(control.dat.data_ro, field.dat.data_ro)
+    # The optimum is written back into the solver's own material parameters.
+    for control, parameter in zip(
+        result, (fwi.wave.rho, fwi.wave.c, fwi.wave.c_s),
+    ):
+        assert np.allclose(control.dat.data_ro, parameter.dat.data_ro)
 
 
 @pytest.mark.newer_firedrake

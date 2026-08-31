@@ -108,11 +108,11 @@ class AutomatedAdjoint:
     Parameters
     ----------
     controls : object, mapping, or iterable, optional
-        Fields with respect to which the functional is differentiated. A
-        mapping keyed by material parameters labels its controls, so the
+        Controls with respect to which the functional is differentiated. A
+        mapping keyed by material parameters labels each one, so the
         derivatives can be handed back under the same names; anything else is
-        taken as unlabeled fields. The wave equation resolves parameter names
-        to these fields before constructing the adjoint solver.
+        taken as unlabeled. The wave equation resolves parameter names to
+        these controls before constructing the adjoint solver.
     ensemble : firedrake.ensemble.Ensemble, optional
         The Firedrake ensemble communicator used to sum the per-shot
         functionals and gradients across ensemble members. In practice this is
@@ -474,7 +474,7 @@ pyadjoint.ReducedFunctional or None
             Controls about which the gradient is verified.
         direction : firedrake.Function or iterable of firedrake.Function, optional
             Perturbation directions. Each defaults to a constant ``0.01``
-            field in the corresponding control's function space.
+            in the corresponding control's function space.
         dJdm : float or iterable, optional
             The directional derivative ``J'(m)(direction)``. pyadjoint expects a
             scalar here, so if a gradient ``Function`` (Riesz representer) or a
