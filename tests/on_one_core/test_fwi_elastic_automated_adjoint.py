@@ -7,7 +7,10 @@ and that is what these tests pin down:
 
 * the controls are the parameters the automated adjoint differentiates, in the
   same order, so an iterate is never written back into the wrong field;
-* selecting a subset of them narrows the inversion to it;
+* selecting a subset of them narrows the inversion to it, and which set they
+  are drawn from is whichever one the equation is written in -- the two wave
+  speeds or the two Lame parameters -- so density can be held fixed while the
+  Lame parameters alone are fitted;
 * bounds take one entry per control, since density and a wave speed are not
   bounded by the same numbers;
 * the derivatives come back one per control, keyed by the parameter each
@@ -38,12 +41,23 @@ REAL_MATERIAL = {
     "p_wave_velocity": 3.0,
     "s_wave_velocity": 1.5,
 }
+# The same medium written in Lame parameters instead. Density is the same in
+# both models, so an inversion that leaves it out of the controls is chasing a
+# target it can reach.
+LAME_GUESS_MATERIAL = {"density": 2.0, "lambda": 6.0, "mu": 3.0}
+LAME_REAL_MATERIAL = {"density": 2.0, "lambda": 9.0, "mu": 4.5}
+
 # The order the equation carries its independent parameters in, which is the
 # order the controls come back in.
 VELOCITY_PARAMETERS = (
     Parameter.DENSITY,
     Parameter.P_WAVE_VELOCITY,
     Parameter.S_WAVE_VELOCITY,
+)
+LAME_PARAMETERS = (
+    Parameter.DENSITY,
+    Parameter.LAMBDA,
+    Parameter.MU,
 )
 
 
@@ -105,8 +119,14 @@ def build_dictionary(material):
     }
 
 
-def build_inversion(tmp_path, monkeypatch, observed_data=True):
+def build_inversion(
+    tmp_path, monkeypatch, observed_data=True,
+    guess_material=None, real_material=None,
+):
     """Build an elastic inversion, with observed data if asked for.
+
+    Which material set is given here is what the equation ends up written in,
+    and so which parameters can be controls.
 
     Parameters
     ----------
@@ -118,23 +138,28 @@ def build_inversion(tmp_path, monkeypatch, observed_data=True):
     observed_data : bool, optional
         Whether to propagate the true model and keep its shot record. Skipped
         by the tests that never run a forward solve.
+    guess_material : dict, optional
+        Material the inversion starts from. Defaults to the velocity set.
+    real_material : dict, optional
+        Material generating the observed data, keyed the same way.
 
     Returns
     -------
     spyro.FullWaveformInversion
         Inversion with the guess model configured.
     """
+    guess_material = GUESS_MATERIAL if guess_material is None else guess_material
+    real_material = REAL_MATERIAL if real_material is None else real_material
+
     monkeypatch.chdir(tmp_path)
     fwi = spyro.FullWaveformInversion(
-        dictionary=build_dictionary(GUESS_MATERIAL),
+        dictionary=build_dictionary(guess_material),
         wave_class=spyro.IsotropicWave,
     )
     if observed_data:
         fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.25})
         fwi.set_real_control({
-            Parameter.DENSITY: REAL_MATERIAL["density"],
-            Parameter.P_WAVE_VELOCITY: REAL_MATERIAL["p_wave_velocity"],
-            Parameter.S_WAVE_VELOCITY: REAL_MATERIAL["s_wave_velocity"],
+            Parameter(name): value for name, value in real_material.items()
         })
         fwi.generate_real_shot_record(save_shot_record=False)
 
@@ -185,6 +210,49 @@ def test_selecting_a_subset_narrows_the_inversion(tmp_path, monkeypatch):
     control = fwi.control_parameters
     assert isinstance(control, fire.Function)
     assert control.name() == Parameter.S_WAVE_VELOCITY.value
+
+
+@pytest.mark.newer_firedrake
+def test_controls_follow_the_set_the_equation_is_written_in(
+    tmp_path, monkeypatch,
+):
+    """A model given in Lame parameters is inverted in Lame parameters.
+
+    Which parameters are carried as fields, and which are computed from them,
+    is what the equation is written in. Only the fields can be controls.
+    """
+    fwi = build_inversion(
+        tmp_path, monkeypatch, observed_data=False,
+        guess_material=LAME_GUESS_MATERIAL,
+    )
+    fwi.enable_automated_adjoint()
+
+    assert tuple(
+        fwi.wave.automated_adjoint.control_parameter_names
+    ) == LAME_PARAMETERS
+    assert [control.name() for control in fwi.control_parameters] == [
+        parameter.value for parameter in LAME_PARAMETERS
+    ]
+    # The wave speeds are computed from these, not carried as fields of their
+    # own, which is exactly why they cannot be controls here.
+    assert not isinstance(fwi.wave.c, fire.Function)
+    assert not isinstance(fwi.wave.c_s, fire.Function)
+
+
+@pytest.mark.newer_firedrake
+def test_a_parameter_computed_from_the_others_cannot_be_a_control(
+    tmp_path, monkeypatch,
+):
+    """The two sets are swapped between, never mixed."""
+    fwi = build_inversion(
+        tmp_path, monkeypatch, observed_data=False,
+        guess_material=LAME_GUESS_MATERIAL,
+    )
+
+    with pytest.raises(TypeError, match="computed from the other physical"):
+        fwi.enable_automated_adjoint(
+            control_parameters={Parameter.P_WAVE_VELOCITY},
+        )
 
 
 @pytest.mark.newer_firedrake
@@ -275,6 +343,51 @@ def test_run_fwi_inverts_every_control(tmp_path, monkeypatch):
     # The optimum is written back into the solver's own material fields.
     for control, field in zip(result, (fwi.wave.rho, fwi.wave.c, fwi.wave.c_s)):
         assert np.allclose(control.dat.data_ro, field.dat.data_ro)
+
+
+@pytest.mark.newer_firedrake
+def test_run_fwi_inverts_the_lame_parameters_with_density_held_fixed(
+    tmp_path, monkeypatch,
+):
+    """A subset of the set in use is an inversion of its own.
+
+    Density is left out of the controls, so it has to come out of the run
+    untouched while the two Lame parameters are fitted.
+    """
+    vmin = [1.0, 0.5]
+    vmax = [20.0, 10.0]
+    fwi = build_inversion(
+        tmp_path, monkeypatch,
+        guess_material=LAME_GUESS_MATERIAL,
+        real_material=LAME_REAL_MATERIAL,
+    )
+    fwi.enable_automated_adjoint(
+        control_parameters={Parameter.LAMBDA, Parameter.MU},
+    )
+
+    assert [control.name() for control in fwi.control_parameters] == [
+        Parameter.LAMBDA.value,
+        Parameter.MU.value,
+    ]
+    density_before = np.array(fwi.wave.rho.dat.data_ro)
+
+    result = fwi.run_fwi(vmin=vmin, vmax=vmax, maxiter=3)
+
+    assert len(result) == 2
+    for control, low, high, start in zip(
+        result, vmin, vmax,
+        (LAME_GUESS_MATERIAL["lambda"], LAME_GUESS_MATERIAL["mu"]),
+    ):
+        values = control.dat.data_ro
+        assert values.min() >= low - 1e-10
+        assert values.max() <= high + 1e-10
+        assert not np.allclose(values, start), (
+            f"{control.name()} was left where it started."
+        )
+
+    assert fwi.functional_history[-1] < fwi.functional_history[0]
+    # Not a control, so nothing in the run had any business moving it.
+    assert np.allclose(fwi.wave.rho.dat.data_ro, density_before)
 
 
 def test_run_fwi_without_the_automated_adjoint_is_refused(

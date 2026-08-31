@@ -1,9 +1,47 @@
 """The named physical fields a wave equation is written in terms of."""
 
-from collections.abc import Set
+from collections.abc import Mapping, Set
 from enum import Enum
 
 import firedrake as fire
+
+
+def as_list(value):
+    """Return one value or a collection of them as a list.
+
+    Material values travel in three shapes -- a bare value, a sequence of
+    them, or a container keying each one by the parameter it belongs to -- and
+    most of what is done with them does not care which. This is where the
+    three meet: a keyed container contributes its values, in its own order, so
+    everything downstream can just iterate.
+
+    Parameters
+    ----------
+    value : object, mapping, PhysicalParameters, list, tuple, or None
+        Value to normalize. Anything keyed by name contributes its values,
+        and ``None`` produces an empty list.
+
+    Returns
+    -------
+    list
+        Normalized values.
+
+    Examples
+    --------
+    >>> as_list(None)
+    []
+    >>> len(as_list(velocity_model))
+    1
+    >>> as_list(parameters) == list(parameters.values())
+    True
+    """
+    if value is None:
+        return []
+    if isinstance(value, (Mapping, PhysicalParameters)):
+        return list(value.values())
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value]
 
 
 def _as_parameter(name):

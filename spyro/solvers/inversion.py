@@ -1,5 +1,6 @@
 import firedrake as fire
 import warnings
+from collections.abc import Mapping
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI
 from pyadjoint import MinimizationProblem, TAOSolver
@@ -16,7 +17,7 @@ from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..utils.typing import AdjointType, WaveType
-from ..utils.physical_parameters import PhysicalParameters
+from ..utils.physical_parameters import PhysicalParameters, as_list
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import parallel_print
 from ..io.basicio import load_shots, save_shots
@@ -293,9 +294,15 @@ class FullWaveformInversion:
     --------
     An acoustic inversion has one control, its velocity model, and that single
     ``Function`` is what :attr:`control_parameters` gives back. An isotropic
-    elastic one is inverted for several parameters at once -- density and the
-    two wave speeds, or density and the Lame parameters, whichever set the
-    equation is written in -- and those come back as a list, in the order
+    elastic one is written in terms of density and the two wave speeds, or
+    density and the Lame parameters, and it is inverted for any subset of
+    whichever of those two sets the equation is currently written in: all
+    three by default, or the two Lame parameters with density held fixed, or
+    the s-wave velocity alone. The other set is computed from the one in use,
+    so it cannot be selected without rewriting the equation in it first --
+    which is the solver's decision, made through
+    ``set_physical_parameterization``, before anything selects controls within
+    it. Several controls come back as a list, in the order
     :meth:`_controlled_parameters` puts them. Everything the optimizers see is
     shaped by that: the bounds take one entry per control, the derivatives come
     back one per control, and ``run_fwi`` returns the controls it converged on.
@@ -511,31 +518,6 @@ class FullWaveformInversion:
             return field
         return fields
 
-    def _as_control_list(self, control):
-        """Return control values as a list, however they were presented.
-
-        Parameters
-        ----------
-        control : firedrake.Function, mapping, iterable, or None
-            Controls in any of the shapes this driver hands around: a bare
-            field, one field per controlled parameter, or a container keyed by
-            parameter. ``None`` gives an empty list.
-
-        Returns
-        -------
-        list
-            The values, in the order they were given.
-        """
-        if control is None:
-            return []
-        # A container keyed by parameter is told apart by whether it has
-        # items(), the same way ``_control_by_parameter`` does it.
-        if hasattr(control, "items"):
-            return list(control.values())
-        if isinstance(control, (list, tuple)):
-            return list(control)
-        return [control]
-
     def _as_control_values(self, values):
         """Return optimizer output in the shape :meth:`set_guess_control` takes.
 
@@ -554,7 +536,7 @@ class FullWaveformInversion:
         firedrake.Function, list of firedrake.Function, or mapping
             The same values, as fields.
         """
-        if hasattr(values, "items"):
+        if isinstance(values, (Mapping, PhysicalParameters)):
             return values
         fields = values if isinstance(values, (list, tuple)) else [values]
         if all(
@@ -797,7 +779,7 @@ class FullWaveformInversion:
         """
         if control is None:
             raise ValueError("No control parameter has been configured.")
-        fields = self._as_control_list(control)
+        fields = as_list(control)
         for field in fields:
             if not isinstance(field, fire.Function):
                 raise TypeError(
@@ -836,7 +818,7 @@ class FullWaveformInversion:
         ValueError
             If the vector size does not match the control references.
         """
-        references = self._as_control_list(control_reference)
+        references = as_list(control_reference)
         for reference in references:
             if not isinstance(reference, fire.Function):
                 raise TypeError(
@@ -1200,7 +1182,7 @@ class FullWaveformInversion:
         self.wave.forward_solve()
         current_control = self.control_parameters
         fire.VTKFile(f"control_{self.current_iteration}.pvd").write(
-            *self._as_control_list(current_control),
+            *as_list(current_control),
         )
         np.save(
             f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
@@ -1616,7 +1598,7 @@ class FullWaveformInversion:
         self._apply_gradient_mask()
         if save:
             fire.VTKFile(f"gradient_{self.current_iteration}.pvd").write(
-                *self._as_control_list(self.gradient),
+                *as_list(self.gradient),
             )
         self.current_iteration += 1
         comm.comm.barrier()
@@ -1782,7 +1764,7 @@ class FullWaveformInversion:
             self.set_guess_control(self.control_parameter_result)
 
         fire.VTKFile("control_end.pvd").write(
-            *self._as_control_list(self.control_parameter_result),
+            *as_list(self.control_parameter_result),
         )
 
         np.save("result", self._flatten_control(self.control_parameter_result))
@@ -1901,7 +1883,7 @@ class FullWaveformInversion:
         ValueError
             If a sequence of bounds does not have one entry per control.
         """
-        fields = self._as_control_list(control_reference)
+        fields = as_list(control_reference)
         if np.isscalar(bound):
             return [float(bound)] * len(fields)
 
@@ -1964,7 +1946,7 @@ class FullWaveformInversion:
         list of firedrake.Function
             The last iterate, one field per control.
         """
-        fields = self._as_control_list(control_reference)
+        fields = as_list(control_reference)
         iterate = [field.copy(deepcopy=True) for field in fields]
         interface = PETScVecInterface(
             tuple(fields), comm=self.wave.comm.comm,
@@ -2178,7 +2160,7 @@ class FullWaveformInversion:
         """
         if not self.has_gradient_mask:
             return
-        if hasattr(self.gradient, "items"):
+        if isinstance(self.gradient, PhysicalParameters):
             # One derivative per controlled parameter, keyed by it: each one
             # lives on the same mesh and is masked the same way.
             for name, derivative in list(self.gradient.items()):

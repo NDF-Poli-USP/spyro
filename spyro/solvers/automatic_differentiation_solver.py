@@ -12,30 +12,7 @@ from checkpoint_schedules import (
     SingleMemoryStorageSchedule,
     StorageType,
 )
-from ..utils.physical_parameters import PhysicalParameters
-
-
-def _as_list(value: object) -> list:
-    """Return one value or collection as a list.
-
-    Parameters
-    ----------
-    value : object, mapping, PhysicalParameters, list, tuple, or None
-        Value to normalize. Anything keyed by name contributes its values,
-        and ``None`` produces an empty list.
-
-    Returns
-    -------
-    list
-        Normalized values.
-    """
-    if value is None:
-        return []
-    if isinstance(value, (Mapping, PhysicalParameters)):
-        return list(value.values())
-    if isinstance(value, (list, tuple)):
-        return list(value)
-    return [value]
+from ..utils.physical_parameters import PhysicalParameters, as_list
 
 
 class AutomatedAdjoint:
@@ -181,7 +158,7 @@ pyadjoint.ReducedFunctional or None
             self.control_parameter_names = list(controls)
             self.controls = list(controls.values())
         else:
-            self.controls = _as_list(controls)
+            self.controls = as_list(controls)
             self.control_parameter_names = [None] * len(self.controls)
         self._checkpointing = bool(checkpointing)
         self._snapshots = snapshots
@@ -399,7 +376,7 @@ pyadjoint.ReducedFunctional or None
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
-        return self.reduced_functional(_as_list(control_value))
+        return self.reduced_functional(as_list(control_value))
 
     def compute_gradient(self) -> object:
         """Return the gradient of the functional.
@@ -474,7 +451,7 @@ pyadjoint.ReducedFunctional or None
             )
         return PhysicalParameters(zip(
             self.control_parameter_names,
-            _as_list(derivatives),
+            as_list(derivatives),
         ))
 
     def verify_gradient(
@@ -519,7 +496,7 @@ pyadjoint.ReducedFunctional or None
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
-        control_var = _as_list(control_var)
+        control_var = as_list(control_var)
         if direction is None:
             direction = []
             for control in control_var:
@@ -527,7 +504,7 @@ pyadjoint.ReducedFunctional or None
                 perturbation.interpolate(0.01)
                 direction.append(perturbation)
         else:
-            direction = _as_list(direction)
+            direction = as_list(direction)
         if len(control_var) != len(direction):
             raise ValueError(
                 "Each control requires exactly one perturbation direction.",
@@ -541,7 +518,7 @@ pyadjoint.ReducedFunctional or None
         # ``min(residuals) < 1E-15`` raises ``UFL conditions cannot be
         # evaluated as bool in a Python context``.
         if dJdm is not None and not isinstance(dJdm, (int, float)):
-            derivatives = _as_list(dJdm)
+            derivatives = as_list(dJdm)
             if len(derivatives) != len(direction):
                 raise ValueError(
                     "Each control requires exactly one derivative.",
