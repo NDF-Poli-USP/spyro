@@ -387,7 +387,11 @@ def analytical_force_source_3d(
 
         ui[k] = u_near + P_far - S_far
 
-    return ui
+    shifted_replacement = ui.copy()
+    shifted_replacement[:-1] = ui[1:nt + 1]
+    shifted_replacement[0] = 0.0
+
+    return shifted_replacement
 
 
 def analytical_explosive_source(
