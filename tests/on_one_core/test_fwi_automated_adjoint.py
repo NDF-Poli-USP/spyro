@@ -277,10 +277,10 @@ def test_tao_bounds_are_one_pair_per_control(tmp_path, monkeypatch):
     fwi = build_inversion(tmp_path, monkeypatch)
     control = fwi.control_parameters
 
-    assert fwi._tao_bound(2.5, control) == 2.5
+    assert fwi._tao_bounds(2.5, control) == [2.5]
 
     varying = np.linspace(2.0, 3.0, control.dat.data_ro.size)
-    bound = fwi._tao_bound(varying, control)
+    (bound,) = fwi._tao_bounds(varying, control)
     assert isinstance(bound, fire.Function)
     assert bound.function_space() == control.function_space()
     assert np.allclose(bound.dat.data_ro, varying)

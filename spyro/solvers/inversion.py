@@ -444,9 +444,26 @@ class FullWaveformInversion:
         self.wave_type = self.wave.wave_type
 
         self.adjoint_type = adjoint_type
-        self._adjoint_options = self._validated_adjoint_options(
-            adjoint_type, adjoint_options,
-        )
+        # The settings are applied on the first forward solve, a long way from
+        # where they were written, so a name that is not a setting is rejected
+        # here instead of being silently ignored there.
+        self._adjoint_options = dict(adjoint_options or {})
+        if self._adjoint_options:
+            if adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
+                raise ValueError(
+                    "adjoint_options configures the automated adjoint, so it "
+                    "needs adjoint_type=AdjointType.AUTOMATED_ADJOINT. "
+                    f"Received {adjoint_type}.",
+                )
+            accepted = set(
+                inspect.signature(Wave.enable_automated_adjoint).parameters,
+            ) - {"self"}
+            unknown = sorted(set(self._adjoint_options) - accepted)
+            if unknown:
+                raise ValueError(
+                    f"{unknown} are not settings of the automated adjoint, "
+                    f"which takes {sorted(accepted)}.",
+                )
 
         self.input_dictionary = self.wave.input_dictionary
         self.comm = self.wave.comm
@@ -506,53 +523,6 @@ class FullWaveformInversion:
         self.has_gradient_mask = False
         self.gradient_mask_available = False
         self.functional_history = []
-
-    @staticmethod
-    def _validated_adjoint_options(adjoint_type, adjoint_options):
-        """Check automated-adjoint settings before anything can use them.
-
-        They are applied on the first forward solve, which can be a long way
-        from where they were written, so a name that is not a setting is
-        rejected here instead of being silently ignored there.
-
-        Parameters
-        ----------
-        adjoint_type : AdjointType
-            The adjoint the settings are meant for.
-        adjoint_options : dict or None
-            Settings as given to the constructor.
-
-        Returns
-        -------
-        dict
-            The settings, or an empty one.
-
-        Raises
-        ------
-        ValueError
-            If settings are given for an adjoint that has none, or a name is
-            not one the solver's ``enable_automated_adjoint`` takes.
-        """
-        if not adjoint_options:
-            return {}
-        if adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
-            raise ValueError(
-                "adjoint_options configures the automated adjoint, so it "
-                "needs adjoint_type=AdjointType.AUTOMATED_ADJOINT. Received "
-                f"{adjoint_type}.",
-            )
-        accepted = set(
-            inspect.signature(
-                Wave.enable_automated_adjoint,
-            ).parameters,
-        ) - {"self"}
-        unknown = sorted(set(adjoint_options) - accepted)
-        if unknown:
-            raise ValueError(
-                f"{unknown} are not settings of the automated adjoint, which "
-                f"takes {sorted(accepted)}.",
-            )
-        return dict(adjoint_options)
 
     def _sync_wave_real_shot_record(self):
         """Copy observed data from the FWI driver to the wave solver.
@@ -1893,7 +1863,16 @@ class FullWaveformInversion:
                 "limit or loosen the tolerances through 'tao_options' if the "
                 "inversion is meant to run to convergence.",
             )
-            solution = self._control_from_tao(solver, adjoint_controls)
+            # TAO raises before handing the iterate back, and holds it as
+            # one vector with every control concatenated into it. Reading it
+            # through an interface built from those same controls lays them
+            # out the way the solver's own does.
+            solution = [
+                control.copy(deepcopy=True) for control in adjoint_controls
+            ]
+            PETScVecInterface(
+                tuple(adjoint_controls), comm=self.wave.comm.comm,
+            ).from_petsc(solver.tao.getSolution(), solution)
         # The tape knows which parameter each control is; the optimizer only
         # ever saw a vector, and hands back the same order it was given.
         return automated_adjoint.label_derivatives(solution)
@@ -1934,70 +1913,19 @@ class FullWaveformInversion:
         bounds = list(bound)
         if len(controls) == 1 and len(bounds) != 1:
             # A lone control takes its bounds one per degree of freedom.
-            return [self._tao_bound(bound, controls[0])]
+            bounds = [bound]
         if len(bounds) != len(controls):
             raise ValueError(
                 f"This inversion controls {len(controls)} parameters, so its "
                 f"bounds take that many entries; {len(bounds)} were given.",
             )
         return [
-            self._tao_bound(value, control)
+            float(value) if np.isscalar(value)
+            else self._rebuild_control_from_vector(
+                control, self._expand_bound(value, control),
+            )
             for value, control in zip(bounds, controls)
         ]
-
-    def _tao_bound(self, bound, control_reference):
-        """Return one control's bound in the form TAO takes it.
-
-        Parameters
-        ----------
-        bound : scalar or array_like
-            Bound value for one control.
-        control_reference : firedrake.Function
-            Control whose function space an array bound is rebuilt in.
-
-        Returns
-        -------
-        float or firedrake.Function
-            The bound as a scalar, broadcast by TAO over the control, or as
-            a ``Function`` in the control's own space when it varies per
-            degree of freedom.
-        """
-        if np.isscalar(bound):
-            return float(bound)
-        return self._rebuild_control_from_vector(
-            control_reference,
-            self._expand_bound(bound, control_reference),
-        )
-
-    def _control_from_tao(self, solver, control_reference):
-        """Read the current iterate out of a TAO solver.
-
-        Used when TAO stops without converging, where the solver raises before
-        handing the solution back. TAO holds the iterate as one vector with
-        every control concatenated into it, so it is read back through an
-        interface built from those same controls, which lays them out the same
-        way the solver's own does.
-
-        Parameters
-        ----------
-        solver : pyadjoint.TAOSolver
-            Solver whose solution vector is read.
-        control_reference : list of firedrake.Function
-            Controls, in the order TAO holds them, whose function spaces the
-            vector is read into.
-
-        Returns
-        -------
-        list of firedrake.Function
-            The last iterate, one value per control.
-        """
-        controls = as_list(control_reference)
-        iterate = [control.copy(deepcopy=True) for control in controls]
-        interface = PETScVecInterface(
-            tuple(controls), comm=self.wave.comm.comm,
-        )
-        interface.from_petsc(solver.tao.getSolution(), iterate)
-        return iterate
 
     def _tao_monitor(self, tao):
         """Record one TAO iteration, mirroring what ``get_functional`` logs.
