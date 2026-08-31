@@ -102,6 +102,7 @@ def run_elastic_forward(dt):
     return l2_error, wave.comm
 
 
+@pytest.mark.parallel(2)
 @pytest.mark.slow
 def test_second_order_time_convergence():
     """Test that the second order time convergence is achieved."""
