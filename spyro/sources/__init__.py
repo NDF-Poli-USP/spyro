@@ -6,7 +6,6 @@ from .Sources import (
     ricker_wavelet,
     timedependentSource,
     ricker_integral,
-    ricker_derivative,
 )
 
 __all__ = [
@@ -15,5 +14,4 @@ __all__ = [
     "full_ricker_wavelet",
     "timedependentSource",
     "ricker_integral",
-    "ricker_derivative",
 ]
