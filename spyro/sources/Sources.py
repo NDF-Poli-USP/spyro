@@ -287,13 +287,3 @@ def ricker_integral(
     """Get source time function (integral of Ricker wavelet)."""
     a = np.pi * frequency * (t - time_delay)
     return (t - time_delay) * np.exp(-(a**2))
-
-
-def ricker_derivative(
-    frequency: float,
-    t: float,
-    time_delay: float,
-):
-    """Get derivative of source time function (Ricker wavelet)."""
-    a = np.pi * frequency * (t - time_delay)
-    return (1 - 2 * a**2) * np.exp(-(a**2))

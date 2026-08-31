@@ -7,7 +7,6 @@ from spyro.tools.error_measure import MeasureError
 from spyro.utils.analytical_solution_nodal import (
     analytical_explosive_source,
     analytical_force_source_3d,
-    analytical_solution_elastic,
 )
 
 
@@ -64,7 +63,7 @@ def test_analytical_solution(use_vertex_only_mesh):
 
 def test_analytical_force_source_3d_offset_symmetry():
     """Tests analytical force source.
-    
+
     It should have the same result with the same abs distance from
     the source.
     """

@@ -8,7 +8,6 @@ from ..sources import (
     full_ricker_wavelet,
     ricker_wavelet,
     ricker_integral,
-    ricker_derivative,
 )
 from .typing import SourceType
 
@@ -346,9 +345,8 @@ def analytical_force_source_3d(
     delta_ij = 1 if i == j else 0
 
     def X0(t):
-        """Source time function (Ricker wavelet derivative)."""
-        a = np.pi * frequency * (t - time_delay)
-        return (1 - 2 * a**2) * np.exp(-(a**2))
+        """Wrap derivative of source time function (Ricker wavelet)."""
+        return ricker_wavelet(t, frequency, delay=time_delay, delay_type="time")
 
     # Initialize displacement components
     ui = np.zeros(nt)
@@ -481,7 +479,7 @@ def analytical_explosive_source(
 
     def w_dot(t):
         """Wrap derivative of source time function (Ricker wavelet)."""
-        return ricker_derivative(frequency, t, time_delay)
+        return ricker_wavelet(t, frequency, delay=time_delay, delay_type="time")
 
     # Initialize displacement components
     ui = np.zeros(nt)
