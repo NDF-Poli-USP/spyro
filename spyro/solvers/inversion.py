@@ -639,24 +639,6 @@ class FullWaveformInversion:
         except ValueError:
             return wave.initialize_physical_parameters()
 
-    def _controllable_parameters(self):
-        """Return the parameters this inversion's solver could be inverted for.
-
-        Only the parameters the wave equation is *written in* can be moved:
-        the rest are computed from those and carry no values of their own.
-
-        Returns
-        -------
-        PhysicalParameters
-            The parameters that can carry a control.
-
-        Raises
-        ------
-        ValueError
-            If the solver has no parameters, and nothing to build them from.
-        """
-        return self._physical_parameters_of(self.wave).select()
-
     def _controlled_parameters(self):
         """Return the parameters being inverted for.
 
@@ -693,7 +675,10 @@ class FullWaveformInversion:
         if self._control_parameters:
             return tuple(self._control_parameters)
         try:
-            controllable = self._controllable_parameters()
+            # Only the parameters the equation is written in can be controls;
+            # the rest are computed from those and carry no values of their
+            # own to move.
+            controllable = self._physical_parameters_of(self.wave).select()
         except ValueError:
             controllable = type(self.wave)._physical_parameter_names
         return tuple(sorted(controllable, key=lambda p: p.value))
