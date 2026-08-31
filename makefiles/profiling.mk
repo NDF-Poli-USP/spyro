@@ -6,7 +6,6 @@
 
 # Directory for all profiling output
 PROFILERS_DIR := profilers
-$(shell mkdir -p $(PROFILERS_DIR))
 
 # Validation function to check if FILE is provided
 define check_file
@@ -40,6 +39,7 @@ PROFILE_PNG := $(PROFILERS_DIR)/memory_profile_$(PROFILE_ROOT)$(PROFILE_SUFFIX)_
 # CPU profiling with pyinstrument - always generates HTML
 # Usage: make profile-cpu FILE=path/to/file.py [FUNCTION=def_name]
 profile-cpu:
+	@mkdir -p $(PROFILERS_DIR)
 	$(call check_file,profile-cpu)
 	@echo "========================================="
 	@echo "CPU Profiling with pyinstrument"
@@ -70,6 +70,7 @@ profile-cpu:
 # Memory profiling with mprof - always generates PNG
 # Usage: make profile-memory FILE=path/to/file.py [FUNCTION=def_name]
 profile-memory:
+	@mkdir -p $(PROFILERS_DIR)
 	$(call check_file,profile-memory)
 	@echo "========================================="
 	@echo "Memory Profiling with mprof"
@@ -103,6 +104,7 @@ profile-memory:
 # CPU profiling for an MPI run
 # Usage: make profile-cpu-mpi FILE=path/to/file.py [FUNCTION=def_name] [MPI_NPROCS=4]
 profile-cpu-mpi:
+	@mkdir -p $(PROFILERS_DIR)
 	$(call check_file,profile-cpu-mpi)
 	@echo "========================================="
 	@echo "CPU Profiling with MPI"
@@ -129,6 +131,7 @@ profile-cpu-mpi:
 # Memory profiling for an MPI run
 # Usage: make profile-memory-mpi FILE=path/to/file.py [FUNCTION=def_name] [MPI_NPROCS=4]
 profile-memory-mpi:
+	@mkdir -p $(PROFILERS_DIR)
 	$(call check_file,profile-memory-mpi)
 	@echo "========================================="
 	@echo "Memory Profiling with MPI"
