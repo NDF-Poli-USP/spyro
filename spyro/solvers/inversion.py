@@ -18,6 +18,7 @@ from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..utils.typing import AdjointType, WaveType
 from ..utils.physical_parameters import PhysicalParameters, as_list
+from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import parallel_print
 from ..io.basicio import load_shots, save_shots
@@ -284,7 +285,8 @@ class FullWaveformInversion:
         freedom.
     Automated adjoint
         Algorithmic differentiation through :mod:`firedrake.adjoint`, asked
-        for with ``adjoint_type``. The forward solve is recorded on
+        for with ``run_fwi(adjoint_type=...)``. The forward solve is recorded
+        on
         a pyadjoint tape *once*; the resulting reduced functional replays it
         for every new control, so the driver does not re-run the forward solve
         itself. The controls stay ``Function``\\ s and the optimization is done
@@ -298,27 +300,19 @@ class FullWaveformInversion:
     density and the Lame parameters, and it is inverted for any subset of
     whichever of those two sets the equation is currently written in: all
     three by default, or the two Lame parameters with density held fixed, or
-    the s-wave velocity alone. The other set is computed from the one in use,
-    so it cannot be selected without rewriting the equation in it first --
-    which is the solver's decision, made through
-    ``set_physical_parameterization``, before anything selects controls within
-    it. Several controls come back as a list, in the order
-    :meth:`_controlled_parameters` puts them. Everything the optimizers see is
-    shaped by that: the bounds take one entry per control, the derivatives come
-    back one per control, and ``run_fwi`` returns the controls it converged on.
+    the s-wave velocity alone.
 
-    Which parameters an elastic inversion runs on is chosen when it is
-    constructed::
+    Which parameters an elastic inversion runs on is chosen where the
+    inversion is run::
 
-        fwi = spyro.FullWaveformInversion(
-            dictionary=config_dict,
-            wave_class=spyro.IsotropicWave,
+        fwi.run_fwi(
             adjoint_type=AdjointType.AUTOMATED_ADJOINT,
             adjoint_options={
                 "control_parameters": {
                     ElasticMaterialParameter.S_WAVE_VELOCITY,
                 },
             },
+            vmin=..., vmax=..., maxiter=20,
         )
 
     Methods
@@ -363,8 +357,7 @@ class FullWaveformInversion:
     """
 
     def __init__(
-        self, dictionary=None, comm=None, wave_class=AcousticWave, wave=None,
-        adjoint_type=AdjointType.NONE, adjoint_options=None,
+        self, dictionary=None, comm=None, wave_class=AcousticWave, wave=None
     ):
         """Initialize the full waveform inversion driver.
 
@@ -385,42 +378,6 @@ class FullWaveformInversion:
             driver uses this instance directly and infers ``wave_class`` from
             its type. The instance must be a :class:`Wave` with
             :attr:`WaveType.ISOTROPIC_ACOUSTIC`.
-        adjoint_type : AdjointType, optional
-            Which adjoint the inversion differentiates with.
-            :attr:`AdjointType.AUTOMATED_ADJOINT` records the material fields
-            on a pyadjoint tape, and is the only adjoint an elastic medium
-            has. The default leaves the choice to the solver, which is the
-            hand-written adjoint it enables on first use.
-        adjoint_options : dict, optional
-            Settings for the automated adjoint, taking the keyword arguments
-            of the solver's ``enable_automated_adjoint``:
-            ``control_parameters``, ``checkpointing``, ``snapshots`` and
-            ``gc_timestep_frequency``. Rejected here, rather than at the first
-            solve, if a name is not one of those.
-
-        Raises
-        ------
-        ValueError
-            If ``adjoint_options`` is given without the automated adjoint, or
-            names a setting the automated adjoint does not take.
-
-        Notes
-        -----
-        The automated adjoint cannot be switched on here: it records the
-        material parameters as controls, and those are fields, which need a
-        mesh and a model that a driver being constructed does not have yet.
-        What is set here is the intent, and the solver is configured from it
-        on the first forward solve. This is the only way to ask for it: an
-        inversion does not change adjoint halfway through.
-
-        Examples
-        --------
-        >>> fwi = spyro.FullWaveformInversion(
-        ...     dictionary=config_dict,
-        ...     wave_class=spyro.IsotropicWave,
-        ...     adjoint_type=AdjointType.AUTOMATED_ADJOINT,
-        ...     adjoint_options={"checkpointing": True, "snapshots": 10},
-        ... )
         """
         if wave is not None:
             if not isinstance(wave, Wave):
@@ -443,27 +400,10 @@ class FullWaveformInversion:
             self.wave = self.wave_class(dictionary=dictionary, comm=comm)
         self.wave_type = self.wave.wave_type
 
-        self.adjoint_type = adjoint_type
-        # The settings are applied on the first forward solve, a long way from
-        # where they were written, so a name that is not a setting is rejected
-        # here instead of being silently ignored there.
-        self._adjoint_options = dict(adjoint_options or {})
-        if self._adjoint_options:
-            if adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
-                raise ValueError(
-                    "adjoint_options configures the automated adjoint, so it "
-                    "needs adjoint_type=AdjointType.AUTOMATED_ADJOINT. "
-                    f"Received {adjoint_type}.",
-                )
-            accepted = set(
-                inspect.signature(Wave.enable_automated_adjoint).parameters,
-            ) - {"self"}
-            unknown = sorted(set(self._adjoint_options) - accepted)
-            if unknown:
-                raise ValueError(
-                    f"{unknown} are not settings of the automated adjoint, "
-                    f"which takes {sorted(accepted)}.",
-                )
+        # Which adjoint to differentiate with is settled by ``run_fwi``, and
+        # the solver is configured from it by the first forward solve.
+        self.adjoint_type = AdjointType.NONE
+        self._adjoint_options = {}
 
         self.input_dictionary = self.wave.input_dictionary
         self.comm = self.wave.comm
@@ -553,7 +493,7 @@ class FullWaveformInversion:
         How they are presented depends on the physics: an acoustic medium is
         described by its velocity model alone, so its control is that single
         ``Function``, which is the API acoustic FWI has always had. An
-        isotropic elastic medium is inverted for several parameters at once --
+        isotropic elastic medium is inverted for multiple parameters at once --
         density and the two wave speeds, or density and the Lame parameters,
         depending on which set the equation is written in -- and those come
         back as a list, ordered the same way as
@@ -562,7 +502,7 @@ class FullWaveformInversion:
         Returns
         -------
         firedrake.Function or list of firedrake.Function or None
-            The single control, a list of them when several parameters are
+            The single control, a list of them when multiple parameters are
             inverted for, or ``None`` if none is configured.
 
         Examples
@@ -694,7 +634,7 @@ class FullWaveformInversion:
         Raises
         ------
         ValueError
-            If a bare value is given while several parameters are controlled,
+            If a bare value is given while multiple parameters are controlled,
             since there is then no way to tell which one it means.
 
         Examples
@@ -753,7 +693,7 @@ class FullWaveformInversion:
         ------
         ValueError
             If the solver has no material parameters yet and no model to
-            build them from, and several parameters are controlled. Only the
+            build them from, and multiple parameters are controlled. Only the
             acoustic velocity model can be created here.
         """
         # A value is applied by writing into the ``Function`` carrying the
@@ -989,9 +929,10 @@ class FullWaveformInversion:
 
         Parameters
         ----------
-        material : mapping, firedrake.Function, firedrake.Constant, scalar, or iterable
+        material : mapping, firedrake.Function, firedrake.Constant, scalar, UFL expression, str, or iterable
             True material values, keyed by material parameter or given one per
-            parameter of the medium.
+            parameter of the medium. A string is read as a formula in the mesh
+            coordinates, such as ``"2.0 + 0.5*tanh(x)"``.
 
         Returns
         -------
@@ -1001,7 +942,8 @@ class FullWaveformInversion:
         Raises
         ------
         ValueError
-            If ``material`` holds no value.
+            If ``material`` holds no value, or a string is given before the
+            mesh it is written on.
 
         Examples
         --------
@@ -1026,6 +968,20 @@ class FullWaveformInversion:
         # carrying the true model into the guess it is meant to invert.
         real_parameters = PhysicalParameters()
         for name, value in material.items():
+            if isinstance(value, str):
+                # A formula in the mesh coordinates, the way
+                # ``set_real_velocity_model(expression=...)`` takes one. It
+                # is resolved here because it needs the mesh it is written
+                # on, which the values themselves never carry.
+                if self.real_mesh is None:
+                    raise ValueError(
+                        "A material expression is written in the mesh "
+                        "coordinates, so it needs one: call set_real_mesh() "
+                        "before set_real_model().",
+                    )
+                value = generate_ufl_functions(
+                    self.real_mesh, value, self.wave.dimension,
+                )
             real_parameters.add(name, value)
         self._real_model_parameters = real_parameters
 
@@ -1370,7 +1326,20 @@ class FullWaveformInversion:
         -----
         Only one of the parameters (constant, conditional, velocity_model_function,
         expression, or new_file) should be provided.
+
+        .. deprecated::
+            Use :meth:`set_real_model` instead, which takes the same values
+            for a medium of any kind rather than for a velocity model alone.
         """
+        warnings.warn(
+            "set_real_velocity_model() is acoustic-only and is being "
+            "replaced by set_real_model(), which takes the material values "
+            "of any medium: set_real_model(3.0) for a constant, "
+            "set_real_model(conditional) for a field, or a mapping keyed by "
+            "material parameter for a medium with more than one.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.wave.set_initial_velocity_model(
             constant=constant,
             conditional=conditional,
@@ -1596,7 +1565,7 @@ class FullWaveformInversion:
         differentiating the recorded tape when the automated adjoint is
         enabled.
 
-        An inversion controlling several parameters gets one derivative for
+        An inversion controlling multiple parameters gets one derivative for
         each, keyed by the parameter it belongs to, which is the shape the
         elastic solver returns them in.
         """
@@ -1669,8 +1638,8 @@ class FullWaveformInversion:
             re-runs the forward and adjoint solves for every iterate.
         Automated adjoint
             PETSc TAO, driven by the pyadjoint reduced functional built from a
-            single recorded forward solve. Ask for it with ``adjoint_type``
-            when constructing the inversion.
+            single recorded forward solve. Ask for it with the
+            ``adjoint_type`` argument below.
 
         Parameters
         ----------
@@ -1681,7 +1650,7 @@ class FullWaveformInversion:
                 Lower bound for the control parameter. Default is 1.429. A
                 bound given per degree of freedom becomes a pair of arrays
                 for L-BFGS-B, and a pair of ``Function`` objects for TAO.
-                An inversion controlling several parameters takes one entry
+                An inversion controlling multiple parameters takes one entry
                 per control, since density and a wave speed are not bounded by
                 the same numbers.
             vmax : float or array_like, optional
@@ -1695,6 +1664,19 @@ class FullWaveformInversion:
                 PETSc options for the TAO solver, merged over the defaults
                 ``{"tao_type": "blmvm", "tao_max_it": maxiter}``. Only used
                 under the automated adjoint.
+            adjoint_type : AdjointType, optional
+                Which adjoint to differentiate with.
+                :attr:`AdjointType.AUTOMATED_ADJOINT` records the material
+                parameters on a pyadjoint tape, and is the only adjoint an
+                elastic medium has. The default leaves the choice to the
+                solver, which is the hand-written adjoint it enables on first
+                use.
+            adjoint_options : dict, optional
+                Settings for the automated adjoint, taking the keyword
+                arguments of the solver's ``enable_automated_adjoint``:
+                ``control_parameters``, ``checkpointing``, ``snapshots`` and
+                ``gc_timestep_frequency``. Rejected here, rather than at the
+                first solve, if a name is not one of those.
 
         Returns
         -------
@@ -1733,6 +1715,29 @@ class FullWaveformInversion:
             },
         }
         tao_options = kwargs.pop("tao_options", None)
+        self.adjoint_type = kwargs.pop("adjoint_type", self.adjoint_type)
+        # The settings reach the solver at the first forward solve of the run,
+        # so a name that is not a setting is rejected here instead of being
+        # silently ignored there.
+        self._adjoint_options = dict(
+            kwargs.pop("adjoint_options", None) or self._adjoint_options,
+        )
+        if self._adjoint_options:
+            if self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
+                raise ValueError(
+                    "adjoint_options configures the automated adjoint, so it "
+                    "needs adjoint_type=AdjointType.AUTOMATED_ADJOINT. "
+                    f"Received {self.adjoint_type}.",
+                )
+            accepted = set(
+                inspect.signature(Wave.enable_automated_adjoint).parameters,
+            ) - {"self"}
+            unknown = sorted(set(self._adjoint_options) - accepted)
+            if unknown:
+                raise ValueError(
+                    f"{unknown} are not settings of the automated adjoint, "
+                    f"which takes {sorted(accepted)}.",
+                )
         parameters.update(kwargs)
 
         if (
@@ -1741,8 +1746,9 @@ class FullWaveformInversion:
         ):
             raise NotImplementedError(
                 f"{self.wave_type.name} inversion needs the automated "
-                "adjoint: construct the inversion with "
-                "adjoint_type=AdjointType.AUTOMATED_ADJOINT. The "
+                "adjoint: pass "
+                "adjoint_type=AdjointType.AUTOMATED_ADJOINT to run_fwi(). "
+                "The "
                 "hand-implemented adjoint, and the L-BFGS-B path built on it, "
                 "are only written for acoustic media.",
             )
@@ -1882,7 +1888,7 @@ class FullWaveformInversion:
 
         A scalar bounds every control the same way, which is what an acoustic
         inversion needs and all a single control can mean. An inversion
-        controlling several parameters at once takes one entry per control
+        controlling multiple parameters at once takes one entry per control
         instead -- density, a p-wave velocity and an s-wave velocity are not
         bounded by the same numbers -- and each entry may itself be a scalar
         or vary per degree of freedom. For a single control, a sequence longer

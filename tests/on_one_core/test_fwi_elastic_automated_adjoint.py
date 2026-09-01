@@ -1,7 +1,7 @@
 """Isotropic-elastic FWI driven by the automated adjoint.
 
 An acoustic medium is inverted for one control, its velocity model. An
-isotropic elastic one is inverted for several at once -- density and the two
+isotropic elastic one is inverted for multiple at once -- density and the two
 wave speeds, or density and the Lame parameters, whichever set the equation is
 written in -- and that is what these tests pin down:
 
@@ -144,8 +144,8 @@ def build_inversion(
     real_material : dict, optional
         Material generating the observed data, keyed the same way.
     adjoint_type : AdjointType, optional
-        Adjoint the inversion is built with. Elastic media only have the
-        automated one, which is the default.
+        Adjoint the inversion differentiates with. Elastic media only have
+        the automated one, which is the default.
     adjoint_options : dict, optional
         Settings for it, such as which parameters to invert for.
 
@@ -161,9 +161,11 @@ def build_inversion(
     fwi = spyro.FullWaveformInversion(
         dictionary=build_dictionary(guess_material),
         wave_class=spyro.IsotropicWave,
-        adjoint_type=adjoint_type,
-        adjoint_options=adjoint_options,
     )
+    # What ``run_fwi(adjoint_type=..., adjoint_options=...)`` sets, so that
+    # the tests driving a forward solve without it get the same inversion.
+    fwi.adjoint_type = adjoint_type
+    fwi._adjoint_options = dict(adjoint_options or {})
     if observed_data:
         fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.25})
         fwi.set_real_model({

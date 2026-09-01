@@ -77,10 +77,7 @@ def build_dictionary():
     }
 
 
-def build_inversion(
-    tmp_path, monkeypatch, real_velocity=3.0, guess_velocity=2.5,
-    **constructor_options,
-):
+def build_inversion(tmp_path, monkeypatch, real_velocity=3.0, guess_velocity=2.5):
     """Build an inversion with synthetic observed data.
 
     Every artefact ``FullWaveformInversion`` writes (control snapshots, the
@@ -97,9 +94,6 @@ def build_inversion(
         Velocity of the model generating the observed data.
     guess_velocity : float, optional
         Velocity the inversion starts from.
-    **constructor_options
-        Passed to :class:`spyro.FullWaveformInversion`, so a test can choose
-        the adjoint there rather than switching it on afterwards.
 
     Returns
     -------
@@ -108,9 +102,7 @@ def build_inversion(
         configured.
     """
     monkeypatch.chdir(tmp_path)
-    fwi = spyro.FullWaveformInversion(
-        dictionary=build_dictionary(), **constructor_options,
-    )
+    fwi = spyro.FullWaveformInversion(dictionary=build_dictionary())
 
     fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.25})
     fwi.set_real_velocity_model(constant=real_velocity)
@@ -121,8 +113,12 @@ def build_inversion(
     return fwi
 
 
-def build_automated_inversion(tmp_path, monkeypatch, **adjoint_options):
-    """Build an inversion that differentiates with the automated adjoint.
+def build_automated_inversion(tmp_path, monkeypatch):
+    """Build an inversion set to differentiate with the automated adjoint.
+
+    ``run_fwi`` takes the choice as an argument and sets this attribute; the
+    tests that drive ``get_functional`` and ``get_gradient`` on their own set
+    it themselves.
 
     Parameters
     ----------
@@ -130,8 +126,6 @@ def build_automated_inversion(tmp_path, monkeypatch, **adjoint_options):
         Directory the inversion runs in.
     monkeypatch : _pytest.monkeypatch.MonkeyPatch
         Used to change the working directory.
-    **adjoint_options
-        Settings for the automated adjoint.
 
     Returns
     -------
@@ -139,11 +133,9 @@ def build_automated_inversion(tmp_path, monkeypatch, **adjoint_options):
         Inversion ready to solve. The solver itself is configured by the
         first forward solve, not here.
     """
-    return build_inversion(
-        tmp_path, monkeypatch,
-        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
-        adjoint_options=adjoint_options or None,
-    )
+    fwi = build_inversion(tmp_path, monkeypatch)
+    fwi.adjoint_type = AdjointType.AUTOMATED_ADJOINT
+    return fwi
 
 
 @pytest.mark.newer_firedrake
@@ -168,53 +160,53 @@ def test_the_control_is_the_solvers_own_field(tmp_path, monkeypatch):
 
 
 @pytest.mark.newer_firedrake
-def test_the_adjoint_can_be_chosen_at_construction(tmp_path, monkeypatch):
-    """Choosing the adjoint up front leaves the run looking like any other.
+def test_the_adjoint_and_its_settings_are_chosen_in_run_fwi(
+    tmp_path, monkeypatch,
+):
+    """The choice is an argument of the run, and reaches the tape from there.
 
-    The automated adjoint cannot be switched on at construction -- its
-    controls are fields, and there is no mesh yet -- so the choice is recorded
-    and the solver is configured from it by the first forward solve. Nothing
-    in between has to know.
+    The automated adjoint cannot be switched on before there is a mesh and a
+    model -- its controls are fields -- so what ``run_fwi`` takes is the
+    choice, and the solver is configured from it by the first forward solve
+    of the run.
     """
-    fwi = build_inversion(
-        tmp_path, monkeypatch,
-        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
-        adjoint_options={"checkpointing": True, "snapshots": 3},
-    )
-
-    # Recorded, but nothing built: the solver has no mesh of its own yet.
-    assert fwi.adjoint_type == AdjointType.AUTOMATED_ADJOINT
+    fwi = build_inversion(tmp_path, monkeypatch)
     assert fwi.wave.automated_adjoint is None
 
-    fwi.get_functional()
+    fwi.run_fwi(
+        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        adjoint_options={"checkpointing": True, "snapshots": 3},
+        vmin=2.0, vmax=3.5, maxiter=1,
+    )
 
     assert fwi.wave.adjoint_type == AdjointType.AUTOMATED_ADJOINT
     assert fwi.wave.automated_adjoint._tape is not None
-    # The settings travelled from the constructor to the tape.
+    # The settings travelled from the call to the tape.
     assert fwi.wave.automated_adjoint._checkpointing is True
     assert fwi.wave.automated_adjoint._snapshots == 3
 
 
-def test_adjoint_options_are_checked_at_construction(tmp_path, monkeypatch):
+def test_adjoint_options_are_checked_before_the_run(tmp_path, monkeypatch):
     """A misspelt setting fails where it was written, not at the first solve.
 
     They are applied a long way from here, and silently ignoring one would
     show up only as memory that never came down.
     """
-    monkeypatch.chdir(tmp_path)
+    fwi = build_inversion(tmp_path, monkeypatch)
 
     with pytest.raises(ValueError, match="not settings of the automated"):
-        spyro.FullWaveformInversion(
-            dictionary=build_dictionary(),
+        fwi.run_fwi(
             adjoint_type=AdjointType.AUTOMATED_ADJOINT,
             adjoint_options={"snapshot": 3},
         )
 
+    # A fresh inversion: the choice sticks to the one it was given, so an
+    # inversion already told to use the automated adjoint takes settings for
+    # it without being told again.
+    fwi = build_inversion(tmp_path, monkeypatch)
+
     with pytest.raises(ValueError, match="needs adjoint_type"):
-        spyro.FullWaveformInversion(
-            dictionary=build_dictionary(),
-            adjoint_options={"snapshots": 3},
-        )
+        fwi.run_fwi(adjoint_options={"snapshots": 3})
 
 
 @pytest.mark.newer_firedrake
@@ -297,9 +289,12 @@ def test_run_fwi_optimizes_with_tao_under_the_automated_adjoint(
     rather than let the exception through.
     """
     vmin, vmax = 2.0, 3.5
-    fwi = build_automated_inversion(tmp_path, monkeypatch)
+    fwi = build_inversion(tmp_path, monkeypatch)
 
-    result = fwi.run_fwi(vmin=vmin, vmax=vmax, maxiter=3)
+    result = fwi.run_fwi(
+        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        vmin=vmin, vmax=vmax, maxiter=3,
+    )
 
     # TAO optimizes the control itself, so that is what comes back.
     assert isinstance(result, fire.Function)
