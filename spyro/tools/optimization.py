@@ -211,11 +211,13 @@ class LumpedTAOSolver(OptimizationSolver):
         module docstring for why the consistent map and the projection fight
         each other.
 
-    The initial Hessian
-        pyadjoint injects the Riesz map as LMVM's ``H0``, fixing the scale of
-        the first quasi-Newton step. That is not done here, so PETSc keeps its
-        own dynamic scaling. It is the reason the two solvers take different
-        paths from the same starting point, even where both converge.
+    The initial scaling
+        BLMVM approximates the inverse Hessian from the gradients it has
+        seen, and starts that approximation from an ``H0``. pyadjoint pins
+        ``H0`` to the Riesz map, fixing the scale of the first quasi-Newton
+        step; that is not done here, so PETSc keeps its own dynamic scaling.
+        It is the reason the two solvers take different paths from the same
+        starting point, even where both converge.
 
     Only ``tao_type="blmvm"`` is supported: the lumped metric is there to
     serve the bound projection, and a solver that does not project has no use
@@ -223,9 +225,10 @@ class LumpedTAOSolver(OptimizationSolver):
     type set through ``tao_options`` or the PETSc command line is caught
     rather than silently run with a metric meant for something else.
 
-    No Hessian is registered. BLMVM is a quasi-Newton method: it builds its
-    own limited-memory metric out of the gradients it has been given, and
-    never calls back for a second derivative. Measured over a run of this
+    No Hessian *callback* is registered either, which is a separate thing
+    from that initial scaling: ``H0`` seeds an approximation BLMVM builds
+    itself, whereas the callback would hand it a true second derivative, and
+    a quasi-Newton method never asks for one. Measured over a run of this
     driver, the only callback TAO invokes is the combined
     objective-and-gradient one; the separate two are registered as well
     because a different line search may ask for them on their own.
