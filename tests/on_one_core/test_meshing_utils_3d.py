@@ -3,8 +3,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from spyro.io.basicio import _read_velocity_binary3D
 from spyro.meshing.meshing_utils3D import (
-    _read_velocity_binary3D,
     create_sizing_function3D,
     define_winslow_points_3d,
     sizing_function_xyz,

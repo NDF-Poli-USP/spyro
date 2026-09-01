@@ -160,6 +160,8 @@ class MeshingParameters():  # noqa: UP039
         Whether to extend the SEGY function sizing into the padding region.
     h_padding : float
         Constant padding element size used if extend_segy is False.
+    gmsh_num_threads : int
+        Number of threads used by parallel 3-D Gmsh/HXT meshing. Default is 1.
 
     Notes
     -----
@@ -307,6 +309,7 @@ class MeshingParameters():  # noqa: UP039
             self.segy_axes_order_sort = self.input_mesh_dictionary.get("segy_axes_order_sort", "F")
             self.segy_dtype = self.input_mesh_dictionary.get("segy_dtype", "float32")
             self.gmsh_parallel = self.input_mesh_dictionary.get("gmsh_parallel", False)
+            self.gmsh_num_threads = self.input_mesh_dictionary.get("gmsh_num_threads", 1)
 
         self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh", "gmsh_mesh"}
         self.is_complete = None

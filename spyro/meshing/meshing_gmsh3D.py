@@ -1,5 +1,4 @@
 import numpy as np
-import os
 
 from .meshing_gmsh_3d_functions import (
     boundary_faces_of_volume,
@@ -27,7 +26,6 @@ def build_gmsh_geometry_and_groups3D(
     water_interface,
     water_search_value,
     structured_mesh,
-    minElementSize,
     nz,
     nx,
     ny,
@@ -390,6 +388,7 @@ def configure_gmsh_mesh_size3D(
     nx,
     ny,
     *,
+    gmsh_num_threads=1,
     comm=None,
     parallel_print,
 ):
@@ -433,6 +432,8 @@ def configure_gmsh_mesh_size3D(
         Number of velocity samples in the x direction.
     ny : int
         Number of velocity samples in the y direction.
+    gmsh_num_threads : int
+        Number of threads used by parallel 3-D Gmsh/HXT meshing. Default is 1.
     comm : mpi4py.MPI.Comm or None
         MPI communicator forwarded to rank-aware output.
     parallel_print : callable
@@ -548,8 +549,15 @@ def configure_gmsh_mesh_size3D(
             gmsh.model.mesh.setSizeCallback(mesh_size_callback3D)
 
         if parallel:
-            num_threads = os.cpu_count() or 1
-            parallel_print("Computing mesh size callback for parallel meshing...", comm=comm)
+            num_threads = gmsh_num_threads
+            if num_threads < 1:
+                raise ValueError("gmsh_num_threads must be a positive integer.")
+
+            parallel_print(
+                f"Computing mesh size callback for parallel meshing "
+                f"with {num_threads} Gmsh thread(s)...",
+                comm=comm,
+            )
 
             x_core = np.linspace(bbox[2], bbox[3], nx)
             y_core = np.linspace(bbox[4], bbox[5], ny)
@@ -565,8 +573,6 @@ def configure_gmsh_mesh_size3D(
             sp_data_core[:, 1] = YY_c.ravel()
             sp_data_core[:, 2] = ZZ_c.ravel()
             sp_data_core[:, 3] = size_core
-
-            del XX_c, YY_c, ZZ_c, coords_c, size_core
 
             xmin_pad = -padding_x
             xmax_pad = length_x + padding_x
@@ -647,19 +653,12 @@ def configure_gmsh_mesh_size3D(
             sp_data_pad[:, 2] = ZZ_out
             sp_data_pad[:, 3] = size_pad
 
-            del XX_p, YY_p, ZZ_p, XX_out, YY_out, ZZ_out
-            if not extend_segy:
-                del XX_proj, YY_proj, ZZ_proj, base_size_pad, tx, ty, tz, t
-            del coords_p, size_pad
-
             sp_data_combined = np.vstack((sp_data_core, sp_data_pad))
             total_points = len(sp_data_combined)
 
             sp_list = sp_data_combined.ravel().tolist()
 
-            del sp_data_core, sp_data_pad, sp_data_combined
-
-            parallel_print(f"Loading {total_points} total points into single Gmsh PostView...", comm=comm)
+            parallel_print(f"Loading {total_points} total points into Gmsh PostView...", comm=comm)
             view_tag = gmsh.view.add("background_size")
 
             gmsh.view.addListData(view_tag, "SP", total_points, sp_list)
@@ -669,8 +668,8 @@ def configure_gmsh_mesh_size3D(
             gmsh.model.mesh.field.setNumber(1, "ViewIndex", view_tag)
             gmsh.model.mesh.field.setAsBackgroundMesh(1)
             # Parallel HXT in 3D
-            gmsh.option.setNumber("General.NumThreads", np.int64(num_threads/2))
-            gmsh.option.setNumber("Mesh.MaxNumThreads3D", np.int64(num_threads/2))
+            gmsh.option.setNumber("General.NumThreads", np.int64(num_threads))
+            gmsh.option.setNumber("Mesh.MaxNumThreads3D", np.int64(num_threads))
             # Serialize the boundary mesh generation for deterministic results
             gmsh.option.setNumber("Mesh.MaxNumThreads1D", 1)
             gmsh.option.setNumber("Mesh.MaxNumThreads2D", 1)
