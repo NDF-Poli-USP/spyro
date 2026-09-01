@@ -1,6 +1,5 @@
 """Source utilities for injecting wavelets into simulation meshes."""
 
-import math
 import numpy as np
 from scipy.signal import butter, filtfilt
 from spyro.receivers.dirac_delta_projector import Delta_projector
@@ -184,7 +183,13 @@ def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
         raise ValueError("source not implemented")
 
 
-def ricker_wavelet(t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimum"):
+def ricker_wavelet(
+    t: float,
+    frequency: float,
+    amplitude: float = 1.0,
+    delay: float | int = 1.5,
+    delay_type: str = "multiples_of_minimum",
+):
     """Create a delayed Ricker source function.
 
     The delay is expressed in either multiples of the distance between minima or
@@ -194,13 +199,13 @@ def ricker_wavelet(t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimum
     ----------
     t : float
         Time
-    freq : float
+    frequency : float
         Frequency of the wavelet
-    amp : float
-        Amplitude of the wavelet
-    delay : float
+    amplitude : float, optional
+        Amplitude of the wavelet. Default value of 1.0.
+    delay : float or int
         Delay in term of multiples of the distance
-        between the minimums.
+        between the minimums or in seconds.
     delay_type : string
         Type of delay. Options are:
         - multiples_of_minimum
@@ -212,13 +217,12 @@ def ricker_wavelet(t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimum
         Value of the wavelet at time t
     """
     if delay_type == "multiples_of_minimum":
-        time_delay = delay * math.sqrt(6.0) / (math.pi * freq)
+        time_delay = delay * np.sqrt(6.0) / (np.pi * frequency)
     elif delay_type == "time":
         time_delay = delay
     t = t - time_delay
-    # t = t - delay / freq
-    tt = (math.pi * freq * t) ** 2
-    return amp * (1.0 - (2.0) * tt) * math.exp((-1.0) * tt)
+    tt = (np.pi * frequency * t) ** 2
+    return amplitude * (1.0 - (2.0) * tt) * np.exp((-1.0) * tt)
 
 
 def full_ricker_wavelet(
@@ -273,3 +277,13 @@ def full_ricker_wavelet(
         b, a = butter(order, normal_cutoff, btype="low", analog=False)
         full_wavelet = filtfilt(b, a, full_wavelet)
     return full_wavelet
+
+
+def ricker_integral(
+    frequency: float,
+    t: float,
+    time_delay: float,
+):
+    """Get source time function (integral of Ricker wavelet)."""
+    a = np.pi * frequency * (t - time_delay)
+    return (t - time_delay) * np.exp(-(a**2))
