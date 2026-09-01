@@ -87,6 +87,12 @@ def test_parse_boundary_conditions():
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",
     }
+    d["synthetic_data"] = {
+        "type": "object",
+        "density": 1,
+        "p_wave_velocity": 2,
+        "s_wave_velocity": 3,
+    }
     d["boundary_conditions"] = [
         ("u", 1, fire.Constant((1, 1, 1))),  # x == 0:  1 (z in spyro)
         ("uz", 2, fire.Constant(2)),         # x == Lx: 2 (z in spyro)
@@ -114,6 +120,12 @@ def test_parse_boundary_conditions_exception():
         "length_y": 1.0,
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",
+    }
+    d["synthetic_data"] = {
+        "type": "object",
+        "density": 1,
+        "p_wave_velocity": 2,
+        "s_wave_velocity": 3,
     }
     d["boundary_conditions"] = [
         ("?", 2, fire.Constant(2)),
