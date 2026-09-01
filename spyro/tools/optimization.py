@@ -18,8 +18,9 @@ neighbouring degrees of freedom, so the projected point is not the closest
 feasible point in that metric, and the two fight each other. Lumping the mass
 -- collapsing it to its row sums, which is a diagonal matrix -- makes the
 metric coefficient-wise too, and the two agree again. That is what
-:class:`LumpedTAOSolver` is for; :func:`minimize_with_tao` selects it whenever
-BLMVM is the requested type.
+:class:`LumpedTAOSolver` is for, and it is the only solver here:
+:func:`minimize_with_tao` always uses it, because BLMVM is the only TAO type
+this supports.
 """
 
 import warnings
@@ -27,19 +28,9 @@ import warnings
 import firedrake as fire
 import numpy as np
 
-from pyadjoint import MinimizationProblem, TAOSolver
+from pyadjoint import MinimizationProblem
 from pyadjoint.enlisting import Enlist
 from pyadjoint.optimization.optimization_solver import OptimizationSolver
-from pyadjoint.optimization.tao_solver import (
-    PETScVecInterface,
-    ReducedFunctionalMat,
-    RFOperation,
-    TAOConvergenceError,
-    TAOObjective,
-    _tao_reasons,
-    new_control_variable,
-    valid_comm,
-)
 
 from ..domains.quadrature import quadrature_rules
 from ..utils.physical_parameters import as_list
@@ -124,9 +115,11 @@ class _LumpedRieszMapContext:
     """
 
     def __init__(self, controls, comm=None):
-        comm = valid_comm(comm)
+        tao_solver = _tao_internals()
+
+        comm = tao_solver.valid_comm(comm)
         self.controls = Enlist(controls)
-        self.vec_interface = PETScVecInterface(
+        self.vec_interface = tao_solver.PETScVecInterface(
             tuple(control.control for control in self.controls), comm=comm,
         )
         self.inverse_mass = self.vec_interface.new_petsc()
@@ -191,6 +184,27 @@ def _lumped_riesz_map(controls, comm=None):
     return matrix
 
 
+def _tao_internals():
+    """Return pyadjoint's TAO internals, imported at the point of use.
+
+    :class:`LumpedTAOSolver` is built on names that are internal to
+    pyadjoint's TAO support and have not always been there. Importing them
+    when the module loads would make ``import spyro`` fail wholesale against
+    an older pyadjoint -- and ``spyro.solvers.inversion`` imports this module,
+    so *every* test that touches spyro would fail to collect, whatever it
+    tests. Only an inversion that actually asks for the lumped metric needs
+    them, so only that path pays for their absence.
+
+    Returns
+    -------
+    module
+        ``pyadjoint.optimization.tao_solver``.
+    """
+    from pyadjoint.optimization import tao_solver
+
+    return tao_solver
+
+
 class LumpedTAOSolver(OptimizationSolver):
     """TAO BLMVM with a diagonal metric, for box-constrained inversions.
 
@@ -210,10 +224,18 @@ class LumpedTAOSolver(OptimizationSolver):
         own dynamic scaling. It is the reason the two solvers take different
         paths from the same starting point, even where both converge.
 
-    Restricted to ``tao_type="blmvm"``: the lumped metric is there to serve
-    the bound projection, and a solver that does not project has no use for
-    it. The restriction is checked after the PETSc options are applied, so it
-    also catches a type set from the command line.
+    Only ``tao_type="blmvm"`` is supported: the lumped metric is there to
+    serve the bound projection, and a solver that does not project has no use
+    for it. The type is checked after the PETSc options are applied, so a
+    type set through ``tao_options`` or the PETSc command line is caught
+    rather than silently run with a metric meant for something else.
+
+    No Hessian is registered. BLMVM is a quasi-Newton method: it builds its
+    own limited-memory metric out of the gradients it has been given, and
+    never calls back for a second derivative. Measured over a run of this
+    driver, the only callback TAO invokes is the combined
+    objective-and-gradient one; the separate two are registered as well
+    because a different line search may ask for them on their own.
 
     Parameters
     ----------
@@ -221,12 +243,6 @@ class LumpedTAOSolver(OptimizationSolver):
         The functional to minimize, its controls, and their bounds.
     parameters : dict
         PETSc options for the solver.
-    options_prefix : str, optional
-        Prefix for this solver's PETSc options.
-    appctx : dict, optional
-        User context handed to the Hessian action.
-    Pmat : petsc4py.PETSc.Mat, optional
-        Preconditioner for the Hessian. Defaults to the Hessian itself.
     comm : petsc4py.PETSc.Comm or mpi4py.MPI.Comm, optional
         Communicator the controls are defined over. Under ensemble
         parallelism this is the *spatial* one.
@@ -242,31 +258,24 @@ class LumpedTAOSolver(OptimizationSolver):
 
     See Also
     --------
-    minimize_with_tao : Selects this solver whenever BLMVM is asked for.
+    minimize_with_tao : Drives this solver.
     """
 
-    def __init__(
-        self,
-        problem,
-        parameters,
-        *,
-        options_prefix=None,
-        appctx=None,
-        Pmat=None,
-        comm=None,
-    ):
+    def __init__(self, problem, parameters, *, comm=None):
         from petsc4py import PETSc
         import petsctools
+
+        tao_solver = _tao_internals()
 
         if not isinstance(problem, MinimizationProblem):
             raise TypeError("MinimizationProblem required")
         if problem.constraints is not None:
             raise NotImplementedError("Constraints not implemented")
 
-        comm = valid_comm(comm)
+        comm = tao_solver.valid_comm(comm)
         reduced_functional = problem.reduced_functional
-        tao_objective = TAOObjective(reduced_functional)
-        vec_interface = PETScVecInterface(
+        tao_objective = tao_solver.TAOObjective(reduced_functional)
+        vec_interface = tao_solver.PETScVecInterface(
             tuple(
                 control.control for control in reduced_functional.controls
             ),
@@ -275,18 +284,18 @@ class LumpedTAOSolver(OptimizationSolver):
         tao = PETSc.TAO().create(comm=comm)
 
         def objective(tao_, x):
-            controls = new_control_variable(reduced_functional)
+            controls = tao_solver.new_control_variable(reduced_functional)
             vec_interface.from_petsc(x, controls)
             return tao_objective.objective(controls)
 
         def gradient(tao_, x, g):
-            controls = new_control_variable(reduced_functional)
+            controls = tao_solver.new_control_variable(reduced_functional)
             vec_interface.from_petsc(x, controls)
             derivative = tao_objective.gradient(controls)
             vec_interface.to_petsc(g, derivative)
 
         def objective_gradient(tao_, x, g):
-            controls = new_control_variable(reduced_functional)
+            controls = tao_solver.new_control_variable(reduced_functional)
             vec_interface.from_petsc(x, controls)
             value, derivative = tao_objective.objective_gradient(controls)
             vec_interface.to_petsc(g, derivative)
@@ -296,18 +305,8 @@ class LumpedTAOSolver(OptimizationSolver):
         tao.setGradient(gradient)
         tao.setObjectiveGradient(objective_gradient)
 
-        hessian = ReducedFunctionalMat(
-            reduced_functional,
-            appctx=appctx,
-            action=RFOperation.HESSIAN,
-            comm=comm,
-        )
-        tao.setHessian(
-            hessian.getPythonContext().update,
-            H=hessian,
-            P=Pmat or hessian,
-        )
-
+        # No Hessian is set: BLMVM builds its own limited-memory metric from
+        # the gradients it has seen, and never asks for one.
         inverse_mass = _lumped_riesz_map(
             reduced_functional.controls, comm=comm,
         )
@@ -332,10 +331,7 @@ class LumpedTAOSolver(OptimizationSolver):
             tao.setVariableBounds(lower_vector, upper_vector)
 
         petsctools.set_from_options(
-            tao,
-            parameters=parameters,
-            options_prefix=options_prefix,
-            default_prefix="pyadjoint",
+            tao, parameters=parameters, default_prefix="pyadjoint",
         )
         if tao.getType() != PETSc.TAO.Type.BLMVM:
             raise ValueError(
@@ -391,6 +387,7 @@ class LumpedTAOSolver(OptimizationSolver):
         """
         import petsctools
 
+        tao_solver = _tao_internals()
         controls = self.tao_objective.reduced_functional.controls
         values = tuple(control.tape_value()._ad_copy() for control in controls)
         with petsctools.inserted_options(self.tao):
@@ -402,10 +399,10 @@ class LumpedTAOSolver(OptimizationSolver):
         if reason <= 0:
             # Named rather than numbered: "DIVERGED_MAXITS" tells the caller
             # to raise the iteration limit, "-2" tells them nothing.
-            raise TAOConvergenceError(
+            raise tao_solver.TAOConvergenceError(
                 "LumpedTAOSolver failed to converge after "
                 f"{self.tao.getIterationNumber()} iterations with reason: "
-                f"{_tao_reasons.get(reason, reason)}."
+                f"{tao_solver._tao_reasons.get(reason, reason)}."
             )
         if isinstance(controls, Enlist):
             return controls.delist(values)
@@ -498,12 +495,9 @@ def minimize_with_tao(
     comm : petsc4py.PETSc.Comm or mpi4py.MPI.Comm, optional
         Communicator the controls are defined over.
     options : dict, optional
-        PETSc options for the solver, such as ``{"tao_type": "blmvm"}``.
-        BLMVM is driven by :class:`LumpedTAOSolver`, which measures gradients
-        in the lumped metric its box projection needs; every other type is
-        left to pyadjoint's own :class:`pyadjoint.TAOSolver`. The choice is
-        read from this mapping, so a type set only through the PETSc command
-        line reaches the solver but not this dispatch.
+        PETSc options for the solver, such as ``{"tao_max_it": 20}``. The
+        type has to resolve to ``blmvm``, which is the only one
+        :class:`LumpedTAOSolver` supports; anything else raises there.
     record : callable, optional
         Called ``record(iteration, functional)`` after each iteration TAO
         accepts. The starting point is not reported: it is the value the
@@ -524,19 +518,21 @@ def minimize_with_tao(
         limit amounts to. The last iterate is returned rather than raising,
         since a fixed iteration budget is a normal way to run an optimization.
 
+    Raises
+    ------
+    ValueError
+        If the TAO type resolves to anything other than BLMVM.
+
     See Also
     --------
-    LumpedTAOSolver : The BLMVM driver, and why its metric is lumped.
+    LumpedTAOSolver : The solver this drives, and why its metric is lumped.
     tao_bounds : Shapes ``vmin``/``vmax`` into the ``bounds`` this takes.
     """
+    tao_solver = _tao_internals()
+
     options = options or {}
     problem = MinimizationProblem(reduced_functional, bounds=bounds)
-    solver_type = (
-        LumpedTAOSolver
-        if str(options.get("tao_type", "")).lower() == "blmvm"
-        else TAOSolver
-    )
-    solver = solver_type(problem, options, comm=comm)
+    solver = LumpedTAOSolver(problem, options, comm=comm)
     if record is not None:
         def monitor(tao):
             iteration, functional = tao.getSolutionStatus()[:2]
@@ -547,7 +543,7 @@ def minimize_with_tao(
 
     try:
         return as_list(solver.solve())
-    except TAOConvergenceError as error:
+    except tao_solver.TAOConvergenceError as error:
         warnings.warn(
             f"{error} Returning the last iterate; raise the iteration limit "
             "or loosen the tolerances in the TAO options if the optimization "
@@ -559,7 +555,7 @@ def minimize_with_tao(
         # the solver's own does.
         controls = [control.control for control in reduced_functional.controls]
         iterate = [control.copy(deepcopy=True) for control in controls]
-        PETScVecInterface(tuple(controls), comm=comm).from_petsc(
+        tao_solver.PETScVecInterface(tuple(controls), comm=comm).from_petsc(
             solver.tao.getSolution(), iterate,
         )
         return iterate
