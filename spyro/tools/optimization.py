@@ -80,7 +80,7 @@ def tao_bounds(bound, controls):
 
 
 def minimize_with_tao(
-    reduced_functional, bounds=None, comm=None, options=None, monitor=None,
+    reduced_functional, bounds=None, comm=None, options=None, record=None,
 ):
     """Minimize a reduced functional with PETSc TAO.
 
@@ -100,8 +100,10 @@ def minimize_with_tao(
         Communicator the controls are defined over.
     options : dict, optional
         PETSc options for the solver, such as ``{"tao_type": "blmvm"}``.
-    monitor : callable, optional
-        Called with the ``petsc4py.PETSc.TAO`` after each iteration.
+    record : callable, optional
+        Called ``record(iteration, functional)`` after each iteration TAO
+        accepts. The starting point is not reported: it is the value the
+        caller already has, from evaluating the functional to get here.
 
     Returns
     -------
@@ -118,7 +120,12 @@ def minimize_with_tao(
     """
     problem = MinimizationProblem(reduced_functional, bounds=bounds)
     solver = TAOSolver(problem, options or {}, comm=comm)
-    if monitor is not None:
+    if record is not None:
+        def monitor(tao):
+            iteration, functional = tao.getSolutionStatus()[:2]
+            if iteration:
+                record(iteration, functional)
+
         solver.tao.setMonitor(monitor)
 
     try:

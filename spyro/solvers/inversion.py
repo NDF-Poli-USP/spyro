@@ -1545,6 +1545,13 @@ class FullWaveformInversion:
             If True, calculate the functional (and misfit) before computing
             the gradient. Default is True.
 
+        Returns
+        -------
+        firedrake.Function or PhysicalParameters
+            The gradient, which is also left on :attr:`gradient`. A single
+            field for an inversion with one control, and one derivative per
+            control keyed by its parameter for one with several.
+
         Notes
         -----
         This method increments the current_iteration counter and applies any
@@ -1587,6 +1594,7 @@ class FullWaveformInversion:
             )
         self.current_iteration += 1
         comm.comm.barrier()
+        return self.gradient
 
     def return_functional_and_gradient(self, c):
         """
@@ -1846,34 +1854,32 @@ class FullWaveformInversion:
             bounds=list(zip(lower, upper)),
             comm=self.wave.comm.comm,
             options=options,
-            monitor=self._tao_monitor,
+            record=self._record_iterate,
         )
         # The tape knows which parameter each control is; the optimizer only
         # ever saw a vector, and hands back the same order it was given.
         return automated_adjoint.label_derivatives(solution)
 
-    def _tao_monitor(self, tao):
-        """Record one TAO iteration, mirroring what ``get_functional`` logs.
+    def _record_iterate(self, iteration, functional):
+        """Log one iterate the optimizer settled on.
 
-        TAO drives the reduced functional itself, so the per-iterate
-        bookkeeping the scipy path does inside :meth:`get_functional` has to
-        happen here instead.
+        The optimizer drives the reduced functional itself, so the
+        bookkeeping :meth:`get_functional` does for the value it computes has
+        to happen here for the values it does not.
 
         Parameters
         ----------
-        tao : petsc4py.PETSc.TAO
-            The solver being monitored.
+        iteration : int
+            Which iteration the optimizer has reached.
+        functional : float
+            The objective value there.
 
         Returns
         -------
         None
-            The functional history and iteration counter are updated in place.
+            The functional history and iteration counter are updated in
+            place.
         """
-        iteration, functional = tao.getSolutionStatus()[:2]
-        if iteration == 0:
-            # The starting point is the control the tape was recorded at,
-            # already logged by the functional evaluation that recorded it.
-            return
         self.current_iteration = iteration
         self.functional = functional
         self.functional_history.append(functional)
