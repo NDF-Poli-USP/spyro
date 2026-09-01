@@ -349,6 +349,7 @@ def _read_velocity_binary3D(
     values = values.transpose(tuple(axes_order))
     return np.asarray(values, dtype=np.float64)
 
+
 def _parse_axes_order(axes_order, ndim=3):
     """Convert an axis-order specification to axis names.
 
