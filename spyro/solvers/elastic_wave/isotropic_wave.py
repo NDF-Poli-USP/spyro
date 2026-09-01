@@ -476,6 +476,7 @@ class IsotropicWave(ElasticWave):
 
         return self.s_wave
 
-    def building_mesh_derived_paramenters(self):
+    def building_mesh_derived_paramenters(self, include_model_parameters=False):
         super(ElasticWave, self).building_mesh_derived_paramenters()
-        super()._initialize_model_parameters()
+        if include_model_parameters:
+            super()._initialize_model_parameters()
