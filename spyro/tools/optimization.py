@@ -9,7 +9,10 @@ The metric
 A gradient computed by the adjoint is a *dual* object: it lives in
 :math:`V'`, and turning it into a direction in :math:`V` takes the Riesz map,
 :math:`\nabla J = M^{-1} DJ` with :math:`M` the mass matrix. TAO is told which
-metric to measure gradients in through ``setGradientNorm``.
+metric to measure gradients in through ``setGradientNorm``, and that is the
+metric its convergence test uses too: ``tao_gatol`` and ``tao_grtol`` are read
+on the projected gradient in this norm, not on the coefficients. It is what
+makes a tolerance mean the same thing on a finer mesh.
 
 For a *bound-constrained* problem that choice is not free. TAO projects onto
 the box coefficient by coefficient, and a projection is only a projection in a
@@ -21,6 +24,11 @@ metric coefficient-wise too, and the two agree again. That is what
 :class:`LumpedTAOSolver` is for, and it is the only solver here:
 :func:`minimize_with_tao` always uses it, because BLMVM is the only TAO type
 this supports.
+
+This module is built on pyadjoint's TAO support, some of it internal, so
+``spyro.solvers.inversion`` imports it where it drives an optimization rather
+than at the top of the file. An inversion that never asks for the automated
+adjoint therefore never loads this, and never depends on what it needs.
 """
 
 import warnings
@@ -31,6 +39,14 @@ import numpy as np
 from pyadjoint import MinimizationProblem
 from pyadjoint.enlisting import Enlist
 from pyadjoint.optimization.optimization_solver import OptimizationSolver
+from pyadjoint.optimization.tao_solver import (
+    PETScVecInterface,
+    TAOConvergenceError,
+    TAOObjective,
+    _tao_reasons,
+    new_control_variable,
+    valid_comm,
+)
 
 from ..domains.quadrature import quadrature_rules
 from ..utils.physical_parameters import as_list
@@ -115,11 +131,9 @@ class _LumpedRieszMapContext:
     """
 
     def __init__(self, controls, comm=None):
-        tao_solver = _tao_internals()
-
-        comm = tao_solver.valid_comm(comm)
+        comm = valid_comm(comm)
         self.controls = Enlist(controls)
-        self.vec_interface = tao_solver.PETScVecInterface(
+        self.vec_interface = PETScVecInterface(
             tuple(control.control for control in self.controls), comm=comm,
         )
         self.inverse_mass = self.vec_interface.new_petsc()
@@ -184,27 +198,6 @@ def _lumped_riesz_map(controls, comm=None):
     return matrix
 
 
-def _tao_internals():
-    """Return pyadjoint's TAO internals, imported at the point of use.
-
-    :class:`LumpedTAOSolver` is built on names that are internal to
-    pyadjoint's TAO support and have not always been there. Importing them
-    when the module loads would make ``import spyro`` fail wholesale against
-    an older pyadjoint -- and ``spyro.solvers.inversion`` imports this module,
-    so *every* test that touches spyro would fail to collect, whatever it
-    tests. Only an inversion that actually asks for the lumped metric needs
-    them, so only that path pays for their absence.
-
-    Returns
-    -------
-    module
-        ``pyadjoint.optimization.tao_solver``.
-    """
-    from pyadjoint.optimization import tao_solver
-
-    return tao_solver
-
-
 class LumpedTAOSolver(OptimizationSolver):
     """TAO BLMVM with a diagonal metric, for box-constrained inversions.
 
@@ -265,17 +258,15 @@ class LumpedTAOSolver(OptimizationSolver):
         from petsc4py import PETSc
         import petsctools
 
-        tao_solver = _tao_internals()
-
         if not isinstance(problem, MinimizationProblem):
             raise TypeError("MinimizationProblem required")
         if problem.constraints is not None:
             raise NotImplementedError("Constraints not implemented")
 
-        comm = tao_solver.valid_comm(comm)
+        comm = valid_comm(comm)
         reduced_functional = problem.reduced_functional
-        tao_objective = tao_solver.TAOObjective(reduced_functional)
-        vec_interface = tao_solver.PETScVecInterface(
+        tao_objective = TAOObjective(reduced_functional)
+        vec_interface = PETScVecInterface(
             tuple(
                 control.control for control in reduced_functional.controls
             ),
@@ -284,18 +275,18 @@ class LumpedTAOSolver(OptimizationSolver):
         tao = PETSc.TAO().create(comm=comm)
 
         def objective(tao_, x):
-            controls = tao_solver.new_control_variable(reduced_functional)
+            controls = new_control_variable(reduced_functional)
             vec_interface.from_petsc(x, controls)
             return tao_objective.objective(controls)
 
         def gradient(tao_, x, g):
-            controls = tao_solver.new_control_variable(reduced_functional)
+            controls = new_control_variable(reduced_functional)
             vec_interface.from_petsc(x, controls)
             derivative = tao_objective.gradient(controls)
             vec_interface.to_petsc(g, derivative)
 
         def objective_gradient(tao_, x, g):
-            controls = tao_solver.new_control_variable(reduced_functional)
+            controls = new_control_variable(reduced_functional)
             vec_interface.from_petsc(x, controls)
             value, derivative = tao_objective.objective_gradient(controls)
             vec_interface.to_petsc(g, derivative)
@@ -387,7 +378,6 @@ class LumpedTAOSolver(OptimizationSolver):
         """
         import petsctools
 
-        tao_solver = _tao_internals()
         controls = self.tao_objective.reduced_functional.controls
         values = tuple(control.tape_value()._ad_copy() for control in controls)
         with petsctools.inserted_options(self.tao):
@@ -399,10 +389,10 @@ class LumpedTAOSolver(OptimizationSolver):
         if reason <= 0:
             # Named rather than numbered: "DIVERGED_MAXITS" tells the caller
             # to raise the iteration limit, "-2" tells them nothing.
-            raise tao_solver.TAOConvergenceError(
+            raise TAOConvergenceError(
                 "LumpedTAOSolver failed to converge after "
                 f"{self.tao.getIterationNumber()} iterations with reason: "
-                f"{tao_solver._tao_reasons.get(reason, reason)}."
+                f"{_tao_reasons.get(reason, reason)}."
             )
         if isinstance(controls, Enlist):
             return controls.delist(values)
@@ -499,8 +489,9 @@ def minimize_with_tao(
         type has to resolve to ``blmvm``, which is the only one
         :class:`LumpedTAOSolver` supports; anything else raises there.
     record : callable, optional
-        Called ``record(iteration, functional)`` after each iteration TAO
-        accepts. The starting point is not reported: it is the value the
+        Called ``record(iteration, functional, controls)`` after each
+        iteration TAO accepts, with the controls it stands at as a list of
+        fresh fields. The starting point is not reported: it is the value the
         caller already has, from evaluating the functional to get here.
 
     Returns
@@ -528,34 +519,36 @@ def minimize_with_tao(
     LumpedTAOSolver : The solver this drives, and why its metric is lumped.
     tao_bounds : Shapes ``vmin``/``vmax`` into the ``bounds`` this takes.
     """
-    tao_solver = _tao_internals()
-
     options = options or {}
     problem = MinimizationProblem(reduced_functional, bounds=bounds)
     solver = LumpedTAOSolver(problem, options, comm=comm)
+    # TAO holds an iterate as one vector with every control concatenated into
+    # it. Reading it through an interface built from those same controls lays
+    # them out the way the solver's own does. Both the monitor and the
+    # unconverged exit below need that, so it is built once.
+    controls = [control.control for control in reduced_functional.controls]
+    vec_interface = PETScVecInterface(tuple(controls), comm=comm)
+
+    def iterate_of(tao):
+        """Return the controls TAO currently stands at, as new fields."""
+        iterate = [control.copy(deepcopy=True) for control in controls]
+        vec_interface.from_petsc(tao.getSolution(), iterate)
+        return iterate
+
     if record is not None:
         def monitor(tao):
             iteration, functional = tao.getSolutionStatus()[:2]
             if iteration:
-                record(iteration, functional)
+                record(iteration, functional, iterate_of(tao))
 
         solver.tao.setMonitor(monitor)
 
     try:
         return as_list(solver.solve())
-    except tao_solver.TAOConvergenceError as error:
+    except TAOConvergenceError as error:
         warnings.warn(
             f"{error} Returning the last iterate; raise the iteration limit "
             "or loosen the tolerances in the TAO options if the optimization "
             "is meant to run to convergence.",
         )
-        # TAO raises before handing the iterate back, and holds it as one
-        # vector with every control concatenated into it. Reading it through
-        # an interface built from those same controls lays them out the way
-        # the solver's own does.
-        controls = [control.control for control in reduced_functional.controls]
-        iterate = [control.copy(deepcopy=True) for control in controls]
-        tao_solver.PETScVecInterface(tuple(controls), comm=comm).from_petsc(
-            solver.tao.getSolution(), iterate,
-        )
-        return iterate
+        return iterate_of(solver.tao)

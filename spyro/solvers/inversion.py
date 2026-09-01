@@ -15,7 +15,6 @@ from ..utils import Gradient_mask_for_pml, Mask
 from ..utils.typing import AdjointType, WaveType
 from ..utils.physical_parameters import PhysicalParameters, as_list
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
-from ..tools.optimization import minimize_with_tao, tao_bounds
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import parallel_print
 from ..io.basicio import load_shots, save_shots
@@ -401,6 +400,7 @@ class FullWaveformInversion:
         # the solver is configured from it by the first forward solve.
         self.adjoint_type = AdjointType.NONE
         self._adjoint_options = {}
+        self._save_controls = True
 
         self.input_dictionary = self.wave.input_dictionary
         self.comm = self.wave.comm
@@ -1660,6 +1660,32 @@ class FullWaveformInversion:
                 PETSc options for the TAO solver, merged over the defaults
                 ``{"tao_type": "blmvm", "tao_max_it": maxiter}``. Only used
                 under the automated adjoint.
+
+                Those two are the only options set here, so what stops a run
+                is ``maxiter``: the convergence *tolerances* are left at
+                PETSc's own, and ``tao_gatol`` and ``tao_grtol`` of 1e-8 are
+                far below the functional an inversion of this kind starts
+                from. A run that should stop on the gradient instead of on a
+                budget sets them here::
+
+                    tao_options={"tao_gatol": 1e-6, "tao_grtol": 1e-6}
+
+                They are measured on the *projected* gradient -- the
+                components pinned against a bound and pointing out of it do
+                not count, or a solution on the boundary could never converge
+                -- and in the lumped mass metric rather than in the
+                coefficients. That is what makes a tolerance mean the same
+                thing on a finer mesh, where the coefficient norm of the same
+                field would not.
+            save_controls : bool, optional
+                Whether to write each accepted iterate to
+                ``control_<iteration>.pvd``. Default is True, which is how
+                an inversion is watched while it runs; a long run that does
+                not need the intermediate models can turn the writing off.
+                The last accepted iterate is kept on
+                ``control_parameter_result`` either way. Only used under the
+                automated adjoint: the implemented one writes its iterates
+                from the forward solve it does for each of them.
             adjoint_type : AdjointType, optional
                 Which adjoint to differentiate with.
                 :attr:`AdjointType.AUTOMATED_ADJOINT` records the material
@@ -1711,6 +1737,7 @@ class FullWaveformInversion:
             },
         }
         tao_options = kwargs.pop("tao_options", None)
+        self._save_controls = kwargs.pop("save_controls", True)
         self.adjoint_type = kwargs.pop("adjoint_type", self.adjoint_type)
         # The settings reach the solver at the first forward solve of the run,
         # so a name that is not a setting is rejected here instead of being
@@ -1807,7 +1834,9 @@ class FullWaveformInversion:
             Optimization parameters assembled by :meth:`run_fwi`. ``vmin``,
             ``vmax`` and ``maxiter`` are read from it.
         tao_options : dict, optional
-            PETSc options merged over the defaults.
+            PETSc options merged over the defaults, which set only the solver
+            type and the iteration budget. See :meth:`run_fwi` for what that
+            leaves to PETSc.
 
         Returns
         -------
@@ -1821,6 +1850,13 @@ class FullWaveformInversion:
             The optimizer this hands the reduced functional to, and what it
             does when TAO stops short of converging.
         """
+        # Imported here, not at module load: the optimizer is built on
+        # pyadjoint's TAO support, and only this path needs it. A driver that
+        # never asks for the automated adjoint must not be made to depend on
+        # it -- ``import spyro`` reaches this module, so anything unavailable
+        # up there fails every test that touches spyro, whatever it tests.
+        from ..tools.optimization import minimize_with_tao, tao_bounds
+
         # Records the tape, and logs the starting functional the same way the
         # scipy path logs every iterate.
         self.get_functional()
@@ -1860,12 +1896,18 @@ class FullWaveformInversion:
         # ever saw a vector, and hands back the same order it was given.
         return automated_adjoint.label_derivatives(solution)
 
-    def _record_iterate(self, iteration, functional):
+    def _record_iterate(self, iteration, functional, controls):
         """Log one iterate the optimizer settled on.
 
         The optimizer drives the reduced functional itself, so the
         bookkeeping :meth:`get_functional` does for the value it computes has
-        to happen here for the values it does not.
+        to happen here for the values it does not -- and so does the record of
+        the model, which otherwise would exist only at the end of the run.
+
+        The iterate is left on :attr:`control_parameter_result`, so a run
+        interrupted part way through still has its last accepted model, and
+        is written to ``control_<iteration>.pvd`` unless ``run_fwi`` was told
+        not to.
 
         Parameters
         ----------
@@ -1873,16 +1915,27 @@ class FullWaveformInversion:
             Which iteration the optimizer has reached.
         functional : float
             The objective value there.
+        controls : list of firedrake.Function
+            The controls at that iterate, one per control.
 
         Returns
         -------
         None
-            The functional history and iteration counter are updated in
-            place.
+            The functional history, the iteration counter and the current
+            model are updated in place.
         """
         self.current_iteration = iteration
         self.functional = functional
         self.functional_history.append(functional)
+
+        # Shaped like ``control_parameters``: the single field of an acoustic
+        # inversion, a list for one with several controls.
+        self.control_parameter_result = (
+            controls[0] if len(controls) == 1 else controls
+        )
+        if self._save_controls:
+            fire.VTKFile(f"control_{iteration}.pvd").write(*controls)
+
         parallel_print(
             f"Functional: {functional} at iteration: {iteration}",
             self.comm,
