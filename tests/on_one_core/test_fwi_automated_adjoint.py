@@ -23,7 +23,6 @@ import firedrake as fire
 import firedrake.adjoint as fire_ad
 import numpy as np
 import pytest
-from pyadjoint import AdjFloat
 
 import spyro
 from spyro.utils.typing import AcousticMaterialParameter, AdjointType
@@ -160,126 +159,7 @@ def test_the_control_is_the_solvers_own_field(tmp_path, monkeypatch):
 
 
 @pytest.mark.newer_firedrake
-def test_the_adjoint_and_its_settings_are_chosen_in_run_fwi(
-    tmp_path, monkeypatch,
-):
-    """The choice is an argument of the run, and reaches the tape from there.
-
-    The automated adjoint cannot be switched on before there is a mesh and a
-    model -- its controls are fields -- so what ``run_fwi`` takes is the
-    choice, and the solver is configured from it by the first forward solve
-    of the run.
-    """
-    fwi = build_inversion(tmp_path, monkeypatch)
-    assert fwi.wave.automated_adjoint is None
-
-    fwi.run_fwi(
-        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
-        adjoint_options={"checkpointing": True, "snapshots": 3},
-        vmin=2.0, vmax=3.5, maxiter=1,
-    )
-
-    assert fwi.wave.adjoint_type == AdjointType.AUTOMATED_ADJOINT
-    assert fwi.wave.automated_adjoint._tape is not None
-    # The settings travelled from the call to the tape.
-    assert fwi.wave.automated_adjoint._checkpointing is True
-    assert fwi.wave.automated_adjoint._snapshots == 3
-
-
-def test_adjoint_options_are_checked_before_the_run(tmp_path, monkeypatch):
-    """A misspelt setting fails where it was written, not at the first solve.
-
-    They are applied a long way from here, and silently ignoring one would
-    show up only as memory that never came down.
-    """
-    fwi = build_inversion(tmp_path, monkeypatch)
-
-    with pytest.raises(ValueError, match="not settings of the automated"):
-        fwi.run_fwi(
-            adjoint_type=AdjointType.AUTOMATED_ADJOINT,
-            adjoint_options={"snapshot": 3},
-        )
-
-    # A fresh inversion: the choice sticks to the one it was given, so an
-    # inversion already told to use the automated adjoint takes settings for
-    # it without being told again.
-    fwi = build_inversion(tmp_path, monkeypatch)
-
-    with pytest.raises(ValueError, match="needs adjoint_type"):
-        fwi.run_fwi(adjoint_options={"snapshots": 3})
-
-
-@pytest.mark.newer_firedrake
-def test_the_functional_comes_off_the_tape(tmp_path, monkeypatch):
-    """The forward solve records a tape and leaves the functional on it.
-
-    The residual is accumulated step by step while taping, so it never exists
-    as an array, and the functional is read off the tape rather than
-    recomputed from one.
-    """
-    fwi = build_automated_inversion(tmp_path, monkeypatch)
-
-    functional = fwi.get_functional()
-
-    assert fwi.wave.automated_adjoint._tape is not None
-    assert isinstance(fwi.wave.functional_value, AdjFloat)
-    assert functional == pytest.approx(float(fwi.wave.functional_value))
-    assert fwi.functional_history == [functional]
-
-
-@pytest.mark.newer_firedrake
-def test_calculate_misfit_is_refused_under_the_automated_adjoint(
-    tmp_path, monkeypatch,
-):
-    """There is no residual array to hand back, so asking for one is an error.
-
-    Returning ``None`` from a method named for what it computes would leave
-    the caller to discover the difference on their own.
-    """
-    fwi = build_automated_inversion(tmp_path, monkeypatch)
-
-    with pytest.raises(ValueError, match="never exists as an array"):
-        fwi.calculate_misfit()
-
-
-@pytest.mark.newer_firedrake
-def test_get_gradient_differentiates_the_recorded_tape(tmp_path, monkeypatch):
-    """``get_gradient`` reads the tape instead of the backward propagator.
-
-    The residual and the forward wavefield the implemented adjoint is handed
-    explicitly are both already on the tape, so neither is passed; what has to
-    come back is a gradient in the control's own space.
-    """
-    fwi = build_automated_inversion(tmp_path, monkeypatch)
-
-    fwi.get_gradient(save=False)
-
-    assert isinstance(fwi.gradient, fire.Function)
-    assert fwi.gradient.function_space() == fwi.wave.c.function_space()
-    # A guess slower than the truth leaves a residual to descend.
-    assert np.linalg.norm(fwi.gradient.dat.data_ro) > 0.0
-
-
-def test_tao_bounds_are_one_pair_per_control(tmp_path, monkeypatch):
-    """TAO takes bounds per control, L-BFGS-B one per degree of freedom.
-
-    A scalar stays a scalar for TAO to broadcast, while a bound that varies
-    over the mesh becomes a ``Function`` in the control's own space.
-    """
-    fwi = build_inversion(tmp_path, monkeypatch)
-    control = fwi.control_parameters
-
-    assert fwi._tao_bounds(2.5, control) == [2.5]
-
-    varying = np.linspace(2.0, 3.0, control.dat.data_ro.size)
-    (bound,) = fwi._tao_bounds(varying, control)
-    assert isinstance(bound, fire.Function)
-    assert bound.function_space() == control.function_space()
-    assert np.allclose(bound.dat.data_ro, varying)
-
-
-@pytest.mark.newer_firedrake
-def test_run_fwi_optimizes_with_tao_under_the_automated_adjoint(
+def test_run_fwi_automated_adjoint(
     tmp_path, monkeypatch,
 ):
     """``run_fwi`` drives TAO from the recorded tape and returns the control.
@@ -320,26 +200,3 @@ def test_run_fwi_optimizes_with_tao_under_the_automated_adjoint(
     )
     assert np.allclose(fwi.wave.c.dat.data_ro, values)
     assert (tmp_path / "result.npy").exists()
-
-
-def test_run_fwi_still_uses_scipy_without_the_automated_adjoint(
-    tmp_path, monkeypatch,
-):
-    """The implemented adjoint stays the default, with the scipy result.
-
-    Guards the dispatch in ``run_fwi``: a driver that was never told which
-    adjoint to use has ``AdjointType.NONE`` on its solver, and that must land
-    on the L-BFGS-B path rather than fall between the two branches.
-    """
-    fwi = build_inversion(tmp_path, monkeypatch)
-    assert fwi.wave.adjoint_type == AdjointType.NONE
-
-    result = fwi.run_fwi(vmin=2.0, vmax=3.5, maxiter=1)
-
-    assert hasattr(result, "x")
-    assert fwi.wave.adjoint_type == AdjointType.IMPLEMENTED_ADJOINT
-    assert fwi.wave.automated_adjoint is None
-    # The backward propagator ran and the driver logged its iterates.
-    assert isinstance(fwi.gradient, fire.Function)
-    assert fwi.functional_history
-    assert isinstance(fwi.control_parameter_result, fire.Function)

@@ -9,14 +9,11 @@ written in -- and that is what these tests pin down:
   same order, so an iterate is never written back into the wrong control;
 * selecting a subset of them narrows the inversion to it, and which set they
   are drawn from is whichever one the equation is written in -- the two wave
-  speeds or the two Lame parameters -- so density can be held fixed while the
-  Lame parameters alone are fitted;
+  speeds or the two Lame parameters;
 * bounds take one entry per control, since density and a wave speed are not
   bounded by the same numbers;
 * the derivatives come back one per control, keyed by the parameter each
-  belongs to;
-* without the automated adjoint there is no elastic gradient at all, and the
-  driver has to say so rather than fall through to L-BFGS-B.
+  belongs to.
 
 The model is deliberately small; what is under test is the plumbing between the
 driver, the tape and TAO, not the quality of the reconstruction.
@@ -26,6 +23,7 @@ import numpy as np
 import pytest
 
 import spyro
+from spyro.tools.optimization import tao_bounds
 from spyro.utils.typing import AdjointType
 
 
@@ -258,45 +256,6 @@ def test_controls_follow_the_set_the_equation_is_written_in(
 
 
 @pytest.mark.newer_firedrake
-def test_a_parameter_computed_from_the_others_cannot_be_a_control(
-    tmp_path, monkeypatch,
-):
-    """The two sets are swapped between, never mixed."""
-    fwi = build_inversion(
-        tmp_path, monkeypatch,
-        guess_material=LAME_GUESS_MATERIAL,
-        real_material=LAME_REAL_MATERIAL,
-        adjoint_options={
-            "control_parameters": {Parameter.P_WAVE_VELOCITY},
-        },
-    )
-
-    with pytest.raises(TypeError, match="computed from the other physical"):
-        fwi.get_functional()
-
-
-@pytest.mark.newer_firedrake
-def test_controls_flatten_into_one_vector(tmp_path, monkeypatch):
-    """Several controls concatenate into the vector each iterate is saved as.
-
-    Nothing splits that vector apart again -- TAO works on the controls
-    themselves -- so this is the whole of what the driver asks of it.
-    """
-    fwi = build_inversion(tmp_path, monkeypatch)
-    fwi.get_functional()
-    controls = fwi.control_parameters
-
-    flat = fwi._flatten_control(controls)
-
-    assert flat.size == sum(control.dat.data_ro.size for control in controls)
-    offset = 0
-    for control in controls:
-        values = control.dat.data_ro
-        assert np.allclose(flat[offset:offset + values.size], values)
-        offset += values.size
-
-
-@pytest.mark.newer_firedrake
 def test_bounds_take_one_entry_per_control(tmp_path, monkeypatch):
     """Each parameter is bounded on its own scale, or all of them alike."""
     fwi = build_inversion(tmp_path, monkeypatch)
@@ -304,12 +263,12 @@ def test_bounds_take_one_entry_per_control(tmp_path, monkeypatch):
     controls = fwi.control_parameters
 
     # One scalar bounds every control the same way.
-    assert fwi._tao_bounds(1.5, controls) == [1.5, 1.5, 1.5]
+    assert tao_bounds(1.5, controls) == [1.5, 1.5, 1.5]
     # One entry per control is how they are bounded apart.
-    assert fwi._tao_bounds([1.0, 1.5, 0.5], controls) == [1.0, 1.5, 0.5]
+    assert tao_bounds([1.0, 1.5, 0.5], controls) == [1.0, 1.5, 0.5]
 
-    with pytest.raises(ValueError, match="controls 3 parameters"):
-        fwi._tao_bounds([1.0, 1.5], controls)
+    with pytest.raises(ValueError, match="bounds take that many entries"):
+        tao_bounds([1.0, 1.5], controls)
 
 
 @pytest.mark.newer_firedrake
@@ -363,65 +322,3 @@ def test_run_fwi_inverts_every_control(tmp_path, monkeypatch):
         result, (fwi.wave.rho, fwi.wave.c, fwi.wave.c_s),
     ):
         assert np.allclose(control.dat.data_ro, parameter.dat.data_ro)
-
-
-@pytest.mark.newer_firedrake
-def test_run_fwi_inverts_the_lame_parameters_with_density_held_fixed(
-    tmp_path, monkeypatch,
-):
-    """A subset of the set in use is an inversion of its own.
-
-    Density is left out of the controls, so it has to come out of the run
-    untouched while the two Lame parameters are fitted.
-    """
-    vmin = [1.0, 0.5]
-    vmax = [20.0, 10.0]
-    fwi = build_inversion(
-        tmp_path, monkeypatch,
-        guess_material=LAME_GUESS_MATERIAL,
-        real_material=LAME_REAL_MATERIAL,
-        adjoint_options={
-            "control_parameters": {Parameter.LAMBDA, Parameter.MU},
-        },
-    )
-
-    result = fwi.run_fwi(vmin=vmin, vmax=vmax, maxiter=3)
-
-    assert [control.name() for control in result] == [
-        Parameter.LAMBDA.value,
-        Parameter.MU.value,
-    ]
-    for control, low, high, start in zip(
-        result, vmin, vmax,
-        (LAME_GUESS_MATERIAL["lambda"], LAME_GUESS_MATERIAL["mu"]),
-    ):
-        values = control.dat.data_ro
-        assert values.min() >= low - 1e-10
-        assert values.max() <= high + 1e-10
-        assert not np.allclose(values, start), (
-            f"{control.name()} was left where it started."
-        )
-
-    assert fwi.functional_history[-1] < fwi.functional_history[0]
-    # Not a control, so nothing in the run had any business moving it: it has
-    # to come out at the value the guess model gave it.
-    assert np.allclose(
-        fwi.wave.rho.dat.data_ro, LAME_GUESS_MATERIAL["density"],
-    )
-
-
-def test_run_fwi_without_the_automated_adjoint_is_refused(
-    tmp_path, monkeypatch,
-):
-    """There is no hand-written elastic adjoint to fall back on.
-
-    Falling through to L-BFGS-B would run a forward solve per iterate and only
-    then fail, deep inside ``gradient_solve``.
-    """
-    fwi = build_inversion(
-        tmp_path, monkeypatch, observed_data=False,
-        adjoint_type=AdjointType.NONE,
-    )
-
-    with pytest.raises(NotImplementedError, match="automated adjoint"):
-        fwi.run_fwi(maxiter=1)

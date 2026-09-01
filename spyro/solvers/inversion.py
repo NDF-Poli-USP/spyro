@@ -3,10 +3,6 @@ import warnings
 import inspect
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI
-from pyadjoint import MinimizationProblem, TAOSolver
-from pyadjoint.optimization.tao_solver import (
-    PETScVecInterface, TAOConvergenceError,
-)
 import numpy as np
 import resource
 import glob
@@ -19,6 +15,7 @@ from ..utils import Gradient_mask_for_pml, Mask
 from ..utils.typing import AdjointType, WaveType
 from ..utils.physical_parameters import PhysicalParameters, as_list
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
+from ..tools.optimization import minimize_with_tao, tao_bounds
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import parallel_print
 from ..io.basicio import load_shots, save_shots
@@ -918,15 +915,6 @@ class FullWaveformInversion:
     def set_real_model(self, material):
         """Set the material values that generate the observed data.
 
-        This is the true model of a synthetic experiment. It is never
-        inverted for -- it is what the inversion is trying to recover -- so it
-        is set as material values rather than as controls, which is the one
-        way it differs from :meth:`set_guess_control`. It is the
-        multi-parameter counterpart of :meth:`set_real_velocity_model`, which
-        speaks the acoustic language of a single velocity model. What is set
-        here is read back by :meth:`generate_real_shot_record`, which writes
-        it into a solver of its own before propagating.
-
         Parameters
         ----------
         material : mapping, firedrake.Function, firedrake.Constant, scalar, UFL expression, str, or iterable
@@ -1801,10 +1789,9 @@ class FullWaveformInversion:
 
         Under ensemble (shot) parallelism the reduced functional is an
         ``EnsembleReducedFunctional``, which sums the per-shot functionals and
-        gradients across ensemble members. TAO is therefore given the
-        *spatial* communicator: the control is replicated on every member, and
-        the default (``COMM_WORLD``) would count each copy as separate degrees
-        of freedom.
+        gradients across ensemble members. The optimizer is therefore given
+        the *spatial* communicator, since the controls are replicated on every
+        member.
 
         Parameters
         ----------
@@ -1817,15 +1804,14 @@ class FullWaveformInversion:
         Returns
         -------
         PhysicalParameters
-            The optimal controls, keyed by the parameter each one belongs to.
+            The controls the optimization stopped at, keyed by the parameter
+            each one belongs to.
 
-        Warns
-        -----
-        UserWarning
-            If TAO stops without converging, which is what reaching
-            ``maxiter`` amounts to. The last iterate is returned rather than
-            raising, since a fixed iteration budget is a normal way to run
-            FWI.
+        See Also
+        --------
+        spyro.tools.optimization.minimize_with_tao :
+            The optimizer this hands the reduced functional to, and what it
+            does when TAO stops short of converging.
         """
         # Records the tape, and logs the starting functional the same way the
         # scipy path logs every iterate.
@@ -1846,12 +1832,8 @@ class FullWaveformInversion:
         adjoint_controls = [
             control.control for control in reduced_functional.controls
         ]
-        lower = self._tao_bounds(parameters["vmin"], adjoint_controls)
-        upper = self._tao_bounds(parameters["vmax"], adjoint_controls)
-        problem = MinimizationProblem(
-            reduced_functional, bounds=list(zip(lower, upper)),
-        )
-
+        lower = tao_bounds(parameters["vmin"], adjoint_controls)
+        upper = tao_bounds(parameters["vmax"], adjoint_controls)
         options = {
             "tao_type": "blmvm",
             "tao_max_it": parameters["maxiter"],
@@ -1859,79 +1841,16 @@ class FullWaveformInversion:
         if tao_options:
             options.update(tao_options)
 
-        solver = TAOSolver(problem, options, comm=self.wave.comm.comm)
-        solver.tao.setMonitor(self._tao_monitor)
-        try:
-            solution = solver.solve()
-        except TAOConvergenceError as error:
-            warnings.warn(
-                f"{error} Returning the last iterate; raise the iteration "
-                "limit or loosen the tolerances through 'tao_options' if the "
-                "inversion is meant to run to convergence.",
-            )
-            # TAO raises before handing the iterate back, and holds it as
-            # one vector with every control concatenated into it. Reading it
-            # through an interface built from those same controls lays them
-            # out the way the solver's own does.
-            solution = [
-                control.copy(deepcopy=True) for control in adjoint_controls
-            ]
-            PETScVecInterface(
-                tuple(adjoint_controls), comm=self.wave.comm.comm,
-            ).from_petsc(solver.tao.getSolution(), solution)
+        solution = minimize_with_tao(
+            reduced_functional,
+            bounds=list(zip(lower, upper)),
+            comm=self.wave.comm.comm,
+            options=options,
+            monitor=self._tao_monitor,
+        )
         # The tape knows which parameter each control is; the optimizer only
         # ever saw a vector, and hands back the same order it was given.
         return automated_adjoint.label_derivatives(solution)
-
-    def _tao_bounds(self, bound, control_reference):
-        """Return one bound per control, in the form TAO takes them.
-
-        A scalar bounds every control the same way, which is what an acoustic
-        inversion needs and all a single control can mean. An inversion
-        controlling multiple parameters at once takes one entry per control
-        instead -- density, a p-wave velocity and an s-wave velocity are not
-        bounded by the same numbers -- and each entry may itself be a scalar
-        or vary per degree of freedom. For a single control, a sequence longer
-        than one entry is read as varying per degree of freedom, which is how
-        ``vmin``/``vmax`` have always been accepted.
-
-        Parameters
-        ----------
-        bound : scalar or array_like
-            Bound specification, as given to :meth:`run_fwi`.
-        control_reference : list of firedrake.Function
-            The controls being bounded, in the order TAO takes them.
-
-        Returns
-        -------
-        list
-            One bound for each control, each a ``float`` or a ``Function``.
-
-        Raises
-        ------
-        ValueError
-            If a sequence of bounds does not have one entry per control.
-        """
-        controls = as_list(control_reference)
-        if np.isscalar(bound):
-            return [float(bound)] * len(controls)
-
-        bounds = list(bound)
-        if len(controls) == 1 and len(bounds) != 1:
-            # A lone control takes its bounds one per degree of freedom.
-            bounds = [bound]
-        if len(bounds) != len(controls):
-            raise ValueError(
-                f"This inversion controls {len(controls)} parameters, so its "
-                f"bounds take that many entries; {len(bounds)} were given.",
-            )
-        return [
-            float(value) if np.isscalar(value)
-            else self._rebuild_control_from_vector(
-                control, self._expand_bound(value, control),
-            )
-            for value, control in zip(bounds, controls)
-        ]
 
     def _tao_monitor(self, tao):
         """Record one TAO iteration, mirroring what ``get_functional`` logs.
