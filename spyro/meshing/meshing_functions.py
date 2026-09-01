@@ -502,6 +502,7 @@ class AutomaticMesh:
         extend_segy = mesh_parameters.extend_segy
         h_padding = mesh_parameters.h_padding
         parallel = getattr(mesh_parameters, "gmsh_parallel", False)
+        gmsh_num_threads = getattr(mesh_parameters, "gmsh_num_threads", 1)
 
         byte_order = getattr(mesh_parameters, "segy_byte_order", "big")
         axes_order = tuple(
@@ -629,7 +630,6 @@ class AutomaticMesh:
                     water_interface=water_interface,
                     water_search_value=water_search_value,
                     structured_mesh=structured_mesh,
-                    minElementSize=minElementSize,
                     nz=nz,
                     nx=nx,
                     ny=ny,
@@ -663,6 +663,7 @@ class AutomaticMesh:
                     nz=nz,
                     nx=nx,
                     ny=ny,
+                    gmsh_num_threads=gmsh_num_threads,
                     comm=self.comm,
                     parallel_print=parallel_print,
                 )
