@@ -1,7 +1,7 @@
-from pathlib import Path
-
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
+
+from ..io.basicio import _read_velocity_binary3D
 
 try:
     import SeismicMesh
@@ -96,70 +96,6 @@ def sizing_function_xyz(
         )
 
     return sizes
-
-
-def _read_velocity_binary3D(
-    fname,
-    nz,
-    nx,
-    ny,
-    byte_order="big",
-    axes_order=(0, 1, 2),
-    axes_order_sort="F",
-    dtype="float32",
-):
-    """Read a three-dimensional velocity model using Spyro ``(z, x, y)`` ordering.
-
-    Parameters
-    ----------
-    fname : str or pathlib.Path
-        Path to the binary velocity model.
-    nz : int
-        Number of velocity samples in the z direction.
-    nx : int
-        Number of velocity samples in the x direction.
-    ny : int
-        Number of velocity samples in the y direction.
-    byte_order : {"big", "little"}
-        Byte order of the velocity-model binary file.
-    axes_order : tuple of int
-        Permutation mapping binary axes to Spyro ``(z, x, y)`` order.
-    axes_order_sort : {"C", "F"}
-        Memory order used to reshape the binary velocity data.
-    dtype : str or numpy.dtype
-        Numeric data type stored in the velocity-model file.
-
-    Returns
-    -------
-    numpy.ndarray
-        Velocity array in canonical ``(z, x, y)`` ordering.
-    """
-    path = Path(fname)
-    if not path.exists():
-        raise FileNotFoundError(f"Velocity model not found: {path}")
-
-    if byte_order not in ("big", "little"):
-        raise ValueError("byte_order must be 'big' or 'little'.")
-    if axes_order_sort not in ("C", "F"):
-        raise ValueError("axes_order_sort must be 'C' or 'F'.")
-    if sorted(tuple(axes_order)) != [0, 1, 2]:  # noqa: C414
-        raise ValueError("axes_order must be a permutation of (0, 1, 2).")
-
-    dt = np.dtype(dtype).newbyteorder(">" if byte_order == "big" else "<")
-    raw = np.fromfile(path, dtype=dt)
-    expected = int(nz) * int(nx) * int(ny)
-    if raw.size != expected:
-        raise ValueError(
-            f"Velocity file contains {raw.size} values; expected {expected} "
-            f"for shape ({nz}, {nx}, {ny})."
-        )
-
-    canonical_shape = (int(nz), int(nx), int(ny))
-    inverse = np.argsort(np.asarray(axes_order, dtype=int))
-    raw_shape = tuple(canonical_shape[i] for i in inverse)
-    values = raw.reshape(raw_shape, order=axes_order_sort)
-    values = values.transpose(tuple(axes_order))
-    return np.asarray(values, dtype=np.float64)
 
 
 def create_sizing_function3D(
