@@ -11,7 +11,8 @@ from .wave import Wave
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
-from ..utils.typing import WaveType, AdjointType
+from ..utils.typing import AdjointType, WaveType
+from ..utils.physical_parameters import PhysicalParameters
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import parallel_print
 from ..io.basicio import load_shots, save_shots
@@ -237,7 +238,9 @@ class Objective(RObjective):
         iteration : int
             Current iteration number.
         """
-        control_reference = self.inversion_obj._guess_control_reference()
+        control_reference = self.inversion_obj.control_parameters
+        if control_reference is None:
+            raise ValueError("No guess control parameter has been configured.")
         updated_control = fire.Function(
             control_reference.function_space(),
             x.vec,
@@ -297,8 +300,6 @@ class FullWaveformInversion:
     >>> fwi.run_fwi(maxiter=50, vmin=1.5, vmax=4.5)
     """
 
-    supported_wave_types = (WaveType.ISOTROPIC_ACOUSTIC,)
-
     def __init__(
         self, dictionary=None, comm=None, wave_class=AcousticWave, wave=None
     ):
@@ -342,7 +343,6 @@ class FullWaveformInversion:
                 )
             self.wave = self.wave_class(dictionary=dictionary, comm=comm)
         self.wave_type = self.wave.wave_type
-        self._validate_supported_wave()
 
         self.input_dictionary = self.wave.input_dictionary
         self.comm = self.wave.comm
@@ -380,8 +380,8 @@ class FullWaveformInversion:
 
         self.real_mesh = None
         self.guess_mesh = None
-        self.real_control = None
-        self.guess_control = None
+        self._control_parameters = PhysicalParameters()
+        self._real_model_parameters = PhysicalParameters()
 
         self.control_out = fire.VTKFile(inversion_dictionary["control_output_file"])
         self.gradient_out = fire.VTKFile(inversion_dictionary["gradient_output_file"])
@@ -391,7 +391,6 @@ class FullWaveformInversion:
 
         self.guess_shot_record = None
         self.gradient = None
-        self.control_result = None
         self.control_parameter_result = None
         self.current_iteration = 0
         self.mesh_iteration = 0
@@ -403,39 +402,6 @@ class FullWaveformInversion:
         self.has_gradient_mask = False
         self.gradient_mask_available = False
         self.functional_history = []
-
-    def _validate_supported_wave(self):
-        """Validate that the composed wave solver can be used for FWI.
-
-        Full waveform inversion requires an adjoint/gradient solve. At the
-        moment, Spyro only provides that workflow for acoustic waves, so the
-        driver checks the solver ``wave_type`` before any inversion state is
-        used.
-
-        Raises
-        ------
-        NotImplementedError
-            If the internal wave solver is not one of
-            ``supported_wave_types``.
-
-        Examples
-        --------
-        ``AcousticWave`` sets ``wave_type`` to
-        ``WaveType.ISOTROPIC_ACOUSTIC`` and is accepted. ``IsotropicWave`` sets
-        ``wave_type`` to ``WaveType.ISOTROPIC_ELASTIC`` and raises here because
-        the elastic adjoint is not implemented yet.
-        """
-        if self.wave_type in self.supported_wave_types:
-            return
-        supported_names = ", ".join(
-            wave_type.name
-            for wave_type in self.supported_wave_types
-        )
-        raise NotImplementedError(
-            "FullWaveformInversion currently supports only acoustic wave "
-            "solvers because adjoint-based gradients are implemented only for "
-            f"{supported_names}. Received {self.wave_type.name}.",
-        )
 
     def _sync_wave_real_shot_record(self):
         """Copy observed data from the FWI driver to the wave solver.
@@ -454,60 +420,231 @@ class FullWaveformInversion:
         if self.real_shot_record is not None:
             self.wave.real_shot_record = self.real_shot_record
 
-    def _copy_control_value(self, value, name=None):
-        """Copy one FWI control parameter.
+    @property
+    def control_parameters(self):
+        """Return the parameters this inversion is inverting for.
 
-        Parameters
-        ----------
-        value : firedrake.Function or firedrake.Constant
-            Control parameter to copy. ``Function`` values are duplicated into
-            a new ``Function``; ``Constant`` values are interpolated into the
-            solver control function space and returned as a ``Function``.
-        name : str, optional
-            Name for the ``Function`` created from a ``Constant``.  Defaults
-            to ``"control"``.
+        The controls are held internally as a set of material parameters
+        mapping each to its field, so which parameters are inverted for is
+        recorded by its members and their current values by the fields. There
+        is no separate record of the selection.
 
-        Returns
-        -------
-        firedrake.Function
-            Independent copy of the control parameter.
-
-        Raises
-        ------
-        TypeError
-            If ``value`` is neither a ``Function`` nor a ``Constant``.
-        """
-        if isinstance(value, fire.Function):
-            copied = fire.Function(value.function_space(), name=value.name())
-            copied.assign(value)
-            return copied
-        if isinstance(value, fire.Constant):
-            control = fire.Function(
-                self.wave.get_control_parameter_function_space(),
-                name=name or "control",
-            )
-            control.interpolate(value)
-            return control
-        raise TypeError(
-            "FWI control must be a firedrake Function or Constant. "
-            f"Received {type(value).__name__}.",
-        )
-
-    def _copy_control_structure(self, control):
-        """Return an independent copy of the current control structure.
-
-        Parameters
-        ----------
-        control : firedrake.Function, firedrake.Constant, or None
-            Control parameter to copy.
+        How they are presented depends on the physics: an acoustic medium is
+        described by its velocity model alone, so its control is that single
+        ``Function``, which is the API acoustic FWI has always had. An elastic
+        medium is inverted for several parameters at once and needs a
+        different shape, which is not defined yet.
 
         Returns
         -------
         firedrake.Function or None
+            For an acoustic inversion, the velocity model, or ``None`` if none
+            is configured.
+
+        Raises
+        ------
+        NotImplementedError
+            If the wave equation is not acoustic.
+
+        Examples
+        --------
+        >>> set(fwi._control_parameters) <= fwi.wave.physical_parameters
+        True
+        """
+        if self.wave_type is not WaveType.ISOTROPIC_ACOUSTIC:
+            raise NotImplementedError(
+                "Inversion controls are only defined for acoustic media; "
+                f"{self.wave_type.name} controls are not implemented yet.",
+            )
+        if not self._control_parameters:
+            return None
+        (field,) = self._control_parameters.values()
+        return field
+
+    def _controlled_parameters(self):
+        """Return the parameters being inverted for.
+
+        Three sources are tried in turn, each one answering the case where the
+        previous is not available yet:
+
+        1. The control set, once ``set_guess_control`` has established it.
+           This is the normal case.
+        2. The solver's physical parameters, when no controls have been set:
+           an inversion that has not been told otherwise inverts for
+           everything the wave equation is written in terms of.
+        3. The parameters the solver *class* declares, when the solver has not
+           built its physical parameters either. Those only exist after the
+           first forward solve, but their names are known from the start, and
+           they are the same set.
+
+        Cases 2 and 3 are what lets ``set_guess_control`` work on a fresh
+        inversion: it is handed a bare ``Function`` that carries no indication
+        of which parameter it belongs to, and the answer has to come from
+        somewhere.
+
+        Returns
+        -------
+        tuple of enum.Enum
+            Controlled material parameters, ordered by name. A tuple rather
+            than a set because callers take the first entry to name the single
+            acoustic control.
+
+        Examples
+        --------
+        On an acoustic inversion, all three cases give
+        ``(AcousticMaterialParameter.P_WAVE_VELOCITY,)``, since an acoustic
+        medium has that one parameter and nothing else to choose from.
+        """
+        if self._control_parameters:
+            return tuple(self._control_parameters)
+        try:
+            physical = self.wave.physical_parameters
+        except ValueError:
+            physical = type(self.wave)._physical_parameter_names
+        return tuple(sorted(physical, key=lambda p: p.value))
+
+    def _control_by_parameter(self, control):
+        """Return control values keyed by the parameter each one belongs to.
+
+        Callers pass controls in two shapes, and this is where the two meet:
+
+        1. A **mapping**, which already says which parameter each value
+           belongs to, and is used as given.
+        2. A **bare value** — a ``Function``, a ``Constant``, a number — which
+           says nothing about which parameter it is, so it is paired with the
+           controlled parameter, of which there has to be exactly one. This is
+           the acoustic API, ``set_guess_control(velocity)``, and also how the
+           optimizer feeds back each iterate: ``_rebuild_control_from_vector``
+           builds a ``Function`` out of a plain array of numbers, which
+           carries no parameter name at all.
+
+        ``None`` gives an empty mapping, so callers can pass "no control
+        given" without a special case.
+
+        The parameters are not checked here. Applying a control reaches
+        ``PhysicalParameters.update``, which already rejects anything the wave
+        equation does not model, and names the known parameters while doing
+        so.
+
+        Parameters
+        ----------
+        control : mapping, firedrake.Function, firedrake.Constant, scalar, UFL expression, or None
+            Control values to key.
+
+        Returns
+        -------
+        dict
+            Control values keyed by material parameter. Empty if ``control``
+            is ``None``.
+
+        Raises
+        ------
+        ValueError
+            If a bare value is given while several parameters are controlled,
+            since there is then no way to tell which one it means.
+
+        Examples
+        --------
+        On an acoustic inversion, both spellings give the same result::
+
+            fwi.set_guess_control(velocity)
+            fwi.set_guess_control(
+                {AcousticMaterialParameter.P_WAVE_VELOCITY: velocity},
+            )
         """
         if control is None:
-            return None
-        return self._copy_control_value(control)
+            return {}
+        # A mapping is told apart from a bare value by whether it has items():
+        # asking is cheaper and safer than testing against a list of types the
+        # caller might legitimately pass.
+        try:
+            items = control.items()
+        except AttributeError:
+            items = None
+        if items is not None:
+            return dict(items)
+        # Unpacking, rather than taking the first entry, so that a bare value
+        # on a multi-parameter inversion fails instead of being assigned to
+        # whichever parameter happens to sort first.
+        (parameter,) = self._controlled_parameters()
+        return {parameter: control}
+
+    def _write_parameters_into_wave(self, wave, values):
+        """Write material values into a solver's physical parameters.
+
+        This is the one place where an inversion value becomes a physical
+        parameter. The solver is only asked to set a parameter of its own
+        equation; it is never told where the value came from, which is why
+        this serves both the controls being optimized and the true model that
+        generates the observed data.
+
+        Parameters
+        ----------
+        wave : Wave
+            Solver to update.
+        values : mapping
+            Values keyed by material parameter.
+
+        Raises
+        ------
+        ValueError
+            If the solver has no fields yet and several parameters are
+            controlled. Only the acoustic velocity model can be created here.
+        """
+        try:
+            parameters = wave.physical_parameters
+        except ValueError:
+            # A value is applied by writing into the field of the parameter
+            # it belongs to, so a solver that has never been given a model has
+            # nothing to write into. Create that field, empty, through the
+            # solver's own public model API; the loop below fills it in, the
+            # same way it writes every later iterate.
+            (parameter,) = self._controlled_parameters()
+            field = fire.Function(
+                self._control_function_space(wave), name=parameter.value,
+            )
+            wave.set_initial_velocity_model(velocity_model_function=field)
+            parameters = wave.initialize_physical_parameters()
+        for name, value in values.items():
+            parameters.update(name, value)
+
+    def _control_function_space(self, wave=None):
+        """Return the function space FWI controls live in.
+
+        Returns
+        -------
+        firedrake.FunctionSpace
+            The solver function space, built if it does not exist yet. FWI
+            is acoustic-only, so this is the space of the velocity model.
+        """
+        wave = self.wave if wave is None else wave
+        if wave.function_space is None:
+            wave.force_rebuild_function_space()
+        return wave.function_space
+
+    def _copy_parameters_from_wave(self, wave):
+        """Copy the controlled parameters' current values out of a solver.
+
+        The counterpart of :meth:`_write_parameters_into_wave`. Only the
+        parameters being inverted for are copied, whether the solver holds a
+        guess model or the true one.
+
+        Parameters
+        ----------
+        wave : Wave
+            Solver to read the physical parameters from. They are built
+            first if they do not exist yet.
+
+        Returns
+        -------
+        PhysicalParameters
+            Independent copies of the controlled parameter fields.
+        """
+        try:
+            parameters = wave.physical_parameters
+        except ValueError:
+            parameters = wave.initialize_physical_parameters()
+        return parameters.copy(self._controlled_parameters())
 
     def _flatten_control(self, control):
         """Flatten a control ``Function`` into an optimizer vector.
@@ -578,27 +715,6 @@ class FullWaveformInversion:
             control_reference.function_space(), name=control_reference.name(),
             val=flat_vector.reshape(reference_shape))
 
-    def _guess_control_reference(self):
-        """Return the current guess control used as optimizer reference.
-
-        Returns
-        -------
-        firedrake.Function
-            Active guess control parameter.
-
-        Raises
-        ------
-        ValueError
-            If neither the FWI driver nor the wave solver has a configured
-            guess control.
-        """
-        control_reference = self.guess_control
-        if control_reference is None:
-            control_reference = self.wave.get_control_parameters()
-        if control_reference is None:
-            raise ValueError("No guess control parameter has been configured.")
-        return control_reference
-
     def _expand_bound(self, bound, control_reference):
         """Expand one bound specification to match a control component.
 
@@ -652,8 +768,13 @@ class FullWaveformInversion:
         Returns
         -------
         None
-            Updates ``guess_control`` and ``guess_mesh``. The cached misfit is
+            Updates ``control_parameters`` and ``guess_mesh``. The cached misfit is
             reset.
+
+        Raises
+        ------
+        ValueError
+            If ``control`` holds no value.
 
         Examples
         --------
@@ -661,11 +782,17 @@ class FullWaveformInversion:
         ``Function``. ``set_guess_control(fire.Constant(2.0))`` creates a
         uniform control ``Function`` filled with ``2.0``.
         """
-        self.wave.set_control_parameters(self._copy_control_structure(control))
+        control = self._control_by_parameter(control)
+        if not control:
+            # Storing an empty mapping would drop the selection and leave the
+            # inversion looking unconfigured, several calls away from here.
+            raise ValueError(
+                "A guess control value is required. Received "
+                f"{control!r}.",
+            )
+        self._write_parameters_into_wave(self.wave, control)
         self.guess_mesh = self.wave.get_mesh()
-        self.guess_control = self._copy_control_structure(
-            self.wave.get_control_parameters(),
-        )
+        self._control_parameters = self.wave.physical_parameters.copy(control)
         self.misfit = None
 
     @property
@@ -739,7 +866,7 @@ class FullWaveformInversion:
         if value is not None:
             self.load_real_shot_record(file_name=value)
 
-    def calculate_misfit(self, c=None):
+    def calculate_misfit(self, c=None, save_output=False):
         """
         Calculate the misfit between observed and simulated data.
 
@@ -771,23 +898,20 @@ class FullWaveformInversion:
 
         if c is not None:
             updated_control = self._rebuild_control_from_vector(
-                self._guess_control_reference(),
+                self.control_parameters,
                 c,
             )
             self.set_guess_control(updated_control)
-        elif self.guess_control is not None:
-            self.wave.set_control_parameters(
-                self._copy_control_structure(self.guess_control),
-            )
-        elif self.wave.get_control_parameters() is None:
+        elif self._control_parameters:
+            self._write_parameters_into_wave(self.wave, self._control_parameters)
+        else:
             raise ValueError("No guess control parameter has been configured.")
 
         self._sync_wave_real_shot_record()
         if self.wave.adjoint_type == AdjointType.IMPLEMENTED_ADJOINT:
             self.wave.enable_implemented_adjoint()
         self.wave.forward_solve()
-        # self.guess_forward_solution = self.wave.f
-        current_control = self.wave.get_control_parameters()
+        current_control = self.control_parameters
         fire.VTKFile(f"control_{self.current_iteration}.pvd").write(current_control)
         np.save(
             f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
@@ -853,8 +977,8 @@ class FullWaveformInversion:
         if self.real_mesh is not None:
             real_wave.set_mesh(user_mesh=self.real_mesh, input_mesh_parameters={})
 
-        if self.real_control is not None:
-            real_wave.set_control_parameters(self._copy_control_structure(self.real_control))
+        if self._real_model_parameters:
+            self._write_parameters_into_wave(real_wave, self._real_model_parameters)
         elif self.real_velocity_model_file is not None:
             try:
                 real_wave.initial_velocity_model_file
@@ -892,7 +1016,16 @@ class FullWaveformInversion:
             self.real_shot_record = real_wave.forward_solution_receivers
         self._sync_wave_real_shot_record()
 
-    def set_real_velocity_model(self, **kwargs):
+    def set_real_velocity_model(
+        self,
+        constant=None,
+        conditional=None,
+        velocity_model_function=None,
+        expression=None,
+        new_file=None,
+        output=False,
+        dg_velocity_model=True,
+    ):
         """
         Set the true velocity model for synthetic test cases.
 
@@ -902,25 +1035,54 @@ class FullWaveformInversion:
 
         Parameters
         ----------
-        **kwargs
-            Keyword arguments accepted by
-            ``self.wave.set_initial_velocity_model``.
+        constant : float, optional
+            Constant velocity value for a homogeneous model.
+        conditional : firedrake.Conditional, optional
+            Firedrake conditional object defining the velocity distribution.
+        velocity_model_function : firedrake.Function, optional
+            Firedrake function to use as the velocity model. Must be in the
+            same function space as the object.
+        expression : str, optional
+            Mathematical expression string for the velocity model. Can use
+            variables: x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
+            Will be interpolated into the function space.
+        new_file : str, optional
+            Path to file containing the velocity model.
+        output : bool, optional
+            If True, output the velocity model to a pvd file for visualization.
+            Default is False.
+        dg_velocity_model : bool, optional
+            If True, use DG0 function space. Default is True.
 
         Notes
         -----
         Only one of the parameters (constant, conditional, velocity_model_function,
         expression, or new_file) should be provided.
         """
-        self.wave.set_initial_velocity_model(**kwargs)
-        self.real_mesh = self.wave.get_mesh()
-        self.real_control = self._copy_control_structure(
-            self.wave.get_control_parameters(),
+        self.wave.set_initial_velocity_model(
+            constant=constant,
+            conditional=conditional,
+            velocity_model_function=velocity_model_function,
+            expression=expression,
+            new_file=new_file,
+            output=output,
+            dg_velocity_model=dg_velocity_model,
         )
-        new_file = kwargs.get("new_file", None)
+        self.real_mesh = self.wave.get_mesh()
+        self._real_model_parameters = self._copy_parameters_from_wave(self.wave)
         if new_file is not None:
             self.real_velocity_model_file = new_file
 
-    def set_guess_velocity_model(self, **kwargs):
+    def set_guess_velocity_model(
+        self,
+        constant=None,
+        conditional=None,
+        velocity_model_function=None,
+        expression=None,
+        new_file=None,
+        output=False,
+        dg_velocity_model=True,
+    ):
         """
         Set the initial guess velocity model for inversion.
 
@@ -930,9 +1092,24 @@ class FullWaveformInversion:
 
         Parameters
         ----------
-        **kwargs
-            Keyword arguments accepted by
-            ``self.wave.set_initial_velocity_model``.
+        constant : float, optional
+            Constant velocity value for a homogeneous initial model.
+        conditional : firedrake.Conditional, optional
+            Firedrake conditional object defining the velocity distribution.
+        velocity_model_function : firedrake.Function, optional
+            Firedrake function to use as the velocity model. Must be in the
+            same function space as the object.
+        expression : str, optional
+            Mathematical expression string for the velocity model. Can use
+            variables: x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
+            Will be interpolated into the function space.
+        new_file : str, optional
+            Path to file containing the velocity model.
+        output : bool, optional
+            If True, output the velocity model to a pvd file for visualization.
+            Default is False.
+        dg_velocity_model : bool, optional
+            If True, use DG0 function space. Default is True.
 
         Notes
         -----
@@ -940,11 +1117,17 @@ class FullWaveformInversion:
         expression, or new_file) should be provided. Setting a new guess model
         will reset the misfit to None.
         """
-        self.wave.set_initial_velocity_model(**kwargs)
-        self.guess_mesh = self.wave.get_mesh()
-        self.guess_control = self._copy_control_structure(
-            self.wave.get_control_parameters(),
+        self.wave.set_initial_velocity_model(
+            constant=constant,
+            conditional=conditional,
+            velocity_model_function=velocity_model_function,
+            expression=expression,
+            new_file=new_file,
+            output=output,
+            dg_velocity_model=dg_velocity_model,
         )
+        self.guess_mesh = self.wave.get_mesh()
+        self._control_parameters = self._copy_parameters_from_wave(self.wave)
         self.misfit = None
 
     def set_real_mesh(self, user_mesh=None, input_mesh_parameters=None):
@@ -1084,7 +1267,7 @@ class FullWaveformInversion:
             self.get_functional(c=c)
         elif c is not None:
             updated_control = self._rebuild_control_from_vector(
-                self._guess_control_reference(),
+                self.control_parameters,
                 c,
             )
             self.set_guess_control(updated_control)
@@ -1175,7 +1358,7 @@ class FullWaveformInversion:
             self.adjoint_type = kwargs.pop("adjoint_type")
         parameters.update(kwargs)
 
-        control_reference = self._guess_control_reference()
+        control_reference = self.control_parameters
         lower = self._expand_bound(parameters["vmin"], control_reference)
         upper = self._expand_bound(parameters["vmax"], control_reference)
         bounds = list(zip(lower, upper))
@@ -1192,15 +1375,12 @@ class FullWaveformInversion:
             options=options,
         )
 
-        self.control_result = self._rebuild_control_from_vector(
+        self.control_parameter_result = self._rebuild_control_from_vector(
             control_reference,
             result.x,
         )
-        self.set_guess_control(self.control_result)
+        self.set_guess_control(self.control_parameter_result)
 
-        self.control_parameter_result = self._copy_control_structure(
-            self.control_result,
-        )
         fire.VTKFile("control_end.pvd").write(self.control_parameter_result)
 
         np.save("result", result.x)
@@ -1244,7 +1424,7 @@ class FullWaveformInversion:
         """
         if ROL is None:
             raise ImportError("The ROL module is not available.")
-        control_reference = self._guess_control_reference()
+        control_reference = self.control_parameters
         if not isinstance(control_reference, fire.Function):
             raise NotImplementedError(
                 "The deprecated ROL inversion path only supports a single "

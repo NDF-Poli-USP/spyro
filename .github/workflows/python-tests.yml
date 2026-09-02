@@ -3,7 +3,10 @@
 
 name: Python tests
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -80,8 +83,8 @@ jobs:
     name: Slow Tests and Parallel Tests
     runs-on: self-hosted
     needs: fast-tests
-    if: github.event_name == 'pull_request'
-    # Only runs on PRs after fast tests pass - saves resources
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    # Only runs on non-draft PRs after fast tests pass - saves resources
 
     container:
       image: firedrakeproject/firedrake:2025.4.1
@@ -197,8 +200,8 @@ jobs:
     name: Updated Firedrake tests
     runs-on: self-hosted
     needs: slow-tests
-    if: github.event_name == 'pull_request'
-    # Only runs on PRs after fast tests pass - saves resources
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    # Only runs on non-draft PRs after slow tests pass - saves resources
 
     container:
       image: firedrakeproject/firedrake:2026.4.0
@@ -257,6 +260,7 @@ jobs:
           mpiexec -n 3 pytest tests/parallel/test_supershot_grad.py
           mpiexec -n 2 pytest tests/parallel/test_gradient_serialshots.py
           mpiexec -n 2 pytest tests/parallel/test_gradient_auto_adjoint.py
+          mpiexec -n 2 pytest tests/parallel/test_elastic_sources_parallel.py
 
     - name: Post-run cleanup
       if: always()
