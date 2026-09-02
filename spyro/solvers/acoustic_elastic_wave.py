@@ -7,6 +7,7 @@ from .acoustic_elastic_solver_no_pml import construct_acoustic_elastic
 from ..utils.typing import override, WaveType
 from ..domains.space import create_function_space
 from ..domains.quadrature import quadrature_rules
+from ..receivers.Receivers import Receivers
 # from ..plots.general_plots import plot acoustic_elastic_snapshot # to implement
 
 def _extract_interface_markers(parent_mesh, child_mesh):
@@ -63,6 +64,10 @@ class AcousticElasticWave(Wave):
         self.submesh_fluid.coordinates.dat.data[:, 0] *= -1.0
         self.submesh_solid.coordinates.dat.data[:, 0] *= -1.0
 
+        # DEBUG temporário
+        teste = self.submesh_solid.locate_cell([-0.49, 0.49], tolerance=1e-6)
+        print("TESTE logo após correção de sinal:", teste)
+
         iface_fluid = _extract_interface_markers(self.mesh, self.submesh_fluid)
         iface_solid = _extract_interface_markers(self.mesh, self.submesh_solid)
         assert iface_fluid == iface_solid, (
@@ -105,6 +110,21 @@ class AcousticElasticWave(Wave):
         )
         mixed_space = self.scalar_function_space * self.vector_function_space
         return mixed_space
+    
+    def _setup_solid_receivers(self):
+        solid_locs = self.input_dictionary["acquisition"].get("solid_receiver_locations")
+        self.solid_receiver_history = []
+        if not solid_locs:
+            self.solid_receivers = None
+            return
+        saved_locs, saved_n = self.receiver_locations, self.number_of_receivers
+        self.receiver_locations = solid_locs
+        self.number_of_receivers = len(solid_locs)
+        self.delta_projector_sub_index = 1
+        self.solid_receivers = Receivers(self)
+        self.delta_projector_sub_index = 0
+        self.receiver_locations = saved_locs
+        self.number_of_receivers = saved_n
 
     # =====BEGIN TEMPORARY=====
     @override
@@ -114,6 +134,7 @@ class AcousticElasticWave(Wave):
         if self.dimension ==3:
             self.mesh_y = coodinates[2]
         self._build_function_space()
+        self._setup_solid_receivers()
         self._map_sources_and_receivers()
         self.mesh_ops.func_space_type = 'mixed'
         self.mesh_parameters.boundary_idx_map = {}
@@ -247,6 +268,9 @@ class AcousticElasticWave(Wave):
         self.source_function_fluid.assign(self.source_function.sub(0))
         self.solid_solver.solve()
         self.fluid_solver.solve()
+        if self.solid_receivers is not None:
+            data = self.X_np1.sub(1).dat.data_ro_with_halos[:]
+            self.solid_receiver_history.append(self.solid_receivers.interpolate(data))
     
     def _compute_p_equivalent(self):
         dim = self.dimension
