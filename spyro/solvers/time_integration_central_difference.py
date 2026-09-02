@@ -4,7 +4,7 @@ from firedrake import *
 
 from . import helpers
 from .. import utils
-from ..utils.typing import FunctionalEvaluationMode, AdjointType, AbsorbingBCsType
+from ..utils.typing import FunctionalEvaluationMode, AdjointType, AbsorbingBCsType, WaveType
 
 
 def _propagate_forward_central_difference(wave, source_ids):
@@ -113,7 +113,7 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
         
-        if wave.viscoelastic:
+        if wave.wave_type == WaveType.ISOTROPIC_ELASTIC and wave.viscoelastic:
 
             dt = wave.dt
             W = wave.strain_space
@@ -126,6 +126,7 @@ def _propagate_forward_central_difference(wave, source_ids):
             # Strain rate
             eps = project(epsilon(wave.vstate), W)
             zeta_old = Function(W)
+            
             # Update memory variables
             for i in range(len(zeta_list)):
                 zeta_old.assign(zeta_list[i])
