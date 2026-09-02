@@ -24,6 +24,10 @@ class AcousticElasticWave(Wave):
         self.wave_type = WaveType.NONE
         self.field_logger.add_field("displacement", "SolidDisplacement", lambda: self.X_n.sub(1))
 
+        self.p_equivalent_space = fire.FunctionSpace(self.submesh_solid, "CG", self.degree)
+        self.p_equivalent_function = fire.Function(self.p_equivalent_space, name="EquivalentPressure")
+        self.field_logger.add_field("p_equivalent", "EquivalentPressure", self._compute_p_equivalent)
+
         self.c           = None # fluid
         self.rho         = None # solid
         self.lmbda       = None # solid
@@ -238,6 +242,24 @@ class AcousticElasticWave(Wave):
         self._snapshot_every = vis.get("snapshot_frequency", None)
         self._snapshot_dir = vis.get("snapshot_output_dir", "results/snapshots")
         self._snapshot_step = 0
+
+    def solve(self):
+        self.source_function_fluid.assign(self.source_function.sub(0))
+        self.solid_solver.solve()
+        self.fluid_solver.solve()
+    
+    def _compute_p_equivalent(self):
+        dim = self.dimension
+        if dim == 2:
+            K = self.lmbda + self.mu
+        elif dim == 3:
+            K = self.lmbda + (2.0/3.0) * self.mu
+        else:
+            raise ValueError(f"Unsupported dimension: {dim}")
+
+        u = self.X_n.sub(1)
+        self.p_equivalent_function.interpolate(-K * fire.div(u))
+        return self.p_equivalent_function
 
 
 

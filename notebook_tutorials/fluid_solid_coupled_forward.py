@@ -42,7 +42,7 @@ dictionary["acquisition"] = {
 dictionary["time_axis"] = {
     "initial_time": 0.0,
     "final_time": 0.22,
-    "dt": 0.001,
+    "dt": 0.0001,
     "output_frequency": 10,
     "gradient_sampling_frequency": 1,
 }
@@ -59,6 +59,8 @@ dictionary["visualization"] = {
     "displacement_output_filename": "results/displacement.pvd",
     "snapshot_frequency": 20,
     "snapshot_output_dir": "results/snapshots",
+    "p_equivalent_output": True,
+    "p_equivalent_output_filename": "results/p_equivalent.pvd",
 }
 
 dictionary["synthetic_data"] = {

@@ -6,7 +6,7 @@ from ..utils.typing import AbsorbingBCsType
 
 
 def build_acoustic_form(wave, u_trial, v_test, u_n,
-                        u_nm1, quad_rule, c=None, implicit=False):
+                        u_nm1, quad_rule, c=None):
 
     if c is None:
         c = wave.c
@@ -18,8 +18,7 @@ def build_acoustic_form(wave, u_trial, v_test, u_n,
         * v_test
         * dx(**quad_rule)
     )
-    stiffness_field = u_trial if implicit else u_n
-    a = dot(grad(stiffness_field), grad(v_test)) * dx(**quad_rule)
+    a = dot(grad(u_n), grad(v_test)) * dx(**quad_rule) # explicit
 
     le = 0.0
     q = wave.source_expression
