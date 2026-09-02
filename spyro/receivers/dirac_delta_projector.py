@@ -69,7 +69,9 @@ class Delta_projector:
         # self.mesh = wave.mesh
         self.function_space = wave.function_space
         self.wave_type = wave.wave_type
-        self.space = self.function_space.sub(0)
+        # self.space = self.function_space.sub(0)
+        sub_index = getattr(wave, "delta_projector_sub_index", 0)
+        self.space = self.function_space.sub(sub_index)
         self.mesh = self.space.mesh() 
         self.my_ensemble = wave.comm
         self.dimension = wave.dimension
@@ -258,8 +260,9 @@ class Delta_projector:
         The returned array stores coordinates as ``(z, x)`` per node.
         """
         z, x = SpatialCoordinate(self.mesh)  # noqa: F405
-        ux = Function(self.space).interpolate(x)  # noqa: F405
-        uz = Function(self.space).interpolate(z)  # noqa: F405
+        scalar_space = self.space if self.space.value_shape == () else self.space.sub(0)
+        ux = Function(scalar_space).interpolate(x)  # noqa: F405
+        uz = Function(scalar_space).interpolate(z)  # noqa: F405
         datax = ux.dat.data_ro_with_halos[:]
         dataz = uz.dat.data_ro_with_halos[:]
         node_locations = np.zeros((len(datax), 2))
@@ -274,9 +277,10 @@ class Delta_projector:
         The returned array stores coordinates as ``(x, y, z)`` per node.
         """
         x, y, z = SpatialCoordinate(self.mesh)  # noqa: F405
-        ux = Function(self.space).interpolate(x)  # noqa: F405
-        uy = Function(self.space).interpolate(y)  # noqa: F405
-        uz = Function(self.space).interpolate(z)  # noqa: F405
+        scalar_space = self.space if self.space.value_shape == () else self.space.sub(0)
+        ux = Function(scalar_space).interpolate(x)  # noqa: F405
+        uy = Function(scalar_space).interpolate(y)  # noqa: F405
+        uz = Function(scalar_space).interpolate(z)  # noqa: F405
         datax = ux.dat.data_ro_with_halos[:]
         datay = uy.dat.data_ro_with_halos[:]
         dataz = uz.dat.data_ro_with_halos[:]
