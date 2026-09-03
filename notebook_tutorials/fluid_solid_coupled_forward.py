@@ -1,5 +1,9 @@
 import spyro
+import matplotlib.pyplot as plt
+import numpy as np
+
 from spyro.solvers.acoustic_elastic_wave import AcousticElasticWave
+from spyro.plots.receiver_plots import plot_receiver_response, plot_displacement_components
 
 dictionary = {}
 
@@ -34,7 +38,7 @@ dictionary["acquisition"] = {
     "frequency": 25.0,
     "delay": 1.0/25.0,
     "delay_type": "time",
-    "receiver_locations": [(-0.51, 0.51)],
+    "receiver_locations": [(-0.51, 0.5025)],
     "solid_receiver_locations": [(-0.49, 0.4975)], 
     "user_vertex_only_mesh": True,
 }
@@ -61,6 +65,7 @@ dictionary["visualization"] = {
     "snapshot_output_dir": "results/snapshots",
     "p_equivalent_output": True,
     "p_equivalent_output_filename": "results/p_equivalent.pvd",
+    "interface_error_frequency": 20,
 }
 
 dictionary["synthetic_data"] = {
@@ -84,9 +89,6 @@ np.savez(
     final_time=dictionary["time_axis"]["final_time"],
 )
 
-import numpy as np
-from spyro.plots.receiver_plots import plot_receiver_response, plot_displacement_components
-
 receiver_data = Wave_obj.forward_solution_receivers[:, 0]
 plot_receiver_response(
     receiver_data,
@@ -95,11 +97,10 @@ plot_receiver_response(
     receiver_id_for_title=0,
 )
 
-if Wave_obj.solid_receivers is not None:
-    solid_data = np.array(Wave_obj.solid_receiver_history)[:, 0, :]
-    plot_displacement_components(
-        time_vector=np.linspace(0, dictionary["time_axis"]["final_time"], len(solid_data)),
-        receiver_results=solid_data,
-        source_type="Ricker",
-        filename="results/receiver_solid.png",
-    )
+solid_data = np.array(Wave_obj.solid_receiver_history)[:, 0, :]
+plot_displacement_components(
+    time_vector=np.linspace(0, dictionary["time_axis"]["final_time"], len(solid_data)),
+    receiver_results=solid_data,
+    source_type="Ricker",
+    filename="results/receiver_solid.png",
+)
