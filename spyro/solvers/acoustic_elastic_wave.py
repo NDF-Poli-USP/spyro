@@ -20,6 +20,7 @@ class AcousticElasticWave(Wave):
         self.fluid_id    = 1
         self.solid_id    = 2
         self.interface_x = dictionary["mesh"].get("interface_x", None)
+        self.sigma_xx_history = []
 
         super().__init__(dictionary, comm=comm)
         self.wave_type = WaveType.NONE
@@ -28,6 +29,10 @@ class AcousticElasticWave(Wave):
         self.p_equivalent_space = fire.FunctionSpace(self.submesh_solid, "CG", self.degree)
         self.p_equivalent_function = fire.Function(self.p_equivalent_space, name="EquivalentPressure")
         self.field_logger.add_field("p_equivalent", "EquivalentPressure", self._compute_p_equivalent)
+
+        self.sigma_xx_space = fire.FunctionSpace(self.submesh_solid, "CG", self.degree)
+        self.sigma_xx_function = fire.Function(self.sigma_xx_space, name="SigmaXX")
+        self.field_logger.add_field("sigma_xx", "SigmaXX", self._compute_sigma_xx)
 
         self.c           = None # fluid
         self.rho         = None # solid
@@ -282,3 +287,10 @@ class AcousticElasticWave(Wave):
         u = self.X_n.sub(1)
         self.p_equivalent_function.interpolate(-K * fire.div(u))
         return self.p_equivalent_function
+
+    def _compute_sigma_xx(self):
+        u = self.X_n.sub(1)
+        strain = fire.sym(fire.grad(u))
+        sigma_xx_expr = self.lmbda * fire.div(u) + 2.0 * self.mu * strain[1, 1]
+        self.sigma_xx_function.interpolate(sigma_xx_expr)
+        return self.sigma_xx_function
