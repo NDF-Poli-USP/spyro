@@ -1,6 +1,8 @@
 import spyro
 import matplotlib.pyplot as plt
 import numpy as np
+import time
+import resource
 
 from spyro.solvers.acoustic_elastic_wave import AcousticElasticWave
 from spyro.plots.receiver_plots import plot_receiver_response, plot_displacement_components
@@ -66,19 +68,31 @@ dictionary["visualization"] = {
     "p_equivalent_output": True,
     "p_equivalent_output_filename": "results/p_equivalent.pvd",
     "interface_error_frequency": 20,
+    "sigma_xx_output": True,
+    "sigma_xx_output_filename": "results/sigma_xx.pvd",
 }
 
 dictionary["synthetic_data"] = {
     "type": "object",
     "velocity_fluid": 1.5,
-    "density_solid": 2.0,
-    "p_wave_velocity": 2.0,
-    "s_wave_velocity": 1.2,
+    "density_solid": 1.0,
+    "p_wave_velocity": 1.5,
+    "s_wave_velocity": 0.0,
     "real_velocity_file": None,
 }
 
 Wave_obj = AcousticElasticWave(dictionary=dictionary)
+t_start = time.perf_counter()
 Wave_obj.forward_solve()
+
+t_end = time.perf_counter()
+elapsed = t_end - t_start
+mem_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+
+print("Computational cost: Fluid-Solid Coupled")
+print(f"  Elapsed time (s): {elapsed:.2f}")
+print(f"  Memory (MB):      {mem_mb:.2f}")
+np.savez("results/cost.npz", elapsed=elapsed, memory_mb=mem_mb)
 
 import numpy as np
 np.savez(
