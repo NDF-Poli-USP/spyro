@@ -26,7 +26,7 @@ dictionary["mesh"] = {
     "length_y": 0.0,
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
-    "edge_length": 0.005,
+    "edge_length": 0.0025, # 0.005, 0.0035
     "interface_x": 0.5,
     "absorb_left": False,
     "absorb_right": False,
@@ -54,30 +54,30 @@ dictionary["time_axis"] = {
 }
 
 dictionary["visualization"] = {
-    "forward_output": True,
+    "forward_output": False,
     "forward_output_filename": "results/pressure.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "graadient_output": False,
     "gradient_filename": None,
     "debug_output": False,
-    "displacement_output": True,
+    "displacement_output": False,
     "displacement_output_filename": "results/displacement.pvd",
     "snapshot_frequency": 20,
     "snapshot_output_dir": "results/snapshots",
-    "p_equivalent_output": True,
+    "p_equivalent_output": False,
     "p_equivalent_output_filename": "results/p_equivalent.pvd",
     "interface_error_frequency": 20,
-    "sigma_xx_output": True,
+    "sigma_xx_output": False,
     "sigma_xx_output_filename": "results/sigma_xx.pvd",
 }
 
 dictionary["synthetic_data"] = {
     "type": "object",
     "velocity_fluid": 1.5,
-    "density_solid": 1.0,
-    "p_wave_velocity": 1.5,
-    "s_wave_velocity": 0.0,
+    "density_solid": 2.0,
+    "p_wave_velocity": 2.0,
+    "s_wave_velocity": 1.2,
     "real_velocity_file": None,
 }
 
