@@ -41,7 +41,6 @@ def configure_gmsh_2d_meshing_mode(
         gmsh.option.setNumber("Mesh.QuadqsSizemapMethod", 0)
 
 
-
 def build_gmsh_geometry_and_groups(
     gmsh,
     fname,
