@@ -6,6 +6,32 @@ from .meshing_utils import (
 )
 
 
+def configure_gmsh_2d_meshing_mode(
+    gmsh, structured_mesh, unstructured_quad_mesh, padding_type, min_element_size
+):
+    if structured_mesh and unstructured_quad_mesh:
+        raise ValueError(
+            "'structured_mesh' and 'unstructured_quad_mesh' are mutually exclusive."
+        )
+
+    if structured_mesh and padding_type != "hyperelliptical":
+        gmsh.option.setNumber("Mesh.MeshSizeMin", min_element_size)
+        gmsh.option.setNumber("Mesh.MeshSizeMax", min_element_size)
+        gmsh.model.mesh.setTransfiniteAutomatic([], np.pi, True)
+    elif unstructured_quad_mesh:
+        gmsh.option.setNumber("Mesh.Algorithm", 8)
+        gmsh.option.setNumber("Mesh.RecombineAll", 1)
+        gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 3)
+        gmsh.option.setNumber("Mesh.Smoothing", 10)
+        gmsh.option.setNumber("Mesh.RecombineOptimizeTopology", 1)
+        gmsh.option.setNumber("Mesh.RecombineNodeRepositioning", 1)
+        gmsh.option.setNumber("Mesh.RecombineMinimumQuality", 0.85)
+        gmsh.model.mesh.optimize("Relocate2D", niter=1)
+        gmsh.option.setNumber("Mesh.QuadqsTopologyOptimizationMethods", 111)
+        gmsh.option.setNumber("Mesh.QuadqsSizemapMethod", 0)
+
+
+
 def build_gmsh_geometry_and_groups(
     gmsh, fname, length_x, depth_z, padding_type, padding_x, padding_z,
     hyper_n, water_interface, water_search_value, structured_mesh, minElementSize
@@ -32,7 +58,7 @@ def build_gmsh_geometry_and_groups(
     if water_interface:
         Xs, Z_bottom = generate_water_profile_from_segy(
             fname, z_min=0.0, z_max=depth_z, x_min=0.0, x_max=length_x,
-            value=water_search_value, tolerance=1.0
+            value=water_search_value, tolerance=0.001
         )
         z_water_L, z_water_R = float(Z_bottom[0]), float(Z_bottom[-1])
 
@@ -634,9 +660,13 @@ def apply_structured_winslow_smoothing2d(
             if is_locked:
                 continue
 
-            if water_interface and i in interface_nodes:
-                locked.add(i)
-                continue
+            if water_interface:
+                if (x <= 0.0 + tol and z >= z_water_L - tol) or (x >= length_x - tol and z >= z_water_R - tol):
+                    locked.add(i)
+                    continue
+                if i in water_surface_nodes:
+                    locked.add(i)
+                    continue
 
             if abs(x - 0.0) < tol or abs(x - length_x) < tol:
                 move_Z_only.add(i)
