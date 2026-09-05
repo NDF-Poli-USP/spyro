@@ -439,7 +439,8 @@ class AutomaticMesh:
     def create_gmsh_2d_mesh(self):
         """
         Creates a 2D mesh using Gmsh with optional water interface,
-        hyperelliptical/rectangular padding, and Winslow smoothing.
+        hyperelliptical/rectangular padding, structured Winslow smoothing,
+        or unstructured full-quadrilateral meshing.
 
         Returns
         -------
