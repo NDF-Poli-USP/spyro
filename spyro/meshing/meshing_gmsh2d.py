@@ -824,9 +824,13 @@ def apply_structured_winslow_smoothing2d(
             if is_locked:
                 continue
 
-            if water_interface and i in interface_nodes:
-                locked.add(i)
-                continue
+            if water_interface:
+                if (x <= 0.0 + tol and z >= z_water_L - tol) or (x >= length_x - tol and z >= z_water_R - tol):
+                    locked.add(i)
+                    continue
+                if i in water_surface_nodes:
+                    locked.add(i)
+                    continue
 
             if abs(x - 0.0) < tol or abs(x - length_x) < tol:
                 move_Z_only.add(i)
