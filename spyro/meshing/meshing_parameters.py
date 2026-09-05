@@ -148,7 +148,6 @@ class MeshingParameters():  # noqa: UP039
         If True, uses a structured quadrilateral mesh.
     unstructured_quad_mesh : bool
         If True, uses a 2D unstructured full-quadrilateral Gmsh mesh.
-        Mutually exclusive with structured_mesh and only supported in 2D.
     min_element_size : float
         Element size constraint for structured mesh spacing.
     winslow_implementation : str

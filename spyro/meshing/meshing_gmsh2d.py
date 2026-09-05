@@ -31,7 +31,6 @@ def configure_gmsh_2d_meshing_mode(
         gmsh.option.setNumber("Mesh.QuadqsSizemapMethod", 0)
 
 
-
 def build_gmsh_geometry_and_groups(
     gmsh, fname, length_x, depth_z, padding_type, padding_x, padding_z,
     hyper_n, water_interface, water_search_value, structured_mesh, minElementSize
