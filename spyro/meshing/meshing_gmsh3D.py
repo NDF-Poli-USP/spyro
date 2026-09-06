@@ -8,7 +8,7 @@ from .meshing_gmsh_3d_functions import (
     generate_structured_rectangular_padding_water,
     generate_water_interface_volumes,
 )
-from .meshing_utils3D import define_winslow_points_3d
+from .meshing_utils3D import align_water_columns3d, define_winslow_points_3d
 from .meshing_winslow3D import run_selected_winslow
 
 
@@ -766,8 +766,17 @@ def apply_structured_winslow_smoothing3D(
     Returns
     -------
     None
-        The Gmsh node coordinates are updated in place when smoothing is enabled.
+        Water columns are aligned in place when delimited. Non-water nodes
+        are smoothed only when smoothing is enabled.
     """
+    aligned_water_tags = set()
+    if water_interface and padding_type in (None, "rectangular"):
+        aligned_water_tags = align_water_columns3d(gmsh, padding_type)
+        parallel_print(
+            f"Aligned 3D water columns ({len(aligned_water_tags)} water nodes).",
+            comm=comm,
+        )
+
     if not apply_winslow:
         parallel_print("Skipping 3D Winslow smoothing.", comm=comm)
         return
@@ -839,6 +848,15 @@ def apply_structured_winslow_smoothing3D(
         water_interface=water_interface,
         tol=2.0,
     )
+
+    if aligned_water_tags:
+        water_nodes = {tag_to_index[tag] for tag in aligned_water_tags}
+        for key in (
+            "move_all", "move_X_only", "move_Y_only", "move_Z_only", "movable_nodes",
+        ):
+            winslow_points[key].difference_update(water_nodes)
+        winslow_points["locked"].update(water_nodes)
+        winslow_points["water_nodes"].update(water_nodes)
 
     move_all = winslow_points["move_all"]
     move_X_only = winslow_points["move_X_only"]
