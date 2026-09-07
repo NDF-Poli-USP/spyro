@@ -578,8 +578,14 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         # New dimensions
         self.abc_new_geometry()
 
-    def infinite_model(self, wave, check_dt=False, max_divisor_tf=1,
-                       method='ANALYTICAL', mag_add=3):
+    def infinite_model(
+        self,
+        wave,
+        check_dt=False,
+        max_divisor_tf=1,
+        method='ANALYTICAL',
+        mag_add=3,
+    ):
         """Create a reference model for the ABC scheme for comparative purposes.
 
         Parameters
@@ -609,8 +615,12 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
 
         # Check the timestep size
         if check_dt:
-            self.check_timestep_abc(wave, max_divisor_tf=max_divisor_tf,
-                                    method=method, mag_add=mag_add)
+            self.check_timestep_abc(
+                wave,
+                max_divisor_tf=max_divisor_tf,
+                method=method,
+                mag_add=mag_add,
+            )
 
         pprint("\nBuilding Infinite Domain Model", comm=self.comm)
 
@@ -631,5 +641,9 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         # Saving reference signal
         output_file = self.abc_boundary_layer_type.value + "_ref"
         self.save_reference_signal(
-            wave.receiver_locations, wave.forward_solution_receivers,
-            wave.number_of_receivers, self.freq_Nyquist, output_file=output_file)
+            wave.receiver_locations,
+            wave.forward_solution_receivers,
+            wave.number_of_receivers,
+            self.freq_Nyquist,
+            output_file_prefix=output_file,
+        )

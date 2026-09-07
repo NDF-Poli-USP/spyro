@@ -105,14 +105,13 @@ def plot_receiver_response(
 
 def plot_displacement_components(
     time_vector: np.ndarray | list[float] | tuple[float, ...],
-    displacement_tuple: tuple[
-        np.ndarray | list[float] | tuple[float, ...],
-        np.ndarray | list[float] | tuple[float, ...],
-        np.ndarray | list[float] | tuple[float, ...],
-    ],
+    receiver_results: np.ndarray,
     source_type: str = "Unknown",
-    output_dir: str | Path | None = None,
+    filename: str | Path | None = None,
     show: bool = False,
+    hold: bool = False,
+    combined: bool = False,
+    **savefig_kwargs,
 ):
     """Plot displacement components over time.
 
@@ -120,8 +119,8 @@ def plot_displacement_components(
     ----------
     time_vector : array_like
         Time samples.
-    displacement_tuple : tuple of array_like
-        Displacement components ``(ux, uy, uz)``.
+    receiver_results : np.ndarray
+        Displacement measurements overtime.
     source_type : str, optional
         Type of source used in plot titles and output filenames.
     save_plots : bool, optional
@@ -131,6 +130,11 @@ def plot_displacement_components(
         current directory.
     show : bool, optional
         Whether to display the plot interactively. Default is False.
+    combined : bool, optional
+        Whether to display all directional components combined in a single plot.
+    hold : bool, optional
+        Default is False. If true does not close the figure. Useful for
+        adding other plots in the same figure.
 
     Returns
     -------
@@ -144,74 +148,73 @@ def plot_displacement_components(
         lengths.
     """
     time_vector = np.asarray(time_vector)
-    ux, uy, uz = (np.asarray(component) for component in displacement_tuple)
+    timestep_number, dimension = np.shape(receiver_results)
+    if dimension not in [2, 3]:
+        raise ValueError("Wrong dimension!")
+
+    ux = receiver_results[:, 0]
+    uy = receiver_results[:, 1]
+    if dimension == 3:
+        uz = receiver_results[:, 2]
 
     if time_vector.ndim != 1:
         raise ValueError("time_vector must be one-dimensional")
-    if any(component.ndim != 1 for component in (ux, uy, uz)):
-        raise ValueError("all displacement components must be one-dimensional")
-    if not (len(time_vector) == len(ux) == len(uy) == len(uz)):
+    if not len(time_vector) == timestep_number:
         raise ValueError(
-            "time_vector and displacement components must have the same length"
+            "time_vector and receiver results must have the same length in 1st axis."
         )
 
-    if output_dir is None:
-        output_dir = Path(".")
-    else:
-        output_dir = Path(output_dir)
+    if combined is False:
+        fig, separated_axes = plt.subplots(
+            dimension,
+            1,
+            figsize=(12, 8),
+            sharex=True,
+            constrained_layout=True,
+        )
 
-    separated_fig, separated_axes = plt.subplots(
-        3,
-        1,
-        figsize=(12, 8),
-        sharex=True,
-        constrained_layout=True,
+        if dimension == 2:
+            component_data = (
+                (ux, "b", "Ux (displacement in x)", "Displacement Component Ux"),
+                (uy, "r", "Uy (displacement in y)", "Displacement Component Uy"),
+            )
+        elif dimension == 3:
+            component_data = (
+                (ux, "b", "Ux (displacement in x)", "Displacement Component Ux"),
+                (uy, "r", "Uy (displacement in y)", "Displacement Component Uy"),
+                (uz, "g", "Uz (displacement in z)", "Displacement Component Uz"),
+            )
+
+        for axis, (component, color, label, title) in zip(
+            separated_axes, component_data
+        ):
+            axis.plot(time_vector, component, color=color, linewidth=2, label=label)
+            axis.set_ylabel("Amplitude")
+            axis.set_title(f"{title} - {source_type}")
+            axis.grid(True, alpha=0.3)
+            axis.legend()
+
+        separated_axes[-1].set_xlabel("Time (s)")
+
+    elif combined:
+        fig, combined_ax = plt.subplots(figsize=(12, 6), constrained_layout=True)
+        combined_ax.plot(time_vector, ux, color="b", linewidth=2, label="Ux")
+        combined_ax.plot(time_vector, uy, color="r", linewidth=2, label="Uy")
+        if dimension == 3:
+            combined_ax.plot(time_vector, uz, color="g", linewidth=2, label="Uz")
+        combined_ax.set_xlabel("Time (s)")
+        combined_ax.set_ylabel("Amplitude")
+        combined_ax.set_title(f"All Displacement Components - {source_type}")
+        combined_ax.legend()
+        combined_ax.grid(True, alpha=0.3)
+
+    return _finalize_figure(
+        fig,
+        filename,
+        show=show,
+        hold=hold,
+        **savefig_kwargs,
     )
-
-    component_data = (
-        (ux, "b", "Ux (displacement in x)", "Displacement Component Ux"),
-        (uy, "r", "Uy (displacement in y)", "Displacement Component Uy"),
-        (uz, "g", "Uz (displacement in z)", "Displacement Component Uz"),
-    )
-
-    for axis, (component, color, label, title) in zip(separated_axes, component_data):
-        axis.plot(time_vector, component, color=color, linewidth=2, label=label)
-        axis.set_ylabel("Amplitude")
-        axis.set_title(f"{title} - {source_type}")
-        axis.grid(True, alpha=0.3)
-        axis.legend()
-
-    separated_axes[-1].set_xlabel("Time (s)")
-
-    combined_fig, combined_ax = plt.subplots(figsize=(12, 6), constrained_layout=True)
-    combined_ax.plot(time_vector, ux, color="b", linewidth=2, label="Ux")
-    combined_ax.plot(time_vector, uy, color="r", linewidth=2, label="Uy")
-    combined_ax.plot(time_vector, uz, color="g", linewidth=2, label="Uz")
-    combined_ax.set_xlabel("Time (s)")
-    combined_ax.set_ylabel("Amplitude")
-    combined_ax.set_title(f"All Displacement Components - {source_type}")
-    combined_ax.legend()
-    combined_ax.grid(True, alpha=0.3)
-
-    if output_dir is not None:
-        output_dir.mkdir(parents=True, exist_ok=True)
-        basename = source_type.replace(" ", "_")
-
-        separated_fig.savefig(
-            output_dir / f"analytical_{basename}_displacement_components_separated.png",
-            dpi=300,
-            bbox_inches="tight",
-        )
-        combined_fig.savefig(
-            output_dir / f"analytical_{basename}_displacement_components_combined.png",
-            dpi=300,
-            bbox_inches="tight",
-        )
-
-    if show:
-        plt.show()
-    plt.close(separated_fig)
-    plt.close(combined_fig)
 
 
 def plot_comparison_of_receivers_to_reference(
@@ -236,7 +239,7 @@ def plot_comparison_of_receivers_to_reference(
         - ``final_time``: final simulation time.
         - ``forward_solution_receivers``: receiver data from the simulation.
         - ``path_case_habc``: output directory for the generated figures.
-    reference_array: reference receiver data.
+    reference_array : reference receiver data.
     show : bool, optional
         Whether to display the figure interactively. Defaults to ``False``.
 

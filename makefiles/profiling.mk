@@ -142,11 +142,11 @@ profile-memory-mpi:
 	@rm -f $(PROFILERS_DIR)/mprofile_*.dat 2>/dev/null || true
 	@echo "Running memory profile..."
 	@if [ -n "$(FUNCTION)" ]; then \
-		echo "Running: mprof run -o $(PROFILE_DAT) -- sh -c '$(MPI_CMD) python3 -m memory_profiler -m pytest $(FILE)::$(FUNCTION) -s'"; \
-		mprof run -o $(PROFILE_DAT) -- sh -c '$(MPI_CMD) python3 -m memory_profiler -m pytest $(FILE)::$(FUNCTION) -s'; \
+		echo "Running: mprof run -o $(PROFILE_DAT) sh -c '$(MPI_CMD) python3 -m memory_profiler -m pytest $(FILE)::$(FUNCTION) -s'"; \
+		mprof run -o $(PROFILE_DAT) sh -c '$(MPI_CMD) python3 -m memory_profiler -m pytest $(FILE)::$(FUNCTION) -s'; \
 	else \
-		echo "Running: mprof run -o $(PROFILE_DAT) -- sh -c '$(MPI_CMD) python3 -m memory_profiler $(FILE)'"; \
-		mprof run -o $(PROFILE_DAT) -- sh -c '$(MPI_CMD) python3 -m memory_profiler $(FILE)'; \
+		echo "Running: mprof run -o $(PROFILE_DAT) sh -c '$(MPI_CMD) python3 -m memory_profiler $(FILE)'"; \
+		mprof run -o $(PROFILE_DAT) sh -c '$(MPI_CMD) python3 -m memory_profiler $(FILE)'; \
 	fi
 	@echo ""
 	@echo "Generating memory plot..."
