@@ -204,6 +204,16 @@ class AbsorbingBCsType(StrEnum):
     PML = "PML"
 
 
+class NRBCBoundaryType(Enum):
+    """Enum for different types of boundaries where NRBCs can be applied.
+
+    STRAIGHT: Straight boundary.
+    HYPERSHAPE: Hypershape boundary.
+    """
+    STRAIGHT = "straight"
+    HYPERSHAPE = "hypershape"
+
+
 class SourceType(StrEnum):
     """Supported source types for analytical equations.
 

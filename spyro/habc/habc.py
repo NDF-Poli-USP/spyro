@@ -323,7 +323,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     #     # Save damping mask
     #     if save_file:
-    #         outfile = VTKFile(self.path_case_abc + "eta_mask.pvd")
+    #         outfile = VTKFile(self.path_case_absl + "eta_mask.pvd")
     #         outfile.write(self.eta_mask)
 
     #     # Domain dimensions with free surface truncation
@@ -366,7 +366,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     #     # Save damping profile
     #     if save_file:
-    #         outfile = VTKFile(self.path_case_abc + "eta_habc.pvd")
+    #         outfile = VTKFile(self.path_case_absl + "eta_habc.pvd")
     #         outfile.write(self.eta_habc)
 
     def rename_folder_habc(self):
@@ -389,9 +389,9 @@ class HABCLayer(ABCLayer, HABC_Damping):
                    "Output Folder for Results Will Be Renamed.", comm=self.comm)
 
             # Define the current and new folder names
-            old = self.path_case_abc
-            new = f"{self.path_case_abc[:-8]}{self.layer_geometry.n_hyp:.1f}" + \
-                f"{self.path_case_abc[-5:]}"
+            old = self.path_case_absl
+            new = f"{self.path_case_absl[:-8]}{self.layer_geometry.n_hyp:.1f}" + \
+                f"{self.path_case_absl[-5:]}"
 
             try:
                 if path.isdir(new):

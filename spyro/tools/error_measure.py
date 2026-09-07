@@ -34,6 +34,9 @@ class MeasureError:
 
     Attributes
     ----------
+    comm : `object`
+        An object representing the communication interface for parallel processing.
+        Default is `None`.
     path_reference : `str`
         Path to save the reference signal.
     path_save_error : `str`
@@ -47,6 +50,8 @@ class MeasureError:
         Compute the error measures at the receivers for comparison between models.
     get_reference_signal()
         Acquire the reference signal for comparison between models.
+    initialize_paths_for_error()
+        Initialize the paths for saving data and reference signals.
     integral_error()
         Compute the integral error between the model and reference signals.
     normalized_root_mean_square_error()
@@ -63,20 +68,11 @@ class MeasureError:
         Get the optimal heuristic factor for the quadratic damping
     """
 
-    def __init__(
-        self,
-        output_folder: Path | str | None = None,
-        output_case: Path | str | None = None,
-        comm=None,
-    ):
+    def __init__(self, comm=None):
         """Initialize the MeasureError class.
 
         Parameters
         ----------
-        output_folder : pathlib.Path or `str`, optional
-            The folder where output data will be saved. Default is `None`.
-        output_case : pathlib.Path or `str`, optional
-            The folder for the current case study. Default is `None`.
         comm : `object`, optional
             An object representing the communication interface for parallel processing.
             Default is `None`.
@@ -85,6 +81,29 @@ class MeasureError:
         -------
         None
         """
+
+        # Communicator MPI
+        self.comm = comm
+
+    def initialize_paths_for_error(
+        self,
+        output_folder: Path | str | None = None,
+        output_case: Path | str | None = None,
+    ):
+        """Initialize the paths for saving data and reference signals.
+
+        Parameters
+        ----------
+        output_folder : `str`, optional
+            The folder where output data will be saved. Default is `None`.
+        output_case : `str`, optional
+            The folder for the current case study. Default is `None`.
+
+        Returns
+        -------
+        None
+        """
+
         # Path to save data
         if output_folder is None:
             output_folder = Path(getcwd()) / "output"
@@ -100,12 +119,11 @@ class MeasureError:
         self.path_save_err_case = output_case
         self.path_reference = output_folder / "preamble"
         self.output_file_prefix = self.path_reference / "reference_"
-        self.comm = comm
 
     def save_reference_signal(
         self,
         receiver_locations,
-        forward_solution_receivers: np.ndarray,
+        forward_solution_receivers,
         number_of_receivers,
         nyquist_frequency: float,
         output_file_prefix="reference",
@@ -120,8 +138,8 @@ class MeasureError:
             Receiver waveform data acquired from forward proeblem.
         number_of_receivers : `int`
             Number of receivers used in the simulation.
-        freq_Nyquist : `float`
-            Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt).
+        nyquist_frequency : `float`
+            Nyquist frequency according to the time step. nyquist_frequency = 1 / (2 * dt).
         output_file_prefix : `str`, optional
             Name of the file to save the reference signal without any extension.
             Default is "ref_rec.npy".

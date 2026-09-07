@@ -18,7 +18,12 @@ class TestMeasureError:
         """Create a MeasureError instance for testing."""
         output_folder = "/output/test_output"
         output_case = "test_case"
-        return MeasureError(output_folder=output_folder, output_case=output_case)
+        measure_error = MeasureError()
+        measure_error.initialize_paths_for_error(
+            output_folder=output_folder,
+            output_case=output_case,
+        )
+        return measure_error
 
     @pytest.fixture
     def sample_signals(self):
@@ -42,6 +47,7 @@ class TestMeasureError:
     def test_initialization_default(self):
         """Test default initialization."""
         error = MeasureError()
+        error.initialize_paths_for_error()
         assert error.path_save_error.name == "output"
         assert error.path_save_err_case.name == "output"
         assert error.path_reference.name == "preamble"
@@ -52,7 +58,11 @@ class TestMeasureError:
         """Test initialization with custom paths."""
         output_folder = "/custom/path"
         output_case = "case123"
-        error = MeasureError(output_folder=output_folder, output_case=output_case)
+        error = MeasureError()
+        error.initialize_paths_for_error(
+            output_folder=output_folder,
+            output_case=output_case,
+        )
         assert str(error.path_save_error) == "/custom/path"
         assert str(error.path_save_err_case) == "case123"
 
@@ -302,8 +312,12 @@ class TestMeasureError:
         assert error_measures[5] == 0.5  # final_energy
         assert error_measures[6] == 0.5  # dissipated energy (1 - 0.5/1.0)
 
-    def test_error_measures_save_file(self, measure_error, receiver_data, tmp_path):
+    def test_error_measures_save_file(self, receiver_data, tmp_path):
         """Test saving error measures to file."""
+        measure_error = MeasureError()
+        measure_error.initialize_paths_for_error(
+            output_folder=str(tmp_path / "output" / "test_output"), output_case="test_case",
+        )
         with patch("spyro.tools.error_measure.getcwd", return_value=str(tmp_path)):
             n_time = 100
             n_rec = 1
@@ -353,7 +367,8 @@ class TestMeasureError:
         """Test loading reference signal."""
         with patch("spyro.tools.error_measure.getcwd", return_value=str(tmp_path)):
             # Create MeasureError instance inside the patch context
-            measure_error = MeasureError(
+            measure_error = MeasureError()
+            measure_error.initialize_paths_for_error(
                 output_folder="test_output", output_case="preamble"
             )
             # Create mock reference files

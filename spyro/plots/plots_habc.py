@@ -1,3 +1,4 @@
+
 """HABC-related plotting routines."""
 
 from pathlib import Path
@@ -8,37 +9,19 @@ import numpy as np
 
 from ..abc.lay_len import f_layer, loop_roots
 from .plot_helpers import _finalize_figure
+from ..tools.abc_set_path_cases import create_folder
 
 plt.rcParams.update({"font.family": "serif"})
 plt.rcParams["text.latex.preamble"] = r"\usepackage{bm} \usepackage{amsmath}"
 
 
-def create_folder(folder: str | Path) -> None:
-    """Ensure a directory exists, creating it if needed.
-
-    Parameters
-    ----------
-    folder : str or pathlib.Path
-        Path to the directory to create.
-
-    Returns
-    -------
-    None
-    """
-    # TODO: replace with the validation method to come
-    folder_path = Path(folder)
-    if not folder_path.is_dir():
-        folder_path.mkdir(parents=True, exist_ok=True)
-
-
 def plot_function_layer_size(
-    layer_parameters: Sequence[float],
-    frequency_parameters: Sequence[float],
-    geometry_parameters: Sequence[float],
-    reference_frequency_layer_sizes: Sequence[float],
-    output_folder: str | Path = "output/",
-    show: bool = False,
-) -> None:
+        layer_parameters: Sequence[float],
+        frequency_parameters: Sequence[float],
+        geometry_parameters: Sequence[float],
+        reference_frequency_layer_sizes: Sequence[float],
+        output_folder: str | Path = "output/",
+        show: bool = False,) -> None:
     """Plot the layer-size criterion for the HABC scheme.
 
     Parameters
