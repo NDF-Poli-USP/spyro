@@ -677,7 +677,7 @@ class HABCMesh(MeshOps):
         fd_rec = final_mesh.Add(FaceDescriptor(bc=1, domin=1, domout=2))
 
         # Get mesh cells from rectangular mesh
-        rec_cells = rec_mesh.coordinates.cell_node_map().values_with_halo
+        rec_cells = rec_mesh.coordinates.cell_node_list
 
         # Add all elements from rectangular mesh to the netgen mesh
         final_mesh.SetMaterial(1, "rec")
@@ -706,7 +706,7 @@ class HABCMesh(MeshOps):
         fd_hyp = final_mesh.Add(FaceDescriptor(bc=2, domin=2, domout=0))
 
         # Get mesh cells from hyperelliptical mesh
-        hyp_cells = hyp_mesh.coordinates.cell_node_map().values_with_halo
+        hyp_cells = hyp_mesh.coordinates.cell_node_list
 
         # Add all elements from hyperelliptical mesh to the netgen mesh
         final_mesh.SetMaterial(2, "hyp")
@@ -814,7 +814,7 @@ class HABCMesh(MeshOps):
         fd_rec = sharp_mesh.Add(FaceDescriptor(bc=1, domin=1, domout=0))
 
         # Get mesh cells from rectangular mesh
-        rec_cells = rec_mesh.coordinates.cell_node_map().values_with_halo
+        rec_cells = rec_mesh.coordinates.cell_node_list
 
         # Add all elements from rectangular mesh to the netgen mesh
         sharp_mesh.SetMaterial(1, "rec")
