@@ -182,6 +182,10 @@ class IsotropicWave(ElasticWave):
         self.mu = declared(ElasticMaterialParameter.MU, "lame_second")
         self.c = declared(ElasticMaterialParameter.P_WAVE_VELOCITY)
         self.c_s = declared(ElasticMaterialParameter.S_WAVE_VELOCITY)
+        self.Q_lambda = declared(ViscoelasticMaterialParameter.Q_LAMBDA)
+        self.Q_mu = declared(ViscoelasticMaterialParameter.Q_MU)
+        self.Q_vp = declared(ViscoelasticMaterialParameter.Q_VP)
+        self.Q_vs = declared(ViscoelasticMaterialParameter.Q_VS)
 
         # Exactly one set must be declared, and it names the parameters
         # that carry the material data. ``is not None`` rather than
@@ -292,8 +296,8 @@ class IsotropicWave(ElasticWave):
             )
             self.mu = self.rho*self.c_s**2
             self.lmbda = self.rho*self.c**2 - 2*self.mu
-            self.Q_vp = as_function(self.Q_vp, ViscoelasticMaterialParameter.Q_vp)
-            self.Q_vs = as_function(self.Q_vs, ViscoelasticMaterialParameter.Q_vs)
+            self.Q_vp = as_function(self.Q_vp, ViscoelasticMaterialParameter.Q_VP)
+            self.Q_vs = as_function(self.Q_vs, ViscoelasticMaterialParameter.Q_VS)
 
         else:
             raise ValueError(
