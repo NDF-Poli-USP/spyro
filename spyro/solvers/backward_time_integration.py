@@ -120,7 +120,8 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
     helpers.display_progress(wave.comm, t)
 
     dJ.dat.data_with_halos[:] *= sample_dt / 2
-    # Diagnostic cleanup: release local objects created during the adjoint.
+
+    # Gambiarra cleanup - If I dont do this memory increases a lot
     del grad_solver
     gc.collect()
 

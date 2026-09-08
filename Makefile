@@ -42,7 +42,8 @@ clean-data:
 clean-output:
 	@rm -rf velocity_models/test*
 	@rm -rf results/*
-	@rm -rf control_*/ gradient*/ initial_velocity_model/ output*/ vp_end*/ test_debug*/
+	@rm -rf profilers/*
+	@rm -rf control_*/ gradient*/ initial_velocity_model/ output*/ vp_end*/ test_debug*/ fwi/*
 
 clean: clean-pyc clean-root clean-data clean-output
 
