@@ -107,7 +107,7 @@ dictionary["time_axis"] = {
     "dt": 0.001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
-    "gradient_sampling_frequency": 4,  # how frequently to save solution to RAM
+    "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
 }
 dictionary["inversion"] = {
     "perform_fwi": True,  # switch to true to make a FWI
