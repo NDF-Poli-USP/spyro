@@ -22,7 +22,7 @@ from ..utils.typing import (
     AdjointType,
     FunctionalEvaluationMode,
     AbsorbingBCsType,
-    LayerShapeType, 
+    LayerShapeType,
     WaveType,
 )
 from .modal.modal_sol import Modal_Solver
@@ -478,10 +478,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.surface_quadrature_rule = s_rule
 
     def get_and_set_maximum_dt(
-            self,
-            fraction: float = 0.7,
-            estimate_max_eigenvalue: bool = False,
-        ):
+        self,
+        fraction: float = 0.7,
+        estimate_max_eigenvalue: bool = False,
+    ):
         """
         Calculates and sets the maximum stable time step (dt) for the wave solver.
 
