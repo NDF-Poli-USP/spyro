@@ -1,4 +1,7 @@
 import firedrake as fire
+from memory_profiler import memory_usage
+import gc
+from time import time
 from . import helpers
 from .wave import Wave
 from ..io.basicio import parallel_print
@@ -32,6 +35,8 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
     Source injection uses ``wave.rhs_no_pml_source()`` and the prebuilt
     variational solver is advanced with ``wave.solver.solve()``.
     """
+    parallel_print(f"Starting backward propagation at {time()-wave.start_time}", comm=wave.comm)
+    parallel_print(f"Starting backword propagation memory at {memory_usage(-1)[0]}", comm=wave.comm)
     wave.reset_pressure()
     mask_available = wave.gradient_mask_available
     if dt is not None:
@@ -115,6 +120,18 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
     helpers.display_progress(wave.comm, t)
 
     dJ.dat.data_with_halos[:] *= sample_dt / 2
+    # Diagnostic cleanup: release local objects created during the adjoint.
+    del grad_solver
+    gc.collect()
+
+    parallel_print(
+        f"Ending backward propagation at {time()-wave.start_time}",
+        comm=wave.comm,
+    )
+    parallel_print(
+        f"Ending backword propagation memory at {memory_usage(-1)[0]}",
+        comm=wave.comm,
+    )
     return dJ
 
 

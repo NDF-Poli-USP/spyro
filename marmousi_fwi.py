@@ -86,7 +86,7 @@ dictionary["mesh"] = {
     "length_z": length_z,
     "length_x": length_x,  # width in km - always positive
     "length_y": 0.0,  # thickness in km - always positive
-    "output_filename": "trial01.msh",
+    "output_filename": "real.msh",
     "cells_per_wavelength": 3.0,
     "frequency": frequency,
     "segy_velocity_model": "velocity_models/vp_marmousi-ii.segy",
@@ -95,7 +95,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.01, 4.0), (-0.01, 12.0), 40),
+    "source_locations": spyro.create_transect((-0.01, 4.0), (-0.01, 12.0), 3),
     "frequency": frequency,
     "delay": 1.0/frequency,
     "delay_type": "time",
@@ -107,7 +107,7 @@ dictionary["time_axis"] = {
     "dt": 0.001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
-    "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
+    "gradient_sampling_frequency": 4,  # how frequently to save solution to RAM
 }
 dictionary["inversion"] = {
     "perform_fwi": True,  # switch to true to make a FWI
@@ -115,8 +115,8 @@ dictionary["inversion"] = {
     "shot_record_file": None,
 }
 dictionary["visualization"] = {
-    "forward_output": True,
-    "forward_output_filename": "results/forward_output.pvd",
+    "forward_output": False,
+    "forward_output_filename": None,
 }
 
 
@@ -192,7 +192,7 @@ def run_fwi():
         "length_z": length_z,
         "length_x": length_x,  # width in km - always positive
         "length_y": 0.0,  # thickness in km - always positive
-        "output_filename": "trial01.msh",
+        "output_filename": "guess.msh",
         "cells_per_wavelength": 2.7,
         "frequency": frequency,
         "segy_velocity_model": "initial_guess.segy",
@@ -207,7 +207,8 @@ def run_fwi():
 
     # Let us set the initial guess velocity
     fwi_obj.set_guess_velocity_model(new_file="initial_guess.hdf5", fast_interpolate=True)
-    fwi_obj.run_fwi(vmin=1.4, vmax=4.7, maxiter=20, )
+    fwi_obj.wave.enable_implemented_adjoint()
+    fwi_obj.run_fwi(vmin=1.4, vmax=4.7, maxiter=2, )
 
     # Let us have a look at our solution
     export_grid_spacing = 0.01

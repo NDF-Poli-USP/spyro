@@ -1,4 +1,6 @@
 from abc import abstractmethod, ABCMeta
+from memory_profiler import memory_usage
+from time import time
 import warnings
 import firedrake as fire
 
@@ -128,6 +130,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
 
         super().__init__(dictionary=dictionary, comm=comm)
+        self.start_time = time()
         self.initial_velocity_model = None
         self.gradient_mask_available = False
 
@@ -591,7 +594,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if source_nums is None:
             source_nums = [0]
         self.current_sources = source_nums
+        parallel_print(f"starting forward solve at {time()-self.start_time}", comm=self.comm)
+        parallel_print(f"starting forward solve memory at {memory_usage(-1)[0]}", comm=self.comm)
+
         _forward_time_integrator(self, source_nums)
+        parallel_print(f"ending forward solve at {time()-self.start_time}", comm=self.comm)
+        parallel_print(f"ending forward solve memory at {memory_usage(-1)[0]}", comm=self.comm)
 
     def get_dt(self):
         return self._dt
