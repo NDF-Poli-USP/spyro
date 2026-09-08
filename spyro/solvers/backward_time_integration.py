@@ -1,12 +1,14 @@
 import firedrake as fire
-from memory_profiler import memory_usage
 import gc
-from time import time
+
 from . import helpers
 from .wave import Wave
 from ..io.basicio import parallel_print
 from ..receivers.Receivers import Receivers
 from ..utils.typing import AbsorbingBCsType
+from ..utils.computational_resources_logging import (
+    log_max_computational_resources_per_core,
+)
 
 
 def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
@@ -35,8 +37,11 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
     Source injection uses ``wave.rhs_no_pml_source()`` and the prebuilt
     variational solver is advanced with ``wave.solver.solve()``.
     """
-    parallel_print(f"Starting backward propagation at {time()-wave.start_time}", comm=wave.comm)
-    parallel_print(f"Starting backword propagation memory at {memory_usage(-1)[0]}", comm=wave.comm)
+    log_max_computational_resources_per_core(
+        t0=wave.start_time,
+        prefix_string="At backward start",
+        comm=wave.comm,
+    )
     wave.reset_pressure()
     mask_available = wave.gradient_mask_available
     if dt is not None:
@@ -125,12 +130,9 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
     del grad_solver
     gc.collect()
 
-    parallel_print(
-        f"Ending backward propagation at {time()-wave.start_time}",
-        comm=wave.comm,
-    )
-    parallel_print(
-        f"Ending backword propagation memory at {memory_usage(-1)[0]}",
+    log_max_computational_resources_per_core(
+        t0=wave.start_time,
+        prefix_string="At backward end",
         comm=wave.comm,
     )
     return dJ

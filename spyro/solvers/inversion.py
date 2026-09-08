@@ -403,6 +403,7 @@ class FullWaveformInversion:
         self.gradient_mask_available = False
         self.functional_history = []
         self.debug = debug
+        self.wave.debug = debug
 
     def _sync_wave_real_shot_record(self):
         """Copy observed data from the FWI driver to the wave solver.

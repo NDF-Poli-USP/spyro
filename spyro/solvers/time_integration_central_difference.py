@@ -1,10 +1,12 @@
 import firedrake as fire
-from memory_profiler import memory_usage
 import numpy as np
 
 from . import helpers
 from .. import utils
 from ..utils.typing import FunctionalEvaluationMode, AdjointType, AbsorbingBCsType
+from ..utils.computational_resources_logging import (
+    log_max_computational_resources_per_core,
+)
 
 
 def _propagate_forward_central_difference(wave, source_ids):
@@ -26,11 +28,14 @@ def _propagate_forward_central_difference(wave, source_ids):
     None
         The solver state, receiver data and functional are updated in place.
     """
-    print("forward start:", memory_usage(-1)[0], flush=True)
+    log_max_computational_resources_per_core(
+        t0=wave.start_time,
+        prefix_string="At forward start",
+        comm=wave.comm,
+    )
     if wave.sources is not None:
         wave.sources.current_sources = source_ids
         rhs_forcing = fire.Cofunction(wave.function_space.dual())
-    print("after_sources:", memory_usage(-1)[0], flush=True)
 
     adjoint_type = wave.adjoint_type
 
@@ -72,7 +77,7 @@ def _propagate_forward_central_difference(wave, source_ids):
                 wave.source_function.function_space()
             )
             master_source_W.sub(0).assign(source_cof)
-    print("After vertexonlymesh:", memory_usage(-1)[0], flush=True)
+
     usol_recv = []
     receiver_array = None
     receiver_buffer = None
@@ -95,7 +100,6 @@ def _propagate_forward_central_difference(wave, source_ids):
         # fresh one, sized by this loop's ``nt``.
         wave.automated_adjoint.start_recording(total_steps=nt)
 
-    print("Before timestepping:", memory_usage(-1)[0], flush=True)
     for step in range(nt):
         # Basic way of applying sources
         wave.update_source_expression(t)
@@ -188,7 +192,6 @@ def _propagate_forward_central_difference(wave, source_ids):
 
         t = step * float(wave.dt)
 
-    print("After timestepping:", memory_usage(-1)[0], flush=True)
     wave.current_time = t
 
     helpers.display_progress(wave.comm, t)
@@ -221,5 +224,11 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.functional_value = J
     else:
         wave.functional_value = None
+
+    log_max_computational_resources_per_core(
+        t0=wave.start_time,
+        prefix_string="At forward end",
+        comm=wave.comm
+    )
 
     wave.field_logger.stop_logging()
