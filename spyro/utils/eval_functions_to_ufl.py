@@ -9,7 +9,7 @@ from ast import parse, walk, Add, BinOp, Call, Constant, Div, \
     Expression, Load, Mult, Name, Pow, Sub, UnaryOp, UAdd, USub
 from firedrake import SpatialCoordinate, acos, asin, atan, atan2, \
     cos, cosh, e, erf, exp, ln, pi, sin, sinh, sqrt, tan, tanh
-from spyro.utils.error_management import value_parameter_error
+from spyro.utils.error_management import validate_parameter
 
 
 def available_functions_to_eval(mesh, dimension):
@@ -71,7 +71,7 @@ def generate_ufl_functions(mesh, expression, dimension):
     """
 
     # Check model dimension
-    value_parameter_error('dimension', dimension, [2, 3])
+    validate_parameter('dimension', dimension, [2, 3])
 
     # Get available functions and variables
     namespace = available_functions_to_eval(mesh, dimension)

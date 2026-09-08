@@ -48,7 +48,7 @@ def test_plot():
     z_switches = [-0.5]
     wave.multiple_layer_velocity_model(z_switches, layer_values)
     wave.forward_solve()
-    spyro.plots.plot_shots(wave, show=False, file_name="test_plot", file_format="png")
+    spyro.plots.plot_shots(wave, show=False, filename="test_plot", file_format="png")
     expected_file = "test_plot[0].png"
     assert os.path.exists(expected_file)
 
@@ -102,7 +102,7 @@ def test_plot_mesh_sizes():
     mesh = Mesh_obj.create_mesh()  # noqa: F841
 
     image_output_filename = "mesh_size.png"
-    spyro.plots.plot_mesh_sizes(mesh_filename=mesh_filename, output_filename=image_output_filename, show=False)
+    spyro.plots.plot_mesh_sizes(mesh=mesh, output_filename=image_output_filename, show=False)
     assert os.path.exists(str(image_output_filename))
 
 

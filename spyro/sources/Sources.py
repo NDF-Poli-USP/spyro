@@ -1,4 +1,5 @@
-import math
+"""Source utilities for injecting wavelets into simulation meshes."""
+
 import numpy as np
 from scipy.signal import butter, filtfilt
 from spyro.receivers.dirac_delta_projector import Delta_projector
@@ -8,7 +9,7 @@ import firedrake as fire
 
 
 class Sources(Delta_projector):
-    """Methods that inject a wavelet into a mesh
+    """Inject a wavelet into a mesh.
 
     ...
 
@@ -16,24 +17,24 @@ class Sources(Delta_projector):
     ----------
     mesh : Firedrake.mesh
         mesh where receivers are located
-    V: Firedrake.FunctionSpace object
+    V : Firedrake.FunctionSpace object
         The space of the finite elements
-    my_ensemble: Firedrake.ensemble_communicator
+    my_ensemble : Firedrake.ensemble_communicator
         An ensemble communicator
-    dimension: int
+    dimension : int
         The dimension of the space
-    degree: int
+    degree : int
         Degree of the function space
-    source_locations: list
+    source_locations : list
         List of tuples containing all source locations
-    num_sources: int
+    num_sources : int
         Number of sources
-    quadrilateral: boolean
+    quadrilateral : boolean
         Boolean that specifies if cells are quadrilateral
-    is_local: list of booleans
+    is_local : list of booleans
         List that checks if sources are present in cores
         spatial paralelism
-    wavelet: list of floats
+    wavelet : list of floats
         Values at timesteps of wavelet used in the simulation
 
     Methods
@@ -47,24 +48,22 @@ class Sources(Delta_projector):
     """
 
     def __init__(self, wave):
-        """Initializes class and gets all receiver parameters from
-        input file.
+        """Initialize the class and load source parameters.
 
         Parameters
         ----------
-        model: `dictionary`
+        model : `dictionary`
             Contains simulation parameters and options.
-        mesh: a Firedrake.mesh
+        mesh : a Firedrake.mesh
             2D/3D simplicial mesh read in by Firedrake.Mesh
-        V: Firedrake.FunctionSpace object
+        V : Firedrake.FunctionSpace object
             The space of the finite elements
-        my_ensemble: Firedrake.ensemble_communicator
+        my_ensemble : Firedrake.ensemble_communicator
             An ensemble communicator
 
         Returns
         -------
-        Sources: :class: 'Source' object
-
+        Sources : :class: 'Source' object
         """
         super().__init__(wave)
 
@@ -81,6 +80,7 @@ class Sources(Delta_projector):
             self.build_maps(order=1)
 
     def update_wavelet(self, wave):
+        """Update the cached wavelet from the current wave settings."""
         self.wavelet = full_ricker_wavelet(
             dt=wave.dt,
             final_time=wave.final_time,
@@ -90,18 +90,18 @@ class Sources(Delta_projector):
         )
 
     def apply_source(self, rhs_forcing, step):
-        """Applies source in a assembled right hand side.
+        """Apply the source to an assembled right-hand side.
 
         Parameters
         ----------
-        rhs_forcing: Firedrake.Function
+        rhs_forcing : Firedrake.Function
             The right hand side of the wave equation
-        step: int
+        step : int
             Time step (index of the wavelet array)
 
         Returns
         -------
-        rhs_forcing: Firedrake.Function
+        rhs_forcing : Firedrake.Function
             The right hand side of the wave equation with the source applied
         """
         for source_id in range(self.number_of_points):
@@ -109,7 +109,9 @@ class Sources(Delta_projector):
                 for i in range(len(self.cellNodeMaps[source_id])):
                     rhs_forcing.dat.data_with_halos[
                         int(self.cellNodeMaps[source_id][i])
-                    ] = (self.wavelet[step] * np.dot(self.amplitude, self.cell_tabulations[source_id][i]))
+                    ] = self.wavelet[step] * np.dot(
+                        self.amplitude, self.cell_tabulations[source_id][i]
+                    )
             else:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841
@@ -121,7 +123,7 @@ class Sources(Delta_projector):
 
         Returns
         -------
-        source_cofunction: Firedrake.Cofunction
+        source_cofunction : Firedrake.Cofunction
             A cofunction with the source applied into the domain.
         """
         if self.current_sources is None or len(self.current_sources) == 0:
@@ -147,12 +149,32 @@ class Sources(Delta_projector):
         else:
             raise ValueError("Invalid wave type")
 
-        return fire.Cofunction(
-            self.function_space.dual()).interpolate(
-                fire.assemble(source_form))
+        return fire.Cofunction(self.function_space.dual()).interpolate(
+            fire.assemble(source_form)
+        )
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
+    """Return the configured time-dependent source value.
+
+    Parameters
+    ----------
+    model : dict
+        Simulation configuration dictionary.
+    t : float
+        Current time.
+    freq : float, optional
+        Source frequency.
+    amp : float, default=1
+        Source amplitude.
+    delay : float, default=1.5
+        Delay multiplier for the source wavelet.
+
+    Returns
+    -------
+    float
+        Source amplitude evaluated at time ``t``.
+    """
     if model["acquisition"]["source_type"] == "Ricker":
         return ricker_wavelet(t, freq, amp, delay=delay)
     # elif model["acquisition"]["source_type"] == "MMS":
@@ -162,24 +184,29 @@ def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
 
 
 def ricker_wavelet(
-    t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimum"
+    t: float,
+    frequency: float,
+    amplitude: float = 1.0,
+    delay: float | int = 1.5,
+    delay_type: str = "multiples_of_minimum",
 ):
-    """Creates a Ricker source function with a
-    delay in term of multiples of the distance
-    between the minimums.
+    """Create a delayed Ricker source function.
+
+    The delay is expressed in either multiples of the distance between minima or
+    in time.
 
     Parameters
     ----------
-    t: float
+    t : float
         Time
-    freq: float
+    frequency : float
         Frequency of the wavelet
-    amp: float
-        Amplitude of the wavelet
-    delay: float
+    amplitude : float, optional
+        Amplitude of the wavelet. Default value of 1.0.
+    delay : float or int
         Delay in term of multiples of the distance
-        between the minimums.
-    delay_type: string
+        between the minimums or in seconds.
+    delay_type : string
         Type of delay. Options are:
         - multiples_of_minimum
         - time
@@ -190,13 +217,12 @@ def ricker_wavelet(
         Value of the wavelet at time t
     """
     if delay_type == "multiples_of_minimum":
-        time_delay = delay * math.sqrt(6.0) / (math.pi * freq)
+        time_delay = delay * np.sqrt(6.0) / (np.pi * frequency)
     elif delay_type == "time":
         time_delay = delay
     t = t - time_delay
-    # t = t - delay / freq
-    tt = (math.pi * freq * t) ** 2
-    return amp * (1.0 - (2.0) * tt) * math.exp((-1.0) * tt)
+    tt = (np.pi * frequency * t) ** 2
+    return amplitude * (1.0 - (2.0) * tt) * np.exp((-1.0) * tt)
 
 
 def full_ricker_wavelet(
@@ -207,23 +233,24 @@ def full_ricker_wavelet(
     delay=1.5,
     delay_type="multiples_of_minimum",
 ):
-    """Compute the Ricker wavelet optionally applying low-pass filtering
-    using cutoff frequency in Hertz.
+    """Compute the Ricker wavelet, optionally applying low-pass filtering.
+
+    Cutoff frequency in Hertz.
 
     Parameters
     ----------
-    dt: float
+    dt : float
         Time step
-    final_time: float
+    final_time : float
         Final time
-    frequency: float
+    frequency : float
         Frequency of the wavelet
-    cutoff: float
+    cutoff : float
         Cutoff frequency in Hertz
-    delay: float
+    delay : float
         Delay in term of multiples of the distance
         between the minimums.
-    delay_type: string
+    delay_type : string
         Type of delay. Options are:
         - multiples_of_minimum
         - time
@@ -250,3 +277,13 @@ def full_ricker_wavelet(
         b, a = butter(order, normal_cutoff, btype="low", analog=False)
         full_wavelet = filtfilt(b, a, full_wavelet)
     return full_wavelet
+
+
+def ricker_integral(
+    frequency: float,
+    t: float,
+    time_delay: float,
+):
+    """Get source time function (integral of Ricker wavelet)."""
+    a = np.pi * frequency * (t - time_delay)
+    return (t - time_delay) * np.exp(-(a**2))

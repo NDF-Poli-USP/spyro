@@ -67,7 +67,7 @@ def test_negative_pad_length_raises_error():
 def test_none_pad_length_raises_error():
     # Test that passing a None pad length raises a TypeError
     hl = RectangLayer((1., 1.))
-    with raises(TypeError, match="'pad_len' must be a float or a integer"):
+    with raises(TypeError, match="'pad_len' must be a float or an integer"):
         hl.define_rec_hyperaxes(None)
 
 

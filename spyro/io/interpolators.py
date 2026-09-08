@@ -1,12 +1,14 @@
+"""Methods related to intepolating grids or functions."""
+
 import firedrake as fire
 import h5py
 import numpy as np
+from pathlib import Path
 from scipy.interpolate import RegularGridInterpolator
 
 
-def _grid_velocity_data_to_source_function(grid_velocity_data, comm=None):
+def _grid_velocity_data_to_source_function(grid_velocity_data: dict, comm=None):
     """Build a CG1 Firedrake function on a structured mesh from grid data."""
-
     # Adding imports here to avoid circular imports
     from ..meshing.meshing_parameters import MeshingParameters
     from ..meshing.meshing_functions import AutomaticMesh
@@ -54,9 +56,11 @@ def _grid_velocity_data_to_source_function(grid_velocity_data, comm=None):
     return source
 
 
-def project_grid_velocity_data(grid_velocity_data, V, comm=None):
+def project_grid_velocity_data(
+    grid_velocity_data: dict, V: fire.FunctionSpace, comm=None
+):
     """Project a structured grid dictionary onto a Firedrake function space."""
-    from ..plots.plots import debug_pvd
+    from ..plots.debug_plots import debug_pvd
     source = _grid_velocity_data_to_source_function(grid_velocity_data, comm=comm)
     debug_pvd(source, "check_source.pvd")
     c = fire.Function(V).interpolate(source, allow_missing_dofs=True)
@@ -64,7 +68,7 @@ def project_grid_velocity_data(grid_velocity_data, V, comm=None):
     return _check_units(c)
 
 
-def _hdf5_velocity_model_to_grid_velocity_data(Model, fname):
+def _hdf5_velocity_model_to_grid_velocity_data(Model, fname: str | Path):
     """Convert an HDF5 velocity model into a grid velocity dictionary."""
     with h5py.File(fname, "r") as f:
         vp_values = np.asarray(f.get("velocity_model")[()])
@@ -109,7 +113,7 @@ def _hdf5_velocity_model_to_grid_velocity_data(Model, fname):
     return grid_velocity_data
 
 
-def interpolate(Model, fname, V, fast_interpolate=False):
+def interpolate(Model, fname: str | Path, V, fast_interpolate=False):
     """Read and interpolate a seismic velocity model onto a Firedrake space.
 
     Parameters
@@ -142,24 +146,25 @@ def interpolate(Model, fname, V, fast_interpolate=False):
 
 
 def fast_interpolation(Model, fname, V):
-    """Read and interpolate a seismic velocity model stored
-    in a HDF5 file onto the nodes of a finite element space.
+    """Read and interpolate fast a seismic velocity model from HDF5.
+
+    Interpolates a seismic velocity model stored in a HDF5 file onto the
+    nodes of a finite element space.
 
     Parameters
     ----------
-    Model: spyro object
+    Model : spyro object
         Model options and parameters.
-    fname: str
+    fname : str
         The name of the HDF5 file containing the seismic velocity model.
-    V: Firedrake.FunctionSpace object
-        The space of the finite elements.
+    V : firedrake.FunctionSpace
+        The finite element space for interpolation.
 
     Returns
     -------
-    c: Firedrake.Function
+    c : Firedrake.Function
         P-wave seismic velocity interpolated onto the nodes
         of the finite elements.
-
     """
     m = V.ufl_domain()
 
@@ -207,12 +212,8 @@ def fast_interpolation(Model, fname, V):
             x = np.linspace(minx, maxx, ncol)
 
             # make sure no out-of-bounds
-            qp_z2 = [
-                minz if z < minz else maxz if z > maxz else z for z in qp_z
-            ]
-            qp_x2 = [
-                minx if x < minx else maxx if x > maxx else x for x in qp_x
-            ]
+            qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
+            qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
 
             interpolant = RegularGridInterpolator((z, x), Z)
             tmp = interpolant((qp_z2, qp_x2))
@@ -223,15 +224,9 @@ def fast_interpolation(Model, fname, V):
             y = np.linspace(miny, maxy, ncol2)
 
             # make sure no out-of-bounds
-            qp_z2 = [
-                minz if z < minz else maxz if z > maxz else z for z in qp_z
-            ]
-            qp_x2 = [
-                minx if x < minx else maxx if x > maxx else x for x in qp_x
-            ]
-            qp_y2 = [
-                miny if y < miny else maxy if y > maxy else y for y in qp_y
-            ]
+            qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
+            qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
+            qp_y2 = [miny if y < miny else maxy if y > maxy else y for y in qp_y]
 
             interpolant = RegularGridInterpolator((z, x, y), Z)
             tmp = interpolant((qp_z2, qp_x2, qp_y2))
@@ -242,7 +237,19 @@ def fast_interpolation(Model, fname, V):
     return c
 
 
-def _check_units(c):
+def _check_units(c: fire.Function):
+    """Verify and convert velocity units from m/s to km/s if needed.
+
+    Parameters
+    ----------
+    c : firedrake.Function
+        Velocity field to check.
+
+    Returns
+    -------
+    firedrake.Function
+        Velocity field with units in km/s.
+    """
     if min(c.dat.data[:]) > 100.0:
         # data is in m/s but must be in km/s
         if fire.COMM_WORLD.rank == 0:

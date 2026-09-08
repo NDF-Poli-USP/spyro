@@ -263,7 +263,7 @@
 
 #     return M
 
-
+# TODO: Use MeasureError class from spyro.tools.error_measure instead of this.
 # def error_calc(p_exact, p, model, comm=False):
 #     """Calculates the error between the exact and the numerical solution
 

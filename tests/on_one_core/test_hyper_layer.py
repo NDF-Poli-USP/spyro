@@ -367,7 +367,7 @@ def test_negative_pad_length_raises_error(layer_2d):
 
 def test_none_pad_length_raises_error(layer_2d):
     # Test that passing a None pad length raises a TypeError
-    with raises(TypeError, match="'pad_len' must be a float or a integer"):
+    with raises(TypeError, match="'pad_len' must be a float or an integer"):
         layer_2d.define_hyperlayer(pad_len=None, lmin=0.01)
 
 
