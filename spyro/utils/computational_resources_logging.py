@@ -6,7 +6,7 @@ from time import time
 
 def log_max_memory_usage_per_core(
     prefix_string: str = "Maximum memory per core:",
-    comm = None,
+    comm=None,
 ):
     from ..io.basicio import parallel_print
     local_memory = memory_usage(-1)[0]
