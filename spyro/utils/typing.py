@@ -105,7 +105,23 @@ class ElasticMaterialParameter(StrEnum):
     MU = "mu"
     P_WAVE_VELOCITY = "p_wave_velocity"
     S_WAVE_VELOCITY = "s_wave_velocity"
+    DELTA = "delta"
+    EPSILON = "epsilon"
+    GAMMA = "gamma"
+    THETA = "theta"
+    PHI = "phi"
+    ANISOTROPY_TYPE = "anisotropy"
 
+class ViscoelasticMaterialParameter(Enum):
+    """Supported isotropic and anisotropic elastic material parameter names."""
+
+    Q_VP = "Q_vp"
+    Q_VS = "Q_vs"
+    Q_LAMBDA = "Q_lambda"
+    Q_MU = "Q_mu"
+    Q_DELTA = "Q_delta"
+    Q_EPSILON = "Q_epsilon"
+    Q_GAMMA = "Q_gamma"
 
 class ElasticMaterialParameterization(StrEnum):
     """Supported isotropic elastic inversion control parameterizations."""

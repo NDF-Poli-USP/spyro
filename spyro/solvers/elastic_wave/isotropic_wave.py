@@ -1,19 +1,22 @@
 import numpy as np
 
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
-                       project)
+                       project, TensorFunctionSpace)
+
 from pyadjoint import AdjFloat, Tape
 
 from .elastic_wave import ElasticWave
-from .forms import (isotropic_elastic_without_pml,
+from .forms import (elastic_without_pml, viscoelastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
+
 from ...utils.physical_parameters import PhysicalParameters
 from ...utils.typing import (AdjointType, ElasticMaterialParameter,
-                             ElasticMaterialParameterization, AbsorbingBCsType,
-                             RieszMapType)
-from ...domains.space import create_function_space
+                             ElasticMaterialParameterization, ViscoelasticMaterialParameter,
+                             AbsorbingBCsType, RieszMapType)
 
+from ...domains.space import create_function_space
+from .tensor_computation import *
 
 PHYSICAL_PARAMETERIZATION = {
     ElasticMaterialParameterization.LAME: (
@@ -27,6 +30,8 @@ PHYSICAL_PARAMETERIZATION = {
         ElasticMaterialParameter.S_WAVE_VELOCITY,
     ),
 }
+
+VISCOELASTIC_PARAMETERS = (ViscoelasticMaterialParameter.Q_VP, ViscoelasticMaterialParameter.Q_VS)
 
 
 def _format_physical_parameters(parameters):
@@ -126,6 +131,41 @@ class IsotropicWave(ElasticWave):
             The method assigns ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s``, and
             the active physical parameterization on ``self``.
         """
+        def material_parameter(value):
+            """Normalize model-dictionary values for elastic parameters.
+
+            Parameters
+            ----------
+            value : scalar, firedrake.Constant, firedrake.Function, or UFL expression
+                Material parameter read from ``synthetic_data_dict``.
+
+            Returns
+            -------
+            firedrake.Constant, firedrake.Function, or object
+                Scalars and ``Constant`` values are converted to scalar
+                material ``Function`` objects once a mesh exists. Before mesh
+                creation, scalar values remain as ``Constant`` values so the
+                regular model initialization flow can continue.
+
+            Examples
+            --------
+            ``density=1.0`` becomes ``Constant(1.0)`` before the mesh exists,
+            and becomes a scalar material ``Function`` after the mesh has been
+            created.
+            """
+            if callable(value) and not isinstance(value, Constant):
+                if self.mesh is None:
+                    return value(self.mesh)  
+                value = value(self.mesh)
+            if np.isscalar(value) or isinstance(value, Constant):
+                if self.mesh is None:
+                    return Constant(value) if np.isscalar(value) else value
+                V = create_function_space(
+                    self.mesh, self.method, self.degree, dim=1,
+                )
+                return Function(V).interpolate(value)
+            return value
+
         if self._physical_parameters:
             return
 
@@ -142,6 +182,10 @@ class IsotropicWave(ElasticWave):
         self.mu = declared(ElasticMaterialParameter.MU, "lame_second")
         self.c = declared(ElasticMaterialParameter.P_WAVE_VELOCITY)
         self.c_s = declared(ElasticMaterialParameter.S_WAVE_VELOCITY)
+        self.Q_lambda = declared(ViscoelasticMaterialParameter.Q_LAMBDA)
+        self.Q_mu = declared(ViscoelasticMaterialParameter.Q_MU)
+        self.Q_vp = declared(ViscoelasticMaterialParameter.Q_VP)
+        self.Q_vs = declared(ViscoelasticMaterialParameter.Q_VS)
 
         # Exactly one set must be declared, and it names the parameters
         # that carry the material data. ``is not None`` rather than
@@ -240,6 +284,8 @@ class IsotropicWave(ElasticWave):
             self.mu = as_function(self.mu, ElasticMaterialParameter.MU)
             self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
             self.c_s = (self.mu/self.rho)**0.5
+            self.Q_lambda = as_function(self.Q_lambda, ViscoelasticMaterialParameter.Q_lambda)
+            self.Q_mu = as_function(self.Q_mu, ViscoelasticMaterialParameter.Q_mu)
         elif parameterization is ElasticMaterialParameterization.VELOCITY:
             self.rho = as_function(self.rho, ElasticMaterialParameter.DENSITY)
             self.c = as_function(
@@ -250,6 +296,9 @@ class IsotropicWave(ElasticWave):
             )
             self.mu = self.rho*self.c_s**2
             self.lmbda = self.rho*self.c**2 - 2*self.mu
+            self.Q_vp = as_function(self.Q_vp, ViscoelasticMaterialParameter.Q_VP)
+            self.Q_vs = as_function(self.Q_vs, ViscoelasticMaterialParameter.Q_VS)
+
         else:
             raise ValueError(
                 "Unsupported elastic material parameterization: "
@@ -262,6 +311,12 @@ class IsotropicWave(ElasticWave):
         add(ElasticMaterialParameter.MU, self.mu)
         add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
         add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
+        if parameterization is ElasticMaterialParameterization.LAME:
+            add(ViscoelasticMaterialParameter.Q_LAMBDA, self.Q_lambda)
+            add(ViscoelasticMaterialParameter.Q_MU, self.Q_mu)
+        elif parameterization is ElasticMaterialParameterization.VELOCITY:
+            add(ViscoelasticMaterialParameter.Q_VP, self.Q_vp)
+            add(ViscoelasticMaterialParameter.Q_VS, self.Q_vs)
 
     def gradient_solve(
         self,
@@ -406,10 +461,51 @@ class IsotropicWave(ElasticWave):
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
 
-        if self.abc_type in [AbsorbingBCsType.NRBC, AbsorbingBCsType.NOABCS]:
-            isotropic_elastic_without_pml(self)
-        elif self.abc_type == AbsorbingBCsType.PML:
-            isotropic_elastic_with_pml(self)
+        self.Elastic_C = C_computation(self)
+
+        self.viscoelastic = self.input_dictionary.get("viscoelastic", False) #Dictionary dentro de dictionary
+
+        if self.viscoelastic:
+            d = self.input_dictionary.get("viscoelasticity", False)
+            self.visco_type = d["visco_type"]
+            W = TensorFunctionSpace(self.function_space.mesh(), "DG", 0)
+            self.strain_space = W
+            
+            # GSLS parameters
+            self.y_list     = d["y_gsls"]        # list of y_l
+            self.omega_list = d["omega_gsls"]    # list of omega_l
+            dim = self.function_space.mesh().topological_dimension()
+
+            num_branches = d["branches"] 
+            
+            # Memory variables
+            self.zeta_list = [Function(self.strain_space, name=f"Memory variable zeta_{i}")
+                    for i in range(num_branches)]
+
+            for zeta in self.zeta_list:
+                zeta.assign(0.0)
+
+            self.eps_np1 = Function(self.strain_space, name="eps_np1")
+            self.eps_n   = Function(self.strain_space, name="eps_n")
+
+            self.eps_n.assign(0.0)
+
+            self.sigma_np1 = Function(self.strain_space, name="eps_np1")
+            self.sigma_n   = Function(self.strain_space, name="eps_n")
+
+            self.sigma_n.assign(0.0)
+
+            self.Gamma = build_Gamma(self)
+
+            if self.abc_type in [AbsorbingBCsType.NRBC, AbsorbingBCsType.NOABCS]:
+                viscoelastic_without_pml(self)
+            elif self.abc_type == AbsorbingBCsType.PML:
+                viscoelastic_with_pml(self)
+        else:
+            if self.abc_type in [AbsorbingBCsType.NRBC, AbsorbingBCsType.NOABCS]:
+                elastic_without_pml(self)
+            elif self.abc_type == AbsorbingBCsType.PML:
+                elastic_with_pml(self)
 
     def rhs_no_pml(self):
         if self.abc_type == AbsorbingBCsType.PML:
