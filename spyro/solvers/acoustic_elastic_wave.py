@@ -37,6 +37,8 @@ class AcousticElasticWave(Wave):
         self.sigma_xx_function = fire.Function(self.sigma_xx_space, name="SigmaXX")
         self.field_logger.add_field("sigma_xx", "SigmaXX", self._compute_sigma_xx)
 
+        self.K = None
+        self.rho_fluid = None
         self.c           = None # fluid
         self.rho         = None # solid
         self.lmbda       = None # solid
@@ -149,15 +151,19 @@ class AcousticElasticWave(Wave):
     def _initialize_model_parameters(self):
         synthetic_data = self.input_dictionary.get("synthetic_data", {})
 
-        velocity_fluid_value  = synthetic_data["velocity_fluid"]  # fluid
-        rho_value             = synthetic_data["density_solid"]   # solid
+        K_value = synthetic_data.get("bulk_modulus") # fluid
+        rho_fluid_value = synthetic_data.get("density_fluid") # fluid
+        velocity_fluid_value  = synthetic_data.get("velocity_fluid")  # fluid
+        rho_solid_value             = synthetic_data["density_solid"]   # solid
         p_wave_velocity_value = synthetic_data["p_wave_velocity"] # solid
         s_wave_velocity_value = synthetic_data["s_wave_velocity"] # solid
 
-        self.c      = fire.Constant(velocity_fluid_value)
-        self.rho    = fire.Constant(rho_value)
-        mu_value    = rho_value * s_wave_velocity_value**2
-        lmbda_value = rho_value * p_wave_velocity_value**2 - 2.0 * mu_value
+        self.K = fire.Constant(K_value) if K_value is not None else None
+        self.rho_fluid = fire.Constant(rho_fluid_value) if rho_fluid_value is not None else None
+        self.c      = fire.Constant(velocity_fluid_value) if velocity_fluid_value is not None else None
+        self.rho_solid    = fire.Constant(rho_solid_value)
+        mu_value    = rho_solid_value * s_wave_velocity_value**2
+        lmbda_value = rho_solid_value * p_wave_velocity_value**2 - 2.0 * mu_value
         self.mu     = fire.Constant(mu_value)
         self.lmbda  = fire.Constant(lmbda_value)
 

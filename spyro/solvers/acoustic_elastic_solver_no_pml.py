@@ -42,20 +42,15 @@ def construct_acoustic_elastic(Wave_obj):
     )
 
     solver_parameters = dict(Wave_obj.solver_parameters)
-    solver_parameters["mat_type"] = "matfree"
+    solver_parameters = {
+        'ksp_type': 'preonly',
+        'pc_type': 'lu',
+    }
 
     Wave_obj.solid_solver = LinearVariationalSolver(
         solid_problem, 
         solver_parameters=solver_parameters
     )
-
-    # Wave_obj.solid_solver = LinearVariationalSolver(
-    #     solid_problem,
-    #     solver_parameters={
-    #         'ksp_type': 'preonly', 'pc_type': 'lu',
-    #         'pc_factor_mat_solver_type': 'mumps'
-    #     }
-    # )
 
     # Fluid sub-problem:
     p_trial = TrialFunction(Wave_obj.scalar_function_space)
@@ -63,7 +58,7 @@ def construct_acoustic_elastic(Wave_obj):
 
     F_acoustic = build_acoustic_form(
         Wave_obj, p_trial, v_f, p_n, p_nm1,
-        Wave_obj.quadrature_rule_fluid, c=Wave_obj.c
+        Wave_obj.quadrature_rule_fluid, c=Wave_obj.c, K=Wave_obj.K, rho_fluid=Wave_obj.rho_fluid
     )
 
     u_tt = (Wave_obj.X_np1.sub(1) - 2.0*u_n + u_nm1) / dt**2
@@ -84,19 +79,14 @@ def construct_acoustic_elastic(Wave_obj):
     )
 
     solver_parameters = dict(Wave_obj.solver_parameters)
-    solver_parameters["mat_type"] = "matfree"
+    solver_parameters = {
+        'ksp_type': 'preonly',
+        'pc_type': 'lu',
+    }
 
     Wave_obj.fluid_solver = LinearVariationalSolver(
         fluid_problem, 
         solver_parameters=solver_parameters
     )
-
-    # Wave_obj.fluid_solver = LinearVariationalSolver(
-    #     fluid_problem,
-    #     solver_parameters={
-    #         'ksp_type': 'preonly', 'pc_type': 'lu',
-    #         'pc_factor_mat_solver_type': 'mumps'
-    #     }
-    # )
 
     Wave_obj.solver = Wave_obj

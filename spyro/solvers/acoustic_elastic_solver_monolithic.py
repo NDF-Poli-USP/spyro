@@ -21,11 +21,11 @@ def construct_acoustic_elastic_monolithic(Wave_obj):
 
     F_acoustic = build_acoustic_form(
         Wave_obj, p_trial, v_f, p_n, p_nm1,
-        Wave_obj.quadrature_rule_fluid, c=Wave_obj.c, implicit=False
+        Wave_obj.quadrature_rule_fluid, c=Wave_obj.c, K=Wave_obj.K, rho_fluid=Wave_obj.rho_fluid
     )
     F_elastic = build_elastic_form(
         Wave_obj, u_trial, v_s, u_n, u_nm1,
-        Wave_obj.quadrature_rule_solid, implicit=False
+        Wave_obj.quadrature_rule_solid
     )
 
     u_tt_explicit = (u_trial - 2.0*u_n + u_nm1) / dt**2
@@ -48,17 +48,8 @@ def construct_acoustic_elastic_monolithic(Wave_obj):
 
     solver_parameters = dict(Wave_obj.solver_parameters)
     solver_parameters = {
-        'mat_type': 'nest',
         'ksp_type': 'preonly',
-        'pc_type': 'fieldsplit',
-        'pc_fieldsplit_type': 'multiplicative',
-        'pc_fieldsplit_diag_use_amat': True,
-        'pc_fieldsplit_0_fields': '1',
-        'pc_fieldsplit_1_fields': '0',
-        'fieldsplit_0_ksp_type': 'preonly',
-        'fieldsplit_0_pc_type': 'jacobi',
-        'fieldsplit_1_ksp_type': 'preonly',
-        'fieldsplit_1_pc_type': 'jacobi',
+        'pc_type': 'lu',
     }
     Wave_obj.solver = LinearVariationalSolver(
         lin_var_prob, solver_parameters=solver_parameters
