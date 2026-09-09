@@ -167,7 +167,10 @@ def create_sizing_function(
     """
 
     # Read velocity model with provided bbox
+    from ..io.segy_io import read_segy_velocity_model
     vp, n_samples, n_traces = read_segy_velocity_model(fname)
+    vp = np.flipud(vp)
+    vp = np.fliplr(vp)
     # Set water velocity if value = 0
     if vp_water is not None:
         vp = np.where(vp == 0, vp_water, vp)
@@ -286,39 +289,6 @@ def create_sizing_function(
         return interpolate_size(x, y, cell_size, bbox)
 
     return sizing_function, cell_size.min(), cell_size.max(), n_samples, n_traces
-
-
-def read_segy_velocity_model(fname):
-    """Read a velocity model array from a SEGY file.
-
-    Parameters
-    ----------
-    fname : str
-        Path to the SEGY filename.
-
-    Returns
-    -------
-    tuple
-        A tuple containing:
-        - vp (ndarray): 2D Velocity model array of shape (n_samples, n_traces).
-        - n_traces (int): Number of traces (columns).
-        - n_samples (int): Number of samples per trace (rows).
-    """
-
-    print(f"Reading SEGY file: {fname}")
-
-    # Open SEGY file
-    with segyio.open(fname, 'r', ignore_geometry=True) as segy:
-
-        n_traces = len(segy.trace)
-        n_samples = len(segy.samples)
-
-        # Read traces directly into array
-        vp = np.zeros((n_samples, n_traces))
-        for i in range(n_traces):
-            vp[:, i] = segy.trace[i]
-    print(f"Final velocity range: {vp.min():.1f} - {vp.max():.1f}")
-    return vp, n_samples, n_traces
 
 
 def calculate_wavelength_sizing(vp, wl, freq):

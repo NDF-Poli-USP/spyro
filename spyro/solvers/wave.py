@@ -1,4 +1,5 @@
 from abc import abstractmethod, ABCMeta
+from time import time
 import warnings
 import firedrake as fire
 
@@ -17,8 +18,13 @@ from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from ..utils.physical_parameters import PhysicalParameters
 from ..utils.error_management import validate_enum
-from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
-                            LayerShapeType, WaveType)
+from ..utils.typing import (
+    AdjointType,
+    FunctionalEvaluationMode,
+    AbsorbingBCsType,
+    LayerShapeType,
+    WaveType,
+)
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
 
@@ -128,9 +134,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
 
         super().__init__(dictionary=dictionary, comm=comm)
+        self.start_time = time()
         self.initial_velocity_model = None
         self.gradient_mask_available = False
-
+        self.debug = False
         # Setting wave type
         self.wave_type = validate_enum("wave_type", wave_type, WaveType)
 
@@ -179,10 +186,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.layer_manager()
 
         # Logger
-        self.field_logger = FieldLogger(self.comm,
-                                        self.input_dictionary["visualization"])
-        self.field_logger.add_field("forward", self.get_function_name(),
-                                    lambda: self.get_function())
+        self.field_logger = FieldLogger(
+            self.comm,
+            self.input_dictionary["visualization"],
+        )
+        self.field_logger.add_field(
+            "forward",
+            self.get_function_name(),
+            lambda: self.get_function(),
+        )
 
         self._physical_parameters = PhysicalParameters()
 
@@ -465,8 +477,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.stiffness_quadrature_rule = k_rule
         self.surface_quadrature_rule = s_rule
 
-    def get_and_set_maximum_dt(self, fraction=0.7,
-                               estimate_max_eigenvalue=False):
+    def get_and_set_maximum_dt(
+        self,
+        fraction: float = 0.7,
+        estimate_max_eigenvalue: bool = False,
+    ):
         """
         Calculates and sets the maximum stable time step (dt) for the wave solver.
 
@@ -488,9 +503,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Maximum timestep size
         method = 'ANALYTICAL' if estimate_max_eigenvalue else 'ARNOLDI'
         dt_solver = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
-        max_dt = dt_solver.estimate_timestep(c, self.function_space, self.final_time,
-                                             quad_rule=self.quadrature_rule,
-                                             fraction=fraction)
+        max_dt = dt_solver.estimate_timestep(
+            c,
+            self.function_space,
+            self.final_time,
+            quad_rule=self.quadrature_rule,
+            fraction=fraction,
+        )
         self.dt = max_dt
 
         return max_dt

@@ -4,6 +4,9 @@ import numpy as np
 from . import helpers
 from .. import utils
 from ..utils.typing import FunctionalEvaluationMode, AdjointType, AbsorbingBCsType
+from ..utils.computational_resources_logging import (
+    log_max_computational_resources_per_core,
+)
 
 
 def _propagate_forward_central_difference(wave, source_ids):
@@ -25,6 +28,11 @@ def _propagate_forward_central_difference(wave, source_ids):
     None
         The solver state, receiver data and functional are updated in place.
     """
+    log_max_computational_resources_per_core(
+        t0=wave.start_time,
+        prefix_string="At forward start",
+        comm=wave.comm,
+    )
     if wave.sources is not None:
         wave.sources.current_sources = source_ids
         rhs_forcing = fire.Cofunction(wave.function_space.dual())
@@ -216,5 +224,11 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.functional_value = J
     else:
         wave.functional_value = None
+
+    log_max_computational_resources_per_core(
+        t0=wave.start_time,
+        prefix_string="At forward end",
+        comm=wave.comm
+    )
 
     wave.field_logger.stop_logging()
