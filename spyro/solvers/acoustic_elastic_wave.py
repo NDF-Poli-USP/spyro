@@ -4,6 +4,7 @@ import os
 
 from .wave import Wave
 from .acoustic_elastic_solver_no_pml import construct_acoustic_elastic
+from .acoustic_elastic_solver_monolithic import construct_acoustic_elastic_monolithic
 from ..utils.typing import override, WaveType
 from ..domains.space import create_function_space
 from ..domains.quadrature import quadrature_rules
@@ -21,6 +22,8 @@ class AcousticElasticWave(Wave):
         self.solid_id    = 2
         self.interface_x = dictionary["mesh"].get("interface_x", None)
         self.sigma_xx_history = []
+
+        self.use_monolithic = False
 
         super().__init__(dictionary, comm=comm)
         self.wave_type = WaveType.NONE
@@ -164,7 +167,11 @@ class AcousticElasticWave(Wave):
         self.X_nm1        = fire.Function(self.function_space)
         self.X_n          = fire.Function(self.function_space)
         self.X_np1        = fire.Function(self.function_space)
-        construct_acoustic_elastic(self)
+
+        if self.use_monolithic:
+            construct_acoustic_elastic_monolithic(self)
+        else:
+            construct_acoustic_elastic(self)
 
     @override
     def _get_vstate(self):
@@ -235,14 +242,6 @@ class AcousticElasticWave(Wave):
     def update_source_expression(self, t):
         # self._handle_snapshot()
         pass
-
-    # def _handle_snapshot(self):
-    #     if self._snapshot_every is not None and self._snapshot_step % self._snapshot_every == 0:
-    #         os.makedirs(self._snapshot_dir, exist_ok=True)
-    #         plot_acoustic_elastic_snapshot(
-    #             self, filename=f"{self._snapshot_dir}/snapshot_{self._snapshot_step:04d}.png"
-    #         )
-    #     self._snapshot_step += 1
 
     @override
     def get_control_parameters(self):
