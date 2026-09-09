@@ -120,28 +120,6 @@ class AcousticWave(Wave):
         if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
             return self._automated_adjoint_gradient(riesz_map=riesz_map)
 
-        # The forward wavefield is stored as one ``fire.Function`` per sampled
-        # step. Firedrake's ``Function.assign`` puts each of those into a
-        # reference cycle (Function/CoordinatelessFunction/Dat/Vec), so
-        # refcounting alone never reclaims them -- only the cyclic collector
-        # can. That collector triggers on the number of *Python objects*
-        # allocated, and a Function is a small Python object wrapping a large
-        # PETSc buffer, so it almost never fires under this workload. The
-        # result is one full wavefield retained per gradient call, growing
-        # without bound across FWI iterations.
-        #
-        # Measured on a 55401-dof mesh with nt=1000 (423 MB per wavefield):
-        # without this collect, +443 MB per iteration, linear, no plateau;
-        # with it, +0.9 MB per iteration. malloc_trim alone changes nothing,
-        # which is how we know the memory is retained by live objects and not
-        # by the allocator.
-        #
-        # This is a workaround, not a fix: the cycle is created inside
-        # Firedrake's assign and reproduces with annotation disabled and no
-        # pyadjoint involvement. The structural fix is to stop allocating one
-        # Function per step -- see WavefieldStore.
-        gc.collect()
-
         self.enable_implemented_adjoint()
         if misfit is not None:
             self.misfit = misfit
@@ -176,7 +154,41 @@ class AcousticWave(Wave):
             raise NotImplementedError(
                 f"Riesz map {riesz_map} not implemented for implemented adjoint."
             )
-        return backward_wave_propagator(self)
+        dJ = backward_wave_propagator(self)
+
+        # Collect HERE, after the backward has consumed the wavefield and the
+        # gradient solver has gone out of scope, and before the next
+        # forward_solve allocates a new one.
+        #
+        # Placement is the whole point. The forward wavefield is stored as one
+        # ``fire.Function`` per sampled step, and Firedrake's
+        # ``Function.assign`` puts each of those into a reference cycle
+        # (Function/CoordinatelessFunction/Dat/Vec), so refcounting never
+        # reclaims them; only the cyclic collector can. That collector
+        # triggers on Python object counts, and a Function is a small Python
+        # object wrapping a large PETSc buffer, so it effectively never fires
+        # under this workload.
+        #
+        # Collecting at the *start* of this method instead looks equivalent
+        # and is not: the dead wavefield then survives until the next gradient
+        # call, so the next forward_solve allocates its wavefield while the
+        # previous one is still resident and the peak holds two of them. On a
+        # real FWI run that placement recovered 463 MB of a 4558 MB peak;
+        # collecting here recovered ~2160 MB.
+        #
+        # ``backward_wave_propagator``'s locals -- grad_solver, forward_field,
+        # uadj, gradi -- are also cyclic, and forward_field participates in the
+        # assign that references the stored snapshots. They are unreachable by
+        # the time we get here, so this same call frees them too; deleting the
+        # gradient solver by hand is not additionally needed.
+        #
+        # This is a workaround. The cycle is created inside Firedrake's assign
+        # and reproduces with annotation disabled and no pyadjoint involvement.
+        # The structural fix is to stop allocating one Function per step -- see
+        # WavefieldStore.
+        gc.collect()
+
+        return dJ
 
     def _automated_adjoint_gradient(self, riesz_map=RieszMapType.L2):
         """Compute the gradient using the automated adjoint.
