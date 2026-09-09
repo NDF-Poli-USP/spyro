@@ -4,6 +4,7 @@ from .wave import Wave
 from ..io.basicio import parallel_print
 from ..receivers.Receivers import Receivers
 from ..utils.typing import AbsorbingBCsType
+from ..io.wavefield_store import WavefieldStore
 
 
 def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
@@ -77,6 +78,7 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
     inv_sample_dt2 = fire.Constant(sample_dt ** 2)
 
     forward_solution = wave.forward_solution
+    using_store = isinstance(forward_solution, WavefieldStore)
     receivers = wave.receivers
 
     for step in range(nt - 1, -1, -1):
@@ -96,14 +98,25 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
             uadj.assign(wave.get_function(state=wave.next_vstate))
 
             if wave.abc_type == AbsorbingBCsType.PML:
-                # Pop to keep the list in sync, but use the element one
+                # Pop to keep the record in sync, but use the element one
                 # step behind so that u_fwd and u_adj are at the same
                 # physical time (usol[k] = u^{k+1}; we need u^k).
-                forward_solution.pop()
-                if len(forward_solution) > 0:
-                    forward_field.assign(forward_solution[-1])
+                if using_store:
+                    forward_solution.pop_into(forward_field)
+                    if len(forward_solution) > 0:
+                        forward_solution.peek_into(forward_field, 0)
+                    else:
+                        forward_field.assign(0.0)
                 else:
-                    forward_field.assign(0.0)
+                    forward_solution.pop()
+                    if len(forward_solution) > 0:
+                        forward_field.assign(forward_solution[-1])
+                    else:
+                        forward_field.assign(0.0)
+            elif using_store:
+                forward_solution.pop_second_derivative_into(
+                    forward_field, sample_dt ** 2
+                )
             else:
                 forward_field.assign(
                     _compute_dufordt2(forward_solution, inv_sample_dt2)

@@ -1,3 +1,4 @@
+from ..io.wavefield_store import WavefieldStore
 import firedrake as fire
 import numpy as np
 
@@ -46,7 +47,12 @@ def _propagate_forward_central_difference(wave, source_ids):
         # before it is needed: a solve that aborts early (e.g. the numerical
         # instability check below) no longer has to first allocate the whole
         # nt-step wavefield, which for fine meshes/small dt is many GB.
-        usol = []
+        if wave.wavefield_storage_dtype is not None:
+            usol = WavefieldStore(
+                wave.function_space, dtype=wave.wavefield_storage_dtype
+            )
+        else:
+            usol = []
     source_cof = None
     interpolate_receivers = None
     master_source_W = None
@@ -154,11 +160,16 @@ def _propagate_forward_central_difference(wave, source_ids):
             wave.store_forward_time_steps
             and step % wave.gradient_sampling_frequency == 0
         ):
-            snapshot = fire.Function(
-                wave.function_space, name=wave.get_function_name()
-            )
-            snapshot.assign(wave.get_function())
-            usol.append(snapshot)
+            if isinstance(usol, WavefieldStore):
+                # No Function is created here, which is the whole point: there
+                # is nothing for the assign reference cycle to retain.
+                usol.append(wave.get_function())
+            else:
+                snapshot = fire.Function(
+                    wave.function_space, name=wave.get_function_name()
+                )
+                snapshot.assign(wave.get_function())
+                usol.append(snapshot)
             save_step += 1
 
         if (step - 1) % wave.output_frequency == 0:
