@@ -237,7 +237,12 @@ def switch_serial_shot(
             # The adjoint propagator consumes forward_solution with pop(). When
             # switching to the next shot, reload saved snapshots even if the
             # in-memory list has been emptied.
-            stacked_shot_arrays = np.load(forward_solution_filename)
+            # mmap_mode='r': the file is only read row by row into existing
+            # Functions below, so there is no reason to materialise the whole
+            # nt-step wavefield in RAM first.
+            stacked_shot_arrays = np.load(
+                forward_solution_filename, mmap_mode="r"
+            )
             if not wave.forward_solution:
                 rebuild_empty_forward_solution(wave, len(stacked_shot_arrays))
             for array_i, array in enumerate(stacked_shot_arrays):
@@ -483,7 +488,9 @@ def save_serial_data(wave, propagation_id):
     # unconditionally true, so a truthiness check reaches the loop below and
     # fails trying to iterate a scalar-valued expression.
     if isinstance(wave.forward_solution, (list, tuple)) and wave.forward_solution:
-        arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
+        # data_ro, not data: read-write access marks every dat dirty and can
+        # trigger halo exchanges we do not need just to serialise.
+        arrays_list = [obj.dat.data_ro for obj in wave.forward_solution]
         stacked_arrays = np.stack(arrays_list, axis=0)
         np.save(_shot_filename(propagation_id, wave, prefix="tmp_shot"), stacked_arrays)
     np.save(

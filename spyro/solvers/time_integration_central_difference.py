@@ -128,15 +128,25 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.vstate = wave.next_vstate
 
         if wave.use_vertex_only_mesh:
+            per_timestep = (
+                functional_mode is FunctionalEvaluationMode.PER_TIMESTEP
+            )
             if receiver_buffer is None:
                 receiver_buffer = fire.assemble(interpolate_receivers)
                 receiver_shape = receiver_buffer.dat.data_ro.shape
-                receiver_array = np.empty((nt,) + receiver_shape, dtype=float)
+                # Only allocated when it will actually be consumed. In
+                # PER_TIMESTEP mode usol_recv is what gets returned and this
+                # array was filled every step and then discarded.
+                if not per_timestep:
+                    receiver_array = np.empty(
+                        (nt,) + receiver_shape, dtype=float
+                    )
             else:
                 fire.assemble(interpolate_receivers, tensor=receiver_buffer)
-            receiver_array[step] = receiver_buffer.dat.data_ro
-            if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
+            if per_timestep:
                 usol_recv.append(receiver_buffer.copy(deepcopy=True))
+            else:
+                receiver_array[step] = receiver_buffer.dat.data_ro
         else:
             usol_recv.append(wave.get_forward_solution_receivers())
 
