@@ -149,10 +149,6 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
 
     dJ.dat.data_with_halos[:] *= sample_dt / 2
 
-    # Gambiarra cleanup - If I dont do this memory increases a lot
-    del grad_solver
-    gc.collect()
-
     log_max_computational_resources_per_core(
         t0=wave.start_time,
         prefix_string="At backward end",
