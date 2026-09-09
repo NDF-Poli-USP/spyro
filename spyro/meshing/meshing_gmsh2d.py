@@ -32,7 +32,7 @@ def build_gmsh_geometry_and_groups(
     if water_interface:
         Xs, Z_bottom = generate_water_profile_from_segy(
             fname, z_min=0.0, z_max=depth_z, x_min=0.0, x_max=length_x,
-            value=water_search_value, tolerance=1.0
+            value=water_search_value,
         )
         z_water_L, z_water_R = float(Z_bottom[0]), float(Z_bottom[-1])
 

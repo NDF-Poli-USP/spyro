@@ -1,7 +1,7 @@
 """Demo script for running a small full waveform inversion example.
 
 This demo has automatic parallelism set up and 6 shots, therefore we need
-a 6n (n positive integer) number of cores in mpiexec -n N_CORES to run. 
+a 6n (n positive integer) number of cores in mpiexec -n N_CORES to run.
 You can experiment with a different number of cores if desired, but you
 would need to change the parallelism dicionary setting.
 
@@ -11,13 +11,13 @@ circular cheese model.
 """
 
 from copy import deepcopy
-import numpy as np
 import firedrake as fire
 import spyro
-import pytest
 
 
-def run_forward_real_model(input_dictionary, case="camembert", shot_filename="shots/shot_record_", dt=None):
+def run_forward_real_model(
+    input_dictionary, case="camembert", shot_filename="shots/shot_record_", dt=None
+):
     """Generate and save a synthetic shot record for the chosen demo case.
 
     Parameters
@@ -48,14 +48,18 @@ def run_forward_real_model(input_dictionary, case="camembert", shot_filename="sh
     center_x = 1.0
     mesh_z = fwi_obj.wave.mesh_z
     mesh_x = fwi_obj.wave.mesh_x
-    cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
+    cond = fire.conditional(
+        (mesh_z - center_z) ** 2 + (mesh_x - center_x) ** 2 < 0.2**2, 3.0, 2.5
+    )
 
-    fwi_obj.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
+    fwi_obj.set_real_velocity_model(
+        conditional=cond, output=True, dg_velocity_model=False
+    )
     fwi_obj.generate_real_shot_record(
         plot_model=True,
         model_filename="True_experiment.png",
         shot_filename=shot_filename,
-        abc_points=[(-0.5, 0.5), (-1.5, 0.5), (-1.5, 1.5), (-0.5, 1.5)]
+        abc_points=[(-0.5, 0.5), (-1.5, 0.5), (-1.5, 1.5), (-0.5, 1.5)],
     )
     if dt is not None:
         fwi_obj.wave.dt = original_dt
@@ -133,7 +137,7 @@ def run_fwi(load_real_shot=True):
     None
         The inversion is run for its side effects.
     """
-    shots_filenames="shots/shot_record_"
+    shots_filenames = "shots/shot_record_"
 
     # Setting up to run synthetic real problem
     if load_real_shot is False:
@@ -174,7 +178,9 @@ def run_fwi(load_real_shot=True):
     export_grid_spacing = 0.01
 
     # Let us have a look at our solution
-    spyro.io.export_scalar_field(fwi_obj.wave.c, export_grid_spacing, "camembert.png", comm=fwi_obj.wave.comm)
+    spyro.io.export_scalar_field(
+        fwi_obj.wave.c, export_grid_spacing, "camembert.png", comm=fwi_obj.wave.comm
+    )
 
     print("END", flush=True)
 

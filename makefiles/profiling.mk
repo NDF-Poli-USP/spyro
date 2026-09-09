@@ -8,6 +8,9 @@
 PROFILERS_DIR := profilers
 $(shell mkdir -p $(PROFILERS_DIR))
 
+# Stopping display errors
+export MPLBACKEND=Agg
+
 # Validation function to check if FILE is provided
 define check_file
 	@if [ -z "$(FILE)" ]; then \

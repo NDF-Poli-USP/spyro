@@ -1,10 +1,15 @@
 import firedrake as fire
+import gc
+
 from . import helpers
 from .wave import Wave
 from ..io.basicio import parallel_print
 from ..receivers.Receivers import Receivers
 from ..utils.typing import AbsorbingBCsType
 from ..io.wavefield_store import WavefieldStore
+from ..utils.computational_resources_logging import (
+    log_max_computational_resources_per_core,
+)
 
 
 def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
@@ -33,6 +38,11 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
     Source injection uses ``wave.rhs_no_pml_source()`` and the prebuilt
     variational solver is advanced with ``wave.solver.solve()``.
     """
+    log_max_computational_resources_per_core(
+        t0=wave.start_time,
+        prefix_string="At backward start",
+        comm=wave.comm,
+    )
     wave.reset_pressure()
     mask_available = wave.gradient_mask_available
     if dt is not None:
@@ -138,6 +148,16 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
     helpers.display_progress(wave.comm, t)
 
     dJ.dat.data_with_halos[:] *= sample_dt / 2
+
+    # Gambiarra cleanup - If I dont do this memory increases a lot
+    del grad_solver
+    gc.collect()
+
+    log_max_computational_resources_per_core(
+        t0=wave.start_time,
+        prefix_string="At backward end",
+        comm=wave.comm,
+    )
     return dJ
 
 
