@@ -26,7 +26,7 @@ dictionary["mesh"] = {
     "length_y": 0.0,
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
-    "edge_length": 0.0025, # 0.005, 0.0035
+    "edge_length": 0.005, # 0.005, 0.0035, 0.0025
     "interface_x": 0.5,
     "absorb_left": False,
     "absorb_right": False,
@@ -82,6 +82,7 @@ dictionary["synthetic_data"] = {
 }
 
 Wave_obj = AcousticElasticWave(dictionary=dictionary)
+Wave_obj.use_monolithic = True
 t_start = time.perf_counter()
 Wave_obj.forward_solve()
 
@@ -95,13 +96,13 @@ print(f"  Memory (MB):      {mem_mb:.2f}")
 np.savez("results/cost.npz", elapsed=elapsed, memory_mb=mem_mb)
 
 import numpy as np
-np.savez(
-    "results/spyro_receiver_data.npz",
-    p_spyro=np.asarray(Wave_obj.forward_solution_receivers)[:, 0],
-    u_solid=np.array(Wave_obj.solid_receiver_history)[:, 0, :],
-    dt=dictionary["time_axis"]["dt"],
-    final_time=dictionary["time_axis"]["final_time"],
-)
+# np.savez(
+#     "results/spyro_receiver_data.npz",
+#     p_spyro=np.asarray(Wave_obj.forward_solution_receivers)[:, 0],
+#     u_solid=np.array(Wave_obj.solid_receiver_history)[:, 0, :],
+#     dt=dictionary["time_axis"]["dt"],
+#     final_time=dictionary["time_axis"]["final_time"],
+# )
 
 receiver_data = Wave_obj.forward_solution_receivers[:, 0]
 plot_receiver_response(
@@ -111,10 +112,10 @@ plot_receiver_response(
     receiver_id_for_title=0,
 )
 
-solid_data = np.array(Wave_obj.solid_receiver_history)[:, 0, :]
-plot_displacement_components(
-    time_vector=np.linspace(0, dictionary["time_axis"]["final_time"], len(solid_data)),
-    receiver_results=solid_data,
-    source_type="Ricker",
-    filename="results/receiver_solid.png",
-)
+# solid_data = np.array(Wave_obj.solid_receiver_history)[:, 0, :]
+# plot_displacement_components(
+#     time_vector=np.linspace(0, dictionary["time_axis"]["final_time"], len(solid_data)),
+#     receiver_results=solid_data,
+#     source_type="Ricker",
+#     filename="results/receiver_solid.png",
+# )
