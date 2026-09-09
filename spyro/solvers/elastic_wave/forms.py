@@ -5,18 +5,17 @@ from firedrake import (Cofunction, Constant, LinearVariationalProblem,
 from .local_abc import local_abc_form
 
 
-def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule, implicit=False):
+def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
     dt = Constant(wave.dt)
-    rho = wave.rho
+    rho_solid = wave.rho_solid
     lmbda = wave.lmbda
     mu = wave.mu
 
-    F_m = (rho/(dt**2))*dot(u_trial - 2*u_n + u_nm1, v_test)*dx(**quad_rule)
+    F_m = (rho_solid/(dt**2))*dot(u_trial - 2*u_n + u_nm1, v_test)*dx(**quad_rule)
 
     eps = lambda v: 0.5*(grad(v) + grad(v).T)
-    stiffness_field = u_trial if implicit else u_n
-    F_k = lmbda*div(stiffness_field)*div(v_test)*dx(**quad_rule) \
-        + 2*mu*inner(eps(stiffness_field), eps(v_test))*dx(**quad_rule)
+    F_k = lmbda*div(u_n)*div(v_test)*dx(**quad_rule) \
+        + 2*mu*inner(eps(u_n), eps(v_test))*dx(**quad_rule)
 
     F_s = 0
     b = wave.body_forces

@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import time
 import resource
+import firedrake as fire
 
 from spyro.solvers.acoustic_elastic_wave import AcousticElasticWave
 from spyro.plots.receiver_plots import plot_receiver_response, plot_displacement_components
@@ -74,7 +75,9 @@ dictionary["visualization"] = {
 
 dictionary["synthetic_data"] = {
     "type": "object",
-    "velocity_fluid": 1.5,
+    "velocity_fluid": None,
+    "bulk_modulus": 2.25,
+    "density_fluid": 1.0,
     "density_solid": 2.0,
     "p_wave_velocity": 2.0,
     "s_wave_velocity": 1.2,
@@ -82,9 +85,27 @@ dictionary["synthetic_data"] = {
 }
 
 Wave_obj = AcousticElasticWave(dictionary=dictionary)
-Wave_obj.use_monolithic = True
+Wave_obj.use_monolithic = False
 t_start = time.perf_counter()
+# Wave_obj.forward_solve()
+
+
+#========
+import tracemalloc
+
+tracemalloc.start()
+snapshot_before = tracemalloc.take_snapshot()
+
 Wave_obj.forward_solve()
+
+snapshot_after = tracemalloc.take_snapshot()
+top_stats = snapshot_after.compare_to(snapshot_before, 'lineno')
+
+with open('results/tracemalloc_coupled.txt', 'w') as f:
+    for stat in top_stats[:30]:
+        f.write(str(stat) + '\n')
+#===========
+
 
 t_end = time.perf_counter()
 elapsed = t_end - t_start

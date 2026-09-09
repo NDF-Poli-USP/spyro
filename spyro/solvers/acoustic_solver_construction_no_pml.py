@@ -1,15 +1,27 @@
 """Constructs Firedrake solver for the acosutic wave with typical BCs, NRBCs or HABCs."""
 
 import firedrake as fire
-from firedrake import ds, dx, dot, grad
+from firedrake import ds, dx, dot, grad, sqrt
 from ..utils.typing import AbsorbingBCsType
 
 
 def build_acoustic_form(wave, u_trial, v_test, u_n,
-                        u_nm1, quad_rule, c=None, implicit=False):
+                        u_nm1, quad_rule, c=None, K=None, rho_fluid=None):
 
+    if c is not None and (K is not None or rho_fluid is not None):
+        raise ValueError(
+            "Ambiguous formulation. Insert 'bulk_modulus' and 'density_fluid' or just 'c'."
+        )
     if c is None:
-        c = wave.c
+        if K is not None and rho_fluid is not None:
+            c = sqrt(K / rho_fluid)
+        elif K is not None or rho_fluid is not None:
+            raise ValueError(
+                "Insert both values 'bulk_modulus' and 'density_fluid'."
+            )
+        else:
+            c = wave.c
+
     dt = wave.dt
     
     m1 = (
@@ -18,9 +30,7 @@ def build_acoustic_form(wave, u_trial, v_test, u_n,
         * v_test
         * dx(**quad_rule)
     )
-    # a = dot(grad(u_n), grad(v_test)) * dx(**quad_rule) # explicit
-    stiffness_field = u_trial if implicit else u_n
-    a = dot(grad(stiffness_field), grad(v_test)) * dx(**quad_rule)
+    a = dot(grad(u_n), grad(v_test)) * dx(**quad_rule)
 
     le = 0.0
     q = wave.source_expression
