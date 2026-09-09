@@ -12,12 +12,13 @@ runs a simple inversion loop against that record.
 
 from copy import deepcopy
 import numpy as np
+from time import time
 import firedrake as fire
 import spyro
 import pytest
 
 
-def run_forward_real_model(default_dictionary, shot_filename="shots/shot_record_", dt=None, save_vp_as_segy=False, segy_filename="velocity_models/vp_marmousi-ii.segy"):
+def run_forward_real_model(default_dictionary, shot_filename="shots/shot_record_", dt=None, save_vp_as_segy=False, segy_filename="velocity_models/vp_marmousi-ii.segy", t0=0.0):
     """Generate and save a synthetic shot record for the chosen demo case.
 
     Parameters
@@ -42,6 +43,7 @@ def run_forward_real_model(default_dictionary, shot_filename="shots/shot_record_
     input_dictionary["mesh"]["cells_per_wavelength"] = 3.5
 
     fwi_obj = spyro.FullWaveformInversion(dictionary=input_dictionary)
+    fwi_obj.wave.start_time = t0
 
     fwi_obj.set_real_velocity_model(new_file="velocity_models/vp_marmousi-ii.segy", fast_interpolate=True)
     fwi_obj.generate_real_shot_record(
@@ -120,7 +122,7 @@ dictionary["visualization"] = {
 }
 
 
-def setting_up_fwi():
+def setting_up_fwi(t0):
 
     shots_filenames="shots/shot_record_"
 
@@ -131,6 +133,7 @@ def setting_up_fwi():
         shot_filename=shots_filenames,
         save_vp_as_segy=True,
         segy_filename="velocity_models/vp_marmousi-ii.segy",
+        t0=t0,
     )
 
     # Let us create a smoothed out initial guess based on a gaussian
@@ -147,7 +150,7 @@ def setting_up_fwi():
     )
 
 
-def run_fwi():
+def run_fwi(t0):
     """Run the demo inversion workflow.
 
     Parameters
@@ -165,6 +168,7 @@ def run_fwi():
     shots_filenames="shots/shot_record_"
     dictionary["inversion"]["real_shot_record_file"] = shots_filenames
     fwi_obj = spyro.FullWaveformInversion(dictionary=dictionary)
+    fwi_obj.wave.start_time = t0
 
     # Since the shot record is using a different timestep than our guess model we have to interpolate the time series into our desired timestep
     fwi_obj.real_shot_record = spyro.io.time_io.interpolate_time_series(
@@ -218,5 +222,6 @@ def run_fwi():
 
 
 if __name__ == "__main__":
-    setting_up_fwi()
-    run_fwi()
+    t0 = time()
+    setting_up_fwi(t0)
+    run_fwi(t0)

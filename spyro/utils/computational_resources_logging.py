@@ -47,5 +47,5 @@ def log_max_computational_resources_per_core(
     else:
         memory_string = "MEMORY: "
         runtime_str = "RUNTIME: "
-    log_max_memory_usage_per_core(prefix_string=memory_string, comm=comm)
     log_max_current_runtime_per_core(t0, prefix_string=runtime_str, comm=comm)
+    log_max_memory_usage_per_core(prefix_string=memory_string, comm=comm)
