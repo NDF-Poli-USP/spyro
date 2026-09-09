@@ -301,7 +301,7 @@ class FullWaveformInversion:
     """
 
     def __init__(
-        self, dictionary=None, comm=None, wave_class=AcousticWave, wave=None
+        self, dictionary=None, comm=None, wave_class=AcousticWave, wave=None, debug=False,
     ):
         """Initialize the full waveform inversion driver.
 
@@ -402,6 +402,8 @@ class FullWaveformInversion:
         self.has_gradient_mask = False
         self.gradient_mask_available = False
         self.functional_history = []
+        self.debug = debug
+        self.wave.debug = debug
 
     def _sync_wave_real_shot_record(self):
         """Copy observed data from the FWI driver to the wave solver.
@@ -910,13 +912,17 @@ class FullWaveformInversion:
         self._sync_wave_real_shot_record()
         if self.wave.adjoint_type == AdjointType.IMPLEMENTED_ADJOINT:
             self.wave.enable_implemented_adjoint()
+        self.wave.forward_solution_receivers = None
+        self.wave.forward_solution = None
+        self.guess_forward_solution = None
         self.wave.forward_solve()
         current_control = self.control_parameters
-        fire.VTKFile(f"control_{self.current_iteration}.pvd").write(current_control)
-        np.save(
-            f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
-            self._flatten_control(current_control),
-        )
+        if self.debug:
+            fire.VTKFile(f"control_{self.current_iteration}.pvd").write(current_control)
+            np.save(
+                f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
+                self._flatten_control(current_control),
+            )
 
         if self.wave.parallelism_type == "spatial" and self.wave.number_of_sources > 1:
             misfit_list = []
@@ -1018,13 +1024,7 @@ class FullWaveformInversion:
 
     def set_real_velocity_model(
         self,
-        constant=None,
-        conditional=None,
-        velocity_model_function=None,
-        expression=None,
-        new_file=None,
-        output=False,
-        dg_velocity_model=True,
+        **kwargs,
     ):
         """
         Set the true velocity model for synthetic test cases.
@@ -1060,28 +1060,17 @@ class FullWaveformInversion:
         expression, or new_file) should be provided.
         """
         self.wave.set_initial_velocity_model(
-            constant=constant,
-            conditional=conditional,
-            velocity_model_function=velocity_model_function,
-            expression=expression,
-            new_file=new_file,
-            output=output,
-            dg_velocity_model=dg_velocity_model,
+            **kwargs,
         )
         self.real_mesh = self.wave.get_mesh()
         self._real_model_parameters = self._copy_parameters_from_wave(self.wave)
+        new_file = kwargs.get("new_file", None)
         if new_file is not None:
             self.real_velocity_model_file = new_file
 
     def set_guess_velocity_model(
         self,
-        constant=None,
-        conditional=None,
-        velocity_model_function=None,
-        expression=None,
-        new_file=None,
-        output=False,
-        dg_velocity_model=True,
+        **kwargs,
     ):
         """
         Set the initial guess velocity model for inversion.
@@ -1118,13 +1107,7 @@ class FullWaveformInversion:
         will reset the misfit to None.
         """
         self.wave.set_initial_velocity_model(
-            constant=constant,
-            conditional=conditional,
-            velocity_model_function=velocity_model_function,
-            expression=expression,
-            new_file=new_file,
-            output=output,
-            dg_velocity_model=dg_velocity_model,
+            **kwargs,
         )
         self.guess_mesh = self.wave.get_mesh()
         self._control_parameters = self._copy_parameters_from_wave(self.wave)
@@ -1235,7 +1218,7 @@ class FullWaveformInversion:
 
         return Jm
 
-    def get_gradient(self, c=None, save=True, calculate_functional=True):
+    def get_gradient(self, c=None, save=False, calculate_functional=True):
         """
         Calculate the gradient of the objective functional.
 

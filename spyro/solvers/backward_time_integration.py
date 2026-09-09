@@ -1,9 +1,15 @@
 import firedrake as fire
+import gc
+
 from . import helpers
 from .wave import Wave
 from ..io.basicio import parallel_print
 from ..receivers.Receivers import Receivers
 from ..utils.typing import AbsorbingBCsType
+from ..io.wavefield_store import WavefieldStore
+from ..utils.computational_resources_logging import (
+    log_max_computational_resources_per_core,
+)
 
 
 def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
@@ -32,6 +38,11 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
     Source injection uses ``wave.rhs_no_pml_source()`` and the prebuilt
     variational solver is advanced with ``wave.solver.solve()``.
     """
+    log_max_computational_resources_per_core(
+        t0=wave.start_time,
+        prefix_string="At backward start",
+        comm=wave.comm,
+    )
     wave.reset_pressure()
     mask_available = wave.gradient_mask_available
     if dt is not None:
@@ -45,7 +56,10 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
             f"{wave.final_time}. Setting final_time to current time "
             f"in backwards propagation.", wave.comm,
         )
-    nt = int(t / dt) + 1
+    # round(), not int(): t is accumulated as step*dt, so t/dt can come back
+    # as 1998.9999999997 and truncate to one step fewer than the forward
+    # stored, silently misaligning the forward/adjoint pair by a whole step.
+    nt = round(t / dt) + 1
 
     # The forward wavefield is stored only every ``gradient_sampling_frequency``
     # steps, so consecutive stored samples are ``sample_dt = freq * dt`` apart in
@@ -68,7 +82,13 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
         wave, mask_available,
     )
 
+    # Hoisted out of the time loop: a fresh Constant per step created one
+    # short-lived UFL coefficient per sampled step (thousands per gradient),
+    # each with a unique counter and therefore its own form signature.
+    inv_sample_dt2 = fire.Constant(sample_dt ** 2)
+
     forward_solution = wave.forward_solution
+    using_store = isinstance(forward_solution, WavefieldStore)
     receivers = wave.receivers
 
     for step in range(nt - 1, -1, -1):
@@ -88,16 +108,29 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
             uadj.assign(wave.get_function(state=wave.next_vstate))
 
             if wave.abc_type == AbsorbingBCsType.PML:
-                # Pop to keep the list in sync, but use the element one
+                # Pop to keep the record in sync, but use the element one
                 # step behind so that u_fwd and u_adj are at the same
                 # physical time (usol[k] = u^{k+1}; we need u^k).
-                forward_solution.pop()
-                if len(forward_solution) > 0:
-                    forward_field.assign(forward_solution[-1])
+                if using_store:
+                    forward_solution.pop_into(forward_field)
+                    if len(forward_solution) > 0:
+                        forward_solution.peek_into(forward_field, 0)
+                    else:
+                        forward_field.assign(0.0)
                 else:
-                    forward_field.assign(0.0)
+                    forward_solution.pop()
+                    if len(forward_solution) > 0:
+                        forward_field.assign(forward_solution[-1])
+                    else:
+                        forward_field.assign(0.0)
+            elif using_store:
+                forward_solution.pop_second_derivative_into(
+                    forward_field, sample_dt ** 2
+                )
             else:
-                forward_field.assign(_compute_dufordt2(forward_solution, sample_dt))
+                forward_field.assign(
+                    _compute_dufordt2(forward_solution, inv_sample_dt2)
+                )
             grad_solver.solve()
             _trapezoidal_gradient_integration(dJ, gradi, step, last_sample)
 
@@ -115,6 +148,12 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
     helpers.display_progress(wave.comm, t)
 
     dJ.dat.data_with_halos[:] *= sample_dt / 2
+
+    log_max_computational_resources_per_core(
+        t0=wave.start_time,
+        prefix_string="At backward end",
+        comm=wave.comm,
+    )
     return dJ
 
 
@@ -221,21 +260,27 @@ def _build_gradient_solver(wave: Wave, mask_available: bool) -> tuple[
     return grad_solver, forward_field, uadj, gradi
 
 
-def _compute_dufordt2(forward_solution: list, sample_dt: float) -> fire.Function:
+def _compute_dufordt2(forward_solution: list,
+                      sample_dt2: fire.Constant) -> fire.Function:
     """Second time-derivative via 3-point finite differences.
 
-    ``sample_dt`` is the physical time between consecutive stored samples
-    (``gradient_sampling_frequency * dt``), which equals ``dt`` only when every
-    step is stored.
+    ``sample_dt2`` is ``(gradient_sampling_frequency * dt) ** 2`` as a Constant
+    built once by the caller; the spacing equals ``dt`` only when every step is
+    stored.
+
+    Note the degenerate branch: with two or fewer samples left this falls back
+    to a one-sided estimate. That happens at the end of the reverse sweep, i.e.
+    near t=0, where the forward field is ~0, so the error is benign -- but it is
+    a silent change of stencil and worth knowing about.
     """
     if len(forward_solution) > 2:
         return (
             forward_solution.pop()
             - 2.0 * forward_solution[-1]
             + forward_solution[-2]
-        ) / fire.Constant(sample_dt**2)
+        ) / sample_dt2
     else:
-        return forward_solution.pop() / fire.Constant(sample_dt**2)
+        return forward_solution.pop() / sample_dt2
 
 
 def _trapezoidal_gradient_integration(
@@ -256,7 +301,10 @@ def _trapezoidal_gradient_integration(
         endpoints of the trapezoidal rule (weight 1); interior samples weight 2.
     """
 
-    if step == last_sample or step == 0:
-        dJ += gradi
-    else:
-        dJ += 2 * gradi
+    # In-place on the underlying array. ``dJ += 2 * gradi`` built a UFL
+    # Product plus a temporary Function on every sampled step, and relied on
+    # Firedrake's __iadd__ mutating in place and returning self -- if that ever
+    # became a non-mutating __add__, the rebinding would be local to this
+    # function and the gradient would silently accumulate to zero.
+    weight = 1.0 if (step == last_sample or step == 0) else 2.0
+    dJ.dat.data_with_halos[:] += weight * gradi.dat.data_ro_with_halos[:]
