@@ -7,11 +7,11 @@ from .local_abc import local_abc_form
 
 def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
     dt = Constant(wave.dt)
-    rho_solid = wave.rho_solid
+    rho = wave.rho
     lmbda = wave.lmbda
     mu = wave.mu
 
-    F_m = (rho_solid/(dt**2))*dot(u_trial - 2*u_n + u_nm1, v_test)*dx(**quad_rule)
+    F_m = (rho/(dt**2))*dot(u_trial - 2*u_n + u_nm1, v_test)*dx(**quad_rule)
 
     eps = lambda v: 0.5*(grad(v) + grad(v).T)
     F_k = lmbda*div(u_n)*div(v_test)*dx(**quad_rule) \
