@@ -1,5 +1,6 @@
 """Parallelism decorators for use in the code base."""
 
+from .wavefield_store import WavefieldStore
 import os
 from mpi4py import MPI
 import glob
@@ -237,11 +238,25 @@ def switch_serial_shot(
             # The adjoint propagator consumes forward_solution with pop(). When
             # switching to the next shot, reload saved snapshots even if the
             # in-memory list has been emptied.
-            stacked_shot_arrays = np.load(forward_solution_filename)
-            if not wave.forward_solution:
-                rebuild_empty_forward_solution(wave, len(stacked_shot_arrays))
-            for array_i, array in enumerate(stacked_shot_arrays):
-                wave.forward_solution[array_i].dat.data[:] = array
+            # mmap_mode='r': the file is only read row by row into existing
+            # Functions below, so there is no reason to materialise the whole
+            # nt-step wavefield in RAM first.
+            stacked_shot_arrays = np.load(
+                forward_solution_filename, mmap_mode="r"
+            )
+            if wave.wavefield_storage_dtype is not None:
+                store = WavefieldStore(
+                    wave.function_space, dtype=wave.wavefield_storage_dtype
+                )
+                store.extend_from_arrays(stacked_shot_arrays)
+                wave.forward_solution = store
+            else:
+                if not wave.forward_solution:
+                    rebuild_empty_forward_solution(
+                        wave, len(stacked_shot_arrays)
+                    )
+                for array_i, array in enumerate(stacked_shot_arrays):
+                    wave.forward_solution[array_i].dat.data[:] = array
         receiver_solution_filename = _shot_filename(
             propagation_id, wave, prefix="tmp_rec"
         )
@@ -482,8 +497,15 @@ def save_serial_data(wave, propagation_id):
     # truth value: every UFL object, that ``Function`` included, is
     # unconditionally true, so a truthiness check reaches the loop below and
     # fails trying to iterate a scalar-valued expression.
-    if isinstance(wave.forward_solution, (list, tuple)) and wave.forward_solution:
-        arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
+    if isinstance(wave.forward_solution, WavefieldStore):
+        arrays_list = wave.forward_solution.to_arrays()
+    elif isinstance(wave.forward_solution, (list, tuple)) and wave.forward_solution:
+        # data_ro, not data: read-write access marks every dat dirty and can
+        # trigger halo exchanges we do not need just to serialise.
+        arrays_list = [obj.dat.data_ro for obj in wave.forward_solution]
+    else:
+        arrays_list = None
+    if arrays_list:
         stacked_arrays = np.stack(arrays_list, axis=0)
         np.save(_shot_filename(propagation_id, wave, prefix="tmp_shot"), stacked_arrays)
     np.save(
