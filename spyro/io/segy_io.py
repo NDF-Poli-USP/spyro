@@ -17,6 +17,7 @@ def segy_to_png(
     dpi=150,
     flip=True,
     show=False,
+    **kwargs,
 ):
     """Read a SEGY file and return a PNG image (bytes) or save to disk.
 
@@ -37,6 +38,7 @@ def segy_to_png(
         If True, flip the data vertically for common display orientation.
     show : bool
         If True shows the image
+    kargs: optional keyword arguments to pyplot.
 
     Returns
     -------
@@ -55,7 +57,7 @@ def segy_to_png(
         data = np.flipud(data)
 
     fig, ax = plt.subplots()
-    ax.imshow(data, cmap=cmap, aspect="auto", origin="lower", vmin=vmin, vmax=vmax)
+    ax.imshow(data, cmap=cmap, origin="lower", vmin=vmin, vmax=vmax, **kwargs)
     ax.set_axis_off()
 
     if show:
@@ -245,7 +247,7 @@ def create_grid_dictionary_from_segy(filename: str, length_z: float, length_x: f
 
 
 @run_in_one_core_kwarg_comm
-def export_scalar_field(function, grid_spacing, output_filename, comm=None, show=False):
+def export_scalar_field(function, grid_spacing, output_filename, comm=None, show=False, **kwargs):
     """Export a scalar field to SEG-Y or PNG.
 
     Parameters
@@ -259,6 +261,7 @@ def export_scalar_field(function, grid_spacing, output_filename, comm=None, show
         ``.png``.
     show : bool (optional)
         If True shows pyplot
+    kwargs: optional keyword arguments for pyplot
 
     Returns
     -------
@@ -280,7 +283,7 @@ def export_scalar_field(function, grid_spacing, output_filename, comm=None, show
     elif output_filename.lower().endswith((".png")):
         segy_filename = Path(output_filename).with_suffix(".segy")
         create_segy(function, V, grid_spacing, segy_filename)
-        segy_to_png(segy_filename, output_file=output_filename, show=show)
+        segy_to_png(segy_filename, output_file=output_filename, show=show, **kwargs)
     else:
         from ..utils.error_management import (
             validate_parameter,

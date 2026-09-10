@@ -18,6 +18,7 @@ class Read_time_axis:
         self.input_dictionary["time_axis"].setdefault("initial_time", 0.0)
         self.initial_time = self.input_dictionary["time_axis"]["initial_time"]
         self.final_time = self.input_dictionary["time_axis"]["final_time"]
+        self.input_dictionary["time_axis"].setdefault("dt", 0.0)
         self.dt = self.input_dictionary["time_axis"]["dt"]
         self.input_dictionary["time_axis"].setdefault(
             "gradient_sampling_frequency", 99999
