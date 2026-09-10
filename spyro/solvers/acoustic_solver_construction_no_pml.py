@@ -1,29 +1,72 @@
-"""Constructs Firedrake solver for the acosutic wave with typical BCs, NRBCs or HABCs."""
+"""Constructs Firedrake solver for the acoustic wave with typical BCs, 
+NRBCs or HABCs."""
 
 import firedrake as fire
 from firedrake import ds, dx, dot, grad, sqrt
 from ..utils.typing import AbsorbingBCsType
 
 
-def build_acoustic_form(wave, u_trial, v_test, u_n,
-                        u_nm1, quad_rule, c=None, K=None, rho_fluid=None):
+def build_acoustic_form(
+    wave,
+    u_trial,
+    v_test,
+    u_n,
+    u_nm1,
+    quad_rule,
+    c=None,
+    K=None,
+    rho_fluid=None
+):
+    """Build the weak form of the acoustic wave equation for one time step.
+
+    Parameters
+    ----------
+    wave : `acoustic_wave.AcousticWave`
+        An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+    u_trial : `firedrake.TrialFunction`
+        Trial function for the pressure field at the next time step.
+    v_test : `firedrake.TestFunction`
+        Test function for the pressure field.
+    u_n : `firedrake.Function`
+        Pressure field at the current time step.
+    u_nm1 : `firedrake.Function`
+        Pressure field at the previous time step.
+    quad_rule : dict
+        Quadrature rule for volume integration.
+    c : `firedrake.Constant` or UFL expression, optional
+        Fluid wave speed. Mutually exclusive with `K`/`rho_fluid`.
+    K : `firedrake.Constant` or `firedrake.Function`, optional
+        Fluid bulk modulus. Must be given together with `rho_fluid`.
+    rho_fluid : `firedrake.Constant` or `firedrake.Function`, optional
+        Fluid density. Must be given together with `K`.
+
+    Returns
+    -------
+    form : UFL form
+        The combined weak form (mass + stiffness + source + absorbing terms).
+
+    Raises
+    ------
+    ValueError
+        If `c` is given together with `K` or `rho_fluid` (ambiguous), or if
+        only one of `K`/`rho_fluid` is given (incomplete).
+    """
 
     if c is not None and (K is not None or rho_fluid is not None):
         raise ValueError(
-            "Ambiguous formulation. Insert 'bulk_modulus' and 'density_fluid' or just 'c'."
+            "Ambiguous formulation. Insert 'bulk_modulus' and 'density_fluid' "
+            "or just 'c'."
         )
     if c is None:
         if K is not None and rho_fluid is not None:
             c = sqrt(K / rho_fluid)
         elif K is not None or rho_fluid is not None:
-            raise ValueError(
-                "Insert both values 'bulk_modulus' and 'density_fluid'."
-            )
+            raise ValueError("Insert both values 'bulk_modulus' and 'density_fluid'.")
         else:
             c = wave.c
 
     dt = wave.dt
-    
+
     m1 = (
         (1 / (c * c))
         * ((u_trial - 2.0 * u_n + u_nm1) / dt**2)
@@ -35,7 +78,7 @@ def build_acoustic_form(wave, u_trial, v_test, u_n,
     le = 0.0
     q = wave.source_expression
     if q is not None:
-        le += - q * v_test * dx(**quad_rule)
+        le += -q * v_test * dx(**quad_rule)
 
     if wave.abc_active and not wave.abc_get_ref_model:
         weak_expr_abc = dot((u_n - u_nm1) / dt, v_test)
@@ -49,24 +92,28 @@ def build_acoustic_form(wave, u_trial, v_test, u_n,
             le += wave.cosHig * f_abc * ds(**qr_s)
 
             # Damping
-            le += wave.eta_mask * weak_expr_abc * \
-                (1 / (c * c)) * \
-                wave.eta_habc * dx(**quad_rule)
+            le += (
+                wave.eta_mask
+                * weak_expr_abc
+                * (1 / (c * c))
+                * wave.eta_habc
+                * dx(**quad_rule)
+            )
 
         else:
             if wave.absorb_top:
-                le += f_abc*ds(1, **qr_s)
+                le += f_abc * ds(1, **qr_s)
             if wave.absorb_bottom:
-                le += f_abc*ds(2, **qr_s)
+                le += f_abc * ds(2, **qr_s)
             if wave.absorb_right:
-                le += f_abc*ds(3, **qr_s)
+                le += f_abc * ds(3, **qr_s)
             if wave.absorb_left:
-                le += f_abc*ds(4, **qr_s)
+                le += f_abc * ds(4, **qr_s)
             if wave.dimension == 3:
                 if wave.absorb_front:
-                    le += f_abc*ds(5, **qr_s)
+                    le += f_abc * ds(5, **qr_s)
                 if wave.absorb_back:
-                    le += f_abc*ds(6, **qr_s)
+                    le += f_abc * ds(6, **qr_s)
 
     # form = m1 + a - le
     # Signal for le is + in derivation, see Salas et al (2022)
@@ -76,15 +123,15 @@ def build_acoustic_form(wave, u_trial, v_test, u_n,
 
 
 def construct_solver_or_matrix_no_pml(wave):
-    """Builds solver operators for wave propagator with typical BCs, NRBCs or HABCs.
-
-    Doesn't create mass matrices if matrix_free option is on, which it is by default.
+    """Build the Firedrake solver for the acoustic wave, without PML,
+    with typical BCs, NRBCs or HABCs.
 
     Parameters
     ----------
     wave : `acoustic_wave.AcousticWave`
         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
     """
+
     V = wave.function_space
     quad_rule = wave.quadrature_rule
 
@@ -109,11 +156,11 @@ def construct_solver_or_matrix_no_pml(wave):
     wave.source_function = fire.Cofunction(V.dual())
 
     lin_var = fire.LinearVariationalProblem(
-        wave.lhs,
-        wave.rhs + wave.source_function,
-        u_np1, constant_jacobian=True)
+        wave.lhs, wave.rhs + wave.source_function, u_np1, constant_jacobian=True
+    )
     solver_parameters = dict(wave.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
     wave.solver = fire.LinearVariationalSolver(
-        lin_var, solver_parameters=solver_parameters,
+        lin_var,
+        solver_parameters=solver_parameters,
     )
