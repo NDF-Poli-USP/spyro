@@ -1,21 +1,54 @@
-"""Constructs Firedrake solver for the acoustic wave with typical BCs, 
-NRBCs or HABCs."""
+"""Constructs Firedrake solver for the acoustic wave with BCs, NRBCs, HABCs."""
 
 import firedrake as fire
 from firedrake import ds, dx, dot, grad, sqrt
 from ..utils.typing import AbsorbingBCsType
 
 
+def velocity_fluid(c=None, K=None, rho_fluid=None, default=None):
+    """Resolve the acoustic wave velocity.
+
+    Uses either an explicity value or the fluid bulk modulus and density.
+
+    Parameters
+    ----------
+    c : `firedrake.Constant` or UFL expression, optional
+        Fluid wave speed. Mutually exclusive with `K`/`rho_fluid`.
+    K : `firedrake.Constant` or `firedrake.Function`, optional
+        Fluid bulk modulus. Must be given together with `rho_fluid`.
+    rho_fluid : `firedrake.Constant` or `firedrake.Function`, optional
+        Fluid density. Must be given together with `K`.
+    default : `firedrake.Constant` or UFL expression, optional.
+        Value to return when neither `c` nor `K`/`rho_fluid` are given.
+
+    Returns
+    -------
+    c : UFL expression
+        The resolved wave velocity.
+
+    Raises
+    ------
+    ValueError
+        If `c` is given together with `K` or `rho_flui`, or if
+        only one of `K`/`rho_fluid` is given.
+    """
+    if c is not None and (K is not None or rho_fluid is not None):
+        raise ValueError(
+            "Ambiguous formulation. Insert 'bulk_modulus' and 'density_fluid' "
+            "or just 'velocity_fluid'."
+        )
+    if c is None:
+        if K is not None and rho_fluid is not None:
+            c = sqrt(K / rho_fluid)
+        elif K is not None or rho_fluid is not None:
+            raise ValueError("Insert both values 'bulk_modulus' and 'density_fluid'.")
+        else:
+            c = default
+    return c
+
+
 def build_acoustic_form(
-    wave,
-    u_trial,
-    v_test,
-    u_n,
-    u_nm1,
-    quad_rule,
-    c=None,
-    K=None,
-    rho_fluid=None
+    wave, u_trial, v_test, u_n, u_nm1, quad_rule, c=None, K=None, rho_fluid=None
 ):
     """Build the weak form of the acoustic wave equation for one time step.
 
@@ -33,12 +66,9 @@ def build_acoustic_form(
         Pressure field at the previous time step.
     quad_rule : dict
         Quadrature rule for volume integration.
-    c : `firedrake.Constant` or UFL expression, optional
-        Fluid wave speed. Mutually exclusive with `K`/`rho_fluid`.
-    K : `firedrake.Constant` or `firedrake.Function`, optional
-        Fluid bulk modulus. Must be given together with `rho_fluid`.
-    rho_fluid : `firedrake.Constant` or `firedrake.Function`, optional
-        Fluid density. Must be given together with `K`.
+    c, K, rho_fluid : optional
+        Passed through to `velocity_fluid` to determine the fluid wave
+        velocity.
 
     Returns
     -------
@@ -51,20 +81,7 @@ def build_acoustic_form(
         If `c` is given together with `K` or `rho_fluid` (ambiguous), or if
         only one of `K`/`rho_fluid` is given (incomplete).
     """
-
-    if c is not None and (K is not None or rho_fluid is not None):
-        raise ValueError(
-            "Ambiguous formulation. Insert 'bulk_modulus' and 'density_fluid' "
-            "or just 'c'."
-        )
-    if c is None:
-        if K is not None and rho_fluid is not None:
-            c = sqrt(K / rho_fluid)
-        elif K is not None or rho_fluid is not None:
-            raise ValueError("Insert both values 'bulk_modulus' and 'density_fluid'.")
-        else:
-            c = wave.c
-
+    c = velocity_fluid(c, K, rho_fluid, default=wave.c)
     dt = wave.dt
 
     m1 = (
@@ -123,15 +140,15 @@ def build_acoustic_form(
 
 
 def construct_solver_or_matrix_no_pml(wave):
-    """Build the Firedrake solver for the acoustic wave, without PML,
-    with typical BCs, NRBCs or HABCs.
+    """Build the Firedrake solver for the acoustic wave, without PML.
+
+    Handles typical BCs, NRBCs or HABCs.
 
     Parameters
     ----------
     wave : `acoustic_wave.AcousticWave`
         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
     """
-
     V = wave.function_space
     quad_rule = wave.quadrature_rule
 

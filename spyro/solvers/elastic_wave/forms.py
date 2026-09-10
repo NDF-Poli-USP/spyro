@@ -1,5 +1,6 @@
-"""Constructs Firedrake solver for the isotropic elastic wave with
-typical BCs, NRBCs or HABCs.
+"""Constructs Firedrake solver for the isotropic elastic wave.
+
+Handles typical BCs, NRBCs or HABCs.
 """
 
 from firedrake import (
@@ -22,8 +23,7 @@ from .local_abc import local_abc_form
 
 
 def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
-    """Build the weak form of the isotropic elastic wave equation for one
-    time step.
+    """Build the weak form of the isotropic elastic wave equation.
 
     Parameters
     ----------
@@ -49,7 +49,6 @@ def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
         The combined weak form (mass + stiffness - source - absorbing
         terms).
     """
-
     dt = Constant(wave.dt)
     rho = wave.rho
     lmbda = wave.lmbda
@@ -73,8 +72,9 @@ def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
 
 
 def isotropic_elastic_without_pml(wave):
-    """Build the Firedrake solver for the isotropic elastic wave, without
-    PML.
+    """Build the Firedrake solver for the isotropic elastic wave.
+
+    Built without PML.
 
     Parameters
     ----------
@@ -82,7 +82,6 @@ def isotropic_elastic_without_pml(wave):
         An instance of the
         :class:`~spyro.solvers.elastic_wave.isotropic_wave.IsotropicWave`.
     """
-
     V = wave.function_space
     quad_rule = wave.quadrature_rule
 
