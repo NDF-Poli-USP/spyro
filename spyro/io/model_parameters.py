@@ -4,12 +4,13 @@ import uuid
 from mpi4py import MPI  # noqa:F401
 import warnings
 from copy import deepcopy
+
+from spyro.mpi.spyro_mpi import SpyroComm
 from ..io.dictionaryio import Read_options, Read_outputs
 from ..io.boundary_layer_io import Read_boundary_layer
 from ..io.material_properties_io import VelocityModelFileIO
 from ..io.time_io import Read_time_axis
 from .. import io
-from .. import utils
 from .. import meshing
 
 
@@ -252,7 +253,14 @@ class Model_parameters(Read_boundary_layer, VelocityModelFileIO, Read_time_axis)
         # Setting up MPI communicator and checking parallelism:
         self.input_dictionary.setdefault("parallelism", {})
         self.input_dictionary["parallelism"].setdefault("type", "automatic")
+
+        SpyroComm.initialize_with_dict(
+            self.input_dictionary["parallelism"], self.number_of_sources
+        )
+
+        self.shot_ids_per_propagation = SpyroComm.config.shot_ids_per_propagation
         self.parallelism_type = self.input_dictionary["parallelism"]["type"]
+        self.comm = SpyroComm.ensemble
 
         # Checking absorving boundary condition parameters
         Read_boundary_layer.__init__(self)
@@ -410,37 +418,6 @@ class Model_parameters(Read_boundary_layer, VelocityModelFileIO, Read_time_axis)
         if value != "second_order_in_pressure":
             raise ValueError("The equation type specified is not implemented yet")
         self._equation_type = value
-
-    @property
-    def parallelism_type(self):
-        """Str: Parallelism strategy used to distribute shot propagations."""
-        return self._parallelism_type
-
-    @parallelism_type.setter
-    def parallelism_type(self, value):
-        accepted_values = [
-            "custom",
-            "automatic",
-            "spatial",
-        ]
-        _validate_enum(value, accepted_values, "parallelism_type")
-
-        if value == "custom":
-            self.shot_ids_per_propagation = self.input_dictionary["parallelism"][
-                "shot_ids_per_propagation"
-            ]
-        elif value == "automatic":
-            self.shot_ids_per_propagation = [
-                [i] for i in range(0, self.number_of_sources)
-            ]
-        elif value == "spatial":
-            self.shot_ids_per_propagation = [
-                [i] for i in range(0, self.number_of_sources)
-            ]
-
-        self._parallelism_type = value
-        self.comm = utils.mpi_init(self)
-        self.comm.comm.barrier()
 
     def _sanitize_automatic_adjoint(self):
         dictionary = self.input_dictionary
