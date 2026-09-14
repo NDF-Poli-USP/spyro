@@ -27,7 +27,7 @@ dictionary["mesh"] = {
     "length_y": 0.0,
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
-    "edge_length": 0.1, # 0.005, 0.0035, 0.0025
+    "edge_length": 0.05, # 0.005, 0.0035, 0.0025
     "interface_x": 0.5,
     "absorb_left": False,
     "absorb_right": False,
@@ -62,7 +62,7 @@ dictionary["visualization"] = {
     "graadient_output": False,
     "gradient_filename": None,
     "debug_output": False,
-    "displacement_output": False,
+    "displacement_output":False,
     "displacement_output_filename": "results/displacement.pvd",
     "snapshot_frequency": 20,
     "snapshot_output_dir": "results/snapshots",
@@ -85,27 +85,9 @@ dictionary["synthetic_data"] = {
 }
 
 Wave_obj = AcousticElasticWave(dictionary=dictionary)
-Wave_obj.use_monolithic = False
+Wave_obj.use_monolithic = True
 t_start = time.perf_counter()
-# Wave_obj.forward_solve()
-
-
-#========
-import tracemalloc
-
-tracemalloc.start()
-snapshot_before = tracemalloc.take_snapshot()
-
 Wave_obj.forward_solve()
-
-snapshot_after = tracemalloc.take_snapshot()
-top_stats = snapshot_after.compare_to(snapshot_before, 'lineno')
-
-with open('results/tracemalloc_coupled.txt', 'w') as f:
-    for stat in top_stats[:30]:
-        f.write(str(stat) + '\n')
-#===========
-
 
 t_end = time.perf_counter()
 elapsed = t_end - t_start

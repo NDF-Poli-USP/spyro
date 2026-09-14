@@ -7,8 +7,8 @@ from spyro.plots.receiver_plots import plot_receiver_response, plot_displacement
 from spyro.tools.error_measure import MeasureError
 
 NPZ_PATH = "results/spyro_receiver_data.npz"
-GAR6MORE_DIR_FLUID = "/workspaces/spyro/notebook_tutorials/results_fluid"
-GAR6MORE_DIR_SOLID = "/workspaces/spyro/notebook_tutorials/results_solid"
+GAR6MORE_DIR_FLUID = "/workspaces/spyro2/notebook_tutorials/results_fluid"
+GAR6MORE_DIR_SOLID = "/workspaces/spyro2/notebook_tutorials/results_solid"
 FLIP_UZ = True
 OUTPUT_DIR = "results"
 

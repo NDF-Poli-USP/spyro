@@ -41,11 +41,17 @@ def construct_acoustic_elastic(Wave_obj):
         constant_jacobian=True,
     )
 
-    solver_parameters = dict(Wave_obj.solver_parameters)
     solver_parameters = {
         'ksp_type': 'preonly',
-        'pc_type': 'lu',
+        'pc_type': 'jacobi',
+        'mat_type': 'matfree',
     }
+
+    # solver_parameters = dict(Wave_obj.solver_parameters)
+    # solver_parameters = {
+    #     'ksp_type': 'preonly',
+    #     'pc_type': 'lu',
+    # }
 
     Wave_obj.solid_solver = LinearVariationalSolver(
         solid_problem, 
@@ -78,11 +84,17 @@ def construct_acoustic_elastic(Wave_obj):
         constant_jacobian=True,
     )
 
-    solver_parameters = dict(Wave_obj.solver_parameters)
     solver_parameters = {
         'ksp_type': 'preonly',
-        'pc_type': 'lu',
+        'pc_type': 'jacobi',
+        'mat_type': 'matfree',
     }
+
+    # solver_parameters = dict(Wave_obj.solver_parameters)
+    # solver_parameters = {
+    #     'ksp_type': 'preonly',
+    #     'pc_type': 'lu',
+    # }
 
     Wave_obj.fluid_solver = LinearVariationalSolver(
         fluid_problem, 
@@ -91,7 +103,7 @@ def construct_acoustic_elastic(Wave_obj):
 
     Wave_obj.solver = Wave_obj
 
-    # ===== DIAGNÓSTICO TEMPORÁRIO — remover depois =====
+    # ===== Análise temporária =====
     import numpy as np
     import matplotlib.pyplot as plt
     from firedrake import assemble, dx
@@ -147,7 +159,7 @@ def construct_acoustic_elastic(Wave_obj):
         axes[3].set_title(f"C_up (transposta)\n{Cup_dense.shape[0]}x{Cup_dense.shape[1]}")
 
         plt.tight_layout()
-        plt.savefig("/workspaces/spyro/sparsity_comparison.png", dpi=150)
+        plt.savefig("/workspaces/spyro2/sparsity_comparison.png", dpi=150)
         print("Salvo em sparsity_comparison.png")
 
         import numpy as np
@@ -163,6 +175,6 @@ def construct_acoustic_elastic(Wave_obj):
         plt.colorbar(im1, ax=axes2[1], label="valor absoluto")
 
         plt.tight_layout()
-        plt.savefig("/workspaces/spyro/coupling_magnitude.png", dpi=150)
+        plt.savefig("/workspaces/spyro2/coupling_magnitude.png", dpi=150)
         print("Salvo em /workspaces/spyro/coupling_magnitude.png")
-    # ===== FIM DIAGNÓSTICO =====
+    # ===== Fim analise temporária =====
