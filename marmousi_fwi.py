@@ -18,7 +18,14 @@ import spyro
 import pytest
 
 
-def run_forward_real_model(default_dictionary, shot_filename="shots/shot_record_", dt=None, save_vp_as_segy=False, segy_filename="velocity_models/vp_marmousi-ii.segy", t0=0.0):
+def run_forward_real_model(
+        default_dictionary,
+        shot_filename="shots/shot_record_",
+        dt=None,
+        save_vp_as_segy=False,
+        segy_filename="velocity_models/vp_marmousi-ii.segy",
+        t0=0.0,
+    ):
     """Generate and save a synthetic shot record for the chosen demo case.
 
     Parameters
@@ -45,7 +52,7 @@ def run_forward_real_model(default_dictionary, shot_filename="shots/shot_record_
     fwi_obj = spyro.FullWaveformInversion(dictionary=input_dictionary)
     fwi_obj.wave.start_time = t0
 
-    fwi_obj.set_real_velocity_model(new_file="velocity_models/vp_marmousi-ii.segy", fast_interpolate=True)
+    fwi_obj.set_real_velocity_model(new_file=segy_filename, fast_interpolate=True)
     fwi_obj.generate_real_shot_record(
         plot_model=True,
         model_filename="True_experiment.png",
@@ -53,14 +60,6 @@ def run_forward_real_model(default_dictionary, shot_filename="shots/shot_record_
     )
     if dt is not None:
         fwi_obj.wave.dt = original_dt
-
-    if save_vp_as_segy:
-        export_grid_spacing = 0.01
-        spyro.io.export_scalar_field(
-            fwi_obj.wave.initial_velocity_model,
-            export_grid_spacing, segy_filename,
-            comm=fwi_obj.wave.comm,
-        )
 
     return fwi_obj
 
@@ -131,7 +130,6 @@ def setting_up_fwi(t0):
         dictionary,
         dt=real_shot_record_dt,
         shot_filename=shots_filenames,
-        save_vp_as_segy=True,
         segy_filename="velocity_models/vp_marmousi-ii.segy",
         t0=t0,
     )
