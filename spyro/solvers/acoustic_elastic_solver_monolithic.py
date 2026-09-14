@@ -46,11 +46,67 @@ def construct_acoustic_elastic_monolithic(Wave_obj):
         constant_jacobian=True,
     )
 
-    solver_parameters = dict(Wave_obj.solver_parameters)
+    # solver_parameters = dict(Wave_obj.solver_parameters)
+    # solver_parameters = {
+    #     'ksp_type': 'preonly',
+    #     'pc_type': 'lu',
+    # }
+
     solver_parameters = {
         'ksp_type': 'preonly',
-        'pc_type': 'lu',
+        'pc_type': 'fieldsplit',
+        'pc_fieldsplit_type': 'multiplicative',
+        'pc_fieldsplit_0_fields': '1',
+        'pc_fieldsplit_1_fields': '0',
+        'fieldsplit_0_ksp_type': 'preonly',
+        'fieldsplit_0_pc_type': 'jacobi',
+        'fieldsplit_1_ksp_type': 'preonly',
+        'fieldsplit_1_pc_type': 'jacobi',
     }
+
     Wave_obj.solver = LinearVariationalSolver(
         lin_var_prob, solver_parameters=solver_parameters
     )
+
+    # ===== Análise temporária =====
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from firedrake import assemble
+    from firedrake.petsc import PETSc
+
+    Np = Wave_obj.scalar_function_space.dim()
+    Nu = Wave_obj.vector_function_space.dim()
+    N_total = Np + Nu
+    print(f"Tamanho espaço fluido (Np): {Np}")
+    print(f"Tamanho espaço sólido (Nu): {Nu}")
+    print(f"Tamanho do sistema monolítico completo (Np+Nu): {N_total}")
+
+    lhs_mat = assemble(Wave_obj.lhs, mat_type="aij").petscmat
+    print(f"LHS monolítico shape: {lhs_mat.getSize()}")
+
+    lhs_dense = lhs_mat[:, :]
+    nnz = np.count_nonzero(np.abs(lhs_dense) > 1e-14)
+    print(f"LHS monolítico: {nnz}/{lhs_dense.size} não-nulos "
+          f"({100*nnz/lhs_dense.size:.2f}%)")
+
+    rank = PETSc.COMM_WORLD.rank
+    if rank == 0:
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.spy(lhs_dense, markersize=2)
+        ax.axhline(Np - 0.5, color="red", linewidth=0.8, linestyle="--")
+        ax.axvline(Np - 0.5, color="red", linewidth=0.8, linestyle="--")
+        ax.set_title(
+            f"LHS {lhs_dense.shape[0]}x{lhs_dense.shape[1]}"
+        )
+        plt.tight_layout()
+        plt.savefig("/workspaces/spyro2/sparsity_full_monolithic.png", dpi=150)
+
+        fig2, ax2 = plt.subplots(figsize=(8, 8))
+        im = ax2.imshow(np.abs(lhs_dense), cmap="viridis", aspect="equal")
+        ax2.axhline(Np - 0.5, color="red", linewidth=0.8, linestyle="--")
+        ax2.axvline(Np - 0.5, color="red", linewidth=0.8, linestyle="--")
+        ax2.set_title(f"LHS\n{lhs_dense.shape[0]}x{lhs_dense.shape[1]}")
+        plt.colorbar(im, ax=ax2, label="valor absoluto")
+        plt.tight_layout()
+        plt.savefig("/workspaces/spyro2/magnitude_full_monolithic.png", dpi=150)
+    # ===== Fim análise temporária =====
