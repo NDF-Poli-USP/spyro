@@ -116,7 +116,7 @@ def build_elastic_dictionary(material):
 
 @pytest.mark.newer_firedrake
 def test_fwi_automated_adjoint(tmp_path, monkeypatch):
-    """Invert an acoustic velocity model from data a faster one generated.
+    """Invert an acoustic velocity model.
 
     A fixed iteration budget is how FWI is normally run, and TAO reports that
     as a failure to converge; the driver has to hand back the last iterate
