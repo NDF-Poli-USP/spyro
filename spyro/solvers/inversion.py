@@ -1,6 +1,8 @@
 import firedrake as fire
 import warnings
 import inspect
+from collections.abc import Mapping
+from enum import Enum
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI
 import numpy as np
@@ -13,7 +15,9 @@ from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..utils.typing import AdjointType, WaveType
-from ..utils.physical_parameters import PhysicalParameters, as_list
+from ..utils.physical_parameters import (
+    PhysicalParameters, as_list, _as_parameter,
+)
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import parallel_print
@@ -1115,28 +1119,7 @@ class FullWaveformInversion:
         ValueError
             If no guess control has been configured.
         """
-        if self.wave.mesh is None and self.guess_mesh is not None:
-            self.wave.set_mesh(user_mesh=self.guess_mesh, input_mesh_parameters={})
-
-        # An inversion told at construction time which adjoint to use has the
-        # solver configured here, where the mesh and the model it needs
-        # finally exist. It comes before the control is written because it is
-        # what establishes the controls of a medium whose model came from the
-        # input dictionary rather than from a setter.
-        if (
-            self.adjoint_type == AdjointType.AUTOMATED_ADJOINT
-            and self.wave.automated_adjoint is None
-        ):
-            self.wave.enable_automated_adjoint(**self._adjoint_options)
-            # What is differentiated is what is inverted for, and in the same
-            # order: the optimizer hands its iterates back positionally,
-            # matched against the tape's controls. Taking the selection from
-            # the adjoint rather than trusting the two to agree is what keeps
-            # the density of an elastic inversion from being written into its
-            # p-wave velocity.
-            self._control_parameters = self.wave.physical_parameters.copy(
-                self.wave.automated_adjoint.control_parameter_names,
-            )
+        self._prepare_solver()
 
         if c is not None:
             updated_control = self._rebuild_control_from_vector(
@@ -1162,6 +1145,42 @@ class FullWaveformInversion:
             f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
             self._flatten_control(current_control),
         )
+
+    def _prepare_solver(self):
+        """Give the solver its mesh and, if asked for, its automated adjoint.
+
+        An inversion told at construction time which adjoint to use has the
+        solver configured here, where the mesh and the model it needs
+        finally exist. It comes before the control is written because it is
+        what establishes the controls of a medium whose model came from the
+        input dictionary rather than from a setter. Every forward solve
+        passes through here; the TAO driver also comes here first, so that
+        what it is asked to do can be checked against the controls before
+        the recording is paid for.
+
+        Returns
+        -------
+        None
+            The solver is configured in place; nothing changes when it
+            already is.
+        """
+        if self.wave.mesh is None and self.guess_mesh is not None:
+            self.wave.set_mesh(user_mesh=self.guess_mesh, input_mesh_parameters={})
+
+        if (
+            self.adjoint_type == AdjointType.AUTOMATED_ADJOINT
+            and self.wave.automated_adjoint is None
+        ):
+            self.wave.enable_automated_adjoint(**self._adjoint_options)
+            # What is differentiated is what is inverted for, and in the same
+            # order: the optimizer hands its iterates back positionally,
+            # matched against the tape's controls. Taking the selection from
+            # the adjoint rather than trusting the two to agree is what keeps
+            # the density of an elastic inversion from being written into its
+            # p-wave velocity.
+            self._control_parameters = self.wave.physical_parameters.copy(
+                self.wave.automated_adjoint.control_parameter_names,
+            )
 
     def _compute_misfit(self):
         """Compute the receiver-data residual left by the last forward solve.
@@ -1652,7 +1671,21 @@ class FullWaveformInversion:
             vmax : float or array_like, optional
                 Upper bound for the control parameter. Default is 6.0.
             maxiter : int, optional
-                Maximum number of iterations. Default is 20.
+                Maximum number of iterations. Default is 20. Not used with
+                ``stages``, which carry their own budgets.
+            stages : list of (parameters, iterations), optional
+                Run the automated adjoint's optimizer in stages, each
+                moving only some of the controls: ``parameters`` is one
+                material parameter or an iterable of them, ``iterations``
+                that stage's budget. The tape is recorded once, with every
+                control, and each stage starts from where the last one
+                stopped, so
+                ``[(S_WAVE_VELOCITY, 10), (P_WAVE_VELOCITY, 10)]``
+                inverts the S-wave velocity first and then the P-wave
+                velocity with the S-wave velocity held; repeat the pairs
+                to alternate. The iteration count and the functional
+                history run through the stages. A parameter that is not a
+                control is rejected.
             scipy_options : dict, optional
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
@@ -1699,6 +1732,22 @@ class FullWaveformInversion:
                 ``control_parameters``, ``checkpointing``, ``snapshots`` and
                 ``gc_timestep_frequency``. Rejected here, rather than at the
                 first solve, if a name is not one of those.
+            gradient_mask : firedrake.Function, ufl.core.expr.Expr, number or dict, optional
+                A factor the optimizer's gradient is multiplied by, one where
+                the model may change and zero where it may not, written in
+                the mesh coordinates or as a field on the mesh; it is
+                interpolated into the space of each control. Zeroing the
+                gradient around the sources and receivers, where it carries
+                their imprint rather than information on the medium, is the
+                usual use. A dictionary gives one factor per control, keyed
+                by material parameter, and leaves the controls it does not
+                name unmasked; a number is broadcast, so
+                ``{ElasticMaterialParameter.P_WAVE_VELOCITY: 0.0}`` holds
+                the P-wave velocity while the other controls move; with
+                ``stages`` the mask applies to the controls a stage moves.
+                Only the automated adjoint's optimizer, TAO, applies it:
+                the gradients ``get_gradient`` returns are left as they
+                are, and the implemented adjoint has ``set_gradient_mask``.
 
         Returns
         -------
@@ -1724,6 +1773,12 @@ class FullWaveformInversion:
         --------
         >>> fwi.run_fwi(maxiter=100, vmin=1.5, vmax=5.0)
         """
+        stages = kwargs.pop("stages", None)
+        if stages is not None and "maxiter" in kwargs:
+            raise ValueError(
+                "stages carry their own iteration budgets, so maxiter is not "
+                "used with them; pass one or the other.",
+            )
         maxiter = kwargs.pop("maxiter", 20)
         parameters = {
             "vmin": kwargs.pop("vmin", 1.429),
@@ -1737,6 +1792,7 @@ class FullWaveformInversion:
             },
         }
         tao_options = kwargs.pop("tao_options", None)
+        gradient_mask = kwargs.pop("gradient_mask", None)
         self._save_controls = kwargs.pop("save_controls", True)
         self.adjoint_type = kwargs.pop("adjoint_type", self.adjoint_type)
         # The settings reach the solver at the first forward solve of the run,
@@ -1764,6 +1820,25 @@ class FullWaveformInversion:
         parameters.update(kwargs)
 
         if (
+            gradient_mask is not None
+            and self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT
+        ):
+            raise ValueError(
+                "gradient_mask is applied by the automated adjoint's "
+                "optimizer, so it needs "
+                "adjoint_type=AdjointType.AUTOMATED_ADJOINT; the implemented "
+                "adjoint takes its mask from set_gradient_mask().",
+            )
+        if (
+            stages is not None
+            and self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT
+        ):
+            raise ValueError(
+                "stages are run by the automated adjoint's optimizer, so they "
+                "need adjoint_type=AdjointType.AUTOMATED_ADJOINT.",
+            )
+
+        if (
             self.adjoint_type != AdjointType.AUTOMATED_ADJOINT
             and self.wave_type is not WaveType.ISOTROPIC_ACOUSTIC
         ):
@@ -1780,7 +1855,10 @@ class FullWaveformInversion:
             # TAO optimizes the controls themselves, and they come back
             # keyed by the parameter each one belongs to.
             self.set_guess_control(
-                self._run_fwi_tao(parameters, tao_options=tao_options),
+                self._run_fwi_tao(
+                    parameters, tao_options=tao_options,
+                    gradient_mask=gradient_mask, stages=stages,
+                ),
             )
             self.control_parameter_result = self.control_parameters
             result = self.control_parameter_result
@@ -1813,7 +1891,9 @@ class FullWaveformInversion:
         np.save("result", self._flatten_control(self.control_parameter_result))
         return result
 
-    def _run_fwi_tao(self, parameters, tao_options=None):
+    def _run_fwi_tao(
+        self, parameters, tao_options=None, gradient_mask=None, stages=None,
+    ):
         """Optimize the recorded reduced functional with PETSc TAO.
 
         The forward solve is recorded once, here, and every functional value
@@ -1837,6 +1917,14 @@ class FullWaveformInversion:
             PETSc options merged over the defaults, which set only the solver
             type and the iteration budget. See :meth:`run_fwi` for what that
             leaves to PETSc.
+        gradient_mask : firedrake.Function, ufl.core.expr.Expr, number or dict, optional
+            Factor the optimizer's gradient is multiplied by, for every
+            control or one per control, interpolated here into the space of
+            each. See :meth:`run_fwi`.
+        stages : list of (parameters, iterations), optional
+            Stages moving only some of the controls, run one after the
+            other on the one recording. See :meth:`run_fwi`. ``None`` runs
+            a single stage moving every control for ``maxiter`` iterations.
 
         Returns
         -------
@@ -1857,11 +1945,23 @@ class FullWaveformInversion:
         # up there fails every test that touches spyro, whatever it tests.
         from ..tools.optimization import minimize_with_tao, tao_bounds
 
+        # What the optimizer is asked to do is checked against the controls
+        # before the recording, which is the expensive part, is made.
+        self._prepare_solver()
+        automated_adjoint = self.wave.automated_adjoint
+        names = automated_adjoint.control_parameter_names
+        if stages is None:
+            stages = [(set(names), parameters["maxiter"])]
+        else:
+            stages = self._stages(stages)
+        base_masks = self._gradient_masks(
+            gradient_mask, automated_adjoint.controls,
+        )
+
         # Records the tape, and logs the starting functional the same way the
         # scipy path logs every iterate.
         self.get_functional()
 
-        automated_adjoint = self.wave.automated_adjoint
         reduced_functional = automated_adjoint.reduced_functional
         if reduced_functional is None:
             reduced_functional = automated_adjoint.create_reduced_functional(
@@ -1878,23 +1978,182 @@ class FullWaveformInversion:
         ]
         lower = tao_bounds(parameters["vmin"], adjoint_controls)
         upper = tao_bounds(parameters["vmax"], adjoint_controls)
-        options = {
-            "tao_type": "blmvm",
-            "tao_max_it": parameters["maxiter"],
-        }
+        options = {"tao_type": "blmvm"}
         if tao_options:
             options.update(tao_options)
 
-        solution = minimize_with_tao(
-            reduced_functional,
-            bounds=list(zip(lower, upper)),
-            comm=self.wave.comm.comm,
-            options=options,
-            record=self._record_iterate,
-        )
+        # Every stage is a TAO solve of its own over the same reduced
+        # functional, told to hold the controls it does not move by zeroing
+        # their gradients: with the lumped metric and no coupling between
+        # controls, a control whose gradient is zero is never stepped. TAO
+        # starts each solve from the controls' tape values, so the point the
+        # last stage stopped at is written there first. The iterations are
+        # numbered through the stages, as one run.
+        done = 0
+        for moving, iterations in stages:
+            offset = done
+
+            def record(iteration, functional, iterate):
+                nonlocal done
+                done = offset + iteration
+                self._record_iterate(done, functional, iterate)
+
+            solution = minimize_with_tao(
+                reduced_functional,
+                bounds=list(zip(lower, upper)),
+                comm=self.wave.comm.comm,
+                options={**options, "tao_max_it": iterations},
+                record=record,
+                gradient_masks=self._stage_masks(
+                    base_masks, moving, names, adjoint_controls,
+                ),
+            )
+            for control, value in zip(reduced_functional.controls, solution):
+                control.update(value)
         # The tape knows which parameter each control is; the optimizer only
         # ever saw a vector, and hands back the same order it was given.
         return automated_adjoint.label_derivatives(solution)
+
+    def _stages(self, stages):
+        """Normalize the stages of a staged inversion.
+
+        Parameters
+        ----------
+        stages : iterable of (parameters, iterations)
+            As given to :meth:`run_fwi`: for each stage, the material
+            parameter it moves, or an iterable of them, and its iteration
+            budget.
+
+        Returns
+        -------
+        list of (set of enum.Enum, int)
+            The parameters each stage moves and its budget.
+
+        Raises
+        ------
+        ValueError
+            If a stage is not such a pair, names a parameter that is not a
+            control, or has no positive budget.
+        """
+        names = self.wave.automated_adjoint.control_parameter_names
+        normalized = []
+        for stage in stages:
+            try:
+                moving, iterations = stage
+            except (TypeError, ValueError):
+                raise ValueError(
+                    "Each stage is a (parameters, iterations) pair; received "
+                    f"{stage!r}.",
+                ) from None
+            # A parameter enum is a string, so a bare one must not be read
+            # as a sequence of characters.
+            if isinstance(moving, Enum):
+                moving = [moving]
+            moving = {_as_parameter(name) for name in moving}
+            unknown = sorted(moving - set(names), key=lambda name: name.value)
+            if unknown:
+                raise ValueError(
+                    f"A stage moves {[name.value for name in unknown]}, which "
+                    "are not controls of this inversion; the controls are "
+                    f"{[name.value for name in names]}.",
+                )
+            if (
+                isinstance(iterations, bool)
+                or not isinstance(iterations, (int, np.integer))
+                or iterations < 1
+            ):
+                raise ValueError(
+                    "A stage's iteration budget is a positive integer; "
+                    f"received {iterations!r}.",
+                )
+            normalized.append((moving, int(iterations)))
+        if not normalized:
+            raise ValueError("stages is empty; give at least one stage.")
+        return normalized
+
+    def _gradient_masks(self, gradient_mask, controls):
+        """Interpolate the optimizer's gradient mask into each control's space.
+
+        One mask per control, in its own space: the controls of an elastic
+        inversion need not share one.
+
+        Parameters
+        ----------
+        gradient_mask : firedrake.Function, ufl.core.expr.Expr, number, dict or None
+            The factor every control's gradient is multiplied by, or a
+            dictionary of one per control keyed by material parameter. A
+            control the dictionary does not name is left unmasked; a number
+            is broadcast over the control. See :meth:`run_fwi`.
+        controls : list of firedrake.Function
+            The controls TAO is given, in its order, which is the order of
+            the automated adjoint's ``control_parameter_names``.
+
+        Returns
+        -------
+        list of firedrake.Function or None
+            The masks, one per control, or ``None`` when there is no mask.
+
+        Raises
+        ------
+        ValueError
+            If the dictionary names a parameter that is not a control.
+        """
+        if gradient_mask is None:
+            return None
+        names = self.wave.automated_adjoint.control_parameter_names
+        if isinstance(gradient_mask, Mapping):
+            masks = {_as_parameter(name): mask for name, mask in gradient_mask.items()}
+            unknown = [name for name in masks if name not in names]
+            if unknown:
+                raise ValueError(
+                    f"gradient_mask names {[name.value for name in unknown]}, "
+                    "which are not controls of this inversion; the controls "
+                    f"are {[name.value for name in names]}.",
+                )
+            masks = [masks.get(name, 1.0) for name in names]
+        else:
+            masks = [gradient_mask] * len(controls)
+        return [
+            fire.Function(control.function_space()).interpolate(
+                fire.Constant(mask) if np.isscalar(mask) else mask,
+            )
+            for mask, control in zip(masks, controls)
+        ]
+
+    @staticmethod
+    def _stage_masks(base_masks, moving, names, controls):
+        """Return the masks of one stage: the base ones, zero where held.
+
+        Parameters
+        ----------
+        base_masks : list of firedrake.Function or None
+            The masks of :meth:`_gradient_masks`, or ``None`` for no mask.
+        moving : set of enum.Enum
+            The parameters the stage moves.
+        names : list of enum.Enum
+            The parameter each control is, in the controls' order.
+        controls : list of firedrake.Function
+            The controls, in TAO's order.
+
+        Returns
+        -------
+        list of firedrake.Function or None
+            One mask per control, or ``None`` when the stage moves every
+            control and there is no base mask.
+        """
+        if moving == set(names):
+            return base_masks
+        masks = []
+        for index, (name, control) in enumerate(zip(names, controls)):
+            if name not in moving:
+                masks.append(fire.Function(control.function_space()))
+            elif base_masks is None:
+                masks.append(
+                    fire.Function(control.function_space()).assign(1.0),
+                )
+            else:
+                masks.append(base_masks[index])
+        return masks
 
     def _record_iterate(self, iteration, functional, controls):
         """Log one iterate the optimizer settled on.

@@ -198,11 +198,62 @@ def _lumped_riesz_map(controls, comm=None):
     return matrix
 
 
+def _lumped_initial_hessian(inverse_mass, vec_interface, comm):
+    """Wrap the lumped Riesz map as the initial Hessian BLMVM starts from.
+
+    TAO takes ``H0`` as a matrix it *solves* with, through a KSP of its own,
+    so what is handed over is a matrix that is never applied, together with a
+    preconditioner that applies its inverse -- the lumped Riesz map -- in a
+    single ``preonly`` step. This mirrors how pyadjoint's ``TAOSolver`` seeds
+    the same method with the consistent map.
+
+    Parameters
+    ----------
+    inverse_mass : petsc4py.PETSc.Mat
+        The lumped inverse Riesz map, from :func:`_lumped_riesz_map`.
+    vec_interface : pyadjoint.optimization.tao_solver.PETScVecInterface
+        Layout of the controls concatenated into one vector, which sizes the
+        matrix.
+    comm : petsc4py.PETSc.Comm or mpi4py.MPI.Comm
+        Communicator the controls are defined over.
+
+    Returns
+    -------
+    tuple of (petsc4py.PETSc.Mat, petsc4py.PETSc.PC)
+        The initial Hessian, and the preconditioner applying its inverse.
+    """
+    from petsc4py import PETSc
+
+    class InitialHessian:
+        """Context of the matrix TAO solves with, which is never applied."""
+
+    class InitialHessianInverse:
+        """Preconditioner context applying the lumped Riesz map."""
+
+        def apply(self, pc, x, y):
+            inverse_mass.mult(x, y)
+
+    local_size, global_size = vec_interface.n, vec_interface.N
+    matrix = PETSc.Mat().createPython(
+        ((local_size, global_size), (local_size, global_size)),
+        InitialHessian(),
+        comm=comm,
+    )
+    matrix.setOption(PETSc.Mat.Option.SYMMETRIC, True)
+    matrix.setUp()
+
+    preconditioner = PETSc.PC().createPython(InitialHessianInverse(), comm=comm)
+    preconditioner.setOperators(matrix)
+    preconditioner.setUp()
+    return matrix, preconditioner
+
+
 class LumpedTAOSolver(OptimizationSolver):
     """TAO BLMVM with a diagonal metric, for box-constrained inversions.
 
-    A near-copy of :class:`pyadjoint.TAOSolver`, differing in two decisions
-    that matter once the controls are bounded:
+    A near-copy of :class:`pyadjoint.TAOSolver`, differing in one decision
+    that matters once the controls are bounded -- which Riesz map to use --
+    and which enters in two places:
 
     The metric
         pyadjoint measures gradients in the consistent Riesz map. This uses
@@ -211,13 +262,20 @@ class LumpedTAOSolver(OptimizationSolver):
         module docstring for why the consistent map and the projection fight
         each other.
 
-    The initial scaling
+    The initial Hessian
         BLMVM approximates the inverse Hessian from the gradients it has
-        seen, and starts that approximation from an ``H0``. pyadjoint pins
-        ``H0`` to the Riesz map, fixing the scale of the first quasi-Newton
-        step; that is not done here, so PETSc keeps its own dynamic scaling.
-        It is the reason the two solvers take different paths from the same
-        starting point, even where both converge.
+        seen, and starts that approximation from an ``H0``, which is also
+        what turns the first derivative into a direction: the first step is
+        along :math:`-H_0^{-1} DJ`. Like pyadjoint, this seeds ``H0`` with
+        the Riesz map -- the lumped one again, so that the direction is the
+        gradient of the module docstring, measured in the same metric as the
+        convergence test. Left to PETSc, ``H0`` would be a scaled identity
+        and the first direction the derivative read as a vector of
+        coefficients, which differs from the gradient by the nodal masses.
+        On spectral elements those vary by nearly two orders of magnitude
+        within one element, and an optimizer stepping along the raw
+        derivative moves the interior nodes and leaves the element edges
+        behind.
 
     Only ``tao_type="blmvm"`` is supported: the lumped metric is there to
     serve the bound projection, and a solver that does not project has no use
@@ -225,8 +283,8 @@ class LumpedTAOSolver(OptimizationSolver):
     type set through ``tao_options`` or the PETSc command line is caught
     rather than silently run with a metric meant for something else.
 
-    No Hessian *callback* is registered either, which is a separate thing
-    from that initial scaling: ``H0`` seeds an approximation BLMVM builds
+    No Hessian *callback* is registered, which is a separate thing from
+    that initial Hessian: ``H0`` seeds an approximation BLMVM builds
     itself, whereas the callback would hand it a true second derivative, and
     a quasi-Newton method never asks for one. Measured over a run of this
     driver, the only callback TAO invokes is the combined
@@ -242,6 +300,13 @@ class LumpedTAOSolver(OptimizationSolver):
     comm : petsc4py.PETSc.Comm or mpi4py.MPI.Comm, optional
         Communicator the controls are defined over. Under ensemble
         parallelism this is the *spatial* one.
+    gradient_masks : list of firedrake.Function, optional
+        One mask per control, in the control's own space, that every
+        derivative handed to TAO is multiplied by, coefficient by
+        coefficient. A coefficient whose mask is zero is never moved: its
+        derivative is zero, so the direction is zero there under the
+        diagonal metric, and the quasi-Newton pairs built from those
+        directions keep it so. ``None`` applies no mask.
 
     Raises
     ------
@@ -257,7 +322,7 @@ class LumpedTAOSolver(OptimizationSolver):
     minimize_with_tao : Drives this solver.
     """
 
-    def __init__(self, problem, parameters, *, comm=None):
+    def __init__(self, problem, parameters, *, comm=None, gradient_masks=None):
         from petsc4py import PETSc
         import petsctools
 
@@ -275,7 +340,22 @@ class LumpedTAOSolver(OptimizationSolver):
             ),
             comm=comm,
         )
+        if gradient_masks is not None:
+            gradient_masks = as_list(gradient_masks)
+            if len(gradient_masks) != len(reduced_functional.controls):
+                raise ValueError(
+                    f"{len(reduced_functional.controls)} controls are being "
+                    "optimized, so the gradient masks take that many "
+                    f"entries; {len(gradient_masks)} were given.",
+                )
         tao = PETSc.TAO().create(comm=comm)
+
+        def masked(derivative):
+            """Zero the derivative where the mask is zero, in place."""
+            if gradient_masks is not None:
+                for value, mask in zip(Enlist(derivative), gradient_masks):
+                    value.dat.data[:] *= mask.dat.data_ro
+            return derivative
 
         def objective(tao_, x):
             controls = new_control_variable(reduced_functional)
@@ -285,14 +365,14 @@ class LumpedTAOSolver(OptimizationSolver):
         def gradient(tao_, x, g):
             controls = new_control_variable(reduced_functional)
             vec_interface.from_petsc(x, controls)
-            derivative = tao_objective.gradient(controls)
+            derivative = masked(tao_objective.gradient(controls))
             vec_interface.to_petsc(g, derivative)
 
         def objective_gradient(tao_, x, g):
             controls = new_control_variable(reduced_functional)
             vec_interface.from_petsc(x, controls)
             value, derivative = tao_objective.objective_gradient(controls)
-            vec_interface.to_petsc(g, derivative)
+            vec_interface.to_petsc(g, masked(derivative))
             return value
 
         tao.setObjective(objective)
@@ -332,6 +412,20 @@ class LumpedTAOSolver(OptimizationSolver):
                 "LumpedTAOSolver is restricted to tao_type='blmvm'."
             )
 
+        # The first direction is -H0^{-1} DJ: seeded with the lumped mass,
+        # it is the gradient the metric above measures, rather than the
+        # derivative read as a vector of coefficients. See the class
+        # docstring for what the difference does on spectral elements.
+        initial_hessian, initial_hessian_inverse = _lumped_initial_hessian(
+            inverse_mass, vec_interface, comm,
+        )
+        tao.setLMVMH0(initial_hessian)
+        ksp = tao.getLMVMH0KSP()
+        ksp.setType(PETSc.KSP.Type.PREONLY)
+        ksp.setTolerances(rtol=0.0, atol=0.0, divtol=None, max_it=1)
+        ksp.setPC(initial_hessian_inverse)
+        ksp.setUp()
+
         solution = vec_interface.new_petsc()
         tao.setSolution(solution)
         with petsctools.inserted_options(tao):
@@ -343,6 +437,10 @@ class LumpedTAOSolver(OptimizationSolver):
         self._tao = tao
         self._x = solution
         self._inverse_mass = inverse_mass
+        # Referenced by TAO's KSP; held here so they outlive this scope for
+        # as long as the solver does.
+        self._initial_hessian = initial_hessian
+        self._initial_hessian_inverse = initial_hessian_inverse
 
     @property
     def tao_objective(self):
@@ -470,6 +568,7 @@ def tao_bounds(bound, controls):
 
 def minimize_with_tao(
     reduced_functional, bounds=None, comm=None, options=None, record=None,
+    gradient_masks=None,
 ):
     """Minimize a reduced functional with PETSc TAO.
 
@@ -496,6 +595,9 @@ def minimize_with_tao(
         iteration TAO accepts, with the controls it stands at as a list of
         fresh fields. The starting point is not reported: it is the value the
         caller already has, from evaluating the functional to get here.
+    gradient_masks : list of firedrake.Function, optional
+        One mask per control that every derivative handed to TAO is
+        multiplied by; see :class:`LumpedTAOSolver`.
 
     Returns
     -------
@@ -524,7 +626,9 @@ def minimize_with_tao(
     """
     options = options or {}
     problem = MinimizationProblem(reduced_functional, bounds=bounds)
-    solver = LumpedTAOSolver(problem, options, comm=comm)
+    solver = LumpedTAOSolver(
+        problem, options, comm=comm, gradient_masks=gradient_masks,
+    )
     # TAO holds an iterate as one vector with every control concatenated into
     # it. Reading it through an interface built from those same controls lays
     # them out the way the solver's own does. Both the monitor and the

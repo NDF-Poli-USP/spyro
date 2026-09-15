@@ -113,6 +113,48 @@ def test_plot_model_in_p1():
     assert os.path.exists(str(filename))
 
 
+def test_plot_scalar_field(tmp_path):
+    """Draw two fields side by side, sampled on a grid, depth downwards."""
+    import firedrake as fire
+
+    mesh = fire.RectangleMesh(4, 4, 1.0, 2.0, quadrilateral=True)
+    mesh.coordinates.dat.data[:, 0] *= -1.0   # depth is negative, as in spyro
+    V = fire.FunctionSpace(mesh, "CG", 2)
+    z, x = fire.SpatialCoordinate(mesh)
+    velocity = fire.Function(V).interpolate(1.5 - z)
+    gradient = fire.Function(V).interpolate(x - 1.0)
+
+    figure = spyro.plots.plot_scalar_field(
+        [velocity, gradient],
+        tmp_path / "fields.png",
+        titles=["velocity", "gradient"],
+        vmin=[1.5, -1.0],
+        vmax=[2.5, 1.0],
+        colorbar_label="km/s",
+        sources=[(-0.1, 1.0)],
+        # As create_transect gives them: an array, with no truth value.
+        receivers=create_transect((-0.9, 0.5), (-0.9, 1.5), 5),
+        spacing=0.05,
+    )
+    assert (tmp_path / "fields.png").exists()
+    # One panel per field, each with its own colour bar.
+    assert len(figure.axes) == 4
+
+    # Three panels on two columns: two rows, the last slot left empty.
+    figure = spyro.plots.plot_scalar_field(
+        [velocity, gradient, velocity], tmp_path / "grid.png", columns=2,
+        spacing=0.05,
+    )
+    assert (tmp_path / "grid.png").exists()
+    visible = [axis for axis in figure.axes if axis.get_visible()]
+    assert len(visible) == 6 and len(figure.axes) == 7
+
+    with pytest.raises(ValueError):
+        spyro.plots.plot_scalar_field([velocity, gradient], titles=["one"])
+    with pytest.raises(ValueError):
+        spyro.plots.plot_scalar_field(fire.Function(fire.VectorFunctionSpace(mesh, "CG", 1)))
+
+
 def test_plot_receiver_response(tmp_path):
     receiver_data = np.sin(np.linspace(0.0, 2.0 * np.pi, 100))
     output_file = tmp_path / "receiver_response.png"
