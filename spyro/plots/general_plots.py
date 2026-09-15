@@ -355,7 +355,7 @@ def _domain_grid(mesh, spacing: float) -> Tuple[np.ndarray, Tuple[float, ...]]:
     mesh : firedrake.mesh.MeshGeometry
         A two-dimensional mesh, with the depth as its first coordinate.
     spacing : float
-        Distance between grid points, in the mesh's units.
+        Maximum distance between grid points, in the mesh's units.
 
     Returns
     -------
@@ -367,18 +367,26 @@ def _domain_grid(mesh, spacing: float) -> Tuple[np.ndarray, Tuple[float, ...]]:
         ``(rows, columns, x_min, x_max, z_min, z_max)``: the shape of the grid
         and the bounding box of the mesh, gathered over its communicator.
 
+    Raises
+    ------
+    ValueError
+        If spacing is not finite and positive.
+
     Notes
     -----
     Collective over the mesh communicator.
     """
+    if not np.isfinite(spacing) or spacing <= 0:
+        raise ValueError("spacing must be finite and positive.")
     coordinates = mesh.coordinates.dat.data_ro
     # A rank may own no vertices; it then contributes nothing to the box.
     local_min = coordinates.min(axis=0) if coordinates.size else np.full(2, np.inf)
     local_max = coordinates.max(axis=0) if coordinates.size else np.full(2, -np.inf)
     z_min, x_min = (mesh.comm.allreduce(float(v), op=MPI.MIN) for v in local_min)
     z_max, x_max = (mesh.comm.allreduce(float(v), op=MPI.MAX) for v in local_max)
-    depths = np.arange(z_max, z_min - spacing / 2, -spacing)
-    positions = np.arange(x_min, x_max + spacing / 2, spacing)
+    # Include both edges without rounding the last sample outside the mesh.
+    depths = np.linspace(z_max, z_min, max(2, int(np.ceil((z_max - z_min) / spacing)) + 1))
+    positions = np.linspace(x_min, x_max, max(2, int(np.ceil((x_max - x_min) / spacing)) + 1))
     Z, X = np.meshgrid(depths, positions, indexing="ij")
     points = np.column_stack([Z.ravel(), X.ravel()])
     return points, (len(depths), len(positions), x_min, x_max, z_min, z_max)
@@ -433,8 +441,8 @@ def plot_scalar_field(
     receivers : sequence of tuple of float, optional
         Receiver positions, ``(z, x)``, marked with white triangles.
     spacing : float, optional
-        Distance between the sampling points, in the mesh's units. Default
-        is 0.01.
+        Maximum distance between sampling points, in the mesh's units.
+        The grid includes both edges of the mesh. Default is 0.01.
     columns : int, optional
         Panels per row; the panels fill the rows in order. Default is all
         of them on one row.

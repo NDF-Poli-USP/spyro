@@ -160,6 +160,63 @@ def test_plot_scalar_field(tmp_path):
         spyro.plots.plot_scalar_field(fire.Function(fire.VectorFunctionSpace(mesh, "CG", 1)))
 
 
+@pytest.mark.newer_firedrake
+@pytest.mark.parametrize("spacing", [0.26, 0.3, 3.0])
+def test_scalar_plot_sampling_covers_mesh(spacing: float) -> None:
+    """Sample both mesh edges even when spacing does not divide its size.
+
+    Parameters
+    ----------
+    spacing : float
+        Maximum spacing, including a value larger than the domain.
+
+    Returns
+    -------
+    None
+        Assertions check sample locations and plotted values.
+    """
+    import firedrake as fire
+    from spyro.plots.general_plots import _domain_grid
+
+    mesh = fire.RectangleMesh(2, 2, 1.0, 2.0, quadrilateral=True)
+    mesh.coordinates.dat.data[:, 0] *= -1.0
+    points, layout = _domain_grid(mesh, spacing)
+    assert np.allclose(points.min(axis=0), [-1.0, 0.0])
+    assert np.allclose(points.max(axis=0), [0.0, 2.0])
+    assert layout[:2] == (
+        max(2, int(np.ceil(1.0 / spacing)) + 1),
+        max(2, int(np.ceil(2.0 / spacing)) + 1),
+    )
+
+    space = fire.FunctionSpace(mesh, "CG", 1)
+    z, x = fire.SpatialCoordinate(mesh)
+    field = fire.Function(space).interpolate(2.0 * z + x)
+    figure = spyro.plots.plot_scalar_field(field, spacing=spacing)
+    samples = figure.axes[0].images[0].get_array()
+    assert not np.any(np.ma.getmaskarray(samples))
+    assert np.allclose(samples.ravel(), 2.0 * points[:, 0] + points[:, 1])
+
+
+@pytest.mark.parametrize("spacing", [0.0, -0.1, np.nan, np.inf])
+def test_scalar_plot_rejects_invalid_spacing(spacing: float) -> None:
+    """Reject invalid spacing before accessing the mesh.
+
+    Parameters
+    ----------
+    spacing : float
+        Invalid sampling distance.
+
+    Returns
+    -------
+    None
+        An assertion checks the validation error.
+    """
+    from spyro.plots.general_plots import _domain_grid
+
+    with pytest.raises(ValueError, match="spacing must be finite and positive"):
+        _domain_grid(None, spacing)
+
+
 def test_plot_receiver_response(tmp_path):
     receiver_data = np.sin(np.linspace(0.0, 2.0 * np.pi, 100))
     output_file = tmp_path / "receiver_response.png"
