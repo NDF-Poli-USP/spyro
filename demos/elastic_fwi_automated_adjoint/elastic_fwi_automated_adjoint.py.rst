@@ -4,10 +4,9 @@ Full-waveform inversion of an isotropic elastic medium with the automated adjoin
 This demo runs a synthetic full-waveform inversion (FWI) of a two-dimensional
 isotropic elastic medium with spyro. The gradient of the misfit is computed
 via algorithmic differentiation of the forward solver, through
-``firedrake.adjoint``. Along the way the demo discusses the elastic wave
-equation and its material parameters, the units spyro works in, how the shots
-are distributed over MPI processes, and how the bound-constrained
-optimisation is driven by PETSc/TAO [Munson2012]_.
+``firedrake.adjoint``. Along the way the demo presents the elastic wave
+equation and its material parameters, the true and starting models, the acquisition geometry,
+the gradient verification, and the results of the inversion.
 
 The demo is meant to be run with one MPI process per shot, three in this case::
 
@@ -23,7 +22,9 @@ What full-waveform inversion does
 
 FWI is a local optimisation that looks for the material parameters
 :math:`m` of the subsurface [Tarantola1984]_, [Virieux2009]_.
-To this end, the FWI process consists of minimising the misfitthe misfit between observed and predicted seismogram data. The misfit is quantified by a functional, which in general is a summation of the cost functions for multiple wave sources:
+To this end, the FWI process consists of minimising the misfit between an observed
+and numerically predicted seismogram data. The misfit is quantified by a functional,
+which in general is a summation of the cost functions for multiple wave sources:
 
 .. math::
 
@@ -33,26 +34,25 @@ To this end, the FWI process consists of minimising the misfitthe misfit between
     \left| \mathbf{u}_s(m, \mathbf{x}_r, t) - \mathbf{d}_s(\mathbf{x}_r, t) \right|^2 \, dt,
     \quad \quad (1)
 
-where :math:`\mathbf{u}_s` is the simulated displacement for shot
+where :math:`\mathbf{u}_s` is the numerically simulated displacement for shot
 :math:`s = 1, \dots, N_s`, :math:`\mathbf{d}_s` the observed one, and
-:math:`\mathbf{x}_r`, :math:`r = 1, \dots, N_r`, the receivers. An elastic
-medium moves in every
-direction, so both :math:`\mathbf{u}_s` and :math:`\mathbf{d}_s` are vectors
+:math:`\mathbf{x}_r`, :math:`r = 1, \dots, N_r`, the receivers. In an elastic
+medium, both :math:`\mathbf{u}_s` and :math:`\mathbf{d}_s` are vectors
 with one component per space dimension, and the norm in (1) sums over the
 components. spyro integrates (1) in time with the trapezoidal rule, on the
 same time grid the wave equation is solved on.
 
 The inversion needs, besides the observed data, a *starting model*: FWI is a
-local method, and it converges to the model nearest to the starting point that
-explains the data. In a synthetic experiment like this one the observed data
-are manufactured by running the same solver on a *true model*, which lets the
-result be compared with the answer.
+local method, and it converges to the model nearest to the starting point.
+In a synthetic experiment like this, we emulate an observed data by considering
+a said true model. The observed data is then obtained by running the forward solver
+on the true model.
 
 The isotropic elastic wave equation
 -----------------------------------
 
 The displacement :math:`\mathbf{u}(\mathbf{x}, t)` of a linear elastic solid
-of density :math:`\rho` obeys
+of density :math:`\rho` satisfies the second-order wave equation
 
 .. math::
 
@@ -73,7 +73,7 @@ stress is given by Hooke's law in terms of the two Lamé parameters
     \left( \nabla \mathbf{u} + \nabla \mathbf{u}^{T} \right).
     \quad \quad (3)
 
-Such a medium carries two kinds of waves, a compressional (P) wave and a
+Such a medium carries two kinds of waves, a pressure (P) wave and a
 shear (S) wave, whose speeds are
 
 .. math::
@@ -105,7 +105,7 @@ delayed by :math:`t_0` so that it starts from rest. The medium is at rest at
 Discretisation
 --------------
 
-spyro solves (2) in the displacement, in weak form. Multiplying by a test
+spyro solves (2) first writing in the weak form. Multiplying by a test
 function :math:`\mathbf{v}` and integrating by parts,
 
 .. math::
@@ -144,10 +144,8 @@ to a transmission geometry.
 
 In space, this tutorial uses the spectral element method [Komatitsch1998]_:
 quadrilateral elements carrying Lagrange polynomials on the
-Gauss–Lobatto–Legendre (GLL) points, with the integrals in (5) evaluated by
-the GLL quadrature rule on those same points. Because the quadrature points
-are the nodes, the mass matrix is diagonal, so an explicit time step costs no
-linear solve. In time, the second derivative in (5) is replaced by the
+Gauss–Lobatto–Legendre (GLL) points. In time, the second derivative in
+(5) is replaced by the
 central difference
 
 .. math::
@@ -160,8 +158,8 @@ with the stiffness and boundary terms evaluated at :math:`\mathbf{u}^n`.
 The automated adjoint
 ---------------------
 
-The gradient of (1) with respect to the material parameters is computed with
-``firedrake.adjoint``. The forward solve is recorded on a
+The gradient of (1) with respect to the material (also called control) parameters
+is computed with ``firedrake.adjoint``. The forward solve is recorded on a
 *tape* as it runs, and differentiating :math:`J` is a reverse traversal of
 that tape, which gives the derivative of the discrete functional with respect
 to the discrete parameters for any parameter that enters the variational
@@ -169,11 +167,16 @@ forms. The tape is wrapped in a *reduced functional*, :math:`\hat{J}(m)`,
 which the optimiser re-evaluates
 at new values of :math:`m` to obtain functional values and gradients. The
 tape holds the forward states, so its memory grows with the number of time
-steps. With ``checkpointing=True`` the tape is managed by a checkpointing
-schedule [Dolci2024]_: by default the *single memory* schedule, which keeps
-the state of every time step in memory and recomputes nothing, as in this
-demo; given a number of ``snapshots``, only that many are kept and the
-forward solve is recomputed between them, trading memory for computation.
+steps. For largest FWI, e.g., trhee dimensional, long-time, high-frequency problems,
+the tape is too large, which means high memory usage. To keep the memory usage under control,
+firedrake.adjoint offers checkpointing, which trades memory for computation by recomputing
+the forward states between a number of *snapshots* that are kept in memory.
+Here, de demo runs with the Single Memory schedule, which keeps all the states used for adjoint
+computation in memory and recomputes nothing. For larger problems, the user can choose a
+a number of snapshots to keep in memory, and the forward solve is recomputed between them.
+firedrake.adjoint uses de python library checkpoint\_schedules [Dolci2024]_,
+fell free to check the documentation for more information on the available schedules.
+
 
 The shots are distributed with Firedrake's *ensemble parallelism*. With
 ``"parallelism": {"type": "automatic"}`` the MPI processes are split into as
@@ -182,7 +185,9 @@ shot and records its own tape, and the reduced functional -- an
 ``EnsembleReducedFunctional`` -- sums the per-shot functionals and gradients
 across members. Running with ``mpiexec -n 3`` gives one process per shot;
 ``-n 6`` would additionally split each shot's mesh over two processes. The
-number of processes has to be a multiple of the number of shots.
+number of processes has to be a multiple of the number of shots. For additional details on
+the ensemble parallelism used in this demo, please refer to the `Firedrake FWI documentation
+<https://www.firedrakeproject.org/demos/full_waveform_inversion.py.html>`__:.
 
 Setting up the problem
 ----------------------
@@ -209,10 +214,7 @@ inversion driver is told which adjoint to use.
 The material values. spyro works in km, s and km/s, so the density is given
 in g/cm³ (:math:`10^3` kg/m³) to match: :math:`\rho c^2` is then in GPa, and
 so are the Lamé parameters (4) computes from these values, 6.25 and 3.125 GPa
-in the background and 9.0 and 4.5 GPa in the circle. The circle is the
-one of the `Firedrake FWI demo
-<https://www.firedrakeproject.org/demos/full_waveform_inversion.py.html>`__:
-a radius of 0.125 km, centred in the domain.
+in the background and 9.0 and 4.5 GPa in the circle.
 
 .. code-block:: python
 
@@ -244,21 +246,6 @@ frequency of 5 Hz.
     frequency = 5.0       # peak frequency of the Ricker wavelet, Hz
     number_of_shots = 3
 
-The final time is set from the travel times, computed as for straight rays
-in a homogeneous medium, distance over speed [Shearer2009]_. The sources
-sit 0.7 km above the line of receivers, so the shortest path to a receiver
-is 0.7 km and the longest, from the source at :math:`x = 0.2` km to the
-receiver at :math:`x = 0.9` km or its mirror image,
-:math:`\sqrt{0.7^2 + 0.7^2} \approx 0.99` km. The wavelet is fired with
-spyro's default delay of :math:`t_0 = 1.5 \sqrt{6} / (\pi f) \approx 0.23`
-s, that is, 1.5 times the interval between its two minima, which Ricker
-[Ricker1953]_ relates to the peak frequency by :math:`\sqrt{6} / (\pi f)`.
-The P waves, at 2.5 km/s, therefore arrive between 0.51 and 0.63 s and are
-recorded in full. The S waves, at 1.25 km/s, arrive from 0.79 s on, and
-within 1.0 s only along paths shorter than
-:math:`(1.0 - 0.23) \times 1.25 \approx 0.96` km, that is, within about
-0.65 km of horizontal offset from a source; the S arrivals at larger
-offsets, and the tail of the others, are left out of the record.
 
 spyro is configured through a dictionary. The ``options`` choose the
 discretisation: quadrilaterals (``"Q"``) with the mass-lumped variant, which
@@ -288,13 +275,7 @@ described.
 
 The three sources are at :math:`z = -0.15` km, at :math:`x = 0.2`, 0.5
 and 0.8 km; the 41 receivers are on the line :math:`z = -0.85` km, from
-:math:`x = 0.1` to 0.9 km. Both lines run through the middle of a row of
-elements rather than along an element boundary, on purpose: the corner and
-edge nodes of a spectral element carry the smallest lumped masses and with
-them the mesh-scale noise of the solution, so a source or a receiver placed
-on them injects or records that noise. With the receivers on the element
-line :math:`z = -0.9` km, the misfit between the true and the starting
-model would be four times larger than it is, all of it noise.
+:math:`x = 0.1` to 0.9 km.
 
 .. code-block:: python
 
@@ -375,12 +356,7 @@ The true model is defined on the mesh the observed data are generated on,
 which ``set_real_mesh`` builds. The circle is written as a UFL expression in
 the mesh coordinates ``fwi.wave.mesh_z`` and ``fwi.wave.mesh_x``, with the
 function of the Firedrake demo: :math:`\tanh(200 \, (0.125 - r))`, where
-:math:`r` is the distance to the centre in km. Its slope of 200 km⁻¹
-switches the velocities over about 10 m, far less than an element, so the
-edge of the circle is a discontinuity as far as the mesh is concerned; the
-degree-4 material fields represent it with a little overshoot on each
-side. The indicator, one inside and zero outside, blends the background and
-circle values of each velocity.
+:math:`r` is the distance to the centre in km.
 
 .. code-block:: python
 
@@ -393,9 +369,7 @@ circle values of each velocity.
     cs_true = cs_background + (cs_circle - cs_background) * inside
 
 ``set_real_model`` takes the true value of each parameter, keyed by the
-parameter it belongs to. All three are given, although the density is the
-same as in the starting model: it is what the true medium is made of, and the
-solver that generates the data has to be told all of it.
+parameter it belongs to.
 
 .. code-block:: python
 
@@ -409,21 +383,14 @@ solver that generates the data has to be told all of it.
 interpolates the values above into its material fields, and propagates every
 shot. The records are kept on ``fwi.real_shot_record``, each ensemble member
 holding the shots it owns, and handed to the inversion's solver, which needs
-them to evaluate (1). In a real application this step is replaced by loading
-field data, see ``fwi.load_real_shot_record``.
+them to evaluate (1).
 
 .. code-block:: python
 
     fwi.generate_real_shot_record(save_shot_record=False)
 
 Before moving on, it is worth looking at what has been built, with spyro's
-plotting helpers. ``plot_scalar_field`` samples a field on a regular grid and
-draws it with the depth pointing downwards, the way seismic sections are
-drawn, one panel per field; the material fields live in the scalar version
-of the displacement space, which ``create_function_space`` builds from the
-solver's own settings. Sampling a field is collective over the mesh, so
-every process of the first ensemble member calls it, and its first process
-saves the figure.
+plotting helpers.
 
 .. code-block:: python
 
@@ -450,9 +417,6 @@ saves the figure.
 as a function of time, one component at a time for an elastic solver. It
 reads the record from the solver's ``forward_solution_receivers``, where a
 forward solve leaves its own, so the observed record is copied there first.
-Each ensemble member saves the record of its own shot, with the shot number
-appended to the file name; the figures below are those of the first shot,
-with the hyperbola of the P-wave arrival followed by the slower S wave.
 
 .. code-block:: python
 
@@ -486,10 +450,8 @@ size as the mesh the data were generated on.
 
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": edge_length})
 
-The starting model is a Gaussian anomaly in the place of the circle, with
-half its contrast and its radius as the width, as a blurred and weaker
-image of the truth from traveltime tomography would be. It is told to the
-driver with ``set_guess_control``, keyed by parameter in the same way as
+The starting model is a Gaussian anomaly in the place of the circle. It is told
+to the driver with ``set_guess_control``, keyed by parameter in the same way as
 ``set_real_model``; the density is the true one.
 
 .. code-block:: python
@@ -522,9 +484,7 @@ driver with ``set_guess_control``, keyed by parameter in the same way as
     :align: center
 
 The *controls*, the fields the inversion moves, are the two velocities; the
-density is kept fixed at its true value, since transmission data constrain
-the velocities through the arrival times but the density only weakly,
-through the amplitudes [Tarantola1986]_. The selection is made when the
+density is kept fixed at its true value. The selection is made when the
 automated adjoint is enabled on the solver, and names the parameters the
 tape is differentiated with respect to; with no selection, every material
 parameter would be taken. The adjoint is enabled with checkpointing, in
@@ -561,7 +521,7 @@ respect to each control, keyed by the parameter it belongs to:
         comm,
     )
 
-The gradient is largest at the sources and, less so, at the receivers,
+The gradient can be largest at the sources and, less so, at the receivers,
 where the wavefields are strongest. What it carries there is the imprint
 of the acquisition rather than information on the medium, and it is usual
 practice in FWI to correct the gradient around the sources and receivers
@@ -576,10 +536,9 @@ perturbation :math:`\delta m` of the controls, the residual
 
 falls as :math:`h^2` if :math:`\nabla J` is the gradient of :math:`J`, and
 only as :math:`h` if it is not. ``verify_gradient`` runs pyadjoint's test
-for :math:`h = 0.01, 0.005, 0.0025, 0.00125` and returns the rate at which
-the residual falls, which should be close to 2. The perturbation is random,
-with a fixed seed so that every ensemble member draws the same one, and at
-most 5 % of each velocity.
+and returns the rate at which the residual falls, which should be close to 2.
+The perturbation is random, with a fixed seed so that every ensemble member draws
+the same one, and at most 5 % of each velocity.
 
 .. code-block:: python
 
@@ -723,28 +682,6 @@ functional with a plain matplotlib line, by the first process.
     :alt: misfit functional against iteration
     :align: center
 
-After 20 iterations the misfit has dropped by a factor of about 19. The
-S-wave velocity has become a circle of the right size and amplitude: at its
-centre :math:`c_s` has risen from 1.375 to about 1.52 km/s, against a true
-value of 1.5. The P-wave velocity has moved much less, from 2.75 to about
-2.82 km/s at the centre, against 3.0, and is still the blurred blob it
-started as. The difference is one of resolution: the circle's diameter of
-250 m is one S wavelength at the peak frequency but only half a P
-wavelength, so the P waves barely notice it, and the S waves, which also
-arrive later and so dominate the misfit, drive the updates. Nothing has
-changed in the masked bands along the sources and the receivers, and the
-update elsewhere carries the imprint of the acquisition, confined to the
-region the waves crossed on their way from the sources to the receivers.
-Higher frequencies, a wider aperture and more shots would all sharpen the
-result, the P-wave velocity in particular.
-
-The functional history tells the same story: it falls quickly while
-:math:`c_s` is being corrected, flattens around iteration 10, and descends
-more slowly afterwards. The gradient with respect to :math:`c_s` is more
-than ten times larger than that with respect to :math:`c_p` in the norm
-the optimiser works with, so a step of BLMVM, which takes one step length
-for both, moves :math:`c_s` more than ten times as far and :math:`c_p`
-hardly at all until :math:`c_s` has converged.
 
 .. admonition:: Exercise
 
