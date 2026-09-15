@@ -166,7 +166,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # Getting parameters from the mesh
         if self.mesh is not None:
-            self.building_mesh_derived_paramenters()
+            self.building_mesh_derived_parameters()
         elif self.mesh_parameters.mesh_type == "firedrake_mesh":
             warnings.warn(
                 "No mesh file, Firedrake mesh will be automatically generated."
@@ -215,7 +215,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def force_rebuild_function_space(self):
         if self.mesh is None:
             self.mesh = self.get_mesh()
-        self.building_mesh_derived_paramenters(include_model_parameters=True)
+        self.building_mesh_derived_parameters(include_model_parameters=True)
 
     @abstractmethod
     def matrix_building(self):
@@ -245,7 +245,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         return boundaries
 
-    def building_mesh_derived_paramenters(self, include_model_parameters=False):
+    def building_mesh_derived_parameters(self, include_model_parameters=False):
         """Build parameters that are derived from the mesh."""
         coordinates = self.mesh_ops._set_spatial_coordinates(self.mesh)
         self.mesh_z, self.mesh_x = coordinates[0], coordinates[1]
@@ -308,7 +308,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         self.mesh = self.get_mesh()
         self._physical_parameters = PhysicalParameters()
-        self.building_mesh_derived_paramenters()
+        self.building_mesh_derived_parameters()
 
     def set_solver_parameters(self, parameters=None):
         """
