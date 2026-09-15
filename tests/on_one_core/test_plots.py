@@ -113,8 +113,13 @@ def test_plot_model_in_p1():
     assert os.path.exists(str(filename))
 
 
+@pytest.mark.newer_firedrake
 def test_plot_scalar_field(tmp_path):
-    """Draw two fields side by side, sampled on a grid, depth downwards."""
+    """Draw two fields side by side, sampled on a grid, depth downwards.
+
+    The fields are sampled with Firedrake's ``PointEvaluator``, which older
+    Firedrake versions do not have.
+    """
     import firedrake as fire
 
     mesh = fire.RectangleMesh(4, 4, 1.0, 2.0, quadrilateral=True)
