@@ -49,9 +49,7 @@ def velocity_fluid(wave):
     return c
 
 
-def build_acoustic_form(
-    wave, u_trial, v_test, u_n, u_nm1, quad_rule
-):
+def build_acoustic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
     """Build the weak form of the acoustic wave equation for one time step.
 
     Parameters
