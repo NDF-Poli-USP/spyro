@@ -12,21 +12,15 @@ from ..utils.error_management import (
 )
 
 
-def velocity_fluid(c=None, K=None, rho_fluid=None, default=None):
+def velocity_fluid(wave):
     """Resolve the acoustic wave velocity.
 
     Uses either an explicit value or the fluid bulk modulus and density.
 
     Parameters
     ----------
-    c : `firedrake.Constant` or UFL expression, optional
-        Fluid wave speed. Mutually exclusive with `K`/`rho_fluid`.
-    K : `firedrake.Constant` or `firedrake.Function`, optional
-        Fluid bulk modulus. Must be given together with `rho_fluid`.
-    rho_fluid : `firedrake.Constant` or `firedrake.Function`, optional
-        Fluid density. Must be given together with `K`.
-    default : `firedrake.Constant` or UFL expression, optional.
-        Value to return when neither `c` nor `K`/`rho_fluid` are given.
+    wave : `acoustic_wave.AcousticWave`
+        An instance of the :class:`~spyro.solver.acoustic_wave.AcousticWave`
 
     Returns
     -------
@@ -36,23 +30,27 @@ def velocity_fluid(c=None, K=None, rho_fluid=None, default=None):
     Raises
     ------
     ValueError
-        If `c` is given together with `K` or `rho_fluid`, or if
-        only one of `K`/`rho_fluid` is given.
+        If `wave.c` is given together with `wave.K` or `wave.rho_fluid`, or
+        if only one of `wave.K`/`wave.rho_fluid` is given.
     """
+    c = wave.c
+    K = wave.K
+    rho_fluid = wave.rho_fluid
+
     combined_k_and_rho_fluid = K if K is not None else rho_fluid
     mutually_exclusive_parameter_error(
         ["velocity_fluid", "bulk_modulus/density_fluid"], [c, combined_k_and_rho_fluid]
     )
-    required_together_parameter_error(["bulk_modulus", "rho_fluid"], [K, rho_fluid])
+    required_together_parameter_error(["bulk_modulus", "density_fluid"], [K, rho_fluid])
 
     if c is None:
-        c = sqrt(K / rho_fluid) if K is not None else default
+        c = sqrt(K / rho_fluid)
 
     return c
 
 
 def build_acoustic_form(
-    wave, u_trial, v_test, u_n, u_nm1, quad_rule, c=None, K=None, rho_fluid=None
+    wave, u_trial, v_test, u_n, u_nm1, quad_rule
 ):
     """Build the weak form of the acoustic wave equation for one time step.
 
@@ -70,9 +68,6 @@ def build_acoustic_form(
         Pressure field at the previous time step.
     quad_rule : dict
         Quadrature rule for volume integration.
-    c, K, rho_fluid : optional
-        Passed through to `velocity_fluid` to determine the fluid wave
-        velocity.
 
     Returns
     -------
@@ -85,7 +80,7 @@ def build_acoustic_form(
         If `c` is given together with `K` or `rho_fluid` (ambiguous), or if
         only one of `K`/`rho_fluid` is given (incomplete).
     """
-    c = velocity_fluid(c, K, rho_fluid, default=wave.c)
+    c = velocity_fluid(wave)
     dt = wave.dt
 
     m1 = (
