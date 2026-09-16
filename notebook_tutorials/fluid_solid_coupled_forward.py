@@ -27,7 +27,7 @@ dictionary["mesh"] = {
     "length_y": 0.0,
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
-    "edge_length": 0.05, # 0.005, 0.0035, 0.0025
+    "edge_length": 0.1, # 0.005, 0.0035, 0.0025
     "interface_x": 0.5,
     "absorb_left": False,
     "absorb_right": False,
@@ -85,7 +85,7 @@ dictionary["synthetic_data"] = {
 }
 
 Wave_obj = AcousticElasticWave(dictionary=dictionary)
-Wave_obj.use_monolithic = True
+Wave_obj.use_monolithic = False
 t_start = time.perf_counter()
 Wave_obj.forward_solve()
 

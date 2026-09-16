@@ -72,7 +72,7 @@ class Delta_projector:
         # self.space = self.function_space.sub(0)
         sub_index = getattr(wave, "delta_projector_sub_index", 0)
         self.space = self.function_space.sub(sub_index)
-        self.mesh = self.space.mesh() 
+        self.mesh = self.space.mesh()
         self.my_ensemble = wave.comm
         self.dimension = wave.dimension
         self.degree = wave.degree
