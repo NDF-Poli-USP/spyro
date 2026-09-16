@@ -137,7 +137,10 @@ The domain is a 1 km × 1 km square. spyro's first coordinate is the depth
 :math:`z`, which is zero at the top and *negative* below it, and the second
 is the horizontal position :math:`x`. The mesh is a uniform grid of
 quadrilaterals of 100 m (``edge_length``), and the Ricker wavelet has a peak
-frequency of 5 Hz.
+frequency of 5 Hz. The time step of 1.6 ms is close to the stability limit
+of this mesh for the fastest velocity the inversion is allowed to reach,
+and the records are 1 s long: enough for the P wave, which arrives from
+about 0.5 s, and the slower S wave, from about 0.8 s.
 
 .. code-block:: python
 
@@ -208,7 +211,7 @@ starting anomalies below.
         "real_velocity_file": None,
     }
 
-The absorbing boundary condition, the time axis and the outputs. The
+Next come the absorbing boundary condition, the time axis and the outputs.
 ``output_frequency`` only controls how often progress is printed, since the
 wavefield output is switched off.
 
@@ -332,6 +335,10 @@ record there before plotting its vertical and horizontal components.
     :width: 45 %
     :alt: observed horizontal displacement record of the first shot
 
+The P wave dominates the vertical component and arrives first; the S wave,
+slower and stronger on the horizontal component, follows about 0.3 s later.
+Both carry the imprint of the circle to the receivers.
+
 The starting model and the controls
 ---------------------------------------
 
@@ -342,9 +349,10 @@ size as the mesh the data were generated on.
 
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": edge_length})
 
-The starting model has a broader, weaker Gaussian anomaly at the same
-centre. ``set_guess_control`` sets the two velocities; density remains
-fixed. We also record the starting velocities at the centre for comparison.
+The starting model is a smooth Gaussian anomaly at the same centre, with
+half the contrast of the circle. ``set_guess_control`` sets the two
+velocities; density remains fixed. We also record the starting velocities
+at the centre for comparison.
 
 .. code-block:: python
 
@@ -376,9 +384,10 @@ fixed. We also record the starting velocities at the centre for comparison.
     :align: center
 
 Enable the automated adjoint for the two velocity fields. Selecting these
-*controls* leaves density fixed. ``checkpointing=True`` uses the memory
-schedule described above; periodic garbage collection releases reference
-cycles, but does not replace checkpointing.
+*controls* leaves density fixed. ``checkpointing=True`` selects the memory
+schedule described above, and ``gc_timestep_frequency=50`` runs Python's
+garbage collector every 50 time steps, which keeps the memory held by the
+tape from creeping up.
 
 .. code-block:: python
 
@@ -550,9 +559,20 @@ each velocity. The misfit history shows how much the fit to the data improved.
     :align: center
 
 
-A falling misfit means the predicted records better match the observations.
-Compare both velocity maps as well: the two parameters need not improve at
-the same rate, and a good data fit can still leave model errors.
+After 20 iterations the misfit has fallen by a factor of about 19. The
+S-wave velocity has become a circle of the right size and amplitude, about
+1.52 km/s at the centre against a true 1.5, while the P-wave velocity has
+moved much less, from 2.75 to about 2.82 km/s against 3.0, and is still the
+blurred blob it started as. Nothing changed in the masked bands.
+
+The two velocities are not seen equally well by the data. At 5 Hz the
+circle's diameter of 250 m is one S wavelength but only half a P
+wavelength, so the S waves feel it far more than the P waves do: the
+gradient with respect to :math:`c_s` is more than ten times larger than
+that with respect to :math:`c_p`, and BLMVM, which takes one step length
+for both, spends its iterations on :math:`c_s`. The misfit history shows
+it, a fast drop while :math:`c_s` is corrected and a slow descent after.
+The exercise below is one way around this.
 
 .. admonition:: Exercise: invert one velocity at a time
 
