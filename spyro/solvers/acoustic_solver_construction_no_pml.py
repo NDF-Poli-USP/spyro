@@ -6,12 +6,16 @@ Handles typical BCs, NRBCs or HABCs.
 import firedrake as fire
 from firedrake import ds, dx, dot, grad, sqrt
 from ..utils.typing import AbsorbingBCsType
+from ..utils.error_management import (
+    mutually_exclusive_parameter_error,
+    required_together_parameter_error
+)
 
 
 def velocity_fluid(c=None, K=None, rho_fluid=None, default=None):
     """Resolve the acoustic wave velocity.
 
-    Uses either an explicity value or the fluid bulk modulus and density.
+    Uses either an explicit value or the fluid bulk modulus and density.
 
     Parameters
     ----------
@@ -32,21 +36,22 @@ def velocity_fluid(c=None, K=None, rho_fluid=None, default=None):
     Raises
     ------
     ValueError
-        If `c` is given together with `K` or `rho_flui`, or if
+        If `c` is given together with `K` or `rho_fluid`, or if
         only one of `K`/`rho_fluid` is given.
     """
-    if c is not None and (K is not None or rho_fluid is not None):
-        raise ValueError(
-            "Ambiguous formulation. Insert 'bulk_modulus' and 'density_fluid' "
-            "or just 'velocity_fluid'."
-        )
+    combined_k_and_rho_fluid = K if K is not None else rho_fluid
+    mutually_exclusive_parameter_error(
+        ["velocity_fluid", "bulk_modulus/density_fluid"],
+        [c, combined_k_and_rho_fluid]
+    )
+    required_together_parameter_error(
+        ["bulk_modulus", "rho_fluid"],
+        [K, rho_fluid]
+    )
+
     if c is None:
-        if K is not None and rho_fluid is not None:
-            c = sqrt(K / rho_fluid)
-        elif K is not None or rho_fluid is not None:
-            raise ValueError("Insert both values 'bulk_modulus' and 'density_fluid'.")
-        else:
-            c = default
+        c = sqrt(K / rho_fluid) if K is not None else default
+
     return c
 
 
