@@ -1,5 +1,4 @@
 import firedrake as fire
-import numpy as np
 
 from . import helpers
 from .. import utils
@@ -82,19 +81,13 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
         if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
             observed_step = utils.get_real_shot_step(wave_obj, step)
             if wave_obj.use_vertex_only_mesh:
-                if isinstance(observed_step, np.ndarray):
-                    real_shot = fire.Function(
-                        usol_recv[-1].function_space(),
-                        val=observed_step,
-                    )
-                    misfit_step = real_shot - usol_recv[-1]
-                elif isinstance(observed_step, fire.Function):
+                if isinstance(observed_step, fire.Function):
                     misfit_step = observed_step - usol_recv[-1]
                 else:
-                    raise ValueError(
-                        "Unsupported type for real_shot_record. Must be "
-                        "either a numpy array or a Firedrake Function."
+                    real_shot = helpers._global_receiver_step_to_vom(
+                        observed_step, usol_recv[-1].function_space()
                     )
+                    misfit_step = real_shot - usol_recv[-1]
             else:
                 misfit_step = observed_step - usol_recv[-1]
             J += utils.compute_functional(
@@ -106,11 +99,16 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
 
     wave_obj.current_time = t
     helpers.display_progress(wave_obj.comm, t)
-    usol_recv = helpers.fill(
-        usol_recv, wave_obj.receivers.is_local, nt, wave_obj.receivers.number_of_points
-    )
 
-    usol_recv = utils.utils.communicate(usol_recv, wave_obj.comm)
+    if wave_obj.use_vertex_only_mesh:
+        usol_recv = helpers._global_receiver_values_from_vom(
+            usol_recv, wave_obj.comm
+        )
+    else:
+        usol_recv = helpers.fill(
+            usol_recv, wave_obj.receivers.is_local, nt, wave_obj.receivers.number_of_points
+        )
+        usol_recv = utils.utils.communicate(usol_recv, wave_obj.comm)
 
     wave_obj.forward_solution = usol
     wave_obj.forward_solution_receivers = usol_recv

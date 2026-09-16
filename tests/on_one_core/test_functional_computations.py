@@ -5,6 +5,7 @@ import numpy as np
 
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.solvers.wave import Wave
+from spyro.utils import get_real_shot_record
 from spyro.utils.typing import FunctionalEvaluationMode
 
 
@@ -96,6 +97,15 @@ def test_compute_functional_accepts_after_solve_mode():
 
     wave.functional_evaluation_mode = FunctionalEvaluationMode.AFTER_SOLVE
     assert wave.functional_evaluation_mode == FunctionalEvaluationMode.AFTER_SOLVE
+
+
+def test_get_real_shot_record_accepts_list_for_current_source():
+    wave = _build_wave()
+    wave.current_sources = [0]
+    source_record = np.ones((2, 3))
+    wave.real_shot_record = [source_record]
+
+    assert get_real_shot_record(wave) is source_record
 
 
 def _base_functional_dictionary():
