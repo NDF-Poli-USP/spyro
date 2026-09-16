@@ -84,8 +84,8 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
                 if isinstance(observed_step, fire.Function):
                     misfit_step = observed_step - usol_recv[-1]
                 else:
-                    real_shot = helpers._global_receiver_step_to_vom(
-                        observed_step, usol_recv[-1].function_space()
+                    real_shot = helpers.global_receiver_step_to_vom(
+                        observed_step, usol_recv[-1].function_space(),
                     )
                     misfit_step = real_shot - usol_recv[-1]
             else:
@@ -101,8 +101,8 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
     helpers.display_progress(wave_obj.comm, t)
 
     if wave_obj.use_vertex_only_mesh:
-        usol_recv = helpers._global_receiver_values_from_vom(
-            usol_recv, wave_obj.comm
+        usol_recv = helpers.global_receiver_values_from_vom(
+            usol_recv, wave_obj.comm, wave_obj.receivers.mesh
         )
     else:
         usol_recv = helpers.fill(

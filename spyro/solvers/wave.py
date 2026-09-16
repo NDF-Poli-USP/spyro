@@ -105,6 +105,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.mesh = self.get_mesh()
         self.c = None
         self.sources = None
+        self.receivers = None
 
         # Creating mesh operations manager
         self.mesh_ops = mshops.MeshOps(
@@ -114,6 +115,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # Getting parameters from the mesh
         if self.mesh is not None:
+            self.define_sources_and_receivers(**kwargs)
             self.building_mesh_derived_paramenters()
         elif self.mesh_parameters.mesh_type == "firedrake_mesh":
             warnings.warn(
@@ -178,6 +180,28 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         return boundaries
 
+    def define_sources_and_receivers(self, **kwargs):
+        """Get the sources and receivers for the problem.
+
+        Parameters:
+        -----------
+        None
+
+        Returns:
+        --------
+        sources : `Sources`
+            Sources object containing information about sources.
+        receivers : `Receivers`
+            Receivers object containing information about receivers.
+        """
+        if self.source_type == "ricker":
+            self.sources = Sources(self, **kwargs)
+        else:
+            raise NotImplementedError(
+                "Source type {} is not implemented.".format(self.source_type)
+            )
+        self.receivers = Receivers(self, **kwargs)
+
     def building_mesh_derived_paramenters(self):
         """Build parameters that are derived from the mesh."""
         coordinates = self.mesh_ops._set_spatial_coordinates(self.mesh)
@@ -185,7 +209,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.dimension == 3:
             self.mesh_y = coordinates[2]
         self._build_function_space()
-        self._map_sources_and_receivers()
 
         # TODO: Create a flag for other domains that are not of type box
         if self.mesh_ops.func_space_type is None:
@@ -342,11 +365,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             fire.VTKFile("initial_velocity_model.pvd").write(
                 self.initial_velocity_model, name="velocity"
             )
-
-    def _map_sources_and_receivers(self):
-        if self.source_type == "ricker":
-            self.sources = Sources(self)
-        self.receivers = Receivers(self)
 
     @abstractmethod
     def _initialize_model_parameters(self):
