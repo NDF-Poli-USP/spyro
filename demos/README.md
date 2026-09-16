@@ -10,11 +10,15 @@ where X_CORES is the required number of MPI processes and demo_name.py is the na
 
 ## Literate demos
 
-`elastic_fwi_automated_adjoint/elastic_fwi_automated_adjoint.py.rst` is a
+[Elastic FWI with the automated adjoint](elastic_fwi_automated_adjoint/elastic_fwi_automated_adjoint.py.rst) is a
 literate demo in the format of the [Firedrake demos](https://www.firedrakeproject.org/demos/full_waveform_inversion.py.html):
 a reStructuredText document whose `.. code-block:: python` blocks, read in
 order, are the program. It runs an FWI of an isotropic elastic medium with the
-automated adjoint, one MPI process per shot. Extract the script with
+automated adjoint, recovering P- and S-wave velocities with density fixed.
+It covers synthetic observations, a Taylor test, joint inversion and an
+exercise comparing staged updates. Use a spyro environment with Firedrake's
+adjoint and `PointEvaluator` support (CI uses Firedrake 2026.4.0) and PETSc/TAO.
+Extract the script with
 [pylit](https://pypi.org/project/pylit/) and run it with three processes:
 
 ```bash
