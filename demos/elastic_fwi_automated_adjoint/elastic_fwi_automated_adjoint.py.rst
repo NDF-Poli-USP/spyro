@@ -1,19 +1,20 @@
-Elastic full-waveform inversion with the automated adjoint
-==============================================================
+Elastic full waveform inversion with the automated adjoint
+==========================================================
 
 This demo uses spyro to recover the P- and S-wave velocities of a circular
 inclusion in a two-dimensional elastic medium. Density stays fixed. We
 first generate synthetic observations, choose a starting model, check the
 adjoint gradient, and then run the inversion.
 
+`Daiane I Dolci <https://ig-dolci.github.io/>`__ prepared this tutorial.
+
 Running the demo
 --------------------
 
-Use a spyro environment with Firedrake's adjoint and ``PointEvaluator``
-support (the demo is tested in CI with Firedrake 2026.4.0), PETSc/TAO,
-Matplotlib and `pylit <https://pypi.org/project/pylit/>`__.
-From this demo's directory, extract the Python code and run three shots on
-three MPI processes::
+We recommend the latest Firedrake release to run this demo. From this
+demo's directory, extract the Python code with
+`pylit <https://pypi.org/project/pylit/>`__ and run three shots on three
+MPI processes::
 
     pylit --code-block-marker ".. code-block:: python" elastic_fwi_automated_adjoint.py.rst
     mpiexec -n 3 python elastic_fwi_automated_adjoint.py
@@ -22,11 +23,11 @@ The ``.. code-block:: python`` blocks below form the complete program, in
 order. The run saves model plots, shot records as figures, and inversion
 outputs in the current directory.
 
-What is being minimised?
-----------------------------
+Full Waveform Inversion (FWI)
+-----------------------------
 
-Full-waveform inversion (FWI) adjusts material parameters to reduce the
-misfit between predicted and observed receiver data [Tarantola1984]_,
+FWI seeks to adjust material parameters to reduce the misfit between
+predicted and observed receiver data [Tarantola1984]_,
 [Virieux2009]_. Here the controls are :math:`m = (c_p, c_s)`, and the misfit is
 
 .. math::
@@ -42,8 +43,7 @@ integral with the trapezoidal rule on the solver's time grid.
 
 In this synthetic example, the observations come from a forward solve with
 a known *true model*. The inversion begins from a different *starting
-model*. FWI is a local optimisation: a good starting model helps, but a
-smaller misfit does not guarantee recovery of the true medium.
+model*.
 
 The forward model
 ---------------------
@@ -75,8 +75,8 @@ absorbing conditions [Stacey1988]_ reduce reflections at all four edges;
 there is no free surface. Sources and receivers lie on opposite sides of
 the inclusion, forming a transmission experiment.
 
-How the automated adjoint fits in
--------------------------------------
+Automated Adjoints
+------------------
 
 ``firedrake.adjoint`` records the forward computation on a *tape* and
 traverses it backwards to differentiate the discrete misfit. A *reduced
@@ -86,7 +86,8 @@ and its gradient at new control values.
 The demo uses ``SingleMemoryStorageSchedule``: all states needed by the
 adjoint stay in memory, with no forward recomputation. For larger problems,
 setting ``snapshots`` enables a schedule that stores fewer checkpoints and
-recomputes intermediate states [Dolci2024]_.
+recomputes intermediate states, the mixed checkpointing strategy of
+[Maddison2024]_.
 
 With ``"parallelism": {"type": "automatic"}``, each ensemble member handles
 one shot. ``EnsembleReducedFunctional`` sums their misfits and gradients.
@@ -198,8 +199,8 @@ and 0.8 km; the 41 receivers are on the line :math:`z = -0.85` km, from
     }
 
 ``synthetic_data`` supplies the background material. spyro computes
-:math:`\lambda` and :math:`\mu` from these values; we add the true and
-starting anomalies below.
+:math:`\lambda` and :math:`\mu` from these values. The true and starting
+velocity models are shown below.
 
 .. code-block:: python
 
@@ -342,8 +343,9 @@ Both carry the imprint of the circle to the receivers.
 The starting model and the controls
 ---------------------------------------
 
-The inversion runs on the *guess* mesh, built here with the same element
-size as the mesh the data were generated on.
+For the sake of simplicity, the inversion runs on the *guess* mesh with
+the same element size as the mesh on which the observed data were
+generated.
 
 .. code-block:: python
 
@@ -384,10 +386,12 @@ at the centre for comparison.
     :align: center
 
 Enable the automated adjoint for the two velocity fields. Selecting these
-*controls* leaves density fixed. ``checkpointing=True`` selects the memory
-schedule described above, and ``gc_timestep_frequency=50`` runs Python's
-garbage collector every 50 time steps, which keeps the memory held by the
-tape from creeping up.
+*controls* leaves density fixed. ``checkpointing=True`` uses a single
+memory schedule that does not recompute the forward solve and stores only
+the forward data used for the adjoint-based gradient. Periodic garbage
+collection (``gc_timestep_frequency``) releases reference cycles, a good
+approach when the code that obtains the automated gradient is prone to
+them.
 
 .. code-block:: python
 
@@ -426,8 +430,7 @@ Thus, halving :math:`h` should reduce the residual by about four, until
 round-off dominates. ``verify_gradient`` pairs the gradient fields with the
 perturbations and returns the observed convergence rate, which should be
 close to two. We use the same random seed on every ensemble member so their
-perturbations agree. The test uses the unmasked gradient; the mask below
-only restricts optimisation updates.
+perturbations agree.
 
 .. code-block:: python
 
@@ -463,8 +466,9 @@ the largest allowed P-wave speed, rather than just the starting velocity.
     cs_bounds = (1.0, 1.6)   # km/s
 
 Large gradients near sources and receivers can dominate model updates
-[Modrak2016]_. This binary mask allows updates only in the strip
-:math:`-0.75 < z < -0.3` km, holding the starting model fixed elsewhere.
+[Modrak2016]_. A common practice in this case is to zero out such regions.
+This binary mask allows updates only in the strip :math:`-0.75 < z < -0.3`
+km, holding the starting model fixed elsewhere.
 
 .. code-block:: python
 
@@ -562,17 +566,12 @@ each velocity. The misfit history shows how much the fit to the data improved.
 After 20 iterations the misfit has fallen by a factor of about 19. The
 S-wave velocity has become a circle of the right size and amplitude, about
 1.52 km/s at the centre against a true 1.5, while the P-wave velocity has
-moved much less, from 2.75 to about 2.82 km/s against 3.0, and is still the
-blurred blob it started as. Nothing changed in the masked bands.
+moved much less, from 2.75 to about 2.82 km/s against 3.0.
 
-The two velocities are not seen equally well by the data. At 5 Hz the
-circle's diameter of 250 m is one S wavelength but only half a P
-wavelength, so the S waves feel it far more than the P waves do: the
-gradient with respect to :math:`c_s` is more than ten times larger than
-that with respect to :math:`c_p`, and BLMVM, which takes one step length
-for both, spends its iterations on :math:`c_s`. The misfit history shows
-it, a fast drop while :math:`c_s` is corrected and a slow descent after.
-The exercise below is one way around this.
+A decreasing misfit means the predicted records better match the
+observations. We can achieve a better predicted model via FWI using more
+iterations, or other strategies for multiparameter inversion problems. It
+is an exercise for you!
 
 .. admonition:: Exercise: invert one velocity at a time
 
@@ -603,15 +602,14 @@ The exercise below is one way around this.
     problems. Technical Report ANL/MCS-P909-0901, Argonne National
     Laboratory.
 
-.. [Dolci2024] Dolci, D. I., Maddison, J. R., Ham, D. A., Pallez, G., &
-    Herrmann, J. (2024). checkpoint_schedules: schedules for incremental
-    checkpointing of adjoint simulations. Journal of Open Source Software,
-    9(95), 6148.
-
 .. [Komatitsch1998] Komatitsch, D., & Vilotte, J.-P. (1998). The spectral
     element method: an efficient tool to simulate the seismic response of 2D
     and 3D geological structures. Bulletin of the Seismological Society of
     America, 88(2), 368–392.
+
+.. [Maddison2024] Maddison, J. R. (2024). Step-based checkpointing with
+    high-level algorithmic differentiation. Journal of Computational
+    Science, 82, 102405.
 
 .. [Modrak2016] Modrak, R., & Tromp, J. (2016). Seismic waveform inversion
     best practices: regional, global and exploration test cases.
