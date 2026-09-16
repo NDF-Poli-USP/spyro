@@ -1,4 +1,7 @@
-"""Constructs Firedrake solver for the acoustic wave with BCs, NRBCs, HABCs."""
+"""Constructs Firedrake solver for the acoustic wave.
+
+Handles typical BCs, NRBCs or HABCs.
+"""
 
 import firedrake as fire
 from firedrake import ds, dx, dot, grad, sqrt
@@ -164,7 +167,6 @@ def construct_solver_or_matrix_no_pml(wave):
     wave.u_np1 = u_np1
 
     wave.current_time = 0.0
-    dt = wave.dt
 
     form = build_acoustic_form(wave, u, v, u_n, u_nm1, quad_rule)
 
