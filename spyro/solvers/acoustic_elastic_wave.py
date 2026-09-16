@@ -23,6 +23,9 @@ class AcousticElasticWave(Wave):
         self.solid_id = 2
         self.interface_x = dictionary["mesh"].get("interface_x", None)
         self.sigma_xx_history = []
+        self.fluid_displacement_history = []
+        self._vf_normal = None
+        self._uf_normal = None
 
         self.use_monolithic = False
 
@@ -198,6 +201,12 @@ class AcousticElasticWave(Wave):
         else:
             construct_acoustic_elastic(self)
 
+        self.gradP_space = fire.VectorFunctionSpace(self.submesh_fluid, "CG", self.degree)
+        self.gradP_function = fire.Function(self.gradP_space, name="gradP")
+        n_recv = len(self.receiver_locations) if self.receiver_locations else 0
+        self._vf_normal = [0.0] * n_recv
+        self._uf_normal = [0.0] * n_recv
+
     @override
     def _get_vstate(self):
         return self.X_n
@@ -308,6 +317,19 @@ class AcousticElasticWave(Wave):
         if self.solid_receivers is not None:
             data = self.X_np1.sub(1).dat.data_ro_with_halos[:]
             self.solid_receiver_history.append(self.solid_receivers.interpolate(data))
+
+        if self.receiver_locations:
+            self.gradP_function.interpolate(fire.grad(self.X_np1.sub(0)))
+            dt = self.dt
+            rho_f_val = float(self.rho_fluid)
+            step_uf = []
+            for i, loc in enumerate(self.receiver_locations):
+                gx = self.gradP_function.at(loc)[1]  # índice 1 = componente x (convenção z,x)
+                af_x = -gx / rho_f_val
+                self._vf_normal[i] += dt * af_x
+                self._uf_normal[i] += dt * self._vf_normal[i]
+                step_uf.append(self._uf_normal[i])
+            self.fluid_displacement_history.append(step_uf)
 
     def _compute_p_equivalent(self):
         dim = self.dimension
