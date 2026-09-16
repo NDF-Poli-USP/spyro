@@ -16,8 +16,7 @@ a reStructuredText document whose `.. code-block:: python` blocks, read in
 order, are the program. It runs an FWI of an isotropic elastic medium with the
 automated adjoint, recovering P- and S-wave velocities with density fixed.
 It covers synthetic observations, a Taylor test, joint inversion and an
-exercise comparing staged updates. Use a spyro environment with Firedrake's
-adjoint and `PointEvaluator` support (CI uses Firedrake 2026.4.0) and PETSc/TAO.
+exercise comparing staged updates. We recommend the latest Firedrake release.
 Extract the script with
 [pylit](https://pypi.org/project/pylit/) and run it with three processes:
 
