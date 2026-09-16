@@ -908,8 +908,10 @@ class FullWaveformInversion:
             raise ValueError("No guess control parameter has been configured.")
 
         self._sync_wave_real_shot_record()
-        if self.wave.adjoint_type == AdjointType.IMPLEMENTED_ADJOINT:
-            self.wave.enable_implemented_adjoint()
+        if self.wave.adjoint_type.is_implemented:
+            self.wave.enable_implemented_adjoint(
+                adjoint_type=self.wave.adjoint_type,
+            )
         self.wave.forward_solve()
         current_control = self.control_parameters
         fire.VTKFile(f"control_{self.current_iteration}.pvd").write(current_control)
@@ -1273,9 +1275,16 @@ class FullWaveformInversion:
             self.set_guess_control(updated_control)
 
         comm.comm.barrier()
+        # An implemented adjoint enabled on the wave (the hand-derived one,
+        # or the one derived by UFL differentiation) drives the gradient;
+        # otherwise gradient_solve() falls back to the hand-derived adjoint.
+        adjoint_type = self.wave.adjoint_type
+        if not adjoint_type.is_implemented:
+            adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
         self.gradient = self.wave.gradient_solve(
             misfit=self.misfit,
             forward_solution=self.guess_forward_solution,
+            adjoint_type=adjoint_type,
         )
         self._apply_gradient_mask()
         if save:

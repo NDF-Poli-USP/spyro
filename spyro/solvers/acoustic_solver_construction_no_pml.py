@@ -84,6 +84,14 @@ def construct_solver_or_matrix_no_pml(wave):
     form = m1 + a + le
     wave.rhs = fire.rhs(form)
     wave.lhs = fire.lhs(form)
+    # Time-step residual R(u^{n+1}, u^n, u^{n-1}; c), differentiated by the
+    # UFL-derived adjoint.
+    wave.set_forward_residual_form(
+        fire.action(wave.lhs, u_np1) - wave.rhs,
+        (u_np1, u_n, u_nm1),
+        state_space=V,
+        state_name="residual pressure",
+    )
     wave.source_function = fire.Cofunction(V.dual())
 
     lin_var = fire.LinearVariationalProblem(

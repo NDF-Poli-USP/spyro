@@ -144,10 +144,18 @@ def _propagate_forward_central_difference(wave, source_ids):
             wave.store_forward_time_steps
             and step % wave.gradient_sampling_frequency == 0
         ):
+            # The UFL-derived adjoint differentiates the residual of the
+            # full time-stepping state (with a PML, pressure and auxiliary
+            # fields together), so it stores that state; the hand-derived
+            # adjoint reads the wave field alone.
+            if adjoint_type.is_ufl_derived:
+                state = wave.vstate
+            else:
+                state = wave.get_function()
             snapshot = fire.Function(
-                wave.function_space, name=wave.get_function_name()
+                state.function_space(), name=wave.get_function_name()
             )
-            snapshot.assign(wave.get_function())
+            snapshot.assign(state)
             usol.append(snapshot)
             save_step += 1
 
@@ -174,6 +182,14 @@ def _propagate_forward_central_difference(wave, source_ids):
                         "Unsupported type for real_shot_record. Must be "
                         "either a numpy array or a Firedrake Function."
                     )
+                if adjoint_type.is_implemented:
+                    # The implemented adjoints inject the misfit of each
+                    # step as a source, which needs its values rather than
+                    # the symbolic difference above. The automated adjoint
+                    # keeps the expression, which it differentiates.
+                    misfit_step = fire.Function(
+                        usol_recv[-1].function_space()
+                    ).assign(misfit_step)
             else:
                 misfit_step = real_shot_record[step] - usol_recv[-1]
             wave.misfit.append(misfit_step)

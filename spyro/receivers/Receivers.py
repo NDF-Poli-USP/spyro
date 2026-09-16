@@ -1,6 +1,9 @@
 """Receivers class for evaluating efficiently point data."""
 
-from firedrake import *  # noqa: F403
+from functools import cached_property
+
+from firedrake import assemble, Cofunction, VertexOnlyMesh
+from firedrake.functionspaceimpl import WithGeometry
 from spyro.receivers.dirac_delta_projector import Delta_projector
 from ..domains.space import create_function_space
 from ..utils.typing import WaveType
@@ -9,6 +12,8 @@ from ..tools.version_control import is_firedrake_new
 
 if is_firedrake_new() is False:
     from firedrake.__future__ import interpolate
+else:
+    from firedrake import interpolate
 
 
 class Receivers(Delta_projector):
@@ -50,6 +55,12 @@ class Receivers(Delta_projector):
     apply_receivers_as_source(rhs_forcing, residual, IT)
         Applies receivers as source with values from residual
         in timestep IT, for usage with adjoint propagation
+    receiver_source_injector(target_space)
+        Builds the vertex-only-mesh counterpart of
+        apply_receivers_as_source, for usage with adjoint propagation
+    receiver_interpolator(f)
+        Builds the vertex-only-mesh interpolation of a field at the
+        receiver locations
     """
 
     def __init__(self, wave):
@@ -106,16 +117,108 @@ class Receivers(Delta_projector):
         """
         for rid in range(self.number_of_points):
             value = residual[IT][rid]
-            if self.is_local[rid]:
+            # ``is_local`` holds the cell id of each receiver, ``None`` when
+            # the receiver is not on this rank; cell 0 is a valid cell.
+            if self.is_local[rid] is not None:
                 idx = np.int_(self.cellNodeMaps[rid])
                 phis = self.cell_tabulations[rid]
 
-                tmp = np.dot(phis, value)
+                # ``value`` is a scalar for a scalar field and a vector for a
+                # vector one, so the outer product scales the tabulated basis
+                # values by every component of the receiver value.
+                tmp = np.multiply.outer(phis, value)
                 rhs_forcing.dat.data_with_halos[idx] += tmp
             else:
                 tmp = rhs_forcing.dat.data_with_halos[0]
 
         return rhs_forcing
+
+    @cached_property
+    def vertex_only_mesh(self) -> VertexOnlyMesh:
+        """Vertex-only mesh at the receiver locations.
+
+        Built once per instance, with the same options as
+        :meth:`receiver_interpolator` uses by default, so the receiver
+        ordering it defines is the one the forward solve records the
+        receiver data in.
+
+        Returns
+        -------
+        firedrake.VertexOnlyMesh
+            Mesh whose vertices are the receiver locations.
+        """
+        return VertexOnlyMesh(
+            self.mesh,
+            self.point_locations,
+            reorder=True,
+            missing_points_behaviour="error",
+            redundant=True,
+        )
+
+    @cached_property
+    def receiver_function_space(self) -> WithGeometry:
+        """Space of one time step of receiver data on :attr:`vertex_only_mesh`.
+
+        Returns
+        -------
+        firedrake.functionspaceimpl.WithGeometry
+            Piecewise-constant space on the vertex-only mesh, scalar for
+            acoustic waves and vector-valued for elastic ones.
+        """
+        return self._receiver_function_space(self.vertex_only_mesh)
+
+    def _receiver_function_space(self, receiver_mesh) -> WithGeometry:
+        """Return the receiver-data space of this wave type on ``receiver_mesh``.
+
+        Parameters
+        ----------
+        receiver_mesh : firedrake.VertexOnlyMesh
+            Vertex-only mesh at the receiver locations.
+
+        Returns
+        -------
+        firedrake.functionspaceimpl.WithGeometry
+            Piecewise-constant space on ``receiver_mesh``, scalar for
+            acoustic waves and vector-valued for elastic ones.
+
+        Raises
+        ------
+        ValueError
+            If the wave type has no receiver-data space.
+        """
+        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
+            return create_function_space(
+                receiver_mesh, "DG0", 0, dim=self.dimension,
+            )
+        elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
+            return create_function_space(receiver_mesh, "DG0", 0)
+        else:
+            raise ValueError("Invalid wave type")
+
+    def receiver_source_injector(
+        self, target_space: WithGeometry,
+    ) -> "ReceiverSourceInjector":
+        """Return the adjoint of the receiver interpolation into ``target_space``.
+
+        This is the vertex-only-mesh counterpart of
+        :meth:`apply_receivers_as_source`: it injects one time step of
+        receiver data as a source in the dual of ``target_space``. The
+        operator is assembled once, so the backward time loop only writes
+        the receiver values of each step into it.
+
+        Parameters
+        ----------
+        target_space : firedrake.functionspaceimpl.WithGeometry
+            Space the receivers read from, and whose dual receives the
+            injected values.
+
+        Returns
+        -------
+        ReceiverSourceInjector
+            Callable mapping one time step of receiver data to a cofunction
+            on ``target_space``.
+        """
+        return ReceiverSourceInjector(self.receiver_function_space, target_space)
 
     def receiver_interpolator(
         self,
@@ -173,14 +276,89 @@ class Receivers(Delta_projector):
             redundant=vom_redundant,
             name=vom_name,
         )
-        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
-            V_r = create_function_space(vom, "DG0", 0, dim=self.dimension)
-        elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
-            V_r = create_function_space(vom, "DG0", 0)
-        else:
-            raise ValueError("Invalid wave type")
+        V_r = self._receiver_function_space(vom)
         return interpolate(f, V_r)
 
     def new_at(self, udat, receiver_id):
         """Evaluate data at a point."""
         return super().new_at(udat, receiver_id)
+
+
+class ReceiverSourceInjector:
+    """Adjoint of the receiver interpolation, assembled once.
+
+    The forward solve reads the receivers by interpolating the solution onto
+    a vertex-only mesh. The adjoint solve needs the transpose of that map: a
+    time step of receiver values injected as a source in the dual of the
+    space the receivers read from. The adjoint interpolation is built once
+    here and re-assembled into the same cofunction on every call.
+
+    Parameters
+    ----------
+    receiver_space : firedrake.functionspaceimpl.WithGeometry
+        Space of one time step of receiver data, on the vertex-only mesh.
+    target_space : firedrake.functionspaceimpl.WithGeometry
+        Space the receivers read from.
+
+    Attributes
+    ----------
+    receiver_values : firedrake.Cofunction
+        Receiver values of the step being injected, in the dual of the
+        receiver space.
+    source : firedrake.Cofunction
+        Injected source, in the dual of the target space. Reused between
+        calls.
+    adjoint_interpolation : firedrake.Interpolate
+        Symbolic adjoint interpolation of ``receiver_values`` into
+        ``source``.
+    """
+
+    def __init__(self, receiver_space: WithGeometry, target_space: WithGeometry):
+        self.receiver_values = Cofunction(receiver_space.dual())
+        self.source = Cofunction(target_space.dual())
+        (coargument,) = self.source.arguments()
+        self.adjoint_interpolation = interpolate(coargument, self.receiver_values)
+
+    def __call__(self, values) -> Cofunction:
+        """Inject one time step of receiver data.
+
+        Parameters
+        ----------
+        values : firedrake.Function or array_like
+            Receiver values of the step, as the ``Function`` on the receiver
+            space the forward solve produced while accumulating the
+            functional, or as an array in the order of the vertex-only mesh
+            (the order the forward solve records receiver data in), of shape
+            ``(n_receivers,)`` for a scalar field or
+            ``(n_receivers, dimension)`` for a vector one.
+
+        Returns
+        -------
+        firedrake.Cofunction
+            The injected source. It is the same cofunction on every call,
+            overwritten each time.
+
+        Raises
+        ------
+        TypeError
+            If ``values`` is neither a Firedrake ``Function`` nor array-like.
+        ValueError
+            If ``values`` does not hold one value per receiver.
+        """
+        try:
+            data = values.dat.data_ro
+        except AttributeError as exc:
+            if not isinstance(values, (np.ndarray, list, tuple)):
+                raise TypeError(
+                    "Receiver values must be a Firedrake Function or "
+                    f"array-like receiver data, received {type(values).__name__}.",
+                ) from exc
+            data = np.asarray(values, dtype=float)
+        receiver_values = self.receiver_values.dat.data
+        if data.shape != receiver_values.shape:
+            raise ValueError(
+                "Receiver values must hold one value per receiver, of shape "
+                f"{receiver_values.shape}; received shape {data.shape}.",
+            )
+        receiver_values[:] = data
+        return assemble(self.adjoint_interpolation, tensor=self.source)

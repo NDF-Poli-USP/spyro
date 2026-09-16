@@ -37,6 +37,16 @@ def isotropic_elastic_without_pml(wave):
 
     wave.lhs = lhs(F)
     wave.rhs = rhs(F)
+    # Time-step residual R(u^{n+1}, u^n, u^{n-1}; rho, lambda, mu), with the
+    # trial function standing for u^{n+1}, differentiated by the UFL-derived
+    # adjoint.
+    wave.set_forward_residual_form(
+        F,
+        (u, u_n, u_nm1),
+        state_space=V,
+        state_name="residual displacement",
+        bcs=wave.bcs,
+    )
     wave.B = Cofunction(V.dual())
     wave.source_function = Cofunction(V.dual())
 

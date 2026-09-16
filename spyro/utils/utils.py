@@ -67,8 +67,10 @@ def compute_functional(
         - dt : float
             Time step size.
     misfit : numpy.ndarray
-        Misfit array of shape (n_time_steps, n_receivers) containing
-        the difference between observed and real (or synthetic) data.
+        Misfit array of shape (n_time_steps, n_receivers), or
+        (n_time_steps, n_receivers, dimension) for vector receiver data,
+        containing the difference between observed and real (or synthetic)
+        data.
     evaluation_mode : FunctionalEvaluationMode, optional
         The mode in which to evaluate the functional. Default is
         FunctionalEvaluationMode.AFTER_SOLVE.
@@ -116,7 +118,9 @@ def compute_functional(
 
     J = 0
     for rn in range(num_receivers):
-        J += np.trapezoid(misfit[:, rn] ** 2, dx=dt)
+        # Vector receiver data carries one trailing component axis, summed
+        # after integrating each component in time.
+        J += np.sum(np.trapezoid(misfit[:, rn] ** 2, dx=dt, axis=0))
 
     J *= 0.5
 

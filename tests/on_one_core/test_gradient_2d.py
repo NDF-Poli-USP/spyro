@@ -5,6 +5,13 @@ from copy import deepcopy
 from firedrake import VTKFile
 import firedrake as fire
 import spyro
+from spyro.utils.typing import AdjointType
+
+
+IMPLEMENTED_ADJOINTS = [
+    AdjointType.IMPLEMENTED_ADJOINT,
+    AdjointType.UFL_DERIVED_ADJOINT,
+]
 
 
 def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
@@ -148,7 +155,8 @@ def get_forward_model(load_true=False):
     return rec_out_exact, rec_out_guess, Wave_obj_guess
 
 
-def test_gradient():
+@pytest.mark.parametrize("adjoint_type", IMPLEMENTED_ADJOINTS)
+def test_gradient(adjoint_type):
     rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(load_true=False)
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
@@ -159,10 +167,110 @@ def test_gradient():
     print(f"Cost functional : {Jm}")
 
     # compute the gradient of the control (to be verified)
-    dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
+    dJ = Wave_obj_guess.gradient_solve(
+        misfit=misfit,
+        forward_solution=forward_solution_guess,
+        adjoint_type=adjoint_type,
+    )
     VTKFile("gradient.pvd").write(dJ)
 
+    if adjoint_type is AdjointType.UFL_DERIVED_ADJOINT:
+        assert Wave_obj_guess.forward_residual_form is not None
+
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True)
+
+
+def test_ufl_derived_gradient_matches_hand_derived_gradient():
+    """Both implemented adjoints discretize the same functional, so their
+    gradients agree far beyond the finite-difference tolerance."""
+    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(load_true=False)
+    misfit = rec_out_exact - rec_out_guess
+
+    gradients = {}
+    for adjoint_type in IMPLEMENTED_ADJOINTS:
+        # Each gradient solve consumes the stored forward solution, so the
+        # second one re-runs the forward solve on the same model.
+        gradients[adjoint_type] = Wave_obj_guess.gradient_solve(
+            misfit=misfit, adjoint_type=adjoint_type,
+        )
+
+    hand_derived = gradients[AdjointType.IMPLEMENTED_ADJOINT]
+    ufl_derived = gradients[AdjointType.UFL_DERIVED_ADJOINT]
+    difference = fire.Function(hand_derived.function_space())
+    difference.assign(ufl_derived - hand_derived)
+    assert fire.norm(difference) < 1e-4 * fire.norm(hand_derived)
+
+
+@pytest.mark.parametrize("use_vertex_only_mesh", [False, True])
+def test_ufl_derived_gradient_receiver_injection(use_vertex_only_mesh):
+    """The misfit is injected by the transpose of whichever receiver
+    interpolation the forward solve used: the vertex-only mesh one, or the
+    Dirac delta projection."""
+    d = deepcopy(dictionary)
+    d["time_axis"]["final_time"] = 0.5
+    d["acquisition"]["use_vertex_only_mesh"] = use_vertex_only_mesh
+
+    Wave_obj_exact = spyro.AcousticWave(dictionary=d)
+    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    cond = fire.conditional(Wave_obj_exact.mesh_z > -0.5, 1.5, 3.5)
+    Wave_obj_exact.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
+    Wave_obj_exact.forward_solve()
+    rec_out_exact = Wave_obj_exact.forward_solution_receivers
+
+    Wave_obj_guess = spyro.AcousticWave(dictionary=d)
+    Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    Wave_obj_guess.set_initial_velocity_model(constant=2.0)
+    Wave_obj_guess.forward_solve()
+    misfit = rec_out_exact - Wave_obj_guess.forward_solution_receivers
+    Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
+
+    dJ = Wave_obj_guess.gradient_solve(
+        misfit=misfit, adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+    )
+    check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
+
+
+def test_ufl_derived_adjoint_requires_every_time_step_stored():
+    d = deepcopy(dictionary)
+    d["time_axis"]["gradient_sampling_frequency"] = 2
+    wave = spyro.AcousticWave(dictionary=d)
+
+    with pytest.raises(ValueError, match="gradient_sampling_frequency"):
+        wave.enable_implemented_adjoint(
+            adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+        )
+    # The hand-derived adjoint subsamples the stored forward solution.
+    wave.enable_implemented_adjoint()
+    assert wave.adjoint_type is AdjointType.IMPLEMENTED_ADJOINT
+
+
+def test_enable_implemented_adjoint_rejects_other_adjoints():
+    wave = spyro.AcousticWave(dictionary=deepcopy(dictionary))
+
+    with pytest.raises(ValueError, match="implemented adjoint"):
+        wave.enable_implemented_adjoint(
+            adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        )
+
+
+def test_receiver_source_injector_validates_its_input():
+    wave = spyro.AcousticWave(dictionary=deepcopy(dictionary))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    inject = wave.receivers.receiver_source_injector(wave.function_space)
+    number_of_receivers = wave.number_of_receivers
+
+    with pytest.raises(TypeError, match="Receiver values must be"):
+        inject({"invalid": "misfit"})
+    with pytest.raises(ValueError, match="one value per receiver"):
+        inject(np.ones(number_of_receivers + 1))
+
+    source = inject(np.ones(number_of_receivers))
+    assert source.function_space() == wave.function_space.dual()
+    # Injecting unit receiver values distributes them over the receiver
+    # cells' nodal basis, whose values sum to one at each receiver.
+    assert np.isclose(source.dat.data_ro.sum(), number_of_receivers)
+    # The same cofunction is reused on every call.
+    assert inject(np.zeros(number_of_receivers)) is source
 
 
 def _gradient_for_sampling_frequency(freq, final_time_override=0.5):
@@ -223,6 +331,7 @@ def test_gradient_sampling_frequency(full_sampling_gradient, freq):
 
 
 if __name__ == "__main__":
-    test_gradient()
+    test_gradient(AdjointType.IMPLEMENTED_ADJOINT)
+    test_gradient(AdjointType.UFL_DERIVED_ADJOINT)
     test_gradient_sampling_frequency(_gradient_for_sampling_frequency(1), 2)
     test_gradient_sampling_frequency(_gradient_for_sampling_frequency(1), 3)

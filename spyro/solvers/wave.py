@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
+import ufl
 
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
@@ -149,6 +150,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.automated_adjoint = None
         self.functional_value = None
         self.misfit = None
+        # Forward time-step residual and the formal states it is written in,
+        # exposed by the solver construction for the UFL-derived adjoint.
+        self.forward_residual_form = None
+        self.forward_residual_states = None
+        self.forward_residual_bcs = ()
+        self.adjoint_source_function = None
         self.current_time = 0.0
         self.source_expression = None  # Expression for sources using UFL (less efficient)
         self.set_solver_parameters()
@@ -610,6 +617,174 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         pass
 
+    def reset_adjoint_state(self) -> None:
+        """Zero the time-stepping registers before an adjoint solve.
+
+        The adjoint is integrated backwards on the same registers the forward
+        solve advances (``prev_vstate``, ``vstate`` and ``next_vstate``), so
+        they must not carry the final forward state into it.
+
+        Returns
+        -------
+        None
+        """
+        self.prev_vstate.assign(0.0)
+        self.vstate.assign(0.0)
+        self.next_vstate.assign(0.0)
+
+    def get_adjoint_receiver_source_space(self) -> fire.FunctionSpace:
+        """Return the space the receiver misfit is injected into.
+
+        The adjoint source is the receiver misfit injected into the space the
+        receivers read from. Solvers whose receivers read a component of the
+        solution (the acoustic pressure of a PML state) override this with
+        that component's space; by default the receivers read the full
+        solution.
+
+        Returns
+        -------
+        firedrake.FunctionSpace
+            Space of the receiver misfit injection.
+        """
+        return self.function_space
+
+    def set_forward_residual_form(
+        self,
+        residual_form: ufl.Form,
+        live_states: tuple,
+        state_space: fire.FunctionSpace | None = None,
+        state_name: str = "residual state",
+        bcs=None,
+    ) -> None:
+        """Expose a forward time-step residual for UFL adjoint differentiation.
+
+        The residual is rewritten in formal state ``Function`` objects that
+        are independent of the live time-stepping registers. During the
+        adjoint solve these formal states are assigned from the stored
+        forward solution before differentiating
+
+            R(u^{n+1}, u^n, u^{n-1}; m)
+
+        with respect to the states and the physical parameters ``m``.
+
+        Parameters
+        ----------
+        residual_form : ufl.Form
+            Forward time-step residual, a linear form in the test function
+            that vanishes at the forward solution.
+        live_states : tuple
+            Objects standing for ``u^{n+1}``, ``u^n`` and ``u^{n-1}`` in
+            ``residual_form``: the time-stepping registers, or the trial
+            function for ``u^{n+1}``.
+        state_space : firedrake.FunctionSpace, optional
+            Space of the formal residual states. Inferred from the first live
+            state when omitted.
+        state_name : str, optional
+            Base name of the formal residual state functions.
+        bcs : firedrake.DirichletBC or list of firedrake.DirichletBC, optional
+            Dirichlet boundary conditions the forward solve applies. Their
+            homogeneous counterparts are applied to the adjoint solve.
+
+        Raises
+        ------
+        ValueError
+            If ``live_states`` does not hold exactly three states, or the
+            state space cannot be inferred from the first one.
+
+        Notes
+        -----
+        This assumes a three-level time-stepping residual,
+        ``R(u^{n+1}, u^n, u^{n-1}; m)``, hence exactly three live states.
+        Schemes with a longer memory need a matching number of formal states
+        and a matching adjoint advance.
+        """
+        if len(live_states) != 3:
+            raise ValueError("Expected live states (np1, n, nm1).")
+
+        if state_space is None:
+            try:
+                state_space = live_states[0].function_space()
+            except AttributeError as exc:
+                raise ValueError(
+                    "state_space is required when it cannot be inferred from "
+                    "the first live state."
+                ) from exc
+
+        residual_states = (
+            fire.Function(state_space, name=f"{state_name} t+dt"),
+            fire.Function(state_space, name=state_name),
+            fire.Function(state_space, name=f"{state_name} t-dt"),
+        )
+        self.forward_residual_states = residual_states
+        self.forward_residual_form = fire.replace(
+            residual_form,
+            dict(zip(live_states, residual_states)),
+        )
+        if bcs is None:
+            bcs = ()
+        elif isinstance(bcs, fire.DirichletBC):
+            bcs = (bcs,)
+        self.forward_residual_bcs = tuple(bcs)
+
+    def get_adjoint_source(self) -> fire.Cofunction:
+        """Return the cofunction driving the adjoint equation.
+
+        ``source_function`` drives the forward problem. The adjoint problem
+        is driven by a distinct cofunction on the same dual space, created on
+        first use.
+
+        Returns
+        -------
+        firedrake.Cofunction
+            Adjoint source, in the dual of the forward source space.
+        """
+        if self.adjoint_source_function is None:
+            self.adjoint_source_function = fire.Cofunction(
+                self.source_function.function_space()
+            )
+        return self.adjoint_source_function
+
+    def set_adjoint_source(self, misfit_form: fire.Cofunction) -> None:
+        """Write the receiver misfit into the adjoint source.
+
+        Parameters
+        ----------
+        misfit_form : firedrake.Cofunction
+            Receiver misfit injected into the dual of
+            :meth:`get_adjoint_receiver_source_space`.
+
+        Raises
+        ------
+        ValueError
+            If ``misfit_form`` lives neither on the adjoint source space nor
+            on its first component.
+        """
+        adjoint_source = self.get_adjoint_source()
+        if adjoint_source.function_space() == misfit_form.function_space():
+            adjoint_source.assign(misfit_form)
+            return
+
+        # A mixed (PML) adjoint source receives the misfit in its first
+        # component, the one the receivers read. ``sub(0)`` only exists on a
+        # mixed source, and fails in a backend-dependent way otherwise, so
+        # any such failure is reported as incompatible spaces.
+        try:
+            adjoint_source_component = adjoint_source.sub(0)
+        except (AttributeError, IndexError, ValueError) as exc:
+            raise ValueError(
+                "Misfit form space is incompatible with the adjoint source "
+                "space."
+            ) from exc
+
+        if adjoint_source_component.function_space() != misfit_form.function_space():
+            raise ValueError(
+                "Misfit form space is incompatible with the first component of "
+                "the adjoint source space."
+            )
+
+        adjoint_source.assign(0.0)
+        adjoint_source_component.assign(misfit_form)
+
     def set_material_properties(self, *args, **kwargs):
         """Wrapper for material_properties_io.set_material_property."""
         return material_properties_io.set_material_property(
@@ -716,9 +891,114 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.functional_value = None
         self.misfit = None
 
-    def enable_implemented_adjoint(self):
-        self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
+    def enable_implemented_adjoint(
+        self, adjoint_type: AdjointType = AdjointType.IMPLEMENTED_ADJOINT,
+    ) -> None:
+        """Switch the solver to an implemented adjoint.
+
+        Selects the implemented :class:`AdjointType` and stores the forward
+        field at every gradient-sampling step, which the backward solve
+        reads. The UFL-derived adjoint differentiates the forward residual of
+        every time step, so it needs every step stored.
+
+        Parameters
+        ----------
+        adjoint_type : AdjointType, optional
+            Implemented adjoint to use. Default is
+            :attr:`AdjointType.IMPLEMENTED_ADJOINT`, the hand-derived one.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        ValueError
+            If ``adjoint_type`` is not an implemented adjoint, or the
+            UFL-derived adjoint is requested with a
+            ``gradient_sampling_frequency`` other than one.
+        """
+        if not adjoint_type.is_implemented:
+            raise ValueError(
+                "enable_implemented_adjoint requires an implemented adjoint "
+                f"AdjointType, received {adjoint_type}.",
+            )
+        if adjoint_type.is_ufl_derived and self.gradient_sampling_frequency != 1:
+            raise ValueError(
+                "The UFL-derived adjoint differentiates the forward residual "
+                "of every time step, so it needs the forward solution stored "
+                "at every step: set gradient_sampling_frequency to 1 "
+                f"(received {self.gradient_sampling_frequency}).",
+            )
+        self.adjoint_type = adjoint_type
         self.store_forward_time_steps = True
+
+    def _prepare_implemented_adjoint(
+        self, misfit=None, forward_solution=None,
+        adjoint_type: AdjointType = AdjointType.IMPLEMENTED_ADJOINT,
+    ) -> None:
+        """Enable the implemented adjoint and make sure it has its inputs.
+
+        Shared ``gradient_solve`` preamble of the wave solvers: it switches
+        on the implemented adjoint, records the supplied ``misfit``, makes
+        sure a stored forward solution is available and, when no misfit was
+        given, derives it from the real shot record.
+
+        Parameters
+        ----------
+        misfit : array_like or list, optional
+            Receiver misfit, observed minus simulated data. If ``None`` it is
+            taken from the forward solve, or computed from
+            ``real_shot_record``.
+        forward_solution : list, optional
+            Stored forward solution to reuse. If ``None`` and none is stored,
+            a forward solve is run with storage enabled.
+        adjoint_type : AdjointType, optional
+            Implemented adjoint to use.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        ValueError
+            If no misfit is available and no real shot record is set.
+        """
+        self.enable_implemented_adjoint(adjoint_type=adjoint_type)
+        if misfit is not None:
+            self.misfit = misfit
+
+        if forward_solution is not None:
+            self.forward_solution = forward_solution
+        elif not (
+            isinstance(self.forward_solution, (list, tuple))
+            and self.forward_solution
+        ):
+            # No stored forward solution: either never run, run before
+            # enable_implemented_adjoint() (store_forward_time_steps was
+            # False at the time), or run under the automated adjoint, which
+            # leaves a single Function here. Re-run now with storage enabled.
+            #
+            # IMPORTANT: only re-run when ``self.forward_solution`` is empty.
+            # For the multi-source FWI path, ``ensemble_gradient`` invokes
+            # ``gradient_solve`` once per source after ``switch_serial_shot``
+            # loaded that source's stored forward solution into
+            # ``self.forward_solution``; calling ``forward_solve()`` here
+            # would discard the per-source data and run a fresh
+            # (multi-source) ensemble forward solve, leaving the backward
+            # propagator with the wrong forward state and producing an
+            # incorrect gradient.
+            self.forward_solve()
+
+        if self.misfit is None:
+            if self.real_shot_record is None:
+                raise ValueError(
+                    "Please load or calculate a real shot record first"
+                )
+            self.misfit = (
+                self.real_shot_record - self.forward_solution_receivers
+            )
 
     @property
     def forward_solution_receivers(self):

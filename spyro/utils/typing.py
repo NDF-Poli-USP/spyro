@@ -29,17 +29,56 @@ class WaveType(Enum):
     ANISOTROPIC_TTI_ELASTIC = 4
 
 
+class ImplementedAdjointDerivation(Enum):
+    """How an implemented :class:`AdjointType` derives its adjoint equation.
+
+    HAND_DERIVED: The adjoint equation and the gradient expression are
+        written out by hand for each wave equation.
+    UFL_DIFFERENTIATION: The adjoint equation and the gradient expression
+        are derived by UFL differentiation of the forward residual form.
+    """
+
+    HAND_DERIVED = 0
+    UFL_DIFFERENTIATION = 1
+
+
 class AdjointType(Enum):
     """Enum for the type of adjoint solver to use.
 
     NONE: No adjoint solver.
     AUTOMATED_ADJOINT: Use the automated adjoint solver via `firedrake.adjoint`.
-    IMPLEMENTED_ADJOINT: Use the manually implemented adjoint solver.
+    IMPLEMENTED_ADJOINT: Use Spyro's hand-derived implemented adjoint solver.
+    UFL_DERIVED_ADJOINT: Use Spyro's implemented adjoint solver derived by UFL
+        differentiation of the forward residual form.
+
+    The implemented adjoints carry the derivation they use as
+    ``implemented_derivation``, an :class:`ImplementedAdjointDerivation`; the
+    other members carry ``None`` there.
     """
 
-    NONE = 0
-    AUTOMATED_ADJOINT = 1
-    IMPLEMENTED_ADJOINT = 2
+    NONE = (0, None)
+    AUTOMATED_ADJOINT = (1, None)
+    IMPLEMENTED_ADJOINT = (2, ImplementedAdjointDerivation.HAND_DERIVED)
+    UFL_DERIVED_ADJOINT = (3, ImplementedAdjointDerivation.UFL_DIFFERENTIATION)
+
+    def __new__(cls, value, implemented_derivation):
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.implemented_derivation = implemented_derivation
+        return obj
+
+    @property
+    def is_implemented(self) -> bool:
+        """Whether this adjoint type uses Spyro's implemented adjoint path."""
+        return self.implemented_derivation is not None
+
+    @property
+    def is_ufl_derived(self) -> bool:
+        """Whether this adjoint type differentiates the forward residual form."""
+        return (
+            self.implemented_derivation
+            is ImplementedAdjointDerivation.UFL_DIFFERENTIATION
+        )
 
 
 class RieszMapType(Enum):

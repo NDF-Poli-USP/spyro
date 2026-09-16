@@ -79,6 +79,12 @@ class AcousticWave(Wave):
             self.X_n = None
             self.X_nm1 = None
             construct_solver_or_matrix_with_pml(self)
+            # The PML layer, not ``_initialize_model_parameters``, binds the
+            # velocity the form reads, so declare it as the physical
+            # parameter here.
+            self._physical_parameters.add(
+                AcousticMaterialParameter.P_WAVE_VELOCITY, self.c,
+            )
         else:
             construct_solver_or_matrix_no_pml(self)
 
@@ -105,7 +111,10 @@ class AcousticWave(Wave):
             can save computational time if it has already been
             computed for the current velocity model, as it avoids redundant forward solves.
         adjoint_type: AdjointType enum (default: AdjointType.IMPLEMENTED_ADJOINT)
-            Whether to use automated adjoint differentiation.
+            Adjoint to compute the gradient with: the automated adjoint, the
+            hand-derived implemented adjoint, or the implemented adjoint
+            derived by UFL differentiation of the forward residual form
+            (:attr:`AdjointType.UFL_DERIVED_ADJOINT`).
         riesz_map: RieszMapType enum (default: RieszMapType.L2)
             The type of Riesz map to use for the gradient. More details in the documentation of the
             :class:`RieszMapType` enum.
@@ -115,45 +124,41 @@ class AcousticWave(Wave):
         dJ: Firedrake 'Function' or Firedrake 'Cofunction'
             Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
             depending on the chosen Riesz map.
+
+        Raises:
+        -------
+        NotImplementedError
+            If ``adjoint_type`` is not an adjoint that computes gradients, or
+            ``riesz_map`` is not supported by the implemented adjoints.
         """
         if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
             return self._automated_adjoint_gradient(riesz_map=riesz_map)
-
-        self.enable_implemented_adjoint()
-        if misfit is not None:
-            self.misfit = misfit
-
-        if forward_solution is not None:
-            self.forward_solution = forward_solution
-        elif not self.forward_solution:
-            # No stored forward solution — either never run, or run before
-            # enable_implemented_adjoint() was called (store_forward_time_steps
-            # was False at the time). Re-run now with storage enabled.
-            #
-            # IMPORTANT: only re-run when ``self.forward_solution`` is empty.
-            # For the multi-source FWI path, ``ensemble_gradient`` invokes this
-            # method once per source after calling ``switch_serial_shot`` to
-            # load that source's stored forward solution into
-            # ``self.forward_solution``; calling ``forward_solve()`` here
-            # would discard the per-source data and run a fresh (multi-source)
-            # ensemble forward solve, leaving the backward propagator with the
-            # wrong forward state and producing an incorrect gradient.
-            self.forward_solve()
-
-        if self.misfit is None:
-            if self.real_shot_record is None:
-                raise ValueError(
-                    "Please load or calculate a real shot record first"
-                )
-            self.misfit = (
-                self.real_shot_record - self.forward_solution_receivers
+        if not adjoint_type.is_implemented:
+            raise NotImplementedError(
+                f"Adjoint type {adjoint_type} does not compute gradients.",
             )
 
         if riesz_map != RieszMapType.L2:
             raise NotImplementedError(
                 f"Riesz map {riesz_map} not implemented for implemented adjoint."
             )
-        return backward_wave_propagator(self)
+
+        self._prepare_implemented_adjoint(
+            misfit=misfit, forward_solution=forward_solution,
+            adjoint_type=adjoint_type,
+        )
+        if not adjoint_type.is_ufl_derived:
+            return backward_wave_propagator(self, adjoint_type=adjoint_type)
+
+        # The UFL-derived adjoint differentiates the residual with respect to
+        # the physical parameter carrying the model: the velocity field.
+        gradients = backward_wave_propagator(
+            self,
+            adjoint_type=adjoint_type,
+            controls=self.physical_parameters.select(),
+        )
+        (gradient,) = gradients.values()
+        return gradient
 
     def _automated_adjoint_gradient(self, riesz_map=RieszMapType.L2):
         """Compute the gradient using the automated adjoint.
@@ -340,6 +345,20 @@ class AcousticWave(Wave):
             return self.scalar_function_space
         else:
             raise ValueError("Scalar function space not found in wave object.")
+
+    @override
+    def get_adjoint_receiver_source_space(self) -> fire.FunctionSpace:
+        """Return the pressure space, which the receivers read.
+
+        With a PML the state is mixed, but the receivers read its pressure
+        component alone, so that is where the misfit is injected.
+
+        Returns
+        -------
+        firedrake.FunctionSpace
+            The scalar pressure space.
+        """
+        return self.get_scalar_function_space()
 
     @override
     def get_function_name(self):

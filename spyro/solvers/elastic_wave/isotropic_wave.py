@@ -8,6 +8,7 @@ from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
+from ..backward_time_integration import backward_wave_propagator
 from ...utils.physical_parameters import PhysicalParameters
 from ...utils.typing import (AdjointType, ElasticMaterialParameter,
                              ElasticMaterialParameterization, AbsorbingBCsType,
@@ -269,34 +270,44 @@ class IsotropicWave(ElasticWave):
         forward_solution=None,
         adjoint_type=AdjointType.AUTOMATED_ADJOINT,
         riesz_map=RieszMapType.L2,
+        control_parameters=None,
     ) -> PhysicalParameters:
-        """Compute automated-adjoint elastic material derivatives.
+        """Compute elastic material gradients with an adjoint.
 
-        Only the automated adjoint is available for the elastic wave so far.
-        The implemented adjoint -- the backward integration written out by
-        hand, which the acoustic solver already offers -- is intended to
-        follow, and ``misfit`` and ``forward_solution`` are the two inputs it
-        needs. They are part of the signature so that callers written against
-        :meth:`~spyro.solvers.acoustic_wave.AcousticWave.gradient_solve` keep
-        working once it lands, and are unused until then.
+        Two adjoints are available: the automated adjoint, which
+        differentiates the functional recorded during the forward solve, and
+        the implemented adjoint derived by UFL differentiation of the forward
+        residual form (:attr:`AdjointType.UFL_DERIVED_ADJOINT`), which
+        integrates the discrete adjoint equation backwards against the stored
+        forward solution. The hand-derived implemented adjoint the acoustic
+        solver offers is not written for the elastic wave.
 
         Parameters
         ----------
         misfit : array_like, optional
             Difference between observed and simulated receiver data. The
-            implemented adjoint drives the backward equation with it. The
-            automated adjoint does not need it: it differentiates the
-            functional recorded during the forward solve, which already
-            accumulated the misfit.
-        forward_solution : firedrake.Function, optional
-            Forward wavefield. The implemented adjoint integrates the adjoint
-            equation backwards against it, so passing it saves a forward
-            solve. The automated adjoint recovers the wavefield on its own.
+            UFL-derived adjoint drives the backward equation with it; if
+            omitted, it is taken from the forward solve or computed from
+            ``real_shot_record``. The automated adjoint does not need it: it
+            differentiates the functional recorded during the forward solve,
+            which already accumulated the misfit.
+        forward_solution : list, optional
+            Stored forward wavefield. The UFL-derived adjoint integrates the
+            adjoint equation backwards against it, so passing it saves a
+            forward solve. The automated adjoint recovers the wavefield on
+            its own.
         adjoint_type : AdjointType, optional
-            Must be :attr:`AdjointType.AUTOMATED_ADJOINT` until the
-            implemented adjoint is available for elastic waves.
+            :attr:`AdjointType.AUTOMATED_ADJOINT` (the default) or
+            :attr:`AdjointType.UFL_DERIVED_ADJOINT`.
         riesz_map : RieszMapType, optional
-            ``L2`` returns primal gradients and ``l2`` raw derivatives.
+            ``L2`` returns primal gradients and ``l2`` raw derivatives. The
+            UFL-derived adjoint supports ``L2`` only.
+        control_parameters : enum.Enum or iterable of enum.Enum, optional
+            Physical parameters the UFL-derived adjoint differentiates with
+            respect to, resolved by ``physical_parameters.select()``.
+            ``None`` takes every parameter carrying the material data. The
+            automated adjoint selects its controls in
+            :meth:`enable_automated_adjoint` instead.
 
         Returns
         -------
@@ -306,13 +317,23 @@ class IsotropicWave(ElasticWave):
         Raises
         ------
         NotImplementedError
-            If a hand-implemented adjoint or unsupported Riesz map is requested.
+            If the hand-derived adjoint, an unsupported Riesz map, a PML or a
+            time-stepping scheme with a longer memory than the central
+            difference is requested.
         ValueError
             If no valid annotated functional is available.
         """
+        if adjoint_type.is_ufl_derived:
+            return self._ufl_derived_gradient(
+                misfit=misfit,
+                forward_solution=forward_solution,
+                riesz_map=riesz_map,
+                control_parameters=control_parameters,
+            )
         if adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
             raise NotImplementedError(
-                "Elastic gradients only support the automated adjoint.",
+                "Elastic gradients support the automated adjoint and the "
+                "UFL-derived implemented adjoint.",
             )
         if not isinstance(self.functional_value, AdjFloat):
             raise ValueError(
@@ -340,6 +361,59 @@ class IsotropicWave(ElasticWave):
                 f"Riesz map {riesz_map} not implemented for automated adjoint.",
             )
         return self.automated_adjoint.label_derivatives(derivatives)
+
+    def _ufl_derived_gradient(
+        self, misfit=None, forward_solution=None,
+        riesz_map=RieszMapType.L2, control_parameters=None,
+    ) -> PhysicalParameters:
+        """Compute the gradients with the UFL-derived implemented adjoint.
+
+        Parameters
+        ----------
+        misfit : array_like, optional
+            Difference between observed and simulated receiver data.
+        forward_solution : list, optional
+            Stored forward wavefield.
+        riesz_map : RieszMapType, optional
+            Only ``L2`` is supported.
+        control_parameters : enum.Enum or iterable of enum.Enum, optional
+            Physical parameters to differentiate with respect to.
+
+        Returns
+        -------
+        PhysicalParameters
+            Gradients keyed by the selected elastic parameter enums.
+
+        Raises
+        ------
+        NotImplementedError
+            If a Riesz map other than ``L2``, a PML or the ``backward_2nd``
+            absorbing-boundary time scheme is in use: the residual the
+            adjoint is derived from is written in three time levels.
+        """
+        if riesz_map is not RieszMapType.L2:
+            raise NotImplementedError(
+                f"Riesz map {riesz_map} not implemented for elastic gradients.",
+            )
+        if self.abc_type == AbsorbingBCsType.PML:
+            raise NotImplementedError(
+                "Elastic implemented adjoint does not support PML yet.",
+            )
+        self._prepare_implemented_adjoint(
+            misfit=misfit, forward_solution=forward_solution,
+            adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+        )
+        if self.u_nm2 is not None:
+            raise NotImplementedError(
+                "The UFL-derived adjoint differentiates a three-level "
+                "residual, which the backward_2nd absorbing-boundary time "
+                "scheme is not.",
+            )
+        return backward_wave_propagator(
+            self,
+            adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+            controls=self.physical_parameters.select(control_parameters),
+        )
 
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
         raise NotImplementedError
@@ -375,8 +449,38 @@ class IsotropicWave(ElasticWave):
             data_with_halos = self.u_n.dat.data_ro_with_halos[:]
         return self.receivers.interpolate(data_with_halos)
 
-    def get_function(self):
-        return self.u_n
+    def get_function(self, state=None):
+        """Return the displacement field.
+
+        Parameters
+        ----------
+        state : firedrake.Function, optional
+            Time-stepping state to read the displacement from. ``None``
+            reads the current displacement, ``u_n``.
+
+        Returns
+        -------
+        firedrake.Function
+            The displacement, which is the whole state of this solver.
+        """
+        if state is None:
+            return self.u_n
+        return state
+
+    def reset_adjoint_state(self):
+        """Zero every displacement register before an adjoint solve.
+
+        The ``backward_2nd`` absorbing-boundary time scheme keeps a fourth
+        register, ``u_nm2``, which is zeroed along with the three the base
+        class handles.
+
+        Returns
+        -------
+        None
+        """
+        super().reset_adjoint_state()
+        if self.u_nm2 is not None:
+            self.u_nm2.assign(0.0)
 
     def get_function_name(self):
         return "Displacement"

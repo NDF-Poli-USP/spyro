@@ -3,8 +3,17 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 import firedrake as fire
 import spyro
-from spyro.utils.typing import AdjointType, AbsorbingBCsType
+from spyro.utils.typing import (AcousticMaterialParameter, AdjointType,
+                                AbsorbingBCsType)
 import pytest
+
+
+VELOCITY = AcousticMaterialParameter.P_WAVE_VELOCITY
+
+IMPLEMENTED_ADJOINTS = [
+    AdjointType.IMPLEMENTED_ADJOINT,
+    AdjointType.UFL_DERIVED_ADJOINT,
+]
 
 
 def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
@@ -28,11 +37,16 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
         indicator.interpolate(fire.conditional(inside, 1.0, 0.0))
         dm.dat.data_wo[:] *= indicator.dat.data_ro[:]
 
+    # The perturbed model is written into the velocity field the forward
+    # solve reads, which with a PML is bound to the variational form once
+    # and not replaced by later forward solves.
+    velocity = Wave_obj_guess.physical_parameters[VELOCITY]
     for step in steps:
 
         Wave_obj_guess.reset_pressure()
         c_guess = fire.Constant(2.0) + step*dm
-        Wave_obj_guess.initial_velocity_model = c_guess
+        Wave_obj_guess.physical_parameters.update(VELOCITY, c_guess)
+        assert Wave_obj_guess.physical_parameters[VELOCITY] is velocity
         Wave_obj_guess.forward_solve()
         misfit_plusdm = rec_out_exact - Wave_obj_guess.forward_solution_receivers
         J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
@@ -186,6 +200,9 @@ def get_forward_model(dictionary: dict = None,
         assert isinstance(Wave_obj_guess.c, fire.Function)
         # The schedule is built per forward solve, so none exists yet.
         assert Wave_obj_guess.automated_adjoint.checkpointing_schedule is None
+    elif adjoint_type.is_implemented:
+        # Store the forward solution the backward solve reads.
+        Wave_obj_guess.enable_implemented_adjoint(adjoint_type=adjoint_type)
     Wave_obj_guess.forward_solve()
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         assert Wave_obj_guess.automated_adjoint._tape is not None
@@ -257,13 +274,16 @@ def test_gradient_auto_adjoint(checkpointing: bool, snapshots: int | None,
 
 
 @pytest.mark.slow
-def test_gradient_implemented_adjoint(PML=False):
+@pytest.mark.parametrize("adjoint_type", IMPLEMENTED_ADJOINTS)
+def test_gradient_implemented_adjoint(adjoint_type, PML=False):
     dictionary = set_dictionary(PML=PML)
     rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(
-        dictionary=dictionary, adjoint_type=AdjointType.IMPLEMENTED_ADJOINT)
+        dictionary=dictionary, adjoint_type=adjoint_type)
 
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
+    nt = int(Wave_obj_guess.final_time / Wave_obj_guess.dt) + 1
+    assert len(forward_solution) == nt
 
     misfit = rec_out_exact - rec_out_guess
 
@@ -272,8 +292,22 @@ def test_gradient_implemented_adjoint(PML=False):
     # compute the gradient of the control (to be verified)
     dJ = Wave_obj_guess.gradient_solve(
         misfit=misfit, forward_solution=forward_solution_guess,
-        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+        adjoint_type=adjoint_type,
     )
+
+    if adjoint_type is AdjointType.UFL_DERIVED_ADJOINT:
+        assert Wave_obj_guess.forward_residual_form is not None
+        if PML:
+            residual_np1, _, _ = Wave_obj_guess.forward_residual_states
+            assert residual_np1.function_space() == (
+                Wave_obj_guess.mixed_function_space
+            )
+            # The stored forward state carries the PML auxiliary fields the
+            # residual is written in.
+            assert forward_solution[0].function_space() == (
+                Wave_obj_guess.mixed_function_space
+            )
+
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
 
 
@@ -298,8 +332,15 @@ def test_gradient_pml_auto_adjoint(checkpointing: bool,
 @pytest.mark.slow
 @pytest.mark.skip(reason="PML formulation subject to another PR")
 def test_gradient_pml_implemented_adjoint():
-    test_gradient_implemented_adjoint(PML=True)
+    test_gradient_implemented_adjoint(AdjointType.IMPLEMENTED_ADJOINT, PML=True)
+
+
+@pytest.mark.slow
+def test_gradient_pml_ufl_derived_adjoint():
+    """The UFL-derived adjoint differentiates the reformulated PML residual
+    itself, so it has a PML gradient where the hand-derived one has none."""
+    test_gradient_implemented_adjoint(AdjointType.UFL_DERIVED_ADJOINT, PML=True)
 
 
 if __name__ == "__main__":
-    test_gradient_pml_implemented_adjoint()
+    test_gradient_pml_ufl_derived_adjoint()
