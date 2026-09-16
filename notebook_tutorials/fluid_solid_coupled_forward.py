@@ -8,6 +8,40 @@ import firedrake as fire
 from spyro.solvers.acoustic_elastic_wave import AcousticElasticWave
 from spyro.plots.receiver_plots import plot_receiver_response, plot_displacement_components
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+import matplotlib.pyplot as plt
+
+def plot_interface_displacement_continuity(Wave_obj, receiver_index=0, filename="results/interface_displacement_check.png"):
+    """Compara o deslocamento normal calculado do lado fluido (via integração
+    da aceleração a partir de grad(p)) com o deslocamento u_x medido do lado
+    sólido, no mesmo receiver de interface.
+    """
+    uf_x = [step[receiver_index] for step in Wave_obj.fluid_displacement_history]
+
+    solid_data = np.array(Wave_obj.solid_receiver_history)  # shape: (nsteps, nreceivers, dim)
+    ux_solid = solid_data[:, receiver_index, 1]  # índice 1 = componente x (convenção z,x)
+
+    dt = Wave_obj.dt
+    t = np.arange(len(uf_x)) * dt
+
+    n = min(len(uf_x), len(ux_solid))
+    uf_x, ux_solid, t = uf_x[:n], ux_solid[:n], t[:n]
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(t, uf_x, 'b-', lw=1.5, label='u_x no lado fluido (calculado)')
+    ax.plot(t, ux_solid, 'r--', lw=1.2, label='u_x no lado sólido (medido)')
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Displacement x (normal)")
+    ax.set_title("Interface normal displacement continuity")
+    ax.legend()
+    ax.grid(True, ls=':')
+    plt.tight_layout()
+    plt.savefig(filename, dpi=200)
+    print(f"Salvo em {filename}")
+
 dictionary = {}
 
 dictionary["options"] = {
@@ -27,7 +61,7 @@ dictionary["mesh"] = {
     "length_y": 0.0,
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
-    "edge_length": 0.1, # 0.005, 0.0035, 0.0025
+    "edge_length": 0.005, # 0.005, 0.0035, 0.0025
     "interface_x": 0.5,
     "absorb_left": False,
     "absorb_right": False,
@@ -88,6 +122,7 @@ Wave_obj = AcousticElasticWave(dictionary=dictionary)
 Wave_obj.use_monolithic = False
 t_start = time.perf_counter()
 Wave_obj.forward_solve()
+plot_interface_displacement_continuity(Wave_obj, receiver_index=0)
 
 t_end = time.perf_counter()
 elapsed = t_end - t_start
@@ -122,3 +157,4 @@ plot_receiver_response(
 #     source_type="Ricker",
 #     filename="results/receiver_solid.png",
 # )
+
