@@ -8,7 +8,7 @@ from firedrake import ds, dx, dot, grad, sqrt
 from ..utils.typing import AbsorbingBCsType
 from ..utils.error_management import (
     mutually_exclusive_parameter_error,
-    required_together_parameter_error
+    required_together_parameter_error,
 )
 
 
@@ -41,13 +41,9 @@ def velocity_fluid(c=None, K=None, rho_fluid=None, default=None):
     """
     combined_k_and_rho_fluid = K if K is not None else rho_fluid
     mutually_exclusive_parameter_error(
-        ["velocity_fluid", "bulk_modulus/density_fluid"],
-        [c, combined_k_and_rho_fluid]
+        ["velocity_fluid", "bulk_modulus/density_fluid"], [c, combined_k_and_rho_fluid]
     )
-    required_together_parameter_error(
-        ["bulk_modulus", "rho_fluid"],
-        [K, rho_fluid]
-    )
+    required_together_parameter_error(["bulk_modulus", "rho_fluid"], [K, rho_fluid])
 
     if c is None:
         c = sqrt(K / rho_fluid) if K is not None else default
