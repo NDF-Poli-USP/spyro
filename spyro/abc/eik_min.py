@@ -1,9 +1,9 @@
 from firedrake import VTKFile
 from numpy import asarray, float64
 from numpy.linalg import norm
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..solvers.eikonal.eikonal_eq import Eikonal_Modeling
 from ..tools.habc_tools import point_cloud_field
-from ..io.basicio import parallel_print as pprint
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -137,7 +137,7 @@ class Minimum_Eikonal(Eikonal_Modeling):
         None
         """
 
-        pprint("\nDefining Eikonal BCs", comm=self.comm)
+        SpyroEnsemble.print("\nDefining Eikonal BCs")
 
         # Define Eikonal BCs and source marker
         self.bcs_eik, sou_marker = self.eikonal_bcs(self.node_positions,
@@ -228,7 +228,7 @@ class Minimum_Eikonal(Eikonal_Modeling):
             self.mesh, self.funct_space_eik, self.boundaries,
             box_domain=True, get_boundary_node_ids=True)[1]
 
-        pprint("\nIdentifying Critical Points on Boundaries", comm=self.comm)
+        SpyroEnsemble.print("\nIdentifying Critical Points on Boundaries")
 
         # Loop over boundaries
         eik_bnd = []
@@ -247,7 +247,7 @@ class Minimum_Eikonal(Eikonal_Modeling):
             pnt_str = "at (in km): ({2:3.3f}, {3:3.3f})"
             if self.dimension == 3:  # 3D
                 pnt_str = pnt_str[:-1] + ", {4:3.3f})"
-            pprint((eik_str + pnt_str).format(bnd_str, 1e3 * eikmin, *pnt_crit), comm=self.comm)
+            SpyroEnsemble.print((eik_str + pnt_str).format(bnd_str, 1e3 * eikmin, *pnt_crit))
 
             # Identify closest source
             lref_allsou = norm(asarray(pnt_crit) - asarray(self.source_locations), axis=1)
