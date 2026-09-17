@@ -1,6 +1,4 @@
-import firedrake as fire
 import numpy as np
-import pytest
 
 from spyro.solvers.elastic_wave.anisotropic_VTI_wave import AnisotropicVTIWave
 from spyro.solvers.elastic_wave.anisotropic_TTI_wave import AnisotropicTTIWave
@@ -49,7 +47,7 @@ base_dict = {
         "p_wave_velocity": 1.5,
         "s_wave_velocity": 1.0,
         "real_velocity_file": None,
-        'epsilon': 0.2, 
+        'epsilon': 0.2,
         'gamma': 0.1,
         'delta': 0.15,
         'anisotropy': 'exact'
@@ -59,8 +57,13 @@ base_dict = {
 
 def test_VTI():
     wave = AnisotropicVTIWave(base_dict)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.2, "periodic": True})
+    wave.forward_solve()
+
 
 def test_TTI():
-    base_dict["synthetic_data"]['theta'] = 30.0,
-    base_dict["synthetic_data"]['phi'] = 0.0,
+    base_dict["synthetic_data"]['theta'] = 30.0
+    base_dict["synthetic_data"]['phi'] = 0.0
     wave = AnisotropicTTIWave(base_dict)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.2, "periodic": True})
+    wave.forward_solve()
