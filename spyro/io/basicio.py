@@ -14,6 +14,8 @@ import numpy as np
 from scipy.interpolate import griddata
 import os
 import warnings
+
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .parallelism_wrappers import ensemble_save, ensemble_load
 from ..tools.version_control import is_firedrake_new
 from .segy_io import read_segy_velocity_model
@@ -182,37 +184,33 @@ def read_mesh(mesh_parameters):
         The distributed mesh across ensemble communicator.
     """
     method = mesh_parameters.method
-    ens_comm = mesh_parameters.comm
-    num_propagations = ens_comm.ensemble_comm.size
-
     mshname = mesh_parameters.mesh_file
 
     if method == "CG_triangle" or method == "mass_lumped_triangle":
         mesh = fire.Mesh(
             mshname,
-            comm=ens_comm.comm,
+            comm=SpyroEnsemble.ensemble.comm,
             distribution_parameters={
                 "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
             },
         )
     else:
-        mesh = fire.Mesh(mshname, comm=ens_comm.comm)
-    if ens_comm.comm.rank == 0 and ens_comm.ensemble_comm.rank == 0:
-        print(
-            "INFO: Distributing %d propagation(s) across %d core(s). \
-                Each shot is using %d cores"
+        mesh = fire.Mesh(mshname, comm=SpyroEnsemble.ensemble.comm)
+
+    SpyroEnsemble.print(
+        "INFO: Distributing %d propagation(s) across %d core(s). \
+            Each shot is using %d cores"
             % (
-                num_propagations,
+                SpyroEnsemble.ensemble.ensemble_comm.size,
                 fire.COMM_WORLD.size,
-                fire.COMM_WORLD.size / ens_comm.ensemble_comm.size,
-            ),
-            flush=True,
-        )
+                fire.COMM_WORLD.size // SpyroEnsemble.ensemble.ensemble_comm.size,
+            ),)
+
     print(
         "  rank %d on ensemble %d owns %d elements and can access %d vertices"
         % (
-            mesh.comm.rank,
-            ens_comm.ensemble_comm.rank,
+            SpyroEnsemble.get_local_rank(),
+            SpyroEnsemble.get_ensemble_rank(),
             mesh.num_cells(),
             mesh.num_vertices(),
         ),

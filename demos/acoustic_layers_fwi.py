@@ -64,8 +64,7 @@ def run_forward_real_model(input_dictionary, shot_filename="shots/shot_record_",
         export_grid_spacing = 0.01
         spyro.io.export_scalar_field(
             fwi_obj.wave.initial_velocity_model,
-            export_grid_spacing, segy_filename,
-            comm=fwi_obj.wave.comm,
+            export_grid_spacing, segy_filename
         )
 
     return fwi_obj
@@ -187,7 +186,6 @@ def setting_up_fwi():
         save_fig=True,
         vp_limit=0.0,
         i_limit=25,
-        comm=wave_obj.comm,
     )
 
 
@@ -259,7 +257,7 @@ def run_fwi():
 
     # Let us have a look at our solution
     export_grid_spacing = 0.01
-    spyro.io.export_scalar_field(fwi_obj.wave.c, export_grid_spacing, "layers.png", comm=fwi_obj.wave.comm)
+    spyro.io.export_scalar_field(fwi_obj.wave.c, export_grid_spacing, "layers.png")
 
     print("END", flush=True)
 

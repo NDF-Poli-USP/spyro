@@ -7,6 +7,8 @@ import resource
 import glob
 import os
 
+from spyro.mpi.spyro_mpi import SpyroEnsemble
+
 from .wave import Wave
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
@@ -18,7 +20,6 @@ from ..io.basicio import parallel_print
 from ..io.basicio import load_shots, save_shots
 from ..io.parallelism_wrappers import switch_serial_shot
 from ..io import create_segy
-from ..io.parallelism_wrappers import run_in_one_core
 
 
 try:
@@ -1220,9 +1221,8 @@ class FullWaveformInversion:
         self.functional_history.append(Jm)
         self.functional = Jm
         peak_memory_mb = get_peak_memory()
-        parallel_print(
+        SpyroEnsemble.print(
             f"Functional: {Jm} at iteration: {self.current_iteration}",
-            self.comm,
         )
         if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
             with open("functional_values.txt", "a") as file:
@@ -1579,7 +1579,7 @@ class FullWaveformInversion:
         self.wave.real_shot_record = self.real_shot_record
         self.wave.forward_solution_receivers = None
 
-    @run_in_one_core
+    @SpyroEnsemble.run_in_one_core
     def save_result_as_segy(self, file_name="final_vp.segy", grid_spacing=0.01):
         """
         Save the final scalar control result as a SEG-Y file.

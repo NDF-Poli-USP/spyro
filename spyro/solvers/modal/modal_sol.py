@@ -1,7 +1,7 @@
 from firedrake import LinearEigenproblem, LinearEigensolver
 from numpy import abs, amax, array, asarray, eye, imag, real, sqrt, unique
 from scipy.sparse.linalg import eigs, eigsh, lobpcg, spilu
-from ...io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .modal_forms_and_matrices import assemble_sparse_matrices, weak_forms
 from .modal_rq_matrices import generate_eigenfunctions, matrices_rayleigh_quotient
 from ...utils.error_management import (validate_data_structure, validate_firedrake_parameter,
@@ -119,7 +119,7 @@ class Modal_Solver():
             from .modal_ana_sol import Modal_Analytical_Solver
             self.AnaModSol = Modal_Analytical_Solver(dimension=self.dimension, comm=comm)
 
-        pprint(f"Solver Method: {self.method}", comm=self.comm)
+        SpyroEnsemble.print(f"Solver Method: {self.method}")
 
     def solver_with_sparse_matrix(self, Asp, Msp, method, k=2, inv_oper=False):
         """Solve the eigenvalue problem with sparse matrices using Scipy.
@@ -482,7 +482,7 @@ class Modal_Solver():
 
         # Maximum eigenvalue
         if self.method == "ANALYTICAL":
-            pprint("Estimating Maximum Eigenvalue", comm=self.comm)
+            SpyroEnsemble.print("Estimating Maximum Eigenvalue")
 
             a, m = self.assemble_weak_forms(c, V, quad_rule=quad_rule, shift=shift)
             Asp, Msp_inv = assemble_sparse_matrices(a, m, return_M_inv=True)
@@ -490,7 +490,7 @@ class Modal_Solver():
             max_eigval = amax(abs(Lsp.diagonal())) - shift
 
         else:
-            pprint("Computing Exact Maximum Eigenvalue", comm=self.comm)
+            SpyroEnsemble.print("Computing Exact Maximum Eigenvalue")
 
             # (eig = 0 is a rigid body motion)
             Lsp = self.solve_eigenproblem(
@@ -499,8 +499,8 @@ class Modal_Solver():
 
         # Maximum stable timestep
         max_dt = float(real(2. / sqrt(max_eigval)))
-        pprint("Maximum Stable Timestep Should Be Approximately "
-               f"(ms): {1e3 * max_dt:.3f}", comm=self.comm)
+        SpyroEnsemble.print("Maximum Stable Timestep Should Be Approximately "
+               f"(ms): {1e3 * max_dt:.3f}")
 
         max_dt *= fraction
         nt = int(final_time / max_dt) + 1

@@ -192,3 +192,5 @@ PacMeshIgnore/
 /profilers
 # Allow specific test SEG-Y files
 !tests/inputfiles/velocity_models/*.segy
+
+.vscode

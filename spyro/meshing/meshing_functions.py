@@ -1,6 +1,6 @@
 import numpy as np
 from firedrake import Mesh as FireMeshReader
-from ..io.basicio import parallel_print
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..io.segy_io import create_segy_from_grid
 from .meshing_gmsh2d import build_gmsh_geometry_and_groups, apply_structured_winslow_smoothing2d
 from .meshing_utils import create_sizing_function, calculate_edge_length
@@ -160,9 +160,9 @@ class AutomaticMesh:
         """
         self.mesh_parameters.check_completeness()
         if self.mesh_parameters.is_complete is False:
-            parallel_print("Skipping mesh generation, since we don't have all the parameters", comm=self.comm)
+            SpyroEnsemble.print("Skipping mesh generation, since we don't have all the parameters")
             return None
-        parallel_print(f"Creating {self.mesh_type} type mesh.", comm=self.comm)
+        SpyroEnsemble.print(f"Creating {self.mesh_type} type mesh.")
         if self.mesh_type == "firedrake_mesh":
             return self.create_firedrake_mesh()
         elif self.mesh_type == "SeismicMesh":
@@ -178,7 +178,7 @@ class AutomaticMesh:
                 if hasattr(self.comm, 'ensemble_comm'):
                     self.comm.ensemble_comm.barrier()
                 self.comm.comm.barrier()
-                parallel_print("Loading mesh.", comm=self.comm)
+                SpyroEnsemble.print("Loading mesh.")
                 return FireMeshReader(self.output_file_name, comm=self.comm.comm)
             else:
                 return FireMeshReader(self.output_file_name)
@@ -206,7 +206,7 @@ class AutomaticMesh:
         if self.dimension == 3:  # 3D
             min_y = mesh.coordinates.dat.data_with_halos[:, 2].min()
             if abs(min_y / pad) != 1.:  # Forcing node at (0,0,0)
-                parallel_print("Adjusting Mesh Y-coordinates", comm=self.comm)
+                SpyroEnsemble.print("Adjusting Mesh Y-coordinates")
                 err_y = (1. - abs(min_y / pad)) * pad
                 err_y *= -np.sign(err_y)
                 mesh.coordinates.dat.data_with_halos[:, 2] += err_y
@@ -214,7 +214,7 @@ class AutomaticMesh:
         # Adjusting coordinates
         min_x = mesh.coordinates.dat.data_with_halos[:, 1].min()
         if abs(min_x / pad) != 1.:  # Forcing node at (0,0)
-            parallel_print("Adjusting Mesh X-coordinates", comm=self.comm)
+            SpyroEnsemble.print("Adjusting Mesh X-coordinates")
             err_x = (1. - abs(min_x / pad)) * pad
             err_x *= -np.sign(err_x)
             mesh.coordinates.dat.data_with_halos[:, 1] += err_x
@@ -247,8 +247,8 @@ class AutomaticMesh:
             self.ensure_common_origin(mesh, pad=self.abc_pad)
 
         # Mesh data
-        parallel_print(f"Mesh Created with {mesh.num_vertices()} Nodes and "
-                       + f"{mesh.num_cells()} " + typ_ele_str, comm=self.comm)
+        SpyroEnsemble.print(f"Mesh Created with {mesh.num_vertices()} Nodes and "
+                       + f"{mesh.num_cells()} " + typ_ele_str)
 
         return mesh
 
@@ -487,7 +487,7 @@ class AutomaticMesh:
             )
 
         if self.comm is None or self.comm.ensemble_comm.rank == 0:
-            parallel_print("Generating Gmsh mesh...", comm=self.comm)
+            SpyroEnsemble.print("Generating Gmsh mesh...")
 
             depth_z = -abs(self.length_z)
             length_x = self.length_x
@@ -596,7 +596,7 @@ class AutomaticMesh:
 
             if structured_mesh:
                 apply_structured_winslow_smoothing2d(
-                    gmsh=gmsh, comm=self.comm, geom_params=geom_params,
+                    gmsh=gmsh, geom_params=geom_params,
                     length_x=length_x, depth_z=depth_z, padding_type=padding_type,
                     water_interface=water_interface, hyper_n=hyper_n,
                     winslow_implementation=winslow_implementation,
@@ -604,7 +604,7 @@ class AutomaticMesh:
                     n_samples=n_samples, n_traces=n_traces,
                     domain_xmin=domain_xmin, domain_xmax=domain_xmax,
                     domain_zmin=domain_zmin, domain_zmax=domain_zmax,
-                    ef_segy2=ef_segy2, parallel_print=parallel_print,
+                    ef_segy2=ef_segy2,
                     z_water_L=z_water_L, z_water_R=z_water_R, pad_x_min=pad_x_min,
                     pad_x_max=pad_x_max, pad_z_min=pad_z_min, a_val=a_val,
                     b_val=b_val, xc=xc, zc=zc, apply_winslow=apply_winslow
@@ -627,7 +627,7 @@ class AutomaticMesh:
 
             gmsh.model.mesh.affineTransform(rotate_xz)
             gmsh.write(output_file)
-            parallel_print(f"Gmsh mesh written to {output_file}", comm=self.comm)
+            SpyroEnsemble.print(f"Gmsh mesh written to {output_file}")
             gmsh.finalize()
 
         # MPI Sync
@@ -635,7 +635,7 @@ class AutomaticMesh:
             if hasattr(self.comm, 'ensemble_comm'):
                 self.comm.ensemble_comm.barrier()
             self.comm.comm.barrier()
-            parallel_print("Loading mesh into Firedrake.", comm=self.comm)
+            SpyroEnsemble.print("Loading mesh into Firedrake.")
             return FireMeshReader(self.output_file_name, comm=self.comm.comm)
         else:
             return FireMeshReader(self.output_file_name)

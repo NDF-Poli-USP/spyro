@@ -4,7 +4,8 @@ import numpy as np
 from pathlib import Path
 import segyio
 from io import BytesIO
-from .parallelism_wrappers import run_in_one_core_kwarg_comm
+
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 import matplotlib.pyplot as plt
 
 
@@ -244,8 +245,8 @@ def create_grid_dictionary_from_segy(filename: str, length_z: float, length_x: f
     return grid_velocity_data
 
 
-@run_in_one_core_kwarg_comm
-def export_scalar_field(function, grid_spacing, output_filename, comm=None, show=False):
+@SpyroEnsemble.run_in_one_core
+def export_scalar_field(function, grid_spacing, output_filename, show=False):
     """Export a scalar field to SEG-Y or PNG.
 
     Parameters

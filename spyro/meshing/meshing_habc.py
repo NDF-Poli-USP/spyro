@@ -3,8 +3,8 @@ import numpy as np
 from netgen.geom2d import SplineGeometry
 from netgen.meshing import Element2D, Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..domains.space import create_function_space
-from ..io.basicio import parallel_print as pprint
 from .meshing_functions import AutomaticMesh
 from .meshing_operations import MeshOps
 from ..tools.habc_tools import point_cloud_field
@@ -138,7 +138,7 @@ class HABCMesh(MeshOps):
             Mesh node coordinates on boundaries of the original domain.
         """
 
-        pprint("Getting Boundary Mesh Data from Original Domain", comm=self.comm)
+        SpyroEnsemble.print("Getting Boundary Mesh Data from Original Domain")
 
         # Extract node positions
         node_positions = self.extract_node_positions(mesh, function_space,
@@ -169,7 +169,7 @@ class HABCMesh(MeshOps):
 
         # Print on screen
         cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"
-        pprint(cbnd_str.format(c_bnd_min, c_bnd_max), comm=self.comm)
+        SpyroEnsemble.print(cbnd_str.format(c_bnd_min, c_bnd_max))
 
         return c_bnd_min, c_bnd_max, coord_bnd_nodes
 
@@ -206,7 +206,7 @@ class HABCMesh(MeshOps):
 
         # Print on screen
         cdom_str = "Domain Velocity Range (km/s): {:.3f} - {:.3f}"
-        pprint(cdom_str.format(c_min, c_max), comm=self.comm)
+        SpyroEnsemble.print(cdom_str.format(c_min, c_max))
 
         # Save initial velocity model
         vel_c = fire.VTKFile(path_save + "preamble/c_vel.pvd")
@@ -233,7 +233,7 @@ class HABCMesh(MeshOps):
             Function space for the Eikonal modeling.
         """
 
-        pprint("Setting Mesh Properties for Eikonal Analysis", comm=self.comm)
+        SpyroEnsemble.print("Setting Mesh Properties for Eikonal Analysis")
 
         allowed_ele_types = ["consistent", "underintegrated"]
         validate_parameter('ele_type_eik', ele_type_eik, allowed_ele_types)
@@ -295,11 +295,11 @@ class HABCMesh(MeshOps):
             Function space for the Eikonal modeling.
         """
 
-        pprint("\nCreating Mesh and Initial Velocity Model", comm=self.comm)
+        SpyroEnsemble.print("\nCreating Mesh and Initial Velocity Model")
 
         # Mesh data
-        pprint(f"Original Mesh with {wave.mesh.num_vertices()} Nodes and "
-               f"{wave.mesh.num_cells()} Volume Elements", comm=self.comm)
+        SpyroEnsemble.print(f"Original Mesh with {wave.mesh.num_vertices()} Nodes and "
+               f"{wave.mesh.num_cells()} Volume Elements")
 
         # Save a copy of the original mesh
         wave.mesh_original = wave.mesh
@@ -424,14 +424,13 @@ class HABCMesh(MeshOps):
                 or pnt_bef_trunc < 3 or pnt_aft_trunc < 3:
 
             num_bnd_pts += 1
-            pprint(f"{pnt_str} Complete Hyperellipse: {num_bnd_pts}", comm=self.comm)
+            SpyroEnsemble.print(f"{pnt_str} Complete Hyperellipse: {num_bnd_pts}")
             bnd_pts = self.bnd_pnts_hyp_2D(a_hyp, b_hyp, n_hyp, num_bnd_pts)
 
             # Filter hyperellipse points based on the truncation plane z0
             filt_bnd_pts = np.array([point for point in bnd_pts
                                      if point[1] <= z0])
-            pprint(f"{pnt_str} Truncated Hyperellipse: {len(filt_bnd_pts)}",
-                   comm=self.comm)
+            SpyroEnsemble.print(f"{pnt_str} Truncated Hyperellipse: {len(filt_bnd_pts)}")
 
             # Identify truncation index
             ini_trunc = max(np.where(bnd_pts[:, 1] > z0)[0][0] - 1, 0)
@@ -591,19 +590,19 @@ class HABCMesh(MeshOps):
                                             optsteps2d=10,  # Optimize mesh
                                             )
                 hyp_mesh.Compress()
-                pprint("Hyperelliptical Mesh Generated Successfully", comm=self.comm)
+                SpyroEnsemble.print("Hyperelliptical Mesh Generated Successfully")
                 break
 
             except Exception as e:
 
                 # Retry with lines if splines fail
                 if spln:
-                    pprint(f"Error Meshing with Splines: {e}", comm=self.comm)
-                    pprint("Now meshing with Lines", comm=self.comm)
+                    SpyroEnsemble.print(f"Error Meshing with Splines: {e}")
+                    SpyroEnsemble.print("Now meshing with Lines")
                     spln = False
 
                 else:
-                    pprint(f"Error Meshing with Lines: {e}. Exiting.", comm=self.comm)
+                    SpyroEnsemble.print(f"Error Meshing with Lines: {e}. Exiting.")
                     break
 
         # Mesh is transformed into a firedrake mesh
@@ -717,17 +716,17 @@ class HABCMesh(MeshOps):
         try:
             # Mesh data
             final_mesh.Compress()
-            pprint(f"Mesh created with {len(final_mesh.Points())} points "
-                   f"and {len(final_mesh.Elements2D())} elements", comm=self.comm)
+            SpyroEnsemble.print(f"Mesh created with {len(final_mesh.Points())} points "
+                   f"and {len(final_mesh.Elements2D())} elements")
 
             # Mesh is transformed into a firedrake mesh
             q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
             final_mesh = fire.Mesh(
                 final_mesh, distribution_parameters=q, comm=self.comm.comm)
-            pprint("Merged Mesh Generated Successfully", comm=self.comm)
+            SpyroEnsemble.print("Merged Mesh Generated Successfully")
 
         except Exception as e:
-            pprint(f"Error Generating Merged Mesh: {e}. Exiting.", comm=self.comm)
+            SpyroEnsemble.print(f"Error Generating Merged Mesh: {e}. Exiting.")
 
         return final_mesh
 
@@ -826,18 +825,18 @@ class HABCMesh(MeshOps):
         try:
             # Mesh data
             sharp_mesh.Compress()
-            pprint(f"Mesh created with {len(sharp_mesh.Points())} points "
-                   f"and {len(sharp_mesh.Elements3D())} elements", comm=self.comm)
+            SpyroEnsemble.print(f"Mesh created with {len(sharp_mesh.Points())} points "
+                   f"and {len(sharp_mesh.Elements3D())} elements")
 
             # Mesh is transformed into a firedrake mesh
             q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
             sharp_mesh = fire.Mesh(
                 sharp_mesh, distribution_parameters=q, comm=self.comm.comm)
-            pprint("Sharp Mesh Generated Successfully", comm=self.comm)
+            SpyroEnsemble.print("Sharp Mesh Generated Successfully")
             # fire.VTKFile("output/sharp_mesh.pvd").write(sharp_mesh)
 
         except Exception as e:
-            pprint(f"Error Generating Merged Mesh: {e}. Exiting.", comm=self.comm)
+            SpyroEnsemble.print(f"Error Generating Merged Mesh: {e}. Exiting.")
 
         return sharp_mesh
 
@@ -920,10 +919,10 @@ class HABCMesh(MeshOps):
         coords = mesh.coordinates.dat.data_with_halos
         min_z, min_x, min_y = np.min(coords, axis=0)
         max_z, max_x, max_y = np.max(coords, axis=0)
-        pprint("Mesh Bounds Detected:", comm=self.comm)
-        pprint(f"       X: [{min_x:.4f}, {max_x:.4f}]", comm=self.comm)
-        pprint(f"       Y: [{min_y:.4f}, {max_y:.4f}]", comm=self.comm)
-        pprint(f"       Z: [{min_z:.4f}, {max_z:.4f}]", comm=self.comm)
+        SpyroEnsemble.print("Mesh Bounds Detected:")
+        SpyroEnsemble.print(f"       X: [{min_x:.4f}, {max_x:.4f}]")
+        SpyroEnsemble.print(f"       Y: [{min_y:.4f}, {max_y:.4f}]")
+        SpyroEnsemble.print(f"       Z: [{min_z:.4f}, {max_z:.4f}]")
 
         # Select nodes to snap
         mask_min_z = np.isclose(coords[:, 0], min_z, atol=plane_tol)
@@ -942,8 +941,8 @@ class HABCMesh(MeshOps):
                 coords[pnt, :], centroid, b_hyp, a_hyp, c_hyp, n_hyp)
             coords[pnt, 0] = np.clip(coords[pnt, 0], -np.inf, max_z)
 
-        pprint(f"Boundary Nodes Snapped: {len(pnts_to_snap)}", comm=self.comm)
-        pprint("Snapped Mesh Generated Successfully", comm=self.comm)
+        SpyroEnsemble.print(f"Boundary Nodes Snapped: {len(pnts_to_snap)}")
+        SpyroEnsemble.print("Snapped Mesh Generated Successfully")
 
         return mesh
 
