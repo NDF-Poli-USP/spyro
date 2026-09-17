@@ -1,0 +1,22 @@
+name: Setup Spyro
+
+runs:
+  using: composite
+  steps:
+    - name: Install dependencies
+      shell: bash
+      run: |
+        apt-get update
+        apt-get install -y git python3 gmsh patchelf \
+          libgmp3-dev libmpfr-dev libcgal-dev python3-tk
+        pip install ".[dev]"
+
+    - name: Clear Firedrake caches
+      shell: bash
+      run: |
+        rm -rf ~/.cache/loopy \
+               ~/.loopy_kernel_cache \
+               ~/.cache/pyop2 \
+               ~/.cache/tsfc \
+               .pytest_cache
+        find . -name '*.pkl' -delete || true
