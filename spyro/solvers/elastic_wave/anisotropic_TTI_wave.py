@@ -8,7 +8,8 @@ from .forms import (elastic_without_pml, viscoelastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
 from ...utils.typing import (ElasticMaterialParameter, ElasticMaterialParameterization,
-                             ViscoelasticMaterialParameter, AbsorbingBCsType, override, WaveType)
+                             ViscoelasticMaterialParameter, AnisotropicMaterialParameter, 
+                             AbsorbingBCsType, override, WaveType)
 from ...domains.space import create_function_space
 from .tensor_computation import C_computation, build_Gamma
 
@@ -16,28 +17,22 @@ CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
     ElasticMaterialParameterization.LAME: (
         ElasticMaterialParameter.DENSITY,
         ElasticMaterialParameter.LAMBDA,
-        ElasticMaterialParameter.MU,
-        ElasticMaterialParameter.DELTA,
-        ElasticMaterialParameter.EPSILON,
-        ElasticMaterialParameter.GAMMA,
-        ElasticMaterialParameter.THETA,
-        ElasticMaterialParameter.PHI,
+        ElasticMaterialParameter.MU
     ),
     ElasticMaterialParameterization.VELOCITY: (
         ElasticMaterialParameter.DENSITY,
         ElasticMaterialParameter.P_WAVE_VELOCITY,
-        ElasticMaterialParameter.S_WAVE_VELOCITY,
-        ElasticMaterialParameter.DELTA,
-        ElasticMaterialParameter.EPSILON,
-        ElasticMaterialParameter.GAMMA,
-        ElasticMaterialParameter.THETA,
-        ElasticMaterialParameter.PHI,
+        ElasticMaterialParameter.S_WAVE_VELOCITY
     ),
 }
 
 VISCOELASTIC_PARAMETERS = (ViscoelasticMaterialParameter.Q_VP, ViscoelasticMaterialParameter.Q_VS,
                            ViscoelasticMaterialParameter.Q_GAMMA, ViscoelasticMaterialParameter.Q_DELTA,
                            ViscoelasticMaterialParameter.Q_EPSILON)
+
+ANISOTROPIC_PARAMETERS = (AnisotropicMaterialParameter.DELTA, AnisotropicMaterialParameter.EPSILON,
+                         AnisotropicMaterialParameter.GAMMA, AnisotropicMaterialParameter.THETA,
+                         AnisotropicMaterialParameter.PHI, AnisotropicMaterialParameter.ANISOTROPY_TYPE)
 
 def _format_control_parameters(parameters):
     """Format material-parameter enum values for error messages.
@@ -142,11 +137,11 @@ class AnisotropicTTIWave(IsotropicWave):
         self.mu = declared(ElasticMaterialParameter.MU, "lame_second")
         self.c = declared(ElasticMaterialParameter.P_WAVE_VELOCITY)
         self.c_s = declared(ElasticMaterialParameter.S_WAVE_VELOCITY)
-        self.gamma = declared(ElasticMaterialParameter.GAMMA)
-        self.epsilon = declared(ElasticMaterialParameter.EPSILON)
-        self.delta = declared(ElasticMaterialParameter.DELTA)
-        self.theta = declared(ElasticMaterialParameter.THETA)
-        self.phi = declared(ElasticMaterialParameter.PHI)
+        self.gamma = declared(AnisotropicMaterialParameter.GAMMA)
+        self.epsilon = declared(AnisotropicMaterialParameter.EPSILON)
+        self.delta = declared(AnisotropicMaterialParameter.DELTA)
+        self.theta = declared(AnisotropicMaterialParameter.THETA)
+        self.phi = declared(AnisotropicMaterialParameter.PHI)
         self.Q_lambda = declared(ViscoelasticMaterialParameter.Q_LAMBDA)
         self.Q_mu = declared(ViscoelasticMaterialParameter.Q_MU)
         self.Q_vp = declared(ViscoelasticMaterialParameter.Q_VP)
