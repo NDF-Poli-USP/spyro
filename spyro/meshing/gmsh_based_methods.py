@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
-from ..io.parallelism_wrappers import run_in_one_core
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .meshing_utils import check_gmsh, vp_to_sizing
 
 try:
@@ -9,7 +9,7 @@ except ImportError:
     gmsh = None
 
 
-@run_in_one_core
+@SpyroEnsemble.run_in_one_core
 @check_gmsh
 def build_big_rect_with_inner_element_group(mesh_parameters):
     """
