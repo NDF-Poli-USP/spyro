@@ -310,9 +310,12 @@ class AcousticElasticWave(Wave):
         self._snapshot_step = 0
 
     def solve(self):
-        self.source_function_fluid.assign(self.source_function.sub(0))
-        self.solid_solver.solve()
-        self.fluid_solver.solve()
+        if self.use_monolithic:
+            self._monolithic_solver.solve()
+        else:
+            self.source_function_fluid.assign(self.source_function.sub(0))
+            self.solid_solver.solve()
+            self.fluid_solver.solve()
 
         if self.solid_receivers is not None:
             data = self.X_np1.sub(1).dat.data_ro_with_halos[:]

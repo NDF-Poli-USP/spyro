@@ -46,6 +46,7 @@ def construct_acoustic_elastic_monolithic(Wave_obj):
     Wave_obj.rhs = fire.rhs(F_total)
 
     Wave_obj.source_function = Cofunction(Wave_obj.function_space.dual())
+    Wave_obj.source_function_fluid = Cofunction(Wave_obj.scalar_function_space.dual())
 
     lin_var_prob = LinearVariationalProblem(
         Wave_obj.lhs,
@@ -72,9 +73,10 @@ def construct_acoustic_elastic_monolithic(Wave_obj):
         "fieldsplit_1_pc_type": "jacobi",
     }
 
-    Wave_obj.solver = LinearVariationalSolver(
+    Wave_obj._monolithic_solver = LinearVariationalSolver(
         lin_var_prob, solver_parameters=solver_parameters
     )
+    Wave_obj.solver = Wave_obj
 
     # # ===== Análise temporária =====
     # import numpy as np
