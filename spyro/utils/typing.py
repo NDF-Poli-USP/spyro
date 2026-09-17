@@ -105,6 +105,10 @@ class ElasticMaterialParameter(StrEnum):
     MU = "mu"
     P_WAVE_VELOCITY = "p_wave_velocity"
     S_WAVE_VELOCITY = "s_wave_velocity"
+
+class AnisotropicMaterialParameter(StrEnum):
+    """Supported anisotropic elastic material parameter names."""
+
     DELTA = "delta"
     EPSILON = "epsilon"
     GAMMA = "gamma"
