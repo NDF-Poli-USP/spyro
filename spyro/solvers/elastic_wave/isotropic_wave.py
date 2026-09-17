@@ -7,7 +7,7 @@ from pyadjoint import AdjFloat, Tape
 
 from .elastic_wave import ElasticWave
 from .forms import (elastic_without_pml, viscoelastic_without_pml,
-                    isotropic_elastic_with_pml)
+                    elastic_with_pml, viscoelastic_with_pml)
 from .functionals import mechanical_energy_form
 
 from ...utils.physical_parameters import PhysicalParameters
@@ -155,7 +155,7 @@ class IsotropicWave(ElasticWave):
             """
             if callable(value) and not isinstance(value, Constant):
                 if self.mesh is None:
-                    return value(self.mesh)  
+                    return value(self.mesh)
                 value = value(self.mesh)
             if np.isscalar(value) or isinstance(value, Constant):
                 if self.mesh is None:
@@ -288,7 +288,6 @@ class IsotropicWave(ElasticWave):
 
         self.viscoelastic = self.input_dictionary.get("viscoelastic", False)
 
-
         if parameterization is ElasticMaterialParameterization.LAME:
             self.rho = as_function(self.rho, ElasticMaterialParameter.DENSITY)
             self.lmbda = as_function(self.lmbda, ElasticMaterialParameter.LAMBDA)
@@ -324,7 +323,6 @@ class IsotropicWave(ElasticWave):
         add(ElasticMaterialParameter.MU, self.mu)
         add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
         add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
-        
 
     def gradient_solve(
         self,
@@ -471,36 +469,34 @@ class IsotropicWave(ElasticWave):
 
         self.Elastic_C = C_computation(self)
 
-        self.viscoelastic = self.input_dictionary.get("viscoelastic", False) #Dictionary dentro de dictionary
-        print(self.viscoelastic)
+        self.viscoelastic = self.input_dictionary.get("viscoelastic", False)
         if self.viscoelastic:
-            
+
             d = self.input_dictionary.get("viscoelasticity", False)
             self.visco_type = d["visco_type"]
             W = TensorFunctionSpace(self.function_space.mesh(), "DG", 0)
             self.strain_space = W
-            
-            # GSLS parameters
-            self.y_list     = d["y_gsls"]        # list of y_l
-            self.omega_list = d["omega_gsls"]    # list of omega_l
-            dim = self.function_space.mesh().topological_dimension()
 
-            num_branches = d["branches"] 
-            
+            # GSLS parameters
+            self.y_list = d["y_gsls"]        # list of y_l
+            self.omega_list = d["omega_gsls"]    # list of omega_l
+
+            num_branches = d["branches"]
+
             # Memory variables
             self.zeta_list = [Function(self.strain_space, name=f"Memory variable zeta_{i}")
-                    for i in range(num_branches)]
+                              for i in range(num_branches)]
 
             for zeta in self.zeta_list:
                 zeta.assign(0.0)
 
             self.eps_np1 = Function(self.strain_space, name="eps_np1")
-            self.eps_n   = Function(self.strain_space, name="eps_n")
+            self.eps_n = Function(self.strain_space, name="eps_n")
 
             self.eps_n.assign(0.0)
 
             self.sigma_np1 = Function(self.strain_space, name="eps_np1")
-            self.sigma_n   = Function(self.strain_space, name="eps_n")
+            self.sigma_n = Function(self.strain_space, name="eps_n")
 
             self.sigma_n.assign(0.0)
 
