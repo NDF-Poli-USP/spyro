@@ -1,133 +1,109 @@
-from types import SimpleNamespace
+"""Vertex-only-mesh receivers under spatial (mesh) parallelism (issue #315).
 
-import firedrake as fire
+Run with::
+
+    mpiexec -n 2 pytest tests/parallel/test_vom_receivers.py
+
+With ``parallelism = "spatial"`` the single shot is decomposed over both
+ranks, so each rank owns only the receivers inside its mesh partition.
+"""
 import numpy as np
 import pytest
 
-from spyro.solvers.acoustic_wave import AcousticWave
-from spyro.solvers.helpers import (
-    _global_receiver_step_to_vom,
-    _global_receiver_values_from_vom,
-)
+import spyro
 from spyro.utils.typing import FunctionalEvaluationMode
 
+# Scattered on purpose: for a transect the vertex-only-mesh order happens to
+# match the input order, which would hide an ordering bug.
+receiver_locations = [
+    (-0.2, 0.8),
+    (-0.5, 0.2),
+    (-0.3, 0.6),
+    (-0.6, 0.9),
+    (-0.15, 0.3),
+    (-0.45, 0.5),
+]
 
-def _distributed_receiver_space_and_field():
-    comm = fire.COMM_WORLD
-    mesh = fire.UnitSquareMesh(4, 4, comm=comm)
-    V = fire.FunctionSpace(mesh, "CG", 1)
-    x, y = fire.SpatialCoordinate(mesh)
-    field = fire.Function(V).interpolate(x + 10.0 * y)
-    receiver_locations = [
-        (0.1, 0.1),
-        (0.2, 0.8),
-        (0.8, 0.2),
-        (0.8, 0.8),
-        (0.5, 0.5),
-    ]
-    vom = fire.VertexOnlyMesh(mesh, receiver_locations, redundant=True)
-    receiver_space = fire.FunctionSpace(vom, "DG", 0)
-    return receiver_space, field
-
-
-def _small_vom_spatial_model():
-    return {
-        "options": {
-            "cell_type": "T",
-            "variant": "lumped",
-            "method": "MLT",
-            "degree": 1,
-            "dimension": 2,
-        },
-        "parallelism": {
-            "type": "spatial",
-        },
-        "mesh": {
-            "length_z": 1.0,
-            "length_x": 1.0,
-            "length_y": 0.0,
-            "mesh_file": None,
-            "mesh_type": "firedrake_mesh",
-        },
-        "acquisition": {
-            "source_type": "ricker",
-            "source_locations": [(-0.25, 0.5)],
-            "frequency": 5.0,
-            "delay": 1.5,
-            "delay_type": "multiples_of_minimum",
-            "receiver_locations": [(-0.2, 0.3), (-0.2, 0.5), (-0.2, 0.7)],
-            "use_vertex_only_mesh": True,
-        },
-        "time_axis": {
-            "initial_time": 0.0,
-            "final_time": 0.002,
-            "dt": 0.001,
-            "amplitude": 1,
-            "output_frequency": 100,
-            "gradient_sampling_frequency": 1,
-        },
-        "visualization": {
-            "forward_output": False,
-            "fwi_velocity_model_output": False,
-            "gradient_output": False,
-            "adjoint_output": False,
-            "debug_output": False,
-        },
-    }
+dictionary = {
+    "options": {
+        "cell_type": "T",
+        "variant": "lumped",
+        "method": "MLT",
+        "degree": 2,
+        "dimension": 2,
+    },
+    "parallelism": {
+        "type": "spatial",
+    },
+    "mesh": {
+        "length_z": 1.0,
+        "length_x": 1.0,
+        "length_y": 0.0,
+        "mesh_file": None,
+        "mesh_type": "firedrake_mesh",
+    },
+    "acquisition": {
+        "source_type": "ricker",
+        "source_locations": [(-0.3, 0.5)],
+        "frequency": 8.0,
+        "delay": 1.5,
+        "delay_type": "multiples_of_minimum",
+        "receiver_locations": receiver_locations,
+    },
+    "time_axis": {
+        "initial_time": 0.0,
+        "final_time": 0.3,
+        "dt": 0.001,
+        "amplitude": 1,
+        "output_frequency": 100,
+        "gradient_sampling_frequency": 1,
+    },
+    "visualization": {
+        "forward_output": False,
+        "fwi_velocity_model_output": False,
+        "gradient_output": False,
+        "adjoint_output": False,
+        "debug_output": False,
+    },
+}
 
 
-def _build_small_vom_spatial_wave():
-    wave = AcousticWave(_small_vom_spatial_model())
-    wave.set_mesh(input_mesh_parameters={"edge_length": 0.25})
-    wave.set_initial_velocity_model(constant=2.0)
+def _wave(use_vertex_only_mesh, real_shot_record=None):
+    dictionary["acquisition"]["use_vertex_only_mesh"] = use_vertex_only_mesh
+    wave = spyro.AcousticWave(dictionary=dictionary)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    wave.set_initial_velocity_model(constant=1.5)
+    if real_shot_record is not None:
+        wave.real_shot_record = real_shot_record
+        wave.enable_compute_functional(
+            mode=FunctionalEvaluationMode.PER_TIMESTEP
+        )
     return wave
 
 
 @pytest.mark.parallel(2)
-def test_vom_receiver_values_return_in_global_input_order():
-    receiver_space, field = _distributed_receiver_space_and_field()
-    local_receivers = fire.assemble(fire.interpolate(field, receiver_space))
-    comm = SimpleNamespace(comm=fire.COMM_WORLD)
+def test_vom_receivers_spatial_parallel():
+    # The Dirac-delta projector returns the record in input order and does
+    # not depend on how the mesh is partitioned: it is the reference.
+    dirac = _wave(use_vertex_only_mesh=False)
+    dirac.forward_solve()
+    expected = np.asarray(dirac.forward_solution_receivers)
+    assert np.abs(expected).max() > 1e-3, "wave did not reach the receivers"
 
-    receiver_values = _global_receiver_values_from_vom([local_receivers], comm)
+    vom = _wave(use_vertex_only_mesh=True)
+    vom.forward_solve()
+    record = np.asarray(vom.forward_solution_receivers)
+    assert record.shape == expected.shape
+    assert np.allclose(record, expected, atol=1e-10 * np.abs(expected).max())
 
-    assert receiver_values.shape == (1, 5)
-    assert np.allclose(receiver_values[0], [1.1, 8.2, 2.8, 8.8, 5.5])
+    # Per-timestep misfit (automated-adjoint path): the global observed
+    # record must be restricted to the receivers each rank owns.
+    same = _wave(use_vertex_only_mesh=True, real_shot_record=expected)
+    same.forward_solve()
+    assert same.functional_value == pytest.approx(0.0, abs=1e-20)
 
-
-@pytest.mark.parallel(2)
-def test_global_receiver_step_projects_to_local_vom_space():
-    receiver_space, _ = _distributed_receiver_space_and_field()
-    global_record = np.array([11.0, 22.0, 33.0, 44.0, 55.0])
-    comm = SimpleNamespace(comm=fire.COMM_WORLD)
-
-    local_record = _global_receiver_step_to_vom(global_record, receiver_space)
-    round_tripped = _global_receiver_values_from_vom([local_record], comm)
-
-    assert np.allclose(round_tripped[0], global_record)
-
-
-@pytest.mark.parallel(2)
-def test_vom_forward_solve_with_spatial_parallelism_returns_global_record():
-    wave = _build_small_vom_spatial_wave()
-
-    wave.forward_solve()
-
-    assert wave.forward_solution_receivers.shape == (3, 3)
-
-
-@pytest.mark.parallel(2)
-def test_vom_per_timestep_functional_uses_local_receiver_space():
-    observed_wave = _build_small_vom_spatial_wave()
-    observed_wave.forward_solve()
-
-    wave = _build_small_vom_spatial_wave()
-    wave.real_shot_record = np.array(
-        observed_wave.forward_solution_receivers, copy=True
+    permuted = _wave(
+        use_vertex_only_mesh=True, real_shot_record=expected[:, ::-1].copy()
     )
-    wave.enable_compute_functional(mode=FunctionalEvaluationMode.PER_TIMESTEP)
-
-    wave.forward_solve()
-
-    assert wave.forward_solution_receivers.shape == (3, 3)
-    assert np.isclose(wave.functional_value, 0.0)
+    permuted.forward_solve()
+    assert permuted.functional_value > 1e-8

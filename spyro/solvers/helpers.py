@@ -1,7 +1,7 @@
 import os
 
 import numpy as np
-from firedrake import VTKFile, Function, FunctionSpace, assemble, interpolate
+from firedrake import VTKFile, Function
 
 from .. import io
 
