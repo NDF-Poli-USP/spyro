@@ -233,7 +233,7 @@ class AcousticWave(Wave):
                 )
 
             if self.initial_velocity_model_file.endswith(".segy"):
-                self.initial_velocity_model_file = write_hdf5_velocity_model(self, self.initial_velocity_model_file)
+                self.initial_velocity_model_file = write_hdf5_velocity_model(self.initial_velocity_model_file)
 
             if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
                 self.initial_velocity_model = interpolate(

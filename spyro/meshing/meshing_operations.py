@@ -15,9 +15,6 @@ class MeshOps():
 
     Attributes
     ----------
-    comm : `object`
-        An object representing the communication interface for parallel processing.
-        Default is `None`
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D.
     domain_dim : `tuple`
@@ -44,7 +41,7 @@ class MeshOps():
     """
 
     def __init__(self, domain_dim, dimension=2, quadrilateral=False,
-                 func_space_type=None, comm=None):
+                 func_space_type=None):
         """Initialize the MeshOps class.
 
         Parameters
@@ -60,10 +57,6 @@ class MeshOps():
         func_space_type, `str`, optional
             Type of function space for the state variable.
             Options: 'scalar' or 'vector'. Default is `None`.
-        comm : `object`, optional
-            An object representing the communication interface for parallel processing.
-            Default is `None`.
-
         Returns
         -------
         None
@@ -80,9 +73,6 @@ class MeshOps():
 
         # Type of function space
         self.func_space_type = func_space_type
-
-        # Communicator MPI
-        self.comm = comm
 
     def _set_spatial_coordinates(self, mesh):
         """Set the coordinates of a mesh.
