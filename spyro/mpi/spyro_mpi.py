@@ -1,7 +1,6 @@
 import copy
 from enum import Enum
 from typing import Dict
-from ..io.basicio import parallel_print
 from pydantic import BaseModel, computed_field
 from firedrake import Ensemble, COMM_WORLD
 from mpi4py import MPI
@@ -83,9 +82,8 @@ class SpyroEnsemble:
 
         cls.config = config
 
-        parallel_print(
+        SpyroEnsemble.print(
             f"Parallelism type: {type(config)}",
-            comm=cls.ensemble,
         )
 
         cls.barrier()
@@ -111,6 +109,14 @@ class SpyroEnsemble:
         return cls.ensemble.global_comm.rank
 
     @classmethod
+    def get_ensemble_rank(cls):
+        return cls.ensemble.ensemble_comm.rank
+
+    @classmethod
+    def get_local_rank(cls):
+        return cls.ensemble.comm.rank
+
+    @classmethod
     def print(cls, string: str):
         if cls.ensemble is None:
             print(string, flush=True)
@@ -118,3 +124,16 @@ class SpyroEnsemble:
 
         if cls.get_global_rank() == 0:
             print(string, flush=True)
+
+    @classmethod
+    def run_in_one_core(cls, fun):
+        def wrapper(*args, **kwargs):
+            if cls.ensemble is None:
+                raise RuntimeError("Ensemble not initialized")
+
+            if cls.get_global_rank() == 0:
+                return fun(*args, *kwargs)
+
+            return
+
+        return wrapper

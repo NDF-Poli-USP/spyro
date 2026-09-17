@@ -3,8 +3,8 @@ import numpy as np
 from netgen.geom2d import SplineGeometry
 from netgen.meshing import Element2D, Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..domains.space import create_function_space
-from ..io.basicio import parallel_print as pprint
 from .meshing_functions import AutomaticMesh
 from .meshing_operations import MeshOps
 from ..tools.habc_tools import point_cloud_field
@@ -13,6 +13,7 @@ from ..tools.version_control import is_firedrake_new
 
 if is_firedrake_new() is False:
     from firedrake.__future__ import interpolate
+
     fire.interpolate = interpolate
 
 
@@ -84,8 +85,14 @@ class HABCMesh(MeshOps):
         Generate the boundary points for a truncated hyperellipse.
     """
 
-    def __init__(self, domain_dim, dimension=2, quadrilateral=False,
-                 func_space_type=None, comm=None):
+    def __init__(
+        self,
+        domain_dim,
+        dimension=2,
+        quadrilateral=False,
+        func_space_type=None,
+        comm=None,
+    ):
         """Initialize the HABCMesh class.
 
         Parameters
@@ -109,12 +116,18 @@ class HABCMesh(MeshOps):
         None
         """
 
-        MeshOps.__init__(self, domain_dim, dimension=dimension,
-                         quadrilateral=quadrilateral,
-                         func_space_type=func_space_type, comm=comm)
+        MeshOps.__init__(
+            self,
+            domain_dim,
+            dimension=dimension,
+            quadrilateral=quadrilateral,
+            func_space_type=func_space_type,
+            comm=comm,
+        )
 
-    def original_boundary_data(self, mesh, function_space, mesh_parameters,
-                               initial_velocity_model):
+    def original_boundary_data(
+        self, mesh, function_space, mesh_parameters, initial_velocity_model
+    ):
         """Generate the boundary data from the original domain mesh.
 
         Parameters
@@ -138,42 +151,53 @@ class HABCMesh(MeshOps):
             Mesh node coordinates on boundaries of the original domain.
         """
 
-        pprint("Getting Boundary Mesh Data from Original Domain", comm=self.comm)
+        SpyroEnsemble.print("Getting Boundary Mesh Data from Original Domain")
 
         # Extract node positions
-        node_positions = self.extract_node_positions(mesh, function_space,
-                                                     output_type="array")
+        node_positions = self.extract_node_positions(
+            mesh, function_space, output_type="array"
+        )
 
         # Extract boundary node positions
-        all_bnd_nodes = np.unique(np.concatenate([
-            bnd_ids for bnd_ids, status
-            in mesh_parameters.boundary_nodes_ids.values() if status]))
+        all_bnd_nodes = np.unique(
+            np.concatenate(
+                [
+                    bnd_ids
+                    for bnd_ids, status in mesh_parameters.boundary_nodes_ids.values()
+                    if status
+                ]
+            )
+        )
         coord_msh = mesh.coordinates.dat.data_with_halos
         coord_bnd_nodes = node_positions[all_bnd_nodes, :]
 
         # Identify the boundary nodes
         tree = cKDTree(coord_msh)
-        indices = tree.query(coord_bnd_nodes, k=1,
-                             distance_upper_bound=mesh_parameters.tol)[1]
+        indices = tree.query(
+            coord_bnd_nodes, k=1, distance_upper_bound=mesh_parameters.tol
+        )[1]
         mask_boundary = indices[indices < len(coord_msh)]
 
         # Create a point cloud to get the extreme velocity values on the boundary
         ptos_bnd = mesh.coordinates.dat.data_with_halos[mask_boundary, :]
-        vel_on_boundary = point_cloud_field(mesh, ptos_bnd, initial_velocity_model,
-                                            mesh_parameters.tol).dat.data_with_halos[:]
+        vel_on_boundary = point_cloud_field(
+            mesh, ptos_bnd, initial_velocity_model, mesh_parameters.tol
+        ).dat.data_with_halos[:]
 
         # Get extreme values of the velocity on the boundary excluding free surfaces
         decimal = int(abs(np.log10(mesh_parameters.tol)))
-        c_bnd_min = round(vel_on_boundary[vel_on_boundary > 0.].min(), decimal)
-        c_bnd_max = round(vel_on_boundary[vel_on_boundary > 0.].max(), decimal)
+        c_bnd_min = round(vel_on_boundary[vel_on_boundary > 0.0].min(), decimal)
+        c_bnd_max = round(vel_on_boundary[vel_on_boundary > 0.0].max(), decimal)
 
         # Print on screen
         cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"
-        pprint(cbnd_str.format(c_bnd_min, c_bnd_max), comm=self.comm)
+        SpyroEnsemble.print(cbnd_str.format(c_bnd_min, c_bnd_max))
 
         return c_bnd_min, c_bnd_max, coord_bnd_nodes
 
-    def creating_velocity_profile(self, function_space, initial_velocity_model, path_save):
+    def creating_velocity_profile(
+        self, function_space, initial_velocity_model, path_save
+    ):
         """Create the velocity profile for the original domain.
 
         Parameters
@@ -196,9 +220,10 @@ class HABCMesh(MeshOps):
         """
 
         # Velocity profile model
-        c = fire.Function(function_space, name='c_orig [km/s])')
-        c.assign(fire.assemble(fire.interpolate(initial_velocity_model,
-                                                function_space)))
+        c = fire.Function(function_space, name="c_orig [km/s])")
+        c.assign(
+            fire.assemble(fire.interpolate(initial_velocity_model, function_space))
+        )
 
         # Get extreme values of the velocity model
         c_min = initial_velocity_model.dat.data_with_halos.min()
@@ -206,7 +231,7 @@ class HABCMesh(MeshOps):
 
         # Print on screen
         cdom_str = "Domain Velocity Range (km/s): {:.3f} - {:.3f}"
-        pprint(cdom_str.format(c_min, c_max), comm=self.comm)
+        SpyroEnsemble.print(cdom_str.format(c_min, c_max))
 
         # Save initial velocity model
         vel_c = fire.VTKFile(path_save + "preamble/c_vel.pvd")
@@ -214,7 +239,7 @@ class HABCMesh(MeshOps):
 
         return c, c_min, c_max
 
-    def create_function_space_eik(self, mesh, degree_eik, ele_type_eik='consistent'):
+    def create_function_space_eik(self, mesh, degree_eik, ele_type_eik="consistent"):
         """Create the function space for the Eikonal equation modeling.
 
         Parameters
@@ -233,24 +258,27 @@ class HABCMesh(MeshOps):
             Function space for the Eikonal modeling.
         """
 
-        pprint("Setting Mesh Properties for Eikonal Analysis", comm=self.comm)
+        SpyroEnsemble.print("Setting Mesh Properties for Eikonal Analysis")
 
         allowed_ele_types = ["consistent", "underintegrated"]
-        validate_parameter('ele_type_eik', ele_type_eik, allowed_ele_types)
+        validate_parameter("ele_type_eik", ele_type_eik, allowed_ele_types)
 
         # Function space for the Eikonal modeling
         if ele_type_eik == "consistent":
             funct_space_eik = create_function_space(mesh, "CG", degree_eik)
 
         if ele_type_eik == "underintegrated":
-            method = "spectral_quadrilateral" if self.quadrilateral \
+            method = (
+                "spectral_quadrilateral"
+                if self.quadrilateral
                 else "mass_lumped_triangle"
+            )
             degree = min(degree_eik, 4 if self.dimension == 2 else 3)
             funct_space_eik = create_function_space(mesh, method, degree)
 
         return funct_space_eik
 
-    def preamble_mesh_operations(self, wave, ele_type_eik='consistent', f_est=0.03):
+    def preamble_mesh_operations(self, wave, ele_type_eik="consistent", f_est=0.03):
         """Perform mesh operations previous to size an absorbing layer.
 
         Parameters
@@ -295,11 +323,13 @@ class HABCMesh(MeshOps):
             Function space for the Eikonal modeling.
         """
 
-        pprint("\nCreating Mesh and Initial Velocity Model", comm=self.comm)
+        SpyroEnsemble.print("\nCreating Mesh and Initial Velocity Model")
 
         # Mesh data
-        pprint(f"Original Mesh with {wave.mesh.num_vertices()} Nodes and "
-               f"{wave.mesh.num_cells()} Volume Elements", comm=self.comm)
+        SpyroEnsemble.print(
+            f"Original Mesh with {wave.mesh.num_vertices()} Nodes and "
+            f"{wave.mesh.num_cells()} Volume Elements"
+        )
 
         # Save a copy of the original mesh
         wave.mesh_original = wave.mesh
@@ -308,17 +338,25 @@ class HABCMesh(MeshOps):
 
         # Velocity profile model
         wave.c, wave.c_min, wave.c_max = self.creating_velocity_profile(
-            wave.function_space, wave.initial_velocity_model, wave.path_save)
+            wave.function_space, wave.initial_velocity_model, wave.path_save
+        )
 
         # Generating boundary data from the original domain mesh
-        wave.c_bnd_min, wave.c_bnd_max, \
-            self.coord_bnd_nodes = self.original_boundary_data(
-                wave.mesh, wave.function_space,
-                wave.mesh_parameters, wave.initial_velocity_model)
+        wave.c_bnd_min, wave.c_bnd_max, self.coord_bnd_nodes = (
+            self.original_boundary_data(
+                wave.mesh,
+                wave.function_space,
+                wave.mesh_parameters,
+                wave.initial_velocity_model,
+            )
+        )
 
         # Setting the properties of the mesh used to solve the Eikonal equation
-        wave.mesh_parameters.degree_eik = wave.degree if not hasattr(
-            wave, 'abc_deg_eikonal') else wave.abc_deg_eikonal
+        wave.mesh_parameters.degree_eik = (
+            wave.degree
+            if not hasattr(wave, "abc_deg_eikonal")
+            else wave.abc_deg_eikonal
+        )
         wave.mesh_parameters.ele_type_eik = ele_type_eik
 
         # Factor for the stabilizing term in Eikonal equation
@@ -326,7 +364,8 @@ class HABCMesh(MeshOps):
 
         # Function space for Eikonal modeling
         wave.mesh_parameters.funct_space_eik = self.create_function_space_eik(
-            wave.mesh, wave.mesh_parameters.degree_eik, ele_type_eik=ele_type_eik)
+            wave.mesh, wave.mesh_parameters.degree_eik, ele_type_eik=ele_type_eik
+        )
 
     @staticmethod
     def bnd_pnts_hyp_2D(a, b, n, num_pts):
@@ -351,21 +390,21 @@ class HABCMesh(MeshOps):
         """
 
         # Generate angle values for the parametric equations
-        theta = np.linspace(0., 2. * np.pi, num_pts)
+        theta = np.linspace(0.0, 2.0 * np.pi, num_pts)
 
         # Especial angle values
-        rc_zero = [np.pi / 2., 3. * np.pi / 2.]
-        rs_zero = [0., np.pi, 2. * np.pi]
+        rc_zero = [np.pi / 2.0, 3.0 * np.pi / 2.0]
+        rs_zero = [0.0, np.pi, 2.0 * np.pi]
 
         # Trigonometric function evaluation
         cr = np.cos(theta)
         sr = np.sin(theta)
-        cr = np.where(np.isin(theta, rc_zero), 0., cr)
-        sr = np.where(np.isin(theta, rs_zero), 0., sr)
+        cr = np.where(np.isin(theta, rc_zero), 0.0, cr)
+        sr = np.where(np.isin(theta, rs_zero), 0.0, sr)
 
         # Parametric equations for the hyperellipse
-        x = a * np.sign(cr) * np.abs(cr)**(2. / n)
-        y = b * np.sign(sr) * np.abs(sr)**(2. / n)
+        x = a * np.sign(cr) * np.abs(cr) ** (2.0 / n)
+        y = b * np.sign(sr) * np.abs(sr) ** (2.0 / n)
 
         bnd_pnts = np.column_stack((x, y))
 
@@ -420,37 +459,39 @@ class HABCMesh(MeshOps):
         pnt_bef_trunc = 0
         pnt_aft_trunc = 0
         pnt_str = "Number of Boundary Points for"
-        while pnt_bef_trunc % 2 == 0 or pnt_aft_trunc % 2 == 0 \
-                or pnt_bef_trunc < 3 or pnt_aft_trunc < 3:
+        while (
+            pnt_bef_trunc % 2 == 0
+            or pnt_aft_trunc % 2 == 0
+            or pnt_bef_trunc < 3
+            or pnt_aft_trunc < 3
+        ):
 
             num_bnd_pts += 1
-            pprint(f"{pnt_str} Complete Hyperellipse: {num_bnd_pts}", comm=self.comm)
+            SpyroEnsemble.print(f"{pnt_str} Complete Hyperellipse: {num_bnd_pts}")
             bnd_pts = self.bnd_pnts_hyp_2D(a_hyp, b_hyp, n_hyp, num_bnd_pts)
 
             # Filter hyperellipse points based on the truncation plane z0
-            filt_bnd_pts = np.array([point for point in bnd_pts
-                                     if point[1] <= z0])
-            pprint(f"{pnt_str} Truncated Hyperellipse: {len(filt_bnd_pts)}",
-                   comm=self.comm)
+            filt_bnd_pts = np.array([point for point in bnd_pts if point[1] <= z0])
+            SpyroEnsemble.print(
+                f"{pnt_str} Truncated Hyperellipse: {len(filt_bnd_pts)}"
+            )
 
             # Identify truncation index
             ini_trunc = max(np.where(bnd_pts[:, 1] > z0)[0][0] - 1, 0)
 
             # Modify points to match with the truncation plane
-            r0 = np.asin((z0 / b_hyp)**(n_hyp / 2))
-            x0 = a_hyp * np.cos(r0)**(2 / n_hyp)
+            r0 = np.asin((z0 / b_hyp) ** (n_hyp / 2))
+            x0 = a_hyp * np.cos(r0) ** (2 / n_hyp)
             filt_bnd_pts[ini_trunc] = np.array([x0, z0])
             filt_bnd_pts[ini_trunc + 1] = np.array([-x0, z0])
 
             # Insert new points to create a rectangular trunc
-            new_pnts = np.array([[xdom, z0], [xdom, -z0],
-                                 [-xdom, -z0], [-xdom, z0]])
-            filt_bnd_pts = np.insert(filt_bnd_pts, ini_trunc + 1,
-                                     new_pnts, axis=0)
+            new_pnts = np.array([[xdom, z0], [xdom, -z0], [-xdom, -z0], [-xdom, z0]])
+            filt_bnd_pts = np.insert(filt_bnd_pts, ini_trunc + 1, new_pnts, axis=0)
             end_trunc = ini_trunc + 5
 
             # Points before and after truncation
-            pnt_bef_trunc = len(filt_bnd_pts[:ini_trunc + 1])
+            pnt_bef_trunc = len(filt_bnd_pts[: ini_trunc + 1])
             pnt_aft_trunc = len(filt_bnd_pts[end_trunc:])
 
         # Total number of the boundary points including the trunc
@@ -580,47 +621,53 @@ class HABCMesh(MeshOps):
         while True:
             try:
                 # Generate the boundary segment curves
-                curves = self.create_bnd_mesh_2D(geo, bnd_pts,
-                                                 trunc_feat, spln)
-                [geo.Append(c[:-1], bc="outer", maxh=c[-1], leftdomain=1,
-                            rightdomain=0) for c in curves]
+                curves = self.create_bnd_mesh_2D(geo, bnd_pts, trunc_feat, spln)
+                [
+                    geo.Append(
+                        c[:-1], bc="outer", maxh=c[-1], leftdomain=1, rightdomain=0
+                    )
+                    for c in curves
+                ]
 
                 # Generate the mesh using netgen library
-                hyp_mesh = geo.GenerateMesh(maxh=self.lmin,
-                                            quad_dominated=self.quadrilateral,
-                                            optsteps2d=10,  # Optimize mesh
-                                            )
+                hyp_mesh = geo.GenerateMesh(
+                    maxh=self.lmin,
+                    quad_dominated=self.quadrilateral,
+                    optsteps2d=10,  # Optimize mesh
+                )
                 hyp_mesh.Compress()
-                pprint("Hyperelliptical Mesh Generated Successfully", comm=self.comm)
+                SpyroEnsemble.print("Hyperelliptical Mesh Generated Successfully")
                 break
 
             except Exception as e:
 
                 # Retry with lines if splines fail
                 if spln:
-                    pprint(f"Error Meshing with Splines: {e}", comm=self.comm)
-                    pprint("Now meshing with Lines", comm=self.comm)
+                    SpyroEnsemble.print(f"Error Meshing with Splines: {e}")
+                    SpyroEnsemble.print("Now meshing with Lines")
                     spln = False
 
                 else:
-                    pprint(f"Error Meshing with Lines: {e}. Exiting.", comm=self.comm)
+                    SpyroEnsemble.print(f"Error Meshing with Lines: {e}. Exiting.")
                     break
 
         # Mesh is transformed into a firedrake mesh
         q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
-        hyp_mesh = fire.Mesh(
-            hyp_mesh, distribution_parameters=q, comm=self.comm.comm)
+        hyp_mesh = fire.Mesh(hyp_mesh, distribution_parameters=q, comm=self.comm.comm)
 
         # Adjusting coordinates: Swap (x,z) -> (z,x) and apply offsets
-        hyp_mesh.coordinates.dat.data_with_halos[:, [0, 1]] = \
+        hyp_mesh.coordinates.dat.data_with_halos[:, [0, 1]] = (
             hyp_mesh.coordinates.dat.data_with_halos[:, [1, 0]]
+        )
         hyp_mesh.coordinates.dat.data_with_halos[:, 0] -= Lz / 2
         hyp_mesh.coordinates.dat.data_with_halos[:, 1] += Lx / 2
 
         # Forcing node at (0,0)
-        err_m = np.sqrt(hyp_mesh.coordinates.dat.data_with_halos[:, 0]**2
-                        + hyp_mesh.coordinates.dat.data_with_halos[:, 1]**2)
-        if err_m.min() > 0.:
+        err_m = np.sqrt(
+            hyp_mesh.coordinates.dat.data_with_halos[:, 0] ** 2
+            + hyp_mesh.coordinates.dat.data_with_halos[:, 1] ** 2
+        )
+        if err_m.min() > 0.0:
             id_min = err_m.argmin()
             err_z = -hyp_mesh.coordinates.dat.data_with_halos[:, 0][id_min]
             err_x = -hyp_mesh.coordinates.dat.data_with_halos[:, 1][id_min]
@@ -661,12 +708,13 @@ class HABCMesh(MeshOps):
         boundary_points = []
         for i, coord in enumerate(coord_rec):
             z, x = coord
-            rec_map[i] = final_mesh.Add(MeshPoint((z, x, 0.)))  # y = 0 for 2D
+            rec_map[i] = final_mesh.Add(MeshPoint((z, x, 0.0)))  # y = 0 for 2D
 
             # Check if the point is on the original boundary
-            if boundary_tree.query(
-                coord, distance_upper_bound=self.tol,
-                    workers=-1)[0] <= self.tol:
+            if (
+                boundary_tree.query(coord, distance_upper_bound=self.tol, workers=-1)[0]
+                <= self.tol
+            ):
                 boundary_coords.append(coord)
                 boundary_points.append(rec_map[i])
 
@@ -693,14 +741,15 @@ class HABCMesh(MeshOps):
 
             # Check if the point is on the original boundary
             dist, idx = boundary_tree.query(
-                coord, distance_upper_bound=self.tol, workers=-1)
+                coord, distance_upper_bound=self.tol, workers=-1
+            )
 
             if dist <= self.tol:
                 # Reuse the existing point
                 hyp_map[i] = boundary_points[idx]
             else:
                 # Creating a new point (y = 0 for 2D)
-                hyp_map[i] = final_mesh.Add(MeshPoint((z, x, 0.)))
+                hyp_map[i] = final_mesh.Add(MeshPoint((z, x, 0.0)))
 
         # Face descriptor for the hyperelliptical mesh
         fd_hyp = final_mesh.Add(FaceDescriptor(bc=2, domin=2, domout=0))
@@ -717,17 +766,20 @@ class HABCMesh(MeshOps):
         try:
             # Mesh data
             final_mesh.Compress()
-            pprint(f"Mesh created with {len(final_mesh.Points())} points "
-                   f"and {len(final_mesh.Elements2D())} elements", comm=self.comm)
+            SpyroEnsemble.print(
+                f"Mesh created with {len(final_mesh.Points())} points "
+                f"and {len(final_mesh.Elements2D())} elements"
+            )
 
             # Mesh is transformed into a firedrake mesh
             q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
             final_mesh = fire.Mesh(
-                final_mesh, distribution_parameters=q, comm=self.comm.comm)
-            pprint("Merged Mesh Generated Successfully", comm=self.comm)
+                final_mesh, distribution_parameters=q, comm=self.comm.comm
+            )
+            SpyroEnsemble.print("Merged Mesh Generated Successfully")
 
         except Exception as e:
-            pprint(f"Error Generating Merged Mesh: {e}. Exiting.", comm=self.comm)
+            SpyroEnsemble.print(f"Error Generating Merged Mesh: {e}. Exiting.")
 
         return final_mesh
 
@@ -806,8 +858,7 @@ class HABCMesh(MeshOps):
         rec_map = {}
         for i, coord in enumerate(coord_rec):
             z, x, y = coord
-            if self.inside_hyp_3D(coord - centroid,
-                                  b_hyp, a_hyp, c_hyp, n_hyp):
+            if self.inside_hyp_3D(coord - centroid, b_hyp, a_hyp, c_hyp, n_hyp):
                 rec_map[i] = sharp_mesh.Add(MeshPoint((z, x, y)))
 
         # Face descriptor for the rectangular mesh
@@ -826,18 +877,21 @@ class HABCMesh(MeshOps):
         try:
             # Mesh data
             sharp_mesh.Compress()
-            pprint(f"Mesh created with {len(sharp_mesh.Points())} points "
-                   f"and {len(sharp_mesh.Elements3D())} elements", comm=self.comm)
+            SpyroEnsemble.print(
+                f"Mesh created with {len(sharp_mesh.Points())} points "
+                f"and {len(sharp_mesh.Elements3D())} elements"
+            )
 
             # Mesh is transformed into a firedrake mesh
             q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
             sharp_mesh = fire.Mesh(
-                sharp_mesh, distribution_parameters=q, comm=self.comm.comm)
-            pprint("Sharp Mesh Generated Successfully", comm=self.comm)
+                sharp_mesh, distribution_parameters=q, comm=self.comm.comm
+            )
+            SpyroEnsemble.print("Sharp Mesh Generated Successfully")
             # fire.VTKFile("output/sharp_mesh.pvd").write(sharp_mesh)
 
         except Exception as e:
-            pprint(f"Error Generating Merged Mesh: {e}. Exiting.", comm=self.comm)
+            SpyroEnsemble.print(f"Error Generating Merged Mesh: {e}. Exiting.")
 
         return sharp_mesh
 
@@ -868,14 +922,14 @@ class HABCMesh(MeshOps):
 
         # Vector from centroid to the point
         d = p_to_snap - centroid
-        if np.allclose(d, 0.):
+        if np.allclose(d, 0.0):
             return p_to_snap.copy()
 
         # Compute scaling factor
-        val = (abs(d[0]/a)**n + abs(d[1]/b)**n + abs(d[2]/c)**n)
-        if val <= 0.:
+        val = abs(d[0] / a) ** n + abs(d[1] / b) ** n + abs(d[2] / c) ** n
+        if val <= 0.0:
             return p_to_snap.copy()
-        s = (1. / val)**(1. / n)
+        s = (1.0 / val) ** (1.0 / n)
 
         # Compute snapped point
         q_snapped = centroid + d * s
@@ -920,10 +974,10 @@ class HABCMesh(MeshOps):
         coords = mesh.coordinates.dat.data_with_halos
         min_z, min_x, min_y = np.min(coords, axis=0)
         max_z, max_x, max_y = np.max(coords, axis=0)
-        pprint("Mesh Bounds Detected:", comm=self.comm)
-        pprint(f"       X: [{min_x:.4f}, {max_x:.4f}]", comm=self.comm)
-        pprint(f"       Y: [{min_y:.4f}, {max_y:.4f}]", comm=self.comm)
-        pprint(f"       Z: [{min_z:.4f}, {max_z:.4f}]", comm=self.comm)
+        SpyroEnsemble.print("Mesh Bounds Detected:")
+        SpyroEnsemble.print(f"       X: [{min_x:.4f}, {max_x:.4f}]")
+        SpyroEnsemble.print(f"       Y: [{min_y:.4f}, {max_y:.4f}]")
+        SpyroEnsemble.print(f"       Z: [{min_z:.4f}, {max_z:.4f}]")
 
         # Select nodes to snap
         mask_min_z = np.isclose(coords[:, 0], min_z, atol=plane_tol)
@@ -939,11 +993,12 @@ class HABCMesh(MeshOps):
         pnts_to_snap = np.where(mask)[0]
         for pnt in pnts_to_snap:
             coords[pnt, :] = self.radial_project_on_hyp_3D(
-                coords[pnt, :], centroid, b_hyp, a_hyp, c_hyp, n_hyp)
+                coords[pnt, :], centroid, b_hyp, a_hyp, c_hyp, n_hyp
+            )
             coords[pnt, 0] = np.clip(coords[pnt, 0], -np.inf, max_z)
 
-        pprint(f"Boundary Nodes Snapped: {len(pnts_to_snap)}", comm=self.comm)
-        pprint("Snapped Mesh Generated Successfully", comm=self.comm)
+        SpyroEnsemble.print(f"Boundary Nodes Snapped: {len(pnts_to_snap)}")
+        SpyroEnsemble.print("Snapped Mesh Generated Successfully")
 
         return mesh
 
@@ -980,7 +1035,7 @@ class HABCMesh(MeshOps):
         Lx, Lz, Ly = self.domain_dim
 
         # Centroid of the hyperellipsoid
-        centroid = np.array([-Lz / 2, Lx / 2., Ly / 2.])
+        centroid = np.array([-Lz / 2, Lx / 2.0, Ly / 2.0])
 
         # Generate sharp mesh
         sharp_mesh = self.sharp_mesh_3D(rec_mesh, hyp_par, centroid)
@@ -1048,7 +1103,8 @@ class HABCMesh(MeshOps):
 
             # Base rectangular mesh
             rec_mesh = AutomaticMesh(
-                mesh_parameters=mesh_parameters).create_firedrake_mesh()
+                mesh_parameters=mesh_parameters
+            ).create_firedrake_mesh()
             # fire.VTKFile("output/rectang_test.pvd").write(rec_mesh)
 
             # Merging the original mesh with a hyperellipsoid layer mesh
@@ -1078,9 +1134,15 @@ class HABCMesh(MeshOps):
         """
 
         # Boundary nodes indices
-        bnd_nod_ids_nfs = np.unique(np.concatenate([
-            bnd_ids for bnd_ids, status
-            in mesh_parameters.boundary_nodes_ids.values() if status]))
+        bnd_nod_ids_nfs = np.unique(
+            np.concatenate(
+                [
+                    bnd_ids
+                    for bnd_ids, status in mesh_parameters.boundary_nodes_ids.values()
+                    if status
+                ]
+            )
+        )
 
         # Extract node positions
         node_positions = self.extract_node_positions(mesh, V, output_type="array")
@@ -1089,8 +1151,9 @@ class HABCMesh(MeshOps):
 
         # Identify the boundary nodes
         tree = cKDTree(coord_msh)
-        indices = tree.query(coord_bnd_nodes, k=1,
-                             distance_upper_bound=mesh_parameters.tol)[1]
+        indices = tree.query(
+            coord_bnd_nodes, k=1, distance_upper_bound=mesh_parameters.tol
+        )[1]
         mask_boundary = indices[indices < len(coord_msh)]
         bnd_nodes_nfs = mesh.coordinates.dat.data_with_halos[mask_boundary, :]
 
@@ -1125,10 +1188,11 @@ class HABCMesh(MeshOps):
         domain_abc = np.asarray(domain_layer)
         domain_to_check = abs(max_coordinates - min_coordinates)
 
-        assert np.allclose(domain_abc, domain_to_check, atol=0.01), \
-            "Mesh dimensions do not match with expected dimensions of " \
-            f"domain with absorbing layer. Expected: {np.round(domain_abc, 3)}, " \
+        assert np.allclose(domain_abc, domain_to_check, atol=0.01), (
+            "Mesh dimensions do not match with expected dimensions of "
+            f"domain with absorbing layer. Expected: {np.round(domain_abc, 3)}, "
             f"Got: {np.round(domain_to_check, 3)}."
+        )
 
         # UFL coordinates for the mesh with absorbing layer
         ufl_coordinates_abc = fire.SpatialCoordinate(mesh)

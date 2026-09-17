@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
@@ -9,7 +10,6 @@ from ..domains.space import check_function_space_type, create_function_space
 from ..io import Model_parameters
 from ..io import material_properties_io
 from ..io.parallelism_wrappers import ensemble_propagator
-from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
@@ -179,7 +179,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.layer_manager()
 
         # Logger
-        self.field_logger = FieldLogger(self.comm, self.read_outputs)
+        self.field_logger = FieldLogger(self.read_outputs)
         self.field_logger.add_field("forward", self.get_function_name(),
                                     lambda: self.get_function())
 
@@ -199,7 +199,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         -------
         None
         """
-        parallel_print("\nSolving Forward Problem", comm=self.comm)
+        SpyroEnsemble.print("\nSolving Forward Problem")
 
         if self.function_space is None:
             self.force_rebuild_function_space()

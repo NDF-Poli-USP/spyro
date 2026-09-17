@@ -1,4 +1,5 @@
 import numpy as np
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .meshing_winslow2d import winslow_smooth_numba, winslow_smooth_vectorized, winslow_smooth_default
 from .meshing_utils import (
     generate_water_profile_from_segy, get_surface_entities_by_physical_name, get_nodes_on_surface_entities,
@@ -450,10 +451,10 @@ def build_gmsh_geometry_and_groups(
 
 
 def apply_structured_winslow_smoothing2d(
-    gmsh, comm, geom_params, length_x, depth_z, padding_type,
+    gmsh, geom_params, length_x, depth_z, padding_type,
     water_interface, hyper_n, winslow_implementation, winslow_iterations,
     winslow_omega, n_samples, n_traces, domain_xmin, domain_xmax,
-    domain_zmin, domain_zmax, ef_segy2, parallel_print,
+    domain_zmin, domain_zmax, ef_segy2,
     z_water_L, z_water_R, pad_x_min, pad_x_max, pad_z_min, a_val, b_val, xc, zc, apply_winslow
 ):
     """
@@ -482,11 +483,11 @@ def apply_structured_winslow_smoothing2d(
         interface_nodes = get_water_interface_node_indices(
             tag_to_index=tag_to_index, water_surface_entities=water_surface_entities, length_x=length_x, tol=1e-8
         )
-        parallel_print("Aligning water columns with water spline X positions...", comm=comm)
+        SpyroEnsemble.print("Aligning water columns with water spline X positions...")
         points_2d, n_snapped, n_cols = align_water_columns_to_interface_x(
             points_2d=points_2d, water_surface_nodes=water_surface_nodes, interface_nodes=interface_nodes, quads=quads
         )
-        parallel_print(f"Snapped {n_snapped} water-surface nodes onto {n_cols} spline-X columns.", comm=comm)
+        SpyroEnsemble.print(f"Snapped {n_snapped} water-surface nodes onto {n_cols} spline-X columns.")
     else:
         interface_nodes = set()
         water_surface_nodes = set()
@@ -647,11 +648,11 @@ def apply_structured_winslow_smoothing2d(
 
             move_all.add(i)
 
-    parallel_print(f"Nodes Breakdown | Total: {len(points_2d)}", comm=comm)
-    parallel_print(f"Move All: {len(move_all)} | X-Slide: {len(move_X_only)} | Z-Slide: {len(move_Z_only)} | hyperellipse: {len(move_hyperellipse)} | Locked: {len(locked)}", comm=comm)
+    SpyroEnsemble.print(f"Nodes Breakdown | Total: {len(points_2d)}")
+    SpyroEnsemble.print(f"Move All: {len(move_all)} | X-Slide: {len(move_X_only)} | Z-Slide: {len(move_Z_only)} | hyperellipse: {len(move_hyperellipse)} | Locked: {len(locked)}")
 
     if apply_winslow:
-        parallel_print("Applying Winslow smoothing...", comm=comm)
+        SpyroEnsemble.print("Applying Winslow smoothing...")
         if winslow_implementation in ("fast", "numba"):
             nx_grid, nz_grid = n_samples, n_traces
             segy_grid_x = np.linspace(domain_xmin, domain_xmax, nx_grid)
@@ -687,8 +688,8 @@ def apply_structured_winslow_smoothing2d(
         smoothed_points_3d = np.zeros_like(points_3d)
         smoothed_points_3d[:, :2] = smoothed_points_2d
 
-        parallel_print("Updating nodes in Gmsh...", comm=comm)
+        SpyroEnsemble.print("Updating nodes in Gmsh...")
         for i, tag in enumerate(node_tags):
             gmsh.model.mesh.setNode(int(tag), smoothed_points_3d[i].tolist(), [])
     else:
-        parallel_print("Skipping Winslow smoothing...", comm=comm)
+        SpyroEnsemble.print("Skipping Winslow smoothing...")
