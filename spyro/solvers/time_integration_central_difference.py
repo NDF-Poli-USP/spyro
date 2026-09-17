@@ -162,9 +162,15 @@ def _propagate_forward_central_difference(wave, source_ids):
         if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
             if wave.use_vertex_only_mesh:
                 if isinstance(real_shot_record[step], np.ndarray):
-                    real_shot = fire.Function(
-                        usol_recv[-1].function_space(),
-                        val=real_shot_record[step],
+                    # The sampled function only holds the receivers owned
+                    # by this spatial rank, so restrict the global record
+                    # to them (issue #315). Written through data_wo because
+                    # ``val`` would also have to cover the halo points.
+                    real_shot = fire.Function(usol_recv[-1].function_space())
+                    real_shot.dat.data_wo[:] = (
+                        wave.receivers.local_receiver_values(
+                            real_shot_record[step]
+                        )
                     )
                     misfit_step = real_shot - usol_recv[-1]
                 elif isinstance(real_shot_record[step], fire.Function):
@@ -187,13 +193,16 @@ def _propagate_forward_central_difference(wave, source_ids):
     wave.current_time = t
 
     helpers.display_progress(wave.comm, t)
-    if receiver_array is not None and functional_mode is not FunctionalEvaluationMode.PER_TIMESTEP:
-        usol_recv = receiver_array
-    usol_recv = helpers.fill(
-        usol_recv, wave.receivers.is_local, nt, wave.receivers.number_of_points
-    )
-
-    usol_recv = utils.utils.communicate(usol_recv, wave.comm)
+    if wave.use_vertex_only_mesh:
+        # Each spatial rank sampled only the receivers inside its mesh
+        # partition, in vertex-only-mesh order: assemble the global record in
+        # the input order from all ranks (issue #315).
+        usol_recv = wave.receivers.gather_receiver_record(receiver_array)
+    else:
+        usol_recv = helpers.fill(
+            usol_recv, wave.receivers.is_local, nt, wave.receivers.number_of_points
+        )
+        usol_recv = utils.utils.communicate(usol_recv, wave.comm)
 
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         wave.automated_adjoint.stop_recording()

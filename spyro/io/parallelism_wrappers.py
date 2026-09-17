@@ -551,6 +551,21 @@ def ensemble_gradient(func):
             grad_total = fire.Function(args[0].function_space)
             misfit_list = kwargs.get("misfit")
 
+            # The per-shot wavefields are only saved by a forward solve that
+            # stores its time steps. Without them, the wrapped gradient_solve
+            # would re-run the forward inside the loop below, i.e. propagate
+            # every shot while computing the adjoint of the first one and
+            # pair that adjoint with the last shot's wavefield. Re-run once,
+            # with storage on, before pairing each shot with its own data.
+            if not all(
+                os.path.exists(
+                    _shot_filename(snum, args[0], prefix="tmp_shot")
+                )
+                for snum in range(num)
+            ):
+                args[0].enable_implemented_adjoint()
+                args[0].forward_solve()
+
             for snum in range(num):
                 switch_serial_shot(args[0], snum)
                 current_misfit = misfit_list[snum]
