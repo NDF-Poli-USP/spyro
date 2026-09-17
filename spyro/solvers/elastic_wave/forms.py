@@ -170,12 +170,12 @@ def viscoelastic_without_pml(wave):
 
     def tensor_to_voigt(T):
         if dim == 2:
-            return as_vector([T[0, 0], T[1, 1], T[0, 1] + T[1, 0]])
+            return as_vector([T[0, 0], T[1, 1], T[0, 1]])
         else:
             return as_vector([T[0, 0], T[1, 1], T[2, 2],
-                              T[1, 2] + T[2, 1],
-                              T[0, 2] + T[2, 0],
-                              T[0, 1] + T[1, 0]])
+                              T[1, 2],
+                              T[0, 2],
+                              T[0, 1]])
 
     F_m = (rho / (dt**2)) * dot(u - 2*u_n + u_nm1, v) * dx(**quad_rule)
 
