@@ -209,13 +209,13 @@ def Gamma_isotropic(self):
 def Gamma_VTI(self, C, dim):
 
     rho = self.rho
-    vP = self.vP
-    vS = self.vS
+    vP = self.c
+    vS = self.c_s
 
     epsilon = self.epsilon
     gamma = self.gamma
     delta = self.delta
-    anisotropy = self.anisotropy
+    anisotropy = self.anisotropy_type
     
     if dim == 2:
         C11 = C[0, 0]
@@ -228,11 +228,11 @@ def Gamma_VTI(self, C, dim):
         C13 = C[0, 2]
         C33 = C[2, 2]
         C44 = C[3, 3]
-
+    print(self.Q_epsilon )
     Q33 = self.Q_vp
-    Q11 = 2 * epsilon/(1 + 2 * epsilon) * self.Qepsilon_inv + Q33 
+    Q11 = 2 * epsilon/(1 + 2 * epsilon) * self.Q_epsilon + Q33 
     Q44 = self.Q_vs
-    Q66 = 2 * gamma/(1 + 2 * gamma) * self.Qgamma_inv + Q44 
+    Q66 = 2 * gamma/(1 + 2 * gamma) * self.Q_gamma + Q44 
             
     num1 = vP**2 * (1 + 2 * epsilon)
     num2 = 2 * vS**2 * (1 + 2 * gamma)
@@ -250,7 +250,7 @@ def Gamma_VTI(self, C, dim):
         c1 = (C33 * (1 + 2 * gamma) - C44 + (C33 - C44) * (1 + 2 * delta)) / (2 * (C13 + C44))
         c2 = (- C33 * (1 + 2 * delta) + 2 * C44 - C33) / (2 * (C13 + C44)) - 1
         c3 = C33 * (C33 - C44)/(C13 + C44)
-        Q13 = (c1 * C33 * Q33 + c2 * C44 * Q44 + c3 * delta * self.Qdelta_inv)/C13
+        Q13 = (c1 * C33 * Q33 + c2 * C44 * Q44 + c3 * delta * self.Q_delta)/C13
 
     if dim == 2:
         Gamma = fire.as_matrix([[Q11, Q13, 0],
@@ -267,7 +267,7 @@ def Gamma_VTI(self, C, dim):
 
 def Gamma_TTI(self, dim, C):
 
-    C_vti_real = C_vti_tensor(dim)
+    C_vti_real = C_vti_tensor(self, dim)
 
     Q_vti = Gamma_VTI(self, C, dim)
 
@@ -324,8 +324,8 @@ def Gamma_TTI(self, dim, C):
             [0.0, 0.0, C44*Q44]
         ])
 
-    C_tti_real = C_tti_tensor(C_vti_real, dim)
-    C_tti_imag = C_tti_tensor(C_imag, dim)
+    C_tti_real = C_tti_tensor(self, C_vti_real, dim)
+    C_tti_imag = C_tti_tensor(self, C_imag, dim)
 
     eps = 1e-12
     Gamma = fire.as_tensor([

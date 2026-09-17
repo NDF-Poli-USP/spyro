@@ -63,7 +63,7 @@ class IsotropicWave(ElasticWave):
     #: declared is computed from the other.
     _physical_parameter_names = frozenset(ElasticMaterialParameter)
 
-    def __init__(self, dictionary, comm=None):
+    def __init__(self, dictionary, anisotropy=WaveType.ISOTROPIC_ELASTIC, comm=None):
         super().__init__(dictionary, comm=comm)
         self.rho = None   # Density
         self.lmbda = None  # First Lame parameter
@@ -267,16 +267,27 @@ class IsotropicWave(ElasticWave):
             self.mesh, self.method, self.degree, dim=1,
         )
 
-        def as_function(value, parameter):
-            """Return ``value`` as the independent field of ``parameter``.
+        # def as_function(value, parameter):
+        #     """Return ``value`` as the independent field of ``parameter``.
 
-            Before a mesh exists there is no space to build a ``Function``
-            in, so the value is left as the scalar or ``Constant`` it came
-            in as, and this set still carries the data.
-            """
+        #     Before a mesh exists there is no space to build a ``Function``
+        #     in, so the value is left as the scalar or ``Constant`` it came
+        #     in as, and this set still carries the data.
+        #     """
+        #     if space is None or isinstance(value, Function):
+        #         return value
+        #     return Function(space, name=parameter.value).interpolate(value)
+
+        def as_function(value, parameter):
             if space is None or isinstance(value, Function):
                 return value
+            # resolve lambda / callable que espera o mesh
+            if callable(value) and not isinstance(value, ufl.core.expr.Expr):
+                value = value(self.mesh)
             return Function(space, name=parameter.value).interpolate(value)
+
+        self.viscoelastic = self.input_dictionary.get("viscoelastic", False)
+
 
         if parameterization is ElasticMaterialParameterization.LAME:
             self.rho = as_function(self.rho, ElasticMaterialParameter.DENSITY)
@@ -284,8 +295,9 @@ class IsotropicWave(ElasticWave):
             self.mu = as_function(self.mu, ElasticMaterialParameter.MU)
             self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
             self.c_s = (self.mu/self.rho)**0.5
-            self.Q_lambda = as_function(self.Q_lambda, ViscoelasticMaterialParameter.Q_lambda)
-            self.Q_mu = as_function(self.Q_mu, ViscoelasticMaterialParameter.Q_mu)
+            if self.viscoelastic:
+                self.Q_lambda = as_function(self.Q_lambda, ViscoelasticMaterialParameter.Q_LAMBDA)
+                self.Q_mu = as_function(self.Q_mu, ViscoelasticMaterialParameter.Q_MU)
         elif parameterization is ElasticMaterialParameterization.VELOCITY:
             self.rho = as_function(self.rho, ElasticMaterialParameter.DENSITY)
             self.c = as_function(
@@ -296,8 +308,9 @@ class IsotropicWave(ElasticWave):
             )
             self.mu = self.rho*self.c_s**2
             self.lmbda = self.rho*self.c**2 - 2*self.mu
-            self.Q_vp = as_function(self.Q_vp, ViscoelasticMaterialParameter.Q_VP)
-            self.Q_vs = as_function(self.Q_vs, ViscoelasticMaterialParameter.Q_VS)
+            if self.viscoelastic:
+                self.Q_vp = as_function(self.Q_vp, ViscoelasticMaterialParameter.Q_VP)
+                self.Q_vs = as_function(self.Q_vs, ViscoelasticMaterialParameter.Q_VS)
 
         else:
             raise ValueError(
@@ -311,12 +324,7 @@ class IsotropicWave(ElasticWave):
         add(ElasticMaterialParameter.MU, self.mu)
         add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
         add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
-        if parameterization is ElasticMaterialParameterization.LAME:
-            add(ViscoelasticMaterialParameter.Q_LAMBDA, self.Q_lambda)
-            add(ViscoelasticMaterialParameter.Q_MU, self.Q_mu)
-        elif parameterization is ElasticMaterialParameterization.VELOCITY:
-            add(ViscoelasticMaterialParameter.Q_VP, self.Q_vp)
-            add(ViscoelasticMaterialParameter.Q_VS, self.Q_vs)
+        
 
     def gradient_solve(
         self,
@@ -464,8 +472,9 @@ class IsotropicWave(ElasticWave):
         self.Elastic_C = C_computation(self)
 
         self.viscoelastic = self.input_dictionary.get("viscoelastic", False) #Dictionary dentro de dictionary
-
+        print(self.viscoelastic)
         if self.viscoelastic:
+            
             d = self.input_dictionary.get("viscoelasticity", False)
             self.visco_type = d["visco_type"]
             W = TensorFunctionSpace(self.function_space.mesh(), "DG", 0)
