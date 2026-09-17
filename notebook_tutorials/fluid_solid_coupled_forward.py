@@ -1,51 +1,17 @@
-import spyro
-import matplotlib.pyplot as plt
-import numpy as np
 import time
 import resource
-import firedrake as fire
+import numpy as np
 
 from spyro.solvers.acoustic_elastic_wave import AcousticElasticWave
-from spyro.plots.receiver_plots import plot_receiver_response, plot_displacement_components
-
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-
-import matplotlib.pyplot as plt
-
-def plot_interface_displacement_continuity(Wave_obj, receiver_index=0, filename="results/interface_displacement_check.png"):
-    """Compara o deslocamento normal calculado do lado fluido (via integração
-    da aceleração a partir de grad(p)) com o deslocamento u_x medido do lado
-    sólido, no mesmo receiver de interface.
-    """
-    uf_x = [step[receiver_index] for step in Wave_obj.fluid_displacement_history]
-
-    solid_data = np.array(Wave_obj.solid_receiver_history)  # shape: (nsteps, nreceivers, dim)
-    ux_solid = solid_data[:, receiver_index, 1]  # índice 1 = componente x (convenção z,x)
-
-    dt = Wave_obj.dt
-    t = np.arange(len(uf_x)) * dt
-
-    n = min(len(uf_x), len(ux_solid))
-    uf_x, ux_solid, t = uf_x[:n], ux_solid[:n], t[:n]
-
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(t, uf_x, 'b-', lw=1.5, label='u_x no lado fluido (calculado)')
-    ax.plot(t, ux_solid, 'r--', lw=1.2, label='u_x no lado sólido (medido)')
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Displacement x (normal)")
-    ax.set_title("Interface normal displacement continuity")
-    ax.legend()
-    ax.grid(True, ls=':')
-    plt.tight_layout()
-    plt.savefig(filename, dpi=200)
-    print(f"Salvo em {filename}")
+from spyro.plots.receiver_plots import (
+    plot_receiver_response,
+    plot_interface_displacement_continuity,
+)
 
 dictionary = {}
 
 dictionary["options"] = {
-    "cell_type": "T",
+    "cell_type": "Q",
     "variant": "lumped",
     "degree": 2,
     "dimension": 2,
@@ -61,7 +27,7 @@ dictionary["mesh"] = {
     "length_y": 0.0,
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
-    "edge_length": 0.005, # 0.005, 0.0035, 0.0025
+    "edge_length": 0.005,
     "interface_x": 0.5,
     "absorb_left": False,
     "absorb_right": False,
@@ -73,10 +39,10 @@ dictionary["acquisition"] = {
     "source_type": "ricker",
     "source_locations": [(-0.5, 0.6)],
     "frequency": 25.0,
-    "delay": 1.0/25.0,
+    "delay": 1.0 / 25.0,
     "delay_type": "time",
     "receiver_locations": [(-0.51, 0.5025)],
-    "solid_receiver_locations": [(-0.49, 0.4975)], 
+    "solid_receiver_locations": [(-0.49, 0.4975)],
     "user_vertex_only_mesh": True,
 }
 
@@ -96,7 +62,7 @@ dictionary["visualization"] = {
     "graadient_output": False,
     "gradient_filename": None,
     "debug_output": False,
-    "displacement_output":False,
+    "displacement_output": False,
     "displacement_output_filename": "results/displacement.pvd",
     "snapshot_frequency": 20,
     "snapshot_output_dir": "results/snapshots",
@@ -110,22 +76,20 @@ dictionary["visualization"] = {
 dictionary["synthetic_data"] = {
     "type": "object",
     "velocity_fluid": None,
-    "bulk_modulus": 2.25,
+    "bulk_modulus": 4.0,
     "density_fluid": 1.0,
-    "density_solid": 2.0,
+    "density_solid": 1.0,
     "p_wave_velocity": 2.0,
-    "s_wave_velocity": 1.2,
+    "s_wave_velocity": 0.0,
     "real_velocity_file": None,
 }
 
 Wave_obj = AcousticElasticWave(dictionary=dictionary)
-Wave_obj.use_monolithic = False
+Wave_obj.use_monolithic = True
+
 t_start = time.perf_counter()
 Wave_obj.forward_solve()
-plot_interface_displacement_continuity(Wave_obj, receiver_index=0)
-
-t_end = time.perf_counter()
-elapsed = t_end - t_start
+elapsed = time.perf_counter() - t_start
 mem_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
 
 print("Computational cost: Fluid-Solid Coupled")
@@ -133,14 +97,7 @@ print(f"  Elapsed time (s): {elapsed:.2f}")
 print(f"  Memory (MB):      {mem_mb:.2f}")
 np.savez("results/cost.npz", elapsed=elapsed, memory_mb=mem_mb)
 
-import numpy as np
-# np.savez(
-#     "results/spyro_receiver_data.npz",
-#     p_spyro=np.asarray(Wave_obj.forward_solution_receivers)[:, 0],
-#     u_solid=np.array(Wave_obj.solid_receiver_history)[:, 0, :],
-#     dt=dictionary["time_axis"]["dt"],
-#     final_time=dictionary["time_axis"]["final_time"],
-# )
+plot_interface_displacement_continuity(Wave_obj, receiver_index=0)
 
 receiver_data = Wave_obj.forward_solution_receivers[:, 0]
 plot_receiver_response(
@@ -149,12 +106,3 @@ plot_receiver_response(
     filename="results/receiver_fluid.png",
     receiver_id_for_title=0,
 )
-
-# solid_data = np.array(Wave_obj.solid_receiver_history)[:, 0, :]
-# plot_displacement_components(
-#     time_vector=np.linspace(0, dictionary["time_axis"]["final_time"], len(solid_data)),
-#     receiver_results=solid_data,
-#     source_type="Ricker",
-#     filename="results/receiver_solid.png",
-# )
-

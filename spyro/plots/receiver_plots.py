@@ -10,6 +10,7 @@ from .plot_helpers import _finalize_figure
 
 if TYPE_CHECKING:  # Avoinding circular imports lazily
     from ..solvers.wave import Wave
+    from ..solvers.acoustic_elastic_wave import AcousticElasticWave
 
 
 def plot_receiver_response(
@@ -380,3 +381,64 @@ def plot_compare_receivers_array(
     _finalize_figure(
         plt.gcf(), output_path, formats=("png", "pdf"), show=show, bbox_inches="tight"
     )
+
+
+def plot_interface_displacement_continuity(
+    wave_obj: "AcousticElasticWave",
+    receiver_index: int = 0,
+    show: bool = False,
+    filename: str | Path | None = "results/interface_displacement_check.png",
+):
+    """Plot fluid-side vs solid-side normal displacement at an interface receiver.
+
+    Compares the fluid-side normal displacement (integrated in time from
+    grad(p) at the receiver location) against the solid-side u_x measured
+    directly at the corresponding interface receiver.
+
+    Parameters
+    ----------
+    wave_obj : AcousticElasticWave
+        A wave object that has already run `forward_solve()`, exposing
+        `fluid_displacement_history`, `solid_receiver_history` and `dt`.
+    receiver_index : int, optional
+        Index of the interface receiver pair to compare. Default is 0.
+    show : bool, optional
+        Whether to display the plot interactively. Default is False.
+    filename : str or pathlib.Path, optional
+        If provided, save the plot to this file. Default is
+        "results/interface_displacement_check.png".
+
+    Returns
+    -------
+    None
+        The function creates the plot and optionally saves or displays it.
+    """
+    uf_x = np.asarray(
+        [step[receiver_index] for step in wave_obj.fluid_displacement_history]
+    )
+
+    solid_data = np.array(wave_obj.solid_receiver_history)
+    ux_solid = solid_data[:, receiver_index, 1]
+
+    n = min(uf_x.size, ux_solid.size)
+    if n == 0:
+        raise ValueError("No samples available to compare at the interface")
+
+    uf_x, ux_solid = uf_x[:n], ux_solid[:n]
+    time_vector = np.arange(n) * wave_obj.dt
+
+    plt.close()
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(time_vector, uf_x, "b-", linewidth=1.5, label="fluid-side u_x (computed)")
+    ax.plot(
+        time_vector, ux_solid, "r--", linewidth=1.2, label="solid-side u_x (measured)"
+    )
+    ax.set_xlabel("time (s)", fontsize=18)
+    ax.set_ylabel("normal displacement x", fontsize=18)
+    ax.set_title("Interface normal displacement continuity", fontsize=22)
+    ax.legend()
+    ax.tick_params(axis="both", labelsize=18)
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+
+    _finalize_figure(fig, filename=filename, show=show)
