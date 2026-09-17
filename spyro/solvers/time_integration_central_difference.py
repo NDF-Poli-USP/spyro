@@ -164,12 +164,13 @@ def _propagate_forward_central_difference(wave, source_ids):
                 if isinstance(real_shot_record[step], np.ndarray):
                     # The sampled function only holds the receivers owned
                     # by this spatial rank, so restrict the global record
-                    # to them (issue #315).
-                    real_shot = fire.Function(
-                        usol_recv[-1].function_space(),
-                        val=wave.receivers.local_receiver_values(
+                    # to them (issue #315). Written through data_wo because
+                    # ``val`` would also have to cover the halo points.
+                    real_shot = fire.Function(usol_recv[-1].function_space())
+                    real_shot.dat.data_wo[:] = (
+                        wave.receivers.local_receiver_values(
                             real_shot_record[step]
-                        ),
+                        )
                     )
                     misfit_step = real_shot - usol_recv[-1]
                 elif isinstance(real_shot_record[step], fire.Function):
