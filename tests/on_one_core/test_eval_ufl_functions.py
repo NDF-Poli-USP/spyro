@@ -1,5 +1,14 @@
+"""Unit tests for the evaluation of UFL expressions with `generate_ufl_functions` utility.
+
+The utility `generate_ufl_functions` is implemented in `spyro.utils.eval_functions_to_ufl`
+and is responsible for safely converting user-provided mathematical expressions into UFL
+expressions that can be evaluated within the Firedrake framework.
+The test suite ensures that the utility correctly handles a wide variety of mathematical
+expressions in both 2D and 3D contexts including edge cases, and that it properly blocks
+any potentially dangerous operations that could compromise the security of the system.
+"""
 from firedrake import Function, FunctionSpace, UnitSquareMesh, UnitCubeMesh
-import numpy as np
+from numpy import all, isfinite
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
 
 
@@ -56,7 +65,7 @@ def test_run_eval_ufl_functions_2d():
         data = f.dat.data
 
         # Checking interpolated data (assertion for non-inf and non-nan)
-        assert np.all(np.isfinite(data)), f"✗ Invalid data in {description}" \
+        assert all(isfinite(data)), f"✗ Invalid data in {description}" \
             + f"   Expression: {expr}"
         success_msg = (f"✓ {description}\n"
                        f"   Expression: {expr}\n"
@@ -121,7 +130,7 @@ def test_run_eval_ufl_functions_3d():
         data = f.dat.data
 
         # Checking interpolated data (assertion for non-inf and non-nan)
-        assert np.all(np.isfinite(data)), f"✗ Invalid data in {description}" \
+        assert all(isfinite(data)), f"✗ Invalid data in {description}" \
             + f"   Expression: {expr}"
         success_msg = (f"✓ {description}\n"
                        f"   Expression: {expr}\n"

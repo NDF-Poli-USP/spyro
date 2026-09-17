@@ -56,10 +56,10 @@ def test_velocity_to_grid():
         "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
     }
 
-    wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02})
-    z = wave_obj.mesh_z
-    x = wave_obj.mesh_x
+    wave = spyro.AcousticWave(dictionary=dictionary)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.02})
+    z = wave.mesh_z
+    x = wave.mesh_x
     zc = -1.5
     xc = 1.5
     rc = 0.7
@@ -68,9 +68,13 @@ def test_velocity_to_grid():
     cond = fire.conditional(
         (z - zc) ** 2 + (x - xc) ** 2 < rc**2, vmax, vmin
     )
-    wave_obj.set_initial_velocity_model(conditional=cond)
+    wave.set_initial_velocity_model(conditional=cond)
     grid_spacing = 0.02
-    grid_velocity_data = spyro.utils.velocity_to_grid(wave_obj, grid_spacing)
+    grid_velocity_data = spyro.utils.velocity_to_grid(
+        wave.initial_velocity_model,
+        wave.mesh_parameters,
+        grid_spacing,
+    )
 
     vp = grid_velocity_data["vp_values"]
     nz, nx = vp.shape

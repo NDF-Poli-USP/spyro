@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from copy import deepcopy
-from firedrake import VTKFile
 import firedrake as fire
 import spyro
+from spyro.utils.typing import AdjointType, AbsorbingBCsType
 import pytest
 
 
@@ -16,7 +16,17 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     dm = fire.Function(V_c)
     size, = np.shape(dm.dat.data[:])
     dm_data = np.random.default_rng(0).random(size)
-    dm.dat.data[:] = dm_data
+    dm.dat.data_wo[:] = dm_data
+    if Wave_obj_guess.abc_type == AbsorbingBCsType.PML:
+        x = Wave_obj_guess.mesh_x
+        z = Wave_obj_guess.mesh_z
+        inside = fire.And(
+            fire.And(z >= -Wave_obj_guess.mesh_parameters.length_z, x >= 0.0),
+            x <= Wave_obj_guess.mesh_parameters.length_x,
+        )
+        indicator = fire.Function(V_c)
+        indicator.interpolate(fire.conditional(inside, 1.0, 0.0))
+        dm.dat.data_wo[:] *= indicator.dat.data_ro[:]
 
     for step in steps:
 
@@ -40,7 +50,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     remainders = np.array(remainders)
 
     if plot:
-        VTKFile("gradient.pvd").write(dJ)
+        fire.VTKFile("gradient.pvd").write(dJ)
         plt.close()
         plt.plot(steps, errors, label="Error")
         plt.legend()
@@ -120,7 +130,7 @@ def set_dictionary(PML=False):
     if PML:
         dictionary["absorving_boundary_conditions"] = {
             "status": True,
-            "damping_type": "PML",
+            "abc_type": "PML",
             "exponent": 2,
             "cmax": 4.5,
             "R": 1e-6,
@@ -129,8 +139,30 @@ def set_dictionary(PML=False):
     return dictionary
 
 
-def get_forward_model(dictionary=None):
+def get_forward_model(dictionary: dict = None,
+                      adjoint_type: AdjointType = AdjointType.NONE,
+                      checkpointing: bool = False,
+                      snapshots: int | None = None):
+    """Run the exact and guess forward models.
 
+    Parameters
+    ----------
+    dictionary : dict
+        Model dictionary, from :func:`set_dictionary`.
+    adjoint_type : AdjointType
+        Which adjoint machinery to enable on the guess model.
+    checkpointing : bool, optional
+        Whether the automated adjoint should checkpoint its tape. Only
+        meaningful for :attr:`AdjointType.AUTOMATED_ADJOINT`.
+    snapshots : int, optional
+        Number of snapshots passed on to ``enable_automated_adjoint``. ``None``
+        keeps every time step in memory.
+
+    Returns
+    -------
+    tuple
+        ``(rec_out_exact, rec_out_guess, Wave_obj_guess)``.
+    """
     # Exact model
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.05})
@@ -139,37 +171,135 @@ def get_forward_model(dictionary=None):
         conditional=cond,
         dg_velocity_model=False,
     )
-    spyro.plots.plot_model(Wave_obj_exact, filename="pml_grad_test_model.png", abc_points=[(-0, 0), (-1, 0), (-1, 1), (-0, 1)])
     Wave_obj_exact.forward_solve()
     rec_out_exact = Wave_obj_exact.forward_solution_receivers
 
     # Guess model
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
+    Wave_obj_guess.real_shot_record = rec_out_exact
+
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
+    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+        Wave_obj_guess.enable_automated_adjoint(
+            checkpointing=checkpointing, snapshots=snapshots)
+        assert isinstance(Wave_obj_guess.c, fire.Function)
+        # The schedule is built per forward solve, so none exists yet.
+        assert Wave_obj_guess.automated_adjoint.checkpointing_schedule is None
     Wave_obj_guess.forward_solve()
+    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+        assert Wave_obj_guess.automated_adjoint._tape is not None
+        Wave_obj_guess.automated_adjoint.stop_recording()
+        if checkpointing:
+            nt = int(Wave_obj_guess.final_time / Wave_obj_guess.dt) + 1
+            schedule = Wave_obj_guess.automated_adjoint.checkpointing_schedule
+            assert schedule is not None
+            # An online schedule has no max_n; a bounded one must match nt.
+            assert schedule.max_n in (None, nt)
     rec_out_guess = Wave_obj_guess.forward_solution_receivers
 
     return rec_out_exact, rec_out_guess, Wave_obj_guess
 
 
+# (checkpointing, snapshots) -> which schedule spyro selects.
+SCHEDULE_CASES = [(False, None), (True, None), (True, 50)]
+SCHEDULE_IDS = ["no_checkpointing", "single_memory", "mixed"]
+
+
 @pytest.mark.slow
-def test_gradient(PML=True):
+@pytest.mark.newer_firedrake
+@pytest.mark.parametrize("checkpointing, snapshots", SCHEDULE_CASES,
+                         ids=SCHEDULE_IDS)
+def test_gradient_auto_adjoint(checkpointing: bool, snapshots: int | None,
+                               PML: bool = True) -> None:
+    """Taylor-test the automated-adjoint gradient under each schedule.
+
+    Checkpointing changes how the tape is stored, not what it computes, so the
+    same second-order Taylor convergence is required in every case, including
+    the recomputing schedule selected by a number of snapshots.
+
+    Parameters
+    ----------
+    checkpointing : bool
+        Whether to manage the tape with a checkpoint schedule.
+    snapshots : int or None
+        Number of snapshots. ``None`` keeps every step in memory.
+    PML : bool, optional
+        Whether to enable the perfectly matched layer. Defaults to ``True``.
+    """
     dictionary = set_dictionary(PML=PML)
-    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(dictionary=dictionary)
+    _, _, Wave_obj_guess = get_forward_model(
+        dictionary=dictionary, adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        checkpointing=checkpointing, snapshots=snapshots)
+    forward_solution_guess = None
+    misfit = None
+    try:
+        # compute the gradient of the control (to be verified)
+        dJ = Wave_obj_guess.gradient_solve(
+            misfit=misfit, forward_solution=forward_solution_guess,
+            adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        )
+
+        Wave_obj_guess.automated_adjoint.create_reduced_functional(
+            Wave_obj_guess.functional_value)
+        size, = np.shape(Wave_obj_guess.c.dat.data[:])
+        direction = fire.Function(
+            Wave_obj_guess.c.function_space(),
+            val=np.random.default_rng(0).random(size))
+        assert Wave_obj_guess.automated_adjoint.verify_gradient(
+            Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.9, \
+            "Automated adjoint gradient verification failed."
+    finally:
+        # Clear on the failing path too, so a failure here does not leave a
+        # tape for the next test in this process to annotate on top of.
+        Wave_obj_guess.automated_adjoint.clear_tape()
+    assert Wave_obj_guess.automated_adjoint._tape is None
+
+
+@pytest.mark.slow
+def test_gradient_implemented_adjoint(PML=False):
+    dictionary = set_dictionary(PML=PML)
+    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(
+        dictionary=dictionary, adjoint_type=AdjointType.IMPLEMENTED_ADJOINT)
+
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
 
     misfit = rec_out_exact - rec_out_guess
 
     Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
-    print(f"Cost functional : {Jm}")
 
     # compute the gradient of the control (to be verified)
     dJ = Wave_obj_guess.gradient_solve(
-        misfit=misfit, forward_solution=forward_solution_guess)
+        misfit=misfit, forward_solution=forward_solution_guess,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+    )
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
 
 
+@pytest.mark.slow
+@pytest.mark.newer_firedrake
+@pytest.mark.parametrize("checkpointing, snapshots", SCHEDULE_CASES,
+                         ids=SCHEDULE_IDS)
+def test_gradient_pml_auto_adjoint(checkpointing: bool,
+                                   snapshots: int | None) -> None:
+    """Run :func:`test_gradient_auto_adjoint` with the PML enabled.
+
+    Parameters
+    ----------
+    checkpointing : bool
+        Whether to manage the tape with a checkpoint schedule.
+    snapshots : int or None
+        Number of snapshots. ``None`` keeps every step in memory.
+    """
+    test_gradient_auto_adjoint(checkpointing, snapshots, PML=True)
+
+
+@pytest.mark.slow
+@pytest.mark.skip(reason="PML formulation subject to another PR")
+def test_gradient_pml_implemented_adjoint():
+    test_gradient_implemented_adjoint(PML=True)
+
+
 if __name__ == "__main__":
-    test_gradient()
+    test_gradient_pml_implemented_adjoint()

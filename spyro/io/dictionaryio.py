@@ -1,6 +1,74 @@
+"""Class for reading option section int he input dictionary."""
+
+from enum import Enum
+from pydantic import BaseModel, field_validator, model_validator, ConfigDict
 
 
-class Read_options:
+class ListEnum(Enum):
+    def __new__(cls, value, *aliases):
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.aliases = aliases
+        return obj
+
+    @classmethod
+    def _missing_(cls, value):
+        for member in cls:
+            if value in member.aliases:
+                return member
+
+        return None
+
+
+class Method(ListEnum):
+    MASS_LUMPED_TRIANGLE = (
+        "mass_lumped_triangle",
+        "KMV",
+        "MLT",
+        "mass_lumped_tetrahedra",
+    )
+    SPECTRAL_QUADRILATERAL = ("spectral_quadrilateral", "spectral", "SEM")
+    DISCONTINUOUS_GALERKIN_TRIANGLE = (
+        "DG_triangle",
+        "DGT",
+        "discontinuous_galerkin_triangle",
+    )
+    DISCONTINUOUS_GALERKIN_QUADRILATERAL = (
+        "DG_quadrilateral",
+        "DGQ",
+        "discontinuous_galerkin_quadrilateral",
+    )
+
+    CG = ("CG",)
+
+
+class CellType(ListEnum):
+    TRIANGLE = ("triangle", "T", "triangles", "tetrahedra", "tetrahedron")
+    QUADRILATERAL = ("quadrilateral", "Q", "quadrilaterals", "hexahedra", "hexahedron")
+
+
+class Variant(Enum):
+    LUMPED = "lumped"
+    EQUISPACED = "equispaced"
+    DG = "DG"
+
+
+class Analysis(Enum):
+    MODAL = "modal"
+    EIKONAL = "eikonal"
+    TRANSIENT = "transient"
+
+
+class Read_options(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
+    degree: int
+    dimension: int
+    analysis: Analysis = Analysis.TRANSIENT.value
+    variant: Variant | None = None
+    method: Method | None = None
+    cell_type: CellType | None = None
+    automatic_adjoint: bool = False
     """
     Read the options section of the dictionary.
 
@@ -20,6 +88,8 @@ class Read_options:
         The spatial dimension of the problem.
     automatic_adjoint : bool
         Whether to automatically compute the adjoint.
+    analysis : `str`
+        The type of analysis to be performed. Can be 'transient', 'modal' or 'eikonal'.
 
     Methods
     -------
@@ -35,186 +105,135 @@ class Read_options:
         Get the method, cell type and variant from the cell type and variant.
     """
 
-    def __init__(self, dictionary={}):
-        options_dictionary = dictionary["options"]
-        options_dictionary.setdefault("method", None)
-        options_dictionary.setdefault("cell_type", None)
-        options_dictionary.setdefault("variant", None)
-        options_dictionary.setdefault("degree", None)
-        options_dictionary.setdefault("dimension", None)
-        options_dictionary.setdefault("automatic_adjoint", False)
-        self.options_dictionary = options_dictionary
+    @field_validator("degree")
+    @classmethod
+    def validate_degree(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("Degree should be greater than 0.")
+        return value
 
-        self.variant = options_dictionary["variant"]
-        self.method = options_dictionary["method"]
-        if options_dictionary["cell_type"] is not None:
-            self.cell_type = options_dictionary["cell_type"]
-        self.degree = options_dictionary["degree"]
-        self.dimension = options_dictionary["dimension"]
+    @field_validator("dimension")
+    @classmethod
+    def validate_dimension(cls, value: int) -> int:
+        if value not in (2, 3):
+            raise ValueError(f"Dimension of {value} not 2 or 3.")
+        return value
 
-    @property
-    def variant(self):
-        return self._variant
+    @model_validator(mode="after")
+    def validate_model(self):
+        if self.method == Method.CG.value and (
+            self.variant is None or self.cell_type is None
+        ):
+            raise ValueError("Can't use CG without specifying cell type and variant.")
 
-    @variant.setter
-    def variant(self, value):
-        accepted_variants = ["lumped", "equispaced", "DG", None]
-        if value not in accepted_variants:
-            raise ValueError(f"Variant of {value} is not valid.")
-        self._variant = value
+        if self.cell_type is None:
+            self._set_cell_type()
 
-    @property
-    def method(self):
-        return self._method
+        self._validate_cell_type()
 
-    @method.setter
-    def method(self, value):
-        mlt_equivalents = [
-            "KMV",
-            "MLT",
-            "mass_lumped_triangle",
-            "mass_lumped_tetrahedra",
-        ]
-        sem_equivalents = ["spectral", "SEM", "spectral_quadrilateral"]
-        dg_t_equivalents = [
-            "DG_triangle",
-            "DGT",
-            "discontinuous_galerkin_triangle",
-        ]
-        dg_q_equivalents = [
-            "DG_quadrilateral",
-            "DGQ",
-            "discontinuous_galerkin_quadrilateral",
-        ]
-        if value in mlt_equivalents:
-            self._method = "mass_lumped_triangle"
-            self.cell_type = "triangle"
-        elif value in sem_equivalents:
-            self._method = "spectral_quadrilateral"
-            self.cell_type = "quadrilateral"
-        elif value in dg_t_equivalents:
-            self._method = "DG_triangle"
-            self.cell_type = "triangle"
-        elif value in dg_q_equivalents:
-            self._method = "DG_quadrilateral"
-            self.cell_type = "quadrilateral"
-        elif value == "DG":
-            raise ValueError(
-                "DG is not a valid method. Please specify \
-                either DG_triangle or DG_quadrilateral."
-            )
-        elif value == "CG":
-            if "variant" in self.input_dictionary["options"] and "cell_type" \
-                    in self.input_dictionary["options"]:
-                self._method = "CG"
-            else:
-                raise ValueError("Cant use CG without specifying cell type and variant.")
-        elif value is None:
-            self._method = None
-        else:
-            raise ValueError(f"Method of {value} is not valid.")
+        if (
+            self.variant is not None
+            and self.cell_type is not None
+            and self.method is None
+        ):
+            self._set_default_method()
 
-    @property
-    def cell_type(self):
-        return self._cell_type
+        return self
 
-    @cell_type.setter
-    def cell_type(self, value):
-        triangle_equivalents = [
-            "T", "triangle", "triangles", "tetrahedra", "tetrahedron"
-        ]
-        triangle_methods = [
-            "mass_lumped_triangle", "DG_triangle", "CG"
-        ]
-        quadrilateral_equivalents = [
-            "Q", "quadrilateral", "quadrilaterals", "hexahedra", "hexahedron"
-        ]
-        quadrilateral_methods = [
-            "spectral_quadrilateral", "DG_quadrilateral", "CG"
-        ]
-
-        if value is None:
-            self._cell_type = None
+    def _set_cell_type(self):
+        if self.method is None:
             return
 
-        if value in triangle_equivalents:
-            canonical = "triangle"
-            if self.method is not None and self.method not in triangle_methods:
-                raise ValueError(
-                    f"Cell type '{canonical}' is not "
-                    f"compatible with method '{self.method}'.")
-            self._cell_type = canonical
-        elif value in quadrilateral_equivalents:
-            canonical = "quadrilateral"
-            if self.method is not None and self.method not in quadrilateral_methods:
-                raise ValueError(
-                    f"Cell type '{canonical}' is not "
-                    f"compatible with method '{self.method}'.")
-            self._cell_type = canonical
-        else:
-            raise ValueError(f"Cell type '{value}' is not supported.")
+        if self.method in (
+            Method.MASS_LUMPED_TRIANGLE.value,
+            Method.DISCONTINUOUS_GALERKIN_TRIANGLE.value,
+        ):
+            self.cell_type = CellType.TRIANGLE
 
-        if self.variant is not None and self.method is None:
-            if self.variant == "lumped" and canonical == "triangle":
-                self.method = "mass_lumped_triangle"
-            elif self.variant == "DG" and canonical == "triangle":
-                self.method = "DG_triangle"
-            elif self.variant == "equispaced" and canonical == "triangle":
-                self.method = "CG"
-            elif self.variant == "lumped" and canonical == "quadrilateral":
-                self.method = "spectral_quadrilateral"
-            elif self.variant == "DG" and canonical == "quadrilateral":
-                self.method = "DG_quadrilateral"
-            elif self.variant == "equispaced" and canonical == "quadrilateral":
-                self.method = "CG"
-            else:
-                raise ValueError(
-                    f"Cell type of {canonical} not "
-                    f"compatible with variant {self.variant}.")
+        elif self.method in (
+            Method.SPECTRAL_QUADRILATERAL.value,
+            Method.DISCONTINUOUS_GALERKIN_QUADRILATERAL.value,
+        ):
+            self.cell_type = CellType.QUADRILATERAL
 
-    @property
-    def degree(self):
-        return self._degree
+    def _validate_cell_type(self):
+        if self.method is None or self.method == Method.CG.value:
+            return
 
-    @degree.setter
-    def degree(self, value):
-        if not isinstance(value, int):
-            raise ValueError("Degree has to be integer")
-        self._degree = value
+        if (
+            self.cell_type == CellType.TRIANGLE.value
+            and self.method
+            not in Method.MASS_LUMPED_TRIANGLE.value
+            + Method.DISCONTINUOUS_GALERKIN_TRIANGLE.value
+        ):
+            raise ValueError(
+                f"Cell type '{self.cell_type}' is not "
+                f"compatible with method '{self.method}'."
+            )
 
-    @property
-    def dimension(self):
-        return self._dimension
+        if (
+            self.cell_type == CellType.QUADRILATERAL.value
+            and self.method
+            not in Method.DISCONTINUOUS_GALERKIN_QUADRILATERAL.value
+            + Method.SPECTRAL_QUADRILATERAL.value
+        ):
+            raise ValueError(
+                f"Cell type '{self.cell_type}' is not "
+                f"compatible with method '{self.method}'."
+            )
 
-    @dimension.setter
-    def dimension(self, value):
-        if value not in {2, 3}:
-            raise ValueError(f"Dimension of {value} not 2 or 3.")
-        self._dimension = value
+    def _set_default_method(self):
+        default_method = {
+            CellType.TRIANGLE: {
+                Variant.LUMPED: Method.MASS_LUMPED_TRIANGLE,
+                Variant.DG: Method.DISCONTINUOUS_GALERKIN_TRIANGLE,
+                Variant.EQUISPACED: Method.CG,
+            },
+            CellType.QUADRILATERAL: {
+                Variant.LUMPED: Method.SPECTRAL_QUADRILATERAL,
+                Variant.DG: Method.DISCONTINUOUS_GALERKIN_QUADRILATERAL,
+                Variant.EQUISPACED: Method.CG,
+            },
+        }
+
+        try:
+            self.method = default_method[CellType(self.cell_type)][
+                Variant(self.variant)
+            ].value
+        except KeyError:
+            raise ValueError(
+                f"Cell type '{self.cell_type}' not compatible "
+                f"with variant '{self.variant}'."
+            )
 
 
-class Read_outputs:
-    def __init__(self):
+class Read_outputs(BaseModel):
+    forward_output: bool = True
+    forward_output_filename: str | None = "results/forward_output.pvd"
 
-        v_str = "visualization"
-        self.input_dictionary.setdefault(v_str, {})
-        self.input_dictionary[v_str].setdefault("forward_output", False)
-        self.forward_output = self.input_dictionary[v_str]["forward_output"]
-        self.input_dictionary[v_str].setdefault("forward_output_filename",
-                                                "results/forward.pvd")
-        self.forward_output_filename = self.input_dictionary[
-            v_str]["forward_output_filename"]
-        self.input_dictionary[v_str].setdefault("gradient_output", False)
-        self.gradient_output = self.input_dictionary[v_str]["gradient_output"]
-        self.input_dictionary[v_str].setdefault("gradient_filename",
-                                                "results/gradient.pvd")
-        self.gradient_filename = self.input_dictionary[
-            v_str]["gradient_filename"]
-        self.input_dictionary[v_str].setdefault("adjoint_output", False)
-        self.adjoint_output = self.input_dictionary[v_str]["adjoint_output"]
-        self.input_dictionary[v_str].setdefault("adjoint_filename",
-                                                "results/adjoint.pvd")
-        self.adjoint_filename = self.input_dictionary[
-            v_str]["adjoint_filename"]
-        self.input_dictionary[v_str].setdefault("debug_output", False)
-        self.debug_output = self.input_dictionary[v_str]["debug_output"]
+    gradient_filename: str | None = None
+    gradient_output: bool = False
+
+    adjoint_filename: str | None = None
+    adjoint_output: bool = False
+
+    time_filename: str | None = None
+    time: bool = False
+
+    acoustic_energy_filename: str | None = None
+    acoustic_energy: bool = False
+
+    mechanical_energy_filename: str | None = None
+    mechanical_energy: bool = False
+
+    output_folder: str = "output/"
+    debug_output: bool = False
+
+    def __getitem__(self, key: str):
+        return getattr(self, key)
+
+    def get(self, key: str, default=None):
+        if hasattr(self, key):
+            return getattr(self, key)
+
+        return default

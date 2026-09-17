@@ -1,3 +1,5 @@
+"""Reusable examples to assist with development and testing."""
+
 from .camembert import Camembert_acoustic
 from .camembert import Camembert_acoustic_FWI
 from .marmousi import Marmousi_acoustic

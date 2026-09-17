@@ -68,9 +68,9 @@ def test_read_and_write_segy():
         "receiver_locations": [(-0.0, 0.5)],
     }
 
-    Wave_obj = spyro.AcousticWave(dictionary=model)
+    wave = spyro.AcousticWave(dictionary=model)
 
-    vp_read = spyro.io.interpolate(Wave_obj, hdf5_file, Wave_obj.function_space)
+    vp_read = spyro.io.interpolate(wave, hdf5_file, wave.function_space)
 
     fire.VTKFile("velocity_models/test.pvd").write(vp_read)
 

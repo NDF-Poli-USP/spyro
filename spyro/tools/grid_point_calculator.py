@@ -212,6 +212,7 @@
 #             print("With G equal to " + str(G))
 #             print("Entering wave solver", flush=True)
 #             p0 = wave_solver(model, G, comm)
+#             TODO: Use MeasureError class from spyro.tools.error_measure instead of this.
 #             error = error_calc(p_exact, p0, model, comm=comm)
 #             print("Error of " + str(error))
 
@@ -262,7 +263,7 @@
 
 #     return M
 
-
+# TODO: Use MeasureError class from spyro.tools.error_measure instead of this.
 # def error_calc(p_exact, p, model, comm=False):
 #     """Calculates the error between the exact and the numerical solution
 

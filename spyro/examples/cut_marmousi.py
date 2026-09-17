@@ -1,10 +1,10 @@
+"""Cut Marmousi acoustic example configuration."""
+
 from spyro import create_transect
 from spyro.examples.example_model import Example_model_acoustic
 
 cut_marmousi_optimization_parameters = {
-    "General": {
-        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
-    },
+    "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
     "Step": {
         "Type": "Augmented Lagrangian",
         "Augmented Lagrangian": {
@@ -64,8 +64,7 @@ cut_marmousi_dictionary["inversion"] = {
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
 cut_marmousi_dictionary["absorving_boundary_conditions"] = {
     "status": False,  # True or false
-    "outer_bc": False,  # None or non-reflective (outer boundary condition)
-    "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
+    "abc_type": "PML",
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
     "R": 1e-6,  # theoretical reflection coefficient
@@ -105,16 +104,21 @@ cut_marmousi_dictionary["time_axis"] = {
 
 
 class Cut_marmousi_acoustic(Example_model_acoustic):
-    """
-    Class for the cut marmousi model.
+    """Class for the cut marmousi model.
 
     Example Setup
 
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+    These examples are intended as reusable velocity model configurations to
+    assist in the development and testing of new methods, such as optimization
+    algorithms, time-marching schemes, or inversion techniques.
 
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
+    Unlike targeted test cases, these examples do not have a specific objective
+    or expected result. Instead, they provide standardized setups, such as
+    Camembert, rectangular, and Marmousi velocity models, that can be quickly
+    reused when prototyping, testing, or validating new functionality.
 
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+    By isolating the setup of common velocity models, we aim to reduce
+    boilerplate and encourage consistency across experiments.
 
     Feel free to adapt these templates to your needs.
 
