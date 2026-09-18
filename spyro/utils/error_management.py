@@ -664,3 +664,39 @@ def _join_options(values, conjunction="or"):
         return values[0]
 
     return f"{', '.join(values[:-1])} {conjunction} {values[-1]}"
+
+
+def required_together_parameter_error(parameter_name_lst, parameter_value_lst):
+    """Raise a ValueError if some parameters in a group aren't given.
+
+    Parameters
+    ----------
+    parameter_name_lst : `list` of `str`
+        List of names of the parameters that must be given together.
+    parameter_value_lst : `list`
+        List of values of the parameters that must be given together.
+
+    Riases
+    ------
+    ValueError
+        If at least one of the parameters have been provided by the
+        user. That is, some parameter values are not `None`.
+    """
+    parameter_defined = [
+        parameter
+        for parameter, value in zip(parameter_name_lst, parameter_value_lst)
+        if value is not None
+    ]
+
+    if 0 < len(parameter_defined) < len(parameter_name_lst):
+        parameter_missing = [
+            parameter
+            for parameter in parameter_name_lst
+            if parameter not in parameter_defined
+        ]
+        exc_str = (
+            f"Parameters {_join_options(parameter_name_lst, conjunction='and')} "
+            "must be provided together.\n"
+        )
+        err_str = f"Missing: {_join_options(parameter_missing)}."
+        raise ValueError(exc_str + err_str)
