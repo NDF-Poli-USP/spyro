@@ -211,7 +211,7 @@ SCHEDULE_IDS = ["no_checkpointing", "single_memory", "mixed"]
 @pytest.mark.parametrize("checkpointing, snapshots", SCHEDULE_CASES,
                          ids=SCHEDULE_IDS)
 def test_gradient_auto_adjoint(checkpointing: bool, snapshots: int | None,
-                               PML: bool = True) -> None:
+                               PML: bool = False) -> None:
     """Taylor-test the automated-adjoint gradient under each schedule.
 
     Checkpointing changes how the tape is stored, not what it computes, so the
@@ -225,7 +225,9 @@ def test_gradient_auto_adjoint(checkpointing: bool, snapshots: int | None,
     snapshots : int or None
         Number of snapshots. ``None`` keeps every step in memory.
     PML : bool, optional
-        Whether to enable the perfectly matched layer. Defaults to ``True``.
+        Whether to enable the perfectly matched layer. Defaults to ``False``,
+        so this test covers the case without absorbing boundaries and
+        :func:`test_gradient_pml_auto_adjoint` the one with the PML.
     """
     dictionary = set_dictionary(PML=PML)
     _, _, Wave_obj_guess = get_forward_model(
