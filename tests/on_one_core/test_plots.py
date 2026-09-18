@@ -106,11 +106,57 @@ def test_plot_mesh_sizes():
     assert os.path.exists(str(image_output_filename))
 
 
-def test_plot_model_in_p1():
+@pytest.mark.newer_firedrake
+def test_plot_model_in_p1(tmp_path):
+    """Draw a solver's material model: one panel per material parameter.
+
+    An acoustic solver has its velocity alone; an isotropic elastic one its
+    density and two wave speeds. The sources, the receivers and the outline
+    of the absorbing layer are drawn on every panel.
+    """
     wave = get_wave_obj()
-    filename = "model_p1.png"
-    spyro.plots.plot_model_in_p1(wave, filename=str(filename), show=False)
-    assert os.path.exists(str(filename))
+    filename = tmp_path / "model_p1.png"
+    corners = [(-0.25, 0.25), (-0.75, 0.25), (-0.75, 0.75), (-0.25, 0.75)]
+    figure = spyro.plots.plot_model_in_p1(
+        wave, dx=0.05, filename=filename, abc_points=corners,
+    )
+    assert filename.exists()
+    panel, colorbar = figure.axes
+    assert panel.get_title() == "$c_p$"
+    assert colorbar.get_ylabel() == "km/s"
+    # The markers of the sources and receivers, then the closed outline.
+    outline = panel.lines[-1]
+    assert len(panel.lines) == 1 + len(wave.source_locations) + len(wave.receiver_locations)
+    assert np.allclose(outline.get_xydata()[[0, -1]], [[0.25, -0.25]] * 2)
+
+    with pytest.warns(DeprecationWarning, match="flip_axis"):
+        spyro.plots.plot_model_in_p1(wave, dx=0.05, filename=None, flip_axis=False)
+
+    # An elastic medium, whose model comes from the input dictionary and
+    # has not been built by a forward solve yet.
+    from tests.on_one_core.test_fwi_automated_adjoint import (
+        ELASTIC_GUESS, build_elastic_dictionary,
+    )
+    elastic = spyro.IsotropicWave(dictionary=build_elastic_dictionary(ELASTIC_GUESS))
+    elastic.set_mesh(input_mesh_parameters={"edge_length": 0.25})
+    figure = spyro.plots.plot_model_in_p1(elastic, dx=0.05, filename=None)
+    # The panels come first in the figure, then their colour bars.
+    panels, colorbars = figure.axes[:3], figure.axes[3:]
+    assert [panel.get_title() for panel in panels] == [r"$\rho$", "$c_p$", "$c_s$"]
+    assert [colorbar.get_ylabel() for colorbar in colorbars] == [
+        "g/cm$^3$", "km/s", "km/s",
+    ]
+
+
+def test_plot_model_high_resolution(tmp_path):
+    """Draw the velocity model regridded on a fine P1 mesh."""
+    wave = get_wave_obj()
+    filename = tmp_path / "model_fine.png"
+    spyro.plots.plot_model(
+        wave, filename=str(filename), high_resolution=True,
+        high_resolution_grid_value=0.05,
+    )
+    assert filename.exists()
 
 
 @pytest.mark.newer_firedrake
@@ -135,15 +181,20 @@ def test_plot_scalar_field(tmp_path):
         titles=["velocity", "gradient"],
         vmin=[1.5, -1.0],
         vmax=[2.5, 1.0],
-        colorbar_label="km/s",
+        colorbar_label=["km/s", "s$^2$/km"],
         sources=[(-0.1, 1.0)],
         # As create_transect gives them: an array, with no truth value.
         receivers=create_transect((-0.9, 0.5), (-0.9, 1.5), 5),
+        outline=[(-0.2, 0.2), (-0.8, 0.2), (-0.8, 1.8), (-0.2, 1.8)],
         spacing=0.05,
     )
     assert (tmp_path / "fields.png").exists()
-    # One panel per field, each with its own colour bar.
+    # One panel per field, each with its own colour bar and label; the
+    # panels come first in the figure, then the colour bars.
     assert len(figure.axes) == 4
+    assert [axis.get_ylabel() for axis in figure.axes[2:]] == ["km/s", "s$^2$/km"]
+    # A source, five receivers and the outline on each panel.
+    assert all(len(panel.lines) == 7 for panel in figure.axes[:2])
 
     # Three panels on two columns: two rows, the last slot left empty.
     figure = spyro.plots.plot_scalar_field(

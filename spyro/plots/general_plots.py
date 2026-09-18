@@ -1,6 +1,6 @@
 """General plotting routines for simulation data and diagnostic outputs."""
 
-import copy
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
 
@@ -74,8 +74,10 @@ def plot_model(
     fig = plt.figure(figsize=(9, 9))
     axes = fig.add_subplot(111)
     if high_resolution:
-        vp_object, _ = change_scalar_field_resolution(wave, high_resolution_grid_value)
-
+        vp_object, _ = change_scalar_field_resolution(
+            wave.initial_velocity_model, wave.mesh_parameters,
+            high_resolution_grid_value,
+        )
     else:
         vp_object = wave.initial_velocity_model
     vp_image = tripcolor(vp_object, axes=axes)
@@ -132,78 +134,85 @@ def plot_model(
         img_rotated.save(filename)
 
 
+# How the material parameters of a solver are labelled when drawn: the
+# symbol of each, and the unit spyro's conventions (km, s, g/cm^3) give it.
+_MATERIAL_LABELS = {
+    "p_wave_velocity": ("$c_p$", "km/s"),
+    "s_wave_velocity": ("$c_s$", "km/s"),
+    "density": (r"$\rho$", "g/cm$^3$"),
+    "lambda": (r"$\lambda$", "GPa"),
+    "mu": (r"$\mu$", "GPa"),
+}
+
+
 def plot_model_in_p1(
     wave: "Wave",
     dx: float = 0.01,
-    filename: str = "model.png",
-    abc_points: Optional[List[Tuple[float, float]]] = None,
+    filename: Union[str, Path, None] = "model.png",
+    abc_points: Optional[Sequence[Tuple[float, float]]] = None,
     show: bool = False,
     flip_axis: bool = True,
-) -> None:
-    """
-    Plot velocity model with P1 finite element projection.
+    **kwargs,
+) -> plt.Figure:
+    """Draw the material model of a solver, sampled on a grid of spacing ``dx``.
 
-    Creates a visualization of the velocity model by first projecting it onto
-    a P1 (piecewise linear) continuous Galerkin finite element space. This is
-    useful for visualizing higher-order velocity models in a simpler, linear
-    representation.
+    One panel per independent material parameter of the solver -- the
+    velocity of an acoustic medium; the density and either the two wave
+    speeds or the Lamé parameters of an isotropic elastic one -- with the
+    sources and receivers overlaid, drawn by :func:`plot_scalar_field`. The
+    name is historical: the model used to be projected onto a P1 space on a
+    grid of edge ``dx`` and drawn from there, which is what sampling it at
+    that spacing amounts to, for any element type or degree.
 
     Parameters
     ----------
     wave : Wave
-        An instance of a wave simulation object containing the velocity model
-        and configuration dictionary.
+        Solver whose model is drawn. Its material parameters are built from
+        the model it holds if a forward solve has not done so yet.
     dx : float, optional
-        The mesh spacing (edge length) to use for the P1 discretization.
-        Default is 0.01.
-    filename : str, optional
-        The filename to save the plot image. Default is "model.png".
-    abc_points : list of tuple, optional
-        List of (z, x) coordinate tuples for absorbing boundary condition
-        markers to be plotted. Default is None.
+        Spacing of the sampling grid, in the mesh's units. Default is 0.01.
+    filename : str or pathlib.Path, optional
+        Where to save the figure. Default is ``"model.png"``.
+    abc_points : sequence of tuple of float, optional
+        Corners ``(z, x)`` of the absorbing layer's inner boundary, drawn as
+        a closed dashed line.
     show : bool, optional
-        Whether to display the plot interactively. Default is False.
+        Whether to display the figure interactively. Default is False.
     flip_axis : bool, optional
-        Whether to flip the plot axes for conventional seismic visualization.
-        Default is True.
+        Ignored, and deprecated: the model is always drawn as a section,
+        depth downwards, which is what ``True`` used to produce.
+    **kwargs
+        Passed on to :func:`plot_scalar_field`, such as ``cmap`` or
+        ``columns``.
 
     Returns
     -------
-    result
-        The return value from the plot_model function.
+    matplotlib.figure.Figure
+        The figure, closed after saving unless ``show`` is set.
 
     See Also
     --------
-    plot_model : The underlying plotting function.
-
-    Notes
-    -----
-    This function:
-    1. Deep copies the wave's input dictionary
-    2. Modifies it to use CG (Continuous Galerkin) method with degree 1
-    3. Creates a new AcousticWave object with the modified configuration
-    4. Sets up a new mesh with the specified edge length
-    5. Projects the original velocity model onto the new P1 space
-    6. Calls plot_model to generate the visualization
+    plot_scalar_field : Draws any scalar fields the same way.
+    plot_model : Draws the finite element velocity model itself.
     """
-    # Local import to avoid circular import
-    from ..solvers import AcousticWave
-
-    p1_obj_dict = copy.deepcopy(wave.input_dictionary)
-    p1_obj_dict["options"]["method"] = "CG"
-    p1_obj_dict["options"]["variant"] = "equispaced"
-    p1_obj_dict["options"]["degree"] = 1
-
-    new_wave_obj = AcousticWave(dictionary=p1_obj_dict)
-    new_wave_obj.set_mesh(input_mesh_parameters={"edge_length": dx})
-    new_wave_obj.set_initial_velocity_model(conditional=wave.initial_velocity_model)
-
-    return plot_model(
-        new_wave_obj,
-        filename=filename,
-        abc_points=abc_points,
-        show=show,
-        flip_axis=flip_axis,
+    if not flip_axis:
+        warnings.warn(
+            "flip_axis is ignored: the model is always drawn with the depth "
+            "downwards.", DeprecationWarning, stacklevel=2,
+        )
+    try:
+        parameters = wave.physical_parameters
+    except ValueError:
+        parameters = wave.initialize_physical_parameters()
+    fields = parameters.select()
+    names = [name.value for name in fields]
+    labels = [_MATERIAL_LABELS.get(name, (name, None)) for name in names]
+    return plot_scalar_field(
+        list(fields.values()), filename,
+        titles=[symbol for symbol, _ in labels],
+        colorbar_label=[unit for _, unit in labels],
+        sources=wave.source_locations, receivers=wave.receiver_locations,
+        outline=abc_points, spacing=dx, show=show, **kwargs,
     )
 
 
@@ -400,9 +409,10 @@ def plot_scalar_field(
     vmin: Union[float, Sequence[Optional[float]], None] = None,
     vmax: Union[float, Sequence[Optional[float]], None] = None,
     cmap: str = "viridis",
-    colorbar_label: Optional[str] = None,
+    colorbar_label: Union[str, Sequence[Optional[str]], None] = None,
     sources: Optional[Sequence[Tuple[float, float]]] = None,
     receivers: Optional[Sequence[Tuple[float, float]]] = None,
+    outline: Optional[Sequence[Tuple[float, float]]] = None,
     spacing: float = 0.01,
     columns: Optional[int] = None,
     show: bool = False,
@@ -434,12 +444,16 @@ def plot_scalar_field(
         Upper limit of the colour scale, likewise.
     cmap : str, optional
         Matplotlib colour map. Default is ``"viridis"``.
-    colorbar_label : str, optional
-        Label of the colour bars, such as the unit of the fields.
+    colorbar_label : str or sequence of str, optional
+        Label of the colour bars, such as the unit of the fields, for every
+        panel or one per panel.
     sources : sequence of tuple of float, optional
         Source positions, ``(z, x)``, marked with red stars.
     receivers : sequence of tuple of float, optional
         Receiver positions, ``(z, x)``, marked with white triangles.
+    outline : sequence of tuple of float, optional
+        Corners ``(z, x)`` of a closed polygon drawn as a dashed line on
+        every panel, such as the inner boundary of an absorbing layer.
     spacing : float, optional
         Maximum distance between sampling points, in the mesh's units.
         The grid includes both edges of the mesh. Default is 0.01.
@@ -501,6 +515,7 @@ def plot_scalar_field(
     titles = per_panel(None, "titles") if titles is None else per_panel(titles, "titles")
     lower = per_panel(vmin, "vmin")
     upper = per_panel(vmax, "vmax")
+    labels = per_panel(colorbar_label, "colorbar_label")
 
     columns = count if columns is None else columns
     rows = -(-count // columns)   # ceiling division
@@ -510,7 +525,9 @@ def plot_scalar_field(
     for axis in axes.flat[count:]:
         axis.set_visible(False)
     evaluators = {}
-    for axis, field, title, low, high in zip(axes.flat, fields, titles, lower, upper):
+    for axis, field, title, low, high, label in zip(
+        axes.flat, fields, titles, lower, upper, labels,
+    ):
         mesh = field.function_space().mesh()
         if id(mesh) not in evaluators:
             points, layout = _domain_grid(mesh, spacing)
@@ -526,13 +543,16 @@ def plot_scalar_field(
             samples, extent=[x_min, x_max, z_min, z_max],
             vmin=low, vmax=high, cmap=cmap,
         )
-        figure.colorbar(image, ax=axis, label=colorbar_label)
+        figure.colorbar(image, ax=axis, label=label)
         # ``is not None`` rather than truthiness: the positions usually come
         # from ``create_transect`` as a NumPy array, which has no truth value.
         for z_s, x_s in (sources if sources is not None else ()):
             axis.plot(x_s, z_s, "*", color="red", markersize=10)
         for z_r, x_r in (receivers if receivers is not None else ()):
             axis.plot(x_r, z_r, "v", color="white", markersize=3)
+        if outline is not None:
+            corners = np.asarray(list(outline) + [list(outline)[0]], dtype=float)
+            axis.plot(corners[:, 1], corners[:, 0], "k--", linewidth=1)
         if title is not None:
             axis.set_title(title)
         axis.set_xlabel("x (km)")
