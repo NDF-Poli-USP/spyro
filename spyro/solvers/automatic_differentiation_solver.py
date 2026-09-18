@@ -306,12 +306,23 @@ pyadjoint.ReducedFunctional or None
         independent gradient computations to make sure no stale operations leak
         from one tape onto the next. The checkpointing *settings* survive, so
         the next forward solve is checkpointed the same way.
+
+        The controls are given fresh block variables as well, so that the
+        next recording starts from the values they hold *now*. A control
+        keeps, on its block variable, a checkpoint of the last value the
+        reduced functional was evaluated at -- a Taylor test's last
+        perturbation, an optimizer's last iterate -- and under a checkpoint
+        schedule that checkpoint is a copy rather than the control itself.
+        Left in place, it would be what the next reduced functional reports
+        as the control's value, whatever the field was reset to since.
         """
         self.reduced_functional = None
         self._tape = None
         self._checkpointing_schedule = None
         fire_ad.set_working_tape(Tape())
         pause_annotation()
+        for control in self.controls:
+            control.create_block_variable()
 
     def create_reduced_functional(
         self, functional: object, ensemble: object = None,

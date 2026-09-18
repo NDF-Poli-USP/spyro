@@ -106,11 +106,166 @@ def test_plot_mesh_sizes():
     assert os.path.exists(str(image_output_filename))
 
 
-def test_plot_model_in_p1():
+@pytest.mark.newer_firedrake
+def test_plot_model_in_p1(tmp_path):
+    """Draw a solver's material model: one panel per material parameter.
+
+    An acoustic solver has its velocity alone; an isotropic elastic one its
+    density and two wave speeds. The sources, the receivers and the outline
+    of the absorbing layer are drawn on every panel.
+    """
     wave = get_wave_obj()
-    filename = "model_p1.png"
-    spyro.plots.plot_model_in_p1(wave, filename=str(filename), show=False)
-    assert os.path.exists(str(filename))
+    filename = tmp_path / "model_p1.png"
+    corners = [(-0.25, 0.25), (-0.75, 0.25), (-0.75, 0.75), (-0.25, 0.75)]
+    figure = spyro.plots.plot_model_in_p1(
+        wave, dx=0.05, filename=filename, abc_points=corners,
+    )
+    assert filename.exists()
+    panel, colorbar = figure.axes
+    assert panel.get_title() == "$c_p$"
+    assert colorbar.get_ylabel() == "km/s"
+    # The markers of the sources and receivers, then the closed outline.
+    outline = panel.lines[-1]
+    assert len(panel.lines) == 1 + len(wave.source_locations) + len(wave.receiver_locations)
+    assert np.allclose(outline.get_xydata()[[0, -1]], [[0.25, -0.25]] * 2)
+
+    with pytest.warns(DeprecationWarning, match="flip_axis"):
+        spyro.plots.plot_model_in_p1(wave, dx=0.05, filename=None, flip_axis=False)
+
+    # An elastic medium, whose model comes from the input dictionary and
+    # has not been built by a forward solve yet.
+    from tests.on_one_core.test_fwi_automated_adjoint import (
+        ELASTIC_GUESS, build_elastic_dictionary,
+    )
+    elastic = spyro.IsotropicWave(dictionary=build_elastic_dictionary(ELASTIC_GUESS))
+    elastic.set_mesh(input_mesh_parameters={"edge_length": 0.25})
+    figure = spyro.plots.plot_model_in_p1(elastic, dx=0.05, filename=None)
+    # The panels come first in the figure, then their colour bars.
+    panels, colorbars = figure.axes[:3], figure.axes[3:]
+    assert [panel.get_title() for panel in panels] == [r"$\rho$", "$c_p$", "$c_s$"]
+    assert [colorbar.get_ylabel() for colorbar in colorbars] == [
+        "g/cm$^3$", "km/s", "km/s",
+    ]
+
+
+def test_plot_model_high_resolution(tmp_path):
+    """Draw the velocity model regridded on a fine P1 mesh."""
+    wave = get_wave_obj()
+    filename = tmp_path / "model_fine.png"
+    spyro.plots.plot_model(
+        wave, filename=str(filename), high_resolution=True,
+        high_resolution_grid_value=0.05,
+    )
+    assert filename.exists()
+
+
+@pytest.mark.newer_firedrake
+def test_plot_scalar_field(tmp_path):
+    """Draw two fields side by side, sampled on a grid, depth downwards.
+
+    The fields are sampled with Firedrake's ``PointEvaluator``, which older
+    Firedrake versions do not have.
+    """
+    import firedrake as fire
+
+    mesh = fire.RectangleMesh(4, 4, 1.0, 2.0, quadrilateral=True)
+    mesh.coordinates.dat.data[:, 0] *= -1.0   # depth is negative, as in spyro
+    V = fire.FunctionSpace(mesh, "CG", 2)
+    z, x = fire.SpatialCoordinate(mesh)
+    velocity = fire.Function(V).interpolate(1.5 - z)
+    gradient = fire.Function(V).interpolate(x - 1.0)
+
+    figure = spyro.plots.plot_scalar_field(
+        [velocity, gradient],
+        tmp_path / "fields.png",
+        titles=["velocity", "gradient"],
+        vmin=[1.5, -1.0],
+        vmax=[2.5, 1.0],
+        colorbar_label=["km/s", "s$^2$/km"],
+        sources=[(-0.1, 1.0)],
+        # As create_transect gives them: an array, with no truth value.
+        receivers=create_transect((-0.9, 0.5), (-0.9, 1.5), 5),
+        outline=[(-0.2, 0.2), (-0.8, 0.2), (-0.8, 1.8), (-0.2, 1.8)],
+        spacing=0.05,
+    )
+    assert (tmp_path / "fields.png").exists()
+    # One panel per field, each with its own colour bar and label; the
+    # panels come first in the figure, then the colour bars.
+    assert len(figure.axes) == 4
+    assert [axis.get_ylabel() for axis in figure.axes[2:]] == ["km/s", "s$^2$/km"]
+    # A source, five receivers and the outline on each panel.
+    assert all(len(panel.lines) == 7 for panel in figure.axes[:2])
+
+    # Three panels on two columns: two rows, the last slot left empty.
+    figure = spyro.plots.plot_scalar_field(
+        [velocity, gradient, velocity], tmp_path / "grid.png", columns=2,
+        spacing=0.05,
+    )
+    assert (tmp_path / "grid.png").exists()
+    visible = [axis for axis in figure.axes if axis.get_visible()]
+    assert len(visible) == 6 and len(figure.axes) == 7
+
+    with pytest.raises(ValueError):
+        spyro.plots.plot_scalar_field([velocity, gradient], titles=["one"])
+    with pytest.raises(ValueError):
+        spyro.plots.plot_scalar_field(fire.Function(fire.VectorFunctionSpace(mesh, "CG", 1)))
+
+
+@pytest.mark.newer_firedrake
+@pytest.mark.parametrize("spacing", [0.26, 0.3, 3.0])
+def test_scalar_plot_sampling_covers_mesh(spacing: float) -> None:
+    """Sample both mesh edges even when spacing does not divide its size.
+
+    Parameters
+    ----------
+    spacing : float
+        Maximum spacing, including a value larger than the domain.
+
+    Returns
+    -------
+    None
+        Assertions check sample locations and plotted values.
+    """
+    import firedrake as fire
+    from spyro.plots.general_plots import _domain_grid
+
+    mesh = fire.RectangleMesh(2, 2, 1.0, 2.0, quadrilateral=True)
+    mesh.coordinates.dat.data[:, 0] *= -1.0
+    points, layout = _domain_grid(mesh, spacing)
+    assert np.allclose(points.min(axis=0), [-1.0, 0.0])
+    assert np.allclose(points.max(axis=0), [0.0, 2.0])
+    assert layout[:2] == (
+        max(2, int(np.ceil(1.0 / spacing)) + 1),
+        max(2, int(np.ceil(2.0 / spacing)) + 1),
+    )
+
+    space = fire.FunctionSpace(mesh, "CG", 1)
+    z, x = fire.SpatialCoordinate(mesh)
+    field = fire.Function(space).interpolate(2.0 * z + x)
+    figure = spyro.plots.plot_scalar_field(field, spacing=spacing)
+    samples = figure.axes[0].images[0].get_array()
+    assert not np.any(np.ma.getmaskarray(samples))
+    assert np.allclose(samples.ravel(), 2.0 * points[:, 0] + points[:, 1])
+
+
+@pytest.mark.parametrize("spacing", [0.0, -0.1, np.nan, np.inf])
+def test_scalar_plot_rejects_invalid_spacing(spacing: float) -> None:
+    """Reject invalid spacing before accessing the mesh.
+
+    Parameters
+    ----------
+    spacing : float
+        Invalid sampling distance.
+
+    Returns
+    -------
+    None
+        An assertion checks the validation error.
+    """
+    from spyro.plots.general_plots import _domain_grid
+
+    with pytest.raises(ValueError, match="spacing must be finite and positive"):
+        _domain_grid(None, spacing)
 
 
 def test_plot_receiver_response(tmp_path):

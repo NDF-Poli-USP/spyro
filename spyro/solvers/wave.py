@@ -208,6 +208,17 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self._initialize_model_parameters()
         if self.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
             self.automated_adjoint.clear_tape()
+            # The tape reads a parameter through its block variable, and a
+            # parameter that is not a control of this recording may still
+            # carry one from an earlier recording -- it was a control of
+            # that one, as in a staged inversion -- holding a checkpoint of
+            # the value it had then. A replay would read that checkpoint
+            # in place of the field, so every parameter the equation reads
+            # starts this recording afresh, as ``clear_tape`` does for the
+            # controls.
+            for field in self.physical_parameters.values():
+                if isinstance(field, fire.Function):
+                    field.create_block_variable()
         self.matrix_building()
         self.wave_propagator()
 
