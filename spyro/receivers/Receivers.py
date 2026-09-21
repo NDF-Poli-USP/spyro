@@ -77,6 +77,9 @@ class Receivers(Delta_projector):
             self.number_of_points = wave.number_of_receivers
 
         self.is_local = [0] * self.number_of_points
+        # Input-order index of each receiver this rank owns in the
+        # vertex-only mesh; set by receiver_interpolator.
+        self.vom_input_indices = None
         if not self.automatic_adjoint:
             self.build_maps()
 
@@ -173,6 +176,7 @@ class Receivers(Delta_projector):
             redundant=vom_redundant,
             name=vom_name,
         )
+        self.vom_input_indices = self._vom_input_indices(vom)
         if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
             V_r = create_function_space(vom, "DG0", 0, dim=self.dimension)
         elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
@@ -180,6 +184,59 @@ class Receivers(Delta_projector):
         else:
             raise ValueError("Invalid wave type")
         return interpolate(f, V_r)
+
+    def _vom_input_indices(self, vom: MeshGeometry) -> np.ndarray:
+        """Input-order index of the receivers this rank owns in ``vom``.
+
+        ``vom.input_ordering`` holds the points as supplied (all on rank 0,
+        since the mesh is redundant); interpolating each point's position in
+        that list onto ``vom`` gives, for every locally owned receiver, its
+        column in the global shot record.
+
+        Parameters
+        ----------
+        vom : firedrake.MeshGeometry
+            Vertex-only mesh built from ``self.point_locations``.
+
+        Returns
+        -------
+        numpy.ndarray
+            One integer index per locally owned receiver.
+        """
+        position = Function(create_function_space(vom.input_ordering, "DG0", 0))
+        position.dat.data_wo[:] = np.arange(position.dat.data_ro.shape[0])
+        local_position = assemble(
+            interpolate(position, create_function_space(vom, "DG0", 0))
+        )
+        return np.rint(local_position.dat.data_ro).astype(int)
+
+    def gather_receiver_record(self, local_record: np.ndarray) -> np.ndarray:
+        """Assemble the global shot record from the receivers each rank owns.
+
+        Parameters
+        ----------
+        local_record : numpy.ndarray
+            ``(nt, n_local[, dim])`` samples of this rank's receivers, in the
+            order of the vertex-only mesh built by :meth:`receiver_interpolator`.
+
+        Returns
+        -------
+        numpy.ndarray
+            ``(nt, number_of_points[, dim])`` record in the order of the model
+            dictionary, identical on every rank of the spatial communicator.
+        """
+        comm = self.mesh.comm
+        global_record = np.full(
+            (local_record.shape[0], self.number_of_points)
+            + local_record.shape[2:],
+            np.nan,
+        )
+        for indices, record in zip(
+            comm.allgather(self.vom_input_indices),
+            comm.allgather(local_record),
+        ):
+            global_record[:, indices] = record
+        return global_record
 
     def new_at(self, udat, receiver_id):
         """Evaluate data at a point."""
