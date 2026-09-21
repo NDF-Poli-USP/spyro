@@ -3,6 +3,8 @@ import numpy as np
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
                        project, TensorFunctionSpace)
 
+import ufl
+
 from pyadjoint import AdjFloat, Tape
 
 from .elastic_wave import ElasticWave
