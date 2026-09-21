@@ -134,10 +134,13 @@ def test_elastic_fwi_automated_adjoint_demo(tmp_path, monkeypatch):
         assert control.dat.data_ro.min() >= low - 1e-10
         assert control.dat.data_ro.max() <= high + 1e-10
 
-    # The gradient mask froze the model along the sources and receivers:
-    # there the result is still the starting model.
+    # The optimizer's mask froze the model in the layers around the sources
+    # (z = -0.15) and the receivers (z = -0.85), half the shortest wavelength
+    # thick: there the result is still the starting model.
     space = cp_result.function_space()
-    frozen = fire.Function(space).interpolate(namespace["gradient_mask"]).dat.data_ro < 0.5
+    radius = 0.5 * namespace["cs_background"] / namespace["frequency"]
+    depth = fire.Function(space).interpolate(fwi.wave.mesh_z).dat.data_ro
+    frozen = np.minimum(np.abs(depth + 0.15), np.abs(depth + 0.85)) < radius
     assert frozen.any() and (~frozen).any()
     for result, start in (
         (cp_result, namespace["cp_start"]), (cs_result, namespace["cs_start"]),

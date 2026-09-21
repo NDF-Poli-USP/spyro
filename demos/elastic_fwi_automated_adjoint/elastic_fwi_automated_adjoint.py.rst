@@ -467,15 +467,14 @@ the largest allowed P-wave speed, rather than just the starting velocity.
     cs_bounds = (1.0, 1.6)   # km/s
 
 Large gradients near sources and receivers can dominate model updates
-[Modrak2016]_. A common practice in this case is to zero out such regions.
-``set_gradient_mask`` takes a factor the gradient is multiplied by: this
-binary mask allows updates only in the strip :math:`-0.75 < z < -0.3` km,
-holding the starting model fixed elsewhere.
-
-.. code-block:: python
-
-    gradient_mask = fire.conditional(fire.And(z < -0.3, z > -0.75), 1.0, 0.0)
-    fwi.set_gradient_mask(gradient_mask)
+[Modrak2016]_. A common practice in this case is to zero out such regions,
+and the optimizer does it when asked to through its options: with
+``sources_receivers_gradient_mask`` it zeroes the gradient in a layer
+around the depth of every source and receiver, half the shortest
+wavelength thick on each side. Here that is :math:`0.5 c_s / f = 125` m,
+so the model is held fixed above :math:`z = -0.275` km, around the
+sources, and between :math:`z = -0.975` and :math:`-0.725` km, around the
+receivers, and updated in between; ``mask_radius`` changes the thickness.
 
 ``run_fwi`` records the starting forward solve and passes its reduced
 functional to PETSc/TAO's bound-constrained quasi-Newton method, BLMVM
@@ -491,6 +490,7 @@ last iterate.
         vmin=[cp_bounds[0], cs_bounds[0]],
         vmax=[cp_bounds[1], cs_bounds[1]],
         maxiter=maxiter,
+        tao_options={"sources_receivers_gradient_mask": True},
     )
 
 The result contains one ``Function`` per control, in the order of the
