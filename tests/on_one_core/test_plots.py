@@ -113,93 +113,89 @@ def test_plot_model_in_p1():
     assert os.path.exists(str(filename))
 
 
-@pytest.mark.newer_firedrake
-def test_plot_scalar_field(tmp_path):
-    """Draw two fields side by side, sampled on a grid, depth downwards.
-
-    The fields are sampled with Firedrake's ``PointEvaluator``, which older
-    Firedrake versions do not have.
-    """
-    import firedrake as fire
-
-    mesh = fire.RectangleMesh(4, 4, 1.0, 2.0, quadrilateral=True)
-    mesh.coordinates.dat.data[:, 0] *= -1.0   # depth is negative, as in spyro
-    V = fire.FunctionSpace(mesh, "CG", 2)
-    z, x = fire.SpatialCoordinate(mesh)
-    velocity = fire.Function(V).interpolate(1.5 - z)
-    gradient = fire.Function(V).interpolate(x - 1.0)
-
-    figure = spyro.plots.plot_scalar_field(
-        [velocity, gradient],
-        tmp_path / "fields.png",
-        titles=["velocity", "gradient"],
-        vmin=[1.5, -1.0],
-        vmax=[2.5, 1.0],
-        colorbar_label="km/s",
-        sources=[(-0.1, 1.0)],
-        # As create_transect gives them: an array, with no truth value.
-        receivers=create_transect((-0.9, 0.5), (-0.9, 1.5), 5),
-        spacing=0.05,
-    )
-    assert (tmp_path / "fields.png").exists()
-    # One panel per field, each with its own colour bar.
-    assert len(figure.axes) == 4
-
-    # Three panels on two columns: two rows, the last slot left empty.
-    figure = spyro.plots.plot_scalar_field(
-        [velocity, gradient, velocity], tmp_path / "grid.png", columns=2,
-        spacing=0.05,
-    )
-    assert (tmp_path / "grid.png").exists()
-    visible = [axis for axis in figure.axes if axis.get_visible()]
-    assert len(visible) == 6 and len(figure.axes) == 7
-
-    with pytest.raises(ValueError):
-        spyro.plots.plot_scalar_field([velocity, gradient], titles=["one"])
-    with pytest.raises(ValueError):
-        spyro.plots.plot_scalar_field(fire.Function(fire.VectorFunctionSpace(mesh, "CG", 1)))
-
-
-@pytest.mark.newer_firedrake
-@pytest.mark.parametrize("spacing", [0.26, 0.3, 3.0])
-def test_scalar_plot_sampling_covers_mesh(spacing: float) -> None:
-    """Sample both mesh edges even when spacing does not divide its size.
+@pytest.mark.parametrize("high_resolution", [False, True])
+@pytest.mark.parametrize("quadrilateral", [False, True])
+def test_plot_model_fields(tmp_path, high_resolution: bool, quadrilateral: bool) -> None:
+    """Plot multiple fields through the shared model plotting entry point.
 
     Parameters
     ----------
-    spacing : float
-        Maximum spacing, including a value larger than the domain.
+    tmp_path : pathlib.Path
+        Output directory.
+    high_resolution : bool
+        Whether to regrid onto a finer CG1 mesh.
+    quadrilateral : bool
+        Whether the original mesh uses quadrilaterals.
 
     Returns
     -------
     None
-        Assertions check sample locations and plotted values.
+        Assertions verify geometry, values, panel layout and unchanged inputs.
     """
     import firedrake as fire
-    from spyro.plots.general_plots import _domain_grid
+    from types import SimpleNamespace
 
-    mesh = fire.RectangleMesh(2, 2, 1.0, 2.0, quadrilateral=True)
+    mesh = fire.RectangleMesh(4, 4, 1.0, 2.0, quadrilateral=quadrilateral)
     mesh.coordinates.dat.data[:, 0] *= -1.0
-    points, layout = _domain_grid(mesh, spacing)
-    assert np.allclose(points.min(axis=0), [-1.0, 0.0])
-    assert np.allclose(points.max(axis=0), [0.0, 2.0])
-    assert layout[:2] == (
-        max(2, int(np.ceil(1.0 / spacing)) + 1),
-        max(2, int(np.ceil(2.0 / spacing)) + 1),
-    )
-
-    space = fire.FunctionSpace(mesh, "CG", 1)
+    space = fire.FunctionSpace(mesh, "CG", 2)
     z, x = fire.SpatialCoordinate(mesh)
-    field = fire.Function(space).interpolate(2.0 * z + x)
-    figure = spyro.plots.plot_scalar_field(field, spacing=spacing)
-    samples = figure.axes[0].images[0].get_array()
-    assert not np.any(np.ma.getmaskarray(samples))
-    assert np.allclose(samples.ravel(), 2.0 * points[:, 0] + points[:, 1])
+    velocity = fire.Function(space).interpolate(1.5 + z * z)
+    gradient = fire.Function(space).interpolate(x - 1.0)
+    wave = SimpleNamespace(
+        initial_velocity_model=velocity,
+        source_locations=[(-0.1, 1.0)],
+        receiver_locations=create_transect((-0.9, 0.5), (-0.9, 1.5), 5),
+        mesh_parameters=spyro.meshing.MeshingParameters(
+            input_mesh_dictionary={"length_z": 1.0, "length_x": 2.0,
+                                   "length_y": 0.0, "dimension": 2},
+            comm=fire.Ensemble(mesh.comm, mesh.comm.size),
+        ),
+    )
+    coordinates = mesh.coordinates.dat.data_ro.copy()
+    values = velocity.dat.data_ro.copy()
+    figure = spyro.plots.plot_model(
+        wave, tmp_path / "fields.png", fields=[velocity, gradient],
+        titles=["velocity", "gradient"], vmin=[1.5, -1.0], vmax=[2.5, 1.0],
+        high_resolution=high_resolution, high_resolution_grid_value=0.13,
+    )
+    assert (tmp_path / "fields.png").exists()
+    assert len(figure.axes) == 4
+    assert figure.axes[0].get_xlabel() == "x (km)"
+    assert figure.axes[0].get_ylabel() == "z (km)"
+    assert figure.axes[0].collections[0].get_clim() == (1.5, 2.5)
+    assert np.isclose(figure.axes[0].collections[0].get_array().min(), 1.5)
+    assert np.isclose(figure.axes[0].collections[0].get_array().max(), 2.5)
+    assert np.array_equal(coordinates, mesh.coordinates.dat.data_ro)
+    assert np.array_equal(values, velocity.dat.data_ro)
+    figure = spyro.plots.plot_model(
+        wave, tmp_path / "grid.png", fields=[velocity, gradient, velocity],
+        columns=2, high_resolution=high_resolution, high_resolution_grid_value=0.13,
+        show_acquisition=False,
+    )
+    assert len([axis for axis in figure.axes if axis.get_visible()]) == 6
+    assert len(figure.axes) == 7
+    assert len(figure.axes[0].collections) == 1
+
+    # Existing single-model calls still work, including the non-flipped axes.
+    figure = spyro.plots.plot_model(
+        wave, tmp_path / "single.png", high_resolution=high_resolution,
+        high_resolution_grid_value=0.13, flip_axis=False,
+        abc_points=[(-0.2, 0.2), (-0.8, 0.2), (-0.8, 1.8)],
+    )
+    assert figure.axes[0].get_xlabel() == "z (km)"
+    assert len(figure.axes[0].lines[0].get_xdata()) == 4
+    for invalid in ([], [fire.Function(fire.VectorFunctionSpace(mesh, "CG", 1))]):
+        with pytest.raises(ValueError):
+            spyro.plots.plot_model(wave, fields=invalid)
+    with pytest.raises(ValueError, match="titles"):
+        spyro.plots.plot_model(wave, fields=[velocity, gradient], titles=["one"])
+    with pytest.raises(ValueError, match="columns"):
+        spyro.plots.plot_model(wave, columns=0)
 
 
 @pytest.mark.parametrize("spacing", [0.0, -0.1, np.nan, np.inf])
-def test_scalar_plot_rejects_invalid_spacing(spacing: float) -> None:
-    """Reject invalid spacing before accessing the mesh.
+def test_model_plot_rejects_invalid_spacing(spacing: float) -> None:
+    """Reject invalid regridding distances before accessing the mesh.
 
     Parameters
     ----------
@@ -211,10 +207,8 @@ def test_scalar_plot_rejects_invalid_spacing(spacing: float) -> None:
     None
         An assertion checks the validation error.
     """
-    from spyro.plots.general_plots import _domain_grid
-
-    with pytest.raises(ValueError, match="spacing must be finite and positive"):
-        _domain_grid(None, spacing)
+    with pytest.raises(ValueError, match="grid_spacing must be finite and positive"):
+        spyro.utils.change_scalar_field_resolution(None, None, spacing)
 
 
 def test_plot_receiver_response(tmp_path):

@@ -288,7 +288,10 @@ ensemble member holds its own shot.
 
     fwi.generate_real_shot_record(save_shot_record=False)
 
-Plot the true velocities with the sources and receivers overlaid:
+Plot the true velocities with the sources and receivers overlaid.
+``high_resolution=True`` interpolates the fields onto a finer CG1 mesh for
+visualisation; ``high_resolution_grid_value`` controls its spacing (0.01 km
+by default). This does not change the simulation mesh:
 
 .. code-block:: python
 
@@ -298,17 +301,15 @@ Plot the true velocities with the sources and receivers overlaid:
     cp_true_field = fire.Function(material_space).interpolate(cp_true)
     cs_true_field = fire.Function(material_space).interpolate(cs_true)
 
-    sources = dictionary["acquisition"]["source_locations"]
-    receivers = dictionary["acquisition"]["receiver_locations"]
     first_member = comm.ensemble_comm.rank == 0
 
     if first_member:
-        spyro.plots.plot_scalar_field(
-            [cp_true_field, cs_true_field], "elastic_fwi_true_model.png",
+        spyro.plots.plot_model(
+            fwi.wave, "elastic_fwi_true_model.png",
+            fields=[cp_true_field, cs_true_field], high_resolution=True,
             titles=["true $c_p$", "true $c_s$"],
             vmin=[cp_background, cs_background], vmax=[cp_circle, cs_circle],
             colorbar_label="km/s", cmap="jet",
-            sources=sources, receivers=receivers,
         )
 
 ``plot_shots`` reads ``forward_solution_receivers``, so copy the observed
@@ -372,12 +373,12 @@ at the centre for comparison.
     cs_start_center = float(at_center.evaluate(fwi.wave.c_s)[0])
 
     if first_member:
-        spyro.plots.plot_scalar_field(
-            [fwi.wave.c, fwi.wave.c_s], "elastic_fwi_starting_model.png",
+        spyro.plots.plot_model(
+            fwi.wave, "elastic_fwi_starting_model.png",
+            fields=[fwi.wave.c, fwi.wave.c_s], high_resolution=True,
             titles=["starting $c_p$", "starting $c_s$"],
             vmin=[cp_background, cs_background], vmax=[cp_circle, cs_circle],
             colorbar_label="km/s", cmap="jet",
-            sources=sources, receivers=receivers,
         )
 
 .. image:: elastic_fwi_starting_model.png
@@ -532,10 +533,11 @@ each velocity. The misfit history shows how much the fit to the data improved.
         space = cp_result.function_space()
         cp_start_field = fire.Function(space).interpolate(cp_start)
         cs_start_field = fire.Function(space).interpolate(cs_start)
-        spyro.plots.plot_scalar_field(
-            [cp_true_field, cp_start_field, cp_result,
+        spyro.plots.plot_model(
+            fwi.wave, "elastic_fwi_models.png",
+            fields=[cp_true_field, cp_start_field, cp_result,
              cs_true_field, cs_start_field, cs_result],
-            "elastic_fwi_models.png", columns=3,
+            columns=3, high_resolution=True, show_acquisition=False,
             titles=["true $c_p$", "starting $c_p$", "inverted $c_p$",
                     "true $c_s$", "starting $c_s$", "inverted $c_s$"],
             vmin=[cp_background] * 3 + [cs_background] * 3,
