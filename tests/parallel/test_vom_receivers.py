@@ -1,11 +1,8 @@
-"""Vertex-only-mesh receivers under spatial (mesh) parallelism (issue #315).
+"""Vertex-only-mesh receivers under spatial parallelism (issue #315).
 
-Run with::
-
-    mpiexec -n 2 pytest tests/parallel/test_vom_receivers.py
-
-With ``parallelism = "spatial"`` the single shot is decomposed over both
-ranks, so each rank owns only the receivers inside its mesh partition.
+Run with ``mpiexec -n 2 pytest tests/parallel/test_vom_receivers.py``: the
+single shot is decomposed over both ranks, so each rank owns only the
+receivers inside its mesh partition.
 """
 import numpy as np
 import pytest
@@ -13,8 +10,8 @@ import pytest
 import spyro
 from spyro.utils.typing import FunctionalEvaluationMode
 
-# Scattered on purpose: for a transect the vertex-only-mesh order happens to
-# match the input order, which would hide an ordering bug.
+# Scattered on purpose: for a transect the vertex-only-mesh order matches
+# the input order, which would hide an ordering bug.
 receiver_locations = [
     (-0.2, 0.8),
     (-0.5, 0.2),
@@ -83,8 +80,8 @@ def _wave(use_vertex_only_mesh, real_shot_record=None):
 
 @pytest.mark.parallel(2)
 def test_vom_receivers_spatial_parallel():
-    # The Dirac-delta projector returns the record in input order and does
-    # not depend on how the mesh is partitioned: it is the reference.
+    # The Dirac-delta projector is the reference: input order, independent
+    # of the mesh partition.
     dirac = _wave(use_vertex_only_mesh=False)
     dirac.forward_solve()
     expected = np.asarray(dirac.forward_solution_receivers)
@@ -96,8 +93,8 @@ def test_vom_receivers_spatial_parallel():
     assert record.shape == expected.shape
     assert np.allclose(record, expected, atol=1e-10 * np.abs(expected).max())
 
-    # Per-timestep misfit (automated-adjoint path): the global observed
-    # record must be restricted to the receivers each rank owns.
+    # Per-timestep misfit (automated-adjoint path): the observed record
+    # must be restricted to the receivers each rank owns.
     same = _wave(use_vertex_only_mesh=True, real_shot_record=expected)
     same.forward_solve()
     assert same.functional_value == pytest.approx(0.0, abs=1e-20)

@@ -162,16 +162,13 @@ def _propagate_forward_central_difference(wave, source_ids):
         if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
             if wave.use_vertex_only_mesh:
                 if isinstance(real_shot_record[step], np.ndarray):
-                    # The sampled function only holds the receivers owned
-                    # by this spatial rank, so restrict the global record
-                    # to them (issue #315). Written through data_wo because
-                    # ``val`` would also have to cover the halo points.
+                    # This rank only samples the receivers it owns (issue
+                    # #315), so restrict the record to them. ``val=`` would
+                    # also need the halo points, hence ``data_wo``.
                     real_shot = fire.Function(usol_recv[-1].function_space())
-                    real_shot.dat.data_wo[:] = (
-                        wave.receivers.local_receiver_values(
-                            real_shot_record[step]
-                        )
-                    )
+                    real_shot.dat.data_wo[:] = real_shot_record[step][
+                        wave.receivers.vom_input_indices
+                    ]
                     misfit_step = real_shot - usol_recv[-1]
                 elif isinstance(real_shot_record[step], fire.Function):
                     misfit_step = real_shot_record[step] - usol_recv[-1]
@@ -194,9 +191,8 @@ def _propagate_forward_central_difference(wave, source_ids):
 
     helpers.display_progress(wave.comm, t)
     if wave.use_vertex_only_mesh:
-        # Each spatial rank sampled only the receivers inside its mesh
-        # partition, in vertex-only-mesh order: assemble the global record in
-        # the input order from all ranks (issue #315).
+        # Each rank sampled only its own receivers, in vertex-only-mesh
+        # order: gather the input-order record from all ranks (issue #315).
         usol_recv = wave.receivers.gather_receiver_record(receiver_array)
     else:
         usol_recv = helpers.fill(

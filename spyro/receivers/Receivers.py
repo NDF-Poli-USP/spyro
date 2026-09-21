@@ -77,8 +77,8 @@ class Receivers(Delta_projector):
             self.number_of_points = wave.number_of_receivers
 
         self.is_local = [0] * self.number_of_points
-        # Set by receiver_interpolator: input-order index of each receiver
-        # owned by this spatial rank in the vertex-only mesh.
+        # Input-order index of each receiver this rank owns in the
+        # vertex-only mesh; set by receiver_interpolator.
         self.vom_input_indices = None
         if not self.automatic_adjoint:
             self.build_maps()
@@ -185,102 +185,58 @@ class Receivers(Delta_projector):
             raise ValueError("Invalid wave type")
         return interpolate(f, V_r)
 
-    def _vom_input_indices(self, vom):
-        """Input-order index of every receiver owned by this spatial rank.
+    def _vom_input_indices(self, vom: MeshGeometry) -> np.ndarray:
+        """Input-order index of the receivers this rank owns in ``vom``.
 
-        A vertex-only mesh keeps on each rank only the points inside its mesh
-        partition, in an order of its own. ``vom.input_ordering`` is the same
-        point cloud in the order the user supplied it, held by the rank that
-        supplied it (rank 0 when ``redundant=True``). Interpolating each
-        point's input position from there onto ``vom`` gives, for every
-        locally owned receiver, its column in the global shot record.
+        ``vom.input_ordering`` holds the points as supplied (all on rank 0,
+        since the mesh is redundant); interpolating each point's position in
+        that list onto ``vom`` gives, for every locally owned receiver, its
+        column in the global shot record.
 
         Parameters
         ----------
-        vom : firedrake.VertexOnlyMesh
+        vom : firedrake.MeshGeometry
             Vertex-only mesh built from ``self.point_locations``.
 
         Returns
         -------
         numpy.ndarray
-            Integer array with one entry per locally owned receiver.
+            One integer index per locally owned receiver.
         """
-        comm = self.mesh.comm
         position = Function(create_function_space(vom.input_ordering, "DG0", 0))
-        counts = comm.allgather(position.dat.data_ro.shape[0])
-        if sum(counts) != self.number_of_points:
-            raise ValueError(
-                f"The vertex-only mesh was built from {sum(counts)} points "
-                f"but there are {self.number_of_points} receivers. Every "
-                "rank supplies the full receiver list, so the mesh must be "
-                "built with redundant=True."
-            )
-        offset = sum(counts[: comm.rank])
-        position.dat.data_wo[:] = np.arange(offset, offset + counts[comm.rank])
+        position.dat.data_wo[:] = np.arange(position.dat.data_ro.shape[0])
         local_position = assemble(
             interpolate(position, create_function_space(vom, "DG0", 0))
         )
         return np.rint(local_position.dat.data_ro).astype(int)
 
-    def gather_receiver_record(self, local_record):
-        """Assemble the global shot record from the samples of every rank.
+    def gather_receiver_record(self, local_record: np.ndarray) -> np.ndarray:
+        """Assemble the global shot record from the receivers each rank owns.
 
         Parameters
         ----------
-        local_record : array_like
-            ``(nt, n_local)`` (``(nt, n_local, dim)`` for vector fields)
-            samples of the receivers owned by this rank, in the order of the
-            vertex-only mesh built by :meth:`receiver_interpolator`.
+        local_record : numpy.ndarray
+            ``(nt, n_local[, dim])`` samples of this rank's receivers, in the
+            order of the vertex-only mesh built by :meth:`receiver_interpolator`.
 
         Returns
         -------
         numpy.ndarray
-            ``(nt, number_of_points[, dim])`` record with the receivers in
-            the order of the model dictionary, identical on every rank of
-            the spatial communicator. Receivers outside the mesh (only
-            possible with ``vom_missing_points_behaviour != "error"``) are
-            ``nan``.
+            ``(nt, number_of_points[, dim])`` record in the order of the model
+            dictionary, identical on every rank of the spatial communicator.
         """
-        if self.vom_input_indices is None:
-            raise RuntimeError(
-                "receiver_interpolator must be called before gathering the "
-                "receiver record."
-            )
         comm = self.mesh.comm
-        local_record = np.asarray(local_record)
-        global_shape = (
+        global_record = np.full(
             (local_record.shape[0], self.number_of_points)
-            + local_record.shape[2:]
+            + local_record.shape[2:],
+            np.nan,
         )
-        global_record = np.full(global_shape, np.nan)
         for indices, record in zip(
             comm.allgather(self.vom_input_indices),
             comm.allgather(local_record),
         ):
             global_record[:, indices] = record
         return global_record
-
-    def local_receiver_values(self, global_values):
-        """Restrict one time step of a global record to this rank's receivers.
-
-        Parameters
-        ----------
-        global_values : array_like
-            ``(number_of_points[, dim])`` values in the order of the model
-            dictionary.
-
-        Returns
-        -------
-        numpy.ndarray
-            Values of the receivers owned by this rank, in the order of the
-            vertex-only mesh built by :meth:`receiver_interpolator`.
-        """
-        if self.vom_input_indices is None:
-            raise RuntimeError(
-                "receiver_interpolator must be called before restricting a "
-                "receiver record."
-            )
-        return np.asarray(global_values)[self.vom_input_indices]
 
     def new_at(self, udat, receiver_id):
         """Evaluate data at a point."""
