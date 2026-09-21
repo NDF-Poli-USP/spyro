@@ -34,7 +34,6 @@ adjoint therefore never loads this, and never depends on what it needs.
 import warnings
 
 import firedrake as fire
-from mpi4py import MPI
 import numpy as np
 
 from pyadjoint import MinimizationProblem
@@ -301,13 +300,6 @@ class LumpedTAOSolver(OptimizationSolver):
     comm : petsc4py.PETSc.Comm or mpi4py.MPI.Comm, optional
         Communicator the controls are defined over. Under ensemble
         parallelism this is the *spatial* one.
-    gradient_masks : list of firedrake.Function, optional
-        One mask per control, in the control's own space, that every
-        derivative handed to TAO is multiplied by, coefficient by
-        coefficient. A coefficient whose mask is zero is never moved: its
-        derivative is zero, so the direction is zero there under the
-        diagonal metric, and the quasi-Newton pairs built from those
-        directions keep it so. ``None`` applies no mask.
 
     Raises
     ------
@@ -323,7 +315,7 @@ class LumpedTAOSolver(OptimizationSolver):
     minimize_with_tao : Drives this solver.
     """
 
-    def __init__(self, problem, parameters, *, comm=None, gradient_masks=None):
+    def __init__(self, problem, parameters, *, comm=None):
         from petsc4py import PETSc
         import petsctools
 
@@ -341,22 +333,7 @@ class LumpedTAOSolver(OptimizationSolver):
             ),
             comm=comm,
         )
-        if gradient_masks is not None:
-            gradient_masks = as_list(gradient_masks)
-            if len(gradient_masks) != len(reduced_functional.controls):
-                raise ValueError(
-                    f"{len(reduced_functional.controls)} controls are being "
-                    "optimized, so the gradient masks take that many "
-                    f"entries; {len(gradient_masks)} were given.",
-                )
         tao = PETSc.TAO().create(comm=comm)
-
-        def masked(derivative):
-            """Zero the derivative where the mask is zero, in place."""
-            if gradient_masks is not None:
-                for value, mask in zip(Enlist(derivative), gradient_masks):
-                    value.dat.data[:] *= mask.dat.data_ro
-            return derivative
 
         def objective(tao_, x):
             controls = new_control_variable(reduced_functional)
@@ -366,14 +343,14 @@ class LumpedTAOSolver(OptimizationSolver):
         def gradient(tao_, x, g):
             controls = new_control_variable(reduced_functional)
             vec_interface.from_petsc(x, controls)
-            derivative = masked(tao_objective.gradient(controls))
+            derivative = tao_objective.gradient(controls)
             vec_interface.to_petsc(g, derivative)
 
         def objective_gradient(tao_, x, g):
             controls = new_control_variable(reduced_functional)
             vec_interface.from_petsc(x, controls)
             value, derivative = tao_objective.objective_gradient(controls)
-            vec_interface.to_petsc(g, masked(derivative))
+            vec_interface.to_petsc(g, derivative)
             return value
 
         tao.setObjective(objective)
@@ -567,109 +544,8 @@ def tao_bounds(bound, controls):
     return shaped
 
 
-def acquisition_mask(function_space, points, thickness):
-    """Return the mask that zeroes the layers the sources and receivers sit in.
-
-    A gradient is largest around the sources and the receivers, where the
-    wavefields are strongest, and what it carries there is the imprint of
-    the acquisition rather than information on the medium; zeroing it in a
-    layer around them is usual practice in FWI [Modrak2016]_. The mask is
-    one where the model may change and zero in every layer within
-    ``thickness`` of the depth of a source or receiver: for an acquisition
-    at the top of the domain, the layer below the surface; for a line of
-    receivers at depth, the layer around it. The depth is the first mesh
-    coordinate, in two and three dimensions alike.
-
-    Parameters
-    ----------
-    function_space : firedrake.FunctionSpace
-        Scalar space the mask is built in, that of the control it will
-        multiply.
-    points : array_like
-        Positions of the sources and receivers, one per row, the depth
-        first.
-    thickness : float
-        Half-thickness of the layers, in the mesh's units: a node closer
-        than this to the depth of a point is zeroed.
-
-    Returns
-    -------
-    firedrake.Function
-        The mask, zero or one at every node of the space.
-
-    References
-    ----------
-    .. [Modrak2016] Modrak, R., & Tromp, J. (2016). Seismic waveform
-       inversion best practices: regional, global and exploration test
-       cases. Geophysical Journal International, 206(3), 1864-1889.
-    """
-    depths = np.unique(np.atleast_2d(np.asarray(points, dtype=float))[:, 0])
-    mesh = function_space.mesh()
-    depth = fire.Function(function_space).interpolate(fire.SpatialCoordinate(mesh)[0])
-    distance = np.abs(depth.dat.data_ro[:, None] - depths[None, :]).min(axis=1)
-    mask = fire.Function(function_space, name="gradient_mask")
-    mask.dat.data[:] = np.where(distance < thickness, 0.0, 1.0)
-    return mask
-
-
-def _acquisition_masks(controls, wave, radius, comm):
-    """Build the masks of :func:`acquisition_mask`, one per control.
-
-    Parameters
-    ----------
-    controls : list of firedrake.Function
-        The controls TAO is given; one mask is built in the space of each,
-        since the controls of an elastic inversion need not share one.
-    wave : Wave
-        The solver, for its sources, receivers, peak frequency and, if the
-        radius is not given, its slowest wave speed.
-    radius : float or None
-        Half-thickness of the layers, in the mesh's units. ``None`` takes
-        half the shortest wavelength of the current model at the peak
-        frequency, the same on every rank of ``comm``.
-    comm : mpi4py.MPI.Comm
-        Communicator the controls are defined over.
-
-    Returns
-    -------
-    list of firedrake.Function
-        One mask per control.
-
-    Raises
-    ------
-    ValueError
-        If ``radius`` is negative.
-    """
-    if radius is None:
-        # The slowest wave sets the shortest wavelength: the S wave of an
-        # elastic medium, the only wave of an acoustic one.
-        speed = wave.c if getattr(wave, "c_s", None) is None else wave.c_s
-        c_min = comm.allreduce(
-            float(speed.dat.data_ro.min()) if speed.dat.data_ro.size else np.inf,
-            op=MPI.MIN,
-        )
-        radius = 0.5 * c_min / wave.frequency
-    elif radius < 0:
-        raise ValueError(f"mask_radius is a distance; received {radius}.")
-    points = np.vstack([
-        np.atleast_2d(np.asarray(wave.source_locations, dtype=float)),
-        np.atleast_2d(np.asarray(wave.receiver_locations, dtype=float)),
-    ])
-    if comm.rank == 0:
-        print(
-            f"Zeroing the gradient within {radius:.4g} of the depth of every "
-            "source and receiver (sources_receivers_gradient_mask).",
-            flush=True,
-        )
-    return [
-        acquisition_mask(control.function_space(), points, radius)
-        for control in controls
-    ]
-
-
 def minimize_with_tao(
     reduced_functional, bounds=None, comm=None, options=None, record=None,
-    gradient_masks=None, wave=None,
 ):
     """Minimize a reduced functional with PETSc TAO.
 
@@ -690,26 +566,12 @@ def minimize_with_tao(
     options : dict, optional
         PETSc options for the solver, such as ``{"tao_max_it": 20}``. The
         type has to resolve to ``blmvm``, which is the only one
-        :class:`LumpedTAOSolver` supports; anything else raises there. Two
-        options are spyro's own and are taken out before PETSc reads the
-        rest: ``sources_receivers_gradient_mask``, whether to zero the
-        gradient in a layer around the depth of every source and receiver
-        (default False; see :func:`acquisition_mask`), and ``mask_radius``,
-        the half-thickness of those layers in the mesh's units, half the
-        shortest wavelength at the peak frequency by default. They need
-        ``wave``.
+        :class:`LumpedTAOSolver` supports; anything else raises there.
     record : callable, optional
         Called ``record(iteration, functional, controls)`` after each
         iteration TAO accepts, with the controls it stands at as a list of
         fresh fields. The starting point is not reported: it is the value the
         caller already has, from evaluating the functional to get here.
-    gradient_masks : list of firedrake.Function, optional
-        One mask per control that every derivative handed to TAO is
-        multiplied by, on top of the acquisition mask if that is on; see
-        :class:`LumpedTAOSolver`.
-    wave : Wave, optional
-        The solver whose sources and receivers the acquisition mask is
-        built around; needed only for that.
 
     Returns
     -------
@@ -729,41 +591,16 @@ def minimize_with_tao(
     Raises
     ------
     ValueError
-        If the TAO type resolves to anything other than BLMVM, or the
-        acquisition mask is asked for without ``wave``, or ``mask_radius``
-        is given with it off.
+        If the TAO type resolves to anything other than BLMVM.
 
     See Also
     --------
     LumpedTAOSolver : The solver this drives, and why its metric is lumped.
     tao_bounds : Shapes ``vmin``/``vmax`` into the ``bounds`` this takes.
     """
-    options = dict(options or {})
-    mask_acquisition = options.pop("sources_receivers_gradient_mask", False)
-    mask_radius = options.pop("mask_radius", None)
-    if mask_radius is not None and not mask_acquisition:
-        raise ValueError(
-            "mask_radius sizes the layers of sources_receivers_gradient_mask, "
-            "which is off.",
-        )
-    if mask_acquisition:
-        if wave is None:
-            raise ValueError(
-                "sources_receivers_gradient_mask needs the wave solver, for "
-                "its sources and receivers.",
-            )
-        masks = _acquisition_masks(
-            [control.control for control in reduced_functional.controls],
-            wave, mask_radius, comm,
-        )
-        if gradient_masks is not None:
-            for mask, given in zip(masks, gradient_masks):
-                mask.dat.data[:] *= given.dat.data_ro
-        gradient_masks = masks
+    options = options or {}
     problem = MinimizationProblem(reduced_functional, bounds=bounds)
-    solver = LumpedTAOSolver(
-        problem, options, comm=comm, gradient_masks=gradient_masks,
-    )
+    solver = LumpedTAOSolver(problem, options, comm=comm)
     # TAO holds an iterate as one vector with every control concatenated into
     # it. Reading it through an interface built from those same controls lays
     # them out the way the solver's own does. Both the monitor and the

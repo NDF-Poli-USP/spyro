@@ -466,22 +466,11 @@ the largest allowed P-wave speed, rather than just the starting velocity.
     cp_bounds = (2.3, 3.5)   # km/s
     cs_bounds = (1.0, 1.6)   # km/s
 
-Large gradients near sources and receivers can dominate model updates
-[Modrak2016]_. A common practice in this case is to zero out such regions,
-and the optimizer does it when asked to through its options: with
-``sources_receivers_gradient_mask`` it zeroes the gradient in a layer
-around the depth of every source and receiver, half the shortest
-wavelength thick on each side. Here that is :math:`0.5 c_s / f = 125` m,
-so the model is held fixed above :math:`z = -0.275` km, around the
-sources, and between :math:`z = -0.975` and :math:`-0.725` km, around the
-receivers, and updated in between; ``mask_radius`` changes the thickness.
-
 ``run_fwi`` records the starting forward solve and passes its reduced
 functional to PETSc/TAO's bound-constrained quasi-Newton method, BLMVM
-[Benson2001]_. spyro uses a lumped mass metric and applies the gradient mask
-at each evaluation. ``maxiter`` is an upper limit of 20 iterations; TAO can
-stop earlier. If it reaches the limit, the driver warns and returns the
-last iterate.
+[Benson2001]_, with a lumped mass metric. ``maxiter`` is an upper limit of
+20 iterations; TAO can stop earlier. If it reaches the limit, the driver
+warns and returns the last iterate.
 
 .. code-block:: python
 
@@ -490,7 +479,6 @@ last iterate.
         vmin=[cp_bounds[0], cs_bounds[0]],
         vmax=[cp_bounds[1], cs_bounds[1]],
         maxiter=maxiter,
-        tao_options={"sources_receivers_gradient_mask": True},
     )
 
 The result contains one ``Function`` per control, in the order of the
@@ -566,10 +554,13 @@ each velocity. The misfit history shows how much the fit to the data improved.
     :align: center
 
 
-After 20 iterations the misfit has fallen by a factor of about 19. The
+After 20 iterations the misfit has fallen by a factor of about 21. The
 S-wave velocity has become a circle of the right size and amplitude, about
-1.52 km/s at the centre against a true 1.5, while the P-wave velocity has
-moved much less, from 2.75 to about 2.82 km/s against 3.0.
+1.48 km/s at the centre against a true 1.5, while the P-wave velocity has
+moved much less, from 2.75 to about 2.79 km/s against 3.0. Both models
+also carry an imprint of the acquisition: spots at the sources and ripples
+along the line of receivers, where the wavefields, and so the gradient,
+are strongest [Modrak2016]_.
 
 A decreasing misfit means the predicted records better match the
 observations. We can achieve a better predicted model via FWI using more

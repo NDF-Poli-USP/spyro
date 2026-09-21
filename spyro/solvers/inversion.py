@@ -1677,18 +1677,6 @@ class FullWaveformInversion:
                 coefficients. That is what makes a tolerance mean the same
                 thing on a finer mesh, where the coefficient norm of the same
                 field would not.
-
-                Two options are spyro's own, read by
-                :func:`spyro.tools.optimization.minimize_with_tao` rather
-                than by PETSc: ``sources_receivers_gradient_mask``, whether
-                the optimizer zeroes the gradient in a layer around the
-                depth of every source and receiver, where it carries the
-                imprint of the acquisition rather than information on the
-                medium (default False), and ``mask_radius``, the
-                half-thickness of those layers, half the shortest
-                wavelength at the peak frequency by default. The gradients
-                ``get_gradient`` returns are never masked this way, and the
-                implemented adjoint has ``set_gradient_mask``.
             save_controls : bool, optional
                 Whether to write each accepted iterate to
                 ``control_<iteration>.pvd``. Default is True, which is how
@@ -1849,6 +1837,7 @@ class FullWaveformInversion:
             PETSc options merged over the defaults, which set only the solver
             type and the iteration budget. See :meth:`run_fwi` for what that
             leaves to PETSc.
+
         Returns
         -------
         PhysicalParameters
@@ -1902,7 +1891,6 @@ class FullWaveformInversion:
             comm=self.wave.comm.comm,
             options=options,
             record=self._record_iterate,
-            wave=self.wave,
         )
         # The tape knows which parameter each control is; the optimizer only
         # ever saw a vector, and hands back the same order it was given.
