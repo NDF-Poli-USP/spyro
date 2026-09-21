@@ -112,10 +112,8 @@ def change_scalar_field_resolution(
     grid_spacing : float
         Desired grid spacing (edge length) for the new structured mesh (km).
     function_space : firedrake.FunctionSpace, optional
-        The CG1 space of a structured mesh built by an earlier call with the
-        same ``mesh_parameters`` and ``grid_spacing``, to interpolate onto
-        instead of building the mesh again; several fields of one domain
-        are regridded onto one mesh that way. Default is None.
+        The space returned by an earlier call with the same parameters, to
+        interpolate onto instead of building the mesh again. Default is None.
 
     Returns
     -------

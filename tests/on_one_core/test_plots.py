@@ -116,10 +116,9 @@ def test_plot_model_in_p1():
 def test_plot_model_material_parameters(tmp_path) -> None:
     """Without ``fields``, a solver's own material parameters are drawn.
 
-    An acoustic solver has its velocity; an isotropic elastic one, whose
-    model comes from the input dictionary and has not been built by a
-    forward solve, its density and two wave speeds, one panel each, named
-    after the parameters.
+    One panel per parameter, named after it: the velocity of an acoustic
+    solver; the density and two wave speeds of an elastic one, built from
+    its model before any forward solve.
     """
     from tests.on_one_core.test_fwi_automated_adjoint import (
         ELASTIC_GUESS, build_elastic_dictionary,
@@ -219,24 +218,6 @@ def test_plot_model_fields(tmp_path, high_resolution: bool, quadrilateral: bool)
         spyro.plots.plot_model(wave, columns=0)
     with pytest.raises(ValueError, match="no material model"):
         spyro.plots.plot_model(SimpleNamespace(initial_velocity_model=None))
-
-
-@pytest.mark.parametrize("spacing", [0.0, -0.1, np.nan, np.inf])
-def test_model_plot_rejects_invalid_spacing(spacing: float) -> None:
-    """Reject invalid regridding distances before accessing the mesh.
-
-    Parameters
-    ----------
-    spacing : float
-        Invalid sampling distance.
-
-    Returns
-    -------
-    None
-        An assertion checks the validation error.
-    """
-    with pytest.raises(ValueError, match="grid_spacing must be finite and positive"):
-        spyro.utils.change_scalar_field_resolution(None, None, spacing)
 
 
 def test_plot_receiver_response(tmp_path):

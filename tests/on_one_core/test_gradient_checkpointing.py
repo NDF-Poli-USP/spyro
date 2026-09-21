@@ -205,10 +205,9 @@ def test_new_recording_starts_from_current_control(observed_record, schedule: st
     """A second recording reports the control's current value, not a stale one.
 
     Evaluating the reduced functional at a perturbed control leaves that
-    value on the control's block variable; under a checkpoint schedule it is
-    a copy, which survives the field being reset. The next forward solve
-    starts a new tape, and what its reduced functional reports as the control
-    -- what an optimizer would start from -- has to be the field as it is.
+    value as a checkpoint on the control's block variable, and it survives
+    the field being reset. The next recording has to read the field as it
+    is: that is what an optimizer starts from.
 
     Parameters
     ----------

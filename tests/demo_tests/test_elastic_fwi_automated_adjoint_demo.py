@@ -1,15 +1,11 @@
 """Run the isotropic elastic FWI demo, coarsened, on 3 ranks.
 
-The demo is a literate ``.py.rst`` file, the Python of which is what pylit
-extracts from it. Rather than depend on pylit, the test pulls the code out of
-the ``.. code-block:: python`` blocks itself, so that what is exercised is the
-text of the demo as committed -- except for the three settings that fix the
-cost of the run, which are coarsened so that the test takes minutes rather
-than a quarter of an hour. Meant to be run as::
+The test pulls the code out of the demo's ``.. code-block:: python`` blocks
+itself (no pylit needed), so it runs the demo as committed, except for the
+three settings that fix its cost, coarsened to keep the test to minutes.
+Run it with one process per shot, as the demo asks for::
 
     mpiexec -n 3 pytest tests/demo_tests/test_elastic_fwi_automated_adjoint_demo.py
-
-one process per shot, as the demo asks for.
 """
 from pathlib import Path
 import re
@@ -35,12 +31,10 @@ COARSE_SETTINGS = {"edge_length": "0.2", "dt": "0.0025", "maxiter": "2"}
 
 
 def extract_code(path: Path) -> str:
-    """Return the Python of the code blocks of a literate demo.
+    """Return the Python of the code blocks of a literate demo, in order.
 
-    A block starts at a line holding exactly ``.. code-block:: python`` and
-    runs through the indented lines that follow it, blank lines included; the
-    first line that is neither blank nor indented ends it. Blocks are joined
-    in order, which is the whole program.
+    A block starts at a ``.. code-block:: python`` line and runs through the
+    indented lines after it; the first non-blank, unindented line ends it.
 
     Parameters
     ----------
@@ -123,21 +117,21 @@ def test_elastic_fwi_automated_adjoint_demo(tmp_path, monkeypatch):
     assert namespace["rate"] > 1.9
 
     # Two controls, the velocities, in the order the bounds were given in.
-    cp_result, cs_result = namespace["controls"]
-    assert [cp_result.name(), cs_result.name()] == [
+    vp_result, vs_result = namespace["controls"]
+    assert [vp_result.name(), vs_result.name()] == [
         "p_wave_velocity", "s_wave_velocity",
     ]
     for control, (low, high) in (
-        (cp_result, namespace["cp_bounds"]),
-        (cs_result, namespace["cs_bounds"]),
+        (vp_result, namespace["vp_bounds"]),
+        (vs_result, namespace["vs_bounds"]),
     ):
         assert control.dat.data_ro.min() >= low - 1e-10
         assert control.dat.data_ro.max() <= high + 1e-10
 
     # Both velocities moved from the starting model.
-    space = cp_result.function_space()
+    space = vp_result.function_space()
     for result, start in (
-        (cp_result, namespace["cp_start"]), (cs_result, namespace["cs_start"]),
+        (vp_result, namespace["vp_start"]), (vs_result, namespace["vs_start"]),
     ):
         starting = fire.Function(space).interpolate(start).dat.data_ro
         assert not np.allclose(result.dat.data_ro, starting)
@@ -148,11 +142,11 @@ def test_elastic_fwi_automated_adjoint_demo(tmp_path, monkeypatch):
     assert namespace["maxiter"] == 2, "the coarsened settings were applied"
     assert 2 <= len(history) <= namespace["maxiter"] + 1
     assert history[-1] < history[0]
-    cs_start_center = float(
+    vs_start_center = float(
         fire.PointEvaluator(fwi.wave.mesh, [(namespace["center_z"], namespace["center_x"])])
-        .evaluate(fire.Function(space).interpolate(namespace["cs_start"]))[0]
+        .evaluate(fire.Function(space).interpolate(namespace["vs_start"]))[0]
     )
-    assert cs_start_center < namespace["cs_center"] < namespace["cs_circle"]
+    assert vs_start_center < namespace["vs_center"] < namespace["vs_circle"]
 
     # The first ensemble member draws the fields; every member saves the
     # record of its own shot, numbered.

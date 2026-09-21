@@ -307,14 +307,11 @@ pyadjoint.ReducedFunctional or None
         from one tape onto the next. The checkpointing *settings* survive, so
         the next forward solve is checkpointed the same way.
 
-        The controls are given fresh block variables as well, so that the
-        next recording starts from the values they hold *now*. A control
-        keeps, on its block variable, a checkpoint of the last value the
-        reduced functional was evaluated at -- a Taylor test's last
-        perturbation, an optimizer's last iterate -- and under a checkpoint
-        schedule that checkpoint is a copy rather than the control itself.
-        Left in place, it would be what the next reduced functional reports
-        as the control's value, whatever the field was reset to since.
+        The controls also get fresh block variables, so the next recording
+        starts from the values they hold now. A block variable keeps a
+        checkpoint of the last value the reduced functional was evaluated
+        at -- a Taylor-test perturbation, an optimizer's iterate -- and a
+        new recording would read that instead of the field.
         """
         self.reduced_functional = None
         self._tape = None

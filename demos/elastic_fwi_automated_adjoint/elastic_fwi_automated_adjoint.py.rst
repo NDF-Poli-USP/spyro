@@ -28,7 +28,7 @@ Full Waveform Inversion (FWI)
 
 FWI seeks to adjust material parameters to reduce the misfit between
 predicted and observed receiver data [Tarantola1984]_,
-[Virieux2009]_. Here the controls are :math:`m = (c_p, c_s)`, and the misfit is
+[Virieux2009]_. Here the controls are :math:`m = (v_p, v_s)`, and the misfit is
 
 .. math::
 
@@ -66,7 +66,7 @@ Lamé parameters from the P- and S-wave speeds:
 
 .. math::
 
-    \mu = \rho c_s^2, \qquad \lambda = \rho(c_p^2 - 2c_s^2).
+    \mu = \rho v_s^2, \qquad \lambda = \rho(v_p^2 - 2v_s^2).
 
 The medium starts at rest and is excited by vertical point forces with a
 5 Hz Ricker wavelet [Ricker1953]_. We use degree-4 spectral elements on
@@ -126,10 +126,10 @@ higher P- and S-wave velocities than the background:
 .. code-block:: python
 
     rho = 2.0              # density, g/cm^3 (the same everywhere)
-    cp_background = 2.5    # P-wave velocity, km/s
-    cs_background = 1.25   # S-wave velocity, km/s
-    cp_circle = 3.0        # km/s
-    cs_circle = 1.5        # km/s
+    vp_background = 2.5    # P-wave velocity, km/s
+    vs_background = 1.25   # S-wave velocity, km/s
+    vp_circle = 3.0        # km/s
+    vs_circle = 1.5        # km/s
 
     center_z, center_x = -0.5, 0.5   # centre of the circle, km
     radius = 0.125                   # km
@@ -207,8 +207,8 @@ velocity models are shown below.
     dictionary["synthetic_data"] = {
         "type": "object",
         "density": rho,
-        "p_wave_velocity": cp_background,
-        "s_wave_velocity": cs_background,
+        "p_wave_velocity": vp_background,
+        "s_wave_velocity": vs_background,
         "real_velocity_file": None,
     }
 
@@ -267,8 +267,8 @@ velocity anomalies. The hyperbolic tangent smooths their edges.
     z, x = fwi.wave.mesh_z, fwi.wave.mesh_x
     distance = fire.sqrt((z - center_z) ** 2 + (x - center_x) ** 2)
     inside = 0.5 * (1.0 + fire.tanh(200.0 * (radius - distance)))
-    cp_true = cp_background + (cp_circle - cp_background) * inside
-    cs_true = cs_background + (cs_circle - cs_background) * inside
+    vp_true = vp_background + (vp_circle - vp_background) * inside
+    vs_true = vs_background + (vs_circle - vs_background) * inside
 
 Pass the three true material fields to ``set_real_model``:
 
@@ -276,8 +276,8 @@ Pass the three true material fields to ``set_real_model``:
 
     fwi.set_real_model({
         Parameter.DENSITY: rho,
-        Parameter.P_WAVE_VELOCITY: cp_true,
-        Parameter.S_WAVE_VELOCITY: cs_true,
+        Parameter.P_WAVE_VELOCITY: vp_true,
+        Parameter.S_WAVE_VELOCITY: vs_true,
     })
 
 ``generate_real_shot_record`` propagates the shots through the true model
@@ -298,17 +298,17 @@ by default). This does not change the simulation mesh:
     material_space = create_function_space(
         fwi.wave.mesh, fwi.wave.method, fwi.wave.degree, dim=1,
     )
-    cp_true_field = fire.Function(material_space).interpolate(cp_true)
-    cs_true_field = fire.Function(material_space).interpolate(cs_true)
+    vp_true_field = fire.Function(material_space).interpolate(vp_true)
+    vs_true_field = fire.Function(material_space).interpolate(vs_true)
 
     first_member = comm.ensemble_comm.rank == 0
 
     if first_member:
         spyro.plots.plot_model(
             fwi.wave, "elastic_fwi_true_model.png",
-            fields=[cp_true_field, cs_true_field], high_resolution=True,
-            titles=["true $c_p$", "true $c_s$"],
-            vmin=[cp_background, cs_background], vmax=[cp_circle, cs_circle],
+            fields=[vp_true_field, vs_true_field], high_resolution=True,
+            titles=["true $v_p$", "true $v_s$"],
+            vmin=[vp_background, vs_background], vmax=[vp_circle, vs_circle],
             colorbar_label="km/s", cmap="jet",
         )
 
@@ -362,22 +362,22 @@ at the centre for comparison.
     z, x = fwi.wave.mesh_z, fwi.wave.mesh_x
     distance = fire.sqrt((z - center_z) ** 2 + (x - center_x) ** 2)
     gaussian = fire.exp(-(distance / radius) ** 2)
-    cp_start = cp_background + 0.5 * (cp_circle - cp_background) * gaussian
-    cs_start = cs_background + 0.5 * (cs_circle - cs_background) * gaussian
+    vp_start = vp_background + 0.5 * (vp_circle - vp_background) * gaussian
+    vs_start = vs_background + 0.5 * (vs_circle - vs_background) * gaussian
     fwi.set_guess_control({
-        Parameter.P_WAVE_VELOCITY: cp_start,
-        Parameter.S_WAVE_VELOCITY: cs_start,
+        Parameter.P_WAVE_VELOCITY: vp_start,
+        Parameter.S_WAVE_VELOCITY: vs_start,
     })
     at_center = fire.PointEvaluator(fwi.wave.mesh, [(center_z, center_x)])
-    cp_start_center = float(at_center.evaluate(fwi.wave.c)[0])
-    cs_start_center = float(at_center.evaluate(fwi.wave.c_s)[0])
+    vp_start_center = float(at_center.evaluate(fwi.wave.c)[0])
+    vs_start_center = float(at_center.evaluate(fwi.wave.c_s)[0])
 
     if first_member:
         spyro.plots.plot_model(
             fwi.wave, "elastic_fwi_starting_model.png",
             fields=[fwi.wave.c, fwi.wave.c_s], high_resolution=True,
-            titles=["starting $c_p$", "starting $c_s$"],
-            vmin=[cp_background, cs_background], vmax=[cp_circle, cs_circle],
+            titles=["starting $v_p$", "starting $v_s$"],
+            vmin=[vp_background, vs_background], vmax=[vp_circle, vs_circle],
             colorbar_label="km/s", cmap="jet",
         )
 
@@ -455,16 +455,16 @@ perturbations agree.
 Running the inversion
 -------------------------
 
-Give each velocity its own bounds, in control order: :math:`c_p`, then
-:math:`c_s`. These bounds keep both speeds positive and ensure
-:math:`c_p/c_s \geq 2.3/1.6 > \sqrt{2}`, so :math:`\lambda > 0`.
+Give each velocity its own bounds, in control order: :math:`v_p`, then
+:math:`v_s`. These bounds keep both speeds positive and ensure
+:math:`v_p/v_s \geq 2.3/1.6 > \sqrt{2}`, so :math:`\lambda > 0`.
 If you change the bounds or mesh, also check the time-step stability using
 the largest allowed P-wave speed, rather than just the starting velocity.
 
 .. code-block:: python
 
-    cp_bounds = (2.3, 3.5)   # km/s
-    cs_bounds = (1.0, 1.6)   # km/s
+    vp_bounds = (2.3, 3.5)   # km/s
+    vs_bounds = (1.0, 1.6)   # km/s
 
 ``run_fwi`` records the starting forward solve and passes its reduced
 functional to PETSc/TAO's bound-constrained quasi-Newton method, BLMVM
@@ -476,8 +476,8 @@ warns and returns the last iterate.
 
     controls = fwi.run_fwi(
         adjoint_type=AdjointType.AUTOMATED_ADJOINT,
-        vmin=[cp_bounds[0], cs_bounds[0]],
-        vmax=[cp_bounds[1], cs_bounds[1]],
+        vmin=[vp_bounds[0], vs_bounds[0]],
+        vmax=[vp_bounds[1], vs_bounds[1]],
         maxiter=maxiter,
     )
 
@@ -489,7 +489,7 @@ in ParaView.
 
 .. code-block:: python
 
-    cp_result, cs_result = controls
+    vp_result, vs_result = controls
     parallel_print(
         f"Controls: {[control.name() for control in controls]}", comm,
     )
@@ -504,13 +504,13 @@ what happened throughout the domain.
 
 .. code-block:: python
 
-    cp_center = float(at_center.evaluate(cp_result)[0])
-    cs_center = float(at_center.evaluate(cs_result)[0])
+    vp_center = float(at_center.evaluate(vp_result)[0])
+    vs_center = float(at_center.evaluate(vs_result)[0])
     parallel_print(
-        f"At the centre of the circle: c_p = {cp_center:.3f} km/s "
-        f"(started at {cp_start_center:.3f}, true {cp_circle}), "
-        f"c_s = {cs_center:.3f} km/s "
-        f"(started at {cs_start_center:.3f}, true {cs_circle})", comm,
+        f"At the centre of the circle: v_p = {vp_center:.3f} km/s "
+        f"(started at {vp_start_center:.3f}, true {vp_circle}), "
+        f"v_s = {vs_center:.3f} km/s "
+        f"(started at {vs_start_center:.3f}, true {vs_circle})", comm,
     )
 
 Plot the true, starting and inverted models on a common colour scale for
@@ -519,18 +519,18 @@ each velocity. The misfit history shows how much the fit to the data improved.
 .. code-block:: python
 
     if first_member:
-        space = cp_result.function_space()
-        cp_start_field = fire.Function(space).interpolate(cp_start)
-        cs_start_field = fire.Function(space).interpolate(cs_start)
+        space = vp_result.function_space()
+        vp_start_field = fire.Function(space).interpolate(vp_start)
+        vs_start_field = fire.Function(space).interpolate(vs_start)
         spyro.plots.plot_model(
             fwi.wave, "elastic_fwi_models.png",
-            fields=[cp_true_field, cp_start_field, cp_result,
-             cs_true_field, cs_start_field, cs_result],
+            fields=[vp_true_field, vp_start_field, vp_result,
+             vs_true_field, vs_start_field, vs_result],
             columns=3, high_resolution=True, show_acquisition=False,
-            titles=["true $c_p$", "starting $c_p$", "inverted $c_p$",
-                    "true $c_s$", "starting $c_s$", "inverted $c_s$"],
-            vmin=[cp_background] * 3 + [cs_background] * 3,
-            vmax=[cp_circle] * 3 + [cs_circle] * 3,
+            titles=["true $v_p$", "starting $v_p$", "inverted $v_p$",
+                    "true $v_s$", "starting $v_s$", "inverted $v_s$"],
+            vmin=[vp_background] * 3 + [vs_background] * 3,
+            vmax=[vp_circle] * 3 + [vs_circle] * 3,
             colorbar_label="km/s", cmap="jet",
         )
 

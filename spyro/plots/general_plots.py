@@ -109,8 +109,7 @@ def plot_model(
         raise ValueError("At least one field is required.")
     for field in fields:
         # The coordinates' shape is the geometric dimension on every
-        # Firedrake version, unlike ``mesh.geometric_dimension``, a method
-        # on older ones and a property on newer ones.
+        # Firedrake version (``mesh.geometric_dimension`` is not).
         if field.ufl_shape != () or field.function_space().mesh().coordinates.ufl_shape != (2,):
             raise ValueError("plot_model requires scalar fields on two-dimensional meshes.")
 
@@ -154,9 +153,7 @@ def plot_model(
         for axis in axes.flat[count:]:
             axis.set_visible(False)
 
-    # The regridding mesh depends on the domain and the spacing alone, so
-    # one serves every field; likewise one sampler serves every field on a
-    # mesh.
+    # One regridding mesh and one sampler per mesh serve every field.
     fine_space = None
     samplers = {}
     for index, field in enumerate(fields):
@@ -212,13 +209,13 @@ def plot_model(
 
 
 def _material_fields(wave: "Wave") -> Tuple[list, list]:
-    """Return the fields a solver's model is made of, and their names.
+    """Return a solver's independent material parameters and their names.
 
     Parameters
     ----------
     wave : Wave
-        The solver. Its material parameters are built from the model it
-        holds if a forward solve has not done so yet.
+        The solver; its parameters are built from its model if no forward
+        solve has done so yet.
 
     Returns
     -------
@@ -249,12 +246,11 @@ def _material_fields(wave: "Wave") -> Tuple[list, list]:
 
 
 def _owned_sampler(mesh, num_sample_points: int) -> Tuple[FunctionPlotter, int, int]:
-    """Return a sampler of a mesh and how much of it the rank owns.
+    """Return Firedrake's plot sampler for a mesh, and how much of it is owned.
 
-    The sampler is the one behind Firedrake's ``tripcolor``. It lays its
-    points and triangles out cell by cell, the owned cells first, so the
-    counts returned cut the halo cells off: they are owned, and drawn, by a
-    neighbouring rank.
+    The sampler lays points and triangles out cell by cell, owned cells
+    first; the counts returned leave the halo cells, drawn by their owner,
+    out.
 
     Parameters
     ----------
@@ -290,9 +286,8 @@ def plot_model_in_p1(
 ) -> Optional[plt.Figure]:
     """Plot the material model with a P1 finite element projection.
 
-    The model is interpolated onto a CG1 space on a structured mesh of the
-    same domain with edge length ``dx``, by
-    :func:`spyro.utils.change_scalar_field_resolution`, and drawn from
+    The model is interpolated onto a CG1 mesh of edge ``dx``
+    (:func:`spyro.utils.change_scalar_field_resolution`) and drawn from
     there: :func:`plot_model` with ``high_resolution=True``.
 
     Parameters

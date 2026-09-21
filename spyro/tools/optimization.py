@@ -201,11 +201,10 @@ def _lumped_riesz_map(controls, comm=None):
 def _lumped_initial_hessian(inverse_mass, vec_interface, comm):
     """Wrap the lumped Riesz map as the initial Hessian BLMVM starts from.
 
-    TAO takes ``H0`` as a matrix it *solves* with, through a KSP of its own,
-    so what is handed over is a matrix that is never applied, together with a
-    preconditioner that applies its inverse -- the lumped Riesz map -- in a
-    single ``preonly`` step. This mirrors how pyadjoint's ``TAOSolver`` seeds
-    the same method with the consistent map.
+    TAO *solves* with ``H0`` through a KSP of its own, so it gets a matrix
+    that is never applied and a preconditioner applying its inverse, the
+    lumped Riesz map, in one ``preonly`` step -- as pyadjoint's ``TAOSolver``
+    does with the consistent map.
 
     Parameters
     ----------
@@ -263,19 +262,14 @@ class LumpedTAOSolver(OptimizationSolver):
         each other.
 
     The initial Hessian
-        BLMVM approximates the inverse Hessian from the gradients it has
-        seen, and starts that approximation from an ``H0``, which is also
-        what turns the first derivative into a direction: the first step is
-        along :math:`-H_0^{-1} DJ`. Like pyadjoint, this seeds ``H0`` with
-        the Riesz map -- the lumped one again, so that the direction is the
-        gradient of the module docstring, measured in the same metric as the
-        convergence test. Left to PETSc, ``H0`` would be a scaled identity
-        and the first direction the derivative read as a vector of
-        coefficients, which differs from the gradient by the nodal masses.
-        On spectral elements those vary by nearly two orders of magnitude
-        within one element, and an optimizer stepping along the raw
-        derivative moves the interior nodes and leaves the element edges
-        behind.
+        BLMVM builds its inverse-Hessian approximation from an ``H0``, which
+        also sets the first step, along :math:`-H_0^{-1} DJ`. Like pyadjoint,
+        this seeds ``H0`` with the Riesz map -- the lumped one -- so the
+        first step follows the gradient in the same metric as the
+        convergence test. PETSc's default, a scaled identity, would step
+        along the raw coefficient derivative; on spectral elements, where
+        the nodal masses vary by nearly two orders of magnitude within an
+        element, that moves the interior nodes and leaves the edges behind.
 
     Only ``tao_type="blmvm"`` is supported: the lumped metric is there to
     serve the bound projection, and a solver that does not project has no use
@@ -390,10 +384,8 @@ class LumpedTAOSolver(OptimizationSolver):
                 "LumpedTAOSolver is restricted to tao_type='blmvm'."
             )
 
-        # The first direction is -H0^{-1} DJ: seeded with the lumped mass,
-        # it is the gradient the metric above measures, rather than the
-        # derivative read as a vector of coefficients. See the class
-        # docstring for what the difference does on spectral elements.
+        # Seeding H0 with the lumped mass makes the first step follow the
+        # gradient in the metric above; see the class docstring.
         initial_hessian, initial_hessian_inverse = _lumped_initial_hessian(
             inverse_mass, vec_interface, comm,
         )
@@ -415,8 +407,7 @@ class LumpedTAOSolver(OptimizationSolver):
         self._tao = tao
         self._x = solution
         self._inverse_mass = inverse_mass
-        # Referenced by TAO's KSP; held here so they outlive this scope for
-        # as long as the solver does.
+        # Referenced by TAO's KSP: kept alive as long as the solver.
         self._initial_hessian = initial_hessian
         self._initial_hessian_inverse = initial_hessian_inverse
 
