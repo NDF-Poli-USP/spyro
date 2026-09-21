@@ -19,7 +19,7 @@ from ..utils.physical_parameters import (
     PhysicalParameters, as_list, _as_parameter,
 )
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
-from ..plots import plot_model as spyro_plot_model, plot_model_in_p1
+from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import parallel_print
 from ..io.basicio import load_shots, save_shots
 from ..io.parallelism_wrappers import switch_serial_shot
@@ -1229,24 +1229,19 @@ class FullWaveformInversion:
         Parameters
         ----------
         plot_model : bool, optional
-            If True, draw and save the real model -- every material
-            parameter of the medium, sampled on a grid, with the sources and
-            receivers -- through :func:`spyro.plots.plot_model_in_p1`.
-            Default is False.
+            If True, plot and save the configured acoustic model. Default is
+            False.
         model_filename : str, optional
             Filename for the model plot. Default is "model.png".
         abc_points : list of tuple, optional
-            Corners ``(z, x)`` of the absorbing layer's inner boundary, drawn
-            on the model as a dashed line. Default is None.
+            Points defining absorbing boundary condition markers for plotting.
+            Default is None.
         save_shot_record : bool, optional
             If True, save the shot records to files. Default is True.
         shot_filename : str, optional
             Prefix for shot record file names. Default is "shots/shot_record_".
         high_resolution_model : bool, optional
-            Only read on a Firedrake without point evaluation, where the
-            velocity model is drawn by :func:`spyro.plots.plot_model`
-            instead: if True, it is regridded at 0.01 km first. Default is
-            False.
+            If True, use high resolution for model plotting. Default is False.
 
         Notes
         -----
@@ -1270,9 +1265,16 @@ class FullWaveformInversion:
         else:
             raise ValueError("No real control parameter has been configured.")
 
-        if plot_model and real_wave.comm.ensemble_comm.rank == 0:
-            self._plot_real_model(
-                real_wave, model_filename, abc_points, high_resolution_model,
+        if (
+            plot_model
+            and real_wave.comm.comm.rank == 0
+            and real_wave.comm.ensemble_comm.rank == 0
+        ):
+            spyro_plot_model(
+                real_wave,
+                filename=model_filename,
+                abc_points=abc_points,
+                high_resolution=high_resolution_model,
             )
 
         real_wave.forward_solve()
@@ -1288,38 +1290,6 @@ class FullWaveformInversion:
         else:
             self.real_shot_record = real_wave.forward_solution_receivers
         self._sync_wave_real_shot_record()
-
-    @staticmethod
-    def _plot_real_model(wave, filename, abc_points, high_resolution):
-        """Draw the real model with its sources and receivers.
-
-        Sampling the model is collective over the spatial communicator, so
-        every rank of the ensemble member calls this; the figure is saved by
-        the first. On a Firedrake without point evaluation the finite
-        element velocity model is drawn directly instead, by that rank
-        alone, which is what every version used to do.
-
-        Parameters
-        ----------
-        wave : Wave
-            Solver holding the real model.
-        filename : str
-            Where the figure is saved.
-        abc_points : list of tuple or None
-            Corners of the absorbing layer's inner boundary, if drawn.
-        high_resolution : bool
-            Whether the direct drawing regrids the model first.
-        """
-        try:
-            from firedrake import PointEvaluator  # noqa: F401
-        except ImportError:
-            if wave.comm.comm.rank == 0:
-                spyro_plot_model(
-                    wave, filename=filename, abc_points=abc_points,
-                    high_resolution=high_resolution,
-                )
-            return
-        plot_model_in_p1(wave, filename=filename, abc_points=abc_points)
 
     def set_real_velocity_model(
         self,
