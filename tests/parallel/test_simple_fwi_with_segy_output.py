@@ -60,7 +60,12 @@ def run_forward_real_model(input_dictionary, case="camembert", shot_filename="sh
         return ValueError(f"Case of {case} only partially implemented.")
 
     fwi_obj.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
-    fwi_obj.generate_real_shot_record(shot_filename=shot_filename)
+    fwi_obj.generate_real_shot_record(
+        plot_model=True,
+        model_filename="True_experiment.png",
+        shot_filename=shot_filename,
+        abc_points=[(-0.5, 0.5), (-1.5, 0.5), (-1.5, 1.5), (-0.5, 1.5)]
+    )
     if dt is not None:
         fwi_obj.wave.dt = original_dt
 

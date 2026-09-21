@@ -106,7 +106,6 @@ def test_plot_mesh_sizes():
     assert os.path.exists(str(image_output_filename))
 
 
-@pytest.mark.newer_firedrake
 def test_plot_model_in_p1():
     wave = get_wave_obj()
     filename = "model_p1.png"
@@ -114,7 +113,6 @@ def test_plot_model_in_p1():
     assert os.path.exists(str(filename))
 
 
-@pytest.mark.newer_firedrake
 def test_plot_model_material_parameters(tmp_path) -> None:
     """Without ``fields``, a solver's own material parameters are drawn.
 
@@ -141,7 +139,6 @@ def test_plot_model_material_parameters(tmp_path) -> None:
     assert len(figure.axes) == 6
 
 
-@pytest.mark.newer_firedrake
 @pytest.mark.parametrize("high_resolution", [False, True])
 @pytest.mark.parametrize("quadrilateral", [False, True])
 def test_plot_model_fields(tmp_path, high_resolution: bool, quadrilateral: bool) -> None:

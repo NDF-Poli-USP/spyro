@@ -108,7 +108,10 @@ def plot_model(
     if not count:
         raise ValueError("At least one field is required.")
     for field in fields:
-        if field.ufl_shape != () or field.function_space().mesh().geometric_dimension != 2:
+        # The coordinates' shape is the geometric dimension on every
+        # Firedrake version, unlike ``mesh.geometric_dimension``, a method
+        # on older ones and a property on newer ones.
+        if field.ufl_shape != () or field.function_space().mesh().coordinates.ufl_shape != (2,):
             raise ValueError("plot_model requires scalar fields on two-dimensional meshes.")
 
     def per_panel(value: object, name: str) -> list:
