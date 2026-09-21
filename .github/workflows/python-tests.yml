@@ -265,6 +265,7 @@ jobs:
           mpiexec -n 2 pytest tests/parallel/test_gradient_auto_adjoint.py
           mpiexec -n 2 pytest tests/parallel/test_fwi_auto_adjoint.py
           mpiexec -n 2 pytest tests/parallel/test_elastic_sources_parallel.py
+          mpiexec -n 2 pytest tests/parallel/test_plot_model.py
           mpiexec -n 3 pytest tests/demo_tests/test_elastic_fwi_automated_adjoint_demo.py
 
     - name: Post-run cleanup

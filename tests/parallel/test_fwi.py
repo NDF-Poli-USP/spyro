@@ -91,11 +91,7 @@ def test_fwi(use_vertex_only_mesh, load_real_shot=False, use_rol=False):
         cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
 
         FWI_obj.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
-        FWI_obj.generate_real_shot_record(
-            plot_model=True,
-            model_filename="True_experiment.png",
-            abc_points=[(-0.5, 0.5), (-1.5, 0.5), (-1.5, 1.5), (-0.5, 1.5)]
-        )
+        FWI_obj.generate_real_shot_record()
         np.save("real_shot_record", FWI_obj.real_shot_record)
 
     else:

@@ -90,6 +90,7 @@ def velocity_to_grid(velocity_function, mesh_parameters, grid_spacing, output=Fa
 
 def change_scalar_field_resolution(
     scalar_field: fire.Function, mesh_parameters: MeshingParameters, grid_spacing: float,
+    function_space: fire.FunctionSpace | None = None,
 ) -> tuple[fire.Function, fire.FunctionSpace]:
     """
     Change a scalar field to a different resolution using a structured grid.
@@ -109,6 +110,11 @@ def change_scalar_field_resolution(
         Mesh metadata describing the original model domain.
     grid_spacing : float
         Desired grid spacing (edge length) for the new structured mesh (km).
+    function_space : firedrake.FunctionSpace, optional
+        The CG1 space of a structured mesh built by an earlier call with the
+        same ``mesh_parameters`` and ``grid_spacing``, to interpolate onto
+        instead of building the mesh again; several fields of one domain
+        are regridded onto one mesh that way. Default is None.
 
     Returns
     -------
@@ -139,6 +145,9 @@ def change_scalar_field_resolution(
     """
     if not np.isfinite(grid_spacing) or grid_spacing <= 0:
         raise ValueError("grid_spacing must be finite and positive.")
+    if function_space is not None:
+        u = fire.Function(function_space).interpolate(scalar_field, allow_missing_dofs=True)
+        return (u, function_space)
     mesh_parameters_original = mesh_parameters
     input_mesh_parameters_cg1 = {
         "dimension": mesh_parameters_original.dimension,

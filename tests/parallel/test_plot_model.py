@@ -9,6 +9,7 @@ import pytest
 import spyro
 
 
+@pytest.mark.newer_firedrake
 @pytest.mark.parallel(2)
 @pytest.mark.parametrize("high_resolution", [False, True])
 def test_plot_model_spatial(tmp_path: Path, high_resolution: bool) -> None:

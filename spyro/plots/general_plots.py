@@ -12,7 +12,7 @@ from ..utils import change_scalar_field_resolution
 from ..utils.physical_parameters import as_list
 from .plot_helpers import _finalize_figure
 
-if TYPE_CHECKING:  # Avoinding circular imports lazily
+if TYPE_CHECKING:  # Avoiding circular imports lazily
     from ..solvers.wave import Wave
 
 
@@ -53,13 +53,17 @@ def plot_model(
         Interpolate each field onto a finer CG1 mesh before plotting.
         Default is False.
     high_resolution_grid_value : float, optional
-        Requested edge length of the visualisation mesh, in km. Default
-        is 0.01. Used only when ``high_resolution`` is True.
+        Requested edge length of the visualisation mesh, in the mesh's
+        units. Default is 0.01. Used only when ``high_resolution`` is True.
     fields : firedrake.Function or sequence of firedrake.Function, optional
-        Fields to plot. Defaults to ``wave.initial_velocity_model``.
+        Fields to plot. Defaults to the solver's independent material
+        parameters: the velocity of an acoustic medium; the density and
+        either the wave speeds or the Lamé parameters of an isotropic
+        elastic one, built from its model if a forward solve has not yet.
         For high resolution, their domains must match ``wave.mesh_parameters``.
     titles : sequence of str, optional
-        One title per field.
+        One title per field. Defaults to the parameter names when the
+        fields are the solver's own, to nothing otherwise.
     vmin : float or sequence of float, optional
         Lower colour limit, shared or one per field.
     vmax : float or sequence of float, optional
@@ -83,7 +87,8 @@ def plot_model(
     ------
     ValueError
         If fields are empty, not scalar or not two-dimensional, panel options
-        have incompatible lengths, or columns is not a positive integer.
+        have incompatible lengths, columns is not a positive integer, or no
+        fields are given and the solver has no material model to draw.
 
     Notes
     -----
@@ -95,7 +100,10 @@ def plot_model(
     --------
     spyro.utils.change_scalar_field_resolution : Shared CG1 regridding tool.
     """
-    fields = as_list(wave.initial_velocity_model if fields is None else fields)
+    if fields is None:
+        fields, names = _material_fields(wave)
+        titles = names if titles is None else titles
+    fields = as_list(fields)
     count = len(fields)
     if not count:
         raise ValueError("At least one field is required.")
@@ -143,16 +151,26 @@ def plot_model(
         for axis in axes.flat[count:]:
             axis.set_visible(False)
 
+    # The regridding mesh depends on the domain and the spacing alone, so
+    # one serves every field; likewise one sampler serves every field on a
+    # mesh.
+    fine_space = None
+    samplers = {}
     for index, field in enumerate(fields):
         if high_resolution:
-            field, _ = change_scalar_field_resolution(
+            field, fine_space = change_scalar_field_resolution(
                 field, wave.mesh_parameters, high_resolution_grid_value,
+                function_space=fine_space,
             )
-        # Reuse the sampler behind Firedrake's tripcolor. Gather its triangles
-        # to support distributed meshes as well as one process per shot.
-        plotter = FunctionPlotter(field.function_space().mesh(), 1 if high_resolution else 10)
+        mesh = field.function_space().mesh()
+        if id(mesh) not in samplers:
+            samplers[id(mesh)] = _owned_sampler(mesh, 1 if high_resolution else 10)
+        plotter, points, triangles = samplers[id(mesh)]
         tri = plotter.triangulation
-        pieces = comm.gather((tri.x, tri.y, tri.triangles, plotter(field)), root=0)
+        pieces = comm.gather(
+            (tri.x[:points], tri.y[:points], tri.triangles[:triangles], plotter(field)[:points]),
+            root=0,
+        )
         if comm.rank != 0:
             continue
         z = np.concatenate([piece[0] for piece in pieces])
@@ -190,24 +208,100 @@ def plot_model(
     return None
 
 
-def plot_model_in_p1(
-    wave: "Wave",
-    dx: float = 0.01,
-    filename: str = "model.png",
-    abc_points: Optional[List[Tuple[float, float]]] = None,
-    show: bool = False,
-    flip_axis: bool = True,
-) -> Optional[plt.Figure]:
-    """Plot the velocity on a CG1 mesh using the shared high-resolution path.
+def _material_fields(wave: "Wave") -> Tuple[list, list]:
+    """Return the fields a solver's model is made of, and their names.
 
     Parameters
     ----------
     wave : Wave
-        Wave object containing the velocity model and mesh metadata.
+        The solver. Its material parameters are built from the model it
+        holds if a forward solve has not done so yet.
+
+    Returns
+    -------
+    list of firedrake.Function
+        The independent material parameters, in the solver's order.
+    list of str
+        Their names.
+
+    Raises
+    ------
+    ValueError
+        If the solver carries no model to build them from.
+    """
+    try:
+        parameters = wave.physical_parameters
+    except ValueError:
+        parameters = wave.initialize_physical_parameters()
+    except AttributeError:
+        # Not a spyro solver: whatever velocity model it carries.
+        velocity = getattr(wave, "initial_velocity_model", None)
+        if velocity is None:
+            raise ValueError(
+                "The solver has no material model to draw; pass fields=.",
+            ) from None
+        return [velocity], [None]
+    fields = parameters.select()
+    return list(fields.values()), [name.value for name in fields]
+
+
+def _owned_sampler(mesh, num_sample_points: int) -> Tuple[FunctionPlotter, int, int]:
+    """Return a sampler of a mesh and how much of it the rank owns.
+
+    The sampler is the one behind Firedrake's ``tripcolor``. It lays its
+    points and triangles out cell by cell, the owned cells first, so the
+    counts returned cut the halo cells off: they are owned, and drawn, by a
+    neighbouring rank.
+
+    Parameters
+    ----------
+    mesh : firedrake.mesh.MeshGeometry
+        Mesh to sample.
+    num_sample_points : int
+        Sample points per cell, as ``FunctionPlotter`` takes them.
+
+    Returns
+    -------
+    firedrake.pyplot.FunctionPlotter
+        The sampler.
+    int
+        Number of its points that lie in owned cells.
+    int
+        Number of its triangles that lie in owned cells.
+    """
+    plotter = FunctionPlotter(mesh, num_sample_points)
+    tri = plotter.triangulation
+    num_cells = mesh.coordinates.function_space().cell_node_list.shape[0]
+    points = mesh.cell_set.size * (len(tri.x) // num_cells)
+    triangles = mesh.cell_set.size * (len(tri.triangles) // num_cells)
+    return plotter, points, triangles
+
+
+def plot_model_in_p1(
+    wave: "Wave",
+    dx: float = 0.01,
+    filename: Union[str, Path, None] = "model.png",
+    abc_points: Optional[List[Tuple[float, float]]] = None,
+    show: bool = False,
+    flip_axis: bool = True,
+) -> Optional[plt.Figure]:
+    """Plot the material model with a P1 finite element projection.
+
+    The model is interpolated onto a CG1 space on a structured mesh of the
+    same domain with edge length ``dx``, by
+    :func:`spyro.utils.change_scalar_field_resolution`, and drawn from
+    there: :func:`plot_model` with ``high_resolution=True``.
+
+    Parameters
+    ----------
+    wave : Wave
+        Wave object containing the material model and mesh metadata.
     dx : float, optional
-        Requested CG1 mesh spacing in km. Default is 0.01.
-    filename : str, optional
-        Output filename. Default is "model.png".
+        Edge length of the visualisation mesh, in the mesh's units. Default
+        is 0.01.
+    filename : str or pathlib.Path, optional
+        Output filename. Default is "model.png"; ``None`` creates the figure
+        without saving it.
     abc_points : list of tuple, optional
         Boundary vertices in ``(z, x)`` order.
     show : bool, optional
@@ -363,8 +457,6 @@ def plot_function(function: Function, **kwargs) -> None:
     plt.close()
     fig = plt.figure(figsize=(9, 9))
     axes = fig.add_subplot(111)
-    fig.set_figwidth = 9.0
-    fig.set_figheight = 9.0
     contours = tricontourf(function, axes=axes, **kwargs)
     plt.colorbar(contours)
     axes.axis("equal")

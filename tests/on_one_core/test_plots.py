@@ -106,6 +106,7 @@ def test_plot_mesh_sizes():
     assert os.path.exists(str(image_output_filename))
 
 
+@pytest.mark.newer_firedrake
 def test_plot_model_in_p1():
     wave = get_wave_obj()
     filename = "model_p1.png"
@@ -113,6 +114,34 @@ def test_plot_model_in_p1():
     assert os.path.exists(str(filename))
 
 
+@pytest.mark.newer_firedrake
+def test_plot_model_material_parameters(tmp_path) -> None:
+    """Without ``fields``, a solver's own material parameters are drawn.
+
+    An acoustic solver has its velocity; an isotropic elastic one, whose
+    model comes from the input dictionary and has not been built by a
+    forward solve, its density and two wave speeds, one panel each, named
+    after the parameters.
+    """
+    from tests.on_one_core.test_fwi_automated_adjoint import (
+        ELASTIC_GUESS, build_elastic_dictionary,
+    )
+
+    figure = spyro.plots.plot_model(get_wave_obj(), tmp_path / "acoustic.png")
+    assert [axis.get_title() for axis in figure.axes[:1]] == ["p_wave_velocity"]
+
+    elastic = spyro.IsotropicWave(dictionary=build_elastic_dictionary(ELASTIC_GUESS))
+    elastic.set_mesh(input_mesh_parameters={"edge_length": 0.25})
+    figure = spyro.plots.plot_model(elastic, tmp_path / "elastic.png", high_resolution=True)
+    assert (tmp_path / "elastic.png").exists()
+    # The panels come first in the figure, then their colour bars.
+    assert [axis.get_title() for axis in figure.axes[:3]] == [
+        "density", "p_wave_velocity", "s_wave_velocity",
+    ]
+    assert len(figure.axes) == 6
+
+
+@pytest.mark.newer_firedrake
 @pytest.mark.parametrize("high_resolution", [False, True])
 @pytest.mark.parametrize("quadrilateral", [False, True])
 def test_plot_model_fields(tmp_path, high_resolution: bool, quadrilateral: bool) -> None:
@@ -191,6 +220,8 @@ def test_plot_model_fields(tmp_path, high_resolution: bool, quadrilateral: bool)
         spyro.plots.plot_model(wave, fields=[velocity, gradient], titles=["one"])
     with pytest.raises(ValueError, match="columns"):
         spyro.plots.plot_model(wave, columns=0)
+    with pytest.raises(ValueError, match="no material model"):
+        spyro.plots.plot_model(SimpleNamespace(initial_velocity_model=None))
 
 
 @pytest.mark.parametrize("spacing", [0.0, -0.1, np.nan, np.inf])
