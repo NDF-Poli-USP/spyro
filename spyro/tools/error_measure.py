@@ -736,6 +736,38 @@ class MeasureError:
         return nrms_error
 
 
+    @staticmethod
+    def calculate_receiver_error(
+            signal_model: np.ndarray,
+            signal_reference: np.ndarray,
+            dt: float,
+            has_displacement: bool = True,
+        ):
+        if has_displacement:
+            _, num_receivers, dimension = np.shape(signal_model)
+            numerator = 0.0
+            denumerator = 0.0
+            for receiver_id in range(num_receivers):
+                for direction in range(dimension):
+                    numerical_receiver = signal_model[:, receiver_id, direction]
+                    reference_receiver = signal_reference[:, receiver_id, direction]
+                    numerator += np.trapezoid((numerical_receiver - reference_receiver) ** 2, dx=dt)
+                    denumerator += np.trapezoid(reference_receiver**2, dx=dt)
+
+            error = numerator / denumerator
+        else:
+            _, num_receivers = signal_model
+            numerator = 0.0
+            denumerator = 0.0
+            for receiver_id in range(num_receivers):
+                numerical_receiver = signal_model[:, receiver_id]
+                reference_receiver = signal_reference[:, receiver_id]
+                numerator += np.trapezoid((numerical_receiver - reference_receiver) ** 2, dx=dt)
+                denumerator += np.trapezoid(reference_receiver**2, dx=dt)
+
+            error = numerator / denumerator
+        return error
+
 #     """
 #     Plot the comparison between the HABC scheme and the reference model.
 

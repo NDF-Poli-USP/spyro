@@ -93,6 +93,7 @@ def periodic_rectangle_mesh(
                                           quadrilateral=quadrilateral, comm=comm)
 
     # Adjusting to Spyro's reference system (z, x) with origin at (0, 0)
+    print(f"Edge length of {length_x/nx}", flush=True)
     mesh.coordinates.dat.data[:, 0] *= -1.0
     mesh.coordinates.dat.data[:, 1] -= pad
 

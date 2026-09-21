@@ -307,6 +307,7 @@ class AutomaticMesh:
         a periodic or non-periodic rectangular mesh based on the periodic attribute.
         """
         # Define the discretization
+        self.mesh_parameters.actual_h = None
         nz, nx = self.define_discretization_for_mesh()
 
         if self.comm is not None:
@@ -315,6 +316,9 @@ class AutomaticMesh:
             comm = None
 
         if self.periodic:
+            self.mesh_parameters.actual_h = np.min(
+                [self.length_x/nx, self.length_z / nz]
+            )
             return periodic_rectangle_mesh(
                 nz,
                 nx,
