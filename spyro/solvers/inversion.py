@@ -13,7 +13,6 @@ import os
 from .wave import Wave
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
-from ..utils import Gradient_mask_for_pml, Mask
 from ..utils.typing import AdjointType, WaveType
 from ..utils.physical_parameters import (
     PhysicalParameters, as_list, _as_parameter,
@@ -461,7 +460,10 @@ class FullWaveformInversion:
         self.misfit = None
         self.functional = None
         self.guess_forward_solution = None
-        self.has_gradient_mask = False
+        # The gradient mask as given to ``set_gradient_mask``; the fields it
+        # becomes, one per control, are built when a gradient is masked.
+        self._gradient_mask = None
+        self._gradient_mask_fields = {}
         self.gradient_mask_available = False
         self.functional_history = []
 
@@ -1685,7 +1687,9 @@ class FullWaveformInversion:
                 velocity with the S-wave velocity held; repeat the pairs
                 to alternate. The iteration count and the functional
                 history run through the stages. A parameter that is not a
-                control is rejected.
+                control is rejected, and a stage that moved a control it
+                was to hold -- which happens if that control starts
+                outside its bounds -- raises ``RuntimeError``.
             scipy_options : dict, optional
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
@@ -1733,21 +1737,12 @@ class FullWaveformInversion:
                 ``gc_timestep_frequency``. Rejected here, rather than at the
                 first solve, if a name is not one of those.
             gradient_mask : firedrake.Function, ufl.core.expr.Expr, number or dict, optional
-                A factor the optimizer's gradient is multiplied by, one where
-                the model may change and zero where it may not, written in
-                the mesh coordinates or as a field on the mesh; it is
-                interpolated into the space of each control. Zeroing the
-                gradient around the sources and receivers, where it carries
-                their imprint rather than information on the medium, is the
-                usual use. A dictionary gives one factor per control, keyed
-                by material parameter, and leaves the controls it does not
-                name unmasked; a number is broadcast, so
-                ``{ElasticMaterialParameter.P_WAVE_VELOCITY: 0.0}`` holds
-                the P-wave velocity while the other controls move; with
+                The gradient mask of this run, as :meth:`set_gradient_mask`
+                takes it: a factor the gradient is multiplied by, one where
+                the model may change and zero where it may not. Passing it
+                here is the same as calling :meth:`set_gradient_mask` first;
+                a mask set there is used when nothing is passed. With
                 ``stages`` the mask applies to the controls a stage moves.
-                Only the automated adjoint's optimizer, TAO, applies it:
-                the gradients ``get_gradient`` returns are left as they
-                are, and the implemented adjoint has ``set_gradient_mask``.
 
         Returns
         -------
@@ -1819,16 +1814,8 @@ class FullWaveformInversion:
                 )
         parameters.update(kwargs)
 
-        if (
-            gradient_mask is not None
-            and self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT
-        ):
-            raise ValueError(
-                "gradient_mask is applied by the automated adjoint's "
-                "optimizer, so it needs "
-                "adjoint_type=AdjointType.AUTOMATED_ADJOINT; the implemented "
-                "adjoint takes its mask from set_gradient_mask().",
-            )
+        if gradient_mask is not None:
+            self.set_gradient_mask(gradient_mask)
         if (
             stages is not None
             and self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT
@@ -1856,8 +1843,7 @@ class FullWaveformInversion:
             # keyed by the parameter each one belongs to.
             self.set_guess_control(
                 self._run_fwi_tao(
-                    parameters, tao_options=tao_options,
-                    gradient_mask=gradient_mask, stages=stages,
+                    parameters, tao_options=tao_options, stages=stages,
                 ),
             )
             self.control_parameter_result = self.control_parameters
@@ -1891,9 +1877,7 @@ class FullWaveformInversion:
         np.save("result", self._flatten_control(self.control_parameter_result))
         return result
 
-    def _run_fwi_tao(
-        self, parameters, tao_options=None, gradient_mask=None, stages=None,
-    ):
+    def _run_fwi_tao(self, parameters, tao_options=None, stages=None):
         """Optimize the recorded reduced functional with PETSc TAO.
 
         The forward solve is recorded once, here, and every functional value
@@ -1917,10 +1901,6 @@ class FullWaveformInversion:
             PETSc options merged over the defaults, which set only the solver
             type and the iteration budget. See :meth:`run_fwi` for what that
             leaves to PETSc.
-        gradient_mask : firedrake.Function, ufl.core.expr.Expr, number or dict, optional
-            Factor the optimizer's gradient is multiplied by, for every
-            control or one per control, interpolated here into the space of
-            each. See :meth:`run_fwi`.
         stages : list of (parameters, iterations), optional
             Stages moving only some of the controls, run one after the
             other on the one recording. See :meth:`run_fwi`. ``None`` runs
@@ -1955,7 +1935,7 @@ class FullWaveformInversion:
         else:
             stages = self._stages(stages)
         base_masks = self._gradient_masks(
-            gradient_mask, automated_adjoint.controls,
+            names, [control.function_space() for control in automated_adjoint.controls],
         )
 
         # Records the tape, and logs the starting functional the same way the
@@ -1984,11 +1964,16 @@ class FullWaveformInversion:
 
         # Every stage is a TAO solve of its own over the same reduced
         # functional, told to hold the controls it does not move by zeroing
-        # their gradients: with the lumped metric and no coupling between
-        # controls, a control whose gradient is zero is never stepped. TAO
-        # starts each solve from the controls' tape values, so the point the
-        # last stage stopped at is written there first. The iterations are
-        # numbered through the stages, as one run.
+        # their gradients. That holds them exactly because the solver is
+        # BLMVM with a diagonal metric (``LumpedTAOSolver`` accepts no other
+        # type): a zero gradient gives a zero step in that block, and the
+        # quasi-Newton pairs it collects there are zero too, so the metric
+        # never couples the blocks. The one way a held control can still
+        # move is the projection onto its bounds at the start of the solve,
+        # which is why the hold is checked after each stage. TAO starts each
+        # solve from the controls' tape values, so the point the last stage
+        # stopped at is written there first. The iterations are numbered
+        # through the stages, as one run.
         done = 0
         for moving, iterations in stages:
             offset = done
@@ -1998,6 +1983,10 @@ class FullWaveformInversion:
                 done = offset + iteration
                 self._record_iterate(done, functional, iterate)
 
+            start = [
+                control.tape_value().dat.data_ro.copy()
+                for control in reduced_functional.controls
+            ]
             solution = minimize_with_tao(
                 reduced_functional,
                 bounds=list(zip(lower, upper)),
@@ -2008,11 +1997,47 @@ class FullWaveformInversion:
                     base_masks, moving, names, adjoint_controls,
                 ),
             )
+            self._check_held(names, moving, start, solution)
             for control, value in zip(reduced_functional.controls, solution):
                 control.update(value)
         # The tape knows which parameter each control is; the optimizer only
         # ever saw a vector, and hands back the same order it was given.
         return automated_adjoint.label_derivatives(solution)
+
+    def _check_held(self, names, moving, start, solution):
+        """Verify that a stage left the controls it does not move untouched.
+
+        Parameters
+        ----------
+        names : list of enum.Enum
+            The parameter each control is, in the controls' order.
+        moving : set of enum.Enum
+            The parameters the stage moved.
+        start : list of numpy.ndarray
+            The controls' values before the stage, in the same order.
+        solution : list of firedrake.Function
+            The controls the stage stopped at.
+
+        Raises
+        ------
+        RuntimeError
+            If a held control changed. Collective over the spatial
+            communicator, so every rank raises together.
+        """
+        moved = [
+            name.value
+            for name, before, after in zip(names, start, solution)
+            if name not in moving
+            and not np.array_equal(before, after.dat.data_ro)
+        ]
+        moved = self.wave.comm.comm.allreduce(moved, op=MPI.SUM)
+        if moved:
+            raise RuntimeError(
+                f"The stage moving {sorted(name.value for name in moving)} "
+                f"changed {sorted(set(moved))}, which it was to hold. A held "
+                "control has to start within its bounds: the optimizer "
+                "projects the starting point onto them.",
+            )
 
     def _stages(self, stages):
         """Normalize the stages of a staged inversion.
@@ -2071,54 +2096,56 @@ class FullWaveformInversion:
             raise ValueError("stages is empty; give at least one stage.")
         return normalized
 
-    def _gradient_masks(self, gradient_mask, controls):
-        """Interpolate the optimizer's gradient mask into each control's space.
+    def _gradient_masks(self, names, spaces):
+        """Return the gradient mask as one field per control, or ``None``.
 
-        One mask per control, in its own space: the controls of an elastic
-        inversion need not share one.
+        The mask set on the driver is interpolated into the space of each
+        control -- the controls of an elastic inversion need not share one
+        -- and the fields are kept, so that an optimizer asking for the
+        gradient at every iterate does not rebuild them.
 
         Parameters
         ----------
-        gradient_mask : firedrake.Function, ufl.core.expr.Expr, number, dict or None
-            The factor every control's gradient is multiplied by, or a
-            dictionary of one per control keyed by material parameter. A
-            control the dictionary does not name is left unmasked; a number
-            is broadcast over the control. See :meth:`run_fwi`.
-        controls : list of firedrake.Function
-            The controls TAO is given, in its order, which is the order of
-            the automated adjoint's ``control_parameter_names``.
+        names : sequence of enum.Enum
+            The parameter each control is, in the controls' order.
+        spaces : sequence of firedrake.FunctionSpace
+            The space of each control, in the same order.
 
         Returns
         -------
         list of firedrake.Function or None
-            The masks, one per control, or ``None`` when there is no mask.
+            The masks, one per control, or ``None`` when no mask is set.
 
         Raises
         ------
         ValueError
-            If the dictionary names a parameter that is not a control.
+            If a mask given per parameter names one that is not a control.
         """
-        if gradient_mask is None:
+        mask = self._gradient_mask
+        if mask is None:
             return None
-        names = self.wave.automated_adjoint.control_parameter_names
-        if isinstance(gradient_mask, Mapping):
-            masks = {_as_parameter(name): mask for name, mask in gradient_mask.items()}
+        if isinstance(mask, Mapping):
+            masks = {_as_parameter(name): value for name, value in mask.items()}
             unknown = [name for name in masks if name not in names]
             if unknown:
                 raise ValueError(
-                    f"gradient_mask names {[name.value for name in unknown]}, "
+                    f"The gradient mask names {[name.value for name in unknown]}, "
                     "which are not controls of this inversion; the controls "
                     f"are {[name.value for name in names]}.",
                 )
             masks = [masks.get(name, 1.0) for name in names]
         else:
-            masks = [gradient_mask] * len(controls)
-        return [
-            fire.Function(control.function_space()).interpolate(
-                fire.Constant(mask) if np.isscalar(mask) else mask,
-            )
-            for mask, control in zip(masks, controls)
-        ]
+            masks = [mask] * len(names)
+        fields = []
+        for name, value, space in zip(names, masks, spaces):
+            field = self._gradient_mask_fields.get(name)
+            if field is None or field.function_space() != space:
+                field = fire.Function(space).interpolate(
+                    fire.Constant(value) if np.isscalar(value) else value,
+                )
+                self._gradient_mask_fields[name] = field
+            fields.append(field)
+        return fields
 
     @staticmethod
     def _stage_masks(base_masks, moving, names, controls):
@@ -2306,83 +2333,125 @@ class FullWaveformInversion:
 
         algo.run(opt, obj, bnd)
 
-    def set_gradient_mask(self, boundaries=None):
-        """
-        DEPRECATED: Set a gradient mask to zero out gradients outside defined boundaries.
+    @property
+    def has_gradient_mask(self):
+        """bool: Whether a gradient mask is set."""
+        return self._gradient_mask is not None
 
-        The gradient mask is used to restrict updates to certain regions of
-        the model domain, which is useful for excluding absorbing boundary
-        layers or other regions where the control parameter should not be
-        updated.
+    def set_gradient_mask(self, mask=None, *, boundaries=None):
+        """Set the mask the gradient is multiplied by before it is used.
 
-        This method is deprecated since we prefer to use mesh based tags for now. In
-        the future we will use the new submesh functionality in Firedrake.
+        The mask is a factor between zero and one over the domain: one
+        where the model may change and zero where it may not. Zeroing the
+        gradient in an absorbing layer, or around the sources and receivers,
+        where it carries their imprint rather than information on the
+        medium, is the usual use. Both optimizers apply it: L-BFGS-B through
+        :meth:`get_gradient`, and TAO, which drives the automated adjoint,
+        at every gradient it evaluates.
 
         Parameters
         ----------
-        boundaries : list of float, optional
-            List of boundary values defining the mask region. If not provided
-            and abc_active is True, uses PML boundary locations automatically.
+        mask : firedrake.Function, ufl.core.expr.Expr, number or dict, optional
+            The factor, written in the mesh coordinates or as a field on
+            the mesh; it is interpolated into the space of each control. A
+            dictionary gives one factor per control, keyed by material
+            parameter, and leaves the controls it does not name unmasked; a
+            number is broadcast, so
+            ``{ElasticMaterialParameter.P_WAVE_VELOCITY: 0.0}`` holds the
+            P-wave velocity while the other controls move.
+        boundaries : dict, optional
+            A box to keep instead, as ``z_min``, ``z_max``, ``x_min``,
+            ``x_max``, ``y_min`` and ``y_max`` entries, any of them: the
+            gradient is zeroed beyond every boundary given. With neither
+            argument, the box is the domain without its absorbing layer,
+            which needs the solver to have one.
 
         Raises
         ------
         ValueError
-            If abc_active is False and boundaries is None.
-            If the mask options configuration doesn't make sense.
-
-        Warnings
-        --------
-        UserWarning
-            If abc_active is True and boundaries is provided, the boundaries
-            parameter will override the automatic PML boundaries.
-
-        Notes
-        -----
-        The mask is applied automatically during get_gradient() via the
-        _apply_gradient_mask() method.
+            If both arguments are given, or neither and the solver has no
+            absorbing layer to exclude.
 
         Examples
         --------
-        >>> fwi.set_gradient_mask(boundaries=[0.0, 0.5, 5.0, 5.5])
+        >>> fwi.set_gradient_mask(boundaries={"z_min": -1.3, "x_max": 1.3})
+        >>> fwi.set_gradient_mask(fire.conditional(fwi.wave.mesh_z < -0.3, 1.0, 0.0))
         """
-        self.has_gradient_mask = True
+        if mask is not None and boundaries is not None:
+            raise ValueError("Give the mask or the boundaries of a box, not both.")
+        if mask is None:
+            if boundaries is None:
+                if not self.wave.abc_active:
+                    raise ValueError(
+                        "Without an absorbing layer to exclude, the gradient "
+                        "mask needs a mask or the boundaries of a box.",
+                    )
+                # The physical domain, without the layer padded around it.
+                boundaries = {
+                    "z_min": -self.wave.mesh_parameters.length_z,
+                    "x_min": 0.0,
+                    "x_max": self.wave.mesh_parameters.length_x,
+                }
+            mask = self._box_mask(boundaries)
+        self._gradient_mask = mask
+        self._gradient_mask_fields = {}
 
-        if self.wave.abc_active is False and boundaries is None:
-            raise ValueError("If no abc boundary please define boundaries for the mask")
-        elif self.wave.abc_active and boundaries is None:
-            mask_obj = Gradient_mask_for_pml(self.wave)
-        elif self.wave.abc_active and boundaries is not None:
-            warnings.warn("Boundaries overuling PML boundaries for mask")
-            mask_obj = Mask(boundaries, self.wave)
-        elif self.wave.abc_active is False and boundaries is not None:
-            mask_obj = Mask(boundaries, self.wave)
-        else:
-            raise ValueError("Mask options do not make sense")
+    def _box_mask(self, boundaries):
+        """Return the mask that keeps a box: one inside it, zero beyond.
 
-        self.mask_obj = mask_obj
+        Parameters
+        ----------
+        boundaries : dict
+            ``z_min``, ``z_max``, ``x_min``, ``x_max``, ``y_min`` or
+            ``y_max`` entries, any of them; a side without an entry is open.
+
+        Returns
+        -------
+        ufl.core.expr.Expr
+            The mask, in the mesh coordinates.
+
+        Raises
+        ------
+        ValueError
+            If an entry is not one of those.
+        """
+        coordinates = {"z": self.wave.mesh_z, "x": self.wave.mesh_x}
+        if any(name.startswith("y") for name in boundaries):
+            coordinates["y"] = self.wave.mesh_y
+        inside = 1.0
+        for name, value in boundaries.items():
+            axis, _, side = name.partition("_")
+            if axis not in coordinates or side not in ("min", "max"):
+                raise ValueError(
+                    f"'{name}' is not a boundary of the box; the boundaries "
+                    "are z_min, z_max, x_min, x_max, y_min and y_max.",
+                )
+            beyond = (
+                coordinates[axis] < value if side == "min"
+                else coordinates[axis] > value
+            )
+            inside = fire.conditional(beyond, 0.0, inside)
+        return inside
 
     def _apply_gradient_mask(self):
-        """
-        DEPRECATED: apply the gradient mask to the computed gradient.
+        """Multiply the gradient on the driver by the mask, if one is set.
 
-        If a gradient mask has been set via set_gradient_mask(), this method
-        applies the mask to zero out gradient values outside the defined region.
-        This is called automatically during get_gradient().
-
-        Notes
-        -----
-        This method is deprecated since we prefer to use mesh based tags for now. In
-        the future we will use the new submesh functionality in Firedrake.
+        Called by :meth:`get_gradient`; the gradient is modified in place,
+        each derivative by the mask in its own control's space.
         """
         if not self.has_gradient_mask:
             return
         if isinstance(self.gradient, PhysicalParameters):
-            # One derivative per controlled parameter, keyed by it: each one
-            # lives on the same mesh and is masked the same way.
-            for name, derivative in list(self.gradient.items()):
-                self.gradient.update(name, self.mask_obj.apply_mask(derivative))
+            names = list(self.gradient)
+            derivatives = list(self.gradient.values())
         else:
-            self.gradient = self.mask_obj.apply_mask(self.gradient)
+            names = list(self._controlled_parameters())
+            derivatives = [self.gradient]
+        masks = self._gradient_masks(
+            names, [derivative.function_space() for derivative in derivatives],
+        )
+        for derivative, mask in zip(derivatives, masks):
+            derivative.dat.data[:] *= mask.dat.data_ro
 
     def load_real_shot_record(self, file_name="shots/shot_record_"):
         """

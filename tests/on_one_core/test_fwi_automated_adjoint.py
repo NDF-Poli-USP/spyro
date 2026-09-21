@@ -165,13 +165,18 @@ def test_fwi_automated_adjoint(tmp_path, monkeypatch):
 
 
 @pytest.mark.newer_firedrake
-def test_fwi_automated_adjoint_gradient_mask(tmp_path, monkeypatch):
-    """A gradient mask freezes the model where it is zero.
+@pytest.mark.parametrize("adjoint_type", [
+    AdjointType.AUTOMATED_ADJOINT, AdjointType.IMPLEMENTED_ADJOINT,
+])
+def test_fwi_gradient_mask(tmp_path, monkeypatch, adjoint_type):
+    """A gradient mask freezes the model where it is zero, on either path.
 
     The mask keeps the lower half of the domain and zeroes the upper one,
     where the source and the receivers sit: no update the optimizer makes
-    reaches it. The gradients the solver returns are not masked, which
-    keeps them the derivative of the misfit.
+    reaches it, whether the optimizer is TAO on the automated adjoint or
+    L-BFGS-B on the implemented one. The gradients the solver returns are
+    not masked, which keeps them the derivative of the misfit; the ones the
+    driver returns are.
     """
     monkeypatch.chdir(tmp_path)
 
@@ -184,14 +189,12 @@ def test_fwi_automated_adjoint_gradient_mask(tmp_path, monkeypatch):
     fwi.set_guess_velocity_model(constant=ACOUSTIC_GUESS)
     keep_below = fire.conditional(fwi.wave.mesh_z < -0.5, 1.0, 0.0)
 
-    with pytest.raises(ValueError, match="gradient_mask"):
-        fwi.run_fwi(gradient_mask=keep_below, maxiter=1)
-
     result = fwi.run_fwi(
-        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
-        gradient_mask=keep_below,
+        adjoint_type=adjoint_type, gradient_mask=keep_below,
         vmin=2.0, vmax=3.5, maxiter=2,
     )
+    if adjoint_type is AdjointType.IMPLEMENTED_ADJOINT:
+        result = fwi.control_parameter_result
 
     mask = fire.Function(result.function_space()).interpolate(keep_below)
     frozen = mask.dat.data_ro < 0.5
@@ -206,9 +209,43 @@ def test_fwi_automated_adjoint_gradient_mask(tmp_path, monkeypatch):
     )
     assert fwi.functional_history[-1] < fwi.functional_history[0]
 
-    # The solver's own gradient is untouched by the optimizer's mask.
-    gradient = fwi.wave.gradient_solve(adjoint_type=AdjointType.AUTOMATED_ADJOINT)
+    # The solver's own gradient is untouched by the mask; the driver's is
+    # the one the optimizers see.
+    gradient = fwi.wave.gradient_solve(adjoint_type=adjoint_type)
     assert np.any(gradient.dat.data_ro[frozen] != 0.0)
+    gradient = fwi.get_gradient(save=False)
+    assert np.all(gradient.dat.data_ro[frozen] == 0.0)
+    assert np.any(gradient.dat.data_ro[~frozen] != 0.0)
+
+
+def test_set_gradient_mask_box(tmp_path, monkeypatch):
+    """A box keeps the model inside it and freezes it beyond its sides.
+
+    Without arguments the box is the domain without its absorbing layer,
+    which a solver without one cannot provide.
+    """
+    monkeypatch.chdir(tmp_path)
+    fwi = spyro.FullWaveformInversion(dictionary=build_dictionary())
+    fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
+    fwi.set_guess_velocity_model(constant=ACOUSTIC_GUESS)
+    space = fwi.wave.c.function_space()
+    z, x = fire.SpatialCoordinate(fwi.wave.mesh)
+
+    with pytest.raises(ValueError, match="absorbing layer"):
+        fwi.set_gradient_mask()
+    with pytest.raises(ValueError, match="not both"):
+        fwi.set_gradient_mask(1.0, boundaries={"z_min": -0.5})
+    with pytest.raises(ValueError, match="not a boundary"):
+        fwi.set_gradient_mask(boundaries={"z_top": 0.0})
+
+    fwi.set_gradient_mask(boundaries={"z_min": -0.75, "x_min": 0.25, "x_max": 0.75})
+    (mask,) = fwi._gradient_masks(fwi._controlled_parameters(), [space])
+    # The sides themselves are kept: the gradient is zeroed beyond them.
+    inside = fire.Function(space).interpolate(
+        fire.conditional(fire.And(z >= -0.75, fire.And(x >= 0.25, x <= 0.75)), 1.0, 0.0),
+    )
+    assert np.array_equal(mask.dat.data_ro, inside.dat.data_ro)
+    assert 0.0 < mask.dat.data_ro.mean() < 1.0
 
 
 @pytest.mark.newer_firedrake
@@ -374,6 +411,14 @@ def test_fwi_elastic_stages(tmp_path, monkeypatch):
                            (cs, ELASTIC_GUESS["s_wave_velocity"])):
         assert not np.allclose(control.dat.data_ro, start), (
             f"{control.name()} did not move in its stage"
+        )
+
+    # A held control that starts outside its bounds is moved onto them by
+    # the optimizer, which the stage refuses to pass off as a hold.
+    with pytest.raises(RuntimeError, match="hold"):
+        fwi.run_fwi(
+            stages=[(S, 1)], adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+            vmin=[ELASTIC_GUESS["density"] + 0.5, 1.5, 0.5], vmax=[3.0, 4.0, 2.5],
         )
 
 

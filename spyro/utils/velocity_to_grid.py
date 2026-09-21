@@ -1,4 +1,5 @@
 from copy import deepcopy
+from typing import Optional
 import firedrake as fire
 import numpy as np
 from ..meshing import MeshingParameters, AutomaticMesh
@@ -90,7 +91,7 @@ def velocity_to_grid(velocity_function, mesh_parameters, grid_spacing, output=Fa
 
 def change_scalar_field_resolution(
     scalar_field: fire.Function, mesh_parameters: MeshingParameters, grid_spacing: float,
-    function_space: fire.FunctionSpace | None = None,
+    function_space: Optional[fire.functionspaceimpl.WithGeometry] = None,
 ) -> tuple[fire.Function, fire.FunctionSpace]:
     """
     Change a scalar field to a different resolution using a structured grid.
