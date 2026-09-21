@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
 
 from firedrake import tripcolor, tricontourf, Function
 import matplotlib.pyplot as plt
-from mpi4py import MPI
 import numpy as np
 from PIL import Image
 from ..io import ensemble_save
@@ -389,10 +388,13 @@ def _domain_grid(mesh, spacing: float) -> Tuple[np.ndarray, Tuple[float, ...]]:
         raise ValueError("spacing must be finite and positive.")
     coordinates = mesh.coordinates.dat.data_ro
     # A rank may own no vertices; it then contributes nothing to the box.
+    # The reductions run on the mesh's own communicator -- the spatial one
+    # of its ensemble member -- with Python's min and max as the operation,
+    # which mpi4py accepts for objects, so no MPI constant is needed here.
     local_min = coordinates.min(axis=0) if coordinates.size else np.full(2, np.inf)
     local_max = coordinates.max(axis=0) if coordinates.size else np.full(2, -np.inf)
-    z_min, x_min = (mesh.comm.allreduce(float(v), op=MPI.MIN) for v in local_min)
-    z_max, x_max = (mesh.comm.allreduce(float(v), op=MPI.MAX) for v in local_max)
+    z_min, x_min = (mesh.comm.allreduce(float(v), op=min) for v in local_min)
+    z_max, x_max = (mesh.comm.allreduce(float(v), op=max) for v in local_max)
     # Include both edges without rounding the last sample outside the mesh.
     depths = np.linspace(z_max, z_min, max(2, int(np.ceil((z_max - z_min) / spacing)) + 1))
     positions = np.linspace(x_min, x_max, max(2, int(np.ceil((x_max - x_min) / spacing)) + 1))

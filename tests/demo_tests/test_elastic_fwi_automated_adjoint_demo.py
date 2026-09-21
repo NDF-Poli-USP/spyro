@@ -15,7 +15,6 @@ from pathlib import Path
 import re
 
 import firedrake as fire
-from mpi4py import MPI
 import numpy as np
 import pytest
 
@@ -103,7 +102,7 @@ def test_elastic_fwi_automated_adjoint_demo(tmp_path, monkeypatch):
     """The demo runs through, and moves the model the way it says it does."""
     # Every rank works in the same directory, so the files the demo writes
     # land in one place rather than in one temporary directory per process.
-    run_directory = MPI.COMM_WORLD.bcast(str(tmp_path), root=0)
+    run_directory = fire.COMM_WORLD.bcast(str(tmp_path), root=0)
     monkeypatch.chdir(run_directory)
 
     namespace = {"__name__": "elastic_fwi_automated_adjoint_demo"}
