@@ -383,19 +383,18 @@ def test_fwi_elastic_stages(tmp_path, monkeypatch):
     settings = dict(adjoint_type=AdjointType.AUTOMATED_ADJOINT, **bounds)
     S, P = Parameter.S_WAVE_VELOCITY, Parameter.P_WAVE_VELOCITY
 
-    # Stages are run by TAO, carry their own budgets, and are checked.
+    # Stages are run by TAO and are checked.
     with pytest.raises(ValueError, match="AUTOMATED_ADJOINT"):
         fwi.run_fwi(stages=[(S, 1)], **bounds)
-    with pytest.raises(ValueError, match="maxiter"):
-        fwi.run_fwi(stages=[(S, 1)], maxiter=1, **settings)
-    with pytest.raises(ValueError, match="pair"):
-        fwi.run_fwi(stages=[S], **settings)
+    with pytest.raises(TypeError, match="enum"):
+        fwi.run_fwi(stages=["s_wave_velocity"], **settings)
     with pytest.raises(ValueError, match="not controls"):
         fwi.run_fwi(stages=[(Parameter.LAMBDA, 1)], **settings)
     with pytest.raises(ValueError, match="positive"):
         fwi.run_fwi(stages=[(S, 0)], **settings)
 
-    rho, cp, cs = fwi.run_fwi(stages=[(S, 2), (P, 1)], **settings)
+    # A stage without a budget of its own takes ``maxiter``.
+    rho, cp, cs = fwi.run_fwi(stages=[S, (P, 1)], maxiter=2, **settings)
 
     assert fwi.current_iteration == 3
     assert len(fwi.functional_history) == 4

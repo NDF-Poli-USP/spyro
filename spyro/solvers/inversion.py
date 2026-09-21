@@ -1673,23 +1673,23 @@ class FullWaveformInversion:
             vmax : float or array_like, optional
                 Upper bound for the control parameter. Default is 6.0.
             maxiter : int, optional
-                Maximum number of iterations. Default is 20. Not used with
-                ``stages``, which carry their own budgets.
-            stages : list of (parameters, iterations), optional
+                Maximum number of iterations. Default is 20. With
+                ``stages``, the budget of every stage given without one.
+            stages : list, optional
                 Run the automated adjoint's optimizer in stages, each
-                moving only some of the controls: ``parameters`` is one
-                material parameter or an iterable of them, ``iterations``
-                that stage's budget. The tape is recorded once, with every
+                moving only some of the controls. A stage is a material
+                parameter, or an iterable of them, optionally paired with
+                its own iteration budget: ``[S_WAVE_VELOCITY,
+                P_WAVE_VELOCITY]`` runs ``maxiter`` iterations on each in
+                turn, ``[(S_WAVE_VELOCITY, 10), (P_WAVE_VELOCITY, 5)]``
+                the budgets given. The tape is recorded once, with every
                 control, and each stage starts from where the last one
-                stopped, so
-                ``[(S_WAVE_VELOCITY, 10), (P_WAVE_VELOCITY, 10)]``
-                inverts the S-wave velocity first and then the P-wave
-                velocity with the S-wave velocity held; repeat the pairs
-                to alternate. The iteration count and the functional
-                history run through the stages. A parameter that is not a
-                control is rejected, and a stage that moved a control it
-                was to hold -- which happens if that control starts
-                outside its bounds -- raises ``RuntimeError``.
+                stopped, the controls it does not move held; repeat the
+                stages to alternate. The iteration count and the
+                functional history run through the stages. A parameter
+                that is not a control is rejected, and a stage that moved
+                a control it was to hold -- which happens if that control
+                starts outside its bounds -- raises ``RuntimeError``.
             scipy_options : dict, optional
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
@@ -1769,11 +1769,6 @@ class FullWaveformInversion:
         >>> fwi.run_fwi(maxiter=100, vmin=1.5, vmax=5.0)
         """
         stages = kwargs.pop("stages", None)
-        if stages is not None and "maxiter" in kwargs:
-            raise ValueError(
-                "stages carry their own iteration budgets, so maxiter is not "
-                "used with them; pass one or the other.",
-            )
         maxiter = kwargs.pop("maxiter", 20)
         parameters = {
             "vmin": kwargs.pop("vmin", 1.429),
@@ -1901,7 +1896,7 @@ class FullWaveformInversion:
             PETSc options merged over the defaults, which set only the solver
             type and the iteration budget. See :meth:`run_fwi` for what that
             leaves to PETSc.
-        stages : list of (parameters, iterations), optional
+        stages : list, optional
             Stages moving only some of the controls, run one after the
             other on the one recording. See :meth:`run_fwi`. ``None`` runs
             a single stage moving every control for ``maxiter`` iterations.
@@ -1933,7 +1928,7 @@ class FullWaveformInversion:
         if stages is None:
             stages = [(set(names), parameters["maxiter"])]
         else:
-            stages = self._stages(stages)
+            stages = self._stages(stages, parameters["maxiter"])
         base_masks = self._gradient_masks(
             names, [control.function_space() for control in automated_adjoint.controls],
         )
@@ -2039,15 +2034,17 @@ class FullWaveformInversion:
                 "projects the starting point onto them.",
             )
 
-    def _stages(self, stages):
+    def _stages(self, stages, maxiter):
         """Normalize the stages of a staged inversion.
 
         Parameters
         ----------
-        stages : iterable of (parameters, iterations)
+        stages : iterable
             As given to :meth:`run_fwi`: for each stage, the material
-            parameter it moves, or an iterable of them, and its iteration
-            budget.
+            parameter it moves, or an iterable of them, alone or paired
+            with its iteration budget.
+        maxiter : int
+            The budget of a stage given without one.
 
         Returns
         -------
@@ -2057,21 +2054,26 @@ class FullWaveformInversion:
         Raises
         ------
         ValueError
-            If a stage is not such a pair, names a parameter that is not a
-            control, or has no positive budget.
+            If a stage names a parameter that is not a control, or has a
+            budget that is not a positive integer.
+        TypeError
+            If what a stage moves is not given by material parameters.
         """
         names = self.wave.automated_adjoint.control_parameter_names
         normalized = []
         for stage in stages:
-            try:
+            # A pair ends in a budget, an iterable of parameters in a
+            # parameter; the enums are strings, so a bare one must not be
+            # read as a sequence of characters either.
+            if (
+                isinstance(stage, tuple) and len(stage) == 2
+                and not isinstance(stage[1], Enum)
+            ):
                 moving, iterations = stage
-            except (TypeError, ValueError):
-                raise ValueError(
-                    "Each stage is a (parameters, iterations) pair; received "
-                    f"{stage!r}.",
-                ) from None
-            # A parameter enum is a string, so a bare one must not be read
-            # as a sequence of characters.
+            else:
+                moving, iterations = stage, None
+            if iterations is None:
+                iterations = maxiter
             if isinstance(moving, Enum):
                 moving = [moving]
             moving = {_as_parameter(name) for name in moving}

@@ -577,18 +577,16 @@ is an exercise for you!
 
 .. admonition:: Exercise: invert one velocity at a time
 
-    Rerun the script from the same starting model, replacing
-    ``maxiter=maxiter`` in ``run_fwi`` with::
+    Rerun the script from the same starting model with ``maxiter = 10``
+    and one more argument to ``run_fwi``::
 
-        stages=[
-            (Parameter.S_WAVE_VELOCITY, 10),
-            (Parameter.P_WAVE_VELOCITY, 10),
-        ],
+        stages=[Parameter.S_WAVE_VELOCITY, Parameter.P_WAVE_VELOCITY],
 
-    The first stage updates only :math:`c_s`; the second updates only
-    :math:`c_p`, keeping the first stage's :math:`c_s`. Both use the same
-    tape and spatial mask. Compare the final misfit and both recovered
-    models with the joint inversion. Does changing the stage order help?
+    Each stage runs ``maxiter`` iterations, the same 20 in total: the
+    first updates only :math:`c_s`; the second updates only :math:`c_p`,
+    keeping the first stage's :math:`c_s`. Both use the same tape and
+    spatial mask. Compare the final misfit and both recovered models with
+    the joint inversion. Does changing the stage order help?
 
 .. note::
 
