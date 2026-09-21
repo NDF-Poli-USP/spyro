@@ -3,7 +3,8 @@ from scipy.ndimage import gaussian_filter
 import segyio
 import numpy as np
 import matplotlib.pyplot as plt
-from ..io.parallelism_wrappers import run_in_one_core_kwarg_comm
+
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 try:
     from SeismicMesh import write_velocity_model
     HAS_SEISMICMESH = True
@@ -11,7 +12,7 @@ except ImportError:
     HAS_SEISMICMESH = False
 
 
-@run_in_one_core_kwarg_comm
+@SpyroEnsemble.run_in_one_core
 def smooth_velocity_field_file(
     input_filename,
     output_filename,
@@ -22,7 +23,6 @@ def smooth_velocity_field_file(
     i_limit=None,
     vp_limit=None,
     tol=1e-5,
-    comm=None,
 ):
     """Smooth a velocity field from a SEG-Y file using a Gaussian filter.
 

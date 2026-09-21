@@ -4,7 +4,8 @@ from firedrake import Function, VTKFile
 from numpy import abs, asarray, cos, maximum, pi, sign, sqrt, sum
 from numpy.linalg import norm
 from os import getcwd
-from ..io.basicio import parallel_print as pprint
+
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..utils.error_management import validate_parameter
 from ..utils.typing import BoundaryConditionsType, LayerShapeType
 
@@ -54,7 +55,7 @@ class NRBC():
     """
 
     def __init__(self, domain_dim, abc_boundary_layer_shape, angle_max=pi/4.,
-                 dimension=2, output_folder=None, comm=None):
+                 dimension=2, output_folder=None):
         """Initialize the NRBC class.
 
         Parameters
@@ -71,9 +72,6 @@ class NRBC():
             Model dimension (2D or 3D). Default is 2D.
         output_folder : `str`, optional
             The folder where output data will be saved. Default is `None`.
-        comm : `object`, optional
-            An object representing the communication interface for parallel processing.
-            Default is `None`.
 
         Returns
         -------
@@ -100,9 +98,6 @@ class NRBC():
             self.path_save_nrbc = getcwd() + "/output/"
         else:
             self.path_save_nrbc = output_folder
-
-        # Communicator MPI
-        self.comm = comm
 
     def source_to_bnd_reference_vector(self, source_coord, bnd_nodes_nfs):
         """Compute a unitary direction vector from the source to a boundary point.
@@ -252,7 +247,7 @@ class NRBC():
                                        [BoundaryConditionsType.HIGDON,
                                         BoundaryConditionsType.SOMMERFELD])
 
-        pprint(f"Creating Field for NRBC: {non_reflect_bc.value}", comm=self.comm)
+        SpyroEnsemble.print(f"Creating Field for NRBC: {non_reflect_bc.value}")
 
         # Initialize field for the cosine of the incidence angle
         self.cosHig = Function(V, name='cosHig')
