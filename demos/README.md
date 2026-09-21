@@ -13,8 +13,8 @@ where X_CORES is the required number of MPI processes and demo_name.py is the na
 [Elastic FWI with the automated adjoint](elastic_fwi_automated_adjoint/elastic_fwi_automated_adjoint.py.rst)
 runs an FWI of an isotropic elastic medium with the
 automated adjoint, recovering P- and S-wave velocities with density fixed.
-It covers synthetic observations, a Taylor test, joint inversion and an
-exercise comparing staged updates. We recommend the latest Firedrake release.
+It covers synthetic observations, a Taylor test and the joint inversion of
+both velocities. We recommend the latest Firedrake release.
 Extract the script with
 [pylit](https://pypi.org/project/pylit/) and run it with three processes:
 
