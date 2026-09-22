@@ -174,7 +174,7 @@ horizontal offset have later arrivals.
     length_z = 1.0   # depth of the domain, km
     length_x = 1.0   # width of the domain, km
 
-    edge_length = 0.1     # element size, km
+    edge_length = 0.1  # km; 1.25 cells per shortest wavelength at fmax = 2*fp
     dt = 0.0016           # time step, s
     maxiter = 20          # optimiser iterations
 
