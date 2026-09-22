@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 from matplotlib import use
 import numpy as np
 import spyro
-from scipy.signal import correlate
 
 from spyro.tools.error_measure import MeasureError
 use("agg")
@@ -45,7 +44,7 @@ ls = vs/frequency
 
 dictionary = {
     "options": {
-        "cell_type": "Q",
+        "cell_type": "T",
         "variant": "lumped",
         "degree": 4,
         "dimension": dimension,
@@ -138,8 +137,9 @@ def get_numerical_result(wave, h):
     return wave.forward_solution_receivers
 
 mesh_sizes = np.array([
-    0.80,
-    # 0.90,
+    0.06,
+    0.08,
+    0.10,
     # 0.10,
     # 0.11,
     # 0.12,
