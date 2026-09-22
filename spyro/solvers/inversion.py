@@ -1659,13 +1659,16 @@ class FullWaveformInversion:
                 ``stages``, the budget of a stage given without one.
             stages : list, optional
                 Run the automated adjoint's optimizer in stages, each
-                moving only some of the controls and holding the others:
+                exposing only some of the controls to TAO:
                 ``[Parameter.S_WAVE_VELOCITY, Parameter.P_WAVE_VELOCITY]``
                 runs ``maxiter`` iterations on each in turn,
                 ``[(Parameter.S_WAVE_VELOCITY, 10), ...]`` the budgets given.
-                A stage may also move several parameters at once. The tape
-                is recorded once and each stage starts where the last one
-                stopped; the iteration count and the functional history run
+                A stage may also expose several parameters at once. Every
+                stage gets a reduced functional and a fresh TAO solver whose
+                vector contains only those active controls; the other control
+                checkpoints stay constant. The full tape is recorded once,
+                and each stage starts from the complete model left by the
+                previous one. The iteration count and functional history run
                 through the stages as one run.
             scipy_options : dict, optional
                 Additional options passed to scipy.optimize.minimize.
@@ -1863,8 +1866,10 @@ class FullWaveformInversion:
             leaves to PETSc.
         stages : list, optional
             Stages moving only some of the controls, run one after the other
-            on the one recording; see :meth:`run_fwi`. ``None`` runs a single
-            stage moving every control for ``maxiter`` iterations.
+            on the one recording; see :meth:`run_fwi`. Each stage builds a
+            reduced functional containing only its active controls. ``None``
+            runs a single stage moving every control for ``maxiter``
+            iterations.
 
         Returns
         -------
@@ -1906,14 +1911,15 @@ class FullWaveformInversion:
         # L-BFGS-B takes a pair for each entry of the flattened control. The
         # controls of the reduced functional, rather than this driver's, are
         # what the pairs are matched against: they are the ones TAO is given.
-        adjoint_controls = [
-            control.control for control in reduced_functional.controls
-        ]
+        names = list(automated_adjoint.control_parameter_names)
+        full_controls = dict(zip(names, reduced_functional.controls))
+        adjoint_controls = [full_controls[name].control for name in names]
         lower = tao_bounds(parameters["vmin"], adjoint_controls)
         upper = tao_bounds(parameters["vmax"], adjoint_controls)
+        lower_by_name = dict(zip(names, lower))
+        upper_by_name = dict(zip(names, upper))
         tao_options = tao_options or {}
 
-        names = automated_adjoint.control_parameter_names
         if stages is None:
             stages = [(set(names), parameters["maxiter"])]
         for moving, _ in stages:
@@ -1925,27 +1931,44 @@ class FullWaveformInversion:
                     f"{[name.value for name in names]}.",
                 )
 
-        # Every stage is a TAO solve of its own over the same reduced
-        # functional, started from the controls' tape values, i.e. where the
-        # last stage stopped. The optimizer holds a control by masking its
-        # gradient to zero; the control is left unbounded meanwhile, so the
-        # projection onto the box at the start of the solve cannot move it
-        # either. The iterations are numbered through the stages, as one run.
+        # The optimizer may mutate the fields it is handed, so the state
+        # between stages is held in defensive copies rather than aliases to
+        # either the tape checkpoints or a TAO iterate.
+        state = PhysicalParameters(
+            (name, full_controls[name].tape_value()) for name in names
+        ).copy()
+
+        # Every stage gets a new TAO solver and a reduced functional exposing
+        # only its active controls. Omitted controls remain values on the full
+        # tape, synchronized explicitly after each solve. Iterations are
+        # numbered through all stages as one run.
         done = 0
         for moving, iterations in stages:
+            active_names = [name for name in names if name in moving]
+            stage_functional = automated_adjoint.reduced_functional_for(
+                self.wave.functional_value,
+                active_names,
+            )
+            stage_start_state = state.copy()
             offset = done
 
-            def record(iteration, functional, iterate):
+            def record(iteration, functional, active_values):
                 nonlocal done
                 done = offset + iteration
-                self._record_iterate(done, functional, iterate)
+                complete = stage_start_state.copy()
+                for name, value in zip(active_names, active_values):
+                    complete.update(name, value)
+                self._record_iterate(
+                    done,
+                    functional,
+                    [complete[name] for name in names],
+                )
 
-            held = [name not in moving for name in names]
-            solution = minimize_with_tao(
-                reduced_functional,
+            stage_solution = minimize_with_tao(
+                stage_functional,
                 bounds=[
-                    (None, None) if hold else (low, up)
-                    for hold, low, up in zip(held, lower, upper)
+                    (lower_by_name[name], upper_by_name[name])
+                    for name in active_names
                 ],
                 comm=self.wave.comm.comm,
                 options={
@@ -1953,16 +1976,13 @@ class FullWaveformInversion:
                     **tao_options,
                 },
                 record=record,
-                gradient_masks=(
-                    [0.0 if hold else 1.0 for hold in held]
-                    if any(held) else None
-                ),
             )
-            for control, value in zip(reduced_functional.controls, solution):
-                control.update(value)
-        # The tape knows which parameter each control is; the optimizer only
-        # ever saw a vector, and hands back the same order it was given.
-        return automated_adjoint.label_derivatives(solution)
+            for name, value in zip(active_names, stage_solution):
+                state.update(name, value)
+            for name in names:
+                full_controls[name].update(state[name])
+
+        return state
 
     @staticmethod
     def _stages(stages, maxiter):

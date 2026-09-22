@@ -294,14 +294,6 @@ class LumpedTAOSolver(OptimizationSolver):
     comm : petsc4py.PETSc.Comm or mpi4py.MPI.Comm, optional
         Communicator the controls are defined over. Under ensemble
         parallelism this is the *spatial* one.
-    gradient_masks : list, optional
-        One mask per control, a scalar or a field in the control's space,
-        that every derivative handed to TAO is multiplied by, coefficient
-        by coefficient. A control whose mask is zero is never moved: its
-        gradient is zero, so its step is, and the quasi-Newton pairs BLMVM
-        collects there are zero as well, so the diagonal metric never
-        couples it to the others. ``None`` applies no mask.
-
     Raises
     ------
     TypeError
@@ -309,15 +301,14 @@ class LumpedTAOSolver(OptimizationSolver):
     NotImplementedError
         If the problem carries constraints, which TAO is not set up for here.
     ValueError
-        If the resolved TAO type is not BLMVM, or there is not one mask per
-        control.
+        If the resolved TAO type is not BLMVM.
 
     See Also
     --------
     minimize_with_tao : Drives this solver.
     """
 
-    def __init__(self, problem, parameters, *, comm=None, gradient_masks=None):
+    def __init__(self, problem, parameters, *, comm=None):
         from petsc4py import PETSc
         import petsctools
 
@@ -337,24 +328,6 @@ class LumpedTAOSolver(OptimizationSolver):
         )
         tao = PETSc.TAO().create(comm=comm)
 
-        if gradient_masks is not None:
-            gradient_masks = as_list(gradient_masks)
-            if len(gradient_masks) != len(reduced_functional.controls):
-                raise ValueError(
-                    f"{len(reduced_functional.controls)} controls are being "
-                    "optimized, so the gradient masks take that many "
-                    f"entries; {len(gradient_masks)} were given.",
-                )
-
-        def masked(derivative):
-            """Multiply each control's derivative by its mask, in place."""
-            if gradient_masks is not None:
-                for value, mask in zip(as_list(derivative), gradient_masks):
-                    if isinstance(mask, fire.Function):
-                        mask = mask.dat.data_ro
-                    value.dat.data[:] *= mask
-            return derivative
-
         def objective(tao_, x):
             controls = new_control_variable(reduced_functional)
             vec_interface.from_petsc(x, controls)
@@ -363,14 +336,14 @@ class LumpedTAOSolver(OptimizationSolver):
         def gradient(tao_, x, g):
             controls = new_control_variable(reduced_functional)
             vec_interface.from_petsc(x, controls)
-            derivative = masked(tao_objective.gradient(controls))
+            derivative = tao_objective.gradient(controls)
             vec_interface.to_petsc(g, derivative)
 
         def objective_gradient(tao_, x, g):
             controls = new_control_variable(reduced_functional)
             vec_interface.from_petsc(x, controls)
             value, derivative = tao_objective.objective_gradient(controls)
-            vec_interface.to_petsc(g, masked(derivative))
+            vec_interface.to_petsc(g, derivative)
             return value
 
         tao.setObjective(objective)
@@ -563,7 +536,6 @@ def tao_bounds(bound, controls):
 
 def minimize_with_tao(
     reduced_functional, bounds=None, comm=None, options=None, record=None,
-    gradient_masks=None,
 ):
     """Minimize a reduced functional with PETSc TAO.
 
@@ -590,10 +562,6 @@ def minimize_with_tao(
         iteration TAO accepts, with the controls it stands at as a list of
         fresh fields. The starting point is not reported: it is the value the
         caller already has, from evaluating the functional to get here.
-    gradient_masks : list, optional
-        One mask per control that every derivative handed to TAO is
-        multiplied by; see :class:`LumpedTAOSolver`.
-
     Returns
     -------
     list
@@ -621,9 +589,7 @@ def minimize_with_tao(
     """
     options = options or {}
     problem = MinimizationProblem(reduced_functional, bounds=bounds)
-    solver = LumpedTAOSolver(
-        problem, options, comm=comm, gradient_masks=gradient_masks,
-    )
+    solver = LumpedTAOSolver(problem, options, comm=comm)
     # TAO holds an iterate as one vector with every control concatenated into
     # it. Reading it through an interface built from those same controls lays
     # them out the way the solver's own does. Both the monitor and the

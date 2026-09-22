@@ -245,6 +245,33 @@ def test_fwi_elastic_stages(tmp_path, monkeypatch):
     settings = dict(adjoint_type=AdjointType.AUTOMATED_ADJOINT, **bounds)
     S, P = Parameter.S_WAVE_VELOCITY, Parameter.P_WAVE_VELOCITY
 
+    from spyro.tools import optimization
+
+    real_minimize = optimization.minimize_with_tao
+    calls = []
+
+    def observed_minimize(reduced_functional: object, **kwargs: object) -> list:
+        automated_adjoint = fwi.wave.automated_adjoint
+        full = automated_adjoint.reduced_functional
+        names = automated_adjoint.control_parameter_names
+        calls.append({
+            "active": [
+                name for name, full_control in zip(names, full.controls)
+                if any(
+                    control is full_control
+                    for control in reduced_functional.controls
+                )
+            ],
+            "bounds": len(kwargs["bounds"]),
+            "full_state": {
+                name: np.array(control.tape_value().dat.data_ro, copy=True)
+                for name, control in zip(names, full.controls)
+            },
+        })
+        return real_minimize(reduced_functional, **kwargs)
+
+    monkeypatch.setattr(optimization, "minimize_with_tao", observed_minimize)
+
     # Stages are run by TAO and are checked before anything is recorded.
     with pytest.raises(ValueError, match="AUTOMATED_ADJOINT"):
         fwi.run_fwi(stages=[(S, 1)], **bounds)
@@ -256,6 +283,11 @@ def test_fwi_elastic_stages(tmp_path, monkeypatch):
     # A stage without a budget of its own takes ``maxiter``.
     rho, cp, cs = fwi.run_fwi(stages=[S, (P, 1)], maxiter=2, **settings)
 
+    assert [call["active"] for call in calls] == [[S], [P]]
+    assert [call["bounds"] for call in calls] == [1, 1]
+    assert not np.allclose(
+        calls[1]["full_state"][S], ELASTIC_GUESS["s_wave_velocity"],
+    ), "the second stage did not see the first stage's result"
     assert fwi.current_iteration == 3
     assert len(fwi.functional_history) == 4
     assert all(
@@ -277,8 +309,8 @@ def test_fwi_elastic_stages(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="not controls"):
         fwi.run_fwi(stages=[(Parameter.LAMBDA, 1)], **settings)
 
-    # A held control is not projected onto the bounds it would have as a
-    # moving one: it stays put even where it starts outside them.
+    # An inactive control is absent from TAO, including its bounds, so it
+    # stays put even where it starts outside the active problem's box.
     rho, cp, cs = fwi.run_fwi(
         stages=[(S, 1)], adjoint_type=AdjointType.AUTOMATED_ADJOINT,
         vmin=[ELASTIC_GUESS["density"] + 0.5, 1.5, 0.5], vmax=[3.0, 4.0, 2.5],

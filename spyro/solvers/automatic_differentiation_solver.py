@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 
 from pyadjoint import Tape, continue_annotation, pause_annotation, taylor_test
 
@@ -365,6 +365,78 @@ pyadjoint.ReducedFunctional or None
             tape=self._tape,
         )
         return self.reduced_functional
+
+    def reduced_functional_for(
+        self, functional: object, active_parameters: Iterable[object],
+    ) -> object:
+        """Build a temporary reduced functional for selected controls.
+
+        The selected controls retain their original
+        :class:`pyadjoint.BlockVariable` objects and checkpoints. The returned
+        functional therefore replays the same tape as the full reduced
+        functional, while controls omitted from it remain fixed at their
+        current checkpoints.
+
+        Parameters
+        ----------
+        functional : pyadjoint.AdjFloat
+            Functional value recorded on :attr:`_tape`.
+        active_parameters : iterable of enum.Enum
+            Labels of the controls to expose, in any order. The controls in
+            the returned functional follow :attr:`control_parameter_names`.
+
+        Returns
+        -------
+        firedrake.adjoint.EnsembleReducedFunctional
+            A new reduced functional containing only the selected controls.
+            :attr:`reduced_functional` remains the canonical full functional.
+
+        Raises
+        ------
+        ValueError
+            If no parameter is selected, a requested parameter is not a
+            control, or the controls were created without parameter labels.
+        """
+        active_parameters = list(active_parameters)
+        if not active_parameters:
+            raise ValueError("At least one active control is required.")
+        if any(name is None for name in self.control_parameter_names):
+            raise ValueError(
+                "A reduced functional for selected parameters requires "
+                "labeled controls.",
+            )
+
+        requested = set(active_parameters)
+        unknown = requested - set(self.control_parameter_names)
+        if unknown:
+            available = [name.value for name in self.control_parameter_names]
+            missing = sorted(
+                (getattr(name, "value", str(name)) for name in unknown),
+            )
+            raise ValueError(
+                f"{missing} are not controls of this inversion; the "
+                f"available controls are {available}.",
+            )
+
+        if self.reduced_functional is None:
+            self.create_reduced_functional(functional)
+        controls_by_name = dict(zip(
+            self.control_parameter_names,
+            self.reduced_functional.controls,
+        ))
+        controls = [
+            controls_by_name[name] for name in self.control_parameter_names
+            if name in requested
+        ]
+        control = controls[0] if len(controls) == 1 else controls
+
+        return fire_ad.EnsembleReducedFunctional(
+            functional,
+            control,
+            self.ensemble,
+            scatter_control=True,
+            tape=self._tape,
+        )
 
     def recompute_functional(self, control_value: object) -> object:
         """Re-evaluate the reduced functional at a new control value.
