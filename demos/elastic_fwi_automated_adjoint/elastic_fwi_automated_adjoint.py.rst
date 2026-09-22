@@ -140,15 +140,41 @@ is the horizontal position :math:`x`. The mesh is a uniform grid of
 quadrilaterals of 100 m (``edge_length``), and the Ricker wavelet has a peak
 frequency of 5 Hz. The time step of 1.6 ms is close to the stability limit
 of this mesh for the fastest velocity the inversion is allowed to reach,
-and the records are 1 s long: enough for the P wave, which arrives from
-about 0.5 s, and the slower S wave, from about 0.8 s.
+and the records are 1 s long. The direct-wave arrival times can be estimated
+from a vertically aligned source--receiver pair, whose propagation distance is
+
+.. math::
+
+    d = \lvert -0.85 - (-0.15) \rvert = 0.70\ \mathrm{km}.
+
+Using the background velocities, the corresponding travel times are
+
+.. math::
+
+    t_P^{\mathrm{travel}} = \frac{d}{v_P}
+    = \frac{0.70}{2.5} = 0.28\ \mathrm{s},
+    \qquad
+    t_S^{\mathrm{travel}} = \frac{d}{v_S}
+    = \frac{0.70}{1.25} = 0.56\ \mathrm{s}.
+
+Spyro's default Ricker-wavelet delay places its peak at
+
+.. math::
+
+    t_0 = \frac{1.5\sqrt{6}}{\pi f_p} \simeq 0.234\ \mathrm{s}
+
+for :math:`f_p = 5` Hz. The peaks of the direct arrivals are therefore
+expected at approximately :math:`t_0 + t_P^{\mathrm{travel}} = 0.51` s and
+:math:`t_0 + t_S^{\mathrm{travel}} = 0.79` s. A final time of 1 s captures
+both arrivals at the vertically aligned receivers; receivers with a larger
+horizontal offset have later arrivals.
 
 .. code-block:: python
 
     length_z = 1.0   # depth of the domain, km
     length_x = 1.0   # width of the domain, km
 
-    edge_length = 0.1     # element size, km
+    edge_length = 0.1  # km; 1.25 cells per shortest wavelength at fmax = 2*fp
     dt = 0.0016           # time step, s
     maxiter = 20          # optimiser iterations
 
@@ -557,10 +583,7 @@ each velocity. The misfit history shows how much the fit to the data improved.
 After 20 iterations the misfit has fallen by a factor of about 21. The
 S-wave velocity has become a circle of the right size and amplitude, about
 1.48 km/s at the centre against a true 1.5, while the P-wave velocity has
-moved much less, from 2.75 to about 2.79 km/s against 3.0. Both models
-also carry an imprint of the acquisition: spots at the sources and ripples
-along the line of receivers, where the wavefields, and so the gradient,
-are strongest [Modrak2016]_.
+moved much less, from 2.75 to about 2.79 km/s against 3.0.
 
 A decreasing misfit means the predicted records better match the
 observations. We can achieve a better predicted model via FWI using more
@@ -602,10 +625,6 @@ is an exercise for you!
 .. [Maddison2024] Maddison, J. R. (2024). Step-based checkpointing with
     high-level algorithmic differentiation. Journal of Computational
     Science, 82, 102405.
-
-.. [Modrak2016] Modrak, R., & Tromp, J. (2016). Seismic waveform inversion
-    best practices: regional, global and exploration test cases.
-    Geophysical Journal International, 206(3), 1864–1889.
 
 .. [Ricker1953] Ricker, N. (1953). The form and laws of propagation of
     seismic wavelets. Geophysics, 18(1), 10–40.
