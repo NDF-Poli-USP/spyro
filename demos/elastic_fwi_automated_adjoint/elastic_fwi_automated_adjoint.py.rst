@@ -615,10 +615,6 @@ iterations, or other strategies for multiparameter inversion problems.
     high-level algorithmic differentiation. Journal of Computational
     Science, 82, 102405.
 
-.. [Modrak2016] Modrak, R., & Tromp, J. (2016). Seismic waveform inversion
-    best practices: regional, global and exploration test cases.
-    Geophysical Journal International, 206(3), 1864–1889.
-
 .. [Ricker1953] Ricker, N. (1953). The form and laws of propagation of
     seismic wavelets. Geophysics, 18(1), 10–40.
 
