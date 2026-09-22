@@ -36,6 +36,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Runge-Kutta-Nystrom time integration, see spyro.solvers.time_integration_irksome.
+irksome = [
+  "IRKsome",
+]
 dev = [
   "black",
   "build",

@@ -4,6 +4,9 @@ import firedrake as fire
 
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
+# Imported at package import so Irksome registers its UFL node type before
+# any form is processed; see the module for what happens when it cannot.
+from .time_integration_irksome import _propagate_forward_irksome
 from ..domains.quadrature import quadrature_rules
 from ..domains.space import check_function_space_type, create_function_space
 from ..io import Model_parameters
@@ -18,7 +21,7 @@ from ..utils import eval_functions_to_ufl
 from ..utils.physical_parameters import PhysicalParameters
 from ..utils.error_management import validate_enum
 from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
-                            LayerShapeType, WaveType)
+                            LayerShapeType, TimeIntegrationScheme, WaveType)
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
 
@@ -42,6 +45,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Function space for the wave equation.
     current_time: float
         Current time of the simulation.
+    time: `Firedrake.Function`
+        Time as a UFL coefficient, a function on the Real space of the mesh,
+        for source expressions written in time. The central-difference
+        scheme sets it once per step; the Irksome stepper advances it and
+        evaluates the expressions at its stage times. It is a coefficient
+        rather than a ``Constant`` so that the automated adjoint records its
+        value at every step. Built with the function space, ``None`` before.
+    bcs: list of `Firedrake.DirichletBC`
+        Strongly imposed boundary conditions of the forward problem.
+    u_t: `Firedrake.Function`
+        Time derivative of the field, carried only by the Irksome stepper.
+    irksome_integrator: `time_integration_irksome.IrksomeIntegrator`
+        The Irksome stepper, built by ``matrix_building`` when
+        ``time_axis["time_integration_scheme"]`` is ``"irksome"``.
     solver_parameters: Python object
         Contains solver parameters.
     real_shot_record: `Firedrake.Function`
@@ -150,6 +167,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.functional_value = None
         self.misfit = None
         self.current_time = 0.0
+        self.time = None
+        self.bcs = []
+        self.u_t = None
+        self.irksome_integrator = None
         self.source_expression = None  # Expression for sources using UFL (less efficient)
         self.set_solver_parameters()
 
@@ -220,6 +241,59 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def matrix_building(self):
         """Builds the matrix for the forward problem."""
         pass
+
+    def weak_form(self, u, u_t, u_tt, v):
+        """Return the weak form of the wave equation.
+
+        The form is written for whatever expressions stand for the field
+        and its time derivatives, which is how the time integrators share
+        it: the central-difference scheme passes finite differences of its
+        stored time levels, the Irksome stepper passes symbolic time
+        derivatives of the trial function. A solver has to override it to
+        be integrated with Irksome; the base implementation raises.
+
+        Parameters
+        ----------
+        u : ufl.core.expr.Expr
+            Expression standing for the field in the spatial operator.
+        u_t : ufl.core.expr.Expr
+            Expression standing for its first time derivative.
+        u_tt : ufl.core.expr.Expr
+            Expression standing for its second time derivative.
+        v : firedrake.TestFunction
+            Test function of the wave function space.
+
+        Returns
+        -------
+        ufl.Form
+            The form ``F`` such that ``F == 0`` is the equation, UFL source
+            expressions included and point sources excluded.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised by the base class.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement weak_form(), which "
+            "the Irksome time integration scheme needs.",
+        )
+
+    @property
+    def uses_irksome(self) -> bool:
+        """Whether the forward solve is time integrated with Irksome.
+
+        Returns
+        -------
+        bool
+            ``True`` when ``time_axis["time_integration_scheme"]`` is
+            ``"irksome"``. Only a transient analysis has a time axis, so
+            any other analysis answers ``False``.
+        """
+        return (
+            self.analysis == "transient"
+            and self.time_integrator is TimeIntegrationScheme.IRKSOME
+        )
 
     def get_absorbing_boundaries(self):
         """Get the absorbing boundaries for the problem.
@@ -446,6 +520,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def _build_function_space(self):
         self.function_space = self._create_function_space()
+        self.time = fire.Function(
+            fire.FunctionSpace(self.mesh, "R", 0), name="time"
+        )
         function_space_type = check_function_space_type(self.function_space)
 
         if function_space_type == "scalar":
@@ -563,7 +640,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def wave_propagator(self, dt=None, final_time=None, source_nums=None):
         """
         Propagate the wave forward in time.
-        Currently uses central differences.
+        Uses central differences, or the Irksome Runge-Kutta-Nystrom stepper
+        selected by ``time_axis["time_integration_scheme"]``.
 
         Parameters:
         -----------
@@ -590,7 +668,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if source_nums is None:
             source_nums = [0]
         self.current_sources = source_nums
-        _forward_time_integrator(self, source_nums)
+        if self.uses_irksome:
+            _propagate_forward_irksome(self, source_nums)
+        else:
+            _forward_time_integrator(self, source_nums)
 
     def get_dt(self):
         return self._dt

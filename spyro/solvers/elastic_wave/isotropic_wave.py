@@ -3,11 +3,14 @@ import numpy as np
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
                        project)
 from pyadjoint import AdjFloat, Tape
+import ufl
 
 from .elastic_wave import ElasticWave
-from .forms import (isotropic_elastic_without_pml,
+from .forms import (isotropic_elastic_form,
+                    isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
+from ..time_integration_irksome import IrksomeIntegrator
 from ...utils.physical_parameters import PhysicalParameters
 from ...utils.typing import (AdjointType, ElasticMaterialParameter,
                              ElasticMaterialParameterization, AbsorbingBCsType,
@@ -72,9 +75,6 @@ class IsotropicWave(ElasticWave):
 
         # Volumetric sources (defined through UFL)
         self.body_forces = None
-
-        # Boundary conditions
-        self.bcs = []
 
         # Variables for logging the P-wave
         self.p_wave = None
@@ -384,6 +384,23 @@ class IsotropicWave(ElasticWave):
     def matrix_building(self):
         self.current_time = 0.0
 
+        if self.uses_irksome:
+            # The stepper needs the boundary conditions and body forces to
+            # build its stage forms, and the state it creates receives the
+            # initial conditions.
+            self.parse_boundary_conditions()
+            self.parse_volumetric_forces()
+            self.irksome_integrator = IrksomeIntegrator(self)
+            self.u_n = self.irksome_integrator.u
+            self.u_t = self.irksome_integrator.u_t
+            self.u_nm1 = None
+            self.u_nm2 = None
+            self.u_np1 = None
+            self.parse_initial_conditions()
+            self.mechanical_energy = mechanical_energy_form(
+                self, velocity=self.u_t)
+            return
+
         self.u_n = Function(self.function_space,
                             name=self.get_function_name())
         self.u_nm1 = Function(self.function_space,
@@ -411,6 +428,25 @@ class IsotropicWave(ElasticWave):
         elif self.abc_type == AbsorbingBCsType.PML:
             isotropic_elastic_with_pml(self)
 
+    def weak_form(self, u, u_t, u_tt, v):
+        """Return the weak form of the isotropic elastic wave equation.
+
+        See :meth:`~spyro.solvers.wave.Wave.weak_form` for the arguments.
+        The form is the one of :func:`~spyro.solvers.elastic_wave.forms.isotropic_elastic_form`,
+        which covers the local absorbing boundary conditions and the body
+        forces.
+
+        Raises
+        ------
+        NotImplementedError
+            With a PML, which the elastic solver does not have yet.
+        """
+        if self.abc_type == AbsorbingBCsType.PML:
+            raise NotImplementedError(
+                "The elastic wave equation has no PML formulation yet."
+            )
+        return isotropic_elastic_form(self, u, u_t, u_tt, v)
+
     def rhs_no_pml(self):
         if self.abc_type == AbsorbingBCsType.PML:
             raise NotImplementedError
@@ -424,14 +460,37 @@ class IsotropicWave(ElasticWave):
             return self.source_function
 
     def parse_initial_conditions(self):
+        """Set the initial state from ``time_axis["initial_condition"]``.
+
+        The entry is a callable ``initial_condition(x, t)`` of the spatial
+        coordinates and the time, returning a UFL expression. The
+        central-difference scheme fills its two stored levels with it, one
+        and two steps before the start, matching the lag of its source
+        evaluation. The Irksome stepper carries the displacement and the
+        velocity at the start, so it interpolates the expression at the
+        initial time and its derivative with respect to the time.
+
+        Returns
+        -------
+        None
+            The state functions are updated in place.
+        """
         time_dict = self.input_dictionary["time_axis"]
         initial_condition = time_dict.get("initial_condition", None)
-        if initial_condition is not None:
-            x_vec = self.get_spatial_coordinates()
+        if initial_condition is None:
+            return
+        x_vec = self.get_spatial_coordinates()
+        if self.uses_irksome:
+            time = ufl.variable(self.time)
+            displacement = initial_condition(x_vec, time)
+            self.u_n.interpolate(displacement)
+            self.u_t.interpolate(ufl.diff(displacement, time))
+        else:
             self.u_n.interpolate(initial_condition(x_vec, 0 - self.dt))
             self.u_nm1.interpolate(initial_condition(x_vec, 0 - 2*self.dt))
 
     def parse_boundary_conditions(self):
+        self.bcs = []
         bc_list = self.input_dictionary.get("boundary_conditions", [])
         for tag, idbc, value in bc_list:
             if tag == "u":
