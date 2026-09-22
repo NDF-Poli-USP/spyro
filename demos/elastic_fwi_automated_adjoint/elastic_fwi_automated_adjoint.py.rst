@@ -564,7 +564,21 @@ are strongest [Modrak2016]_.
 
 A decreasing misfit means the predicted records better match the
 observations. We can achieve a better predicted model via FWI using more
-iterations, or other strategies for multiparameter inversion problems.
+iterations, or other strategies for multiparameter inversion problems. It
+is an exercise for you!
+
+.. admonition:: Exercise: invert one velocity at a time
+
+    Rerun the script from the same starting model with ``maxiter = 10``
+    and one more argument to ``run_fwi``::
+
+        stages=[Parameter.S_WAVE_VELOCITY, Parameter.P_WAVE_VELOCITY],
+
+    Each stage runs ``maxiter`` iterations, the same 20 in total: the
+    first updates only :math:`v_s`; the second updates only :math:`v_p`,
+    keeping the first stage's :math:`v_s`. Both replay the same tape.
+    Compare the final misfit and both recovered models with the joint
+    inversion. Does changing the stage order help?
 
 .. note::
 

@@ -216,3 +216,73 @@ def test_fwi_elastic_automated_adjoint(tmp_path, monkeypatch):
         result, (fwi.wave.rho, fwi.wave.c, fwi.wave.c_s),
     ):
         assert np.allclose(control.dat.data_ro, parameter.dat.data_ro)
+
+
+@pytest.mark.newer_firedrake
+def test_fwi_elastic_stages(tmp_path, monkeypatch):
+    """One ``run_fwi`` in stages, each moving only some of the controls.
+
+    The tape is recorded once with every control. The first stage moves
+    the s-wave velocity alone and the second the p-wave velocity alone,
+    from where the first left the s-wave velocity; the density is moved by
+    neither. The iteration count and the functional history run through
+    both stages as one run.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    fwi = spyro.FullWaveformInversion(
+        dictionary=build_elastic_dictionary(ELASTIC_GUESS),
+        wave_class=spyro.IsotropicWave,
+    )
+    fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.25})
+    fwi.set_real_model({
+        Parameter(name): value for name, value in ELASTIC_REAL.items()
+    })
+    fwi.generate_real_shot_record(save_shot_record=False)
+    fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
+
+    bounds = dict(vmin=[1.0, 1.5, 0.5], vmax=[3.0, 4.0, 2.5])
+    settings = dict(adjoint_type=AdjointType.AUTOMATED_ADJOINT, **bounds)
+    S, P = Parameter.S_WAVE_VELOCITY, Parameter.P_WAVE_VELOCITY
+
+    # Stages are run by TAO and are checked before anything is recorded.
+    with pytest.raises(ValueError, match="AUTOMATED_ADJOINT"):
+        fwi.run_fwi(stages=[(S, 1)], **bounds)
+    with pytest.raises(TypeError, match="enum"):
+        fwi.run_fwi(stages=["s_wave_velocity"], **settings)
+    with pytest.raises(ValueError, match="positive"):
+        fwi.run_fwi(stages=[(S, 0)], **settings)
+
+    # A stage without a budget of its own takes ``maxiter``.
+    rho, cp, cs = fwi.run_fwi(stages=[S, (P, 1)], maxiter=2, **settings)
+
+    assert fwi.current_iteration == 3
+    assert len(fwi.functional_history) == 4
+    assert all(
+        later < earlier for earlier, later in zip(
+            fwi.functional_history, fwi.functional_history[1:],
+        )
+    ), "every stage brought the functional down"
+    assert np.array_equal(
+        rho.dat.data_ro, np.full_like(rho.dat.data_ro, ELASTIC_GUESS["density"]),
+    ), "the density moved although no stage moves it"
+    for control, start in ((cp, ELASTIC_GUESS["p_wave_velocity"]),
+                           (cs, ELASTIC_GUESS["s_wave_velocity"])):
+        assert not np.allclose(control.dat.data_ro, start), (
+            f"{control.name()} did not move in its stage"
+        )
+
+    # The controls are only known once the tape is recorded, so a stage
+    # naming something else is rejected after the recording.
+    with pytest.raises(ValueError, match="not controls"):
+        fwi.run_fwi(stages=[(Parameter.LAMBDA, 1)], **settings)
+
+    # A held control is not projected onto the bounds it would have as a
+    # moving one: it stays put even where it starts outside them.
+    rho, cp, cs = fwi.run_fwi(
+        stages=[(S, 1)], adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        vmin=[ELASTIC_GUESS["density"] + 0.5, 1.5, 0.5], vmax=[3.0, 4.0, 2.5],
+    )
+    assert np.array_equal(
+        rho.dat.data_ro, np.full_like(rho.dat.data_ro, ELASTIC_GUESS["density"]),
+    )
