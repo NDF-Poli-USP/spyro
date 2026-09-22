@@ -44,7 +44,7 @@ ls = vs/frequency
 
 dictionary = {
     "options": {
-        "cell_type": "T",
+        "cell_type": "Q",
         "variant": "lumped",
         "degree": 4,
         "dimension": dimension,
@@ -137,21 +137,16 @@ def get_numerical_result(wave, h):
     return wave.forward_solution_receivers
 
 mesh_sizes = np.array([
-    0.06,
-    0.08,
-    0.10,
-    # 0.10,
-    # 0.11,
-    # 0.12,
-    # 0.13,
-    # 0.14,
+    0.06875,
+    0.07857142857142858,
+    0.09166667,
 ])
 
 cpws = []
 
 errors = []
 
-load_analytical = True
+load_analytical = False
 for h in mesh_sizes:
     numerical_result = get_numerical_result(wave, h)
     analytical_result = get_analytical_solution(dt, load_analytical=load_analytical)
