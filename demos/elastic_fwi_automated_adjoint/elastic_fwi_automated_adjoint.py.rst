@@ -583,10 +583,7 @@ each velocity. The misfit history shows how much the fit to the data improved.
 After 20 iterations the misfit has fallen by a factor of about 21. The
 S-wave velocity has become a circle of the right size and amplitude, about
 1.48 km/s at the centre against a true 1.5, while the P-wave velocity has
-moved much less, from 2.75 to about 2.79 km/s against 3.0. Both models
-also carry an imprint of the acquisition: spots at the sources and ripples
-along the line of receivers, where the wavefields, and so the gradient,
-are strongest [Modrak2016]_.
+moved much less, from 2.75 to about 2.79 km/s against 3.0.
 
 A decreasing misfit means the predicted records better match the
 observations. We can achieve a better predicted model via FWI using more
