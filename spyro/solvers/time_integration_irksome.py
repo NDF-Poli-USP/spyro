@@ -51,6 +51,53 @@ from .time_integration_central_difference import _propagate_forward
 from ..io.time_io import IrksomeOptions
 from ..utils.typing import AdjointType
 
+#: What this module needs from Irksome, beyond importing: the Nystrom steppers
+#: for second-order-in-time equations and the tableau module they live behind.
+#: An Irksome that predates them imports fine and then fails deep inside a
+#: solve, so it is rejected here instead, with the feature reporting itself as
+#: unavailable exactly as it does when Irksome is absent.
+REQUIRED_ATTRIBUTES = (
+    "StageDerivativeNystromTimeStepper",
+    "DIRKNystromTimeStepper",
+    "ClassicNystrom4Tableau",
+)
+REQUIRED_MODULES = ("irksome.tableaux.ButcherTableaux", "irksome.nystrom_stepper")
+
+
+def _check_irksome_api(module):
+    """Return why ``module`` cannot drive the Nystrom steppers, or ``None``.
+
+    Parameters
+    ----------
+    module : module
+        The imported :mod:`irksome`.
+
+    Returns
+    -------
+    ImportError or None
+        The reason the installed Irksome is too old, or ``None`` when it
+        offers everything this module uses.
+    """
+    import importlib
+
+    missing = [name for name in REQUIRED_ATTRIBUTES if not hasattr(module, name)]
+    for name in REQUIRED_MODULES:
+        try:
+            importlib.import_module(name)
+        except ImportError:
+            missing.append(name)
+    if not missing:
+        return None
+    return ImportError(
+        "The installed Irksome predates the Runge-Kutta-Nystrom methods this "
+        f"module is built on (missing: {', '.join(missing)}). They arrived "
+        "with the 2026.0.0 release; the Irksome bundled with Firedrake "
+        "2025.4.1 and earlier does not have them. Note that the bilinear "
+        "form spyro hands the stepper also needs an Irksome whose time "
+        "derivative accepts an Argument."
+    )
+
+
 try:
     import irksome
     from irksome import Dt
@@ -65,7 +112,10 @@ except Exception as error:  # noqa: BLE001
     Dt = None
     IRKSOME_IMPORT_ERROR = error
 else:
-    IRKSOME_IMPORT_ERROR = None
+    IRKSOME_IMPORT_ERROR = _check_irksome_api(irksome)
+    if IRKSOME_IMPORT_ERROR is not None:
+        irksome = None
+        Dt = None
 
 
 #: Stepper families, decided by the structure of the Butcher matrix.
@@ -174,9 +224,10 @@ def require_irksome():
         return
     if isinstance(IRKSOME_IMPORT_ERROR, ImportError):
         raise ImportError(
-            "The 'irksome' time integration scheme needs Irksome, which is "
-            "not installed. Install it with 'pip install IRKsome' (or from "
-            "https://github.com/firedrakeproject/Irksome) into the "
+            "The 'irksome' time integration scheme needs Irksome 2026.0.0 or "
+            "newer, which is either not installed or too old here "
+            f"({IRKSOME_IMPORT_ERROR}). Install it with 'pip install IRKsome' "
+            "(or from https://github.com/firedrakeproject/Irksome) into the "
             "Firedrake environment."
         ) from IRKSOME_IMPORT_ERROR
     raise ImportError(
