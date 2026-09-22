@@ -140,8 +140,34 @@ is the horizontal position :math:`x`. The mesh is a uniform grid of
 quadrilaterals of 100 m (``edge_length``), and the Ricker wavelet has a peak
 frequency of 5 Hz. The time step of 1.6 ms is close to the stability limit
 of this mesh for the fastest velocity the inversion is allowed to reach,
-and the records are 1 s long: enough for the P wave, which arrives from
-about 0.5 s, and the slower S wave, from about 0.8 s.
+and the records are 1 s long. The direct-wave arrival times can be estimated
+from a vertically aligned source--receiver pair, whose propagation distance is
+
+.. math::
+
+    d = \lvert -0.85 - (-0.15) \rvert = 0.70\ \mathrm{km}.
+
+Using the background velocities, the corresponding travel times are
+
+.. math::
+
+    t_P^{\mathrm{travel}} = \frac{d}{v_P}
+    = \frac{0.70}{2.5} = 0.28\ \mathrm{s},
+    \qquad
+    t_S^{\mathrm{travel}} = \frac{d}{v_S}
+    = \frac{0.70}{1.25} = 0.56\ \mathrm{s}.
+
+Spyro's default Ricker-wavelet delay places its peak at
+
+.. math::
+
+    t_0 = \frac{1.5\sqrt{6}}{\pi f_p} \simeq 0.234\ \mathrm{s}
+
+for :math:`f_p = 5` Hz. The peaks of the direct arrivals are therefore
+expected at approximately :math:`t_0 + t_P^{\mathrm{travel}} = 0.51` s and
+:math:`t_0 + t_S^{\mathrm{travel}} = 0.79` s. A final time of 1 s captures
+both arrivals at the vertically aligned receivers; receivers with a larger
+horizontal offset have later arrivals.
 
 .. code-block:: python
 
