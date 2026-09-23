@@ -198,11 +198,61 @@ def _lumped_riesz_map(controls, comm=None):
     return matrix
 
 
+def _lumped_initial_hessian(inverse_mass, vec_interface, comm):
+    """Wrap the lumped Riesz map as the initial Hessian BLMVM starts from.
+
+    TAO *solves* with ``H0`` through a KSP of its own, so it gets a matrix
+    that is never applied and a preconditioner applying its inverse, the
+    lumped Riesz map, in one ``preonly`` step -- as pyadjoint's ``TAOSolver``
+    does with the consistent map.
+
+    Parameters
+    ----------
+    inverse_mass : petsc4py.PETSc.Mat
+        The lumped inverse Riesz map, from :func:`_lumped_riesz_map`.
+    vec_interface : pyadjoint.optimization.tao_solver.PETScVecInterface
+        Layout of the controls concatenated into one vector, which sizes the
+        matrix.
+    comm : petsc4py.PETSc.Comm or mpi4py.MPI.Comm
+        Communicator the controls are defined over.
+
+    Returns
+    -------
+    tuple of (petsc4py.PETSc.Mat, petsc4py.PETSc.PC)
+        The initial Hessian, and the preconditioner applying its inverse.
+    """
+    from petsc4py import PETSc
+
+    class InitialHessian:
+        """Context of the matrix TAO solves with, which is never applied."""
+
+    class InitialHessianInverse:
+        """Preconditioner context applying the lumped Riesz map."""
+
+        def apply(self, pc, x, y):
+            inverse_mass.mult(x, y)
+
+    local_size, global_size = vec_interface.n, vec_interface.N
+    matrix = PETSc.Mat().createPython(
+        ((local_size, global_size), (local_size, global_size)),
+        InitialHessian(),
+        comm=comm,
+    )
+    matrix.setOption(PETSc.Mat.Option.SYMMETRIC, True)
+    matrix.setUp()
+
+    preconditioner = PETSc.PC().createPython(InitialHessianInverse(), comm=comm)
+    preconditioner.setOperators(matrix)
+    preconditioner.setUp()
+    return matrix, preconditioner
+
+
 class LumpedTAOSolver(OptimizationSolver):
     """TAO BLMVM with a diagonal metric, for box-constrained inversions.
 
-    A near-copy of :class:`pyadjoint.TAOSolver`, differing in two decisions
-    that matter once the controls are bounded:
+    A near-copy of :class:`pyadjoint.TAOSolver`, differing in one decision
+    that matters once the controls are bounded -- which Riesz map to use --
+    and which enters in two places:
 
     The metric
         pyadjoint measures gradients in the consistent Riesz map. This uses
@@ -211,13 +261,15 @@ class LumpedTAOSolver(OptimizationSolver):
         module docstring for why the consistent map and the projection fight
         each other.
 
-    The initial scaling
-        BLMVM approximates the inverse Hessian from the gradients it has
-        seen, and starts that approximation from an ``H0``. pyadjoint pins
-        ``H0`` to the Riesz map, fixing the scale of the first quasi-Newton
-        step; that is not done here, so PETSc keeps its own dynamic scaling.
-        It is the reason the two solvers take different paths from the same
-        starting point, even where both converge.
+    The initial Hessian
+        BLMVM builds its inverse-Hessian approximation from an ``H0``, which
+        also sets the first step, along :math:`-H_0^{-1} DJ`. Like pyadjoint,
+        this seeds ``H0`` with the Riesz map -- the lumped one -- so the
+        first step follows the gradient in the same metric as the
+        convergence test. PETSc's default, a scaled identity, would step
+        along the raw coefficient derivative; on spectral elements, where
+        the nodal masses vary by nearly two orders of magnitude within an
+        element, that moves the interior nodes and leaves the edges behind.
 
     Only ``tao_type="blmvm"`` is supported: the lumped metric is there to
     serve the bound projection, and a solver that does not project has no use
@@ -225,8 +277,8 @@ class LumpedTAOSolver(OptimizationSolver):
     type set through ``tao_options`` or the PETSc command line is caught
     rather than silently run with a metric meant for something else.
 
-    No Hessian *callback* is registered either, which is a separate thing
-    from that initial scaling: ``H0`` seeds an approximation BLMVM builds
+    No Hessian *callback* is registered, which is a separate thing from
+    that initial Hessian: ``H0`` seeds an approximation BLMVM builds
     itself, whereas the callback would hand it a true second derivative, and
     a quasi-Newton method never asks for one. Measured over a run of this
     driver, the only callback TAO invokes is the combined
@@ -332,6 +384,18 @@ class LumpedTAOSolver(OptimizationSolver):
                 "LumpedTAOSolver is restricted to tao_type='blmvm'."
             )
 
+        # Seeding H0 with the lumped mass makes the first step follow the
+        # gradient in the metric above; see the class docstring.
+        initial_hessian, initial_hessian_inverse = _lumped_initial_hessian(
+            inverse_mass, vec_interface, comm,
+        )
+        tao.setLMVMH0(initial_hessian)
+        ksp = tao.getLMVMH0KSP()
+        ksp.setType(PETSc.KSP.Type.PREONLY)
+        ksp.setTolerances(rtol=0.0, atol=0.0, divtol=None, max_it=1)
+        ksp.setPC(initial_hessian_inverse)
+        ksp.setUp()
+
         solution = vec_interface.new_petsc()
         tao.setSolution(solution)
         with petsctools.inserted_options(tao):
@@ -343,6 +407,9 @@ class LumpedTAOSolver(OptimizationSolver):
         self._tao = tao
         self._x = solution
         self._inverse_mass = inverse_mass
+        # Referenced by TAO's KSP: kept alive as long as the solver.
+        self._initial_hessian = initial_hessian
+        self._initial_hessian_inverse = initial_hessian_inverse
 
     @property
     def tao_objective(self):
