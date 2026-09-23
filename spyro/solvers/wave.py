@@ -143,6 +143,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.tensor_function_space1 = None
         self._forward_solution_receivers = None
         self._store_forward_time_steps = False
+        # Storage backend for the forward wavefield used by the implemented
+        # adjoint. None keeps the historical behaviour (one fire.Function per
+        # sampled step). A numpy dtype switches to WavefieldStore, which does
+        # not allocate a Function inside the time loop and therefore cannot
+        # accumulate the Firedrake assign reference cycle. np.float64 is
+        # bit-for-bit identical to the legacy path; np.float32 halves memory
+        # and changes the gradient, so validate it against the
+        # finite-difference tests before using it.
+        self.wavefield_storage_dtype = None
         self.forward_solution = None
         self.adjoint_solution = None
         self.adjoint_type = AdjointType.NONE

@@ -1,3 +1,4 @@
+from ..io.wavefield_store import WavefieldStore
 import firedrake as fire
 import numpy as np
 
@@ -46,7 +47,12 @@ def _propagate_forward_central_difference(wave, source_ids):
         # before it is needed: a solve that aborts early (e.g. the numerical
         # instability check below) no longer has to first allocate the whole
         # nt-step wavefield, which for fine meshes/small dt is many GB.
-        usol = []
+        if wave.wavefield_storage_dtype is not None:
+            usol = WavefieldStore(
+                wave.function_space, dtype=wave.wavefield_storage_dtype
+            )
+        else:
+            usol = []
     source_cof = None
     interpolate_receivers = None
     master_source_W = None
@@ -128,15 +134,25 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.vstate = wave.next_vstate
 
         if wave.use_vertex_only_mesh:
+            per_timestep = (
+                functional_mode is FunctionalEvaluationMode.PER_TIMESTEP
+            )
             if receiver_buffer is None:
                 receiver_buffer = fire.assemble(interpolate_receivers)
                 receiver_shape = receiver_buffer.dat.data_ro.shape
-                receiver_array = np.empty((nt,) + receiver_shape, dtype=float)
+                # Only allocated when it will actually be consumed. In
+                # PER_TIMESTEP mode usol_recv is what gets returned and this
+                # array was filled every step and then discarded.
+                if not per_timestep:
+                    receiver_array = np.empty(
+                        (nt,) + receiver_shape, dtype=float
+                    )
             else:
                 fire.assemble(interpolate_receivers, tensor=receiver_buffer)
-            receiver_array[step] = receiver_buffer.dat.data_ro
-            if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
+            if per_timestep:
                 usol_recv.append(receiver_buffer.copy(deepcopy=True))
+            else:
+                receiver_array[step] = receiver_buffer.dat.data_ro
         else:
             usol_recv.append(wave.get_forward_solution_receivers())
 
@@ -144,11 +160,16 @@ def _propagate_forward_central_difference(wave, source_ids):
             wave.store_forward_time_steps
             and step % wave.gradient_sampling_frequency == 0
         ):
-            snapshot = fire.Function(
-                wave.function_space, name=wave.get_function_name()
-            )
-            snapshot.assign(wave.get_function())
-            usol.append(snapshot)
+            if isinstance(usol, WavefieldStore):
+                # No Function is created here, which is the whole point: there
+                # is nothing for the assign reference cycle to retain.
+                usol.append(wave.get_function())
+            else:
+                snapshot = fire.Function(
+                    wave.function_space, name=wave.get_function_name()
+                )
+                snapshot.assign(wave.get_function())
+                usol.append(snapshot)
             save_step += 1
 
         if (step - 1) % wave.output_frequency == 0:
