@@ -1,16 +1,18 @@
 """Parallel automated-adjoint gradient verification.
 
 This test exercises spyro's *automated adjoint* (algorithmic differentiation via
-pyadjoint) under **ensemble (shot) parallelism**. It is meant to be run with two
-MPI ranks::
+pyadjoint) under **ensemble (shot) parallelism combined with spatial (mesh)
+parallelism**. It is meant to be run with four MPI ranks::
 
-    mpiexec -n 2 pytest tests/parallel/test_gradient_auto_adjoint.py
+    mpiexec -n 4 pytest tests/parallel/test_gradient_auto_adjoint.py
 
 With ``parallelism = "automatic"`` and two sources, spyro sets
-``num_cores_per_propagation = available_cores / number_of_sources = 2 / 2 = 1``
-and builds an ``Ensemble(COMM_WORLD, 1)``. This yields **two ensemble members**
-(``ensemble_comm`` of size 2), one per source, each integrating its shot on a
-single spatial core (``comm`` of size 1).
+``num_cores_per_propagation = available_cores / number_of_sources = 4 / 2 = 2``
+and builds an ``Ensemble(COMM_WORLD, 2)``. This yields **two ensemble members**
+(``ensemble_comm`` of size 2), one per source, each integrating its shot on
+two spatial cores (``comm`` of size 2). The automated adjoint samples the
+receivers through a vertex-only mesh, so each spatial core owns only the
+receivers inside its mesh partition (issue #315).
 
 Each ensemble member records the forward solve for its own source on its own
 pyadjoint tape and accumulates that shot's functional ``J_i``. The reduced
@@ -38,8 +40,8 @@ dictionary["options"] = {
     "dimension": 2,  # dimension
 }
 
-# "automatic" ensemble parallelism: with two sources and two MPI ranks each
-# ensemble member integrates one shot (source parallelism) on a single core.
+# "automatic" ensemble parallelism: with two sources and four MPI ranks each
+# ensemble member integrates one shot (source parallelism) on two cores.
 dictionary["parallelism"] = {
     "type": "automatic",
 }
@@ -168,13 +170,14 @@ def get_forward_model(checkpointing=False, snapshots=None):
 
 
 @pytest.mark.newer_firedrake
-@pytest.mark.parallel(2)
+@pytest.mark.parallel(4)
 @pytest.mark.parametrize("checkpointing", [False, True],
                          ids=["no_checkpointing", "single_memory"])
 def test_gradient_auto_adjoint_parallel(checkpointing):
     """Taylor-test the ensemble automated-adjoint gradient.
 
-    Runs on two cores: two sources (ensemble parallelism), one core per shot.
+    Runs on four cores: two sources (ensemble parallelism), two cores per
+    shot (spatial parallelism).
     Each member checkpoints its own tape; the ``EnsembleReducedFunctional``
     still has to sum the per-shot functionals and gradients across members.
 
@@ -209,10 +212,11 @@ def _verify_ensemble_gradient(Wave_obj_guess, checkpointing):
     -------
     None
     """
-    # Sanity check the ensemble (shot) parallelism is active, one core per shot.
+    # Sanity check both parallelisms are active: one ensemble member per
+    # source, each shot decomposed over two spatial cores.
     comm = Wave_obj_guess.comm
     assert comm.ensemble_comm.size == 2, "Expected 2 ensemble members (sources)."
-    assert comm.comm.size == 1, "Expected 1 spatial core per shot."
+    assert comm.comm.size == 2, "Expected 2 spatial cores per shot."
 
     # Build the reduced functional. With wave.comm as the ensemble this is an
     # EnsembleReducedFunctional summing the per-shot functionals/gradients.

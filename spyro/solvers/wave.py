@@ -179,8 +179,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.layer_manager()
 
         # Logger
-        self.field_logger = FieldLogger(self.comm,
-                                        self.input_dictionary["visualization"])
+        self.field_logger = FieldLogger(self.comm, self.read_outputs)
         self.field_logger.add_field("forward", self.get_function_name(),
                                     lambda: self.get_function())
 
