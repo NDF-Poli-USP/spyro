@@ -135,7 +135,11 @@ class Sources(Delta_projector):
             self.point_locations[source_id] for source_id in self.current_sources
         ]
         source_mesh = fire.VertexOnlyMesh(self.mesh, source_locations)
-        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
+        if self.wave_type in (
+            WaveType.ISOTROPIC_ELASTIC,
+            WaveType.ANISOTROPIC_VTI_ELASTIC,
+            WaveType.ANISOTROPIC_TTI_ELASTIC,
+        ):
             V_s = create_function_space(source_mesh, "DG0", 0, dim=self.dimension)
             source_value = fire.Function(V_s)
             if source_value.dat.data.shape[0] > 0:

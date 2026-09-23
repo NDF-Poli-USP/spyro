@@ -177,7 +177,11 @@ class Receivers(Delta_projector):
             name=vom_name,
         )
         self.vom_input_indices = self._vom_input_indices(vom)
-        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
+        if self.wave_type in (
+            WaveType.ISOTROPIC_ELASTIC,
+            WaveType.ANISOTROPIC_VTI_ELASTIC,
+            WaveType.ANISOTROPIC_TTI_ELASTIC,
+        ):
             V_r = create_function_space(vom, "DG0", 0, dim=self.dimension)
         elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
             V_r = create_function_space(vom, "DG0", 0)

@@ -95,6 +95,9 @@ class AnisotropicTTIWave(IsotropicWave):
             The method assigns ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s``, and
             the active control parameterization on ``self``.
         """
+        if self._physical_parameters:
+            return
+
         def material_parameter(value):
             """Normalize model-dictionary values for elastic parameters.
 
@@ -167,13 +170,9 @@ class AnisotropicTTIWave(IsotropicWave):
             not bool(self.mu)
 
         if option_1:
-            self._control_parameterization = ElasticMaterialParameterization.LAME
-            self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
-            self.c_s = (self.mu/self.rho)**0.5
+            parameterization = ElasticMaterialParameterization.LAME
         elif option_2:
-            self._control_parameterization = ElasticMaterialParameterization.VELOCITY
-            self.mu = self.rho*self.c_s**2
-            self.lmbda = self.rho*self.c**2 - 2*self.mu
+            parameterization = ElasticMaterialParameterization.VELOCITY
         else:
             raise ValueError(
                 "Inconsistent selection of isotropic elastic wave parameters:\n"
@@ -185,6 +184,7 @@ class AnisotropicTTIWave(IsotropicWave):
                 "The valid options are {Density, Lame first, Lame second} "
                 "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
             )
+        self.set_physical_parameterization(parameterization)
 
     def set_physical_parameterization(
         self, parameterization: ElasticMaterialParameterization,

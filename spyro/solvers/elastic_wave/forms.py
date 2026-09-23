@@ -67,7 +67,7 @@ def elastic_without_pml(wave):
     dt = Constant(wave.dt)
     rho = wave.rho
 
-    dim = V.mesh().topological_dimension()
+    dim = V.mesh().topological_dimension
 
     Elastic_C = wave.Elastic_C
 
@@ -154,7 +154,7 @@ def viscoelastic_without_pml(wave):
     zeta_list = wave.zeta_list
     y_list = wave.y_list
 
-    dim = V.mesh().topological_dimension()
+    dim = V.mesh().topological_dimension
     voigt_size = 3 if dim == 2 else 6
 
     Elastic_C = wave.Elastic_C

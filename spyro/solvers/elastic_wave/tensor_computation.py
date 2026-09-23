@@ -7,7 +7,7 @@ from ...utils.typing import WaveType
 
 
 def C_computation(self):
-    dim = self.function_space.mesh().topological_dimension()
+    dim = self.function_space.mesh().topological_dimension
 
     if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
         Elastic_C = C_isotropic_tensor(self)
@@ -25,7 +25,7 @@ def C_isotropic_tensor(self):
     Elastic tensor in terms of vp, vs and rho.
     """
 
-    dim = self.function_space.mesh().topological_dimension()
+    dim = self.function_space.mesh().topological_dimension
 
     rho = self.rho
     vp = self.c
@@ -165,7 +165,7 @@ def bond_rotation_2d_elastic(theta):
 
 def build_Gamma(self):
 
-    dim = self.function_space.mesh().topological_dimension()
+    dim = self.function_space.mesh().topological_dimension
 
     C = self.Elastic_C
 
@@ -184,7 +184,7 @@ def build_Gamma(self):
 
 
 def Gamma_isotropic(self):
-    dim = self.function_space.mesh().topological_dimension()
+    dim = self.function_space.mesh().topological_dimension
 
     vp_sq = self.c**2
     vs_sq = self.c_s**2
