@@ -264,6 +264,44 @@ spyro.io.save_shots(wave)
 my_shot = spyro.io.load_shots(wave)
 ```
 
+### Time integration with Irksome
+
+By default the wave equations are advanced with the second-order central-difference
+scheme. Runge-Kutta-Nystrom methods from [Irksome](https://www.firedrakeproject.org/Irksome/)
+are available as an alternative: install it into the Firedrake environment
+(`pip install IRKsome`, or `pip install -e ".[irksome]"`) and select the scheme in the
+`time_axis` entry:
+
+```python
+dictionary["time_axis"] = {
+    "initial_time": 0.0,
+    "final_time": 0.50,
+    "dt": 0.0005,
+    "time_integration_scheme": "irksome",
+    "irksome": {
+        # rk4 (default), classic_nystrom4, backward_euler, alexander,
+        # qin_zhang, gauss_legendre, radau_iia, lobatto_iiia, lobatto_iiic,
+        # or an Irksome tableau object
+        "tableau": "gauss_legendre",
+        # number of stages of the collocation families
+        "stages": 2,
+        # optional: how Irksome imposes Dirichlet conditions on the stages
+        "bc_type": None,
+        # optional: PETSc options of the stage system (replaces the defaults)
+        "solver_parameters": None,
+    },
+}
+```
+
+Explicit tableaux reuse the mass-matrix solver of the spatial method for each
+stage, diagonally implicit ones solve a shifted mass-stiffness system per stage
+with conjugate gradients and fully implicit ones factorize the coupled stage
+system once. The forward solve, the receivers, the functional and the automated
+adjoint (`enable_automated_adjoint()`) work as with central differences; the
+PML and the hand-written (implemented) adjoint are only available with the
+central-difference scheme. See `spyro.solvers.time_integration_irksome` for the
+details.
+
 ### Testing
 
 To run the spyro unit tests (and turn off plots), check out this repository and type

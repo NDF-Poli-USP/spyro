@@ -6,6 +6,23 @@ from .. import utils
 from ..utils.typing import FunctionalEvaluationMode, AdjointType, AbsorbingBCsType
 
 
+def number_of_time_steps(wave):
+    """Return how many time steps a forward solve of ``wave`` takes.
+
+    Parameters
+    ----------
+    wave : Wave
+        The wave solver, whose ``final_time`` and ``dt`` set the count.
+
+    Returns
+    -------
+    int
+        The number of time steps, which is also the length of the receiver
+        record.
+    """
+    return int(wave.final_time / wave.dt) + 1
+
+
 def _propagate_forward_central_difference(wave, source_ids):
     """Advance the forward solve with the central-difference scheme.
 
@@ -25,74 +42,33 @@ def _propagate_forward_central_difference(wave, source_ids):
     None
         The solver state, receiver data and functional are updated in place.
     """
+    rhs_forcing = None
+    source_cof = None
+    master_source_W = None
     if wave.sources is not None:
         wave.sources.current_sources = source_ids
         rhs_forcing = fire.Cofunction(wave.function_space.dual())
+        if wave.use_vertex_only_mesh:
+            # source_cof is a cofunction that represents a point source,
+            # being one at a point and zero elsewhere.
+            source_cof = wave.sources.source_cofunction()
+            if (
+                wave.abc_type == AbsorbingBCsType.PML
+                and wave.source_function is not None
+            ):
+                master_source_W = fire.Cofunction(
+                    wave.source_function.function_space()
+                )
+                master_source_W.sub(0).assign(source_cof)
 
-    adjoint_type = wave.adjoint_type
-
-    wave.field_logger.start_logging(source_ids)
-    wave.comm.comm.barrier()
-
-    functional_mode = wave.functional_evaluation_mode
-    compute_functional = functional_mode is not None
-
-    t = wave.current_time
-    nt = int(wave.final_time / wave.dt) + 1  # number of timesteps
-    usol = None
-    if wave.store_forward_time_steps:
-        # Snapshots are appended as the solve advances rather than allocated
-        # up front. The final footprint is the same, but nothing is reserved
-        # before it is needed: a solve that aborts early (e.g. the numerical
-        # instability check below) no longer has to first allocate the whole
-        # nt-step wavefield, which for fine meshes/small dt is many GB.
-        usol = []
-    source_cof = None
-    interpolate_receivers = None
-    master_source_W = None
-    if wave.sources is not None and wave.use_vertex_only_mesh:
-        # source_cof is a cofunction that represents a point source,
-        # being one at a point and zero elsewhere.
-        source_cof = wave.sources.source_cofunction()
-
-        if wave.abc_type == AbsorbingBCsType.PML:
-            pressure_expr = fire.split(wave.X_n)[0]
-        else:
-            pressure_expr = wave.u_n
-        interpolate_receivers = wave.receivers.receiver_interpolator(
-            pressure_expr)
-        if (
-            wave.abc_type == AbsorbingBCsType.PML
-            and wave.source_function is not None
-        ):
-            master_source_W = fire.Cofunction(
-                wave.source_function.function_space()
-            )
-            master_source_W.sub(0).assign(source_cof)
-
-    usol_recv = []
-    receiver_array = None
-    receiver_buffer = None
     # Reused accumulator for the point-source cofunction, so the per-timestep
     # source assembly writes into an existing tensor instead of allocating a
     # fresh Cofunction on every step.
     source_buffer = None
-    save_step = 0
-    real_shot_record = None
-    if compute_functional:
-        J = 0.0
-        real_shot_record = utils.get_real_shot_record(wave)
-        # Reset misfit to None at the start of the solve to avoid
-        # using stale misfit values from previous solves.
-        wave.misfit = None
-        wave.misfit = []
 
-    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-        # A schedule is consumed as it executes, so each forward solve needs a
-        # fresh one, sized by this loop's ``nt``.
-        wave.automated_adjoint.start_recording(total_steps=nt)
-
-    for step in range(nt):
+    def advance(step, t, nt):
+        """Take one central-difference step from time level ``step``."""
+        nonlocal source_buffer
         # Basic way of applying sources
         wave.update_source_expression(t)
 
@@ -121,11 +97,91 @@ def _propagate_forward_central_difference(wave, source_ids):
         # the state rotation below makes the solve output look disposable, and
         # its checkpoint is dropped. The final step is closed by pyadjoint
         # itself when taping ends, hence ``nt - 1``.
-        if adjoint_type == AdjointType.AUTOMATED_ADJOINT and step < nt - 1:
+        if wave.adjoint_type == AdjointType.AUTOMATED_ADJOINT and step < nt - 1:
             wave.automated_adjoint.end_timestep()
 
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
+        return step * float(wave.dt)
+
+    _propagate_forward(wave, source_ids, advance)
+
+
+def _propagate_forward(wave, source_ids, advance):
+    """Run the forward time loop with the given time-stepping rule.
+
+    Everything a forward solve does around the time steps -- recording the
+    receivers, accumulating the functional, logging fields and storing the
+    wavefield -- is the same for every time integrator. This loop does that
+    and leaves the step itself to ``advance``, so a time integrator only has
+    to say how the state moves from one time level to the next.
+
+    Parameters
+    ----------
+    wave : Wave
+        The wave solver object containing all necessary information to perform
+        the forward solve.
+    source_ids : list of int
+        List of source IDs to simulate.
+    advance : callable
+        ``advance(step, t, nt)`` advances the state of ``wave`` from time
+        level ``step`` to ``step + 1``, where ``t`` is the time associated
+        with the level and ``nt`` the number of steps, and returns the time
+        of the new level. On the automated adjoint, it is also responsible
+        for closing the time step on the tape right after its solve.
+
+    Returns
+    -------
+    None
+        The solver state, receiver data and functional are updated in place.
+    """
+    adjoint_type = wave.adjoint_type
+
+    wave.field_logger.start_logging(source_ids)
+    wave.comm.comm.barrier()
+
+    functional_mode = wave.functional_evaluation_mode
+    compute_functional = functional_mode is not None
+
+    t = wave.current_time
+    nt = number_of_time_steps(wave)
+    usol = None
+    if wave.store_forward_time_steps:
+        # Snapshots are appended as the solve advances rather than allocated
+        # up front. The final footprint is the same, but nothing is reserved
+        # before it is needed: a solve that aborts early (e.g. the numerical
+        # instability check below) no longer has to first allocate the whole
+        # nt-step wavefield, which for fine meshes/small dt is many GB.
+        usol = []
+    interpolate_receivers = None
+    if wave.use_vertex_only_mesh:
+        if wave.abc_type == AbsorbingBCsType.PML:
+            pressure_expr = fire.split(wave.X_n)[0]
+        else:
+            pressure_expr = wave.u_n
+        interpolate_receivers = wave.receivers.receiver_interpolator(
+            pressure_expr)
+
+    usol_recv = []
+    receiver_array = None
+    receiver_buffer = None
+    save_step = 0
+    real_shot_record = None
+    if compute_functional:
+        J = 0.0
+        real_shot_record = utils.get_real_shot_record(wave)
+        # Reset misfit to None at the start of the solve to avoid
+        # using stale misfit values from previous solves.
+        wave.misfit = None
+        wave.misfit = []
+
+    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+        # A schedule is consumed as it executes, so each forward solve needs a
+        # fresh one, sized by this loop's ``nt``.
+        wave.automated_adjoint.start_recording(total_steps=nt)
+
+    for step in range(nt):
+        t_next = advance(step, t, nt)
 
         if wave.use_vertex_only_mesh:
             if receiver_buffer is None:
@@ -185,7 +241,7 @@ def _propagate_forward_central_difference(wave, source_ids):
                 step=step, nsteps=nt
             )
 
-        t = step * float(wave.dt)
+        t = t_next
 
     wave.current_time = t
 

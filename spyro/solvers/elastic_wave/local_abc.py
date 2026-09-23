@@ -1,10 +1,67 @@
 from firedrake import (Constant, ds, TestFunction, TrialFunction)
 
 
-def local_abc_form(wave):
+def local_abc_velocity(wave):
+    """Return the finite-difference velocity the local ABCs use with central differences.
+
+    The absorbing boundary conditions of :func:`local_abc_form` act on the
+    velocity. With the central-difference time integrator it is
+    approximated from the stored displacement levels according to
+    ``absorving_boundary_conditions["nrbc"]["dt_scheme"]``: ``"backward"``
+    (first order, the default), ``"backward_2nd"`` (second order, needs the
+    level ``n-2``) or ``"central"`` (second order, implicit in the unknown
+    level ``n+1``, which is the trial function).
+
+    Parameters
+    ----------
+    wave : `isotropic_wave.IsotropicWave`
+        Elastic wave solver holding the displacement levels.
+
+    Returns
+    -------
+    ufl.core.expr.Expr
+        The velocity expression at the current time level.
+
+    Raises
+    ------
+    NotImplementedError
+        If ``dt_scheme`` is not one of the three schemes above.
+    """
+    abc_dict = wave.input_dictionary.get("absorving_boundary_conditions", {})
+    dt_scheme = abc_dict.get("nrbc", {}).get("dt_scheme", "backward")
+    u_nm1 = wave.u_nm1
+    u_n = wave.u_n
+    dt = Constant(wave.dt)
+    if dt_scheme == "backward":
+        return (u_n - u_nm1)/dt
+    elif dt_scheme == "backward_2nd":
+        return (3*u_n - 4*u_nm1 + wave.u_nm2)/(2*dt)
+    elif dt_scheme == "central":
+        u = TrialFunction(wave.function_space)
+        return (u - u_nm1)/(2*dt)
+    raise NotImplementedError(
+        f"Unsupported time discretization: {dt_scheme}")
+
+
+def local_abc_form(wave, u, u_t):
     '''
     Returns the linear form associated with the traction loads
     when combined with local absorbing boundary conditions.
+
+    Parameters
+    ----------
+    wave : `isotropic_wave.IsotropicWave`
+        Elastic wave solver.
+    u : ufl.core.expr.Expr
+        Expression standing for the displacement in the spatial derivatives.
+    u_t : ufl.core.expr.Expr
+        Expression standing for the velocity, see :func:`local_abc_velocity`
+        for the central-difference choice.
+
+    Returns
+    -------
+    ufl.Form or int
+        The boundary form, or ``0`` when no local ABC is active.
     '''
     abc_dict = wave.input_dictionary.get("absorving_boundary_conditions", None)
     if abc_dict is None:
@@ -13,16 +70,12 @@ def local_abc_form(wave):
         abc_active = abc_dict.get("status", False)
         if abc_active:
             abc_type = abc_dict.get("nrbc", {}).get("type", "Stacey")
-            dt_scheme = abc_dict.get("nrbc", {}).get("dt_scheme", "backward")
         else:
             return 0
 
     V = wave.function_space
     v = TestFunction(V)
-    u_nm1 = wave.u_nm1
-    u_n = wave.u_n
 
-    dt = Constant(wave.dt)
     rho = wave.rho
     c_p = wave.c
     c_s = wave.c_s
@@ -35,36 +88,19 @@ def local_abc_form(wave):
     iy = 2
 
     # Partial derivatives
-    if dt_scheme == "backward":
-        uz_dt = (u_n[iz] - u_nm1[iz])/dt
-        ux_dt = (u_n[ix] - u_nm1[ix])/dt
-    elif dt_scheme == "backward_2nd":
-        u_nm2 = wave.u_nm2
-        uz_dt = (3*u_n[iz] - 4*u_nm1[iz] + u_nm2[iz])/(2*dt)
-        ux_dt = (3*u_n[ix] - 4*u_nm1[ix] + u_nm2[ix])/(2*dt)
-    elif dt_scheme == "central":
-        u = TrialFunction(V)
-        uz_dt = (u[iz] - u_nm1[iz])/(2*dt)
-        ux_dt = (u[ix] - u_nm1[ix])/(2*dt)
-    else:
-        raise NotImplementedError(
-            f"Unsupported time discretization: {dt_scheme}")
-    uz_dz = u_n[iz].dx(iz)
-    uz_dx = u_n[iz].dx(ix)
-    ux_dz = u_n[ix].dx(iz)
-    ux_dx = u_n[ix].dx(ix)
+    uz_dt = u_t[iz]
+    ux_dt = u_t[ix]
+    uz_dz = u[iz].dx(iz)
+    uz_dx = u[iz].dx(ix)
+    ux_dz = u[ix].dx(iz)
+    ux_dx = u[ix].dx(ix)
     if wave.dimension == 3:
-        if dt_scheme == "backward":
-            uy_dt = (u_n[iy] - u_nm1[iy])/dt
-        elif dt_scheme == "backward_2nd":
-            uy_dt = (3*u_n[iy] - 4*u_nm1[iy] + u_nm2[iy])/(2*dt)
-        elif dt_scheme == "central":
-            uy_dt = (u[iy] - u_nm1[iy])/(2*dt)
-        uz_dy = u_n[iz].dx(iy)
-        ux_dy = u_n[ix].dx(iy)
-        uy_dz = u_n[iy].dx(iz)
-        uy_dx = u_n[iy].dx(ix)
-        uy_dy = u_n[iy].dx(iy)
+        uy_dt = u_t[iy]
+        uz_dy = u[iz].dx(iy)
+        ux_dy = u[ix].dx(iy)
+        uy_dz = u[iy].dx(iz)
+        uy_dx = u[iy].dx(ix)
+        uy_dy = u[iy].dx(iy)
     else:
         uy_dt = None
         uz_dy = None

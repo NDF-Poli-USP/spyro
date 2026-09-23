@@ -213,3 +213,16 @@ class SourceType(StrEnum):
 
     FORCE = "force_source"
     EXPLOSIVE = "explosive_source"
+
+
+class TimeIntegrationScheme(StrEnum):
+    """Time integration schemes of the forward wave propagators.
+
+    CENTRAL_DIFFERENCE: Second-order explicit central differences in time,
+    with the stiffness term evaluated at the current time level.
+    IRKSOME: Runge-Kutta-Nystrom methods provided by Irksome, selected by a
+    Butcher tableau. See :mod:`spyro.solvers.time_integration_irksome`.
+    """
+
+    CENTRAL_DIFFERENCE = "central_difference"
+    IRKSOME = "irksome"

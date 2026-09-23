@@ -1,17 +1,34 @@
 from firedrake import (Constant, div, dx, grad, inner)
 
 
-def mechanical_energy_form(wave):
-    u_nm1 = wave.u_nm1
+def mechanical_energy_form(wave, velocity=None):
+    """Return the mechanical energy of the current displacement level.
+
+    Parameters
+    ----------
+    wave : `isotropic_wave.IsotropicWave`
+        Elastic wave solver.
+    velocity : ufl.core.expr.Expr, optional
+        Expression of the velocity entering the kinetic energy. ``None``
+        uses the backward difference of the two stored displacement levels,
+        which is what the central-difference integrator keeps; integrators
+        carrying the velocity as a field pass it instead.
+
+    Returns
+    -------
+    ufl.Form
+        Kinetic plus strain energy.
+    """
     u_n = wave.u_n
 
-    dt = Constant(wave.dt)
     rho = wave.rho
     lmbda = wave.lmbda
     mu = wave.mu
 
     # Kinetic energy
-    v = (u_n - u_nm1)/dt
+    if velocity is None:
+        velocity = (u_n - wave.u_nm1)/Constant(wave.dt)
+    v = velocity
     K = (rho/2)*inner(v, v)*dx
 
     # Strain energy

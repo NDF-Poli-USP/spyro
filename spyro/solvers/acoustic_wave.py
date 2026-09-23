@@ -5,6 +5,7 @@ from pyadjoint import Tape, AdjFloat
 from ..io.parallelism_wrappers import ensemble_gradient
 from ..io import interpolate
 from .acoustic_solver_construction_no_pml import (
+    acoustic_form_no_pml,
     construct_solver_or_matrix_no_pml,
 )
 from .acoustic_solver_construction_with_pml import (
@@ -13,6 +14,7 @@ from .acoustic_solver_construction_with_pml import (
 from .backward_time_integration import (
     backward_wave_propagator,
 )
+from .time_integration_irksome import IrksomeIntegrator
 from ..domains.space import create_function_space
 from ..utils.typing import (
     AcousticMaterialParameter, AdjointType, RieszMapType, override,
@@ -61,6 +63,11 @@ class AcousticWave(Wave):
         """Builds solver operators. Doesn't create mass matrices if
         matrix_free option is on,
         which it is by default.
+
+        With the Irksome time integration scheme the operators are the
+        stage systems of the Runge-Kutta-Nystrom method, held by
+        ``irksome_integrator`` together with the pressure and its time
+        derivative, ``u_n`` and ``u_t``.
         """
         self.current_time = 0.0
 
@@ -68,13 +75,19 @@ class AcousticWave(Wave):
         self.trial_function = None
         self.u_nm1 = None
         self.u_n = None
+        self.u_t = None
         self.u_np1 = fire.Function(self.function_space)
         self.lhs = None
         self.solver = None
         self.rhs = None
         self.B = None
+        self.irksome_integrator = None
 
-        if self.abc_type == AbsorbingBCsType.PML:
+        if self.uses_irksome:
+            self.irksome_integrator = IrksomeIntegrator(self)
+            self.u_n = self.irksome_integrator.u
+            self.u_t = self.irksome_integrator.u_t
+        elif self.abc_type == AbsorbingBCsType.PML:
             self.X_np1 = None
             self.X_n = None
             self.X_nm1 = None
@@ -83,6 +96,32 @@ class AcousticWave(Wave):
             construct_solver_or_matrix_no_pml(self)
 
         self.acoustic_energy = acoustic_energy(self)
+
+    @override
+    def weak_form(self, u, u_t, u_tt, v):
+        """Return the weak form of the acoustic wave equation.
+
+        See :meth:`~spyro.solvers.wave.Wave.weak_form` for the arguments.
+        The form is the one of :func:`acoustic_form_no_pml`, which covers
+        the free-surface, non-reflecting and hybrid absorbing boundary
+        conditions.
+
+        Raises
+        ------
+        NotImplementedError
+            With a PML. Its auxiliary field obeys an equation that is first
+            order in time, so the PML system has no weak form in the
+            pressure alone; only the central-difference scheme integrates
+            it.
+        """
+        if self.abc_type == AbsorbingBCsType.PML:
+            raise NotImplementedError(
+                "The PML is only available with the central-difference "
+                "time integration scheme: its auxiliary field obeys a "
+                "first-order equation in time, which the Nystrom steppers "
+                "of Irksome do not integrate."
+            )
+        return acoustic_form_no_pml(self, u, u_t, u_tt, v)
 
     @ensemble_gradient
     def gradient_solve(
@@ -118,6 +157,13 @@ class AcousticWave(Wave):
         """
         if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
             return self._automated_adjoint_gradient(riesz_map=riesz_map)
+        if self.uses_irksome:
+            raise NotImplementedError(
+                "The implemented adjoint is the discrete adjoint of the "
+                "central-difference scheme. With the Irksome time "
+                "integration scheme use "
+                "adjoint_type=AdjointType.AUTOMATED_ADJOINT."
+            )
 
         self.enable_implemented_adjoint()
         if misfit is not None:
@@ -200,7 +246,9 @@ class AcousticWave(Wave):
             )
 
     def reset_pressure(self):
-        if self.abc_type == AbsorbingBCsType.PML:
+        if self.uses_irksome:
+            self.irksome_integrator.reset()
+        elif self.abc_type == AbsorbingBCsType.PML:
             self.X_n.assign(0.0)
             self.X_nm1.assign(0.0)
         else:

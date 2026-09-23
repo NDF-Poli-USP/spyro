@@ -1,11 +1,14 @@
 """Source utilities for injecting wavelets into simulation meshes."""
 
+import math
+
 import numpy as np
 from scipy.signal import butter, filtfilt
 from spyro.receivers.dirac_delta_projector import Delta_projector
 from ..domains.space import create_function_space
 from ..utils.typing import WaveType
 import firedrake as fire
+import ufl
 
 
 class Sources(Delta_projector):
@@ -70,6 +73,9 @@ class Sources(Delta_projector):
         self.point_locations = wave.source_locations
         self.number_of_points = wave.number_of_sources
         self.amplitude = wave.amplitude
+        self.frequency = wave.frequency
+        self.delay = wave.delay
+        self.delay_type = wave.delay_type
         self.is_local = [0] * self.number_of_points
         self.current_sources = None
         if wave.analysis == "transient":
@@ -87,6 +93,36 @@ class Sources(Delta_projector):
             frequency=wave.frequency,
             delay=wave.delay,
             delay_type=wave.delay_type,
+        )
+
+    def wavelet_expression(self, t: ufl.core.expr.Expr) -> ufl.core.expr.Expr:
+        """Return the source wavelet as a UFL expression of the time ``t``.
+
+        This is the continuous counterpart of :attr:`wavelet`, whose entries
+        sample the same function at the time steps. Time integrators that
+        evaluate the source between time levels, such as the Runge-Kutta
+        stages of :mod:`spyro.solvers.time_integration_irksome`, need the
+        expression rather than the samples.
+
+        Parameters
+        ----------
+        t : ufl.core.expr.Expr
+            The time, usually a ``firedrake.Constant`` the time integrator
+            updates.
+
+        Returns
+        -------
+        ufl.core.expr.Expr
+            The unit-amplitude Ricker wavelet at time ``t``. The amplitude
+            enters through the point source, see
+            :meth:`point_source_cofunction`.
+        """
+        return ricker_wavelet_ufl(
+            t,
+            self.frequency,
+            amplitude=1.0,
+            delay=self.delay,
+            delay_type=self.delay_type,
         )
 
     def apply_source(self, rhs_forcing, step):
@@ -117,6 +153,48 @@ class Sources(Delta_projector):
                     tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841
 
         return rhs_forcing
+
+    def point_source_cofunction(self) -> fire.Cofunction:
+        """Return the cofunction of the active point sources at unit wavelet.
+
+        The right-hand side contribution of the sources at any time is this
+        cofunction scaled by the wavelet value at that time. It is built from
+        the vertex-only mesh when the solver uses one and from the tabulated
+        basis functions of :class:`Delta_projector` otherwise, so both
+        source paths give the same source term.
+
+        Returns
+        -------
+        firedrake.Cofunction
+            The point sources listed in :attr:`current_sources`, weighted
+            by :attr:`amplitude`, as a cofunction of the wave function space.
+
+        Raises
+        ------
+        ValueError
+            If no source is active.
+        """
+        if self.current_sources is None or len(self.current_sources) == 0:
+            raise ValueError(
+                "Point source assembly requires at least one active source."
+            )
+        if self.use_vertex_only_mesh:
+            return self.source_cofunction()
+
+        source_cofunction = fire.Cofunction(self.function_space.dual())
+        for source_id in self.current_sources:
+            # ``is_local`` holds the cell containing the source, or ``None``
+            # when it lies on another rank, so it is compared to ``None``
+            # rather than tested for truth: the first cell has id ``0``.
+            if self.is_local[source_id] is None:
+                continue
+            for node, tabulation in zip(
+                self.cellNodeMaps[source_id], self.cell_tabulations[source_id]
+            ):
+                source_cofunction.dat.data_with_halos[int(node)] = np.dot(
+                    self.amplitude, tabulation
+                )
+        return source_cofunction
 
     def source_cofunction(self):
         """Return a cofunction with the source applied into the domain.
@@ -223,6 +301,57 @@ def ricker_wavelet(
     t = t - time_delay
     tt = (np.pi * frequency * t) ** 2
     return amplitude * (1.0 - (2.0) * tt) * np.exp((-1.0) * tt)
+
+
+def ricker_wavelet_ufl(
+    t: ufl.core.expr.Expr,
+    frequency: float,
+    amplitude: float = 1.0,
+    delay: float | int = 1.5,
+    delay_type: str = "multiples_of_minimum",
+) -> ufl.core.expr.Expr:
+    """Create a delayed Ricker wavelet as a UFL expression of the time.
+
+    Symbolic counterpart of :func:`ricker_wavelet`: the same function of
+    time, but built with UFL operators so that ``t`` can be a
+    ``firedrake.Constant`` inside a variational form and be evaluated
+    wherever the time integrator needs it.
+
+    Parameters
+    ----------
+    t : ufl.core.expr.Expr
+        Time, typically a ``firedrake.Constant``.
+    frequency : float
+        Peak frequency of the wavelet.
+    amplitude : float, optional
+        Amplitude of the wavelet. Default is 1.0.
+    delay : float or int, optional
+        Delay, in multiples of the distance between the minima of the
+        wavelet or in seconds, according to ``delay_type``. Default is 1.5.
+    delay_type : str, optional
+        ``"multiples_of_minimum"`` (default) or ``"time"``.
+
+    Returns
+    -------
+    ufl.core.expr.Expr
+        Value of the wavelet at time ``t``.
+
+    Raises
+    ------
+    ValueError
+        If ``delay_type`` is not one of the two options.
+    """
+    if delay_type == "multiples_of_minimum":
+        time_delay = delay * math.sqrt(6.0) / (math.pi * frequency)
+    elif delay_type == "time":
+        time_delay = delay
+    else:
+        raise ValueError(
+            "delay_type must be 'multiples_of_minimum' or 'time', "
+            f"got {delay_type!r}."
+        )
+    tt = (math.pi * frequency * (t - time_delay)) ** 2
+    return amplitude * (1.0 - 2.0 * tt) * ufl.exp(-tt)
 
 
 def full_ricker_wavelet(
