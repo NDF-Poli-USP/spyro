@@ -113,6 +113,113 @@ def test_plot_model_in_p1():
     assert os.path.exists(str(filename))
 
 
+def test_plot_model_material_parameters(tmp_path) -> None:
+    """Without ``fields``, a solver's own material parameters are drawn.
+
+    One panel per parameter, named after it: the velocity of an acoustic
+    solver; the density and two wave speeds of an elastic one, built from
+    its model before any forward solve.
+    """
+    from tests.on_one_core.test_fwi_automated_adjoint import (
+        ELASTIC_GUESS, build_elastic_dictionary,
+    )
+
+    figure = spyro.plots.plot_model(get_wave_obj(), tmp_path / "acoustic.png")
+    assert [axis.get_title() for axis in figure.axes[:1]] == ["p_wave_velocity"]
+
+    elastic = spyro.IsotropicWave(dictionary=build_elastic_dictionary(ELASTIC_GUESS))
+    elastic.set_mesh(input_mesh_parameters={"edge_length": 0.25})
+    figure = spyro.plots.plot_model(elastic, tmp_path / "elastic.png", high_resolution=True)
+    assert (tmp_path / "elastic.png").exists()
+    # The panels come first in the figure, then their colour bars.
+    assert [axis.get_title() for axis in figure.axes[:3]] == [
+        "density", "p_wave_velocity", "s_wave_velocity",
+    ]
+    assert len(figure.axes) == 6
+
+
+@pytest.mark.parametrize("high_resolution", [False, True])
+@pytest.mark.parametrize("quadrilateral", [False, True])
+def test_plot_model_fields(tmp_path, high_resolution: bool, quadrilateral: bool) -> None:
+    """Plot multiple fields through the shared model plotting entry point.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Output directory.
+    high_resolution : bool
+        Whether to regrid onto a finer CG1 mesh.
+    quadrilateral : bool
+        Whether the original mesh uses quadrilaterals.
+
+    Returns
+    -------
+    None
+        Assertions verify geometry, values, panel layout and unchanged inputs.
+    """
+    import firedrake as fire
+    from types import SimpleNamespace
+
+    mesh = fire.RectangleMesh(4, 4, 1.0, 2.0, quadrilateral=quadrilateral)
+    mesh.coordinates.dat.data[:, 0] *= -1.0
+    space = fire.FunctionSpace(mesh, "CG", 2)
+    z, x = fire.SpatialCoordinate(mesh)
+    velocity = fire.Function(space).interpolate(1.5 + z * z)
+    gradient = fire.Function(space).interpolate(x - 1.0)
+    wave = SimpleNamespace(
+        initial_velocity_model=velocity,
+        source_locations=[(-0.1, 1.0)],
+        receiver_locations=create_transect((-0.9, 0.5), (-0.9, 1.5), 5),
+        mesh_parameters=spyro.meshing.MeshingParameters(
+            input_mesh_dictionary={"length_z": 1.0, "length_x": 2.0,
+                                   "length_y": 0.0, "dimension": 2},
+            comm=fire.Ensemble(mesh.comm, mesh.comm.size),
+        ),
+    )
+    coordinates = mesh.coordinates.dat.data_ro.copy()
+    values = velocity.dat.data_ro.copy()
+    figure = spyro.plots.plot_model(
+        wave, tmp_path / "fields.png", fields=[velocity, gradient],
+        titles=["velocity", "gradient"], vmin=[1.5, -1.0], vmax=[2.5, 1.0],
+        high_resolution=high_resolution, high_resolution_grid_value=0.13,
+    )
+    assert (tmp_path / "fields.png").exists()
+    assert len(figure.axes) == 4
+    assert figure.axes[0].get_xlabel() == "x (km)"
+    assert figure.axes[0].get_ylabel() == "z (km)"
+    assert figure.axes[0].collections[0].get_clim() == (1.5, 2.5)
+    assert np.isclose(figure.axes[0].collections[0].get_array().min(), 1.5)
+    assert np.isclose(figure.axes[0].collections[0].get_array().max(), 2.5)
+    assert np.array_equal(coordinates, mesh.coordinates.dat.data_ro)
+    assert np.array_equal(values, velocity.dat.data_ro)
+    figure = spyro.plots.plot_model(
+        wave, tmp_path / "grid.png", fields=[velocity, gradient, velocity],
+        columns=2, high_resolution=high_resolution, high_resolution_grid_value=0.13,
+        show_acquisition=False,
+    )
+    assert len([axis for axis in figure.axes if axis.get_visible()]) == 6
+    assert len(figure.axes) == 7
+    assert len(figure.axes[0].collections) == 1
+
+    # Existing single-model calls still work, including the non-flipped axes.
+    figure = spyro.plots.plot_model(
+        wave, tmp_path / "single.png", high_resolution=high_resolution,
+        high_resolution_grid_value=0.13, flip_axis=False,
+        abc_points=[(-0.2, 0.2), (-0.8, 0.2), (-0.8, 1.8)],
+    )
+    assert figure.axes[0].get_xlabel() == "z (km)"
+    assert len(figure.axes[0].lines[0].get_xdata()) == 4
+    for invalid in ([], [fire.Function(fire.VectorFunctionSpace(mesh, "CG", 1))]):
+        with pytest.raises(ValueError):
+            spyro.plots.plot_model(wave, fields=invalid)
+    with pytest.raises(ValueError, match="titles"):
+        spyro.plots.plot_model(wave, fields=[velocity, gradient], titles=["one"])
+    with pytest.raises(ValueError, match="columns"):
+        spyro.plots.plot_model(wave, columns=0)
+    with pytest.raises(ValueError, match="no material model"):
+        spyro.plots.plot_model(SimpleNamespace(initial_velocity_model=None))
+
+
 def test_plot_receiver_response(tmp_path):
     receiver_data = np.sin(np.linspace(0.0, 2.0 * np.pi, 100))
     output_file = tmp_path / "receiver_response.png"

@@ -187,10 +187,13 @@ def _propagate_forward_central_difference(wave, source_ids):
         if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
             if wave.use_vertex_only_mesh:
                 if isinstance(real_shot_record[step], np.ndarray):
-                    real_shot = fire.Function(
-                        usol_recv[-1].function_space(),
-                        val=real_shot_record[step],
-                    )
+                    # This rank only samples the receivers it owns (issue
+                    # #315), so restrict the record to them. ``val=`` would
+                    # also need the halo points, hence ``data_wo``.
+                    real_shot = fire.Function(usol_recv[-1].function_space())
+                    real_shot.dat.data_wo[:] = real_shot_record[step][
+                        wave.receivers.vom_input_indices
+                    ]
                     misfit_step = real_shot - usol_recv[-1]
                 elif isinstance(real_shot_record[step], fire.Function):
                     misfit_step = real_shot_record[step] - usol_recv[-1]
@@ -212,13 +215,15 @@ def _propagate_forward_central_difference(wave, source_ids):
     wave.current_time = t
 
     helpers.display_progress(wave.comm, t)
-    if receiver_array is not None and functional_mode is not FunctionalEvaluationMode.PER_TIMESTEP:
-        usol_recv = receiver_array
-    usol_recv = helpers.fill(
-        usol_recv, wave.receivers.is_local, nt, wave.receivers.number_of_points
-    )
-
-    usol_recv = utils.utils.communicate(usol_recv, wave.comm)
+    if wave.use_vertex_only_mesh:
+        # Each rank sampled only its own receivers, in vertex-only-mesh
+        # order: gather the input-order record from all ranks (issue #315).
+        usol_recv = wave.receivers.gather_receiver_record(receiver_array)
+    else:
+        usol_recv = helpers.fill(
+            usol_recv, wave.receivers.is_local, nt, wave.receivers.number_of_points
+        )
+        usol_recv = utils.utils.communicate(usol_recv, wave.comm)
 
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         wave.automated_adjoint.stop_recording()
