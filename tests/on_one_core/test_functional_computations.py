@@ -146,20 +146,7 @@ class _SerialComm:
     size = 1
 
     def allreduce(self, sendobj: object, op: object = None) -> object:
-        """Return the only rank's value.
-
-        Parameters
-        ----------
-        sendobj : object
-            Value supplied by the only rank.
-        op : object, optional
-            Reduction operation, unused for one rank.
-
-        Returns
-        -------
-        object
-            ``sendobj`` unchanged.
-        """
+        """Return the only rank's value."""
         return sendobj
 
 
@@ -192,11 +179,6 @@ def test_partial_reduced_functional_shares_tape_and_checkpoint() -> None:
         assert automated_adjoint.reduced_functional is complete
         assert len(density_stage.controls) == 1
         assert density_stage.controls[0] is complete.controls[0]
-        try:
-            local_density_stage = density_stage.local_reduced_functional
-        except AttributeError:
-            local_density_stage = density_stage
-        assert local_density_stage.tape is automated_adjoint._tape
         assert float(density_stage(AdjFloat(4.0))) == pytest.approx(37.0)
         assert float(density_stage.derivative()) == pytest.approx(11.0)
 

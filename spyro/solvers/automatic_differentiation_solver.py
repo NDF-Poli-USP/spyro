@@ -398,31 +398,12 @@ pyadjoint.ReducedFunctional or None
             If no parameter is selected, a requested parameter is not a
             control, or the controls were created without parameter labels.
 
-        Notes
-        -----
-        For two controls, the complete reduced functional is
-
-        .. math::
-
-            \widehat J(m_1, m_2)
-            = J\left(u(m_1, m_2), m_1, m_2\right),
-
-        where the state :math:`u` is recovered by replaying the tape. If only
-        :math:`m_1` is selected and :math:`m_2^*` is its current checkpoint,
-        this method constructs the partial reduced functional
+        For a complete functional :math:`\widehat J(m_1, m_2)`, selecting only
+        :math:`m_1` keeps :math:`m_2` at its current checkpoint:
 
         .. math::
 
             \widehat J_1(m_1) = \widehat J(m_1, m_2^*).
-
-        Selecting only :math:`m_2` analogously gives
-
-        .. math::
-
-            \widehat J_2(m_2) = \widehat J(m_1^*, m_2).
-
-        These are restrictions of the same recorded objective, not separately
-        recorded forward problems.
         """
         active_control_param = list(active_control_param)
         if not active_control_param:
