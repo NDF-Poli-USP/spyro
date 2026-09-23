@@ -6,6 +6,7 @@ from firedrake import (
     And,
     conditional,
 )
+import spyro
 
 # ============================================================
 # Mesh
@@ -202,3 +203,4 @@ rho.interpolate(rho_expr)
 fire.VTKFile("vp.pvd").write(vp)
 fire.VTKFile("vs.pvd").write(vs)
 fire.VTKFile("rho.pvd").write(rho)
+spyro.io.create_segy(vs, V, 0.01, "vs.segy")

@@ -1,5 +1,5 @@
 h values not actual h values used in mesh generation!
-SEM RESULTS:
+SEM RESULTS 4th order:
 Using 2km depth using final time = 1.0:
 cpw = 3.071e+00  |  error = 1.648121e-02  |  h = 9.000e-02
 cpw = 2.750e+00  |  error = 2.992618e-02  |  h = 1.000e-01
@@ -11,6 +11,7 @@ cpw = 1.742e+00  |  error = 4.931293e+00  |  h = 1.600e-01
 cpw = 1.513e+00  |  error = 7.737406e+00  |  h = 1.800e-01
 cpw = 1.375e+00  |  error = 1.229036e+01  |  h = 2.000e-01
 
+Sem 4th order
 Using 2km depth using final time = 1.1:
 cpw = 3.071e+00  |  error = 1.669422e-02  |  h = 9.000e-02 
 cpw = 2.979e+00  |  error = 3.271060e-02  |  h = 9.200e-02
@@ -37,7 +38,8 @@ cpw = 2.979e+00  |  error = 3.271060e-02  |  h = 9.167e-02
 Using error = 2e-02 for 3.0 cpw! (or 1.5 cpw, MONDAIC)
 Using error 5e-2 for 2.75 (or 1.375 cpw)
 
-Now triangles (new Firedrake) ML4:
+Now triangles (new Firedrake)
+ML4:
 cpw = 5.500e+00  |  error = 1.117542e-02  |  h = 5.000e-02
 cpw = 4.583e+00  |  error = 1.138238e-02  |  h = 6.000e-02
 cpw = 3.438e+00  |  error = 1.184404e-02  |  h = 8.000e-02
@@ -55,26 +57,6 @@ cpw = 2.521e+00  |  error = 3.977317e-02  |  h = 1.100e-01
 cpw = 2.613e+00  |  error = 2.047810e-02  |  h = 1.058e-01
 cpw = 2.704e+00  |  error = 2.972936e-02  |  h = 1.019e-01
 cpw = 2.796e+00  |  error = 2.086649e-02  |  h = 9.821e-02
-
-
-h_values to try:
->>> ls/4.0
-0.06875
->>> ls/3.5
-0.07857142857142858
->>> ls/3.0
-0.09166666666666667
->>> ls/2.8
-0.09821428571428573
->>> ls/2.6
-0.10576923076923077
->>> ls/2.4
-0.11458333333333334
->>> ls/2.2
-0.125
->>> ls/2.0
-0.1375
->>> 
 
 
 ML2:
@@ -108,7 +90,7 @@ cpw = 4.996e+00  |  error = 1.508910e-02  |  h = 5.500e-02
 cpw = 4.492e+00  |  error = 1.859287e-02  |  h = 6.111e-02
 
 
-ml6:
+ML6:
 cpw = 3.988e+00  |  error = 1.114692e-02  |  h = 6.875e-02
 cpw = 3.483e+00  |  error = 1.115627e-02  |  h = 7.857e-02
 cpw = 2.979e+00  |  error = 1.116224e-02  |  h = 9.167e-02

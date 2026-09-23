@@ -14,17 +14,17 @@ source_locations = [
     (-0.5, 5.0)
 ]
 
-receiver_locations = [
-    (-0.5, x)
-    for x in np.arange(0.5, 9.51, 0.1)
-]
+# receiver_locations = [
+#     (-0.5, x)
+#     for x in np.arange(0.5, 9.51, 0.1)
+# ]
 
-receiver_locations += [
+receiver_locations = [
     (-3.0, x)
     for x in np.arange(0.5, 9.51, 0.1)
 ]
 
-final_time = 4.0
+final_time = 1.0
 dt = 1.0e-4
 
 dictionary = {
@@ -51,12 +51,13 @@ dictionary = {
         "delay_type": "time",
         "receiver_locations": receiver_locations,
         "amplitude": np.array([0.0, 1.0]),
+        "use_vertex_only_mesh": True,
     },
-    "absorving_boundary_conditions": {
-        "status": True,
-        "abc_type": "nrbc",
-        "nrbc": {"type": "Stacey", "dt_scheme": "backward"},
-    },
+    # "absorving_boundary_conditions": {
+    #     "status": True,
+    #     "abc_type": "nrbc",
+    #     "nrbc": {"type": "Stacey", "dt_scheme": "backward"},
+    # },
     "time_axis": {
         "initial_time": 0.0,
         "final_time": final_time,
