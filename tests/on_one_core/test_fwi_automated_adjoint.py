@@ -307,7 +307,7 @@ def test_fwi_elastic_stages(tmp_path, monkeypatch):
         )
 
 
-def test_fwi_stages_validation():
+def test_fwi_stages_verification():
     """Stage syntax is normalized before an expensive forward recording."""
     normalize = spyro.FullWaveformInversion._stages
     S, P = Parameter.S_WAVE_VELOCITY, Parameter.P_WAVE_VELOCITY

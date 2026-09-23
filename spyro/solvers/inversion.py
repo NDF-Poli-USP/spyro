@@ -1659,13 +1659,19 @@ class FullWaveformInversion:
                 ``stages``, the maximum number of iterations for a stage that
                 does not specify its own limit.
             stages : list, optional
-                Controls exposed to each successive automated-adjoint solve:
+                Successive optimization stages. Each stage exposes only its
+                listed controls to TAO. For example,
                 ``[Parameter.S_WAVE_VELOCITY, Parameter.P_WAVE_VELOCITY]``
-                runs ``maxiter`` iterations on each in turn,
-                ``[(Parameter.S_WAVE_VELOCITY, 10), ...]`` uses the specified
-                limits. A stage may contain several controls. Each starts from
-                the complete model left by the preceding stage. Its limit
-                takes precedence over ``tao_options["tao_max_it"]``.
+                runs ``maxiter`` iterations for each control in turn, while
+                ``[(Parameter.S_WAVE_VELOCITY, 10), ...]`` specifies a limit
+                per stage. A stage can expose multiple controls::
+
+                    stages=[((Parameter.S_WAVE_VELOCITY,
+                              Parameter.P_WAVE_VELOCITY), 10)]
+
+                Each stage starts from the complete model produced by the
+                previous one. Its iteration limit takes precedence over
+                ``tao_options["tao_max_it"]``.
             scipy_options : dict, optional
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
