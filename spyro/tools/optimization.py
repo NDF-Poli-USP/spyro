@@ -575,7 +575,7 @@ def minimize_with_tao(
     UserWarning
         If TAO stops without converging, which is what reaching the iteration
         limit amounts to. The last iterate is returned rather than raising,
-        since a fixed iteration budget is a normal way to run an optimization.
+        since a fixed iteration limit is a normal way to run an optimization.
 
     Raises
     ------

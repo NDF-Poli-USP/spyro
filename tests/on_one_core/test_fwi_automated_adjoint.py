@@ -118,7 +118,7 @@ def build_elastic_dictionary(material):
 def test_fwi_automated_adjoint(tmp_path, monkeypatch):
     """Invert an acoustic velocity model.
 
-    A fixed iteration budget is how FWI is normally run, and TAO reports that
+    A fixed iteration limit is how FWI is normally run, and TAO reports that
     as a failure to converge; the driver has to hand back the last iterate
     rather than let the exception through.
     """
@@ -252,25 +252,29 @@ def test_fwi_elastic_stages(tmp_path, monkeypatch):
 
     def observed_minimize(reduced_functional: object, **kwargs: object) -> list:
         automated_adjoint = fwi.wave.automated_adjoint
-        full = automated_adjoint.reduced_functional
-        names = automated_adjoint.control_parameter_names
+        complete = automated_adjoint.reduced_functional
+        control_names = automated_adjoint.control_parameter_names
         calls.append({
             "active": [
-                name for name, full_control in zip(names, full.controls)
+                name for name, complete_control in zip(
+                    control_names, complete.controls,
+                )
                 if any(
-                    control is full_control
+                    control is complete_control
                     for control in reduced_functional.controls
                 )
             ],
             "bounds": len(kwargs["bounds"]),
-            "full_state": {
+            "complete_state": {
                 name: np.array(control.tape_value().dat.data_ro, copy=True)
-                for name, control in zip(names, full.controls)
+                for name, control in zip(control_names, complete.controls)
             },
         })
         return real_minimize(reduced_functional, **kwargs)
 
-    monkeypatch.setattr(optimization, "minimize_with_tao", observed_minimize)
+    monkeypatch.setitem(
+        optimization.__dict__, "minimize_with_tao", observed_minimize,
+    )
 
     # Stages are run by TAO and are checked before anything is recorded.
     with pytest.raises(ValueError, match="AUTOMATED_ADJOINT"):
@@ -280,13 +284,13 @@ def test_fwi_elastic_stages(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="positive"):
         fwi.run_fwi(stages=[(S, 0)], **settings)
 
-    # A stage without a budget of its own takes ``maxiter``.
+    # A stage without its own iteration limit takes ``maxiter``.
     rho, cp, cs = fwi.run_fwi(stages=[S, (P, 1)], maxiter=2, **settings)
 
     assert [call["active"] for call in calls] == [[S], [P]]
     assert [call["bounds"] for call in calls] == [1, 1]
     assert not np.allclose(
-        calls[1]["full_state"][S], ELASTIC_GUESS["s_wave_velocity"],
+        calls[1]["complete_state"][S], ELASTIC_GUESS["s_wave_velocity"],
     ), "the second stage did not see the first stage's result"
     assert fwi.current_iteration == 3
     assert len(fwi.functional_history) == 4

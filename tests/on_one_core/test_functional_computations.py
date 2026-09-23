@@ -169,7 +169,7 @@ class _SerialEnsemble:
     ensemble_comm = _SerialComm()
 
 
-def test_reduced_functional_for_shares_tape_and_checkpoint() -> None:
+def test_partial_reduced_functional_shares_tape_and_checkpoint() -> None:
     """Partial functionals share controls, tape, ordering and held state."""
     density = AdjFloat(2.0)
     velocity = AdjFloat(3.0)
@@ -184,54 +184,55 @@ def test_reduced_functional_for_shares_tape_and_checkpoint() -> None:
     automated_adjoint.stop_recording()
 
     try:
-        full = automated_adjoint.create_reduced_functional(functional)
-        density_stage = automated_adjoint.reduced_functional_for(
+        complete = automated_adjoint.create_reduced_functional(functional)
+        density_stage = automated_adjoint.create_partial_reduced_functional(
             functional, [density_name],
         )
 
-        assert automated_adjoint.reduced_functional is full
+        assert automated_adjoint.reduced_functional is complete
         assert len(density_stage.controls) == 1
-        assert density_stage.controls[0] is full.controls[0]
-        assert (
-            density_stage.local_reduced_functional.tape
-            is automated_adjoint._tape
-        )
+        assert density_stage.controls[0] is complete.controls[0]
+        try:
+            local_density_stage = density_stage.local_reduced_functional
+        except AttributeError:
+            local_density_stage = density_stage
+        assert local_density_stage.tape is automated_adjoint._tape
         assert float(density_stage(AdjFloat(4.0))) == pytest.approx(37.0)
         assert float(density_stage.derivative()) == pytest.approx(11.0)
 
-        velocity_stage = automated_adjoint.reduced_functional_for(
+        velocity_stage = automated_adjoint.create_partial_reduced_functional(
             functional, [velocity_name],
         )
-        assert velocity_stage.controls[0] is full.controls[1]
+        assert velocity_stage.controls[0] is complete.controls[1]
         assert float(velocity_stage(AdjFloat(5.0))) == pytest.approx(61.0)
         assert float(velocity_stage.derivative()) == pytest.approx(14.0)
         assert taylor_test(
             velocity_stage, AdjFloat(5.0), AdjFloat(0.25),
         ) > 1.9
 
-        reversed_request = automated_adjoint.reduced_functional_for(
+        reversed_request = automated_adjoint.create_partial_reduced_functional(
             functional, [velocity_name, density_name],
         )
-        assert list(reversed_request.controls) == list(full.controls)
+        assert list(reversed_request.controls) == list(complete.controls)
     finally:
         automated_adjoint.clear_tape()
 
 
-def test_reduced_functional_for_validates_selection() -> None:
+def test_partial_reduced_functional_validates_selection() -> None:
     """A partial functional rejects empty, unknown and unlabeled controls."""
     parameter = ElasticMaterialParameter.DENSITY
     automated_adjoint = AutomatedAdjoint(None, {parameter: AdjFloat(2.0)})
 
     with pytest.raises(ValueError, match="active control"):
-        automated_adjoint.reduced_functional_for(None, [])
+        automated_adjoint.create_partial_reduced_functional(None, [])
     with pytest.raises(ValueError, match="available controls"):
-        automated_adjoint.reduced_functional_for(
+        automated_adjoint.create_partial_reduced_functional(
             None, [ElasticMaterialParameter.MU],
         )
 
     unlabeled = AutomatedAdjoint(None, AdjFloat(2.0))
     with pytest.raises(ValueError, match="labeled controls"):
-        unlabeled.reduced_functional_for(None, [parameter])
+        unlabeled.create_partial_reduced_functional(None, [parameter])
 
 
 def test_verify_gradient_normalizes_one_control(monkeypatch):

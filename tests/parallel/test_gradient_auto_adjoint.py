@@ -227,16 +227,19 @@ def _verify_ensemble_gradient(Wave_obj_guess, checkpointing):
         reduced_functional, fire_ad.EnsembleReducedFunctional
     ), "Reduced functional must be an EnsembleReducedFunctional."
     parameter, = Wave_obj_guess.automated_adjoint.control_parameter_names
-    stage_functional = Wave_obj_guess.automated_adjoint.reduced_functional_for(
-        Wave_obj_guess.functional_value,
-        [parameter],
+    stage_functional = (
+        Wave_obj_guess.automated_adjoint.create_partial_reduced_functional(
+            Wave_obj_guess.functional_value,
+            [parameter],
+        )
     )
     assert isinstance(stage_functional, fire_ad.EnsembleReducedFunctional)
     assert stage_functional.controls[0] is reduced_functional.controls[0]
-    assert (
-        stage_functional.local_reduced_functional.tape
-        is Wave_obj_guess.automated_adjoint._tape
-    )
+    try:
+        local_stage_functional = stage_functional.local_reduced_functional
+    except AttributeError:
+        local_stage_functional = stage_functional
+    assert local_stage_functional.tape is Wave_obj_guess.automated_adjoint._tape
 
     if checkpointing:
         assert isinstance(

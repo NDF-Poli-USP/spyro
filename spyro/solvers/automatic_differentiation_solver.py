@@ -366,14 +366,14 @@ pyadjoint.ReducedFunctional or None
         )
         return self.reduced_functional
 
-    def reduced_functional_for(
-        self, functional: object, active_parameters: Iterable[object],
+    def create_partial_reduced_functional(
+        self, functional: object, active_control_param: Iterable[object],
     ) -> object:
-        """Build a temporary reduced functional for selected controls.
+        r"""Build a partial reduced functional for selected controls.
 
         The selected controls retain their original
         :class:`pyadjoint.BlockVariable` objects and checkpoints. The returned
-        functional therefore replays the same tape as the full reduced
+        functional therefore replays the same tape as the complete reduced
         functional, while controls omitted from it remain fixed at their
         current checkpoints.
 
@@ -381,7 +381,7 @@ pyadjoint.ReducedFunctional or None
         ----------
         functional : pyadjoint.AdjFloat
             Functional value recorded on :attr:`_tape`.
-        active_parameters : iterable of enum.Enum
+        active_control_param : iterable of enum.Enum
             Labels of the controls to expose, in any order. The controls in
             the returned functional follow :attr:`control_parameter_names`.
 
@@ -389,16 +389,43 @@ pyadjoint.ReducedFunctional or None
         -------
         firedrake.adjoint.EnsembleReducedFunctional
             A new reduced functional containing only the selected controls.
-            :attr:`reduced_functional` remains the canonical full functional.
+            :attr:`reduced_functional` remains the canonical complete
+            functional.
 
         Raises
         ------
         ValueError
             If no parameter is selected, a requested parameter is not a
             control, or the controls were created without parameter labels.
+
+        Notes
+        -----
+        For two controls, the complete reduced functional is
+
+        .. math::
+
+            \widehat J(m_1, m_2)
+            = J\left(u(m_1, m_2), m_1, m_2\right),
+
+        where the state :math:`u` is recovered by replaying the tape. If only
+        :math:`m_1` is selected and :math:`m_2^*` is its current checkpoint,
+        this method constructs the partial reduced functional
+
+        .. math::
+
+            \widehat J_1(m_1) = \widehat J(m_1, m_2^*).
+
+        Selecting only :math:`m_2` analogously gives
+
+        .. math::
+
+            \widehat J_2(m_2) = \widehat J(m_1^*, m_2).
+
+        These are restrictions of the same recorded objective, not separately
+        recorded forward problems.
         """
-        active_parameters = list(active_parameters)
-        if not active_parameters:
+        active_control_param = list(active_control_param)
+        if not active_control_param:
             raise ValueError("At least one active control is required.")
         if any(name is None for name in self.control_parameter_names):
             raise ValueError(
@@ -406,13 +433,19 @@ pyadjoint.ReducedFunctional or None
                 "labeled controls.",
             )
 
-        requested = set(active_parameters)
+        requested = set(active_control_param)
+        # Parameters requested for the partial functional that were not
+        # registered as controls of the complete reduced functional.
         unknown = requested - set(self.control_parameter_names)
         if unknown:
             available = [name.value for name in self.control_parameter_names]
-            missing = sorted(
-                (getattr(name, "value", str(name)) for name in unknown),
-            )
+            missing = []
+            for name in unknown:
+                try:
+                    missing.append(name.value)
+                except AttributeError:
+                    missing.append(str(name))
+            missing.sort()
             raise ValueError(
                 f"{missing} are not controls of this inversion; the "
                 f"available controls are {available}.",

@@ -599,11 +599,30 @@ is an exercise for you!
 
     Each stage runs ``maxiter`` iterations, the same 20 in total: the
     first updates only :math:`v_s`; the second updates only :math:`v_p`,
-    keeping the first stage's :math:`v_s`. Both replay the same full tape,
+    keeping the first stage's :math:`v_s`. Both replay the same tape,
     but each stage builds a reduced functional containing only its active
     velocity. Consequently TAO's vector and gradient contain no degrees of
     freedom for the velocity held constant in that stage. A new TAO solver
     starts each stage from the complete model produced by the preceding one.
+
+    In the joint inversion, the complete reduced functional is
+
+    .. math::
+
+        \widehat J(v_p, v_s).
+
+    The first stage instead optimises the restriction
+
+    .. math::
+
+        \widehat J_1(v_s) = \widehat J(v_p^0, v_s),
+
+    and, after obtaining :math:`v_s^1`, the second stage optimises
+
+    .. math::
+
+        \widehat J_2(v_p) = \widehat J(v_p, v_s^1).
+
     Compare the final misfit and both recovered models with the joint
     inversion. Does changing the stage order help?
 
