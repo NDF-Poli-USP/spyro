@@ -85,6 +85,56 @@ def build_gmsh_geometry_and_groups(
             gmsh.model.addPhysicalGroup(2, water_tags, name="WaterSurface")
             gmsh.model.addPhysicalGroup(2, clipped_rect_tags, name="SubSurface")
 
+            water_boundary_curves = {
+                tag for dim, tag in gmsh.model.getBoundary(
+                    [(2, tag) for tag in water_tags],
+                    combined=True,
+                    oriented=False,
+                    recursive=False,
+                )
+                if dim == 1
+            }
+            rock_boundary_curves = {
+                tag for dim, tag in gmsh.model.getBoundary(
+                    [(2, tag) for tag in clipped_rect_tags],
+                    combined=True,
+                    oriented=False,
+                    recursive=False,
+                )
+                if dim == 1
+            }
+
+            water_interface_curves = sorted(water_boundary_curves & rock_boundary_curves)
+            water_outer_curves = sorted(water_boundary_curves - set(water_interface_curves))
+            rock_outer_curves = sorted(rock_boundary_curves - set(water_interface_curves))
+
+            tol = 1.0e-6 * max(1.0, abs(length_x), abs(depth_z))
+
+            def _classify_rectangular_curves(curves):
+                top, left, right, bottom = [], [], [], []
+                for curve in curves:
+                    xmin, ymin, _, xmax, ymax, _ = gmsh.model.getBoundingBox(1, curve)
+                    if abs(ymin) <= tol and abs(ymax) <= tol:
+                        top.append(curve)
+                    elif abs(xmin) <= tol and abs(xmax) <= tol:
+                        left.append(curve)
+                    elif abs(xmin - length_x) <= tol and abs(xmax - length_x) <= tol:
+                        right.append(curve)
+                    elif abs(ymin - depth_z) <= tol and abs(ymax - depth_z) <= tol:
+                        bottom.append(curve)
+                return top, left, right, bottom
+
+            water_top, water_left, water_right, _ = _classify_rectangular_curves(water_outer_curves)
+            _, rock_left, rock_right, rock_bottom = _classify_rectangular_curves(rock_outer_curves)
+
+            gmsh.model.addPhysicalGroup(1, water_top, 1, "InternalTop")
+            gmsh.model.addPhysicalGroup(1, water_left, 2, "InternalWaterLeft")
+            gmsh.model.addPhysicalGroup(1, water_right, 3, "InternalWaterRight")
+            gmsh.model.addPhysicalGroup(1, water_interface_curves, 4, "WaterInterface")
+            gmsh.model.addPhysicalGroup(1, rock_left, 5, "InternalRockLeft")
+            gmsh.model.addPhysicalGroup(1, rock_right, 6, "InternalRockRight")
+            gmsh.model.addPhysicalGroup(1, rock_bottom, 7, "InternalBottom")
+
         if padding_type == "rectangular":
             pt_rock_bl = gmsh.model.occ.addPoint(0.0, depth_z, 0.0)
             pt_rock_br = gmsh.model.occ.addPoint(length_x, depth_z, 0.0)
@@ -136,6 +186,24 @@ def build_gmsh_geometry_and_groups(
             gmsh.model.addPhysicalGroup(2, [water_surface], name="WaterSurface")
             gmsh.model.addPhysicalGroup(2, [surf_rock], name="SubSurface")
             gmsh.model.addPhysicalGroup(2, [surf_pad_tr, surf_pad_mr, surf_pad_tl, surf_pad_ml, surf_pad_bl, surf_pad_bc, surf_pad_br], name="Padding")
+
+            gmsh.model.addPhysicalGroup(1, [pad_tl_top], 1, "PaddingTopLeft")
+            gmsh.model.addPhysicalGroup(1, [pad_tl_left, pad_ml_left], 2, "PaddingLeftUpper")
+            gmsh.model.addPhysicalGroup(1, [pad_bl_left], 3, "PaddingLeftLower")
+            gmsh.model.addPhysicalGroup(1, [pad_bl_bot], 4, "PaddingBottomLeft")
+            gmsh.model.addPhysicalGroup(1, [pad_bc_bot], 5, "PaddingBottomCenter")
+            gmsh.model.addPhysicalGroup(1, [pad_br_bot], 6, "PaddingBottomRight")
+            gmsh.model.addPhysicalGroup(1, [pad_br_right], 7, "PaddingRightLower")
+            gmsh.model.addPhysicalGroup(1, [pad_mr_right, pad_tr_right], 8, "PaddingRightUpper")
+            gmsh.model.addPhysicalGroup(1, [pad_tr_top], 9, "PaddingTopRight")
+
+            gmsh.model.addPhysicalGroup(1, [line_top], 10, "InternalTop")
+            gmsh.model.addPhysicalGroup(1, [line_left], 11, "InternalWaterLeft")
+            gmsh.model.addPhysicalGroup(1, [line_right], 12, "InternalWaterRight")
+            gmsh.model.addPhysicalGroup(1, [bottom_curve], 13, "WaterInterface")
+            gmsh.model.addPhysicalGroup(1, [rock_left], 14, "InternalRockLeft")
+            gmsh.model.addPhysicalGroup(1, [rock_right], 15, "InternalRockRight")
+            gmsh.model.addPhysicalGroup(1, [rock_bottom], 16, "InternalBottom")
 
         if padding_type == "hyperelliptical":
 
@@ -218,6 +286,38 @@ def build_gmsh_geometry_and_groups(
             gmsh.model.addPhysicalGroup(2, [water_surface], name="WaterSurface")
             gmsh.model.addPhysicalGroup(2, [surf_rock], name="SubSurface")
             gmsh.model.addPhysicalGroup(2, [surf_pad_TL, surf_pad_ML1, surf_pad_ML2, surf_pad_B_L, surf_pad_B_M, surf_pad_B_R, surf_pad_MR2, surf_pad_MR1, surf_pad_TR], name="Padding")
+
+            gmsh.model.addPhysicalGroup(1, [ray_TL], 1, "PaddingTopLeft")
+            gmsh.model.addPhysicalGroup(1, [ray_TR], 2, "PaddingTopRight")
+            gmsh.model.addPhysicalGroup(
+                1,
+                [arc_TL_WL, arc_WL_ML, arc_ML_BL45],
+                3,
+                "HyperellipseLeft",
+            )
+            gmsh.model.addPhysicalGroup(1, [arc_BL45_BML], 4, "HyperellipseBottomLeft")
+            gmsh.model.addPhysicalGroup(1, [arc_BML_BMR], 5, "HyperellipseBottomCenter")
+            gmsh.model.addPhysicalGroup(1, [arc_BMR_BR45], 6, "HyperellipseBottomRight")
+            gmsh.model.addPhysicalGroup(
+                1,
+                [arc_BR45_MR, arc_MR_WR, arc_WR_TR],
+                7,
+                "HyperellipseRight",
+            )
+
+            gmsh.model.addPhysicalGroup(1, [line_top], 8, "InternalTop")
+            gmsh.model.addPhysicalGroup(1, [line_left], 9, "InternalWaterLeft")
+            gmsh.model.addPhysicalGroup(1, [line_right], 10, "InternalWaterRight")
+            gmsh.model.addPhysicalGroup(1, [bottom_curve], 11, "WaterInterface")
+            gmsh.model.addPhysicalGroup(
+                1, [rock_L_upper, rock_L_lower], 12, "InternalRockLeft"
+            )
+            gmsh.model.addPhysicalGroup(
+                1, [rock_R_upper, rock_R_lower], 13, "InternalRockRight"
+            )
+            gmsh.model.addPhysicalGroup(
+                1, [rock_B_left, rock_B_mid, rock_B_right], 14, "InternalBottom"
+            )
 
             if structured_mesh:
                 len_radial = max(padding_x, padding_z)
