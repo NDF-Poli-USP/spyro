@@ -267,6 +267,36 @@ def build_gmsh_geometry_and_groups(
             gmsh.model.occ.synchronize()
             gmsh.model.addPhysicalGroup(2, [rectangle_tag], name="SubSurface")
 
+            boundary_curves = [
+                tag for dim, tag in gmsh.model.getBoundary(
+                    [(2, rectangle_tag)],
+                    oriented=False,
+                    recursive=False,
+                )
+                if dim == 1
+            ]
+            tol = 1.0e-6 * max(1.0, abs(length_x), abs(depth_z))
+            left_curves = []
+            right_curves = []
+            bottom_curves = []
+            top_curves = []
+
+            for curve in boundary_curves:
+                xmin, ymin, _, xmax, ymax, _ = gmsh.model.getBoundingBox(1, curve)
+                if abs(xmin) <= tol and abs(xmax) <= tol:
+                    left_curves.append(curve)
+                elif abs(xmin - length_x) <= tol and abs(xmax - length_x) <= tol:
+                    right_curves.append(curve)
+                elif abs(ymin - depth_z) <= tol and abs(ymax - depth_z) <= tol:
+                    bottom_curves.append(curve)
+                elif abs(ymin) <= tol and abs(ymax) <= tol:
+                    top_curves.append(curve)
+
+            gmsh.model.addPhysicalGroup(1, left_curves, 1, "Left")
+            gmsh.model.addPhysicalGroup(1, right_curves, 2, "Right")
+            gmsh.model.addPhysicalGroup(1, bottom_curves, 3, "Bottom")
+            gmsh.model.addPhysicalGroup(1, top_curves, 4, "Top")
+
         if padding_type == "rectangular":
             pt_tl = gmsh.model.occ.addPoint(0.0, 0.0, 0.0)
             pt_tr = gmsh.model.occ.addPoint(length_x, 0.0, 0.0)
@@ -324,6 +354,21 @@ def build_gmsh_geometry_and_groups(
 
             gmsh.model.addPhysicalGroup(2, [surf_internal], name="SubSurface")
             gmsh.model.addPhysicalGroup(2, [surf_pad_left, surf_pad_bl, surf_pad_bot, surf_pad_br, surf_pad_right], name="Padding")
+
+            gmsh.model.addPhysicalGroup(1, [pad_top_left], 1, "PaddingTopLeft")
+            gmsh.model.addPhysicalGroup(1, [pad_left], 2, "PaddingLeftUpper")
+            gmsh.model.addPhysicalGroup(1, [pad_corner_bl_left], 3, "PaddingLeftLower")
+            gmsh.model.addPhysicalGroup(1, [pad_corner_bl_bot], 4, "PaddingBottomLeft")
+            gmsh.model.addPhysicalGroup(1, [pad_bot_mid], 5, "PaddingBottomCenter")
+            gmsh.model.addPhysicalGroup(1, [pad_corner_br_bot], 6, "PaddingBottomRight")
+            gmsh.model.addPhysicalGroup(1, [pad_corner_br_right], 7, "PaddingRightLower")
+            gmsh.model.addPhysicalGroup(1, [pad_right], 8, "PaddingRightUpper")
+            gmsh.model.addPhysicalGroup(1, [pad_top_right], 9, "PaddingTopRight")
+
+            gmsh.model.addPhysicalGroup(1, [line_top], 10, "InternalTop")
+            gmsh.model.addPhysicalGroup(1, [line_left], 11, "InternalLeft")
+            gmsh.model.addPhysicalGroup(1, [line_right], 12, "InternalRight")
+            gmsh.model.addPhysicalGroup(1, [line_bottom], 13, "InternalBottom")
 
         if padding_type == "hyperelliptical":
 
@@ -383,6 +428,25 @@ def build_gmsh_geometry_and_groups(
 
             gmsh.model.addPhysicalGroup(2, [surf_rock], name="SubSurface")
             gmsh.model.addPhysicalGroup(2, [surf_pad_left, surf_pad_bot_left, surf_pad_bot_mid, surf_pad_bot_right, surf_pad_right], name="Padding")
+
+            gmsh.model.addPhysicalGroup(1, [ray_TL], 1, "PaddingTopLeft")
+            gmsh.model.addPhysicalGroup(1, [ray_TR], 2, "PaddingTopRight")
+
+            gmsh.model.addPhysicalGroup(1, [arc_TL_BL], 3, "HyperellipseLeft")
+            gmsh.model.addPhysicalGroup(1, [arc_BL_BML], 4, "HyperellipseBottomLeft")
+            gmsh.model.addPhysicalGroup(1, [arc_BML_BMR], 5, "HyperellipseBottomCenter")
+            gmsh.model.addPhysicalGroup(1, [arc_BMR_BR], 6, "HyperellipseBottomRight")
+            gmsh.model.addPhysicalGroup(1, [arc_BR_TR], 7, "HyperellipseRight")
+
+            gmsh.model.addPhysicalGroup(1, [line_top], 8, "InternalTop")
+            gmsh.model.addPhysicalGroup(1, [line_left], 9, "InternalLeft")
+            gmsh.model.addPhysicalGroup(1, [line_right], 10, "InternalRight")
+            gmsh.model.addPhysicalGroup(
+                1,
+                [line_bot_left, line_bot_mid, line_bot_right],
+                11,
+                "InternalBottom",
+            )
 
             if structured_mesh:
                 len_radial = max(padding_x, padding_z)
