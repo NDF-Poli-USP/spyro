@@ -11,6 +11,8 @@ from ..io import ensemble_save
 from ..utils import change_scalar_field_resolution
 from .plot_helpers import _finalize_figure
 
+from ..domains.space import create_function_space
+
 if TYPE_CHECKING:  # Avoinding circular imports lazily
     from ..solvers.wave import Wave
 
@@ -335,3 +337,103 @@ def plot_function(function: Function, **kwargs) -> None:
     contours = tricontourf(function, axes=axes, **kwargs)
     plt.colorbar(contours)
     axes.axis("equal")
+
+def plot_model_jessica(
+    wave: "Wave",
+    filename: str = "model.png",
+    abc_points: Optional[List[Tuple[float, float]]] = None,
+    show: bool = False,
+    flip_axis: bool = True,
+    high_resolution: bool = False,
+    high_resolution_grid_value: float = 0.01,
+) -> None:
+    """..."""
+    from ..solvers.acoustic_solver_construction_no_pml import velocity_fluid
+
+    plt.close()
+    fig = plt.figure(figsize=(9, 9))
+    axes = fig.add_subplot(111)
+
+    is_fluid_solid_coupled = hasattr(wave, "submesh_fluid") and hasattr(wave, "submesh_solid")
+
+    if is_fluid_solid_coupled:
+        if high_resolution:
+            raise NotImplementedError(
+                "high_resolution is not supported for fluid-solid coupled waves."
+            )
+        fluid_c_space = create_function_space(wave.submesh_fluid, "CG", 1)
+        fluid_c_field = Function(fluid_c_space, name="Vp (fluid)").interpolate(velocity_fluid(wave))
+
+        solid_vp_expr = ((wave.lmbda + 2 * wave.mu) / wave.rho) ** 0.5
+        solid_c_space = create_function_space(wave.submesh_solid, "CG", 1)
+        solid_c_field = Function(solid_c_space, name="Vp (solid)").interpolate(solid_vp_expr)
+
+        vp_image = tripcolor(fluid_c_field, axes=axes)
+        tripcolor(solid_c_field, axes=axes)
+    else:
+        if high_resolution:
+            vp_object, _ = change_scalar_field_resolution(wave, high_resolution_grid_value)
+        else:
+            vp_object = wave.initial_velocity_model
+        vp_image = tripcolor(vp_object, axes=axes)
+
+    for source in wave.source_locations:
+        z, x = source
+        plt.scatter(z, x, c="green", marker="*", s=150, label="Source", zorder=5)
+    for receiver in wave.receiver_locations:
+        z, x = receiver
+        plt.scatter(z, x, c="red", marker="v", s=80, label="Receiver (fluid)", zorder=5)
+    solid_receiver_locations = wave.input_dictionary["acquisition"].get("solid_receiver_locations")
+    if is_fluid_solid_coupled and solid_receiver_locations:
+        for receiver in solid_receiver_locations:
+            z, x = receiver
+            plt.scatter(z, x, c="orange", marker="^", s=80, label="Receiver (solid)", zorder=5)
+
+    # legenda sem repetir rótulos duplicados
+    handles, labels = axes.get_legend_handles_labels()
+    unique = dict(zip(labels, handles))
+    axes.legend(unique.values(), unique.keys(), loc="best", fontsize=14)
+
+    if flip_axis:
+        axes.invert_yaxis()
+
+    axes.set_xlabel("Z (km)", fontsize=18)
+
+    if flip_axis:
+        axes.set_ylabel("X (km)", rotation=-90, labelpad=20, fontsize=18)
+        plt.setp(axes.get_xticklabels(), rotation=-90, va="top", ha="center")
+        plt.setp(axes.get_yticklabels(), rotation=-90, va="center", ha="left")
+    else:
+        axes.set_ylabel("X (km)", fontsize=18)
+
+    cbar = plt.colorbar(vp_image, orientation="horizontal")
+    cbar.set_label("Velocity (km/s)", fontsize=18)
+    cbar.ax.tick_params(labelsize=18)
+    if flip_axis:
+        cbar.ax.tick_params(rotation=-90)
+    axes.tick_params(axis="both", labelsize=18)
+    axes.tick_params(axis="y", pad=20)
+    axes.axis("equal")
+
+    if abc_points is not None:
+        zs = []
+        xs = []
+        first = True
+        for point in abc_points:
+            z, x = point
+            zs.append(z)
+            xs.append(x)
+            if first:
+                z_first = z
+                x_first = x
+            first = False
+        zs.append(z_first)
+        xs.append(x_first)
+        plt.plot(zs, xs, "--")
+
+    _finalize_figure(fig, filename=filename, show=show)
+
+    if flip_axis:
+        img = Image.open(filename)
+        img_rotated = img.rotate(90)
+        img_rotated.save(filename)
