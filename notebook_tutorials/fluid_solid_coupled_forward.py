@@ -7,6 +7,10 @@ from spyro.plots.receiver_plots import (
     plot_receiver_response,
     plot_interface_displacement_continuity,
 )
+from spyro.plots.general_plots import (
+    plot_model_jessica,
+    plot_shots,
+)
 
 dictionary = {}
 
@@ -76,11 +80,11 @@ dictionary["visualization"] = {
 dictionary["synthetic_data"] = {
     "type": "object",
     "velocity_fluid": None,
-    "bulk_modulus": 4.0,
+    "bulk_modulus": 2.25,
     "density_fluid": 1.0,
-    "density_solid": 1.0,
+    "density_solid": 2.0,
     "p_wave_velocity": 2.0,
-    "s_wave_velocity": 0.0,
+    "s_wave_velocity": 1.2,
     "real_velocity_file": None,
 }
 
@@ -91,6 +95,14 @@ t_start = time.perf_counter()
 Wave_obj.forward_solve()
 elapsed = time.perf_counter() - t_start
 mem_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+
+plot_model_jessica(Wave_obj, filename="results/model.png", flip_axis=False, show=True)
+last_pressure_data = Wave_obj.get_function().dat.data_ro_with_halos[:]
+# plot_shots(
+#     Wave_obj, contour_lines=100,
+#     vmin=-np.max(last_pressure_data), vmax=np.max(last_pressure_data),
+#     show=True,
+# )
 
 print("Computational cost: Fluid-Solid Coupled")
 print(f"  Elapsed time (s): {elapsed:.2f}")
@@ -106,3 +118,35 @@ plot_receiver_response(
     filename="results/receiver_fluid.png",
     receiver_id_for_title=0,
 )
+
+# solid_data = np.array(Wave_obj.solid_receiver_history)[:, 0, :]
+# plot_displacement_components(
+#     time_vector=np.linspace(0, dictionary["time_axis"]["final_time"], len(solid_data)),
+#     receiver_results=solid_data,
+#     source_type="Ricker",
+#     filename="results/receiver_solid.png",
+# )
+
+import matplotlib.pyplot as plt
+from firedrake import triplot
+
+fig, ax = plt.subplots(figsize=(8, 8))
+triplot(Wave_obj.mesh, axes=ax)
+ax.set_aspect("equal")
+ax.set_xlabel("Z (km)", fontsize=18)
+ax.set_ylabel("X (km)", fontsize=18)
+ax.set_title("Parent mesh", fontsize=22)
+ax.tick_params(axis="both", labelsize=18)
+plt.savefig("results/mesh_only.png", dpi=150)
+plt.close()
+
+fig, ax = plt.subplots(figsize=(8, 8))
+triplot(Wave_obj.submesh_fluid, axes=ax, interior_kw={"edgecolors": "blue"})
+triplot(Wave_obj.submesh_solid, axes=ax, interior_kw={"edgecolors": "orange"})
+ax.set_aspect("equal")
+ax.set_xlabel("Z (km)", fontsize=18)
+ax.set_ylabel("X (km)", fontsize=18)
+ax.set_title("Child submeshes", fontsize=22)
+ax.tick_params(axis="both", labelsize=18)
+plt.savefig("results/mesh_domains.png", dpi=150)
+plt.close()

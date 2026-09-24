@@ -176,8 +176,8 @@ def plot_displacement_components(
 
         if dimension == 2:
             component_data = (
-                (ux, "b", "Ux (displacement in x)", "Displacement Component Ux"),
-                (uy, "r", "Uy (displacement in y)", "Displacement Component Uy"),
+                (ux, "b", "Ux (displacement in x)", "Displacement Component Ux (normalized)"),
+                (uy, "r", "Uz (displacement in z)", "Displacement Component Uz (normalized)"),
             )
         elif dimension == 3:
             component_data = (
@@ -190,24 +190,26 @@ def plot_displacement_components(
             separated_axes, component_data
         ):
             axis.plot(time_vector, component, color=color, linewidth=2, label=label)
-            axis.set_ylabel("Amplitude")
-            axis.set_title(f"{title} - {source_type}")
+            axis.set_ylabel("Amplitude", fontsize=18)
+            axis.set_title(f"{title} - {source_type}", fontsize=22)
             axis.grid(True, alpha=0.3)
-            axis.legend()
+            axis.legend(fontsize=14)
+            axis.tick_params(axis="both", labelsize=18)
 
-        separated_axes[-1].set_xlabel("Time (s)")
+        separated_axes[-1].set_xlabel("Time (s)", fontsize=18)
 
     elif combined:
         fig, combined_ax = plt.subplots(figsize=(12, 6), constrained_layout=True)
         combined_ax.plot(time_vector, ux, color="b", linewidth=2, label="Ux")
-        combined_ax.plot(time_vector, uy, color="r", linewidth=2, label="Uy")
+        combined_ax.plot(time_vector, uy, color="r", linewidth=2, label="Uz")
         if dimension == 3:
             combined_ax.plot(time_vector, uz, color="g", linewidth=2, label="Uz")
-        combined_ax.set_xlabel("Time (s)")
-        combined_ax.set_ylabel("Amplitude")
-        combined_ax.set_title(f"All Displacement Components - {source_type}")
-        combined_ax.legend()
+        combined_ax.set_xlabel("Time (s)", fontsize=18)
+        combined_ax.set_ylabel("Amplitude", fontsize=18)
+        combined_ax.set_title(f"All Displacement Components - {source_type}", fontsize=22)
+        combined_ax.legend(fontsize=14)
         combined_ax.grid(True, alpha=0.3)
+        combined_ax.tick_params(axis="both", labelsize=18)
 
     return _finalize_figure(
         fig,
