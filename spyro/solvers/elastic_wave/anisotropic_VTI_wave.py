@@ -28,7 +28,11 @@ VISCOELASTIC_PARAMETERS = (ViscoelasticMaterialParameter.Q_VP, ViscoelasticMater
                            ViscoelasticMaterialParameter.Q_GAMMA, ViscoelasticMaterialParameter.Q_DELTA,
                            ViscoelasticMaterialParameter.Q_EPSILON)
 
-ANISOTROPIC_PARAMETERS = (AnisotropicMaterialParameter.DELTA, AnisotropicMaterialParameter.EPSILON,)
+ANISOTROPIC_PARAMETERS = (
+    AnisotropicMaterialParameter.DELTA,
+    AnisotropicMaterialParameter.EPSILON,
+    AnisotropicMaterialParameter.GAMMA,
+)
 
 
 def _format_control_parameters(parameters):
@@ -54,6 +58,11 @@ def _format_control_parameters(parameters):
 
 class AnisotropicVTIWave(IsotropicWave):
     '''Anisotropic elastic wave propagator'''
+
+    _physical_parameter_names = (
+        IsotropicWave._physical_parameter_names
+        | frozenset(ANISOTROPIC_PARAMETERS)
+    )
 
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, anisotropy=WaveType.ANISOTROPIC_VTI_ELASTIC, comm=comm)
@@ -221,11 +230,20 @@ class AnisotropicVTIWave(IsotropicWave):
             in, so the value is left as the scalar or ``Constant`` it came
             in as, and this set still carries the data.
             """
-            if space is None or isinstance(value, Function):
+            if value is None or space is None or isinstance(value, Function):
                 return value
             return Function(space, name=parameter.value).interpolate(value)
 
         self.viscoelastic = self.input_dictionary.get("viscoelastic", False)
+        self.delta = as_function(
+            self.delta, AnisotropicMaterialParameter.DELTA,
+        )
+        self.epsilon = as_function(
+            self.epsilon, AnisotropicMaterialParameter.EPSILON,
+        )
+        self.gamma = as_function(
+            self.gamma, AnisotropicMaterialParameter.GAMMA,
+        )
 
         if parameterization is ElasticMaterialParameterization.LAME:
             self.rho = as_function(self.rho, ElasticMaterialParameter.DENSITY)
@@ -262,12 +280,16 @@ class AnisotropicVTIWave(IsotropicWave):
                 f"{parameterization}.",
             )
 
+        self._control_parameterization = parameterization
         add = self._physical_parameters.add
         add(ElasticMaterialParameter.DENSITY, self.rho)
         add(ElasticMaterialParameter.LAMBDA, self.lmbda)
         add(ElasticMaterialParameter.MU, self.mu)
         add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
         add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
+        add(AnisotropicMaterialParameter.DELTA, self.delta)
+        add(AnisotropicMaterialParameter.EPSILON, self.epsilon)
+        add(AnisotropicMaterialParameter.GAMMA, self.gamma)
 
     def get_control_parameters(self):
         """Return the active isotropic elastic material controls.

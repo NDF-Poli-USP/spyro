@@ -19,6 +19,7 @@ from .solvers.elastic_wave.anisotropic_VTI_wave import AnisotropicVTIWave
 from .solvers.elastic_wave.anisotropic_TTI_wave import AnisotropicTTIWave
 from .solvers.inversion import FullWaveformInversion
 from .utils.typing import (AcousticMaterialParameter,
+                           AnisotropicMaterialParameter,
                            ElasticMaterialParameter,
                            ElasticMaterialParameterization, WaveType)
 from .utils.physical_parameters import PhysicalParameters
@@ -62,6 +63,7 @@ __all__ = [
     "AcousticWave",
     "FullWaveformInversion",
     "AcousticMaterialParameter",
+    "AnisotropicMaterialParameter",
     "ElasticMaterialParameter",
     "PhysicalParameters",
     "ElasticMaterialParameterization",
