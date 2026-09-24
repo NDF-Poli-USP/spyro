@@ -21,7 +21,7 @@ receiver_locations = [
 
 final_time = 1.5
 dt = 1.0e-4
-c = 3.0
+c = 3.5
 mesh_filename = f"meshes/example_mesh_2D{c:.1f}".replace(".", "") + ".msh"
 
 dictionary = {

@@ -106,39 +106,39 @@ ml3_results = ml3_results[np.argsort(ml3_results[:, 0])]
 ml4_results = ml4_results[np.argsort(ml4_results[:, 0])]
 ml6_results = ml6_results[np.argsort(ml6_results[:, 0])]
 
-
+# Have to divide cpw results by 2 if I'm using f = 2*fp
 plt.figure(figsize=(8, 6))
 
 plt.plot(
-    sem4_results[:, 0],
+    sem4_results[:, 0]/2.,
     sem4_results[:, 1],
     "o-",
     label="SEM4",
 )
 
 plt.plot(
-    ml2_results[:, 0],
+    ml2_results[:, 0]/2.,
     ml2_results[:, 1],
     "o-",
     label="ML2",
 )
 
 plt.plot(
-    ml3_results[:, 0],
+    ml3_results[:, 0]/2.,
     ml3_results[:, 1],
     "o-",
     label="ML3",
 )
 
 plt.plot(
-    ml4_results[:, 0],
+    ml4_results[:, 0]/2.,
     ml4_results[:, 1],
     "o-",
     label="ML4",
 )
 
 plt.plot(
-    ml6_results[:, 0],
+    ml6_results[:, 0]/2.,
     ml6_results[:, 1],
     "o-",
     label="ML6",
