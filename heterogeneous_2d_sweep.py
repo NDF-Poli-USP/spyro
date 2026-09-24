@@ -14,18 +14,15 @@ source_locations = [
     (-0.5, 5.0)
 ]
 
-# receiver_locations = [
-#     (-0.5, x)
-#     for x in np.arange(0.5, 9.51, 0.1)
-# ]
-
 receiver_locations = [
     (-3.0, x)
-    for x in np.arange(0.5, 9.51, 0.1)
+    for x in np.arange(3.0, 7.0, 0.1)
 ]
 
-final_time = 1.0
+final_time = 1.5
 dt = 1.0e-4
+c = 3.0
+mesh_filename = f"meshes/example_mesh_2D{c:.1f}".replace(".", "") + ".msh"
 
 dictionary = {
     "options": {
@@ -41,7 +38,7 @@ dictionary = {
         "length_z": 5.0,
         "length_x": 10.0,
         "mesh_type": "file",
-        "mesh_file": "example_mesh_2D.msh",
+        "mesh_file": mesh_filename,
     },
     "acquisition": {
         "source_type": "ricker",
@@ -88,11 +85,6 @@ vp, vs, rho = get_velocities(wave)
 
 
 def get_numerical_result(wave):
-    # wave.set_mesh(
-    #     input_mesh_parameters={
-    #         "mesh_file": "example_mesh_2D.msh",
-    #     }
-    # )
     wave._initialize_model_parameters()
     wave.rho = rho
     wave.c_s = vs
@@ -104,12 +96,15 @@ def get_numerical_result(wave):
 
 
 numerical_result = get_numerical_result(wave)
+result_filename = f"2dhetsol{c:.1f}".replace(".", "") + ".npy"
+np.save(result_filename, numerical_result)
 
 plt.close()
-rec_id = 10
+rec_id = round(len(receiver_locations)/2)
 time_vector = spyro.utils.get_time_vector(wave)
 plt.plot(time_vector, wave.forward_solution_receivers[:, rec_id, 1], label='numerical')
 plt.legend()
-plt.savefig("debug.png")
+plot_filename = f"2dhetsol{c:.1f}".replace(".", "") + ".png"
+plt.savefig(plot_filename)
 
 print("END")
