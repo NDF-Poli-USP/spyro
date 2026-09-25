@@ -52,7 +52,6 @@ def isotropic_elastic_without_pml(wave):
         lin_var, solver_parameters=solver_parameters
     )
 
-
 def elastic_without_pml(wave):
 
     V = wave.function_space
@@ -66,7 +65,7 @@ def elastic_without_pml(wave):
 
     dt = Constant(wave.dt)
     rho = wave.rho
-
+        
     dim = V.mesh().topological_dimension()
 
     Elastic_C = wave.Elastic_C
@@ -135,7 +134,6 @@ def elastic_without_pml(wave):
         lin_var, solver_parameters=solver_parameters
     )
 
-
 def viscoelastic_without_pml(wave):
     print("Viscoelastic Maxwell GSLS")
 
@@ -150,10 +148,10 @@ def viscoelastic_without_pml(wave):
 
     dt = Constant(wave.dt)
     rho = wave.rho
-
+    
     zeta_list = wave.zeta_list
     y_list = wave.y_list
-
+    
     dim = V.mesh().topological_dimension()
     voigt_size = 3 if dim == 2 else 6
 
@@ -172,12 +170,12 @@ def viscoelastic_without_pml(wave):
 
     def tensor_to_voigt(T):
         if dim == 2:
-            return as_vector([T[0, 0], T[1, 1], T[0, 1]])
+            return as_vector([T[0, 0], T[1, 1], T[0, 1] + T[1, 0]])
         else:
             return as_vector([T[0, 0], T[1, 1], T[2, 2],
-                              T[1, 2],
-                              T[0, 2],
-                              T[0, 1]])
+                              T[1, 2] + T[2, 1],
+                              T[0, 2] + T[2, 0],
+                              T[0, 1] + T[1, 0]])
 
     F_m = (rho / (dt**2)) * dot(u - 2*u_n + u_nm1, v) * dx(**quad_rule)
 
@@ -187,7 +185,7 @@ def viscoelastic_without_pml(wave):
     e_v = strain_vector_from_displacement(v)
 
     e_mem_components = [0.0] * voigt_size
-
+        
     if len(zeta_list) > 0:
         for i in range(len(zeta_list)):
             zeta_voigt = tensor_to_voigt(zeta_list[i])
@@ -224,14 +222,5 @@ def viscoelastic_without_pml(wave):
         lin_var, solver_parameters=solver_parameters
     )
 
-
 def isotropic_elastic_with_pml():
-    raise NotImplementedError
-
-
-def elastic_with_pml():
-    raise NotImplementedError
-
-
-def viscoelastic_with_pml():
     raise NotImplementedError
