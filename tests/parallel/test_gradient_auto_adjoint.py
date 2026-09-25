@@ -26,6 +26,7 @@ import firedrake as fire
 import firedrake.adjoint as fire_ad
 import spyro
 import pytest
+from pyadjoint import taylor_test
 
 from checkpoint_schedules import SingleMemoryStorageSchedule
 
@@ -226,6 +227,15 @@ def _verify_ensemble_gradient(Wave_obj_guess, checkpointing):
     assert isinstance(
         reduced_functional, fire_ad.EnsembleReducedFunctional
     ), "Reduced functional must be an EnsembleReducedFunctional."
+    parameter, = Wave_obj_guess.automated_adjoint.control_parameter_names
+    stage_functional = (
+        Wave_obj_guess.automated_adjoint.create_partial_reduced_functional(
+            Wave_obj_guess.functional_value,
+            [parameter],
+        )
+    )
+    assert isinstance(stage_functional, fire_ad.EnsembleReducedFunctional)
+    assert stage_functional.controls[0] is reduced_functional.controls[0]
 
     if checkpointing:
         assert isinstance(
@@ -234,7 +244,7 @@ def _verify_ensemble_gradient(Wave_obj_guess, checkpointing):
         )
 
     # The ensemble-summed gradient is a Function in the control space.
-    dJ = Wave_obj_guess.automated_adjoint.compute_gradient()
+    dJ = stage_functional.derivative(apply_riesz=True)
     assert isinstance(dJ, fire.Function)
     assert dJ.dat.data.shape == Wave_obj_guess.c.dat.data.shape
 
@@ -244,9 +254,7 @@ def _verify_ensemble_gradient(Wave_obj_guess, checkpointing):
     # Let taylor_test compute the directional derivative from the
     # EnsembleReducedFunctional itself so the ensemble reduction stays
     # consistent (do not pass dJdm here).
-    rate = Wave_obj_guess.automated_adjoint.verify_gradient(
-        Wave_obj_guess.c, direction=direction
-    )
+    rate = taylor_test(stage_functional, Wave_obj_guess.c, direction)
     print(f"Automated-adjoint Taylor convergence rate: {rate}", flush=True)
     assert rate > 1.9, (
         "Automated adjoint gradient verification failed: Taylor convergence "

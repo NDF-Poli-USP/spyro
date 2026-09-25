@@ -118,7 +118,7 @@ def build_elastic_dictionary(material):
 def test_fwi_automated_adjoint(tmp_path, monkeypatch):
     """Invert an acoustic velocity model.
 
-    A fixed iteration budget is how FWI is normally run, and TAO reports that
+    A fixed iteration limit is how FWI is normally run, and TAO reports that
     as a failure to converge; the driver has to hand back the last iterate
     rather than let the exception through.
     """
@@ -216,3 +216,118 @@ def test_fwi_elastic_automated_adjoint(tmp_path, monkeypatch):
         result, (fwi.wave.rho, fwi.wave.c, fwi.wave.c_s),
     ):
         assert np.allclose(control.dat.data_ro, parameter.dat.data_ro)
+
+
+@pytest.mark.newer_firedrake
+def test_fwi_elastic_stages(tmp_path, monkeypatch):
+    """One ``run_fwi`` in stages, each moving only some of the controls.
+
+    The tape is recorded once with every control. The first stage moves
+    the s-wave velocity alone and the second the p-wave velocity alone,
+    from where the first left the s-wave velocity; the density is moved by
+    neither. The iteration count and the functional history run through
+    both stages as one run.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    fwi = spyro.FullWaveformInversion(
+        dictionary=build_elastic_dictionary(ELASTIC_GUESS),
+        wave_class=spyro.IsotropicWave,
+    )
+    fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.25})
+    fwi.set_real_model({
+        Parameter(name): value for name, value in ELASTIC_REAL.items()
+    })
+    fwi.generate_real_shot_record(save_shot_record=False)
+    fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
+
+    # Density is inactive and remains fixed even outside its supplied bounds.
+    bounds = dict(
+        vmin=[ELASTIC_GUESS["density"] + 0.5, 1.5, 0.5],
+        vmax=[3.0, 4.0, 2.5],
+    )
+    settings = dict(adjoint_type=AdjointType.AUTOMATED_ADJOINT, **bounds)
+    S, P = Parameter.S_WAVE_VELOCITY, Parameter.P_WAVE_VELOCITY
+
+    from spyro.tools import optimization
+
+    real_minimize = optimization.minimize_with_tao
+    calls = []
+
+    def observed_minimize(reduced_functional: object, **kwargs: object) -> list:
+        automated_adjoint = fwi.wave.automated_adjoint
+        complete = automated_adjoint.reduced_functional
+        control_names = automated_adjoint.control_parameter_names
+        calls.append({
+            "active": [
+                name for name, complete_control in zip(
+                    control_names, complete.controls,
+                )
+                if any(
+                    control is complete_control
+                    for control in reduced_functional.controls
+                )
+            ],
+            "bounds": len(kwargs["bounds"]),
+            "iterations": kwargs["options"]["tao_max_it"],
+            "complete_state": {
+                name: np.array(control.tape_value().dat.data_ro, copy=True)
+                for name, control in zip(control_names, complete.controls)
+            },
+        })
+        return real_minimize(reduced_functional, **kwargs)
+
+    monkeypatch.setitem(
+        optimization.__dict__, "minimize_with_tao", observed_minimize,
+    )
+
+    # A stage without its own limit takes maxiter. Explicit stage limits take
+    # precedence over a global tao_max_it option.
+    rho, cp, cs = fwi.run_fwi(
+        stages=[S, (P, 1)], maxiter=2,
+        tao_options={"tao_max_it": 99}, **settings,
+    )
+
+    assert [call["active"] for call in calls] == [[S], [P]]
+    assert [call["bounds"] for call in calls] == [1, 1]
+    assert [call["iterations"] for call in calls] == [2, 1]
+    assert not np.allclose(
+        calls[1]["complete_state"][S], ELASTIC_GUESS["s_wave_velocity"],
+    ), "the second stage did not see the first stage's result"
+    assert fwi.current_iteration == 3
+    assert len(fwi.functional_history) == 4
+    assert fwi.functional_history[-1] < fwi.functional_history[0]
+    assert np.array_equal(
+        rho.dat.data_ro, np.full_like(rho.dat.data_ro, ELASTIC_GUESS["density"]),
+    ), "the density moved although no stage moves it"
+    for control, start in ((cp, ELASTIC_GUESS["p_wave_velocity"]),
+                           (cs, ELASTIC_GUESS["s_wave_velocity"])):
+        assert not np.allclose(control.dat.data_ro, start), (
+            f"{control.name()} did not move in its stage"
+        )
+
+
+def test_fwi_stages_verification():
+    """Stage syntax is normalized before an expensive forward recording."""
+    normalize = spyro.FullWaveformInversion._stages
+    S, P = Parameter.S_WAVE_VELOCITY, Parameter.P_WAVE_VELOCITY
+
+    assert normalize([S, (P, 2), ((S, P), 3)], 4) == [
+        ({S}, 4), ({P}, 2), ({S, P}, 3),
+    ]
+    with pytest.raises(ValueError, match="stages is empty"):
+        normalize([], 4)
+    with pytest.raises(ValueError, match="at least one control"):
+        normalize([([], 1)], 4)
+    with pytest.raises(TypeError, match="enum"):
+        normalize(["s_wave_velocity"], 4)
+    with pytest.raises(ValueError, match="positive"):
+        normalize([(S, 0)], 4)
+
+
+def test_fwi_stages_require_automated_adjoint():
+    """Staged optimization is unavailable to the implemented adjoint."""
+    fwi = spyro.FullWaveformInversion(dictionary=build_dictionary())
+
+    with pytest.raises(ValueError, match="AUTOMATED_ADJOINT"):
+        fwi.run_fwi(stages=[Parameter.S_WAVE_VELOCITY])

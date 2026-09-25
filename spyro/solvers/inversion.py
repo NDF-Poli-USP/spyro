@@ -1,6 +1,7 @@
 import firedrake as fire
 import warnings
 import inspect
+from enum import Enum
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI
 import numpy as np
@@ -13,7 +14,9 @@ from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..utils.typing import AdjointType, WaveType
-from ..utils.physical_parameters import PhysicalParameters, as_list
+from ..utils.physical_parameters import (
+    PhysicalParameters, as_list, _as_parameter,
+)
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import parallel_print
@@ -1652,7 +1655,23 @@ class FullWaveformInversion:
             vmax : float or array_like, optional
                 Upper bound for the control parameter. Default is 6.0.
             maxiter : int, optional
-                Maximum number of iterations. Default is 20.
+                Maximum number of iterations. Default is 20. With
+                ``stages``, the maximum number of iterations for a stage that
+                does not specify its own limit.
+            stages : list, optional
+                Successive optimization stages. Each stage exposes only its
+                listed controls to TAO. For example,
+                ``[Parameter.S_WAVE_VELOCITY, Parameter.P_WAVE_VELOCITY]``
+                runs ``maxiter`` iterations for each control in turn, while
+                ``[(Parameter.S_WAVE_VELOCITY, 10), ...]`` specifies a limit
+                per stage. A stage can expose multiple controls::
+
+                    stages=[((Parameter.S_WAVE_VELOCITY,
+                              Parameter.P_WAVE_VELOCITY), 10)]
+
+                Each stage starts from the complete model produced by the
+                previous one. Its iteration limit takes precedence over
+                ``tao_options["tao_max_it"]``.
             scipy_options : dict, optional
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
@@ -1665,8 +1684,8 @@ class FullWaveformInversion:
                 is ``maxiter``: the convergence *tolerances* are left at
                 PETSc's own, and ``tao_gatol`` and ``tao_grtol`` of 1e-8 are
                 far below the functional an inversion of this kind starts
-                from. A run that should stop on the gradient instead of on a
-                budget sets them here::
+                from. A run that should stop on the gradient instead of at
+                the iteration limit sets them here::
 
                     tao_options={"tao_gatol": 1e-6, "tao_grtol": 1e-6}
 
@@ -1724,6 +1743,7 @@ class FullWaveformInversion:
         --------
         >>> fwi.run_fwi(maxiter=100, vmin=1.5, vmax=5.0)
         """
+        stages = kwargs.pop("stages", None)
         maxiter = kwargs.pop("maxiter", 20)
         parameters = {
             "vmin": kwargs.pop("vmin", 1.429),
@@ -1763,6 +1783,13 @@ class FullWaveformInversion:
                 )
         parameters.update(kwargs)
 
+        if stages is not None:
+            if self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
+                raise ValueError(
+                    "stages are run by the automated adjoint's optimizer, so "
+                    "they need adjoint_type=AdjointType.AUTOMATED_ADJOINT.",
+                )
+            stages = self._stages(stages, maxiter)
         if (
             self.adjoint_type != AdjointType.AUTOMATED_ADJOINT
             and self.wave_type is not WaveType.ISOTROPIC_ACOUSTIC
@@ -1780,7 +1807,9 @@ class FullWaveformInversion:
             # TAO optimizes the controls themselves, and they come back
             # keyed by the parameter each one belongs to.
             self.set_guess_control(
-                self._run_fwi_tao(parameters, tao_options=tao_options),
+                self._run_fwi_tao(
+                    parameters, tao_options=tao_options, stages=stages,
+                ),
             )
             self.control_parameter_result = self.control_parameters
             result = self.control_parameter_result
@@ -1813,7 +1842,7 @@ class FullWaveformInversion:
         np.save("result", self._flatten_control(self.control_parameter_result))
         return result
 
-    def _run_fwi_tao(self, parameters, tao_options=None):
+    def _run_fwi_tao(self, parameters, tao_options=None, stages=None):
         """Optimize the recorded reduced functional with PETSc TAO.
 
         The forward solve is recorded once, here, and every functional value
@@ -1835,14 +1864,24 @@ class FullWaveformInversion:
             ``vmax`` and ``maxiter`` are read from it.
         tao_options : dict, optional
             PETSc options merged over the defaults, which set only the solver
-            type and the iteration budget. See :meth:`run_fwi` for what that
-            leaves to PETSc.
+            type and the maximum number of iterations. See :meth:`run_fwi` for
+            what that leaves to PETSc.
+        stages : list, optional
+            Stages moving only some of the controls, run one after the other
+            on the one recording; see :meth:`run_fwi`. Each listed stage builds
+            a reduced functional containing only its active controls. ``None``
+            uses the complete reduced functional for ``maxiter`` iterations.
 
         Returns
         -------
         PhysicalParameters
             The controls the optimization stopped at, keyed by the parameter
             each one belongs to.
+
+        Raises
+        ------
+        ValueError
+            If a stage names a parameter that is not a control.
 
         See Also
         --------
@@ -1870,31 +1909,158 @@ class FullWaveformInversion:
 
         # One bound pair per control, not per degree of freedom: TAO takes the
         # bounds as Function objects (or scalars broadcast over them), while
-        # L-BFGS-B takes a pair for each entry of the flattened control. The
-        # controls of the reduced functional, rather than this driver's, are
-        # what the pairs are matched against: they are the ones TAO is given.
+        # L-BFGS-B takes a pair for each entry of the flattened control.
         adjoint_controls = [
             control.control for control in reduced_functional.controls
         ]
         lower = tao_bounds(parameters["vmin"], adjoint_controls)
         upper = tao_bounds(parameters["vmax"], adjoint_controls)
-        options = {
-            "tao_type": "blmvm",
-            "tao_max_it": parameters["maxiter"],
-        }
-        if tao_options:
-            options.update(tao_options)
+        tao_options = tao_options or {}
 
-        solution = minimize_with_tao(
-            reduced_functional,
-            bounds=list(zip(lower, upper)),
-            comm=self.wave.comm.comm,
-            options=options,
-            record=self._record_iterate,
-        )
-        # The tape knows which parameter each control is; the optimizer only
-        # ever saw a vector, and hands back the same order it was given.
-        return automated_adjoint.label_derivatives(solution)
+        if stages is None:
+            options = {
+                "tao_type": "blmvm",
+                "tao_max_it": parameters["maxiter"],
+                **tao_options,
+            }
+            solution = minimize_with_tao(
+                reduced_functional,
+                bounds=list(zip(lower, upper)),
+                comm=self.wave.comm.comm,
+                options=options,
+                record=self._record_iterate,
+            )
+            return automated_adjoint.label_derivatives(solution)
+
+        control_names = list(automated_adjoint.control_parameter_names)
+        complete_controls = dict(zip(
+            control_names, reduced_functional.controls,
+        ))
+        lower_by_name = dict(zip(control_names, lower))
+        upper_by_name = dict(zip(control_names, upper))
+        for moving, _ in stages:
+            unknown = sorted(
+                moving - set(control_names), key=lambda name: name.value,
+            )
+            if unknown:
+                raise ValueError(
+                    f"A stage moves {[name.value for name in unknown]}, which "
+                    "are not controls of this inversion; the controls are "
+                    f"{[name.value for name in control_names]}.",
+                )
+
+        # The optimizer may mutate the fields it is handed, so the state
+        # between stages is held in defensive copies rather than aliases to
+        # either the tape checkpoints or a TAO iterate.
+        state = PhysicalParameters(
+            (name, complete_controls[name].tape_value())
+            for name in control_names
+        ).copy()
+
+        # Every stage gets a new TAO solver and a reduced functional exposing
+        # only its active controls. Omitted controls remain values on the
+        # complete recorded problem and are synchronized explicitly after
+        # each solve. Iterations are numbered through all stages as one run.
+        done = 0
+        for moving, iterations in stages:
+            active_names = [name for name in control_names if name in moving]
+            stage_functional = automated_adjoint.create_partial_reduced_functional(
+                self.wave.functional_value,
+                active_names,
+            )
+            stage_start_state = state.copy()
+            offset = done
+
+            def record(iteration, functional, active_values):
+                nonlocal done
+                done = offset + iteration
+                complete = stage_start_state.copy()
+                for name, value in zip(active_names, active_values):
+                    complete.update(name, value)
+                self._record_iterate(
+                    done,
+                    functional,
+                    [complete[name] for name in control_names],
+                )
+
+            stage_solution = minimize_with_tao(
+                stage_functional,
+                bounds=[
+                    (lower_by_name[name], upper_by_name[name])
+                    for name in active_names
+                ],
+                comm=self.wave.comm.comm,
+                options={
+                    "tao_type": "blmvm",
+                    **tao_options,
+                    # The limit declared by the stage is authoritative.
+                    "tao_max_it": iterations,
+                },
+                record=record,
+            )
+            for name, value in zip(active_names, stage_solution):
+                state.update(name, value)
+            for name in control_names:
+                complete_controls[name].update(state[name])
+
+        return state
+
+    @staticmethod
+    def _stages(stages, maxiter):
+        """Normalize the stages of a staged inversion.
+
+        Parameters
+        ----------
+        stages : iterable
+            As given to :meth:`run_fwi`: for each stage, the material
+            parameter it moves, or an iterable of them, alone or paired with
+            its iteration limit.
+        maxiter : int
+            Maximum number of iterations for a stage without its own limit.
+
+        Returns
+        -------
+        list of (set of enum.Enum, int)
+            The parameters each stage moves and its iteration limit.
+
+        Raises
+        ------
+        ValueError
+            If there is no stage, a stage has no controls, or an iteration
+            limit is not a positive integer.
+        TypeError
+            If what a stage moves is not given by material parameters.
+        """
+        normalized = []
+        for stage in stages:
+            # A pair ends in an iteration limit, an iterable of parameters in a
+            # parameter; the enums are strings, so a bare one must not be
+            # read as a sequence of characters either.
+            if (
+                isinstance(stage, tuple) and len(stage) == 2
+                and not isinstance(stage[1], Enum)
+            ):
+                moving, iterations = stage
+            else:
+                moving, iterations = stage, maxiter
+            if isinstance(moving, Enum):
+                moving = [moving]
+            moving = {_as_parameter(name) for name in moving}
+            if not moving:
+                raise ValueError("A stage must move at least one control.")
+            if (
+                isinstance(iterations, bool)
+                or not isinstance(iterations, (int, np.integer))
+                or iterations < 1
+            ):
+                raise ValueError(
+                    "A stage's iteration limit must be a positive integer; "
+                    f"received {iterations!r}.",
+                )
+            normalized.append((moving, int(iterations)))
+        if not normalized:
+            raise ValueError("stages is empty; give at least one stage.")
+        return normalized
 
     def _record_iterate(self, iteration, functional, controls):
         """Log one iterate the optimizer settled on.
