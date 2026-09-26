@@ -3,12 +3,15 @@ import firedrake as fire
 from .wave import Wave
 from .acoustic_elastic_solver_no_pml import construct_acoustic_elastic
 from .acoustic_elastic_solver_monolithic import construct_acoustic_elastic_monolithic
+from .acoustic_elastic_solver_uu import construct_displacement_displacement
 from ..utils.typing import override, WaveType
 from ..domains.space import create_function_space
 from ..domains.quadrature import quadrature_rules
 from ..receivers.Receivers import Receivers
 
-# from ..plots.general_plots import plot acoustic_elastic_snapshot # to implement
+import numpy as np
+
+FLUID_FORMULATIONS = ("pressure", "displacement")
 
 
 def _extract_interface_markers(parent_mesh, child_mesh):
@@ -18,6 +21,13 @@ def _extract_interface_markers(parent_mesh, child_mesh):
 
 
 class AcousticElasticWave(Wave):
+    """Acoplamento fluido-sólido.
+
+    fluid_formulation (dictionary["options"]):
+      "pressure"     -> P-us (fluido escalar, pressão)           [padrão]
+      "displacement" -> u_f-u_s (fluido vetorial, deslocamento)
+    """
+
     def __init__(self, dictionary, comm=None):
         self.fluid_id = 1
         self.solid_id = 2
@@ -26,8 +36,21 @@ class AcousticElasticWave(Wave):
         self.fluid_displacement_history = []
         self._vf_normal = None
         self._uf_normal = None
+        self.fluid_pressure_history = []
+        self.record_fluid_pressure = False
+        self._uu_step = 0
+        self.record_fluid_displacement = False        
 
         self.use_monolithic = False
+
+        # Precisa existir ANTES do super().__init__ (que monta o espaço).
+        options = dictionary.get("options", {})
+        self.fluid_formulation = options.get("fluid_formulation", "pressure")
+        if self.fluid_formulation not in FLUID_FORMULATIONS:
+            raise ValueError(
+                f"fluid_formulation inválida: {self.fluid_formulation!r}. "
+                f"Use uma de {FLUID_FORMULATIONS}."
+            )
 
         super().__init__(dictionary, comm=comm)
         self.wave_type = WaveType.NONE
@@ -49,6 +72,17 @@ class AcousticElasticWave(Wave):
         self.sigma_xx_function = fire.Function(self.sigma_xx_space, name="SigmaXX")
         self.field_logger.add_field("sigma_xx", "SigmaXX", self._compute_sigma_xx)
 
+        if self.fluid_is_vector:
+            self.fluid_pressure_space = fire.FunctionSpace(
+                self.submesh_fluid, "CG", self.degree
+            )
+            self.fluid_pressure_function = fire.Function(
+                self.fluid_pressure_space, name="FluidPressure"
+            )
+            self.field_logger.add_field(
+                "fluid_pressure", "FluidPressure", self._compute_fluid_pressure
+            )
+
         self.K = None
         self.rho_fluid = None
         self.c = None  # fluid
@@ -59,6 +93,12 @@ class AcousticElasticWave(Wave):
 
         self._setup_snapshots(dictionary)
 
+    # ------------------------------------------------------------------
+    @property
+    def fluid_is_vector(self):
+        return self.fluid_formulation == "displacement"
+
+    # ------------------------------------------------------------------
     def _mark_mesh_regions(self):
         if self.interface_x is None:
             raise ValueError(
@@ -121,14 +161,17 @@ class AcousticElasticWave(Wave):
         self._build_submeshes()
         self._build_measures()
 
-        self.scalar_function_space = create_function_space(
-            self.submesh_fluid, self.method, self.degree, dim=1
+        fluid_dim = self.dimension if self.fluid_is_vector else 1
+        self.fluid_function_space = create_function_space(
+            self.submesh_fluid, self.method, self.degree, dim=fluid_dim
         )
-        self.vector_function_space = create_function_space(
+        self.solid_function_space = create_function_space(
             self.submesh_solid, self.method, self.degree, dim=self.dimension
         )
-        mixed_space = self.scalar_function_space * self.vector_function_space
-        return mixed_space
+        # compatibilidade com solvers/plots antigos
+        self.scalar_function_space = self.fluid_function_space
+        self.vector_function_space = self.solid_function_space
+        return self.fluid_function_space * self.solid_function_space
 
     def _setup_solid_receivers(self):
         solid_locs = self.input_dictionary["acquisition"].get(
@@ -158,6 +201,8 @@ class AcousticElasticWave(Wave):
         self._build_function_space()
         self._setup_solid_receivers()
         self._map_sources_and_receivers()
+        if self.fluid_is_vector:
+            self._fix_moment_source_tabulations()
         self.mesh_ops.func_space_type = "mixed"
         self.mesh_parameters.boundary_idx_map = {}
 
@@ -189,6 +234,21 @@ class AcousticElasticWave(Wave):
         self.mu = fire.Constant(mu_value)
         self.lmbda = fire.Constant(lmbda_value)
 
+        if self.fluid_is_vector:
+            # u_f-u_s precisa de rho_f e kappa explicitamente.
+            if self.rho_fluid is None:
+                raise ValueError(
+                    "synthetic_data['density_fluid'] é obrigatório com "
+                    "fluid_formulation='displacement'."
+                )
+            if self.K is None:
+                if self.c is None:
+                    raise ValueError(
+                        "Informe 'bulk_modulus' ou 'velocity_fluid' para o fluido."
+                    )
+                self.K = fire.Constant(rho_fluid_value * velocity_fluid_value**2)
+
+    @override
     @override
     def matrix_building(self):
         self.current_time = 0.0
@@ -196,16 +256,38 @@ class AcousticElasticWave(Wave):
         self.X_n = fire.Function(self.function_space)
         self.X_np1 = fire.Function(self.function_space)
 
-        if self.use_monolithic:
+        if self.fluid_is_vector:
+            if self.use_monolithic:
+                raise NotImplementedError(
+                    "Monolítico ainda não implementado para u_f-u_s."
+                )
+            construct_displacement_displacement(self)
+
+            # Fonte explosiva (amplitude = I): tempo = integral dupla do wavelet
+            # do próprio Spyro (Cao et al., eqs. 3-4). A flag evita integrar
+            # de novo se forward_solve for chamado mais de uma vez.
+            if not getattr(self, "_wavelet_integrated", False):
+                w = np.asarray(self.sources.wavelet)
+                from scipy.integrate import cumulative_trapezoid
+                w1 = cumulative_trapezoid(w, dx=self.dt, initial=0.0)
+                self.sources.wavelet = cumulative_trapezoid(w1, dx=self.dt, initial=0.0)
+                self._wavelet_integrated = True
+
+            self._uu_step = 0
+
+        elif self.use_monolithic:
             construct_acoustic_elastic_monolithic(self)
         else:
             construct_acoustic_elastic(self)
 
-        self.gradP_space = fire.VectorFunctionSpace(self.submesh_fluid, "CG", self.degree)
-        self.gradP_function = fire.Function(self.gradP_space, name="gradP")
-        n_recv = len(self.receiver_locations) if self.receiver_locations else 0
-        self._vf_normal = [0.0] * n_recv
-        self._uf_normal = [0.0] * n_recv
+        if not self.fluid_is_vector:
+            self.gradP_space = fire.VectorFunctionSpace(
+                self.submesh_fluid, "CG", self.degree
+            )
+            self.gradP_function = fire.Function(self.gradP_space, name="gradP")
+            n_recv = len(self.receiver_locations) if self.receiver_locations else 0
+            self._vf_normal = [0.0] * n_recv
+            self._uf_normal = [0.0] * n_recv
 
     @override
     def _get_vstate(self):
@@ -233,6 +315,7 @@ class AcousticElasticWave(Wave):
 
     @override
     def get_forward_solution_receivers(self):
+        # pressure: P nos receptores | displacement: u_f (vetor) nos receptores
         data_with_halos = self.X_n.sub(0).dat.data_ro_with_halos[:]
         return self.receivers.interpolate(data_with_halos)
 
@@ -262,7 +345,7 @@ class AcousticElasticWave(Wave):
             self.quadrature_rule_fluid,
             self.stiffness_quadrature_rule_fluid,
             self.surface_quadrature_rule_fluid,
-        ) = quadrature_rules(self.scalar_function_space)
+        ) = quadrature_rules(self.fluid_function_space)
         for qr in (
             self.quadrature_rule_fluid,
             self.stiffness_quadrature_rule_fluid,
@@ -274,7 +357,7 @@ class AcousticElasticWave(Wave):
             self.quadrature_rule_solid,
             self.stiffness_quadrature_rule_solid,
             self.surface_quadrature_rule_solid,
-        ) = quadrature_rules(self.vector_function_space)
+        ) = quadrature_rules(self.solid_function_space)
         for qr in (
             self.quadrature_rule_solid,
             self.stiffness_quadrature_rule_solid,
@@ -284,7 +367,6 @@ class AcousticElasticWave(Wave):
 
     @override
     def update_source_expression(self, t):
-        # self._handle_snapshot()
         pass
 
     @override
@@ -309,30 +391,56 @@ class AcousticElasticWave(Wave):
         self._snapshot_dir = vis.get("snapshot_output_dir", "results/snapshots")
         self._snapshot_step = 0
 
+    # ------------------------------------------------------------------
     def solve(self):
+        # Registro em t = step*dt (estado ANTES do passo), alinhado com o loop do Spyro
+        if self.solid_receivers is not None:
+            data = self.X_n.sub(1).dat.data_ro_with_halos[:]
+            self.solid_receiver_history.append(self.solid_receivers.interpolate(data))
+
+        if (self.fluid_is_vector and self.record_fluid_pressure
+                and self.receiver_locations):
+            self.fluid_pressure_function.interpolate(
+                -self.K * fire.div(self.X_n.sub(0)))
+            self.fluid_pressure_history.append(
+                [self.fluid_pressure_function.at(loc)
+                 for loc in self.receiver_locations])
+
+        if (not self.fluid_is_vector and self.record_fluid_displacement
+                and self.receiver_locations):
+            self._record_fluid_displacement_from_pressure()
+
+        # Passo de tempo
         if self.use_monolithic:
             self._monolithic_solver.solve()
         else:
             self.source_function_fluid.assign(self.source_function.sub(0))
             self.solid_solver.solve()
             self.fluid_solver.solve()
+            if self.fluid_is_vector:
+                self._impose_interface_normal_continuity()
 
-        if self.solid_receivers is not None:
-            data = self.X_np1.sub(1).dat.data_ro_with_halos[:]
-            self.solid_receiver_history.append(self.solid_receivers.interpolate(data))
 
-        if self.receiver_locations:
-            self.gradP_function.interpolate(fire.grad(self.X_np1.sub(0)))
-            dt = self.dt
-            rho_f_val = float(self.rho_fluid)
-            step_uf = []
-            for i, loc in enumerate(self.receiver_locations):
-                gx = self.gradP_function.at(loc)[1]  # índice 1 = componente x (convenção z,x)
-                af_x = -gx / rho_f_val
-                self._vf_normal[i] += dt * af_x
-                self._uf_normal[i] += dt * self._vf_normal[i]
-                step_uf.append(self._uf_normal[i])
-            self.fluid_displacement_history.append(step_uf)
+    def _record_fluid_displacement_from_pressure(self):
+        # Só P-us: integra a_f = -grad(P)/rho_f duas vezes no tempo.
+        self.gradP_function.interpolate(fire.grad(self.X_np1.sub(0)))
+        dt = self.dt
+        rho_f_val = float(self.rho_fluid)
+        step_uf = []
+        for i, loc in enumerate(self.receiver_locations):
+            gx = self.gradP_function.at(loc)[1]  # índice 1 = componente x (z,x)
+            af_x = -gx / rho_f_val
+            self._vf_normal[i] += dt * af_x
+            self._uf_normal[i] += dt * self._vf_normal[i]
+            step_uf.append(self._uf_normal[i])
+        self.fluid_displacement_history.append(step_uf)
+
+    # ------------------------------------------------------------------
+    def _compute_fluid_pressure(self):
+        # Só u_f-u_s: p = -kappa * div(u_f)
+        u_f = self.X_n.sub(0)
+        self.fluid_pressure_function.interpolate(-self.K * fire.div(u_f))
+        return self.fluid_pressure_function
 
     def _compute_p_equivalent(self):
         dim = self.dimension
@@ -353,3 +461,55 @@ class AcousticElasticWave(Wave):
         sigma_xx_expr = self.lmbda * fire.div(u) + 2.0 * self.mu * strain[1, 1]
         self.sigma_xx_function.interpolate(sigma_xx_expr)
         return self.sigma_xx_function
+
+    def _impose_interface_normal_continuity(self):
+        """Dof compartilhado na interface: soma das linhas do fluido e do
+        sólido (média das previsões ponderada pelas massas lumped).
+        Padrão: só a componente normal (deslizamento, eq. 10).
+        Teste: synthetic_data["welded_interface_test"] = True compartilha
+        todas as componentes (interface soldada)."""
+        welded = self.input_dictionary["synthetic_data"].get(
+            "welded_interface_test", False)
+        comps = range(self.dimension) if welded else (self._iface_normal_comp,)
+
+        jf, js = self._iface_f_nodes, self._iface_s_nodes
+        mf, ms = self._m_f_iface, self._m_s_iface   # massa lumped: igual por componente
+        uf = self.X_np1.sub(0).dat.data
+        us = self.X_np1.sub(1).dat.data
+        for c in comps:
+            un = (mf * uf[jf, c] + ms * us[js, c]) / (mf + ms)
+            uf[jf, c] = un
+            us[js, c] = un
+
+    def _fix_moment_source_tabulations(self, rel_eps=1e-6):
+        """Converte as derivadas de referência da fonte de momento do Spyro
+        (ordem 1) em derivadas físicas: dphi/dx_k = sum_j dphi/dxi_j dxi_j/dx_k.
+        Não altera o Spyro; só corrige as tabulações já montadas."""
+        from spyro.receivers.changing_coordinates import (
+            change_to_reference_quad, change_to_reference_triangle,
+        )
+        src = self.sources
+        tabs = np.asarray(src.cell_tabulations)
+        if tabs.ndim != 3:          # não é fonte de momento (amplitude escalar/vetor)
+            return
+
+        if self.dimension != 2:
+            raise NotImplementedError("Correção implementada só para 2D.")
+        n_v, change = (4, change_to_reference_quad) if src.quadrilateral \
+            else (3, change_to_reference_triangle)
+
+        for i in range(src.number_of_points):
+            if src.is_local[i] is None:
+                continue
+            p = np.asarray(src.point_locations[i], dtype=float)
+            verts = src.cellVertices[i][0:n_v]
+            eps = rel_eps * np.max(np.ptp(np.asarray(verts, dtype=float), axis=0))
+            dxi_dx = np.zeros((2, 2))
+            for k in range(2):
+                e = np.zeros(2)
+                e[k] = eps
+                xi_p = np.asarray(change(tuple(p + e), verts), dtype=float)
+                xi_m = np.asarray(change(tuple(p - e), verts), dtype=float)
+                dxi_dx[:, k] = (xi_p - xi_m) / (2.0 * eps)
+            tabs[i] = tabs[i] @ dxi_dx
+        src.cell_tabulations = tabs
