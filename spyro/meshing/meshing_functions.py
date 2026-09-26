@@ -668,41 +668,17 @@ class AutomaticMesh:
             # Rotating mesh for axis (z,x,y)
             if padding_type in ["rectangular", "hyperelliptical"]:
                 rotate_xz = [
-                    0.0,
-                    1.0,
-                    0.0,
-                    0.0,
-                    -1.0,
-                    0.0,
-                    0.0,
-                    domain_xmax,
-                    0.0,
-                    0.0,
-                    1.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    1.0,
+                    0.0, 1.0, 0.0, 0.0,
+                    1.0, 0.0, 0.0, -domain_xmax,
+                    0.0, 0.0, 1.0, 0.0,
+                    0.0, 0.0, 0.0, 1.0
                 ]
             else:
                 rotate_xz = [
-                    0.0,
-                    1.0,
-                    0.0,
-                    -domain_zmin,
-                    -1.0,
-                    0.0,
-                    0.0,
-                    domain_xmax,
-                    0.0,
-                    0.0,
-                    1.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    1.0,
+                    0.0, 1.0, 0.0, -domain_zmin,
+                    1.0, 0.0, 0.0, -domain_xmax,
+                    0.0, 0.0, 1.0, 0.0,
+                    0.0, 0.0, 0.0, 1.0
                 ]
 
             gmsh.model.mesh.affineTransform(rotate_xz)
