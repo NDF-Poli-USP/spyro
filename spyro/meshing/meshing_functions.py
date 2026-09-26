@@ -642,19 +642,28 @@ class AutomaticMesh:
             if padding_type in ["rectangular", "hyperelliptical"]:
                 rotate_xz = [
                     0.0, 1.0, 0.0, 0.0,
-                    1.0, 0.0, 0.0, -domain_xmax,
+                    -1.0, 0.0, 0.0, domain_xmax,
                     0.0, 0.0, 1.0, 0.0,
                     0.0, 0.0, 0.0, 1.0
                 ]
             else:
                 rotate_xz = [
                     0.0, 1.0, 0.0, -domain_zmin,
-                    1.0, 0.0, 0.0, -domain_xmax,
+                    -1.0, 0.0, 0.0, domain_xmax,
                     0.0, 0.0, 1.0, 0.0,
                     0.0, 0.0, 0.0, 1.0
                 ]
 
             gmsh.model.mesh.affineTransform(rotate_xz)
+
+            # Flip the x-axis after the rotation (mirror the second coordinate).
+            flip_x = [
+                1.0, 0.0, 0.0, 0.0,
+                0.0, -1.0, 0.0, domain_xmax,
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0,
+            ]
+            gmsh.model.mesh.affineTransform(flip_x)
             gmsh.write(output_file)
             parallel_print(f"Gmsh mesh written to {output_file}", comm=self.comm)
             gmsh.finalize()
