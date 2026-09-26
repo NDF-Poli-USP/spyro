@@ -92,6 +92,9 @@ def _propagate_forward_central_difference(wave, source_ids):
         # fresh one, sized by this loop's ``nt``.
         wave.automated_adjoint.start_recording(total_steps=nt)
 
+    if not wave.use_vertex_only_mesh:
+        usol_recv.append(wave.get_forward_solution_receivers())   # t = 0
+
     for step in range(nt):
         # Basic way of applying sources
         wave.update_source_expression(t)
