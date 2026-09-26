@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib import use
 import numpy as np
 import spyro
+import firedrake as fire
 
 from spyro.tools.error_measure import MeasureError
 from generate_velocity_models import get_velocities
@@ -19,16 +20,24 @@ receiver_locations = [
     for x in np.arange(3.0, 7.0, 0.1)
 ]
 
-final_time = 1.5
+final_time = 3.0
 dt = 1.0e-4
-c = 3.5
+c = 2.0
+degree = 6
+cell_type = "T"
+# if cell_type == "T":
+#     mesh_filename = f"meshes/unstructured_triangle/example_mesh_2D{c:.1f}".replace(".", "") + ".msh"
+# elif cell_type == "Q":
+#     mesh_filename = f"meshes/unstructured_quad/example_mesh_2D{c:.1f}".replace(".", "") + ".msh"
+
 mesh_filename = f"meshes/example_mesh_2D{c:.1f}".replace(".", "") + ".msh"
+
 
 dictionary = {
     "options": {
         "cell_type": "T",
         "variant": "lumped",
-        "degree": 4,
+        "degree": degree,
         "dimension": 2,
     },
     "parallelism": {
@@ -82,7 +91,8 @@ wave.scalar_function_space = spyro.domains.space.create_function_space(
         wave.mesh, wave.method, wave.degree, dim=1,
     )
 vp, vs, rho = get_velocities(wave)
-
+out = fire.VTKFile("debug_tri_vs.pvd")
+out.write(vs)
 
 def get_numerical_result(wave):
     wave._initialize_model_parameters()
@@ -96,7 +106,7 @@ def get_numerical_result(wave):
 
 
 numerical_result = get_numerical_result(wave)
-result_filename = f"2dhetsol{c:.1f}".replace(".", "") + ".npy"
+result_filename = f"2dhetsol_ml{degree}_{c:.1f}".replace(".", "") + ".npy"
 np.save(result_filename, numerical_result)
 
 plt.close()
@@ -104,7 +114,7 @@ rec_id = round(len(receiver_locations)/2)
 time_vector = spyro.utils.get_time_vector(wave)
 plt.plot(time_vector, wave.forward_solution_receivers[:, rec_id, 1], label='numerical')
 plt.legend()
-plot_filename = f"2dhetsol{c:.1f}".replace(".", "") + ".png"
+plot_filename = f"2dhetsol_ml{degree}_{c:.1f}".replace(".", "") + ".png"
 plt.savefig(plot_filename)
 
 print("END")
