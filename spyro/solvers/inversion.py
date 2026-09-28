@@ -1305,16 +1305,11 @@ class FullWaveformInversion:
             stacklevel=2,
         )
         self.wave.set_initial_velocity_model(
-            constant=constant,
-            conditional=conditional,
-            velocity_model_function=velocity_model_function,
-            expression=expression,
-            new_file=new_file,
-            output=output,
-            dg_velocity_model=dg_velocity_model,
+            **kwargs,
         )
         self.real_mesh = self.wave.get_mesh()
         self._real_model_parameters = self._copy_parameters_from_wave(self.wave)
+        new_file = kwargs.get("new_file", None)
         if new_file is not None:
             self.real_velocity_model_file = new_file
 
