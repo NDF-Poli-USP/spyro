@@ -6,8 +6,8 @@ tests are designed to ensure that the computed transiente responses and energies
 are consistent with expected values. The tests cover both 2D and 3D cases.
 """
 
-from pytest import fail, mark, param
-from firedrake import COMM_WORLD as comm, conditional, ConvergenceError
+import pytest
+from firedrake import conditional, ConvergenceError
 from numpy import all, sum
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
@@ -171,6 +171,13 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
     # Maximum divisor of the final time
     max_divisor_tf = 3 if dimension == 2 else 4
 
+    # Create dictionary with parameters for the model
+    dictionary = wave_dict(element_geometry, dimension, calc_eik, abc_type, dt_usu)
+
+    # Create the acoustic wave object with HABCs
+    wave = AcousticWave(dictionary=dictionary)
+    comm = wave.comm
+
     # Get simulation parameters
     pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
     pprint(f"Element Geometry: {element_geometry}", comm=comm)
@@ -178,13 +185,7 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
     pprint(f"Timestep Size: {1e3 * dt_usu:.3f} ms", comm=comm)
     pprint(f"Maximum Divisor of Final Time: {max_divisor_tf}", comm=comm)
 
-    # Create dictionary with parameters for the model
-    dictionary = wave_dict(element_geometry, dimension, calc_eik, abc_type, dt_usu)
-
     # ============ MESH FEATURES ============
-
-    # Create the acoustic wave object with HABCs
-    wave = AcousticWave(dictionary=dictionary)
 
     # Mesh
     wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
@@ -205,16 +206,16 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
     return wave, max_divisor_tf
 
 
-@mark.older_firedrake
-@mark.parametrize("element_geometry, dimension, calc_eik", [
+@pytest.mark.older_firedrake
+@pytest.mark.parametrize("element_geometry, dimension, calc_eik", [
     ("T", 2, True),
     ("T", 2, False),
     ("Q", 2, True),
     ("Q", 2, False),
-    param("T", 3, True, marks=mark.slow),
-    param("T", 3, False, marks=mark.slow),
-    param("Q", 3, True, marks=mark.slow),
-    param("Q", 3, False, marks=mark.slow)])
+    pytest.param("T", 3, True, marks=pytest.mark.slow),
+    pytest.param("T", 3, False, marks=pytest.mark.slow),
+    pytest.param("Q", 3, True, marks=pytest.mark.slow),
+    pytest.param("Q", 3, False, marks=pytest.mark.slow)])
 def test_infinite_model_abc(element_geometry, dimension, calc_eik):
     """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
@@ -272,9 +273,6 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
     """
 
     act_eik = "Activated" if calc_eik else "Deactivated"
-    pprint("\n" + 60 * "=" + f"\nTesting Reference Model with {element_geometry} "
-           + f"elements for ABCs\nand {dimension}D case. Eikonal analysis: {act_eik}\n"
-           + 60 * "=", comm=comm)
 
     # ============ REFERENCE MODEL ============
 
@@ -290,11 +288,17 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
             # Reference to resource usage
             tRef = comp_cost("tini")
 
-            pprint(f"\nAbsorbing Boundary Condition: {abc_type}", comm=comm)
-
             # Create an instance of the acoustic wave solver
             wave, max_divisor_tf = wave_instance(element_geometry, dimension,
                                                  abc_type, calc_eik)
+
+            pprint(f"\nAbsorbing Boundary Condition: {abc_type}", comm=wave.comm)
+
+            pprint(
+                "\n" + 60 * "=" + f"\nTesting Reference Model with {element_geometry} "
+                + f"elements for ABCs\nand {dimension}D case. Eikonal analysis: {act_eik}\n"
+                + 60 * "=", comm=wave.comm
+            )
 
             # Computing reference get_reference_signal
             wave.layer_ops.infinite_model(wave, check_dt=True,
@@ -317,26 +321,33 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
         assert pml_signal is not None, "PML signal not found"
 
         dt = wave.get_dt()
-        error_measures = wave.layer_ops.error_measures(pml_signal, hybrid_signal, dt,
-                                                       wave.number_of_receivers,
-                                                       final_energy=pml_energy,
-                                                       final_energy_reference=hybrid_energy,
-                                                       save_in_case_folder=False)
+        error_measures = wave.layer_ops.calculate_error_measures(
+            pml_signal,
+            hybrid_signal,
+            dt,
+            wave.number_of_receivers,
+            final_energy=pml_energy,
+            final_energy_reference=hybrid_energy,
+            save_in_case_folder=False,
+        )
+
         errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener = error_measures
 
         assert sum(errIt) == 0. and max_errIt == 0., \
             "✗ Integral Error check for 'hybrid' and 'PML' solvers in Reference Model " \
             f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
-        pprint("✓ Integral Error Verified for 'hybrid' and 'PML' solvers", comm=comm)
+        pprint("✓ Integral Error Verified for 'hybrid' and 'PML' solvers", comm=wave.comm)
         assert sum(errPk) == 0. and max_errPK == 0. and all(pkMax) > 0., \
             "✗ Peak Error check for 'hybrid' and 'PML' solvers in Reference Model " \
             f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
-        pprint("✓ Peak Error Verified for 'hybrid' and 'PML' solvers", comm=comm)
+        pprint("✓ Peak Error Verified for 'hybrid' and 'PML' solvers", comm=wave.comm)
         assert final_ener > 0. and dsspt_ener == 0., \
             "✗ Final Energy check for 'hybrid' and 'PML' solvers in Reference Model " \
             f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
-        pprint("✓ Final Energy Verified for 'hybrid' and 'PML' solvers", comm=comm)
+        pprint("✓ Final Energy Verified for 'hybrid' and 'PML' solvers", comm=wave.comm)
 
     except ConvergenceError as e:
-        fail(f"Checking Reference Model with {element_geometry} elements for "
-             f"{dimension}D and Eikonal {act_eik} case raised an exception: {str(e)}")
+        pytest.fail(
+            f"Checking Reference Model with {element_geometry} elements for "
+            f"{dimension}D and Eikonal {act_eik} case raised an exception: {str(e)}",
+        )

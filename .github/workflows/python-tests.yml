@@ -3,7 +3,10 @@
 
 name: Python tests
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -45,7 +48,8 @@ jobs:
         && pip3 install meshio \
         && pip3 install -U memory_profiler \
         && pip3 install pytest pytest-cov \
-        && pip3 install pytest-sugar
+        && pip3 install pytest-sugar \
+        && pip3 install pydantic
 
     - name: Clear all firedrake-related caches
       run: |
@@ -80,8 +84,8 @@ jobs:
     name: Slow Tests and Parallel Tests
     runs-on: self-hosted
     needs: fast-tests
-    if: github.event_name == 'pull_request'
-    # Only runs on PRs after fast tests pass - saves resources
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    # Only runs on non-draft PRs after fast tests pass - saves resources
 
     container:
       image: firedrakeproject/firedrake:2025.4.1
@@ -107,7 +111,8 @@ jobs:
         && pip3 install meshio \
         && pip3 install -U memory_profiler \
         && pip3 install pytest pytest-cov \
-        && pip3 install pytest-sugar
+        && pip3 install pytest-sugar \
+        && pip3 install pydantic
 
     - name: Clear all firedrake-related caches
       run: |
@@ -141,6 +146,7 @@ jobs:
           mpiexec -n 6 pytest tests/parallel/test_forward_supershot.py
           mpiexec -n 2 pytest tests/parallel/test_parallel_io.py
           mpiexec -n 2 pytest tests/parallel/test_forward_multiple_serial_shots.py
+          mpiexec -n 2 pytest tests/parallel/test_vom_receivers.py
     
     - name: Running parallel tests for inversion
       run: |
@@ -197,8 +203,8 @@ jobs:
     name: Updated Firedrake tests
     runs-on: self-hosted
     needs: slow-tests
-    if: github.event_name == 'pull_request'
-    # Only runs on PRs after fast tests pass - saves resources
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    # Only runs on non-draft PRs after slow tests pass - saves resources
 
     container:
       image: firedrakeproject/firedrake:2026.4.0
@@ -225,7 +231,8 @@ jobs:
         && pip3 install -U memory_profiler \
         && pip3 install pytest pytest-cov \
         && pip3 install pytest-sugar \
-        && pip3 install gmsh
+        && pip3 install gmsh \
+        && pip3 install pydantic
 
     - name: Clear all firedrake-related caches
       run: |
@@ -249,6 +256,7 @@ jobs:
           mpiexec -n 6 pytest tests/parallel/test_forward_supershot.py
           mpiexec -n 2 pytest tests/parallel/test_parallel_io.py
           mpiexec -n 2 pytest tests/parallel/test_forward_multiple_serial_shots.py
+          mpiexec -n 2 pytest tests/parallel/test_vom_receivers.py
     
     - name: Running parallel tests for inversion
       run: |
@@ -256,7 +264,15 @@ jobs:
           mpiexec -n 6 pytest tests/parallel/test_fwi.py
           mpiexec -n 3 pytest tests/parallel/test_supershot_grad.py
           mpiexec -n 2 pytest tests/parallel/test_gradient_serialshots.py
-          mpiexec -n 2 pytest tests/parallel/test_gradient_auto_adjoint.py
+          mpiexec -n 4 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_gradient_auto_adjoint.py
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_fwi_auto_adjoint.py
+          mpiexec -n 2 pytest tests/parallel/test_elastic_sources_parallel.py
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_plot_model.py
+          mpiexec -n 3 pytest --cov-report=xml --cov-append --cov=spyro tests/demo_tests/test_elastic_fwi_automated_adjoint_demo.py
+
+    - name: Uploading coverage to Codecov
+      run: |
+        export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && curl -s https://codecov.io/bash | bash
 
     - name: Post-run cleanup
       if: always()

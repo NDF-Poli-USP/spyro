@@ -20,11 +20,7 @@ def logger():
     a_str = "asn" + rnd_str
     b_str = "bsn" + rnd_str
     c_str = "csn" + rnd_str
-    d = {
-        a_str + "_output": True,
-        b_str + "_output": True,
-        c_str + "_output": False
-    }
+    d = {a_str + "_output": True, b_str + "_output": True, c_str + "_output": False}
     logger = FieldLogger(comm, d)
     logger.rnd_str = rnd_str
     logger.add_field(a_str, "1st", lambda: u)

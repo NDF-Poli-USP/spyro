@@ -29,6 +29,7 @@ dependencies = [
   "numpy",
   "scipy",
   "matplotlib",
+  "pydantic",
   "segyio",
   "meshio",
   "mpi-pytest",

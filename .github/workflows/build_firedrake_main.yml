@@ -7,9 +7,9 @@ on:
   pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened, ready_for_review]
   schedule:
     - cron: '0 0 * * 0'
-# on: [push, pull_request]
 
 concurrency:
   group: build-firedrake-main-${{ github.workflow }}-${{ github.ref }}
@@ -18,6 +18,7 @@ concurrency:
 jobs:
   test:
     name: build
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: self-hosted
 
     container:

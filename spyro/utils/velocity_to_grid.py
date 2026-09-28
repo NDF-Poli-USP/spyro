@@ -1,5 +1,7 @@
 from copy import deepcopy
+from typing import Optional
 import firedrake as fire
+import numpy as np
 from ..meshing import MeshingParameters, AutomaticMesh
 from ..domains.space import create_function_space
 from ..io import write_function_to_grid
@@ -87,7 +89,10 @@ def velocity_to_grid(velocity_function, mesh_parameters, grid_spacing, output=Fa
     return grid_velocity_data
 
 
-def change_scalar_field_resolution(scalar_field, mesh_parameters, grid_spacing):
+def change_scalar_field_resolution(
+    scalar_field: fire.Function, mesh_parameters: MeshingParameters, grid_spacing: float,
+    function_space: Optional[fire.functionspaceimpl.WithGeometry] = None,
+) -> tuple[fire.Function, fire.FunctionSpace]:
     """
     Change a scalar field to a different resolution using a structured grid.
 
@@ -106,6 +111,9 @@ def change_scalar_field_resolution(scalar_field, mesh_parameters, grid_spacing):
         Mesh metadata describing the original model domain.
     grid_spacing : float
         Desired grid spacing (edge length) for the new structured mesh (km).
+    function_space : firedrake.FunctionSpace, optional
+        The space returned by an earlier call with the same parameters, to
+        interpolate onto instead of building the mesh again. Default is None.
 
     Returns
     -------
@@ -113,6 +121,11 @@ def change_scalar_field_resolution(scalar_field, mesh_parameters, grid_spacing):
         The scalar field interpolated onto the new structured mesh.
     V : firedrake.FunctionSpace
         The CG1 function space on the new structured mesh.
+
+    Raises
+    ------
+    ValueError
+        If grid_spacing is not finite and positive.
 
     Notes
     -----
@@ -129,6 +142,11 @@ def change_scalar_field_resolution(scalar_field, mesh_parameters, grid_spacing):
     ...     grid_spacing=0.01,
     ... )
     """
+    if not np.isfinite(grid_spacing) or grid_spacing <= 0:
+        raise ValueError("grid_spacing must be finite and positive.")
+    if function_space is not None:
+        u = fire.Function(function_space).interpolate(scalar_field, allow_missing_dofs=True)
+        return (u, function_space)
     mesh_parameters_original = mesh_parameters
     input_mesh_parameters_cg1 = {
         "dimension": mesh_parameters_original.dimension,
@@ -141,7 +159,8 @@ def change_scalar_field_resolution(scalar_field, mesh_parameters, grid_spacing):
     }
     meshing_parameters_cg1 = MeshingParameters(
         input_mesh_dictionary=input_mesh_parameters_cg1,
-        comm=mesh_parameters_original.comm
+        comm=mesh_parameters_original.comm,
+        negative_z=mesh_parameters_original.negative_z,
     )
     meshing_obj = AutomaticMesh(meshing_parameters_cg1)
     mesh = meshing_obj.create_mesh()

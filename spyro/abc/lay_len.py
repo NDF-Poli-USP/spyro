@@ -1,6 +1,14 @@
-# This file contains methods for sizing an absorbing layer
+"""This file contains methods for sizing an absorbing layer.
+
+The criterion for the size of the absorbing layer is based on the reflection
+coefficient and the attenuation amplitude factor. The size of the absorbing
+layer is determined by finding the roots of a function combining these factors.
+"""
+
 from ..io.basicio import parallel_print as pprint
 from numpy import array, ceil, cos, exp, floor, log10, pi, round, sin
+from ..utils.error_management import (sanitize_num_array, validate_data_structure,
+                                      validate_parameter, validate_numeric)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -11,14 +19,16 @@ from numpy import array, ceil, cos, exp, floor, log10, pi, round, sin
 # With additions by Alexandre Olender.
 
 
-def f_layer(x, a_par, vibration_mode=1, damping_ratio=0.999, function_type='FL'):
-    """
-    Function whose zeros are solution for the parameter size of the layer.
+def f_layer(factor_length_pad, a_par, vibration_mode=1,
+            damping_ratio=0.999, function_type="FL"):
+    """Function whose zeros are solution for the parameter size of the layer.
 
     Parameters
     ----------
-    x : `float`
-        Size  parameter of the absorbing layer (F_L).
+    factor_length_pad : `float` or `array`
+        Size parameter of the absorbing layer (F_L). When an array is provided,
+        the function returns an array of values of the same size. It is useful
+        for creating plots of the function (see spyro.plots.plots_habc).
     a_par : `float`
         Adimensional propagation speed parameter (a = z / f, z = c / l).
         Also, 'z' parameter is the inverse of the minimum Eikonal (1 / phi_min).
@@ -28,20 +38,20 @@ def f_layer(x, a_par, vibration_mode=1, damping_ratio=0.999, function_type='FL')
         Damping ratio (s). Default is 0.999.
     function_type : `str`, optional
         Type of function to be computed. Default is 'FL'.
-        Options: 'FL' (size layer criterion) or 'CR' (reflection coeficient).
+        Options: "FL" (size layer criterion) or "CR"(reflection coeficient).
 
     Returns
     -------
     CritFL: `float`
         Value of the function for the size criterion computed as CritFL = CR - RF.
     CR: `float`
-        Value for the reflection coefficient4
+        Value for the reflection coefficient.
 
     Examples
     -------
     Let c = 1.5 km/s, l = 1.2 km, m=1, s=0.999
 
-    Zeros for  f = 5Hz, a = 0.25
+    Zeros for f = 5Hz, a = 0.25
     Expected: F_L1=0.1917, F_L2=0.2682, F_L3=0.2981, F_L4=0.4130, F_L5=0.4244
     Tol 1e-2: F_L1=0.1917, F_L2=0.2682, F_L3=0.2981, F_L4=0.4131, F_L5=0.4244
     Tol 1e-3: F_L1=0.1917, F_L2=0.2682, F_L3=0.2981, F_L4=0.4131, F_L5=0.4244
@@ -55,6 +65,25 @@ def f_layer(x, a_par, vibration_mode=1, damping_ratio=0.999, function_type='FL')
     Tol 1e-4: F_L1=0.4259, F_L2=0.5959, F_L3=0.6624, F_L4=0.9179, F_L5=0.9431
     Tol 1e-5: F_L1=0.4259, F_L2=0.5959, F_L3=0.6624, F_L4=0.9179, F_L5=0.9431
     """
+
+    # Checking input parameters
+    if isinstance(factor_length_pad, float):
+        x = validate_numeric("factor_length_pad", factor_length_pad, float_num=True,
+                             lower_bound=0., include_lower_bound=True)
+
+    else:
+        validate_data_structure("factor_length_pad", factor_length_pad,
+                                "array", expected_type_element=("float"))
+        x = sanitize_num_array(factor_length_pad, nan_values=True,
+                               inf_values=True, negative_values=True)
+
+    validate_numeric("Parameter a", a_par, float_num=True, lower_bound=0.)
+    validate_numeric("vibration_mode", vibration_mode, float_num=False,
+                     integer_num=True, lower_bound=1, include_lower_bound=True)
+    validate_numeric("damping_ratio", damping_ratio, float_num=True,
+                     integer_num=False, lower_bound=0., upper_bound=1.,
+                     include_lower_bound=True, include_upper_bound=True)
+    validate_parameter("function_type", function_type, ["FL", "CR"])
 
     # Reflection coefficient
     s = damping_ratio
@@ -152,6 +181,15 @@ def loop_roots(a_par, lmin, lref, max_roots, tol_rel=1e-3, show_ig=True, monitor
     FLpos : `list`
         Possible size parameters for the absorbing layer without rounding.
     """
+
+    # Checking input parameters
+    validate_numeric("Parameter a", a_par, float_num=True, lower_bound=0.)
+    validate_numeric("lmin", lmin, float_num=True, lower_bound=0)
+    validate_numeric("lref", lref, float_num=True, lower_bound=0)
+    validate_numeric("max_roots", max_roots, float_num=False,
+                     integer_num=True, lower_bound=1, include_lower_bound=True)
+    validate_numeric("tol_rel", tol_rel, float_num=True, integer_num=False,
+                     lower_bound=0., upper_bound=0.01)
 
     # Initial guess
     FLmin = 0.5 * lmin / lref
@@ -283,7 +321,7 @@ def roundFL(lmin, lref, factor_length_pad):
     Parameters
     ----------
     factor_length_pad : `float`
-        Size parameter of the absorbing layer.
+        Size parameter of the absorbing layer (F_L).
     lmin : `float`
         Minimum mesh size.
     lref : `float`
@@ -299,6 +337,12 @@ def roundFL(lmin, lref, factor_length_pad):
         Number of elements in the layer of edge length 'lmin'.
     """
 
+    # Checking input parameters
+    validate_numeric("lmin", lmin, float_num=True, lower_bound=0)
+    validate_numeric("lref", lref, float_num=True, lower_bound=0)
+    validate_numeric("factor_length_pad", factor_length_pad, float_num=True,
+                     lower_bound=0., include_lower_bound=True)
+
     # Adjusting the parameter size of the layer
     factor_length_pad = (lmin / lref) * ceil(lref * factor_length_pad / lmin)
 
@@ -306,7 +350,7 @@ def roundFL(lmin, lref, factor_length_pad):
     pad_length = factor_length_pad * lref
 
     # Number of elements in the layer
-    ele_pad = int(pad_length / lmin)
+    ele_pad = int(round(pad_length / lmin, 15))  # Avoid floating point errors
 
     pprint("\nModifying Layer Size Based on the Element Size")
     pprint(f"Modified Parameter Size FL: {factor_length_pad:.4f}")

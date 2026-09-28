@@ -1,8 +1,11 @@
+"""Source generation and injection helpers."""
+
 from . import Sources
 from .Sources import (
     full_ricker_wavelet,
     ricker_wavelet,
     timedependentSource,
+    ricker_integral,
 )
 
 __all__ = [
@@ -10,4 +13,5 @@ __all__ = [
     "ricker_wavelet",
     "full_ricker_wavelet",
     "timedependentSource",
+    "ricker_integral",
 ]

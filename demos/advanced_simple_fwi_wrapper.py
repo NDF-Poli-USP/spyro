@@ -63,7 +63,7 @@ class MyFWI(spyro.FullWaveformInversion):
         }
         parameters.update(kwargs)
 
-        control_reference = self._guess_control_reference()
+        control_reference = self.control_parameters
         lower = self._expand_bound(parameters["vmin"], control_reference)
         upper = self._expand_bound(parameters["vmax"], control_reference)
         bounds = list(zip(lower, upper))
@@ -80,15 +80,12 @@ class MyFWI(spyro.FullWaveformInversion):
             options=options,
         )
 
-        self.control_result = self._rebuild_control_from_vector(
+        self.control_parameter_result = self._rebuild_control_from_vector(
             control_reference,
             result.x,
         )
-        self.set_guess_control(self.control_result)
+        self.set_guess_control(self.control_parameter_result)
 
-        self.control_parameter_result = self._copy_control_structure(
-            self.control_result,
-        )
         fire.VTKFile("control_end.pvd").write(self.control_parameter_result)
 
         np.save("result", result.x)

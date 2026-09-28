@@ -1,14 +1,15 @@
+"""Immersed polygon example model for acoustic forward and FWI workflows."""
+
 from spyro import create_transect
 from spyro.examples.rectangle import Rectangle_acoustic, Rectangle_acoustic_FWI
 import firedrake as fire
 import copy
+
 # Adapted from Velocity model-based adapted meshes using optimal transport
 # TODO: add correct citation as soon as Thiago's paper is published
 
 polygon_optimization_parameters = {
-    "General": {
-        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
-    },
+    "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
     "Step": {
         "Type": "Augmented Lagrangian",
         "Augmented Lagrangian": {
@@ -101,6 +102,8 @@ polygon_dictionary_fwi["inversion"]["perform_fwi"] = True
 
 
 class Polygon_velocity:
+    """Mixin that builds the polygon velocity distribution."""
+
     def _polygon_velocity_model(self):
         polygon_dict = self.input_dictionary["polygon_options"]
         z = self.mesh_z
@@ -112,7 +115,7 @@ class Polygon_velocity:
         v1 = polygon_dict["upper_layer"]
         v2 = polygon_dict["middle_layer"]  # background vp (km/s)
         vl = polygon_dict["lower_layer"]  # lower layer (km/s)
-        dv = polygon_dict["polygon_layer_perturbation"]*v2  # 30% of perturbation
+        dv = polygon_dict["polygon_layer_perturbation"] * v2  # 30% of perturbation
         d0 = -water_layer_depth
         d1 = d0 - 0.14
         d2 = d1 - 0.2
@@ -122,12 +125,20 @@ class Polygon_velocity:
             cond = fire.conditional(z <= d1, v2, cond)
         else:
             cond = fire.conditional(z <= d1, v2, v1)
-        cond = fire.conditional(z <= d2 - 0.2*x, vl, cond)
+        cond = fire.conditional(z <= d2 - 0.2 * x, vl, cond)
 
-        cond = fire.conditional(300*((x-0.5)*(-z-0.5))**2 + ((x-0.5)+(-z-0.5))**2 <= 0.300**2, v2+dv, cond)
+        cond = fire.conditional(
+            300 * ((x - 0.5) * (-z - 0.5)) ** 2 + ((x - 0.5) + (-z - 0.5)) ** 2
+            <= 0.300**2,
+            v2 + dv,
+            cond,
+        )
 
         if self.abc_pad_length is not None and self.abc_pad_length > 0.0:
-            middle_of_pad = -self.mesh_parameters.length_z - self.mesh_parameters.abc_pad_length*0.5
+            middle_of_pad = (
+                -self.mesh_parameters.length_z
+                - self.mesh_parameters.abc_pad_length * 0.5
+            )
             cond = fire.conditional(z <= middle_of_pad, v0, cond)
 
         self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
@@ -135,20 +146,12 @@ class Polygon_velocity:
 
 
 class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
-    """polygon model.
-    This class is a child of the Example_model class.
-    It is used to create a dictionary with the parameters of the
-    polygon model.
+    """Immersed Polygon acoustic model.
+
+    This class is a child of the Example_model class. It is used to
+    create a dictionary with the parameters of the polygon model.
 
     Example Setup
-
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
-
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
-
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
-
-    Feel free to adapt these templates to your needs.
 
     Parameters
     ----------
@@ -156,6 +159,16 @@ class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
         Dictionary with the parameters of the model that are different from
         the default polygon model. The default is None.
 
+    Notes
+    -----
+    This example is intended as a reusable model configuration for
+    development and testing of numerical methods. It does not represent a
+    targeted validation case with a single expected output.
+
+    By isolating common model setup logic, this class reduces boilerplate and
+    encourages consistency across experiments.
+
+    Feel free to adapt these templates to your needs.
     """
 
     def __init__(
@@ -175,20 +188,10 @@ class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
 
 
 class Polygon_acoustic_FWI(Polygon_velocity, Rectangle_acoustic_FWI):
-    """polygon model.
-    This class is a child of the Example_model class.
-    It is used to create a dictionary with the parameters of the
-    polygon model.
+    """Immersed Polygon acoustic FWI model.
 
-    Example Setup
-
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
-
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
-
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
-
-    Feel free to adapt these templates to your needs.
+    This class is a child of the Example_model class. It is used to
+    create a dictionary with the parameters of the polygon model.
 
     Parameters
     ----------
@@ -196,6 +199,16 @@ class Polygon_acoustic_FWI(Polygon_velocity, Rectangle_acoustic_FWI):
         Dictionary with the parameters of the model that are different from
         the default polygon model. The default is None.
 
+    Notes
+    -----
+    This example is intended as a reusable model configuration for
+    development and testing of numerical methods. It does not represent a
+    targeted validation case with a single expected output.
+
+    By isolating common model setup logic, this class reduces boilerplate and
+    encourages consistency across experiments.
+
+    Feel free to adapt these templates to your needs.
     """
 
     def __init__(
