@@ -186,7 +186,7 @@ class FieldLogger:
 
                 parallel_print(f"Saving {name} in: {filename}", self.comm)
 
-                file = VTKFile(filename, comm=self.comm.comm)
+                file = VTKFile(filename, comm=self.comm.comm, adaptive=True)
                 self.__enabled_fields.append(Field(name, file, callback))
 
         if self.__rank == 0:
