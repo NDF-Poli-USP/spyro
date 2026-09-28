@@ -22,7 +22,7 @@ import sparsity_plots; print("sparsity_plots from:", sparsity_plots.__file__)
 # ===========================================================================
 # CASE SELECTION: formulation and scheme. Every saved file carries this tag.
 # ===========================================================================
-FLUID_FORMULATION = "displacement"   # "pressure" (P-us) or "displacement" (u_f-u_s)
+FLUID_FORMULATION = "pressure"   # "pressure" (P-us) or "displacement" (u_f-u_s)
 USE_MONOLITHIC = False           # True = monolithic, False = sequential
 COST_RUN = False                 # True: measure cost (no outputs, no recordings)
                                  # False: ParaView outputs + receiver .npz for plots
@@ -36,10 +36,10 @@ print(f"=== Case: {TAG} ({'cost run' if COST_RUN else 'validation run'}) ===")
 dictionary = {}
 
 dictionary["options"] = {
-    "cell_type": "Q",
+    "cell_type": "T",
     "variant": "lumped",
     "degree": 2,
-    "dimension": 2,
+    "dimension": 3,
     "fluid_formulation": FLUID_FORMULATION,
 }
 
@@ -50,10 +50,10 @@ dictionary["parallelism"] = {
 dictionary["mesh"] = {
     "length_z": 1.0,
     "length_x": 1.0,
-    "length_y": 0.0,
+    "length_y": 1.0,
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
-    "edge_length": 0.005,
+    "edge_length": 0.050,
     "interface_x": 0.5,
     "absorb_left": False,
     "absorb_right": False,
@@ -63,14 +63,14 @@ dictionary["mesh"] = {
 
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-0.5, 0.6)],
+    "source_locations": [(-0.5, 0.6, 0.5)],
     "frequency": 25.0,
     "delay": 1.0 / 25.0,
     "delay_type": "time",
     # isotropic moment source for u_f-u_s; scalar source for P-us
     "amplitude": np.eye(2) if FLUID_FORMULATION == "displacement" else 1.0,
-    "receiver_locations": [(-0.51, 0.5025)],
-    "solid_receiver_locations": [(-0.49, 0.4975)],
+    "receiver_locations": [(-0.51, 0.5025, 0.5)],
+    "solid_receiver_locations": [(-0.49, 0.4975, 0.5)],
     "use_vertex_only_mesh": False,
 }
 
@@ -112,9 +112,9 @@ dictionary["synthetic_data"] = {
     "velocity_fluid": None,
     "bulk_modulus": 2.25,
     "density_fluid": 1.0,
-    "density_solid": 2.0,
-    "p_wave_velocity": 2.0,
-    "s_wave_velocity": 1.2,
+    "density_solid": 1.0,
+    "p_wave_velocity": 1.5,
+    "s_wave_velocity": 0.0,
     "real_velocity_file": None,
     "s_wave_velocity_fluid": 0.0,
     "welded_interface_test": False,
@@ -205,3 +205,8 @@ else:
         u_fluid_x=u_fluid_x,
     )
     print(f"[OK] Saved: {OUT}/spyro_receiver_data_{TAG}.npz")
+
+import spyro
+
+RESOLUTION = 0.002  # km: grid spacing used only for the image
+
