@@ -256,23 +256,26 @@ def test_fwi_elastic_stages(tmp_path, monkeypatch):
 
     def observed_minimize(reduced_functional: object, **kwargs: object) -> list:
         automated_adjoint = fwi.wave.automated_adjoint
-        complete = automated_adjoint.reduced_functional
-        control_names = automated_adjoint.control_parameter_names
+        fields = dict(zip(
+            automated_adjoint.control_parameter_names,
+            automated_adjoint.controls,
+        ))
         calls.append({
             "active": [
-                name for name, complete_control in zip(
-                    control_names, complete.controls,
-                )
+                name for name, field in fields.items()
                 if any(
-                    control is complete_control
+                    control.control is field
                     for control in reduced_functional.controls
                 )
             ],
             "bounds": len(kwargs["bounds"]),
             "iterations": kwargs["options"]["tao_max_it"],
             "complete_state": {
-                name: np.array(control.tape_value().dat.data_ro, copy=True)
-                for name, control in zip(control_names, complete.controls)
+                name: np.array(
+                    fire_ad.Control(field).tape_value().dat.data_ro,
+                    copy=True,
+                )
+                for name, field in fields.items()
             },
         })
         return real_minimize(reduced_functional, **kwargs)
@@ -289,6 +292,9 @@ def test_fwi_elastic_stages(tmp_path, monkeypatch):
     )
 
     assert [call["active"] for call in calls] == [[S], [P]]
+    assert fwi.wave.automated_adjoint.reduced_functional is None, (
+        "a staged run built the complete reduced functional it never uses"
+    )
     assert [call["bounds"] for call in calls] == [1, 1]
     assert [call["iterations"] for call in calls] == [2, 1]
     assert not np.allclose(

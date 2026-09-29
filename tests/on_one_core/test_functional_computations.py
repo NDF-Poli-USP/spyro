@@ -157,7 +157,7 @@ class _SerialEnsemble:
 
 
 def test_partial_reduced_functional_shares_tape_and_checkpoint() -> None:
-    """Partial functionals share controls, tape, ordering and held state."""
+    """Partial functionals share tape nodes, ordering and held state."""
     density = AdjFloat(2.0)
     velocity = AdjFloat(3.0)
     density_name = ElasticMaterialParameter.DENSITY
@@ -171,21 +171,25 @@ def test_partial_reduced_functional_shares_tape_and_checkpoint() -> None:
     automated_adjoint.stop_recording()
 
     try:
-        complete = automated_adjoint.create_reduced_functional(functional)
         density_stage = automated_adjoint.create_partial_reduced_functional(
             functional, [density_name],
         )
 
-        assert automated_adjoint.reduced_functional is complete
+        # The complete functional is neither needed nor created.
+        assert automated_adjoint.reduced_functional is None
         assert len(density_stage.controls) == 1
-        assert density_stage.controls[0] is complete.controls[0]
+        assert density_stage.controls[0].block_variable is (
+            density.block_variable
+        )
         assert float(density_stage(AdjFloat(4.0))) == pytest.approx(37.0)
         assert float(density_stage.derivative()) == pytest.approx(11.0)
 
         velocity_stage = automated_adjoint.create_partial_reduced_functional(
             functional, [velocity_name],
         )
-        assert velocity_stage.controls[0] is complete.controls[1]
+        assert velocity_stage.controls[0].block_variable is (
+            velocity.block_variable
+        )
         assert float(velocity_stage(AdjFloat(5.0))) == pytest.approx(61.0)
         assert float(velocity_stage.derivative()) == pytest.approx(14.0)
         assert taylor_test(
@@ -195,7 +199,9 @@ def test_partial_reduced_functional_shares_tape_and_checkpoint() -> None:
         reversed_request = automated_adjoint.create_partial_reduced_functional(
             functional, [velocity_name, density_name],
         )
-        assert list(reversed_request.controls) == list(complete.controls)
+        assert [
+            control.block_variable for control in reversed_request.controls
+        ] == [density.block_variable, velocity.block_variable]
     finally:
         automated_adjoint.clear_tape()
 

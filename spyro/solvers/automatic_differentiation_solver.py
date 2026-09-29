@@ -389,8 +389,7 @@ pyadjoint.ReducedFunctional or None
         -------
         firedrake.adjoint.EnsembleReducedFunctional
             A new reduced functional containing only the selected controls.
-            :attr:`reduced_functional` remains the canonical complete
-            functional.
+            :attr:`reduced_functional` is neither required nor modified.
 
         Raises
         ------
@@ -432,14 +431,13 @@ pyadjoint.ReducedFunctional or None
                 f"available controls are {available}.",
             )
 
-        if self.reduced_functional is None:
-            self.create_reduced_functional(functional)
-        controls_by_name = dict(zip(
-            self.control_parameter_names,
-            self.reduced_functional.controls,
-        ))
+        # A control stands for the tape node its field has when the control
+        # is created: the node the recording read, which the complete
+        # reduced functional's control would stand for as well.
         controls = [
-            controls_by_name[name] for name in self.control_parameter_names
+            fire_ad.Control(value) for name, value in zip(
+                self.control_parameter_names, self.controls,
+            )
             if name in requested
         ]
         control = controls[0] if len(controls) == 1 else controls

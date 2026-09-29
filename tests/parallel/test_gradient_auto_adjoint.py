@@ -235,7 +235,9 @@ def _verify_ensemble_gradient(Wave_obj_guess, checkpointing):
         )
     )
     assert isinstance(stage_functional, fire_ad.EnsembleReducedFunctional)
-    assert stage_functional.controls[0] is reduced_functional.controls[0]
+    assert stage_functional.controls[0].block_variable is (
+        reduced_functional.controls[0].block_variable
+    )
 
     if checkpointing:
         assert isinstance(

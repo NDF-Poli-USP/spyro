@@ -1901,23 +1901,20 @@ class FullWaveformInversion:
         self.get_functional()
 
         automated_adjoint = self.wave.automated_adjoint
-        reduced_functional = automated_adjoint.reduced_functional
-        if reduced_functional is None:
-            reduced_functional = automated_adjoint.create_reduced_functional(
-                self.wave.functional_value,
-            )
 
         # One bound pair per control, not per degree of freedom: TAO takes the
         # bounds as Function objects (or scalars broadcast over them), while
         # L-BFGS-B takes a pair for each entry of the flattened control.
-        adjoint_controls = [
-            control.control for control in reduced_functional.controls
-        ]
-        lower = tao_bounds(parameters["vmin"], adjoint_controls)
-        upper = tao_bounds(parameters["vmax"], adjoint_controls)
+        lower = tao_bounds(parameters["vmin"], automated_adjoint.controls)
+        upper = tao_bounds(parameters["vmax"], automated_adjoint.controls)
         tao_options = tao_options or {}
 
         if stages is None:
+            reduced_functional = automated_adjoint.reduced_functional
+            if reduced_functional is None:
+                reduced_functional = automated_adjoint.create_reduced_functional(
+                    self.wave.functional_value,
+                )
             options = {
                 "tao_type": "blmvm",
                 "tao_max_it": parameters["maxiter"],
@@ -1933,9 +1930,6 @@ class FullWaveformInversion:
             return automated_adjoint.label_derivatives(solution)
 
         control_names = list(automated_adjoint.control_parameter_names)
-        complete_controls = dict(zip(
-            control_names, reduced_functional.controls,
-        ))
         lower_by_name = dict(zip(control_names, lower))
         upper_by_name = dict(zip(control_names, upper))
         for moving, _ in stages:
@@ -1949,18 +1943,17 @@ class FullWaveformInversion:
                     f"{[name.value for name in control_names]}.",
                 )
 
-        # The optimizer may mutate the fields it is handed, so the state
-        # between stages is held in defensive copies rather than aliases to
-        # either the tape checkpoints or a TAO iterate.
+        # The tape was just recorded from the controls, so they hold the model
+        # the first stage starts from. The optimizer may mutate the fields it
+        # is handed, so the state between stages is held in defensive copies
+        # rather than aliases to either the controls or a TAO iterate.
         state = PhysicalParameters(
-            (name, complete_controls[name].tape_value())
-            for name in control_names
+            zip(control_names, automated_adjoint.controls),
         ).copy()
 
         # Every stage gets a new TAO solver and a reduced functional exposing
-        # only its active controls. Omitted controls remain values on the
-        # complete recorded problem and are synchronized explicitly after
-        # each solve. Iterations are numbered through all stages as one run.
+        # only its active controls. Omitted controls keep their checkpoints
+        # on the tape. Iterations are numbered through all stages as one run.
         done = 0
         for moving, iterations in stages:
             active_names = [name for name in control_names if name in moving]
@@ -1998,10 +1991,13 @@ class FullWaveformInversion:
                 },
                 record=record,
             )
-            for name, value in zip(active_names, stage_solution):
+            # TAO leaves the active checkpoints at the last point it
+            # evaluated, and the next stage starts from the checkpoints.
+            for name, control, value in zip(
+                active_names, stage_functional.controls, stage_solution,
+            ):
                 state.update(name, value)
-            for name in control_names:
-                complete_controls[name].update(state[name])
+                control.update(value)
 
         return state
 
