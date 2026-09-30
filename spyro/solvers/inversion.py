@@ -1956,10 +1956,12 @@ class FullWaveformInversion:
         # on the tape. Iterations are numbered through all stages as one run.
         done = 0
         for moving, iterations in stages:
-            active_names = [name for name in control_names if name in moving]
+            active_control_names = [
+                name for name in control_names if name in moving
+            ]
             stage_functional = automated_adjoint.create_partial_reduced_functional(
                 self.wave.functional_value,
-                active_names,
+                active_control_names,
             )
             stage_start_state = state.copy()
             offset = done
@@ -1968,7 +1970,7 @@ class FullWaveformInversion:
                 nonlocal done
                 done = offset + iteration
                 complete = stage_start_state.copy()
-                for name, value in zip(active_names, active_values):
+                for name, value in zip(active_control_names, active_values):
                     complete.update(name, value)
                 self._record_iterate(
                     done,
@@ -1980,7 +1982,7 @@ class FullWaveformInversion:
                 stage_functional,
                 bounds=[
                     (lower_by_name[name], upper_by_name[name])
-                    for name in active_names
+                    for name in active_control_names
                 ],
                 comm=self.wave.comm.comm,
                 options={
@@ -1994,7 +1996,9 @@ class FullWaveformInversion:
             # TAO leaves the active checkpoints at the last point it
             # evaluated, and the next stage starts from the checkpoints.
             for name, control, value in zip(
-                active_names, stage_functional.controls, stage_solution,
+                active_control_names,
+                stage_functional.controls,
+                stage_solution,
             ):
                 state.update(name, value)
                 control.update(value)
