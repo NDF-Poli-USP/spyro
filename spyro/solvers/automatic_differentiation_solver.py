@@ -11,7 +11,9 @@ from checkpoint_schedules import (
     SingleMemoryStorageSchedule,
     StorageType,
 )
-from ..utils.physical_parameters import PhysicalParameters, as_list
+from ..utils.physical_parameters import (
+    PhysicalParameters, as_list, _as_parameter,
+)
 
 
 class AutomatedAdjoint:
@@ -396,6 +398,8 @@ pyadjoint.ReducedFunctional or None
         ValueError
             If no parameter is selected, a requested parameter is not a
             control, or the controls were created without parameter labels.
+        TypeError
+            If a requested parameter is not a material parameter enum member.
 
         For a complete functional :math:`\widehat J(m_1, m_2)`, selecting only
         :math:`m_1` keeps :math:`m_2` at its current checkpoint:
@@ -404,7 +408,9 @@ pyadjoint.ReducedFunctional or None
 
             \widehat J_1(m_1) = \widehat J(m_1, m_2^*).
         """
-        active_control_param = list(active_control_param)
+        active_control_param = [
+            _as_parameter(name) for name in active_control_param
+        ]
         if not active_control_param:
             raise ValueError("At least one active control is required.")
         if any(name is None for name in self.control_parameter_names):
@@ -414,18 +420,12 @@ pyadjoint.ReducedFunctional or None
             )
 
         requested = set(active_control_param)
-        # Parameters requested for the partial functional that were not
-        # registered as controls of the complete reduced functional.
+        # Parameters requested for the partial functional that are not
+        # controls of this adjoint.
         unknown = requested - set(self.control_parameter_names)
         if unknown:
             available = [name.value for name in self.control_parameter_names]
-            missing = []
-            for name in unknown:
-                try:
-                    missing.append(name.value)
-                except AttributeError:
-                    missing.append(str(name))
-            missing.sort()
+            missing = sorted(name.value for name in unknown)
             raise ValueError(
                 f"{missing} are not controls of this inversion; the "
                 f"available controls are {available}.",

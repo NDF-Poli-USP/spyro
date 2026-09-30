@@ -321,6 +321,10 @@ def test_fwi_stages_verification():
     assert normalize([S, (P, 2), ((S, P), 3)], 4) == [
         ({S}, 4), ({P}, 2), ({S, P}, 3),
     ]
+    # Repeating stages alternates the controls, one stage after the other.
+    assert normalize([(P, 10), (S, 10)] * 2, 4) == [
+        ({P}, 10), ({S}, 10), ({P}, 10), ({S}, 10),
+    ]
     with pytest.raises(ValueError, match="stages is empty"):
         normalize([], 4)
     with pytest.raises(ValueError, match="at least one control"):

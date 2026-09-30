@@ -207,7 +207,7 @@ def test_partial_reduced_functional_shares_tape_and_checkpoint() -> None:
 
 
 def test_partial_reduced_functional_validates_selection() -> None:
-    """A partial functional rejects empty, unknown and unlabeled controls."""
+    """Partial functionals reject empty, unknown, unlabeled and non-enum names."""
     parameter = ElasticMaterialParameter.DENSITY
     automated_adjoint = AutomatedAdjoint(None, {parameter: AdjFloat(2.0)})
 
@@ -217,6 +217,10 @@ def test_partial_reduced_functional_validates_selection() -> None:
         automated_adjoint.create_partial_reduced_functional(
             None, [ElasticMaterialParameter.MU],
         )
+    # Elastic parameters are string enums, so a string equal to a control's
+    # label would otherwise be taken for it.
+    with pytest.raises(TypeError, match="enum"):
+        automated_adjoint.create_partial_reduced_functional(None, ["density"])
 
     unlabeled = AutomatedAdjoint(None, AdjFloat(2.0))
     with pytest.raises(ValueError, match="labeled controls"):
