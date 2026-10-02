@@ -77,16 +77,16 @@ def construct_displacement_displacement(Wave_obj):
     uf_n, u_n = fire.split(Wave_obj.X_n)
     dt = Constant(Wave_obj.dt)
 
-    # solver_parameters = {
-    #     'ksp_type': 'preonly',
-    #     'pc_type': 'lu',
-    # }
-
     solver_parameters = {
-        "ksp_type": "preonly",
-        "pc_type": "jacobi",
-        "mat_type": "matfree",
+        'ksp_type': 'preonly',
+        'pc_type': 'lu',
     }
+
+    # solver_parameters = {
+    #     "ksp_type": "preonly",
+    #     "pc_type": "jacobi",
+    #     "mat_type": "matfree",
+    # }
 
     # ---- Sólido: onda elástica do Spyro (sem termo de interface) ----
     u_trial = TrialFunction(Wave_obj.solid_function_space)

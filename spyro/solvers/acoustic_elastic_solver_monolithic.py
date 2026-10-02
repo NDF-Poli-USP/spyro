@@ -55,23 +55,24 @@ def construct_acoustic_elastic_monolithic(Wave_obj):
         constant_jacobian=True,
     )
 
-    # solver_parameters = dict(Wave_obj.solver_parameters)
-    # solver_parameters = {
-    #     'ksp_type': 'preonly',
-    #     'pc_type': 'lu',
-    # }
-
+    solver_parameters = dict(Wave_obj.solver_parameters)
     solver_parameters = {
-        "ksp_type": "preonly",
-        "pc_type": "fieldsplit",
-        "pc_fieldsplit_type": "multiplicative",
-        "pc_fieldsplit_0_fields": "1",
-        "pc_fieldsplit_1_fields": "0",
-        "fieldsplit_0_ksp_type": "preonly",
-        "fieldsplit_0_pc_type": "jacobi",
-        "fieldsplit_1_ksp_type": "preonly",
-        "fieldsplit_1_pc_type": "jacobi",
+        'ksp_type': 'preonly',
+        'pc_type': 'lu',
     }
+
+    # solver_parameters = {
+    #     "mat_type": "matfree",
+    #     "ksp_type": "preonly",
+    #     "pc_type": "fieldsplit",
+    #     "pc_fieldsplit_type": "multiplicative",
+    #     "pc_fieldsplit_0_fields": "1",
+    #     "pc_fieldsplit_1_fields": "0",
+    #     "fieldsplit_0_ksp_type": "preonly",
+    #     "fieldsplit_0_pc_type": "jacobi",
+    #     "fieldsplit_1_ksp_type": "preonly",
+    #     "fieldsplit_1_pc_type": "jacobi",
+    # }
 
     Wave_obj._monolithic_solver = LinearVariationalSolver(
         lin_var_prob, solver_parameters=solver_parameters

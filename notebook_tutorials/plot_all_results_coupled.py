@@ -24,12 +24,12 @@ from sparsity_plots import load_sparsity_matrices
 # Cases to include: label -> (tag, line style).
 # Comment out a line to remove a case; append a line to add one.
 CASES = {
-    # "P – u_s (sequential)": (
-    #     "pressure_sequential", dict(color="tab:blue", lw=1.5, ls="-")),
-    # "P – u_s (monolithic)": (
-    #     "pressure_monolithic", dict(color="tab:green", lw=1.5, ls="-")),
-    "u_f – u_s (sequential)": (
-        "displacement_sequential", dict(color="tab:orange", lw=1.5, ls="-")),
+    "P – u_s (sequential)": (
+        "pressure_sequential_2d", dict(color="tab:blue", lw=1.5, ls="-")),
+    "P – u_s (monolithic)": (
+        "pressure_monolithic_2d", dict(color="tab:green", lw=1.5, ls="-")),
+    # "u_f – u_s (sequential)": (
+    #     "displacement_sequential_2d", dict(color="tab:orange", lw=1.5, ls="-")),
 }
 
 SHOW_GAR6 = True         # include the Gar6more2D reference (and the L2 errors)
@@ -45,9 +45,9 @@ FS_TICKS    = 18   # tick labels
 FS_LEGEND   = 14   # legend
 
 RESULTS_DIR = "results"
-GAR6MORE_DIR_FLUID = "/workspaces/spyro/notebook_tutorials/python_files/results_fluid"
-GAR6MORE_DIR_SOLID = "/workspaces/spyro/notebook_tutorials/python_files/results_solid"
-FLIP_UZ = True
+GAR6MORE_DIR_FLUID = "/workspaces/spyro2/notebook_tutorials/python_files/results_fluid"
+GAR6MORE_DIR_SOLID = "/workspaces/spyro2/notebook_tutorials/python_files/results_solid"
+FLIP_UZ = False
 GAR6_STYLE = dict(color="red", lw=1.5, ls="--")
 
 if SHOW_GAR6:
@@ -114,8 +114,12 @@ for label, (tag, style) in CASES.items():
     u = np.asarray(d["u_solid"])
 
     # Records start at t = 0 and end at T, with step dt
-    t_p = np.linspace(0.0, T, len(p))
-    t_u = np.linspace(0.0, T, len(u))
+    # t_p = np.linspace(0.0, T, len(p))
+    # t_u = np.linspace(0.0, T, len(u))
+
+    dt_case = float(d["dt"])
+    t_p = np.arange(len(p)) * dt_case   # sample k is t = k*dt
+    t_u = np.arange(len(u)) * dt_case
 
     r = dict(tag=tag, style=style, t_p=t_p, t_u=t_u,
              p=prep(p), uz=prep(u[:, 0]), ux=prep(u[:, 1]),
