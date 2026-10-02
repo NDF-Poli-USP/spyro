@@ -14,7 +14,6 @@ from spyro.plots.general_plots import (
     plot_shots,
 )
 from sparsity_plots import save_sparsity_matrices
-
 from check_spyro_moment_source import check_spyro_moment_source
 
 import sparsity_plots; print("sparsity_plots from:", sparsity_plots.__file__)
@@ -34,15 +33,49 @@ OUT = "results"
 os.makedirs(OUT, exist_ok=True)
 print(f"=== Case: {TAG} ({'cost run' if COST_RUN else 'validation run'}) ===")
 
-dictionary = {}
+case_small_2D ={
+    "length_z": 1.0,
+    "length_x": 1.0,
+    "length_y": 0.0,
+    "edge_length": 0.005,
+    "interface_x": 0.5,
+    "source_locations": [(-0.5, 0.55)],
+    "frequency": 25,
+    "receiver_location": [(-0.5, 0.5)],
+    "solid_receiver_locations": [(-0.5, 0.49)],
+    "final_time": 0.22,
+    "dt": 0.0001,
+}
 
-# dictionary["options"] = {
-#     "cell_type": "Q",            # tetrahedra (quads in 3D give an ExtrudedMesh)
-#     "variant": "lumped",
-#     "degree": 2,
-#     "dimension": DIMENSION,
-#     "fluid_formulation": FLUID_FORMULATION,
-# }
+case_large_2D ={
+    "length_z": 12.0,
+    "length_x": 30.0,
+    "length_y": 0.0,
+    "edge_length": 0.060,
+    "interface_x": 6.0,
+    "source_locations": [(-15.0, 6.6)],
+    "frequency": 10,
+    "receiver_location": [(-15.0, 6.01)],
+    "solid_receiver_locations": [(-15.0, 5.99)],
+    "final_time": 16.0,
+    "dt": 0.001,
+}
+
+case_3D ={
+    "length_z": 4.0,
+    "length_x": 6.0,
+    "length_y": 6.0,
+    "edge_length": 0.060,
+    "interface_x": 1.5,
+    "source_locations": [(-2.0, 3.3, 3.0)],
+    "frequency": 10,
+    "receiver_location": [(-2.0, 3.01, 3.0)],
+    "solid_receiver_locations": [(-2.0, 2.99, 3.0)],
+    "final_time": 6.0,
+    "dt": 0.001,
+}
+
+dictionary = {}
 
 dictionary["options"] = {
     "cell_type": "Q",
@@ -56,20 +89,6 @@ dictionary["parallelism"] = {
     "type": "automatic",
 }
 
-# dictionary["mesh"] = {
-#     "length_z": 1.0,
-#     "length_x": 1.0,
-#     "length_y": 0.0,
-#     "mesh_file": None,
-#     "mesh_type": "firedrake_mesh",
-#     "edge_length": 0.005,
-#     "interface_x": 0.5,
-#     "absorb_left": False,
-#     "absorb_right": False,
-#     "absorb_top": False,
-#     "absorb_bottom": False,
-# }
-
 dictionary["mesh"] = {
     "length_z": 13.5,     
     "length_x": 10.0,     
@@ -82,20 +101,6 @@ dictionary["mesh"] = {
     "absorb_top": False, "absorb_bottom": False,
 }
 
-# dictionary["acquisition"] = {
-#     "source_type": "ricker",
-#     "source_locations": [(-0.5, 0.6)],
-#     # 5 Hz: smallest wavelength ~0.12 km, resolved by 0.05 km elements
-#     "frequency": 25.0,
-#     "delay": 1.0 / 25.0,
-#     "delay_type": "time",
-#     # isotropic moment source for u_f-u_s; scalar source for P-us
-#     "amplitude": np.eye(DIMENSION) if FLUID_FORMULATION == "displacement" else 1.0,
-#     "receiver_locations": [(-0.51, 0.5025)],
-#     "solid_receiver_locations": [(-0.49, 0.4975)],
-#     "use_vertex_only_mesh": False,
-# }
-
 dictionary["acquisition"] = {
     "source_type": "ricker",
     "source_locations": [(-6.75, 5.5)],            
@@ -107,14 +112,6 @@ dictionary["acquisition"] = {
     "solid_receiver_locations": [(-9.75, 4.975)],   
     "use_vertex_only_mesh": False,
 }
-
-# dictionary["time_axis"] = {
-#     "initial_time": 0.0,
-#     "final_time": 0.22,           # longer pulse at 5 Hz
-#     "dt": 0.0001,
-#     "output_frequency": 50,
-#     "gradient_sampling_frequency": 1,
-# }
 
 dictionary["time_axis"] = {
     "initial_time": 0.0,
@@ -141,29 +138,9 @@ dictionary["visualization"] = {
     "interface_error_frequency": 20,
     "sigma_xx_output": False,
     "sigma_xx_output_filename": f"{OUT}/sigma_xx_{TAG}.pvd",
-    # only exists for u_f-u_s
-    "fluid_pressure_output": FLUID_FORMULATION == "displacement",
-    "fluid_pressure_output_filename": f"{OUT}/fluid_pressure_{TAG}.pvd",
+    "fluid_pressure_output": FLUID_FORMULATION == "displacement", # only for u_f-u_s
+    "fluid_pressure_output_filename": f"{OUT}/fluid_pressure_{TAG}.pvd", # only for u_f-u_s
 }
-if COST_RUN:  # no ParaView output in cost runs
-    for key in dictionary["visualization"]:
-        if key.endswith("_output"):
-            dictionary["visualization"][key] = False
-
-# # Homogeneous test: solid identical to the fluid (no reflection expected)
-# dictionary["synthetic_data"] = {
-#     "type": "object",
-#     "velocity_fluid": None,
-#     "bulk_modulus": 2.25,
-#     "density_fluid": 1.0,
-#     "density_solid": 2.0,
-#     "p_wave_velocity": 2.0,
-#     "s_wave_velocity": 1.2,
-#     "real_velocity_file": None,
-#     "s_wave_velocity_fluid": 0.0,
-#     "welded_interface_test": False,
-#     "rotation_penalty": 1.0,
-# }
 
 dictionary["synthetic_data"] = {         
     "type": "object",

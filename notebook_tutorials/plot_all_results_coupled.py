@@ -21,8 +21,7 @@ from sparsity_plots import load_sparsity_matrices
 # ===========================================================================
 # SETTINGS
 # ===========================================================================
-# Cases to include: label -> (tag, line style).
-# Comment out a line to remove a case; append a line to add one.
+# Cases to include. Comment out a line to remove a case; append a line to add one.
 CASES = {
     "P – u_s (sequential)": (
         "pressure_sequential_2d", dict(color="tab:blue", lw=1.5, ls="-")),
@@ -32,12 +31,12 @@ CASES = {
     #     "displacement_sequential_2d", dict(color="tab:orange", lw=1.5, ls="-")),
 }
 
-SHOW_GAR6 = True         # include the Gar6more2D reference (and the L2 errors)
-NORMALIZE = True         # peak-normalize the curves (forced True if SHOW_GAR6)
-PLOT_CONTINUITY = True   # interface normal-displacement continuity, per case
-PLOT_SPARSITY = True     # sparsity-pattern figure for each case
+SHOW_GAR6 = True         # include the Gar6more2D reference and the L2 errors
+NORMALIZE = False        # peak-normalize the curves (forced True if SHOW_GAR6)
+PLOT_CONTINUITY = True   # interface normal-displacement continuity
+PLOT_SPARSITY = True     # sparsity
 
-# Font sizes (change here to change every figure)
+# Font sizes
 FS_SUPTITLE = 22   # figure title
 FS_TITLE    = 22   # subplot title
 FS_LABEL    = 18   # axis labels
@@ -51,9 +50,8 @@ FLIP_UZ = False
 GAR6_STYLE = dict(color="red", lw=1.5, ls="--")
 
 if SHOW_GAR6:
-    NORMALIZE = True   # the Gar6more2D amplitude scale differs from Spyro's
+    NORMALIZE = True   # the Gar6more2D amplitude scale differs from spyro's
 os.makedirs(RESULTS_DIR, exist_ok=True)
-
 
 # ===========================================================================
 # HELPERS
@@ -90,7 +88,6 @@ def style_axis(ax, title, ylabel, xlabel=None):
     ax.tick_params(axis="both", labelsize=FS_TICKS)
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=FS_LEGEND)
-
 
 # ===========================================================================
 # LOAD CASES
@@ -160,7 +157,6 @@ amp = "Amplitude (normalized)" if NORMALIZE else "Amplitude"
 suffix = "_vs_gar6" if SHOW_GAR6 else ""
 cases_tag = "__".join(r["tag"] for r in results.values())
 
-
 # ===========================================================================
 # FLUID RECEIVER — pressure
 # ===========================================================================
@@ -176,9 +172,8 @@ fig_p.savefig(p_path, dpi=150)
 plt.close(fig_p)
 print(f"[OK] Saved to: {os.path.abspath(p_path)}")
 
-
 # ===========================================================================
-# SOLID RECEIVER — displacement components (same layout as the fluid one)
+# SOLID RECEIVER — displacement components
 # ===========================================================================
 fig_u, axes = plt.subplots(2, 1, figsize=(12, 9), sharex=True)
 for ax, comp, gkey, ekey, title in (
@@ -196,9 +191,8 @@ fig_u.savefig(u_path, dpi=150)
 plt.close(fig_u)
 print(f"[OK] Saved to: {os.path.abspath(u_path)}")
 
-
 # ===========================================================================
-# INTERFACE NORMAL-DISPLACEMENT CONTINUITY (one figure per case, raw values)
+# INTERFACE NORMAL-Displacement continuity 
 # ===========================================================================
 if PLOT_CONTINUITY:
     for label, r in results.items():
@@ -226,7 +220,7 @@ if PLOT_CONTINUITY:
         print(f"[OK] Saved to: {os.path.abspath(c_path)}")
 
 # ===========================================================================
-# SPARSITY PATTERNS (one figure per case)
+# SPARSITY
 # ===========================================================================
 if PLOT_SPARSITY:
     for label, (tag, _) in CASES.items():
