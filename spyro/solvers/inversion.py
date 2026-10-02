@@ -1855,18 +1855,26 @@ class FullWaveformInversion:
         # never asks for the automated adjoint must not be made to depend on
         # it -- ``import spyro`` reaches this module, so anything unavailable
         # up there fails every test that touches spyro, whatever it tests.
-        from ..tools.optimization import minimize_with_tao, tao_bounds
+        from ..tools.optimization import (
+            LumpedL2RieszMap, minimize_with_tao, tao_bounds,
+        )
 
         # Records the tape, and logs the starting functional the same way the
         # scipy path logs every iterate.
         self.get_functional()
 
+        # The forward solve above dropped any earlier reduced functional with
+        # its tape, so the one built here is the only one. Its controls carry
+        # the lumped metric, which TAO measures gradients in and seeds its
+        # initial Hessian with; see ``spyro.tools.optimization``.
         automated_adjoint = self.wave.automated_adjoint
-        reduced_functional = automated_adjoint.reduced_functional
-        if reduced_functional is None:
-            reduced_functional = automated_adjoint.create_reduced_functional(
-                self.wave.functional_value,
-            )
+        reduced_functional = automated_adjoint.create_reduced_functional(
+            self.wave.functional_value,
+            riesz_map=[
+                LumpedL2RieszMap(control.function_space())
+                for control in automated_adjoint.controls
+            ],
+        )
 
         # One bound pair per control, not per degree of freedom: TAO takes the
         # bounds as Function objects (or scalars broadcast over them), while
