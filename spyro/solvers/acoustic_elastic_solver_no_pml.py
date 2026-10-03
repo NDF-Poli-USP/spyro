@@ -44,16 +44,10 @@ def construct_acoustic_elastic(Wave_obj):
         constant_jacobian=True,
     )
 
-    # solver_parameters = {
-    #     "ksp_type": "preonly",
-    #     "pc_type": "jacobi",
-    #     "mat_type": "matfree",
-    # }
-
-    solver_parameters = dict(Wave_obj.solver_parameters)
     solver_parameters = {
-        'ksp_type': 'preonly',
-        'pc_type': 'lu',
+        "ksp_type": "preonly",
+        "pc_type": "jacobi",
+        "mat_type": "matfree",
     }
 
     Wave_obj.solid_solver = LinearVariationalSolver(
@@ -90,16 +84,10 @@ def construct_acoustic_elastic(Wave_obj):
         constant_jacobian=True,
     )
 
-    # solver_parameters = {
-    #     "ksp_type": "preonly",
-    #     "pc_type": "jacobi",
-    #     "mat_type": "matfree",
-    # }
-
-    solver_parameters = dict(Wave_obj.solver_parameters)
     solver_parameters = {
-        'ksp_type': 'preonly',
-        'pc_type': 'lu',
+        "ksp_type": "preonly",
+        "pc_type": "jacobi",
+        "mat_type": "matfree",
     }
 
     Wave_obj.fluid_solver = LinearVariationalSolver(

@@ -3,7 +3,6 @@ import firedrake as fire
 from .wave import Wave
 from .acoustic_elastic_solver_no_pml import construct_acoustic_elastic
 from .acoustic_elastic_solver_monolithic import construct_acoustic_elastic_monolithic
-from .acoustic_elastic_solver_uu import construct_displacement_displacement
 from ..utils.typing import override, WaveType
 from ..domains.space import create_function_space
 from ..domains.quadrature import quadrature_rules
@@ -248,7 +247,7 @@ class AcousticElasticWave(Wave):
                     )
                 self.K = fire.Constant(rho_fluid_value * velocity_fluid_value**2)
 
-    @override
+
     @override
     def matrix_building(self):
         self.current_time = 0.0
@@ -256,26 +255,7 @@ class AcousticElasticWave(Wave):
         self.X_n = fire.Function(self.function_space)
         self.X_np1 = fire.Function(self.function_space)
 
-        if self.fluid_is_vector:
-            if self.use_monolithic:
-                raise NotImplementedError(
-                    "Monolítico ainda não implementado para u_f-u_s."
-                )
-            construct_displacement_displacement(self)
-
-            # Fonte explosiva (amplitude = I): tempo = integral dupla do wavelet
-            # do próprio Spyro (Cao et al., eqs. 3-4). A flag evita integrar
-            # de novo se forward_solve for chamado mais de uma vez.
-            if not getattr(self, "_wavelet_integrated", False):
-                w = np.asarray(self.sources.wavelet)
-                from scipy.integrate import cumulative_trapezoid
-                w1 = cumulative_trapezoid(w, dx=self.dt, initial=0.0)
-                self.sources.wavelet = cumulative_trapezoid(w1, dx=self.dt, initial=0.0)
-                self._wavelet_integrated = True
-
-            self._uu_step = 0
-
-        elif self.use_monolithic:
+        if self.use_monolithic:
             construct_acoustic_elastic_monolithic(self)
         else:
             construct_acoustic_elastic(self)

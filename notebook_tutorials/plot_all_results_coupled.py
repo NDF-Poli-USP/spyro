@@ -14,24 +14,24 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from scipy.signal import correlate
+import pickle
+from firedrake import triplot
 
 from spyro.tools.error_measure import MeasureError
 from sparsity_plots import load_sparsity_matrices
 
 # ===========================================================================
-# SETTINGS
+# Settings
 # ===========================================================================
 # Cases to include. Comment out a line to remove a case; append a line to add one.
 CASES = {
     "P – u_s (sequential)": (
-        "pressure_sequential_2d", dict(color="tab:blue", lw=1.5, ls="-")),
-    "P – u_s (monolithic)": (
-        "pressure_monolithic_2d", dict(color="tab:green", lw=1.5, ls="-")),
-    # "u_f – u_s (sequential)": (
-    #     "displacement_sequential_2d", dict(color="tab:orange", lw=1.5, ls="-")),
+        "sequential_2d", dict(color="tab:blue", lw=1.5, ls="-")),
+    # "P – u_s (monolithic)": (
+    #     "monolithic_2d", dict(color="tab:green", lw=1.5, ls="-")),
 }
 
-SHOW_GAR6 = True         # include the Gar6more2D reference and the L2 errors
+SHOW_GAR6 = False         # include the Gar6more2D reference and the L2 errors
 NORMALIZE = False        # peak-normalize the curves (forced True if SHOW_GAR6)
 PLOT_CONTINUITY = True   # interface normal-displacement continuity
 PLOT_SPARSITY = True     # sparsity
@@ -44,8 +44,8 @@ FS_TICKS    = 18   # tick labels
 FS_LEGEND   = 14   # legend
 
 RESULTS_DIR = "results"
-GAR6MORE_DIR_FLUID = "/workspaces/spyro2/notebook_tutorials/python_files/results_fluid"
-GAR6MORE_DIR_SOLID = "/workspaces/spyro2/notebook_tutorials/python_files/results_solid"
+GAR6MORE_DIR_FLUID = "/workspaces/spyro/notebook_tutorials/python_files/results_fluid"
+GAR6MORE_DIR_SOLID = "/workspaces/spyro/notebook_tutorials/python_files/results_solid"
 FLIP_UZ = False
 GAR6_STYLE = dict(color="red", lw=1.5, ls="--")
 
@@ -54,7 +54,7 @@ if SHOW_GAR6:
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 # ===========================================================================
-# HELPERS
+# Helpers
 # ===========================================================================
 def load_gar6more_file(path):
     values = np.loadtxt(path)
@@ -90,7 +90,7 @@ def style_axis(ax, title, ylabel, xlabel=None):
     ax.legend(fontsize=FS_LEGEND)
 
 # ===========================================================================
-# LOAD CASES
+# Load cases
 # ===========================================================================
 if SHOW_GAR6:
     t_g_p,  p_g  = load_gar6more_file(f"{GAR6MORE_DIR_FLUID}/P.dat")
@@ -158,7 +158,7 @@ suffix = "_vs_gar6" if SHOW_GAR6 else ""
 cases_tag = "__".join(r["tag"] for r in results.values())
 
 # ===========================================================================
-# FLUID RECEIVER — pressure
+# Fluid receiver — pressure
 # ===========================================================================
 fig_p, ax_p = plt.subplots(figsize=(12, 5))
 if SHOW_GAR6:
@@ -173,7 +173,7 @@ plt.close(fig_p)
 print(f"[OK] Saved to: {os.path.abspath(p_path)}")
 
 # ===========================================================================
-# SOLID RECEIVER — displacement components
+# Solid receiver — displacement components
 # ===========================================================================
 fig_u, axes = plt.subplots(2, 1, figsize=(12, 9), sharex=True)
 for ax, comp, gkey, ekey, title in (
@@ -192,7 +192,7 @@ plt.close(fig_u)
 print(f"[OK] Saved to: {os.path.abspath(u_path)}")
 
 # ===========================================================================
-# INTERFACE NORMAL-Displacement continuity 
+# Interface normal - Displacement continuity 
 # ===========================================================================
 if PLOT_CONTINUITY:
     for label, r in results.items():
@@ -220,7 +220,7 @@ if PLOT_CONTINUITY:
         print(f"[OK] Saved to: {os.path.abspath(c_path)}")
 
 # ===========================================================================
-# SPARSITY
+# Sparsity
 # ===========================================================================
 if PLOT_SPARSITY:
     for label, (tag, _) in CASES.items():
