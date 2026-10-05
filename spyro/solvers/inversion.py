@@ -1658,8 +1658,10 @@ class FullWaveformInversion:
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
             tao_options : dict, optional
                 PETSc options for the TAO solver, merged over the defaults
-                ``{"tao_type": "blmvm", "tao_max_it": maxiter}``. Only used
-                under the automated adjoint.
+                ``{"tao_type": "bqnls", "tao_max_it": maxiter}``. Only used
+                under the automated adjoint. BQNLS is TAO's bound-constrained
+                quasi-Newton method; see :mod:`spyro.tools.optimization` for
+                why it is the default.
 
                 Those two are the only options set here, so what stops a run
                 is ``maxiter``: the convergence *tolerances* are left at
@@ -1855,26 +1857,18 @@ class FullWaveformInversion:
         # never asks for the automated adjoint must not be made to depend on
         # it -- ``import spyro`` reaches this module, so anything unavailable
         # up there fails every test that touches spyro, whatever it tests.
-        from ..tools.optimization import (
-            LumpedL2RieszMap, minimize_with_tao, tao_bounds,
-        )
+        from ..tools.optimization import minimize_with_tao, tao_bounds
 
         # Records the tape, and logs the starting functional the same way the
         # scipy path logs every iterate.
         self.get_functional()
 
-        # The forward solve above dropped any earlier reduced functional with
-        # its tape, so the one built here is the only one. Its controls carry
-        # the lumped metric, which TAO measures gradients in and seeds its
-        # initial Hessian with; see ``spyro.tools.optimization``.
         automated_adjoint = self.wave.automated_adjoint
-        reduced_functional = automated_adjoint.create_reduced_functional(
-            self.wave.functional_value,
-            riesz_map=[
-                LumpedL2RieszMap(control.function_space())
-                for control in automated_adjoint.controls
-            ],
-        )
+        reduced_functional = automated_adjoint.reduced_functional
+        if reduced_functional is None:
+            reduced_functional = automated_adjoint.create_reduced_functional(
+                self.wave.functional_value,
+            )
 
         # One bound pair per control, not per degree of freedom: TAO takes the
         # bounds as Function objects (or scalars broadcast over them), while
@@ -1887,7 +1881,7 @@ class FullWaveformInversion:
         lower = tao_bounds(parameters["vmin"], adjoint_controls)
         upper = tao_bounds(parameters["vmax"], adjoint_controls)
         options = {
-            "tao_type": "blmvm",
+            "tao_type": "bqnls",
             "tao_max_it": parameters["maxiter"],
         }
         if tao_options:

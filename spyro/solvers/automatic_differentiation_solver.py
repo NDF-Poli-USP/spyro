@@ -323,7 +323,6 @@ pyadjoint.ReducedFunctional or None
 
     def create_reduced_functional(
         self, functional: object, ensemble: object = None,
-        riesz_map: object = None,
     ) -> object:
         """Build the reduced functional for the recorded forward problem.
 
@@ -343,11 +342,6 @@ pyadjoint.ReducedFunctional or None
         ensemble : firedrake.ensemble.Ensemble, optional
             Ensemble communicator to use. Defaults to the ensemble supplied at
             construction time (``self.ensemble``, i.e. ``wave.comm``).
-        riesz_map : object or list, optional
-            Riesz map of the controls, in any form ``pyadjoint.Control``
-            takes, or a list with one per control. It is the metric the
-            gradient and any optimizer handed the reduced functional measure
-            the controls in. Defaults to pyadjoint's, the consistent L2 map.
 
         Returns
         -------
@@ -357,19 +351,7 @@ pyadjoint.ReducedFunctional or None
         """
         if not self.controls:
             raise ValueError("At least one control is required.")
-        if isinstance(riesz_map, (list, tuple)):
-            if len(riesz_map) != len(self.controls):
-                raise ValueError(
-                    f"{len(self.controls)} controls take that many Riesz "
-                    f"maps; {len(riesz_map)} were given.",
-                )
-            riesz_maps = list(riesz_map)
-        else:
-            riesz_maps = [riesz_map] * len(self.controls)
-        controls = [
-            fire_ad.Control(value, riesz_map=map_)
-            for value, map_ in zip(self.controls, riesz_maps)
-        ]
+        controls = [fire_ad.Control(value) for value in self.controls]
         # pyadjoint mirrors the shape it is given: a bare control comes back
         # as a bare derivative, a list as a list. Handing it a one-item list
         # would make every single-control caller unwrap by hand.
