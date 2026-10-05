@@ -37,9 +37,13 @@ quasi-Newton method, with its own rescaling, and that method *is* the
 :math:`L^2` one in :math:`m`. :math:`M_L` being diagonal, a box on :math:`m`
 stays a box on :math:`z`, and the coefficient-wise projection stays exact.
 
-BQNLS is the default method. pyadjoint's ``TAOSolver`` installs an initial
-Hessian of its own for LMVM and BLMVM, which turns PETSc's rescaling off; it
-leaves BQNLS alone.
+BQNLS is the default method: TAO's bound-constrained quasi-Newton method,
+added in PETSc 3.10 to replace BLMVM, which PETSc nevertheless still ships.
+pyadjoint's ``TAOSolver`` installs an initial Hessian of its own for LMVM and
+BLMVM, which turns PETSc's rescaling off; it leaves BQNLS alone. BLMVM also
+restarts every line search from a unit step, whatever ``tao_ls_stepinit``
+says, and LMVM is unconstrained, so it ignores bounds altogether.
+:func:`minimize_with_tao` warns when it is given either.
 
 This module is built on pyadjoint's TAO support, some of it internal, so
 ``spyro.solvers.inversion`` imports it where it drives an optimization rather
@@ -93,8 +97,12 @@ def _lumped_mass(function_space: fire.FunctionSpace) -> fire.Cofunction:
     Raises
     ------
     ValueError
-        If a row sum is not positive, as for the vertices of a quadratic
-        Lagrange element, whose basis functions integrate to zero there.
+        If a row sum is not positive. A row sum is the integral of a basis
+        function, and some Lagrange elements have basis functions that
+        integrate to zero or less: the vertex functions of quadratic Lagrange
+        integrate to zero on triangles and to a negative value on
+        tetrahedra. The lumped metric is then not positive definite, so it
+        cannot be the metric TAO runs in.
     """
     trial = fire.TrialFunction(function_space)
     test = fire.TestFunction(function_space)
@@ -110,10 +118,19 @@ def _lumped_mass(function_space: fire.FunctionSpace) -> fire.Cofunction:
     with mass.dat.vec_ro as entries:
         _, smallest = entries.min()
     if smallest <= 0.0:
+        element = function_space.ufl_element()
         raise ValueError(
-            "The lumped mass of a control space has to be positive; this one "
-            f"has an entry of {smallest}. Use a mass-lumped (spectral) "
-            "element for the controls.",
+            "The lumped mass of a control space has to be positive, and this "
+            f"one, {element.family()} of degree {element.degree()} on a "
+            f"{function_space.mesh().ufl_cell()} mesh, has an entry "
+            f"of {smallest:.3g}. Lumping by row sums gives each degree of "
+            "freedom the integral of its basis function, and some basis "
+            "functions of this element integrate to zero or less (the vertex "
+            "functions of quadratic Lagrange do, on triangles and "
+            "tetrahedra), so the lumped metric TAO would run in is not "
+            "positive definite. Use a mass-lumped element for the controls "
+            "(KMV, or spectral on quadrilaterals), or a Lagrange degree whose "
+            "basis functions all integrate to a positive value, such as 1.",
         )
     return mass
 
@@ -432,8 +449,9 @@ def minimize_with_tao(
     comm : petsc4py.PETSc.Comm or mpi4py.MPI.Comm, optional
         Communicator the controls are defined over.
     options : dict, optional
-        PETSc options for the solver, such as ``{"tao_type": "bqnls",
-        "tao_max_it": 20}``.
+        PETSc options for the solver, such as ``{"tao_max_it": 20}``, merged
+        over ``{"tao_type": "bqnls"}``. Without a type TAO would fall back on
+        its own default, LMVM, which ignores bounds.
     record : callable, optional
         Called ``record(iteration, functional, controls)`` after each
         iteration TAO accepts, with the controls it stands at as a list of
@@ -454,18 +472,47 @@ def minimize_with_tao(
         If TAO stops without converging, which is what reaching the iteration
         limit amounts to. The last iterate is returned rather than raising,
         since a fixed iteration budget is a normal way to run an optimization.
+    UserWarning
+        If the TAO type resolves to LMVM or BLMVM, with the reasons it is not
+        recommended: pyadjoint's ``TAOSolver`` gives both an initial Hessian
+        that PETSc keeps fixed instead of rescaling; BLMVM restarts every line
+        search from a unit step; and LMVM ignores the bounds.
 
     See Also
     --------
     LumpedL2TransformedFunctional : The change of variables TAO runs in.
     tao_bounds : Shapes ``vmin``/``vmax`` into the ``bounds`` this takes.
     """
-    options = options or {}
+    options = {"tao_type": "bqnls", **(options or {})}
     transformed = LumpedL2TransformedFunctional(reduced_functional)
     if bounds is not None:
         bounds = transformed.transform_bounds(bounds)
     problem = MinimizationProblem(transformed, bounds=bounds)
     solver = TAOSolver(problem, options, comm=comm)
+    # Checked on the type TAO resolved, which the PETSc command line can set
+    # as well as ``options``.
+    tao_type = solver.tao.getType()
+    if tao_type in {"lmvm", "blmvm"}:
+        reasons = [
+            "pyadjoint's TAOSolver gives it a fixed initial Hessian, which "
+            "turns off PETSc's rescaling of the quasi-Newton step",
+        ]
+        if tao_type == "blmvm":
+            reasons.append(
+                "it restarts every line search from a unit step, ignoring "
+                "tao_ls_stepinit",
+            )
+        elif bounds is not None:
+            reasons.append(
+                "it is unconstrained, so it ignores the bounds and the "
+                "controls can leave them",
+            )
+        warnings.warn(
+            f"TAO type '{tao_type}' is not recommended here: "
+            + "; ".join(reasons)
+            + ". The default 'bqnls', which TAO introduced to replace "
+            "BLMVM, has none of these problems.",
+        )
     # TAO holds an iterate as one vector with every control concatenated into
     # it. Reading it through an interface built from those same controls lays
     # them out the way the solver's own does. Both the monitor and the

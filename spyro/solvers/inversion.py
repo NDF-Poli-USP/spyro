@@ -1881,7 +1881,6 @@ class FullWaveformInversion:
         lower = tao_bounds(parameters["vmin"], adjoint_controls)
         upper = tao_bounds(parameters["vmax"], adjoint_controls)
         options = {
-            "tao_type": "bqnls",
             "tao_max_it": parameters["maxiter"],
         }
         if tao_options:

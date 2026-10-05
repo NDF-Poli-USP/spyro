@@ -6,6 +6,8 @@ transformation itself, and that TAO, running its own Euclidean quasi-Newton
 method on ``z``, behaves as an L2 method on ``m``: on an L2 least-squares
 problem its first step lands on the minimizer, on any mesh.
 """
+import warnings
+
 import firedrake as fire
 import numpy as np
 import pytest
@@ -175,11 +177,43 @@ def test_bounds_are_projected_exactly():
                            rtol=0.0, atol=1e-7)
 
 
+def test_bqnls_is_the_default():
+    """Left to itself TAO would pick LMVM, which warns and ignores bounds."""
+    space = kmv_space(4)
+    reduced_functional = lumped_misfit(
+        [fire.Function(space).assign(1.0)], [reference(space)],
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        minimize_with_tao(
+            reduced_functional, bounds=[(0.5, 2.0)],
+            options={"tao_gatol": 1e-10, "tao_grtol": 0.0, "tao_gttol": 0.0,
+                     "tao_max_it": 20},
+        )
+
+
+@pytest.mark.parametrize("tao_type, bounds, reason", [
+    ("lmvm", None, "fixed initial Hessian"),
+    ("blmvm", None, "fixed initial Hessian"),
+    ("blmvm", None, "unit step"),
+    ("lmvm", [(0.5, 2.0)], "ignores the bounds"),
+])
+def test_types_that_are_not_recommended_warn(tao_type, bounds, reason):
+    """LMVM and BLMVM warn, with the reasons that apply to each."""
+    space = kmv_space(4)
+    reduced_functional = lumped_misfit(
+        [fire.Function(space).assign(1.0)], [reference(space)],
+    )
+    with pytest.warns(UserWarning, match=reason):
+        minimize_with_tao(reduced_functional, bounds=bounds,
+                          options={"tao_type": tao_type, "tao_max_it": 1})
+
+
 def test_a_mass_that_does_not_lump_is_rejected():
     """Quadratic Lagrange vertex functions integrate to zero on triangles."""
     space = fire.FunctionSpace(fire.UnitSquareMesh(2, 2), "CG", 2)
     reduced_functional = lumped_misfit(
         [fire.Function(space).assign(1.0)], [fire.Function(space)],
     )
-    with pytest.raises(ValueError, match="lumped mass"):
+    with pytest.raises(ValueError, match="integrate to zero or less"):
         LumpedL2TransformedFunctional(reduced_functional)
