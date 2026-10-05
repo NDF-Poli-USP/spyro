@@ -18,9 +18,6 @@ import sparsity_plots; print("sparsity_plots from:", sparsity_plots.__file__)
 # Settings
 # ===========================================================================
 USE_MONOLITHIC = False
-DIMENSION = 2
-SCHEME = "monolithic" if USE_MONOLITHIC else "sequential"
-TAG = f"{SCHEME}_{DIMENSION}d"
 OUT = "results"
 os.makedirs(OUT, exist_ok=True)
 
@@ -28,6 +25,8 @@ os.makedirs(OUT, exist_ok=True)
 # Cases
 # ===========================================================================
 case_small_2D = {
+    "cell_type": "Q",
+    "degree": 4,
     "length_z": 1.0,
     "length_x": 1.0,
     "length_y": 0.0,
@@ -48,10 +47,12 @@ case_small_2D = {
 }
 
 case_large_2D = {
+    "cell_type": "Q",
+    "degree": 4,
     "length_z": 30.0,
     "length_x": 12.0,
     "length_y": 0.0,
-    "edge_length": 0.060,
+    "edge_length": 0.045,
     "interface_x": 6.0,
     "source_locations": [(-15.0, 6.6)],
     "frequency": 10,
@@ -68,16 +69,18 @@ case_large_2D = {
 }
 
 case_3D = {
-    "length_z": 4.0,
-    "length_x": 6.0,
+    "cell_type": "T",
+    "degree": 3,
+    "length_z": 6.0,
+    "length_x": 4.0,
     "length_y": 6.0,
     "edge_length": 0.060,
-    "interface_x": 1.5,
-    "source_locations": [(-2.0, 3.3, 3.0)],
+    "interface_x": 2.5,
+    "source_locations": [(-3.0, 2.65, 3.0)],
     "frequency": 10,
-    "receiver_location": [(-2.01, 3.01, 3.0)],
-    "solid_receiver_locations": [(-1.99, 2.99, 3.0)],
-    "final_time": 6.0,
+    "receiver_location": [(-3.01, 2.51, 3.0)],
+    "solid_receiver_locations": [(-2.99, 2.49, 3.0)],
+    "final_time": 1.0,
     "dt": 0.001,
     "velocity_fluid": None,
     "bulk_modulus": 2.25,
@@ -87,8 +90,15 @@ case_3D = {
     "s_wave_velocity": 1.963,
 }
 
-cases = {1: case_small_2D, 2: case_large_2D, 3: case_3D}
-selected_case = cases[2]
+cases = {1: ("case_small_2d", case_small_2D),
+         2: ("case_large_2d", case_large_2D),
+         3: ("case_3d", case_3D)}
+CASE_NUM = 1
+CASE_NAME, selected_case = cases[CASE_NUM]
+
+DIMENSION = 3 if CASE_NAME == "case_3d" else 2
+SCHEME = "monolithic" if USE_MONOLITHIC else "sequential"
+TAG = f"{CASE_NAME}_{SCHEME}_{DIMENSION}d"
 
 # ===========================================================================
 # Dictionary
@@ -96,9 +106,9 @@ selected_case = cases[2]
 dictionary = {}
 
 dictionary["options"] = {
-    "cell_type": "Q",
+    "cell_type": selected_case["cell_type"],
     "variant": "lumped",
-    "degree": 4,
+    "degree": selected_case["degree"],
     "dimension": DIMENSION,
 }
 
