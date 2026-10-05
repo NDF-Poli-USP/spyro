@@ -1,8 +1,8 @@
 import firedrake as fire
 import numpy as np
-from firedrake import *
 
 from . import helpers
+from .memory_update import update_memory_variables
 from .. import utils
 from ..utils.typing import FunctionalEvaluationMode, AdjointType, AbsorbingBCsType, WaveType
 
@@ -93,6 +93,18 @@ def _propagate_forward_central_difference(wave, source_ids):
         # fresh one, sized by this loop's ``nt``.
         wave.automated_adjoint.start_recording(total_steps=nt)
 
+    viscoelastic = (
+        wave.wave_type != WaveType.ISOTROPIC_ACOUSTIC
+        and getattr(wave, "viscoelastic", False)
+    )
+    if viscoelastic:
+        # Zera a memória a cada solve (cada tiro / iteração da inversão).
+        # Sem isso, um solve herda a memória do anterior. O assign é feito
+        # depois de start_recording para que o estado inicial fique na fita.
+        for chi in wave.chi_list:
+            chi.assign(0.0)
+        wave.chi_mem.assign(0.0)
+
     for step in range(nt):
         # Basic way of applying sources
         wave.update_source_expression(t)
@@ -128,29 +140,14 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
 
-        if wave.wave_type != WaveType.ISOTROPIC_ACOUSTIC and wave.viscoelastic:
-
-            dt = wave.dt
-            W = wave.strain_space
-
-            zeta_list = wave.zeta_list
-            omega_list = wave.omega_list
-
-            def epsilon(u):
-                return sym(grad(u))
-
-            # Strain rate
-            eps_old = Function(zeta_list[0].function_space())
-
-            # Dentro de cada passo de tempo:
-            eps_old.interpolate(epsilon(wave.prev_vstate))
-            zeta_old = Function(W)
-
-            # Update memory variables
-            for i in range(len(zeta_list)):
-                zeta_old.assign(zeta_list[i])
-                omega = omega_list[i]
-                zeta_list[i].assign(zeta_old + dt * omega * (eps_old - zeta_old))
+        if viscoelastic:
+            # Após a rotação, prev_vstate (u_nm1) contém u^n. Atualização
+            # pontual nos Vec do PETSc; com fita ativa, grava um único bloco
+            # (recompute/adjunto/TLM) no lugar dos interpolates/assigns.
+            update_memory_variables(
+                wave.prev_vstate, wave.chi_list, wave.chi_mem,
+                wave.chi_a, wave.chi_b, wave.y_list,
+            )
 
         if wave.use_vertex_only_mesh:
             if receiver_buffer is None:
