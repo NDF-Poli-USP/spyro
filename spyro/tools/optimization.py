@@ -1,36 +1,6 @@
-r"""Optimizers a reduced functional can be handed to.
-
-Tools to minimize a reduced functional with pyadjoint's ``TAOSolver``: the
+"""Tools to minimize a reduced functional with pyadjoint's ``TAOSolver``: the
 metric of the controls, the bounds in the form TAO expects, and the call to
 TAO itself.
-
-The metric
-----------
-The adjoint gives the derivative :math:`DJ \in V^{\ast}`. The gradient is its
-Riesz representer, :math:`\nabla J = M^{-1} DJ`, with :math:`M` the mass
-matrix. TAO uses this metric for its steps and for its convergence test
-(``tao_gatol``, ``tao_grtol``), which makes the tolerances independent of the
-mesh.
-
-With bounds, the metric must be diagonal: TAO projects onto the box one
-coefficient at a time, which is the true projection only for a diagonal
-metric. The mass is therefore lumped, :math:`M_L`.
-
-Passing :math:`M_L^{-1}` to TAO as the initial Hessian would stop PETSc from
-rescaling the quasi-Newton step. Instead,
-:class:`LumpedL2TransformedFunctional` changes variables to
-:math:`z = M_L^{1/2} m`. In :math:`z` the lumped :math:`L^2` inner product is
-the Euclidean one, :math:`m^T M_L m = z^T z`, so TAO's standard method, with
-its own step rescaling, is the :math:`L^2` method in :math:`m`. Since
-:math:`M_L` is diagonal, bounds on :math:`m` remain bounds on :math:`z`.
-
-The default method is BQNLS. For LMVM and BLMVM, pyadjoint sets a fixed
-initial Hessian that disables PETSc's rescaling; BLMVM also restarts each line
-search with a unit step, and LMVM ignores bounds. :func:`minimize_with_tao`
-warns if either is used.
-
-This module is imported only when the automated adjoint drives an
-optimization, so other inversions do not depend on pyadjoint's TAO support.
 """
 
 import warnings
@@ -122,7 +92,7 @@ class LumpedL2TransformedFunctional(AbstractReducedFunctional):
 
     Represents :math:`\hat{J}(z) = J(M_L^{-1/2} z)`: each control :math:`m`
     of the wrapped functional is replaced by :math:`z = M_L^{1/2} m`, with
-    :math:`M_L` its lumped mass. See the module docstring for why.
+    :math:`M_L` its lumped mass.
 
     The controls here carry the ``"l2"`` Riesz map, which in :math:`z` is the
     lumped :math:`L^2` one in :math:`m`. Values go in and come out as
@@ -414,7 +384,7 @@ def minimize_with_tao(
 
     The optimization runs over :class:`LumpedL2TransformedFunctional`, so TAO
     measures gradients, takes steps and projects onto the bounds in the
-    lumped :math:`L^2` metric of the controls; see the module docstring.
+    lumped :math:`L^2` metric of the controls.
 
     Under ensemble parallelism the controls are replicated on every member,
     so ``comm`` has to be the *spatial* communicator: TAO's default
