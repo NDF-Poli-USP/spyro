@@ -1679,8 +1679,7 @@ class FullWaveformInversion:
                 PETSc options for the TAO solver, merged over the defaults
                 ``{"tao_type": "bqnls", "tao_max_it": maxiter}``. Only used
                 under the automated adjoint. BQNLS is TAO's bound-constrained
-                quasi-Newton method; see :mod:`spyro.tools.optimization` for
-                why it is the default.
+                quasi-Newton method.
 
                 Those two are the only options set here, so what stops a run
                 is ``maxiter``: the convergence *tolerances* are left at

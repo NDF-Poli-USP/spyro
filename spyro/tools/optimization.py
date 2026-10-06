@@ -1,54 +1,36 @@
 r"""Optimizers a reduced functional can be handed to.
 
-What lives here is the optimizer's half of an inversion: the metric the
-controls are measured in, shaping bounds into the form TAO takes them, driving
-TAO, and reading the iterate back when it stops short. None of it knows what is
-being inverted for. The optimizer itself is pyadjoint's ``TAOSolver``.
+Tools to minimize a reduced functional with pyadjoint's ``TAOSolver``: the
+metric of the controls, the bounds in the form TAO expects, and the call to
+TAO itself.
 
 The metric
 ----------
-A gradient computed by the adjoint is a *dual* object: it lives in
-:math:`V'`, and turning it into a direction in :math:`V` takes the Riesz map,
-:math:`\nabla J = M^{-1} DJ` with :math:`M` the mass matrix. TAO measures
-gradients in one metric, and its convergence test uses it too: ``tao_gatol``
-and ``tao_grtol`` are read on the projected gradient in that norm. Measuring
-it in :math:`L^2` rather than on the coefficients is what makes a tolerance
-mean the same thing on a finer mesh.
+The adjoint gives the derivative :math:`DJ \in V^{\ast}`. The gradient is its
+Riesz representer, :math:`\nabla J = M^{-1} DJ`, with :math:`M` the mass
+matrix. TAO uses this metric for its steps and for its convergence test
+(``tao_gatol``, ``tao_grtol``), which makes the tolerances independent of the
+mesh.
 
-For a *bound-constrained* problem the metric has to be coefficient-wise as
-well. TAO projects onto the box coefficient by coefficient, and that is only a
-projection in a metric that is itself coefficient-wise. A consistent mass
-matrix couples neighbouring degrees of freedom; lumping it -- collapsing it to
-its row sums :math:`M_L`, a diagonal matrix -- makes the metric
-coefficient-wise, and the two agree.
+With bounds, the metric must be diagonal: TAO projects onto the box one
+coefficient at a time, which is the true projection only for a diagonal
+metric. The mass is therefore lumped, :math:`M_L`.
 
-A quasi-Newton method also needs the *scale* of its first step right, and it
-learns that scale from the curvature it observes,
-:math:`\gamma_k = s_k^T y_k / y_k^T H_0 y_k`. PETSc does this rescaling for
-the initial Hessian it builds itself, but not for one supplied from outside --
-and an initial Hessian supplied from outside is the only way to give it the
-:math:`L^2` metric directly.
+Passing :math:`M_L^{-1}` to TAO as the initial Hessian would stop PETSc from
+rescaling the quasi-Newton step. Instead,
+:class:`LumpedL2TransformedFunctional` changes variables to
+:math:`z = M_L^{1/2} m`. In :math:`z` the lumped :math:`L^2` inner product is
+the Euclidean one, :math:`m^T M_L m = z^T z`, so TAO's standard method, with
+its own step rescaling, is the :math:`L^2` method in :math:`m`. Since
+:math:`M_L` is diagonal, bounds on :math:`m` remain bounds on :math:`z`.
 
-So the metric is given to TAO by a change of variables instead.
-:class:`LumpedL2TransformedFunctional` optimizes over
-:math:`z = M_L^{1/2} m`, in which the lumped :math:`L^2` inner product is the
-Euclidean one, :math:`m^T M_L m = z^T z`. TAO then runs its own Euclidean
-quasi-Newton method, with its own rescaling, and that method *is* the
-:math:`L^2` one in :math:`m`. :math:`M_L` being diagonal, a box on :math:`m`
-stays a box on :math:`z`, and the coefficient-wise projection stays exact.
+The default method is BQNLS. For LMVM and BLMVM, pyadjoint sets a fixed
+initial Hessian that disables PETSc's rescaling; BLMVM also restarts each line
+search with a unit step, and LMVM ignores bounds. :func:`minimize_with_tao`
+warns if either is used.
 
-BQNLS is the default method: TAO's bound-constrained quasi-Newton method,
-added in PETSc 3.10 to replace BLMVM, which PETSc nevertheless still ships.
-pyadjoint's ``TAOSolver`` installs an initial Hessian of its own for LMVM and
-BLMVM, which turns PETSc's rescaling off; it leaves BQNLS alone. BLMVM also
-restarts every line search from a unit step, whatever ``tao_ls_stepinit``
-says, and LMVM is unconstrained, so it ignores bounds altogether.
-:func:`minimize_with_tao` warns when it is given either.
-
-This module is built on pyadjoint's TAO support, some of it internal, so
-``spyro.solvers.inversion`` imports it where it drives an optimization rather
-than at the top of the file. An inversion that never asks for the automated
-adjoint therefore never loads this, and never depends on what it needs.
+This module is imported only when the automated adjoint drives an
+optimization, so other inversions do not depend on pyadjoint's TAO support.
 """
 
 import warnings
