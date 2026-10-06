@@ -21,8 +21,10 @@ from ..utils.physical_parameters import as_list
 
 
 @no_annotations
-def _lumped_mass(function_space: fire.FunctionSpace) -> fire.Cofunction:
-    r"""Return the lumped mass of a control space.
+def _inverse_sqrt_lumped_mass(
+    function_space: fire.FunctionSpace,
+) -> fire.Function:
+    r"""Return :math:`M_L^{-1/2}`, the inverse square root of the lumped mass.
 
     The mass is lumped by row sums, :math:`m_i = \sum_j M_{ij}`, which is what
     ``action(u v dx, 1)`` assembles: applying the mass matrix to the constant
@@ -43,8 +45,9 @@ def _lumped_mass(function_space: fire.FunctionSpace) -> fire.Cofunction:
 
     Returns
     -------
-    firedrake.Cofunction
-        The row sums.
+    firedrake.Function
+        One over the square root of each row sum, the coefficient-wise scale
+        taking :math:`z` to :math:`m = M_L^{-1/2} z`.
 
     Raises
     ------
@@ -84,7 +87,9 @@ def _lumped_mass(function_space: fire.FunctionSpace) -> fire.Cofunction:
             "(KMV, or spectral on quadrilaterals), or a Lagrange degree whose "
             "basis functions all integrate to a positive value, such as 1.",
         )
-    return mass
+    scale = fire.Function(function_space)
+    scale.dat.data_wo[:] = 1.0 / np.sqrt(mass.dat.data_ro)
+    return scale
 
 
 class LumpedL2TransformedFunctional(AbstractReducedFunctional):
@@ -120,17 +125,16 @@ class LumpedL2TransformedFunctional(AbstractReducedFunctional):
             model_controls = Enlist(model_controls)
         self._model_controls = model_controls
 
-        masses = {}
+        # One scale per space: controls in the same space share it.
+        scales = {}
         self._scales = []
         transformed = []
         for control in model_controls:
             model = control.control
             space = model.function_space()
-            if space not in masses:
-                masses[space] = _lumped_mass(space)
-            # m = scale * z, with scale the inverse square root of the mass.
-            scale = fire.Function(space)
-            scale.dat.data_wo[:] = 1.0 / np.sqrt(masses[space].dat.data_ro)
+            if space not in scales:
+                scales[space] = _inverse_sqrt_lumped_mass(space)
+            scale = scales[space]
             self._scales.append(scale)
             z = fire.Function(space)
             z.dat.data_wo[:] = model.dat.data_ro / scale.dat.data_ro
