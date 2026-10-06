@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 
 from pyadjoint import Tape, continue_annotation, pause_annotation, taylor_test
 
@@ -11,7 +11,9 @@ from checkpoint_schedules import (
     SingleMemoryStorageSchedule,
     StorageType,
 )
-from ..utils.physical_parameters import PhysicalParameters, as_list
+from ..utils.physical_parameters import (
+    PhysicalParameters, as_list, _as_parameter,
+)
 
 
 class AutomatedAdjoint:
@@ -365,6 +367,88 @@ pyadjoint.ReducedFunctional or None
             tape=self._tape,
         )
         return self.reduced_functional
+
+    def create_partial_reduced_functional(
+        self, functional: object, active_control_param: Iterable[object],
+    ) -> object:
+        r"""Build a partial reduced functional for selected controls.
+
+        The selected controls retain their original
+        :class:`pyadjoint.BlockVariable` objects and checkpoints. The returned
+        functional therefore replays the same tape as the complete reduced
+        functional, while controls omitted from it remain fixed at their
+        current checkpoints.
+
+        Parameters
+        ----------
+        functional : pyadjoint.AdjFloat
+            Functional value recorded on :attr:`_tape`.
+        active_control_param : iterable of enum.Enum
+            Labels of the controls to expose, in any order. The controls in
+            the returned functional follow :attr:`control_parameter_names`.
+
+        Returns
+        -------
+        firedrake.adjoint.EnsembleReducedFunctional
+            A new reduced functional containing only the selected controls.
+            :attr:`reduced_functional` is neither required nor modified.
+
+        Raises
+        ------
+        ValueError
+            If no parameter is selected, a requested parameter is not a
+            control, or the controls were created without parameter labels.
+        TypeError
+            If a requested parameter is not a material parameter enum member.
+
+        For a complete functional :math:`\widehat J(m_1, m_2)`, selecting only
+        :math:`m_1` keeps :math:`m_2` at its current checkpoint:
+
+        .. math::
+
+            \widehat J_1(m_1) = \widehat J(m_1, m_2^*).
+        """
+        active_control_param = [
+            _as_parameter(name) for name in active_control_param
+        ]
+        if not active_control_param:
+            raise ValueError("At least one active control is required.")
+        if any(name is None for name in self.control_parameter_names):
+            raise ValueError(
+                "A reduced functional for selected parameters requires "
+                "labeled controls.",
+            )
+
+        requested = set(active_control_param)
+        # Parameters requested for the partial functional that are not
+        # controls of this adjoint.
+        unknown = requested - set(self.control_parameter_names)
+        if unknown:
+            available = [name.value for name in self.control_parameter_names]
+            missing = sorted(name.value for name in unknown)
+            raise ValueError(
+                f"{missing} are not controls of this inversion; the "
+                f"available controls are {available}.",
+            )
+
+        # A control stands for the tape node its field has when the control
+        # is created: the node the recording read, which the complete
+        # reduced functional's control would stand for as well.
+        controls = [
+            fire_ad.Control(value) for name, value in zip(
+                self.control_parameter_names, self.controls,
+            )
+            if name in requested
+        ]
+        control = controls[0] if len(controls) == 1 else controls
+
+        return fire_ad.EnsembleReducedFunctional(
+            functional,
+            control,
+            self.ensemble,
+            scatter_control=True,
+            tape=self._tape,
+        )
 
     def recompute_functional(self, control_value: object) -> object:
         """Re-evaluate the reduced functional at a new control value.

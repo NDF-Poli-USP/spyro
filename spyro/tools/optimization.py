@@ -471,7 +471,7 @@ def minimize_with_tao(
     UserWarning
         If TAO stops without converging, which is what reaching the iteration
         limit amounts to. The last iterate is returned rather than raising,
-        since a fixed iteration budget is a normal way to run an optimization.
+        since a fixed iteration limit is a normal way to run an optimization.
     UserWarning
         If the TAO type resolves to LMVM or BLMVM, with the reasons it is not
         recommended: pyadjoint's ``TAOSolver`` gives both an initial Hessian
