@@ -120,7 +120,7 @@ class Sources(Delta_projector):
                     )
             else:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    tmp = target.dat.data_with_halos[0]  # noqa: F841
+                    tmp = target.dat.data_with_halos  # noqa: F841
 
         return rhs_forcing
 
