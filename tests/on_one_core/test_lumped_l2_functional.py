@@ -126,6 +126,23 @@ def test_lumped_functional_matches_the_model_functional():
     assert taylor_test(lumped_functional, m_tilde, direction) > 1.9
 
 
+def test_lumped_functional_starts_from_the_tape_value():
+    """Between stages the controls move through Control.update.
+
+    That changes the tape value of a control but not its Function, so the
+    lumped functional has to start from the tape value.
+    """
+    from spyro.reduced_functionals import LumpedL2ReducedFunctional
+
+    space = _space("mass_lumped_triangle", 2)
+    m = fire.Function(space).assign(1.0)
+    reduced_functional = lumped_misfit(m, reference(space))
+    reduced_functional.controls[0].update(fire.Function(space).assign(2.0))
+    lumped_functional = LumpedL2ReducedFunctional(reduced_functional)
+    (start,) = lumped_functional.map_result(lumped_functional.controls[0].control)
+    assert np.allclose(start.dat.data_ro, 2.0)
+
+
 @pytest.mark.parametrize("method, degree", [
     ("CG_triangle", 1), ("CG_triangle", 2), ("DG_triangle", 1), ("DQ", 2),
 ])

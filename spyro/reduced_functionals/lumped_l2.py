@@ -114,7 +114,9 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         self._scales = []
         transformed = []
         for control in model_controls:
-            model = control.control
+            # The tape value, not ``control.control``: between stages the
+            # controls move through ``Control.update``, which only changes it.
+            model = control.tape_value()
             space = model.function_space()
             if space not in scales:
                 scales[space] = _inverse_sqrt_lumped_mass(space)
