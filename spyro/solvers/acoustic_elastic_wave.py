@@ -121,9 +121,10 @@ class AcousticElasticWave(Wave):
         self.submesh_fluid = fire.Submesh(self.mesh, dim, self.fluid_id)
         self.submesh_solid = fire.Submesh(self.mesh, dim, self.solid_id)
 
-        # Restore the lost negative z-sign in the Submesh
-        self.submesh_fluid.coordinates.dat.data[:, 0] *= -1.0
-        self.submesh_solid.coordinates.dat.data[:, 0] *= -1.0
+        # Restore the lost negative z-sign in the Submesh (owned + halo nodes,
+        # otherwise the geometry is inconsistent in parallel)
+        self.submesh_fluid.coordinates.dat.data_with_halos[:, 0] *= -1.0
+        self.submesh_solid.coordinates.dat.data_with_halos[:, 0] *= -1.0
 
         iface_fluid = _extract_interface_markers(self.mesh, self.submesh_fluid)
         iface_solid = _extract_interface_markers(self.mesh, self.submesh_solid)
