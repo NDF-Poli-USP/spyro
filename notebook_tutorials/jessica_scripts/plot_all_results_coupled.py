@@ -49,7 +49,7 @@ FS_TICKS    = 18   # tick labels
 FS_LEGEND   = 14   # legend
 
 RESULTS_DIR = "results"
-GAR6_BASE = "/workspaces/spyro/notebook_tutorials/jessica_scripts/results_gar6"
+GAR6_BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results_gar6")
 GAR6MORE_DIR_FLUID = f"{GAR6_BASE}/{CASE_NAME}/fluid"
 GAR6MORE_DIR_SOLID = f"{GAR6_BASE}/{CASE_NAME}/solid"
 GAR6_NAME = "Gar6more3D" if DIMENSION == 3 else "Gar6more2D"

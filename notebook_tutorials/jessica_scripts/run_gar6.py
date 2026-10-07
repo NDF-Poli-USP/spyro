@@ -8,7 +8,7 @@ from pathlib import Path
 # ===========================================================================
 PAIR_NUM = 3
 
-BASE = Path("/workspaces/spyro2/notebook_tutorials/jessica_scripts")
+BASE = Path(__file__).resolve().parent
 
 DIR_2D = BASE / "gar6more2d"
 DIR_3D = BASE / "gar6more3d"
