@@ -27,7 +27,7 @@ def _inverse_sqrt_lumped_mass(
     Returns
     -------
     firedrake.Function
-        The scale taking :math:`z` to :math:`m = M_L^{-1/2} z`.
+        The scale taking :math:`\tilde{m}` to :math:`m = M_L^{-1/2} \tilde{m}`.
 
     Raises
     ------
@@ -71,8 +71,8 @@ def _inverse_sqrt_lumped_mass(
 class LumpedL2ReducedFunctional(AbstractReducedFunctional):
     r"""A reduced functional over controls rescaled by their lumped mass.
 
-    Represents :math:`\hat{J}(z) = J(M_L^{-1/2} z)`: each control :math:`m`
-    of the wrapped functional is replaced by :math:`z = M_L^{1/2} m`, with
+    Represents :math:`\hat{J}(\tilde{m}) = J(M_L^{-1/2} \tilde{m})`: each control :math:`m`
+    of the wrapped functional is replaced by :math:`\tilde{m} = M_L^{1/2} m`, with
     :math:`M_L` its lumped mass.
 
     :math:`M_L` is the mass matrix assembled with the quadrature spyro adopts
@@ -80,11 +80,11 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
     KMV elements and spectral (GLL) quadrilaterals the quadrature points are
     the nodes, so this matrix is diagonal at any degree.
 
-    The controls here carry the ``"l2"`` Riesz map, which in :math:`z` is the
+    The controls here carry the ``"l2"`` Riesz map, which in :math:`\tilde{m}` is the
     lumped :math:`L^2` one in :math:`m`. Values go in and come out as
-    :math:`z`; :meth:`map_result` takes them back to :math:`m`, and
+    :math:`\tilde{m}`; :meth:`map_result` takes them back to :math:`m`, and
     :meth:`transform_bounds` takes bounds on :math:`m` to bounds on
-    :math:`z`.
+    :math:`\tilde{m}`.
 
     The diagonal analogue of :class:`firedrake.adjoint.L2TransformedFunctional`,
     which keeps the consistent mass through a block-diagonal factorization in
@@ -117,30 +117,30 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
                 scales[space] = _inverse_sqrt_lumped_mass(space)
             scale = scales[space]
             self._scales.append(scale)
-            z = fire.Function(space)
-            z.dat.data_wo[:] = model.dat.data_ro / scale.dat.data_ro
-            transformed.append(Control(z, riesz_map="l2"))
+            m_tilde = fire.Function(space)
+            m_tilde.dat.data_wo[:] = model.dat.data_ro / scale.dat.data_ro
+            transformed.append(Control(m_tilde, riesz_map="l2"))
         self._controls = Enlist(model_controls.delist(transformed))
 
     @property
     def controls(self) -> Enlist:
-        """:class:`pyadjoint.enlisting.Enlist`: the controls over :math:`z`."""
+        r""":class:`pyadjoint.enlisting.Enlist`: the controls over :math:`\tilde{m}`."""
         return self._controls
 
     def _scaled(self, values, dual: bool) -> list:
-        """Multiply each value by its control's scale, coefficient-wise.
+        """Return :math:`M_L^{-1/2}` times each value.
 
         Parameters
         ----------
         values : firedrake.Function, firedrake.Cofunction or sequence
-            One value per control.
+            One per control.
         dual : bool
             Whether the values are Cofunctions.
 
         Returns
         -------
         list
-            The scaled values, new objects of the same kind.
+            The scaled values, one per control.
         """
         scaled = []
         for value, scale in zip(Enlist(values), self._scales):
@@ -151,39 +151,35 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         return scaled
 
     def __call__(self, values):
-        """Evaluate the functional at transformed control values.
+        r"""Return :math:`\hat{J}(\tilde{m}) = J(M_L^{-1/2} \tilde{m})`.
 
         Parameters
         ----------
         values : firedrake.Function or sequence of firedrake.Function
-            Values of :math:`z`, one per control.
+            :math:`\tilde{m}`, one per control.
 
         Returns
         -------
         pyadjoint.AdjFloat
-            The functional at :math:`m = M_L^{-1/2} z`.
+            The functional value.
         """
         models = self._scaled(values, dual=False)
         return self._functional(self._model_controls.delist(models))
 
     def derivative(self, adj_input=1.0, apply_riesz: bool = False):
-        """Return the derivative with respect to :math:`z`.
-
-        By the chain rule it is the derivative with respect to :math:`m`,
-        scaled coefficient-wise by :math:`M_L^{-1/2}`.
+        r"""Return :math:`D\hat{J}(\tilde{m}) = M_L^{-1/2} DJ(m)`.
 
         Parameters
         ----------
         adj_input : float, optional
             Adjoint value of the functional result.
         apply_riesz : bool, optional
-            Whether to return the gradient, through the ``"l2"`` Riesz map,
-            instead of the derivative.
+            Whether to return the gradient instead of the derivative.
 
         Returns
         -------
         firedrake.Cofunction, firedrake.Function or list
-            One per control, shaped like the controls.
+            One per control.
         """
         derivative = self._functional.derivative(adj_input=adj_input)
         scaled = self._scaled(derivative, dual=True)
@@ -195,40 +191,40 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         return self._controls.delist(scaled)
 
     def tlm(self, m_dot):
-        """Return the tangent linear action along a direction in :math:`z`.
+        r"""Return :math:`DJ(m)[M_L^{-1/2} \dot{\tilde{m}}]`.
 
         Parameters
         ----------
         m_dot : firedrake.Function or sequence of firedrake.Function
-            Direction in :math:`z`, one per control.
+            :math:`\dot{\tilde{m}}`, one per control.
 
         Returns
         -------
         pyadjoint.OverloadedType
-            The tangent linear action, of the functional's type.
+            The tangent linear action.
         """
         directions = self._scaled(m_dot, dual=False)
         return self._functional.tlm(self._model_controls.delist(directions))
 
     def hessian(self, m_dot, hessian_input=None, evaluate_tlm: bool = True,
                 apply_riesz: bool = False):
-        """Return the Hessian action along a direction in :math:`z`.
+        r"""Return :math:`M_L^{-1/2} D^2J(m) M_L^{-1/2} \dot{\tilde{m}}`.
 
         Parameters
         ----------
         m_dot : firedrake.Function or sequence of firedrake.Function
-            Direction in :math:`z`, one per control.
+            :math:`\dot{\tilde{m}}`, one per control.
         hessian_input : pyadjoint.OverloadedType, optional
             Hessian value of the functional result.
         evaluate_tlm : bool, optional
             Whether to evaluate the tangent linear model first.
         apply_riesz : bool, optional
-            Whether to map the result through the ``"l2"`` Riesz map.
+            Whether to return the primal result instead of the dual one.
 
         Returns
         -------
         firedrake.Cofunction, firedrake.Function or list
-            One per control, shaped like the controls.
+            One per control.
         """
         directions = self._scaled(m_dot, dual=False)
         action = self._functional.hessian(
@@ -244,18 +240,17 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         return self._controls.delist(scaled)
 
     def map_result(self, values) -> list:
-        """Map values of :math:`z` back to the model controls.
+        r"""Return :math:`m = M_L^{-1/2} \tilde{m}`.
 
         Parameters
         ----------
         values : firedrake.Function or sequence of firedrake.Function
-            Values of :math:`z`, one per control.
+            :math:`\tilde{m}`, one per control.
 
         Returns
         -------
         list of firedrake.Function
-            :math:`m = M_L^{-1/2} z`, one per control, named after the
-            controls of the wrapped functional.
+            :math:`m`, one per control.
         """
         models = self._scaled(values, dual=False)
         for model, control in zip(models, self._model_controls):
@@ -263,19 +258,18 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         return models
 
     def transform_bounds(self, bounds) -> list:
-        """Map bounds on the model controls to bounds on :math:`z`.
+        r"""Return bounds on :math:`\tilde{m}` from bounds on :math:`m`.
 
         Parameters
         ----------
         bounds : sequence of tuple
-            One ``(lower, upper)`` pair per control, each a scalar, a field
-            in the control's space, or None.
+            ``(lower, upper)`` on :math:`m`, one per control. Each bound is a
+            scalar, a field, or None.
 
         Returns
         -------
         list of tuple
-            The same pairs on :math:`z`, each bound that is not None a field
-            in the control's space.
+            ``(lower, upper)`` on :math:`\tilde{m}`, one per control.
         """
         transformed = []
         for (lower, upper), scale in zip(bounds, self._scales):

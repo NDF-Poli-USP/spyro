@@ -1,7 +1,7 @@
 """The lumped L2 change of variables of the reduced functional.
 
 ``LumpedL2ReducedFunctional`` replaces the controls ``m`` by
-``z = M_L^{1/2} m``, in which the lumped L2 inner product is the Euclidean
+``m_tilde = M_L^{1/2} m``, in which the lumped L2 inner product is the Euclidean
 one. These tests check the transformation itself; ``test_optimization`` checks
 what TAO does with it.
 """
@@ -102,16 +102,16 @@ def test_transformed_functional_matches_the_model_functional():
     m = fire.Function(space).assign(1.2)
     reduced_functional = lumped_misfit([m], [reference(space)], power=2)
     transformed = LumpedL2ReducedFunctional(reduced_functional)
-    z = transformed.controls[0].control
+    m_tilde = transformed.controls[0].control
 
-    assert np.isclose(float(transformed(z)), float(reduced_functional(m)))
-    (m_back,) = transformed.map_result(z)
+    assert np.isclose(float(transformed(m_tilde)), float(reduced_functional(m)))
+    (m_back,) = transformed.map_result(m_tilde)
     assert np.allclose(m_back.dat.data_ro, m.dat.data_ro)
 
     direction = fire.Function(space).interpolate(
         fire.sin(3 * fire.SpatialCoordinate(space.mesh())[0])
     )
-    assert taylor_test(transformed, z, direction) > 1.9
+    assert taylor_test(transformed, m_tilde, direction) > 1.9
 
 
 def test_a_mass_that_does_not_lump_is_rejected():

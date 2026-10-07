@@ -2,7 +2,7 @@
 
 ``minimize_with_tao`` runs TAO over ``LumpedL2ReducedFunctional``. These
 tests check that TAO, running its own Euclidean quasi-Newton method on
-``z = M_L^{1/2} m``, behaves as an L2 method on ``m``: on an L2 least-squares
+``m_tilde = M_L^{1/2} m``, behaves as an L2 method on ``m``: on an L2 least-squares
 problem its first step lands on the minimizer, on any mesh.
 """
 import warnings
@@ -28,8 +28,8 @@ def test_l2_least_squares_takes_one_step(n):
     """The first BQNLS step solves an L2 least-squares problem, on any mesh.
 
     PETSc scales the first quasi-Newton step by :math:`2|f|/\\|g\\|^2`. In
-    :math:`z` that is exactly the step to the minimizer of
-    :math:`\\frac12\\|z - z^*\\|^2`; on the untransformed coefficients, where
+    :math:`\\tilde{m}` that is exactly the step to the minimizer of
+    :math:`\\frac12\\|\\tilde{m} - \\tilde{m}^*\\|^2`; on the untransformed coefficients, where
     the gradient is :math:`M_L (m - m^*)`, it is not.
     """
     space = kmv_space(n)
