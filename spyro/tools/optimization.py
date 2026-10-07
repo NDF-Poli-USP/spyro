@@ -294,7 +294,6 @@ class LumpedTAOSolver(OptimizationSolver):
     comm : petsc4py.PETSc.Comm or mpi4py.MPI.Comm, optional
         Communicator the controls are defined over. Under ensemble
         parallelism this is the *spatial* one.
-
     Raises
     ------
     TypeError
@@ -563,7 +562,6 @@ def minimize_with_tao(
         iteration TAO accepts, with the controls it stands at as a list of
         fresh fields. The starting point is not reported: it is the value the
         caller already has, from evaluating the functional to get here.
-
     Returns
     -------
     list
@@ -577,7 +575,7 @@ def minimize_with_tao(
     UserWarning
         If TAO stops without converging, which is what reaching the iteration
         limit amounts to. The last iterate is returned rather than raising,
-        since a fixed iteration budget is a normal way to run an optimization.
+        since a fixed iteration limit is a normal way to run an optimization.
 
     Raises
     ------
