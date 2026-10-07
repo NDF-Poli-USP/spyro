@@ -96,7 +96,13 @@ def lumped_misfit(control: fire.Function, target: fire.Function,
     return ReducedFunctional(functional, Control(control))
 
 
-def test_transformed_functional_matches_the_model_functional():
+def test_lumped_functional_matches_the_model_functional():
+    """The lumped functional is the same problem, written in m_tilde.
+
+    Checks that it gives the same value as the original functional, that
+    ``map_result`` brings m_tilde back to m, and that its derivative passes
+    a Taylor test.
+    """
     space = _space("mass_lumped_triangle", 2)
     m = fire.Function(space).assign(1.2)
     reduced_functional = lumped_misfit(m, reference(space), power=2)
