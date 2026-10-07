@@ -376,7 +376,15 @@ class AcousticElasticWave(Wave):
         # Registro em t = step*dt (estado ANTES do passo), alinhado com o loop do Spyro
         if self.solid_receivers is not None:
             data = self.X_n.sub(1).dat.data_ro_with_halos[:]
-            self.solid_receiver_history.append(self.solid_receivers.interpolate(data))
+            values = []
+            for rid in range(self.solid_receivers.number_of_points):
+                # In parallel, only the rank that owns the receiver evaluates it;
+                # the others store a placeholder, combined later with MPI (MAX).
+                if self.solid_receivers.is_local[rid] is None or data.shape[0] == 0:
+                    values.append(np.full(self.dimension, -99999.0))
+                else:
+                    values.append(self.solid_receivers.new_at(data, rid))
+            self.solid_receiver_history.append(values)
 
         if (self.fluid_is_vector and self.record_fluid_pressure
                 and self.receiver_locations):
