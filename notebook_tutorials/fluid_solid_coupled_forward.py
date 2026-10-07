@@ -11,6 +11,7 @@ from firedrake import triplot
 from spyro.solvers.acoustic_elastic_wave import AcousticElasticWave
 from spyro.plots.general_plots import plot_model_jessica
 from sparsity_plots import save_sparsity_matrices
+from spyro.utils.utils import communicate
 
 import sparsity_plots; print("sparsity_plots from:", sparsity_plots.__file__)
 
@@ -191,7 +192,7 @@ print(f"Memory: {mem_mb:.2f} MB")
 # ===========================================================================
 # Plots (2D only)
 # ===========================================================================
-if DIMENSION == 2:
+if DIMENSION == 2 and Wave_obj.comm.comm.size == 1:
     plot_model_jessica(Wave_obj, filename=f"{OUT}/model_{TAG}.png", flip_axis=False)
 
     fig, ax = plt.subplots(figsize=(8, 8))
@@ -215,19 +216,28 @@ if DIMENSION == 2:
     plt.savefig(f"{OUT}/mesh_child.png", dpi=150)
     plt.close()
 
+from spyro.utils.utils import communicate
+
 # ===========================================================================
 # Save data
 # ===========================================================================
-save_sparsity_matrices(Wave_obj, f"{OUT}/sparsity_{TAG}.npz")
-
 p_spyro = np.asarray(Wave_obj.forward_solution_receivers)[:, 0]
-u_solid = np.asarray(Wave_obj.solid_receiver_history)[:, 0, :]
+u_all = communicate(np.asarray(Wave_obj.solid_receiver_history), Wave_obj.comm)
+u_solid = u_all[:, 0, :]
 
-np.savez(
-    f"{OUT}/spyro_receiver_data_{TAG}.npz",
-    dt=dictionary["time_axis"]["dt"],
-    final_time=dictionary["time_axis"]["final_time"],
-    p_spyro=p_spyro,
-    u_solid=u_solid,
-)
-print(f"[OK] Saved: {OUT}/spyro_receiver_data_{TAG}.npz")
+n_procs = Wave_obj.comm.comm.size
+rank = Wave_obj.comm.comm.rank
+
+if n_procs == 1:
+    # assembled with local rows only in parallel: run in serial
+    save_sparsity_matrices(Wave_obj, f"{OUT}/sparsity_{TAG}.npz")
+
+if rank == 0:
+    np.savez(
+        f"{OUT}/spyro_receiver_data_{TAG}.npz",
+        dt=dictionary["time_axis"]["dt"],
+        final_time=dictionary["time_axis"]["final_time"],
+        p_spyro=p_spyro,
+        u_solid=u_solid,
+    )
+    print(f"[OK] Saved: {OUT}/spyro_receiver_data_{TAG}.npz")
