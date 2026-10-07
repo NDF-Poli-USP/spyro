@@ -15,7 +15,7 @@ from pyadjoint.optimization.tao_solver import (
 )
 from pyadjoint.reduced_functional import AbstractReducedFunctional
 
-from ..reduced_functionals import LumpedL2TransformedFunctional
+from ..reduced_functionals import LumpedL2ReducedFunctional
 from ..utils.physical_parameters import as_list
 
 
@@ -94,7 +94,7 @@ def minimize_with_tao(
 ) -> list:
     """Minimize a reduced functional with PETSc TAO, in the lumped L2 metric.
 
-    The optimization runs over :class:`LumpedL2TransformedFunctional`, so TAO
+    The optimization runs over :class:`LumpedL2ReducedFunctional`, so TAO
     measures gradients, takes steps and projects onto the bounds in the
     lumped :math:`L^2` metric of the controls.
 
@@ -144,11 +144,11 @@ def minimize_with_tao(
 
     See Also
     --------
-    LumpedL2TransformedFunctional : The change of variables TAO runs in.
+    LumpedL2ReducedFunctional : The change of variables TAO runs in.
     tao_bounds : Shapes ``vmin``/``vmax`` into the ``bounds`` this takes.
     """
     options = {"tao_type": "bqnls", **(options or {})}
-    transformed = LumpedL2TransformedFunctional(reduced_functional)
+    transformed = LumpedL2ReducedFunctional(reduced_functional)
     if bounds is not None:
         bounds = transformed.transform_bounds(bounds)
     problem = MinimizationProblem(transformed, bounds=bounds)

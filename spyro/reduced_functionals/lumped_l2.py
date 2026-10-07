@@ -16,17 +16,8 @@ def _inverse_sqrt_lumped_mass(
 ) -> fire.Function:
     r"""Return :math:`M_L^{-1/2}`, the inverse square root of the lumped mass.
 
-    The mass is lumped by row sums, :math:`m_i = \sum_j M_{ij}`, which is what
-    ``action(u v dx, 1)`` assembles: applying the mass matrix to the constant
-    one. The row sums of a mass matrix partition the domain measure, so the
-    entries sum to the volume of the mesh, and each one is the measure the
-    degree of freedom owns.
-
-    Spyro's spectral elements are integrated with a quadrature of their own,
-    under which the mass matrix is already diagonal and lumping is exact. That
-    rule is used when the space has one; a space the rule does not cover falls
-    back to the default measure, where lumping is an approximation of the
-    consistent mass rather than a rewriting of it.
+    See :class:`LumpedL2ReducedFunctional` for the quadrature it is assembled
+    with.
 
     Parameters
     ----------
@@ -36,18 +27,13 @@ def _inverse_sqrt_lumped_mass(
     Returns
     -------
     firedrake.Function
-        One over the square root of each row sum, the coefficient-wise scale
-        taking :math:`z` to :math:`m = M_L^{-1/2} z`.
+        The scale taking :math:`z` to :math:`m = M_L^{-1/2} z`.
 
     Raises
     ------
     ValueError
-        If a row sum is not positive. A row sum is the integral of a basis
-        function, and some Lagrange elements have basis functions that
-        integrate to zero or less: the vertex functions of quadratic Lagrange
-        integrate to zero on triangles and to a negative value on
-        tetrahedra. The lumped metric is then not positive definite, so it
-        cannot be the metric TAO runs in.
+        If the lumped mass is not positive, as for quadratic Lagrange on
+        triangles and tetrahedra.
     """
     trial = fire.TrialFunction(function_space)
     test = fire.TestFunction(function_space)
@@ -82,12 +68,17 @@ def _inverse_sqrt_lumped_mass(
     return scale
 
 
-class LumpedL2TransformedFunctional(AbstractReducedFunctional):
+class LumpedL2ReducedFunctional(AbstractReducedFunctional):
     r"""A reduced functional over controls rescaled by their lumped mass.
 
     Represents :math:`\hat{J}(z) = J(M_L^{-1/2} z)`: each control :math:`m`
     of the wrapped functional is replaced by :math:`z = M_L^{1/2} m`, with
     :math:`M_L` its lumped mass.
+
+    :math:`M_L` is the mass matrix assembled with the quadrature spyro adopts
+    for each element (:func:`spyro.domains.quadrature.quadrature_rules`). For
+    KMV elements and spectral (GLL) quadrilaterals the quadrature points are
+    the nodes, so this matrix is diagonal at any degree.
 
     The controls here carry the ``"l2"`` Riesz map, which in :math:`z` is the
     lumped :math:`L^2` one in :math:`m`. Values go in and come out as

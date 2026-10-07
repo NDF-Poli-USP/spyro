@@ -1,6 +1,6 @@
 """Minimizing with TAO in the lumped L2 metric.
 
-``minimize_with_tao`` runs TAO over ``LumpedL2TransformedFunctional``. These
+``minimize_with_tao`` runs TAO over ``LumpedL2ReducedFunctional``. These
 tests check that TAO, running its own Euclidean quasi-Newton method on
 ``z = M_L^{1/2} m``, behaves as an L2 method on ``m``: on an L2 least-squares
 problem its first step lands on the minimizer, on any mesh.

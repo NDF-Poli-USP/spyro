@@ -1,6 +1,6 @@
 """The lumped L2 change of variables of the reduced functional.
 
-``LumpedL2TransformedFunctional`` replaces the controls ``m`` by
+``LumpedL2ReducedFunctional`` replaces the controls ``m`` by
 ``z = M_L^{1/2} m``, in which the lumped L2 inner product is the Euclidean
 one. These tests check the transformation itself; ``test_optimization`` checks
 what TAO does with it.
@@ -19,7 +19,7 @@ from firedrake.adjoint import (
 from pyadjoint import Tape
 
 from spyro.domains.quadrature import quadrature_rules
-from spyro.reduced_functionals import LumpedL2TransformedFunctional
+from spyro.reduced_functionals import LumpedL2ReducedFunctional
 
 
 @pytest.fixture(autouse=True)
@@ -101,7 +101,7 @@ def test_transformed_functional_matches_the_model_functional():
     space = kmv_space(4)
     m = fire.Function(space).assign(1.2)
     reduced_functional = lumped_misfit([m], [reference(space)], power=2)
-    transformed = LumpedL2TransformedFunctional(reduced_functional)
+    transformed = LumpedL2ReducedFunctional(reduced_functional)
     z = transformed.controls[0].control
 
     assert np.isclose(float(transformed(z)), float(reduced_functional(m)))
@@ -121,4 +121,4 @@ def test_a_mass_that_does_not_lump_is_rejected():
         [fire.Function(space).assign(1.0)], [fire.Function(space)],
     )
     with pytest.raises(ValueError, match="integrate to zero or less"):
-        LumpedL2TransformedFunctional(reduced_functional)
+        LumpedL2ReducedFunctional(reduced_functional)

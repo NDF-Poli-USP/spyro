@@ -1,8 +1,8 @@
 """Reduced functionals that wrap a pyadjoint reduced functional."""
 
-from .lumped_l2 import LumpedL2TransformedFunctional
+from .lumped_l2 import LumpedL2ReducedFunctional
 
 
 __all__ = [
-    "LumpedL2TransformedFunctional",
+    "LumpedL2ReducedFunctional",
 ]
