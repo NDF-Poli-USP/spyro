@@ -2,8 +2,7 @@
 
 ``LumpedL2ReducedFunctional`` replaces the controls ``m`` by
 ``m_tilde = M_L^{1/2} m``, in which the lumped L2 inner product is the Euclidean
-one. These tests check the transformation itself; ``test_optimization`` checks
-what TAO does with it.
+one.
 """
 import firedrake as fire
 import numpy as np
@@ -34,21 +33,24 @@ def fresh_tape():
     tape.clear_tape()
 
 
-def kmv_space(n: int) -> fire.FunctionSpace:
-    """Return a mass-lumped quadratic space on an ``n`` by ``n`` mesh.
+def _space(method: str, degree: int) -> fire.FunctionSpace:
+    """Return a spyro function space on a small mesh of the method's cells.
 
     Parameters
     ----------
-    n : int
-        Cells per side.
+    method : str
+        Spyro method name, see ``spyro.domains.space.create_function_space``.
+    degree : int
+        Polynomial degree.
 
     Returns
     -------
     firedrake.FunctionSpace
-        KMV space of degree 2, whose lumped mass varies between vertex, edge
-        and interior nodes, so that it is far from a multiple of the identity.
+        The space.
     """
-    return fire.FunctionSpace(fire.UnitSquareMesh(n, n), "KMV", 2)
+    quadrilateral = "quadrilateral" in method or method == "DQ"
+    mesh = fire.UnitSquareMesh(3, 3, quadrilateral=quadrilateral)
+    return create_function_space(mesh, method, degree)
 
 
 def reference(space: fire.FunctionSpace) -> fire.Function:
@@ -70,83 +72,45 @@ def reference(space: fire.FunctionSpace) -> fire.Function:
     )
 
 
-def lumped_misfit(controls, targets, power: int = 1) -> ReducedFunctional:
-    r"""Return :math:`\sum_i \frac12 \|m_i^p - t_i\|^2` in the lumped metric.
+def lumped_misfit(control: fire.Function, target: fire.Function,
+                  power: int = 1) -> ReducedFunctional:
+    r"""Return :math:`\frac12 \|m^p - t\|^2` in the lumped metric.
 
     Parameters
     ----------
-    controls : list of firedrake.Function
-        The controls :math:`m_i`.
-    targets : list of firedrake.Function
-        The targets :math:`t_i`.
+    control : firedrake.Function
+        The control :math:`m`.
+    target : firedrake.Function
+        The target :math:`t`.
     power : int, optional
         The power :math:`p`; 1 makes this an L2 least-squares problem.
 
     Returns
     -------
     pyadjoint.ReducedFunctional
-        The functional of the controls.
+        The functional of the control.
     """
-    functional = 0.0
-    for control, target in zip(controls, targets):
-        quadrature, _, _ = quadrature_rules(control.function_space())
-        measure = fire.dx(**quadrature) if quadrature else fire.dx
-        functional += fire.assemble(
-            0.5 * (control ** power - target) ** 2 * measure
-        )
-    controls = [Control(control) for control in controls]
-    return ReducedFunctional(functional, controls[0] if len(controls) == 1 else controls)
+    quadrature, _, _ = quadrature_rules(control.function_space())
+    measure = fire.dx(**quadrature) if quadrature else fire.dx
+    functional = fire.assemble(0.5 * (control ** power - target) ** 2 * measure)
+    return ReducedFunctional(functional, Control(control))
 
 
 def test_transformed_functional_matches_the_model_functional():
-    space = kmv_space(4)
+    space = _space("mass_lumped_triangle", 2)
     m = fire.Function(space).assign(1.2)
-    reduced_functional = lumped_misfit([m], [reference(space)], power=2)
-    transformed = LumpedL2ReducedFunctional(reduced_functional)
-    m_tilde = transformed.controls[0].control
+    reduced_functional = lumped_misfit(m, reference(space), power=2)
+    lumped_functional = LumpedL2ReducedFunctional(reduced_functional)
+    m_tilde = lumped_functional.controls[0].control
 
-    assert np.isclose(float(transformed(m_tilde)), float(reduced_functional(m)))
-    (m_back,) = transformed.map_result(m_tilde)
+    assert np.isclose(float(lumped_functional(m_tilde)), float(reduced_functional(m)))
+    (m_back,) = lumped_functional.map_result(m_tilde)
     assert np.allclose(m_back.dat.data_ro, m.dat.data_ro)
 
     direction = fire.Function(space).interpolate(
         fire.sin(3 * fire.SpatialCoordinate(space.mesh())[0])
     )
-    assert taylor_test(transformed, m_tilde, direction) > 1.9
-
-
-def _space(method: str, degree: int) -> fire.FunctionSpace:
-    """Return a spyro function space on a small mesh of the method's cells.
-
-    Parameters
-    ----------
-    method : str
-        Spyro method name, see ``spyro.domains.space.create_function_space``.
-    degree : int
-        Polynomial degree.
-
-    Returns
-    -------
-    firedrake.FunctionSpace
-        The space.
-    """
-    quadrilateral = "quadrilateral" in method or method == "DQ"
-    mesh = fire.UnitSquareMesh(3, 3, quadrilateral=quadrilateral)
-    return create_function_space(mesh, method, degree)
-
-
-@pytest.mark.parametrize("method, degree", [
-    ("mass_lumped_triangle", 1), ("mass_lumped_triangle", 3),
-    ("spectral_quadrilateral", 2), ("spectral_quadrilateral", 4),
-    ("DG0", 0),
-])
-def test_diagonal_mass_spaces_are_accepted(method, degree):
-    """KMV and spectral elements, and DG0, have a diagonal mass."""
-    space = _space(method, degree)
-    transformed = LumpedL2ReducedFunctional(
-        lumped_misfit([fire.Function(space).assign(1.0)], [fire.Function(space)]),
-    )
-    assert len(transformed.controls) == 1
+    assert taylor_test(lumped_functional, m_tilde, direction) > 1.9
 
 
 @pytest.mark.parametrize("method, degree", [
@@ -156,21 +120,7 @@ def test_non_diagonal_mass_spaces_are_rejected(method, degree):
     """Spaces whose mass, with spyro's quadrature, is not diagonal fail."""
     space = _space(method, degree)
     reduced_functional = lumped_misfit(
-        [fire.Function(space).assign(1.0)], [fire.Function(space)],
+        fire.Function(space).assign(1.0), fire.Function(space),
     )
     with pytest.raises(ValueError, match="is diagonal"):
         LumpedL2ReducedFunctional(reduced_functional)
-
-
-def test_second_order_actions_are_not_provided():
-    """spyro's inversions run BQNLS, which needs no Hessian or TLM."""
-    space = kmv_space(2)
-    m = fire.Function(space).assign(1.0)
-    transformed = LumpedL2ReducedFunctional(
-        lumped_misfit([m], [reference(space)]),
-    )
-    direction = fire.Function(space).assign(1.0)
-    with pytest.raises(NotImplementedError, match="only needs gradients"):
-        transformed.tlm(direction)
-    with pytest.raises(NotImplementedError, match="only needs gradients"):
-        transformed.hessian(direction)

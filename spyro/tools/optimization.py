@@ -153,10 +153,10 @@ def minimize_with_tao(
         raise ValueError(
             f"minimize_with_tao always uses BQNLS, not '{tao_type}'.",
         )
-    transformed = LumpedL2ReducedFunctional(reduced_functional)
+    lumped_functional = LumpedL2ReducedFunctional(reduced_functional)
     if bounds is not None:
-        bounds = transformed.transform_bounds(bounds)
-    problem = MinimizationProblem(transformed, bounds=bounds)
+        bounds = lumped_functional.transform_bounds(bounds)
+    problem = MinimizationProblem(lumped_functional, bounds=bounds)
     solver = TAOSolver(problem, options, comm=comm)
     # The PETSc command line can still set the type.
     if solver.tao.getType() != "bqnls":
@@ -168,14 +168,14 @@ def minimize_with_tao(
     # it. Reading it through an interface built from those same controls lays
     # them out the way the solver's own does. Both the monitor and the
     # unconverged exit below need that, so it is built once.
-    controls = [control.control for control in transformed.controls]
+    controls = [control.control for control in lumped_functional.controls]
     vec_interface = PETScVecInterface(tuple(controls), comm=comm)
 
     def iterate_of(tao):
         """Return the model controls TAO currently stands at, as new fields."""
         iterate = [control.copy(deepcopy=True) for control in controls]
         vec_interface.from_petsc(tao.getSolution(), iterate)
-        return transformed.map_result(iterate)
+        return lumped_functional.map_result(iterate)
 
     if record is not None:
         def monitor(tao):
@@ -186,7 +186,7 @@ def minimize_with_tao(
         solver.tao.setMonitor(monitor)
 
     try:
-        return transformed.map_result(as_list(solver.solve()))
+        return lumped_functional.map_result(as_list(solver.solve()))
     except TAOConvergenceError as error:
         warnings.warn(
             f"{error} Returning the last iterate; raise the iteration limit "
