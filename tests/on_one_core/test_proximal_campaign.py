@@ -49,6 +49,30 @@ def test_campaign_case_coverage() -> None:
             assert proximal["scales"] == [0.0, 0.0]
 
 
+@pytest.mark.parametrize("name, latent, kind", [
+    ("bqnls_physical", False, None), ("bqnls_latent", True, None),
+    ("l2_proximal_physical", False, "l2"), ("l2_proximal_latent", True, "l2"),
+    ("bregman_proximal_physical", False, "bregman"),
+    ("bregman_proximal_latent", True, "bregman"),
+    ("bqnls_physical_restart", False, "l2"), ("bqnls_latent_restart", True, "l2"),
+])
+def test_case_names_select_the_intended_method(name: str, latent: bool, kind: str | None) -> None:
+    """Preserve solver semantics under the descriptive case names.
+
+    Parameters
+    ----------
+    name : str
+        Public case identifier.
+    latent : bool
+        Expected optimization coordinates.
+    kind : str or None
+        Expected proximal divergence, or no proximal subproblem.
+    """
+    arguments, _ = campaign.case_arguments(name, campaign.settings({}))
+    assert arguments["latent"] is latent
+    assert arguments.get("proximal", {}).get("kind") == kind
+
+
 @pytest.fixture
 def fake_campaign(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple:
     """Replace the converter and MPI launcher with deterministic test doubles.
@@ -112,17 +136,17 @@ def test_campaign_reuse_and_configuration_identity(fake_campaign: tuple) -> None
     """
     config, state = fake_campaign
     source = {"source_sha256": "first"}
-    directory = campaign.run_case("l2prox", config, source)
+    directory = campaign.run_case("l2_proximal_physical", config, source)
     assert json.loads((directory / "status.json").read_text())["status"] == "completed"
-    campaign.run_case("l2prox", config, source)
+    campaign.run_case("l2_proximal_physical", config, source)
     assert state["calls"] == 1
-    changed = campaign.run_case("l2prox", {**config, "step": 50.0}, source)
+    changed = campaign.run_case("l2_proximal_physical", {**config, "step": 50.0}, source)
     assert changed != directory
-    changed_source = campaign.run_case("l2prox", config, {"source_sha256": "second"})
+    changed_source = campaign.run_case("l2_proximal_physical", config, {"source_sha256": "second"})
     assert changed_source != directory
     (directory / "end.vtu").unlink()
     with pytest.raises(RuntimeError, match="Incomplete or failed"):
-        campaign.run_case("l2prox", config, source)
+        campaign.run_case("l2_proximal_physical", config, source)
 
 
 @pytest.mark.parametrize("failure", ["process", "missing_outputs", "tao"])
@@ -141,13 +165,13 @@ def test_campaign_failure_is_not_completion(fake_campaign: tuple, failure: str) 
                  outputs=failure != "missing_outputs",
                  log="reason: DIVERGED_LS_FAILURE" if failure == "tao" else "")
     with pytest.raises(RuntimeError, match="failed or missing"):
-        campaign.run_case("latent", config, {})
+        campaign.run_case("bqnls_latent", config, {})
     directory = next(Path(config["output"]).iterdir())
     assert json.loads((directory / "status.json").read_text())["status"] == "failed"
     state.update(exit_code=0, outputs=True, log="reason: DIVERGED_MAXITS")
     with pytest.raises(RuntimeError, match="Incomplete or failed"):
-        campaign.run_case("latent", config, {})
-    retry = campaign.run_case("latent", {**config, "run_tag": "retry"}, {})
+        campaign.run_case("bqnls_latent", config, {})
+    retry = campaign.run_case("bqnls_latent", {**config, "run_tag": "retry"}, {})
     status = json.loads((retry / "status.json").read_text())
     assert status["status"] == "completed"
     assert status["tao_termination_reasons"] == ["DIVERGED_MAXITS"]
@@ -162,6 +186,6 @@ def test_campaign_dry_run(fake_campaign: tuple) -> None:
         Configuration and fake process controls.
     """
     config, state = fake_campaign
-    directory = campaign.run_case("physical", config, {}, dry_run=True)
+    directory = campaign.run_case("bqnls_physical", config, {}, dry_run=True)
     assert not directory.exists()
     assert state["calls"] == 0

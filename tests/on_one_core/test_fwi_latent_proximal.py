@@ -45,7 +45,8 @@ def acoustic_fwi() -> spyro.FullWaveformInversion:
     {"proximal": {"kind": "bregman", "outer_iterations": 2}},
     {"latent": True, "proximal": {"kind": "l2", "outer_iterations": 2}},
     {"latent": True, "proximal": {"kind": "bregman", "outer_iterations": 2}},
-], ids=["latent", "l2prox", "lvpp", "latent-l2prox", "latent-lvpp"])
+], ids=["bqnls_latent", "l2_proximal_physical", "bregman_proximal_physical",
+        "l2_proximal_latent", "bregman_proximal_latent"])
 def test_latent_and_proximal_runs(tmp_path, monkeypatch, options):
     """The model stays within the bounds and the misfit goes down."""
     monkeypatch.chdir(tmp_path)
