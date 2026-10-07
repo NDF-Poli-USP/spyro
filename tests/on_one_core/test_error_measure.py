@@ -32,12 +32,69 @@ class TestMeasureError:
         return model, reference, dt
 
     @pytest.fixture
-    def receiver_data(self):
-        """Create sample receiver data for testing."""
-        n_time = 100
-        n_receivers = 3
-        receivers = np.random.randn(n_time, n_receivers)
-        return receivers
+    def acoustic_receiver_data(self):
+        """Create synthetic acoustic seismic receiver data."""
+        dt = 0.001
+        n_time = 20001
+        n_receivers = 40
+
+        t = np.arange(n_time) * dt
+
+        # Ricker wavelet
+        frequency = 10.0
+        t0 = 2.0
+        tau = np.pi * frequency * (t - t0)
+        reference = (1 - 2 * tau**2) * np.exp(-tau**2)
+
+        # Receiver-dependent amplitudes
+        amplitudes = np.linspace(1.0, 0.7, n_receivers)
+
+        reference = reference[:, np.newaxis] * amplitudes[np.newaxis, :]
+
+        # Numerical signal = reference + reproducible random noise
+        rng = np.random.default_rng(42)
+        noise = 0.01 * rng.standard_normal(reference.shape)
+
+        numerical = reference + noise
+
+        return numerical, reference, dt
+
+
+    @pytest.fixture
+    def elastic_receiver_data(self):
+        """Create synthetic elastic seismic receiver data."""
+        dt = 0.001
+        n_time = 20001
+        n_receivers = 40
+        n_directions = 2
+
+        t = np.arange(n_time) * dt
+
+        # Ricker wavelet
+        frequency = 10.0
+        t0 = 2.0
+        tau = np.pi * frequency * (t - t0)
+        ricker = (1 - 2 * tau**2) * np.exp(-tau**2)
+
+        # Receiver-dependent amplitudes
+        receiver_amplitudes = np.linspace(1.0, 0.7, n_receivers)
+
+        # Different amplitudes for the two displacement directions
+        direction_amplitudes = np.array([1.0, 0.6])
+
+        reference = (
+            ricker[:, np.newaxis, np.newaxis]
+            * receiver_amplitudes[np.newaxis, :, np.newaxis]
+            * direction_amplitudes[np.newaxis, np.newaxis, :]
+        )
+
+        # Numerical signal = reference + reproducible random noise
+        rng = np.random.default_rng(42)
+        noise = 0.01 * rng.standard_normal(reference.shape)
+
+        numerical = reference + noise
+
+        return numerical, reference, dt
 
     def test_initialization_default(self):
         """Test default initialization."""
@@ -231,55 +288,73 @@ class TestMeasureError:
         assert nrms_error > 0.0
         assert nrms_error < 1.0
 
-    def test_save_reference_signal(self, measure_error, receiver_data, tmp_path):
+    def test_save_reference_signal(
+        self,
+        measure_error,
+        acoustic_receiver_data,
+        tmp_path,
+    ):
         """Test saving reference signal."""
-        with patch("spyro.tools.error_measure.getcwd", return_value=str(tmp_path)):
-            # Mock save function to avoid actual file I/O
+        numerical, _, _ = acoustic_receiver_data
+        n_receivers = numerical.shape[1]
+
+        receiver_locations = [
+            (i, i + 1)
+            for i in range(n_receivers)
+        ]
+
+        with patch(
+            "spyro.tools.error_measure.getcwd",
+            return_value=str(tmp_path),
+        ):
             with patch("numpy.save") as mock_save:
-                receiver_locations = [(1, 2), (3, 4), (5, 6)]
                 measure_error.save_reference_signal(
                     receiver_locations=receiver_locations,
-                    forward_solution_receivers=receiver_data,
-                    number_of_receivers=3,
+                    forward_solution_receivers=numerical,
+                    number_of_receivers=n_receivers,
                     nyquist_frequency=50.0,
                     output_file_prefix="test_ref",
                 )
-                # Check that save was called twice (time and fft)
-                assert mock_save.call_count == 2
 
-    def test_error_measures_basic(self, measure_error, receiver_data):
+        # One file for the time-domain signal and one for its FFT.
+        assert mock_save.call_count == 2
+
+    def test_error_measures_basic(
+        self,
+        measure_error,
+        acoustic_receiver_data,
+    ):
         """Test basic error measures computation."""
-        # Create simple test data
-        n_time = 100
-        n_rec = 2
-        dt = 0.01
-
-        # Create reference signal (sine wave)
-        t = np.arange(0, n_time * dt, dt)
-        ref = np.sin(2 * np.pi * 5 * t)[:, np.newaxis]
-        ref = np.tile(ref, (1, n_rec))
-
-        # Create model signal (slightly different)
-        model = np.sin(2 * np.pi * 5 * t + 0.1)[:, np.newaxis]
-        model = np.tile(model, (1, n_rec))
+        numerical, reference, dt = acoustic_receiver_data
+        n_rec = reference.shape[1]
 
         error_measures = measure_error.calculate_error_measures(
-            forward_solution_receivers=model,
-            receivers_reference=ref,
+            forward_solution_receivers=numerical,
+            receivers_reference=reference,
             dt=dt,
             number_of_receivers=n_rec,
             save_file=False,
         )
 
-        # Check structure of output
-        assert len(error_measures) == 5  # [errIt, errPk, pkMax, max_errIt, max_errPK]
-        assert len(error_measures[0]) == n_rec  # errIt list
-        assert len(error_measures[1]) == n_rec  # errPk list
-        assert len(error_measures[2]) == n_rec  # pkMax list
-        assert error_measures[3] >= 0.0  # max_errIt
-        assert error_measures[4] >= 0.0  # max_errPK
+        err_it, err_pk, pk_max, max_err_it, max_err_pk = error_measures
 
-    def test_error_measures_with_energy(self, measure_error, receiver_data):
+        assert len(err_it) == n_rec
+        assert len(err_pk) == n_rec
+        assert len(pk_max) == n_rec
+
+        assert all(np.isfinite(err_it))
+        assert all(np.isfinite(err_pk))
+        assert all(np.isfinite(pk_max))
+
+        assert max_err_it == max(err_it)
+        assert max_err_pk == max(err_pk)
+
+        # The numerical signal differs from the reference only by
+        # low-amplitude random noise.
+        assert max_err_it < 0.1
+        assert max_err_pk < 0.1
+
+    def test_error_measures_with_energy(self, measure_error):
         """Test error measures with energy values."""
         # Create simple test data
         n_time = 100
@@ -304,7 +379,7 @@ class TestMeasureError:
         assert error_measures[5] == 0.5  # final_energy
         assert error_measures[6] == 0.5  # dissipated energy (1 - 0.5/1.0)
 
-    def test_error_measures_save_file(self, measure_error, receiver_data, tmp_path):
+    def test_error_measures_save_file(self, measure_error, tmp_path):
         """Test saving error measures to file."""
         with patch("spyro.tools.error_measure.getcwd", return_value=str(tmp_path)):
             n_time = 100
@@ -329,58 +404,86 @@ class TestMeasureError:
 
     @pytest.mark.parametrize("invalid_value", [-1, -0.5, "dt"])
     def test_error_measures_invalid_dt(
-        self, measure_error, receiver_data, invalid_value
+        self,
+        measure_error,
+        acoustic_receiver_data,
+        invalid_value,
     ):
         """Test error measures with invalid dt values."""
-        if isinstance(invalid_value, str):
-            with pytest.raises(TypeError):  # Strings raise TypeError
-                measure_error.calculate_error_measures(
-                    forward_solution_receivers=receiver_data,
-                    receivers_reference=receiver_data,
-                    dt=invalid_value,
-                    number_of_receivers=3,
-                    save_file=False,
-                )
-        else:
-            with pytest.raises(ValueError):  # Negative numbers raise ValueError
-                measure_error.calculate_error_measures(
-                    forward_solution_receivers=receiver_data,
-                    receivers_reference=receiver_data,
-                    dt=invalid_value,
-                    number_of_receivers=3,
-                    save_file=False,
-                )
+        numerical, reference, _ = acoustic_receiver_data
+        n_receivers = numerical.shape[1]
 
-    def test_get_reference_signal(self, receiver_data, tmp_path):
-        """Test loading reference signal."""
-        with patch("spyro.tools.error_measure.getcwd", return_value=str(tmp_path)):
-            # Create MeasureError instance inside the patch context
-            measure_error = MeasureError(
-                output_folder="test_output", output_case="preamble"
+        expected_exception = TypeError if isinstance(invalid_value, str) else ValueError
+
+        with pytest.raises(expected_exception):
+            measure_error.calculate_error_measures(
+                forward_solution_receivers=numerical,
+                receivers_reference=reference,
+                dt=invalid_value,
+                number_of_receivers=n_receivers,
+                save_file=False,
             )
-            # Create mock reference files
+
+
+    def test_get_reference_signal(
+        self,
+        acoustic_receiver_data,
+        tmp_path,
+    ):
+        """Test loading reference signal."""
+        numerical, _, _ = acoustic_receiver_data
+        n_receivers = numerical.shape[1]
+
+        with patch(
+            "spyro.tools.error_measure.getcwd",
+            return_value=str(tmp_path),
+        ):
+            measure_error = MeasureError(
+                output_folder="test_output",
+                output_case="preamble",
+            )
+
             with patch("numpy.load") as mock_load:
-                mock_load.return_value = receiver_data
+                mock_load.return_value = numerical
+
                 with patch("numpy.save"):
-                    # Mock path.exists where it's actually used
                     with patch(
-                        "spyro.utils.error_management.path.exists", return_value=True
+                        "spyro.utils.error_management.path.exists",
+                        return_value=True,
                     ):
-                        # First save the reference
-                        n_rec = receiver_data.shape[
-                            1
-                        ]  # Get the actual number of receivers
                         measure_error.save_reference_signal(
-                            receiver_locations=[(1, 2)] * n_rec,
-                            forward_solution_receivers=receiver_data,
-                            number_of_receivers=n_rec,
+                            receiver_locations=[(i, i + 1) for i in range(n_receivers)],
+                            forward_solution_receivers=numerical,
+                            number_of_receivers=n_receivers,
                             nyquist_frequency=50.0,
                             output_file_prefix="test_ref",
                         )
 
-                        # Then load it
                         ref, ref_fft = measure_error.get_reference_signal()
 
-                        # Check that load was called twice (time and fft)
+                        # One file for the time-domain signal and one for its FFT.
                         assert mock_load.call_count == 2
-                        np.testing.assert_array_equal(ref, receiver_data)
+
+                        np.testing.assert_array_equal(ref, numerical)
+
+
+    @pytest.mark.parametrize(
+        "data_fixture",
+        ["acoustic_receiver_data", "elastic_receiver_data"],
+    )
+    def test_calculate_receiver_error(
+        self,
+        request,
+        data_fixture,
+    ):
+        """Test receiver error for acoustic and elastic data."""
+        numerical, reference, dt = request.getfixturevalue(data_fixture)
+
+        error = MeasureError.calculate_receiver_error(
+            numerical,
+            reference,
+            dt,
+        )
+
+        # Numerical data differs from the reference only by low-amplitude noise.
+        assert 0.0 < error < 1.0
