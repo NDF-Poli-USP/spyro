@@ -113,9 +113,8 @@ def minimize_with_tao(
     comm : petsc4py.PETSc.Comm or mpi4py.MPI.Comm, optional
         Communicator the controls are defined over.
     options : dict, optional
-        PETSc options for the solver, such as ``{"tao_max_it": 20}``, merged
-        over ``{"tao_type": "bqnls"}``. Without a type TAO would fall back on
-        its own default, LMVM, which ignores bounds.
+        PETSc options for TAO, such as ``{"tao_max_it": 20}``. The method is
+        always BQNLS, TAO's bound-constrained quasi-Newton method.
     record : callable, optional
         Called ``record(iteration, functional, controls)`` after each
         iteration TAO accepts, with the controls it stands at as a list of
@@ -136,46 +135,34 @@ def minimize_with_tao(
         If TAO stops without converging, which is what reaching the iteration
         limit amounts to. The last iterate is returned rather than raising,
         since a fixed iteration limit is a normal way to run an optimization.
-    UserWarning
-        If the TAO type resolves to LMVM or BLMVM, with the reasons it is not
-        recommended: pyadjoint's ``TAOSolver`` gives both an initial Hessian
-        that PETSc keeps fixed instead of rescaling; BLMVM restarts every line
-        search from a unit step; and LMVM ignores the bounds.
+
+    Raises
+    ------
+    ValueError
+        If the options or the PETSc command line ask for a TAO type other
+        than BQNLS.
 
     See Also
     --------
     LumpedL2ReducedFunctional : The change of variables TAO runs in.
     tao_bounds : Shapes ``vmin``/``vmax`` into the ``bounds`` this takes.
     """
-    options = {"tao_type": "bqnls", **(options or {})}
+    options = dict(options or {})
+    tao_type = options.setdefault("tao_type", "bqnls")
+    if tao_type != "bqnls":
+        raise ValueError(
+            f"minimize_with_tao always uses BQNLS, not '{tao_type}'.",
+        )
     transformed = LumpedL2ReducedFunctional(reduced_functional)
     if bounds is not None:
         bounds = transformed.transform_bounds(bounds)
     problem = MinimizationProblem(transformed, bounds=bounds)
     solver = TAOSolver(problem, options, comm=comm)
-    # Checked on the type TAO resolved, which the PETSc command line can set
-    # as well as ``options``.
-    tao_type = solver.tao.getType()
-    if tao_type in {"lmvm", "blmvm"}:
-        reasons = [
-            "pyadjoint's TAOSolver gives it a fixed initial Hessian, which "
-            "turns off PETSc's rescaling of the quasi-Newton step",
-        ]
-        if tao_type == "blmvm":
-            reasons.append(
-                "it restarts every line search from a unit step, ignoring "
-                "tao_ls_stepinit",
-            )
-        elif bounds is not None:
-            reasons.append(
-                "it is unconstrained, so it ignores the bounds and the "
-                "controls can leave them",
-            )
-        warnings.warn(
-            f"TAO type '{tao_type}' is not recommended here: "
-            + "; ".join(reasons)
-            + ". The default 'bqnls', which TAO introduced to replace "
-            "BLMVM, has none of these problems.",
+    # The PETSc command line can still set the type.
+    if solver.tao.getType() != "bqnls":
+        raise ValueError(
+            "minimize_with_tao always uses BQNLS, not "
+            f"'{solver.tao.getType()}'.",
         )
     # TAO holds an iterate as one vector with every control concatenated into
     # it. Reading it through an interface built from those same controls lays

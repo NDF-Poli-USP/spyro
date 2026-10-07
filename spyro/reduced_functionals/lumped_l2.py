@@ -1,7 +1,6 @@
 """A reduced functional over controls rescaled by their lumped mass."""
 
 import firedrake as fire
-import numpy as np
 
 from pyadjoint import Control, no_annotations
 from pyadjoint.enlisting import Enlist
@@ -32,39 +31,42 @@ def _inverse_sqrt_lumped_mass(
     Raises
     ------
     ValueError
-        If the lumped mass is not positive, as for quadratic Lagrange on
-        triangles and tetrahedra.
+        If the mass matrix assembled with that quadrature is not diagonal.
     """
+    from petsc4py import PETSc
+
     trial = fire.TrialFunction(function_space)
     test = fire.TestFunction(function_space)
-    one = fire.Function(function_space).assign(1.0)
-
     try:
         quadrature, _, _ = quadrature_rules(function_space)
     except ValueError:
         quadrature = {}
-
     measure = fire.dx(**quadrature) if quadrature else fire.dx
-    mass = fire.assemble(fire.action(trial * test * measure, one))
-    with mass.dat.vec_ro as entries:
-        _, smallest = entries.min()
-    if smallest <= 0.0:
+    mass = fire.assemble(trial * test * measure).petscmat
+
+    diagonal = mass.getDiagonal()
+    off_diagonal = mass.duplicate(copy=True)
+    zeros = diagonal.duplicate()
+    zeros.zeroEntries()
+    off_diagonal.setDiagonal(zeros)
+    largest = off_diagonal.norm(PETSc.NormType.INFINITY) / diagonal.max()[1]
+    if largest > 1e-12:
         element = function_space.ufl_element()
         raise ValueError(
-            "The lumped mass of a control space has to be positive, and this "
-            f"one, {element.family()} of degree {element.degree()} on a "
-            f"{function_space.mesh().ufl_cell()} mesh, has an entry "
-            f"of {smallest:.3g}. Lumping by row sums gives each degree of "
-            "freedom the integral of its basis function, and some basis "
-            "functions of this element integrate to zero or less (the vertex "
-            "functions of quadratic Lagrange do, on triangles and "
-            "tetrahedra), so the lumped metric TAO would run in is not "
-            "positive definite. Use a mass-lumped element for the controls "
-            "(KMV, or spectral on quadrilaterals), or a Lagrange degree whose "
-            "basis functions all integrate to a positive value, such as 1.",
+            "LumpedL2ReducedFunctional needs a control space whose mass "
+            "matrix, assembled with the quadrature spyro adopts for the "
+            "element, is diagonal: KMV elements, spectral (GLL) "
+            "quadrilaterals or hexahedra, or DG0. This one, "
+            f"{element.family()} of degree {element.degree()} on a "
+            f"{function_space.mesh().ufl_cell()} mesh, is not: its "
+            f"off-diagonal entries reach {largest:.2g} of the diagonal.",
         )
+
     scale = fire.Function(function_space)
-    scale.dat.data_wo[:] = 1.0 / np.sqrt(mass.dat.data_ro)
+    with scale.dat.vec_wo as values:
+        diagonal.copy(values)
+        values.sqrtabs()
+        values.reciprocal()
     return scale
 
 
@@ -78,7 +80,8 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
     :math:`M_L` is the mass matrix assembled with the quadrature spyro adopts
     for each element (:func:`spyro.domains.quadrature.quadrature_rules`). For
     KMV elements and spectral (GLL) quadrilaterals the quadrature points are
-    the nodes, so this matrix is diagonal at any degree.
+    the nodes, so this matrix is diagonal at any degree. Control spaces where
+    it is not diagonal are rejected.
 
     The controls here carry the ``"l2"`` Riesz map, which in :math:`\tilde{m}` is the
     lumped :math:`L^2` one in :math:`m`. Values go in and come out as
@@ -86,15 +89,15 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
     :meth:`transform_bounds` takes bounds on :math:`m` to bounds on
     :math:`\tilde{m}`.
 
-    The diagonal analogue of :class:`firedrake.adjoint.L2TransformedFunctional`,
-    which keeps the consistent mass through a block-diagonal factorization in
-    a DG space. That turns a box on :math:`m` into a general polytope, which
-    TAO cannot project onto; a diagonal transformation keeps it a box.
-
     Parameters
     ----------
     reduced_functional : pyadjoint.reduced_functional.AbstractReducedFunctional
         Functional of the model controls.
+
+    Raises
+    ------
+    ValueError
+        If the mass matrix of a control space is not diagonal.
     """
 
     @no_annotations
@@ -191,29 +194,32 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         return self._controls.delist(scaled)
 
     def tlm(self, m_dot):
-        r"""Return :math:`DJ(m)[M_L^{-1/2} \dot{\tilde{m}}]`.
+        """Not provided: spyro's inversions use first derivatives only.
 
         Parameters
         ----------
         m_dot : firedrake.Function or sequence of firedrake.Function
-            :math:`\dot{\tilde{m}}`, one per control.
+            Direction, one per control.
 
-        Returns
-        -------
-        pyadjoint.OverloadedType
-            The tangent linear action.
+        Raises
+        ------
+        NotImplementedError
+            Always.
         """
-        directions = self._scaled(m_dot, dual=False)
-        return self._functional.tlm(self._model_controls.delist(directions))
+        raise NotImplementedError(
+            "LumpedL2ReducedFunctional does not provide tangent linear "
+            "actions: spyro's inversions run BQNLS, a quasi-Newton method "
+            "that only needs gradients.",
+        )
 
     def hessian(self, m_dot, hessian_input=None, evaluate_tlm: bool = True,
                 apply_riesz: bool = False):
-        r"""Return :math:`M_L^{-1/2} D^2J(m) M_L^{-1/2} \dot{\tilde{m}}`.
+        """Not provided: spyro's inversions use first derivatives only.
 
         Parameters
         ----------
         m_dot : firedrake.Function or sequence of firedrake.Function
-            :math:`\dot{\tilde{m}}`, one per control.
+            Direction, one per control.
         hessian_input : pyadjoint.OverloadedType, optional
             Hessian value of the functional result.
         evaluate_tlm : bool, optional
@@ -221,23 +227,16 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         apply_riesz : bool, optional
             Whether to return the primal result instead of the dual one.
 
-        Returns
-        -------
-        firedrake.Cofunction, firedrake.Function or list
-            One per control.
+        Raises
+        ------
+        NotImplementedError
+            Always.
         """
-        directions = self._scaled(m_dot, dual=False)
-        action = self._functional.hessian(
-            self._model_controls.delist(directions),
-            hessian_input=hessian_input, evaluate_tlm=evaluate_tlm,
+        raise NotImplementedError(
+            "LumpedL2ReducedFunctional does not provide Hessian actions: "
+            "spyro's inversions run BQNLS, a quasi-Newton method that only "
+            "needs gradients.",
         )
-        scaled = self._scaled(action, dual=True)
-        if apply_riesz:
-            scaled = [
-                control.control._ad_convert_riesz(value, riesz_map="l2")
-                for control, value in zip(self._controls, scaled)
-            ]
-        return self._controls.delist(scaled)
 
     def map_result(self, values) -> list:
         r"""Return :math:`m = M_L^{-1/2} \tilde{m}`.

@@ -19,6 +19,7 @@ from firedrake.adjoint import (
 from pyadjoint import Tape
 
 from spyro.domains.quadrature import quadrature_rules
+from spyro.domains.space import create_function_space
 from spyro.reduced_functionals import LumpedL2ReducedFunctional
 
 
@@ -114,11 +115,62 @@ def test_transformed_functional_matches_the_model_functional():
     assert taylor_test(transformed, m_tilde, direction) > 1.9
 
 
-def test_a_mass_that_does_not_lump_is_rejected():
-    """Quadratic Lagrange vertex functions integrate to zero on triangles."""
-    space = fire.FunctionSpace(fire.UnitSquareMesh(2, 2), "CG", 2)
+def _space(method: str, degree: int) -> fire.FunctionSpace:
+    """Return a spyro function space on a small mesh of the method's cells.
+
+    Parameters
+    ----------
+    method : str
+        Spyro method name, see ``spyro.domains.space.create_function_space``.
+    degree : int
+        Polynomial degree.
+
+    Returns
+    -------
+    firedrake.FunctionSpace
+        The space.
+    """
+    quadrilateral = "quadrilateral" in method or method == "DQ"
+    mesh = fire.UnitSquareMesh(3, 3, quadrilateral=quadrilateral)
+    return create_function_space(mesh, method, degree)
+
+
+@pytest.mark.parametrize("method, degree", [
+    ("mass_lumped_triangle", 1), ("mass_lumped_triangle", 3),
+    ("spectral_quadrilateral", 2), ("spectral_quadrilateral", 4),
+    ("DG0", 0),
+])
+def test_diagonal_mass_spaces_are_accepted(method, degree):
+    """KMV and spectral elements, and DG0, have a diagonal mass."""
+    space = _space(method, degree)
+    transformed = LumpedL2ReducedFunctional(
+        lumped_misfit([fire.Function(space).assign(1.0)], [fire.Function(space)]),
+    )
+    assert len(transformed.controls) == 1
+
+
+@pytest.mark.parametrize("method, degree", [
+    ("CG_triangle", 1), ("CG_triangle", 2), ("DG_triangle", 1), ("DQ", 2),
+])
+def test_non_diagonal_mass_spaces_are_rejected(method, degree):
+    """Spaces whose mass, with spyro's quadrature, is not diagonal fail."""
+    space = _space(method, degree)
     reduced_functional = lumped_misfit(
         [fire.Function(space).assign(1.0)], [fire.Function(space)],
     )
-    with pytest.raises(ValueError, match="integrate to zero or less"):
+    with pytest.raises(ValueError, match="is diagonal"):
         LumpedL2ReducedFunctional(reduced_functional)
+
+
+def test_second_order_actions_are_not_provided():
+    """spyro's inversions run BQNLS, which needs no Hessian or TLM."""
+    space = kmv_space(2)
+    m = fire.Function(space).assign(1.0)
+    transformed = LumpedL2ReducedFunctional(
+        lumped_misfit([m], [reference(space)]),
+    )
+    direction = fire.Function(space).assign(1.0)
+    with pytest.raises(NotImplementedError, match="only needs gradients"):
+        transformed.tlm(direction)
+    with pytest.raises(NotImplementedError, match="only needs gradients"):
+        transformed.hessian(direction)

@@ -80,7 +80,7 @@ def test_bounds_are_projected_exactly():
 
 
 def test_bqnls_is_the_default():
-    """Left to itself TAO would pick LMVM, which warns and ignores bounds."""
+    """Without a type, TAO itself would pick LMVM, which ignores bounds."""
     space = kmv_space(4)
     reduced_functional = lumped_misfit(
         [fire.Function(space).assign(1.0)], [reference(space)],
@@ -94,18 +94,13 @@ def test_bqnls_is_the_default():
         )
 
 
-@pytest.mark.parametrize("tao_type, bounds, reason", [
-    ("lmvm", None, "fixed initial Hessian"),
-    ("blmvm", None, "fixed initial Hessian"),
-    ("blmvm", None, "unit step"),
-    ("lmvm", [(0.5, 2.0)], "ignores the bounds"),
-])
-def test_types_that_are_not_recommended_warn(tao_type, bounds, reason):
-    """LMVM and BLMVM warn, with the reasons that apply to each."""
+@pytest.mark.parametrize("tao_type", ["lmvm", "blmvm", "nls"])
+def test_other_methods_are_rejected(tao_type):
+    """minimize_with_tao always runs BQNLS."""
     space = kmv_space(4)
     reduced_functional = lumped_misfit(
         [fire.Function(space).assign(1.0)], [reference(space)],
     )
-    with pytest.warns(UserWarning, match=reason):
-        minimize_with_tao(reduced_functional, bounds=bounds,
+    with pytest.raises(ValueError, match="always uses BQNLS"):
+        minimize_with_tao(reduced_functional,
                           options={"tao_type": tao_type, "tao_max_it": 1})
