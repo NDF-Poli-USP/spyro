@@ -60,7 +60,7 @@ case_large_2D = {
     "receiver_location": [(-15.01, 6.01)],
     "solid_receiver_locations": [(-14.99, 5.99)],
     "final_time": 2.0,
-    "dt": 0.001,
+    "dt": 0.0005,
     "velocity_fluid": None,
     "bulk_modulus": 2.25,
     "density_fluid": 1.0,
