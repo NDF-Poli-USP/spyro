@@ -686,5 +686,5 @@ def get_real_shot_record(wave):
 
 def get_time_vector(wave):
     """Get a time vector representing the time axis of a wave object."""
-    number_timesteps = int(wave.final_time/wave.dt) + 1
+    number_timesteps = round(wave.final_time/wave.dt) + 1
     return np.linspace(0.0, wave.final_time, number_timesteps)

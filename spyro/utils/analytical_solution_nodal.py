@@ -186,7 +186,7 @@ def analytical_solution_elastic(
     if dimension == 2 and source_type == "explosive_source":
         raise ValueError("Explosive source only supported for 3D simulations.")
 
-    nt = int(final_time / dt + 1)
+    nt = round(final_time / dt + 1)
     final_time = dt * (nt - 1)
     time_vector = np.linspace(0.0, final_time, nt)
     u = np.zeros((nt, dimension))
