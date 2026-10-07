@@ -1,6 +1,7 @@
 import firedrake as fire
 import warnings
 import inspect
+import operator
 from enum import Enum
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI
@@ -1874,8 +1875,9 @@ class FullWaveformInversion:
         np.save("result", self._flatten_control(self.control_parameter_result))
         return result
 
-    def _run_fwi_tao(self, parameters, tao_options=None, stages=None,
-                     latent=False, proximal=None):
+    def _run_fwi_tao(self, parameters: dict, tao_options: dict | None = None,
+                     stages: list | None = None, latent: bool = False,
+                     proximal: dict | None = None) -> PhysicalParameters:
         """Optimize the recorded reduced functional with PETSc TAO.
 
         The forward solve is recorded once, here, and every functional value
@@ -1939,6 +1941,11 @@ class FullWaveformInversion:
         self.get_functional()
 
         automated_adjoint = self.wave.automated_adjoint
+
+        if proximal is not None:
+            from ..reduced_functionals.proximal import _proximal_parameters
+            _proximal_parameters(proximal["step"], proximal["scales"],
+                                 len(automated_adjoint.controls))
 
         # One bound pair per control, not per degree of freedom: TAO takes the
         # bounds as Function objects (or scalars broadcast over them), while
@@ -2016,6 +2023,13 @@ class FullWaveformInversion:
                     [complete[name] for name in control_names],
                 )
 
+            stage_proximal = proximal
+            if proximal is not None and proximal["scales"] is not None:
+                weights = dict(zip(control_names, proximal["scales"]))
+                stage_proximal = {
+                    **proximal,
+                    "scales": [weights[name] for name in active_control_names],
+                }
             stage_solution = self._minimize(
                 stage_functional,
                 [
@@ -2029,7 +2043,7 @@ class FullWaveformInversion:
                 },
                 record,
                 latent=latent,
-                proximal=proximal,
+                proximal=stage_proximal,
             )
             # TAO leaves the active checkpoints at the last point it
             # evaluated, and the next stage starts from the checkpoints.
@@ -2043,8 +2057,9 @@ class FullWaveformInversion:
 
         return state
 
-    def _minimize(self, reduced_functional, bounds, options, record,
-                  latent=False, proximal=None) -> list:
+    def _minimize(self, reduced_functional: object, bounds: list,
+                  options: dict, record: object, latent: bool = False,
+                  proximal: dict | None = None) -> list:
         r"""Minimize a reduced functional with TAO, latent and proximal if asked.
 
         Without ``proximal`` this is one call to
@@ -2089,8 +2104,11 @@ class FullWaveformInversion:
         from ..reduced_functionals import (
             LatentReducedFunctional, ProximalReducedFunctional,
         )
+        from ..reduced_functionals.latent import _box_bounds
         from ..tools.optimization import minimize_with_tao
 
+        if latent or proximal is not None:
+            _box_bounds(bounds, Enlist(reduced_functional.controls))
         done = 0
 
         def solve(functional, functional_bounds, to_model, misfit):
@@ -2195,7 +2213,7 @@ class FullWaveformInversion:
         return shrunk
 
     @staticmethod
-    def _proximal(proximal) -> dict | None:
+    def _proximal(proximal: dict | None) -> dict | None:
         """Normalize the proximal point settings of a run.
 
         Parameters
@@ -2214,12 +2232,16 @@ class FullWaveformInversion:
         Raises
         ------
         ValueError
-            If a setting is unknown, ``kind`` is missing or unknown, or
-            ``outer_iterations`` is not a positive integer.
+            If a setting is unknown, the kind is invalid, the step is not
+            finite and positive, weights are not finite and nonnegative,
+            the margin is outside [0, 0.5), or outer_iterations is not a
+            positive integer.
         """
         if proximal is None:
             return None
-        from ..reduced_functionals.proximal import PROXIMAL_KINDS
+        from ..reduced_functionals.proximal import (
+            PROXIMAL_KINDS, _proximal_parameters,
+        )
 
         settings = {"kind": None, "step": 1.0, "outer_iterations": 6,
                     "scales": None, "bound_margin": 1e-4}
@@ -2231,9 +2253,20 @@ class FullWaveformInversion:
         if settings["kind"] not in PROXIMAL_KINDS:
             raise ValueError(f"proximal['kind'] must be one of "
                              f"{PROXIMAL_KINDS}, not {settings['kind']!r}.")
-        if int(settings["outer_iterations"]) < 1:
-            raise ValueError("proximal['outer_iterations'] has to be at least 1.")
-        settings["outer_iterations"] = int(settings["outer_iterations"])
+        try:
+            iterations = operator.index(settings["outer_iterations"])
+        except TypeError as error:
+            raise ValueError("proximal outer_iterations must be a positive integer.") from error
+        if isinstance(settings["outer_iterations"], (bool, np.bool_)) or iterations < 1:
+            raise ValueError("proximal outer_iterations must be a positive integer.")
+        settings["outer_iterations"] = iterations
+        settings["step"], settings["scales"] = _proximal_parameters(
+            settings["step"], settings["scales"],
+        )
+        margin = float(settings["bound_margin"])
+        if not np.isfinite(margin) or not 0 <= margin < 0.5:
+            raise ValueError("proximal bound_margin must be finite and in [0, 0.5).")
+        settings["bound_margin"] = margin
         return settings
 
     @staticmethod

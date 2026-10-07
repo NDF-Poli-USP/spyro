@@ -52,6 +52,47 @@ def _bound_array(bound, space: fire.FunctionSpace) -> np.ndarray:
     return np.full(fire.Function(space).dat.data_ro.shape, float(bound))
 
 
+def _box_bounds(bounds: list | tuple, controls: Enlist) -> list:
+    """Validate finite box bounds and return their lower values and widths.
+
+    Parameters
+    ----------
+    bounds : sequence of tuple
+        One lower/upper pair per control, containing scalars or fields.
+    controls : pyadjoint.enlisting.Enlist
+        Controls whose spaces and communicators define the bounds.
+
+    Returns
+    -------
+    list of tuple of numpy.ndarray
+        Lower values and nonnegative widths on locally owned degrees of freedom.
+
+    Raises
+    ------
+    ValueError
+        If bounds are missing, nonfinite, reversed or have incompatible sizes.
+    """
+    if bounds is None or len(bounds) != len(controls):
+        raise ValueError("bounds must contain one pair per control.")
+    result = []
+    for control, pair in zip(controls, bounds):
+        if len(pair) != 2:
+            raise ValueError("Each bound must be a (lower, upper) pair.")
+        space = control.control.function_space()
+        lower, upper = [_bound_array(bound, space) for bound in pair]
+        shape = control.control.dat.data_ro.shape
+        invalid = lower.shape != shape or upper.shape != shape
+        if not invalid:
+            invalid = (not np.all(np.isfinite(lower))
+                       or not np.all(np.isfinite(upper))
+                       or np.any(upper < lower)
+                       or not np.all(np.isfinite(upper - lower)))
+        if space.mesh().comm.allreduce(int(invalid)):
+            raise ValueError("bounds must be finite, ordered and match the control.")
+        result.append((lower, upper - lower))
+    return result
+
+
 class LatentReducedFunctional(AbstractReducedFunctional):
     r"""A reduced functional over latent controls :math:`\psi`.
 
@@ -62,10 +103,10 @@ class LatentReducedFunctional(AbstractReducedFunctional):
         m = \ell + (u - \ell)\,\sigma(\psi), \qquad
         \sigma(\psi) = \frac{1}{1 + e^{-\psi}},
 
-    applied at each degree of freedom. Any :math:`\psi` gives a model
-    strictly inside the bounds :math:`[\ell, u]`, so the optimization over
-    :math:`\psi` needs no bounds. Degrees of freedom with :math:`\ell = u`
-    stay fixed.
+    applied at each degree of freedom. Any finite :math:`\psi` gives a model
+    strictly inside the bounds in exact arithmetic; floating-point rounding
+    can reach an endpoint. The optimization over :math:`\psi` needs no bounds.
+    Degrees of freedom with :math:`\ell = u` stay fixed.
 
     Parameters
     ----------
@@ -78,11 +119,12 @@ class LatentReducedFunctional(AbstractReducedFunctional):
     Raises
     ------
     ValueError
-        If a bound is None.
+        If bounds are missing, nonfinite, reversed or incompatible with the controls.
     """
 
     @no_annotations
-    def __init__(self, reduced_functional: AbstractReducedFunctional, bounds):
+    def __init__(self, reduced_functional: AbstractReducedFunctional,
+                 bounds: list | tuple) -> None:
         super().__init__()
         self._functional = reduced_functional
         model_controls = reduced_functional.controls
@@ -93,12 +135,12 @@ class LatentReducedFunctional(AbstractReducedFunctional):
         self._lower = []
         self._width = []
         latent = []
-        for control, (lower, upper) in zip(model_controls, bounds):
+        for control, (lower, width) in zip(
+            model_controls, _box_bounds(bounds, model_controls),
+        ):
             # The tape value: Control.update moves it, not the Function.
             model = control.tape_value()
             space = model.function_space()
-            lower = _bound_array(lower, space)
-            width = _bound_array(upper, space) - lower
             self._lower.append(lower)
             self._width.append(width)
             free = width > 0.0

@@ -7,6 +7,7 @@ import warnings
 
 import firedrake as fire
 import numpy as np
+from petsc4py import PETSc
 
 from pyadjoint import MinimizationProblem, TAOSolver
 from pyadjoint.optimization.tao_solver import (
@@ -132,15 +133,17 @@ def minimize_with_tao(
     Warns
     -----
     UserWarning
-        If TAO stops without converging, which is what reaching the iteration
-        limit amounts to. The last iterate is returned rather than raising,
-        since a fixed iteration limit is a normal way to run an optimization.
+        If TAO reaches its iteration limit. The last iterate is returned,
+        since a fixed iteration budget is a normal way to run an optimization.
 
     Raises
     ------
     ValueError
         If the options or the PETSc command line ask for a TAO type other
         than BQNLS.
+    TAOConvergenceError
+        If TAO fails for any reason other than its iteration limit, including
+        line-search failure or a nonfinite objective or gradient.
 
     See Also
     --------
@@ -188,6 +191,8 @@ def minimize_with_tao(
     try:
         return lumped_functional.map_result(as_list(solver.solve()))
     except TAOConvergenceError as error:
+        if solver.tao.getConvergedReason() != PETSc.TAO.Reason.DIVERGED_MAXITS:
+            raise
         warnings.warn(
             f"{error} Returning the last iterate; raise the iteration limit "
             "or loosen the tolerances in the TAO options if the optimization "
