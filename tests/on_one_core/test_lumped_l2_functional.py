@@ -19,7 +19,12 @@ from pyadjoint import Tape
 
 from spyro.domains.quadrature import quadrature_rules
 from spyro.domains.space import create_function_space
-from spyro.reduced_functionals import LumpedL2ReducedFunctional
+
+
+# LumpedL2ReducedFunctional needs pyadjoint's AbstractReducedFunctional, which
+# older Firedrake releases do not ship; it is imported inside each test so
+# that collecting this module does not fail there.
+pytestmark = pytest.mark.newer_firedrake
 
 
 @pytest.fixture(autouse=True)
@@ -103,6 +108,8 @@ def test_lumped_functional_matches_the_model_functional():
     ``map_result`` brings m_tilde back to m, and that its derivative passes
     a Taylor test.
     """
+    from spyro.reduced_functionals import LumpedL2ReducedFunctional
+
     space = _space("mass_lumped_triangle", 2)
     m = fire.Function(space).assign(1.2)
     reduced_functional = lumped_misfit(m, reference(space), power=2)
@@ -124,6 +131,8 @@ def test_lumped_functional_matches_the_model_functional():
 ])
 def test_non_diagonal_mass_spaces_are_rejected(method, degree):
     """Spaces whose mass, with spyro's quadrature, is not diagonal fail."""
+    from spyro.reduced_functionals import LumpedL2ReducedFunctional
+
     space = _space(method, degree)
     reduced_functional = lumped_misfit(
         fire.Function(space).assign(1.0), fire.Function(space),
