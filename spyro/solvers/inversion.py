@@ -1672,6 +1672,26 @@ class FullWaveformInversion:
                 Each stage starts from the complete model produced by the
                 previous one. Its iteration limit takes precedence over
                 ``tao_options["tao_max_it"]``.
+            latent : bool, optional
+                Optimize over latent controls :math:`\\psi`, with the model
+                :math:`m = \\ell + (u - \\ell)\\,\\sigma(\\psi)` built from
+                ``vmin`` and ``vmax``. Any :math:`\\psi` gives a model inside
+                the bounds, so TAO runs without them. Default False. Only
+                used under the automated adjoint.
+            proximal : dict, optional
+                Run a proximal point method: ``outer_iterations``
+                subproblems, each minimizing the misfit plus
+                :math:`\\frac{1}{\\alpha} D(v, v_k)` for up to ``maxiter``
+                iterations (or the stage's limit), with the anchor
+                :math:`v_k` moved to each subproblem's solution. Keys:
+                ``kind``, ``"l2"`` (:math:`\\frac12\\|v - v_k\\|^2`, in the
+                optimized variable) or ``"bregman"`` (the Bregman divergence
+                of the entropy of the box ``[vmin, vmax]``); ``step``
+                (:math:`\\alpha`, default 1.0); ``outer_iterations``
+                (default 6); ``scales`` (one weight per control, default 1);
+                and ``bound_margin`` (default 1e-4), the fraction of the box
+                width the ``"bregman"`` term keeps away from the bounds.
+                Only used under the automated adjoint.
             scipy_options : dict, optional
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
@@ -1745,6 +1765,8 @@ class FullWaveformInversion:
         >>> fwi.run_fwi(maxiter=100, vmin=1.5, vmax=5.0)
         """
         stages = kwargs.pop("stages", None)
+        latent = kwargs.pop("latent", False)
+        proximal = self._proximal(kwargs.pop("proximal", None))
         maxiter = kwargs.pop("maxiter", 20)
         parameters = {
             "vmin": kwargs.pop("vmin", 1.429),
@@ -1784,6 +1806,14 @@ class FullWaveformInversion:
                 )
         parameters.update(kwargs)
 
+        if (latent or proximal is not None) and (
+            self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT
+        ):
+            raise ValueError(
+                "latent and proximal are run by the automated adjoint's "
+                "optimizer, so they need "
+                "adjoint_type=AdjointType.AUTOMATED_ADJOINT.",
+            )
         if stages is not None:
             if self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
                 raise ValueError(
@@ -1810,6 +1840,7 @@ class FullWaveformInversion:
             self.set_guess_control(
                 self._run_fwi_tao(
                     parameters, tao_options=tao_options, stages=stages,
+                    latent=latent, proximal=proximal,
                 ),
             )
             self.control_parameter_result = self.control_parameters
@@ -1843,7 +1874,8 @@ class FullWaveformInversion:
         np.save("result", self._flatten_control(self.control_parameter_result))
         return result
 
-    def _run_fwi_tao(self, parameters, tao_options=None, stages=None):
+    def _run_fwi_tao(self, parameters, tao_options=None, stages=None,
+                     latent=False, proximal=None):
         """Optimize the recorded reduced functional with PETSc TAO.
 
         The forward solve is recorded once, here, and every functional value
@@ -1872,6 +1904,11 @@ class FullWaveformInversion:
             on the one recording; see :meth:`run_fwi`. Each listed stage builds
             a reduced functional containing only its active controls. ``None``
             uses the complete reduced functional for ``maxiter`` iterations.
+        latent : bool, optional
+            Whether to optimize over latent controls; see :meth:`run_fwi`.
+        proximal : dict, optional
+            Proximal point settings, normalized by :meth:`_proximal`; see
+            :meth:`run_fwi`.
 
         Returns
         -------
@@ -1895,7 +1932,7 @@ class FullWaveformInversion:
         # never asks for the automated adjoint must not be made to depend on
         # it -- ``import spyro`` reaches this module, so anything unavailable
         # up there fails every test that touches spyro, whatever it tests.
-        from ..tools.optimization import minimize_with_tao, tao_bounds
+        from ..tools.optimization import tao_bounds
 
         # Records the tape, and logs the starting functional the same way the
         # scipy path logs every iterate.
@@ -1920,12 +1957,13 @@ class FullWaveformInversion:
                 "tao_max_it": parameters["maxiter"],
                 **tao_options,
             }
-            solution = minimize_with_tao(
+            solution = self._minimize(
                 reduced_functional,
-                bounds=list(zip(lower, upper)),
-                comm=self.wave.comm.comm,
-                options=options,
-                record=self._record_iterate,
+                list(zip(lower, upper)),
+                options,
+                self._record_iterate,
+                latent=latent,
+                proximal=proximal,
             )
             return automated_adjoint.label_derivatives(solution)
 
@@ -1978,19 +2016,20 @@ class FullWaveformInversion:
                     [complete[name] for name in control_names],
                 )
 
-            stage_solution = minimize_with_tao(
+            stage_solution = self._minimize(
                 stage_functional,
-                bounds=[
+                [
                     (lower_by_name[name], upper_by_name[name])
                     for name in active_control_names
                 ],
-                comm=self.wave.comm.comm,
-                options={
+                {
                     **tao_options,
                     # The limit declared by the stage is authoritative.
                     "tao_max_it": iterations,
                 },
-                record=record,
+                record,
+                latent=latent,
+                proximal=proximal,
             )
             # TAO leaves the active checkpoints at the last point it
             # evaluated, and the next stage starts from the checkpoints.
@@ -2003,6 +2042,199 @@ class FullWaveformInversion:
                 control.update(value)
 
         return state
+
+    def _minimize(self, reduced_functional, bounds, options, record,
+                  latent=False, proximal=None) -> list:
+        r"""Minimize a reduced functional with TAO, latent and proximal if asked.
+
+        Without ``proximal`` this is one call to
+        :func:`spyro.tools.optimization.minimize_with_tao`. With it, it runs
+        ``proximal["outer_iterations"]`` subproblems
+
+        .. math::
+
+            \min_v\ J(v) + \frac{1}{\alpha} D(v, v_k),
+
+        each of up to ``options["tao_max_it"]`` iterations, moving the
+        anchor :math:`v_k` to the solution of the previous one. With
+        ``latent``, :math:`v` is the latent control :math:`\psi` and TAO runs
+        without bounds. The ``"l2"`` term is taken in :math:`v`; the
+        ``"bregman"`` term is the same in :math:`m` and :math:`\psi`, and is
+        taken in :math:`m`.
+
+        Parameters
+        ----------
+        reduced_functional : pyadjoint.reduced_functional.AbstractReducedFunctional
+            Functional of the model controls :math:`m`.
+        bounds : list of tuple
+            ``(lower, upper)`` on :math:`m`, one per control.
+        options : dict
+            TAO options of each subproblem.
+        record : callable
+            Called ``record(iteration, functional, controls)`` after each
+            accepted iteration, with the data misfit and the model controls,
+            iterations numbered through all subproblems.
+        latent : bool, optional
+            Whether to optimize over latent controls.
+        proximal : dict, optional
+            Settings from :meth:`_proximal`.
+
+        Returns
+        -------
+        list of firedrake.Function
+            The model controls the last subproblem stopped at.
+        """
+        from pyadjoint.enlisting import Enlist
+
+        from ..reduced_functionals import (
+            LatentReducedFunctional, ProximalReducedFunctional,
+        )
+        from ..tools.optimization import minimize_with_tao
+
+        done = 0
+
+        def solve(functional, functional_bounds, to_model, misfit):
+            """Run TAO on ``functional`` and return the model controls."""
+            offset = done
+
+            def record_model(iteration, value, values):
+                nonlocal done
+                done = offset + iteration
+                record(done, misfit(value, values), to_model(values))
+
+            values = minimize_with_tao(
+                functional, bounds=functional_bounds,
+                comm=self.wave.comm.comm, options=options, record=record_model,
+            )
+            return to_model(values)
+
+        def unchanged(value, values):
+            return value
+
+        if proximal is None:
+            if not latent:
+                return solve(reduced_functional, bounds, list, unchanged)
+            latent_functional = LatentReducedFunctional(reduced_functional, bounds)
+            return solve(latent_functional, None,
+                         latent_functional.map_result, unchanged)
+
+        models = None
+        for _ in range(proximal["outer_iterations"]):
+            # Every subproblem anchors at the tape value of the controls,
+            # which the previous one moved to its solution.
+            if proximal["kind"] == "bregman":
+                term = ProximalReducedFunctional(
+                    reduced_functional, "bregman", step=proximal["step"],
+                    scales=proximal["scales"], bounds=bounds,
+                )
+                if latent:
+                    functional = LatentReducedFunctional(term, bounds)
+                    functional_bounds = None
+                    to_model = functional.map_result
+                else:
+                    functional = term
+                    functional_bounds = self._shrink_bounds(
+                        bounds, proximal["bound_margin"],
+                    )
+                    to_model = list
+
+                def misfit(value, values, term=term, to_model=to_model):
+                    return value - term.proximal_value(to_model(values))
+            else:
+                if latent:
+                    inner = LatentReducedFunctional(reduced_functional, bounds)
+                    to_model = inner.map_result
+                    functional_bounds = None
+                else:
+                    inner = reduced_functional
+                    to_model = list
+                    functional_bounds = bounds
+                functional = ProximalReducedFunctional(
+                    inner, "l2", step=proximal["step"],
+                    scales=proximal["scales"],
+                )
+
+                def misfit(value, values, term=functional):
+                    return value - term.proximal_value(values)
+
+            models = solve(functional, functional_bounds, to_model, misfit)
+            for control, model in zip(Enlist(reduced_functional.controls), models):
+                control.update(model)
+        return models
+
+    @staticmethod
+    def _shrink_bounds(bounds, margin: float) -> list:
+        """Move each bound inwards by ``margin`` times the width of the box.
+
+        Parameters
+        ----------
+        bounds : list of tuple
+            ``(lower, upper)``, one per control, each a scalar or a field.
+        margin : float
+            Fraction of the width.
+
+        Returns
+        -------
+        list of tuple
+            The shrunk bounds, of the same kinds.
+        """
+        shrunk = []
+        for lower, upper in bounds:
+            if isinstance(lower, fire.Function) or isinstance(upper, fire.Function):
+                space = (lower if isinstance(lower, fire.Function)
+                         else upper).function_space()
+                lower = fire.Function(space).assign(lower)
+                upper = fire.Function(space).assign(upper)
+                width = fire.Function(space).assign(upper - lower)
+                lower = fire.Function(space).assign(lower + margin * width)
+                upper = fire.Function(space).assign(upper - margin * width)
+            else:
+                width = upper - lower
+                lower, upper = lower + margin * width, upper - margin * width
+            shrunk.append((lower, upper))
+        return shrunk
+
+    @staticmethod
+    def _proximal(proximal) -> dict | None:
+        """Normalize the proximal point settings of a run.
+
+        Parameters
+        ----------
+        proximal : dict or None
+            ``kind`` (``"l2"`` or ``"bregman"``), and optionally ``step``
+            (default 1.0), ``outer_iterations`` (default 6), ``scales``
+            (one weight per control, default 1) and ``bound_margin``
+            (default 1e-4).
+
+        Returns
+        -------
+        dict or None
+            The settings with their defaults, or None.
+
+        Raises
+        ------
+        ValueError
+            If a setting is unknown, ``kind`` is missing or unknown, or
+            ``outer_iterations`` is not a positive integer.
+        """
+        if proximal is None:
+            return None
+        from ..reduced_functionals.proximal import PROXIMAL_KINDS
+
+        settings = {"kind": None, "step": 1.0, "outer_iterations": 6,
+                    "scales": None, "bound_margin": 1e-4}
+        unknown = sorted(set(proximal) - set(settings))
+        if unknown:
+            raise ValueError(f"{unknown} are not proximal settings, which are "
+                             f"{sorted(settings)}.")
+        settings.update(proximal)
+        if settings["kind"] not in PROXIMAL_KINDS:
+            raise ValueError(f"proximal['kind'] must be one of "
+                             f"{PROXIMAL_KINDS}, not {settings['kind']!r}.")
+        if int(settings["outer_iterations"]) < 1:
+            raise ValueError("proximal['outer_iterations'] has to be at least 1.")
+        settings["outer_iterations"] = int(settings["outer_iterations"])
+        return settings
 
     @staticmethod
     def _stages(stages, maxiter):

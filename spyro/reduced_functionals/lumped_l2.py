@@ -10,10 +10,8 @@ from ..domains.quadrature import quadrature_rules
 
 
 @no_annotations
-def _inverse_sqrt_lumped_mass(
-    function_space: fire.FunctionSpace,
-) -> fire.Function:
-    r"""Return :math:`M_L^{-1/2}`, the inverse square root of the lumped mass.
+def _lumped_mass(function_space: fire.FunctionSpace) -> fire.Function:
+    r"""Return :math:`M_L`, the diagonal of the lumped mass matrix.
 
     See :class:`LumpedL2ReducedFunctional` for the quadrature it is assembled
     with.
@@ -26,7 +24,7 @@ def _inverse_sqrt_lumped_mass(
     Returns
     -------
     firedrake.Function
-        The scale taking :math:`\tilde{m}` to :math:`m = M_L^{-1/2} \tilde{m}`.
+        The diagonal of the mass matrix, one entry per degree of freedom.
 
     Raises
     ------
@@ -62,9 +60,34 @@ def _inverse_sqrt_lumped_mass(
             f"off-diagonal entries reach {largest:.2g} of the diagonal.",
         )
 
-    scale = fire.Function(function_space)
-    with scale.dat.vec_wo as values:
+    lumped = fire.Function(function_space)
+    with lumped.dat.vec_wo as values:
         diagonal.copy(values)
+    return lumped
+
+
+def _inverse_sqrt_lumped_mass(
+    function_space: fire.FunctionSpace,
+) -> fire.Function:
+    r"""Return :math:`M_L^{-1/2}`, the inverse square root of the lumped mass.
+
+    Parameters
+    ----------
+    function_space : firedrake.FunctionSpace
+        Space a control lives in.
+
+    Returns
+    -------
+    firedrake.Function
+        The scale taking :math:`\tilde{m}` to :math:`m = M_L^{-1/2} \tilde{m}`.
+
+    Raises
+    ------
+    ValueError
+        If the mass matrix of the space is not diagonal.
+    """
+    scale = _lumped_mass(function_space)
+    with scale.dat.vec as values:
         values.sqrtabs()
         values.reciprocal()
     return scale
@@ -114,7 +137,9 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         self._scales = []
         transformed = []
         for control in model_controls:
-            model = control.control
+            # The tape value, not ``control.control``: between stages the
+            # controls move through ``Control.update``, which only changes it.
+            model = control.tape_value()
             space = model.function_space()
             if space not in scales:
                 scales[space] = _inverse_sqrt_lumped_mass(space)
