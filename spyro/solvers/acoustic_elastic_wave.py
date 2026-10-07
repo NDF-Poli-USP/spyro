@@ -297,7 +297,15 @@ class AcousticElasticWave(Wave):
     def get_forward_solution_receivers(self):
         # pressure: P nos receptores | displacement: u_f (vetor) nos receptores
         data_with_halos = self.X_n.sub(0).dat.data_ro_with_halos[:]
-        return self.receivers.interpolate(data_with_halos)
+        placeholder = (np.full(self.dimension, -99999.0)
+                       if self.fluid_is_vector else -99999.0)
+        values = []
+        for rid in range(self.receivers.number_of_points):
+            if self.receivers.is_local[rid] is None or data_with_halos.shape[0] == 0:
+                values.append(placeholder)
+            else:
+                values.append(self.receivers.new_at(data_with_halos, rid))
+        return values
 
     @override
     def get_function(self):
