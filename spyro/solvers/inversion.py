@@ -1676,11 +1676,12 @@ class FullWaveformInversion:
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
             tao_options : dict, optional
-                PETSc options for the TAO solver, merged over the defaults
-                ``{"tao_type": "blmvm", "tao_max_it": maxiter}``. Only used
-                under the automated adjoint.
+                PETSc options for the TAO solver, merged over the default
+                ``{"tao_max_it": maxiter}``. Only used under the automated
+                adjoint. The method is always BQNLS, TAO's bound-constrained
+                quasi-Newton method, and cannot be changed here.
 
-                Those two are the only options set here, so what stops a run
+                That is the only option set here, so what stops a run
                 is ``maxiter``: the convergence *tolerances* are left at
                 PETSc's own, and ``tao_gatol`` and ``tao_grtol`` of 1e-8 are
                 far below the functional an inversion of this kind starts
@@ -1916,7 +1917,6 @@ class FullWaveformInversion:
                     self.wave.functional_value,
                 )
             options = {
-                "tao_type": "blmvm",
                 "tao_max_it": parameters["maxiter"],
                 **tao_options,
             }
@@ -1986,7 +1986,6 @@ class FullWaveformInversion:
                 ],
                 comm=self.wave.comm.comm,
                 options={
-                    "tao_type": "blmvm",
                     **tao_options,
                     # The limit declared by the stage is authoritative.
                     "tao_max_it": iterations,
