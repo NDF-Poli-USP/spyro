@@ -16,7 +16,7 @@ from pyadjoint.optimization.tao_solver import (
 )
 from pyadjoint.reduced_functional import AbstractReducedFunctional
 
-from ..reduced_functionals import LumpedL2ReducedFunctional
+from ..functionals.reduced import LumpedL2ReducedFunctional
 from ..utils.physical_parameters import as_list
 
 

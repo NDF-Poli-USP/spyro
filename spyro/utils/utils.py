@@ -47,9 +47,11 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
 
 @ensemble_functional
 def compute_functional(
-    wave, misfit, evaluation_mode=FunctionalEvaluationMode.AFTER_SOLVE, step=None, nsteps=None,
-    functional_form=FunctionalType.L2Norm
-):
+    wave: object, misfit: object,
+    evaluation_mode: FunctionalEvaluationMode = FunctionalEvaluationMode.AFTER_SOLVE,
+    step: int | None = None, nsteps: int | None = None,
+    functional_form: FunctionalType = FunctionalType.L2Norm,
+) -> object:
     """Compute the functional value for the given misfit at receiver
     locations.
 
@@ -76,6 +78,9 @@ def compute_functional(
         Current time step index. Required if evaluation_mode is PER_TIMESTEP.
     nsteps : int, optional
         Total number of time steps. Required if evaluation_mode is PER_TIMESTEP.
+    functional_form : FunctionalType, optional
+        Legacy selector. Only L2Norm is supported; evaluation is delegated
+        to L2DataMisfit while this wrapper preserves ensemble reduction.
 
     Returns
     -------
@@ -96,31 +101,9 @@ def compute_functional(
         raise NotImplementedError(
             f"Functional form {functional_form} not implemented. Only L2Norm"
             " is currently supported.")
-    if evaluation_mode == FunctionalEvaluationMode.PER_TIMESTEP:
-        weight = 0.5 if step == 0 or step == nsteps - 1 else 1.0
+    from ..functionals.misfit import L2DataMisfit
 
-        if wave.use_vertex_only_mesh:
-            return assemble(
-                0.5 * wave.dt * weight
-                * inner(misfit, misfit) * dx
-            )
-        elif isinstance(misfit, np.ndarray):
-            return np.sum(misfit**2) * (0.5 * wave.dt * weight)
-        else:
-            raise ValueError(
-                "Expected misfit to be a numpy array when not using vertex-only mesh."
-            )
-
-    num_receivers = wave.number_of_receivers
-    dt = wave.dt
-
-    J = 0
-    for rn in range(num_receivers):
-        J += np.trapezoid(misfit[:, rn] ** 2, dx=dt)
-
-    J *= 0.5
-
-    return J
+    return L2DataMisfit()(wave, misfit, evaluation_mode, step, nsteps)
 
 
 def evaluate_misfit(model, guess, exact):

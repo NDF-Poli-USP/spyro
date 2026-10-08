@@ -36,6 +36,11 @@ def _propagate_forward_central_difference(wave, source_ids):
 
     functional_mode = wave.functional_evaluation_mode
     compute_functional = functional_mode is not None
+    misfit_functional = (
+        wave.inversion_objective.misfit
+        if wave.inversion_objective is not None
+        else utils.compute_functional
+    )
 
     t = wave.current_time
     nt = int(wave.final_time / wave.dt) + 1  # number of timesteps
@@ -180,7 +185,7 @@ def _propagate_forward_central_difference(wave, source_ids):
             else:
                 misfit_step = real_shot_record[step] - usol_recv[-1]
             wave.misfit.append(misfit_step)
-            J += utils.compute_functional(
+            J += misfit_functional(
                 wave, misfit_step, evaluation_mode=FunctionalEvaluationMode.PER_TIMESTEP,
                 step=step, nsteps=nt
             )
@@ -201,6 +206,10 @@ def _propagate_forward_central_difference(wave, source_ids):
         usol_recv = utils.utils.communicate(usol_recv, wave.comm)
 
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+        if compute_functional and wave.inversion_objective is not None:
+            J = wave.inversion_objective.local_value(
+                J, wave.physical_parameters, wave.comm.ensemble_comm.size,
+            )
         wave.automated_adjoint.stop_recording()
         # Will store only the final value of the functional.
         # Note: for the automated adjoint, the solutions are save in the pyadjoint tape,

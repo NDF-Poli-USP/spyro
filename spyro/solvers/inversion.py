@@ -1696,6 +1696,10 @@ class FullWaveformInversion:
             scipy_options : dict, optional
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
+            objective : InversionObjective, optional
+                Receiver misfit and physical regularization. Requires the
+                automated adjoint. The objective is composed before latent,
+                proximal and lumped coordinate wrappers are applied.
             tao_options : dict, optional
                 PETSc options for the TAO solver, merged over the default
                 ``{"tao_max_it": maxiter}``. Only used under the automated
@@ -1783,6 +1787,15 @@ class FullWaveformInversion:
         tao_options = kwargs.pop("tao_options", None)
         self._save_controls = kwargs.pop("save_controls", True)
         self.adjoint_type = kwargs.pop("adjoint_type", self.adjoint_type)
+        from ..functionals import InversionObjective
+
+        objective = kwargs.pop("objective", None)
+        if objective is not None:
+            if not isinstance(objective, InversionObjective):
+                raise TypeError("objective must be an InversionObjective.")
+            if self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
+                raise ValueError("An objective requires the automated adjoint.")
+        self.wave.inversion_objective = objective
         # The settings reach the solver at the first forward solve of the run,
         # so a name that is not a setting is rejected here instead of being
         # silently ignored there.
@@ -1943,7 +1956,7 @@ class FullWaveformInversion:
         automated_adjoint = self.wave.automated_adjoint
 
         if proximal is not None:
-            from ..reduced_functionals.proximal import _proximal_parameters
+            from ..functionals.reduced.proximal import _proximal_parameters
             _proximal_parameters(proximal["step"], proximal["scales"],
                                  len(automated_adjoint.controls))
 
@@ -2101,10 +2114,10 @@ class FullWaveformInversion:
         """
         from pyadjoint.enlisting import Enlist
 
-        from ..reduced_functionals import (
+        from ..functionals.reduced import (
             LatentReducedFunctional, ProximalReducedFunctional,
         )
-        from ..reduced_functionals.latent import _box_bounds
+        from ..functionals.reduced.latent import _box_bounds
         from ..tools.optimization import minimize_with_tao
 
         if latent or proximal is not None:
@@ -2239,7 +2252,7 @@ class FullWaveformInversion:
         """
         if proximal is None:
             return None
-        from ..reduced_functionals.proximal import (
+        from ..functionals.reduced.proximal import (
             PROXIMAL_KINDS, _proximal_parameters,
         )
 
