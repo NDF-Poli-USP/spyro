@@ -10,8 +10,10 @@ from ..domains.quadrature import quadrature_rules
 
 
 @no_annotations
-def _lumped_mass(function_space: fire.FunctionSpace) -> fire.Function:
-    r"""Return :math:`M_L`, the diagonal of the lumped mass matrix.
+def _inverse_sqrt_lumped_mass(
+    function_space: fire.FunctionSpace,
+) -> fire.Function:
+    r"""Return :math:`M_L^{-1/2}`, the inverse square root of the lumped mass.
 
     See :class:`LumpedL2ReducedFunctional` for the quadrature it is assembled
     with.
@@ -24,7 +26,7 @@ def _lumped_mass(function_space: fire.FunctionSpace) -> fire.Function:
     Returns
     -------
     firedrake.Function
-        The diagonal of the mass matrix, one entry per degree of freedom.
+        The scale taking :math:`\tilde{m}` to :math:`m = M_L^{-1/2} \tilde{m}`.
 
     Raises
     ------
@@ -58,35 +60,9 @@ def _lumped_mass(function_space: fire.FunctionSpace) -> fire.Function:
             f"off-diagonal entries reach {largest:.2g} of the diagonal.",
         )
 
-    lumped = fire.Function(function_space)
-    with lumped.dat.vec_wo as values:
+    inverse_sqrt_mass = fire.Function(function_space)
+    with inverse_sqrt_mass.dat.vec_wo as values:
         diagonal.copy(values)
-    return lumped
-
-
-def _inverse_sqrt_lumped_mass(
-    function_space: fire.FunctionSpace,
-) -> fire.Function:
-    r"""Return :math:`M_L^{-1/2}`, the inverse square root of the lumped mass.
-
-    Parameters
-    ----------
-    function_space : firedrake.FunctionSpace
-        Space a control lives in.
-
-    Returns
-    -------
-    firedrake.Function
-        The scale taking :math:`\tilde{m}` to :math:`m = M_L^{-1/2} \tilde{m}`.
-
-    Raises
-    ------
-    ValueError
-        If the quadrature spyro adopts for the space does not give a
-        diagonal mass matrix.
-    """
-    inverse_sqrt_mass = _lumped_mass(function_space)
-    with inverse_sqrt_mass.dat.vec as values:
         values.sqrtabs()
         values.reciprocal()
     return inverse_sqrt_mass
