@@ -1913,7 +1913,7 @@ class FullWaveformInversion:
         # never asks for the automated adjoint must not be made to depend on
         # it -- ``import spyro`` reaches this module, so anything unavailable
         # up there fails every test that touches spyro, whatever it tests.
-        from ..tools.optimization import tao_bounds
+        from ..tools.optimization import minimize_with_tao, tao_bounds
 
         # Records the tape, and logs the starting functional the same way the
         # scipy path logs every iterate.
@@ -1938,11 +1938,12 @@ class FullWaveformInversion:
                 "tao_max_it": parameters["maxiter"],
                 **tao_options,
             }
-            solution = self._minimize(
+            solution = minimize_with_tao(
                 reduced_functional,
-                list(zip(lower, upper)),
-                options,
-                self._record_iterate,
+                bounds=list(zip(lower, upper)),
+                comm=self.wave.comm.comm,
+                options=options,
+                record=self._record_iterate,
                 latent=latent,
             )
             return automated_adjoint.label_derivatives(solution)
@@ -1996,18 +1997,19 @@ class FullWaveformInversion:
                     [complete[name] for name in control_names],
                 )
 
-            stage_solution = self._minimize(
+            stage_solution = minimize_with_tao(
                 stage_functional,
-                [
+                bounds=[
                     (lower_by_name[name], upper_by_name[name])
                     for name in active_control_names
                 ],
-                {
+                comm=self.wave.comm.comm,
+                options={
                     **tao_options,
                     # The limit declared by the stage is authoritative.
                     "tao_max_it": iterations,
                 },
-                record,
+                record=record,
                 latent=latent,
             )
             # TAO leaves the active checkpoints at the last point it
@@ -2021,53 +2023,6 @@ class FullWaveformInversion:
                 control.update(value)
 
         return state
-
-    def _minimize(self, reduced_functional: object, bounds: list,
-                  options: dict, record: object, latent: bool = False) -> list:
-        r"""Minimize a reduced functional with TAO, over latent controls if asked.
-
-        One call to :func:`spyro.tools.optimization.minimize_with_tao`. With
-        ``latent``, TAO optimizes the latent controls :math:`\psi` of
-        :class:`spyro.reduced_functionals.LatentReducedFunctional` without
-        bounds, and ``record`` and the result receive the model
-        :math:`m(\psi)`.
-
-        Parameters
-        ----------
-        reduced_functional : pyadjoint.reduced_functional.AbstractReducedFunctional
-            Functional of the model controls :math:`m`.
-        bounds : list of tuple
-            ``(lower, upper)`` on :math:`m`, one per control.
-        options : dict
-            TAO options.
-        record : callable
-            Called ``record(iteration, functional, controls)`` after each
-            accepted iteration, with the model controls.
-        latent : bool, optional
-            Whether to optimize over latent controls.
-
-        Returns
-        -------
-        list of firedrake.Function
-            The model controls TAO stopped at.
-        """
-        from ..reduced_functionals import LatentReducedFunctional
-        from ..tools.optimization import minimize_with_tao
-
-        if not latent:
-            return list(minimize_with_tao(
-                reduced_functional, bounds=bounds, comm=self.wave.comm.comm,
-                options=options, record=record,
-            ))
-        latent_functional = LatentReducedFunctional(reduced_functional, bounds)
-
-        def record_model(iteration, value, values):
-            record(iteration, value, latent_functional.map_result(values))
-
-        return latent_functional.map_result(minimize_with_tao(
-            latent_functional, comm=self.wave.comm.comm, options=options,
-            record=record_model,
-        ))
 
     @staticmethod
     def _stages(stages, maxiter):

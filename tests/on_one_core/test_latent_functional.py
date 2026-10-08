@@ -48,15 +48,15 @@ def test_latent_optimization_stays_within_the_bounds():
     The target lies below the lower bound in most of the domain, so psi goes
     to minus infinity there and the model reaches the bound in floating point.
     """
-    from spyro.reduced_functionals import LatentReducedFunctional
     from spyro.tools.optimization import minimize_with_tao
 
     space = _space("mass_lumped_triangle", 2)
     target = reference(space)
     m = fire.Function(space).assign(1.3)
-    latent = LatentReducedFunctional(lumped_misfit(m, target), [(LOWER, UPPER)])
-    psi = minimize_with_tao(latent, options={"tao_max_it": 50})
-    (model,) = latent.map_result(psi)
+    (model,) = minimize_with_tao(
+        lumped_misfit(m, target), bounds=[(LOWER, UPPER)],
+        options={"tao_max_it": 50}, latent=True,
+    )
 
     values = model.dat.data_ro
     assert values.min() >= LOWER and values.max() <= UPPER
