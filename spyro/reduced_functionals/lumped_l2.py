@@ -130,8 +130,8 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         """
         return self._controls
 
-    def _divide_by_sqrt_mass(self, values, dual: bool) -> list:
-        r"""Divide each value by the square root of its control's lumped mass.
+    def _apply_inverse_sqrt_mass(self, values, dual: bool) -> list:
+        r"""Multiply each value by the inverse square root of its control's lumped mass.
 
         That is :math:`M_L^{-1/2}` times each value: it takes the controls
         :math:`\tilde{m}` to the model :math:`m`, and the derivative
@@ -147,15 +147,15 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         Returns
         -------
         list
-            The divided values, one per control.
+            The products, one per control.
         """
-        divided = []
+        products = []
         for value, inverse_sqrt_mass in zip(Enlist(values), self._inverse_sqrt_masses):
             space = inverse_sqrt_mass.function_space()
             out = fire.Cofunction(space.dual()) if dual else fire.Function(space)
             out.dat.data_wo[:] = value.dat.data_ro * inverse_sqrt_mass.dat.data_ro
-            divided.append(out)
-        return divided
+            products.append(out)
+        return products
 
     def __call__(self, values):
         r"""Return :math:`\hat{J}(\tilde{m}) = J(M_L^{-1/2} \tilde{m})`.
@@ -170,7 +170,7 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         pyadjoint.AdjFloat
             The functional value.
         """
-        models = self._divide_by_sqrt_mass(values, dual=False)
+        models = self._apply_inverse_sqrt_mass(values, dual=False)
         return self._functional(self._model_controls.delist(models))
 
     def derivative(self, adj_input=1.0, apply_riesz: bool = False):
@@ -189,7 +189,7 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
             One per control.
         """
         derivative = self._functional.derivative(adj_input=adj_input)
-        derivatives = self._divide_by_sqrt_mass(derivative, dual=True)
+        derivatives = self._apply_inverse_sqrt_mass(derivative, dual=True)
         if apply_riesz:
             derivatives = [
                 control.control._ad_convert_riesz(value, riesz_map="l2")
@@ -256,7 +256,7 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         list of firedrake.Function
             :math:`m`, one per control, named after the model controls.
         """
-        models = self._divide_by_sqrt_mass(values, dual=False)
+        models = self._apply_inverse_sqrt_mass(values, dual=False)
         for model, control in zip(models, self._model_controls):
             model.rename(control.control.name())
         return models
