@@ -1672,6 +1672,12 @@ class FullWaveformInversion:
                 Each stage starts from the complete model produced by the
                 previous one. Its iteration limit takes precedence over
                 ``tao_options["tao_max_it"]``.
+            latent : bool, optional
+                Optimize over latent controls :math:`\\psi`, with the model
+                :math:`m = \\ell + (u - \\ell)\\,\\sigma(\\psi)` built from
+                ``vmin`` and ``vmax``. Any :math:`\\psi` gives a model inside
+                the bounds, so TAO runs without them. Default False. Only
+                used under the automated adjoint.
             scipy_options : dict, optional
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
@@ -1745,6 +1751,7 @@ class FullWaveformInversion:
         >>> fwi.run_fwi(maxiter=100, vmin=1.5, vmax=5.0)
         """
         stages = kwargs.pop("stages", None)
+        latent = kwargs.pop("latent", False)
         maxiter = kwargs.pop("maxiter", 20)
         parameters = {
             "vmin": kwargs.pop("vmin", 1.429),
@@ -1784,6 +1791,12 @@ class FullWaveformInversion:
                 )
         parameters.update(kwargs)
 
+        if latent and self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
+            raise ValueError(
+                "latent controls are optimized by the automated adjoint's "
+                "optimizer, so they need "
+                "adjoint_type=AdjointType.AUTOMATED_ADJOINT.",
+            )
         if stages is not None:
             if self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
                 raise ValueError(
@@ -1810,6 +1823,7 @@ class FullWaveformInversion:
             self.set_guess_control(
                 self._run_fwi_tao(
                     parameters, tao_options=tao_options, stages=stages,
+                    latent=latent,
                 ),
             )
             self.control_parameter_result = self.control_parameters
@@ -1843,7 +1857,9 @@ class FullWaveformInversion:
         np.save("result", self._flatten_control(self.control_parameter_result))
         return result
 
-    def _run_fwi_tao(self, parameters, tao_options=None, stages=None):
+    def _run_fwi_tao(self, parameters: dict, tao_options: dict | None = None,
+                     stages: list | None = None,
+                     latent: bool = False) -> PhysicalParameters:
         """Optimize the recorded reduced functional with PETSc TAO.
 
         The forward solve is recorded once, here, and every functional value
@@ -1872,6 +1888,8 @@ class FullWaveformInversion:
             on the one recording; see :meth:`run_fwi`. Each listed stage builds
             a reduced functional containing only its active controls. ``None``
             uses the complete reduced functional for ``maxiter`` iterations.
+        latent : bool, optional
+            Whether to optimize over latent controls; see :meth:`run_fwi`.
 
         Returns
         -------
@@ -1926,6 +1944,7 @@ class FullWaveformInversion:
                 comm=self.wave.comm.comm,
                 options=options,
                 record=self._record_iterate,
+                latent=latent,
             )
             return automated_adjoint.label_derivatives(solution)
 
@@ -1991,6 +2010,7 @@ class FullWaveformInversion:
                     "tao_max_it": iterations,
                 },
                 record=record,
+                latent=latent,
             )
             # TAO leaves the active checkpoints at the last point it
             # evaluated, and the next stage starts from the checkpoints.
