@@ -9,6 +9,8 @@ import resource
 import glob
 import os
 
+from spyro.mpi.spyro_mpi import SpyroEnsemble
+
 from .wave import Wave
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
@@ -23,7 +25,6 @@ from ..io.basicio import parallel_print
 from ..io.basicio import load_shots, save_shots
 from ..io.parallelism_wrappers import switch_serial_shot
 from ..io import create_segy
-from ..io.parallelism_wrappers import run_in_one_core
 
 
 try:
@@ -1511,9 +1512,8 @@ class FullWaveformInversion:
         self.functional_history.append(Jm)
         self.functional = Jm
         peak_memory_mb = get_peak_memory()
-        parallel_print(
+        SpyroEnsemble.print(
             f"Functional: {Jm} at iteration: {self.current_iteration}",
-            self.comm,
         )
         if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
             with open("functional_values.txt", "a") as file:
@@ -1676,11 +1676,12 @@ class FullWaveformInversion:
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
             tao_options : dict, optional
-                PETSc options for the TAO solver, merged over the defaults
-                ``{"tao_type": "blmvm", "tao_max_it": maxiter}``. Only used
-                under the automated adjoint.
+                PETSc options for the TAO solver, merged over the default
+                ``{"tao_max_it": maxiter}``. Only used under the automated
+                adjoint. The method is always BQNLS, TAO's bound-constrained
+                quasi-Newton method, and cannot be changed here.
 
-                Those two are the only options set here, so what stops a run
+                That is the only option set here, so what stops a run
                 is ``maxiter``: the convergence *tolerances* are left at
                 PETSc's own, and ``tao_gatol`` and ``tao_grtol`` of 1e-8 are
                 far below the functional an inversion of this kind starts
@@ -1916,7 +1917,6 @@ class FullWaveformInversion:
                     self.wave.functional_value,
                 )
             options = {
-                "tao_type": "blmvm",
                 "tao_max_it": parameters["maxiter"],
                 **tao_options,
             }
@@ -1986,7 +1986,6 @@ class FullWaveformInversion:
                 ],
                 comm=self.wave.comm.comm,
                 options={
-                    "tao_type": "blmvm",
                     **tao_options,
                     # The limit declared by the stage is authoritative.
                     "tao_max_it": iterations,
@@ -2313,7 +2312,7 @@ class FullWaveformInversion:
         self.wave.real_shot_record = self.real_shot_record
         self.wave.forward_solution_receivers = None
 
-    @run_in_one_core
+    @SpyroEnsemble.run_in_one_core
     def save_result_as_segy(self, file_name="final_vp.segy", grid_spacing=0.01):
         """
         Save the final scalar control result as a SEG-Y file.
