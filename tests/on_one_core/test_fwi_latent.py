@@ -1,10 +1,9 @@
-"""FWI with the latent map and the proximal point methods.
+"""FWI over latent controls.
 
 ``run_fwi(latent=True)`` optimizes over latent controls, inside the bounds by
-construction; ``run_fwi(proximal=...)`` runs a proximal point method with the
-L2 or the Bregman (box entropy) term. Each test inverts the constant acoustic
-model of ``test_fwi_automated_adjoint`` and checks that the run stays within
-the bounds and lowers the misfit.
+construction. The test inverts the constant acoustic model of
+``test_fwi_automated_adjoint`` and checks that the run stays within the bounds
+and lowers the misfit.
 """
 import numpy as np
 import pytest
@@ -39,21 +38,13 @@ def acoustic_fwi() -> spyro.FullWaveformInversion:
 
 
 @pytest.mark.newer_firedrake
-@pytest.mark.parametrize("options", [
-    {"latent": True},
-    {"proximal": {"kind": "l2", "outer_iterations": 2}},
-    {"proximal": {"kind": "bregman", "outer_iterations": 2}},
-    {"latent": True, "proximal": {"kind": "l2", "outer_iterations": 2}},
-    {"latent": True, "proximal": {"kind": "bregman", "outer_iterations": 2}},
-], ids=["bqnls_latent", "l2_proximal_physical", "bregman_proximal_physical",
-        "l2_proximal_latent", "bregman_proximal_latent"])
-def test_latent_and_proximal_runs(tmp_path, monkeypatch, options):
+def test_latent_run(tmp_path, monkeypatch):
     """The model stays within the bounds and the misfit goes down."""
     monkeypatch.chdir(tmp_path)
     fwi = acoustic_fwi()
     result = fwi.run_fwi(
         adjoint_type=AdjointType.AUTOMATED_ADJOINT,
-        vmin=VMIN, vmax=VMAX, maxiter=2, save_controls=False, **options,
+        vmin=VMIN, vmax=VMAX, maxiter=2, save_controls=False, latent=True,
     )
 
     values = result.dat.data_ro
@@ -62,19 +53,8 @@ def test_latent_and_proximal_runs(tmp_path, monkeypatch, options):
     assert fwi.functional_history[-1] < fwi.functional_history[0]
 
 
-def test_proximal_settings_are_checked():
-    """Unknown settings and kinds are rejected before any solve."""
-    fwi = spyro.FullWaveformInversion(dictionary=build_dictionary())
-    with pytest.raises(ValueError, match="not proximal settings"):
-        fwi.run_fwi(adjoint_type=AdjointType.AUTOMATED_ADJOINT,
-                    proximal={"kind": "l2", "alpha": 1.0})
-    with pytest.raises(ValueError, match="must be one of"):
-        fwi.run_fwi(adjoint_type=AdjointType.AUTOMATED_ADJOINT,
-                    proximal={"kind": "entropy"})
-
-
 def test_latent_needs_the_automated_adjoint():
-    """The implemented adjoint's scipy path has no latent or proximal option."""
+    """The implemented adjoint's scipy path has no latent option."""
     fwi = spyro.FullWaveformInversion(dictionary=build_dictionary())
     with pytest.raises(ValueError, match="automated adjoint"):
         fwi.run_fwi(adjoint_type=AdjointType.IMPLEMENTED_ADJOINT, latent=True)
