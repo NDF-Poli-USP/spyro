@@ -17,6 +17,7 @@ from pyadjoint.optimization.tao_solver import (
 from pyadjoint.reduced_functional import AbstractReducedFunctional
 
 from ..reduced_functionals import LatentReducedFunctional, LumpedL2ReducedFunctional
+from ..reduced_functionals.lumped_l2 import _inverse_sqrt_lumped_mass
 from ..utils.physical_parameters import as_list
 
 
@@ -84,6 +85,63 @@ def tao_bounds(bound, controls):
             val=data.reshape(shape),
         ))
     return shaped
+
+
+def _bound_to_field(bound, scale: fire.Function) -> fire.Function | None:
+    r"""Return a bound on :math:`m` as a field on :math:`\tilde{m} = M_L^{1/2} m`.
+
+    Parameters
+    ----------
+    bound : float, firedrake.Function or None
+        The bound on :math:`m`.
+    scale : firedrake.Function
+        :math:`M_L^{-1/2}` in the space of the control it bounds.
+
+    Returns
+    -------
+    firedrake.Function or None
+        The bound on :math:`\tilde{m}`, or None for no bound.
+    """
+    if bound is None:
+        return None
+    field = fire.Function(scale.function_space())
+    values = bound.dat.data_ro if isinstance(bound, fire.Function) else bound
+    field.dat.data_wo[:] = values / scale.dat.data_ro
+    return field
+
+
+def _lumped_bounds(bounds: list, controls) -> list:
+    r"""Return bounds on :math:`\tilde{m} = M_L^{1/2} m` from bounds on :math:`m`.
+
+    The change of variables is diagonal and positive, so a box on :math:`m`
+    is a box on :math:`\tilde{m}`, with each bound scaled the same way.
+
+    Parameters
+    ----------
+    bounds : sequence of tuple
+        ``(lower, upper)`` on :math:`m`, one per control. Each bound is a
+        scalar, a field, or None.
+    controls : pyadjoint.enlisting.Enlist
+        Controls of the :class:`LumpedL2ReducedFunctional`, over
+        :math:`\tilde{m}`.
+
+    Returns
+    -------
+    list of tuple
+        ``(lower, upper)`` on :math:`\tilde{m}`, one per control.
+    """
+    # One scale per space: controls in the same space share it.
+    scales = {}
+    transformed = []
+    for (lower, upper), control in zip(bounds, controls):
+        space = control.control.function_space()
+        if space not in scales:
+            scales[space] = _inverse_sqrt_lumped_mass(space)
+        scale = scales[space]
+        transformed.append(
+            (_bound_to_field(lower, scale), _bound_to_field(upper, scale)),
+        )
+    return transformed
 
 
 def minimize_with_tao(
@@ -174,7 +232,7 @@ def minimize_with_tao(
         bounds = None
     lumped_functional = LumpedL2ReducedFunctional(reduced_functional)
     if bounds is not None:
-        bounds = lumped_functional.transform_bounds(bounds)
+        bounds = _lumped_bounds(bounds, lumped_functional.controls)
     problem = MinimizationProblem(lumped_functional, bounds=bounds)
     solver = TAOSolver(problem, options, comm=comm)
     # The PETSc command line can still set the type.

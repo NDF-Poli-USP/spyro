@@ -108,9 +108,7 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
 
     The controls here carry the ``"l2"`` Riesz map, which in :math:`\tilde{m}` is the
     lumped :math:`L^2` one in :math:`m`. Values go in and come out as
-    :math:`\tilde{m}`; :meth:`map_result` takes them back to :math:`m`, and
-    :meth:`transform_bounds` takes bounds on :math:`m` to bounds on
-    :math:`\tilde{m}`.
+    :math:`\tilde{m}`; :meth:`map_result` takes them back to :math:`m`.
 
     Parameters
     ----------
@@ -280,31 +278,3 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         for model, control in zip(models, self._model_controls):
             model.rename(control.control.name())
         return models
-
-    def transform_bounds(self, bounds) -> list:
-        r"""Return bounds on :math:`\tilde{m}` from bounds on :math:`m`.
-
-        Parameters
-        ----------
-        bounds : sequence of tuple
-            ``(lower, upper)`` on :math:`m`, one per control. Each bound is a
-            scalar, a field, or None.
-
-        Returns
-        -------
-        list of tuple
-            ``(lower, upper)`` on :math:`\tilde{m}`, one per control.
-        """
-        transformed = []
-        for (lower, upper), scale in zip(bounds, self._scales):
-            pair = []
-            for bound in (lower, upper):
-                if bound is None:
-                    pair.append(None)
-                    continue
-                field = fire.Function(scale.function_space())
-                values = bound.dat.data_ro if isinstance(bound, fire.Function) else bound
-                field.dat.data_wo[:] = values / scale.dat.data_ro
-                pair.append(field)
-            transformed.append(tuple(pair))
-        return transformed
