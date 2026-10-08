@@ -2,8 +2,7 @@
 
 ``LumpedL2ReducedFunctional`` replaces the controls ``m`` by
 ``m_tilde = M_L^{1/2} m``, in which the lumped L2 inner product is the Euclidean
-one. With ``latent`` it uses ``psi_tilde = M_L^{1/2} psi`` instead, with
-the latent control ``psi`` of ``m = lower + (upper - lower) * sigmoid(psi)``.
+one.
 """
 import firedrake as fire
 import numpy as np
@@ -26,8 +25,6 @@ from spyro.domains.space import create_function_space
 # older Firedrake releases do not ship; it is imported inside each test so
 # that collecting this module does not fail there.
 pytestmark = pytest.mark.newer_firedrake
-
-LOWER, UPPER = 1.1, 1.6
 
 
 @pytest.fixture(autouse=True)
@@ -104,32 +101,29 @@ def lumped_misfit(control: fire.Function, target: fire.Function,
     return ReducedFunctional(functional, Control(control))
 
 
-@pytest.mark.parametrize("latent", [False, True], ids=["physical", "latent"])
-def test_lumped_functional_matches_the_model_functional(latent):
-    """The lumped functional is the same problem, written in m_tilde or psi_tilde.
+def test_lumped_functional_matches_the_model_functional():
+    """The lumped functional is the same problem, written in m_tilde.
 
     Checks that it gives the same value as the original functional, that
-    ``map_result`` brings m_tilde or psi_tilde back to m, and that its
-    derivative passes a Taylor test.
+    ``map_result`` brings m_tilde back to m, and that its derivative passes
+    a Taylor test.
     """
     from spyro.reduced_functionals import LumpedL2ReducedFunctional
 
     space = _space("mass_lumped_triangle", 2)
     m = fire.Function(space).assign(1.2)
     reduced_functional = lumped_misfit(m, reference(space), power=2)
-    lumped_functional = LumpedL2ReducedFunctional(
-        reduced_functional, bounds=[(LOWER, UPPER)], latent=latent,
-    )
-    start = lumped_functional.controls[0].control
+    lumped_functional = LumpedL2ReducedFunctional(reduced_functional)
+    m_tilde = lumped_functional.controls[0].control
 
-    assert np.isclose(float(lumped_functional(start)), float(reduced_functional(m)))
-    (m_back,) = lumped_functional.map_result(start)
+    assert np.isclose(float(lumped_functional(m_tilde)), float(reduced_functional(m)))
+    (m_back,) = lumped_functional.map_result(m_tilde)
     assert np.allclose(m_back.dat.data_ro, m.dat.data_ro)
 
     direction = fire.Function(space).interpolate(
         fire.sin(3 * fire.SpatialCoordinate(space.mesh())[0])
     )
-    assert taylor_test(lumped_functional, start, direction) > 1.9
+    assert taylor_test(lumped_functional, m_tilde, direction) > 1.9
 
 
 def test_lumped_functional_starts_from_the_tape_value():
@@ -162,26 +156,3 @@ def test_non_diagonal_mass_spaces_are_rejected(method, degree):
     )
     with pytest.raises(ValueError, match="is diagonal"):
         LumpedL2ReducedFunctional(reduced_functional)
-
-
-def test_latent_optimization_stays_within_the_bounds():
-    """Without bounds on the latent controls, the model never leaves [lower, upper].
-
-    The target lies below the lower bound in most of the domain, so the
-    latent control goes to minus infinity there and the model reaches the
-    bound in floating point.
-    """
-    from spyro.tools.optimization import minimize_with_tao
-
-    space = _space("mass_lumped_triangle", 2)
-    target = reference(space)
-    m = fire.Function(space).assign(1.3)
-    (model,) = minimize_with_tao(
-        lumped_misfit(m, target), bounds=[(LOWER, UPPER)],
-        options={"tao_max_it": 50}, latent=True,
-    )
-
-    values = model.dat.data_ro
-    assert values.min() >= LOWER and values.max() <= UPPER
-    interior = (target.dat.data_ro > LOWER + 0.05) & (target.dat.data_ro < UPPER - 0.05)
-    assert np.allclose(values[interior], target.dat.data_ro[interior], atol=1e-3)
