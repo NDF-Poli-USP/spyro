@@ -130,8 +130,12 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         """
         return self._controls
 
-    def _scaled(self, values, dual: bool) -> list:
-        """Return :math:`M_L^{-1/2}` times each value.
+    def _divide_by_sqrt_mass(self, values, dual: bool) -> list:
+        r"""Divide each value by the square root of its control's lumped mass.
+
+        That is :math:`M_L^{-1/2}` times each value: it takes the controls
+        :math:`\tilde{m}` to the model :math:`m`, and the derivative
+        :math:`DJ(m)` to the derivative in :math:`\tilde{m}`.
 
         Parameters
         ----------
@@ -143,15 +147,15 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         Returns
         -------
         list
-            The scaled values, one per control.
+            The divided values, one per control.
         """
-        scaled = []
+        divided = []
         for value, inverse_sqrt_mass in zip(Enlist(values), self._inverse_sqrt_masses):
             space = inverse_sqrt_mass.function_space()
             out = fire.Cofunction(space.dual()) if dual else fire.Function(space)
             out.dat.data_wo[:] = value.dat.data_ro * inverse_sqrt_mass.dat.data_ro
-            scaled.append(out)
-        return scaled
+            divided.append(out)
+        return divided
 
     def __call__(self, values):
         r"""Return :math:`\hat{J}(\tilde{m}) = J(M_L^{-1/2} \tilde{m})`.
@@ -166,7 +170,7 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         pyadjoint.AdjFloat
             The functional value.
         """
-        models = self._scaled(values, dual=False)
+        models = self._divide_by_sqrt_mass(values, dual=False)
         return self._functional(self._model_controls.delist(models))
 
     def derivative(self, adj_input=1.0, apply_riesz: bool = False):
@@ -185,13 +189,13 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
             One per control.
         """
         derivative = self._functional.derivative(adj_input=adj_input)
-        scaled = self._scaled(derivative, dual=True)
+        derivatives = self._divide_by_sqrt_mass(derivative, dual=True)
         if apply_riesz:
-            scaled = [
+            derivatives = [
                 control.control._ad_convert_riesz(value, riesz_map="l2")
-                for control, value in zip(self._controls, scaled)
+                for control, value in zip(self._controls, derivatives)
             ]
-        return self._controls.delist(scaled)
+        return self._controls.delist(derivatives)
 
     def tlm(self, m_dot):
         """Not provided: spyro's inversions use first derivatives only.
@@ -252,7 +256,7 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         list of firedrake.Function
             :math:`m`, one per control, named after the model controls.
         """
-        models = self._scaled(values, dual=False)
+        models = self._divide_by_sqrt_mass(values, dual=False)
         for model, control in zip(models, self._model_controls):
             model.rename(control.control.name())
         return models
