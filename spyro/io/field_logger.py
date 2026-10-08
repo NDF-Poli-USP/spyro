@@ -3,12 +3,13 @@
 This module provides lightweight wrappers around Firedrake VTK output and
 NumPy array persistence to support time-stepped logging during simulations.
 """
+
 import numpy as np
 from pathlib import Path
 import warnings
 
 from firedrake import VTKFile
-from .basicio import parallel_print
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 class Field:
@@ -97,7 +98,7 @@ class FieldLogger:
         outputs are enabled and the associated output filenames.
     """
 
-    def __init__(self, comm, visualization_dict):
+    def __init__(self, visualization_dict):
         """Initialize FieldLogger class.
 
         Parameters
@@ -108,15 +109,13 @@ class FieldLogger:
             Visualization and logging configuration dictionary. Keys control which
             outputs are enabled and the associated output filenames.
         """
-        self.comm = comm
         self.visualization_dict = visualization_dict
 
         self.__source_id = None
         self.__enabled_fields = []
         self.__wave_data = []
 
-        self.__rank = comm.comm.Get_rank()
-        if self.__rank == 0:
+        if SpyroEnsemble.get_local_rank() == 0:
             self.__func_data = {}
             self.__enabled_functionals = {}
 
@@ -142,6 +141,7 @@ class FieldLogger:
         """
         self.__wave_data.append((key, name, callback))
 
+    @SpyroEnsemble.run_in_one_core
     def add_functional(self, key: str, callback):
         """Register a scalar functional callback on rank zero.
 
@@ -152,8 +152,7 @@ class FieldLogger:
         callback : callable
             Zero-argument callable returning the current functional value.
         """
-        if self.__rank == 0:
-            self.__func_data[key] = callback
+        self.__func_data[key] = callback
 
     def start_logging(self, source_id):
         """Initialize logging targets for a given source id.
@@ -172,44 +171,50 @@ class FieldLogger:
             warnings.warn("Started a new record without stopping the previous one")
 
         self.__source_id = source_id
+
+        self._init_fields(source_id)
+        self._init_functionals()
+
+    def _init_fields(self, source_id):
         self.__enabled_fields = []
         for key, name, callback in self.__wave_data:
-            enabled = self.visualization_dict.get(key + "_output", False)
-            if enabled:
-                fullname = self.visualization_dict.get(
-                    key + "_output_filename", key + ".pvd"
-                )
-                prefix, extension = fullname.split(".")
-                filename = prefix + "sn" + str(source_id) + "." + extension
+            if not self.visualization_dict.get(key + "_output", False):
+                continue
 
-                parallel_print(f"Saving {name} in: {filename}", self.comm)
+            fullname = self.visualization_dict.get(
+                key + "_output_filename", key + ".pvd"
+            )
+            prefix, extension = fullname.split(".")
+            filename = prefix + "sn" + str(source_id) + "." + extension
 
-                file = VTKFile(filename, comm=self.comm.comm)
-                self.__enabled_fields.append(Field(name, file, callback))
+            SpyroEnsemble.print(f"Saving {name} in: {filename}")
 
-        if self.__rank == 0:
-            if self.__time_enabled:
-                self.__time = []
+            file = VTKFile(filename, comm=SpyroEnsemble.ensemble.comm)
+            self.__enabled_fields.append(Field(name, file, callback))
 
-            for key, callback in self.__func_data.items():
-                enabled = self.visualization_dict.get(key, False)
-                if enabled:
-                    filename = self.visualization_dict.get(
-                        key + "_filename", key + ".npy"
-                    )
-                    print(f"Saving {key} in: {filename}")
-                    self.__enabled_functionals[key] = Functional(filename, callback)
+    @SpyroEnsemble.run_in_one_core
+    def _init_functionals(self):
+        if self.__time_enabled:
+            self.__time = []
+
+        for key, callback in self.__func_data.items():
+            if self.visualization_dict.get(key, False):
+                filename = self.visualization_dict.get(key + "_filename", key + ".npy")
+                print(f"Saving {key} in: {filename}")
+                self.__enabled_functionals[key] = Functional(filename, callback)
 
     def stop_logging(self):
         """Finalize the current logging session and persist accumulated data."""
         self.__source_id = None
+        self._save_logs()
 
-        if self.__rank == 0:
-            if self.__time_enabled:
-                np.save(self.__time_filename, self.__time)
+    @SpyroEnsemble.run_in_one_core
+    def _save_logs(self):
+        if self.__time_enabled:
+            np.save(self.__time_filename, self.__time)
 
-            for functional in self.__enabled_functionals.values():
-                functional.save()
+        for functional in self.__enabled_functionals.values():
+            functional.save()
 
     def log(self, t: float):
         """Write enabled fields and sample enabled functionals.
@@ -222,12 +227,15 @@ class FieldLogger:
         for field in self.__enabled_fields:
             field.write(t)
 
-        if self.__rank == 0:
-            if self.__time_enabled:
-                self.__time.append(t)
+        self._sample_functionals(t)
 
-            for functional in self.__enabled_functionals.values():
-                functional.sample()
+    @SpyroEnsemble.run_in_one_core
+    def _sample_functionals(self, t):
+        if self.__time_enabled:
+            self.__time.append(t)
+
+        for functional in self.__enabled_functionals.values():
+            functional.sample()
 
     def get(self, key: str):
         """Return the latest sampled value for an enabled functional.
