@@ -3,8 +3,9 @@ import warnings
 import firedrake as fire
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 
-from .time_integration_central_difference import \
-    _propagate_forward_central_difference as _forward_time_integrator
+from .time_integration_central_difference import (
+    _propagate_forward_central_difference as _forward_time_integrator,
+)
 from ..domains.quadrature import quadrature_rules
 from ..domains.space import check_function_space_type, create_function_space
 from ..io import Model_parameters
@@ -17,11 +18,15 @@ from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from ..utils.physical_parameters import PhysicalParameters
 from ..utils.error_management import validate_enum
-from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
-                            LayerShapeType, WaveType)
+from ..utils.typing import (
+    AdjointType,
+    FunctionalEvaluationMode,
+    AbsorbingBCsType,
+    LayerShapeType,
+    WaveType,
+)
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
-
 
 fire.set_log_level(fire.ERROR)
 
@@ -30,35 +35,35 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     """
     Base class for wave equation solvers.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     comm : `object`
         An object representing the communication interface.
-    boundary_idx_map: dict
+    boundary_idx_map : dict
         Mapping of boundary IDs for applying absorbing boundary conditions.
-    initial_velocity_model: `Firedrake.Function`
+    initial_velocity_model : `Firedrake.Function`
         Initial velocity model.
-    function_space: firedrake function space
+    function_space : firedrake function space
         Function space for the wave equation.
-    current_time: float
+    current_time : float
         Current time of the simulation.
-    solver_parameters: Python object
+    solver_parameters : Python object
         Contains solver parameters.
-    real_shot_record: `Firedrake.Function`
+    real_shot_record : `Firedrake.Function`
         Real shot record.
-    mesh: `Firedrake.Mesh`
+    mesh : `Firedrake.Mesh`
         Mesh used in the simulation (2D or 3D).
     mesh_parameters : `Python object`
         Contains mesh parameters.
-    mesh_x: `ufl.geometry.SpatialCoordinate`
+    mesh_x : `ufl.geometry.SpatialCoordinate`
         Symbolic coordinate x of the mesh object.
-    mesh_y: `ufl.geometry.SpatialCoordinate`
+    mesh_y : `ufl.geometry.SpatialCoordinate`
         Symbolic coordinate y of the mesh object.
     mesh_z : `ufl.geometry.SpatialCoordinate`
         Symbolic coordinate z of the mesh object.
-    sources: Sources object
+    sources : Sources object
         Contains information about sources.
-    receivers: Receivers object
+    receivers : Receivers object
         Contains information about receivers.
     path_case_abc : `string`
         Path to save data for the abc case study.
@@ -69,8 +74,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     layer_ops : `habc.HABCLayer` or `pml_nsnc.PMLLayer`
         ABC layer operation manager.
 
-    Methods:
-    --------
+    Methods
+    -------
     get_and_set_maximum_dt()
         Calculates and/or sets maximum dt.
     get_mass_matrix_diagonal()
@@ -126,7 +131,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         model_parameters : `Python object`
             Contains model parameters.
         """
-
         super().__init__(dictionary=dictionary, comm=comm)
         self.initial_velocity_model = None
         self.gradient_mask_available = False
@@ -150,7 +154,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.functional_value = None
         self.misfit = None
         self.current_time = 0.0
-        self.source_expression = None  # Expression for sources using UFL (less efficient)
+        self.source_expression = (
+            None  # Expression for sources using UFL (less efficient)
+        )
         self.set_solver_parameters()
 
         # Create or get the mesh
@@ -180,8 +186,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # Logger
         self.field_logger = FieldLogger(self.read_outputs)
-        self.field_logger.add_field("forward", self.get_function_name(),
-                                    lambda: self.get_function())
+        self.field_logger.add_field(
+            "forward", self.get_function_name(), lambda: self.get_function()
+        )
 
         self._physical_parameters = PhysicalParameters()
 
@@ -224,23 +231,30 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def get_absorbing_boundaries(self):
         """Get the absorbing boundaries for the problem.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         None
 
-        Returns:
-        --------
+        Returns
+        -------
         boundaries : `tuple`
             Tuple containing the boundary boolean labels for applying absorbing BCs.
             - (absorb_top, absorb_bottom, absorb_right, absorb_left) for 2D
             - (absorb_top, absorb_bottom, absorb_right,
                 absorb_left, absorb_front, absorb_back) for 3D
         """
-        boundaries = (self.absorb_top, self.absorb_bottom,
-                      self.absorb_right, self.absorb_left)
+        boundaries = (
+            self.absorb_top,
+            self.absorb_bottom,
+            self.absorb_right,
+            self.absorb_left,
+        )
 
         if self.dimension == 3:
-            boundaries += (self.absorb_front, self.absorb_back,)
+            boundaries += (
+                self.absorb_front,
+                self.absorb_back,
+            )
 
         return boundaries
 
@@ -254,8 +268,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._map_sources_and_receivers()
 
         # Function space type for the mesh operations
-        self.mesh_ops.func_space_type = 'scalar' \
-            if self.wave_type == WaveType.ISOTROPIC_ACOUSTIC else 'vector'
+        self.mesh_ops.func_space_type = (
+            "scalar" if self.wave_type == WaveType.ISOTROPIC_ACOUSTIC else "vector"
+        )
 
         # Get boundaries
         boundaries = self.get_absorbing_boundaries()
@@ -263,20 +278,29 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Build the boundary ID mapping
         # TODO: Include the logic for hypershape layer from HABC
         # TODO: Create a flag for other domains that are not of type box
-        if not (hasattr(self, 'abc_boundary_layer_shape')
-                and hasattr(self.mesh_parameters, 'boundary_ids_map')
-                and self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE):
-            self.mesh_parameters.boundary_ids_map, \
-                self.mesh_parameters.boundary_nodes_ids = \
-                self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
-                                                   boundaries, box_domain=True,
-                                                   get_boundary_node_ids=True)
+        if not (
+            hasattr(self, "abc_boundary_layer_shape")
+            and hasattr(self.mesh_parameters, "boundary_ids_map")
+            and self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE
+        ):
+            (
+                self.mesh_parameters.boundary_ids_map,
+                self.mesh_parameters.boundary_nodes_ids,
+            ) = self.mesh_ops.mapping_boundary_ids(
+                self.mesh,
+                self.function_space,
+                boundaries,
+                box_domain=True,
+                get_boundary_node_ids=True,
+            )
 
         # Get geometry parameters from mesh
-        if self.mesh_ops.func_space_type == 'scalar' \
-                and not hasattr(self.mesh_parameters, 'diam_mesh'):
-            data_mesh = self.mesh_ops.representative_mesh_dimensions(self.mesh,
-                                                                     self.function_space)
+        if self.mesh_ops.func_space_type == "scalar" and not hasattr(
+            self.mesh_parameters, "diam_mesh"
+        ):
+            data_mesh = self.mesh_ops.representative_mesh_dimensions(
+                self.mesh, self.function_space
+            )
             self.mesh_parameters.diam_mesh = data_mesh[0]
             self.mesh_parameters.lmin = data_mesh[1]
             self.mesh_parameters.lmax = data_mesh[2]
@@ -284,9 +308,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.mesh_parameters.tol = data_mesh[4]
 
     def set_mesh(
-            self,
-            user_mesh=None,
-            input_mesh_parameters=None,
+        self,
+        user_mesh=None,
+        input_mesh_parameters=None,
     ):
         """
         Set the mesh for the solver.
@@ -296,7 +320,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             mesh_parameters (optional): Parameters for generating a mesh.
             Defaults to None.
         """
-
         if input_mesh_parameters is None:
             input_mesh_parameters = {}
 
@@ -316,15 +339,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Args:
             parameters (dict): A dictionary containing the solver parameters.
 
-        Returns:
+        Returns
+        -------
             None
         """
         if parameters is not None:
             self.solver_parameters = parameters
         elif parameters is None:
-            self.solver_parameters = get_default_parameters_for_method(
-                self.method
-            )
+            self.solver_parameters = get_default_parameters_for_method(self.method)
 
     def get_spatial_coordinates(self):
         """
@@ -338,9 +360,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         -------
         mesh_z : `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate z of the mesh object
-        mesh_x: `ufl.geometry.SpatialCoordinate`
+        mesh_x : `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate x of the mesh object
-        mesh_y: `ufl.geometry.SpatialCoordinate`
+        mesh_y : `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate y of the mesh object
         """
         if self.dimension == 2:
@@ -361,20 +383,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     ):
         """Method to define new user velocity model or file. It is optional.
 
-        Parameters:
-        -----------
-        conditional:  (optional)
+        Parameters
+        ----------
+        conditional : (optional)
             Firedrake conditional object.
-        velocity_model_function: Firedrake function (optional)
+        velocity_model_function : Firedrake function (optional)
             Firedrake function to be used as the velocity model. Has to be in the same function space as the object.
-        expression:  str (optional)
+        expression : str (optional)
             If you use an expression, you can use the following variables:
             x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
             It will be interpoalte into either the same function space as the object or a DG0 function space
             in the same mesh.
-        new_file:  str (optional)
+        new_file : str (optional)
             Name of the file containing the velocity model.
-        output:  bool (optional)
+        output : bool (optional)
             If True, outputs the velocity model to a pvd file for visualization.
         """
         # Resseting old velocity model
@@ -406,15 +428,19 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         elif expression is not None:
             V = self.function_space
             vp = eval_functions_to_ufl.generate_ufl_functions(
-                self.mesh, expression, self.dimension)
-            self.initial_velocity_model = fire.Function(
-                V, name="velocity").interpolate(vp)
+                self.mesh, expression, self.dimension
+            )
+            self.initial_velocity_model = fire.Function(V, name="velocity").interpolate(
+                vp
+            )
 
         elif velocity_model_function is not None:
             self.initial_velocity_model = velocity_model_function
         elif new_file is not None:
             self.initial_velocity_model_file = new_file
-            self._initialize_model_parameters(fast_interpolate=fast_interpolate)  # TODO in PR206
+            self._initialize_model_parameters(
+                fast_interpolate=fast_interpolate
+            )  # TODO in PR206
         elif constant is not None:
             V = self.function_space
             vp = fire.Function(V, name="velocity")
@@ -426,8 +452,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 "firedrake function or new file name (segy or hdf5)."
             )
         if output:
-            fire.VTKFile("initial_velocity_model.pvd").write(
-                self.initial_velocity_model, name="velocity"
+            SpyroEnsemble.write_vtk(
+                "initial_velocity_model.pvd",
+                self.initial_velocity_model,
+                name="velocity",
             )
 
     def _map_sources_and_receivers(self):
@@ -452,9 +480,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if function_space_type == "scalar":
             self.scalar_function_space = self.function_space
         elif function_space_type == "mixed":
-            scalar_function_space_type = check_function_space_type(self.function_space.sub(0))
+            scalar_function_space_type = check_function_space_type(
+                self.function_space.sub(0)
+            )
             if scalar_function_space_type != "scalar":
-                raise ValueError("Do not change mixed space order, use scalar first!!! (ノಠ益ಠ)ノ彡┻━┻")
+                raise ValueError(
+                    "Do not change mixed space order, use scalar first!!! (ノಠ益ಠ)ノ彡┻━┻"
+                )
             self.scalar_function_space = self.function_space.sub(0)
             self.vector_function_space = self.function_space.sub(1)
         elif function_space_type == "vector":
@@ -465,8 +497,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.stiffness_quadrature_rule = k_rule
         self.surface_quadrature_rule = s_rule
 
-    def get_and_set_maximum_dt(self, fraction=0.7,
-                               estimate_max_eigenvalue=False):
+    def get_and_set_maximum_dt(self, fraction=0.7, estimate_max_eigenvalue=False):
         """
         Calculates and sets the maximum stable time step (dt) for the wave solver.
 
@@ -476,21 +507,25 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             estimate_max_eigenvalue (bool, optional):
                 Whether to estimate the maximum eigenvalue. Defaults to False.
 
-        Returns:
+        Returns
+        -------
             float: The calculated maximum time step (dt).
         """
-
         if self.c is None:
             c = self.initial_velocity_model
         else:
             c = self.c
 
         # Maximum timestep size
-        method = 'ANALYTICAL' if estimate_max_eigenvalue else 'ARNOLDI'
+        method = "ANALYTICAL" if estimate_max_eigenvalue else "ARNOLDI"
         dt_solver = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
-        max_dt = dt_solver.estimate_timestep(c, self.function_space, self.final_time,
-                                             quad_rule=self.quadrature_rule,
-                                             fraction=fraction)
+        max_dt = dt_solver.estimate_timestep(
+            c,
+            self.function_space,
+            self.final_time,
+            quad_rule=self.quadrature_rule,
+            fraction=fraction,
+        )
         self.dt = max_dt
 
         return max_dt
@@ -532,12 +567,18 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     # Managed attributes to access state variables in current, previous and next iteration
-    vstate = property(fget=lambda self: self._get_vstate(),
-                      fset=lambda self, value: self._set_vstate(value))
-    prev_vstate = property(fget=lambda self: self._get_prev_vstate(),
-                           fset=lambda self, value: self._set_prev_vstate(value))
-    next_vstate = property(fget=lambda self: self._get_next_vstate(),
-                           fset=lambda self, value: self._set_next_vstate(value))
+    vstate = property(
+        fget=lambda self: self._get_vstate(),
+        fset=lambda self, value: self._set_vstate(value),
+    )
+    prev_vstate = property(
+        fget=lambda self: self._get_prev_vstate(),
+        fset=lambda self, value: self._set_prev_vstate(value),
+    )
+    next_vstate = property(
+        fget=lambda self: self._get_next_vstate(),
+        fset=lambda self, value: self._set_next_vstate(value),
+    )
 
     @abstractmethod
     def get_forward_solution_receivers(self):
@@ -545,19 +586,22 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @abstractmethod
     def get_function(self):
-        '''Returns the function (e.g., pressure or displacement) associated with
-        the wave object without additional variables (e.g., PML variables)'''
+        """Returns the function (e.g., pressure or displacement) associated with
+        the wave object without additional variables (e.g., PML variables).
+        """
         pass
 
     @abstractmethod
     def get_function_name(self):
-        '''Returns the string representing the function of the wave object
-        (e.g., "pressure" or "displacement")'''
+        """Returns the string representing the function of the wave object
+        (e.g., "pressure" or "displacement").
+        """
         pass
 
     def update_source_expression(self, t):
-        '''Update the source expression during wave propagation. This method must be
-        implemented only by subclasses that make use of the source term'''
+        """Update the source expression during wave propagation. This method must be
+        implemented only by subclasses that make use of the source term.
+        """
         pass
 
     @ensemble_propagator
@@ -566,22 +610,22 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Propagate the wave forward in time.
         Currently uses central differences.
 
-        Parameters:
-        -----------
-        dt: Python 'float' (optional)
+        Parameters
+        ----------
+        dt : Python 'float' (optional)
             Time step to be used explicitly. If not mentioned uses the default,
             that was estabilished in the wave object.
-        final_time: Python 'float' (optional)
+        final_time : Python 'float' (optional)
             Time which simulation ends. If not mentioned uses the default,
             that was estabilished in the wave object.
-        source_nums: list of int (optional)
+        source_nums : list of int (optional)
             List of source numbers to be simulated. If not mentioned, simulates all sources.
 
-        Returns:
-        --------
-        usol: Firedrake 'Function'
+        Returns
+        -------
+        usol : Firedrake 'Function'
             Wavefield at the final time.
-        u_rec: numpy array
+        u_rec : numpy array
             Wavefield at the receivers across the timesteps.
         """
         if final_time is not None:
@@ -613,11 +657,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def set_material_properties(self, *args, **kwargs):
         """Wrapper for material_properties_io.set_material_property."""
-        return material_properties_io.set_material_property(
-            self,
-            *args,
-            **kwargs
-        )
+        return material_properties_io.set_material_property(self, *args, **kwargs)
 
     def set_material_property(self, *args, **kwargs):
         """Backward-compatible alias for set_material_properties."""
@@ -632,9 +672,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._store_forward_time_steps = value
 
     def enable_automated_adjoint(
-        self, control_parameters=None, checkpointing: bool = False,
+        self,
+        control_parameters=None,
+        checkpointing: bool = False,
         snapshots: int | None = None,
-        gc_timestep_frequency: int | None = None
+        gc_timestep_frequency: int | None = None,
     ) -> None:
         """Enable the automated-adjoint solver.
 
@@ -666,12 +708,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             intended, so collecting periodically lowers the peak memory.
             ``None`` (the default) disables it.
 
-        See Also
-        --------
-        spyro.solvers.automatic_differentiation_solver.AutomatedAdjoint :
-            Which schedule each setting selects, when to prefer one over the
-            other, and the references behind them.
-
         Returns
         -------
         None
@@ -682,15 +718,19 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         ValueError
             If the mesh has not been set, so a control cannot be a field.
 
+        See Also
+        --------
+        spyro.solvers.automatic_differentiation_solver.AutomatedAdjoint :
+            Which schedule each setting selects, when to prefer one over the
+            other, and the references behind them.
+
         Notes
         -----
         The checkpoint schedule is *not* created here; only the intent is
         stored. It is built at the start of each forward solve.
         """
         self.store_forward_time_steps = False
-        self.enable_compute_functional(
-            mode=FunctionalEvaluationMode.PER_TIMESTEP
-        )
+        self.enable_compute_functional(mode=FunctionalEvaluationMode.PER_TIMESTEP)
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
         self._initialize_model_parameters()
@@ -729,14 +769,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def forward_solution_receivers(self, value):
         self._forward_solution_receivers = value
 
-    def enable_compute_functional(
-        self, mode=FunctionalEvaluationMode.AFTER_SOLVE
-    ):
+    def enable_compute_functional(self, mode=FunctionalEvaluationMode.AFTER_SOLVE):
         """Enable functional evaluation during forward solves.
 
-        Parameters:
-        -----------
-        mode: FunctionalEvaluationMode, optional
+        Parameters
+        ----------
+        mode : FunctionalEvaluationMode, optional
             The mode in which to evaluate the functional.
             Default is :attribute:`FunctionalEvaluationMode.AFTER_SOLVE`.
         """
@@ -764,23 +802,29 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def mesh_manager(self):
         """Create the mesh operations manager for the wave solver."""
-
         # Domain dimensions
         domain_dim = self.domain_dimensions()
 
         if self.abc_active:  # If ABC scheme is used
             from ..meshing.meshing_habc import HABCMesh
-            self.mesh_ops = HABCMesh(domain_dim, dimension=self.dimension,
-                                     quadrilateral=self.mesh_parameters.quadrilateral)
+
+            self.mesh_ops = HABCMesh(
+                domain_dim,
+                dimension=self.dimension,
+                quadrilateral=self.mesh_parameters.quadrilateral,
+            )
 
         else:  # If no ABC scheme is used
             from ..meshing.meshing_operations import MeshOps
-            self.mesh_ops = MeshOps(domain_dim, dimension=self.dimension,
-                                    quadrilateral=self.mesh_parameters.quadrilateral)
+
+            self.mesh_ops = MeshOps(
+                domain_dim,
+                dimension=self.dimension,
+                quadrilateral=self.mesh_parameters.quadrilateral,
+            )
 
     def layer_manager(self):
         """Return the layer operations manager for the wave solver."""
-
         # Domain dimensions
         domain_dim = self.domain_dimensions()
 
@@ -789,24 +833,36 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         if self.abc_type == AbsorbingBCsType.PML:  # PML
             from ..pml.pml_nsnc import PMLLayer
-            self.layer_ops = PMLLayer(domain_dim, frequency=self.frequency,
-                                      dt=time_step, dimension=self.dimension,
-                                      quadrilateral=self.mesh_parameters.quadrilateral,
-                                      func_space_type=self.mesh_ops.func_space_type,
-                                      abc_reference_freq=self.abc_reference_freq,
-                                      output_folder=self.output_folder, comm=self.comm)
+
+            self.layer_ops = PMLLayer(
+                domain_dim,
+                frequency=self.frequency,
+                dt=time_step,
+                dimension=self.dimension,
+                quadrilateral=self.mesh_parameters.quadrilateral,
+                func_space_type=self.mesh_ops.func_space_type,
+                abc_reference_freq=self.abc_reference_freq,
+                output_folder=self.output_folder,
+                comm=self.comm,
+            )
 
         if self.abc_type == AbsorbingBCsType.HYBRID:  # HABC
             from ..habc.habc import HABCLayer
-            self.layer_ops = HABCLayer(domain_dim, frequency=self.frequency,
-                                       dt=time_step, dimension=self.dimension,
-                                       quadrilateral=self.mesh_parameters.quadrilateral,
-                                       func_space_type=self.mesh_ops.func_space_type,
-                                       abc_boundary_layer_shape=self.abc_boundary_layer_shape,
-                                       abc_reference_freq=self.abc_reference_freq,
-                                       abc_degree_type=self.abc_degree_type,
-                                       abc_deg_layer=self.abc_deg_layer,
-                                       output_folder=self.output_folder, comm=self.comm)
+
+            self.layer_ops = HABCLayer(
+                domain_dim,
+                frequency=self.frequency,
+                dt=time_step,
+                dimension=self.dimension,
+                quadrilateral=self.mesh_parameters.quadrilateral,
+                func_space_type=self.mesh_ops.func_space_type,
+                abc_boundary_layer_shape=self.abc_boundary_layer_shape,
+                abc_reference_freq=self.abc_reference_freq,
+                abc_degree_type=self.abc_degree_type,
+                abc_deg_layer=self.abc_deg_layer,
+                output_folder=self.output_folder,
+                comm=self.comm,
+            )
 
         # Identifier for the current case study
         if self.abc_type in [AbsorbingBCsType.PML, AbsorbingBCsType.HYBRID]:
