@@ -131,7 +131,7 @@ def _bound_array(bound, space: fire.FunctionSpace) -> np.ndarray:
         If ``bound`` is None: the latent map needs both bounds.
     """
     if bound is None:
-        raise ValueError("latent_bounds needs a lower and an upper bound "
+        raise ValueError("The latent map needs a lower and an upper bound "
                          "for every control.")
     if isinstance(bound, fire.Function):
         return bound.dat.data_ro.copy()
@@ -182,21 +182,23 @@ def _box_bounds(bounds: list | tuple, controls: Enlist) -> list:
 class LumpedL2ReducedFunctional(AbstractReducedFunctional):
     r"""A reduced functional over controls rescaled by their lumped mass.
 
-    Represents :math:`\hat{J}(\tilde{v}) = J(m)`. TAO works with
-    :math:`\tilde{v} = M_L^{1/2} v`, with :math:`M_L` the lumped mass, and
+    Represents :math:`\hat{J}(\tilde{m}) = J(M_L^{-1/2} \tilde{m})`: TAO
+    works with :math:`\tilde{m} = M_L^{1/2} m`, with :math:`M_L` the lumped
+    mass. With ``latent`` it works instead with
+    :math:`\tilde{\psi} = M_L^{1/2} \psi`, where :math:`\psi` is the
+    latent control of the model
 
     .. math::
 
-        m = v, \qquad\text{or, with ``latent_bounds``,}\qquad
-        m = \ell + (u - \ell)\,\sigma(v), \quad
-        \sigma(v) = \frac{1}{1 + e^{-v}}.
+        m = \ell + (u - \ell)\,\sigma(\psi), \qquad
+        \sigma(\psi) = \frac{1}{1 + e^{-\psi}}.
 
-    The Euclidean inner product in :math:`\tilde{v}` is the lumped
-    :math:`L^2` one in :math:`v`, so TAO measures gradients and steps in that
-    metric. With ``latent_bounds``, :math:`v` is the latent control
-    :math:`\psi`: any :math:`\psi` gives a model inside :math:`[\ell, u]`,
-    so TAO needs no bounds. Degrees of freedom with :math:`\ell = u` stay
-    fixed.
+    The Euclidean inner product in :math:`\tilde{m}` (or
+    :math:`\tilde{\psi}`) is the lumped :math:`L^2` one in :math:`m` (or
+    :math:`\psi`), so TAO measures gradients and steps in that metric. Any
+    :math:`\psi` gives a model inside :math:`[\ell, u]`, so with
+    ``latent`` TAO needs no bounds. Degrees of freedom with
+    :math:`\ell = u` stay fixed.
 
     :math:`M_L` is the mass matrix assembled with the quadrature spyro adopts
     for each element (:func:`spyro.domains.quadrature.quadrature_rules`). For
@@ -204,29 +206,32 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
     the nodes, so this matrix is diagonal at any degree. Control spaces where
     it is not diagonal are rejected.
 
-    Values go in and come out as :math:`\tilde{v}`; :meth:`map_result`
-    takes them to :math:`m`, and :meth:`transform_bounds` takes bounds on
-    :math:`m` to bounds on :math:`\tilde{v}` when there are no
-    ``latent_bounds``.
+    Values go in and come out as :math:`\tilde{m}`, or :math:`\tilde{\psi}`
+    with ``latent``; :meth:`map_result` takes them to :math:`m`, and
+    :attr:`bounds` holds the bounds TAO takes.
 
     Parameters
     ----------
     reduced_functional : pyadjoint.reduced_functional.AbstractReducedFunctional
         Functional of the model controls.
-    latent_bounds : sequence of tuple, optional
-        ``(lower, upper)`` on :math:`m`, one per control, each a scalar or a
-        field. Given, the optimization runs over latent controls inside them.
+    bounds : sequence of tuple, optional
+        ``(lower, upper)`` on :math:`m`, one per control, each a scalar, a
+        field, or None. Required, and finite, with ``latent``.
+    latent : bool, optional
+        Whether to optimize over the latent controls :math:`\psi` inside
+        ``bounds``. Default False.
 
     Raises
     ------
     ValueError
-        If the mass matrix of a control space is not diagonal, or
-        ``latent_bounds`` are missing, nonfinite or reversed.
+        If the mass matrix of a control space is not diagonal, or, with
+        ``latent``, the bounds are missing, nonfinite or reversed.
     """
 
     @no_annotations
     def __init__(self, reduced_functional: AbstractReducedFunctional,
-                 latent_bounds: list | tuple | None = None) -> None:
+                 bounds: list | tuple | None = None,
+                 latent: bool = False) -> None:
         super().__init__()
         self._functional = reduced_functional
         model_controls = reduced_functional.controls
@@ -234,8 +239,8 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
             model_controls = Enlist(model_controls)
         self._model_controls = model_controls
         # (lower, width) per control, or None without the latent map.
-        self._boxes = ([None] * len(model_controls) if latent_bounds is None
-                       else _box_bounds(latent_bounds, model_controls))
+        self._boxes = (_box_bounds(bounds, model_controls) if latent
+                       else [None] * len(model_controls))
 
         # One scale per space: controls in the same space share it.
         scales = {}
@@ -250,33 +255,46 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
                 scales[space] = _inverse_sqrt_lumped_mass(space)
             scale = scales[space]
             self._scales.append(scale)
-            v = model.dat.data_ro
+            # m, or psi with latent.
+            values = model.dat.data_ro
             if box is not None:
                 lower, width = box
                 free = width > 0.0
                 t = np.full(width.shape, 0.5)
-                t[free] = np.clip((v[free] - lower[free]) / width[free],
+                t[free] = np.clip((values[free] - lower[free]) / width[free],
                                   1e-12, 1.0 - 1e-12)
-                v = np.log(t) - np.log1p(-t)
-            v_tilde = fire.Function(space)
-            v_tilde.dat.data_wo[:] = v / scale.dat.data_ro
-            transformed.append(Control(v_tilde, riesz_map="l2"))
+                values = np.log(t) - np.log1p(-t)
+            scaled = fire.Function(space)
+            scaled.dat.data_wo[:] = values / scale.dat.data_ro
+            transformed.append(Control(scaled, riesz_map="l2"))
         self._controls = Enlist(model_controls.delist(transformed))
         self._last = [control.control.copy(deepcopy=True)
                       for control in self._controls]
+        # The latent map keeps the model inside the bounds on its own.
+        self._bounds = (None if latent or bounds is None
+                        else self._scaled_bounds(bounds))
 
     @property
     def controls(self) -> Enlist:
-        r""":class:`pyadjoint.enlisting.Enlist`: the controls over :math:`\tilde{v}`."""
+        r""":class:`pyadjoint.enlisting.Enlist`: the controls over :math:`\tilde{m}` or :math:`\tilde{\psi}`."""
         return self._controls
 
+    @property
+    def bounds(self) -> list | None:
+        r"""list of tuple or None: the bounds on the controls, :math:`\tilde{m}`.
+
+        What TAO takes: None with ``latent``, or without bounds.
+        """
+        return self._bounds
+
     def __call__(self, values):
-        r"""Return :math:`\hat{J}(\tilde{v}) = J(m)`.
+        r"""Return :math:`J(m)` at :math:`\tilde{m}` or :math:`\tilde{\psi}`.
 
         Parameters
         ----------
         values : firedrake.Function or sequence of firedrake.Function
-            :math:`\tilde{v}`, one per control.
+            :math:`\tilde{m}`, or :math:`\tilde{\psi}` with
+            ``latent``, one per control.
 
         Returns
         -------
@@ -288,11 +306,12 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         return self._functional(self._model_controls.delist(self.map_result(values)))
 
     def derivative(self, adj_input=1.0, apply_riesz: bool = False):
-        r"""Return :math:`D\hat{J}(\tilde{v}) = M_L^{-1/2}\, \frac{dm}{dv}\, DJ(m)`.
+        r"""Return the derivative in :math:`\tilde{m}` or :math:`\tilde{\psi}`.
 
-        :math:`dm/dv` is 1, or :math:`(u - \ell)\,\sigma(1 - \sigma)` with
-        ``latent_bounds``, taken at the last :math:`\tilde{v}` the functional
-        was evaluated at.
+        It is :math:`M_L^{-1/2}\, DJ(m)` in :math:`\tilde{m}`, and
+        :math:`M_L^{-1/2}\,(u - \ell)\,\sigma(1 - \sigma)\, DJ(m)` in
+        :math:`\tilde{\psi}`, taken at the last :math:`\tilde{\psi}` the
+        functional was evaluated at.
 
         Parameters
         ----------
@@ -370,12 +389,13 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         )
 
     def map_result(self, values) -> list:
-        r"""Return the model :math:`m` at :math:`\tilde{v}`.
+        r"""Return the model :math:`m` at :math:`\tilde{m}` or :math:`\tilde{\psi}`.
 
         Parameters
         ----------
         values : firedrake.Function or sequence of firedrake.Function
-            :math:`\tilde{v}`, one per control.
+            :math:`\tilde{m}`, or :math:`\tilde{\psi}` with
+            ``latent``, one per control.
 
         Returns
         -------
@@ -386,17 +406,18 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         for value, scale, box, control in zip(
             Enlist(values), self._scales, self._boxes, self._model_controls,
         ):
-            v = value.dat.data_ro * scale.dat.data_ro
+            # m, or psi with latent.
+            unscaled = value.dat.data_ro * scale.dat.data_ro
             if box is not None:
                 lower, width = box
-                v = lower + width * _sigmoid(v)
+                unscaled = lower + width * _sigmoid(unscaled)
             model = fire.Function(scale.function_space(), name=control.control.name())
-            model.dat.data_wo[:] = v
+            model.dat.data_wo[:] = unscaled
             models.append(model)
         return models
 
-    def transform_bounds(self, bounds) -> list:
-        r"""Return bounds on :math:`\tilde{v}` from bounds on :math:`m`.
+    def _scaled_bounds(self, bounds) -> list:
+        r"""Return bounds on :math:`\tilde{m}` from bounds on :math:`m`.
 
         Parameters
         ----------
@@ -407,18 +428,8 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         Returns
         -------
         list of tuple
-            ``(lower, upper)`` on :math:`\tilde{v}`, one per control.
-
-        Raises
-        ------
-        ValueError
-            With ``latent_bounds``: the latent controls need no bounds.
+            ``(lower, upper)`` on :math:`\tilde{m}`, one per control.
         """
-        if self._boxes[0] is not None:
-            raise ValueError(
-                "With latent_bounds the model stays inside its bounds by "
-                "construction, so the latent controls take no bounds.",
-            )
         transformed = []
         for (lower, upper), scale in zip(bounds, self._scales):
             pair = []

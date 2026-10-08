@@ -1,9 +1,9 @@
 """The lumped L2 change of variables of the reduced functional.
 
-``LumpedL2ReducedFunctional`` replaces the controls by
-``v_tilde = M_L^{1/2} v``, in which the lumped L2 inner product is the Euclidean
-one. ``v`` is the model ``m``, or, with ``latent_bounds``, the latent control
-``psi`` with ``m = lower + (upper - lower) * sigmoid(psi)``.
+``LumpedL2ReducedFunctional`` replaces the controls ``m`` by
+``m_tilde = M_L^{1/2} m``, in which the lumped L2 inner product is the Euclidean
+one. With ``latent`` it uses ``psi_tilde = M_L^{1/2} psi`` instead, with
+the latent control ``psi`` of ``m = lower + (upper - lower) * sigmoid(psi)``.
 """
 import firedrake as fire
 import numpy as np
@@ -104,14 +104,13 @@ def lumped_misfit(control: fire.Function, target: fire.Function,
     return ReducedFunctional(functional, Control(control))
 
 
-@pytest.mark.parametrize("latent_bounds", [None, [(LOWER, UPPER)]],
-                         ids=["physical", "latent"])
-def test_lumped_functional_matches_the_model_functional(latent_bounds):
-    """The lumped functional is the same problem, written in v_tilde.
+@pytest.mark.parametrize("latent", [False, True], ids=["physical", "latent"])
+def test_lumped_functional_matches_the_model_functional(latent):
+    """The lumped functional is the same problem, written in m_tilde or psi_tilde.
 
     Checks that it gives the same value as the original functional, that
-    ``map_result`` brings v_tilde back to m, and that its derivative passes
-    a Taylor test.
+    ``map_result`` brings m_tilde or psi_tilde back to m, and that its
+    derivative passes a Taylor test.
     """
     from spyro.reduced_functionals import LumpedL2ReducedFunctional
 
@@ -119,18 +118,18 @@ def test_lumped_functional_matches_the_model_functional(latent_bounds):
     m = fire.Function(space).assign(1.2)
     reduced_functional = lumped_misfit(m, reference(space), power=2)
     lumped_functional = LumpedL2ReducedFunctional(
-        reduced_functional, latent_bounds=latent_bounds,
+        reduced_functional, bounds=[(LOWER, UPPER)], latent=latent,
     )
-    v_tilde = lumped_functional.controls[0].control
+    start = lumped_functional.controls[0].control
 
-    assert np.isclose(float(lumped_functional(v_tilde)), float(reduced_functional(m)))
-    (m_back,) = lumped_functional.map_result(v_tilde)
+    assert np.isclose(float(lumped_functional(start)), float(reduced_functional(m)))
+    (m_back,) = lumped_functional.map_result(start)
     assert np.allclose(m_back.dat.data_ro, m.dat.data_ro)
 
     direction = fire.Function(space).interpolate(
         fire.sin(3 * fire.SpatialCoordinate(space.mesh())[0])
     )
-    assert taylor_test(lumped_functional, v_tilde, direction) > 1.9
+    assert taylor_test(lumped_functional, start, direction) > 1.9
 
 
 def test_lumped_functional_starts_from_the_tape_value():

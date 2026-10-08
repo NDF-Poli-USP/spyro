@@ -166,14 +166,11 @@ def minimize_with_tao(
             f"minimize_with_tao always uses BQNLS, not '{tao_type}'.",
         )
     lumped_functional = LumpedL2ReducedFunctional(
-        reduced_functional, latent_bounds=bounds if latent else None,
+        reduced_functional, bounds=bounds, latent=latent,
     )
-    if latent:
-        # The latent map keeps the model inside the bounds.
-        bounds = None
-    elif bounds is not None:
-        bounds = lumped_functional.transform_bounds(bounds)
-    problem = MinimizationProblem(lumped_functional, bounds=bounds)
+    problem = MinimizationProblem(
+        lumped_functional, bounds=lumped_functional.bounds,
+    )
     solver = TAOSolver(problem, options, comm=comm)
     # The PETSc command line can still set the type.
     if solver.tao.getType() != "bqnls":
