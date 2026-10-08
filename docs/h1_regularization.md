@@ -1,8 +1,8 @@
 # Physical H1 regularization
 
 The implementation extends `dolci/proximal_opt`. `spyro.functionals` owns
-receiver misfits, spatial penalties and their composition. Coordinate and
-proximal wrappers live in `spyro.functionals.reduced`; the old
+receiver misfits, spatial penalties and their composition. Coordinate
+wrappers live in `spyro.functionals.reduced`; the old
 `spyro.reduced_functionals` imports remain compatible.
 
 ```python
@@ -27,7 +27,8 @@ result = fwi.run_fwi(
 
 The example weights illustrate the API, not recommended universal values.
 For acoustic inversion, use the acoustic material-parameter enum instead.
-Existing bounds, latent and proximal options keep their existing meanings.
+Existing bounds and latent options keep their existing meanings.
+The updated base removed proximal subproblems; this branch does not restore them.
 
 ## Mathematical meaning
 

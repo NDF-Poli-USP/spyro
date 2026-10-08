@@ -1,10 +1,7 @@
-"""The latent map and the proximal term, as reduced functionals.
+"""The latent map, as a reduced functional.
 
 ``LatentReducedFunctional`` optimizes over ``psi``, with the model
 ``m = lower + (upper - lower) * sigmoid(psi)`` inside its bounds.
-``ProximalReducedFunctional`` adds ``(1/alpha) D(v, anchor)`` to a
-functional, with ``D`` the L2 distance or the Bregman divergence of the box
-entropy.
 """
 import firedrake as fire
 import numpy as np
@@ -51,54 +48,17 @@ def test_latent_optimization_stays_within_the_bounds():
     The target lies below the lower bound in most of the domain, so psi goes
     to minus infinity there and the model reaches the bound in floating point.
     """
-    from spyro.reduced_functionals import LatentReducedFunctional
     from spyro.tools.optimization import minimize_with_tao
 
     space = _space("mass_lumped_triangle", 2)
     target = reference(space)
     m = fire.Function(space).assign(1.3)
-    latent = LatentReducedFunctional(lumped_misfit(m, target), [(LOWER, UPPER)])
-    psi = minimize_with_tao(latent, options={"tao_max_it": 50})
-    (model,) = latent.map_result(psi)
+    (model,) = minimize_with_tao(
+        lumped_misfit(m, target), bounds=[(LOWER, UPPER)],
+        options={"tao_max_it": 50}, latent=True,
+    )
 
     values = model.dat.data_ro
     assert values.min() >= LOWER and values.max() <= UPPER
     interior = (target.dat.data_ro > LOWER + 0.05) & (target.dat.data_ro < UPPER - 0.05)
     assert np.allclose(values[interior], target.dat.data_ro[interior], atol=1e-3)
-
-
-@pytest.mark.parametrize("kind", ["l2", "bregman"])
-def test_proximal_functional_derivative(kind):
-    """The proximal term vanishes at the anchor, and its derivative is right."""
-    from spyro.reduced_functionals import ProximalReducedFunctional
-
-    space = _space("mass_lumped_triangle", 2)
-    m = fire.Function(space).assign(1.3)
-    reduced_functional = lumped_misfit(m, reference(space))
-    proximal = ProximalReducedFunctional(
-        reduced_functional, kind, step=0.5, bounds=[(LOWER, UPPER)],
-    )
-    assert np.isclose(float(proximal(m)), float(reduced_functional(m)))
-
-    x = fire.SpatialCoordinate(space.mesh())[0]
-    away = fire.Function(space).interpolate(1.3 + 0.1 * fire.sin(2 * x))
-    direction = fire.Function(space).interpolate(fire.cos(3 * x))
-    assert proximal.proximal_value(away) > 0.0
-    assert taylor_test(proximal, away, direction) > 1.9
-
-
-def test_l2_proximal_step_has_the_closed_form_minimizer():
-    """min 1/2|v - t|^2 + 1/(2 alpha)|v - a|^2 is v = (alpha t + a)/(alpha + 1)."""
-    from spyro.reduced_functionals import ProximalReducedFunctional
-    from spyro.tools.optimization import minimize_with_tao
-
-    alpha = 0.5
-    space = _space("mass_lumped_triangle", 2)
-    target = reference(space)
-    m = fire.Function(space).assign(1.3)
-    proximal = ProximalReducedFunctional(lumped_misfit(m, target), "l2", step=alpha)
-    (v,) = minimize_with_tao(proximal, options={
-        "tao_gatol": 1e-10, "tao_grtol": 0.0, "tao_gttol": 0.0, "tao_max_it": 20,
-    })
-    expected = (alpha * target.dat.data_ro + 1.3) / (alpha + 1.0)
-    assert np.allclose(v.dat.data_ro, expected, rtol=0.0, atol=1e-8)

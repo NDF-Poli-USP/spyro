@@ -1,4 +1,4 @@
-"""Physical regularization before coordinate and proximal transformations."""
+"""Physical regularization before coordinate transformations."""
 
 from types import SimpleNamespace
 
@@ -11,7 +11,7 @@ from pyadjoint import Tape
 from spyro import ElasticMaterialParameter as P
 from spyro.functionals import H1Regularization, InversionObjective, L2DataMisfit
 from spyro.functionals.reduced import (
-    LatentReducedFunctional, LumpedL2ReducedFunctional, ProximalReducedFunctional,
+    LatentReducedFunctional, LumpedL2ReducedFunctional,
 )
 from spyro.utils.typing import FunctionalEvaluationMode as Mode
 from spyro.domains.space import create_function_space
@@ -93,14 +93,14 @@ def test_reference_is_frozen() -> None:
     assert adj.taylor_test(rf, m, fire.Function(space).interpolate(x)) > 1.9
 
 
-@pytest.mark.parametrize("wrapper", ["physical", "lumped", "latent", "proximal"])
+@pytest.mark.parametrize("wrapper", ["physical", "lumped", "latent"])
 def test_composed_objective_taylor(wrapper: str) -> None:
     """Differentiate H1 through the same coordinates as the data misfit.
 
     Parameters
     ----------
     wrapper : str
-        Coordinate or proximal wrapper under test.
+        Coordinate wrapper under test.
     """
     mesh = fire.UnitSquareMesh(3, 3)
     space = create_function_space(mesh, "mass_lumped_triangle", 2)
@@ -115,8 +115,6 @@ def test_composed_objective_taylor(wrapper: str) -> None:
         rf = LumpedL2ReducedFunctional(rf)
     elif wrapper == "latent":
         rf = LatentReducedFunctional(rf, bounds=[(1.0, 3.0)])
-    elif wrapper == "proximal":
-        rf = ProximalReducedFunctional(rf, kind="l2", step=0.5)
     start = rf.controls[0].control
     direction = fire.Function(space).interpolate(0.1 + x * y)
     assert adj.taylor_test(rf, start, direction) > 1.9
@@ -155,7 +153,6 @@ def test_compatibility_imports() -> None:
     from spyro import reduced_functionals as old
     assert old.LatentReducedFunctional is LatentReducedFunctional
     assert old.LumpedL2ReducedFunctional is LumpedL2ReducedFunctional
-    assert old.ProximalReducedFunctional is ProximalReducedFunctional
 
 
 @pytest.mark.parametrize("snapshots", [None, 2])

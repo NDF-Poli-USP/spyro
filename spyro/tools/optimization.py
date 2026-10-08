@@ -7,7 +7,6 @@ import warnings
 
 import firedrake as fire
 import numpy as np
-from petsc4py import PETSc
 
 from pyadjoint import MinimizationProblem, TAOSolver
 from pyadjoint.optimization.tao_solver import (
@@ -16,7 +15,8 @@ from pyadjoint.optimization.tao_solver import (
 )
 from pyadjoint.reduced_functional import AbstractReducedFunctional
 
-from ..functionals.reduced import LumpedL2ReducedFunctional
+from ..functionals.reduced import LatentReducedFunctional, LumpedL2ReducedFunctional
+from ..functionals.reduced.lumped_l2 import _inverse_sqrt_lumped_mass
 from ..utils.physical_parameters import as_list
 
 
@@ -86,18 +86,84 @@ def tao_bounds(bound, controls):
     return shaped
 
 
+def _bound_to_field(bound, inverse_sqrt_mass: fire.Function) -> fire.Function | None:
+    r"""Return a bound on the model as a field on the controls TAO optimizes.
+
+    The bound on :math:`m` becomes a field on :math:`\tilde{m} = M_L^{1/2} m`.
+
+    Parameters
+    ----------
+    bound : float, firedrake.Function or None
+        The bound on :math:`m`.
+    inverse_sqrt_mass : firedrake.Function
+        :math:`M_L^{-1/2}` in the space of the control it bounds.
+
+    Returns
+    -------
+    firedrake.Function or None
+        The bound on :math:`\tilde{m}`, or None for no bound.
+    """
+    if bound is None:
+        return None
+    field = fire.Function(inverse_sqrt_mass.function_space())
+    values = bound.dat.data_ro if isinstance(bound, fire.Function) else bound
+    field.dat.data_wo[:] = values / inverse_sqrt_mass.dat.data_ro
+    return field
+
+
+def _lumped_bounds(bounds: list, controls) -> list:
+    r"""Return the bounds on the model as bounds on the controls TAO optimizes.
+
+    Bounds on :math:`m` become bounds on :math:`\tilde{m} = M_L^{1/2} m`.
+    The change of variables is diagonal and positive, so a box on :math:`m`
+    is a box on :math:`\tilde{m}`, with each bound scaled the same way.
+
+    Parameters
+    ----------
+    bounds : sequence of tuple
+        ``(lower, upper)`` on :math:`m`, one per control. Each bound is a
+        scalar, a field, or None.
+    controls : pyadjoint.enlisting.Enlist
+        Controls of the :class:`LumpedL2ReducedFunctional`, over
+        :math:`\tilde{m}`.
+
+    Returns
+    -------
+    list of tuple
+        ``(lower, upper)`` on :math:`\tilde{m}`, one per control.
+    """
+    # One M_L^{-1/2} per space: controls in the same space share it.
+    inverse_sqrt_masses = {}
+    m_tilde_bounds = []
+    for (lower, upper), control in zip(bounds, controls):
+        space = control.control.function_space()
+        if space not in inverse_sqrt_masses:
+            inverse_sqrt_masses[space] = _inverse_sqrt_lumped_mass(space)
+        inverse_sqrt_mass = inverse_sqrt_masses[space]
+        m_tilde_bounds.append((
+            _bound_to_field(lower, inverse_sqrt_mass),
+            _bound_to_field(upper, inverse_sqrt_mass),
+        ))
+    return m_tilde_bounds
+
+
 def minimize_with_tao(
     reduced_functional: AbstractReducedFunctional,
     bounds: list | None = None,
     comm=None,
     options: dict | None = None,
     record=None,
+    latent: bool = False,
 ) -> list:
     """Minimize a reduced functional with PETSc TAO, in the lumped L2 metric.
 
     The optimization runs over :class:`LumpedL2ReducedFunctional`, so TAO
     measures gradients, takes steps and projects onto the bounds in the
-    lumped :math:`L^2` metric of the controls.
+    lumped :math:`L^2` metric of the controls. With ``latent``, the controls
+    are first replaced by the latent controls of
+    :class:`LatentReducedFunctional`, which keep the model inside ``bounds``
+    on their own, so TAO runs without bounds in the lumped :math:`L^2`
+    metric of the latent controls.
 
     Under ensemble parallelism the controls are replicated on every member,
     so ``comm`` has to be the *spatial* communicator: TAO's default
@@ -110,7 +176,8 @@ def minimize_with_tao(
         Functional to minimize, and the controls to minimize it over.
     bounds : list of tuple, optional
         One ``(lower, upper)`` pair per control, each a scalar TAO broadcasts
-        over the control or a value in the control's own space.
+        over the control or a value in the control's own space. Required
+        with ``latent``.
     comm : petsc4py.PETSc.Comm or mpi4py.MPI.Comm, optional
         Communicator the controls are defined over.
     options : dict, optional
@@ -121,6 +188,9 @@ def minimize_with_tao(
         iteration TAO accepts, with the controls it stands at as a list of
         fresh fields. The starting point is not reported: it is the value the
         caller already has, from evaluating the functional to get here.
+        With ``latent``, the controls are the model, not the latent ones.
+    latent : bool, optional
+        Whether to optimize over the latent controls. Default False.
 
     Returns
     -------
@@ -140,7 +210,8 @@ def minimize_with_tao(
     ------
     ValueError
         If the options or the PETSc command line ask for a TAO type other
-        than BQNLS.
+        than BQNLS, or ``latent`` is given bounds that are missing,
+        nonfinite or reversed.
     TAOConvergenceError
         If TAO fails for any reason other than its iteration limit, including
         line-search failure or a nonfinite objective or gradient.
@@ -148,6 +219,7 @@ def minimize_with_tao(
     See Also
     --------
     LumpedL2ReducedFunctional : The change of variables TAO runs in.
+    LatentReducedFunctional : The latent controls, with ``latent``.
     tao_bounds : Shapes ``vmin``/``vmax`` into the ``bounds`` this takes.
     """
     options = dict(options or {})
@@ -156,9 +228,14 @@ def minimize_with_tao(
         raise ValueError(
             f"minimize_with_tao always uses BQNLS, not '{tao_type}'.",
         )
+    to_model = list
+    if latent:
+        reduced_functional = LatentReducedFunctional(reduced_functional, bounds)
+        to_model = reduced_functional.map_result
+        bounds = None
     lumped_functional = LumpedL2ReducedFunctional(reduced_functional)
     if bounds is not None:
-        bounds = lumped_functional.transform_bounds(bounds)
+        bounds = _lumped_bounds(bounds, lumped_functional.controls)
     problem = MinimizationProblem(lumped_functional, bounds=bounds)
     solver = TAOSolver(problem, options, comm=comm)
     # The PETSc command line can still set the type.
@@ -178,7 +255,7 @@ def minimize_with_tao(
         """Return the model controls TAO currently stands at, as new fields."""
         iterate = [control.copy(deepcopy=True) for control in controls]
         vec_interface.from_petsc(tao.getSolution(), iterate)
-        return lumped_functional.map_result(iterate)
+        return to_model(lumped_functional.map_result(iterate))
 
     if record is not None:
         def monitor(tao):
@@ -189,9 +266,9 @@ def minimize_with_tao(
         solver.tao.setMonitor(monitor)
 
     try:
-        return lumped_functional.map_result(as_list(solver.solve()))
+        return to_model(lumped_functional.map_result(as_list(solver.solve())))
     except TAOConvergenceError as error:
-        if solver.tao.getConvergedReason() != PETSc.TAO.Reason.DIVERGED_MAXITS:
+        if solver.tao.getConvergedReason() != fire.PETSc.TAO.Reason.DIVERGED_MAXITS:
             raise
         warnings.warn(
             f"{error} Returning the last iterate; raise the iteration limit "
