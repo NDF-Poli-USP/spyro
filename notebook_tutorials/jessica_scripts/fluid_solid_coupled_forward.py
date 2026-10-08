@@ -82,7 +82,7 @@ case_3D = {
     "receiver_location": [(-3.01, 2.51, 3.0)],
     "solid_receiver_locations": [(-2.99, 2.49, 3.0)],
     "final_time": 1.0,
-    "dt": 0.001,
+    "dt": 4e-5,
     "velocity_fluid": None,
     "bulk_modulus": 2.25,
     "density_fluid": 1.0,
@@ -94,7 +94,7 @@ case_3D = {
 cases = {1: ("case_small_2d", case_small_2D),
          2: ("case_large_2d", case_large_2D),
          3: ("case_3d", case_3D)}
-CASE_NUM = 2
+CASE_NUM = 3
 CASE_NAME, selected_case = cases[CASE_NUM]
 
 DIMENSION = 3 if CASE_NAME == "case_3d" else 2

@@ -25,7 +25,7 @@ from sparsity_plots import load_sparsity_matrices
 # ===========================================================================
 # Settings
 # ===========================================================================
-CASE_NAME = "case_large_2d"   # "case_small_2d", "case_large_2d" or "case_3d"
+CASE_NAME = "case_3d"   # "case_small_2d", "case_large_2d" or "case_3d"
 DIMENSION = 3 if CASE_NAME == "case_3d" else 2
 
 # Schemes to include. Comment out a line to remove a scheme.
