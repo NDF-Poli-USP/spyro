@@ -21,12 +21,23 @@ def test_invalid_box_bounds(bounds: list) -> None:
     bounds : list
         Missing, reversed or nonfinite bounds.
     """
-    from spyro.reduced_functionals import LatentReducedFunctional
+    from spyro.reduced_functionals import LumpedL2ReducedFunctional
 
     space = _space("mass_lumped_triangle", 2)
     base = lumped_misfit(fire.Function(space).assign(0.4), reference(space))
     with pytest.raises(ValueError):
-        LatentReducedFunctional(base, bounds)
+        LumpedL2ReducedFunctional(base, latent_bounds=bounds)
+
+
+def test_latent_controls_take_no_bounds() -> None:
+    """With latent bounds, bounds for TAO are refused rather than ignored."""
+    from spyro.reduced_functionals import LumpedL2ReducedFunctional
+
+    space = _space("mass_lumped_triangle", 2)
+    base = lumped_misfit(fire.Function(space).assign(0.4), reference(space))
+    lumped_functional = LumpedL2ReducedFunctional(base, latent_bounds=[(0.0, 1.0)])
+    with pytest.raises(ValueError, match="take no bounds"):
+        lumped_functional.transform_bounds([(0.0, 1.0)])
 
 
 @pytest.mark.parametrize("reason", [

@@ -16,7 +16,7 @@ from pyadjoint.optimization.tao_solver import (
 )
 from pyadjoint.reduced_functional import AbstractReducedFunctional
 
-from ..reduced_functionals import LatentReducedFunctional, LumpedL2ReducedFunctional
+from ..reduced_functionals import LumpedL2ReducedFunctional
 from ..utils.physical_parameters import as_list
 
 
@@ -98,11 +98,10 @@ def minimize_with_tao(
 
     The optimization runs over :class:`LumpedL2ReducedFunctional`, so TAO
     measures gradients, takes steps and projects onto the bounds in the
-    lumped :math:`L^2` metric of the controls. With ``latent``, the controls
-    are first replaced by the latent controls of
-    :class:`LatentReducedFunctional`, which keep the model inside ``bounds``
-    on their own, so TAO runs without bounds in the lumped :math:`L^2`
-    metric of the latent controls.
+    lumped :math:`L^2` metric of the controls. With ``latent``, it runs over
+    latent controls that keep the model inside ``bounds`` on their own, so
+    TAO runs without bounds, in the lumped :math:`L^2` metric of the latent
+    controls.
 
     Under ensemble parallelism the controls are replicated on every member,
     so ``comm`` has to be the *spatial* communicator: TAO's default
@@ -158,7 +157,6 @@ def minimize_with_tao(
     See Also
     --------
     LumpedL2ReducedFunctional : The change of variables TAO runs in.
-    LatentReducedFunctional : The latent controls, with ``latent``.
     tao_bounds : Shapes ``vmin``/``vmax`` into the ``bounds`` this takes.
     """
     options = dict(options or {})
@@ -167,13 +165,13 @@ def minimize_with_tao(
         raise ValueError(
             f"minimize_with_tao always uses BQNLS, not '{tao_type}'.",
         )
-    to_model = list
+    lumped_functional = LumpedL2ReducedFunctional(
+        reduced_functional, latent_bounds=bounds if latent else None,
+    )
     if latent:
-        reduced_functional = LatentReducedFunctional(reduced_functional, bounds)
-        to_model = reduced_functional.map_result
+        # The latent map keeps the model inside the bounds.
         bounds = None
-    lumped_functional = LumpedL2ReducedFunctional(reduced_functional)
-    if bounds is not None:
+    elif bounds is not None:
         bounds = lumped_functional.transform_bounds(bounds)
     problem = MinimizationProblem(lumped_functional, bounds=bounds)
     solver = TAOSolver(problem, options, comm=comm)
@@ -194,7 +192,7 @@ def minimize_with_tao(
         """Return the model controls TAO currently stands at, as new fields."""
         iterate = [control.copy(deepcopy=True) for control in controls]
         vec_interface.from_petsc(tao.getSolution(), iterate)
-        return to_model(lumped_functional.map_result(iterate))
+        return lumped_functional.map_result(iterate)
 
     if record is not None:
         def monitor(tao):
@@ -205,7 +203,7 @@ def minimize_with_tao(
         solver.tao.setMonitor(monitor)
 
     try:
-        return to_model(lumped_functional.map_result(as_list(solver.solve())))
+        return lumped_functional.map_result(as_list(solver.solve()))
     except TAOConvergenceError as error:
         if solver.tao.getConvergedReason() != PETSc.TAO.Reason.DIVERGED_MAXITS:
             raise
