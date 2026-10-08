@@ -53,7 +53,7 @@ case_large_2D = {
     "length_z": 30.0,
     "length_x": 12.0,
     "length_y": 0.0,
-    "edge_length": 0.050,
+    "edge_length": 0.040,
     "interface_x": 6.0,
     "source_locations": [(-15.0, 6.6)],
     "frequency": 10,
