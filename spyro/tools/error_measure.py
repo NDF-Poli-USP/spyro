@@ -741,7 +741,36 @@ class MeasureError:
         signal_reference: np.ndarray,
         dt: float,
         has_displacement: bool = True,
-    ):
+    ) -> float:
+        """Calculate the relative squared L2 error over all receivers.
+
+        The error is the time integral of the squared difference between
+        the model and reference signals, summed over all receivers (and
+        directions, for vector data), divided by the time integral of the
+        squared reference signal summed in the same way.
+
+        Parameters
+        ----------
+        signal_model : np.ndarray
+            Receiver data from the model. Shape ``(n_time, n_receivers)``
+            for scalar data or ``(n_time, n_receivers, dimension)`` for
+            displacement data.
+        signal_reference : np.ndarray
+            Reference receiver data, with the same shape as
+            ``signal_model``.
+        dt : float
+            Time step used for the trapezoidal integration.
+        has_displacement : bool, optional
+            If True, the signals are treated as vector (displacement) data
+            with a trailing direction axis. If False, they are treated as
+            scalar data. Default is True.
+
+        Returns
+        -------
+        float
+            Relative squared L2 error between the model and reference
+            signals.
+        """
         if has_displacement:
             _, num_receivers, dimension = np.shape(signal_model)
             numerator = 0.0
@@ -755,7 +784,7 @@ class MeasureError:
 
             error = numerator / denumerator
         else:
-            _, num_receivers = signal_model
+            _, num_receivers = np.shape(signal_model)
             numerator = 0.0
             denumerator = 0.0
             for receiver_id in range(num_receivers):
