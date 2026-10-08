@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 import firedrake as fire
 import spyro
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.utils.typing import AdjointType, AbsorbingBCsType
 import pytest
 
@@ -14,7 +15,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     remainders = []
     V_c = Wave_obj_guess.function_space
     dm = fire.Function(V_c)
-    size, = np.shape(dm.dat.data[:])
+    (size,) = np.shape(dm.dat.data[:])
     dm_data = np.random.default_rng(0).random(size)
     dm.dat.data_wo[:] = dm_data
     if Wave_obj_guess.abc_type == AbsorbingBCsType.PML:
@@ -31,7 +32,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     for step in steps:
 
         Wave_obj_guess.reset_pressure()
-        c_guess = fire.Constant(2.0) + step*dm
+        c_guess = fire.Constant(2.0) + step * dm
         Wave_obj_guess.initial_velocity_model = c_guess
         Wave_obj_guess.forward_solve()
         misfit_plusdm = rec_out_exact - Wave_obj_guess.forward_solution_receivers
@@ -50,7 +51,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     remainders = np.array(remainders)
 
     if plot:
-        fire.VTKFile("gradient.pvd").write(dJ)
+        fire.VTKFile("gradient.pvd", comm=SpyroEnsemble.ensemble.comm).write(dJ)
         plt.close()
         plt.plot(steps, errors, label="Error")
         plt.legend()
@@ -139,10 +140,12 @@ def set_dictionary(PML=False):
     return dictionary
 
 
-def get_forward_model(dictionary: dict = None,
-                      adjoint_type: AdjointType = AdjointType.NONE,
-                      checkpointing: bool = False,
-                      snapshots: int | None = None):
+def get_forward_model(
+    dictionary: dict = None,
+    adjoint_type: AdjointType = AdjointType.NONE,
+    checkpointing: bool = False,
+    snapshots: int | None = None,
+):
     """Run the exact and guess forward models.
 
     Parameters
@@ -182,7 +185,8 @@ def get_forward_model(dictionary: dict = None,
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         Wave_obj_guess.enable_automated_adjoint(
-            checkpointing=checkpointing, snapshots=snapshots)
+            checkpointing=checkpointing, snapshots=snapshots
+        )
         assert isinstance(Wave_obj_guess.c, fire.Function)
         # The schedule is built per forward solve, so none exists yet.
         assert Wave_obj_guess.automated_adjoint.checkpointing_schedule is None
@@ -208,10 +212,10 @@ SCHEDULE_IDS = ["no_checkpointing", "single_memory", "mixed"]
 
 @pytest.mark.slow
 @pytest.mark.newer_firedrake
-@pytest.mark.parametrize("checkpointing, snapshots", SCHEDULE_CASES,
-                         ids=SCHEDULE_IDS)
-def test_gradient_auto_adjoint(checkpointing: bool, snapshots: int | None,
-                               PML: bool = False) -> None:
+@pytest.mark.parametrize("checkpointing, snapshots", SCHEDULE_CASES, ids=SCHEDULE_IDS)
+def test_gradient_auto_adjoint(
+    checkpointing: bool, snapshots: int | None, PML: bool = False
+) -> None:
     """Taylor-test the automated-adjoint gradient under each schedule.
 
     Checkpointing changes how the tape is stored, not what it computes, so the
@@ -231,26 +235,34 @@ def test_gradient_auto_adjoint(checkpointing: bool, snapshots: int | None,
     """
     dictionary = set_dictionary(PML=PML)
     _, _, Wave_obj_guess = get_forward_model(
-        dictionary=dictionary, adjoint_type=AdjointType.AUTOMATED_ADJOINT,
-        checkpointing=checkpointing, snapshots=snapshots)
+        dictionary=dictionary,
+        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        checkpointing=checkpointing,
+        snapshots=snapshots,
+    )
     forward_solution_guess = None
     misfit = None
     try:
         # compute the gradient of the control (to be verified)
         dJ = Wave_obj_guess.gradient_solve(
-            misfit=misfit, forward_solution=forward_solution_guess,
+            misfit=misfit,
+            forward_solution=forward_solution_guess,
             adjoint_type=AdjointType.AUTOMATED_ADJOINT,
         )
 
         Wave_obj_guess.automated_adjoint.create_reduced_functional(
-            Wave_obj_guess.functional_value)
-        size, = np.shape(Wave_obj_guess.c.dat.data[:])
+            Wave_obj_guess.functional_value
+        )
+        (size,) = np.shape(Wave_obj_guess.c.dat.data[:])
         direction = fire.Function(
-            Wave_obj_guess.c.function_space(),
-            val=np.random.default_rng(0).random(size))
-        assert Wave_obj_guess.automated_adjoint.verify_gradient(
-            Wave_obj_guess.c, direction=direction, dJdm=dJ) > 1.9, \
-            "Automated adjoint gradient verification failed."
+            Wave_obj_guess.c.function_space(), val=np.random.default_rng(0).random(size)
+        )
+        assert (
+            Wave_obj_guess.automated_adjoint.verify_gradient(
+                Wave_obj_guess.c, direction=direction, dJdm=dJ
+            )
+            > 1.9
+        ), "Automated adjoint gradient verification failed."
     finally:
         # Clear on the failing path too, so a failure here does not leave a
         # tape for the next test in this process to annotate on top of.
@@ -262,7 +274,8 @@ def test_gradient_auto_adjoint(checkpointing: bool, snapshots: int | None,
 def test_gradient_implemented_adjoint(PML=False):
     dictionary = set_dictionary(PML=PML)
     rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(
-        dictionary=dictionary, adjoint_type=AdjointType.IMPLEMENTED_ADJOINT)
+        dictionary=dictionary, adjoint_type=AdjointType.IMPLEMENTED_ADJOINT
+    )
 
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
@@ -273,7 +286,8 @@ def test_gradient_implemented_adjoint(PML=False):
 
     # compute the gradient of the control (to be verified)
     dJ = Wave_obj_guess.gradient_solve(
-        misfit=misfit, forward_solution=forward_solution_guess,
+        misfit=misfit,
+        forward_solution=forward_solution_guess,
         adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
     )
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
@@ -281,10 +295,8 @@ def test_gradient_implemented_adjoint(PML=False):
 
 @pytest.mark.slow
 @pytest.mark.newer_firedrake
-@pytest.mark.parametrize("checkpointing, snapshots", SCHEDULE_CASES,
-                         ids=SCHEDULE_IDS)
-def test_gradient_pml_auto_adjoint(checkpointing: bool,
-                                   snapshots: int | None) -> None:
+@pytest.mark.parametrize("checkpointing, snapshots", SCHEDULE_CASES, ids=SCHEDULE_IDS)
+def test_gradient_pml_auto_adjoint(checkpointing: bool, snapshots: int | None) -> None:
     """Run :func:`test_gradient_auto_adjoint` with the PML enabled.
 
     Parameters
