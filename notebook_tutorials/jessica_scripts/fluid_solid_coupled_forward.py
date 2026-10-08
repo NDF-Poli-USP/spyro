@@ -147,7 +147,7 @@ dictionary["time_axis"] = {
     "initial_time": 0.0,
     "final_time": selected_case["final_time"],
     "dt": selected_case["dt"],
-    "output_frequency": 100,
+    "output_frequency": 2500,
     "gradient_sampling_frequency": 1,
 }
 
