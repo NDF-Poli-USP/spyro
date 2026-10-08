@@ -86,14 +86,16 @@ def tao_bounds(bound, controls):
     return shaped
 
 
-def _bound_to_field(bound, scale: fire.Function) -> fire.Function | None:
-    r"""Return a bound on :math:`m` as a field on :math:`\tilde{m} = M_L^{1/2} m`.
+def _bound_to_field(bound, inverse_sqrt_mass: fire.Function) -> fire.Function | None:
+    r"""Return a bound on the model as a field on the controls TAO optimizes.
+
+    The bound on :math:`m` becomes a field on :math:`\tilde{m} = M_L^{1/2} m`.
 
     Parameters
     ----------
     bound : float, firedrake.Function or None
         The bound on :math:`m`.
-    scale : firedrake.Function
+    inverse_sqrt_mass : firedrake.Function
         :math:`M_L^{-1/2}` in the space of the control it bounds.
 
     Returns
@@ -103,15 +105,16 @@ def _bound_to_field(bound, scale: fire.Function) -> fire.Function | None:
     """
     if bound is None:
         return None
-    field = fire.Function(scale.function_space())
+    field = fire.Function(inverse_sqrt_mass.function_space())
     values = bound.dat.data_ro if isinstance(bound, fire.Function) else bound
-    field.dat.data_wo[:] = values / scale.dat.data_ro
+    field.dat.data_wo[:] = values / inverse_sqrt_mass.dat.data_ro
     return field
 
 
 def _lumped_bounds(bounds: list, controls) -> list:
-    r"""Return bounds on :math:`\tilde{m} = M_L^{1/2} m` from bounds on :math:`m`.
+    r"""Return the bounds on the model as bounds on the controls TAO optimizes.
 
+    Bounds on :math:`m` become bounds on :math:`\tilde{m} = M_L^{1/2} m`.
     The change of variables is diagonal and positive, so a box on :math:`m`
     is a box on :math:`\tilde{m}`, with each bound scaled the same way.
 
@@ -129,18 +132,19 @@ def _lumped_bounds(bounds: list, controls) -> list:
     list of tuple
         ``(lower, upper)`` on :math:`\tilde{m}`, one per control.
     """
-    # One scale per space: controls in the same space share it.
-    scales = {}
-    transformed = []
+    # One M_L^{-1/2} per space: controls in the same space share it.
+    inverse_sqrt_masses = {}
+    m_tilde_bounds = []
     for (lower, upper), control in zip(bounds, controls):
         space = control.control.function_space()
-        if space not in scales:
-            scales[space] = _inverse_sqrt_lumped_mass(space)
-        scale = scales[space]
-        transformed.append(
-            (_bound_to_field(lower, scale), _bound_to_field(upper, scale)),
-        )
-    return transformed
+        if space not in inverse_sqrt_masses:
+            inverse_sqrt_masses[space] = _inverse_sqrt_lumped_mass(space)
+        inverse_sqrt_mass = inverse_sqrt_masses[space]
+        m_tilde_bounds.append((
+            _bound_to_field(lower, inverse_sqrt_mass),
+            _bound_to_field(upper, inverse_sqrt_mass),
+        ))
+    return m_tilde_bounds
 
 
 def minimize_with_tao(

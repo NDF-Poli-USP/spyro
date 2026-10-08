@@ -31,10 +31,8 @@ def _inverse_sqrt_lumped_mass(
     Raises
     ------
     ValueError
-        If the mass matrix assembled with that quadrature is not diagonal.
+        If that quadrature does not give a diagonal mass matrix.
     """
-    from petsc4py import PETSc
-
     trial = fire.TrialFunction(function_space)
     test = fire.TestFunction(function_space)
     try:
@@ -49,7 +47,7 @@ def _inverse_sqrt_lumped_mass(
     zeros = diagonal.duplicate()
     zeros.zeroEntries()
     off_diagonal.setDiagonal(zeros)
-    largest = off_diagonal.norm(PETSc.NormType.INFINITY) / diagonal.max()[1]
+    largest = off_diagonal.norm(fire.PETSc.NormType.INFINITY) / diagonal.max()[1]
     if largest > 1e-12:
         element = function_space.ufl_element()
         raise ValueError(
@@ -62,12 +60,12 @@ def _inverse_sqrt_lumped_mass(
             f"off-diagonal entries reach {largest:.2g} of the diagonal.",
         )
 
-    scale = fire.Function(function_space)
-    with scale.dat.vec_wo as values:
+    inverse_sqrt_mass = fire.Function(function_space)
+    with inverse_sqrt_mass.dat.vec_wo as values:
         diagonal.copy(values)
         values.sqrtabs()
         values.reciprocal()
-    return scale
+    return inverse_sqrt_mass
 
 
 class LumpedL2ReducedFunctional(AbstractReducedFunctional):
@@ -83,10 +81,6 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
     the nodes, so this matrix is diagonal at any degree. Control spaces where
     it is not diagonal are rejected.
 
-    The controls here carry the ``"l2"`` Riesz map, which in :math:`\tilde{m}` is the
-    lumped :math:`L^2` one in :math:`m`. Values go in and come out as
-    :math:`\tilde{m}`; :meth:`map_result` takes them back to :math:`m`.
-
     Parameters
     ----------
     reduced_functional : pyadjoint.reduced_functional.AbstractReducedFunctional
@@ -95,7 +89,8 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
     Raises
     ------
     ValueError
-        If the mass matrix of a control space is not diagonal.
+        If the quadrature spyro adopts for a control space does not give a
+        diagonal mass matrix.
     """
 
     @no_annotations
@@ -107,27 +102,32 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
             model_controls = Enlist(model_controls)
         self._model_controls = model_controls
 
-        # One scale per space: controls in the same space share it.
-        scales = {}
-        self._scales = []
-        transformed = []
+        # One M_L^{-1/2} per space: controls in the same space share it.
+        inverse_sqrt_masses = {}
+        self._inverse_sqrt_masses = []
+        m_tilde_controls = []
         for control in model_controls:
             # The tape value, not ``control.control``: between stages the
             # controls move through ``Control.update``, which only changes it.
             model = control.tape_value()
             space = model.function_space()
-            if space not in scales:
-                scales[space] = _inverse_sqrt_lumped_mass(space)
-            scale = scales[space]
-            self._scales.append(scale)
+            if space not in inverse_sqrt_masses:
+                inverse_sqrt_masses[space] = _inverse_sqrt_lumped_mass(space)
+            inverse_sqrt_mass = inverse_sqrt_masses[space]
+            self._inverse_sqrt_masses.append(inverse_sqrt_mass)
             m_tilde = fire.Function(space)
-            m_tilde.dat.data_wo[:] = model.dat.data_ro / scale.dat.data_ro
-            transformed.append(Control(m_tilde, riesz_map="l2"))
-        self._controls = Enlist(model_controls.delist(transformed))
+            m_tilde.dat.data_wo[:] = model.dat.data_ro / inverse_sqrt_mass.dat.data_ro
+            m_tilde_controls.append(Control(m_tilde, riesz_map="l2"))
+        self._controls = Enlist(model_controls.delist(m_tilde_controls))
 
     @property
     def controls(self) -> Enlist:
-        r""":class:`pyadjoint.enlisting.Enlist`: the controls over :math:`\tilde{m}`."""
+        r""":class:`pyadjoint.enlisting.Enlist`: the controls :math:`\tilde{m} = M_L^{1/2} m`.
+
+        Each is a model control :math:`m` scaled by the square root of its
+        lumped mass, so the Euclidean inner product of :math:`\tilde{m}` is
+        the lumped :math:`L^2` inner product of :math:`m`.
+        """
         return self._controls
 
     def _scaled(self, values, dual: bool) -> list:
@@ -146,10 +146,10 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
             The scaled values, one per control.
         """
         scaled = []
-        for value, scale in zip(Enlist(values), self._scales):
-            space = scale.function_space()
+        for value, inverse_sqrt_mass in zip(Enlist(values), self._inverse_sqrt_masses):
+            space = inverse_sqrt_mass.function_space()
             out = fire.Cofunction(space.dual()) if dual else fire.Function(space)
-            out.dat.data_wo[:] = value.dat.data_ro * scale.dat.data_ro
+            out.dat.data_wo[:] = value.dat.data_ro * inverse_sqrt_mass.dat.data_ro
             scaled.append(out)
         return scaled
 
@@ -239,17 +239,18 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         )
 
     def map_result(self, values) -> list:
-        r"""Return :math:`m = M_L^{-1/2} \tilde{m}`.
+        r"""Return the model controls :math:`m = M_L^{-1/2} \tilde{m}`.
 
         Parameters
         ----------
         values : firedrake.Function or sequence of firedrake.Function
-            :math:`\tilde{m}`, one per control.
+            :math:`\tilde{m}`, the model controls scaled by the square root
+            of their lumped mass, one per control.
 
         Returns
         -------
         list of firedrake.Function
-            :math:`m`, one per control.
+            :math:`m`, one per control, named after the model controls.
         """
         models = self._scaled(values, dual=False)
         for model, control in zip(models, self._model_controls):
