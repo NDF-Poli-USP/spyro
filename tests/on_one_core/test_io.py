@@ -2,6 +2,7 @@ import firedrake as fire
 import math
 import pytest
 import spyro
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 try:
     from SeismicMesh import write_velocity_model
@@ -31,7 +32,7 @@ def test_read_and_write_segy():
 
     vp.interpolate(c)
 
-    spyro.io.create_segy(vp, V, 10.0/1000.0, segy_file)
+    spyro.io.create_segy(vp, V, 10.0 / 1000.0, segy_file)
     write_velocity_model(segy_file, vp_name)
 
     model = {}
@@ -72,7 +73,9 @@ def test_read_and_write_segy():
 
     vp_read = spyro.io.interpolate(wave, hdf5_file, wave.function_space)
 
-    fire.VTKFile("velocity_models/test.pvd").write(vp_read)
+    fire.VTKFile("velocity_models/test.pvd", comm=SpyroEnsemble.ensemble.comm).write(
+        vp_read
+    )
 
     value_at_center = vp_read.at(xc, yc)
     test1 = math.isclose(value_at_center, 3.0)

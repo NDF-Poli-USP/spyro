@@ -108,7 +108,6 @@ class HABCMesh(MeshOps):
         -------
         None
         """
-
         MeshOps.__init__(
             self,
             domain_dim,
@@ -142,7 +141,6 @@ class HABCMesh(MeshOps):
         coord_bnd_nodes : `array`
             Mesh node coordinates on boundaries of the original domain.
         """
-
         SpyroEnsemble.print("Getting Boundary Mesh Data from Original Domain")
 
         # Extract node positions
@@ -210,7 +208,6 @@ class HABCMesh(MeshOps):
         c_max : `float`
             Maximum velocity value in the model without absorbing layer.
         """
-
         # Velocity profile model
         c = fire.Function(function_space, name="c_orig [km/s])")
         c.assign(
@@ -226,7 +223,9 @@ class HABCMesh(MeshOps):
         SpyroEnsemble.print(cdom_str.format(c_min, c_max))
 
         # Save initial velocity model
-        vel_c = fire.VTKFile(path_save + "preamble/c_vel.pvd")
+        vel_c = fire.VTKFile(
+            path_save + "preamble/c_vel.pvd", comm=SpyroEnsemble.ensemble.comm
+        )
         vel_c.write(c)
 
         return c, c_min, c_max
@@ -246,10 +245,9 @@ class HABCMesh(MeshOps):
 
         Returns
         -------
-        funct_space_eik: `Firedrake.FunctionSpace`
+        funct_space_eik : `Firedrake.FunctionSpace`
             Function space for the Eikonal modeling.
         """
-
         SpyroEnsemble.print("Setting Mesh Properties for Eikonal Analysis")
 
         allowed_ele_types = ["consistent", "underintegrated"]
@@ -314,7 +312,6 @@ class HABCMesh(MeshOps):
         mesh_parameters.funct_space_eik: `Firedrake.FunctionSpace`
             Function space for the Eikonal modeling.
         """
-
         SpyroEnsemble.print("\nCreating Mesh and Initial Velocity Model")
 
         # Mesh data
@@ -325,7 +322,9 @@ class HABCMesh(MeshOps):
 
         # Save a copy of the original mesh
         wave.mesh_original = wave.mesh
-        mesh_orig = fire.VTKFile(wave.path_save + "preamble/mesh_orig.pvd")
+        mesh_orig = fire.VTKFile(
+            wave.path_save + "preamble/mesh_orig.pvd", comm=SpyroEnsemble.ensemble.comm
+        )
         mesh_orig.write(wave.mesh_original)
 
         # Velocity profile model
@@ -380,7 +379,6 @@ class HABCMesh(MeshOps):
             Array of shape (num_pts, 2) containing the coordinates
             of the hyperellipse boundary points.
         """
-
         # Generate angle values for the parametric equations
         theta = np.linspace(0.0, 2.0 * np.pi, num_pts)
 
@@ -440,7 +438,6 @@ class HABCMesh(MeshOps):
             - ltrunc : `float`
                 Mesh size for arc length due to the truncation operation.
         """
-
         # Hyperellipse parameters
         n_hyp, perimeter, a_hyp, b_hyp = hyp_par
 
@@ -457,7 +454,6 @@ class HABCMesh(MeshOps):
             or pnt_bef_trunc < 3
             or pnt_aft_trunc < 3
         ):
-
             num_bnd_pts += 1
             SpyroEnsemble.print(f"{pnt_str} Complete Hyperellipse: {num_bnd_pts}")
             bnd_pts = self.bnd_pnts_hyp_2D(a_hyp, b_hyp, n_hyp, num_bnd_pts)
@@ -527,7 +523,6 @@ class HABCMesh(MeshOps):
             List of curves to be added to the geometry object. Each curve is
             represented as a list containing the curve type and its points.
         """
-
         ini_trunc, end_trunc, num_bnd_pts, ltrunc = trunc_feat
 
         curves = []
@@ -573,7 +568,7 @@ class HABCMesh(MeshOps):
 
     def create_hyp_trunc_mesh_2D(self, hyp_par, spln=True):
         """
-        Generate the mesh for the hyperelliptical absorbing layer
+        Generate the mesh for the hyperelliptical absorbing layer.
 
         Parameters
         ----------
@@ -597,7 +592,6 @@ class HABCMesh(MeshOps):
         hyp_mesh : `netgen mesh`
             Generated mesh for the hyperelliptical layer.
         """
-
         # Domain dimensions
         Lx, Lz = self.domain_dim[:2]
 
@@ -632,7 +626,6 @@ class HABCMesh(MeshOps):
                 break
 
             except Exception as e:
-
                 # Retry with lines if splines fail
                 if spln:
                     SpyroEnsemble.print(f"Error Meshing with Splines: {e}")
@@ -683,7 +676,6 @@ class HABCMesh(MeshOps):
         final_mesh : `Firedrake.Mesh`
             Merged final mesh.
         """
-
         # Create the final mesh that will contain both
         final_mesh = Mesh()
         final_mesh.dim = self.dimension
@@ -765,9 +757,7 @@ class HABCMesh(MeshOps):
 
             # Mesh is transformed into a firedrake mesh
             q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
-            final_mesh = fire.Mesh(
-                final_mesh, distribution_parameters=q
-            )
+            final_mesh = fire.Mesh(final_mesh, distribution_parameters=q)
             SpyroEnsemble.print("Merged Mesh Generated Successfully")
 
         except Exception as e:
@@ -797,7 +787,6 @@ class HABCMesh(MeshOps):
         in_hyp : `bool`
             `True` if the point is inside the hyperellipsoid, `False` otherwise
         """
-
         # Evaluate hyperellipsoid equation
         x, y, z = pnt
         in_hyp = abs(x / a) ** n + abs(y / b) ** n + abs(z / c) ** n <= 1.1
@@ -834,7 +823,6 @@ class HABCMesh(MeshOps):
         sharp_mesh : `Firedrake.Mesh`
             Generated sharp mesh.
         """
-
         # Hyperellipsoid parameters
         n_hyp, _, a_hyp, b_hyp, c_hyp = hyp_par
 
@@ -876,9 +864,7 @@ class HABCMesh(MeshOps):
 
             # Mesh is transformed into a firedrake mesh
             q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
-            sharp_mesh = fire.Mesh(
-                sharp_mesh, distribution_parameters=q
-            )
+            sharp_mesh = fire.Mesh(sharp_mesh, distribution_parameters=q)
             SpyroEnsemble.print("Sharp Mesh Generated Successfully")
             # fire.VTKFile("output/sharp_mesh.pvd").write(sharp_mesh)
 
@@ -911,7 +897,6 @@ class HABCMesh(MeshOps):
         q_snapped : `array`
             Projected point (x', y', z').
         """
-
         # Vector from centroid to the point
         d = p_to_snap - centroid
         if np.allclose(d, 0.0):
@@ -958,7 +943,6 @@ class HABCMesh(MeshOps):
         mesh : `Firedrake.Mesh`
             Modified mesh with snapped boundary nodes.
         """
-
         # Hyperellipsoid parameters
         n_hyp, _, a_hyp, b_hyp, c_hyp = hyp_par
 
@@ -1022,7 +1006,6 @@ class HABCMesh(MeshOps):
         final_mesh : `Firedrake.Mesh`
             Merged final mesh
         """
-
         # Original domain dimensions
         Lx, Lz, Ly = self.domain_dim
 
@@ -1076,13 +1059,11 @@ class HABCMesh(MeshOps):
         mesh_habc : `Firedrake.Mesh`
             Mesh with a hypershape absorbing layer.
         """
-
         # Get the mesh parameters for use in hypershape mesh generation
         self.lmin = mesh_parameters.lmin
         self.tol = mesh_parameters.tol
 
         if self.dimension == 2:  # 2D
-
             # Creating the hyperellipse layer mesh
             hyp_mesh = self.create_hyp_trunc_mesh_2D(hyp_par[:4], spln=spln)
             # fire.VTKFile("output/trunc_hyp_test.pvd").write(hyp_mesh)
@@ -1092,7 +1073,6 @@ class HABCMesh(MeshOps):
             # fire.VTKFile("output/trunc_merged_test.pvd").write(mesh_habc)
 
         if self.dimension == 3:  # 3D
-
             # Base rectangular mesh
             rec_mesh = AutomaticMesh(
                 mesh_parameters=mesh_parameters
@@ -1124,7 +1104,6 @@ class HABCMesh(MeshOps):
         bnd_nodes_nfs : `tuple`
             Mesh node coordinates on non-free surfaces of the domain with absorbing layer.
         """
-
         # Boundary nodes indices
         bnd_nod_ids_nfs = np.unique(
             np.concatenate(
@@ -1174,7 +1153,6 @@ class HABCMesh(MeshOps):
         max_coordinates : `array`
             Array containing the maximum coordinates in each dimension (z, x, y).
         """
-
         # Mesh limits
         min_coordinates, max_coordinates = self.extract_extreme_coordinates(mesh)
         domain_abc = np.asarray(domain_layer)

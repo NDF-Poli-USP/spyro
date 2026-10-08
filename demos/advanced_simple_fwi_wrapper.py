@@ -12,6 +12,7 @@ import firedrake as fire
 from scipy.optimize import minimize as scipy_minimize
 import spyro
 import pytest
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 class MyFWI(spyro.FullWaveformInversion):
@@ -87,13 +88,17 @@ class MyFWI(spyro.FullWaveformInversion):
         )
         self.set_guess_control(self.control_parameter_result)
 
-        fire.VTKFile("control_end.pvd").write(self.control_parameter_result)
+        fire.VTKFile("control_end.pvd", comm=SpyroEnsemble.ensemble.comm).write(
+            self.control_parameter_result
+        )
 
         np.save("result", result.x)
         return result
 
 
-def run_forward_real_model(input_dictionary, case="camembert", shot_filename="shots/shot_record_"):
+def run_forward_real_model(
+    input_dictionary, case="camembert", shot_filename="shots/shot_record_"
+):
     """Generate and save a synthetic shot record for the chosen demo case.
 
     Parameters
@@ -118,23 +123,29 @@ def run_forward_real_model(input_dictionary, case="camembert", shot_filename="sh
     supported_cases = ["camembert"]
     if case == "camembert":
         # Builds the true velocity model based on a conditional
-    
+
         center_z = -1.0
         center_x = 1.0
         mesh_z = fwi_obj.wave.mesh_z
         mesh_x = fwi_obj.wave.mesh_x
-        cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
+        cond = fire.conditional(
+            (mesh_z - center_z) ** 2 + (mesh_x - center_x) ** 2 < 0.2**2, 3.0, 2.5
+        )
     elif case not in supported_cases:
-        return ValueError(f"Case of {case} not part of supported cases: {supported_cases}")
+        return ValueError(
+            f"Case of {case} not part of supported cases: {supported_cases}"
+        )
     else:
         return ValueError(f"Case of {case} only partially implemented.")
 
-    fwi_obj.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
+    fwi_obj.set_real_velocity_model(
+        conditional=cond, output=True, dg_velocity_model=False
+    )
     fwi_obj.generate_real_shot_record(
         plot_model=True,
         model_filename="True_experiment.png",
         shot_filename=shot_filename,
-        abc_points=[(-0.5, 0.5), (-1.5, 0.5), (-1.5, 1.5), (-0.5, 1.5)]
+        abc_points=[(-0.5, 0.5), (-1.5, 0.5), (-1.5, 1.5), (-0.5, 1.5)],
     )
 
     return fwi_obj
@@ -154,18 +165,14 @@ def multiple_layer_velocity_model(fwi_obj, z_switch, layers):
         List of velocity values for each layer.
     """
     if len(z_switch) != (len(layers) - 1):
-        raise ValueError(
-            "Float list of z_switch has to have length exactly one less \
-                            than list of layer values"
-        )
+        raise ValueError("Float list of z_switch has to have length exactly one less \
+                            than list of layer values")
     if len(z_switch) == 0:
         raise ValueError("Float list of z_switch cannot be empty")
 
     cond = fire.conditional(fwi_obj.wave.mesh_z > z_switch[0], layers[0], layers[1])
     for i in range(1, len(z_switch)):
-        cond = fire.conditional(
-            fwi_obj.wave.mesh_z > z_switch[i], cond, layers[i + 1]
-        )
+        cond = fire.conditional(fwi_obj.wave.mesh_z > z_switch[i], cond, layers[i + 1])
 
     return cond
 
@@ -239,7 +246,7 @@ def run_fwi(load_real_shot=True):
     None
         The inversion is run for its side effects.
     """
-    shots_filenames="shots/shot_record_"
+    shots_filenames = "shots/shot_record_"
 
     # Setting up to run synthetic real problem
     if load_real_shot is False:
