@@ -1683,8 +1683,8 @@ class FullWaveformInversion:
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
             objective : InversionObjective, optional
                 Receiver misfit and physical regularization. Requires the
-                automated adjoint. The objective is composed before latent,
-                proximal and lumped coordinate wrappers are applied.
+                automated adjoint. The objective is composed before latent
+                and lumped coordinate wrappers are applied.
             tao_options : dict, optional
                 PETSc options for the TAO solver, merged over the default
                 ``{"tao_max_it": maxiter}``. Only used under the automated
