@@ -480,20 +480,56 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             float: The calculated maximum time step (dt).
         """
 
-        if self.c is None:
-            c = self.initial_velocity_model
-        else:
-            c = self.c
-
         # Maximum timestep size
         method = 'ANALYTICAL' if estimate_max_eigenvalue else 'ARNOLDI'
         dt_solver = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
-        max_dt = dt_solver.estimate_timestep(c, self.function_space, self.final_time,
+        max_dt = dt_solver.estimate_timestep(self._modal_velocity(), self.function_space,
+                                             self.final_time,
                                              quad_rule=self.quadrature_rule,
-                                             fraction=fraction)
+                                             fraction=fraction,
+                                             forms=self.modal_weak_forms())
         self.dt = max_dt
 
         return max_dt
+
+    def _modal_velocity(self) -> fire.Function:
+        """Return the velocity model used by the modal time-step estimate.
+
+        Returns
+        -------
+        firedrake.Function
+            The current velocity model, or the initial one when the
+            current model has not been set.
+        """
+        if self.c is None:
+            return self.initial_velocity_model
+        return self.c
+
+    def modal_weak_forms(self) -> tuple[fire.Form, fire.Form]:
+        """Build the stiffness and mass forms of the free-vibration problem.
+
+        The largest generalized eigenvalue of these forms bounds the stable
+        time step. They match the scalar acoustic solver forms, with the
+        velocity in the mass, so a heterogeneous velocity is weighted as in
+        the solver. Wave physics with a different spatial operator override
+        this method.
+
+        Returns
+        -------
+        a : firedrake.Form
+            Stiffness form ``grad(u) . grad(v)``.
+        m : firedrake.Form
+            Mass form ``u * v / c**2``.
+        """
+        V = self.function_space
+        u = fire.TrialFunction(V)
+        v = fire.TestFunction(V)
+        c = self._modal_velocity()
+        quad_rule = self.quadrature_rule
+
+        a = fire.inner(fire.grad(u), fire.grad(v))*fire.dx(**quad_rule)
+        m = (1/(c*c))*u*v*fire.dx(**quad_rule)
+        return a, m
 
     def get_mass_matrix_diagonal(self):
         """Builds a section of the mass matrix for debugging purposes."""
