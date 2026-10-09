@@ -292,3 +292,186 @@ def test_elastic_regularized_fwi(tmp_path, monkeypatch) -> None:
     assert float(partial(start[index])) == pytest.approx(float(full_value))
     assert np.allclose(partial.derivative().dat.data_ro, full_gradient[index].dat.data_ro)
     assert adj.taylor_test(partial, start[index], directions[index]) > 1.9
+
+
+def test_auto_weight_settings() -> None:
+    """``"auto"`` is a weight; other strings, bad fractions and unresolved calls fail."""
+    mesh = fire.UnitSquareMesh(2, 2)
+    space = fire.FunctionSpace(mesh, "CG", 1)
+    vp = fire.Function(space).interpolate(fire.SpatialCoordinate(mesh)[0])
+    reg = H1Regularization({P.P_WAVE_VELOCITY: "auto", P.S_WAVE_VELOCITY: 1.0})
+    assert reg.automatic == [P.P_WAVE_VELOCITY]
+    with pytest.raises(ValueError, match="still 'auto'"):
+        reg({P.P_WAVE_VELOCITY: vp, P.S_WAVE_VELOCITY: vp})
+    with pytest.raises(ValueError, match="'auto'"):
+        H1Regularization({P.P_WAVE_VELOCITY: "fast"})
+    with pytest.raises(ValueError, match="gradient_fraction"):
+        H1Regularization({P.P_WAVE_VELOCITY: "auto"}, gradient_fraction=0.0)
+
+
+def test_unit_derivative_is_the_penalty_derivative() -> None:
+    """The unit-weight derivative matches a central difference of the penalty.
+
+    The penalty is quadratic, so the central difference is exact.
+    """
+    mesh = fire.UnitSquareMesh(3, 3)
+    space = fire.FunctionSpace(mesh, "CG", 2)
+    x, y = fire.SpatialCoordinate(mesh)
+    m = fire.Function(space).interpolate(x * y + x ** 2)
+    h = fire.Function(space).interpolate(fire.sin(3 * x) * y)
+    reg = H1Regularization({P.P_WAVE_VELOCITY: 1.0}, scales={P.P_WAVE_VELOCITY: 2.0})
+    with adj.stop_annotating():
+        derivative = reg.unit_derivative(P.P_WAVE_VELOCITY, m)
+        plus = float(reg({P.P_WAVE_VELOCITY: fire.Function(space).assign(m + 0.1 * h)}))
+        minus = float(reg({P.P_WAVE_VELOCITY: fire.Function(space).assign(m - 0.1 * h)}))
+    assert fire.assemble(fire.action(derivative, h)) == pytest.approx((plus - minus) / 0.2)
+
+
+def _acoustic_fwi(guess: str):
+    """Return the acoustic inversion of ``test_acoustic_regularized_fwi``.
+
+    Parameters
+    ----------
+    guess : str
+        Expression of the starting velocity.
+
+    Returns
+    -------
+    spyro.FullWaveformInversion
+        Driver with observed data and the starting model.
+    """
+    import spyro
+    from tests.on_one_core.test_fwi_automated_adjoint import build_dictionary
+
+    dictionary = build_dictionary()
+    dictionary["time_axis"]["final_time"] = 0.04
+    fwi = spyro.FullWaveformInversion(dictionary=dictionary)
+    fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.25})
+    fwi.set_real_model(3.0)
+    fwi.generate_real_shot_record(save_shot_record=False)
+    fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
+    fwi.set_guess_velocity_model(expression=guess, dg_velocity_model=False)
+    return fwi
+
+
+def test_acoustic_auto_weight_fwi(tmp_path, monkeypatch) -> None:
+    """An ``"auto"`` weight is chosen, and the logged parts add up to the objective.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Isolated output directory.
+    monkeypatch : pytest.MonkeyPatch
+        Temporary working-directory manager.
+    """
+    import spyro
+    from spyro.utils.typing import AdjointType
+
+    monkeypatch.chdir(tmp_path)
+    fwi = _acoustic_fwi("2.5 + 0.1*x")
+    key = spyro.AcousticMaterialParameter.P_WAVE_VELOCITY
+    regularization = H1Regularization({key: "auto"}, gradient_fraction=0.1)
+    fwi.run_fwi(
+        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        objective=InversionObjective(regularization=regularization),
+        maxiter=2, vmin=2.0, vmax=3.5, save_controls=False,
+    )
+    weight = regularization.weights[key]
+    assert not regularization.automatic and weight > 0
+    assert len(fwi.misfit_history) == len(fwi.functional_history)
+    assert len(fwi.regularization_history) == len(fwi.functional_history)
+    parts = np.add(fwi.misfit_history, fwi.regularization_history)
+    assert np.allclose(parts, fwi.functional_history, rtol=1e-12)
+    assert all(value > 0 for value in fwi.regularization_history)
+
+
+def test_auto_weight_needs_a_nonuniform_start(tmp_path, monkeypatch) -> None:
+    """A uniform start has no H1 gradient to size the weight against.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Isolated output directory.
+    monkeypatch : pytest.MonkeyPatch
+        Temporary working-directory manager.
+    """
+    import spyro
+    from spyro.utils.typing import AdjointType
+
+    monkeypatch.chdir(tmp_path)
+    fwi = _acoustic_fwi("2.5")
+    key = spyro.AcousticMaterialParameter.P_WAVE_VELOCITY
+    with pytest.raises(ValueError, match="uniform"):
+        fwi.run_fwi(
+            adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+            objective=InversionObjective(regularization=H1Regularization({key: "auto"})),
+            maxiter=1, vmin=2.0, vmax=3.5, save_controls=False,
+        )
+
+
+def test_l_curve_corner() -> None:
+    """The corner of an L, given out of order, is where it turns."""
+    from spyro.tools.l_curve import l_curve_corner
+
+    # log points (misfit, penalty) along increasing weights: down, then right.
+    log_points = [(0.0, 4.0), (0.05, 2.0), (0.1, 0.2), (2.0, 0.1), (4.0, 0.05)]
+    weights = [1e-9, 1e-8, 1e-7, 1e-6, 1e-5]
+    order = [3, 0, 4, 2, 1]
+    misfits = [np.exp(log_points[i][0]) for i in order]
+    penalties = [np.exp(log_points[i][1]) for i in order]
+    corner = l_curve_corner([weights[i] for i in order], misfits, penalties)
+    assert [weights[i] for i in order][corner] == 1e-7
+    with pytest.raises(ValueError, match="three"):
+        l_curve_corner([1, 2], [1, 2], [2, 1])
+    with pytest.raises(ValueError, match="positive"):
+        l_curve_corner([1, 2, 3], [1, 0, 2], [3, 2, 1])
+
+
+@pytest.mark.parametrize("continuation", [
+    {"cycles": 1, "factor": 10}, {"cycles": 2, "factor": 1.0},
+    {"cycles": 2}, {"cycles": 2.5, "factor": 10},
+])
+def test_invalid_continuation(continuation: dict) -> None:
+    """Reject continuation settings before any solve.
+
+    Parameters
+    ----------
+    continuation : dict
+        Invalid settings.
+    """
+    import spyro
+
+    with pytest.raises(ValueError):
+        spyro.FullWaveformInversion._continuation(continuation)
+
+
+def test_acoustic_continuation_fwi(tmp_path, monkeypatch) -> None:
+    """Continuation divides the weights per cycle, and the parts still add up.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Isolated output directory.
+    monkeypatch : pytest.MonkeyPatch
+        Temporary working-directory manager.
+    """
+    import spyro
+    from spyro.utils.typing import AdjointType
+
+    monkeypatch.chdir(tmp_path)
+    fwi = _acoustic_fwi("2.5 + 0.1*x")
+    key = spyro.AcousticMaterialParameter.P_WAVE_VELOCITY
+    regularization = H1Regularization({key: 0.01})
+    fwi.run_fwi(
+        adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+        objective=InversionObjective(regularization=regularization),
+        continuation={"cycles": 2, "factor": 10}, maxiter=2,
+        vmin=2.0, vmax=3.5, save_controls=False,
+    )
+    assert regularization.weights[key] == pytest.approx(0.001)
+    assert fwi.current_iteration == 2
+    parts = np.add(fwi.misfit_history, fwi.regularization_history)
+    assert np.allclose(parts, fwi.functional_history, rtol=1e-12)
+    with pytest.raises(ValueError, match="needs an objective"):
+        fwi.run_fwi(adjoint_type=AdjointType.AUTOMATED_ADJOINT,
+                    continuation={"cycles": 2, "factor": 10})

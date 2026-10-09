@@ -464,6 +464,9 @@ class FullWaveformInversion:
         self.has_gradient_mask = False
         self.gradient_mask_available = False
         self.functional_history = []
+        # With a regularized objective, its two parts at each logged iterate.
+        self.misfit_history = []
+        self.regularization_history = []
 
     def _sync_wave_real_shot_record(self):
         """Copy observed data from the FWI driver to the wave solver.
@@ -1523,6 +1526,7 @@ class FullWaveformInversion:
 
             with open("peak_memory.txt", "a") as file:
                 file.write(f"Peak memory usage: {peak_memory_mb:.2f} MB \n")
+        self._log_objective_parts(Jm, self.wave.physical_parameters)
 
         return Jm
 
@@ -1685,6 +1689,15 @@ class FullWaveformInversion:
                 Receiver misfit and physical regularization. Requires the
                 automated adjoint. The objective is composed before latent
                 and lumped coordinate wrappers are applied.
+            continuation : dict, optional
+                Lower the regularization weights during the run: each stage
+                (or the whole run, without stages) is split into
+                ``cycles`` consecutive optimizations, the weights of cycle
+                :math:`c` being the starting ones divided by
+                ``factor`` :math:`^c`. The starting weights come back at the
+                start of each stage. Each change of weights records the tape
+                again at the current model, one forward solve. Needs an
+                ``objective`` with a regularization.
             tao_options : dict, optional
                 PETSc options for the TAO solver, merged over the default
                 ``{"tao_max_it": maxiter}``. Only used under the automated
@@ -1755,6 +1768,7 @@ class FullWaveformInversion:
         >>> fwi.run_fwi(maxiter=100, vmin=1.5, vmax=5.0)
         """
         stages = kwargs.pop("stages", None)
+        continuation = self._continuation(kwargs.pop("continuation", None))
         latent = kwargs.pop("latent", False)
         maxiter = kwargs.pop("maxiter", 20)
         parameters = {
@@ -1780,6 +1794,13 @@ class FullWaveformInversion:
             if self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
                 raise ValueError("An objective requires the automated adjoint.")
         self.wave.inversion_objective = objective
+        if continuation is not None and (
+            objective is None or objective.regularization is None
+        ):
+            raise ValueError(
+                "continuation lowers the regularization weights, so it needs "
+                "an objective with a regularization.",
+            )
         # The settings reach the solver at the first forward solve of the run,
         # so a name that is not a setting is rejected here instead of being
         # silently ignored there.
@@ -1836,7 +1857,7 @@ class FullWaveformInversion:
             self.set_guess_control(
                 self._run_fwi_tao(
                     parameters, tao_options=tao_options, stages=stages,
-                    latent=latent,
+                    latent=latent, continuation=continuation,
                 ),
             )
             self.control_parameter_result = self.control_parameters
@@ -1871,8 +1892,8 @@ class FullWaveformInversion:
         return result
 
     def _run_fwi_tao(self, parameters: dict, tao_options: dict | None = None,
-                     stages: list | None = None,
-                     latent: bool = False) -> PhysicalParameters:
+                     stages: list | None = None, latent: bool = False,
+                     continuation: dict | None = None) -> PhysicalParameters:
         """Optimize the recorded reduced functional with PETSc TAO.
 
         The forward solve is recorded once, here, and every functional value
@@ -1903,6 +1924,9 @@ class FullWaveformInversion:
             uses the complete reduced functional for ``maxiter`` iterations.
         latent : bool, optional
             Whether to optimize over latent controls; see :meth:`run_fwi`.
+        continuation : dict, optional
+            ``cycles`` and ``factor`` of the regularization continuation,
+            normalized by :meth:`_continuation`; see :meth:`run_fwi`.
 
         Returns
         -------
@@ -1928,6 +1952,8 @@ class FullWaveformInversion:
         # up there fails every test that touches spyro, whatever it tests.
         from ..tools.optimization import minimize_with_tao, tao_bounds
 
+        # A weight is part of the tape, so "auto" ones are chosen first.
+        self._choose_regularization_weights()
         # Records the tape, and logs the starting functional the same way the
         # scipy path logs every iterate.
         self.get_functional()
@@ -1941,6 +1967,9 @@ class FullWaveformInversion:
         upper = tao_bounds(parameters["vmax"], automated_adjoint.controls)
         tao_options = tao_options or {}
 
+        if stages is None and continuation is not None:
+            stages = [(set(automated_adjoint.control_parameter_names),
+                       parameters["maxiter"])]
         if stages is None:
             reduced_functional = automated_adjoint.reduced_functional
             if reduced_functional is None:
@@ -1986,56 +2015,150 @@ class FullWaveformInversion:
         # Every stage gets a new TAO solver and a reduced functional exposing
         # only its active controls. Omitted controls keep their checkpoints
         # on the tape. Iterations are numbered through all stages as one run.
+        # With continuation, each stage is split into cycles of their own,
+        # each with lower regularization weights than the last.
+        regularization = (None if continuation is None
+                          else self.wave.inversion_objective.regularization)
+        starting_weights = (None if regularization is None
+                            else dict(regularization.weights))
+        cycles = 1 if continuation is None else continuation["cycles"]
         done = 0
         for moving, iterations in stages:
             active_control_names = [
                 name for name in control_names if name in moving
             ]
-            stage_functional = automated_adjoint.create_partial_reduced_functional(
-                self.wave.functional_value,
-                active_control_names,
-            )
-            stage_start_state = state.copy()
-            offset = done
-
-            def record(iteration, functional, active_values):
-                nonlocal done
-                done = offset + iteration
-                complete = stage_start_state.copy()
-                for name, value in zip(active_control_names, active_values):
-                    complete.update(name, value)
-                self._record_iterate(
-                    done,
-                    functional,
-                    [complete[name] for name in control_names],
-                )
-
-            stage_solution = minimize_with_tao(
-                stage_functional,
-                bounds=[
-                    (lower_by_name[name], upper_by_name[name])
-                    for name in active_control_names
-                ],
-                comm=self.wave.comm.comm,
-                options={
-                    **tao_options,
-                    # The limit declared by the stage is authoritative.
-                    "tao_max_it": iterations,
-                },
-                record=record,
-                latent=latent,
-            )
-            # TAO leaves the active checkpoints at the last point it
-            # evaluated, and the next stage starts from the checkpoints.
-            for name, control, value in zip(
-                active_control_names,
-                stage_functional.controls,
-                stage_solution,
+            for cycle, cycle_iterations in enumerate(
+                self._split_iterations(iterations, cycles),
             ):
-                state.update(name, value)
-                control.update(value)
+                if regularization is not None:
+                    weights = {
+                        name: weight / continuation["factor"] ** cycle
+                        for name, weight in starting_weights.items()
+                    }
+                    if weights != regularization.weights:
+                        # A weight is part of the tape, so a new one needs
+                        # the tape recorded again, at the current model.
+                        regularization.weights.update(weights)
+                        self._retape(state)
+                        parallel_print(
+                            "Regularization weights: "
+                            + ", ".join(f"{name.value} {weight:.6e}"
+                                        for name, weight in weights.items()),
+                            self.comm,
+                        )
+                stage_functional = automated_adjoint.create_partial_reduced_functional(
+                    self.wave.functional_value,
+                    active_control_names,
+                )
+                stage_start_state = state.copy()
+                offset = done
+
+                def record(iteration, functional, active_values,
+                           stage_start_state=stage_start_state, offset=offset):
+                    nonlocal done
+                    done = offset + iteration
+                    complete = stage_start_state.copy()
+                    for name, value in zip(active_control_names, active_values):
+                        complete.update(name, value)
+                    self._record_iterate(
+                        done,
+                        functional,
+                        [complete[name] for name in control_names],
+                    )
+
+                stage_solution = minimize_with_tao(
+                    stage_functional,
+                    bounds=[
+                        (lower_by_name[name], upper_by_name[name])
+                        for name in active_control_names
+                    ],
+                    comm=self.wave.comm.comm,
+                    options={
+                        **tao_options,
+                        # The limit declared by the stage is authoritative.
+                        "tao_max_it": cycle_iterations,
+                    },
+                    record=record,
+                    latent=latent,
+                )
+                # TAO leaves the active checkpoints at the last point it
+                # evaluated, and the next stage starts from the checkpoints.
+                for name, control, value in zip(
+                    active_control_names,
+                    stage_functional.controls,
+                    stage_solution,
+                ):
+                    state.update(name, value)
+                    control.update(value)
 
         return state
+
+    def _retape(self, state: PhysicalParameters) -> None:
+        """Record the tape again at ``state``, for new regularization weights.
+
+        Parameters
+        ----------
+        state : PhysicalParameters
+            The controls to record at.
+        """
+        self.set_guess_control(state)
+        self.wave.automated_adjoint.clear_tape()
+        self._forward_solve()
+
+    @staticmethod
+    def _split_iterations(iterations: int, cycles: int) -> list:
+        """Split a stage's iterations into at most ``cycles`` nonempty cycles.
+
+        Parameters
+        ----------
+        iterations : int
+            Iteration limit of the stage.
+        cycles : int
+            Number of cycles.
+
+        Returns
+        -------
+        list of int
+            Iterations of each cycle, the first ones taking the remainder.
+        """
+        sizes = [iterations // cycles + (1 if cycle < iterations % cycles else 0)
+                 for cycle in range(cycles)]
+        return [size for size in sizes if size > 0]
+
+    @staticmethod
+    def _continuation(continuation: dict | None) -> dict | None:
+        """Normalize the regularization continuation of a run.
+
+        Parameters
+        ----------
+        continuation : dict or None
+            ``cycles``, an integer of at least 2, and ``factor``, a finite
+            number above 1 the weights are divided by from cycle to cycle.
+
+        Returns
+        -------
+        dict or None
+            The settings, or None.
+
+        Raises
+        ------
+        ValueError
+            If a setting is missing, unknown or invalid.
+        """
+        if continuation is None:
+            return None
+        if set(continuation) != {"cycles", "factor"}:
+            raise ValueError(
+                "continuation takes exactly 'cycles' and 'factor', not "
+                f"{sorted(continuation)}.",
+            )
+        cycles, factor = continuation["cycles"], continuation["factor"]
+        if isinstance(cycles, bool) or not isinstance(cycles, (int, np.integer)) or cycles < 2:
+            raise ValueError("continuation 'cycles' must be an integer of at least 2.")
+        factor = float(factor)
+        if not np.isfinite(factor) or factor <= 1:
+            raise ValueError("continuation 'factor' must be finite and above 1.")
+        return {"cycles": int(cycles), "factor": factor}
 
     @staticmethod
     def _stages(stages, maxiter):
@@ -2146,6 +2269,129 @@ class FullWaveformInversion:
 
             with open("peak_memory.txt", "a") as file:
                 file.write(f"Peak memory usage: {get_peak_memory():.2f} MB \n")
+        if self.wave.automated_adjoint is not None:
+            parameters = dict(self.wave.physical_parameters.items())
+            parameters.update(zip(
+                self.wave.automated_adjoint.control_parameter_names, controls,
+            ))
+            self._log_objective_parts(functional, parameters)
+
+    def _log_objective_parts(self, functional: float, parameters) -> None:
+        """Log the data misfit and the regularization of a regularized objective.
+
+        The tape records only their sum, so the regularization is evaluated
+        again here, without annotation, and the misfit is the rest. Without a
+        regularization there is nothing to split and nothing is logged.
+
+        Parameters
+        ----------
+        functional : float
+            The objective value, misfit plus regularization.
+        parameters : mapping
+            The physical fields it was evaluated at, keyed by parameter.
+        """
+        from pyadjoint import stop_annotating
+
+        objective = self.wave.inversion_objective
+        if objective is None or objective.regularization is None:
+            return
+        with stop_annotating():
+            regularization = float(objective.regularization(parameters))
+        misfit = functional - regularization
+        self.misfit_history.append(misfit)
+        self.regularization_history.append(regularization)
+        parallel_print(
+            f"Misfit: {misfit}, Regularization: {regularization} "
+            f"at iteration: {self.current_iteration}",
+            self.comm,
+        )
+        if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
+            with open("functional_values.txt", "a") as file:
+                file.write(
+                    f"Iteration: {self.current_iteration}, Misfit: {misfit}, "
+                    f"Regularization: {regularization}\n",
+                )
+
+    def _choose_regularization_weights(self) -> None:
+        r"""Choose the ``"auto"`` weights of an H1 regularization.
+
+        Each is :math:`\beta_p = \gamma\,\|D_p J(m_0)\| / \|D_p R_p(m_0)\|`,
+        with :math:`J` the data misfit and :math:`R_p` the penalty of
+        parameter :math:`p` with unit weight, both differentiated at the
+        starting model; see
+        :class:`spyro.functionals.H1Regularization`. The norms are the lumped
+        :math:`L^2` norms of the derivatives, the metric the optimizer uses.
+
+        A weight is part of the recorded tape, so it has to be known before
+        the run records it: this tapes the misfit alone, takes its gradient
+        and discards that tape, at the cost of one forward and one adjoint
+        solve.
+
+        Raises
+        ------
+        ValueError
+            If a starting field with an ``"auto"`` weight is uniform, so the
+            penalty has no gradient to size the weight against, or the
+            parameter is not a control of the inversion.
+        """
+        from pyadjoint.enlisting import Enlist
+
+        from ..functionals import InversionObjective
+        from ..functionals.reduced.lumped_l2 import _inverse_sqrt_lumped_mass
+
+        objective = self.wave.inversion_objective
+        regularization = None if objective is None else objective.regularization
+        if regularization is None or not regularization.automatic:
+            return
+
+        def norm(derivative):
+            """Return the lumped L2 norm of a derivative."""
+            space = derivative.function_space().dual()
+            weighted = fire.Function(space)
+            weighted.dat.data_wo[:] = (
+                derivative.dat.data_ro
+                * _inverse_sqrt_lumped_mass(space).dat.data_ro
+            )
+            with weighted.dat.vec_ro as values:
+                return values.norm()
+
+        if self.wave.automated_adjoint is not None:
+            self.wave.automated_adjoint.clear_tape()
+        self.wave.inversion_objective = InversionObjective(misfit=objective.misfit)
+        try:
+            self._forward_solve()
+            automated_adjoint = self.wave.automated_adjoint
+            derivatives = Enlist(
+                automated_adjoint.create_reduced_functional(
+                    self.wave.functional_value,
+                ).derivative(),
+            )
+        finally:
+            self.wave.inversion_objective = objective
+            self.wave.automated_adjoint.clear_tape()
+
+        for name, field, derivative in zip(
+            automated_adjoint.control_parameter_names,
+            automated_adjoint.controls,
+            derivatives,
+        ):
+            if name not in regularization.automatic:
+                continue
+            penalty = norm(regularization.unit_derivative(name, field))
+            if penalty == 0.0:
+                raise ValueError(
+                    f"The starting {name.value} is uniform, so its H1 penalty "
+                    "has no gradient to size an 'auto' weight against; give "
+                    "the weight explicitly.",
+                )
+            weight = regularization.gradient_fraction * norm(derivative) / penalty
+            regularization.weights[name] = weight
+            parallel_print(f"H1 weight for {name.value}: {weight:.6e}", self.comm)
+        if regularization.automatic:
+            raise ValueError(
+                "'auto' H1 weights need the parameters to be controls; "
+                f"{[name.value for name in regularization.automatic]} are not.",
+            )
 
     def run_fwi_rol(self, **kwargs):
         """
