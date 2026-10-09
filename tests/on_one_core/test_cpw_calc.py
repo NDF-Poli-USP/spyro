@@ -47,7 +47,7 @@ def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
         "C_accuracy": 0.1,
     }
 
-    Cpw_calc = spyro.tools.Meshing_parameter_calculator(
+    Cpw_calc = spyro.tools.MeshingParameterCalculator(
         grid_point_calculator_parameters
     )
 

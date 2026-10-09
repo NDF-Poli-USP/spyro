@@ -1,8 +1,8 @@
-from .cells_per_wavelength_calculator import Meshing_parameter_calculator
+from .cells_per_wavelength_calculator import MeshingParameterCalculator
 from .velocity_smoother import smooth_velocity_field_file
 
 
 __all__ = [
-    "Meshing_parameter_calculator",
+    "MeshingParameterCalculator",
     "smooth_velocity_field_file",
 ]

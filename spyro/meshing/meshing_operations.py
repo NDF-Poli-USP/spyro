@@ -2,7 +2,7 @@ from firedrake import as_vector, assemble, CellDiameter, DirichletBC, SpatialCoo
 from numpy import allclose, clip, column_stack, linspace, log10, min, max
 from ..utils.error_management import validate_parameter
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
-from ..tools.version_control import is_firedrake_new
+from ..version_control import is_firedrake_new
 
 if is_firedrake_new():
     from firedrake import interpolate

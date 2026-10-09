@@ -38,7 +38,7 @@ def test_cpw_analytic_calc_analytical_gen():
         "C_accuracy": 0.1,
     }
 
-    Cpw_calc = spyro.tools.Meshing_parameter_calculator(
+    Cpw_calc = spyro.tools.MeshingParameterCalculator(
         grid_point_calculator_parameters
     )
 
