@@ -24,7 +24,6 @@ Use with care for research and production workflows.
 
 The following functionalities are available in this branch, have test coverage, but are **not yet completely verified**:
 
-* PLease add here
 * Please add here
 
 Installation
@@ -238,7 +237,7 @@ dictionary["visualization"] = {
 wave = spyro.AcousticWave(dictionary=dictionary)
 
 # Defines the element size in the automatically generated firedrake mesh.
-wave.set_mesh(dx=0.01)
+wave.set_mesh(input_mesh_parameters={"edge_length": 0.01})
 
 
 # Manually create a simple two layer seismic velocity model.
