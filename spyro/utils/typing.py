@@ -114,6 +114,42 @@ class ElasticMaterialParameterization(StrEnum):
     VELOCITY = "velocity"
 
 
+class VelocityProfileType(StrEnum):
+    """Enum for the velocity profile used by the cells-per-wavelength calculator.
+
+    HOMOGENEOUS: Constant material, compared against an analytical solution.
+    HETEROGENEOUS: Material read from file, compared against a numerical
+    reference solution.
+    """
+
+    HOMOGENEOUS = "homogeneous"
+    HETEROGENEOUS = "heterogeneous"
+
+
+class TimeStepCalculationType(StrEnum):
+    """Enum for how the cells-per-wavelength calculator picks the time step.
+
+    EXACT: Maximum stable time step from the exact largest eigenvalue.
+    ESTIMATE: Maximum stable time step from an estimated largest eigenvalue.
+    FIXED: User-supplied time step, read from the ``"time-step"`` key.
+    """
+
+    EXACT = "exact"
+    ESTIMATE = "estimate"
+    FIXED = "float"
+
+
+class CpwSearchDirection(StrEnum):
+    """Enum for the direction of the cells-per-wavelength line search.
+
+    BACKWARD: Start from a passing value and step down.
+    FORWARD: Start from a failing value and step up.
+    """
+
+    BACKWARD = "backward"
+    FORWARD = "forward"
+
+
 class FunctionalType(Enum):
     """Enum for different types of functionals that can be computed.
 

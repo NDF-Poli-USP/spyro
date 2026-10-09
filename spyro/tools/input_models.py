@@ -72,6 +72,7 @@ def build_on_top_of_base_dictionary(variables):
         "source_locations": variables["source_locations"],
         "frequency": variables["frequency"],
         "receiver_locations": variables["receiver_locations"],
+        "use_vertex_only_mesh": True,
     }
     model_dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
@@ -121,7 +122,7 @@ def create_initial_model_for_meshing_parameter(Meshing_calc_obj):
 
     Parameters
     ----------
-    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+    Meshing_calc_obj : spyro.MeshingParameterCalculator
         The meshing calculation object.
 
     Returns
@@ -144,7 +145,7 @@ def create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj):
 
     Parameters
     ----------
-    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+    Meshing_calc_obj : spyro.MeshingParameterCalculator
         The meshing calculation object.
 
     Returns
@@ -171,7 +172,7 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj
 
     Parameters
     ----------
-    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+    Meshing_calc_obj : spyro.MeshingParameterCalculator
         The meshing calculation object.
 
     Returns
@@ -252,7 +253,7 @@ def create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj):
 
     Parameters
     ----------
-    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+    Meshing_calc_obj : spyro.MeshingParameterCalculator
         The meshing calculation object.
 
     Returns
@@ -279,7 +280,7 @@ def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
 
     Parameters
     ----------
-    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+    Meshing_calc_obj : spyro.MeshingParameterCalculator
         The meshing calculation object.
 
     Returns
@@ -354,3 +355,127 @@ def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
     model_dictionary = build_on_top_of_base_dictionary(variables)
 
     return model_dictionary
+
+
+def create_elastic_model_for_meshing_parameter_2D_homogeneous(
+    method: str,
+    degree: int,
+    frequency: float,
+    p_wave_velocity: float,
+    s_wave_velocity: float,
+    density: float,
+    dt: float,
+    reduced: bool = False,
+) -> dict:
+    """Create a 2D homogeneous isotropic elastic model for the cpw calculator.
+
+    A horizontal (x-direction) point force is placed in a periodic box. The receivers lie on
+    a horizontal line ``7`` S-wavelengths below the source, spanning
+    horizontal offsets from ``0`` to ``7`` S-wavelengths. The final time lets
+    the S-wave reach the farthest receiver, and the box is sized so that no
+    P-wave from a periodic image of the source reaches any receiver before
+    the final time.
+
+    Parameters
+    ----------
+    method : str
+        Finite element method, either ``"mass_lumped_triangle"`` or
+        ``"spectral_quadrilateral"``.
+    degree : int
+        Spatial polynomial degree.
+    frequency : float
+        Ricker source peak frequency.
+    p_wave_velocity : float
+        P-wave velocity.
+    s_wave_velocity : float
+        S-wave velocity, which sets the wavelength.
+    density : float
+        Density.
+    dt : float
+        Time step used by the initial object and the analytical reference.
+    reduced : bool, optional
+        If True, use 3 receivers instead of 11, for testing. Default is
+        False.
+
+    Returns
+    -------
+    dict
+        Spyro model dictionary for :class:`spyro.IsotropicWave`.
+    """
+    if method not in ("mass_lumped_triangle", "spectral_quadrilateral"):
+        raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
+    if s_wave_velocity > 500:
+        warnings.warn("Velocity in meters per second")
+
+    s_wavelength = s_wave_velocity / frequency
+    delay = 1.0 / frequency
+
+    # Acquisition, in S-wavelengths, following Lyu et al. (2024)
+    # doi: 10.1029/2023JB027576
+    vertical_offset = 7 * s_wavelength
+    maximum_horizontal_offset = 7 * s_wavelength
+    receiver_quantity = 3 if reduced else 11
+    farthest_offset = np.hypot(vertical_offset, maximum_horizontal_offset)
+
+    # S-wave reaches the farthest receiver, plus two periods of wavelet tail
+    final_time = farthest_offset / s_wave_velocity + delay + 2.0 / frequency
+
+    # Nearest periodic image is at least (length - source-receiver span) away
+    # in some direction; keep its P arrival after the final time.
+    length = p_wave_velocity * final_time + maximum_horizontal_offset + s_wavelength
+
+    source_z = -(length - vertical_offset) / 2.0
+    source_x = (length - maximum_horizontal_offset) / 2.0
+    receiver_z = source_z - vertical_offset
+    receiver_locations = [
+        (receiver_z, float(receiver_x))
+        for receiver_x in np.linspace(
+            source_x, source_x + maximum_horizontal_offset, receiver_quantity,
+        )
+    ]
+
+    return {
+        "options": {
+            "method": method,
+            "degree": degree,
+            "dimension": 2,
+        },
+        "parallelism": {"type": "automatic"},
+        "mesh": {
+            "length_z": length,
+            "length_x": length,
+            "mesh_type": "firedrake_mesh",
+            "periodic": True,
+        },
+        "acquisition": {
+            "source_type": "ricker",
+            "source_locations": [(source_z, source_x)],
+            "frequency": frequency,
+            "delay": delay,
+            "delay_type": "time",
+            "receiver_locations": receiver_locations,
+            "amplitude": np.array([0.0, 1.0]),
+            "use_vertex_only_mesh": True,
+        },
+        "synthetic_data": {
+            "type": "object",
+            "density": density,
+            "p_wave_velocity": p_wave_velocity,
+            "s_wave_velocity": s_wave_velocity,
+            "real_velocity_file": None,
+        },
+        "time_axis": {
+            "initial_time": 0.0,
+            "final_time": final_time,
+            "dt": dt,
+            "output_frequency": 1000,
+            "gradient_sampling_frequency": 1,
+        },
+        "visualization": {
+            "forward_output": True,
+            "fwi_velocity_model_output": False,
+            "gradient_output": False,
+            "adjoint_output": False,
+            "debug_output": False,
+        },
+    }
