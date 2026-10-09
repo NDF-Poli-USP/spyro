@@ -76,7 +76,8 @@ def interpolate_time_series(
     Parameters
     ----------
     values : array_like
-        Time series data stored as ``(time, receiver)`` or ``(time,)``.
+        Time series data with time on the first axis, e.g. ``(time,)``,
+        ``(time, receiver)`` or ``(time, receiver, direction)``.
     target_dt : float
         Desired timestep.
     initial_time : float
@@ -87,7 +88,8 @@ def interpolate_time_series(
     Returns
     -------
     numpy.ndarray
-        Data interpolated onto the target time grid.
+        Data interpolated onto the target time grid, with the same trailing
+        shape as ``values``.
     """
     if target_dt <= 0.0:
         raise ValueError("target_dt must be positive.")
@@ -100,11 +102,10 @@ def interpolate_time_series(
         raise ValueError("final_time must be greater than or equal to initial_time.")
 
     array = np.asarray(values, dtype=float)
-    input_was_1d = array.ndim == 1
-    if array.ndim == 1:
-        array = array[:, np.newaxis]
-    elif array.ndim != 2:
-        raise ValueError("Time series interpolation expects a 1D or 2D array.")
+    if array.ndim == 0:
+        raise ValueError("Time series interpolation expects at least a 1D array.")
+    trailing_shape = array.shape[1:]
+    array = array.reshape(array.shape[0], -1)
 
     num_source_steps = array.shape[0]
     if num_source_steps <= 1:
@@ -129,6 +130,4 @@ def interpolate_time_series(
             right=array[-1, receiver_id],
         )
 
-    if input_was_1d:
-        return interpolated[:, 0]
-    return interpolated
+    return interpolated.reshape((target_num_steps, *trailing_shape))
