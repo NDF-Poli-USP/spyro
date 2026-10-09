@@ -17,7 +17,7 @@ import warnings
 
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .parallelism_wrappers import ensemble_save, ensemble_load
-from ..tools.version_control import is_firedrake_new
+from ..version_control import is_firedrake_new
 from .segy_io import read_segy_velocity_model
 
 if is_firedrake_new() is False:
