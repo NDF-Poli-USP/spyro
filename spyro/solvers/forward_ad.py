@@ -2,7 +2,7 @@ import firedrake as fire
 import firedrake.adjoint as fire_ad
 from ..domains.space import create_function_space
 from .time_integration_ad import central_difference_acoustic
-from ..tools.version_control import is_firedrake_new
+from ..version_control import is_firedrake_new
 
 
 if is_firedrake_new() is False:

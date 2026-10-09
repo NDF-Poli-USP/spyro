@@ -9,7 +9,7 @@ from .meshing_functions import AutomaticMesh
 from .meshing_operations import MeshOps
 from ..tools.habc_tools import point_cloud_field
 from ..utils.error_management import validate_parameter
-from ..tools.version_control import is_firedrake_new
+from ..version_control import is_firedrake_new
 
 if is_firedrake_new() is False:
     from firedrake.__future__ import interpolate

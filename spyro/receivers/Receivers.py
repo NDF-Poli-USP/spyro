@@ -5,7 +5,7 @@ from spyro.receivers.dirac_delta_projector import Delta_projector
 from ..domains.space import create_function_space
 from ..utils.typing import WaveType
 import numpy as np
-from ..tools.version_control import is_firedrake_new
+from ..version_control import is_firedrake_new
 
 if is_firedrake_new() is False:
     from firedrake.__future__ import interpolate
