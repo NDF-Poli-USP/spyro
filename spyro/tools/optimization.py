@@ -15,8 +15,8 @@ from pyadjoint.optimization.tao_solver import (
 )
 from pyadjoint.reduced_functional import AbstractReducedFunctional
 
-from ..reduced_functionals import LatentReducedFunctional, LumpedL2ReducedFunctional
-from ..reduced_functionals.lumped_l2 import _inverse_sqrt_lumped_mass
+from ..functionals.reduced import LatentReducedFunctional, LumpedL2ReducedFunctional
+from ..functionals.reduced.lumped_l2 import _inverse_sqrt_lumped_mass
 from ..utils.physical_parameters import as_list
 
 

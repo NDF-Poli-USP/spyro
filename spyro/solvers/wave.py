@@ -148,6 +148,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.adjoint_type = AdjointType.NONE
         self.automated_adjoint = None
         self.functional_value = None
+        self.inversion_objective = None
         self.misfit = None
         self.current_time = 0.0
         self.source_expression = None  # Expression for sources using UFL (less efficient)
@@ -200,6 +201,17 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         None
         """
         SpyroEnsemble.print("\nSolving Forward Problem")
+
+        if self.inversion_objective is not None:
+            if self.adjoint_type != AdjointType.AUTOMATED_ADJOINT:
+                raise ValueError("An inversion objective requires the automated adjoint.")
+            if self.functional_evaluation_mode != FunctionalEvaluationMode.PER_TIMESTEP:
+                raise ValueError("An inversion objective requires per-timestep data evaluation.")
+            if len(self.shot_ids_per_propagation) != self.comm.ensemble_comm.size:
+                raise NotImplementedError(
+                    "Regularized objectives currently require one propagation per "
+                    "ensemble member. Sequential shot accumulation is not supported.",
+                )
 
         if self.function_space is None:
             self.force_rebuild_function_space()
