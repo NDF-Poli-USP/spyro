@@ -189,7 +189,7 @@ class Read_boundary_layer:
             value = "no_abcs"
 
         self._abc_type = validate_enum("abc_type", value, AbsorbingBCsType)
-        pprint(f"Absorbing Boundary Condition type: {value}", comm=self.comm)
+        SpyroEnsemble.print(f"Absorbing Boundary Condition type: {value}")
 
         if value == "PML":
             # PML forces rectangular shape
