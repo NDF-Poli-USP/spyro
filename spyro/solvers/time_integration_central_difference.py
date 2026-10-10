@@ -1,9 +1,10 @@
 import firedrake as fire
 import numpy as np
+from firedrake import *
 
 from . import helpers
 from .. import utils
-from ..utils.typing import FunctionalEvaluationMode, AdjointType, AbsorbingBCsType
+from ..utils.typing import FunctionalEvaluationMode, AdjointType, AbsorbingBCsType, WaveType
 
 
 def _propagate_forward_central_difference(wave, source_ids):
@@ -126,6 +127,30 @@ def _propagate_forward_central_difference(wave, source_ids):
 
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
+
+        if wave.wave_type != WaveType.ISOTROPIC_ACOUSTIC and wave.viscoelastic:
+
+            dt = wave.dt
+            W = wave.strain_space
+
+            zeta_list = wave.zeta_list
+            omega_list = wave.omega_list
+
+            def epsilon(u):
+                return sym(grad(u))
+
+            # Strain rate
+            eps_old = Function(zeta_list[0].function_space())
+
+            # Dentro de cada passo de tempo:
+            eps_old.interpolate(epsilon(wave.prev_vstate))
+            zeta_old = Function(W)
+
+            # Update memory variables
+            for i in range(len(zeta_list)):
+                zeta_old.assign(zeta_list[i])
+                omega = omega_list[i]
+                zeta_list[i].assign(zeta_old + dt * omega * (eps_old - zeta_old))
 
         if wave.use_vertex_only_mesh:
             if receiver_buffer is None:
