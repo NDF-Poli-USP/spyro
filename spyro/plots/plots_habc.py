@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from ..abc.lay_len import f_layer, loop_roots
-from ..tools.abc_labeling_cases import create_folder
 from .plot_helpers import _finalize_figure
 from ..tools.abc_set_path_cases import create_folder
 

@@ -142,9 +142,6 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         # Communicator MPI
         self.comm = comm
 
-        # Initializing the error measure class
-        MeasureError.__init__(self, comm=self.comm)
-
     def critical_boundary_points(self, wave):
         """Determine critical boundary points using the Eikonal criterion.
 

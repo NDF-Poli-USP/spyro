@@ -361,8 +361,10 @@ class TestMeasureError:
         with patch("spyro.tools.error_measure.getcwd", return_value=str(tmp_path)):
             # Create MeasureError instance inside the patch context
             measure_error = MeasureError()
-            measure_error.initialize_paths_for_error(output_folder="test_output",
-                                                     output_case="preamble")
+            measure_error.initialize_paths_for_error(
+                output_folder="test_output",
+                output_case="preamble",
+            )
             # Create mock reference files
             with patch("numpy.load") as mock_load:
                 mock_load.return_value = receiver_data
