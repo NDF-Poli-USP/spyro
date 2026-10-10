@@ -629,4 +629,4 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         output_file = self.abc_boundary_layer_type.value + "_ref"
         self.save_reference_signal(
             wave.receiver_locations, wave.forward_solution_receivers,
-            wave.number_of_receivers, self.freq_Nyquist, output_file=output_file)
+            wave.number_of_receivers, self.freq_Nyquist, output_file_prefix=output_file)
