@@ -586,3 +586,40 @@ def test_mesh_frequency_factor_scales_mesh_size(
     else:
         edge_length = velocity / (frequency * requested["cells_per_wavelength"])
     assert np.isclose(edge_length, velocity / (factor * frequency * cpw))
+
+
+def test_interpolate_time_series_applies_time_shift() -> None:
+    """Target sample i is taken at initial_time + time_shift + i * dt."""
+    final_time = 1.0
+    source_time = np.linspace(0.0, final_time, 101)
+
+    interpolated = interpolate_time_series(
+        3.0 * source_time, 0.1, final_time=final_time, time_shift=0.05
+    )
+
+    expected = 3.0 * np.minimum(0.05 + 0.1 * np.arange(11), final_time)
+    assert np.allclose(interpolated, expected)
+
+
+@pytest.mark.parametrize(
+    "physics, profile, expected_steps",
+    [
+        (AcousticCpwPhysics, VelocityProfileType.HOMOGENEOUS, 1.0),
+        (AcousticCpwPhysics, VelocityProfileType.HETEROGENEOUS, 0.0),
+        (IsotropicElasticCpwPhysics, VelocityProfileType.HOMOGENEOUS, 0.0),
+    ],
+)
+def test_reference_time_shift(
+    physics: type,
+    profile: VelocityProfileType,
+    expected_steps: float,
+) -> None:
+    """Only analytical acoustic references are shifted one solver step."""
+    calculator = SimpleNamespace(physics=physics({}), velocity_profile_type=profile)
+    wave = SimpleNamespace(dt=2e-3)
+
+    shift = spyro.tools.MeshingParameterCalculator._reference_time_shift(
+        calculator, wave
+    )
+
+    assert np.isclose(shift, expected_steps * wave.dt)
