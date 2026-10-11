@@ -6,6 +6,7 @@ that error calculations and file operations work as expected.
 
 import numpy as np
 import pytest
+from pathlib import Path
 from unittest.mock import patch
 from spyro.tools.error_measure import MeasureError
 
@@ -18,7 +19,10 @@ class TestMeasureError:
         """Create a MeasureError instance for testing."""
         output_folder = "/output/test_output"
         output_case = "test_case"
-        return MeasureError(output_folder=output_folder, output_case=output_case)
+        measure_error = MeasureError()
+        measure_error.initialize_paths_for_error(output_folder=output_folder,
+                                                 output_case=output_case)
+        return measure_error
 
     @pytest.fixture
     def sample_signals(self):
@@ -42,6 +46,7 @@ class TestMeasureError:
     def test_initialization_default(self):
         """Test default initialization."""
         error = MeasureError()
+        error.initialize_paths_for_error()
         assert error.path_save_error.name == "output"
         assert error.path_save_err_case.name == "output"
         assert error.path_reference.name == "preamble"
@@ -50,10 +55,13 @@ class TestMeasureError:
     def test_initialization_custom_paths(self):
         """Test initialization with custom paths."""
         output_folder = "/custom/path"
-        output_case = "case123"
-        error = MeasureError(output_folder=output_folder, output_case=output_case)
-        assert str(error.path_save_error) == "/custom/path"
-        assert str(error.path_save_err_case) == "case123"
+        output_case = "/custom/path/case123/"
+        error = MeasureError()
+        error.initialize_paths_for_error(output_folder=output_folder,
+                                         output_case=output_case)
+        assert error.path_save_error == Path("/custom/path")
+        assert error.path_save_err_case == Path("/custom/path/case123")
+        assert error.path_reference == Path("/custom/path/preamble")
 
     def test_pad_signal_lengths_equal(self):
         """Test when signals have equal lengths."""
@@ -303,9 +311,11 @@ class TestMeasureError:
         assert error_measures[5] == 0.5  # final_energy
         assert error_measures[6] == 0.5  # dissipated energy (1 - 0.5/1.0)
 
-    def test_error_measures_save_file(self, measure_error, receiver_data, tmp_path):
+    def test_error_measures_save_file(self, receiver_data, tmp_path):
         """Test saving error measures to file."""
         with patch("spyro.tools.error_measure.getcwd", return_value=str(tmp_path)):
+            measure_error = MeasureError()
+            measure_error.initialize_paths_for_error()
             n_time = 100
             n_rec = 1
             dt = 0.01
@@ -354,8 +364,10 @@ class TestMeasureError:
         """Test loading reference signal."""
         with patch("spyro.tools.error_measure.getcwd", return_value=str(tmp_path)):
             # Create MeasureError instance inside the patch context
-            measure_error = MeasureError(
-                output_folder="test_output", output_case="preamble"
+            measure_error = MeasureError()
+            measure_error.initialize_paths_for_error(
+                output_folder="test_output",
+                output_case="preamble",
             )
             # Create mock reference files
             with patch("numpy.load") as mock_load:
