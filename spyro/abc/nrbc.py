@@ -7,8 +7,12 @@ from numpy.linalg import norm
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .abc import AbsorbingBC
 from ..tools.abc_set_path_cases import path_to_save_abc_case
-from ..utils.error_management import validate_enum, validate_numeric, validate_parameter
-from ..utils.typing import AbsorbingBCsType, BoundaryConditionsType, NRBCBoundaryType
+from ..utils.error_management import (
+    validate_enum, validate_numeric, validate_parameter, validate_string,
+)
+from ..utils.typing import (
+    AbsorbingBCsType, BoundaryConditionsType, LayerShapeType, NRBCBoundaryType,
+)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -25,8 +29,12 @@ class NRBC(AbsorbingBC):
 
     Attributes
     ----------
+    abc_boundary_layer_shape : `typing.LayerShapeType`
+        Shape type of the pad layer. Options: `LayerShapeType.RECTANGULAR` or
+        `LayerShapeType.HYPERSHAPE`. Default is `LayerShapeType.RECTANGULAR`
+        in case the infinite model is needed for comparative purposes.
     abc_boundary_type : `typing.NRBCBoundaryType`, optional
-        Boundary typr where NRBCs are applied . Options: `NRBCBoundaryType.STRAIGHT`
+        Boundary type where NRBCs are applied . Options: `NRBCBoundaryType.STRAIGHT`
         or `NRBCBoundaryType.HYPERSHAPE`. Default is `NRBCBoundaryType.STRAIGHT`.
     angle_max : `float`
         Maximum incidence angle considered. Default is `numpy.pi/4`.
@@ -43,7 +51,7 @@ class NRBC(AbsorbingBC):
             Type of boundary condition to apply on the domain boundaries (for only NRBCs)
             or the outer absorbing layer boundaries (HABCs: Absorbing Layer aand NRBCs).
             Options:'BoundaryConditionsType.HIGDON' or 'BoundaryConditionsType.SOMMERFELD'.
-            Dafault is 'BoundaryConditionsType.HIGDON'.
+            Default is 'BoundaryConditionsType.HIGDON'.
     path_case_nrbc : `string`
         Path to save data for the current case study of NRBCs.
     path_save : `string`
@@ -59,9 +67,11 @@ class NRBC(AbsorbingBC):
         Compute a unitary direction vector from the source to a boundary point.
     """
 
-    def __init__(self, domain_dim, non_reflect_bc=BoundaryConditionsType.HIGDON,
-                 angle_max=pi/4., abc_boundary_type=NRBCBoundaryType.STRAIGHT,
-                 dimension=2, nrbc_in_habc=False, output_folder=None, comm=None):
+    def __init__(self, domain_dim, frequency=None, dt=None,
+                 abc_boundary_type=NRBCBoundaryType.STRAIGHT,
+                 non_reflect_bc=BoundaryConditionsType.HIGDON,
+                 angle_max=pi/4., dimension=2, quadrilateral=False,
+                 nrbc_in_habc=False, output_folder=None, comm=None):
         """Initialize the NRBC class.
 
         Parameters
@@ -69,18 +79,25 @@ class NRBC(AbsorbingBC):
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
             or (length_z, length_x, length_y) for 3D.
+        frequency: `float`, optional
+            Frequency of the source.
+        dt : `float`, optional
+            Time step used in the simulation. Default is `None`.
+        abc_boundary_type : `typing.NRBCBoundaryType`, optional
+            Boundary type where NRBCs are applied . Options: `NRBCBoundaryType.STRAIGHT`
+            or `NRBCBoundaryType.HYPERSHAPE`. Default is `NRBCBoundaryType.STRAIGHT`.
         non_reflect_bc : `typing.BoundaryConditionsType`, optional
             Type of boundary condition to apply on the domain boundaries (for only NRBCs)
             or the outer absorbing layer boundaries (HABCs: Absorbing Layer aand NRBCs).
             Options: `BoundaryConditionsType.HIGDON` or `BoundaryConditionsType.SOMMERFELD`.
-            Dafault is `BoundaryConditionsType.HIGDON`.
+            Default is `BoundaryConditionsType.HIGDON`.
         angle_max : `float`, optional
             Maximum incidence angle considered in the NRBC. Default is `numpy.pi/4` (45°).
-        abc_boundary_type : `typing.NRBCBoundaryType`, optional
-            Boundary type where NRBCs are applied . Options: `NRBCBoundaryType.STRAIGHT`
-            or `NRBCBoundaryType.HYPERSHAPE`. Default is `NRBCBoundaryType.STRAIGHT`.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
+        quadrilateral : `bool`, optional
+            Flag to indicate whether to use quadrilateral/hexahedral elements.
+            Default is `False` (triangular/tetrahedral elements).
         nrbc_in_habc : `bool`, optional
             If `True`, the NRBCs are applied on the outer absorbing layer boundaries
             (HABCs: Absorbing Layer and NRBCs). If `False`, the NRBCs are applied on
@@ -95,42 +112,110 @@ class NRBC(AbsorbingBC):
 
         # Initializing the AbsorbingBC class if NRBCs are not in HABC scheme
         if not nrbc_in_habc:
-            AbsorbingBC.__init__(self, domain_dim, dimension=dimension, comm=comm)
+            AbsorbingBC.__init__(self, domain_dim, frequency=frequency,
+                                 dt=dt, dimension=dimension,
+                                 quadrilateral=quadrilateral, comm=comm)
 
-            # Non-reflective BC type
-        self.non_reflect_bc = validate_parameter('non_reflect_bc', non_reflect_bc,
-                                                 [BoundaryConditionsType.HIGDON,
-                                                  BoundaryConditionsType.SOMMERFELD])
+            # Set sthe pad to rectangular shape in case the infinite model is needed.
+            self.abc_boundary_layer_shape = LayerShapeType.RECTANGULAR
+
+        # Flag to indicate if NRBCs are used in HABC scheme
+        self.nrbc_in_habc = nrbc_in_habc
+
+        # Non-reflective BC type
+        self.non_reflect_bc = non_reflect_bc
 
         # Boundary type where NRBCs are applied
-        self.abc_boundary_type = validate_enum("abc_boundary_type",
-                                               abc_boundary_type,
-                                               NRBCBoundaryType)
+        self.abc_boundary_type = abc_boundary_type
 
         # Maximum incidence angle considered
-        self.angle_max = validate_numeric("angle_max", angle_max, float_num=True,
-                                          integer_num=False, lower_bound=0.,
-                                          include_lower_bound=True)
+        self.angle_max = angle_max
 
-        # Maximum value of the cosine of the incidence angle
-        self.cos_min = cos(angle_max)
+        # Output folder
+        self.output_folder = output_folder
 
-        """"
-        Create the path to save data
-        The required abc_type argument from path_to_save_abc_layer_case() method is set
-        to `AbsorbingBCsType.NRBC` since it is an instance of `typing.AbsorbingBCsType`.
+    @property
+    def non_reflect_bc(self):
+        return self._non_reflect_bc
+
+    @non_reflect_bc.setter
+    def non_reflect_bc(self, value):
+        """Set the non-reflective BC type with validation."""
+        self._non_reflect_bc = validate_parameter('non_reflect_bc', value,
+                                                  [BoundaryConditionsType.HIGDON,
+                                                   BoundaryConditionsType.SOMMERFELD])
+
+        # Non-reflective BC type changes should update paths
+        self._create_or_update_paths()
+
+    @property
+    def abc_boundary_type(self):
+        return self._abc_boundary_type
+
+    @abc_boundary_type.setter
+    def abc_boundary_type(self, value):
+        """Set the boundary type where NRBCs are applied with validation."""
+        self._abc_boundary_type = validate_enum("abc_boundary_type", value, NRBCBoundaryType)
+
+        # Boundary type changes should update paths
+        self._create_or_update_paths()
+
+    @property
+    def angle_max(self):
+        return self._angle_max
+
+    @angle_max.setter
+    def angle_max(self, value):
+        """Set the maximum incidence angle with validation."""
+        self._angle_max = validate_numeric("angle_max", value, float_num=True,
+                                           integer_num=False, lower_bound=0.,
+                                           include_lower_bound=True)
+
+        # Minimum value of the cosine of the incidence angle
+        self.cos_min = cos(self._angle_max)
+
+        # Angle changes should update paths
+        self._create_or_update_paths()
+
+    @property
+    def output_folder(self):
+        return self._output_folder
+
+    @output_folder.setter
+    def output_folder(self, value):
+        """Set the output folder with validation."""
+        self._output_folder = validate_string("output_folder", value,
+                                              accept_parameter_as_none=True)
+
+        # Output folder changes should update paths
+        self._create_or_update_paths()
+
+    def _create_or_update_paths(self):
+        """Create or update the path folders for the NRBC case.
+
+        This method is called whenever non_reflect_bc, abc_boundary_type,
+        angle_max, or output_folder changes. The required abc_type argument from
+        path_to_save_abc_layer_case() method is set to `AbsorbingBCsType.NRBC`
+        since it is an instance of `typing.AbsorbingBCsType`.
         """
-        self.path_save, self.case_nrbc, self.path_case_nrbc = \
-            path_to_save_abc_case(AbsorbingBCsType.NRBC,
-                                  non_reflect_bc=self.non_reflect_bc,
-                                  angle_max=self.angle_max,
-                                  abc_boundary_type=self.abc_boundary_type,
-                                  output_folder=output_folder)
 
-        # Initializing the MeasureError class if NRBCs are not in HABC scheme
-        if not nrbc_in_habc:
-            self.initialize_paths_for_error(output_folder=self.path_save,
-                                            output_case=self.path_case_nrbc)
+        # Check that all required attributes exist AND are not None
+        required_attrs = ['_non_reflect_bc', '_abc_boundary_type',
+                          '_angle_max', '_output_folder']
+
+        # Only update paths if all parameters have been set and avoid infinite recursion
+        if all(hasattr(self, attr) and getattr(self, attr) for attr in required_attrs):
+            self.path_save, self.case_nrbc, self.path_case_nrbc = \
+                path_to_save_abc_case(AbsorbingBCsType.NRBC,
+                                      non_reflect_bc=self._non_reflect_bc,
+                                      angle_max=self._angle_max,
+                                      abc_boundary_type=self._abc_boundary_type,
+                                      output_folder=self._output_folder)
+
+            # Initializing the error paths if NRBCs are not in HABC scheme
+            if not self.nrbc_in_habc:
+                self.initialize_paths_for_error(output_folder=self.path_save,
+                                                output_case=self.path_case_nrbc)
 
     def source_to_bnd_reference_vector(self, source_coord, bnd_nodes_nfs):
         """Compute a unitary direction vector from the source to a boundary point.
@@ -151,7 +236,7 @@ class NRBC(AbsorbingBC):
         """
 
         # Boundary node data
-        bnd_z, bnd_x = bnd_nodes_nfs[:2]
+        bnd_z, bnd_x = bnd_nodes_nfs[:, 0], bnd_nodes_nfs[:, 1]
 
         # Source coordinates
         psouz = source_coord[0]
@@ -165,7 +250,7 @@ class NRBC(AbsorbingBC):
         if self.dimension == 3:  # 3D
 
             # Third component of the vector pointing to the boundary point
-            bnd_y = bnd_nodes_nfs[2]
+            bnd_y = bnd_nodes_nfs[:, 2]
             psouy = source_coord[2]
             ref_y = bnd_y - psouy
             ref_vct.append(ref_y)
@@ -322,5 +407,46 @@ class NRBC(AbsorbingBC):
 
         # Save boundary profile of cosine of incidence angle
         if save_file:
-            outfile = VTKFile(self.path_save_nrbc + "cosHig.pvd")
+            outfile = VTKFile(self.path_case_nrbc + "cosHig.pvd")
             outfile.write(self.cosHig)
+
+    def nrbc_on_boundary(self, wave, source_coord=None, hyp_par=None, save_file=True):
+        """Apply Non-Reflective BCs on absorbing boundaries.
+
+        Parameters
+        ----------
+        wave : `acoustic_wave.AcousticWave`
+            An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+        source_coord : `tuple`
+            Source coordinates.
+        save_file : `bool`, optional
+            If `True`, save the velocity model with absorbing layer in a .pvd file.
+            Default is `True`.
+
+        Returns
+        -------
+        None
+        """
+
+        SpyroEnsemble.print("\nApplying Non-Reflecting Boundary Conditions")
+
+        # Getting boundary data from the layer boundaries
+        if self.non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
+            bnd_nod_ids_nfs = wave.mesh_ops.layer_boundary_data(wave.mesh,
+                                                                wave.function_space,
+                                                                wave.mesh_parameters)
+            bnd_nodes_nfs = None
+
+        if self.non_reflect_bc == BoundaryConditionsType.HIGDON:
+            bnd_nod_ids_nfs, bnd_nodes_nfs = \
+                wave.mesh_ops.layer_boundary_data(wave.mesh, wave.function_space,
+                                                  wave.mesh_parameters,
+                                                  return_boundary_coords=True)
+
+        if source_coord is None:
+            source_coord = self.min_coord_differ_source_boundary(wave.source_locations,
+                                                                 get_crit_source=True)[1]
+
+        # Applying Higdon ABCs
+        self.cos_ang_HigdonBC(wave.function_space, source_coord, bnd_nod_ids_nfs,
+                              bnd_nodes_nfs, hyp_par=hyp_par, save_file=save_file)

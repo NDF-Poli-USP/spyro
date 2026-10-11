@@ -1,17 +1,21 @@
 from abc import ABCMeta
-from firedrake import Function, VTKFile
-from numpy import abs, array, ceil, log10, minimum
+from firedrake import (ds as fire_ds, ds_b as quad_dsbottom, ds_t as quad_dstop,
+                       ds_v as quad_ds, Function, VTKFile)
+from numpy import abs, array, ceil, log10, minimum, prod, sign, sum, where
 from sympy import divisors
 from .eik_min import Minimum_Eikonal
 from ..solvers.modal.modal_sol import Modal_Solver
 from ..tools.error_measure import MeasureError
 from ..domains.space import create_function_space
 from ..io.basicio import parallel_print as pprint
+from ..plots.plots_habc import plot_frequency_domain_receiver_responses
+from ..plots.receiver_plots import plot_comparison_of_receivers_to_reference
 from ..tools.abc_set_path_cases import formatting_abc_layer_type
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
 from ..utils.error_management import (validate_data_structure, validate_numeric,
                                       validate_parameter)
-from ..utils.typing import LayerShapeType
+from ..utils.freq_tools import fft_at_receivers
+from ..utils.typing import AbsorbingBCsType, LayerShapeType
 
 
 class AbsorbingBC(MeasureError, metaclass=ABCMeta):
@@ -73,12 +77,16 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         Create a mesh with absorbing layer based on the determined size.
     critical_boundary_points()
         Determine critical boundary points using the Eikonal criterion.
+    forms_acoustic_NRBCs()
+        Construct the load term forms for non-reflecting boundary conditions (NRBCs).
     geometry_infinite_model()
         Determine the geometry for the infinite domain model.
     infinite_model()
         Create a reference model for the ABC scheme for comparative purposes.
     layer_infinite_model()
         Determine the domain extension size for the infinite domain model.
+    comparison_plots()
+        Plot the comparison between the ABC scheme and the reference model.
     velocity_abc()
         Set the velocity profile for the model with absorbing layer.
     """
@@ -470,6 +478,111 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         self.freq_Nyquist = 1. / (2. * wave.dt)
         pprint(f"New Nyquist Frequency: {self.freq_Nyquist:.5f} Hz", comm=self.comm)
 
+    def min_coord_differ_source_boundary(self, source_locations, get_crit_source=False):
+        """Compute the minimum coordinate difference from sources to the nearest boundary.
+
+        Parameters
+        ----------
+        source_locations: `list`
+            List of source locations.
+        get_crit_source: `bool`, optional
+            If `True`, return the critical source location. Default is `False`.
+
+        Returns
+        -------
+        min_dist_to_bnd": `float`
+            minimum coordinate difference from sources to the nearest boundary.
+            It is not an Euclidean distance and is calculates as:
+                min_dist_to_bnd(P, Q) = min_i |x_i − y_i|
+            This distance is the opposite to the Chebyshev distance defined as:
+            (https://en.wikipedia.org/wiki/Chebyshev_distance) TODO: Add citation
+                D_Chebyshev(P, Q) = max_i |x_i − y_i|
+        critical_source: `tuple`
+           Critical source location. If there are multiple sources with the
+           same minimum coordinate difference, the critical source is the
+           geometric mean of the critical sources.
+        """
+
+        # Source locations
+        source_loc = array(source_locations)
+
+        # Original  domain dimensions
+        length_z, length_x = self.domain_dim[:2]
+
+        def update_min_value_and_sources(candidate, delta, min_dist_to_bnd, source_cand):
+            """Update candidates to minimum coordinate difference and associated sources.
+
+            Parameters
+            ----------
+            candidate : `float`
+                Candidate to minimum coordinate difference to the boundaries.
+            delta : `arrray`
+                Array of coordinate differences to the boundaries.
+            min_dist_to_bnd : `float`
+                Current minimum coordinate difference to the boundaries.
+            source_cand : `set`
+                Current set of source indices for the minimum coordinate difference.
+
+            Returns
+            -------
+            min_dist_to_bnd : `float`
+                Updated minimum coordinate difference to the boundaries.
+            source_cand : `set`
+                Updated set of source indices for the minimum coordinate difference.
+            """
+
+            source_update = where(delta == candidate)[0]
+            if candidate < min_dist_to_bnd:
+                min_dist_to_bnd = candidate
+                source_cand = set(source_update)
+            elif candidate_x == min_dist_to_bnd:
+                source_cand.update(source_update)
+
+            return min_dist_to_bnd, source_cand
+
+        # Candidate to minimum coordinate difference to the boundaries
+        delta_z = abs(source_loc[:, 0] - length_z)
+        candidate_z = delta_z.min()
+        min_dist_to_bnd = candidate_z
+        source_cand = set(where(delta_z == candidate_z)[0])
+        delta_x = minimum(abs(source_loc[:, 1]), abs(source_loc[:, 1] - length_x))
+        candidate_x = delta_x.min()
+        min_dist_to_bnd, source_cand = \
+            update_min_value_and_sources(candidate_x, delta_x,
+                                         min_dist_to_bnd, source_cand)
+
+        if self.dimension == 3:  # 3D
+            length_y = self.domain_dim[2]
+            delta_y = minimum(abs(source_loc[:, 2]), abs(source_loc[:, 2] - length_y))
+            candidate_y = delta_y.min()
+            min_dist_to_bnd, source_cand = \
+                update_min_value_and_sources(candidate_y, delta_y,
+                                             min_dist_to_bnd, source_cand)
+        if get_crit_source:
+
+            if len(source_cand) > 1:
+
+                # Critical sources
+                critical_sources = source_loc[list(source_cand), :]
+
+                # Avoiding zero values for geometric mean
+                critical_sources[critical_sources == 0.] = 1e-6
+
+                # Apparent source location as the geometric mean of the critical sources
+                n_sources = critical_sources.shape[0]
+                prod_coord = prod(critical_sources, axis=0)
+                sign_coord = sign(sum(critical_sources, axis=0))
+                critical_source = tuple(sign_coord * abs(prod_coord) ** (1. / n_sources))
+
+            else:
+
+                # Critical source location
+                critical_source = source_locations[[*source_cand][0]]
+
+            return min_dist_to_bnd, critical_source
+
+        return min_dist_to_bnd
+
     def layer_infinite_model(self, lmin, c_bnd_max, final_time, source_locations=None):
         """Determine the domain extension size for the infinite domain model.
 
@@ -497,8 +610,6 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
                          integer_num=True, lower_bound=0.)
         validate_numeric("final_time", final_time, float_num=True,
                          integer_num=True, lower_bound=0.)
-        validate_data_structure("source_locations", source_locations, "list",
-                                expected_type_element="tuple", accept_parameter_as_none=True)
 
         # Size of the domain extension
         add_dom = c_bnd_max * final_time / 2.
@@ -508,9 +619,9 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         # Distance already travelled by the wave
         if hasattr(self, 'eik_bnd'):
 
+            # If Eikonal analysis was performed (see `critical_boundary_points` method)
             str_pad += "Minimun Eikonal at Critical Boundary Points"
 
-            # If Eikonal analysis was performed (see `critical_boundary_points` method)
             # Structure eikmin: [pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]
             eikmin = self.eik_bnd[0][2]
 
@@ -518,26 +629,15 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
             dist_to_bnd = c_bnd_max * eikmin / 2.
         else:
 
-            str_pad += "Minimum Distance Source-Boundary"
+            # If Eikonal analysis was not performed (see `min_coord_differ_source_boundary`)
+            str_pad += "Minimum Coordinate Difference Source-Boundary"
 
-            # If Eikonal analysis was not performed
-            source_loc = array(source_locations)
+            # Checking source locations
+            validate_data_structure("source_locations", source_locations, "list",
+                                    expected_type_element="tuple")
 
-            # Original  domain dimensions
-            length_z, length_x = self.domain_dim[:2]
-
-            # Candidate to minimum distance to the boundaries
-            delta_z = abs(source_loc[:, 0] - length_z)
-            delta_x = minimum(abs(source_loc[:, 1]), abs(source_loc[:, 1] - length_x))
-            cand_dist = (delta_z, delta_x)
-
-            if self.dimension == 3:  # 3D
-                length_y = self.domain_dim[2]
-                delta_y = minimum(abs(source_loc[:, 2]), abs(source_loc[:, 2] - length_y))
-                cand_dist += (delta_y,)
-
-            # Minimum distance to the nearest boundary
-            dist_to_bnd = float(min(cand_dist))
+            # Minimum distance to the nearest boundary (not Euclidean distance)
+            dist_to_bnd = self.min_coord_differ_source_boundary(source_locations)
 
         pprint(str_pad, comm=self.comm)
 
@@ -626,7 +726,114 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         wave.forward_solve()
 
         # Saving reference signal
-        output_file = self.abc_boundary_layer_type.value + "_ref"
+        output_file = wave.abc_type.value + "_ref"
         self.save_reference_signal(
             wave.receiver_locations, wave.forward_solution_receivers,
             wave.number_of_receivers, self.freq_Nyquist, output_file_prefix=output_file)
+
+    def forms_acoustic_NRBCs(self, wave, weak_expr_nrbc, bc_surf):
+        """Build the load term weak forms for non-reflecting boundary conditions (NRBCs).
+
+        Parameters
+        ----------
+        wave : `acoustic_wave.AcousticWave`
+            An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+        weak_expr_nrbc : `ufl.form`
+            General weak expression for the NRBCs.
+        bc_surf : `tuple`
+            Tuple of boundary markers where NRBCs are applied.
+
+        Returns
+        -------
+        le_nrbc : `ufl.form`
+            Load term for the NRBCs.
+        """
+
+        # Quadrature surface rule for NRBCs
+        quad_surf = wave.surface_quadrature_rule
+
+        # Initializing load term for NRBCs
+        le_nrbc = 0.
+
+        if self.quadrilateral and self.dimension == 3:
+
+            # exterior_markers = set(wave.mesh.exterior_facets.unique_markers)
+            # print("Available boundary markers:", exterior_markers)
+
+            # Integer boundary IDs for 3D quadrilaterals/hexahedra meshes
+            int_ids = tuple(filter(lambda k: isinstance(k, int), bc_surf))
+
+            # Integration measure for 3D quadrilaterals/hexahedra meshes with integer ids
+            ds = quad_ds(int_ids, **quad_surf) if quad_surf else quad_ds(int_ids)
+
+            # NRBC on top boundary for 3D quadrilaterals/hexahedra
+            if "top" in bc_surf:
+                le_nrbc += weak_expr_nrbc * quad_dstop  # (Do not support quadrature)
+
+            # NRBC on bottom boundary for 3D quadrilaterals/hexahedra meshes
+            if "bottom" in bc_surf:
+                le_nrbc += weak_expr_nrbc * quad_dsbottom  # (Do not support quadrature)
+
+        else:
+
+            # Integration measure for triangles/tetrahedra and 2D quadrilaterals/hexahedra
+            ds = fire_ds(bc_surf, **quad_surf) if quad_surf else fire_ds(bc_surf)
+
+        # NRBCs: Higdon or Sommerfeld
+        le_nrbc += weak_expr_nrbc * ds
+
+        return le_nrbc
+
+    def comparison_plots(self, wave, receivers_reference, reference_receiver_fft,
+                         regression_xCR=False, data_regr_xCR=None):
+        """Plot the comparison between the ABC scheme and the reference model.
+
+        Parameters
+        ----------
+        wave : `wave.Wave`
+            An instance of the :class:`~spyro.solvers.wave.Wave`.
+        receivers_reference : `array`
+            Receiver waveform data in the reference model
+        reference_receiver_fft : `ndarray`
+            Frequency response magnitude of the reference receiver data.
+        regression_xCR : `bool`, optional
+            If `True`, Plot the regression for the error measure vs xCR. Default is `False`.
+        data_regr_xCR: `list`
+            Data for the regression of the parameter xCR.
+            Structure: [xCR, max_errIt, max_errPK, crit_opt]
+            - xCR: Values of xCR used in the regression.
+              The last value IS the optimal xCR
+            - max_errIt: Values of the maximum integral error.
+              The last value corresponds to the optimal xCR
+            - max_errPK: Values of the maximum peak error.
+              The last value corresponds to the optimal xCR
+            - crit_opt : Criterion for the optimal heuristic factor.
+              * 'err_difference' : Difference between integral and peak errors
+              * 'err_integral' : Minimum integral error
+
+        Returns
+        -------
+        None
+        """
+
+        # Time domain comparison
+        plot_comparison_of_receivers_to_reference(wave, receivers_reference)
+
+        # Compute FFT for output signal at receivers
+        wave.receivers_out_fft = fft_at_receivers(
+            wave.number_of_receivers, wave.forward_solution_receivers, self.freq_Nyquist)
+
+        # For NRBCs the source frequency is set as reference
+        if wave.abc_type == AbsorbingBCsType.NRBC:
+            self.freq_ref = self.frequency
+
+        # Frequency parameters for plotting
+        frequency_parameters = (self.freq_ref, self.frequency, self.freq_Nyquist)
+
+        # Frequency domain comparison
+        plot_frequency_domain_receiver_responses(wave, reference_receiver_fft,
+                                                 frequency_parameters)
+
+        # # Plot the error measures
+        # if regression_xCR:
+        #     plot_xCR_opt(self, data_regr_xCR)

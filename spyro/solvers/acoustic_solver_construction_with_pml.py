@@ -1,8 +1,8 @@
 """Constructs Firedrake solver for the acosutic wave with a PML."""
 
-from firedrake import (Cofunction, DirichletBC, div, dot, ds as fire_ds, dx as fire_dx,
-                       Function, grad, inner, lhs, LinearVariationalProblem,
-                       LinearVariationalSolver, rhs, split, TestFunctions, TrialFunctions)
+from firedrake import (Cofunction, DirichletBC, div, dot, dx as fire_dx, Function, grad,
+                       inner, lhs, LinearVariationalProblem, LinearVariationalSolver,
+                       rhs, split, TestFunctions, TrialFunctions)
 from ..domains.space import create_function_space
 from ..utils.typing import BoundaryConditionsType
 
@@ -52,6 +52,7 @@ def forms_pml(wave, W, X_n, X_nm1):
     c = wave.c
     c_sqr_inv = 1. / (c * c)
     quad_rule = wave.quadrature_rule
+    quad_surf = wave.surface_quadrature_rule
     dx = fire_dx(**quad_rule) if quad_rule else fire_dx
 
     # Trial and test functions, and state variables
@@ -76,8 +77,8 @@ def forms_pml(wave, W, X_n, X_nm1):
     bc_surf = tuple([non_free_surf for non_free_surf, status in
                      wave.mesh_parameters.boundary_ids_map.items() if status])
     bc_bndr = wave.layer_ops.bc_boundary_pml
-
-    if not wave.abc_get_ref_model:
+    include_bcs = not wave.abc_get_ref_model
+    if wave.abc_active and include_bcs:
 
         # Common PML forms (Backward difference for first time derivative)
         pml3 = -div(pp_n) * v
@@ -119,20 +120,20 @@ def forms_pml(wave, W, X_n, X_nm1):
         # -------------------------------------------------------
         FF += (mm1 + mm2 + c * c * dd1) * dx
 
-        # exterior_markers = set(wave.mesh.exterior_facets.unique_markers)
-        # print("Available boundary markers:", exterior_markers)
-
         # Apply NRBCs (Higdon or Sommerfeld) at PML boundaries
         if bc_bndr in [BoundaryConditionsType.HIGDON, BoundaryConditionsType.SOMMERFELD]:
-            ds = fire_ds(bc_surf, **quad_rule) if quad_rule else fire_ds(bc_surf)
-            f_abc = c * ((u_n - u_nm1) / dt) * v
-            le = wave.layer_ops.cosHig * f_abc * ds
-            FF += le
+
+            # General weak form for NRBCs
+            c_inv = 1. / c
+            weak_expr_nrbc = wave.layer_ops.cosHig * c_inv * ((u_n - u_nm1) / dt) * v
+
+            # include NRBC terms in the load term
+            le_nrbc = wave.layer_ops.forms_acoustic_NRBCs(wave, weak_expr_nrbc, bc_surf)
+            FF += le_nrbc
 
     # Dirichlet BCs for PML model or Neumann BCs for the reference model
-    get_ref_model_negat = not wave.abc_get_ref_model
-    fix_bnd = DirichletBC(W.sub(0), 0., bc_surf) if \
-        bc_bndr == BoundaryConditionsType.DIRICHLET and get_ref_model_negat else None
+    bc_fix = (bc_bndr == BoundaryConditionsType.DIRICHLET and include_bcs)
+    fix_bnd = DirichletBC(W.sub(0), 0., bc_surf) if bc_fix else None
 
     return FF, fix_bnd
 

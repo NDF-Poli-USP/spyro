@@ -268,7 +268,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.function_space is None:
             self.building_mesh_derived_paramenters()
 
-        if self.abc_type in [AbsorbingBCsType.NOABCS, AbsorbingBCsType.NRBC]:
+        # TODO: Delete any dependency on _initialize_model_parameters()
+        if self.abc_type in [AbsorbingBCsType.NOABCS]:
             self._initialize_model_parameters()
         if self.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
             self.automated_adjoint.clear_tape()
@@ -685,6 +686,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Time step used in the simulation.
         """
         self._dt = dt
+        self.num_timesteps = int(round(self.final_time / dt)) + 1
+
         if self.sources is not None:
             self.sources.update_wavelet(self)
 
@@ -859,7 +862,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.mesh_ops = MeshOps(domain_dim, dimension=self.dimension,
                                     quadrilateral=self.mesh_parameters.quadrilateral)
 
-    def layer_manager(self, domain_dim):
+    def layer_manager(self, domain_dim, time_step):
         """Create the layer operations manager for the wave solver.
 
         Parameters:
@@ -867,14 +870,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
             or (length_z, length_x, length_y) for 3D.
+        time_step : `float`
+            Time step used in the simulation.
 
         Returns:
         --------
         None
         """
-
-        # Timestep of the simulation. It is `None` if the response is not 'transient'.
-        time_step = None if self.analysis != "transient" else self.dt
 
         if self.abc_type == AbsorbingBCsType.PML:  # PML
             from ..pml.pml_nsnc import PMLLayer
@@ -897,31 +899,61 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                        abc_deg_layer=self.abc_deg_layer,
                                        output_folder=self.output_folder, comm=self.comm)
 
+    @property
+    def abc_ops(self):
+        """Return the active ABC operations object."""
+        if self.abc_type == AbsorbingBCsType.NRBC and hasattr(self, 'nrbc_ops'):
+            return self.nrbc_ops
+        elif hasattr(self, 'layer_ops'):
+            return self.layer_ops
+
+    @property
+    def case_abc(self):
+        """Get the current ABC case identifier."""
+        ops = self.abc_ops
+        if ops is not None:
+            if self.abc_type == AbsorbingBCsType.NRBC:
+                return ops.case_nrbc
+            else:
+                return ops.case_absl
+
+    @property
+    def path_save(self):
+        """Get the current ABC save path."""
+        ops = self.abc_ops
+        if ops is not None:
+            return ops.path_save
+
+    @property
+    def path_case_abc(self):
+        """Get the current ABC case path."""
+        ops = self.abc_ops
+        if ops is not None:
+            if self.abc_type == AbsorbingBCsType.NRBC:
+                return ops.path_case_nrbc
+            else:
+                return ops.path_case_absl
+
     def abcs_manager(self):
         """Create the ABCs operations manager for the wave solver."""
 
         # Domain dimensions
         domain_dim = self.domain_dimensions()
 
+        # Timestep of the simulation. It is `None` if `analysis` is not 'transient'.
+        time_step = None if self.analysis != "transient" else self.dt
+
         # Creating absorbing layer manager if needed
         if self.abc_type in [AbsorbingBCsType.PML, AbsorbingBCsType.HYBRID]:
-            self.layer_manager(domain_dim)
-
-            # Identifier for the current case study
-            self.case_abc = self.layer_ops.case_absl
-            self.path_save = self.layer_ops.path_save
-            self.path_case_abc = self.layer_ops.path_case_absl
+            self.layer_manager(domain_dim, time_step)
 
         # Creating NRBC manager if needed (when no layer is added).
         elif self.abc_type == AbsorbingBCsType.NRBC:
             from ..abc.nrbc import NRBC
-            self.nrbc_ops = NRBC(domain_dim, dimension=self.dimension,
+            self.nrbc_ops = NRBC(domain_dim, frequency=self.frequency,
+                                 dt=time_step, dimension=self.dimension,
+                                 quadrilateral=self.mesh_parameters.quadrilateral,
                                  output_folder=self.output_folder, comm=self.comm)
-
-            # Identifier for the current case study
-            self.case_abc = self.nrbc_ops.case_nrbc
-            self.path_save = self.nrbc_ops.path_save
-            self.path_case_abc = self.nrbc_ops.path_case_nrbc
 
     @abstractmethod
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):

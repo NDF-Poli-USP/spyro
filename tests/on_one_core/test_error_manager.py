@@ -15,6 +15,7 @@ from spyro.utils.error_management import (
     mutually_exclusive_parameter_error,
     sanitize_num_array,
     validate_data_structure,
+    validate_equal_lengths_for_two_sequences,
     validate_firedrake_parameter,
     validate_file,
     validate_model_dimension,
@@ -590,16 +591,14 @@ class TestTypeDataStructureError:
         """Test with matching shape."""
         arr = array([[1, 2], [3, 4]])
         result = validate_data_structure(
-            "test_param", arr, "array2D", expected_shape=(2, 2)
-        )
+            "test_param", arr, "array2D", expected_shape=(2, 2))
         assert_array_equal(result, arr)
 
     def test_shape_check_with_none_dimension(self):
         """Test with shape containing None dimension."""
         arr = array([[1, 2, 3], [4, 5, 6]])
-        result = validate_data_structure(
-            "test_param", arr, "array2D", expected_shape=(2, None)
-        )
+        result = validate_data_structure("test_param", arr, "array2D",
+                                         expected_shape=(2, None))
         assert_array_equal(result, arr)
 
     def test_shape_check_mismatch(self):
@@ -612,45 +611,121 @@ class TestTypeDataStructureError:
     def test_element_type_check_for_array(self):
         """Test element type check for numpy array."""
         arr = array([1, 2, 3])
-        result = validate_data_structure(
-            "test_param", arr, "array", expected_type_element="int"
-        )
+        result = validate_data_structure("test_param", arr, "array",
+                                         expected_type_element="int")
         assert_array_equal(result, arr)
 
     def test_element_type_check_for_array_failure(self):
         """Test element type check failure for numpy array."""
         arr = array([1, 2.5, 3])
         with raises(TypeError) as exc_info:
-            validate_data_structure(
-                "test_param", arr, "array", expected_type_element="int"
-            )
-        assert "All elements of 'test_param' must be of type: 'int'" in str(
-            exc_info.value
-        )
+            validate_data_structure("test_param", arr, "array",
+                                    expected_type_element="int")
+        assert "All elements of 'test_param' must be of type: 'int'" \
+            in str(exc_info.value)
 
     def test_element_type_check_single_string(self):
         """Test with single element type check as string (not tuple)."""
-        result = validate_data_structure(
-            "test_param", ["a", "b", "c"], "list", expected_type_element="str"
-        )
+        result = validate_data_structure("test_param", ["a", "b", "c"], "list",
+                                         expected_type_element="str")
         assert result == ["a", "b", "c"]
 
     def test_invalid_expected_type_element(self):
         """Test with invalid expected_type_element."""
         with raises(ValueError) as exc_info:
-            validate_data_structure(
-                "test_param", [1, 2, 3], "list", expected_type_element="invalid"
-            )
+            validate_data_structure("test_param", [1, 2, 3], "list",
+                                    expected_type_element="invalid")
         assert "Invalid expected_type_element: 'invalid'" in str(exc_info.value)
 
     def test_mixed_element_types_valid(self):
         """Test with mixed valid element types."""
         result = validate_data_structure(
-            "test_param",
-            [1, "two", 3.0, None],
-            "list",
-            expected_type_element=("int", "str", "float", "NoneType"),
-        )
+            "test_param", [1, "two", 3.0, None], "list",
+            expected_type_element=("int", "str", "float", "NoneType"))
+        assert result == [1, "two", 3.0, None]
+
+    def test_valid_sequence_list(self):
+        """Test with valid list as sequence."""
+        result = validate_data_structure("test_param", [1, 2, 3], "sequence")
+        assert result == [1, 2, 3]
+
+    def test_valid_sequence_tuple(self):
+        """Test with valid tuple as sequence."""
+        result = validate_data_structure("test_param", (1, 2, 3), "sequence")
+        assert result == (1, 2, 3)
+
+    def test_valid_sequence_array(self):
+        """Test with valid numpy array as sequence."""
+        arr = array([1, 2, 3])
+        result = validate_data_structure("test_param", arr, "sequence")
+        assert_array_equal(result, arr)
+
+    def test_sequence_element_type_check_single(self):
+        """Test sequence with single element type check."""
+        result = validate_data_structure("test_param", [1, 2, 3], "sequence",
+                                         expected_type_element="int")
+        assert result == [1, 2, 3]
+
+    def test_sequence_element_type_check_multiple(self):
+        """Test sequence with multiple element type check."""
+        result = validate_data_structure("test_param", [1, 2.5, "three"], "sequence",
+                                         expected_type_element=("int", "float", "str"))
+        assert result == [1, 2.5, "three"]
+
+    def test_valid_sequence_with_length(self):
+        """Test sequence with expected length."""
+        result = validate_data_structure("test_param", [1, 2, 3],
+                                         "sequence", expected_length=3)
+        assert result == [1, 2, 3]
+
+    def test_sequence_length_mismatch(self):
+        """Test sequence with mismatching expected length."""
+        with raises(ValueError) as exc_info:
+            validate_data_structure("test_param", [1, 2, 3],
+                                    "sequence", expected_length=4)
+        assert "'test_param' must have length 4" in str(exc_info.value)
+
+    def test_invalid_sequence_type(self):
+        """Test with invalid type for sequence."""
+        with raises(TypeError) as exc_info:
+            validate_data_structure("test_param", "not a sequence", "sequence")
+        assert "'test_param' must be a sequence" in str(exc_info.value)
+
+    def test_sequence_element_type_check_failure(self):
+        """Test sequence with element type check failure."""
+        with raises(TypeError) as exc_info:
+            validate_data_structure("test_param", [1, "string", 3], "sequence",
+                                    expected_type_element="int")
+        assert "All elements of 'test_param' must be of type: 'int'" \
+            in str(exc_info.value)
+
+    def test_sequence_element_type_check_with_none(self):
+        """Test sequence with element type check including None."""
+        result = validate_data_structure("test_param", [1, None, 3], "sequence",
+                                         expected_type_element=("int", "NoneType"))
+        assert result == [1, None, 3]
+
+    def test_sequence_element_type_check_array(self):
+        """Test sequence element type check with numpy array."""
+        arr = array([1, 2, 3])
+        result = validate_data_structure("test_param", arr, "sequence",
+                                         expected_type_element="int")
+        assert_array_equal(result, arr)
+
+    def test_sequence_element_type_check_array_failure(self):
+        """Test sequence element type check failure with numpy array."""
+        arr = array([1, 2.5, 3])
+        with raises(TypeError) as exc_info:
+            validate_data_structure("test_param", arr, "sequence",
+                                    expected_type_element="int")
+        assert "All elements of 'test_param' must be of type: 'int'" \
+            in str(exc_info.value)
+
+    def test_sequence_mixed_element_types_valid(self):
+        """Test sequence with mixed valid element types."""
+        result = validate_data_structure(
+            "test_param", [1, "two", 3.0, None], "sequence",
+            expected_type_element=("int", "str", "float", "NoneType"))
         assert result == [1, "two", 3.0, None]
 
 
@@ -904,3 +979,148 @@ class TestValueFileError:
         """Test with multiple valid extensions."""
         result = validate_file("data", "data.csv", [".txt", ".csv", ".json"])
         assert result == "data.csv"
+
+
+class TestEqualLengthsError:
+    """Tests for validate_equal_lengths_for_two_sequences function."""
+
+    def test_equal_length_lists(self):
+        """Test with two lists of equal length."""
+        param1 = [1, 2, 3]
+        param2 = [4, 5, 6]
+        # Should not raise an exception
+        validate_equal_lengths_for_two_sequences("param1", param1, "param2", param2)
+
+    def test_equal_length_tuples(self):
+        """Test with two tuples of equal length."""
+        param1 = (1, 2, 3)
+        param2 = (4, 5, 6)
+        validate_equal_lengths_for_two_sequences("param1", param1, "param2", param2)
+
+    def test_equal_length_list_and_tuple(self):
+        """Test with a list and a tuple of equal length."""
+        param1 = [1, 2, 3]
+        param2 = (4, 5, 6)
+        validate_equal_lengths_for_two_sequences("param1", param1, "param2", param2)
+
+    def test_equal_length_numpy_arrays(self):
+        """Test with two numpy arrays of equal length."""
+        param1 = array([1, 2, 3])
+        param2 = array([4, 5, 6])
+        validate_equal_lengths_for_two_sequences("param1", param1, "param2", param2)
+
+    def test_sequence_with_strings(self):
+        """Test with sequences containing strings."""
+        param1 = ["a", "b", "c"]
+        param2 = ["d", "e", "f"]
+        validate_equal_lengths_for_two_sequences("param1", param1, "param2", param2)
+
+    def test_mixed_types_sequences(self):
+        """Test with sequences containing mixed types."""
+        param1 = [1, "two", 3.0]
+        param2 = [4, "five", 6.0]
+        validate_equal_lengths_for_two_sequences("param1", param1, "param2", param2)
+
+    def test_different_but_equal_length_sequences(self):
+        """Test with different sequence types but equal length."""
+        param1 = [1, 2, 3]           # list
+        param2 = (4, 5, 6)           # tuple
+        param3 = array([7, 8, 9])    # numpy array
+
+        # All combinations should work
+        validate_equal_lengths_for_two_sequences("param1", param1, "param2", param2)
+        validate_equal_lengths_for_two_sequences("param1", param1, "param2", param3)
+        validate_equal_lengths_for_two_sequences("param1", param2, "param2", param3)
+
+    def test_unequal_length_lists(self):
+        """Test with two lists of unequal length."""
+        param1 = [1, 2, 3]
+        param2 = [4, 5]
+        with raises(ValueError) as exc_info:
+            validate_equal_lengths_for_two_sequences("param1", param1, "param2", param2)
+        assert "must have same length" in str(exc_info.value)
+        assert "length: 3" in str(exc_info.value)
+        assert "length: 2" in str(exc_info.value)
+
+    def test_unequal_length_list_and_tuple(self):
+        """Test with a list and a tuple of unequal length."""
+        param1 = [1, 2, 3]
+        param2 = (4, 5)
+        with raises(ValueError) as exc_info:
+            validate_equal_lengths_for_two_sequences("param1", param1, "param2", param2)
+        assert "must have same length" in str(exc_info.value)
+        assert "length: 3" in str(exc_info.value)
+        assert "length: 2" in str(exc_info.value)
+
+    def test_unequal_length_numpy_arrays(self):
+        """Test with two numpy arrays of unequal length."""
+        param1 = array([1, 2, 3])
+        param2 = array([4, 5])
+        with raises(ValueError) as exc_info:
+            validate_equal_lengths_for_two_sequences("param1", param1, "param2", param2)
+        assert "must have same length" in str(exc_info.value)
+        assert "length: 3" in str(exc_info.value)
+        assert "length: 2" in str(exc_info.value)
+
+    def test_first_parameter_not_sequence(self):
+        """Test when first parameter is not a sequence."""
+        with raises(TypeError) as exc_info:
+            validate_equal_lengths_for_two_sequences("param1", "not a sequence",
+                                                     "param2", [1, 2, 3])
+        assert "'param1' must be a sequence" in str(exc_info.value)
+
+    def test_second_parameter_not_sequence(self):
+        """Test when second parameter is not a sequence."""
+        with raises(TypeError) as exc_info:
+            validate_equal_lengths_for_two_sequences("param1", [1, 2, 3],
+                                                     "param2", "not a sequence")
+        assert "'param2' must be a sequence" in str(exc_info.value)
+
+    def test_both_parameters_not_sequence(self):
+        """Test when both parameters are not sequences."""
+        with raises(TypeError) as exc_info:
+            validate_equal_lengths_for_two_sequences("param1", "not a sequence",
+                                                     "param2", "also not a sequence")
+        assert "'param1' must be a sequence" in str(exc_info.value)
+
+    def test_first_parameter_none(self):
+        """Test with None as first parameter."""
+        with raises(TypeError) as exc_info:
+            validate_equal_lengths_for_two_sequences("param1", None, "param2", [1, 2, 3])
+        assert "'param1' must be a sequence" in str(exc_info.value)
+
+    def test_second_parameter_none(self):
+        """Test with None as second parameter."""
+        with raises(TypeError) as exc_info:
+            validate_equal_lengths_for_two_sequences("param1", [1, 2, 3], "param2", None)
+        assert "'param2' must be a sequence" in str(exc_info.value)
+
+    def test_empty_sequences(self):
+        """Test with two empty sequences."""
+        param1 = []
+        param2 = []
+        with raises(ValueError) as exc_info:
+            validate_equal_lengths_for_two_sequences("param1", param1, "param2", param2)
+        assert "cannot both be empty sequences" in str(exc_info.value)
+
+    def test_empty_and_non_empty_sequences(self):
+        """Test with one empty and one non-empty sequence."""
+        param1 = []
+        param2 = [1, 2, 3]
+        with raises(ValueError) as exc_info:
+            validate_equal_lengths_for_two_sequences(
+                "param1", param1, "param2", param2
+            )
+        assert "must have same length" in str(exc_info.value)
+        assert "length: 0" in str(exc_info.value)
+        assert "length: 3" in str(exc_info.value)
+
+    def test_non_empty_and_empty_sequences(self):
+        """Test with one non-empty and one empty sequence."""
+        param1 = [1, 2, 3]
+        param2 = []
+        with raises(ValueError) as exc_info:
+            validate_equal_lengths_for_two_sequences("param1", param1, "param2", param2)
+        assert "must have same length" in str(exc_info.value)
+        assert "length: 3" in str(exc_info.value)
+        assert "length: 0" in str(exc_info.value)

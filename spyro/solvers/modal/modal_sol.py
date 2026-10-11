@@ -595,7 +595,7 @@ class Modal_Solver:
         )
 
         max_dt *= fraction
-        nt = int(final_time / max_dt) + 1
+        nt = int(round(final_time / max_dt)) + 1
         max_dt = final_time / (nt - 1)
 
         return max_dt

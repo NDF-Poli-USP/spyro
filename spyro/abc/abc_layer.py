@@ -62,7 +62,7 @@ class ABCLayer(AbsorbingBC):
     factor_length_pad : `float`
         Size parameter of the absorbing layer.
     freq_ref : `float`
-        Reference frequency of the wave at the critical poin on boundary.
+        Reference frequency of the wave at the critical point on boundary.
     FLpossible : `list`
         Possible size parameters for the absorbing layer without rounding.
     layer_geometry : `rec_lay.RectangLayer` or `hyp_lay.HyperLayer`
@@ -362,40 +362,27 @@ class ABCLayer(AbsorbingBC):
         if non_reflect_bc in [BoundaryConditionsType.SOMMERFELD,
                               BoundaryConditionsType.HIGDON]:
 
-            crit_source = bnd_nod_ids_nfs = bnd_nodes_nfs = None
-
             # Getting the boundary type where NRBCs are applied
             abc_boundary_type = NRBCBoundaryType.HYPERSHAPE \
                 if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE \
                 else NRBCBoundaryType.STRAIGHT
 
             # Initializing the NRBC class
-            NRBC.__init__(self, self.domain_dim, non_reflect_bc=non_reflect_bc,
-                          abc_boundary_type=abc_boundary_type,
-                          dimension=self.dimension, nrbc_in_habc=True,
+            NRBC.__init__(self, self.domain_dim, frequency=self.frequency,
+                          dt=self.dt, abc_boundary_type=abc_boundary_type,
+                          non_reflect_bc=non_reflect_bc, dimension=self.dimension,
+                          quadrilateral=self.quadrilateral, nrbc_in_habc=True,
                           output_folder=self.path_case_absl, comm=self.comm)
-
-            SpyroEnsemble.print("\nApplying Non-Reflecting Boundary Conditions")
-
-            # Getting boundary data from the layer boundaries
-            if non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
-                bnd_nod_ids_nfs = wave.mesh_ops.layer_boundary_data(wave.mesh,
-                                                                    wave.function_space,
-                                                                    wave.mesh_parameters)[0]
-
-            if non_reflect_bc == BoundaryConditionsType.HIGDON:
-                crit_source = self.crit_source
-                bnd_nod_ids_nfs, bnd_nodes_nfs = wave.mesh_ops.layer_boundary_data(wave.mesh,
-                                                                                   wave.function_space,
-                                                                                   wave.mesh_parameters)
 
             # Hypershape parameters
             hyp_par = (self.layer_geometry.n_hyp, *self.layer_geometry.hyper_axes) \
                 if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else None
 
-            # Applying Higdon ABCs
-            self.cos_ang_HigdonBC(wave.function_space, crit_source, bnd_nod_ids_nfs,
-                                  bnd_nodes_nfs, hyp_par=hyp_par, save_file=save_file)
+            crit_source = self.crit_source \
+                if non_reflect_bc == BoundaryConditionsType.HIGDON else None
+
+            self.nrbc_on_boundary(wave, source_coord=crit_source,
+                                  hyp_par=hyp_par, save_file=save_file)
 
         else:
             SpyroEnsemble.print("\nNot Non-Reflecting Boundary Conditions Prescribed")
