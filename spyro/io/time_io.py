@@ -70,6 +70,7 @@ def interpolate_time_series(
     target_dt,
     initial_time=None,
     final_time=None,
+    time_shift: float = 0.0,
 ):
     """Resample receiver data from one time grid onto another.
 
@@ -84,6 +85,10 @@ def interpolate_time_series(
         Starting time of the simulation.
     final_time : float
         Final time of the simulation.
+    time_shift : float, optional
+        Target sample ``i`` is taken at ``initial_time + time_shift +
+        i * target_dt``. Default is 0.0. Samples past either end of the
+        data take its first or last value.
 
     Returns
     -------
@@ -118,7 +123,7 @@ def interpolate_time_series(
         raise ValueError("target_dt and time interval produce too few target samples.")
 
     source_times = initial_time + np.arange(num_source_steps) * source_dt
-    target_times = initial_time + np.arange(target_num_steps) * target_dt
+    target_times = initial_time + time_shift + np.arange(target_num_steps) * target_dt
 
     interpolated = np.empty((target_num_steps, array.shape[1]), dtype=float)
     for receiver_id in range(array.shape[1]):
