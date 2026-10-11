@@ -550,7 +550,14 @@ class Modal_Solver:
         return Lsp
 
     def estimate_timestep(
-        self, c, V, final_time, shift=0.0, quad_rule=None, inv_oper=False, fraction=0.7,
+        self,
+        c,
+        V,
+        final_time,
+        shift=0.0,
+        quad_rule=None,
+        inv_oper=False,
+        fraction=0.7,
         forms=None,
     ):
         """Estimate the maximum stable timestep based on the spectral radius.
@@ -604,7 +611,11 @@ class Modal_Solver:
 
             # (eig = 0 is a rigid body motion)
             Lsp = self.solve_eigenproblem(
-                c, V=V, shift=shift, quad_rule=quad_rule, inv_oper=inv_oper,
+                c,
+                V=V,
+                shift=shift,
+                quad_rule=quad_rule,
+                inv_oper=inv_oper,
                 forms=forms,
             )
             max_eigval = max(unique(Lsp[(Lsp > 0.0) & (imag(Lsp) == 0.0)]))

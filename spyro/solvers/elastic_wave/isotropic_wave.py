@@ -1,8 +1,19 @@
 import numpy as np
 
-from firedrake import (assemble, Constant, curl, DirichletBC, div, dot, dx,
-                       Form, Function, grad, inner, project, TestFunction,
-                       TrialFunction)
+import firedrake as fire
+from firedrake import (
+    assemble,
+    Constant,
+    curl,
+    DirichletBC,
+    div,
+    dot,
+    dx,
+    Function,
+    grad,
+    inner,
+    project,
+)
 from pyadjoint import AdjFloat, Tape
 
 from .elastic_wave import ElasticWave
@@ -10,9 +21,13 @@ from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
 from ...utils.physical_parameters import PhysicalParameters
-from ...utils.typing import (AdjointType, ElasticMaterialParameter,
-                             ElasticMaterialParameterization, AbsorbingBCsType,
-                             RieszMapType)
+from ...utils.typing import (
+    AdjointType,
+    ElasticMaterialParameter,
+    ElasticMaterialParameterization,
+    AbsorbingBCsType,
+    RieszMapType,
+)
 from ...domains.space import create_function_space
 
 
@@ -376,7 +391,7 @@ class IsotropicWave(ElasticWave):
             data_with_halos = self.u_n.dat.data_ro_with_halos[:]
         return self.receivers.interpolate(data_with_halos)
 
-    def modal_weak_forms(self) -> tuple[Form, Form]:
+    def modal_weak_forms(self) -> tuple[fire.Form, fire.Form]:
         """Build the isotropic elastic stiffness and mass forms.
 
         Returns
@@ -388,15 +403,17 @@ class IsotropicWave(ElasticWave):
             Mass form ``rho * u . v``.
         """
         V = self.function_space
-        u = TrialFunction(V)
-        v = TestFunction(V)
+        u = fire.TrialFunction(V)
+        v = fire.TestFunction(V)
         quad_rule = self.quadrature_rule
 
         def eps(w):
             return 0.5*(grad(w) + grad(w).T)
 
-        a = self.lmbda*div(u)*div(v)*dx(**quad_rule) \
+        a = (
+            self.lmbda*div(u)*div(v)*dx(**quad_rule)
             + 2*self.mu*inner(eps(u), eps(v))*dx(**quad_rule)
+        )
         m = self.rho*dot(u, v)*dx(**quad_rule)
         return a, m
 
