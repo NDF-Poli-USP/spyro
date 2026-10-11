@@ -15,11 +15,13 @@ from spyro.tools.cells_per_wavelength_calculator import (
     IsotropicElasticCpwPhysics,
     MAX_CPW,
     ThresholdCase,
-    _parse_threshold_case,
     backward_line_search,
     forward_line_search,
 )
-from spyro.tools.input_models import (
+from spyro.tools.cells_per_wavelength_calculator.threshold_case import (
+    _parse_threshold_case,
+)
+from spyro.tools.cells_per_wavelength_calculator.input_models import (
     create_elastic_model_for_meshing_parameter_2D_homogeneous,
 )
 from spyro.utils.typing import VelocityProfileType, WaveType

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from spyro.tools import input_models
+from spyro.tools.cells_per_wavelength_calculator import input_models
 from spyro.tools.cells_per_wavelength_calculator import AcousticCpwPhysics
 from spyro.utils.typing import VelocityProfileType
 
