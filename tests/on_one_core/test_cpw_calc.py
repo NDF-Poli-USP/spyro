@@ -34,7 +34,6 @@ def make_parameters(method: str, degree: int) -> dict:
         "source_frequency": FREQUENCY,
         "minimum_velocity_in_the_domain": VELOCITY,
         "velocity_profile_type": "homogeneous",
-        "velocity_model_file_name": None,
         "FEM_method_to_evaluate": method,
         "dimension": 2,
         "receiver_setup": "near",
@@ -57,7 +56,7 @@ def test_acoustic_cpw_search_quads() -> None:
     calculator = spyro.tools.MeshingParameterCalculator(
         make_parameters("spectral_quadrilateral", 4)
     )
-    wave = calculator.initial_guess_object
+    wave = calculator.initial_wave
     reference = calculator.reference_solution
     assert reference.shape == (round(wave.final_time / wave.dt) + 1, 4)
 

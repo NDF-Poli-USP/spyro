@@ -24,3 +24,14 @@ cd demos/elastic_fwi_automated_adjoint
 pylit --code-block-marker ".. code-block:: python" elastic_fwi_automated_adjoint.py.rst
 mpiexec -n 3 python3 elastic_fwi_automated_adjoint.py
 ```
+
+## Cells-per-wavelength calculator
+
+[acoustic_homogeneous_cpw.py](acoustic_homogeneous_cpw.py) finds the
+minimum cells-per-wavelength of a discretization for the 2D homogeneous
+acoustic case, against the analytical solution. Edit the arguments of
+`run()` to evaluate another method or degree:
+
+```bash
+python3 demos/acoustic_homogeneous_cpw.py
+```

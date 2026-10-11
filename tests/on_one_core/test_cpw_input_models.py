@@ -1,13 +1,16 @@
 """Tests for the cells-per-wavelength calculator model dictionaries."""
 
-from types import SimpleNamespace
-
 import numpy as np
 import pytest
 
 from spyro.tools.cells_per_wavelength_calculator import input_models
-from spyro.tools.cells_per_wavelength_calculator import AcousticCpwPhysics
-from spyro.utils.typing import VelocityProfileType
+from spyro.tools.cells_per_wavelength_calculator import (
+    AcousticHeterogeneousProblem,
+    AcousticHomogeneousProblem,
+    ElasticHeterogeneousProblem,
+    ElasticSyntheticCase,
+    MaterialFileCase,
+)
 
 METHODS = ["mass_lumped_triangle", "spectral_quadrilateral"]
 
@@ -46,30 +49,15 @@ def make_homogeneous_model(
     )
 
 
-def make_calculator_stub(**overrides) -> SimpleNamespace:
-    """Build the calculator attributes the acoustic physics reads.
-
-    Parameters
-    ----------
-    **overrides
-        Attributes replacing the defaults.
-
-    Returns
-    -------
-    SimpleNamespace
-        Stand-in for a :class:`MeshingParameterCalculator`.
-    """
-    defaults = {
-        "dimension": 2,
-        "velocity_profile_type": VelocityProfileType.HOMOGENEOUS,
-        "source_frequency": 5.0,
-        "cpw_initial": 2.8,
-        "reduced_obj_for_testing": True,
-        "fixed_timestep": None,
-        "velocity_model_file_name": None,
-    }
-    defaults.update(overrides)
-    return SimpleNamespace(**defaults)
+#: Problem parameters shared by the tests that build a problem.
+PROBLEM_PARAMETERS = {
+    "source_frequency": 5.0,
+    "dimension": 2,
+    "testing": True,
+    "reference_degree": 5,
+    "C_reference": 6.0,
+    "C_initial": 2.8,
+}
 
 
 @pytest.mark.parametrize(
@@ -173,9 +161,12 @@ def test_heterogeneous_model_sets_core_fields(
         degree=5,
         frequency=8.0,
         minimum_velocity=1.6,
-        length_z=12.0,
-        length_x=30.0,
-        velocity_model_file_name="my_model.segy",
+        case=MaterialFileCase(
+            name="my_model",
+            length_z=12.0,
+            length_x=30.0,
+            material_files={"p_wave_velocity": "my_model.segy"},
+        ),
         cells_per_wavelength=2.8,
     )
 
@@ -196,6 +187,48 @@ def test_heterogeneous_model_sets_core_fields(
     assert len(receivers) == 500
     assert tuple(receivers[0]) == pytest.approx((-0.3, 5.0))
     assert tuple(receivers[-1]) == pytest.approx((-0.3, 13.0))
+    assert model["acquisition"]["source_locations"] == [(-0.3, 3.0)]
+    assert model["time_axis"]["final_time"] == 7.5
+    assert model["time_axis"]["dt"] == 1e-4
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda case: input_models.create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
+            "spectral_quadrilateral", 4, 5.0, 1.5, case, 3.0
+        ),
+        lambda case: input_models.create_elastic_model_for_meshing_parameter_2D_heterogeneous(
+            "spectral_quadrilateral", 4, 5.0, case
+        ),
+    ],
+    ids=["acoustic", "elastic"],
+)
+def test_heterogeneous_case_overrides_acquisition_and_time_axis(build) -> None:
+    """Each acquisition or time axis value given by the case is used."""
+    case = MaterialFileCase(
+        name="custom",
+        length_z=2.0,
+        length_x=4.0,
+        material_files={
+            "p_wave_velocity": "custom_vp.segy",
+            "s_wave_velocity": "custom_vs.segy",
+            "density": "custom_rho.segy",
+        },
+        source_locations=[(-0.1, 1.0)],
+        receiver_locations=[(-1.0, 2.0), (-1.0, 3.0)],
+        final_time=0.8,
+        dt=2e-4,
+    )
+
+    model = build(case)
+
+    assert model["mesh"]["length_z"] == 2.0
+    assert model["mesh"]["length_x"] == 4.0
+    assert model["acquisition"]["source_locations"] == [(-0.1, 1.0)]
+    assert model["acquisition"]["receiver_locations"] == [(-1.0, 2.0), (-1.0, 3.0)]
+    assert model["time_axis"]["final_time"] == 0.8
+    assert model["time_axis"]["dt"] == 2e-4
 
 
 def test_periodic_model_rejects_pml() -> None:
@@ -253,12 +286,14 @@ def test_homogeneous_final_time_is_on_reference_grid(dt: float, wave: str) -> No
     assert np.isclose((num_steps - 1) * dt, final_time, rtol=0.0, atol=1e-12)
 
 
-def test_acoustic_physics_builds_homogeneous_model() -> None:
+def test_acoustic_problem_builds_homogeneous_model() -> None:
     """The reference time step is fixed, whatever the solver time step."""
-    physics = AcousticCpwPhysics({"minimum_velocity_in_the_domain": 1.5})
-    calculator = make_calculator_stub(fixed_timestep=2e-3)
+    problem = AcousticHomogeneousProblem(
+        {**PROBLEM_PARAMETERS, "minimum_velocity_in_the_domain": 1.5},
+        fixed_timestep=2e-3,
+    )
 
-    model = physics.build_dictionary(calculator, "mass_lumped_triangle", 3)
+    model = problem.model_dictionary("mass_lumped_triangle", 3)
 
     assert model["mesh"]["periodic"] is True
     assert model["acquisition"]["frequency"] == 5.0
@@ -266,17 +301,20 @@ def test_acoustic_physics_builds_homogeneous_model() -> None:
     assert len(model["acquisition"]["receiver_locations"]) == 4
 
 
-def test_acoustic_physics_builds_heterogeneous_model() -> None:
+def test_acoustic_problem_builds_heterogeneous_model() -> None:
     """The heterogeneous model reads its lengths and file from the inputs."""
-    physics = AcousticCpwPhysics(
-        {"minimum_velocity_in_the_domain": 1.5, "length_z": 3.0, "length_x": 17.0}
+    case = MaterialFileCase(
+        name="velocity",
+        length_z=3.0,
+        length_x=17.0,
+        material_files={"p_wave_velocity": "velocity.segy"},
+        minimum_velocity=1.5,
     )
-    calculator = make_calculator_stub(
-        velocity_profile_type=VelocityProfileType.HETEROGENEOUS,
-        velocity_model_file_name="velocity.segy",
+    problem = AcousticHeterogeneousProblem(
+        {**PROBLEM_PARAMETERS, "heterogeneous_case": case}
     )
 
-    model = physics.build_dictionary(calculator, "spectral_quadrilateral", 4)
+    model = problem.model_dictionary("spectral_quadrilateral", 4)
 
     assert model["mesh"]["length_z"] == 3.0
     assert model["mesh"]["length_x"] == 17.0
@@ -284,10 +322,104 @@ def test_acoustic_physics_builds_heterogeneous_model() -> None:
     assert model["synthetic_data"]["real_velocity_file"] == "velocity.segy"
 
 
-def test_acoustic_physics_rejects_3d() -> None:
-    """Only 2D acoustic models are implemented."""
-    physics = AcousticCpwPhysics({"minimum_velocity_in_the_domain": 1.5})
-    calculator = make_calculator_stub(dimension=3)
+@pytest.mark.parametrize("method", METHODS)
+def test_elastic_heterogeneous_model_sets_core_fields(method: str, tmp_path) -> None:
+    """The model has Stacey boundaries, no layer, and a deep receiver line."""
+    model = input_models.create_elastic_model_for_meshing_parameter_2D_heterogeneous(
+        method=method,
+        degree=4,
+        frequency=10.0,
+        case=ElasticSyntheticCase(name=str(tmp_path / "salt")),
+    )
 
-    with pytest.raises(NotImplementedError, match="only supports 2D"):
-        physics.build_dictionary(calculator, "spectral_quadrilateral", 4)
+    assert model["options"]["method"] == method
+    assert model["options"]["degree"] == 4
+    assert model["mesh"]["mesh_type"] == "firedrake_mesh"
+    assert model["mesh"]["periodic"] is False
+    assert model["mesh"]["length_z"] == 5.0
+    assert model["mesh"]["length_x"] == 10.0
+    abc = model["absorving_boundary_conditions"]
+    assert abc["status"] is True
+    assert abc["abc_type"] == "nrbc"
+    assert abc["nrbc"] == {"type": "Stacey", "dt_scheme": "backward"}
+
+    acquisition = model["acquisition"]
+    assert acquisition["source_locations"] == [(-0.5, 5.0)]
+    assert acquisition["delay"] == pytest.approx(0.1)
+    assert np.array_equal(acquisition["amplitude"], [0.0, 1.0])
+    receivers = np.asarray(acquisition["receiver_locations"])
+    assert receivers.shape == (40, 2)
+    assert np.allclose(receivers[:, 0], -4.0)
+    assert np.allclose(receivers[:, 1], np.arange(3.0, 7.0, 0.1))
+
+    assert model["time_axis"]["final_time"] == 2.0
+    assert model["time_axis"]["dt"] == 1e-4
+
+
+def test_elastic_heterogeneous_model_writes_material_files(tmp_path) -> None:
+    """The material SEG-Y files exist once the dictionary is returned."""
+    base_name = str(tmp_path / "salt")
+    model = input_models.create_elastic_model_for_meshing_parameter_2D_heterogeneous(
+        method="spectral_quadrilateral",
+        degree=4,
+        frequency=10.0,
+        case=ElasticSyntheticCase(name=base_name),
+    )
+
+    assert model["synthetic_data"] == {
+        "type": "file",
+        "p_wave_velocity": f"{base_name}_vp.segy",
+        "s_wave_velocity": f"{base_name}_vs.segy",
+        "density": f"{base_name}_rho.segy",
+    }
+    for parameter in ("p_wave_velocity", "s_wave_velocity", "density"):
+        assert (tmp_path / model["synthetic_data"][parameter]).is_file()
+
+
+def test_acoustic_heterogeneous_model_writes_only_p_wave_file(tmp_path) -> None:
+    """An acoustic model of an elastic material writes its P-wave velocity."""
+    base_name = str(tmp_path / "salt")
+    model = input_models.create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
+        method="spectral_quadrilateral",
+        degree=4,
+        frequency=10.0,
+        minimum_velocity=2.5,
+        case=ElasticSyntheticCase(name=base_name),
+        cells_per_wavelength=3.0,
+    )
+
+    assert model["synthetic_data"]["real_velocity_file"] == f"{base_name}_vp.segy"
+    assert [path.name for path in tmp_path.iterdir()] == ["salt_vp.segy"]
+
+
+def test_elastic_heterogeneous_model_rejects_invalid_method(tmp_path) -> None:
+    """Only the two supported methods are accepted, before writing files."""
+    with pytest.raises(ValueError, match="Method is not"):
+        input_models.create_elastic_model_for_meshing_parameter_2D_heterogeneous(
+            method="CG",
+            degree=4,
+            frequency=10.0,
+            case=ElasticSyntheticCase(name=str(tmp_path / "salt")),
+        )
+    assert not any(tmp_path.iterdir())
+
+
+def test_elastic_problem_builds_heterogeneous_model(tmp_path) -> None:
+    """The heterogeneous elastic model reads its domain and files from the case."""
+    base_name = str(tmp_path / "salt")
+    problem = ElasticHeterogeneousProblem(
+        {
+            **PROBLEM_PARAMETERS,
+            "source_frequency": 10.0,
+            "heterogeneous_case": ElasticSyntheticCase(name=base_name, length_z=3.0),
+        }
+    )
+
+    model = problem.model_dictionary("mass_lumped_triangle", 3)
+
+    assert model["options"]["method"] == "mass_lumped_triangle"
+    assert model["options"]["degree"] == 3
+    assert model["mesh"]["length_z"] == 3.0
+    assert model["mesh"]["length_x"] == 10.0
+    assert model["acquisition"]["frequency"] == 10.0
+    assert model["synthetic_data"]["s_wave_velocity"] == f"{base_name}_vs.segy"

@@ -6,6 +6,7 @@ import warnings
 import numpy as np
 
 import spyro
+from .heterogeneous_case import HeterogeneousCase
 
 #: Mesh type used for each supported finite element method.
 MESH_TYPES = {
@@ -36,6 +37,15 @@ HETEROGENEOUS_RECEIVER_OFFSETS = (2.0, 10.0)
 HETEROGENEOUS_RECEIVER_QUANTITY = 500
 HETEROGENEOUS_FINAL_TIME = 7.5
 HETEROGENEOUS_DT = 1e-4
+
+# Acquisition of the heterogeneous isotropic elastic model, in km and s.
+ELASTIC_HETEROGENEOUS_SOURCE_LOCATION = (-0.5, 5.0)
+#: Depth and horizontal span of the receiver line.
+ELASTIC_HETEROGENEOUS_RECEIVER_DEPTH = -4.0
+ELASTIC_HETEROGENEOUS_RECEIVER_X_RANGE = (3.0, 6.9)
+ELASTIC_HETEROGENEOUS_RECEIVER_QUANTITY = 40
+ELASTIC_HETEROGENEOUS_FINAL_TIME = 2.0
+ELASTIC_HETEROGENEOUS_DT = 1e-4
 
 
 def set_mesh_type(method: str) -> str:
@@ -72,6 +82,24 @@ def _warn_if_meters_per_second(velocity: float) -> None:
     """
     if velocity > METERS_PER_SECOND_THRESHOLD:
         warnings.warn("Velocity in meters per second")
+
+
+def _or_default(value: object, default: object) -> object:
+    """Return a case override, or the default when it is not given.
+
+    Parameters
+    ----------
+    value : object
+        Case override, None when not given.
+    default : object
+        Value used when ``value`` is None.
+
+    Returns
+    -------
+    object
+        ``value`` unless it is None, else ``default``.
+    """
+    return default if value is None else value
 
 
 def _round_up_to_time_step(time: float, dt: float) -> float:
@@ -317,17 +345,17 @@ def create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
     degree: int,
     frequency: float,
     minimum_velocity: float,
-    length_z: float,
-    length_x: float,
-    velocity_model_file_name: str,
+    case: HeterogeneousCase,
     cells_per_wavelength: float,
 ) -> dict:
     """Create a 2D heterogeneous acoustic model for the cpw calculator.
 
-    A source at :data:`HETEROGENEOUS_SOURCE_LOCATION` records on a line of
-    receivers at the source depth. The domain is surrounded by a PML one
+    By default, a source at :data:`HETEROGENEOUS_SOURCE_LOCATION` records on
+    a line of receivers at the source depth; the case can replace the
+    acquisition and time axis. The domain is surrounded by a PML one
     wavelength thick. The reference is numerical, so the same layer is
-    present in the reference and in every evaluated solve.
+    present in the reference and in every evaluated solve. The P-wave
+    velocity file of the case is written, if needed, before returning.
 
     Parameters
     ----------
@@ -339,12 +367,8 @@ def create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
         Ricker source peak frequency.
     minimum_velocity : float
         Minimum velocity in the domain, which sets the PML thickness.
-    length_z : float
-        Domain length in the z direction, without absorbing layer.
-    length_x : float
-        Domain length in the x direction, without absorbing layer.
-    velocity_model_file_name : str
-        Velocity model file.
+    case : HeterogeneousCase
+        Domain, material and acquisition overrides.
     cells_per_wavelength : float
         Cells-per-wavelength of the initial mesh.
 
@@ -353,27 +377,32 @@ def create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
     dict
         Spyro model dictionary for :class:`spyro.AcousticWave`.
     """
-    source_z, source_x = HETEROGENEOUS_SOURCE_LOCATION
-    first_offset, last_offset = HETEROGENEOUS_RECEIVER_OFFSETS
-    receiver_locations = spyro.create_transect(
-        (source_z, source_x + first_offset),
-        (source_z, source_x + last_offset),
-        HETEROGENEOUS_RECEIVER_QUANTITY,
-    )
+    receiver_locations = case.receiver_locations
+    if receiver_locations is None:
+        source_z, source_x = HETEROGENEOUS_SOURCE_LOCATION
+        first_offset, last_offset = HETEROGENEOUS_RECEIVER_OFFSETS
+        receiver_locations = spyro.create_transect(
+            (source_z, source_x + first_offset),
+            (source_z, source_x + last_offset),
+            HETEROGENEOUS_RECEIVER_QUANTITY,
+        )
+    material_files = case.write_material_files(("p_wave_velocity",))
 
     return _build_acoustic_model_dictionary(
         method=method,
         degree=degree,
-        length_z=length_z,
-        length_x=length_x,
-        source_locations=[HETEROGENEOUS_SOURCE_LOCATION],
+        length_z=case.length_z,
+        length_x=case.length_x,
+        source_locations=_or_default(
+            case.source_locations, [HETEROGENEOUS_SOURCE_LOCATION]
+        ),
         receiver_locations=receiver_locations,
         frequency=frequency,
-        final_time=HETEROGENEOUS_FINAL_TIME,
-        dt=HETEROGENEOUS_DT,
+        final_time=_or_default(case.final_time, HETEROGENEOUS_FINAL_TIME),
+        dt=_or_default(case.dt, HETEROGENEOUS_DT),
         pml_pad_length=minimum_velocity / frequency,
         cells_per_wavelength=cells_per_wavelength,
-        velocity_model_file_name=velocity_model_file_name,
+        velocity_model_file_name=material_files["p_wave_velocity"],
     )
 
 
@@ -497,6 +526,116 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
         },
         "visualization": {
             "forward_output": True,
+            "fwi_velocity_model_output": False,
+            "gradient_output": False,
+            "adjoint_output": False,
+            "debug_output": False,
+        },
+    }
+
+
+def create_elastic_model_for_meshing_parameter_2D_heterogeneous(
+    method: str,
+    degree: int,
+    frequency: float,
+    case: HeterogeneousCase,
+) -> dict:
+    """Create a 2D heterogeneous isotropic elastic model for the cpw calculator.
+
+    By default, a horizontal (x-direction) point force at
+    :data:`ELASTIC_HETEROGENEOUS_SOURCE_LOCATION` records on a horizontal
+    line of receivers at :data:`ELASTIC_HETEROGENEOUS_RECEIVER_DEPTH`; the
+    case can replace the acquisition and time axis. The domain has
+    first-order Stacey absorbing boundaries and no absorbing layer. The
+    reference is numerical, so the same boundaries are present in the
+    reference and in every evaluated solve.
+
+    The P-wave velocity, S-wave velocity and density files of the case are
+    written, if needed, before the dictionary is returned, and the
+    dictionary reads the material from them.
+
+    Parameters
+    ----------
+    method : str
+        Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+    degree : int
+        Spatial polynomial degree.
+    frequency : float
+        Ricker source peak frequency.
+    case : HeterogeneousCase
+        Domain, material and acquisition overrides.
+
+    Returns
+    -------
+    dict
+        Spyro model dictionary for :class:`spyro.IsotropicWave`.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not supported.
+    """
+    if method not in MESH_TYPES:
+        raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
+    receiver_locations = case.receiver_locations
+    if receiver_locations is None:
+        receiver_x_first, receiver_x_last = ELASTIC_HETEROGENEOUS_RECEIVER_X_RANGE
+        receiver_locations = spyro.create_transect(
+            (ELASTIC_HETEROGENEOUS_RECEIVER_DEPTH, receiver_x_first),
+            (ELASTIC_HETEROGENEOUS_RECEIVER_DEPTH, receiver_x_last),
+            ELASTIC_HETEROGENEOUS_RECEIVER_QUANTITY,
+        )
+    material_files = case.write_material_files(
+        ("p_wave_velocity", "s_wave_velocity", "density")
+    )
+
+    return {
+        "options": {
+            "method": method,
+            "degree": degree,
+            "dimension": 2,
+        },
+        "parallelism": {"type": "automatic"},
+        "mesh": {
+            "length_z": case.length_z,
+            "length_x": case.length_x,
+            # Uniform for both methods; its boundary ids are the ones the
+            # Stacey boundary terms integrate over
+            "mesh_type": "firedrake_mesh",
+            "periodic": False,
+        },
+        "absorving_boundary_conditions": {
+            "status": True,
+            "abc_type": "nrbc",
+            "nrbc": {"type": "Stacey", "dt_scheme": "backward"},
+        },
+        "acquisition": {
+            "source_type": "ricker",
+            "source_locations": _or_default(
+                case.source_locations, [ELASTIC_HETEROGENEOUS_SOURCE_LOCATION]
+            ),
+            "frequency": frequency,
+            "delay": 1.0 / frequency,
+            "delay_type": "time",
+            "receiver_locations": receiver_locations,
+            "amplitude": np.array([0.0, 1.0]),
+            "use_vertex_only_mesh": True,
+        },
+        "synthetic_data": {
+            "type": "file",
+            **material_files,
+        },
+        "time_axis": {
+            "initial_time": 0.0,
+            "final_time": _or_default(
+                case.final_time, ELASTIC_HETEROGENEOUS_FINAL_TIME
+            ),
+            "dt": _or_default(case.dt, ELASTIC_HETEROGENEOUS_DT),
+            "output_frequency": 1000,
+            "gradient_sampling_frequency": 1,
+        },
+        "visualization": {
+            "forward_output": False,
             "fwi_velocity_model_output": False,
             "gradient_output": False,
             "adjoint_output": False,

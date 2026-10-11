@@ -1,30 +1,95 @@
-"""Tests for the physics-generic cells-per-wavelength calculator."""
+"""Tests for the cells-per-wavelength problems, line searches and calculator."""
 
 import math
 from collections.abc import Callable
 from types import SimpleNamespace
 
+import firedrake as fire
 import numpy as np
 import pytest
 
 import spyro
 from spyro.io.time_io import interpolate_time_series
 from spyro.tools.cells_per_wavelength_calculator import (
-    CPW_PHYSICS,
-    AcousticCpwPhysics,
-    IsotropicElasticCpwPhysics,
+    ACOUSTIC,
+    CPW_PROBLEMS,
+    ISOTROPIC_ELASTIC,
     MAX_CPW,
-    ThresholdCase,
+    AcousticHeterogeneousProblem,
+    AcousticHomogeneousProblem,
+    CpwProblem,
+    ElasticHeterogeneousProblem,
+    ElasticHomogeneousProblem,
+    HeterogeneousCpwProblem,
+    MaterialFileCase,
+    ThresholdDiscretization,
+    WavePhysics,
     backward_line_search,
     forward_line_search,
 )
-from spyro.tools.cells_per_wavelength_calculator.threshold_case import (
-    _parse_threshold_case,
+from spyro.tools.cells_per_wavelength_calculator import calculator as calculator_module
+from spyro.tools.cells_per_wavelength_calculator.threshold_discretization import (
+    _parse_threshold_discretization,
+)
+from spyro.tools.cells_per_wavelength_calculator.elastic_2d_material_model import (
+    elastic_2d_material,
+)
+from spyro.tools.cells_per_wavelength_calculator.heterogeneous_cases import (
+    ElasticSyntheticCase,
 )
 from spyro.tools.cells_per_wavelength_calculator.input_models import (
     create_elastic_model_for_meshing_parameter_2D_homogeneous,
 )
 from spyro.utils.typing import VelocityProfileType, WaveType
+
+PROBLEM_CLASSES = [
+    AcousticHomogeneousProblem,
+    AcousticHeterogeneousProblem,
+    ElasticHomogeneousProblem,
+    ElasticHeterogeneousProblem,
+]
+
+
+def make_problem(problem_class: type[CpwProblem], **overrides) -> CpwProblem:
+    """Build a problem with typical settings and no file access.
+
+    A heterogeneous problem gets a case with a given minimum velocity, so
+    no material file is read.
+
+    Parameters
+    ----------
+    problem_class : type[CpwProblem]
+        Problem to build.
+    **overrides
+        Parameters replacing the defaults.
+
+    Returns
+    -------
+    CpwProblem
+        The problem.
+    """
+    parameters = {
+        "source_frequency": 5.0,
+        "dimension": 2,
+        "testing": True,
+        "minimum_velocity_in_the_domain": 1.5,
+        "p_wave_velocity": 5.6,
+        "s_wave_velocity": 2.75,
+        "density": 2.0,
+        "reference_degree": 5,
+        "C_reference": 6.0,
+        "C_initial": 3.0,
+    }
+    if issubclass(problem_class, HeterogeneousCpwProblem):
+        parameters["heterogeneous_case"] = MaterialFileCase(
+            name="velocity",
+            length_z=3.0,
+            length_x=17.0,
+            material_files={"p_wave_velocity": "velocity.segy"},
+            minimum_velocity=1.5,
+        )
+    parameters.update(overrides)
+    return problem_class(parameters)
 
 
 def make_error_function(
@@ -169,11 +234,74 @@ def test_interpolate_time_series_keeps_trailing_axes() -> None:
     assert np.allclose(interpolated[:, 1, 0], -target_time)
 
 
-def test_cpw_physics_registry() -> None:
-    """Every registered physics is keyed by the WaveType of its solver."""
-    assert CPW_PHYSICS[WaveType.ISOTROPIC_ACOUSTIC] is AcousticCpwPhysics
-    assert CPW_PHYSICS[WaveType.ISOTROPIC_ELASTIC] is IsotropicElasticCpwPhysics
-    assert IsotropicElasticCpwPhysics({"s_wave_velocity": 2.75}).wavelength_velocity == 2.75
+@pytest.mark.parametrize(
+    "wave_type, physics",
+    [
+        (WaveType.ISOTROPIC_ACOUSTIC, ACOUSTIC),
+        (WaveType.ISOTROPIC_ELASTIC, ISOTROPIC_ELASTIC),
+    ],
+)
+@pytest.mark.parametrize("profile", list(VelocityProfileType))
+def test_cpw_problems_registry(
+    wave_type: WaveType, physics: WavePhysics, profile: VelocityProfileType,
+) -> None:
+    """Every problem is keyed by its own wave physics and velocity profile."""
+    problem_class = CPW_PROBLEMS[(wave_type, profile)]
+
+    assert problem_class.physics is physics
+    assert problem_class.velocity_profile_type is profile
+
+
+@pytest.mark.parametrize(
+    "problem_class, expected",
+    [(AcousticHomogeneousProblem, 1.5), (ElasticHomogeneousProblem, 2.75)],
+)
+def test_homogeneous_minimum_wavelength_velocity(
+    problem_class: type[CpwProblem], expected: float,
+) -> None:
+    """The wavelength is the acoustic velocity, or the S-wave velocity."""
+    assert make_problem(problem_class).minimum_wavelength_velocity == expected
+
+
+@pytest.mark.parametrize("problem_class", PROBLEM_CLASSES)
+def test_problem_rejects_3d(problem_class: type[CpwProblem]) -> None:
+    """Only 2D problems are implemented."""
+    with pytest.raises(NotImplementedError, match="only supports 2D"):
+        make_problem(problem_class, dimension=3)
+
+
+@pytest.mark.parametrize("problem_class", PROBLEM_CLASSES)
+def test_problem_rejects_non_positive_mesh_frequency_factor(
+    problem_class: type[CpwProblem],
+) -> None:
+    """The meshing frequency must be a positive multiple of the peak."""
+    with pytest.raises(ValueError, match="mesh_frequency_factor must be positive"):
+        make_problem(problem_class, mesh_frequency_factor=-1.0)
+
+
+@pytest.mark.parametrize(
+    "problem_class, case",
+    [
+        (AcousticHomogeneousProblem, ElasticSyntheticCase()),
+        (ElasticHomogeneousProblem, ElasticSyntheticCase()),
+        (AcousticHeterogeneousProblem, None),
+        (ElasticHeterogeneousProblem, None),
+    ],
+)
+def test_problem_matches_case_to_profile(
+    problem_class: type[CpwProblem], case: ElasticSyntheticCase | None,
+) -> None:
+    """Only heterogeneous problems have a heterogeneous case."""
+    with pytest.raises(ValueError, match="heterogeneous_case should be given"):
+        make_problem(problem_class, heterogeneous_case=case)
+
+
+def test_calculator_rejects_unregistered_problem(monkeypatch) -> None:
+    """A wave and profile type pair with no problem is not implemented."""
+    monkeypatch.setattr(calculator_module, "CPW_PROBLEMS", {})
+
+    with pytest.raises(NotImplementedError, match="No cells-per-wavelength problem"):
+        spyro.tools.MeshingParameterCalculator({"source_frequency": 5.0})
 
 
 def test_elastic_model_geometry_avoids_periodic_images() -> None:
@@ -278,7 +406,6 @@ def test_elastic_cpw_search_meets_threshold() -> None:
         "s_wave_velocity": 2.75,
         "density": 2.0,
         "velocity_profile_type": "homogeneous",
-        "velocity_model_file_name": None,
         "FEM_method_to_evaluate": "mass_lumped_triangle",
         "dimension": 2,
         "receiver_setup": "line",
@@ -410,39 +537,41 @@ def test_backward_line_search_uses_default_max_cpw() -> None:
     [
         (None, None),
         (False, None),
-        (True, ThresholdCase("spectral_quadrilateral", 4, 2.0)),
-        ({"cpw": 3.0}, ThresholdCase("spectral_quadrilateral", 4, 3.0)),
+        (True, ThresholdDiscretization("spectral_quadrilateral", 4, 2.0)),
+        ({"cpw": 3.0}, ThresholdDiscretization("spectral_quadrilateral", 4, 3.0)),
         (
-            ThresholdCase("mass_lumped_triangle", 2, 5.0),
-            ThresholdCase("mass_lumped_triangle", 2, 5.0),
+            ThresholdDiscretization("mass_lumped_triangle", 2, 5.0),
+            ThresholdDiscretization("mass_lumped_triangle", 2, 5.0),
         ),
     ],
 )
-def test_parse_threshold_case(
-    value: bool | dict | ThresholdCase | None, expected: ThresholdCase | None,
+def test_parse_threshold_discretization(
+    value: bool | dict | ThresholdDiscretization | None,
+    expected: ThresholdDiscretization | None,
 ) -> None:
-    """The threshold case parameter defaults to P4 quadrilaterals at cpw 2."""
-    assert _parse_threshold_case(value) == expected
+    """The threshold discretization defaults to P4 quadrilaterals at cpw 2."""
+    assert _parse_threshold_discretization(value) == expected
 
 
 @pytest.mark.parametrize("value", [{"order": 4}, 4.0])
-def test_parse_threshold_case_rejects_bad_values(value: dict | float) -> None:
+def test_parse_threshold_discretization_rejects_bad_values(
+    value: dict | float,
+) -> None:
     """Unknown keys and unsupported types are rejected."""
     with pytest.raises(TypeError):
-        _parse_threshold_case(value)
+        _parse_threshold_discretization(value)
 
 
 @pytest.mark.parametrize(
     "threshold_settings",
-    [{}, {"accepted_error_threshold": 0.05, "threshold_case": True}],
+    [{}, {"accepted_error_threshold": 0.05, "threshold_discretization": True}],
 )
 def test_calculator_needs_exactly_one_threshold(threshold_settings: dict) -> None:
-    """A threshold is given directly or through a threshold case, not both."""
+    """A threshold is given directly or by a discretization, not both."""
     parameters = {
         "source_frequency": 5.0,
         "minimum_velocity_in_the_domain": 1.5,
         "velocity_profile_type": "homogeneous",
-        "velocity_model_file_name": None,
         "FEM_method_to_evaluate": "mass_lumped_triangle",
         "dimension": 2,
         "receiver_setup": "near",
@@ -453,57 +582,16 @@ def test_calculator_needs_exactly_one_threshold(threshold_settings: dict) -> Non
         spyro.tools.MeshingParameterCalculator(parameters)
 
 
-def make_calculator_stub(
-    wave_type: WaveType, method: str, degree: int,
-) -> SimpleNamespace:
-    """Build the calculator attributes the physics dictionary builders read.
-
-    Parameters
-    ----------
-    wave_type : WaveType
-        Physics whose dictionary is built.
-    method : str
-        Method under evaluation by the calculator.
-    degree : int
-        Degree under evaluation by the calculator.
-
-    Returns
-    -------
-    SimpleNamespace
-        Stand-in for a :class:`MeshingParameterCalculator`.
-    """
-    velocity = 1.5 if wave_type is WaveType.ISOTROPIC_ACOUSTIC else 2.75
-    return SimpleNamespace(
-        dimension=2,
-        velocity_profile_type=VelocityProfileType.HOMOGENEOUS,
-        minimum_velocity=velocity,
-        source_frequency=5.0,
-        cpw_initial=3.0,
-        FEM_method_to_evaluate=method,
-        desired_degree=degree,
-        reduced_obj_for_testing=True,
-        fixed_timestep=None,
-    )
-
-
 @pytest.mark.parametrize(
-    "wave_type, parameters",
-    [
-        (WaveType.ISOTROPIC_ACOUSTIC, {"minimum_velocity_in_the_domain": 1.5}),
-        (
-            WaveType.ISOTROPIC_ELASTIC,
-            {"p_wave_velocity": 5.6, "s_wave_velocity": 2.75, "density": 2.0},
-        ),
-    ],
+    "problem_class", [AcousticHomogeneousProblem, ElasticHomogeneousProblem]
 )
-def test_physics_builds_dictionary_for_requested_discretization(
-    wave_type: WaveType, parameters: dict,
+def test_problem_builds_dictionary_for_requested_discretization(
+    problem_class: type[CpwProblem],
 ) -> None:
-    """The threshold case can use a method and degree the search does not."""
-    physics = CPW_PHYSICS[wave_type](parameters)
-    calculator = make_calculator_stub(wave_type, "mass_lumped_triangle", 2)
+    """The threshold discretization can use a method and degree the search does not."""
+    problem = make_problem(problem_class)
 
-    dictionary = physics.build_dictionary(calculator, "spectral_quadrilateral", 4)
+    dictionary = problem.model_dictionary("spectral_quadrilateral", 4)
 
     assert dictionary["options"]["method"] == "spectral_quadrilateral"
     assert dictionary["options"]["degree"] == 4
@@ -516,7 +604,6 @@ def test_calculator_rejects_non_positive_mesh_frequency_factor() -> None:
         "source_frequency": 5.0,
         "minimum_velocity_in_the_domain": 1.5,
         "velocity_profile_type": "homogeneous",
-        "velocity_model_file_name": None,
         "mesh_frequency_factor": 0.0,
     }
 
@@ -525,27 +612,20 @@ def test_calculator_rejects_non_positive_mesh_frequency_factor() -> None:
 
 
 @pytest.mark.parametrize("factor", [1.0, 2.0, 2.5])
-@pytest.mark.parametrize(
-    "profile", [VelocityProfileType.HOMOGENEOUS, VelocityProfileType.HETEROGENEOUS]
-)
+@pytest.mark.parametrize("problem_class", PROBLEM_CLASSES)
 def test_mesh_frequency_factor_scales_mesh_size(
-    factor: float, profile: VelocityProfileType,
+    factor: float, problem_class: type[CpwProblem],
 ) -> None:
     """A cpw refers to the wavelength at ``factor`` times the peak frequency."""
-    velocity, frequency, cpw = 1.5, 5.0, 3.0
+    frequency, cpw = 5.0, 3.0
+    problem = make_problem(
+        problem_class, source_frequency=frequency, mesh_frequency_factor=factor
+    )
+    velocity = problem.minimum_wavelength_velocity
     requested = {}
 
     class RecordingWave:
         """Records the mesh request instead of building a mesh."""
-
-        def __init__(self, dictionary: dict) -> None:
-            """Accept and ignore the model dictionary.
-
-            Parameters
-            ----------
-            dictionary : dict
-                Spyro model dictionary.
-            """
 
         def set_mesh(self, input_mesh_parameters: dict) -> None:
             """Record the mesh parameters.
@@ -553,37 +633,23 @@ def test_mesh_frequency_factor_scales_mesh_size(
             Parameters
             ----------
             input_mesh_parameters : dict
-                Mesh parameters passed by the calculator.
+                Mesh parameters passed by the problem.
             """
             requested.update(input_mesh_parameters)
 
-    def record_edge_length(wave: RecordingWave, edge_length: float) -> None:
-        """Record the edge length of a homogeneous mesh.
+        def set_initial_velocity_model(self, constant: float) -> None:
+            """Accept and ignore a constant velocity.
 
-        Parameters
-        ----------
-        wave : RecordingWave
-            Wave object being set up.
-        edge_length : float
-            Mesh edge length requested by the calculator.
-        """
-        requested["edge_length"] = edge_length
+            Parameters
+            ----------
+            constant : float
+                Constant velocity set by the problem.
+            """
 
-    calculator = SimpleNamespace(
-        initial_dictionary={},
-        velocity_profile_type=profile,
-        minimum_velocity=velocity,
-        mesh_frequency_factor=factor,
-        mesh_frequency=factor * frequency,
-        physics=SimpleNamespace(
-            wave_class=RecordingWave, setup_homogeneous_wave=record_edge_length
-        ),
-    )
-
-    spyro.tools.MeshingParameterCalculator.build_current_object(calculator, cpw)
+    problem.setup_wave(RecordingWave(), cpw)
 
     # The mesher turns cells_per_wavelength into velocity / (frequency * cpw)
-    if profile is VelocityProfileType.HOMOGENEOUS:
+    if "edge_length" in requested:
         edge_length = requested["edge_length"]
     else:
         edge_length = velocity / (frequency * requested["cells_per_wavelength"])
@@ -604,24 +670,158 @@ def test_interpolate_time_series_applies_time_shift() -> None:
 
 
 @pytest.mark.parametrize(
-    "physics, profile, expected_steps",
+    "problem_class, expected_steps",
     [
-        (AcousticCpwPhysics, VelocityProfileType.HOMOGENEOUS, 1.0),
-        (AcousticCpwPhysics, VelocityProfileType.HETEROGENEOUS, 0.0),
-        (IsotropicElasticCpwPhysics, VelocityProfileType.HOMOGENEOUS, 0.0),
+        (AcousticHomogeneousProblem, 1.0),
+        (AcousticHeterogeneousProblem, 0.0),
+        (ElasticHomogeneousProblem, 0.0),
+        (ElasticHeterogeneousProblem, 0.0),
     ],
 )
 def test_reference_time_shift(
-    physics: type,
-    profile: VelocityProfileType,
-    expected_steps: float,
+    problem_class: type[CpwProblem], expected_steps: float,
 ) -> None:
     """Only analytical acoustic references are shifted one solver step."""
-    calculator = SimpleNamespace(physics=physics({}), velocity_profile_type=profile)
     wave = SimpleNamespace(dt=2e-3)
 
-    shift = spyro.tools.MeshingParameterCalculator._reference_time_shift(
-        calculator, wave
-    )
+    shift = make_problem(problem_class).reference_time_shift(wave)
 
     assert np.isclose(shift, expected_steps * wave.dt)
+
+
+@pytest.mark.parametrize(
+    "problem_class, expected",
+    [
+        (AcousticHomogeneousProblem, "acoustic_homogeneous_cpw_reference.npy"),
+        (AcousticHeterogeneousProblem, "acoustic_heterogeneous_cpw_reference.npy"),
+        (ElasticHomogeneousProblem, "elastic_homogeneous_cpw_reference.npy"),
+        (ElasticHeterogeneousProblem, "elastic_heterogeneous_cpw_reference.npy"),
+    ],
+)
+def test_default_reference_file(
+    problem_class: type[CpwProblem], expected: str,
+) -> None:
+    """The default reference file is named after the physics and profile."""
+    assert make_problem(problem_class).default_reference_file() == expected
+
+
+def test_homogeneous_reference_is_analytical(monkeypatch) -> None:
+    """A homogeneous reference is the analytical data of the initial wave."""
+    problem = make_problem(ElasticHomogeneousProblem)
+    initial_wave = SimpleNamespace()
+    reference = np.ones((3, 2, 2))
+    monkeypatch.setattr(
+        problem,
+        "analytical_solution",
+        lambda wave: reference if wave is initial_wave else None,
+    )
+
+    assert problem.reference_solution(initial_wave, "mass_lumped_triangle") is reference
+
+
+def test_heterogeneous_reference_uses_reference_discretization(monkeypatch) -> None:
+    """A heterogeneous reference is solved at the reference degree and cpw."""
+    problem = make_problem(AcousticHeterogeneousProblem)
+    reference = np.ones((3, 2))
+    built = {}
+
+    def build_wave(dictionary: dict, cpw: float) -> SimpleNamespace:
+        """Record the reference discretization instead of building a wave.
+
+        Parameters
+        ----------
+        dictionary : dict
+            Model dictionary of the reference.
+        cpw : float
+            Cells-per-wavelength of the reference.
+
+        Returns
+        -------
+        SimpleNamespace
+            Stand-in wave whose solve returns ``reference``.
+        """
+        built.update(dictionary, cpw=cpw)
+        return SimpleNamespace(
+            forward_solve=lambda: None, forward_solution_receivers=reference
+        )
+
+    monkeypatch.setattr(
+        problem,
+        "model_dictionary",
+        lambda method, degree: {"method": method, "degree": degree},
+    )
+    monkeypatch.setattr(problem, "build_wave", build_wave)
+
+    result = problem.reference_solution(None, "mass_lumped_triangle")
+
+    assert result is reference
+    assert built == {"method": "mass_lumped_triangle", "degree": 5, "cpw": 6.0}
+
+
+def test_reference_solution_saves_and_loads_default_file(
+    tmp_path, monkeypatch,
+) -> None:
+    """A saved reference is found again by a later load with no file name."""
+    monkeypatch.chdir(tmp_path)
+    reference = np.arange(6.0).reshape(3, 2)
+    calculator = SimpleNamespace(
+        reference_solution_file=make_problem(
+            AcousticHomogeneousProblem
+        ).default_reference_file(),
+        save_reference=True,
+        load_reference=False,
+        initial_wave=None,
+        FEM_method_to_evaluate="mass_lumped_triangle",
+        problem=SimpleNamespace(
+            reference_solution=lambda initial_wave, method: reference
+        ),
+    )
+
+    spyro.tools.MeshingParameterCalculator.get_reference_solution(calculator)
+    assert (tmp_path / "acoustic_homogeneous_cpw_reference.npy").is_file()
+
+    calculator.save_reference = False
+    calculator.load_reference = True
+    calculator.problem = None
+    loaded = spyro.tools.MeshingParameterCalculator.get_reference_solution(calculator)
+    assert np.array_equal(loaded, reference)
+
+
+@pytest.mark.parametrize("method", ["mass_lumped_triangle", "spectral_quadrilateral"])
+def test_elastic_heterogeneous_setup_meshes_and_reads_material(
+    method: str, tmp_path,
+) -> None:
+    """The mesh is sized by the minimum S-wavelength; the material is read."""
+    frequency, factor, cpw = 10.0, 2.0, 0.1
+    minimum_s_wave_velocity = 1.2
+    problem = make_problem(
+        ElasticHeterogeneousProblem,
+        heterogeneous_case=ElasticSyntheticCase(name=str(tmp_path / "salt")),
+        source_frequency=frequency,
+        mesh_frequency_factor=factor,
+    )
+
+    wave = problem.build_wave(problem.model_dictionary(method, 2), cpw)
+    wave.initialize_physical_parameters()
+
+    edge_length = minimum_s_wave_velocity / (factor * frequency * cpw)
+    cells_per_square = 1 if method == "spectral_quadrilateral" else 2
+    expected_cells = (
+        cells_per_square * round(5.0 / edge_length) * round(10.0 / edge_length)
+    )
+    assert wave.mesh.num_cells() == expected_cells
+
+    # The file values match the material model at the nodes
+    space = wave.c_s.function_space()
+    coordinates = fire.Function(
+        fire.VectorFunctionSpace(wave.mesh, space.ufl_element())
+    ).interpolate(wave.mesh.coordinates).dat.data_ro
+    expected = elastic_2d_material(coordinates[:, 0], coordinates[:, 1], 10.0)
+    for parameter, values in [
+        ("p_wave_velocity", wave.c),
+        ("s_wave_velocity", wave.c_s),
+        ("density", wave.rho),
+    ]:
+        # Interface nodes may pick either side of the sampled grid
+        mismatch = ~np.isclose(values.dat.data_ro, expected[parameter], atol=1e-3)
+        assert mismatch.mean() < 0.05, parameter

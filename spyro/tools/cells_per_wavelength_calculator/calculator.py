@@ -1,21 +1,16 @@
-"""Find the minimum cells-per-wavelength meshing parameter for a wave physics."""
+"""Find the minimum cells-per-wavelength meshing parameter of a wave problem."""
 
 import copy
 import time
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import numpy as np
 
 import spyro
 from .line_search import LINE_SEARCHES, MAX_CPW
-from .threshold_case import _parse_threshold_case
+from .problems import CPW_PROBLEMS
+from .threshold_discretization import _parse_threshold_discretization
 from ..error_measure import MeasureError
-from .input_models import (
-    create_acoustic_model_for_meshing_parameter_2D_heterogeneous,
-    create_acoustic_model_for_meshing_parameter_2D_homogeneous,
-    create_elastic_model_for_meshing_parameter_2D_homogeneous,
-)
 from ...io.time_io import interpolate_time_series
 from ...mpi.spyro_mpi import SpyroEnsemble
 from ...solvers.wave import Wave
@@ -50,353 +45,13 @@ class CpwEvaluation:
     runtime: float
 
 
-class CpwPhysics(ABC):
-    """Wave-physics-specific part of the cells-per-wavelength calculator.
-
-    A new physics is supported by subclassing this and registering it in
-    :data:`CPW_PHYSICS` under its :class:`~spyro.utils.typing.WaveType`.
-
-    Attributes
-    ----------
-    parameters_dictionary : dict
-        The calculator parameters dictionary.
-    wave_class : type[Wave]
-        Wave solver class built for every forward solve.
-    has_displacement : bool
-        Whether receiver data has a trailing direction axis.
-    shift_analytical_reference : bool
-        Whether the analytical reference is shifted one solver step when
-        resampled, to match the receiver time convention.
-    """
-
-    wave_class: type[Wave]
-    has_displacement: bool
-    shift_analytical_reference: bool
-
-    def __init__(self, parameters_dictionary: dict) -> None:
-        """Store the parameters dictionary.
-
-        Parameters
-        ----------
-        parameters_dictionary : dict
-            The calculator parameters dictionary.
-        """
-        self.parameters_dictionary = parameters_dictionary
-
-    @property
-    @abstractmethod
-    def wavelength_velocity(self) -> float:
-        """Velocity whose wavelength the cells-per-wavelength refers to.
-
-        Returns
-        -------
-        float
-            The minimum propagation velocity of the physics.
-        """
-
-    @abstractmethod
-    def build_dictionary(
-        self, calculator: "MeshingParameterCalculator", method: str, degree: int
-    ) -> dict:
-        """Build the model dictionary of a wave object.
-
-        Parameters
-        ----------
-        calculator : MeshingParameterCalculator
-            The calculator, providing the shared search settings.
-        method : str
-            Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
-        degree : int
-            Spatial polynomial degree.
-
-        Returns
-        -------
-        dict
-            Spyro model dictionary for :attr:`wave_class`.
-        """
-
-    @abstractmethod
-    def setup_homogeneous_wave(self, wave: Wave, edge_length: float) -> None:
-        """Build the mesh and the constant material of a homogeneous model.
-
-        Parameters
-        ----------
-        wave : Wave
-            Wave object to set up.
-        edge_length : float
-            Mesh edge length.
-        """
-
-    @abstractmethod
-    def analytical_solution(self, wave: Wave) -> np.ndarray:
-        """Compute the analytical receiver data of the homogeneous model.
-
-        Parameters
-        ----------
-        wave : Wave
-            Wave object holding the acquisition and time axis.
-
-        Returns
-        -------
-        np.ndarray
-            Receiver data sampled at ``wave.dt``, shaped like
-            ``wave.forward_solution_receivers``.
-        """
-
-
-class AcousticCpwPhysics(CpwPhysics):
-    """Isotropic acoustic physics for the cells-per-wavelength calculator."""
-
-    wave_class = spyro.AcousticWave
-    has_displacement = False
-    shift_analytical_reference = True
-
-    @property
-    def wavelength_velocity(self) -> float:
-        """Minimum acoustic velocity in the domain.
-
-        Returns
-        -------
-        float
-            The ``"minimum_velocity_in_the_domain"`` parameter.
-        """
-        return self.parameters_dictionary["minimum_velocity_in_the_domain"]
-
-    def build_dictionary(
-        self, calculator: "MeshingParameterCalculator", method: str, degree: int
-    ) -> dict:
-        """Build the acoustic model dictionary.
-
-        Parameters
-        ----------
-        calculator : MeshingParameterCalculator
-            The calculator, providing the shared search settings.
-        method : str
-            Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
-        degree : int
-            Spatial polynomial degree.
-
-        Returns
-        -------
-        dict
-            Spyro model dictionary for :class:`spyro.AcousticWave`.
-
-        Raises
-        ------
-        NotImplementedError
-            For 3D models.
-        """
-        if calculator.dimension != 2:
-            raise NotImplementedError("Acoustic cpw calculation only supports 2D.")
-
-        if calculator.velocity_profile_type is VelocityProfileType.HOMOGENEOUS:
-            return create_acoustic_model_for_meshing_parameter_2D_homogeneous(
-                method=method,
-                degree=degree,
-                frequency=calculator.source_frequency,
-                velocity=self.wavelength_velocity,
-                reduced=calculator.reduced_obj_for_testing,
-            )
-        return create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
-            method=method,
-            degree=degree,
-            frequency=calculator.source_frequency,
-            minimum_velocity=self.wavelength_velocity,
-            length_z=self.parameters_dictionary["length_z"],
-            length_x=self.parameters_dictionary["length_x"],
-            velocity_model_file_name=calculator.velocity_model_file_name,
-            cells_per_wavelength=calculator.cpw_initial,
-        )
-
-    def setup_homogeneous_wave(self, wave: Wave, edge_length: float) -> None:
-        """Build a periodic mesh and set a constant velocity.
-
-        Parameters
-        ----------
-        wave : Wave
-            Wave object to set up.
-        edge_length : float
-            Mesh edge length.
-        """
-        wave.set_mesh(
-            input_mesh_parameters={"edge_length": edge_length, "periodic": True}
-        )
-        wave.set_initial_velocity_model(constant=self.wavelength_velocity)
-
-    def analytical_solution(self, wave: Wave) -> np.ndarray:
-        """Compute the acoustic analytical receiver data.
-
-        Parameters
-        ----------
-        wave : Wave
-            Wave object holding the acquisition and time axis.
-
-        Returns
-        -------
-        np.ndarray
-            Pressure at the receivers, shaped ``(n_time, n_receivers)``.
-        """
-        velocity = self.wavelength_velocity
-        num_t = round(wave.final_time / wave.dt) + 1
-        analytical = np.zeros((num_t, wave.number_of_receivers))
-        source = np.asarray(wave.source_locations[0])
-        for i, receiver in enumerate(wave.receiver_locations):
-            offset = np.linalg.norm(np.asarray(receiver) - source)
-            analytical[:, i] = spyro.utils.nodal_homogeneous_analytical(
-                wave, offset, velocity
-            )
-        return analytical
-
-
-class IsotropicElasticCpwPhysics(CpwPhysics):
-    """Isotropic elastic physics for the cells-per-wavelength calculator.
-
-    The parameters dictionary must hold ``"p_wave_velocity"``,
-    ``"s_wave_velocity"`` and ``"density"``. The wavelength is the
-    S-wavelength.
-    """
-
-    wave_class = spyro.IsotropicWave
-    has_displacement = True
-    # The elastic analytical solution is already shifted one reference step
-    shift_analytical_reference = False
-
-    @property
-    def wavelength_velocity(self) -> float:
-        """S-wave velocity, the slowest elastic body wave.
-
-        Returns
-        -------
-        float
-            The ``"s_wave_velocity"`` parameter.
-        """
-        return self.parameters_dictionary["s_wave_velocity"]
-
-    def build_dictionary(
-        self, calculator: "MeshingParameterCalculator", method: str, degree: int
-    ) -> dict:
-        """Build the isotropic elastic model dictionary.
-
-        Parameters
-        ----------
-        calculator : MeshingParameterCalculator
-            The calculator, providing the shared search settings.
-        method : str
-            Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
-        degree : int
-            Spatial polynomial degree.
-
-        Returns
-        -------
-        dict
-            Spyro model dictionary for :class:`spyro.IsotropicWave`.
-
-        Raises
-        ------
-        NotImplementedError
-            For heterogeneous or 3D models.
-        """
-        if calculator.velocity_profile_type is not VelocityProfileType.HOMOGENEOUS:
-            raise NotImplementedError(
-                "Elastic cpw calculation only supports homogeneous models."
-            )
-        if calculator.dimension != 2:
-            raise NotImplementedError("Elastic cpw calculation only supports 2D.")
-
-        frequency = calculator.source_frequency
-        dt = calculator.fixed_timestep
-        if dt is None:
-            # Fine enough that interpolating onto the solver dt is negligible
-            dt = 1.0 / (500.0 * frequency)
-
-        return create_elastic_model_for_meshing_parameter_2D_homogeneous(
-            method=method,
-            degree=degree,
-            frequency=frequency,
-            p_wave_velocity=self.parameters_dictionary["p_wave_velocity"],
-            s_wave_velocity=self.wavelength_velocity,
-            density=self.parameters_dictionary["density"],
-            dt=dt,
-            reduced=calculator.reduced_obj_for_testing,
-        )
-
-    def setup_homogeneous_wave(self, wave: Wave, edge_length: float) -> None:
-        """Build a periodic mesh; the material comes from the dictionary.
-
-        Parameters
-        ----------
-        wave : Wave
-            Wave object to set up.
-        edge_length : float
-            Mesh edge length.
-        """
-        wave.set_mesh(
-            input_mesh_parameters={"edge_length": edge_length, "periodic": True}
-        )
-
-    def analytical_solution(self, wave: Wave) -> np.ndarray:
-        """Compute the 2D point-force analytical receiver displacement.
-
-        Parameters
-        ----------
-        wave : Wave
-            Wave object holding the acquisition and time axis.
-
-        Returns
-        -------
-        np.ndarray
-            Displacement at the receivers, shaped
-            ``(n_time, n_receivers, 2)``.
-
-        Raises
-        ------
-        ValueError
-            If the source amplitude is not aligned with a single axis.
-        """
-        amplitude = np.asarray(wave.amplitude, dtype=float)
-        force_directions = np.flatnonzero(amplitude)
-        if len(force_directions) != 1:
-            raise ValueError(
-                "The analytical elastic solution needs a source amplitude "
-                f"along a single axis, got {amplitude}."
-            )
-        force_direction = int(force_directions[0])
-
-        num_t = round(wave.final_time / wave.dt) + 1
-        analytical = np.zeros((num_t, wave.number_of_receivers, wave.dimension))
-        source = np.asarray(wave.source_locations[0])
-        for i, receiver in enumerate(wave.receiver_locations):
-            components = spyro.utils.analytical_solution_elastic(
-                source_type="force_source",
-                offsets=source - np.asarray(receiver),
-                p_wave_velocity=self.parameters_dictionary["p_wave_velocity"],
-                s_wave_velocity=self.wavelength_velocity,
-                density=self.parameters_dictionary["density"],
-                amplitude=amplitude[force_direction],
-                frequency=wave.frequency,
-                time_delay=wave.delay,
-                final_time=wave.final_time,
-                dt=wave.dt,
-                force_direction=force_direction,
-                dimension=wave.dimension,
-            )
-            analytical[:, i, :] = np.column_stack(components)
-        return analytical
-
-
-#: Cells-per-wavelength physics, selected by the ``"wave_type"`` parameter.
-CPW_PHYSICS: dict[WaveType, type[CpwPhysics]] = {
-    WaveType.ISOTROPIC_ACOUSTIC: AcousticCpwPhysics,
-    WaveType.ISOTROPIC_ELASTIC: IsotropicElasticCpwPhysics,
-}
-
-
 class MeshingParameterCalculator:
     """Calculate the minimum meshing parameter C (cells-per-wavelength).
 
-    The physics is chosen by the optional ``"wave_type"`` parameter, a
+    The wave problem is chosen by the optional ``"wave_type"`` parameter, a
     :class:`~spyro.utils.typing.WaveType` defaulting to
-    ``WaveType.ISOTROPIC_ACOUSTIC``. See :data:`CPW_PHYSICS`.
+    ``WaveType.ISOTROPIC_ACOUSTIC``, and the ``"velocity_profile_type"``
+    parameter. See :data:`~.problems.CPW_PROBLEMS`.
 
     Attributes
     ----------
@@ -404,43 +59,29 @@ class MeshingParameterCalculator:
         All the parameters needed for the calculation.
     wave_type : WaveType
         The wave physics being evaluated.
-    physics : CpwPhysics
-        The physics-specific part of the calculation.
-    source_frequency : float
-        Source (Ricker peak) frequency in Hz.
-    mesh_frequency_factor : float
-        Ratio of the meshing frequency to ``source_frequency``.
-    mesh_frequency : float
-        Frequency in Hz whose wavelength every cells-per-wavelength value
-        refers to, ``mesh_frequency_factor * source_frequency``.
-    minimum_velocity : float
-        Velocity whose wavelength the cpw refers to, in km/s. The minimum
-        velocity for acoustic, the S-wave velocity for elastic.
     velocity_profile_type : VelocityProfileType
         Homogeneous (analytical reference) or heterogeneous (numerical
         reference).
-    velocity_model_file_name : str or None
-        Velocity model file of a heterogeneous model.
+    timestep_calculation : TimeStepCalculationType
+        How the time step of each forward solve is chosen.
+    fixed_timestep : float or None
+        Time step when ``timestep_calculation`` is ``FIXED``.
+    problem : CpwProblem
+        The wave problem solved at every cells-per-wavelength.
     FEM_method_to_evaluate : str
         Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
-    dimension : int
-        Spatial dimension, 2 or 3.
     receiver_setup : str
         Receiver setup, ``"near"``, ``"line"`` or ``"far"``.
     accepted_error_threshold : float
         Largest receiver error accepted. Given directly, or the error of
-        ``threshold_case``.
-    threshold_case : ThresholdCase or None
+        ``threshold_discretization``.
+    threshold_discretization : ThresholdDiscretization or None
         Discretization whose error sets ``accepted_error_threshold``, or
         None if the threshold is given directly.
-    threshold_case_evaluation : CpwEvaluation or None
-        The forward solve of ``threshold_case``.
+    threshold_evaluation : CpwEvaluation or None
+        The forward solve of ``threshold_discretization``.
     desired_degree : int
         Polynomial degree the cpw is calculated for.
-    reference_degree : int or None
-        Polynomial degree of a heterogeneous numerical reference.
-    cpw_reference : float or None
-        Cells-per-wavelength of a heterogeneous numerical reference.
     cpw_initial : float
         Starting cells-per-wavelength. Must meet the error threshold for a
         backward search and exceed it for a forward search.
@@ -450,26 +91,24 @@ class MeshingParameterCalculator:
         Largest cells-per-wavelength evaluated.
     search_direction : CpwSearchDirection
         Direction of the line search run by :meth:`find_minimum`.
-    reduced_obj_for_testing : bool
-        Use a smaller receiver set, for testing.
-    save_reference : bool
-        Save the reference solution to ``reference_solution.npy``.
-    load_reference : bool
-        Load the reference solution from ``"reference_solution_file"``.
-    timestep_calculation : TimeStepCalculationType
-        How the time step of each forward solve is chosen.
-    fixed_timestep : float or None
-        Time step when ``timestep_calculation`` is ``FIXED``.
     search_history : list of CpwEvaluation
         Every forward solve of the last :meth:`find_minimum` call.
+    save_reference : bool
+        Save the reference solution to ``reference_solution_file``.
+    load_reference : bool
+        Load the reference solution from ``reference_solution_file``.
+    reference_solution_file : str
+        File the reference is saved to or loaded from. Defaults to
+        :meth:`CpwProblem.default_reference_file`, e.g.
+        ``"acoustic_homogeneous_cpw_reference.npy"``.
     initial_dictionary : dict
-        Model dictionary of the initial guess object.
-    initial_guess_object : Wave
+        Model dictionary of the discretization under evaluation.
+    initial_wave : Wave
         Wave object built from ``initial_dictionary``.
     comm : SpyroEnsemble
         The MPI communicator.
     reference_solution : np.ndarray
-        Receiver data of the reference, sampled at the initial object's dt.
+        Receiver data of the reference, sampled at the initial wave's dt.
     """
 
     def __init__(self, parameters_dictionary: dict) -> None:
@@ -487,24 +126,31 @@ class MeshingParameterCalculator:
               of ``"source_frequency"``, e.g. 2.0 (about 90% of the Ricker
               energy) or 2.5 (close to its maximum frequency). Default is
               1.0, the peak frequency.
-            - ``"minimum_velocity_in_the_domain"``: float, acoustic only.
+            - ``"minimum_velocity_in_the_domain"``: float, homogeneous
+              acoustic only.
             - ``"p_wave_velocity"``, ``"s_wave_velocity"``, ``"density"``:
-              float, elastic only.
+              float, homogeneous elastic only.
+            - ``"heterogeneous_case"``: HeterogeneousCase, heterogeneous
+              only. Its domain, material and any acquisition or time axis
+              overrides. See
+              :class:`~.heterogeneous_case.HeterogeneousCase`.
             - ``"velocity_profile_type"``: ``"homogeneous"`` or
-              ``"heterogeneous"``.
-            - ``"velocity_model_file_name"``: str or None.
+              ``"heterogeneous"``, optional. Default is heterogeneous when
+              ``"heterogeneous_case"`` is given, else homogeneous.
             - ``"FEM_method_to_evaluate"``: str.
             - ``"dimension"``: int.
             - ``"receiver_setup"``: str.
             - ``"accepted_error_threshold"``: float. Exactly one of this
-              and ``"threshold_case"`` must be given.
-            - ``"threshold_case"``: True, dict or ThresholdCase, optional.
-              Use the error of this discretization as the threshold. True
-              is a degree 4 ``"spectral_quadrilateral"`` at cpw 2.0, and a
-              dict overrides fields of :class:`~.threshold_case.ThresholdCase`.
+              and ``"threshold_discretization"`` must be given.
+            - ``"threshold_discretization"``: True, dict or
+              ThresholdDiscretization, optional. Use the error of this
+              discretization as the threshold. True is a degree 4
+              ``"spectral_quadrilateral"`` at cpw 2.0, and a dict overrides
+              fields of
+              :class:`~.threshold_discretization.ThresholdDiscretization`.
             - ``"desired_degree"``: int.
             - ``"reference_degree"``, ``"C_reference"``: heterogeneous
-              reference settings.
+              only, numerical reference settings.
             - ``"C_initial"``, ``"C_accuracy"``: float, search settings.
             - ``"C_max"``: float, optional. Largest cells-per-wavelength
               evaluated. Default is :data:`MAX_CPW`.
@@ -514,14 +160,19 @@ class MeshingParameterCalculator:
               ``"estimate"`` or ``"float"``, with ``"time-step"`` for the
               latter.
             - ``"testing"``, ``"save_reference"``, ``"load_reference"``,
-              ``"reference_solution_file"``: optional.
+              ``"reference_solution_file"``: optional. The reference file
+              defaults to ``"<physics>_<profile>_cpw_reference.npy"``, e.g.
+              ``"acoustic_homogeneous_cpw_reference.npy"``.
 
         Raises
         ------
+        NotImplementedError
+            If no problem is registered for the wave and profile types.
         ValueError
-            If ``"mesh_frequency_factor"`` is not positive, or both or
+            If ``"mesh_frequency_factor"`` is not positive, the
+            heterogeneous case does not match the profile type, or both or
             neither of ``"accepted_error_threshold"`` and
-            ``"threshold_case"`` are given.
+            ``"threshold_discretization"`` are given.
         """
         self.parameters_dictionary = parameters_dictionary
         self.wave_type = validate_enum(
@@ -529,51 +180,53 @@ class MeshingParameterCalculator:
             parameters_dictionary.get("wave_type", WaveType.ISOTROPIC_ACOUSTIC),
             WaveType,
         )
-        if self.wave_type not in CPW_PHYSICS:
-            raise NotImplementedError(
-                f"No cells-per-wavelength physics for {self.wave_type.name}."
-            )
-        self.physics = CPW_PHYSICS[self.wave_type](parameters_dictionary)
-
-        self.source_frequency = parameters_dictionary["source_frequency"]
-        self.mesh_frequency_factor = parameters_dictionary.get(
-            "mesh_frequency_factor", 1.0
-        )
-        if self.mesh_frequency_factor <= 0.0:
-            raise ValueError(
-                "mesh_frequency_factor must be positive, got "
-                f"{self.mesh_frequency_factor}."
-            )
-        self.mesh_frequency = self.mesh_frequency_factor * self.source_frequency
-        self.minimum_velocity = self.physics.wavelength_velocity
         self.velocity_profile_type = validate_enum(
             "velocity_profile_type",
-            parameters_dictionary["velocity_profile_type"],
+            parameters_dictionary.get(
+                "velocity_profile_type",
+                VelocityProfileType.HOMOGENEOUS
+                if parameters_dictionary.get("heterogeneous_case") is None
+                else VelocityProfileType.HETEROGENEOUS,
+            ),
             VelocityProfileType,
         )
-        self.velocity_model_file_name = parameters_dictionary[
-            "velocity_model_file_name"
-        ]
-        self._check_velocity_profile_type()
+        problem_class = CPW_PROBLEMS.get((self.wave_type, self.velocity_profile_type))
+        if problem_class is None:
+            raise NotImplementedError(
+                f"No cells-per-wavelength problem for {self.wave_type.name} "
+                f"with a {self.velocity_profile_type.value} velocity profile."
+            )
+
+        self.timestep_calculation = validate_enum(
+            "time-step_calculation",
+            parameters_dictionary.get(
+                "time-step_calculation", TimeStepCalculationType.EXACT
+            ),
+            TimeStepCalculationType,
+        )
+        self.fixed_timestep = None
+        if self.timestep_calculation is TimeStepCalculationType.FIXED:
+            self.fixed_timestep = parameters_dictionary["time-step"]
+
+        self.problem = problem_class(parameters_dictionary, self.fixed_timestep)
+
         self.FEM_method_to_evaluate = parameters_dictionary["FEM_method_to_evaluate"]
-        self.dimension = parameters_dictionary["dimension"]
         self.receiver_setup = parameters_dictionary["receiver_setup"]
         self.accepted_error_threshold = parameters_dictionary.get(
             "accepted_error_threshold"
         )
-        self.threshold_case = _parse_threshold_case(
-            parameters_dictionary.get("threshold_case")
+        self.threshold_discretization = _parse_threshold_discretization(
+            parameters_dictionary.get("threshold_discretization")
         )
-        if (self.accepted_error_threshold is None) == (self.threshold_case is None):
+        if (self.accepted_error_threshold is None) == (
+            self.threshold_discretization is None
+        ):
             raise ValueError(
-                "Give exactly one of accepted_error_threshold and threshold_case."
+                "Give exactly one of accepted_error_threshold and "
+                "threshold_discretization."
             )
-        self.threshold_case_evaluation: CpwEvaluation | None = None
+        self.threshold_evaluation: CpwEvaluation | None = None
         self.desired_degree = parameters_dictionary["desired_degree"]
-
-        # Only for use in heterogeneous models
-        self.reference_degree = parameters_dictionary["reference_degree"]
-        self.cpw_reference = parameters_dictionary["C_reference"]
 
         # Search parameters
         self.cpw_initial = parameters_dictionary["C_initial"]
@@ -587,73 +240,25 @@ class MeshingParameterCalculator:
         self.search_history: list[CpwEvaluation] = []
 
         # Debugging and testing parameters
-        self.reduced_obj_for_testing = parameters_dictionary.get("testing", False)
         self.save_reference = parameters_dictionary.get("save_reference", False)
         self.load_reference = parameters_dictionary.get("load_reference", False)
-
-        self.timestep_calculation = validate_enum(
-            "time-step_calculation",
-            parameters_dictionary.get(
-                "time-step_calculation", TimeStepCalculationType.EXACT
-            ),
-            TimeStepCalculationType,
+        self.reference_solution_file = parameters_dictionary.get(
+            "reference_solution_file", self.problem.default_reference_file()
         )
-        self.fixed_timestep = None
-        if self.timestep_calculation is TimeStepCalculationType.FIXED:
-            self.fixed_timestep = parameters_dictionary["time-step"]
 
-        self.initial_dictionary = self.physics.build_dictionary(
-            self, self.FEM_method_to_evaluate, self.desired_degree
+        self.initial_dictionary = self.problem.model_dictionary(
+            self.FEM_method_to_evaluate, self.desired_degree
         )
-        self.initial_guess_object = self.physics.wave_class(
+        self.initial_wave = self.problem.physics.wave_class(
             copy.deepcopy(self.initial_dictionary)
         )
-        self.comm = self.initial_guess_object.comm
+        self.comm = self.initial_wave.comm
         self.reference_solution = self.get_reference_solution()
-        if self.threshold_case is not None:
+        if self.threshold_discretization is not None:
             self.accepted_error_threshold = self._calculate_threshold()
 
-    def _check_velocity_profile_type(self) -> None:
-        """Check the velocity model inputs against the profile type.
-
-        Raises
-        ------
-        ValueError
-            If a homogeneous model names a velocity file, or a heterogeneous
-            model lacks one or its domain lengths.
-        """
-        if self.velocity_profile_type is VelocityProfileType.HOMOGENEOUS:
-            if self.velocity_model_file_name is not None:
-                raise ValueError(
-                    "Velocity model file name should be None for homogeneous models"
-                )
-        else:
-            self._check_heterogeneous_mesh_lengths()
-            if self.velocity_model_file_name is None:
-                raise ValueError(
-                    "Velocity model file name should be defined for heterogeneous models"
-                )
-
-    def _check_heterogeneous_mesh_lengths(self) -> None:
-        """Check the domain lengths of a heterogeneous model.
-
-        Raises
-        ------
-        ValueError
-            If a length is missing, or ``length_x`` is negative.
-        """
-        parameters = self.parameters_dictionary
-        if parameters.get("length_z") is None:
-            raise ValueError("Length in z direction not defined")
-        if parameters.get("length_x") is None:
-            raise ValueError("Length in x direction not defined")
-        if parameters["length_z"] < 0.0:
-            parameters["length_z"] = abs(parameters["length_z"])
-        if parameters["length_x"] < 0.0:
-            raise ValueError("Length in x direction must be positive")
-
     def get_reference_solution(self) -> np.ndarray:
-        """Load, compute numerically or compute analytically the reference.
+        """Load or compute the reference receiver data.
 
         Returns
         -------
@@ -661,47 +266,17 @@ class MeshingParameterCalculator:
             The reference receiver data.
         """
         if self.load_reference:
-            filename = self.parameters_dictionary.get(
-                "reference_solution_file", "reference_solution.npy"
-            )
-            return np.load(filename)
+            return np.load(self.reference_solution_file)
 
-        if self.velocity_profile_type is VelocityProfileType.HETEROGENEOUS:
-            reference = self.calculate_reference_solution()
-        else:
-            reference = self.calculate_analytical_solution()
+        reference = self.problem.reference_solution(
+            self.initial_wave, self.FEM_method_to_evaluate
+        )
 
         if self.save_reference:
-            np.save("reference_solution.npy", reference)
+            np.save(self.reference_solution_file, reference)
         return reference
 
-    def calculate_reference_solution(self) -> np.ndarray:
-        """Compute the numerical reference of a heterogeneous model.
-
-        Uses the ``C_reference`` and ``reference_degree`` parameters.
-
-        Returns
-        -------
-        np.ndarray
-            The reference receiver data.
-        """
-        wave = self.build_current_object(
-            self.cpw_reference, degree=self.reference_degree
-        )
-        wave.forward_solve()
-        return wave.forward_solution_receivers
-
-    def calculate_analytical_solution(self) -> np.ndarray:
-        """Compute the analytical reference of a homogeneous model.
-
-        Returns
-        -------
-        np.ndarray
-            The reference receiver data, at the initial object's dt.
-        """
-        return self.physics.analytical_solution(self.initial_guess_object)
-
-    def build_current_object(
+    def build_wave(
         self, cpw: float, degree: int | None = None, method: str | None = None
     ) -> Wave:
         """Build the wave object for a cells-per-wavelength value.
@@ -723,24 +298,11 @@ class MeshingParameterCalculator:
         if degree is None and method is None:
             dictionary = copy.deepcopy(self.initial_dictionary)
         else:
-            dictionary = self.physics.build_dictionary(
-                self,
+            dictionary = self.problem.model_dictionary(
                 method if method is not None else self.FEM_method_to_evaluate,
                 degree if degree is not None else self.desired_degree,
             )
-        wave = self.physics.wave_class(dictionary)
-        if self.velocity_profile_type is VelocityProfileType.HOMOGENEOUS:
-            wavelength = self.minimum_velocity / self.mesh_frequency
-            self.physics.setup_homogeneous_wave(wave, wavelength / cpw)
-        else:
-            # The mesher sizes cells from the source frequency, and the edge
-            # length depends only on frequency * cpw
-            wave.set_mesh(
-                input_mesh_parameters={
-                    "cells_per_wavelength": cpw * self.mesh_frequency_factor
-                }
-            )
-        return wave
+        return self.problem.build_wave(dictionary, cpw)
 
     def calculate_error(self, cpw: float) -> float:
         """Solve at a cells-per-wavelength and measure the receiver error.
@@ -759,35 +321,38 @@ class MeshingParameterCalculator:
             Receiver error from :meth:`MeasureError.calculate_receiver_error`.
         """
         SpyroEnsemble.print(f"Trying cells-per-wavelength = {cpw}")
-        wave = self.build_current_object(cpw)
+        wave = self.build_wave(cpw)
         evaluation = self._solve_and_measure(wave, cpw)
         spyro.io.save_shots(wave, file_name=f"test_shot_record{cpw}")
         self.search_history.append(evaluation)
         return evaluation.error
 
     def _calculate_threshold(self) -> float:
-        """Measure the receiver error of :attr:`threshold_case`.
+        """Measure the receiver error of :attr:`threshold_discretization`.
 
-        The solve is stored in :attr:`threshold_case_evaluation`.
+        The solve is stored in :attr:`threshold_evaluation`.
 
         Returns
         -------
         float
-            The error of the threshold case, used as the threshold.
+            The error of the threshold discretization, used as the threshold.
         """
-        case = self.threshold_case
+        discretization = self.threshold_discretization
         SpyroEnsemble.print(
-            f"Computing the error threshold from {case.method} degree "
-            f"{case.degree} at cells-per-wavelength = {case.cpw}"
+            f"Computing the error threshold from {discretization.method} degree "
+            f"{discretization.degree} at cells-per-wavelength = "
+            f"{discretization.cpw}"
         )
-        wave = self.build_current_object(
-            case.cpw, degree=case.degree, method=case.method
+        wave = self.build_wave(
+            discretization.cpw,
+            degree=discretization.degree,
+            method=discretization.method,
         )
-        self.threshold_case_evaluation = self._solve_and_measure(wave, case.cpw)
+        self.threshold_evaluation = self._solve_and_measure(wave, discretization.cpw)
         SpyroEnsemble.print(
-            f"Accepted error threshold is {self.threshold_case_evaluation.error}"
+            f"Accepted error threshold is {self.threshold_evaluation.error}"
         )
-        return self.threshold_case_evaluation.error
+        return self.threshold_evaluation.error
 
     def _solve_and_measure(self, wave: Wave, cpw: float) -> CpwEvaluation:
         """Run a forward solve and measure its error against the reference.
@@ -820,41 +385,16 @@ class MeshingParameterCalculator:
             wave.dt,
             initial_time=wave.initial_time,
             final_time=wave.final_time,
-            time_shift=self._reference_time_shift(wave),
+            time_shift=self.problem.reference_time_shift(wave),
         )
         error = MeasureError.calculate_receiver_error(
             wave.forward_solution_receivers,
             reference,
             wave.dt,
-            has_displacement=self.physics.has_displacement,
+            has_displacement=self.problem.physics.has_displacement,
         )
         SpyroEnsemble.print(f"Error is {error}")
         return CpwEvaluation(cpw, wave.dt, error, runtime)
-
-    def _reference_time_shift(self, wave: Wave) -> float:
-        """Return the time shift applied when resampling the reference.
-
-        Parameters
-        ----------
-        wave : Wave
-            Wave object of the forward solve.
-
-        Returns
-        -------
-        float
-            One solver time step for an analytical reference of a physics
-            with ``shift_analytical_reference``, otherwise 0.0.
-        """
-        # TODO: The receivers store the field at time (i + 1) * dt at index
-        # i, one solver step ahead of their time label. Until the receiver
-        # indexing is fixed in its own PR, the analytical reference is
-        # sampled one solver step later to match. Remove this shift then.
-        if (
-            self.physics.shift_analytical_reference
-            and self.velocity_profile_type is VelocityProfileType.HOMOGENEOUS
-        ):
-            return wave.dt
-        return 0.0
 
     def _set_time_step(self, wave: Wave) -> None:
         """Set the forward solve time step.
@@ -936,7 +476,7 @@ class MeshingParameterCalculator:
 
         if savetxt:
             np.savetxt(
-                f"p{self.initial_guess_object.degree}_cpw_results.txt",
+                f"p{self.initial_wave.degree}_cpw_results.txt",
                 [(e.cpw, e.dt, e.error, e.runtime) for e in self.search_history],
                 header="cpw dt error runtime",
             )

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class ThresholdCase:
+class ThresholdDiscretization:
     """Discretization whose receiver error sets the accepted error threshold.
 
     Attributes
@@ -22,22 +22,23 @@ class ThresholdCase:
     cpw: float = 2.0
 
 
-def _parse_threshold_case(
-    value: "bool | dict | ThresholdCase | None",
-) -> ThresholdCase | None:
-    """Convert the ``"threshold_case"`` parameter to a threshold case.
+def _parse_threshold_discretization(
+    value: "bool | dict | ThresholdDiscretization | None",
+) -> ThresholdDiscretization | None:
+    """Convert the ``"threshold_discretization"`` parameter.
 
     Parameters
     ----------
-    value : bool, dict, ThresholdCase or None
-        None or False for no threshold case, True for the default
-        :class:`ThresholdCase`, or a dict of :class:`ThresholdCase` fields
-        overriding the defaults.
+    value : bool, dict, ThresholdDiscretization or None
+        None or False for no threshold discretization, True for the default
+        :class:`ThresholdDiscretization`, or a dict of
+        :class:`ThresholdDiscretization` fields overriding the defaults.
 
     Returns
     -------
-    ThresholdCase or None
-        The threshold case, or None if the threshold is given directly.
+    ThresholdDiscretization or None
+        The threshold discretization, or None if the threshold is given
+        directly.
 
     Raises
     ------
@@ -47,12 +48,12 @@ def _parse_threshold_case(
     if value is None or value is False:
         return None
     if value is True:
-        return ThresholdCase()
-    if isinstance(value, ThresholdCase):
+        return ThresholdDiscretization()
+    if isinstance(value, ThresholdDiscretization):
         return value
     if isinstance(value, dict):
-        return ThresholdCase(**value)
+        return ThresholdDiscretization(**value)
     raise TypeError(
-        "threshold_case must be a bool, a dict or a ThresholdCase, "
-        f"got {type(value).__name__}."
+        "threshold_discretization must be a bool, a dict or a "
+        f"ThresholdDiscretization, got {type(value).__name__}."
     )
