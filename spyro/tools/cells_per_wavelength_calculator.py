@@ -613,9 +613,7 @@ class MeshingParameterCalculator:
         self.cpw_max = parameters_dictionary.get("C_max", MAX_CPW)
         self.search_direction = validate_enum(
             "search_direction",
-            parameters_dictionary.get(
-                "search_direction", CpwSearchDirection.BACKWARD
-            ),
+            parameters_dictionary.get("search_direction", CpwSearchDirection.BACKWARD),
             CpwSearchDirection,
         )
         self.search_history: list[CpwEvaluation] = []
@@ -719,7 +717,9 @@ class MeshingParameterCalculator:
         np.ndarray
             The reference receiver data.
         """
-        wave = self.build_current_object(self.cpw_reference, degree=self.reference_degree)
+        wave = self.build_current_object(
+            self.cpw_reference, degree=self.reference_degree
+        )
         wave.forward_solve()
         return wave.forward_solution_receivers
 
@@ -812,7 +812,9 @@ class MeshingParameterCalculator:
             f"Computing the error threshold from {case.method} degree "
             f"{case.degree} at cells-per-wavelength = {case.cpw}"
         )
-        wave = self.build_current_object(case.cpw, degree=case.degree, method=case.method)
+        wave = self.build_current_object(
+            case.cpw, degree=case.degree, method=case.method
+        )
         self.threshold_case_evaluation = self._solve_and_measure(wave, case.cpw)
         SpyroEnsemble.print(
             f"Accepted error threshold is {self.threshold_case_evaluation.error}"
@@ -940,10 +942,7 @@ class MeshingParameterCalculator:
         if savetxt:
             np.savetxt(
                 f"p{self.initial_guess_object.degree}_cpw_results.txt",
-                [
-                    (e.cpw, e.dt, e.error, e.runtime)
-                    for e in self.search_history
-                ],
+                [(e.cpw, e.dt, e.error, e.runtime) for e in self.search_history],
                 header="cpw dt error runtime",
             )
         return cpw
