@@ -1,360 +1,380 @@
-import numpy as np
-import spyro
+"""Model dictionaries used by the cells-per-wavelength calculator."""
+
+import math
 import warnings
 
+import numpy as np
 
-def build_on_top_of_base_dictionary(variables):
-    """
-    Builds a model dictionary on top of the base dictionary.
+import spyro
 
-    Parameters
-    ----------
-    variables : dict
-        Dictionary containing the variables to be used in the model dictionary. It should include:
-            - method: string
-                The finite element method to be used. Either "mass_lumped_triangle" or "spectral_quadrilateral".
-            - degree: int
-                The spatial polynomial degree of the finite element method
-            - dimension: int
-                The dimension of the problem. Either 2 or 3.
-            - Lz: float
-                The length of the domain in the z direction.
-            - Lx: float
-                The length of the domain in the x direction.
-            - Ly: float
-                The length of the domain in the y direction.
-            - cells_per_wavelength: float
-                The number of cells per wavelength.
-            - pad: float
-                The padding to be used in the domain.
-            - source_locations: list
-                A list containing the source locations.
-            - frequency: float
-                The frequency of the source.
-            - receiver_locations: list
-                A list containing the receiver locations.
-            - final_time: float
-                The final time of the simulation.
-            - dt: float
-                The time step size of the simulation.
+#: Mesh type used for each supported finite element method.
+MESH_TYPES = {
+    "mass_lumped_triangle": "SeismicMesh",
+    "spectral_quadrilateral": "firedrake_mesh",
+}
 
-    Returns
-    -------
-    model_dictionary : dict
-        Dictionary containing the model dictionary.
-    """
-    mesh_type = set_mesh_type(variables["method"])
-    model_dictionary = {}
-    model_dictionary["options"] = {
-        "method": variables["method"],
-        "degree": variables["degree"],
-        "dimension": variables["dimension"],
-        "automatic_adjoint": False,
-    }
-    model_dictionary["parallelism"] = {"type": "automatic", }
-    model_dictionary["mesh"] = {
-        "length_z": variables["length_z"],
-        "length_x": variables["length_x"],
-        "length_y": variables["length_y"],
-        "cells_per_wavelength": variables["cells_per_wavelength"],
-        "mesh_type": mesh_type,
-    }
-    model_dictionary["absorving_boundary_conditions"] = {
-        "status": True,
-        "abc_type": "PML",
-        "exponent": 2,
-        "cmax": 4.5,
-        "R": 1e-6,
-        "pad_length": variables["pad"],
-    }
-    model_dictionary["acquisition"] = {
-        "source_type": "ricker",
-        "source_locations": variables["source_locations"],
-        "frequency": variables["frequency"],
-        "receiver_locations": variables["receiver_locations"],
-        "use_vertex_only_mesh": True,
-    }
-    model_dictionary["time_axis"] = {
-        "initial_time": 0.0,  # Initial time for event
-        "final_time": variables["final_time"],  # Final time for event
-        "dt": variables["dt"],  # timestep size
-        "amplitude": 1,  # the Ricker has an amplitude of 1.
-        "output_frequency": 1000,  # how frequently to output solution to pvds
-        "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
-    }
-    model_dictionary["visualization"] = {
-        "forward_output": True,
-        "forward_output_filename": "results/reference_forward_output.pvd",
-        "fwi_velocity_model_output": False,
-        "velocity_model_filename": None,
-        "gradient_output": False,
-        "gradient_filename": None,
-    }
-    return model_dictionary
+#: Velocities above this value are assumed to be in m/s instead of km/s.
+METERS_PER_SECOND_THRESHOLD = 500.0
+
+# Acquisition of the homogeneous acoustic model, in wavelengths. The
+# receivers form a square grid centred below the source.
+#: Vertical distance from the source to the centre of the receiver grid.
+HOMOGENEOUS_RECEIVER_GRID_DEPTH = 10.0
+#: Side of the square receiver grid.
+HOMOGENEOUS_RECEIVER_GRID_WIDTH = 5.0
+#: Receivers per side of the grid, and in reduced (testing) mode.
+HOMOGENEOUS_RECEIVERS_PER_SIDE = 6
+HOMOGENEOUS_RECEIVERS_PER_SIDE_REDUCED = 2
+
+#: Time step of the homogeneous acoustic analytical reference, in s.
+HOMOGENEOUS_REFERENCE_DT = 5e-4
+
+# Acquisition of the heterogeneous acoustic model, in km and s.
+HETEROGENEOUS_SOURCE_LOCATION = (-0.3, 3.0)
+#: Horizontal offsets of the first and last receivers from the source.
+HETEROGENEOUS_RECEIVER_OFFSETS = (2.0, 10.0)
+HETEROGENEOUS_RECEIVER_QUANTITY = 500
+HETEROGENEOUS_FINAL_TIME = 7.5
+HETEROGENEOUS_DT = 1e-4
 
 
-def set_mesh_type(method):
-    """
-    Sets the mesh type based on the method.
+def set_mesh_type(method: str) -> str:
+    """Return the mesh type used for a finite element method.
 
     Parameters
     ----------
-    method : string
-        The finite element method to be used. Either "mass_lumped_triangle" or "spectral_quadrilateral".
+    method : str
+        Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
 
     Returns
     -------
-    mesh_type : string
-        The mesh type to be used.
+    str
+        ``"SeismicMesh"`` for triangles, ``"firedrake_mesh"`` for
+        quadrilaterals.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not supported.
     """
-    if method == "mass_lumped_triangle":
-        mesh_type = "SeismicMesh"
-    elif method == "spectral_quadrilateral":
-        mesh_type = "firedrake_mesh"
-    else:
+    if method not in MESH_TYPES:
         raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
-    return mesh_type
+    return MESH_TYPES[method]
 
 
-def create_initial_model_for_meshing_parameter(Meshing_calc_obj):
-    """
-    Creates an initial model dictionary for the meshing parameter calculation.
-
-    Parameters
-    ----------
-    Meshing_calc_obj : spyro.MeshingParameterCalculator
-        The meshing calculation object.
-
-    Returns
-    -------
-    model_dictionary : dict
-        Dictionary containing the initial model dictionary to be later incremented.
-    """
-    dimension = Meshing_calc_obj.dimension
-    if dimension == 2:
-        return create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj)
-    elif dimension == 3:
-        return create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj)
-    else:
-        raise ValueError("Dimension is not 2 or 3")
-
-
-def create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj):
-    """
-    Creates an initial model dictionary for the meshing parameter calculation in 2D.
+def _warn_if_meters_per_second(velocity: float) -> None:
+    """Warn if a velocity looks like it is in m/s instead of km/s.
 
     Parameters
     ----------
-    Meshing_calc_obj : spyro.MeshingParameterCalculator
-        The meshing calculation object.
-
-    Returns
-    -------
-    model_dictionary : dict
-        Dictionary containing the initial model dictionary to be later incremented.
+    velocity : float
+        Velocity to check.
     """
-    velocity_profile_type = Meshing_calc_obj.velocity_profile_type
-    if velocity_profile_type == "homogeneous":
-        return create_initial_model_for_meshing_parameter_2D_homogeneous(
-            Meshing_calc_obj
-        )
-    elif velocity_profile_type == "heterogeneous":
-        return create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj)
-    else:
-        raise ValueError(
-            "Velocity profile type is not homogeneous or heterogeneous"
-        )
-
-
-def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj):
-    """
-    Creates an initial model dictionary for the meshing parameter calculation in 2D with a heterogeneous velocity model.
-
-    Parameters
-    ----------
-    Meshing_calc_obj : spyro.MeshingParameterCalculator
-        The meshing calculation object.
-
-    Returns
-    -------
-    model_dictionary : dict
-        Dictionary containing the initial model dictionary.
-    """
-    dimension = 2
-    c_value = Meshing_calc_obj.minimum_velocity
-    frequency = Meshing_calc_obj.source_frequency
-    cells_per_wavelength = Meshing_calc_obj.cpw_initial
-
-    method = Meshing_calc_obj.FEM_method_to_evaluate
-    degree = Meshing_calc_obj.desired_degree
-    reduced = Meshing_calc_obj.reduced_obj_for_testing  # noqa: F841
-
-    # Domain calculations
-    lbda = c_value / frequency
-    pad = lbda
-
-    parameters = Meshing_calc_obj.parameters_dictionary
-    length_z = parameters["length_z"]
-    length_x = parameters["length_x"]
-
-    # Source and receiver calculations
-    source_z = -0.3
-    source_x = 3.0
-    source_locations = [(source_z, source_x)]
-
-    # Receiver calculations
-    receiver_bin_center1 = 2000.0/1000
-    receiver_bin_center2 = 10000.0/1000
-    receiver_quantity = 500
-
-    bin1_startZ = source_z
-    bin1_endZ = source_z
-    bin1_startX = source_x + receiver_bin_center1
-    bin1_endX = source_x + receiver_bin_center2
-
-    receiver_locations = spyro.create_transect(
-        (bin1_startZ, bin1_startX),
-        (bin1_endZ, bin1_endX),
-        receiver_quantity
-    )
-
-    # Time axis calculations
-    tmin = 1.0 / frequency  # noqa: F841
-    final_time = 7.5
-
-    variables = {
-        "method": method,
-        "degree": degree,
-        "dimension": dimension,
-        "length_z": length_z,
-        "length_x": length_x,
-        "length_y": 0.0,
-        "cells_per_wavelength": cells_per_wavelength,
-        "pad": pad,
-        "source_locations": source_locations,
-        "frequency": frequency,
-        "receiver_locations": receiver_locations,
-        "final_time": final_time,
-        "dt": 0.0001,
-    }
-
-    model_dictionary = build_on_top_of_base_dictionary(variables)
-
-    model_dictionary["synthetic_data"] = {
-        "real_velocity_file": Meshing_calc_obj.velocity_model_file_name,
-    }
-
-    return model_dictionary
-
-
-def create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj):
-    """
-    Creates an initial model dictionary for the meshing parameter calculation in 3D.
-
-    Parameters
-    ----------
-    Meshing_calc_obj : spyro.MeshingParameterCalculator
-        The meshing calculation object.
-
-    Returns
-    -------
-    model_dictionary : dict
-        Dictionary containing the initial model dictionary.
-    """
-    velocity_profile_type = Meshing_calc_obj.velocity_profile_type
-    if velocity_profile_type == "homogeneous":
-        raise NotImplementedError("Not yet implemented")
-        # return create_initial_model_for_meshing_parameter_3D_homogeneous(Meshing_calc_obj)
-    elif velocity_profile_type == "heterogeneous":
-        raise NotImplementedError("Not yet implemented")
-        # return create_initial_model_for_meshing_parameter_3D_heterogeneous(Meshing_calc_obj)
-    else:
-        raise ValueError(
-            "Velocity profile type is not homogeneous or heterogeneous"
-        )
-
-
-def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
-    """
-    Creates an initial model dictionary for the meshing parameter calculation in 2D with a homogeneous velocity model.
-
-    Parameters
-    ----------
-    Meshing_calc_obj : spyro.MeshingParameterCalculator
-        The meshing calculation object.
-
-    Returns
-    -------
-    model_dictionary : dict
-        Dictionary containing the initial model dictionary.
-    """
-    dimension = 2
-    c_value = Meshing_calc_obj.minimum_velocity
-    frequency = Meshing_calc_obj.source_frequency
-    cells_per_wavelength = Meshing_calc_obj.cpw_initial
-
-    method = Meshing_calc_obj.FEM_method_to_evaluate
-    degree = Meshing_calc_obj.desired_degree
-    reduced = Meshing_calc_obj.reduced_obj_for_testing
-
-    if c_value > 500:
+    if velocity > METERS_PER_SECOND_THRESHOLD:
         warnings.warn("Velocity in meters per second")
 
-    # Domain calculations
-    lbda = c_value / frequency
-    Lz = 40 * lbda
-    Lx = 30 * lbda
-    Ly = 0.0
-    pad = lbda
 
-    # Source and receiver calculations
-    source_z = -Lz / 2.0
-    source_x = Lx / 2.0
-    source_locations = [(source_z, source_x)]
+def _round_up_to_time_step(time: float, dt: float) -> float:
+    """Round a time up to a whole number of time steps.
 
-    receiver_bin_center1 = 10 * lbda  # 20*lbda
-    receiver_bin_width = 5 * lbda  # 15*lbda
-    if reduced is True:
-        receiver_quantity = 4
+    A time series of ``round(time / dt) + 1`` samples then ends exactly at
+    the returned time, which :func:`~spyro.io.time_io.interpolate_time_series`
+    assumes when it resamples the reference.
+
+    Parameters
+    ----------
+    time : float
+        Time to round.
+    dt : float
+        Time step.
+
+    Returns
+    -------
+    float
+        Smallest multiple of ``dt`` not below ``time``.
+    """
+    # The small tolerance keeps times already on the grid in place
+    return math.ceil(time / dt - 1e-9) * dt
+
+
+def _build_acoustic_model_dictionary(
+    *,
+    method: str,
+    degree: int,
+    length_z: float,
+    length_x: float,
+    source_locations: list[tuple[float, float]],
+    receiver_locations: list[tuple[float, float]],
+    frequency: float,
+    final_time: float,
+    dt: float,
+    pml_pad_length: float | None = None,
+    periodic: bool = False,
+    cells_per_wavelength: float | None = None,
+    velocity_model_file_name: str | None = None,
+) -> dict:
+    """Assemble a 2D acoustic model dictionary for the cpw calculator.
+
+    Parameters
+    ----------
+    method : str
+        Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+    degree : int
+        Spatial polynomial degree.
+    length_z : float
+        Domain length in the z direction, without absorbing layer.
+    length_x : float
+        Domain length in the x direction, without absorbing layer.
+    source_locations : list of tuple of float
+        Source ``(z, x)`` locations.
+    receiver_locations : list of tuple of float
+        Receiver ``(z, x)`` locations.
+    frequency : float
+        Ricker source peak frequency.
+    final_time : float
+        Final time of the simulation.
+    dt : float
+        Time step of the simulation.
+    pml_pad_length : float, optional
+        Thickness of a PML absorbing layer. Default is None, meaning no
+        absorbing layer.
+    periodic : bool, optional
+        If True, use a periodic ``"firedrake_mesh"`` for either method.
+        Default is False, with the mesh type given by :func:`set_mesh_type`.
+    cells_per_wavelength : float, optional
+        Cells-per-wavelength of the mesh. Default is None, meaning the mesh
+        is sized when it is built.
+    velocity_model_file_name : str, optional
+        Velocity model file. Default is None, for a velocity set later.
+
+    Returns
+    -------
+    dict
+        Spyro model dictionary for :class:`spyro.AcousticWave`.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not supported, or a periodic mesh is given a PML.
+    """
+    mesh_type = set_mesh_type(method)
+    if periodic:
+        if pml_pad_length is not None:
+            raise ValueError("A periodic mesh cannot have a PML.")
+        # Only Firedrake meshes can be periodic
+        mesh_type = "firedrake_mesh"
+
+    if pml_pad_length is None:
+        absorbing_boundary_conditions = {"status": False}
     else:
-        receiver_quantity = 36  # 2500 # 50 squared
+        absorbing_boundary_conditions = {
+            "status": True,
+            "abc_type": "PML",
+            "exponent": 2,
+            "cmax": 4.5,
+            "R": 1e-6,
+            "pad_length": pml_pad_length,
+        }
 
-    bin1_startZ = source_z + receiver_bin_center1 - receiver_bin_width / 2.0
-    bin1_endZ = source_z + receiver_bin_center1 + receiver_bin_width / 2.0
-    bin1_startX = source_x - receiver_bin_width / 2.0
-    bin1_endX = source_x + receiver_bin_width / 2.0
-
-    receiver_locations = spyro.create_2d_grid(
-        bin1_startZ,
-        bin1_endZ,
-        bin1_startX,
-        bin1_endX,
-        int(np.sqrt(receiver_quantity)),
-    )
-
-    # Time axis calculations
-    tmin = 1.0 / frequency
-    final_time = 20 * tmin  # Should be 35
-
-    variables = {
-        "method": method,
-        "degree": degree,
-        "dimension": dimension,
-        "length_z": Lz,
-        "length_x": Lx,
-        "length_y": Ly,
-        "cells_per_wavelength": cells_per_wavelength,
-        "pad": pad,
-        "source_locations": source_locations,
-        "frequency": frequency,
-        "receiver_locations": receiver_locations,
-        "final_time": final_time,
-        "dt": 0.0005,
+    return {
+        "options": {
+            "method": method,
+            "degree": degree,
+            "dimension": 2,
+            "automatic_adjoint": False,
+        },
+        "parallelism": {"type": "automatic"},
+        "mesh": {
+            "length_z": length_z,
+            "length_x": length_x,
+            "length_y": 0.0,
+            "cells_per_wavelength": cells_per_wavelength,
+            "mesh_type": mesh_type,
+            "periodic": periodic,
+        },
+        "absorving_boundary_conditions": absorbing_boundary_conditions,
+        "acquisition": {
+            "source_type": "ricker",
+            "source_locations": source_locations,
+            "frequency": frequency,
+            "receiver_locations": receiver_locations,
+            "use_vertex_only_mesh": True,
+        },
+        "synthetic_data": {
+            "real_velocity_file": velocity_model_file_name,
+        },
+        "time_axis": {
+            "initial_time": 0.0,
+            "final_time": final_time,
+            "dt": dt,
+            "amplitude": 1,
+            "output_frequency": 1000,
+            "gradient_sampling_frequency": 100,
+        },
+        "visualization": {
+            "forward_output": False,
+            "fwi_velocity_model_output": False,
+            "velocity_model_filename": None,
+            "gradient_output": False,
+            "gradient_filename": None,
+        },
     }
 
-    model_dictionary = build_on_top_of_base_dictionary(variables)
 
-    return model_dictionary
+def create_acoustic_model_for_meshing_parameter_2D_homogeneous(
+    method: str,
+    degree: int,
+    frequency: float,
+    velocity: float,
+    dt: float = HOMOGENEOUS_REFERENCE_DT,
+    reduced: bool = False,
+) -> dict:
+    """Create a 2D homogeneous acoustic model for the cpw calculator.
+
+    The receivers form a square grid of side
+    :data:`HOMOGENEOUS_RECEIVER_GRID_WIDTH` wavelengths, centred
+    :data:`HOMOGENEOUS_RECEIVER_GRID_DEPTH` wavelengths below the source.
+    The final time lets the wave reach the farthest receiver, rounded up
+    to a whole number of time steps. The domain is
+    a periodic box without absorbing layer, sized so that no wave from a
+    periodic image of the source reaches a receiver before the final time.
+    The receiver data then matches the free-space analytical solution.
+
+    Parameters
+    ----------
+    method : str
+        Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+    degree : int
+        Spatial polynomial degree.
+    frequency : float
+        Ricker source peak frequency.
+    velocity : float
+        Constant acoustic velocity, which sets the wavelength.
+    dt : float, optional
+        Time step used by the initial object and the analytical reference.
+        Default is :data:`HOMOGENEOUS_REFERENCE_DT`.
+    reduced : bool, optional
+        If True, use a 2 by 2 receiver grid instead of 6 by 6, for testing.
+        Default is False.
+
+    Returns
+    -------
+    dict
+        Spyro model dictionary for :class:`spyro.AcousticWave`.
+    """
+    _warn_if_meters_per_second(velocity)
+    wavelength = velocity / frequency
+
+    grid_depth = HOMOGENEOUS_RECEIVER_GRID_DEPTH * wavelength
+    half_width = HOMOGENEOUS_RECEIVER_GRID_WIDTH * wavelength / 2.0
+    deepest_offset = grid_depth + half_width
+    farthest_offset = np.hypot(deepest_offset, half_width)
+
+    # The wavelet delay is about 1.2 periods, plus two periods of wavelet tail
+    final_time = _round_up_to_time_step(
+        farthest_offset / velocity + 3.0 / frequency, dt
+    )
+
+    # A periodic image is one box length away along an axis, so it is at
+    # least (length - source-receiver span) away from every receiver. Keep
+    # its arrival one wavelength past the final time.
+    image_distance = velocity * final_time + wavelength
+    length_z = image_distance + deepest_offset
+    length_x = image_distance + half_width
+
+    # Centre the acquisition in the box
+    source_z = -(length_z - deepest_offset) / 2.0
+    source_x = length_x / 2.0
+    receivers_per_side = (
+        HOMOGENEOUS_RECEIVERS_PER_SIDE_REDUCED
+        if reduced
+        else HOMOGENEOUS_RECEIVERS_PER_SIDE
+    )
+    receiver_locations = spyro.create_2d_grid(
+        source_z - grid_depth + half_width,
+        source_z - deepest_offset,
+        source_x - half_width,
+        source_x + half_width,
+        receivers_per_side,
+    )
+
+    return _build_acoustic_model_dictionary(
+        method=method,
+        degree=degree,
+        length_z=length_z,
+        length_x=length_x,
+        source_locations=[(source_z, source_x)],
+        receiver_locations=receiver_locations,
+        frequency=frequency,
+        final_time=final_time,
+        dt=dt,
+        periodic=True,
+    )
+
+
+def create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
+    method: str,
+    degree: int,
+    frequency: float,
+    minimum_velocity: float,
+    length_z: float,
+    length_x: float,
+    velocity_model_file_name: str,
+    cells_per_wavelength: float,
+) -> dict:
+    """Create a 2D heterogeneous acoustic model for the cpw calculator.
+
+    A source at :data:`HETEROGENEOUS_SOURCE_LOCATION` records on a line of
+    receivers at the source depth. The domain is surrounded by a PML one
+    wavelength thick. The reference is numerical, so the same layer is
+    present in the reference and in every evaluated solve.
+
+    Parameters
+    ----------
+    method : str
+        Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+    degree : int
+        Spatial polynomial degree.
+    frequency : float
+        Ricker source peak frequency.
+    minimum_velocity : float
+        Minimum velocity in the domain, which sets the PML thickness.
+    length_z : float
+        Domain length in the z direction, without absorbing layer.
+    length_x : float
+        Domain length in the x direction, without absorbing layer.
+    velocity_model_file_name : str
+        Velocity model file.
+    cells_per_wavelength : float
+        Cells-per-wavelength of the initial mesh.
+
+    Returns
+    -------
+    dict
+        Spyro model dictionary for :class:`spyro.AcousticWave`.
+    """
+    source_z, source_x = HETEROGENEOUS_SOURCE_LOCATION
+    first_offset, last_offset = HETEROGENEOUS_RECEIVER_OFFSETS
+    receiver_locations = spyro.create_transect(
+        (source_z, source_x + first_offset),
+        (source_z, source_x + last_offset),
+        HETEROGENEOUS_RECEIVER_QUANTITY,
+    )
+
+    return _build_acoustic_model_dictionary(
+        method=method,
+        degree=degree,
+        length_z=length_z,
+        length_x=length_x,
+        source_locations=[HETEROGENEOUS_SOURCE_LOCATION],
+        receiver_locations=receiver_locations,
+        frequency=frequency,
+        final_time=HETEROGENEOUS_FINAL_TIME,
+        dt=HETEROGENEOUS_DT,
+        pml_pad_length=minimum_velocity / frequency,
+        cells_per_wavelength=cells_per_wavelength,
+        velocity_model_file_name=velocity_model_file_name,
+    )
 
 
 def create_elastic_model_for_meshing_parameter_2D_homogeneous(
@@ -372,7 +392,8 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
     A horizontal (x-direction) point force is placed in a periodic box. The receivers lie on
     a horizontal line ``7`` S-wavelengths below the source, spanning
     horizontal offsets from ``0`` to ``7`` S-wavelengths. The final time lets
-    the S-wave reach the farthest receiver, and the box is sized so that no
+    the S-wave reach the farthest receiver, rounded up to a whole number of
+    time steps, and the box is sized so that no
     P-wave from a periodic image of the source reaches any receiver before
     the final time.
 
@@ -404,8 +425,7 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
     """
     if method not in ("mass_lumped_triangle", "spectral_quadrilateral"):
         raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
-    if s_wave_velocity > 500:
-        warnings.warn("Velocity in meters per second")
+    _warn_if_meters_per_second(s_wave_velocity)
 
     s_wavelength = s_wave_velocity / frequency
     delay = 1.0 / frequency
@@ -418,7 +438,9 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
     farthest_offset = np.hypot(vertical_offset, maximum_horizontal_offset)
 
     # S-wave reaches the farthest receiver, plus two periods of wavelet tail
-    final_time = farthest_offset / s_wave_velocity + delay + 2.0 / frequency
+    final_time = _round_up_to_time_step(
+        farthest_offset / s_wave_velocity + delay + 2.0 / frequency, dt
+    )
 
     # Nearest periodic image is at least (length - source-receiver span) away
     # in some direction; keep its P arrival after the final time.
@@ -430,7 +452,9 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
     receiver_locations = [
         (receiver_z, float(receiver_x))
         for receiver_x in np.linspace(
-            source_x, source_x + maximum_horizontal_offset, receiver_quantity,
+            source_x,
+            source_x + maximum_horizontal_offset,
+            receiver_quantity,
         )
     ]
 

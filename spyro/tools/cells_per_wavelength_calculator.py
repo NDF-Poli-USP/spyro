@@ -12,9 +12,9 @@ import numpy as np
 import spyro
 from .error_measure import MeasureError
 from .input_models import (
+    create_acoustic_model_for_meshing_parameter_2D_heterogeneous,
+    create_acoustic_model_for_meshing_parameter_2D_homogeneous,
     create_elastic_model_for_meshing_parameter_2D_homogeneous,
-    create_initial_model_for_meshing_parameter,
-    set_mesh_type,
 )
 from ..io.time_io import interpolate_time_series
 from ..mpi.spyro_mpi import SpyroEnsemble
@@ -125,10 +125,14 @@ class CpwPhysics(ABC):
         Wave solver class built for every forward solve.
     has_displacement : bool
         Whether receiver data has a trailing direction axis.
+    shift_analytical_reference : bool
+        Whether the analytical reference is shifted one solver step when
+        resampled, to match the receiver time convention.
     """
 
     wave_class: type[Wave]
     has_displacement: bool
+    shift_analytical_reference: bool
 
     def __init__(self, parameters_dictionary: dict) -> None:
         """Store the parameters dictionary.
@@ -206,6 +210,7 @@ class AcousticCpwPhysics(CpwPhysics):
 
     wave_class = spyro.AcousticWave
     has_displacement = False
+    shift_analytical_reference = True
 
     @property
     def wavelength_velocity(self) -> float:
@@ -236,16 +241,36 @@ class AcousticCpwPhysics(CpwPhysics):
         -------
         dict
             Spyro model dictionary for :class:`spyro.AcousticWave`.
+
+        Raises
+        ------
+        NotImplementedError
+            For 3D models.
         """
-        dictionary = create_initial_model_for_meshing_parameter(calculator)
-        # The input model builders use the calculator's method and degree
-        dictionary["options"]["method"] = method
-        dictionary["options"]["degree"] = degree
-        dictionary["mesh"]["mesh_type"] = set_mesh_type(method)
-        return dictionary
+        if calculator.dimension != 2:
+            raise NotImplementedError("Acoustic cpw calculation only supports 2D.")
+
+        if calculator.velocity_profile_type is VelocityProfileType.HOMOGENEOUS:
+            return create_acoustic_model_for_meshing_parameter_2D_homogeneous(
+                method=method,
+                degree=degree,
+                frequency=calculator.source_frequency,
+                velocity=self.wavelength_velocity,
+                reduced=calculator.reduced_obj_for_testing,
+            )
+        return create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
+            method=method,
+            degree=degree,
+            frequency=calculator.source_frequency,
+            minimum_velocity=self.wavelength_velocity,
+            length_z=self.parameters_dictionary["length_z"],
+            length_x=self.parameters_dictionary["length_x"],
+            velocity_model_file_name=calculator.velocity_model_file_name,
+            cells_per_wavelength=calculator.cpw_initial,
+        )
 
     def setup_homogeneous_wave(self, wave: Wave, edge_length: float) -> None:
-        """Build the mesh and set a constant velocity.
+        """Build a periodic mesh and set a constant velocity.
 
         Parameters
         ----------
@@ -254,7 +279,9 @@ class AcousticCpwPhysics(CpwPhysics):
         edge_length : float
             Mesh edge length.
         """
-        wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+        wave.set_mesh(
+            input_mesh_parameters={"edge_length": edge_length, "periodic": True}
+        )
         wave.set_initial_velocity_model(constant=self.wavelength_velocity)
 
     def analytical_solution(self, wave: Wave) -> np.ndarray:
@@ -279,7 +306,7 @@ class AcousticCpwPhysics(CpwPhysics):
             analytical[:, i] = spyro.utils.nodal_homogeneous_analytical(
                 wave, offset, velocity
             )
-        return analytical / velocity**2
+        return analytical
 
 
 class IsotropicElasticCpwPhysics(CpwPhysics):
@@ -292,6 +319,8 @@ class IsotropicElasticCpwPhysics(CpwPhysics):
 
     wave_class = spyro.IsotropicWave
     has_displacement = True
+    # The elastic analytical solution is already shifted one reference step
+    shift_analytical_reference = False
 
     @property
     def wavelength_velocity(self) -> float:
@@ -852,6 +881,7 @@ class MeshingParameterCalculator:
             wave.dt,
             initial_time=wave.initial_time,
             final_time=wave.final_time,
+            time_shift=self._reference_time_shift(wave),
         )
         error = MeasureError.calculate_receiver_error(
             wave.forward_solution_receivers,
@@ -861,6 +891,31 @@ class MeshingParameterCalculator:
         )
         SpyroEnsemble.print(f"Error is {error}")
         return CpwEvaluation(cpw, wave.dt, error, runtime)
+
+    def _reference_time_shift(self, wave: Wave) -> float:
+        """Return the time shift applied when resampling the reference.
+
+        Parameters
+        ----------
+        wave : Wave
+            Wave object of the forward solve.
+
+        Returns
+        -------
+        float
+            One solver time step for an analytical reference of a physics
+            with ``shift_analytical_reference``, otherwise 0.0.
+        """
+        # TODO: The receivers store the field at time (i + 1) * dt at index
+        # i, one solver step ahead of their time label. Until the receiver
+        # indexing is fixed in its own PR, the analytical reference is
+        # sampled one solver step later to match. Remove this shift then.
+        if (
+            self.physics.shift_analytical_reference
+            and self.velocity_profile_type is VelocityProfileType.HOMOGENEOUS
+        ):
+            return wave.dt
+        return 0.0
 
     def _set_time_step(self, wave: Wave) -> None:
         """Set the forward solve time step.

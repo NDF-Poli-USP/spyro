@@ -1,38 +1,72 @@
+"""Tests for the cells-per-wavelength calculator model dictionaries."""
+
 from types import SimpleNamespace
+
+import numpy as np
 import pytest
+
 from spyro.tools import input_models
+from spyro.tools.cells_per_wavelength_calculator import AcousticCpwPhysics
+from spyro.utils.typing import VelocityProfileType
+
+METHODS = ["mass_lumped_triangle", "spectral_quadrilateral"]
 
 
-def _base_variables(method="mass_lumped_triangle"):
-    return {
-        "method": method,
-        "degree": 3,
-        "dimension": 2,
-        "length_z": 5.0,
-        "length_x": 7.5,
-        "length_y": 0.0,
-        "cells_per_wavelength": 2.4,
-        "pad": 0.8,
-        "source_locations": [(-1.0, 2.0)],
-        "frequency": 4.0,
-        "receiver_locations": [(-1.0, 2.5), (-1.0, 3.0)],
-        "final_time": 2.0,
-        "dt": 0.001,
-    }
+def make_homogeneous_model(
+    method: str = "spectral_quadrilateral",
+    velocity: float = 1.5,
+    frequency: float = 5.0,
+    reduced: bool = False,
+) -> dict:
+    """Build a homogeneous acoustic model with typical settings.
+
+    Parameters
+    ----------
+    method : str, optional
+        Finite element method. Default is ``"spectral_quadrilateral"``.
+    velocity : float, optional
+        Acoustic velocity. Default is 1.5.
+    frequency : float, optional
+        Source peak frequency. Default is 5.0.
+    reduced : bool, optional
+        Use the reduced receiver grid. Default is False.
+
+    Returns
+    -------
+    dict
+        The model dictionary.
+    """
+    return input_models.create_acoustic_model_for_meshing_parameter_2D_homogeneous(
+        method=method,
+        degree=4,
+        frequency=frequency,
+        velocity=velocity,
+        dt=1e-3,
+        reduced=reduced,
+    )
 
 
-def _base_meshing_obj(**overrides):
+def make_calculator_stub(**overrides) -> SimpleNamespace:
+    """Build the calculator attributes the acoustic physics reads.
+
+    Parameters
+    ----------
+    **overrides
+        Attributes replacing the defaults.
+
+    Returns
+    -------
+    SimpleNamespace
+        Stand-in for a :class:`MeshingParameterCalculator`.
+    """
     defaults = {
         "dimension": 2,
-        "velocity_profile_type": "homogeneous",
-        "minimum_velocity": 1.5,
+        "velocity_profile_type": VelocityProfileType.HOMOGENEOUS,
         "source_frequency": 5.0,
-        "cpw_initial": 2.2,
-        "FEM_method_to_evaluate": "mass_lumped_triangle",
-        "desired_degree": 4,
-        "reduced_obj_for_testing": False,
-        "parameters_dictionary": {"length_z": 10.0, "length_x": 20.0},
-        "velocity_model_file_name": "velocity.segy",
+        "cpw_initial": 2.8,
+        "reduced_obj_for_testing": True,
+        "fixed_timestep": None,
+        "velocity_model_file_name": None,
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -45,114 +79,117 @@ def _base_meshing_obj(**overrides):
         ("spectral_quadrilateral", "firedrake_mesh"),
     ],
 )
-def test_set_mesh_type(method, expected_mesh_type):
+def test_set_mesh_type(method: str, expected_mesh_type: str) -> None:
+    """Each supported method maps to its mesh generator."""
     assert input_models.set_mesh_type(method) == expected_mesh_type
 
 
-def test_set_mesh_type_raises_for_invalid_method():
+def test_set_mesh_type_raises_for_invalid_method() -> None:
+    """An unsupported method is rejected."""
     with pytest.raises(ValueError, match="Method is not"):
         input_models.set_mesh_type("unsupported_method")
 
 
-def test_build_on_top_of_base_dictionary_populates_expected_sections():
-    model = input_models.build_on_top_of_base_dictionary(_base_variables())
+@pytest.mark.parametrize("method", METHODS)
+def test_homogeneous_model_is_periodic_without_pml(method: str) -> None:
+    """Both methods use a periodic Firedrake mesh and no absorbing layer."""
+    model = make_homogeneous_model(method=method)
 
-    assert model["options"]["automatic_adjoint"] is False
-    assert model["mesh"]["mesh_type"] == "SeismicMesh"
-    assert model["mesh"]["length_x"] == 7.5
-    assert model["absorving_boundary_conditions"]["pad_length"] == 0.8
-    assert model["acquisition"]["source_type"] == "ricker"
-    assert model["time_axis"]["dt"] == 0.001
-    assert model["visualization"]["forward_output"] is True
-
-
-def test_create_initial_model_for_meshing_parameter_dispatches_2d(monkeypatch):
-    expected = {"kind": "2d", "dimension": 2}
-
-    def fake_create_2d(obj):
-        return {"kind": "2d", "dimension": obj.dimension}
-
-    monkeypatch.setattr(
-        input_models,
-        "create_initial_model_for_meshing_parameter_2D",
-        fake_create_2d,
-    )
-
-    obj = _base_meshing_obj(dimension=2)
-    got = input_models.create_initial_model_for_meshing_parameter(obj)
-
-    assert got == expected
+    assert model["options"]["method"] == method
+    assert model["options"]["degree"] == 4
+    assert model["mesh"]["periodic"] is True
+    assert model["mesh"]["mesh_type"] == "firedrake_mesh"
+    assert model["absorving_boundary_conditions"]["status"] is False
 
 
-def test_create_initial_model_for_meshing_parameter_dispatches_3d(monkeypatch):
-    expected = {"kind": "3d"}
+@pytest.mark.parametrize("reduced, expected_receivers", [(True, 4), (False, 36)])
+def test_homogeneous_model_receiver_quantity(
+    reduced: bool, expected_receivers: int
+) -> None:
+    """The reduced flag shrinks the receiver grid for testing."""
+    model = make_homogeneous_model(reduced=reduced)
 
-    monkeypatch.setattr(
-        input_models,
-        "create_initial_model_for_meshing_parameter_3D",
-        lambda _: expected,
-    )
-
-    obj = _base_meshing_obj(dimension=3)
-    assert input_models.create_initial_model_for_meshing_parameter(obj) == expected
+    assert len(model["acquisition"]["receiver_locations"]) == expected_receivers
 
 
-def test_create_initial_model_for_meshing_parameter_rejects_invalid_dimension():
-    obj = _base_meshing_obj(dimension=4)
-    with pytest.raises(ValueError, match="Dimension is not 2 or 3"):
-        input_models.create_initial_model_for_meshing_parameter(obj)
+@pytest.mark.parametrize("velocity, frequency", [(1.5, 5.0), (3.0, 12.0)])
+def test_homogeneous_model_geometry_avoids_periodic_images(
+    velocity: float, frequency: float
+) -> None:
+    """The direct wave arrives in time, and no periodic image does."""
+    model = make_homogeneous_model(velocity=velocity, frequency=frequency)
+
+    length_z = model["mesh"]["length_z"]
+    length_x = model["mesh"]["length_x"]
+    final_time = model["time_axis"]["final_time"]
+    source = np.array(model["acquisition"]["source_locations"][0])
+    receivers = np.array(model["acquisition"]["receiver_locations"])
+
+    # Source and receivers lie inside the box
+    points = np.vstack([source, receivers])
+    assert np.all((points[:, 0] < 0.0) & (points[:, 0] > -length_z))
+    assert np.all((points[:, 1] > 0.0) & (points[:, 1] < length_x))
+
+    # Receivers sit below the source, 7.5 to 12.5 wavelengths deep
+    wavelength = velocity / frequency
+    depths = (source[0] - receivers[:, 0]) / wavelength
+    assert np.isclose(depths.min(), 7.5)
+    assert np.isclose(depths.max(), 12.5)
+
+    # The wave reaches the farthest receiver before the final time
+    distances = np.linalg.norm(receivers - source, axis=1)
+    assert distances.max() / velocity < final_time
+
+    # Nearest periodic image of the source, over the 8 neighbouring copies
+    shifts = np.array(
+        [(i, j) for i in (-1, 0, 1) for j in (-1, 0, 1) if (i, j) != (0, 0)]
+    ) * np.array([length_z, length_x])
+    images = source + shifts
+    image_distance = np.linalg.norm(
+        receivers[:, None, :] - images[None, :, :], axis=2
+    ).min()
+    assert image_distance / velocity > final_time
 
 
-def test_create_initial_model_for_meshing_parameter_2d_dispatches_homogeneous(monkeypatch):
-    expected = {"profile": "homogeneous"}
-    monkeypatch.setattr(
-        input_models,
-        "create_initial_model_for_meshing_parameter_2D_homogeneous",
-        lambda _: expected,
-    )
-
-    obj = _base_meshing_obj(velocity_profile_type="homogeneous")
-    assert input_models.create_initial_model_for_meshing_parameter_2D(obj) == expected
+def test_homogeneous_model_warns_for_large_velocity() -> None:
+    """A velocity in m/s instead of km/s triggers a warning."""
+    with pytest.warns(UserWarning, match="Velocity in meters per second"):
+        make_homogeneous_model(velocity=1500.0)
 
 
-def test_create_initial_model_for_meshing_parameter_2d_dispatches_heterogeneous(monkeypatch):
-    expected = {"profile": "heterogeneous"}
-    monkeypatch.setattr(
-        input_models,
-        "create_initial_model_for_meshing_parameter_2D_heterogeneous",
-        lambda _: expected,
-    )
-
-    obj = _base_meshing_obj(velocity_profile_type="heterogeneous")
-    assert input_models.create_initial_model_for_meshing_parameter_2D(obj) == expected
-
-
-def test_create_initial_model_for_meshing_parameter_2d_rejects_invalid_profile():
-    obj = _base_meshing_obj(velocity_profile_type="layered")
-    with pytest.raises(ValueError, match="Velocity profile type is not"):
-        input_models.create_initial_model_for_meshing_parameter_2D(obj)
-
-
-def test_create_initial_model_for_meshing_parameter_2d_heterogeneous_sets_core_fields():
-    obj = _base_meshing_obj(
-        velocity_profile_type="heterogeneous",
+@pytest.mark.parametrize(
+    "method, expected_mesh_type",
+    [
+        ("mass_lumped_triangle", "SeismicMesh"),
+        ("spectral_quadrilateral", "firedrake_mesh"),
+    ],
+)
+def test_heterogeneous_model_sets_core_fields(
+    method: str, expected_mesh_type: str
+) -> None:
+    """The heterogeneous model has a one-wavelength PML and a receiver line."""
+    model = input_models.create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
+        method=method,
+        degree=5,
+        frequency=8.0,
         minimum_velocity=1.6,
-        source_frequency=8.0,
-        cpw_initial=2.8,
-        FEM_method_to_evaluate="spectral_quadrilateral",
-        desired_degree=5,
-        parameters_dictionary={"length_z": 12.0, "length_x": 30.0},
+        length_z=12.0,
+        length_x=30.0,
         velocity_model_file_name="my_model.segy",
+        cells_per_wavelength=2.8,
     )
 
-    model = input_models.create_initial_model_for_meshing_parameter_2D_heterogeneous(obj)
-
-    assert model["options"]["method"] == "spectral_quadrilateral"
+    assert model["options"]["method"] == method
     assert model["options"]["degree"] == 5
+    assert model["mesh"]["mesh_type"] == expected_mesh_type
+    assert model["mesh"]["periodic"] is False
     assert model["mesh"]["length_z"] == 12.0
     assert model["mesh"]["length_x"] == 30.0
     assert model["mesh"]["cells_per_wavelength"] == 2.8
-    assert model["absorving_boundary_conditions"]["pad_length"] == pytest.approx(0.2)
+    abc = model["absorving_boundary_conditions"]
+    assert abc["status"] is True
+    assert abc["abc_type"] == "PML"
+    assert abc["pad_length"] == pytest.approx(0.2)
     assert model["synthetic_data"]["real_velocity_file"] == "my_model.segy"
 
     receivers = model["acquisition"]["receiver_locations"]
@@ -161,49 +198,96 @@ def test_create_initial_model_for_meshing_parameter_2d_heterogeneous_sets_core_f
     assert tuple(receivers[-1]) == pytest.approx((-0.3, 13.0))
 
 
-@pytest.mark.parametrize("reduced, expected_receivers", [(True, 4), (False, 36)])
-def test_create_initial_model_for_meshing_parameter_2d_homogeneous_reduced_flag(
-    reduced, expected_receivers
-):
-    obj = _base_meshing_obj(
-        velocity_profile_type="homogeneous",
-        minimum_velocity=2.0,
-        source_frequency=4.0,
-        cpw_initial=3.1,
-        FEM_method_to_evaluate="mass_lumped_triangle",
-        desired_degree=3,
-        reduced_obj_for_testing=reduced,
+def test_periodic_model_rejects_pml() -> None:
+    """A periodic box has no boundary for a PML."""
+    with pytest.raises(ValueError, match="periodic mesh cannot have a PML"):
+        input_models._build_acoustic_model_dictionary(
+            method="spectral_quadrilateral",
+            degree=2,
+            length_z=1.0,
+            length_x=1.0,
+            source_locations=[(-0.5, 0.5)],
+            receiver_locations=[(-0.6, 0.5)],
+            frequency=5.0,
+            final_time=1.0,
+            dt=1e-3,
+            pml_pad_length=0.3,
+            periodic=True,
+        )
+
+
+@pytest.mark.parametrize(
+    "time, dt, expected",
+    [(1.0, 0.25, 1.0), (1.01, 0.25, 1.25), (3.14951, 0.002, 3.15)],
+)
+def test_round_up_to_time_step(time: float, dt: float, expected: float) -> None:
+    """Times are rounded up onto the grid, and grid times stay in place."""
+    assert np.isclose(input_models._round_up_to_time_step(time, dt), expected)
+
+
+@pytest.mark.parametrize("dt", [5e-4, 2e-3, 7e-4])
+@pytest.mark.parametrize("wave", ["acoustic", "elastic"])
+def test_homogeneous_final_time_is_on_reference_grid(dt: float, wave: str) -> None:
+    """The last of ``round(T / dt) + 1`` reference samples is at ``T``."""
+    if wave == "acoustic":
+        model = input_models.create_acoustic_model_for_meshing_parameter_2D_homogeneous(
+            method="spectral_quadrilateral",
+            degree=4,
+            frequency=5.0,
+            velocity=1.5,
+            dt=dt,
+        )
+    else:
+        model = input_models.create_elastic_model_for_meshing_parameter_2D_homogeneous(
+            method="spectral_quadrilateral",
+            degree=4,
+            frequency=5.0,
+            p_wave_velocity=5.6,
+            s_wave_velocity=2.75,
+            density=2.0,
+            dt=dt,
+        )
+
+    final_time = model["time_axis"]["final_time"]
+    num_steps = round(final_time / dt) + 1
+    assert np.isclose((num_steps - 1) * dt, final_time, rtol=0.0, atol=1e-12)
+
+
+def test_acoustic_physics_builds_homogeneous_model() -> None:
+    """The reference time step is fixed, whatever the solver time step."""
+    physics = AcousticCpwPhysics({"minimum_velocity_in_the_domain": 1.5})
+    calculator = make_calculator_stub(fixed_timestep=2e-3)
+
+    model = physics.build_dictionary(calculator, "mass_lumped_triangle", 3)
+
+    assert model["mesh"]["periodic"] is True
+    assert model["acquisition"]["frequency"] == 5.0
+    assert model["time_axis"]["dt"] == input_models.HOMOGENEOUS_REFERENCE_DT
+    assert len(model["acquisition"]["receiver_locations"]) == 4
+
+
+def test_acoustic_physics_builds_heterogeneous_model() -> None:
+    """The heterogeneous model reads its lengths and file from the inputs."""
+    physics = AcousticCpwPhysics(
+        {"minimum_velocity_in_the_domain": 1.5, "length_z": 3.0, "length_x": 17.0}
+    )
+    calculator = make_calculator_stub(
+        velocity_profile_type=VelocityProfileType.HETEROGENEOUS,
+        velocity_model_file_name="velocity.segy",
     )
 
-    model = input_models.create_initial_model_for_meshing_parameter_2D_homogeneous(obj)
+    model = physics.build_dictionary(calculator, "spectral_quadrilateral", 4)
 
-    lbda = obj.minimum_velocity / obj.source_frequency
-    assert model["mesh"]["length_z"] == pytest.approx(40 * lbda)
-    assert model["mesh"]["length_x"] == pytest.approx(30 * lbda)
-    assert model["absorving_boundary_conditions"]["pad_length"] == pytest.approx(lbda)
-    assert model["time_axis"]["final_time"] == pytest.approx(20 * (1.0 / obj.source_frequency))
-    assert len(model["acquisition"]["receiver_locations"]) == expected_receivers
+    assert model["mesh"]["length_z"] == 3.0
+    assert model["mesh"]["length_x"] == 17.0
+    assert model["mesh"]["cells_per_wavelength"] == 2.8
+    assert model["synthetic_data"]["real_velocity_file"] == "velocity.segy"
 
 
-def test_create_initial_model_for_meshing_parameter_2d_homogeneous_warns_for_large_velocity():
-    obj = _base_meshing_obj(
-        velocity_profile_type="homogeneous",
-        minimum_velocity=600.0,
-        source_frequency=6.0,
-    )
+def test_acoustic_physics_rejects_3d() -> None:
+    """Only 2D acoustic models are implemented."""
+    physics = AcousticCpwPhysics({"minimum_velocity_in_the_domain": 1.5})
+    calculator = make_calculator_stub(dimension=3)
 
-    with pytest.warns(UserWarning, match="Velocity in meters per second"):
-        input_models.create_initial_model_for_meshing_parameter_2D_homogeneous(obj)
-
-
-@pytest.mark.parametrize("profile", ["homogeneous", "heterogeneous"])
-def test_create_initial_model_for_meshing_parameter_3d_not_implemented(profile):
-    obj = _base_meshing_obj(dimension=3, velocity_profile_type=profile)
-    with pytest.raises(NotImplementedError, match="Not yet implemented"):
-        input_models.create_initial_model_for_meshing_parameter_3D(obj)
-
-
-def test_create_initial_model_for_meshing_parameter_3d_rejects_invalid_profile():
-    obj = _base_meshing_obj(dimension=3, velocity_profile_type="layered")
-    with pytest.raises(ValueError, match="Velocity profile type is not"):
-        input_models.create_initial_model_for_meshing_parameter_3D(obj)
+    with pytest.raises(NotImplementedError, match="only supports 2D"):
+        physics.build_dictionary(calculator, "spectral_quadrilateral", 4)
