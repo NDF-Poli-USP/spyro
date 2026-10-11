@@ -105,11 +105,12 @@ def _analytical_solution(
     fft_rw = np.fft.fft(ricker_wavelet)
     fft_rw = fft_rw[0:nf]
 
+    # The zero and last frequencies are left out, as the Hankel function is
+    # singular at zero
+    inner = slice(1, nf - 1)
     U_a = np.zeros((nf), dtype=complex)
-    for a in range(1, nf - 1):
-        k = 2 * np.pi * frequency_axis[a] / c_value
-        tmp = k * offset
-        U_a[a] = -1j * np.pi * hankel2(0.0, tmp) * fft_rw[a]
+    k = 2 * np.pi * frequency_axis[inner] / c_value
+    U_a[inner] = -1j * np.pi * hankel2(0.0, k * offset) * fft_rw[inner]
 
     U_t = 1.0 / (2.0 * np.pi) * np.real(np.fft.ifft(U_a[:], num_t))
 
