@@ -118,8 +118,8 @@ class VelocityProfileType(StrEnum):
     """Enum for the velocity profile used by the cells-per-wavelength calculator.
 
     HOMOGENEOUS: Constant material, compared against an analytical solution.
-    HETEROGENEOUS: Material read from file, compared against a numerical
-    reference solution.
+    HETEROGENEOUS: Material read from file or given by a material model,
+    compared against a numerical reference solution.
     """
 
     HOMOGENEOUS = "homogeneous"
