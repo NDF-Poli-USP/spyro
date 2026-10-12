@@ -32,11 +32,11 @@ case_small_2D = {
     "length_x": 1.0,
     "length_y": 0.0,
     "edge_length": 0.010,
-    "interface_x": 0.5,
-    "source_locations": [(-0.5, 0.55)],
+    "interface_z": -0.5,
+    "source_locations": [(-0.45, 0.5)], # [(-0.5, 0.55)]
     "frequency": 25,
-    "receiver_location": [(-0.51, 0.51)],
-    "solid_receiver_locations": [(-0.49, 0.49)],
+    "receiver_location": [(-0.49, 0.49)], # [(-0.51, 0.51)]
+    "solid_receiver_locations": [(-0.51, 0.51)], # [(-0.49, 0.49)]
     "final_time": 0.22,
     "dt": 0.0001,
     "velocity_fluid": None,
@@ -54,7 +54,7 @@ case_large_2D = {
     "length_x": 12.0,
     "length_y": 0.0,
     "edge_length": 0.040,
-    "interface_x": 6.0,
+    "interface_z": 6.0,
     "source_locations": [(-15.0, 6.6)],
     "frequency": 10,
     "receiver_location": [(-15.01, 6.01)],
@@ -76,7 +76,7 @@ case_3D = {
     "length_x": 4.0,
     "length_y": 6.0,
     "edge_length": 0.050,
-    "interface_x": 2.5,
+    "interface_z": 2.5,
     "source_locations": [(-3.0, 2.65, 3.0)],
     "frequency": 10,
     "receiver_location": [(-3.01, 2.51, 3.0)],
@@ -94,7 +94,7 @@ case_3D = {
 cases = {1: ("case_small_2d", case_small_2D),
          2: ("case_large_2d", case_large_2D),
          3: ("case_3d", case_3D)}
-CASE_NUM = 3
+CASE_NUM = 1
 CASE_NAME, selected_case = cases[CASE_NUM]
 
 DIMENSION = 3 if CASE_NAME == "case_3d" else 2
@@ -124,7 +124,7 @@ dictionary["mesh"] = {
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
     "edge_length": selected_case["edge_length"],
-    "interface_x": selected_case["interface_x"],
+    "interface_z": selected_case["interface_z"],
     "absorb_left": False,
     "absorb_right": False,
     "absorb_top": False,
@@ -166,8 +166,8 @@ dictionary["visualization"] = {
     "p_equivalent_output": False,
     "p_equivalent_output_filename": f"{OUT}/p_equivalent_{TAG}.pvd",
     "interface_error_frequency": 20,
-    "sigma_xx_output": True,
-    "sigma_xx_output_filename": f"{OUT}/sigma_xx_{TAG}.pvd",
+    "sigma_zz_output": True,
+    "sigma_zz_output_filename": f"{OUT}/sigma_zz_{TAG}.pvd",
 }
 
 dictionary["synthetic_data"] = {
