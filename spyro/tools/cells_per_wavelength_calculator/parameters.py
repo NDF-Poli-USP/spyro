@@ -88,13 +88,14 @@ class CpwParameters:
     cpw_max : float
         Largest cells-per-wavelength evaluated. Default is :data:`MAX_CPW`.
     search_direction : CpwSearchDirection
-        Default is ``CpwSearchDirection.BACKWARD``.
+        Default is ``CpwSearchDirection.FORWARD``.
     timestep_calculation : TimeStepCalculationType
         How the time step of each forward solve is chosen. Default is
-        ``TimeStepCalculationType.EXACT``.
+        ``TimeStepCalculationType.FIXED`` when ``fixed_timestep`` is given,
+        else ``TimeStepCalculationType.ESTIMATE``.
     fixed_timestep : float or None
         Time step of every solve, given only with
-        ``TimeStepCalculationType.FIXED``.
+        ``TimeStepCalculationType.FIXED``. Default is None.
     testing : bool
         Use a reduced acquisition, for faster tests. Default is False.
     save_reference : bool
@@ -129,10 +130,8 @@ class CpwParameters:
     accepted_error_threshold: float | None = None
     threshold_discretization: ThresholdDiscretization | bool | dict | None = None
     cpw_max: float = MAX_CPW
-    search_direction: CpwSearchDirection | str = CpwSearchDirection.BACKWARD
-    timestep_calculation: TimeStepCalculationType | str = (
-        TimeStepCalculationType.EXACT
-    )
+    search_direction: CpwSearchDirection | str = CpwSearchDirection.FORWARD
+    timestep_calculation: TimeStepCalculationType | str | None = None
     fixed_timestep: float | None = None
     testing: bool = False
     save_reference: bool = False
@@ -159,6 +158,14 @@ class CpwParameters:
             )
         else:
             profile = self.velocity_profile_type
+        if self.timestep_calculation is None:
+            timestep_calculation = (
+                TimeStepCalculationType.ESTIMATE
+                if self.fixed_timestep is None
+                else TimeStepCalculationType.FIXED
+            )
+        else:
+            timestep_calculation = self.timestep_calculation
         # The dataclass is frozen, so conversions bypass its __setattr__
         for name, value, enum in (
             ("wave_type", self.wave_type, WaveType),
@@ -166,7 +173,7 @@ class CpwParameters:
             ("search_direction", self.search_direction, CpwSearchDirection),
             (
                 "timestep_calculation",
-                self.timestep_calculation,
+                timestep_calculation,
                 TimeStepCalculationType,
             ),
         ):

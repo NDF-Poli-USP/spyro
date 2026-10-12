@@ -48,6 +48,7 @@ def make_parameters(method: str, degree: int) -> dict:
         "C_max": 2.5,
         "accepted_error_threshold": 0.01,
         "C_accuracy": 0.1,
+        "search_direction": "backward",
     }
 
 

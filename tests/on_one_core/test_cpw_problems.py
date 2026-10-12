@@ -901,7 +901,11 @@ def test_parameters_require_mesh_frequency_factor() -> None:
 
 @pytest.mark.parametrize(
     "timestep_settings",
-    [{"time-step_calculation": "float"}, {"time-step": 1e-3}],
+    [
+        {"time-step_calculation": "float"},
+        {"time-step_calculation": "estimate", "time-step": 1e-3},
+        {"time-step_calculation": "exact", "time-step": 1e-3},
+    ],
 )
 def test_parameters_pair_fixed_timestep_with_calculation(
     timestep_settings: dict,
@@ -909,6 +913,26 @@ def test_parameters_pair_fixed_timestep_with_calculation(
     """A time step is given exactly when the time step is fixed."""
     with pytest.raises(ValueError, match="time-step"):
         CpwParameters.from_dict({**CALCULATOR_PARAMETERS, **timestep_settings})
+
+
+@pytest.mark.parametrize(
+    "timestep_settings, expected",
+    [
+        ({}, TimeStepCalculationType.ESTIMATE),
+        ({"time-step": None}, TimeStepCalculationType.ESTIMATE),
+        ({"time-step": 1e-3}, TimeStepCalculationType.FIXED),
+        ({"time-step_calculation": "estimate"}, TimeStepCalculationType.ESTIMATE),
+    ],
+)
+def test_parameters_infer_timestep_calculation(
+    timestep_settings: dict, expected: TimeStepCalculationType,
+) -> None:
+    """A given time step is fixed; otherwise the time step is estimated."""
+    parameters = CpwParameters.from_dict(
+        {**CALCULATOR_PARAMETERS, **timestep_settings}
+    )
+
+    assert parameters.timestep_calculation is expected
 
 
 def test_problem_requires_its_material() -> None:

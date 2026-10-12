@@ -9,8 +9,8 @@ resolution at which the evaluated element matches that accuracy.
 
 The domain is a periodic box, sized so that no wave from a periodic image
 of the source reaches a receiver before the final time. The search starts
-at ``C_initial`` and steps down until the error passes the threshold, then
-refines the result to ``C_accuracy``.
+at ``C_initial``, which must fail the threshold, and steps up until the
+error passes it, then refines the result to ``C_accuracy``.
 
 Run it with::
 
@@ -37,9 +37,8 @@ def run(
     degree: int = 4,
     accepted_error_threshold: float | None = None,
     threshold_discretization: ThresholdDiscretization | bool | dict | None = None,
-    cpw_initial: float = 4.0,
+    cpw_initial: float = 1.0,
     cpw_max: float = MAX_CPW,
-    fixed_timestep: float | None = None,
 ) -> spyro.tools.MeshingParameterCalculator:
     """Search for the minimum cells-per-wavelength of one discretization.
 
@@ -58,12 +57,11 @@ def run(
         degree 4 spectral quadrilateral mesh at cpw 2.0. Giving both is
         rejected by the calculator.
     cpw_initial : float, optional
-        Starting cells-per-wavelength. Default is 4.0.
+        Starting cells-per-wavelength, whose error must exceed the
+        threshold. Default is 1.0.
     cpw_max : float, optional
         Largest cells-per-wavelength evaluated. Default is
         :data:`~spyro.tools.cells_per_wavelength_calculator.MAX_CPW`.
-    fixed_timestep : float or None, optional
-        Time step of every solve. Default is None, for an estimated one.
 
     Returns
     -------
@@ -88,8 +86,7 @@ def run(
         "FEM_method_to_evaluate": method,
         "dimension": 2,
         "receiver_setup": "near",
-        "time-step_calculation": "estimate" if fixed_timestep is None else "float",
-        "time-step": fixed_timestep,
+        "time-step_calculation": "estimate",
         "reference_degree": None,
         "C_reference": None,
         "desired_degree": degree,
