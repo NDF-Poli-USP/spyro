@@ -43,3 +43,27 @@ S-wavelength and comparing against the analytical point-force solution:
 ```bash
 python3 demos/elastic_homogeneous_cpw.py
 ```
+
+[acoustic_marmousi2_cpw.py](acoustic_marmousi2_cpw.py) finds the minimum
+cells-per-wavelength of a discretization on the Marmousi2 model with its
+water layer (Martin et al., 2006, doi: 10.1190/1.2172306), against a
+numerical reference. A single towed-streamer shot is used: an air gun 6 m
+deep and a streamer 8 m deep with receiver groups every 12.5 m at offsets
+from 2 km to 10 km. The P-wave velocity SEG-Y is
+not distributed with spyro; save it as
+`velocity_models/vp_marmousi-ii.segy` first. The run is long, so use MPI:
+
+```bash
+mpiexec -n N_CORES python3 demos/acoustic_marmousi2_cpw.py
+```
+
+[elastic_marmousi2_cpw.py](elastic_marmousi2_cpw.py) does the same for the
+2D isotropic elastic Marmousi2, with the water layer as an elastic material
+of zero S-wave velocity. The mesh is sized by the slowest wave in the
+model, the rock S-wave or the water P-wave. It also needs the S-wave
+velocity and density SEG-Ys, saved as `velocity_models/vs_marmousi-ii.segy`
+and `velocity_models/rho_marmousi-ii.segy`:
+
+```bash
+mpiexec -n N_CORES python3 demos/elastic_marmousi2_cpw.py
+```

@@ -7,7 +7,14 @@ from .heterogeneous_case import (
     MaterialFileCase,
     MaterialModelCase,
 )
-from .heterogeneous_cases import ElasticSyntheticCase
+from .heterogeneous_cases import (
+    MARMOUSI2_DENSITY_FILE,
+    MARMOUSI2_P_WAVE_VELOCITY_FILE,
+    MARMOUSI2_S_WAVE_VELOCITY_FILE,
+    AcousticMarmousi2Case,
+    ElasticMarmousi2Case,
+    ElasticSyntheticCase,
+)
 from .line_search import (
     COARSE_STEP_FRACTION,
     LINE_SEARCHES,
@@ -35,14 +42,19 @@ __all__ = [
     "CPW_PROBLEMS",
     "ISOTROPIC_ELASTIC",
     "LINE_SEARCHES",
+    "MARMOUSI2_DENSITY_FILE",
+    "MARMOUSI2_P_WAVE_VELOCITY_FILE",
+    "MARMOUSI2_S_WAVE_VELOCITY_FILE",
     "MAX_CPW",
     "AcousticHeterogeneousProblem",
     "AcousticHomogeneousProblem",
+    "AcousticMarmousi2Case",
     "CpwEvaluation",
     "CpwParameters",
     "CpwProblem",
     "ElasticHeterogeneousProblem",
     "ElasticHomogeneousProblem",
+    "ElasticMarmousi2Case",
     "ElasticSyntheticCase",
     "HeterogeneousCase",
     "HeterogeneousCpwProblem",
