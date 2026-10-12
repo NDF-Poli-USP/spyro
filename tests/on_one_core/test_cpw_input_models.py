@@ -313,8 +313,8 @@ def test_acoustic_problem_builds_homogeneous_model() -> None:
         make_parameters(
             **{
                 "minimum_velocity_in_the_domain": 1.5,
-                "time-step_calculation": "float",
-                "time-step": 2e-3,
+                "timestep_calculation": "float",
+                "timestep": 2e-3,
             }
         )
     )

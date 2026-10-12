@@ -26,8 +26,7 @@ DICTIONARY_KEYS = {
     "cpw_accuracy": "C_accuracy",
     "cpw_max": "C_max",
     "cpw_reference": "C_reference",
-    "timestep_calculation": "time-step_calculation",
-    "fixed_timestep": "time-step",
+    "fixed_timestep": "timestep",
 }
 
 
@@ -199,7 +198,7 @@ class CpwParameters:
         is_fixed = self.timestep_calculation is TimeStepCalculationType.FIXED
         if is_fixed != (self.fixed_timestep is not None):
             raise ValueError(
-                "Give a time-step exactly when time-step_calculation is "
+                "Give a timestep exactly when timestep_calculation is "
                 f"{TimeStepCalculationType.FIXED.value!r}."
             )
 

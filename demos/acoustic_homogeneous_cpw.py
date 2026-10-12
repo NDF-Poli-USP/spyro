@@ -86,7 +86,7 @@ def run(
         "FEM_method_to_evaluate": method,
         "dimension": 2,
         "receiver_setup": "near",
-        "time-step_calculation": "estimate",
+        "timestep_calculation": "estimate",
         "reference_degree": None,
         "C_reference": None,
         "desired_degree": degree,

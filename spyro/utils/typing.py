@@ -131,7 +131,7 @@ class TimeStepCalculationType(StrEnum):
 
     EXACT: Maximum stable time step from the exact largest eigenvalue.
     ESTIMATE: Maximum stable time step from an estimated largest eigenvalue.
-    FIXED: User-supplied time step, read from the ``"time-step"`` key.
+    FIXED: User-supplied time step, read from the ``"timestep"`` key.
     """
 
     EXACT = "exact"
