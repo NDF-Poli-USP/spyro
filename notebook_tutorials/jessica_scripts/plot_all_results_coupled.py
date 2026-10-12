@@ -1,13 +1,13 @@
 """Single analysis script: receiver comparisons (with or without Gar6more),
 interface normal-displacement continuity and sparsity patterns.
 
-The case (small 2D, large 2D or 3D) is chosen with CASE_NAME. Each scheme is
-identified by the tag used in the forward script,
+The case is chosen with CASE_NAME. Each scheme is identified by the tag used
+in the forward script,
     <case>_<scheme>_<dim>d   (e.g. case_small_2d_sequential_2d),
 which gives the input files:
     results/spyro_receiver_data_<tag>.npz
     results/sparsity_<tag>.npz
-The Gar6more reference of the same case is read from:
+The Gar6more reference of the same case, when it exists, is read from:
     results_gar6/<case>/fluid/P.dat
     results_gar6/<case>/solid/Ux.dat, Uy.dat (Uz.dat in 3D)
 """
@@ -25,10 +25,16 @@ from sparsity_plots import load_sparsity_matrices
 # ===========================================================================
 # Settings
 # ===========================================================================
-CASE_NAME = "case_small_2d"   # "case_small_2d", "case_large_2d" or "case_3d"
-DIMENSION = 3 if CASE_NAME == "case_3d" else 2
+# "case_small_2d", "case_large_2d", "case_3d",
+# "case_small_2d_irregular_topography", "case_large_2d_irregular_topography",
+# "case_3d_irregular_topography"
+CASE_NAME = "case_3d"
+DIMENSION = 3 if CASE_NAME.startswith("case_3d") else 2
 
-# Schemes to include. Comment out a line to remove a scheme.
+# Results computed before the axis change (x vertical, z horizontal):
+# u_solid columns are (horizontal, vertical[, y]) instead of (vertical, horizontal[, y]).
+LEGACY_AXES = True
+
 SCHEMES = {
     "P – u_s (sequential)": ("sequential", dict(color="tab:blue", lw=1.5, ls="-")),
     # "P – u_s (monolithic)": ("monolithic", dict(color="tab:green", lw=1.5, ls="-")),
@@ -36,17 +42,15 @@ SCHEMES = {
 CASES = {label: (f"{CASE_NAME}_{scheme}_{DIMENSION}d", style)
          for label, (scheme, style) in SCHEMES.items()}
 
-SHOW_GAR6 = True         # include the Gar6more reference and the L2 errors
-NORMALIZE = False        # peak-normalize the curves (forced True if SHOW_GAR6)
-PLOT_CONTINUITY = True   # interface normal-displacement continuity
-PLOT_SPARSITY = True     # sparsity
+NORMALIZE = False
+PLOT_CONTINUITY = True
+PLOT_SPARSITY = True
 
-# Font sizes
-FS_SUPTITLE = 22   # figure title
-FS_TITLE    = 22   # subplot title
-FS_LABEL    = 18   # axis labels
-FS_TICKS    = 18   # tick labels
-FS_LEGEND   = 14   # legend
+FS_SUPTITLE = 22
+FS_TITLE    = 22
+FS_LABEL    = 18
+FS_TICKS    = 18
+FS_LEGEND   = 14
 
 RESULTS_DIR = "results"
 GAR6_BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results_gar6")
@@ -54,31 +58,28 @@ GAR6MORE_DIR_FLUID = f"{GAR6_BASE}/{CASE_NAME}/fluid"
 GAR6MORE_DIR_SOLID = f"{GAR6_BASE}/{CASE_NAME}/solid"
 GAR6_NAME = "Gar6more3D" if DIMENSION == 3 else "Gar6more2D"
 GAR6_STYLE = dict(color="red", lw=1.5, ls="--")
+SHOW_GAR6 = os.path.isfile(f"{GAR6MORE_DIR_FLUID}/P.dat")
 
-# In all three cases the solid receiver is on the larger-z side of the source,
-# which flips the sign of the tangential component relative to Gar6more.
-FLIP_UZ = True
+# The solid receiver is on the larger-x side of the source, which flips the
+# sign of the horizontal component relative to Gar6more.
+FLIP_UX = True
 
-# Spyro component -> (Gar6more file, sign).
-#   Spyro: u_z = along the interface (offset direction), u_x = normal to it,
-#          u_y = second horizontal direction (3D only).
-#   Gar6more2D: Ux = horizontal, Uy = vertical.
+# (name, column in u_solid, Gar6more file, sign)
+COL_UZ, COL_UX = (1, 0) if LEGACY_AXES else (0, 1)
 if DIMENSION == 2:
     COMPONENTS = [
-        ("uz", "Ux.dat", -1.0 if FLIP_UZ else 1.0),
-        ("ux", "Uy.dat", -1.0),
+        ("uz", COL_UZ, "Uy.dat", -1.0),
+        ("ux", COL_UX, "Ux.dat", -1.0 if FLIP_UX else 1.0),
     ]
 else:
-    # TO CONFIRM with the Gar6more3D documentation/output: assumed here
-    # Ux = horizontal (offset direction), Uy = second horizontal, Uz = vertical.
     COMPONENTS = [
-        ("uz", "Ux.dat", -1.0 if FLIP_UZ else 1.0),
-        ("ux", "Uz.dat", -1.0),
-        ("uy", "Uy.dat", 1.0),
+        ("uz", COL_UZ, "Uz.dat", -1.0),
+        ("ux", COL_UX, "Ux.dat", -1.0 if FLIP_UX else 1.0),
+        ("uy", 2, "Uy.dat", 1.0),
     ]
 
 if SHOW_GAR6:
-    NORMALIZE = True   # the Gar6more amplitude scale differs from spyro's
+    NORMALIZE = True
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 # ===========================================================================
@@ -125,8 +126,10 @@ if SHOW_GAR6:
     print(f"Gar6more fluid: {GAR6MORE_DIR_FLUID}")
     print(f"Gar6more solid: {GAR6MORE_DIR_SOLID}")
     gar6 = {"p": load_gar6more_file(f"{GAR6MORE_DIR_FLUID}/P.dat")}
-    for comp, fname, _ in COMPONENTS:
+    for comp, _, fname, _ in COMPONENTS:
         gar6[comp] = load_gar6more_file(f"{GAR6MORE_DIR_SOLID}/{fname}")
+else:
+    print("No Gar6more reference for this case — plotting spyro only.")
 
 prep = normalize if NORMALIZE else (lambda x: x)
 results = {}
@@ -140,22 +143,21 @@ for label, (tag, style) in CASES.items():
     u = np.asarray(d["u_solid"])
 
     dt_case = float(d["dt"])
-    t_p = np.arange(len(p)) * dt_case   # sample k is t = k*dt
+    t_p = np.arange(len(p)) * dt_case
     t_u = np.arange(len(u)) * dt_case
 
     r = dict(tag=tag, style=style, t_p=t_p, t_u=t_u, p=prep(p),
-             ux_solid_raw=u[:, 1])
-    for i, comp in enumerate(["uz", "ux", "uy"][:u.shape[1]]):
-        r[comp] = prep(u[:, i])
+             uz_solid_raw=u[:, COL_UZ])
+    for comp, col, _, _ in COMPONENTS:
+        r[comp] = prep(u[:, col])
 
-    # Fluid-side normal displacement (raw), if it was recorded
-    if "u_fluid_x" in d and np.asarray(d["u_fluid_x"]).size:
-        r["ux_fluid_raw"] = np.asarray(d["u_fluid_x"]).ravel()
+    if "u_fluid_z" in d and np.asarray(d["u_fluid_z"]).size:
+        r["uz_fluid_raw"] = np.asarray(d["u_fluid_z"]).ravel()
 
     if SHOW_GAR6:
         r["p_g"] = gar6_on(t_p, *gar6["p"])
         r["err_p"] = MeasureError.calculate_normalized_L2_error(r["p"], r["p_g"])
-        for comp, _, sign in COMPONENTS:
+        for comp, _, _, sign in COMPONENTS:
             r[f"{comp}_g"] = gar6_on(t_u, *gar6[comp], sign)
             r[f"err_{comp}"] = MeasureError.calculate_normalized_L2_error(
                 r[comp], r[f"{comp}_g"])
@@ -165,7 +167,7 @@ for label, (tag, style) in CASES.items():
 if not results:
     raise SystemExit("No receiver .npz file found.")
 
-comp_keys = [c for c, _, _ in COMPONENTS]
+comp_keys = [c for c, _, _, _ in COMPONENTS]
 if SHOW_GAR6:
     w = max(len(k) for k in results) + 2
     print(f"\n=== Normalized L2 error vs {GAR6_NAME} ===")
@@ -226,21 +228,21 @@ print(f"[OK] Saved to: {os.path.abspath(u_path)}")
 # ===========================================================================
 if PLOT_CONTINUITY:
     for label, r in results.items():
-        if "ux_fluid_raw" not in r:
-            print(f"[WARNING] '{label}': fluid-side u_x not recorded — no continuity plot.")
+        if "uz_fluid_raw" not in r:
+            print(f"[WARNING] '{label}': fluid-side u_z not recorded — no continuity plot.")
             continue
-        uf, us = r["ux_fluid_raw"], r["ux_solid_raw"]
+        uf, us = r["uz_fluid_raw"], r["uz_solid_raw"]
         n = min(len(uf), len(us))
         t = r["t_u"][:n]
         mismatch = np.linalg.norm(uf[:n] - us[:n]) / max(np.linalg.norm(us[:n]), 1e-30)
 
         fig_c, ax_c = plt.subplots(figsize=(12, 5))
         ax_c.plot(t, uf[:n], color=r["style"]["color"], lw=1.5, ls="-",
-                  label="fluid side u_x")
+                  label="fluid side u_z")
         ax_c.plot(t, us[:n], color="black", lw=1.5, ls="--",
-                  label="solid side u_x")
+                  label="solid side u_z")
         style_axis(ax_c, f"Interface continuity — {label}",
-                   "Normal displacement u_x", "Time (s)")
+                   "Normal displacement u_z", "Time (s)")
         ax_c.text(0.01, 0.95, f"relative mismatch = {mismatch * 100:.2f}%",
                   transform=ax_c.transAxes, fontsize=FS_LEGEND, va="top")
         fig_c.tight_layout()
@@ -263,7 +265,7 @@ if PLOT_SPARSITY:
         fig_s, axes_s = plt.subplots(1, len(mats), figsize=(6.5 * len(mats), 7))
         for ax, A, lab in zip(np.atleast_1d(axes_s), mats, labels):
             ax.spy(A, markersize=4 if max(A.shape) < 5000 else 0.3)
-            if split > 0:  # monolithic: separate the P and u_s blocks
+            if split > 0:
                 ax.axhline(split, color="red", lw=0.8, ls="--")
                 ax.axvline(split, color="red", lw=0.8, ls="--")
             ax.set_title(lab, fontsize=FS_TITLE)

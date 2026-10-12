@@ -8,6 +8,7 @@ from ..utils.typing import override, WaveType
 from ..domains.space import create_function_space
 from ..domains.quadrature import quadrature_rules
 from ..receivers.Receivers import Receivers
+from ..io.segy_io import read_segy_velocity_model
 
 
 def _extract_interface_markers(parent_mesh, child_mesh):
@@ -61,33 +62,53 @@ class AcousticElasticWave(Wave):
         self._setup_snapshots(dictionary)
 
     # ------------------------------------------------------------------
-    # Mesh, submeshes and measures
+    # Malha, submalhas e medidas
     # ------------------------------------------------------------------
-    def _mark_mesh_regions(self):
-        if self.interface_z is None:
-            raise ValueError(
-                "dictionary['mesh']['interface_z'] must be set when "
-                "using an automatically-generated mesh (mesh_file=None) "
-                "with AcousticElasticWave."
-            )
-        dq0 = fire.FunctionSpace(self.mesh, "DG", 0)
+    def _cell_centers(self):
+        V = fire.VectorFunctionSpace(self.mesh, "DG", 0)
+        centers = fire.Function(V).interpolate(fire.SpatialCoordinate(self.mesh))
+        return centers.dat.data_ro_with_halos
 
-        indicator_fluid = fire.Function(dq0).interpolate(
-            fire.conditional(self.mesh_z >= self.interface_z, 1, 0)
-        )
-        self.mesh.mark_entities(indicator_fluid, self.fluid_id)
-        indicator_solid = fire.Function(dq0).interpolate(
-            fire.conditional(self.mesh_z < self.interface_z, 1, 0)
-        )
-        self.mesh.mark_entities(indicator_solid, self.solid_id)
+    def _fluid_cells(self):
+        mesh_dict = self.input_dictionary["mesh"]
+        centers = self._cell_centers()
+        z, x = centers[:, 0], centers[:, 1]
+
+        if mesh_dict.get("mesh_type") == "firedrake_mesh":
+            if self.interface_z is None:
+                raise ValueError(
+                    "dictionary['mesh']['interface_z'] must be set for "
+                    "mesh_type='firedrake_mesh'."
+                )
+            return z >= self.interface_z
+
+        vp, nz, nx = read_segy_velocity_model(mesh_dict["segy_velocity_model"])
+        lz, lx = mesh_dict["length_z"], mesh_dict["length_x"]
+        iz = np.clip(np.rint((z + lz) / lz * (nz - 1)).astype(int), 0, nz - 1)
+        ix = np.clip(np.rint(x / lx * (nx - 1)).astype(int), 0, nx - 1)
+        return np.isclose(vp[iz, ix], mesh_dict["water_search_value"], rtol=1e-5)
+
+    def _mark_mesh_regions(self):
+        is_fluid = self._fluid_cells()
+        dq0 = fire.FunctionSpace(self.mesh, "DG", 0)
+        for region_id, mask in ((self.fluid_id, is_fluid), (self.solid_id, ~is_fluid)):
+            indicator = fire.Function(dq0)
+            indicator.dat.data_with_halos[:] = mask
+            self.mesh.mark_entities(indicator, region_id, label_name=self.region_label)
 
     def _build_submeshes(self):
         dim = self.dimension
-        self.submesh_fluid = fire.Submesh(self.mesh, dim, self.fluid_id)
-        self.submesh_solid = fire.Submesh(self.mesh, dim, self.solid_id)
+        self.submesh_fluid = fire.Submesh(
+            self.mesh, dim, self.fluid_id, label_name=self.region_label
+        )
+        self.submesh_solid = fire.Submesh(
+            self.mesh, dim, self.solid_id, label_name=self.region_label
+        )
 
-        self.submesh_fluid.coordinates.dat.data_with_halos[:, 0] *= -1.0
-        self.submesh_solid.coordinates.dat.data_with_halos[:, 0] *= -1.0
+        for sub in (self.submesh_fluid, self.submesh_solid):
+            z = sub.coordinates.dat.data_with_halos[:, 0]
+            if z.size and z.max() > 1e-12:
+                z *= -1.0
 
         iface_fluid = _extract_interface_markers(self.mesh, self.submesh_fluid)
         iface_solid = _extract_interface_markers(self.mesh, self.submesh_solid)
@@ -114,12 +135,11 @@ class AcousticElasticWave(Wave):
 
     @override
     def _create_function_space(self):
-        is_automatic_mesh = self.input_dictionary["mesh"].get("mesh_file") is None
-        if is_automatic_mesh:
-            self._mark_mesh_regions()
+        if self.input_dictionary["mesh"].get("mesh_file"):
+            self.region_label = None
         else:
-            # TODO: mesh-file case not implemented yet.
-            pass
+            self.region_label = "fluid_solid_regions"
+            self._mark_mesh_regions()
 
         self._build_submeshes()
         self._build_measures()
@@ -198,7 +218,7 @@ class AcousticElasticWave(Wave):
     # ======END TEMPORARY======
 
     # ------------------------------------------------------------------
-    # Parameters and building the system
+    # Parâmetros e montagem
     # ------------------------------------------------------------------
     @override
     def _initialize_model_parameters(self):
@@ -247,7 +267,7 @@ class AcousticElasticWave(Wave):
         self._uf_normal = [0.0] * n_recv
 
     # ------------------------------------------------------------------
-    # States and interface with Wave
+    # Estados e interface com Wave
     # ------------------------------------------------------------------
     @override
     def _get_vstate(self):
@@ -316,7 +336,7 @@ class AcousticElasticWave(Wave):
         self._snapshot_step = 0
 
     # ------------------------------------------------------------------
-    # Time stepping and solving
+    # Passo de tempo e receptores
     # ------------------------------------------------------------------
     def solve(self):
         if self.solid_receivers is not None:
@@ -366,7 +386,7 @@ class AcousticElasticWave(Wave):
         self.fluid_displacement_history.append(step_uf)
 
     # ------------------------------------------------------------------
-    # Derived fields
+    # Campos derivados
     # ------------------------------------------------------------------
     def _compute_p_equivalent(self):
         dim = self.dimension
