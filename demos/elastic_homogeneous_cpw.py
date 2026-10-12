@@ -49,6 +49,7 @@ def run(
     threshold_discretization: ThresholdDiscretization | bool | dict | None = None,
     cpw_initial: float = 1.0,
     cpw_max: float = MAX_CPW,
+    load_reference: bool = False,
 ) -> spyro.tools.MeshingParameterCalculator:
     """Search for the minimum cells-per-wavelength of one discretization.
 
@@ -72,6 +73,11 @@ def run(
     cpw_max : float, optional
         Largest cells-per-wavelength evaluated. Default is
         :data:`~spyro.tools.cells_per_wavelength_calculator.MAX_CPW`.
+    load_reference : bool, optional
+        Load the reference receiver data from
+        ``elastic_homogeneous_cpw_reference.npy`` in the working
+        directory. If False, it is computed and saved there. Default is
+        False.
 
     Returns
     -------
@@ -103,7 +109,8 @@ def run(
         "C_initial": cpw_initial,
         "C_max": cpw_max,
         "C_accuracy": 0.1,
-        "save_reference": True,
+        "load_reference": load_reference,
+        "save_reference": not load_reference,
         **threshold,
     }
 
