@@ -22,7 +22,7 @@ The P-wave velocity, S-wave velocity and density SEG-Ys are not
 distributed with spyro. Save them as
 ``velocity_models/vp_marmousi-ii.segy``,
 ``velocity_models/vs_marmousi-ii.segy`` and
-``velocity_models/rho_marmousi-ii.segy``, see
+``velocity_models/density_marmousi-ii.segy``, see
 :class:`~spyro.tools.cells_per_wavelength_calculator.ElasticMarmousi2Case`,
 or give other files to :func:`run`. Then run, from the repository root::
 

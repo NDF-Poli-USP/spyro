@@ -62,8 +62,21 @@ mpiexec -n N_CORES python3 demos/acoustic_marmousi2_cpw.py
 of zero S-wave velocity. The mesh is sized by the slowest wave in the
 model, the rock S-wave or the water P-wave. It also needs the S-wave
 velocity and density SEG-Ys, saved as `velocity_models/vs_marmousi-ii.segy`
-and `velocity_models/rho_marmousi-ii.segy`:
+and `velocity_models/density_marmousi-ii.segy`:
 
 ```bash
 mpiexec -n N_CORES python3 demos/elastic_marmousi2_cpw.py
+```
+
+## Forward propagation
+
+[elastic_marmousi_forward_propagation.py](elastic_marmousi_forward_propagation.py)
+runs a single isotropic elastic forward propagation on Marmousi2, with
+the P-wave velocity, S-wave velocity and density read from the same three
+SEG-Ys as the elastic Marmousi2 calculator. The mesh is sized by the
+slowest S-wave in the rock and the time step is the largest stable one
+estimated for it. The mesh is fine, so use MPI:
+
+```bash
+mpiexec -n N_CORES python3 demos/elastic_marmousi_forward_propagation.py
 ```

@@ -34,7 +34,7 @@ MARMOUSI2_P_WAVE_VELOCITY_FILE = "velocity_models/vp_marmousi-ii.segy"
 MARMOUSI2_S_WAVE_VELOCITY_FILE = "velocity_models/vs_marmousi-ii.segy"
 #: Density SEG-Y of the Marmousi2 model (``MODEL_DENSITY_1.25m.segy`` in
 #: the same distribution).
-MARMOUSI2_DENSITY_FILE = "velocity_models/rho_marmousi-ii.segy"
+MARMOUSI2_DENSITY_FILE = "velocity_models/density_marmousi-ii.segy"
 
 # Single streamer shot of the Marmousi2 case, in km. The vessel sails
 # towards -x, towing the source and, behind it, the streamer.
