@@ -427,7 +427,7 @@ def test_elastic_cpw_search_meets_threshold() -> None:
         "dimension": 2,
         "receiver_setup": "line",
         "testing": True,
-        "time-step_calculation": "exact",
+        "timestep_calculation": "exact",
         "reference_degree": None,
         "C_reference": None,
         "desired_degree": 4,
@@ -843,8 +843,8 @@ def test_parameters_from_dict_maps_legacy_keys() -> None:
             **CALCULATOR_PARAMETERS,
             "C_max": 4.0,
             "search_direction": "forward",
-            "time-step_calculation": "float",
-            "time-step": 1e-3,
+            "timestep_calculation": "float",
+            "timestep": 1e-3,
         }
     )
 
@@ -902,16 +902,16 @@ def test_parameters_require_mesh_frequency_factor() -> None:
 @pytest.mark.parametrize(
     "timestep_settings",
     [
-        {"time-step_calculation": "float"},
-        {"time-step_calculation": "estimate", "time-step": 1e-3},
-        {"time-step_calculation": "exact", "time-step": 1e-3},
+        {"timestep_calculation": "float"},
+        {"timestep_calculation": "estimate", "timestep": 1e-3},
+        {"timestep_calculation": "exact", "timestep": 1e-3},
     ],
 )
 def test_parameters_pair_fixed_timestep_with_calculation(
     timestep_settings: dict,
 ) -> None:
     """A time step is given exactly when the time step is fixed."""
-    with pytest.raises(ValueError, match="time-step"):
+    with pytest.raises(ValueError, match="timestep"):
         CpwParameters.from_dict({**CALCULATOR_PARAMETERS, **timestep_settings})
 
 
@@ -919,9 +919,9 @@ def test_parameters_pair_fixed_timestep_with_calculation(
     "timestep_settings, expected",
     [
         ({}, TimeStepCalculationType.ESTIMATE),
-        ({"time-step": None}, TimeStepCalculationType.ESTIMATE),
-        ({"time-step": 1e-3}, TimeStepCalculationType.FIXED),
-        ({"time-step_calculation": "estimate"}, TimeStepCalculationType.ESTIMATE),
+        ({"timestep": None}, TimeStepCalculationType.ESTIMATE),
+        ({"timestep": 1e-3}, TimeStepCalculationType.FIXED),
+        ({"timestep_calculation": "estimate"}, TimeStepCalculationType.ESTIMATE),
     ],
 )
 def test_parameters_infer_timestep_calculation(
