@@ -35,3 +35,11 @@ acoustic case, against the analytical solution. Edit the arguments of
 ```bash
 python3 demos/acoustic_homogeneous_cpw.py
 ```
+
+[elastic_homogeneous_cpw.py](elastic_homogeneous_cpw.py) does the same
+for the 2D homogeneous isotropic elastic case, sizing the mesh by the
+S-wavelength and comparing against the analytical point-force solution:
+
+```bash
+python3 demos/elastic_homogeneous_cpw.py
+```
