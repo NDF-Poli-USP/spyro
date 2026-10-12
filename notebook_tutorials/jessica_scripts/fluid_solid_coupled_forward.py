@@ -1,24 +1,124 @@
 import os
 import time
 import resource
-import numpy as np
+from pathlib import Path
 
+import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from firedrake import triplot
+from matplotlib.transforms import Affine2D
+from firedrake import Function, FunctionSpace, triplot, tripcolor
 
 from spyro.solvers.acoustic_elastic_wave import AcousticElasticWave
-from spyro.plots.general_plots import plot_model_jessica
-from sparsity_plots import save_sparsity_matrices
+from spyro.solvers.acoustic_solver_construction_no_pml import velocity_fluid
 from spyro.utils.utils import communicate
+from spyro.io.segy_io import create_segy_from_grid
+from sparsity_plots import save_sparsity_matrices
 
-import sparsity_plots; print("sparsity_plots from:", sparsity_plots.__file__)
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+
+def build_segy(filename, length_z, length_x, dz, interface, v_fluid, v_solid):
+    z = np.linspace(0.0, -length_z, int(round(length_z / dz)) + 1)
+    x = np.linspace(0.0, length_x, int(round(length_x / dz)) + 1)
+    X, Z = np.meshgrid(x, z, indexing="ij")
+    if callable(interface):
+        z_int = np.broadcast_to(interface(x), x.shape)
+    elif isinstance(interface, (str, Path)):
+        d = np.loadtxt(interface)
+        z_int = np.interp(x, d[:, 0], d[:, 1])
+    else:
+        z_int = np.full(x.shape, float(interface))
+    field = lambda v: np.broadcast_to(v(Z, X), Z.shape) if callable(v) else np.full(Z.shape, float(v))
+    v = np.where(Z > z_int[:, None], field(v_fluid), field(v_solid))
+    create_segy_from_grid(v[:, ::-1].astype(np.float32), str(filename))
+
+
+def specfem_interface(filename, index, length_z):
+    with open(filename) as f:
+        rows = [line.split() for line in f
+                if line.strip() and not line.lstrip().startswith("#")]
+    it = iter(rows[1:])
+    interfaces = []
+    for _ in range(int(rows[0][0])):
+        n = int(next(it)[0])
+        interfaces.append(np.array([[float(a), float(b)] for a, b in (next(it) for _ in range(n))]))
+    xs = interfaces[index][:, 0] / 1000.0
+    zs = interfaces[index][:, 1] / 1000.0 - length_z
+    return lambda x: np.interp(x, xs, zs)
+
+
+def acquisition_on_interface(z_int, x_source, height_source, offset, distance):
+    z_at = lambda x: float(z_int(np.array([x]))[0])
+    return {
+        "source_locations": [(z_at(x_source) + height_source, x_source)],
+        "receiver_location": [(z_at(x_source - offset) + distance, x_source - offset)],
+        "solid_receiver_locations": [(z_at(x_source + offset) - distance, x_source + offset)],
+    }
+
+
+def plot_mesh_xz(meshes, title, filename):
+    fig, ax = plt.subplots(figsize=(8, 8))
+    swap = Affine2D().from_values(0, 1, 1, 0, 0, 0) + ax.transData
+    for mesh, color in meshes:
+        kw = {"edgecolors": color} if color else {}
+        for coll in triplot(mesh, axes=ax, interior_kw=kw):
+            coll.set_transform(swap)
+    ax.set_xlim(0.0, selected_case["length_x"])
+    ax.set_ylim(-selected_case["length_z"], 0.0)
+    ax.set_aspect("equal")
+    ax.set_xlabel("X (km)", fontsize=18)
+    ax.set_ylabel("Z (km)", fontsize=18)
+    ax.set_title(title, fontsize=22)
+    ax.tick_params(axis="both", labelsize=18)
+    fig.tight_layout()
+    fig.savefig(filename, dpi=150)
+    plt.close(fig)
+
+
+def plot_model_xz(wave, filename):
+    vf = Function(FunctionSpace(wave.submesh_fluid, "CG", 1)).interpolate(velocity_fluid(wave))
+    vs = Function(FunctionSpace(wave.submesh_solid, "CG", 1)).interpolate(
+        ((wave.lmbda + 2 * wave.mu) / wave.rho) ** 0.5)
+    vmin = min(vf.dat.data_ro.min(), vs.dat.data_ro.min())
+    vmax = max(vf.dat.data_ro.max(), vs.dat.data_ro.max())
+
+    fig, ax = plt.subplots(figsize=(9, 9))
+    swap = Affine2D().from_values(0, 1, 1, 0, 0, 0) + ax.transData
+    for f in (vf, vs):
+        img = tripcolor(f, axes=ax, vmin=vmin, vmax=vmax)
+        img.set_transform(swap)
+
+    acq = dictionary["acquisition"]
+    for key, marker, color, label in (
+        ("source_locations", "*", "green", "Source"),
+        ("receiver_locations", "v", "red", "Receiver (fluid)"),
+        ("solid_receiver_locations", "^", "orange", "Receiver (solid)"),
+    ):
+        pts = np.asarray(acq[key])
+        ax.scatter(pts[:, 1], pts[:, 0], marker=marker, c=color, s=120, label=label, zorder=5)
+
+    ax.set_xlim(0.0, selected_case["length_x"])
+    ax.set_ylim(-selected_case["length_z"], 0.0)
+    ax.set_aspect("equal")
+    ax.set_xlabel("X (km)", fontsize=18)
+    ax.set_ylabel("Z (km)", fontsize=18)
+    ax.tick_params(axis="both", labelsize=18)
+    ax.legend(loc="best", fontsize=14)
+    cbar = fig.colorbar(img, ax=ax, orientation="horizontal")
+    cbar.set_label("Velocity (km/s)", fontsize=18)
+    cbar.ax.tick_params(labelsize=18)
+    fig.tight_layout()
+    fig.savefig(filename, dpi=150)
+    plt.close(fig)
+
 
 # ===========================================================================
 # Settings
 # ===========================================================================
 USE_MONOLITHIC = False
+MESH_TYPE = "firedrake_mesh"   # "gmsh_mesh" ou "firedrake_mesh"
 OUT = "results"
 os.makedirs(OUT, exist_ok=True)
 
@@ -33,10 +133,10 @@ case_small_2D = {
     "length_y": 0.0,
     "edge_length": 0.010,
     "interface_z": -0.5,
-    "source_locations": [(-0.45, 0.5)], # [(-0.5, 0.55)]
+    "source_locations": [(-0.45, 0.5)],
     "frequency": 25,
-    "receiver_location": [(-0.49, 0.49)], # [(-0.51, 0.51)]
-    "solid_receiver_locations": [(-0.51, 0.51)], # [(-0.49, 0.49)]
+    "receiver_location": [(-0.49, 0.49)],
+    "solid_receiver_locations": [(-0.51, 0.51)],
     "final_time": 0.22,
     "dt": 0.0001,
     "velocity_fluid": None,
@@ -45,20 +145,23 @@ case_small_2D = {
     "density_solid": 2.0,
     "p_wave_velocity": 2.0,
     "s_wave_velocity": 1.2,
+    "segy_dz": 0.002,
+    "segy_interface": -0.5,
+    "cells_per_wavelength": 6.0,
 }
 
 case_large_2D = {
     "cell_type": "Q",
     "degree": 4,
-    "length_z": 30.0,
-    "length_x": 12.0,
+    "length_z": 12.0,
+    "length_x": 30.0,
     "length_y": 0.0,
     "edge_length": 0.040,
-    "interface_z": 6.0,
-    "source_locations": [(-15.0, 6.6)],
+    "interface_z": -6.0,
+    "source_locations": [(-5.4, 15.0)],
     "frequency": 10,
-    "receiver_location": [(-15.01, 6.01)],
-    "solid_receiver_locations": [(-14.99, 5.99)],
+    "receiver_location": [(-5.99, 14.99)],
+    "solid_receiver_locations": [(-6.01, 15.01)],
     "final_time": 2.0,
     "dt": 0.0005,
     "velocity_fluid": None,
@@ -67,20 +170,23 @@ case_large_2D = {
     "density_solid": 2.5,
     "p_wave_velocity": 3.4,
     "s_wave_velocity": 1.963,
+    "segy_dz": 0.005,
+    "segy_interface": -6.0,
+    "cells_per_wavelength": 6.0,
 }
 
 case_3D = {
     "cell_type": "T",
     "degree": 3,
-    "length_z": 6.0,
-    "length_x": 4.0,
+    "length_z": 4.0,
+    "length_x": 6.0,
     "length_y": 6.0,
     "edge_length": 0.050,
-    "interface_z": 2.5,
-    "source_locations": [(-3.0, 2.65, 3.0)],
+    "interface_z": -1.5,
+    "source_locations": [(-1.35, 3.0, 3.0)],
     "frequency": 10,
-    "receiver_location": [(-3.01, 2.51, 3.0)],
-    "solid_receiver_locations": [(-2.99, 2.49, 3.0)],
+    "receiver_location": [(-1.49, 2.99, 2.99)],
+    "solid_receiver_locations": [(-1.51, 3.01, 3.01)],
     "final_time": 1.0,
     "dt": 4e-5,
     "velocity_fluid": None,
@@ -91,15 +197,38 @@ case_3D = {
     "s_wave_velocity": 1.963,
 }
 
+small_irregular_interface = lambda x: -0.5 + 0.02 * np.sin(2 * np.pi * x / 0.25)
+case_small_2D_irregular = dict(
+    case_small_2D,
+    segy_interface=small_irregular_interface,
+)
+
+large_irregular_interface = specfem_interface(SCRIPT_DIR / "interfaces_specfem.dat", 1, 9.6)
+case_large_2D_irregular = dict(
+    case_large_2D,
+    length_z=9.6,
+    length_x=20.0,
+    interface_z=None,
+    segy_interface=large_irregular_interface,
+    **acquisition_on_interface(large_irregular_interface, 10.0, 0.6, 0.01, 0.01),
+)
+
 cases = {1: ("case_small_2d", case_small_2D),
          2: ("case_large_2d", case_large_2D),
-         3: ("case_3d", case_3D)}
-CASE_NUM = 1
+         3: ("case_3d", case_3D),
+         4: ("case_small_2d_irregular_topography", case_small_2D_irregular),
+         5: ("case_large_2d_irregular_topography", case_large_2D_irregular)}
+CASE_NUM = 4
 CASE_NAME, selected_case = cases[CASE_NUM]
 
-DIMENSION = 3 if CASE_NAME == "case_3d" else 2
+DIMENSION = 3 if CASE_NAME.startswith("case_3d") else 2
 SCHEME = "monolithic" if USE_MONOLITHIC else "sequential"
 TAG = f"{CASE_NAME}_{SCHEME}_{DIMENSION}d"
+
+if selected_case["velocity_fluid"] is not None:
+    VP_WATER = selected_case["velocity_fluid"]
+else:
+    VP_WATER = np.sqrt(selected_case["bulk_modulus"] / selected_case["density_fluid"])
 
 # ===========================================================================
 # Dictionary
@@ -122,7 +251,7 @@ dictionary["mesh"] = {
     "length_x": selected_case["length_x"],
     "length_y": selected_case["length_y"],
     "mesh_file": None,
-    "mesh_type": "firedrake_mesh",
+    "mesh_type": MESH_TYPE,
     "edge_length": selected_case["edge_length"],
     "interface_z": selected_case["interface_z"],
     "absorb_left": False,
@@ -130,6 +259,27 @@ dictionary["mesh"] = {
     "absorb_top": False,
     "absorb_bottom": False,
 }
+
+if MESH_TYPE == "gmsh_mesh":
+    segy_file = f"{OUT}/model_{TAG}.segy"
+    build_segy(segy_file, selected_case["length_z"], selected_case["length_x"],
+               selected_case["segy_dz"], selected_case["segy_interface"],
+               VP_WATER, selected_case["s_wave_velocity"])
+    dictionary["mesh"].pop("edge_length")
+    dictionary["mesh"].update({
+        "output_filename": f"{OUT}/mesh_{TAG}.msh",
+        "segy_velocity_model": segy_file,
+        "cells_per_wavelength": selected_case["cells_per_wavelength"],
+        "frequency": selected_case["frequency"],
+        "min_element_size": selected_case["edge_length"],
+        "grade": 0.05,
+        "structured_mesh": selected_case["cell_type"] == "Q",
+        "apply_winslow": False,
+        "winslow_iterations": 2000,
+        "vp_water": VP_WATER,
+        "water_interface": True,
+        "water_search_value": VP_WATER,
+    })
 
 dictionary["acquisition"] = {
     "source_type": "ricker",
@@ -179,9 +329,6 @@ dictionary["synthetic_data"] = {
     "p_wave_velocity": selected_case["p_wave_velocity"],
     "s_wave_velocity": selected_case["s_wave_velocity"],
     "real_velocity_file": None,
-    "s_wave_velocity_fluid": 0.0,
-    "welded_interface_test": False,
-    "rotation_penalty": 1.0,
 }
 
 # ===========================================================================
@@ -200,35 +347,6 @@ print(f"Elapsed time: {elapsed:.2f}s")
 print(f"Memory: {mem_mb:.2f} MB")
 
 # ===========================================================================
-# Plots (2D only)
-# ===========================================================================
-if DIMENSION == 2 and Wave_obj.comm.comm.size == 1:
-    plot_model_jessica(Wave_obj, filename=f"{OUT}/model_{TAG}.png", flip_axis=False)
-
-    fig, ax = plt.subplots(figsize=(8, 8))
-    triplot(Wave_obj.mesh, axes=ax)
-    ax.set_aspect("equal")
-    ax.set_xlabel("Z (km)", fontsize=18)
-    ax.set_ylabel("X (km)", fontsize=18)
-    ax.set_title("Parent mesh", fontsize=22)
-    ax.tick_params(axis="both", labelsize=18)
-    plt.savefig(f"{OUT}/mesh_parent.png", dpi=150)
-    plt.close()
-
-    fig, ax = plt.subplots(figsize=(8, 8))
-    triplot(Wave_obj.submesh_fluid, axes=ax, interior_kw={"edgecolors": "blue"})
-    triplot(Wave_obj.submesh_solid, axes=ax, interior_kw={"edgecolors": "orange"})
-    ax.set_aspect("equal")
-    ax.set_xlabel("Z (km)", fontsize=18)
-    ax.set_ylabel("X (km)", fontsize=18)
-    ax.set_title("Child submeshes", fontsize=22)
-    ax.tick_params(axis="both", labelsize=18)
-    plt.savefig(f"{OUT}/mesh_child.png", dpi=150)
-    plt.close()
-
-from spyro.utils.utils import communicate
-
-# ===========================================================================
 # Save data
 # ===========================================================================
 p_spyro = np.asarray(Wave_obj.forward_solution_receivers)[:, 0]
@@ -239,7 +357,6 @@ n_procs = Wave_obj.comm.comm.size
 rank = Wave_obj.comm.comm.rank
 
 if n_procs == 1:
-    # assembled with local rows only in parallel: run in serial
     save_sparsity_matrices(Wave_obj, f"{OUT}/sparsity_{TAG}.npz")
 
 if rank == 0:
@@ -251,3 +368,12 @@ if rank == 0:
         u_solid=u_solid,
     )
     print(f"[OK] Saved: {OUT}/spyro_receiver_data_{TAG}.npz")
+
+# ===========================================================================
+# Plots (2D only)
+# ===========================================================================
+if DIMENSION == 2 and n_procs == 1:
+    plot_model_xz(Wave_obj, f"{OUT}/model_{TAG}.png")
+    plot_mesh_xz([(Wave_obj.mesh, None)], "Parent mesh", f"{OUT}/mesh_parent_{TAG}.png")
+    plot_mesh_xz([(Wave_obj.submesh_fluid, "blue"), (Wave_obj.submesh_solid, "orange")],
+                 "Child submeshes", f"{OUT}/mesh_child_{TAG}.png")

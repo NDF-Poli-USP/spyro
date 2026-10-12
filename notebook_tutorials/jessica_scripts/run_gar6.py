@@ -37,7 +37,7 @@ CASES = {
         "input": "Gar6more2D.dat", "kind": "solid"},
     5: {"name": "case_3d", "work": DIR_3D, "build": BUILD_3D,
         "executable": "Gar6more3D.out",
-        "dat": "Gar6more3D-case_3d.dat",
+        "dat": "Gar6more3D-case_3d_fluid.dat",
         "input": "Gar6more3D.dat", "kind": "fluid"},
     6: {"name": "case_3d", "work": DIR_3D, "build": BUILD_3D,
         "executable": "Gar6more3D.out",
@@ -51,7 +51,7 @@ PAIRS = {
     3: (5, 6),
 }
 
-OUTPUT_FILES = ["Ux.dat", "Uy.dat", "P.dat"]
+OUTPUT_FILES = ["Ux.dat", "Uy.dat", "Uz.dat", "P.dat"]
 
 # ===========================================================================
 
