@@ -48,6 +48,29 @@ ELASTIC_HETEROGENEOUS_FINAL_TIME = 2.0
 ELASTIC_HETEROGENEOUS_DT = 1e-4
 
 
+#: Time step of the homogeneous elastic analytical reference, in Ricker
+#: periods, when the solver time step is not fixed. Fine enough that
+#: interpolating onto the solver time step is negligible.
+ELASTIC_REFERENCE_DT_PERIODS = 1.0 / 500.0
+
+
+def _check_method(method: str) -> None:
+    """Check that a finite element method is supported.
+
+    Parameters
+    ----------
+    method : str
+        Finite element method.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not a key of :data:`MESH_TYPES`.
+    """
+    if method not in MESH_TYPES:
+        raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
+
+
 def set_mesh_type(method: str) -> str:
     """Return the mesh type used for a finite element method.
 
@@ -67,8 +90,7 @@ def set_mesh_type(method: str) -> str:
     ValueError
         If ``method`` is not supported.
     """
-    if method not in MESH_TYPES:
-        raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
+    _check_method(method)
     return MESH_TYPES[method]
 
 
@@ -138,7 +160,6 @@ def _build_acoustic_model_dictionary(
     dt: float,
     pml_pad_length: float | None = None,
     periodic: bool = False,
-    cells_per_wavelength: float | None = None,
     velocity_model_file_name: str | None = None,
 ) -> dict:
     """Assemble a 2D acoustic model dictionary for the cpw calculator.
@@ -169,9 +190,6 @@ def _build_acoustic_model_dictionary(
     periodic : bool, optional
         If True, use a periodic ``"firedrake_mesh"`` for either method.
         Default is False, with the mesh type given by :func:`set_mesh_type`.
-    cells_per_wavelength : float, optional
-        Cells-per-wavelength of the mesh. Default is None, meaning the mesh
-        is sized when it is built.
     velocity_model_file_name : str, optional
         Velocity model file. Default is None, for a velocity set later.
 
@@ -216,7 +234,6 @@ def _build_acoustic_model_dictionary(
             "length_z": length_z,
             "length_x": length_x,
             "length_y": 0.0,
-            "cells_per_wavelength": cells_per_wavelength,
             "mesh_type": mesh_type,
             "periodic": periodic,
         },
@@ -346,7 +363,6 @@ def create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
     frequency: float,
     minimum_velocity: float,
     case: HeterogeneousCase,
-    cells_per_wavelength: float,
 ) -> dict:
     """Create a 2D heterogeneous acoustic model for the cpw calculator.
 
@@ -369,8 +385,6 @@ def create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
         Minimum velocity in the domain, which sets the PML thickness.
     case : HeterogeneousCase
         Domain, material and acquisition overrides.
-    cells_per_wavelength : float
-        Cells-per-wavelength of the initial mesh.
 
     Returns
     -------
@@ -401,9 +415,123 @@ def create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
         final_time=_or_default(case.final_time, HETEROGENEOUS_FINAL_TIME),
         dt=_or_default(case.dt, HETEROGENEOUS_DT),
         pml_pad_length=minimum_velocity / frequency,
-        cells_per_wavelength=cells_per_wavelength,
         velocity_model_file_name=material_files["p_wave_velocity"],
     )
+
+
+def _build_elastic_model_dictionary(
+    *,
+    method: str,
+    degree: int,
+    length_z: float,
+    length_x: float,
+    source_locations: list[tuple[float, float]],
+    receiver_locations: list[tuple[float, float]],
+    frequency: float,
+    final_time: float,
+    dt: float,
+    synthetic_data: dict,
+    periodic: bool = False,
+    stacey_boundaries: bool = False,
+    forward_output: bool = False,
+) -> dict:
+    """Assemble a 2D isotropic elastic model dictionary for the cpw calculator.
+
+    The source is a horizontal (x-direction) Ricker point force delayed by
+    one period, and the mesh is a ``"firedrake_mesh"`` for either method.
+
+    Parameters
+    ----------
+    method : str
+        Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+    degree : int
+        Spatial polynomial degree.
+    length_z : float
+        Domain length in the z direction.
+    length_x : float
+        Domain length in the x direction.
+    source_locations : list of tuple of float
+        Source ``(z, x)`` locations.
+    receiver_locations : list of tuple of float
+        Receiver ``(z, x)`` locations.
+    frequency : float
+        Ricker source peak frequency.
+    final_time : float
+        Final time of the simulation.
+    dt : float
+        Time step of the simulation.
+    synthetic_data : dict
+        The ``"synthetic_data"`` section, giving the material.
+    periodic : bool, optional
+        If True, use a periodic mesh. Default is False.
+    stacey_boundaries : bool, optional
+        If True, use first-order Stacey absorbing boundaries. Default is
+        False, for no absorbing boundary.
+    forward_output : bool, optional
+        If True, write the forward solution to disk. Default is False.
+
+    Returns
+    -------
+    dict
+        Spyro model dictionary for :class:`spyro.IsotropicWave`.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not supported.
+    """
+    _check_method(method)
+    if stacey_boundaries:
+        absorbing_boundary_conditions = {
+            "status": True,
+            "abc_type": "nrbc",
+            "nrbc": {"type": "Stacey", "dt_scheme": "backward"},
+        }
+    else:
+        absorbing_boundary_conditions = {"status": False}
+
+    return {
+        "options": {
+            "method": method,
+            "degree": degree,
+            "dimension": 2,
+        },
+        "parallelism": {"type": "automatic"},
+        "mesh": {
+            "length_z": length_z,
+            "length_x": length_x,
+            # Uniform for both methods; its boundary ids are the ones the
+            # Stacey boundary terms integrate over
+            "mesh_type": "firedrake_mesh",
+            "periodic": periodic,
+        },
+        "absorving_boundary_conditions": absorbing_boundary_conditions,
+        "acquisition": {
+            "source_type": "ricker",
+            "source_locations": source_locations,
+            "frequency": frequency,
+            "delay": 1.0 / frequency,
+            "delay_type": "time",
+            "receiver_locations": receiver_locations,
+            "amplitude": np.array([0.0, 1.0]),
+            "use_vertex_only_mesh": True,
+        },
+        "synthetic_data": synthetic_data,
+        "time_axis": {
+            "initial_time": 0.0,
+            "final_time": final_time,
+            "dt": dt,
+            "output_frequency": 1000,
+            "gradient_sampling_frequency": 1,
+        },
+        "visualization": {
+            "forward_output": forward_output,
+            "fwi_velocity_model_output": False,
+            "gradient_output": False,
+            "adjoint_output": False,
+            "debug_output": False,
+        },
+    }
 
 
 def create_elastic_model_for_meshing_parameter_2D_homogeneous(
@@ -413,7 +541,7 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
     p_wave_velocity: float,
     s_wave_velocity: float,
     density: float,
-    dt: float,
+    dt: float | None = None,
     reduced: bool = False,
 ) -> dict:
     """Create a 2D homogeneous isotropic elastic model for the cpw calculator.
@@ -441,8 +569,10 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
         S-wave velocity, which sets the wavelength.
     density : float
         Density.
-    dt : float
+    dt : float, optional
         Time step used by the initial object and the analytical reference.
+        Default is None, for :data:`ELASTIC_REFERENCE_DT_PERIODS` Ricker
+        periods.
     reduced : bool, optional
         If True, use 3 receivers instead of 11, for testing. Default is
         False.
@@ -451,10 +581,15 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
     -------
     dict
         Spyro model dictionary for :class:`spyro.IsotropicWave`.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not supported.
     """
-    if method not in ("mass_lumped_triangle", "spectral_quadrilateral"):
-        raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
     _warn_if_meters_per_second(s_wave_velocity)
+    if dt is None:
+        dt = ELASTIC_REFERENCE_DT_PERIODS / frequency
 
     s_wavelength = s_wave_velocity / frequency
     delay = 1.0 / frequency
@@ -487,51 +622,26 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
         )
     ]
 
-    return {
-        "options": {
-            "method": method,
-            "degree": degree,
-            "dimension": 2,
-        },
-        "parallelism": {"type": "automatic"},
-        "mesh": {
-            "length_z": length,
-            "length_x": length,
-            "mesh_type": "firedrake_mesh",
-            "periodic": True,
-        },
-        "acquisition": {
-            "source_type": "ricker",
-            "source_locations": [(source_z, source_x)],
-            "frequency": frequency,
-            "delay": delay,
-            "delay_type": "time",
-            "receiver_locations": receiver_locations,
-            "amplitude": np.array([0.0, 1.0]),
-            "use_vertex_only_mesh": True,
-        },
-        "synthetic_data": {
+    return _build_elastic_model_dictionary(
+        method=method,
+        degree=degree,
+        length_z=length,
+        length_x=length,
+        source_locations=[(source_z, source_x)],
+        receiver_locations=receiver_locations,
+        frequency=frequency,
+        final_time=final_time,
+        dt=dt,
+        synthetic_data={
             "type": "object",
             "density": density,
             "p_wave_velocity": p_wave_velocity,
             "s_wave_velocity": s_wave_velocity,
             "real_velocity_file": None,
         },
-        "time_axis": {
-            "initial_time": 0.0,
-            "final_time": final_time,
-            "dt": dt,
-            "output_frequency": 1000,
-            "gradient_sampling_frequency": 1,
-        },
-        "visualization": {
-            "forward_output": True,
-            "fwi_velocity_model_output": False,
-            "gradient_output": False,
-            "adjoint_output": False,
-            "debug_output": False,
-        },
-    }
+        periodic=True,
+        forward_output=True,
+    )
 
 
 def create_elastic_model_for_meshing_parameter_2D_heterogeneous(
@@ -575,8 +685,8 @@ def create_elastic_model_for_meshing_parameter_2D_heterogeneous(
     ValueError
         If ``method`` is not supported.
     """
-    if method not in MESH_TYPES:
-        raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
+    # Checked before the material files are written
+    _check_method(method)
     receiver_locations = case.receiver_locations
     if receiver_locations is None:
         receiver_x_first, receiver_x_last = ELASTIC_HETEROGENEOUS_RECEIVER_X_RANGE
@@ -589,56 +699,18 @@ def create_elastic_model_for_meshing_parameter_2D_heterogeneous(
         ("p_wave_velocity", "s_wave_velocity", "density")
     )
 
-    return {
-        "options": {
-            "method": method,
-            "degree": degree,
-            "dimension": 2,
-        },
-        "parallelism": {"type": "automatic"},
-        "mesh": {
-            "length_z": case.length_z,
-            "length_x": case.length_x,
-            # Uniform for both methods; its boundary ids are the ones the
-            # Stacey boundary terms integrate over
-            "mesh_type": "firedrake_mesh",
-            "periodic": False,
-        },
-        "absorving_boundary_conditions": {
-            "status": True,
-            "abc_type": "nrbc",
-            "nrbc": {"type": "Stacey", "dt_scheme": "backward"},
-        },
-        "acquisition": {
-            "source_type": "ricker",
-            "source_locations": _or_default(
-                case.source_locations, [ELASTIC_HETEROGENEOUS_SOURCE_LOCATION]
-            ),
-            "frequency": frequency,
-            "delay": 1.0 / frequency,
-            "delay_type": "time",
-            "receiver_locations": receiver_locations,
-            "amplitude": np.array([0.0, 1.0]),
-            "use_vertex_only_mesh": True,
-        },
-        "synthetic_data": {
-            "type": "file",
-            **material_files,
-        },
-        "time_axis": {
-            "initial_time": 0.0,
-            "final_time": _or_default(
-                case.final_time, ELASTIC_HETEROGENEOUS_FINAL_TIME
-            ),
-            "dt": _or_default(case.dt, ELASTIC_HETEROGENEOUS_DT),
-            "output_frequency": 1000,
-            "gradient_sampling_frequency": 1,
-        },
-        "visualization": {
-            "forward_output": False,
-            "fwi_velocity_model_output": False,
-            "gradient_output": False,
-            "adjoint_output": False,
-            "debug_output": False,
-        },
-    }
+    return _build_elastic_model_dictionary(
+        method=method,
+        degree=degree,
+        length_z=case.length_z,
+        length_x=case.length_x,
+        source_locations=_or_default(
+            case.source_locations, [ELASTIC_HETEROGENEOUS_SOURCE_LOCATION]
+        ),
+        receiver_locations=receiver_locations,
+        frequency=frequency,
+        final_time=_or_default(case.final_time, ELASTIC_HETEROGENEOUS_FINAL_TIME),
+        dt=_or_default(case.dt, ELASTIC_HETEROGENEOUS_DT),
+        synthetic_data={"type": "file", **material_files},
+        stacey_boundaries=True,
+    )

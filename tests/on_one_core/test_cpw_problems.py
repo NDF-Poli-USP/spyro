@@ -17,6 +17,7 @@ from spyro.tools.cells_per_wavelength_calculator import (
     MAX_CPW,
     AcousticHeterogeneousProblem,
     AcousticHomogeneousProblem,
+    CpwParameters,
     CpwProblem,
     ElasticHeterogeneousProblem,
     ElasticHomogeneousProblem,
@@ -40,7 +41,25 @@ from spyro.tools.cells_per_wavelength_calculator.heterogeneous_cases import (
 from spyro.tools.cells_per_wavelength_calculator.input_models import (
     create_elastic_model_for_meshing_parameter_2D_homogeneous,
 )
-from spyro.utils.typing import VelocityProfileType, WaveType
+from spyro.utils.typing import (
+    CpwSearchDirection,
+    TimeStepCalculationType,
+    VelocityProfileType,
+    WaveType,
+)
+
+#: Calculator parameters of a homogeneous acoustic search, with no file access.
+CALCULATOR_PARAMETERS = {
+    "source_frequency": 5.0,
+    "minimum_velocity_in_the_domain": 1.5,
+    "FEM_method_to_evaluate": "mass_lumped_triangle",
+    "dimension": 2,
+    "testing": True,
+    "desired_degree": 2,
+    "C_initial": 3.0,
+    "C_accuracy": 0.1,
+    "accepted_error_threshold": 0.05,
+}
 
 PROBLEM_CLASSES = [
     AcousticHomogeneousProblem,
@@ -69,16 +88,12 @@ def make_problem(problem_class: type[CpwProblem], **overrides) -> CpwProblem:
         The problem.
     """
     parameters = {
-        "source_frequency": 5.0,
-        "dimension": 2,
-        "testing": True,
-        "minimum_velocity_in_the_domain": 1.5,
+        **CALCULATOR_PARAMETERS,
         "p_wave_velocity": 5.6,
         "s_wave_velocity": 2.75,
         "density": 2.0,
         "reference_degree": 5,
         "C_reference": 6.0,
-        "C_initial": 3.0,
     }
     if issubclass(problem_class, HeterogeneousCpwProblem):
         parameters["heterogeneous_case"] = MaterialFileCase(
@@ -89,7 +104,7 @@ def make_problem(problem_class: type[CpwProblem], **overrides) -> CpwProblem:
             minimum_velocity=1.5,
         )
     parameters.update(overrides)
-    return problem_class(parameters)
+    return problem_class(CpwParameters.from_dict(parameters))
 
 
 def make_error_function(
@@ -301,7 +316,7 @@ def test_calculator_rejects_unregistered_problem(monkeypatch) -> None:
     monkeypatch.setattr(calculator_module, "CPW_PROBLEMS", {})
 
     with pytest.raises(NotImplementedError, match="No cells-per-wavelength problem"):
-        spyro.tools.MeshingParameterCalculator({"source_frequency": 5.0})
+        spyro.tools.MeshingParameterCalculator(CALCULATOR_PARAMETERS)
 
 
 def test_elastic_model_geometry_avoids_periodic_images() -> None:
@@ -413,9 +428,10 @@ def test_elastic_cpw_search_meets_threshold() -> None:
         "time-step_calculation": "exact",
         "reference_degree": None,
         "C_reference": None,
-        "desired_degree": 2,
-        "C_initial": 8.0,
-        "C_max": 8.0,
+        "desired_degree": 4,
+        "C_initial": 1.0,
+        "C_max": 3.0,
+        "search_direction": "forward",
         "accepted_error_threshold": 0.05,
         "C_accuracy": 0.5,
     }
@@ -569,14 +585,11 @@ def test_parse_threshold_discretization_rejects_bad_values(
 def test_calculator_needs_exactly_one_threshold(threshold_settings: dict) -> None:
     """A threshold is given directly or by a discretization, not both."""
     parameters = {
-        "source_frequency": 5.0,
-        "minimum_velocity_in_the_domain": 1.5,
-        "velocity_profile_type": "homogeneous",
-        "FEM_method_to_evaluate": "mass_lumped_triangle",
-        "dimension": 2,
-        "receiver_setup": "near",
-        **threshold_settings,
+        key: value
+        for key, value in CALCULATOR_PARAMETERS.items()
+        if key != "accepted_error_threshold"
     }
+    parameters.update(threshold_settings)
 
     with pytest.raises(ValueError, match="exactly one"):
         spyro.tools.MeshingParameterCalculator(parameters)
@@ -600,12 +613,7 @@ def test_problem_builds_dictionary_for_requested_discretization(
 
 def test_calculator_rejects_non_positive_mesh_frequency_factor() -> None:
     """The meshing frequency must be a positive multiple of the peak."""
-    parameters = {
-        "source_frequency": 5.0,
-        "minimum_velocity_in_the_domain": 1.5,
-        "velocity_profile_type": "homogeneous",
-        "mesh_frequency_factor": 0.0,
-    }
+    parameters = {**CALCULATOR_PARAMETERS, "mesh_frequency_factor": 0.0}
 
     with pytest.raises(ValueError, match="mesh_frequency_factor must be positive"):
         spyro.tools.MeshingParameterCalculator(parameters)
@@ -648,12 +656,9 @@ def test_mesh_frequency_factor_scales_mesh_size(
 
     problem.setup_wave(RecordingWave(), cpw)
 
-    # The mesher turns cells_per_wavelength into velocity / (frequency * cpw)
-    if "edge_length" in requested:
-        edge_length = requested["edge_length"]
-    else:
-        edge_length = velocity / (frequency * requested["cells_per_wavelength"])
-    assert np.isclose(edge_length, velocity / (factor * frequency * cpw))
+    assert np.isclose(
+        requested["edge_length"], velocity / (factor * frequency * cpw)
+    )
 
 
 def test_interpolate_time_series_applies_time_shift() -> None:
@@ -768,10 +773,12 @@ def test_reference_solution_saves_and_loads_default_file(
         reference_solution_file=make_problem(
             AcousticHomogeneousProblem
         ).default_reference_file(),
-        save_reference=True,
-        load_reference=False,
+        parameters=SimpleNamespace(
+            save_reference=True,
+            load_reference=False,
+            fem_method="mass_lumped_triangle",
+        ),
         initial_wave=None,
-        FEM_method_to_evaluate="mass_lumped_triangle",
         problem=SimpleNamespace(
             reference_solution=lambda initial_wave, method: reference
         ),
@@ -780,8 +787,8 @@ def test_reference_solution_saves_and_loads_default_file(
     spyro.tools.MeshingParameterCalculator.get_reference_solution(calculator)
     assert (tmp_path / "acoustic_homogeneous_cpw_reference.npy").is_file()
 
-    calculator.save_reference = False
-    calculator.load_reference = True
+    calculator.parameters.save_reference = False
+    calculator.parameters.load_reference = True
     calculator.problem = None
     loaded = spyro.tools.MeshingParameterCalculator.get_reference_solution(calculator)
     assert np.array_equal(loaded, reference)
@@ -825,3 +832,98 @@ def test_elastic_heterogeneous_setup_meshes_and_reads_material(
         # Interface nodes may pick either side of the sampled grid
         mismatch = ~np.isclose(values.dat.data_ro, expected[parameter], atol=1e-3)
         assert mismatch.mean() < 0.05, parameter
+
+
+def test_parameters_from_dict_maps_legacy_keys() -> None:
+    """Dictionary keys map to fields, and enum strings are converted."""
+    parameters = CpwParameters.from_dict(
+        {
+            **CALCULATOR_PARAMETERS,
+            "C_max": 4.0,
+            "search_direction": "forward",
+            "time-step_calculation": "float",
+            "time-step": 1e-3,
+        }
+    )
+
+    assert parameters.fem_method == "mass_lumped_triangle"
+    assert parameters.minimum_velocity == 1.5
+    assert parameters.cpw_initial == 3.0
+    assert parameters.cpw_accuracy == 0.1
+    assert parameters.cpw_max == 4.0
+    assert parameters.wave_type is WaveType.ISOTROPIC_ACOUSTIC
+    assert parameters.velocity_profile_type is VelocityProfileType.HOMOGENEOUS
+    assert parameters.search_direction is CpwSearchDirection.FORWARD
+    assert parameters.timestep_calculation is TimeStepCalculationType.FIXED
+    assert parameters.fixed_timestep == 1e-3
+
+
+def test_parameters_infer_heterogeneous_profile() -> None:
+    """A heterogeneous case makes the profile heterogeneous by default."""
+    parameters = CpwParameters.from_dict(
+        {**CALCULATOR_PARAMETERS, "heterogeneous_case": ElasticSyntheticCase()}
+    )
+
+    assert parameters.velocity_profile_type is VelocityProfileType.HETEROGENEOUS
+
+
+def test_parameters_from_dict_warns_on_unknown_keys() -> None:
+    """Unknown keys, such as typos, are reported and ignored."""
+    with pytest.warns(UserWarning, match="C_inital"):
+        CpwParameters.from_dict({**CALCULATOR_PARAMETERS, "C_inital": 2.0})
+
+
+def test_parameters_from_dict_names_missing_keys() -> None:
+    """Missing required keys are named as dictionary keys."""
+    parameters = {
+        key: value
+        for key, value in CALCULATOR_PARAMETERS.items()
+        if key != "FEM_method_to_evaluate"
+    }
+
+    with pytest.raises(KeyError, match="FEM_method_to_evaluate"):
+        CpwParameters.from_dict(parameters)
+
+
+@pytest.mark.parametrize(
+    "timestep_settings",
+    [{"time-step_calculation": "float"}, {"time-step": 1e-3}],
+)
+def test_parameters_pair_fixed_timestep_with_calculation(
+    timestep_settings: dict,
+) -> None:
+    """A time step is given exactly when the time step is fixed."""
+    with pytest.raises(ValueError, match="time-step"):
+        CpwParameters.from_dict({**CALCULATOR_PARAMETERS, **timestep_settings})
+
+
+def test_problem_requires_its_material() -> None:
+    """A missing material parameter is named by its dictionary key."""
+    with pytest.raises(ValueError, match="minimum_velocity_in_the_domain"):
+        make_problem(
+            AcousticHomogeneousProblem, minimum_velocity_in_the_domain=None
+        )
+
+
+@pytest.mark.parametrize("save_shot_records", [False, True])
+def test_calculate_error_saves_shot_records_on_request(
+    monkeypatch, save_shot_records: bool,
+) -> None:
+    """Shot records are written only when save_shot_records is set."""
+    saved = []
+    monkeypatch.setattr(
+        spyro.io, "save_shots", lambda wave, file_name: saved.append(file_name)
+    )
+    evaluation = calculator_module.CpwEvaluation(2.0, 1e-3, 0.5, 1.0)
+    calculator = SimpleNamespace(
+        parameters=SimpleNamespace(save_shot_records=save_shot_records),
+        build_wave=lambda cpw: None,
+        _solve_and_measure=lambda wave, cpw: evaluation,
+        search_history=[],
+    )
+
+    error = spyro.tools.MeshingParameterCalculator.calculate_error(calculator, 2.0)
+
+    assert error == 0.5
+    assert calculator.search_history == [evaluation]
+    assert saved == (["test_shot_record2.0"] if save_shot_records else [])

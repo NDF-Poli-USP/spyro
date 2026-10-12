@@ -21,6 +21,7 @@ from .input_models import (
     create_elastic_model_for_meshing_parameter_2D_heterogeneous,
     create_elastic_model_for_meshing_parameter_2D_homogeneous,
 )
+from .parameters import CpwParameters
 from .wave_physics import ACOUSTIC, ISOTROPIC_ELASTIC, WavePhysics
 from ...solvers.wave import Wave
 from ...utils.typing import VelocityProfileType, WaveType
@@ -54,51 +55,36 @@ class CpwProblem(ABC):
         Solver time step when it is fixed, else None.
     minimum_wavelength_velocity : float
         Minimum velocity of the slowest wave, whose wavelength the
-        cells-per-wavelength refers to.
+        cells-per-wavelength refers to. Set by each subclass.
     """
 
     physics: WavePhysics
     velocity_profile_type: VelocityProfileType
     minimum_wavelength_velocity: float
 
-    def __init__(
-        self, parameters_dictionary: dict, fixed_timestep: float | None = None
-    ) -> None:
+    def __init__(self, parameters: CpwParameters) -> None:
         """Read the settings shared by every problem.
 
         Parameters
         ----------
-        parameters_dictionary : dict
-            The calculator parameters dictionary.
-        fixed_timestep : float, optional
-            Solver time step when it is fixed. Default is None.
+        parameters : CpwParameters
+            The calculator parameters.
 
         Raises
         ------
-        ValueError
-            If ``"mesh_frequency_factor"`` is not positive.
         NotImplementedError
             For 3D models.
         """
-        self.source_frequency: float = parameters_dictionary["source_frequency"]
-        self.mesh_frequency_factor: float = parameters_dictionary.get(
-            "mesh_frequency_factor", 1.0
-        )
-        if self.mesh_frequency_factor <= 0.0:
-            raise ValueError(
-                "mesh_frequency_factor must be positive, got "
-                f"{self.mesh_frequency_factor}."
-            )
+        self.source_frequency: float = parameters.source_frequency
+        self.mesh_frequency_factor: float = parameters.mesh_frequency_factor
         self.mesh_frequency = self.mesh_frequency_factor * self.source_frequency
-        self.dimension: int = parameters_dictionary["dimension"]
+        self.dimension: int = parameters.dimension
         if self.dimension != 2:
             raise NotImplementedError(
                 f"{self.physics.name.capitalize()} cpw calculation only supports 2D."
             )
-        self.reduced_obj_for_testing: bool = parameters_dictionary.get(
-            "testing", False
-        )
-        self.fixed_timestep = fixed_timestep
+        self.reduced_obj_for_testing: bool = parameters.testing
+        self.fixed_timestep: float | None = parameters.fixed_timestep
 
     def default_reference_file(self) -> str:
         """Return the default file name of a saved or loaded reference.
@@ -133,6 +119,22 @@ class CpwProblem(ABC):
         self.setup_wave(wave, cpw)
         return wave
 
+    def setup_wave(self, wave: Wave, cpw: float) -> None:
+        """Build a uniform mesh sized by the minimum wavelength.
+
+        Any periodicity comes from the model dictionary. Subclasses add any
+        material not read from the dictionary.
+
+        Parameters
+        ----------
+        wave : Wave
+            Wave object to set up.
+        cpw : float
+            Cells-per-wavelength of the mesh, at the meshing frequency.
+        """
+        wavelength = self.minimum_wavelength_velocity / self.mesh_frequency
+        wave.set_mesh(input_mesh_parameters={"edge_length": wavelength / cpw})
+
     def reference_time_shift(self, wave: Wave) -> float:
         """Return the time shift applied when resampling the reference.
 
@@ -166,18 +168,6 @@ class CpwProblem(ABC):
         """
 
     @abstractmethod
-    def setup_wave(self, wave: Wave, cpw: float) -> None:
-        """Build the mesh, and any material not read from files.
-
-        Parameters
-        ----------
-        wave : Wave
-            Wave object to set up.
-        cpw : float
-            Cells-per-wavelength of the mesh, at the meshing frequency.
-        """
-
-    @abstractmethod
     def reference_solution(self, initial_wave: Wave, method: str) -> np.ndarray:
         """Compute the reference receiver data.
 
@@ -201,41 +191,22 @@ class HomogeneousCpwProblem(CpwProblem):
 
     velocity_profile_type = VelocityProfileType.HOMOGENEOUS
 
-    def __init__(
-        self, parameters_dictionary: dict, fixed_timestep: float | None = None
-    ) -> None:
+    def __init__(self, parameters: CpwParameters) -> None:
         """Check that no heterogeneous case is given, then read settings.
 
         Parameters
         ----------
-        parameters_dictionary : dict
-            The calculator parameters dictionary.
-        fixed_timestep : float, optional
-            Solver time step when it is fixed. Default is None.
+        parameters : CpwParameters
+            The calculator parameters.
 
         Raises
         ------
         ValueError
-            If a ``"heterogeneous_case"`` is given.
+            If a ``heterogeneous_case`` is given.
         """
-        if parameters_dictionary.get("heterogeneous_case") is not None:
+        if parameters.heterogeneous_case is not None:
             raise ValueError(_CASE_MISMATCH)
-        super().__init__(parameters_dictionary, fixed_timestep)
-
-    def setup_wave(self, wave: Wave, cpw: float) -> None:
-        """Build a periodic mesh sized by the minimum wavelength.
-
-        Parameters
-        ----------
-        wave : Wave
-            Wave object to set up.
-        cpw : float
-            Cells-per-wavelength of the mesh, at the meshing frequency.
-        """
-        wavelength = self.minimum_wavelength_velocity / self.mesh_frequency
-        wave.set_mesh(
-            input_mesh_parameters={"edge_length": wavelength / cpw, "periodic": True}
-        )
+        super().__init__(parameters)
 
     def reference_solution(self, initial_wave: Wave, method: str) -> np.ndarray:
         """Compute the analytical reference.
@@ -286,30 +257,26 @@ class HeterogeneousCpwProblem(CpwProblem):
 
     velocity_profile_type = VelocityProfileType.HETEROGENEOUS
 
-    def __init__(
-        self, parameters_dictionary: dict, fixed_timestep: float | None = None
-    ) -> None:
+    def __init__(self, parameters: CpwParameters) -> None:
         """Read the heterogeneous case and the reference settings.
 
         Parameters
         ----------
-        parameters_dictionary : dict
-            The calculator parameters dictionary.
-        fixed_timestep : float, optional
-            Solver time step when it is fixed. Default is None.
+        parameters : CpwParameters
+            The calculator parameters.
 
         Raises
         ------
         ValueError
-            If no ``"heterogeneous_case"`` is given.
+            If no ``heterogeneous_case``, ``reference_degree`` or
+            ``cpw_reference`` is given.
         """
-        case = parameters_dictionary.get("heterogeneous_case")
-        if case is None:
+        if parameters.heterogeneous_case is None:
             raise ValueError(_CASE_MISMATCH)
-        super().__init__(parameters_dictionary, fixed_timestep)
-        self.heterogeneous_case: HeterogeneousCase = case
-        self.reference_degree: int = parameters_dictionary["reference_degree"]
-        self.cpw_reference: float = parameters_dictionary["C_reference"]
+        super().__init__(parameters)
+        self.heterogeneous_case: HeterogeneousCase = parameters.heterogeneous_case
+        self.reference_degree: int = parameters.require("reference_degree")
+        self.cpw_reference: float = parameters.require("cpw_reference")
 
     @cached_property
     def minimum_wavelength_velocity(self) -> float:
@@ -351,27 +318,26 @@ class HeterogeneousCpwProblem(CpwProblem):
 class AcousticHomogeneousProblem(HomogeneousCpwProblem):
     """Acoustic wave in a constant velocity.
 
-    The velocity is the ``"minimum_velocity_in_the_domain"`` parameter.
+    The velocity is the ``minimum_velocity`` parameter.
     """
 
     physics = ACOUSTIC
 
-    def __init__(
-        self, parameters_dictionary: dict, fixed_timestep: float | None = None
-    ) -> None:
+    def __init__(self, parameters: CpwParameters) -> None:
         """Read the velocity.
 
         Parameters
         ----------
-        parameters_dictionary : dict
-            The calculator parameters dictionary.
-        fixed_timestep : float, optional
-            Solver time step when it is fixed. Default is None.
+        parameters : CpwParameters
+            The calculator parameters.
+
+        Raises
+        ------
+        ValueError
+            If no ``minimum_velocity`` is given.
         """
-        super().__init__(parameters_dictionary, fixed_timestep)
-        self.minimum_wavelength_velocity = parameters_dictionary[
-            "minimum_velocity_in_the_domain"
-        ]
+        super().__init__(parameters)
+        self.minimum_wavelength_velocity = parameters.require("minimum_velocity")
 
     def model_dictionary(self, method: str, degree: int) -> dict:
         """Build the homogeneous acoustic model dictionary.
@@ -456,13 +422,15 @@ class AcousticHomogeneousProblem(HomogeneousCpwProblem):
 class ElasticHomogeneousProblem(HomogeneousCpwProblem):
     """Isotropic elastic wave in a constant material.
 
-    Needs the ``"p_wave_velocity"``, ``"s_wave_velocity"`` and
-    ``"density"`` parameters. The wavelength is the S-wavelength.
+    Needs the ``p_wave_velocity``, ``s_wave_velocity`` and ``density``
+    parameters. The wavelength is the S-wavelength.
 
     Attributes
     ----------
     p_wave_velocity : float
         P-wave velocity.
+    s_wave_velocity : float
+        S-wave velocity.
     density : float
         Density.
 
@@ -474,23 +442,37 @@ class ElasticHomogeneousProblem(HomogeneousCpwProblem):
 
     physics = ISOTROPIC_ELASTIC
 
-    def __init__(
-        self, parameters_dictionary: dict, fixed_timestep: float | None = None
-    ) -> None:
+    def __init__(self, parameters: CpwParameters) -> None:
         """Read the material.
+
+        A fixed solver time step is also used as the time step of the
+        analytical reference.
 
         Parameters
         ----------
-        parameters_dictionary : dict
-            The calculator parameters dictionary.
-        fixed_timestep : float, optional
-            Solver time step when it is fixed, also used as the time step of
-            the analytical reference. Default is None.
+        parameters : CpwParameters
+            The calculator parameters.
+
+        Raises
+        ------
+        ValueError
+            If a material parameter is not given.
         """
-        super().__init__(parameters_dictionary, fixed_timestep)
-        self.p_wave_velocity: float = parameters_dictionary["p_wave_velocity"]
-        self.minimum_wavelength_velocity = parameters_dictionary["s_wave_velocity"]
-        self.density: float = parameters_dictionary["density"]
+        super().__init__(parameters)
+        self.p_wave_velocity: float = parameters.require("p_wave_velocity")
+        self.s_wave_velocity: float = parameters.require("s_wave_velocity")
+        self.density: float = parameters.require("density")
+
+    @property
+    def minimum_wavelength_velocity(self) -> float:
+        """The S-wave velocity, the slowest body wave.
+
+        Returns
+        -------
+        float
+            ``s_wave_velocity``.
+        """
+        return self.s_wave_velocity
 
     def model_dictionary(self, method: str, degree: int) -> dict:
         """Build the homogeneous isotropic elastic model dictionary.
@@ -507,19 +489,14 @@ class ElasticHomogeneousProblem(HomogeneousCpwProblem):
         dict
             Spyro model dictionary for :class:`spyro.IsotropicWave`.
         """
-        dt = self.fixed_timestep
-        if dt is None:
-            # Fine enough that interpolating onto the solver dt is negligible
-            dt = 1.0 / (500.0 * self.source_frequency)
-
         return create_elastic_model_for_meshing_parameter_2D_homogeneous(
             method=method,
             degree=degree,
             frequency=self.source_frequency,
             p_wave_velocity=self.p_wave_velocity,
-            s_wave_velocity=self.minimum_wavelength_velocity,
+            s_wave_velocity=self.s_wave_velocity,
             density=self.density,
-            dt=dt,
+            dt=self.fixed_timestep,
             reduced=self.reduced_obj_for_testing,
         )
 
@@ -559,7 +536,7 @@ class ElasticHomogeneousProblem(HomogeneousCpwProblem):
                 source_type="force_source",
                 offsets=source - np.asarray(receiver),
                 p_wave_velocity=self.p_wave_velocity,
-                s_wave_velocity=self.minimum_wavelength_velocity,
+                s_wave_velocity=self.s_wave_velocity,
                 density=self.density,
                 amplitude=amplitude[force_direction],
                 frequency=wave.frequency,
@@ -576,28 +553,11 @@ class ElasticHomogeneousProblem(HomogeneousCpwProblem):
 class AcousticHeterogeneousProblem(HeterogeneousCpwProblem):
     """Acoustic wave in the P-wave velocity of a heterogeneous case.
 
-    Attributes
-    ----------
-    cpw_initial : float
-        The ``"C_initial"`` parameter, written to the model dictionary.
+    The mesh is uniform, sized by the minimum P-wavelength in the domain,
+    as in :class:`ElasticHeterogeneousProblem`.
     """
 
     physics = ACOUSTIC
-
-    def __init__(
-        self, parameters_dictionary: dict, fixed_timestep: float | None = None
-    ) -> None:
-        """Read the initial cells-per-wavelength.
-
-        Parameters
-        ----------
-        parameters_dictionary : dict
-            The calculator parameters dictionary.
-        fixed_timestep : float, optional
-            Solver time step when it is fixed. Default is None.
-        """
-        super().__init__(parameters_dictionary, fixed_timestep)
-        self.cpw_initial: float = parameters_dictionary["C_initial"]
 
     def model_dictionary(self, method: str, degree: int) -> dict:
         """Build the heterogeneous acoustic model dictionary.
@@ -620,32 +580,14 @@ class AcousticHeterogeneousProblem(HeterogeneousCpwProblem):
             frequency=self.source_frequency,
             minimum_velocity=self.minimum_wavelength_velocity,
             case=self.heterogeneous_case,
-            cells_per_wavelength=self.cpw_initial,
-        )
-
-    def setup_wave(self, wave: Wave, cpw: float) -> None:
-        """Build a velocity-adapted mesh; the velocity comes from the file.
-
-        Parameters
-        ----------
-        wave : Wave
-            Wave object to set up.
-        cpw : float
-            Cells-per-wavelength of the mesh, at the meshing frequency.
-        """
-        # The mesher sizes cells from the source frequency, and the edge
-        # length depends only on frequency * cpw
-        wave.set_mesh(
-            input_mesh_parameters={
-                "cells_per_wavelength": cpw * self.mesh_frequency_factor
-            }
         )
 
 
 class ElasticHeterogeneousProblem(HeterogeneousCpwProblem):
     """Isotropic elastic wave in the material of a heterogeneous case.
 
-    The case must define the P- and S-wave velocities and the density.
+    The case must define the P- and S-wave velocities and the density. The
+    mesh is uniform, sized by the minimum S-wavelength in the domain.
     """
 
     physics = ISOTROPIC_ELASTIC
@@ -671,21 +613,6 @@ class ElasticHeterogeneousProblem(HeterogeneousCpwProblem):
             frequency=self.source_frequency,
             case=self.heterogeneous_case,
         )
-
-    def setup_wave(self, wave: Wave, cpw: float) -> None:
-        """Build a uniform mesh; the material comes from the model files.
-
-        The mesh is sized by the minimum S-wavelength in the domain.
-
-        Parameters
-        ----------
-        wave : Wave
-            Wave object to set up.
-        cpw : float
-            Cells-per-wavelength of the mesh, at the meshing frequency.
-        """
-        wavelength = self.minimum_wavelength_velocity / self.mesh_frequency
-        wave.set_mesh(input_mesh_parameters={"edge_length": wavelength / cpw})
 
 
 #: Cells-per-wavelength problems, selected by the ``"wave_type"`` and

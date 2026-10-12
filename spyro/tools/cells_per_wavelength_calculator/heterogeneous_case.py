@@ -4,7 +4,8 @@ Concrete cases are in :mod:`~.heterogeneous_cases`.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from functools import cached_property
 
 import h5py
 import numpy as np
@@ -217,17 +218,22 @@ class MaterialModelCase(HeterogeneousCase):
 
     The material is sampled on a grid and written to SEG-Y files named
     ``"<name>_vp.segy"``, ``"<name>_vs.segy"`` and ``"<name>_rho.segy"``
-    when the model dictionary is built. Subclasses implement
-    :meth:`material`.
+    when the model dictionary is built. The grid is sampled once, and each
+    file is written once per case. Subclasses implement :meth:`material`.
 
     Attributes
     ----------
     grid_spacing : float
         Spacing of the sampling grid. Default is
         :data:`MATERIAL_GRID_SPACING`.
+    written_parameters : set of str
+        Parameters whose SEG-Y file this case has written.
     """
 
     grid_spacing: float = MATERIAL_GRID_SPACING
+    written_parameters: set[str] = field(
+        default_factory=set, init=False, repr=False, compare=False
+    )
 
     @abstractmethod
     def material(self, z: np.ndarray, x: np.ndarray) -> dict[str, np.ndarray]:
@@ -247,8 +253,9 @@ class MaterialModelCase(HeterogeneousCase):
             :data:`MATERIAL_FILE_SUFFIXES`.
         """
 
-    def sample_material(self) -> dict[str, np.ndarray]:
-        """Sample :meth:`material` on the case grid.
+    @cached_property
+    def sampled_material(self) -> dict[str, np.ndarray]:
+        """:meth:`material` sampled on the case grid, computed once.
 
         Returns
         -------
@@ -268,7 +275,7 @@ class MaterialModelCase(HeterogeneousCase):
         """Sample the material and write one SEG-Y per parameter.
 
         The files are written by global rank 0, and every rank waits for
-        them.
+        them. Files this case already wrote are not written again.
 
         Parameters
         ----------
@@ -289,8 +296,15 @@ class MaterialModelCase(HeterogeneousCase):
             parameter: f"{self.name}{MATERIAL_FILE_SUFFIXES[parameter]}.segy"
             for parameter in parameters
         }
-        # Raised on every rank, as the other ranks wait for rank 0's result
-        self._check_defines(parameters, _write_material_segys(self, file_names))
+        to_write = {
+            parameter: file_name
+            for parameter, file_name in file_names.items()
+            if parameter not in self.written_parameters
+        }
+        if to_write:
+            # Raised on every rank, as the other ranks wait for rank 0's result
+            self._check_defines(parameters, _write_material_segys(self, to_write))
+            self.written_parameters.update(to_write)
         return file_names
 
     def minimum(self, parameter: str) -> float:
@@ -311,9 +325,8 @@ class MaterialModelCase(HeterogeneousCase):
         ValueError
             If the case does not define ``parameter``.
         """
-        material = self.sample_material()
-        self._check_defines((parameter,), material)
-        return float(np.min(material[parameter]))
+        self._check_defines((parameter,), self.sampled_material)
+        return float(np.min(self.sampled_material[parameter]))
 
 
 @SpyroEnsemble.run_in_one_core_and_broadcast
@@ -339,7 +352,7 @@ def _write_material_segys(
         ``file_names``. Nothing is written if one of ``file_names`` is
         missing.
     """
-    material = case.sample_material()
+    material = case.sampled_material
     if file_names.keys() <= material.keys():
         for parameter, file_name in file_names.items():
             # This layout is the one create_segy_from_grid(rotate=True)

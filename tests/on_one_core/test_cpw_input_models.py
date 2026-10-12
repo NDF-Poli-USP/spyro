@@ -7,6 +7,7 @@ from spyro.tools.cells_per_wavelength_calculator import input_models
 from spyro.tools.cells_per_wavelength_calculator import (
     AcousticHeterogeneousProblem,
     AcousticHomogeneousProblem,
+    CpwParameters,
     ElasticHeterogeneousProblem,
     ElasticSyntheticCase,
     MaterialFileCase,
@@ -52,12 +53,32 @@ def make_homogeneous_model(
 #: Problem parameters shared by the tests that build a problem.
 PROBLEM_PARAMETERS = {
     "source_frequency": 5.0,
+    "FEM_method_to_evaluate": "mass_lumped_triangle",
     "dimension": 2,
     "testing": True,
+    "desired_degree": 2,
     "reference_degree": 5,
     "C_reference": 6.0,
     "C_initial": 2.8,
+    "C_accuracy": 0.1,
+    "accepted_error_threshold": 0.05,
 }
+
+
+def make_parameters(**overrides) -> CpwParameters:
+    """Build problem parameters from :data:`PROBLEM_PARAMETERS`.
+
+    Parameters
+    ----------
+    **overrides
+        Dictionary entries replacing the defaults.
+
+    Returns
+    -------
+    CpwParameters
+        The parameters.
+    """
+    return CpwParameters.from_dict({**PROBLEM_PARAMETERS, **overrides})
 
 
 @pytest.mark.parametrize(
@@ -167,7 +188,6 @@ def test_heterogeneous_model_sets_core_fields(
             length_x=30.0,
             material_files={"p_wave_velocity": "my_model.segy"},
         ),
-        cells_per_wavelength=2.8,
     )
 
     assert model["options"]["method"] == method
@@ -176,7 +196,7 @@ def test_heterogeneous_model_sets_core_fields(
     assert model["mesh"]["periodic"] is False
     assert model["mesh"]["length_z"] == 12.0
     assert model["mesh"]["length_x"] == 30.0
-    assert model["mesh"]["cells_per_wavelength"] == 2.8
+    assert "cells_per_wavelength" not in model["mesh"]
     abc = model["absorving_boundary_conditions"]
     assert abc["status"] is True
     assert abc["abc_type"] == "PML"
@@ -196,7 +216,7 @@ def test_heterogeneous_model_sets_core_fields(
     "build",
     [
         lambda case: input_models.create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
-            "spectral_quadrilateral", 4, 5.0, 1.5, case, 3.0
+            "spectral_quadrilateral", 4, 5.0, 1.5, case
         ),
         lambda case: input_models.create_elastic_model_for_meshing_parameter_2D_heterogeneous(
             "spectral_quadrilateral", 4, 5.0, case
@@ -289,8 +309,13 @@ def test_homogeneous_final_time_is_on_reference_grid(dt: float, wave: str) -> No
 def test_acoustic_problem_builds_homogeneous_model() -> None:
     """The reference time step is fixed, whatever the solver time step."""
     problem = AcousticHomogeneousProblem(
-        {**PROBLEM_PARAMETERS, "minimum_velocity_in_the_domain": 1.5},
-        fixed_timestep=2e-3,
+        make_parameters(
+            **{
+                "minimum_velocity_in_the_domain": 1.5,
+                "time-step_calculation": "float",
+                "time-step": 2e-3,
+            }
+        )
     )
 
     model = problem.model_dictionary("mass_lumped_triangle", 3)
@@ -310,15 +335,12 @@ def test_acoustic_problem_builds_heterogeneous_model() -> None:
         material_files={"p_wave_velocity": "velocity.segy"},
         minimum_velocity=1.5,
     )
-    problem = AcousticHeterogeneousProblem(
-        {**PROBLEM_PARAMETERS, "heterogeneous_case": case}
-    )
+    problem = AcousticHeterogeneousProblem(make_parameters(heterogeneous_case=case))
 
     model = problem.model_dictionary("spectral_quadrilateral", 4)
 
     assert model["mesh"]["length_z"] == 3.0
     assert model["mesh"]["length_x"] == 17.0
-    assert model["mesh"]["cells_per_wavelength"] == 2.8
     assert model["synthetic_data"]["real_velocity_file"] == "velocity.segy"
 
 
@@ -385,7 +407,6 @@ def test_acoustic_heterogeneous_model_writes_only_p_wave_file(tmp_path) -> None:
         frequency=10.0,
         minimum_velocity=2.5,
         case=ElasticSyntheticCase(name=base_name),
-        cells_per_wavelength=3.0,
     )
 
     assert model["synthetic_data"]["real_velocity_file"] == f"{base_name}_vp.segy"
@@ -408,11 +429,10 @@ def test_elastic_problem_builds_heterogeneous_model(tmp_path) -> None:
     """The heterogeneous elastic model reads its domain and files from the case."""
     base_name = str(tmp_path / "salt")
     problem = ElasticHeterogeneousProblem(
-        {
-            **PROBLEM_PARAMETERS,
-            "source_frequency": 10.0,
-            "heterogeneous_case": ElasticSyntheticCase(name=base_name, length_z=3.0),
-        }
+        make_parameters(
+            source_frequency=10.0,
+            heterogeneous_case=ElasticSyntheticCase(name=base_name, length_z=3.0),
+        )
     )
 
     model = problem.model_dictionary("mass_lumped_triangle", 3)

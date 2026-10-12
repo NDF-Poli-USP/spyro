@@ -10,6 +10,7 @@ import spyro
 from spyro.io.segy_io import create_segy_from_grid, read_segy_velocity_model
 from spyro.tools.cells_per_wavelength_calculator import (
     CPW_PROBLEMS,
+    CpwParameters,
     HeterogeneousCase,
     HeterogeneousCpwProblem,
     MaterialFileCase,
@@ -192,14 +193,19 @@ def make_heterogeneous_problem(
     """
     problem_class = CPW_PROBLEMS[(wave_type, VelocityProfileType.HETEROGENEOUS)]
     return problem_class(
-        {
-            "source_frequency": 5.0,
-            "dimension": 2,
-            "heterogeneous_case": case,
-            "reference_degree": 5,
-            "C_reference": 6.0,
-            "C_initial": 3.0,
-        }
+        CpwParameters(
+            source_frequency=5.0,
+            fem_method="mass_lumped_triangle",
+            dimension=2,
+            desired_degree=2,
+            cpw_initial=3.0,
+            cpw_accuracy=0.1,
+            accepted_error_threshold=0.05,
+            wave_type=wave_type,
+            heterogeneous_case=case,
+            reference_degree=5,
+            cpw_reference=6.0,
+        )
     )
 
 
@@ -239,6 +245,12 @@ def test_calculator_matches_case_to_profile(
         "wave_type": WaveType.ISOTROPIC_ELASTIC,
         "source_frequency": 5.0,
         "velocity_profile_type": profile,
+        "FEM_method_to_evaluate": "mass_lumped_triangle",
+        "dimension": 2,
+        "desired_degree": 2,
+        "C_initial": 3.0,
+        "C_accuracy": 0.1,
+        "accepted_error_threshold": 0.05,
     }
     if give_case:
         parameters["heterogeneous_case"] = LinearCase()
@@ -267,3 +279,63 @@ def test_case_missing_parameter_writes_nothing(tmp_path) -> None:
     with pytest.raises(ValueError, match="does not define"):
         case.write_material_files(("p_wave_velocity", "density"))
     assert not any(tmp_path.iterdir())
+
+
+def test_case_samples_material_once(monkeypatch) -> None:
+    """Every use of the sampled material shares one evaluation."""
+    case = LinearCase()
+    calls = []
+    material = LinearCase.material
+
+    def counting_material(
+        self: LinearCase, z: np.ndarray, x: np.ndarray
+    ) -> dict[str, np.ndarray]:
+        """Count the evaluations of the linear material.
+
+        Parameters
+        ----------
+        self : LinearCase
+            Case being sampled.
+        z : np.ndarray
+            Vertical coordinates.
+        x : np.ndarray
+            Horizontal coordinates.
+
+        Returns
+        -------
+        dict
+            The linear material.
+        """
+        calls.append(None)
+        return material(self, z, x)
+
+    monkeypatch.setattr(LinearCase, "material", counting_material)
+
+    case.minimum("p_wave_velocity")
+    case.minimum("s_wave_velocity")
+
+    assert len(calls) == 1
+
+
+def test_case_writes_each_material_file_once(tmp_path) -> None:
+    """Files already written are not written again; new parameters are."""
+    case = LinearCase(name=str(tmp_path / "linear"))
+
+    case.write_material_files(("p_wave_velocity",))
+    vp_file = tmp_path / "linear_vp.segy"
+    vp_file.write_bytes(b"sentinel")
+
+    file_names = case.write_material_files(("p_wave_velocity", "density"))
+
+    assert vp_file.read_bytes() == b"sentinel"
+    assert (tmp_path / "linear_rho.segy").is_file()
+    assert file_names["p_wave_velocity"] == str(vp_file)
+    assert case.written_parameters == {"p_wave_velocity", "density"}
+
+
+def test_written_parameters_do_not_affect_equality(tmp_path) -> None:
+    """Two cases with the same fields are equal, whatever they wrote."""
+    case = LinearCase(name=str(tmp_path / "linear"))
+    case.write_material_files(("density",))
+
+    assert case == LinearCase(name=str(tmp_path / "linear"))

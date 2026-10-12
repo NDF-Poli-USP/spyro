@@ -18,7 +18,7 @@ def test_ElasticSyntheticCase() -> None:
     assert case.final_time == 1.0
     assert case.minimum("s_wave_velocity") == pytest.approx(1.2)
     assert case.minimum("p_wave_velocity") == pytest.approx(2.5)
-    material = case.sample_material()
+    material = case.sampled_material
     assert material["density"].shape == (501, 1001)
 
 

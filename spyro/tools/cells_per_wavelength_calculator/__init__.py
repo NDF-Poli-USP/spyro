@@ -15,6 +15,7 @@ from .line_search import (
     backward_line_search,
     forward_line_search,
 )
+from .parameters import CpwParameters
 from .problems import (
     CPW_PROBLEMS,
     AcousticHeterogeneousProblem,
@@ -38,6 +39,7 @@ __all__ = [
     "AcousticHeterogeneousProblem",
     "AcousticHomogeneousProblem",
     "CpwEvaluation",
+    "CpwParameters",
     "CpwProblem",
     "ElasticHeterogeneousProblem",
     "ElasticHomogeneousProblem",
