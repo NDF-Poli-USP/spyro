@@ -34,10 +34,10 @@ VELOCITY = 1.5
 
 def run(
     method: str = "mass_lumped_triangle",
-    degree: int = 4,
+    degree: int = 5,
     accepted_error_threshold: float | None = None,
     threshold_discretization: ThresholdDiscretization | bool | dict | None = None,
-    cpw_initial: float = 1.0,
+    cpw_initial: float = 0.8,
     cpw_max: float = MAX_CPW,
 ) -> spyro.tools.MeshingParameterCalculator:
     """Search for the minimum cells-per-wavelength of one discretization.
@@ -87,12 +87,11 @@ def run(
         "dimension": 2,
         "receiver_setup": "near",
         "timestep_calculation": "estimate",
-        "reference_degree": None,
-        "C_reference": None,
         "desired_degree": degree,
         "C_initial": cpw_initial,
         "C_max": cpw_max,
         "C_accuracy": 0.1,
+        "load_reference": True,
         **threshold,
     }
 
