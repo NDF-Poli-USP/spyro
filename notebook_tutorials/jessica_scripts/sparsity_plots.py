@@ -42,34 +42,6 @@ def _matrices_pressure(wave):
     return mats, labels, rows, cols
 
 
-def _matrices_displacement(wave):
-    """u_f-u_s: fluid/solid mass matrices and the shared normal dof map.
-    There is no interface integral in this formulation: the coupling is the
-    normal displacement dof shared by the paired interface nodes."""
-    Vf, Vs = wave.fluid_function_space, wave.solid_function_space
-    dim = wave.dimension
-    uf_t, uf_v = TrialFunction(Vf), TestFunction(Vf)
-    us_t, us_v = TrialFunction(Vs), TestFunction(Vs)
-
-    c = wave._iface_normal_comp
-    rows = np.asarray(wave._iface_f_nodes) * dim + c
-    cols = np.asarray(wave._iface_s_nodes) * dim + c
-    shared = sp.csr_matrix(
-        (np.ones(len(rows)), (rows, cols)), shape=(Vf.dim(), Vs.dim())
-    )
-    mats = [
-        _to_scipy(dot(uf_t, uf_v) * dx(**wave.quadrature_rule_fluid)),
-        _to_scipy(dot(us_t, us_v) * dx(**wave.quadrature_rule_solid)),
-        shared,
-    ]
-    labels = ["M_uf (fluid)", "M_us (solid)", "Shared normal dof (u_f·n = u_s·n)"]
-    rows = ["u_f dofs (fluid equation)", "u_s dofs (solid equation)",
-            "u_f dofs (fluid, interface)"]
-    cols = ["u_f dofs (unknown)", "u_s dofs (unknown)",
-            "u_s dofs (solid, interface)"]
-    return mats, labels, rows, cols
-
-
 def save_sparsity_matrices(wave, filename):
     """Assemble the matrices of the case being run and save them to filename.
     Row index = dof of the equation (test function);
@@ -83,9 +55,6 @@ def save_sparsity_matrices(wave, filename):
         cols = ["[ P | u_s ] dofs (unknowns)"]
         case = "P – u_s (monolithic)"
         split = wave.fluid_function_space.dim()
-    elif wave.fluid_is_vector:
-        mats, labels, rows, cols = _matrices_displacement(wave)
-        case = "u_f – u_s"
     else:
         mats, labels, rows, cols = _matrices_pressure(wave)
         case = "P – u_s"
