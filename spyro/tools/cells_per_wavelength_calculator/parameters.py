@@ -45,6 +45,11 @@ class CpwParameters:
     ----------
     source_frequency : float
         Ricker peak frequency.
+    mesh_frequency_factor : float
+        The wavelength of every cells-per-wavelength value is taken at this
+        multiple of ``source_frequency``, e.g. 1.0 (the peak frequency), 2.0
+        (about 90% of the Ricker energy) or 2.5 (close to its maximum
+        frequency). It has no default, since the result depends on it.
     fem_method : str
         Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
     dimension : int
@@ -64,11 +69,6 @@ class CpwParameters:
     receiver_setup : str or None
         Receiver setup label, kept for older parameter dictionaries. The
         acquisition is set by the problem.
-    mesh_frequency_factor : float
-        The wavelength of every cells-per-wavelength value is taken at this
-        multiple of ``source_frequency``, e.g. 2.0 (about 90% of the Ricker
-        energy) or 2.5 (close to its maximum frequency). Default is 1.0,
-        the peak frequency.
     minimum_velocity : float or None
         Velocity, homogeneous acoustic only.
     p_wave_velocity, s_wave_velocity, density : float or None
@@ -110,6 +110,7 @@ class CpwParameters:
     """
 
     source_frequency: float
+    mesh_frequency_factor: float
     fem_method: str
     dimension: int
     desired_degree: int
@@ -118,7 +119,6 @@ class CpwParameters:
     wave_type: WaveType | str = WaveType.ISOTROPIC_ACOUSTIC
     velocity_profile_type: VelocityProfileType | str | None = None
     receiver_setup: str | None = None
-    mesh_frequency_factor: float = 1.0
     minimum_velocity: float | None = None
     p_wave_velocity: float | None = None
     s_wave_velocity: float | None = None

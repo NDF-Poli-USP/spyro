@@ -51,6 +51,7 @@ from spyro.utils.typing import (
 #: Calculator parameters of a homogeneous acoustic search, with no file access.
 CALCULATOR_PARAMETERS = {
     "source_frequency": 5.0,
+    "mesh_frequency_factor": 2.0,
     "minimum_velocity_in_the_domain": 1.5,
     "FEM_method_to_evaluate": "mass_lumped_triangle",
     "dimension": 2,
@@ -417,6 +418,7 @@ def test_elastic_cpw_search_meets_threshold() -> None:
     parameters = {
         "wave_type": WaveType.ISOTROPIC_ELASTIC,
         "source_frequency": 10.0,
+        "mesh_frequency_factor": 2.0,
         "p_wave_velocity": 5.6,
         "s_wave_velocity": 2.75,
         "density": 2.0,
@@ -882,6 +884,18 @@ def test_parameters_from_dict_names_missing_keys() -> None:
     }
 
     with pytest.raises(KeyError, match="FEM_method_to_evaluate"):
+        CpwParameters.from_dict(parameters)
+
+
+def test_parameters_require_mesh_frequency_factor() -> None:
+    """The mesh frequency factor has no default and must be given."""
+    parameters = {
+        key: value
+        for key, value in CALCULATOR_PARAMETERS.items()
+        if key != "mesh_frequency_factor"
+    }
+
+    with pytest.raises(KeyError, match="mesh_frequency_factor"):
         CpwParameters.from_dict(parameters)
 
 

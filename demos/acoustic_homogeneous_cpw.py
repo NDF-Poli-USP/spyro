@@ -21,6 +21,10 @@ search takes several minutes per evaluated mesh.
 """
 
 import spyro
+from spyro.tools.cells_per_wavelength_calculator import (
+    MAX_CPW,
+    ThresholdDiscretization,
+)
 
 #: Peak frequency of the Ricker source, in Hz.
 FREQUENCY = 5.0
@@ -31,6 +35,11 @@ VELOCITY = 1.5
 def run(
     method: str = "mass_lumped_triangle",
     degree: int = 4,
+    accepted_error_threshold: float | None = None,
+    threshold_discretization: ThresholdDiscretization | bool | dict | None = None,
+    cpw_initial: float = 4.0,
+    cpw_max: float = MAX_CPW,
+    fixed_timestep: float | None = None,
 ) -> spyro.tools.MeshingParameterCalculator:
     """Search for the minimum cells-per-wavelength of one discretization.
 
@@ -41,6 +50,20 @@ def run(
         ``"spectral_quadrilateral"``. Default is ``"mass_lumped_triangle"``.
     degree : int, optional
         Polynomial degree to evaluate. Default is 4.
+    accepted_error_threshold : float or None, optional
+        Largest accepted receiver error. Default is None.
+    threshold_discretization : ThresholdDiscretization, bool, dict or None, optional
+        Discretization whose error is used as the threshold. Default is
+        None, which, when ``accepted_error_threshold`` is also None, uses a
+        degree 4 spectral quadrilateral mesh at cpw 2.0. Giving both is
+        rejected by the calculator.
+    cpw_initial : float, optional
+        Starting cells-per-wavelength. Default is 4.0.
+    cpw_max : float, optional
+        Largest cells-per-wavelength evaluated. Default is
+        :data:`~spyro.tools.cells_per_wavelength_calculator.MAX_CPW`.
+    fixed_timestep : float or None, optional
+        Time step of every solve. Default is None, for an estimated one.
 
     Returns
     -------
@@ -48,21 +71,32 @@ def run(
         The calculator after the search, holding its
         ``search_history``.
     """
+    threshold = {}
+    if accepted_error_threshold is not None:
+        threshold["accepted_error_threshold"] = accepted_error_threshold
+    if threshold_discretization is not None:
+        threshold["threshold_discretization"] = threshold_discretization
+    if not threshold:
+        # Error of a degree 4 spectral quadrilateral mesh at cpw 2.0
+        threshold["threshold_discretization"] = True
+
     parameters = {
         "source_frequency": FREQUENCY,
+        "mesh_frequency_factor": 2.0,
         "minimum_velocity_in_the_domain": VELOCITY,
         "velocity_profile_type": "homogeneous",
         "FEM_method_to_evaluate": method,
         "dimension": 2,
         "receiver_setup": "near",
-        "time-step_calculation": "estimate",
+        "time-step_calculation": "estimate" if fixed_timestep is None else "float",
+        "time-step": fixed_timestep,
         "reference_degree": None,
         "C_reference": None,
         "desired_degree": degree,
-        # Error of a degree 4 spectral quadrilateral mesh at cpw 2.0
-        "threshold_discretization": True,
-        "C_initial": 4.0,
+        "C_initial": cpw_initial,
+        "C_max": cpw_max,
         "C_accuracy": 0.1,
+        **threshold,
     }
 
     calculator = spyro.tools.MeshingParameterCalculator(parameters)

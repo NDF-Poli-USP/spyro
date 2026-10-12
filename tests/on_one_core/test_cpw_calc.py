@@ -32,6 +32,7 @@ def make_parameters(method: str, degree: int) -> dict:
     """
     return {
         "source_frequency": FREQUENCY,
+        "mesh_frequency_factor": 2.0,
         "minimum_velocity_in_the_domain": VELOCITY,
         "velocity_profile_type": "homogeneous",
         "FEM_method_to_evaluate": method,

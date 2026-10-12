@@ -195,6 +195,7 @@ def make_heterogeneous_problem(
     return problem_class(
         CpwParameters(
             source_frequency=5.0,
+            mesh_frequency_factor=2.0,
             fem_method="mass_lumped_triangle",
             dimension=2,
             desired_degree=2,
@@ -244,6 +245,7 @@ def test_calculator_matches_case_to_profile(
     parameters = {
         "wave_type": WaveType.ISOTROPIC_ELASTIC,
         "source_frequency": 5.0,
+        "mesh_frequency_factor": 2.0,
         "velocity_profile_type": profile,
         "FEM_method_to_evaluate": "mass_lumped_triangle",
         "dimension": 2,

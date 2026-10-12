@@ -14,11 +14,10 @@ def test_acoustic_homogeneous_cpw_demo(tmp_path, monkeypatch) -> None:
     calculator = run(
         method="spectral_quadrilateral",
         degree=4,
-        testing=True,
-        **{"time-step_calculation": "float", "time-step": 0.002},
         accepted_error_threshold=0.01,
-        C_initial=2.5,
-        C_max=2.5,
+        cpw_initial=2.5,
+        cpw_max=2.5,
+        fixed_timestep=0.002,
     )
 
     errors = {e.cpw: e.error for e in calculator.search_history}

@@ -53,6 +53,7 @@ def make_homogeneous_model(
 #: Problem parameters shared by the tests that build a problem.
 PROBLEM_PARAMETERS = {
     "source_frequency": 5.0,
+    "mesh_frequency_factor": 2.0,
     "FEM_method_to_evaluate": "mass_lumped_triangle",
     "dimension": 2,
     "testing": True,
