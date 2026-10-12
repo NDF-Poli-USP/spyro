@@ -143,7 +143,9 @@ class MeshingParameterCalculator:
         )
 
         if self.parameters.save_reference:
-            np.save(self.reference_solution_file, reference)
+            SpyroEnsemble.run_in_one_core_and_broadcast(np.save)(
+                self.reference_solution_file, reference
+            )
         return reference
 
     def build_wave(
@@ -350,7 +352,7 @@ class MeshingParameterCalculator:
         )
 
         if savetxt:
-            np.savetxt(
+            SpyroEnsemble.run_in_one_core_and_broadcast(np.savetxt)(
                 f"p{self.initial_wave.degree}_cpw_results.txt",
                 [(e.cpw, e.dt, e.error, e.runtime) for e in self.search_history],
                 header="cpw dt error runtime",
