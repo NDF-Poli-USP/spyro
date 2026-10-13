@@ -7,6 +7,7 @@ that error calculations and file operations work as expected.
 import numpy as np
 import pytest
 from unittest.mock import patch
+from spyro.sources import full_ricker_wavelet
 from spyro.tools.error_measure import MeasureError
 
 
@@ -35,27 +36,15 @@ class TestMeasureError:
     def acoustic_receiver_data(self):
         """Create synthetic acoustic seismic receiver data."""
         dt = 0.001
-        n_time = 20001
-        n_receivers = 40
+        ricker = full_ricker_wavelet(
+            dt, final_time=20.0, frequency=10.0, delay=2.0, delay_type="time",
+        )
+        receiver_amplitudes = np.linspace(1.0, 0.7, 40)
 
-        t = np.arange(n_time) * dt
+        reference = ricker[:, np.newaxis] * receiver_amplitudes[np.newaxis, :]
 
-        # Ricker wavelet
-        frequency = 10.0
-        t0 = 2.0
-        tau = np.pi * frequency * (t - t0)
-        reference = (1 - 2 * tau**2) * np.exp(-tau**2)
-
-        # Receiver-dependent amplitudes
-        amplitudes = np.linspace(1.0, 0.7, n_receivers)
-
-        reference = reference[:, np.newaxis] * amplitudes[np.newaxis, :]
-
-        # Numerical signal = reference + reproducible random noise
         rng = np.random.default_rng(42)
-        noise = 0.01 * rng.standard_normal(reference.shape)
-
-        numerical = reference + noise
+        numerical = reference + 0.01 * rng.standard_normal(reference.shape)
 
         return numerical, reference, dt
 
@@ -63,19 +52,10 @@ class TestMeasureError:
     def elastic_receiver_data(self):
         """Create synthetic elastic seismic receiver data."""
         dt = 0.001
-        n_time = 20001
-        n_receivers = 40
-
-        t = np.arange(n_time) * dt
-
-        # Ricker wavelet
-        frequency = 10.0
-        t0 = 2.0
-        tau = np.pi * frequency * (t - t0)
-        ricker = (1 - 2 * tau**2) * np.exp(-tau**2)
-
-        # Receiver-dependent amplitudes
-        receiver_amplitudes = np.linspace(1.0, 0.7, n_receivers)
+        ricker = full_ricker_wavelet(
+            dt, final_time=20.0, frequency=10.0, delay=2.0, delay_type="time",
+        )
+        receiver_amplitudes = np.linspace(1.0, 0.7, 40)
 
         # Different amplitudes for the two displacement directions
         direction_amplitudes = np.array([1.0, 0.6])
@@ -86,11 +66,8 @@ class TestMeasureError:
             * direction_amplitudes[np.newaxis, np.newaxis, :]
         )
 
-        # Numerical signal = reference + reproducible random noise
         rng = np.random.default_rng(42)
-        noise = 0.01 * rng.standard_normal(reference.shape)
-
-        numerical = reference + noise
+        numerical = reference + 0.01 * rng.standard_normal(reference.shape)
 
         return numerical, reference, dt
 
@@ -272,6 +249,43 @@ class TestMeasureError:
         integral_error = MeasureError.calculate_integral_error(signal, zero_signal, dt)
         assert integral_error == np.inf
 
+    def test_integral_error_multidimensional_sums_traces(self, elastic_receiver_data):
+        """Test that multidimensional integral error sums over all traces."""
+        numerical, reference, dt = elastic_receiver_data
+        integral_error = MeasureError.calculate_integral_error(
+            numerical, reference, dt
+        )
+
+        numerator = sum(
+            np.trapezoid((numerical[:, r, d] - reference[:, r, d]) ** 2, dx=dt)
+            for r in range(numerical.shape[1])
+            for d in range(numerical.shape[2])
+        )
+        denominator = sum(
+            np.trapezoid(reference[:, r, d] ** 2, dx=dt)
+            for r in range(numerical.shape[1])
+            for d in range(numerical.shape[2])
+        )
+        assert np.isclose(integral_error, numerator / denominator)
+
+    def test_integral_error_multidimensional_padding(self, sample_signals):
+        """Test that multidimensional signals are padded along time only."""
+        _, reference, dt = sample_signals
+        reference = np.column_stack([reference, 0.5 * reference])
+        shorter = reference[:-10]
+
+        integral_error = MeasureError.calculate_integral_error(
+            shorter,
+            reference,
+            dt,
+            error_if_different_length=False,
+            end_padding=True,
+        )
+
+        padded = np.vstack([shorter, np.zeros((10, 2))])
+        expected = MeasureError.calculate_integral_error(padded, reference, dt)
+        assert integral_error == expected
+
     def test_normalized_L2_error_identical(self, sample_signals):
         """Test NRMSE with identical signals."""
         signal, _, _ = sample_signals
@@ -430,65 +444,46 @@ class TestMeasureError:
         numerical, _, _ = acoustic_receiver_data
         n_receivers = numerical.shape[1]
 
-        with patch(
-            "spyro.tools.error_measure.getcwd",
-            return_value=str(tmp_path),
+        with (
+            patch("spyro.tools.error_measure.getcwd", return_value=str(tmp_path)),
+            patch("numpy.load", return_value=numerical) as mock_load,
+            patch("numpy.save"),
+            patch("spyro.utils.error_management.path.exists", return_value=True),
         ):
             measure_error = MeasureError(
                 output_folder="test_output",
                 output_case="preamble",
             )
 
-            with patch("numpy.load") as mock_load:
-                mock_load.return_value = numerical
-
-                with patch("numpy.save"):
-                    with patch(
-                        "spyro.utils.error_management.path.exists",
-                        return_value=True,
-                    ):
-                        measure_error.save_reference_signal(
-                            receiver_locations=[(i, i + 1) for i in range(n_receivers)],
-                            forward_solution_receivers=numerical,
-                            number_of_receivers=n_receivers,
-                            nyquist_frequency=50.0,
-                            output_file_prefix="test_ref",
-                        )
-
-                        ref, ref_fft = measure_error.get_reference_signal()
-
-                        # One file for the time-domain signal and one for its FFT.
-                        assert mock_load.call_count == 2
-
-                        np.testing.assert_array_equal(ref, numerical)
-
-    @pytest.mark.parametrize(
-        "physics",
-        ["acoustic", "elastic"],
-    )
-    def test_calculate_receiver_error(
-        self,
-        request,
-        physics,
-    ):
-        """Test receiver error for acoustic and elastic data."""
-        if physics == "acoustic":
-            numerical, reference, dt = request.getfixturevalue(
-                "acoustic_receiver_data"
+            measure_error.save_reference_signal(
+                receiver_locations=[(i, i + 1) for i in range(n_receivers)],
+                forward_solution_receivers=numerical,
+                number_of_receivers=n_receivers,
+                nyquist_frequency=50.0,
+                output_file_prefix="test_ref",
             )
-            has_displacement = False
-        elif physics == "elastic":
-            numerical, reference, dt = request.getfixturevalue(
-                "elastic_receiver_data"
-            )
-            has_displacement = True
 
-        error = MeasureError.calculate_receiver_error(
-            numerical,
-            reference,
-            dt,
-            has_displacement=has_displacement,
-        )
+            ref, ref_fft = measure_error.get_reference_signal()
+
+        # One file for the time-domain signal and one for its FFT.
+        assert mock_load.call_count == 2
+
+        np.testing.assert_array_equal(ref, numerical)
+
+    def test_calculate_receiver_error_scalar(self, acoustic_receiver_data):
+        """Test receiver error for scalar (acoustic) data."""
+        numerical, reference, dt = acoustic_receiver_data
+
+        error = MeasureError.calculate_receiver_error(numerical, reference, dt)
+
+        # Numerical data differs from the reference only by low-amplitude noise.
+        assert 0.0 < error < 1.0
+
+    def test_calculate_receiver_error_displacement(self, elastic_receiver_data):
+        """Test receiver error for displacement (elastic) data."""
+        numerical, reference, dt = elastic_receiver_data
+
+        error = MeasureError.calculate_receiver_error(numerical, reference, dt)
 
         # Numerical data differs from the reference only by low-amplitude noise.
         assert 0.0 < error < 1.0
