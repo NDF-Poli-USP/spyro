@@ -1,8 +1,14 @@
+import warnings
+
 from firedrake import LinearEigenproblem, LinearEigensolver
-from numpy import abs, amax, array, asarray, eye, imag, real, sqrt, unique
+from numpy import array, asarray, eye, imag, real, sqrt, unique
 from scipy.sparse.linalg import eigs, eigsh, lobpcg, spilu
 from spyro.mpi.spyro_mpi import SpyroEnsemble
-from .modal_forms_and_matrices import assemble_sparse_matrices, weak_forms
+from .modal_forms_and_matrices import (
+    assemble_sparse_matrices,
+    maximum_diagonal_ratio,
+    acoustic_weak_forms_c_in_stiffness,
+)
 from .modal_rq_matrices import generate_eigenfunctions, matrices_rayleigh_quotient
 from ...utils.error_management import (
     validate_data_structure,
@@ -351,13 +357,13 @@ class Modal_Solver:
 
         return Lsp
 
-    def assemble_weak_forms(self, c, V, quad_rule=None, shift=0.0):
+    def assemble_weak_forms(self, c, V, quad_rule=None, shift=0.0, forms=None):
         """Build the weak forms for the modal problem solved using UFL or sparse matrices.
 
         Parameters
         ----------
         c : `Firedrake.Function`
-            Velocity model.
+            Velocity model. Ignored when ``forms`` is given.
         V : `Firedrake.FunctionSpace`
             Function space for the modal problem.
         quad_rule : `dict`, optional
@@ -365,6 +371,10 @@ class Modal_Solver:
             Default is `None`, which uses the default quadrature rule.
         shift: `float`, optional
             Value to stabilize the Neumann BC null space. Default is 0.
+        forms : `tuple` of `Firedrake.Form`, optional
+            Stiffness and mass forms ``(a, m)`` supplied by the wave
+            physics. Default is `None`, which builds the scalar acoustic
+            forms from ``c``.
 
         Returns
         -------
@@ -375,7 +385,6 @@ class Modal_Solver:
         """
 
         # Check input arguments
-        validate_firedrake_parameter("c", c, "Function")
         validate_firedrake_parameter("V", V, "FunctionSpace")
         validate_data_structure(
             "quad_rule", quad_rule, "dict", accept_parameter_as_none=True
@@ -390,7 +399,11 @@ class Modal_Solver:
         )
 
         # Get bilinear forms
-        a, m = weak_forms(c, V, quad_rule=quad_rule)
+        if forms is None:
+            validate_firedrake_parameter("c", c, "Function")
+            a, m = acoustic_weak_forms_c_in_stiffness(c, V, quad_rule=quad_rule)
+        else:
+            a, m = forms
 
         # Add shift to stabilize Neumann BC null space
         if shift > 0:
@@ -415,6 +428,7 @@ class Modal_Solver:
         dof_load=None,
         amplitude_load=None,
         fitting_c=(0.0, 0.0, 0.0, 0.0),
+        forms=None,
     ):
         """Solve the eigenvalue problem with Neumann boundary conditions.
 
@@ -480,6 +494,10 @@ class Modal_Solver:
                 Exponent factor for the minimum equivalent velocity.
             - fp2 : `float`
                 Exponent factor for the maximum equivalent velocity.
+        forms : `tuple` of `Firedrake.Form`, optional
+            Stiffness and mass forms ``(a, m)`` supplied by the wave
+            physics. Only used by the numerical eigensolvers. Default is
+            `None`, which builds the scalar acoustic forms from ``c``.
 
         Returns
         -------
@@ -520,7 +538,9 @@ class Modal_Solver:
             )
         else:
             # Get weak forms for the modal problem
-            a, m = self.assemble_weak_forms(c, V, quad_rule=quad_rule, shift=shift)
+            a, m = self.assemble_weak_forms(
+                c, V, quad_rule=quad_rule, shift=shift, forms=forms
+            )
 
         if self.method.startswith("KRYLOVSCH"):
             Lsp = self.solver_with_ufl(a, m, k=k)
@@ -536,7 +556,15 @@ class Modal_Solver:
         return Lsp
 
     def estimate_timestep(
-        self, c, V, final_time, shift=0.0, quad_rule=None, inv_oper=False, fraction=0.7
+        self,
+        c,
+        V,
+        final_time,
+        shift=0.0,
+        quad_rule=None,
+        inv_oper=False,
+        fraction=0.7,
+        forms=None,
     ):
         """Estimate the maximum stable timestep based on the spectral radius.
 
@@ -546,8 +574,9 @@ class Modal_Solver:
 
         Parameters
         ----------
-        c : `Firedrake.Function`
-            Velocity model.
+        c : `Firedrake.Function` or `None`
+            Velocity model. Ignored, and may be `None`, when ``forms`` is
+            given.
         V : `Firedrake.FunctionSpace`
             Function space for the modal problem.
         final_time : `float`
@@ -562,6 +591,11 @@ class Modal_Solver:
             Default is `False`.
         fraction : `float`, optional
             Fraction of the estimated timestep to use. Defaults to 0.7.
+        forms : `tuple` of `Firedrake.Form`, optional
+            Stiffness and mass forms ``(a, m)`` supplied by the wave
+            physics. Default is `None`, which is deprecated and builds the
+            acoustic forms with the velocity in the stiffness from ``c``
+            (see ``acoustic_weak_forms_c_in_stiffness``).
 
         Returns
         -------
@@ -569,21 +603,38 @@ class Modal_Solver:
             Estimated maximum stable timestep.
         """
 
+        if forms is None:
+            warnings.warn(
+                "Calling estimate_timestep without forms builds the acoustic "
+                "forms with the velocity in the stiffness "
+                "(acoustic_weak_forms_c_in_stiffness), which differ from the "
+                "forward problem for a heterogeneous velocity. This is "
+                "deprecated; pass the forms of the wave physics instead, e.g. "
+                "forms=wave.modal_weak_forms().",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         # Maximum eigenvalue
         if self.method == "ANALYTICAL":
             SpyroEnsemble.print("Estimating Maximum Eigenvalue")
 
-            a, m = self.assemble_weak_forms(c, V, quad_rule=quad_rule, shift=shift)
-            Asp, Msp_inv = assemble_sparse_matrices(a, m, return_M_inv=True)
-            Lsp = Msp_inv.multiply(Asp)
-            max_eigval = amax(abs(Lsp.diagonal())) - shift
+            a, m = self.assemble_weak_forms(
+                c, V, quad_rule=quad_rule, shift=shift, forms=forms
+            )
+            max_eigval = maximum_diagonal_ratio(a, m) - shift
 
         else:
             SpyroEnsemble.print("Computing Exact Maximum Eigenvalue")
 
             # (eig = 0 is a rigid body motion)
             Lsp = self.solve_eigenproblem(
-                c, V=V, shift=shift, quad_rule=quad_rule, inv_oper=inv_oper
+                c,
+                V=V,
+                shift=shift,
+                quad_rule=quad_rule,
+                inv_oper=inv_oper,
+                forms=forms,
             )
             max_eigval = max(unique(Lsp[(Lsp > 0.0) & (imag(Lsp) == 0.0)]))
 
