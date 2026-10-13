@@ -26,6 +26,9 @@ class DummyWave(Wave):
     def _create_function_space(self):
         pass
 
+    def modal_weak_forms(self):
+        raise NotImplementedError
+
     def _set_vstate(self, vstate):
         self._vstate = vstate
 
