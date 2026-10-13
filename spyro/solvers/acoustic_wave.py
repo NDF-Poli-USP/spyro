@@ -350,6 +350,31 @@ class AcousticWave(Wave):
         return create_function_space(self.mesh, self.method, self.degree)
 
     @override
+    def modal_weak_forms(self) -> tuple[fire.Form, fire.Form]:
+        """Build the scalar acoustic stiffness and mass forms.
+
+        The velocity is in the mass, as in the acoustic solver, so a
+        heterogeneous velocity is weighted as in the solver. The initial
+        velocity model is used when the current one has not been set.
+
+        Returns
+        -------
+        a : firedrake.Form
+            Stiffness form ``grad(u) . grad(v)``.
+        m : firedrake.Form
+            Mass form ``u * v / c**2``.
+        """
+        V = self.function_space
+        u = fire.TrialFunction(V)
+        v = fire.TestFunction(V)
+        c = self.initial_velocity_model if self.c is None else self.c
+        quad_rule = self.quadrature_rule
+
+        a = fire.inner(fire.grad(u), fire.grad(v))*fire.dx(**quad_rule)
+        m = (1/(c*c))*u*v*fire.dx(**quad_rule)
+        return a, m
+
+    @override
     def rhs_no_pml(self):
         if self.abc_type == AbsorbingBCsType.PML:
             return self.B.sub(0)
