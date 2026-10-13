@@ -1,17 +1,35 @@
 import numpy as np
 
-from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
-                       project)
+import firedrake as fire
+from firedrake import (
+    assemble,
+    Constant,
+    curl,
+    DirichletBC,
+    div,
+    dot,
+    dx,
+    Function,
+    grad,
+    inner,
+    project,
+)
 from pyadjoint import AdjFloat, Tape
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
+from ...io import interpolate
+from ...utils import write_hdf5_velocity_model
 from ...utils.physical_parameters import PhysicalParameters
-from ...utils.typing import (AdjointType, ElasticMaterialParameter,
-                             ElasticMaterialParameterization, AbsorbingBCsType,
-                             RieszMapType)
+from ...utils.typing import (
+    AdjointType,
+    ElasticMaterialParameter,
+    ElasticMaterialParameterization,
+    AbsorbingBCsType,
+    RieszMapType,
+)
 from ...domains.space import create_function_space
 
 
@@ -341,8 +359,53 @@ class IsotropicWave(ElasticWave):
             )
         return self.automated_adjoint.label_derivatives(derivatives)
 
-    def initialize_model_parameters_from_file(self, synthetic_data_dict):
-        raise NotImplementedError
+    def initialize_model_parameters_from_file(
+        self, synthetic_data_dict: dict, fast_interpolate: bool = True,
+    ):
+        """Initialize isotropic elastic material parameters from model files.
+
+        Every file is interpolated onto the scalar space of the mesh, and
+        the parameters are then set as in
+        :meth:`initialize_model_parameters_from_object`, which also sets
+        when this runs and why it reads the files only once.
+
+        Parameters
+        ----------
+        synthetic_data_dict : dict
+            Material parameter dictionary with the keys of
+            :meth:`initialize_model_parameters_from_object`. A string value
+            is a ``.segy`` or ``.hdf5`` file; any other value is used as
+            given.
+        fast_interpolate : bool, optional
+            If True, sample the file grid at the nodes of the scalar space.
+            If False, project it from a mesh built at the grid resolution,
+            which is slow for fine grids. Default is True.
+
+        Returns
+        -------
+        None
+            The method assigns ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s``, and
+            the active physical parameterization on ``self``.
+        """
+        if self._physical_parameters:
+            return
+
+        space = create_function_space(self.mesh, self.method, self.degree, dim=1)
+
+        def load(value):
+            """Interpolate ``value`` if it names a file."""
+            if not isinstance(value, str):
+                return value
+            if value.endswith(".segy"):
+                value = write_hdf5_velocity_model(value)
+            return interpolate(
+                self, value, space, fast_interpolate=fast_interpolate,
+            )
+
+        self.initialize_model_parameters_from_object(
+            {key: load(value) for key, value in synthetic_data_dict.items()
+             if key != "type"}
+        )
 
     def _create_function_space(self):
         return create_function_space(self.mesh, self.method, self.degree,
@@ -374,6 +437,32 @@ class IsotropicWave(ElasticWave):
         else:
             data_with_halos = self.u_n.dat.data_ro_with_halos[:]
         return self.receivers.interpolate(data_with_halos)
+
+    def modal_weak_forms(self) -> tuple[fire.Form, fire.Form]:
+        """Build the isotropic elastic stiffness and mass forms.
+
+        Returns
+        -------
+        a : firedrake.Form
+            Elastic stiffness form
+            ``lmbda * div(u) * div(v) + 2 * mu * eps(u) : eps(v)``.
+        m : firedrake.Form
+            Mass form ``rho * u . v``.
+        """
+        V = self.function_space
+        u = fire.TrialFunction(V)
+        v = fire.TestFunction(V)
+        quad_rule = self.quadrature_rule
+
+        def eps(w):
+            return 0.5*(grad(w) + grad(w).T)
+
+        a = (
+            self.lmbda*div(u)*div(v)*dx(**quad_rule)
+            + 2*self.mu*inner(eps(u), eps(v))*dx(**quad_rule)
+        )
+        m = self.rho*dot(u, v)*dx(**quad_rule)
+        return a, m
 
     def get_function(self):
         return self.u_n

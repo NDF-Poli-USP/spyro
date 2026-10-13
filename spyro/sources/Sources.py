@@ -260,14 +260,11 @@ def full_ricker_wavelet(
     list of float
         list of ricker values at each time step
     """
-    nt = int(final_time / dt) + 1  # number of timesteps
-    time = 0.0
-    full_wavelet = np.zeros((nt,))
-    for t in range(nt):
-        full_wavelet[t] = ricker_wavelet(
-            time, frequency, 1, delay=delay, delay_type=delay_type
-        )
-        time += dt
+    nt = round(final_time / dt) + 1  # number of timesteps
+    time = dt * np.arange(nt)
+    full_wavelet = ricker_wavelet(
+        time, frequency, 1, delay=delay, delay_type=delay_type
+    )
     if cutoff is not None:
         fs = 1.0 / dt
         order = 2

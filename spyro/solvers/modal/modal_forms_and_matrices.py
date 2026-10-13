@@ -1,7 +1,9 @@
 """Generate weak forms used in the modal solver."""
 
 from firedrake import assemble, dx as fire_dx, grad, inner, TestFunction, TrialFunction
-from numpy import array
+from mpi4py import MPI
+from numpy import abs, array, concatenate, cumsum
+from petsc4py import PETSc
 from scipy.sparse import csr_matrix
 
 
@@ -56,8 +58,43 @@ def weak_forms(c, V, quad_rule=None, source=False, user_load=None):
     return a, m
 
 
+def gather_csr_matrix(petsc_matrix: PETSc.Mat) -> csr_matrix:
+    """Gather a distributed PETSc matrix into a SciPy matrix on every rank.
+
+    Each rank only holds its own rows of a parallel matrix, so the rows of
+    every rank are gathered, in rank order, which is the global row order.
+
+    Parameters
+    ----------
+    petsc_matrix : PETSc.Mat
+        AIJ matrix, possibly distributed over its communicator.
+
+    Returns
+    -------
+    scipy.sparse.csr_matrix
+        The whole matrix, identical on every rank of the communicator.
+    """
+    ptr, ind, val = petsc_matrix.getValuesCSR()
+    comm = petsc_matrix.comm.tompi4py()
+    # Each rank's row pointer starts at zero, so it is offset by the
+    # number of nonzeros on the lower ranks
+    nonzeros_per_row = concatenate([[0]] + [
+        rank_ptr[1:] - rank_ptr[:-1] for rank_ptr in comm.allgather(ptr)
+    ])
+    return csr_matrix(
+        (
+            concatenate(comm.allgather(val)),
+            concatenate(comm.allgather(ind)),
+            cumsum(nonzeros_per_row),
+        ),
+        petsc_matrix.size,
+    )
+
+
 def assemble_sparse_matrices(a, m, return_M_inv=False):
     """Assemble the sparse matrices for numerical modal solvers (e.g., SciPy solvers).
+
+    In parallel, every rank gets the whole matrices.
 
     Parameters
     ----------
@@ -80,20 +117,45 @@ def assemble_sparse_matrices(a, m, return_M_inv=False):
     """
 
     # Assemble the stiffness matrix
-    A = assemble(a)
-    a_ptr, a_ind, a_val = A.petscmat.getValuesCSR()
-    Asp = csr_matrix((a_val, a_ind, a_ptr), A.petscmat.size)
+    Asp = gather_csr_matrix(assemble(a).petscmat)
 
     # Assemble the mass matrix
-    M = assemble(m)
-    m_ptr, m_ind, m_val = M.petscmat.getValuesCSR()
-    Msp = csr_matrix((m_val, m_ind, m_ptr), M.petscmat.size)
+    Msp = gather_csr_matrix(assemble(m).petscmat)
 
     if return_M_inv:
         # Assemble the inverse mass matrix
-        m_val_inv = array(m_val)
+        m_val_inv = array(Msp.data)
         m_val_inv[m_val_inv != 0.] = 1. / m_val_inv[m_val_inv != 0.]
-        Msp_inv = csr_matrix((m_val_inv, m_ind, m_ptr), M.petscmat.size)
+        Msp_inv = csr_matrix((m_val_inv, Msp.indices, Msp.indptr), Msp.shape)
         return Asp, Msp_inv
 
     return Asp, Msp
+
+
+def maximum_diagonal_ratio(a, m) -> float:
+    """Return the largest ratio of the stiffness and mass matrix diagonals.
+
+    This is ``max |A_ii / M_ii|`` over the rows with a nonzero mass
+    diagonal, the largest eigenvalue of a lumped mass system. Each rank
+    only reads the diagonal entries of its own rows, so nothing is gathered.
+
+    Parameters
+    ----------
+    a : firedrake.Form
+        Weak form representing the stiffness matrix.
+    m : firedrake.Form
+        Weak form representing the mass matrix.
+
+    Returns
+    -------
+    float
+        The largest diagonal ratio, identical on every rank.
+    """
+    a_diagonal = assemble(a).petscmat.getDiagonal()
+    m_diagonal = assemble(m).petscmat.getDiagonal()
+    a_values = a_diagonal.getArray(readonly=True)
+    m_values = m_diagonal.getArray(readonly=True)
+    nonzero = m_values != 0.0
+    ratios = abs(a_values[nonzero] / m_values[nonzero])
+    local_maximum = ratios.max() if ratios.size else 0.0
+    return a_diagonal.comm.tompi4py().allreduce(local_maximum, op=MPI.MAX)

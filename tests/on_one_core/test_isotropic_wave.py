@@ -136,12 +136,14 @@ def test_parse_boundary_conditions_exception():
         wave.parse_boundary_conditions()
 
 
-def test_initialize_model_parameters_from_file_notimplemented():
+def test_initialize_model_parameters_from_file_requires_parameters():
+    """A file model must still declare a complete parameter set."""
     synthetic_dict = {
         "type": "file",
     }
     wave = IsotropicWave(dummy_dict)
-    with pytest.raises(NotImplementedError) as e:  # noqa: F841
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.2, "periodic": True})
+    with pytest.raises(ValueError, match="Inconsistent selection"):
         wave.initialize_model_parameters_from_file(synthetic_dict)
 
 
@@ -152,4 +154,4 @@ if __name__ == "__main__":
     test_initialize_model_parameters_from_object_redundant()
     test_parse_boundary_conditions()
     test_parse_boundary_conditions_exception()
-    test_initialize_model_parameters_from_file_notimplemented()
+    test_initialize_model_parameters_from_file_requires_parameters()

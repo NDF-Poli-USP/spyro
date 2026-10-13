@@ -1,102 +1,77 @@
+"""Acoustic cells-per-wavelength search on the homogeneous 2D model."""
+
 import numpy as np
 import pytest
+
 import spyro
 
+FREQUENCY = 5.0
+VELOCITY = 1.5
 
-def is_seismicmesh_installed():
-    try:
-        import SeismicMesh  # noqa: F401
-        return True
-    except ImportError:
-        return False
+#: Default Ricker delay, 1.5 times the distance between its minima, in s.
+RICKER_DELAY = 1.5 * np.sqrt(6.0) / (np.pi * FREQUENCY)
 
 
-@pytest.mark.slow
-def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
-    grid_point_calculator_parameters = {
-        # Experiment parameters
-        # Here we define the frequency of the Ricker wavelet source
-        "source_frequency": 5.0,
-        # The minimum velocity present in the domain.
-        "minimum_velocity_in_the_domain": 1.5,
-        # if an homogeneous test case is used this velocity will be defined in
-        # the whole domain.
-        # Either or heterogeneous. If heterogeneous is
+def make_parameters(method: str, degree: int) -> dict:
+    """Build calculator parameters small enough to run in under 2 minutes.
+
+    The reference uses the reduced receiver grid, the solves use a fixed,
+    coarse time step, and the search starts from its upper bound.
+
+    Parameters
+    ----------
+    method : str
+        Finite element method to evaluate.
+    degree : int
+        Polynomial degree to evaluate.
+
+    Returns
+    -------
+    dict
+        Parameters for :class:`spyro.tools.MeshingParameterCalculator`.
+    """
+    return {
+        "source_frequency": FREQUENCY,
+        "mesh_frequency_factor": 2.0,
+        "minimum_velocity_in_the_domain": VELOCITY,
         "velocity_profile_type": "homogeneous",
-        # chosen be careful to have the desired velocity model below.
-        "velocity_model_file_name": None,
-        # FEM to evaluate such as `KMV` or `spectral`
-        # (GLL nodes on quads and hexas)
-        "FEM_method_to_evaluate": FEM_method_to_evaluate,
-        "dimension": 2,  # Domain dimension. Either 2 or 3.
-        # Either near or line. Near defines a receiver grid near to the source,
+        "FEM_method_to_evaluate": method,
+        "dimension": 2,
         "receiver_setup": "near",
-        # line defines a line of point receivers with pre-established near and far
-        # offsets.
-        # Line search parameters
-        "load_reference": True,
-        "reference_solution_file": "tests/inputfiles/reference_solution_cpw.npy",
-        "save_reference": False,
-        "time-step_calculation": "estimate",
-        "reference_degree": None,  # Degree to use in the reference case (int)
-        # grid point density to use in the reference case (float)
+        "testing": True,
+        "timestep_calculation": "float",
+        "timestep": 0.002,
+        "reference_degree": None,
         "C_reference": None,
-        "desired_degree": 4,  # degree we are calculating G for. (int)
-        "C_initial": 2.2,  # Initial G for line search (float)
-        "accepted_error_threshold": 0.05,
+        "desired_degree": degree,
+        "C_initial": 2.5,
+        "C_max": 2.5,
+        "accepted_error_threshold": 0.01,
         "C_accuracy": 0.1,
+        "search_direction": "backward",
     }
 
-    Cpw_calc = spyro.tools.Meshing_parameter_calculator(
-        grid_point_calculator_parameters
+
+@pytest.mark.slow
+def test_acoustic_cpw_search_quads() -> None:
+    """The analytical reference is causal and the search finds the minimum."""
+    calculator = spyro.tools.MeshingParameterCalculator(
+        make_parameters("spectral_quadrilateral", 4)
     )
+    wave = calculator.initial_wave
+    reference = calculator.reference_solution
+    assert reference.shape == (round(wave.final_time / wave.dt) + 1, 4)
 
-    # Check correct offset
-    source_location = Cpw_calc.initial_guess_object.source_locations[0]
-    receiver_location = Cpw_calc.initial_guess_object.receiver_locations[1]
-    sz, sx = source_location
-    rz, rx = receiver_location
-    offset = np.sqrt((sz - rz) ** 2 + (sx - rx) ** 2)
-    expected_offset_value = 2.6580067720004026
-    test1 = np.isclose(offset, expected_offset_value)
-    print(f"Checked if offset calculation is correct: {test1}")
+    # Each receiver peaks just after the delayed direct arrival
+    source = np.asarray(wave.source_locations[0])
+    for i, receiver in enumerate(wave.receiver_locations):
+        arrival = np.linalg.norm(np.asarray(receiver) - source) / VELOCITY
+        peak_time = np.argmax(reference[:, i]) * wave.dt
+        assert 0.0 <= peak_time - (arrival + RICKER_DELAY) < 0.25 / FREQUENCY
 
-    # Check if analytical solution has the correct peak location
-    analytical_solve_one_receiver = Cpw_calc.reference_solution[:, 1]
-    peak_indice = np.argmax(analytical_solve_one_receiver)
-    expected_peak_indice = 4052  # 2804
-    test2 = expected_peak_indice == peak_indice
-    print(f"Checked if reference solution seems correct: {test2}")
+    cpw = calculator.find_minimum()
 
-    # Check if cpw is within error TOL, starting search at min
-    min_cpw = Cpw_calc.find_minimum()
-    print(f"Minimum of {min_cpw}")
-    test3 = np.isclose(correct_cpw, min_cpw)
-
-    print("END")
-    assert all([test1, test2, test3])
-
-
-# @pytest.mark.xfail(
-#     reason="Waiting for seismicmesh update for compatibility",
-# )
-# @pytest.mark.skipif(not is_seismicmesh_installed(), reason="SeismicMesh is not installed")
-@pytest.mark.slow
-@pytest.mark.skip(reason="PML formulation subject to another PR")
-def test_cpw_calc_triangles():
-    method = "mass_lumped_triangle"
-    correct_cpw = 2.3
-    return run_test_cpw_calc(method, correct_cpw)
-
-
-@pytest.mark.slow
-@pytest.mark.skip(reason="PML in quads subject to another PR")
-def test_cpw_calc_quads():
-    method = "spectral_quadrilateral"
-    correct_cpw = 2.5
-    return run_test_cpw_calc(method, correct_cpw)
-
-
-if __name__ == "__main__":
-    test_cpw_calc_triangles()
-    test_cpw_calc_quads()
+    errors = {e.cpw: e.error for e in calculator.search_history}
+    assert np.isclose(cpw, 2.1)
+    assert errors[cpw] <= 0.01
+    assert errors[round(cpw - 0.1, 10)] > 0.01
