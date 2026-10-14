@@ -426,9 +426,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 "firedrake function or new file name (segy or hdf5)."
             )
         if output:
-            fire.VTKFile("initial_velocity_model.pvd").write(
-                self.initial_velocity_model, name="velocity"
-            )
+            SpyroEnsemble.write_vtk("initial_velocity_model.pvd", self.initial_velocity_model, name="velocity")
 
     def _map_sources_and_receivers(self):
         if self.source_type == "ricker":
