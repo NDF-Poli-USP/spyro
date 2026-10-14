@@ -1,4 +1,3 @@
-from firedrake import VTKFile
 from numpy import asarray, float64
 from numpy.linalg import norm
 from spyro.mpi.spyro_mpi import SpyroEnsemble
@@ -145,8 +144,7 @@ class Minimum_Eikonal(Eikonal_Modeling):
                                                     self.lmin)
 
         # Save source marker
-        outfile = VTKFile(self.path_save + "souEik.pvd")
-        outfile.write(sou_marker)
+        SpyroEnsemble.write_vtk(self.path_save + "souEik.pvd", sou_marker)
 
     def solve_eik(self):
         """Solve the nonlinear Eikonal.
@@ -165,8 +163,7 @@ class Minimum_Eikonal(Eikonal_Modeling):
             self.c, self.c_min, self.funct_space_eik, self.diam_mesh)
 
         # Save Eikonal results
-        eikonal_file = VTKFile(self.path_save + "Eik.pvd")
-        eikonal_file.write(self.yp)
+        SpyroEnsemble.write_vtk(self.path_save + "Eik.pvd", self.yp)
 
     def ident_eik_on_bnd(self, bnd_ids):
         """Identify Eikonal minimum values on a boundary.

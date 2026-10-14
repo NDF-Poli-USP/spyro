@@ -1,7 +1,8 @@
-from firedrake import as_tensor, conditional, Function, VTKFile
+from firedrake import as_tensor, conditional, Function
 from numpy import log
 from ..abc.abc_layer import ABCLayer
 from ..io.basicio import parallel_print as pprint
+from ..mpi.spyro_mpi import SpyroEnsemble
 from ..utils.error_management import validate_enum, validate_numeric
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..utils.typing import (BoundaryConditionsType, AbsorbingBCsType,
@@ -244,11 +245,13 @@ class PMLLayer(ABCLayer):
 
         # Save damping profile
         if not wave.abc_get_ref_model and save_file:
-            outfile = VTKFile(self.path_case_abc + "sigma_pml.pvd")
+            pth_sigma = self.path_case_abc + "sigma_pml.pvd"
             if self.dimension == 2:  # 2D
-                outfile.write(self.sigma_z, self.sigma_x)
+                SpyroEnsemble.write_vtk(pth_sigma, self.sigma_z, self.sigma_x)
             if self.dimension == 3:  # 3D
-                outfile.write(self.sigma_z, self.sigma_x, self.sigma_y)
+                SpyroEnsemble.write_vtk(
+                    pth_sigma, self.sigma_z, self.sigma_x, self.sigma_y
+                )
 
     def pml_layer(self, wave, save_file=True):
         """Set the damping profile within the PML layer.

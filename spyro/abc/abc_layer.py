@@ -1,4 +1,4 @@
-from firedrake import Function, VTKFile
+from firedrake import Function
 from numpy import abs, array, ceil, inf, log10, minimum
 from os import getcwd
 from sympy import divisors
@@ -699,8 +699,7 @@ class ABCLayer(NRBC, MeasureError):
                 pth_mesh = self.path_case_abc + mesh_file_name
 
             # Save new mesh
-            outfile = VTKFile(pth_mesh)
-            outfile.write(wave.mesh)
+            SpyroEnsemble.write_vtk(pth_mesh, wave.mesh)
 
     def velocity_abc(self, wave, inf_model=False, method="point_cloud", save_file=True):
         """Set the velocity profile for the model with absorbing layer.
@@ -782,8 +781,7 @@ class ABCLayer(NRBC, MeasureError):
                                                              for_prints=False)
                 file_name = self.case_abc + c_file_name
 
-            outfile = VTKFile(self.path_save + file_name)
-            outfile.write(wave.c)
+            SpyroEnsemble.write_vtk(self.path_save + file_name, wave.c)
 
     def nrbc_on_boundary_layer(self, wave, non_reflect_bc, save_file=True):
         """Apply Non-Reflective BCs on the outer boundary of the absorbing layer.

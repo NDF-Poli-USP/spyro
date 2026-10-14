@@ -1,6 +1,6 @@
 """Non-reflecting boundary condition helpers for ABCs."""
 
-from firedrake import Function, VTKFile
+from firedrake import Function
 from numpy import abs, asarray, cos, maximum, pi, sign, sqrt, sum
 from numpy.linalg import norm
 from os import getcwd
@@ -298,8 +298,7 @@ class NRBC():
 
         # Save boundary profile of cosine of incidence angle
         if save_file:
-            outfile = VTKFile(self.path_save_nrbc + "cosHig.pvd")
-            outfile.write(self.cosHig)
+            SpyroEnsemble.write_vtk(self.path_save_nrbc + "cosHig.pvd", self.cosHig)
 
 # dx = 0.1 km REC
 # W/O = 107.72% - 0.80%
