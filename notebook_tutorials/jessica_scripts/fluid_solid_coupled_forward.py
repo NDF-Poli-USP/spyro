@@ -234,7 +234,7 @@ cases = {1: ("case_small_2d", case_small_2D),
          3: ("case_3d", case_3D),
          4: ("case_small_2d_irregular_topography", case_small_2D_irregular),
          5: ("case_large_2d_irregular_topography", case_large_2D_irregular)}
-CASE_NUM = 5
+CASE_NUM = 3
 CASE_NAME, selected_case = cases[CASE_NUM]
 if callable(selected_case):
     selected_case = selected_case()
