@@ -19,9 +19,10 @@ from sparsity_plots import save_sparsity_matrices
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 
-def build_segy(filename, length_z, length_x, dz, interface, v_fluid, v_solid):
+def build_segy(filename, length_z, length_x, dz, interface, v_fluid, v_solid, dx=None):
+    dx = dz if dx is None else dx
     z = np.linspace(0.0, -length_z, int(round(length_z / dz)) + 1)
-    x = np.linspace(0.0, length_x, int(round(length_x / dz)) + 1)
+    x = np.linspace(0.0, length_x, int(round(length_x / dx)) + 1)
     X, Z = np.meshgrid(x, z, indexing="ij")
     if callable(interface):
         z_int = np.broadcast_to(interface(x), x.shape)
@@ -198,28 +199,50 @@ case_3D = {
 }
 
 small_irregular_interface = lambda x: -0.5 + 0.02 * np.sin(2 * np.pi * x / 0.25)
+# case_small_2D_irregular = dict(
+#     case_small_2D,
+#     segy_interface=small_irregular_interface,
+#     segy_dz=0.0005,
+#     segy_dx=0.010,
+# )
 case_small_2D_irregular = dict(
     case_small_2D,
+    cell_type="Q",
     segy_interface=small_irregular_interface,
+    segy_dz=0.0005,
+    segy_dx=0.010,
 )
 
-large_irregular_interface = specfem_interface(SCRIPT_DIR / "interfaces_specfem.dat", 1, 9.6)
-case_large_2D_irregular = dict(
-    case_large_2D,
-    length_z=9.6,
-    length_x=20.0,
-    interface_z=None,
-    segy_interface=large_irregular_interface,
-    **acquisition_on_interface(large_irregular_interface, 10.0, 0.6, 0.01, 0.01),
-)
+def case_large_2D_irregular():
+    interface = specfem_interface(SCRIPT_DIR / "interfaces_specfem.dat", 1, 9.6)
+    return dict(
+        case_large_2D,
+        cell_type="T",
+        length_z=9.6,
+        length_x=20.0,
+        interface_z=None,
+        segy_interface=interface,
+        segy_dz=0.005,
+        segy_dx=0.040,
+        dt=0.00025,
+        **acquisition_on_interface(interface, 10.0, 0.6, 0.01, 0.01),
+    )
+
 
 cases = {1: ("case_small_2d", case_small_2D),
          2: ("case_large_2d", case_large_2D),
          3: ("case_3d", case_3D),
          4: ("case_small_2d_irregular_topography", case_small_2D_irregular),
          5: ("case_large_2d_irregular_topography", case_large_2D_irregular)}
-CASE_NUM = 3
+CASE_NUM = 5
 CASE_NAME, selected_case = cases[CASE_NUM]
+if callable(selected_case):
+    selected_case = selected_case()
+
+if "irregular" in CASE_NAME:
+    MESH_TYPE = "gmsh_mesh"
+elif CASE_NAME.startswith("case_3d"):
+    MESH_TYPE = "firedrake_mesh"
 
 DIMENSION = 3 if CASE_NAME.startswith("case_3d") else 2
 SCHEME = "monolithic" if USE_MONOLITHIC else "sequential"
@@ -264,7 +287,8 @@ if MESH_TYPE == "gmsh_mesh":
     segy_file = f"{OUT}/model_{TAG}.segy"
     build_segy(segy_file, selected_case["length_z"], selected_case["length_x"],
                selected_case["segy_dz"], selected_case["segy_interface"],
-               VP_WATER, selected_case["s_wave_velocity"])
+               VP_WATER, selected_case["s_wave_velocity"],
+               dx=selected_case.get("segy_dx"))
     dictionary["mesh"].pop("edge_length")
     dictionary["mesh"].update({
         "output_filename": f"{OUT}/mesh_{TAG}.msh",
@@ -297,7 +321,7 @@ dictionary["time_axis"] = {
     "initial_time": 0.0,
     "final_time": selected_case["final_time"],
     "dt": selected_case["dt"],
-    "output_frequency": 2500,
+    "output_frequency": int(round(0.005 / selected_case["dt"])),
     "gradient_sampling_frequency": 1,
 }
 
@@ -335,6 +359,17 @@ dictionary["synthetic_data"] = {
 # Run
 # ===========================================================================
 Wave_obj = AcousticElasticWave(dictionary=dictionary)
+
+import firedrake as fire
+for name, sub in (("fluido", Wave_obj.submesh_fluid), ("solido", Wave_obj.submesh_solid)):
+    V = fire.VectorFunctionSpace(sub, "DG", 0)
+    c = fire.Function(V).interpolate(fire.SpatialCoordinate(sub)).dat.data_ro
+    zi = -0.5 + 0.02 * np.sin(2 * np.pi * c[:, 1] / 0.25)
+    wrong = (c[:, 0] < zi) if name == "fluido" else (c[:, 0] > zi)
+    print(name, "- elementos do lado errado:", wrong.sum(), "de", len(c))
+L = fire.assemble(fire.Constant(1.0) * Wave_obj.ds_int(Wave_obj.interface_id))
+print("comprimento da interface:", L, "(senoide exata: ~1.06 km)")
+
 Wave_obj.use_monolithic = USE_MONOLITHIC
 
 t_start = time.perf_counter()

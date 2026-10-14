@@ -28,12 +28,12 @@ from sparsity_plots import load_sparsity_matrices
 # "case_small_2d", "case_large_2d", "case_3d",
 # "case_small_2d_irregular_topography", "case_large_2d_irregular_topography",
 # "case_3d_irregular_topography"
-CASE_NAME = "case_3d"
+CASE_NAME = "case_large_2d_irregular_topography"
 DIMENSION = 3 if CASE_NAME.startswith("case_3d") else 2
 
 # Results computed before the axis change (x vertical, z horizontal):
 # u_solid columns are (horizontal, vertical[, y]) instead of (vertical, horizontal[, y]).
-LEGACY_AXES = True
+LEGACY_AXES = False
 
 SCHEMES = {
     "P – u_s (sequential)": ("sequential", dict(color="tab:blue", lw=1.5, ls="-")),
@@ -78,14 +78,35 @@ else:
         ("uy", 2, "Uy.dat", 1.0),
     ]
 
-if SHOW_GAR6:
+SPECFEM_BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results_specfem")
+SPECFEM_DIR = f"{SPECFEM_BASE}/{CASE_NAME}"
+SPECFEM_NAME = "SPECFEM2D"
+SPECFEM_STYLE = dict(color="black", lw=1.2, ls=":")
+SHOW_SPECFEM = DIMENSION == 2 and os.path.isfile(f"{SPECFEM_DIR}/AA.S0001.PRE.semp")
+
+# SPECFEM centers the Ricker at t = 0; spyro centers it at t = delay = 1/f.
+SPECFEM_DELAY = {
+    "case_small_2d": 1 / 25,
+    "case_small_2d_irregular_topography": 1 / 25,
+    "case_large_2d": 1 / 10,
+    "case_large_2d_irregular_topography": 1 / 10,
+}.get(CASE_NAME, 0.0)
+
+# key -> (file, sign). S0001 = fluid receiver, S0002 = solid receiver.
+SPECFEM_FILES = {
+    "p": ("AA.S0001.PRE.semp", 1.0),
+    "uz": ("AA.S0002.BXZ.semd", 1.0),
+    "ux": ("AA.S0002.BXX.semd", 1.0),
+}
+
+if SHOW_GAR6 or SHOW_SPECFEM:
     NORMALIZE = True
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 # ===========================================================================
 # Helpers
 # ===========================================================================
-def load_gar6more_file(path):
+def load_trace(path):
     values = np.loadtxt(path)
     if values.ndim == 1:
         raise ValueError(f"{path}: only 1 column found — expected (time, value).")
@@ -105,7 +126,7 @@ def estimate_time_shift(time_vector, numerical, reference):
     return lag_samples * (time_vector[1] - time_vector[0])
 
 
-def gar6_on(t, t_ref, v_ref, sign=1.0):
+def ref_on(t, t_ref, v_ref, sign=1.0):
     return normalize(sign * np.interp(t, t_ref, v_ref, left=0.0, right=0.0))
 
 
@@ -125,11 +146,17 @@ print(f"=== Case: {CASE_NAME} ({DIMENSION}D) ===")
 if SHOW_GAR6:
     print(f"Gar6more fluid: {GAR6MORE_DIR_FLUID}")
     print(f"Gar6more solid: {GAR6MORE_DIR_SOLID}")
-    gar6 = {"p": load_gar6more_file(f"{GAR6MORE_DIR_FLUID}/P.dat")}
+    gar6 = {"p": load_trace(f"{GAR6MORE_DIR_FLUID}/P.dat")}
     for comp, _, fname, _ in COMPONENTS:
-        gar6[comp] = load_gar6more_file(f"{GAR6MORE_DIR_SOLID}/{fname}")
-else:
-    print("No Gar6more reference for this case — plotting spyro only.")
+        gar6[comp] = load_trace(f"{GAR6MORE_DIR_SOLID}/{fname}")
+if SHOW_SPECFEM:
+    print(f"SPECFEM: {SPECFEM_DIR}  (time shift +{SPECFEM_DELAY:.4f} s)")
+    spec = {}
+    for key, (fname, _) in SPECFEM_FILES.items():
+        t_s, v_s = load_trace(f"{SPECFEM_DIR}/{fname}")
+        spec[key] = (t_s + SPECFEM_DELAY, v_s)
+if not (SHOW_GAR6 or SHOW_SPECFEM):
+    print("No reference for this case — plotting spyro only.")
 
 prep = normalize if NORMALIZE else (lambda x: x)
 results = {}
@@ -155,48 +182,68 @@ for label, (tag, style) in CASES.items():
         r["uz_fluid_raw"] = np.asarray(d["u_fluid_z"]).ravel()
 
     if SHOW_GAR6:
-        r["p_g"] = gar6_on(t_p, *gar6["p"])
-        r["err_p"] = MeasureError.calculate_normalized_L2_error(r["p"], r["p_g"])
+        r["p_g"] = ref_on(t_p, *gar6["p"])
+        r["err_p_g"] = MeasureError.calculate_normalized_L2_error(r["p"], r["p_g"])
         for comp, _, _, sign in COMPONENTS:
-            r[f"{comp}_g"] = gar6_on(t_u, *gar6[comp], sign)
-            r[f"err_{comp}"] = MeasureError.calculate_normalized_L2_error(
+            r[f"{comp}_g"] = ref_on(t_u, *gar6[comp], sign)
+            r[f"err_{comp}_g"] = MeasureError.calculate_normalized_L2_error(
                 r[comp], r[f"{comp}_g"])
-        r["shift"] = estimate_time_shift(t_p, r["p"], r["p_g"])
+        r["shift_g"] = estimate_time_shift(t_p, r["p"], r["p_g"])
+
+    if SHOW_SPECFEM:
+        r["p_s"] = ref_on(t_p, *spec["p"], SPECFEM_FILES["p"][1])
+        r["err_p_s"] = MeasureError.calculate_normalized_L2_error(r["p"], r["p_s"])
+        for comp in ("uz", "ux"):
+            r[f"{comp}_s"] = ref_on(t_u, *spec[comp], SPECFEM_FILES[comp][1])
+            r[f"err_{comp}_s"] = MeasureError.calculate_normalized_L2_error(
+                r[comp], r[f"{comp}_s"])
+        r["shift_s"] = estimate_time_shift(t_p, r["p"], r["p_s"])
     results[label] = r
 
 if not results:
     raise SystemExit("No receiver .npz file found.")
 
 comp_keys = [c for c, _, _, _ in COMPONENTS]
-if SHOW_GAR6:
-    w = max(len(k) for k in results) + 2
-    print(f"\n=== Normalized L2 error vs {GAR6_NAME} ===")
-    header = f"{'Case':<{w}} {'P':>9}" + "".join(
-        f" {'u_' + c[1]:>9}" for c in comp_keys) + f" {'shift (s)':>11}"
-    print(header)
+REFERENCES = [(tag, name, style) for tag, name, style, show in (
+    ("g", GAR6_NAME, GAR6_STYLE, SHOW_GAR6),
+    ("s", SPECFEM_NAME, SPECFEM_STYLE, SHOW_SPECFEM),
+) if show]
+
+ref = next(iter(results.values()))
+w = max(len(k) for k in results) + 2
+for rt, rname, _ in REFERENCES:
+    keys = ["p"] + [c for c in comp_keys if f"err_{c}_{rt}" in ref]
+    print(f"\n=== Normalized L2 error vs {rname} ===")
+    print(f"{'Case':<{w}}" + "".join(f" {('P' if k == 'p' else 'u_' + k[1]):>9}" for k in keys)
+          + f" {'shift (s)':>11}")
     for label, r in results.items():
-        line = f"{label:<{w}} {r['err_p']:9.4f}" + "".join(
-            f" {r['err_' + c]:9.4f}" for c in comp_keys) + f" {r['shift']:11.6f}"
-        print(line)
+        print(f"{label:<{w}}" + "".join(f" {r[f'err_{k}_{rt}']:9.4f}" for k in keys)
+              + f" {r[f'shift_{rt}']:11.6f}")
 
 
 def curve_label(label, r, key):
-    return f"{label}  (L2 = {r[key] * 100:.2f}%)" if SHOW_GAR6 else label
+    errs = [f"{rname} {r[f'err_{key}_{rt}'] * 100:.2f}%" for rt, rname, _ in REFERENCES
+            if f"err_{key}_{rt}" in r]
+    return f"{label}  (L2: {', '.join(errs)})" if errs else label
 
 
-ref = next(iter(results.values()))
-amp = "Amplitude (normalized)" if NORMALIZE else "Amplitude"
-suffix = "_vs_gar6" if SHOW_GAR6 else ""
+def plot_references(ax, key, t):
+    for rt, rname, rstyle in REFERENCES:
+        if f"{key}_{rt}" in ref:
+            ax.plot(t, ref[f"{key}_{rt}"], label=rname, **rstyle)
+
+
+amp ="Amplitude (normalized)" if NORMALIZE else "Amplitude"
+suffix = "".join(f"_vs_{'gar6' if rt == 'g' else 'specfem'}" for rt, _, _ in REFERENCES)
 cases_tag = "__".join(r["tag"] for r in results.values())
 
 # ===========================================================================
 # Fluid receiver — pressure
 # ===========================================================================
 fig_p, ax_p = plt.subplots(figsize=(12, 5))
-if SHOW_GAR6:
-    ax_p.plot(ref["t_p"], ref["p_g"], label=GAR6_NAME, **GAR6_STYLE)
+plot_references(ax_p, "p", ref["t_p"])
 for label, r in results.items():
-    ax_p.plot(r["t_p"], r["p"], label=curve_label(label, r, "err_p"), **r["style"])
+    ax_p.plot(r["t_p"], r["p"], label=curve_label(label, r, "p"), **r["style"])
 style_axis(ax_p, "Fluid receiver — pressure", amp, "Time (s)")
 fig_p.tight_layout()
 p_path = f"{RESULTS_DIR}/receiver_fluid_P_{cases_tag}{suffix}.png"
@@ -210,11 +257,9 @@ print(f"[OK] Saved to: {os.path.abspath(p_path)}")
 n_comp = len(comp_keys)
 fig_u, axes = plt.subplots(n_comp, 1, figsize=(12, 4.5 * n_comp), sharex=True)
 for i, (ax, comp) in enumerate(zip(axes, comp_keys)):
-    if SHOW_GAR6:
-        ax.plot(ref["t_u"], ref[f"{comp}_g"], label=GAR6_NAME, **GAR6_STYLE)
+    plot_references(ax, comp, ref["t_u"])
     for label, r in results.items():
-        ax.plot(r["t_u"], r[comp], label=curve_label(label, r, f"err_{comp}"),
-                **r["style"])
+        ax.plot(r["t_u"], r[comp], label=curve_label(label, r, comp), **r["style"])
     style_axis(ax, f"Solid receiver — displacement u_{comp[1]}", amp,
                "Time (s)" if i == n_comp - 1 else None)
 fig_u.tight_layout()
