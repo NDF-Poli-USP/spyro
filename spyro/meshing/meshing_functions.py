@@ -592,6 +592,10 @@ class AutomaticMesh:
                 gmsh.option.setNumber('Mesh.MeshSizeMin', minElementSize)
                 gmsh.option.setNumber('Mesh.MeshSizeMax', minElementSize)
                 gmsh.model.mesh.setTransfiniteAutomatic()
+            if self.quadrilateral and not structured_mesh:
+                gmsh.option.setNumber("Mesh.Algorithm", 8)
+                gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 3)
+                gmsh.option.setNumber("Mesh.RecombineAll", 1)
             gmsh.model.mesh.generate(2)
 
             if structured_mesh:
@@ -620,7 +624,7 @@ class AutomaticMesh:
             else:
                 rotate_xz = [
                     0.0, 1.0, 0.0, -domain_zmin,
-                    -1.0, 0.0, 0.0, domain_xmax,
+                    1.0, 0.0, 0.0, 0.0,
                     0.0, 0.0, 1.0, 0.0,
                     0.0, 0.0, 0.0, 1.0
                 ]

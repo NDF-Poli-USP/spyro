@@ -88,6 +88,14 @@ class AcousticElasticWave(Wave):
         ix = np.clip(np.rint(x / lx * (nx - 1)).astype(int), 0, nx - 1)
         return np.isclose(vp[iz, ix], mesh_dict["water_search_value"], rtol=1e-5)
 
+    def _has_region_tags(self):
+        dm = self.mesh.topology_dm
+        ids = set()
+        if dm.hasLabel("Cell Sets"):
+            ids = {int(i) for i in dm.getLabelIdIS("Cell Sets").indices}
+        ids = set().union(*self.mesh.comm.allgather(ids))
+        return {self.fluid_id, self.solid_id} <= ids
+
     def _mark_mesh_regions(self):
         is_fluid = self._fluid_cells()
         dq0 = fire.FunctionSpace(self.mesh, "DG", 0)
@@ -135,7 +143,7 @@ class AcousticElasticWave(Wave):
 
     @override
     def _create_function_space(self):
-        if self.input_dictionary["mesh"].get("mesh_file"):
+        if self.input_dictionary["mesh"].get("mesh_file") or self._has_region_tags():
             self.region_label = None
         else:
             self.region_label = "fluid_solid_regions"

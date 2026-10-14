@@ -194,3 +194,4 @@ PacMeshIgnore/
 !tests/inputfiles/velocity_models/*.segy
 notebook_tutorials/jessica_scripts/gar6more2d/
 notebook_tutorials/jessica_scripts/gar6more3d/
+results/
