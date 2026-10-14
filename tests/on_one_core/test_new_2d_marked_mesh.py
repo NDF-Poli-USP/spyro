@@ -57,8 +57,7 @@ def test_2d_wave_adapted_marked_mesh():
     # a multiscale FWI process
     u_ho = fire.Function(V_ho)
     u_ho.interpolate(cond)
-    output_file = fire.VTKFile("debug_ho.pvd", comm=SpyroEnsemble.ensemble.comm)
-    output_file.write(u_ho)
+    SpyroEnsemble.write_vtk("debug_ho.pvd", u_ho)
 
     # Making a grid like the one we can use to save a .segy file
     # this is usually 0.01 or 0.02 km on a structured mesh
@@ -80,8 +79,7 @@ def test_2d_wave_adapted_marked_mesh():
 
     V = fire.FunctionSpace(mesh, "CG", 1)
     u = fire.Function(V).interpolate(u_ho, allow_missing_dofs=True)
-    output_file = fire.VTKFile("debug.pvd", comm=SpyroEnsemble.ensemble.comm)
-    output_file.write(u)
+    SpyroEnsemble.write_vtk("debug.pvd", u)
 
     # Creading a grid velocity data dictionary, this can be used to7
     # create a wave-adapted mesh later on and is similar to the data

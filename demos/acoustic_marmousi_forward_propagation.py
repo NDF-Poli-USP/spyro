@@ -20,8 +20,8 @@ The script just runs a single acoustic marmousi forward propagation.
 """
 
 import spyro
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from copy import deepcopy
-from firedrake import VTKFile
 import sys
 
 degree = 4
@@ -78,7 +78,7 @@ def test_real_shot_record_generation_parallel():
     real_wave = spyro.AcousticWave(dictionary=real_dictionary)
     real_wave.set_initial_velocity_model(new_file="velocity_models/vp_marmousi-ii.segy", fast_interpolate=True)
     real_wave.forward_solve()
-    VTKFile("vp.pvd").write(real_wave.c)
+    SpyroEnsemble.write_vtk("vp.pvd", real_wave.c)
     spyro.io.save_shots(real_wave)
 
 

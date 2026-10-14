@@ -2,9 +2,9 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 from copy import deepcopy
-from firedrake import VTKFile
 import firedrake as fire
 import spyro
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
@@ -157,7 +157,7 @@ def test_gradient_supershot():
 
     # compute the gradient of the control (to be verified)
     dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
-    VTKFile("gradient.pvd").write(dJ)
+    SpyroEnsemble.write_vtk("gradient.pvd", dJ)
 
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True)
 

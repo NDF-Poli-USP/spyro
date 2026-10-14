@@ -1,9 +1,10 @@
 """Plots for debugging purposes."""
 
-from firedrake import VTKFile, Function
+from firedrake import Function
 import matplotlib.pyplot as plt
 from pathlib import Path
 from .general_plots import plot_function
+from ..mpi.spyro_mpi import SpyroEnsemble
 
 
 def debug_plot(
@@ -66,5 +67,4 @@ def debug_pvd(
     The .pvd format can be opened directly in ParaView for 3D visualization
     and advanced post-processing.
     """
-    out = VTKFile(filename)
-    out.write(function)
+    SpyroEnsemble.write_vtk(filename, function)
