@@ -1,9 +1,8 @@
 import copy
 from enum import Enum
 from typing import Dict
-from ..io.basicio import parallel_print
 from pydantic import BaseModel, computed_field
-from firedrake import Ensemble, COMM_WORLD
+from firedrake import Ensemble, COMM_WORLD, VTKFile
 from mpi4py import MPI
 
 
@@ -83,9 +82,8 @@ class SpyroEnsemble:
 
         cls.config = config
 
-        parallel_print(
+        SpyroEnsemble.print(
             f"Parallelism type: {type(config)}",
-            comm=cls.ensemble,
         )
 
         cls.barrier()
@@ -107,8 +105,43 @@ class SpyroEnsemble:
         return array_reduced
 
     @classmethod
+    def write_vtk(cls, filename: str, *functions, **kwargs) -> None:
+        """Write ensemble-replicated fields to a VTK file once.
+
+        Every ensemble member holds an identical copy of fields such as the
+        velocity model, the control or the gradient. Only the first member
+        writes them, on its spatial communicator, so that members do not race
+        to create the same output directory and files.
+
+        Parameters
+        ----------
+        filename : str
+            Path of the ``.pvd`` file to write.
+        *functions : firedrake.Function or firedrake.MeshGeometry
+            Fields (or a mesh) to write, as accepted by
+            ``firedrake.VTKFile.write``.
+        **kwargs
+            Keyword arguments forwarded to ``firedrake.VTKFile.write``, such
+            as ``name``.
+
+        Returns
+        -------
+        None
+        """
+        if cls.get_ensemble_rank() == 0:
+            VTKFile(filename, comm=cls.ensemble.comm).write(*functions, **kwargs)
+
+    @classmethod
     def get_global_rank(cls) -> int:
         return cls.ensemble.global_comm.rank
+
+    @classmethod
+    def get_ensemble_rank(cls):
+        return cls.ensemble.ensemble_comm.rank
+
+    @classmethod
+    def get_local_rank(cls):
+        return cls.ensemble.comm.rank
 
     @classmethod
     def print(cls, string: str):
@@ -118,3 +151,32 @@ class SpyroEnsemble:
 
         if cls.get_global_rank() == 0:
             print(string, flush=True)
+
+    @classmethod
+    def run_in_one_core_and_broadcast(cls, fun):
+        def wrapper(*args, **kwargs):
+            if cls.ensemble is None:
+                return fun(*args, **kwargs)
+
+            result = None
+            if cls.get_ensemble_rank() == 0 and cls.get_local_rank() == 0:
+                result = fun(*args, **kwargs)
+
+            result = cls.ensemble.ensemble_comm.bcast(result, root=0)
+            result = cls.ensemble.comm.bcast(result, root=0)
+            return result
+
+        return wrapper
+
+    @classmethod
+    def run_in_one_core(cls, fun):
+        def wrapper(*args, **kwargs):
+            if cls.ensemble is None:
+                raise RuntimeError("Ensemble not initialized")
+
+            if cls.get_global_rank() == 0:
+                return fun(*args, *kwargs)
+
+            return
+
+        return wrapper
