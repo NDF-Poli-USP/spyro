@@ -165,12 +165,22 @@ def test_fwi_automated_adjoint(tmp_path, monkeypatch):
 
 
 @pytest.mark.newer_firedrake
-def test_fwi_elastic_automated_adjoint(tmp_path, monkeypatch):
+@pytest.mark.parametrize("normalized", [False, True])
+def test_fwi_elastic_automated_adjoint(tmp_path, monkeypatch, normalized: bool) -> None:
     """Invert three elastic parameters at once, each within its own bounds.
 
     Density and the two wave speeds are on different scales, so the bounds
     take one entry per control, and each parameter comes back as a control of
     its own.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Directory for inversion outputs.
+    monkeypatch : pytest.MonkeyPatch
+        Fixture for isolating the working directory and optimizer calls.
+    normalized : bool
+        Whether to scale controls by their bound widths.
     """
     vmin = [1.0, 1.5, 0.5]
     vmax = [3.0, 4.0, 2.5]
@@ -191,7 +201,7 @@ def test_fwi_elastic_automated_adjoint(tmp_path, monkeypatch):
 
     result = fwi.run_fwi(
         adjoint_type=AdjointType.AUTOMATED_ADJOINT,
-        vmin=vmin, vmax=vmax, maxiter=3,
+        vmin=vmin, vmax=vmax, maxiter=3, normalized=normalized,
     )
 
     # One control per parameter the equation is written in, in that order.
@@ -219,7 +229,8 @@ def test_fwi_elastic_automated_adjoint(tmp_path, monkeypatch):
 
 
 @pytest.mark.newer_firedrake
-def test_fwi_elastic_stages(tmp_path, monkeypatch):
+@pytest.mark.parametrize("normalized", [False, True])
+def test_fwi_elastic_stages(tmp_path, monkeypatch, normalized: bool) -> None:
     """One ``run_fwi`` in stages, each moving only some of the controls.
 
     The tape is recorded once with every control. The first stage moves
@@ -227,6 +238,15 @@ def test_fwi_elastic_stages(tmp_path, monkeypatch):
     from where the first left the s-wave velocity; the density is moved by
     neither. The iteration count and the functional history run through
     both stages as one run.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Directory for inversion outputs.
+    monkeypatch : pytest.MonkeyPatch
+        Fixture for isolating the working directory and optimizer calls.
+    normalized : bool
+        Whether to scale controls by their bound widths.
     """
     monkeypatch.chdir(tmp_path)
 
@@ -287,7 +307,7 @@ def test_fwi_elastic_stages(tmp_path, monkeypatch):
     # A stage without its own limit takes maxiter. Explicit stage limits take
     # precedence over a global tao_max_it option.
     rho, cp, cs = fwi.run_fwi(
-        stages=[S, (P, 1)], maxiter=2,
+        stages=[S, (P, 1)], maxiter=2, normalized=normalized,
         tao_options={"tao_max_it": 99}, **settings,
     )
 

@@ -230,8 +230,8 @@ def test_normalized_minimization_reaches_the_same_solution():
 
     lower, upper = 1.1, 1.6
     solutions = []
+    space = _space("mass_lumped_triangle", 2)
     for normalized in (False, True):
-        space = _space("mass_lumped_triangle", 2)
         m = fire.Function(space, name="vp").assign(1.3)
         reduced_functional = lumped_misfit(m, reference(space))
         (solution,) = minimize_with_tao(reduced_functional, bounds=[(lower, upper)],
@@ -279,3 +279,29 @@ def test_normalized_needs_finite_ordered_bounds(bounds):
     with pytest.raises(ValueError):
         minimize_with_tao(reduced_functional, bounds=bounds, options=TIGHT,
                           normalized=True)
+
+
+@pytest.mark.parametrize("as_bound", [False, True])
+def test_normalized_rejects_fields_on_another_mesh(as_bound: bool) -> None:
+    """Reject unrelated fields even when their local array sizes match.
+
+    Parameters
+    ----------
+    as_bound : bool
+        Whether the incompatible field is a bound rather than a scale.
+    """
+    from spyro.reduced_functionals import LumpedL2ReducedFunctional
+    from spyro.tools.optimization import minimize_with_tao
+
+    space = _space("mass_lumped_triangle", 2)
+    other_space = _space("mass_lumped_triangle", 2)
+    field = fire.Function(other_space).assign(2.0)
+    m = fire.Function(space).assign(1.3)
+    assert field.dat.data_ro.shape == m.dat.data_ro.shape
+    reduced_functional = lumped_misfit(m, reference(space))
+    with pytest.raises(ValueError, match="control's space"):
+        if as_bound:
+            minimize_with_tao(reduced_functional, bounds=[(1.0, field)],
+                              options=TIGHT, normalized=True)
+        else:
+            LumpedL2ReducedFunctional(reduced_functional, scales=[field])

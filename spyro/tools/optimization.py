@@ -180,7 +180,7 @@ def _box_widths(bounds: list | None, controls: Enlist) -> list:
     ------
     ValueError
         If a control lacks a finite lower or upper bound, or a lower bound
-        exceeds its upper bound.
+        exceeds its upper bound, or a bound field belongs to another space.
     """
     if bounds is None or len(bounds) != len(controls):
         raise ValueError("normalized needs a lower and an upper bound for every control.")
@@ -195,6 +195,9 @@ def _box_widths(bounds: list | None, controls: Enlist) -> list:
             widths.append(width if width > 0.0 else 1.0)
             continue
         space = control.control.function_space()
+        if any(isinstance(bound, fire.Function) and bound.function_space() != space
+               for bound in (lower, upper)):
+            raise ValueError("Each bound field must be in its control's space.")
         values = [bound.dat.data_ro if isinstance(bound, fire.Function)
                   else np.full(fire.Function(space).dat.data_ro.shape, float(bound))
                   for bound in (lower, upper)]
@@ -245,12 +248,10 @@ def minimize_with_tao(
         fresh fields. The starting point is not reported: it is the value the
         caller already has, from evaluating the functional to get here.
     normalized : bool, optional
-        Whether to measure each control in units of the width of its box,
-        so that controls with boxes of different widths move by the same
-        fraction of their boxes. The widths become the ``scales`` of the
-        :class:`LumpedL2ReducedFunctional`; the problem, the returned
-        controls and the bounds are the same. Needs a finite lower and upper
-        bound for every control. Default False.
+        Divide each control by its bound interval width before applying the
+        mass scaling. Requires finite, ordered bounds. Equal bounds keep a
+        degree of freedom fixed with scale 1. Returned fields retain their
+        physical units. Default False.
 
     Returns
     -------

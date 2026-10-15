@@ -1688,17 +1688,11 @@ class FullWaveformInversion:
                 previous one. Its iteration limit takes precedence over
                 ``tao_options["tao_max_it"]``.
             normalized : bool, optional
-                Whether TAO measures each control in units of the width of
-                its box, ``vmax - vmin``, instead of in its own units: the
-                widths become the ``scales`` of
-                :class:`spyro.reduced_functionals.LumpedL2ReducedFunctional`.
-                It is the same problem, and the result is the model as
-                usual. What changes is the scale of the steps: P- and S-wave
-                velocities, whose boxes differ in width, move by the same
-                fraction of their boxes, which lets a joint inversion of
-                both converge in fewer evaluations. Default False. Only used
-                under the automated adjoint, and needs finite ``vmin`` and
-                ``vmax`` for every control.
+                Scale each control by ``vmax - vmin`` for optimization.
+                Requires the automated adjoint and finite, ordered bounds.
+                The objective and returned physical fields are unchanged.
+                This can help balance controls with different scales, but
+                does not guarantee faster convergence. Default False.
             scipy_options : dict, optional
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.

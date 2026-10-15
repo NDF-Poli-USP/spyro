@@ -69,7 +69,7 @@ def _inverse_sqrt_lumped_mass(
     return inverse_sqrt_mass
 
 
-def _scale_array(scale, space: fire.FunctionSpace) -> np.ndarray:
+def _scale_array(scale: float | fire.Function, space: fire.FunctionSpace) -> np.ndarray:
     """Return a control's scale as values at the degrees of freedom of ``space``.
 
     Parameters
@@ -92,6 +92,8 @@ def _scale_array(scale, space: fire.FunctionSpace) -> np.ndarray:
     """
     shape = fire.Function(space).dat.data_ro.shape
     if isinstance(scale, fire.Function):
+        if scale.function_space() != space:
+            raise ValueError("Each scale field must be in its control's space.")
         values = scale.dat.data_ro.copy()
     else:
         values = np.full(shape, float(scale))
@@ -109,13 +111,11 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
     of the wrapped functional is replaced by :math:`\tilde{m} = M_L^{1/2} m`, with
     :math:`M_L` its lumped mass.
 
-    With ``scales``, each control is also divided by its scale :math:`s`,
-    a number or a field: the optimizer then measures every control in units
-    of its own scale. Taking :math:`s` as the width of a control's box makes
-    controls with boxes of different widths, such as P- and S-wave
-    velocities, move by the same fraction of their boxes. In formulas,
-    :math:`\tilde{m} = M_L^{1/2} m / s`, whose Euclidean inner product is
-    :math:`\sum_c \|m_c / s_c\|^2_{M_L}`.
+    Optional positive ``scales`` change the optimizer's variables to
+    :math:`\tilde{m} = M_L^{1/2} m / s`. Choosing :math:`s = u-l`
+    measures changes relative to each control's bound interval. This does
+    not change the physical objective or guarantee equal updates across
+    controls. Bounds must be transformed with the same scale.
 
     :math:`M_L` is the mass matrix assembled with the quadrature spyro adopts
     for each element (:func:`spyro.domains.quadrature.quadrature_rules`). For
@@ -178,12 +178,12 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
 
     @property
     def controls(self) -> Enlist:
-        r""":class:`pyadjoint.enlisting.Enlist`: the controls :math:`\tilde{m} = M_L^{1/2} m / s`.
+        r"""Return the optimizer controls.
 
-        Each is a model control :math:`m` divided by its scale and multiplied
-        by the square root of its lumped mass, so the Euclidean inner product
-        of :math:`\tilde{m}` is the lumped :math:`L^2` inner product of
-        :math:`m/s`.
+        Returns
+        -------
+        pyadjoint.enlisting.Enlist
+            Controls :math:`\tilde{m} = M_L^{1/2} m / s`.
         """
         return self._controls
 
