@@ -2,6 +2,7 @@ import firedrake as fire
 import numpy as np
 
 from . import helpers
+from .acoustic_solver_construction_no_pml import set_point_source
 from .. import utils
 from ..utils.typing import FunctionalEvaluationMode, AdjointType, AbsorbingBCsType
 
@@ -69,6 +70,10 @@ def _propagate_forward_central_difference(wave, source_ids):
                 wave.source_function.function_space()
             )
             master_source_W.sub(0).assign(source_cof)
+        if wave.source_amplitude is not None:
+            # Only the amplitude of the source changes from one step to the
+            # next, so the tape records a scalar per step for it.
+            set_point_source(wave, source_cof)
 
     usol_recv = []
     receiver_array = None
@@ -102,6 +107,8 @@ def _propagate_forward_central_difference(wave, source_ids):
                     wave.source_function.assign(
                         wave.sources.wavelet[step] * master_source_W
                     )
+                elif wave.source_amplitude is not None:
+                    wave.source_amplitude.assign(wave.sources.wavelet[step])
                 else:
                     if source_buffer is None:
                         source_buffer = fire.assemble(
