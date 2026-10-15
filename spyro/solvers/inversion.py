@@ -2,6 +2,7 @@ import firedrake as fire
 import warnings
 import inspect
 from enum import Enum
+from typing import TYPE_CHECKING
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI
 import numpy as np
@@ -27,6 +28,9 @@ from ..io.basicio import parallel_print
 from ..io.basicio import load_shots, save_shots
 from ..io.parallelism_wrappers import switch_serial_shot
 from ..io import create_segy
+
+if TYPE_CHECKING:
+    from pyadjoint.reduced_functional import AbstractReducedFunctional
 
 try:
     from ROL.firedrake_vector import FiredrakeVector as FireVector
@@ -1638,6 +1642,55 @@ class FullWaveformInversion:
         self.get_gradient(c=c)
         return self.functional, self._flatten_control(self.gradient)
 
+    def reduced_functional(self) -> "AbstractReducedFunctional":
+        """Return the objective as a reduced functional of the controls.
+
+        This is the one interface both adjoints are differentiated through,
+        so an optimizer written against it runs with either. Which adjoint
+        differentiates the functional follows :attr:`adjoint_type`:
+
+        Implemented adjoint (the default, acoustic only)
+            A new
+            :class:`~spyro.reduced_functionals.ImplementedAdjointReducedFunctional`,
+            which re-runs the forward and backward solves through this
+            driver for every evaluation and derivative.
+        Automated adjoint
+            The reduced functional of the forward solve recorded on the
+            pyadjoint tape. The forward solve is run and recorded first if the
+            solver has not been configured for the automated adjoint yet.
+
+        Returns
+        -------
+        pyadjoint.reduced_functional.AbstractReducedFunctional
+            The functional, with one control per inverted parameter.
+
+        Raises
+        ------
+        NotImplementedError
+            If the implemented adjoint is asked for on a medium that is not
+            acoustic.
+        ValueError
+            If no guess control has been configured.
+        """
+        if self.adjoint_type != AdjointType.AUTOMATED_ADJOINT:
+            # Imported here for the same reason as the optimizer in
+            # ``_run_fwi_tao``: ``import spyro`` must not depend on what only
+            # the optimization paths use.
+            from ..reduced_functionals import ImplementedAdjointReducedFunctional
+
+            return ImplementedAdjointReducedFunctional(self)
+
+        if self.wave.automated_adjoint is None:
+            # The solver is configured for the automated adjoint by the first
+            # forward solve, which is also what records the tape.
+            self.get_functional()
+        automated_adjoint = self.wave.automated_adjoint
+        # Each forward solve drops the reduced functional of the previous
+        # recording, so one built from the current tape is made on demand.
+        if automated_adjoint.reduced_functional is None:
+            automated_adjoint.create_reduced_functional(self.wave.functional_value)
+        return automated_adjoint.reduced_functional
+
     def run_fwi(self, **kwargs):
         """
         Run full waveform inversion.
@@ -1928,11 +1981,7 @@ class FullWaveformInversion:
         tao_options = tao_options or {}
 
         if stages is None:
-            reduced_functional = automated_adjoint.reduced_functional
-            if reduced_functional is None:
-                reduced_functional = automated_adjoint.create_reduced_functional(
-                    self.wave.functional_value,
-                )
+            reduced_functional = self.reduced_functional()
             options = {
                 "tao_max_it": parameters["maxiter"],
                 **tao_options,
