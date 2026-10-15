@@ -166,6 +166,9 @@ pyadjoint.ReducedFunctional or None
         self._gc_timestep_frequency = gc_timestep_frequency
         # Schedule of the tape being recorded; ``None`` when not checkpointed.
         self._checkpointing_schedule = None
+        # Whether an adjoint has run on the current tape, see
+        # ``ensure_first_adjoint``.
+        self._adjoint_evaluated = False
 
     @property
     def checkpointing_schedule(self) -> CheckpointSchedule | None:
@@ -259,6 +262,7 @@ pyadjoint.ReducedFunctional or None
             fire_ad.set_working_tape(self._tape)
             self.reduced_functional = None
             self._checkpointing_schedule = None
+            self._adjoint_evaluated = False
 
             if self._checkpointing:
                 self._checkpointing_schedule = self._build_schedule(total_steps)
@@ -318,6 +322,7 @@ pyadjoint.ReducedFunctional or None
         self.reduced_functional = None
         self._tape = None
         self._checkpointing_schedule = None
+        self._adjoint_evaluated = False
         fire_ad.set_working_tape(Tape())
         pause_annotation()
         for control in self.controls:
@@ -471,7 +476,54 @@ pyadjoint.ReducedFunctional or None
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
+        self.ensure_first_adjoint()
         return self.reduced_functional(as_list(control_value))
+
+    def ensure_first_adjoint(self, reduced_functional: object = None) -> None:
+        """Run the first adjoint of a checkpointed tape before it is replayed.
+
+        With a checkpoint schedule, pyadjoint gets the first adjoint of a tape
+        wrong if the tape was replayed (the reduced functional called, even at
+        the recorded controls) before it: the last time step is linearized
+        about values the replay did not keep. Once an adjoint has run, replays
+        and the adjoints after them are exact. Callers that replay before
+        differentiating, as an optimizer does, call this first.
+
+        A no-op without checkpointing, or once an adjoint has run on the
+        current tape.
+
+        Parameters
+        ----------
+        reduced_functional : pyadjoint.ReducedFunctional, optional
+            Reduced functional on the current tape to differentiate. Defaults
+            to :attr:`reduced_functional`; any other reduced functional on the
+            same tape, such as one over some of the controls only, will do.
+
+        Returns
+        -------
+        None
+            The derivative is discarded; only its side effect on the tape is
+            needed.
+
+        Raises
+        ------
+        ValueError
+            If no reduced functional is given and none has been created yet.
+
+        Notes
+        -----
+        Seen with pyadjoint 2026.10. Remove once pyadjoint keeps the state of
+        the last time step when it replays a tape that has not been
+        differentiated yet.
+        """
+        if not self.checkpointing_enabled or self._adjoint_evaluated:
+            return
+        if reduced_functional is None:
+            reduced_functional = self.reduced_functional
+        if reduced_functional is None:
+            raise ValueError("Reduced functional not created.")
+        reduced_functional.derivative()
+        self._adjoint_evaluated = True
 
     def compute_gradient(self) -> object:
         """Return the gradient of the functional.
@@ -494,7 +546,9 @@ pyadjoint.ReducedFunctional or None
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
-        return self.reduced_functional.derivative(apply_riesz=True)
+        gradient = self.reduced_functional.derivative(apply_riesz=True)
+        self._adjoint_evaluated = True
+        return gradient
 
     def compute_derivative(self) -> object:
         """Return the raw derivative of the functional.
@@ -519,7 +573,9 @@ pyadjoint.ReducedFunctional or None
         """
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
-        return self.reduced_functional.derivative(apply_riesz=False)
+        derivative = self.reduced_functional.derivative(apply_riesz=False)
+        self._adjoint_evaluated = True
+        return derivative
 
     def label_derivatives(self, derivatives: object) -> PhysicalParameters:
         """Associate computed derivatives with selected physical parameters.
@@ -635,4 +691,6 @@ pyadjoint.ReducedFunctional or None
                     break
             else:
                 dJdm = sum(directional_derivatives)
+        # The Taylor test replays the tape before it differentiates.
+        self.ensure_first_adjoint()
         return taylor_test(self.reduced_functional, control_var, direction, dJdm=dJdm)

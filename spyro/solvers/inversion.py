@@ -1933,6 +1933,8 @@ class FullWaveformInversion:
                 reduced_functional = automated_adjoint.create_reduced_functional(
                     self.wave.functional_value,
                 )
+            # TAO replays the tape before it asks for the first gradient.
+            automated_adjoint.ensure_first_adjoint(reduced_functional)
             options = {
                 "tao_max_it": parameters["maxiter"],
                 **tao_options,
@@ -1981,6 +1983,7 @@ class FullWaveformInversion:
             )
             stage_start_state = state.copy()
             offset = done
+            automated_adjoint.ensure_first_adjoint(stage_functional)
 
             def record(iteration, functional, active_values):
                 nonlocal done
