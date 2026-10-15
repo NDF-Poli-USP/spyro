@@ -1,3 +1,5 @@
+from spyro.mpi.spyro_mpi import SpyroEnsemble
+
 from ..io.basicio import parallel_print as pprint
 from ..utils.error_management import (validate_model_dimension, validate_numeric,
                                       validate_parameter)
@@ -135,7 +137,7 @@ class RectangLayer():
         None
         """
 
-        pprint("Determining Rectangular Layer Parameters", comm=self.comm)
+        SpyroEnsemble.print("Determining Rectangular Layer Parameters")
 
         # Checking inputs
         validate_model_dimension(('domain_dim', 'domain_layer'),

@@ -194,3 +194,4 @@ PacMeshIgnore/
 !tests/inputfiles/velocity_models/*.segy
 # Allow the figures of the literate demos
 !demos/elastic_fwi_automated_adjoint/*.png
+.vscode

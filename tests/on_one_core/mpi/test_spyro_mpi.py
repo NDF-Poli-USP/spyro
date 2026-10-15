@@ -147,3 +147,43 @@ def test_communicate_when_size_is_ten():
     reduced = SpyroEnsemble.communicate([1, 4])
 
     assert reduced == [1, 4]
+
+
+def _mock_ensemble_with_rank(ensemble_rank: int) -> MagicMock:
+    """Install a mocked ensemble on ``SpyroEnsemble``.
+
+    Parameters
+    ----------
+    ensemble_rank : int
+        Rank of this process in the ensemble communicator.
+
+    Returns
+    -------
+    MagicMock
+        The mocked ensemble.
+    """
+    SpyroEnsemble.ensemble = MagicMock()
+    SpyroEnsemble.ensemble.ensemble_comm.rank = ensemble_rank
+    return SpyroEnsemble.ensemble
+
+
+def test_write_vtk_on_first_ensemble_member(monkeypatch):
+    ensemble = _mock_ensemble_with_rank(0)
+    vtk_file = MagicMock()
+    monkeypatch.setattr("spyro.mpi.spyro_mpi.VTKFile", vtk_file)
+    field = object()
+
+    SpyroEnsemble.write_vtk("out.pvd", field, name="velocity")
+
+    vtk_file.assert_called_once_with("out.pvd", comm=ensemble.comm)
+    vtk_file.return_value.write.assert_called_once_with(field, name="velocity")
+
+
+def test_write_vtk_skipped_on_other_ensemble_members(monkeypatch):
+    _mock_ensemble_with_rank(1)
+    vtk_file = MagicMock()
+    monkeypatch.setattr("spyro.mpi.spyro_mpi.VTKFile", vtk_file)
+
+    SpyroEnsemble.write_vtk("out.pvd", object())
+
+    vtk_file.assert_not_called()

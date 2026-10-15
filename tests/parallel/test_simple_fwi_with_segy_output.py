@@ -220,7 +220,7 @@ def test_camembert_fwi_with_output(load_real_shot=False):
 
     fwi_obj.run_fwi(vmin=2.5, vmax=3.0, maxiter=2)
     export_grid_spacing = 0.01
-    spyro.io.export_scalar_field(fwi_obj.wave.c, export_grid_spacing, "camembert.png", comm=fwi_obj.wave.comm)
+    spyro.io.export_scalar_field(fwi_obj.wave.c, export_grid_spacing, "camembert.png")
 
     print("END", flush=True)
 
