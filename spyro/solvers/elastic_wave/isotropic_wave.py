@@ -1,15 +1,14 @@
 import numpy as np
 
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
-                       project, TensorFunctionSpace)
+                       grad, interpolate, project, sym)
 
 import ufl
 
 from pyadjoint import AdjFloat, Tape
 
 from .elastic_wave import ElasticWave
-from .forms import (elastic_without_pml, viscoelastic_without_pml,
-                    elastic_with_pml, viscoelastic_with_pml)
+from .forms import (elastic_without_pml, viscoelastic_without_pml)
 from .functionals import mechanical_energy_form
 
 from ...utils.physical_parameters import PhysicalParameters
@@ -476,12 +475,11 @@ class IsotropicWave(ElasticWave):
 
             d = self.input_dictionary.get("viscoelasticity", False)
             self.visco_type = d["visco_type"]
-            W = TensorFunctionSpace(self.function_space.mesh(), "DG", 0)
-            self.strain_space = W
+            self.strain_space = create_strain_space(self)
 
-            # GSLS parameters
-            self.y_list = d["y_gsls"]        # list of y_l
-            self.omega_list = d["omega_gsls"]    # list of omega_l
+            # GSLS parameters (floats puros: evita erros com arrays NumPy)
+            self.y_list = [float(y) for y in d["y_gsls"]]        # list of y_l
+            self.omega_list = [float(w) for w in d["omega_gsls"]]    # list of omega_l
 
             num_branches = d["branches"]
 
@@ -492,15 +490,20 @@ class IsotropicWave(ElasticWave):
             for zeta in self.zeta_list:
                 zeta.assign(0.0)
 
-            self.eps_np1 = Function(self.strain_space, name="eps_np1")
+            # Deformação no espaço de memória, reutilizada a cada passo (antes eram criadas
+            # duas Functions novas por passo dentro do loop).
             self.eps_n = Function(self.strain_space, name="eps_n")
 
-            self.eps_n.assign(0.0)
+            # Interpolação simbólica montada uma única vez. Após a rotação de
+            # estado, u_nm1 (= prev_vstate) contém u^n, como no original.
+            self.eps_interp = interpolate(sym(grad(self.u_nm1)),
+                                          self.strain_space)
 
-            self.sigma_np1 = Function(self.strain_space, name="eps_np1")
-            self.sigma_n = Function(self.strain_space, name="eps_n")
-
-            self.sigma_n.assign(0.0)
+            # Coeficientes da atualização zeta <- a*zeta + b*eps, iguais ao
+            # original: zeta + dt*omega*(eps - zeta).
+            dt = float(self.dt)
+            self.zeta_a = [1.0 - dt * w for w in self.omega_list]
+            self.zeta_b = [dt * w for w in self.omega_list]
 
             self.Gamma = build_Gamma(self)
 
@@ -578,8 +581,3 @@ class IsotropicWave(ElasticWave):
         self.s_wave.assign(project(curl(self.get_function()), self.C_h))
 
         return self.s_wave
-
-    def building_mesh_derived_parameters(self, include_model_parameters=False):
-        super(ElasticWave, self).building_mesh_derived_parameters()
-        if include_model_parameters:
-            super()._initialize_model_parameters()

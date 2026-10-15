@@ -6,6 +6,31 @@ from ufl import conditional
 from ...utils.typing import WaveType
 
 
+def create_strain_space(wave) -> fire.functionspaceimpl.WithGeometry:
+    """Create the space holding the strain and the GSLS memory variables.
+
+    The memory variables are driven by ``sym(grad(u))``, so they are stored
+    in a discontinuous space one degree below the displacement. A
+    piecewise-constant space would add an O(h) error to the viscous stress
+    regardless of the displacement degree, which caps the accuracy of the
+    whole viscoelastic scheme.
+
+    Parameters
+    ----------
+    wave : spyro.solvers.elastic_wave.isotropic_wave.IsotropicWave
+        Viscoelastic wave solver whose displacement space and polynomial
+        degree define the strain space.
+
+    Returns
+    -------
+    firedrake.functionspaceimpl.WithGeometry
+        Discontinuous tensor function space of degree ``wave.degree - 1``
+        (``DQ`` on quadrilaterals and hexahedra, ``DG`` on simplices).
+    """
+    return fire.TensorFunctionSpace(wave.function_space.mesh(), "DG",
+                                    max(wave.degree - 2, 0))
+
+
 def C_computation(self):
     dim = self.function_space.mesh().topological_dimension()
 
@@ -247,7 +272,7 @@ def Gamma_VTI(self, C, dim):
         c2 = (- C11 - 3 * C33 + 4 * C44) / (4 * (C13 + C44)) - 1
         c3 = (C33 - C44) / (4 * (C13 + C44))
         c4 = C33 / (2 * (C13 + C44))
-        Q13 = (c1 * C33 * Q33 + c2 * C44 * Q44 + c3 * C11 * Q11 + c4 * delta * self.Qdelta_inv) / C13
+        Q13 = (c1 * C33 * Q33 + c2 * C44 * Q44 + c3 * C11 * Q11 + c4 * delta * self.Q_delta) / C13
 
     elif anisotropy == 'exact':
         c1 = (C33 * (1 + 2 * gamma) - C44 + (C33 - C44) * (1 + 2 * delta)) / (2 * (C13 + C44))
@@ -296,14 +321,9 @@ def Gamma_TTI(self, dim, C):
         C44 = C_vti_real[3, 3]
         C66 = C_vti_real[5, 5]
 
-        denom = C11 - 2*C66
-        Q12 = conditional(abs(denom) > 1e-12,
-                          (C11/Q11 - 2*C66/Q66) / denom,
-                          0.0)
-
         C_imag = fire.as_tensor([
             [C11*Q11, C12*Q12, C13*Q13, 0.0, 0.0, 0.0],
-            [C12*Q12, C11/Q11, C13*Q13, 0.0, 0.0, 0.0],
+            [C12*Q12, C11*Q11, C13*Q13, 0.0, 0.0, 0.0],
             [C13*Q13, C13*Q13, C33*Q33, 0.0, 0.0, 0.0],
             [0.0, 0.0, 0.0, C44*Q44, 0.0, 0.0],
             [0.0, 0.0, 0.0, 0.0, C44*Q44, 0.0],

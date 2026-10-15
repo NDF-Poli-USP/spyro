@@ -1,6 +1,7 @@
 import numpy as np
 
-from firedrake import (Constant, Function, TensorFunctionSpace)
+from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
+                       grad, interpolate, project, sym)
 
 from .isotropic_wave import IsotropicWave
 from .forms import (elastic_without_pml, viscoelastic_without_pml,
@@ -10,7 +11,7 @@ from ...utils.typing import (ElasticMaterialParameter, ElasticMaterialParameteri
                              AbsorbingBCsType, override, WaveType, ViscoelasticMaterialParameter,
                              AnisotropicMaterialParameter)
 from ...domains.space import create_function_space
-from .tensor_computation import C_computation, build_Gamma
+from .tensor_computation import C_computation, build_Gamma, create_strain_space
 
 CONTROL_PARAMETERS_BY_PARAMETERIZATION = {
     ElasticMaterialParameterization.LAME: (
@@ -29,7 +30,6 @@ VISCOELASTIC_PARAMETERS = (ViscoelasticMaterialParameter.Q_VP, ViscoelasticMater
                            ViscoelasticMaterialParameter.Q_EPSILON)
 
 ANISOTROPIC_PARAMETERS = (AnisotropicMaterialParameter.DELTA, AnisotropicMaterialParameter.EPSILON,)
-
 
 def _format_control_parameters(parameters):
     """Format material-parameter enum values for error messages.
@@ -56,7 +56,7 @@ class AnisotropicVTIWave(IsotropicWave):
     '''Anisotropic elastic wave propagator'''
 
     def __init__(self, dictionary, comm=None):
-        super().__init__(dictionary, anisotropy=WaveType.ANISOTROPIC_VTI_ELASTIC, comm=comm)
+        super().__init__(dictionary, anisotropy = WaveType.ANISOTROPIC_VTI_ELASTIC, comm=comm)
         self.wave_type = WaveType.ANISOTROPIC_VTI_ELASTIC
         self.viscoelastic = dictionary.get("viscoelastic", False)
         self.delta = None
@@ -120,13 +120,13 @@ class AnisotropicVTIWave(IsotropicWave):
             return value
 
         def declared(parameter, *aliases):
-            """Return the model value of ``parameter``, or ``None``."""
-            for key in (parameter.value, *aliases):
-                if key in synthetic_data_dict:
-                    value = synthetic_data_dict[key]
-                    return Constant(value) if np.isscalar(value) else value
-            return None
-
+                    """Return the model value of ``parameter``, or ``None``."""
+                    for key in (parameter.value, *aliases):
+                        if key in synthetic_data_dict:
+                            value = synthetic_data_dict[key]
+                            return Constant(value) if np.isscalar(value) else value
+                    return None
+        
         self.rho = declared(ElasticMaterialParameter.DENSITY)
         self.lmbda = declared(ElasticMaterialParameter.LAMBDA, "lame_first")
         self.mu = declared(ElasticMaterialParameter.MU, "lame_second")
@@ -176,7 +176,6 @@ class AnisotropicVTIWave(IsotropicWave):
                 "The valid options are {Density, Lame first, Lame second} "
                 "or (exclusive) {Density, P-wave velocity, S-wave velocity}",
             )
-
     def set_physical_parameterization(
         self, parameterization: ElasticMaterialParameterization,
     ) -> None:
@@ -227,6 +226,7 @@ class AnisotropicVTIWave(IsotropicWave):
 
         self.viscoelastic = self.input_dictionary.get("viscoelastic", False)
 
+
         if parameterization is ElasticMaterialParameterization.LAME:
             self.rho = as_function(self.rho, ElasticMaterialParameter.DENSITY)
             self.lmbda = as_function(self.lmbda, ElasticMaterialParameter.LAMBDA)
@@ -268,7 +268,7 @@ class AnisotropicVTIWave(IsotropicWave):
         add(ElasticMaterialParameter.MU, self.mu)
         add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c)
         add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
-
+        
     def get_control_parameters(self):
         """Return the active isotropic elastic material controls.
 
@@ -475,15 +475,14 @@ class AnisotropicVTIWave(IsotropicWave):
         self.Elastic_C = C_computation(self)
 
         if self.viscoelastic:
-
-            d = self.input_dictionary.get("viscoelasticity", False)
+            
+            d = self.input_dictionary["viscoelasticity"]
             self.visco_type = d["visco_type"]
-            W = TensorFunctionSpace(self.function_space.mesh(), "DG", 0)
-            self.strain_space = W
+            self.strain_space = create_strain_space(self)
 
-            # GSLS parameters
-            self.y_list = d["y_gsls"]        # list of y_l
-            self.omega_list = d["omega_gsls"]    # list of omega_l
+            # GSLS parameters (floats puros: evita erros com arrays NumPy)
+            self.y_list = [float(y) for y in d["y_gsls"]]        # list of y_l
+            self.omega_list = [float(w) for w in d["omega_gsls"]]    # list of omega_l
 
             num_branches = d["branches"]
 
@@ -494,15 +493,20 @@ class AnisotropicVTIWave(IsotropicWave):
             for zeta in self.zeta_list:
                 zeta.assign(0.0)
 
-            self.eps_np1 = Function(self.strain_space, name="eps_np1")
+            # Deformação no espaço de memória, reutilizada a cada passo (antes eram criadas
+            # duas Functions novas por passo dentro do loop).
             self.eps_n = Function(self.strain_space, name="eps_n")
 
-            self.eps_n.assign(0.0)
+            # Interpolação simbólica montada uma única vez. Após a rotação de
+            # estado, u_nm1 (= prev_vstate) contém u^n, como no original.
+            self.eps_interp = interpolate(sym(grad(self.u_nm1)),
+                                          self.strain_space)
 
-            self.sigma_np1 = Function(self.strain_space, name="eps_np1")
-            self.sigma_n = Function(self.strain_space, name="eps_n")
-
-            self.sigma_n.assign(0.0)
+            # Coeficientes da atualização zeta <- a*zeta + b*eps, iguais ao
+            # original: zeta + dt*omega*(eps - zeta).
+            dt = float(self.dt)
+            self.zeta_a = [1.0 - dt * w for w in self.omega_list]
+            self.zeta_b = [dt * w for w in self.omega_list]
 
             self.Gamma = build_Gamma(self)
 
