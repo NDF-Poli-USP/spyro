@@ -12,9 +12,13 @@ import numpy as np
 import pytest
 
 import spyro
-from spyro.reduced_functionals import ImplementedAdjointReducedFunctional
 from spyro.utils.typing import AdjointType
 
+
+# The reduced functional needs pyadjoint's AbstractReducedFunctional, which
+# older Firedrake releases do not ship; it is imported inside each test so
+# that collecting this module does not fail there.
+pytestmark = pytest.mark.newer_firedrake
 
 GUESS = 2.5
 REAL = 3.0
@@ -124,6 +128,8 @@ def test_driver_hands_out_the_implemented_adjoint(fwi):
     fwi : spyro.FullWaveformInversion
         Acoustic inversion with observed data and a guess model.
     """
+    from spyro.reduced_functionals import ImplementedAdjointReducedFunctional
+
     reduced_functional = fwi.reduced_functional()
 
     assert isinstance(reduced_functional, ImplementedAdjointReducedFunctional)
@@ -216,7 +222,6 @@ def test_derivative_before_any_evaluation(fwi):
     assert np.allclose(gradient.dat.data_ro, expected.dat.data_ro)
 
 
-@pytest.mark.newer_firedrake
 @pytest.mark.filterwarnings("ignore:TAOSolver failed to converge")
 def test_tao_runs_on_the_implemented_adjoint(fwi):
     """TAO, so far driven only by the automated adjoint, runs with this one.
@@ -254,6 +259,8 @@ def test_automated_adjoint_is_refused(fwi):
     fwi : spyro.FullWaveformInversion
         Acoustic inversion with observed data and a guess model.
     """
+    from spyro.reduced_functionals import ImplementedAdjointReducedFunctional
+
     fwi.adjoint_type = AdjointType.AUTOMATED_ADJOINT
 
     with pytest.raises(ValueError, match="automated adjoint"):
@@ -278,7 +285,6 @@ def test_missing_control_is_refused(tmp_path, monkeypatch):
         driver.reduced_functional()
 
 
-@pytest.mark.newer_firedrake
 def test_driver_hands_out_the_recorded_functional(fwi):
     """Under the automated adjoint, the functional is the recorded one.
 
