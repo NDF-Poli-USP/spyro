@@ -1,6 +1,5 @@
 import firedrake as fire
 from .acoustic_wave import AcousticWave
-from .acoustic_solver_construction_no_pml import build_acceleration_solver
 from ..utils.typing import override
 
 
@@ -18,10 +17,21 @@ class AcousticWaveMMS(AcousticWave):
         self.source_expression = self.q_t * self.q_xy
 
         super().matrix_building()
-        # The pressure vanishes on the boundary at all times, so does its
-        # acceleration.
+        lhs = self.lhs
         bcs = fire.DirichletBC(self.function_space, 0.0, "on_boundary")
-        self.solver = build_acceleration_solver(self, bcs=bcs)
+
+        lin_var = fire.LinearVariationalProblem(
+            lhs,
+            self.rhs + self.source_function,
+            self.u_np1,
+            bcs=bcs,
+            constant_jacobian=True,
+        )
+        solver_parameters = dict(self.solver_parameters)
+        solver_parameters["mat_type"] = "matfree"
+        self.solver = fire.LinearVariationalSolver(
+            lin_var, solver_parameters=solver_parameters
+        )
         dt = self.dt
         t = self.current_time
         self.u_nm1.assign(self.analytical_solution(t - 2 * dt))

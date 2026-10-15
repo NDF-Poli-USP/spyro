@@ -6,9 +6,11 @@ $$M(c)\,a^n = f^n - K u^n - g(u^n,u^{n-1}), \qquad u^{n+1} = 2u^n - u^{n-1} + \D
 
 preservando forward e gradiente, e medir se isso reduz o armazenamento do adjunto automático (pyadjoint + `checkpoint_schedules`).
 
-**Conclusão até aqui:** a reformulação preserva os resultados até o arredondamento, mas **não reduz memória no tape genérico: aumenta**, em todas as agendas. O original já guarda só um campo de pressão próprio por passo. O desperdício real está em outro lugar: cópias redundantes nos checkpoints do pyadjoint e cofunções da fonte pontual. Recomendação: **não adotar a reformulação como padrão** sem antes resolver isso (ver "O que falta").
+**Conclusão:** a reformulação preserva os resultados até o arredondamento, mas **não reduz memória no tape genérico: aumenta**, em todas as agendas, e o tempo preliminar também é pior. **Decisão: manter o solver do `main`** (solve para $u^{n+1}$). A reformulação foi revertida. Da investigação ficou a fonte pontual como amplitude escalar (seção 1.8), aplicada sobre o solver do `main`: o tape completo cai 3× (2408 → 808 campos).
 
-Branch: `claude/spyro-acceleration-adjoint-870c10` (base `main` @ `d5458bef`). Commits `wip` com a reformulação, os benchmarks e este relatório; a fonte pontual por amplitude (seção 1.8) vem em commit próprio.
+**Atenção (seção 1.9):** no `main`, refazer o tape checkpointado em outro modelo de velocidade dá gradiente errado (erro de 2e-3). A FWI com adjunto automático via TAO faz exatamente isso a cada iteração. O bug já existia antes desta branch e a causa ainda não foi encontrada. A formulação por aceleração não tinha esse problema.
+
+Branch: `claude/spyro-acceleration-adjoint-870c10` (base `main` @ `d5458bef`). Os commits `wip` e `cc246b6` têm a reformulação. O commit seguinte a reverte para o solver do `main` e mantém só a fonte por amplitude. As seções 1.1 a 1.7 descrevem a reformulação; o código dela fica no histórico (`cc246b6`).
 
 ---
 
@@ -126,25 +128,43 @@ Por que não `s * source_cof` diretamente no lado direito: o Firedrake 2026.10 s
 
 O adjunto implementado reutiliza o mesmo solver e injeta a fonte adjunta por `source_function`. Por isso `backward_wave_propagator` zera `source_amplitude` (o forward a deixa no último valor da wavelet). O PML e o elástico não mudaram.
 
-Medição (mesmo problema da 1.3, Firedrake 2026.10 em Docker, `bench.py --probe-bytes`; "antes" = HEAD `d7fb990`):
+Medição sobre o solver do `main` (mesmo problema da 1.3, Firedrake 2026.10 em Docker, `bench.py --probe-bytes`):
 
-| agenda | antes (campos) | depois | recomp. |
+| agenda | `main` (campos) | `main` + fonte por amplitude | recomp. |
 |---|---|---|---|
-| tape completo (single) | 3209 | **1609** | 0 / 0 |
-| mixed s=8 | 97.2 | 90.2 | 2717 / 2717 |
-| mixed s=16 | 188.0 | 173.0 | 1521 / 1521 |
-| Revolve s=16 | 57.4 | 57.4 | 2232 / 2232 |
+| tape completo (single) | 2408 | **808** | 0 / 0 |
+| mixed s=16 | 156.0 | 140.0 | 1521 / 1521 |
 
-Os valores "antes" diferem um pouco da coluna "nova" da 1.6 (por exemplo, mixed s=16: 188 contra 183). As medições foram feitas em outra máquina e com outra versão do Firedrake, então só a comparação dentro desta tabela vale.
+Equivalência contra o `main`: J 8.9e-15, receptores 4.7e-14, campo final 3.6e-14, gradiente 5.8e-14. Os tempos dessas rodadas não valem como medição, porque o `--probe-bytes` percorre o tape a cada ação.
 
-Equivalência contra antes: J 2.9e-15, receptores 2.5e-14, gradiente 2.8e-14.
+No tape completo, cada passo passa de 3 campos (pressão + 2 cofunções da fonte) para 1, só a pressão. No mixed, o ganho é de 1 campo por unidade, e não 2. O motivo é que `TimeStep.checkpoint` copia em cada unidade todas as dependências do adjunto, inclusive as entradas que nunca mudam. Assim, cada unidade passa a copiar `source_density` e também `source_function`, que fica zerada no forward mas continua na forma para o adjunto implementado. No Revolve não se espera ganho (na reformulação ele foi nulo), porque a fonte não está nos checkpoints de reinício. O restante depende do item 3(a) (não recopiar entradas constantes), ou de tirar `source_function` do solver do forward.
 
-No tape completo, a fonte passa de 2 campos por passo para 0. No mixed, o ganho é de cerca de 1 campo por unidade, e não 2. O motivo é que `TimeStep.checkpoint` copia todas as dependências do adjunto em cada unidade, inclusive as entradas que nunca mudam. Assim, cada unidade passa a copiar `source_density` e também `source_function`, que fica zerada no forward mas continua na forma para o adjunto implementado. No Revolve não há ganho, porque a fonte não estava nos checkpoints de reinício. O restante depende do item 3(a) (não recopiar entradas constantes), ou de tirar `source_function` do solver do forward.
+Na reformulação (antes da reversão) o efeito foi o mesmo: tape completo 3209 → 1609, mixed s=16 188 → 173, Revolve s=16 inalterado.
 
 Testes: `tests/on_one_core/test_point_source_amplitude.py`.
 - O termo assemblado reproduz $s\,q$ (< 1e-12).
 - Depois do 1º passo, nenhum passo do tape tem cofunção de saída. Antes eram 2 por passo, conferido no HEAD.
 - O adjunto implementado ignora a amplitude deixada pelo forward. O teste falha se o reset em `backward_wave_propagator` for removido.
+
+`tests/on_one_core/test_automated_adjoint_recomputation.py` (antes `test_acceleration_central_difference.py`, sem o teste específico da aceleração) verifica o gradiente com poucos checkpoints contra o tape completo, a reavaliação em outro modelo e o teste de Taylor com NRBC e recomputação.
+
+### 1.9 Bug pré-existente: reavaliação do tape checkpointado no `main`
+
+`test_reevaluation_after_velocity_change` grava o tape em $c$, chama `rf(c_novo)` e `rf.derivative()`, e compara com uma gravação nova em `c_novo` (NRBC em todos os lados, malha 0.2, `dt=0.004`, `T=0.8`):
+
+| | J | gradiente |
+|---|---|---|
+| sem checkpointing | 0.0 | 0.0 |
+| mixed, 5 snapshots | 0.0 | **2.1e-3** |
+
+- O resultado é idêntico no `main` puro (`d5458bef`) e com a fonte por amplitude, então não foi introduzido aqui.
+- Com a formulação por aceleração o teste passava (< 1e-10).
+- `Inversion._run_fwi_tao` otimiza sobre `reduced_functional`, então a FWI com adjunto automático e `snapshots` usa esse gradiente a partir da 2ª iteração.
+- O teste ficou como `xfail(strict=True)` até a correção.
+
+Suspeitas, não verificadas:
+- O solve para $u^{n+1}$ depende de $c$ tanto na matriz (`constant_jacobian=True`) quanto no lado direito ($M(c)(2u^n-u^{n-1})/\Delta t^2$).
+- Algum checkpoint que depende de $c$ pode estar sendo restaurado do modelo antigo no reverso.
 
 ---
 
@@ -156,7 +176,8 @@ Testes: `tests/on_one_core/test_point_source_amplitude.py`.
    ./sweep.sh timing 1
    python analyse.py
    ```
-2. **Decidir sobre a reformulação.** Os dados indicam não adotar como padrão. Se for mantida (por clareza ou para preparar um reverso especializado), adotar a variante *in-place* ou evitar a dependência do chute inicial, para não pagar +1 campo por checkpoint de reinício.
+2. ~~**Decidir sobre a reformulação**~~: decidido manter o solver do `main`.
+2b. **Corrigir o bug da seção 1.9** (gradiente errado ao refazer o tape checkpointado em outro $c$). Isso afeta a FWI com adjunto automático e checkpointing. Prioridade alta, em PR separado.
 3. **Passo 6 (reverso especializado):** o armazenamento genérico é de fato um gargalo (7 cópias por unidade de dependências do adjunto, contra 1 necessária). Mas um bloco spyro sozinho não resolve, porque o `CheckpointManager` do pyadjoint revisa `adjoint_dependencies` adicionando **todas** as dependências de todos os blocos do passo, sem consultar o bloco. Caminhos possíveis:
    - (a) no pyadjoint/Firedrake: não copiar de novo checkpoints delegados/compartilhados em `TimeStep.checkpoint`. Isso é genérico e beneficia o original.
    - (b) API de bloco para declarar quais dependências o adjunto realmente lê. Só então um bloco de passo que use $\delta J_n = -{z^n}^T \delta M(c)\,a^n$ guardaria apenas $a^n$.
@@ -169,6 +190,8 @@ Testes: `tests/on_one_core/test_point_source_amplitude.py`.
 9. **Antes de um PR:** um humano revisa e assume cada mudança (AGENTS.md); declarar o uso de IA (Claude Code, Opus 5.5) para implementação, testes e medições; decidir se esta pasta de benchmark (3.3 MB, inclui `.npz`) entra no repositório.
 
 ## 3. Como reproduzir
+
+Os comandos abaixo reproduzem as seções 1.4–1.7 e supõem que a árvore de trabalho tem a reformulação. Depois da reversão, faça antes `git checkout cc246b6`. Na árvore atual, `bench.py` com `PYTHONPATH` apontando para o repositório mede o solver do `main` com a fonte por amplitude (seção 1.8).
 
 ```
 source ~/dev_code/venv-firedrake/bin/activate

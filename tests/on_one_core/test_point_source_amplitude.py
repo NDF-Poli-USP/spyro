@@ -13,7 +13,7 @@ import pytest
 import firedrake as fire
 from spyro.solvers.acoustic_solver_construction_no_pml import set_point_source
 
-from .test_acceleration_central_difference import guess_wave, relative_error
+from .test_automated_adjoint_recomputation import guess_wave, relative_error
 from .test_gradient_auto_adjoint_nrbc import observed_record
 
 
