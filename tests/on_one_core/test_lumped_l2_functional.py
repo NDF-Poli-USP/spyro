@@ -156,3 +156,126 @@ def test_non_diagonal_mass_spaces_are_rejected(method, degree):
     )
     with pytest.raises(ValueError, match="is diagonal"):
         LumpedL2ReducedFunctional(reduced_functional)
+
+
+def _scale_field(space: fire.FunctionSpace) -> fire.Function:
+    """Return a positive scale that varies over the domain.
+
+    Parameters
+    ----------
+    space : firedrake.FunctionSpace
+        Space of the control.
+
+    Returns
+    -------
+    firedrake.Function
+        Values between 0.5 and 1.5.
+    """
+    x, _ = fire.SpatialCoordinate(space.mesh())
+    return fire.Function(space).interpolate(0.5 + x)
+
+
+@pytest.mark.parametrize("scale", ["number", "field"])
+def test_scaled_functional_matches_the_model_functional(scale):
+    """With a scale, the same problem: value, the way back to m, and a Taylor test.
+
+    Parameters
+    ----------
+    scale : str
+        Whether the scale is a number or a field.
+    """
+    from spyro.reduced_functionals import LumpedL2ReducedFunctional
+
+    space = _space("mass_lumped_triangle", 2)
+    m = fire.Function(space).assign(1.2)
+    reduced_functional = lumped_misfit(m, reference(space), power=2)
+    s = 0.6 if scale == "number" else _scale_field(space)
+    lumped_functional = LumpedL2ReducedFunctional(reduced_functional, scales=[s])
+    m_tilde = lumped_functional.controls[0].control
+    plain = LumpedL2ReducedFunctional(reduced_functional).controls[0].control
+    s_values = s if scale == "number" else s.dat.data_ro
+    assert np.allclose(m_tilde.dat.data_ro, plain.dat.data_ro / s_values)
+    assert np.isclose(float(lumped_functional(m_tilde)), float(reduced_functional(m)))
+    (m_back,) = lumped_functional.map_result(m_tilde)
+    assert np.allclose(m_back.dat.data_ro, m.dat.data_ro)
+    direction = fire.Function(space).interpolate(
+        fire.sin(3 * fire.SpatialCoordinate(space.mesh())[0])
+    )
+    assert taylor_test(lumped_functional, m_tilde, direction) > 1.9
+
+
+@pytest.mark.parametrize("scales", [[0.0], [-1.0], [np.inf], [1.0, 1.0]])
+def test_invalid_scales_are_rejected(scales):
+    """A scale is finite and positive, one per control.
+
+    Parameters
+    ----------
+    scales : list
+        Invalid scales.
+    """
+    from spyro.reduced_functionals import LumpedL2ReducedFunctional
+
+    space = _space("mass_lumped_triangle", 2)
+    reduced_functional = lumped_misfit(fire.Function(space).assign(1.2), reference(space))
+    with pytest.raises(ValueError):
+        LumpedL2ReducedFunctional(reduced_functional, scales=scales)
+
+
+TIGHT = {"tao_gatol": 1e-12, "tao_grtol": 0.0, "tao_gttol": 0.0, "tao_max_it": 100}
+
+
+def test_normalized_minimization_reaches_the_same_solution():
+    """Measured in units of the box or not, BQNLS finds the projection of the target."""
+    from spyro.tools.optimization import minimize_with_tao
+
+    lower, upper = 1.1, 1.6
+    solutions = []
+    for normalized in (False, True):
+        space = _space("mass_lumped_triangle", 2)
+        m = fire.Function(space, name="vp").assign(1.3)
+        reduced_functional = lumped_misfit(m, reference(space))
+        (solution,) = minimize_with_tao(reduced_functional, bounds=[(lower, upper)],
+                                        options=TIGHT, normalized=normalized)
+        assert solution.name() == "vp"
+        solutions.append(solution.dat.data_ro.copy())
+    expected = np.clip(reference(space).dat.data_ro, lower, upper)
+    # The target is below the box at most nodes: the lower bound is active.
+    assert np.any(expected == lower)
+    for values in solutions:
+        assert np.allclose(values, expected, atol=1e-6)
+
+
+def test_normalized_keeps_degrees_of_freedom_without_width_fixed():
+    """Where the box has no width, the scale is 1 and the bounds hold the control."""
+    from spyro.tools.optimization import _box_widths, minimize_with_tao
+
+    space = _space("mass_lumped_triangle", 2)
+    m = fire.Function(space, name="vp").assign(1.3)
+    reduced_functional = lumped_misfit(m, reference(space))
+    x, _ = fire.SpatialCoordinate(space.mesh())
+    upper = fire.Function(space).interpolate(fire.conditional(x < 0.5, 1.3, 1.8))
+    (width,) = _box_widths([(1.3, upper)], reduced_functional.controls)
+    fixed = upper.dat.data_ro == 1.3
+    assert np.any(fixed) and np.all(width.dat.data_ro[fixed] == 1.0)
+    assert np.allclose(width.dat.data_ro[~fixed], 0.5)
+    (solution,) = minimize_with_tao(reduced_functional, bounds=[(1.3, upper)],
+                                    options=TIGHT, normalized=True)
+    assert np.allclose(solution.dat.data_ro[fixed], 1.3)
+
+
+@pytest.mark.parametrize("bounds", [None, [(None, 1.6)], [(1.6, 1.1)], [(1.1, np.inf)]])
+def test_normalized_needs_finite_ordered_bounds(bounds):
+    """Without a finite box there is no width to measure the control by.
+
+    Parameters
+    ----------
+    bounds : list or None
+        Invalid bounds.
+    """
+    from spyro.tools.optimization import minimize_with_tao
+
+    space = _space("mass_lumped_triangle", 2)
+    reduced_functional = lumped_misfit(fire.Function(space).assign(1.3), reference(space))
+    with pytest.raises(ValueError):
+        minimize_with_tao(reduced_functional, bounds=bounds, options=TIGHT,
+                          normalized=True)

@@ -341,3 +341,65 @@ def test_fwi_stages_require_automated_adjoint():
 
     with pytest.raises(ValueError, match="AUTOMATED_ADJOINT"):
         fwi.run_fwi(stages=[Parameter.S_WAVE_VELOCITY])
+
+
+@pytest.mark.newer_firedrake
+@pytest.mark.parametrize("staged", [False, True])
+def test_fwi_elastic_normalized(tmp_path, monkeypatch, staged):
+    """``normalized=True`` reaches every TAO run, and the inversion still descends.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Working directory.
+    monkeypatch : pytest.MonkeyPatch
+        Fixture to observe the optimizer.
+    staged : bool
+        Whether to run the s-wave then the p-wave velocity, or all at once.
+    """
+    vmin, vmax = [1.0, 1.5, 0.5], [3.0, 4.0, 2.5]
+    monkeypatch.chdir(tmp_path)
+
+    fwi = spyro.FullWaveformInversion(
+        dictionary=build_elastic_dictionary(ELASTIC_GUESS),
+        wave_class=spyro.IsotropicWave,
+    )
+    fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.25})
+    fwi.set_real_model({
+        Parameter(name): value for name, value in ELASTIC_REAL.items()
+    })
+    fwi.generate_real_shot_record(save_shot_record=False)
+    fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
+
+    from spyro.tools import optimization
+
+    real_minimize = optimization.minimize_with_tao
+    flags = []
+
+    def observed_minimize(reduced_functional: object, **kwargs: object) -> list:
+        flags.append(kwargs.get("normalized"))
+        return real_minimize(reduced_functional, **kwargs)
+
+    monkeypatch.setitem(
+        optimization.__dict__, "minimize_with_tao", observed_minimize,
+    )
+    stages = ([Parameter.S_WAVE_VELOCITY, Parameter.P_WAVE_VELOCITY]
+              if staged else None)
+    result = fwi.run_fwi(
+        adjoint_type=AdjointType.AUTOMATED_ADJOINT, vmin=vmin, vmax=vmax,
+        maxiter=2, stages=stages, normalized=True,
+    )
+
+    assert flags == ([True, True] if staged else [True])
+    for control, low, high in zip(result, vmin, vmax):
+        assert control.dat.data_ro.min() >= low - 1e-10
+        assert control.dat.data_ro.max() <= high + 1e-10
+    assert fwi.functional_history[-1] < fwi.functional_history[0]
+
+
+def test_fwi_normalized_requires_automated_adjoint():
+    """Normalized controls are unavailable to the implemented adjoint."""
+    fwi = spyro.FullWaveformInversion(dictionary=build_dictionary())
+
+    with pytest.raises(ValueError, match="AUTOMATED_ADJOINT"):
+        fwi.run_fwi(normalized=True)
