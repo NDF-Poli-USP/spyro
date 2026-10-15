@@ -73,9 +73,7 @@ def test_read_and_write_segy():
 
     vp_read = spyro.io.interpolate(wave, hdf5_file, wave.function_space)
 
-    fire.VTKFile("velocity_models/test.pvd", comm=SpyroEnsemble.ensemble.comm).write(
-        vp_read
-    )
+    SpyroEnsemble.write_vtk("velocity_models/test.pvd", vp_read)
 
     value_at_center = vp_read.at(xc, yc)
     test1 = math.isclose(value_at_center, 3.0)

@@ -51,7 +51,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     remainders = np.array(remainders)
 
     if plot:
-        fire.VTKFile("gradient.pvd", comm=SpyroEnsemble.ensemble.comm).write(dJ)
+        SpyroEnsemble.write_vtk("gradient.pvd", dJ)
         plt.close()
         plt.plot(steps, errors, label="Error")
         plt.legend()
