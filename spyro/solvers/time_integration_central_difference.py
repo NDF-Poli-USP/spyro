@@ -119,8 +119,11 @@ def _propagate_forward_central_difference(wave, source_ids):
 
         # The time step has to close right after the solve: closing it after
         # the state rotation below makes the solve output look disposable, and
-        # its checkpoint is dropped. The final step is closed by pyadjoint
-        # itself when taping ends, hence ``nt - 1``.
+        # its checkpoint is dropped. Without the PML the solve is the
+        # acceleration solve followed by the explicit pressure update, so a
+        # restart needs the two pressure levels only, never the acceleration.
+        # The final step is closed by pyadjoint itself when taping ends, hence
+        # ``nt - 1``.
         if adjoint_type == AdjointType.AUTOMATED_ADJOINT and step < nt - 1:
             wave.automated_adjoint.end_timestep()
 

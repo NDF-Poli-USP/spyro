@@ -1,0 +1,119 @@
+{
+ "label": "orig",
+ "schedule": "single",
+ "snapshots": null,
+ "abc": "none",
+ "nt": 801,
+ "ndofs": 2481,
+ "field_bytes": 19848,
+ "J": 0.000464418407406919,
+ "t_forward": 7.933268749999115,
+ "t_gradient": 23.225790833006613,
+ "t_total": 31.159059583005728,
+ "rss_before_record": 361807872,
+ "rss_after_record": 480051200,
+ "peak_rss": 487309312,
+ "checkpoint_bytes_after_record": 47910088,
+ "checkpoint_bytes_peak_reverse": 47910088,
+ "checkpoint_field_bytes_after_record": 47801040,
+ "checkpoint_field_bytes_peak_reverse": 47801040,
+ "recomputed_steps": 0,
+ "action_counts": {
+  "Reverse": 1,
+  "EndReverse": 1
+ },
+ "tape_after_record": {
+  "label": "after recording",
+  "n_timesteps": 801,
+  "n_blocks": 7211,
+  "mid_step": 400,
+  "mid_blocks": [
+   "FunctionAssignBlock",
+   "FunctionAssignBlock",
+   "AssembleBlock",
+   "FunctionAssignBlock",
+   "AssembleBlock",
+   "AdjFloatExprBlock",
+   "AssembleBlock",
+   "CofunctionAssignBlock",
+   "NonlinearVariationalSolveBlock"
+  ],
+  "checkpointable_state": {
+   "field Cofunction:cofunction_32 [input; bv chk=own copy]": 1,
+   "field Function:pressure [FunctionAssignBlock; bv chk=delegated]": 1,
+   "field Function:pressure t+dt [NonlinearVariationalSolveBlock; bv chk=own copy]": 1,
+   "field Function:velocity [input; bv chk=own copy]": 1,
+   "receiver Function:* [input; bv chk=own copy]": 402,
+   "scalar AdjFloat:* [AdjFloatExprBlock; bv chk=own copy]": 1,
+   "scalar MeshGeometry:* [input; bv chk=own copy]": 1
+  },
+  "adjoint_dependencies": {
+   "field Cofunction:cofunction_19 [CofunctionAssignBlock; bv chk=own copy]": 1,
+   "field Cofunction:cofunction_45 [AssembleBlock; bv chk=own copy]": 1,
+   "field Function:pressure [FunctionAssignBlock; bv chk=delegated]": 1,
+   "field Function:pressure t+dt [NonlinearVariationalSolveBlock; bv chk=own copy]": 1,
+   "field Function:pressure t-dt [FunctionAssignBlock; bv chk=delegated]": 1,
+   "receiver Function:* [AssembleBlock; bv chk=own copy]": 1,
+   "receiver Function:* [FunctionAssignBlock; bv chk=own copy]": 1,
+   "scalar AdjFloat:* [AdjFloatExprBlock; bv chk=own copy]": 1,
+   "scalar AdjFloat:* [AssembleBlock; bv chk=own copy]": 1
+  },
+  "step_checkpoint_entries": 0,
+  "step_checkpoint_bytes": 0,
+  "live_bytes_by_category": {
+   "field": 47801040,
+   "receiver": 96200,
+   "scalar": 12848
+  },
+  "step_checkpoint_census": {}
+ },
+ "tape_after_reverse": {
+  "label": "after reverse",
+  "n_timesteps": 801,
+  "n_blocks": 7211,
+  "mid_step": 400,
+  "mid_blocks": [
+   "FunctionAssignBlock",
+   "FunctionAssignBlock",
+   "AssembleBlock",
+   "FunctionAssignBlock",
+   "AssembleBlock",
+   "AdjFloatExprBlock",
+   "AssembleBlock",
+   "CofunctionAssignBlock",
+   "NonlinearVariationalSolveBlock"
+  ],
+  "checkpointable_state": {
+   "field Cofunction:cofunction_32 [input; bv chk=own copy]": 1,
+   "field Function:pressure [FunctionAssignBlock; bv chk=none]": 1,
+   "field Function:pressure t+dt [NonlinearVariationalSolveBlock; bv chk=none]": 1,
+   "field Function:velocity [input; bv chk=own copy]": 1,
+   "receiver Function:* [input; bv chk=own copy]": 402,
+   "scalar AdjFloat:* [AdjFloatExprBlock; bv chk=none]": 1,
+   "scalar MeshGeometry:* [input; bv chk=own copy]": 1
+  },
+  "adjoint_dependencies": {
+   "field Cofunction:cofunction_19 [CofunctionAssignBlock; bv chk=none]": 1,
+   "field Cofunction:cofunction_32 [input; bv chk=own copy]": 1,
+   "field Cofunction:cofunction_45 [AssembleBlock; bv chk=none]": 1,
+   "field Function:pressure [FunctionAssignBlock; bv chk=none]": 2,
+   "field Function:pressure t+dt [NonlinearVariationalSolveBlock; bv chk=none]": 2,
+   "field Function:pressure t-dt [FunctionAssignBlock; bv chk=none]": 1,
+   "field Function:velocity [input; bv chk=own copy]": 1,
+   "receiver Function:* [AssembleBlock; bv chk=none]": 1,
+   "receiver Function:* [FunctionAssignBlock; bv chk=none]": 1,
+   "receiver Function:* [input; bv chk=own copy]": 1,
+   "scalar AdjFloat:* [AdjFloatExprBlock; bv chk=none]": 2,
+   "scalar AdjFloat:* [AssembleBlock; bv chk=none]": 1,
+   "scalar MeshGeometry:* [input; bv chk=own copy]": 1
+  },
+  "step_checkpoint_entries": 0,
+  "step_checkpoint_bytes": 0,
+  "live_bytes_by_category": {
+   "field": 106296,
+   "receiver": 32120,
+   "scalar": 16
+  },
+  "step_checkpoint_census": {}
+ }
+}

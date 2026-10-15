@@ -1,0 +1,42 @@
+== equivalence against orig/single (all configurations)
+{'J': '1.2e-15', 'receivers': '1.2e-14', 'u_final': '9.0e-15', 'grad': '2.4e-14'}
+
+field = 19848 B, nt = 801
+
+== by number of checkpoints (peak checkpoint memory in fields; recomputed steps; time s)
+sched      s |    orig mem  rec   time |     new mem  rec   time | inplace mem  rec   time
+single     0 |    2408.4     0    nan |    3209.4     0    nan |    3209.4     0    nan
+mixed      4 |      43.1  5740    nan |      51.1  5740    nan |      48.1  5740    nan
+mixed      8 |      79.1  2717    nan |      95.1  2717    nan |      88.1  2717    nan
+mixed     16 |     151.1  1521    nan |     183.1  1521    nan |     168.1  1521    nan
+mixed     32 |     295.1  1048    nan |     359.1  1048    nan |     328.1  1048    nan
+mixed     64 |     583.1   749    nan |     711.1   749    nan |     648.1   749    nan
+revolve    4 |      16.7  6008    nan |      21.0  6008    nan |      17.7  6008    nan
+revolve    8 |      24.7  3290    nan |      33.0  3290    nan |      25.7  3290    nan
+revolve   16 |      40.7  2232    nan |      57.0  2232    nan |      41.7  2232    nan
+revolve   32 |      72.7  1808    nan |     105.0  1808    nan |      73.7  1808    nan
+revolve   64 |     136.7  1536    nan |     201.0  1536    nan |     137.7  1536    nan
+
+== equal memory budget: best configuration with peak <= B fields
+B = 25 fields
+  orig     mixed -- does not fit || revolve s=8   rec=3290  mem=  24.7 t=  nans
+  new      mixed -- does not fit || revolve s=4   rec=6008  mem=  21.0 t=  nans
+  inplace  mixed -- does not fit || revolve s=4   rec=6008  mem=  17.7 t=  nans
+B = 50 fields
+  orig     mixed s=4   rec=5740  mem=  43.1 t=  nans || revolve s=16  rec=2232  mem=  40.7 t=  nans
+  new      mixed -- does not fit || revolve s=8   rec=3290  mem=  33.0 t=  nans
+  inplace  mixed s=4   rec=5740  mem=  48.1 t=  nans || revolve s=16  rec=2232  mem=  41.7 t=  nans
+B = 100 fields
+  orig     mixed s=8   rec=2717  mem=  79.1 t=  nans || revolve s=32  rec=1808  mem=  72.7 t=  nans
+  new      mixed s=8   rec=2717  mem=  95.1 t=  nans || revolve s=16  rec=2232  mem=  57.0 t=  nans
+  inplace  mixed s=8   rec=2717  mem=  88.1 t=  nans || revolve s=32  rec=1808  mem=  73.7 t=  nans
+B = 200 fields
+  orig     mixed s=16  rec=1521  mem= 151.1 t=  nans || revolve s=64  rec=1536  mem= 136.7 t=  nans
+  new      mixed s=16  rec=1521  mem= 183.1 t=  nans || revolve s=32  rec=1808  mem= 105.0 t=  nans
+  inplace  mixed s=16  rec=1521  mem= 168.1 t=  nans || revolve s=64  rec=1536  mem= 137.7 t=  nans
+B = 400 fields
+  orig     mixed s=32  rec=1048  mem= 295.1 t=  nans || revolve s=64  rec=1536  mem= 136.7 t=  nans
+  new      mixed s=32  rec=1048  mem= 359.1 t=  nans || revolve s=64  rec=1536  mem= 201.0 t=  nans
+  inplace  mixed s=32  rec=1048  mem= 328.1 t=  nans || revolve s=64  rec=1536  mem= 137.7 t=  nans
+
+== peak RSS (MB) and time, timing runs
