@@ -8,7 +8,7 @@ preservando forward e gradiente, e medir se isso reduz o armazenamento do adjunt
 
 **Conclusão:** a reformulação preserva os resultados até o arredondamento, mas **não reduz memória no tape genérico: aumenta**, em todas as agendas, e o tempo preliminar também é pior. **Decisão: manter o solver do `main`** (solve para $u^{n+1}$). A reformulação foi revertida. Da investigação ficou a fonte pontual como amplitude escalar (seção 1.8), aplicada sobre o solver do `main`: o tape completo cai 3× (2408 → 808 campos).
 
-**Atenção (seção 1.9):** no `main`, refazer o tape checkpointado em outro modelo de velocidade dá gradiente errado (erro de 2e-3). A FWI com adjunto automático via TAO faz exatamente isso a cada iteração. O bug já existia antes desta branch e a causa ainda não foi encontrada. A formulação por aceleração não tinha esse problema.
+**Atenção (seção 1.9):** há um bug no pyadjoint. Com checkpointing, qualquer reavaliação `rf(m)` feita antes da primeira derivada torna essa derivada errada (erro de 2e-3 a 3e-3). O TAO faz exatamente isso, então toda FWI com adjunto automático e `snapshots` parte de um gradiente errado. Há reprodutor mínimo e um contorno validado, ainda não aplicado.
 
 Branch: `claude/spyro-acceleration-adjoint-870c10` (base `main` @ `d5458bef`). Os commits `wip` e `cc246b6` têm a reformulação. O commit seguinte a reverte para o solver do `main` e mantém só a fonte por amplitude. As seções 1.1 a 1.7 descrevem a reformulação; o código dela fica no histórico (`cc246b6`).
 
@@ -148,23 +148,41 @@ Testes: `tests/on_one_core/test_point_source_amplitude.py`.
 
 `tests/on_one_core/test_automated_adjoint_recomputation.py` (antes `test_acceleration_central_difference.py`, sem o teste específico da aceleração) verifica o gradiente com poucos checkpoints contra o tape completo, a reavaliação em outro modelo e o teste de Taylor com NRBC e recomputação.
 
-### 1.9 Bug pré-existente: reavaliação do tape checkpointado no `main`
+### 1.9 Bug do pyadjoint: reavaliar o tape checkpointado antes do primeiro adjunto
 
-`test_reevaluation_after_velocity_change` grava o tape em $c$, chama `rf(c_novo)` e `rf.derivative()`, e compara com uma gravação nova em `c_novo` (NRBC em todos os lados, malha 0.2, `dt=0.004`, `T=0.8`):
+**Sintoma:** `test_reevaluation_after_velocity_change` grava o tape em $c$, chama `rf(c_novo)` e `rf.derivative()`, e compara com uma gravação nova em `c_novo`. O J sai exato, mas o gradiente erra 2.1e-3. No `main` puro (`d5458bef`) o valor é idêntico.
 
-| | J | gradiente |
-|---|---|---|
-| sem checkpointing | 0.0 | 0.0 |
-| mixed, 5 snapshots | 0.0 | **2.1e-3** |
+**Causa:** é um bug do pyadjoint/Firedrake 2026.10, não do spyro. Com uma agenda de checkpointing (mixed ou Revolve), **qualquer chamada `rf(m)` feita antes da primeira `derivative()` corrompe essa derivada**, inclusive em `m` igual ao valor gravado. Reprodutor em Firedrake puro: `repro_replay_before_first_adjoint.py` (≈50 linhas).
 
-- O resultado é idêntico no `main` puro (`d5458bef`) e com a fonte por amplitude, então não foi introduzido aqui.
-- Com a formulação por aceleração o teste passava (< 1e-10).
-- `Inversion._run_fwi_tao` otimiza sobre `reduced_functional`, então a FWI com adjunto automático e `snapshots` usa esse gradiente a partir da 2ª iteração.
-- O teste ficou como `xfail(strict=True)` até a correção.
+| sequência (após gravar em $c_0$) | erro do gradiente |
+|---|---|
+| derivada | 0 |
+| `rf(c0)`, derivada | 3.4e-3 |
+| `rf(c1)`, derivada | 2.5e-3 |
+| derivada, `rf(c1)`, derivada | 4.9e-15 |
 
-Suspeitas, não verificadas:
-- O solve para $u^{n+1}$ depende de $c$ tanto na matriz (`constant_jacobian=True`) quanto no lado direito ($M(c)(2u^n-u^{n-1})/\Delta t^2$).
-- Algum checkpoint que depende de $c$ pode estar sendo restaurado do modelo antigo no reverso.
+**Mecanismo** (instrumentando o reverso no spyro):
+- Só o **último passo de tempo** sai errado. O adjunto do solve desse passo lê `u_n` e `u_nm1` errados; os outros 200 passos estão certos.
+- O `recompute` roda o último passo com armazenamento WORK. No fim desse passo, ele limpa o `checkpointable_state` (não há passo seguinte para manter). Antes do primeiro reverso, as dependências do adjunto ainda não foram revisadas, e o último passo fica sem checkpoint desses valores. O adjunto então lê as `Function` vivas, que guardam outro estado: no caso medido, o estado final da gravação em `c0`.
+- Depois do primeiro reverso, as dependências são revisadas e as reavaliações seguintes saem exatas.
+- Testei dois contornos que **não** resolvem: rotação com cópia (`assign(1.0*u)`) e fechar também o último passo com `end_timestep`.
+- A posição do `end_timestep` muda quais formulações expõem o bug. A da aceleração passava no teste do spyro porque, nela, a fronteira do passo vinha depois da atualização de `u`.
+
+**Impacto no spyro:**
+- `Inversion._run_fwi_tao` grava o tape e entrega o `reduced_functional` ao TAO.
+- O TAO chama `rf(x0)` e depois a derivada. Portanto, **toda FWI com adjunto automático e `snapshots` parte de um gradiente errado**, e a trajetória inteira se desvia.
+- Medido com a configuração de `test_fwi_automated_adjoint` (4 iterações, `snapshots=3`), comparando contra a mesma FWI sem checkpointing:
+  - histórico do funcional: diferença de 1.8e-5;
+  - modelo final: diferença de 1.1e-6.
+- Sem checkpointing não há problema.
+
+**Contorno validado:** rodar `rf.derivative()` uma vez logo após a gravação, antes de qualquer `rf(m)`. Com isso, a mesma FWI reproduz o caso sem checkpointing até o arredondamento:
+- histórico do funcional: 6.6e-14;
+- modelo final: 3.7e-15.
+
+O custo é uma passada adjunta extra por gravação. Ainda **não foi aplicado ao spyro**; está pendente de decisão (item 2b).
+
+**Observação de ambiente:** no Docker do Firedrake 2026.10, o `TAOSolver` do pyadjoint usa `PETSc.TAO.Reason`, que no petsc4py 3.26 se chama `ConvergedReason`. Por isso `test_fwi_automated_adjoint` falha nessa imagem independentemente desta branch. Os experimentos de FWI acima usaram um shim só no script.
 
 ---
 
@@ -177,7 +195,7 @@ Suspeitas, não verificadas:
    python analyse.py
    ```
 2. ~~**Decidir sobre a reformulação**~~: decidido manter o solver do `main`.
-2b. **Corrigir o bug da seção 1.9** (gradiente errado ao refazer o tape checkpointado em outro $c$). Isso afeta a FWI com adjunto automático e checkpointing. Prioridade alta, em PR separado.
+2b. **Bug da seção 1.9** (pyadjoint): (i) decidir se o spyro aplica o contorno (uma derivada logo após gravar com checkpointing) e onde, de modo a não dobrar o custo no caminho `gradient_solve`; (ii) abrir issue no pyadjoint com `repro_replay_before_first_adjoint.py`; (iii) quando houver correção, tirar o `xfail` de `test_reevaluation_after_velocity_change` e adicionar um teste de FWI com `snapshots` contra a mesma FWI sem checkpointing.
 3. **Passo 6 (reverso especializado):** o armazenamento genérico é de fato um gargalo (7 cópias por unidade de dependências do adjunto, contra 1 necessária). Mas um bloco spyro sozinho não resolve, porque o `CheckpointManager` do pyadjoint revisa `adjoint_dependencies` adicionando **todas** as dependências de todos os blocos do passo, sem consultar o bloco. Caminhos possíveis:
    - (a) no pyadjoint/Firedrake: não copiar de novo checkpoints delegados/compartilhados em `TimeStep.checkpoint`. Isso é genérico e beneficia o original.
    - (b) API de bloco para declarar quais dependências o adjunto realmente lê. Só então um bloco de passo que use $\delta J_n = -{z^n}^T \delta M(c)\,a^n$ guardaria apenas $a^n$.

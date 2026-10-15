@@ -134,10 +134,9 @@ def test_gradient_with_few_checkpoints(sides: str | None) -> None:
 @pytest.mark.newer_firedrake
 @pytest.mark.xfail(
     strict=True,
-    reason="Replaying a checkpointed tape at a new velocity gives a gradient "
-           "off by about 2e-3 with the u^{n+1} solve; the functional and the "
-           "replay without checkpointing are exact. Pre-existing, cause not "
-           "yet found.",
+    reason="pyadjoint: replaying a checkpointed tape before its first "
+           "adjoint makes that adjoint wrong (about 2e-3 here); see "
+           "benchmarks/adjoint_acceleration/repro_replay_before_first_adjoint.py",
 )
 def test_reevaluation_after_velocity_change() -> None:
     """Replaying a checkpointed tape at a new velocity matches a new solve.
