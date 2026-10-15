@@ -100,6 +100,36 @@ def build_acceleration_solver(
     )
 
 
+def set_point_source(wave: object, source_cofunction: fire.Cofunction) -> None:
+    r"""Set the spatial part of a point source to ``source_cofunction``.
+
+    The source enters the right-hand side as
+    :math:`s(t)\, \int q_h v \, dx`, where :math:`s` is
+    ``wave.source_amplitude`` and :math:`q_h` is ``wave.source_density``.
+    This solves :math:`M q_h = q` with the mass matrix of the time-step
+    quadrature, so that the source term assembles back to
+    :math:`s(t)\, q`. The pyadjoint tape then records one scalar per time
+    step for the source instead of a source cofunction.
+
+    Parameters
+    ----------
+    wave : spyro.AcousticWave
+        Wave object built by :func:`construct_solver_or_matrix_no_pml`.
+    source_cofunction : firedrake.Cofunction
+        The point source :math:`q`, in the dual of ``wave.function_space``.
+
+    Returns
+    -------
+    None
+        ``wave.source_density`` is updated in place.
+    """
+    V = wave.function_space
+    mass = fire.TrialFunction(V) * fire.TestFunction(V) \
+        * dx(**wave.quadrature_rule)
+    fire.solve(mass == source_cofunction, wave.source_density,
+               solver_parameters=wave.solver_parameters)
+
+
 def construct_solver_or_matrix_no_pml(wave):
     """Builds solver operators for wave propagator with typical BCs, NRBCs or HABCs.
 
@@ -124,6 +154,9 @@ def construct_solver_or_matrix_no_pml(wave):
     wave.u_n = u_n
     wave.u_np1 = u_np1
     wave.acceleration = fire.Function(V, name="pressure acceleration")
+    wave.source_amplitude = fire.Function(
+        fire.FunctionSpace(wave.mesh, "R", 0), name="source amplitude")
+    wave.source_density = fire.Function(V, name="source density")
 
     wave.current_time = 0.0
     dt = wave.dt
@@ -138,6 +171,10 @@ def construct_solver_or_matrix_no_pml(wave):
     q = wave.source_expression
     if q is not None:
         le += - q * v * dx(**quad_rule)
+    # Point source, see set_point_source. The amplitude stays zero until a
+    # forward solve with a vertex-only-mesh source sets it, and the
+    # implemented adjoint switches it off again.
+    le += - wave.source_amplitude * wave.source_density * v * dx(**quad_rule)
 
     if wave.abc_active and not wave.abc_get_ref_model:
         weak_expr_abc = dot((u_n - u_nm1) / dt, v)

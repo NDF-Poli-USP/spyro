@@ -23,7 +23,8 @@ from .test_gradient_auto_adjoint_nrbc import (
 )
 
 
-def guess_wave(absorbing_sides: dict | None) -> spyro.AcousticWave:
+def guess_wave(absorbing_sides: dict | None,
+               use_vertex_only_mesh: bool = False) -> spyro.AcousticWave:
     """Build a guess model with a heterogeneous velocity.
 
     Parameters
@@ -31,13 +32,18 @@ def guess_wave(absorbing_sides: dict | None) -> spyro.AcousticWave:
     absorbing_sides : dict or None
         ``absorb_<side>`` flags of the non-reflecting boundary condition, or
         ``None`` for reflecting boundaries.
+    use_vertex_only_mesh : bool, optional
+        Whether sources and receivers use vertex-only meshes. The automated
+        adjoint turns this on regardless.
 
     Returns
     -------
     spyro.AcousticWave
         The wave object, with mesh and velocity model set, not yet solved.
     """
-    wave = spyro.AcousticWave(dictionary=build_dictionary(absorbing_sides))
+    dictionary = build_dictionary(absorbing_sides)
+    dictionary["acquisition"]["use_vertex_only_mesh"] = use_vertex_only_mesh
+    wave = spyro.AcousticWave(dictionary=dictionary)
     wave.set_mesh(input_mesh_parameters={"edge_length": EDGE_LENGTH})
     wave.set_initial_velocity_model(
         conditional=2.0 - 0.5 * wave.mesh_z

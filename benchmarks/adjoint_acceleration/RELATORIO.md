@@ -8,7 +8,7 @@ preservando forward e gradiente, e medir se isso reduz o armazenamento do adjunt
 
 **Conclusão até aqui:** a reformulação preserva os resultados até o arredondamento, mas **não reduz memória no tape genérico: aumenta**, em todas as agendas. O original já guarda só um campo de pressão próprio por passo. O desperdício real está em outro lugar: cópias redundantes nos checkpoints do pyadjoint e cofunções da fonte pontual. Recomendação: **não adotar a reformulação como padrão** sem antes resolver isso (ver "O que falta").
 
-Branch: `claude/spyro-acceleration-adjoint-870c10` (base `main` @ `d5458bef`), **sem commits**.
+Branch: `claude/spyro-acceleration-adjoint-870c10` (base `main` @ `d5458bef`). Commits `wip` com a reformulação, os benchmarks e este relatório; a fonte pontual por amplitude (seção 1.8) vem em commit próprio.
 
 ---
 
@@ -114,6 +114,38 @@ Rodadas isoladas no início, sem o probe:
 
 A varredura de tempo completa **não foi feita**: a máquina estava ocupada por outros processos (`case.py` de `latent_diagnostics`, load average > 100).
 
+### 1.8 Fonte pontual como amplitude escalar (item 4)
+
+Implementado no caminho sem PML com fonte em VOM (o que o adjunto automático usa). A fonte entra na forma como
+
+$$s(t)\int q_h\,v\,dx, \qquad M q_h = q,$$
+
+onde `wave.source_amplitude` ($s$) é uma `Function` no espaço `R` e `wave.source_density` ($q_h$) é calculada uma vez por propagação por `set_point_source` (um solve com a massa da mesma quadratura; com massa agrupada é exato). Por passo, o tape registra só `source_amplitude.assign(wavelet[step])`: 8 bytes, em vez de `assemble(wavelet*source_cof)` mais o `assign` em `source_function` (2 campos).
+
+Por que não `s * source_cof` diretamente no lado direito: o Firedrake 2026.10 só avalia pesos de `FormSum` que sejam `Constant`/`Function` puros, e o residual `J u - L` transforma o peso em `-1*s`, o que dá `ValueError: Expecting a scalar weight expression`.
+
+O adjunto implementado reutiliza o mesmo solver e injeta a fonte adjunta por `source_function`. Por isso `backward_wave_propagator` zera `source_amplitude` (o forward a deixa no último valor da wavelet). O PML e o elástico não mudaram.
+
+Medição (mesmo problema da 1.3, Firedrake 2026.10 em Docker, `bench.py --probe-bytes`; "antes" = HEAD `d7fb990`):
+
+| agenda | antes (campos) | depois | recomp. |
+|---|---|---|---|
+| tape completo (single) | 3209 | **1609** | 0 / 0 |
+| mixed s=8 | 97.2 | 90.2 | 2717 / 2717 |
+| mixed s=16 | 188.0 | 173.0 | 1521 / 1521 |
+| Revolve s=16 | 57.4 | 57.4 | 2232 / 2232 |
+
+Os valores "antes" diferem um pouco da coluna "nova" da 1.6 (por exemplo, mixed s=16: 188 contra 183). As medições foram feitas em outra máquina e com outra versão do Firedrake, então só a comparação dentro desta tabela vale.
+
+Equivalência contra antes: J 2.9e-15, receptores 2.5e-14, gradiente 2.8e-14.
+
+No tape completo, a fonte passa de 2 campos por passo para 0. No mixed, o ganho é de cerca de 1 campo por unidade, e não 2. O motivo é que `TimeStep.checkpoint` copia todas as dependências do adjunto em cada unidade, inclusive as entradas que nunca mudam. Assim, cada unidade passa a copiar `source_density` e também `source_function`, que fica zerada no forward mas continua na forma para o adjunto implementado. No Revolve não há ganho, porque a fonte não estava nos checkpoints de reinício. O restante depende do item 3(a) (não recopiar entradas constantes), ou de tirar `source_function` do solver do forward.
+
+Testes: `tests/on_one_core/test_point_source_amplitude.py`.
+- O termo assemblado reproduz $s\,q$ (< 1e-12).
+- Depois do 1º passo, nenhum passo do tape tem cofunção de saída. Antes eram 2 por passo, conferido no HEAD.
+- O adjunto implementado ignora a amplitude deixada pelo forward. O teste falha se o reset em `backward_wave_propagator` for removido.
+
 ---
 
 ## 2. O que falta fazer
@@ -129,7 +161,7 @@ A varredura de tempo completa **não foi feita**: a máquina estava ocupada por 
    - (a) no pyadjoint/Firedrake: não copiar de novo checkpoints delegados/compartilhados em `TimeStep.checkpoint`. Isso é genérico e beneficia o original.
    - (b) API de bloco para declarar quais dependências o adjunto realmente lê. Só então um bloco de passo que use $\delta J_n = -{z^n}^T \delta M(c)\,a^n$ guardaria apenas $a^n$.
    - (c) alternativa já existente: o adjunto implementado do spyro, que guarda $u$ por passo.
-4. **Fonte pontual:** 2 dos 3 campos por passo no tape completo são cofunções da fonte (montagem + `assign`), independentemente da formulação. Representar a fonte como amplitude escalar vezes uma cofunção fixa reduziria isso a um escalar por passo. É um ganho imediato e independente desta mudança.
+4. ~~**Fonte pontual**~~: feito (seção 1.8). Pendente: tirar `source_function` (zerada) das dependências do solver do forward, ou resolver o 3(a), para ganhar o segundo campo por unidade do mixed. A fonte via `apply_source` (sem VOM) e a da PML continuam como cofunção por passo.
 5. **Registros observados no estado de reinício:** criar os `real_shot` sem que entrem retroativamente no `checkpointable_state` (por exemplo, pré-criá-los fora do laço ou como dados não anotados).
 6. **Revisar a docstring de `AutomatedAdjoint`** sobre mixed vs Revolve, ou expor o Revolve no spyro com a ressalva do custo por unidade.
 7. **Avaliar com NRBC/HABC e em malhas maiores** (a varredura usou só o caso sem absorção). `bench.py --abc nrbc` já suporta NRBC.

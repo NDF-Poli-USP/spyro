@@ -74,6 +74,8 @@ class AcousticWave(Wave):
         self.u_n = None
         self.u_np1 = fire.Function(self.function_space)
         self.acceleration = None
+        self.source_amplitude = None
+        self.source_density = None
         self.lhs = None
         self.solver = None
         self.rhs = None
