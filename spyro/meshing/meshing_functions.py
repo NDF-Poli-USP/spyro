@@ -483,7 +483,7 @@ class AutomaticMesh:
                     f"but received shape {vp.shape}."
                 )
 
-            vp_for_gmsh = np.ascontiguousarray(vp[::-1, :])
+            vp_for_gmsh = np.ascontiguousarray(vp)
 
             filename = "tmp_velocity_model.segy"
             create_segy_from_grid(vp_for_gmsh, filename)
@@ -666,31 +666,13 @@ class AutomaticMesh:
                     apply_winslow=apply_winslow,
                 )
             # Rotating mesh for axis (z,x,y)
-            if padding_type in ["rectangular", "hyperelliptical"]:
-                rotate_xz = [
-                    0.0, 1.0, 0.0, 0.0,
-                    -1.0, 0.0, 0.0, domain_xmax,
-                    0.0, 0.0, 1.0, 0.0,
-                    0.0, 0.0, 0.0, 1.0
-                ]
-            else:
-                rotate_xz = [
-                    0.0, 1.0, 0.0, -domain_zmin,
-                    -1.0, 0.0, 0.0, domain_xmax,
-                    0.0, 0.0, 1.0, 0.0,
-                    0.0, 0.0, 0.0, 1.0
-                ]
-
-            gmsh.model.mesh.affineTransform(rotate_xz)
-
-            # Flip the x-axis after the rotation (mirror the second coordinate).
-            flip_x = [
+            gmsh_xy_to_spyro_zx = [
+                0.0, 1.0, 0.0, 0.0,
                 1.0, 0.0, 0.0, 0.0,
-                0.0, -1.0, 0.0, domain_xmax,
                 0.0, 0.0, 1.0, 0.0,
                 0.0, 0.0, 0.0, 1.0,
             ]
-            gmsh.model.mesh.affineTransform(flip_x)
+            gmsh.model.mesh.affineTransform(gmsh_xy_to_spyro_zx)
             gmsh.write(output_file)
             SpyroEnsemble.print(f"Gmsh mesh written to {output_file}")
             gmsh.finalize()
