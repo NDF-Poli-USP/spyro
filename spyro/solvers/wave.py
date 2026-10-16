@@ -151,10 +151,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.misfit = None
         self.current_time = 0.0
         self.source_expression = None  # Expression for sources using UFL (less efficient)
-        # Point source written as ``source_amplitude * source_density`` in the
-        # variational form, set by the solvers that support it.
-        self.source_amplitude = None
-        self.source_density = None
+        # Whether the time-step form injects the vertex-only-mesh point source
+        # as ``sources.time_function * sources.spatial_function``; set by the
+        # solvers that build that term.
+        self.point_source_in_form = False
         self.set_solver_parameters()
 
         # Create or get the mesh

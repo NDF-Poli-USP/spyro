@@ -1,5 +1,7 @@
 """Source utilities for injecting wavelets into simulation meshes."""
 
+from functools import cached_property
+
 import numpy as np
 from scipy.signal import butter, filtfilt
 from spyro.receivers.dirac_delta_projector import Delta_projector
@@ -36,6 +38,13 @@ class Sources(Delta_projector):
         spatial paralelism
     wavelet : list of floats
         Values at timesteps of wavelet used in the simulation
+    time_function : Firedrake.Function
+        Value of the wavelet at the current time step, in the real space
+        ``R``. Built on first use.
+    spatial_function : Firedrake.Function
+        Spatial part :math:`q_h` of the active point sources, such that
+        :math:`\\int q_h v \\, dx` reproduces :meth:`source_cofunction`.
+        Built on first use.
 
     Methods
     -------
@@ -45,6 +54,10 @@ class Sources(Delta_projector):
         Interpolates field value at receiver locations
     apply_source(rhs_forcing, value)
         Applies value at source locations in rhs_forcing operator
+    update_time_function(step)
+        Sets time_function to the wavelet at a time step
+    update_spatial_function(source_cofunction, quadrature_rule, solver_parameters)
+        Sets spatial_function from the point-source cofunction
     """
 
     def __init__(self, wave):
@@ -88,6 +101,83 @@ class Sources(Delta_projector):
             delay=wave.delay,
             delay_type=wave.delay_type,
         )
+
+    @cached_property
+    def time_function(self) -> fire.Function:
+        """Value of the wavelet at the current time step.
+
+        Returns
+        -------
+        firedrake.Function
+            Function in the real space ``R``, set by
+            :meth:`update_time_function`.
+        """
+        return fire.Function(
+            fire.FunctionSpace(self.mesh, "R", 0), name="source time function"
+        )
+
+    @cached_property
+    def spatial_function(self) -> fire.Function:
+        """Spatial part of the active point sources.
+
+        Returns
+        -------
+        firedrake.Function
+            Function in :attr:`function_space`, set by
+            :meth:`update_spatial_function`.
+        """
+        return fire.Function(
+            self.function_space, name="source spatial function"
+        )
+
+    def update_time_function(self, step: int) -> None:
+        """Set :attr:`time_function` to the wavelet at ``step``.
+
+        Parameters
+        ----------
+        step : int
+            Time step (index of the wavelet array).
+
+        Returns
+        -------
+        None
+            :attr:`time_function` is updated in place.
+        """
+        self.time_function.assign(self.wavelet[step])
+
+    def update_spatial_function(self, source_cofunction: fire.Cofunction,
+                                quadrature_rule: dict,
+                                solver_parameters: dict | None) -> None:
+        r"""Set :attr:`spatial_function` from the point-source cofunction.
+
+        The source then enters a variational form as
+        :math:`s(t) \int q_h v \, dx(\text{quadrature\_rule})`, with
+        :math:`s` the :attr:`time_function` and :math:`q_h` the
+        :attr:`spatial_function`. This solves :math:`M q_h = q` with the mass
+        matrix of that quadrature, so the term assembles back to
+        :math:`s(t)\, q`, and a pyadjoint tape records one scalar per time
+        step for the source instead of a cofunction.
+
+        Parameters
+        ----------
+        source_cofunction : firedrake.Cofunction
+            The point source :math:`q`, from :meth:`source_cofunction`.
+        quadrature_rule : dict
+            Quadrature of the form the source term belongs to, as passed to
+            ``dx``.
+        solver_parameters : dict or None
+            Solver parameters for the mass solve.
+
+        Returns
+        -------
+        None
+            :attr:`spatial_function` is updated in place.
+        """
+        V = self.function_space
+        mass = fire.TrialFunction(V) * fire.TestFunction(V) \
+            * fire.dx(**quadrature_rule)
+        fire.solve(mass == source_cofunction, self.spatial_function,
+                   solver_parameters=solver_parameters)
 
     def apply_source(self, rhs_forcing, step):
         """Apply the source to an assembled right-hand side.

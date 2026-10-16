@@ -182,19 +182,36 @@ def _random_source_locations(dimension, count=5):
     return locations
 
 
-def _check_cofunction_values(wave, source_locations, test_exprs):
+def _check_cofunction_values(wave, source_locations, test_exprs,
+                             spatial_function=False):
     """Check that the cofunction action on each test function matches the
-    expected value for each source individually."""
+    expected value for each source individually.
+
+    With ``spatial_function``, also check that the spatial function the
+    time-step form uses in place of the cofunction has the same action.
+    """
     for source_id, sl in enumerate(source_locations):
         wave.sources.point_locations = [sl]
         wave.sources.current_sources = [0]
         cofunction = wave.sources.source_cofunction()
+        if spatial_function:
+            wave.sources.update_spatial_function(
+                cofunction, wave.quadrature_rule, wave.solver_parameters,
+            )
 
         for f, expected_fn in test_exprs:
             expected = expected_fn(sl)
             action = np.dot(cofunction.dat.data_ro.ravel(), f.dat.data_ro.ravel())
             assert math.isclose(action, expected, abs_tol=1e-6), \
                 f"Source {source_id} at {sl}: <c, f> = {action}, expected {expected}"
+            if spatial_function:
+                action = fire.assemble(
+                    wave.sources.spatial_function * f
+                    * fire.dx(**wave.quadrature_rule)
+                )
+                assert math.isclose(action, expected, abs_tol=1e-6), \
+                    f"Source {source_id} at {sl}: (q_h, f) = {action}, " \
+                    f"expected {expected}"
 
 
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
@@ -213,7 +230,9 @@ def test_cofunction_values_acoustic(cell_type):
         (fire.Function(V).interpolate(x[1]), lambda sl: sl[1]),
         (fire.Function(V).interpolate(x[0]**2 + x[1]**2), lambda sl: sl[0]**2 + sl[1]**2),
     ]
-    _check_cofunction_values(wave, source_locations, test_exprs)
+    _check_cofunction_values(
+        wave, source_locations, test_exprs, spatial_function=True,
+    )
 
 
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
