@@ -1,7 +1,7 @@
 import firedrake as fire
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from . import helpers
 from .wave import Wave
-from ..io.basicio import parallel_print
 from ..receivers.Receivers import Receivers
 from ..utils.typing import AbsorbingBCsType
 
@@ -40,10 +40,10 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
     dt = wave.dt
     t = wave.current_time
     if t != wave.final_time:
-        parallel_print(
+        SpyroEnsemble.print(
             f"Current time of {t}, different than final_time of "
             f"{wave.final_time}. Setting final_time to current time "
-            f"in backwards propagation.", wave.comm,
+            f"in backwards propagation."
         )
     nt = int(t / dt) + 1
 
