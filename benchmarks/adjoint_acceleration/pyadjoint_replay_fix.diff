@@ -1,0 +1,13 @@
+--- a/pyadjoint/checkpointing.py
++++ b/pyadjoint/checkpointing.py
+@@ -349,6 +349,10 @@
+                 next_step = self.tape.timesteps[step + 1]
+                 # The checkpointable state set of the current step.
+                 to_keep = next_step.checkpointable_state
++            if cp_action.write_adj_deps and cp_action.storage == StorageType.WORK:
++                # The Reverse of this step follows and reads its state from
++                # working memory.
++                to_keep = to_keep.union(current_step.checkpointable_state)
+             if functional:
+                 to_keep = to_keep.union([functional.block_variable])
+ 
