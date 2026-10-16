@@ -196,7 +196,7 @@ def _check_cofunction_values(wave, source_locations, test_exprs,
         cofunction = wave.sources.source_cofunction()
         if spatial_function:
             wave.sources.update_spatial_function(
-                cofunction, wave.quadrature_rule, wave.solver_parameters,
+                cofunction, wave.solver_parameters,
             )
 
         for f, expected_fn in test_exprs:
@@ -207,7 +207,7 @@ def _check_cofunction_values(wave, source_locations, test_exprs,
             if spatial_function:
                 action = fire.assemble(
                     wave.sources.spatial_function * f
-                    * fire.dx(**wave.quadrature_rule)
+                    * wave.sources.source_measure
                 )
                 assert math.isclose(action, expected, abs_tol=1e-6), \
                     f"Source {source_id} at {sl}: (q_h, f) = {action}, " \
@@ -230,6 +230,10 @@ def test_cofunction_values_acoustic(cell_type):
         (fire.Function(V).interpolate(x[1]), lambda sl: sl[1]),
         (fire.Function(V).interpolate(x[0]**2 + x[1]**2), lambda sl: sl[0]**2 + sl[1]**2),
     ]
+    # Building the time-step form puts the source term in it.
+    wave._initialize_model_parameters()
+    wave.matrix_building()
+    assert wave.point_source_in_form
     _check_cofunction_values(
         wave, source_locations, test_exprs, spatial_function=True,
     )

@@ -72,6 +72,13 @@ def forms_pml(wave, W, X_n, X_nm1):
     a = dot(grad(u_n), grad(v))
     FF = (m1 + a) * dx
 
+    # Point source, on the pressure only; see Sources.source_term.
+    wave.point_source_in_form = (
+        wave.sources is not None and wave.use_vertex_only_mesh
+    )
+    if wave.point_source_in_form:
+        FF -= wave.sources.source_term(v, dx)
+
     # Surfaces to apply boundary conditions (NRBCs or Traditional BCs)
     bc_surf = tuple([non_free_surf for non_free_surf, status in
                      wave.mesh_parameters.boundary_ids_map.items() if status])

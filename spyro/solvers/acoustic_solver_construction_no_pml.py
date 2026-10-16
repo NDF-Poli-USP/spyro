@@ -49,11 +49,9 @@ def construct_solver_or_matrix_no_pml(wave):
         wave.sources is not None and wave.use_vertex_only_mesh
     )
     if wave.point_source_in_form:
-        # See Sources.update_spatial_function. The time function is zero
-        # until a forward solve sets it, and the implemented adjoint
-        # switches it off again.
-        le += - wave.sources.time_function * wave.sources.spatial_function \
-            * v * dx(**quad_rule)
+        # See Sources.source_term. The time function is zero until a forward
+        # solve sets it, and the implemented adjoint switches it off again.
+        le += - wave.sources.source_term(v, dx(**quad_rule))
 
     if wave.abc_active and not wave.abc_get_ref_model:
         weak_expr_abc = dot((u_n - u_nm1) / dt, v)

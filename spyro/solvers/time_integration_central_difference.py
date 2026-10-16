@@ -49,7 +49,6 @@ def _propagate_forward_central_difference(wave, source_ids):
         usol = []
     source_cof = None
     interpolate_receivers = None
-    master_source_W = None
     if wave.sources is not None and wave.use_vertex_only_mesh:
         # source_cof is a cofunction that represents a point source,
         # being one at a point and zero elsewhere.
@@ -61,19 +60,11 @@ def _propagate_forward_central_difference(wave, source_ids):
             pressure_expr = wave.u_n
         interpolate_receivers = wave.receivers.receiver_interpolator(
             pressure_expr)
-        if (
-            wave.abc_type == AbsorbingBCsType.PML
-            and wave.source_function is not None
-        ):
-            master_source_W = fire.Cofunction(
-                wave.source_function.function_space()
-            )
-            master_source_W.sub(0).assign(source_cof)
         if wave.point_source_in_form:
             # Only the time function of the source changes from one step to
             # the next, so the tape records a scalar per step for it.
             wave.sources.update_spatial_function(
-                source_cof, wave.quadrature_rule, wave.solver_parameters,
+                source_cof, wave.solver_parameters,
             )
 
     usol_recv = []
@@ -104,11 +95,7 @@ def _propagate_forward_central_difference(wave, source_ids):
 
         if wave.sources is not None:
             if wave.use_vertex_only_mesh:
-                if master_source_W is not None:
-                    wave.source_function.assign(
-                        wave.sources.wavelet[step] * master_source_W
-                    )
-                elif wave.point_source_in_form:
+                if wave.point_source_in_form:
                     wave.sources.update_time_function(step)
                 else:
                     if source_buffer is None:

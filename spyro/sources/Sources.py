@@ -45,6 +45,9 @@ class Sources(Delta_projector):
         Spatial part :math:`q_h` of the active point sources, such that
         :math:`\\int q_h v \\, dx` reproduces :meth:`source_cofunction`.
         Built on first use.
+    source_measure : ufl.Measure or None
+        Measure of the time-step form the source term was put in by
+        :meth:`source_term`, also used by :meth:`update_spatial_function`.
 
     Methods
     -------
@@ -54,9 +57,11 @@ class Sources(Delta_projector):
         Interpolates field value at receiver locations
     apply_source(rhs_forcing, value)
         Applies value at source locations in rhs_forcing operator
+    source_term(test_function, measure)
+        Returns the point-source term of a time-step form
     update_time_function(step)
         Sets time_function to the wavelet at a time step
-    update_spatial_function(source_cofunction, quadrature_rule, solver_parameters)
+    update_spatial_function(source_cofunction, solver_parameters)
         Sets spatial_function from the point-source cofunction
     """
 
@@ -85,6 +90,7 @@ class Sources(Delta_projector):
         self.amplitude = wave.amplitude
         self.is_local = [0] * self.number_of_points
         self.current_sources = None
+        self.source_measure = None
         if wave.analysis == "transient":
             self.update_wavelet(wave)
         if np.isscalar(self.amplitude) or (self.amplitude.size <= 3):
@@ -130,6 +136,31 @@ class Sources(Delta_projector):
             self.function_space, name="source spatial function"
         )
 
+    def source_term(self, test_function: object, measure: object) -> object:
+        """Return the point-source term of a time-step form.
+
+        The term is :math:`s(t) \\int q_h v`, with :math:`s` the
+        :attr:`time_function` and :math:`q_h` the :attr:`spatial_function`.
+        ``measure`` is kept, so that :meth:`update_spatial_function` solves
+        with the mass matrix of the same quadrature, which is what makes the
+        term reproduce :meth:`source_cofunction`.
+
+        Parameters
+        ----------
+        test_function : ufl.Argument
+            Test function of the pressure in the form.
+        measure : ufl.Measure
+            Cell measure of the form, with its quadrature.
+
+        Returns
+        -------
+        ufl.Form
+            The source term, to be added to the right-hand side.
+        """
+        self.source_measure = measure
+        return self.time_function * self.spatial_function * test_function \
+            * measure
+
     def update_time_function(self, step: int) -> None:
         """Set :attr:`time_function` to the wavelet at ``step``.
 
@@ -146,25 +177,21 @@ class Sources(Delta_projector):
         self.time_function.assign(self.wavelet[step])
 
     def update_spatial_function(self, source_cofunction: fire.Cofunction,
-                                quadrature_rule: dict,
                                 solver_parameters: dict | None) -> None:
         r"""Set :attr:`spatial_function` from the point-source cofunction.
 
-        The source then enters a variational form as
-        :math:`s(t) \int q_h v \, dx(\text{quadrature\_rule})`, with
-        :math:`s` the :attr:`time_function` and :math:`q_h` the
-        :attr:`spatial_function`. This solves :math:`M q_h = q` with the mass
-        matrix of that quadrature, so the term assembles back to
-        :math:`s(t)\, q`, and a pyadjoint tape records one scalar per time
-        step for the source instead of a cofunction.
+        The term built by :meth:`source_term` is
+        :math:`s(t) \int q_h v \, dx`, with :math:`s` the
+        :attr:`time_function` and :math:`q_h` the :attr:`spatial_function`.
+        This solves :math:`M q_h = q` with the mass matrix of the measure of
+        that term, so the term assembles back to :math:`s(t)\, q`, and a
+        pyadjoint tape records one scalar per time step for the source
+        instead of a cofunction.
 
         Parameters
         ----------
         source_cofunction : firedrake.Cofunction
             The point source :math:`q`, from :meth:`source_cofunction`.
-        quadrature_rule : dict
-            Quadrature of the form the source term belongs to, as passed to
-            ``dx``.
         solver_parameters : dict or None
             Solver parameters for the mass solve.
 
@@ -172,10 +199,19 @@ class Sources(Delta_projector):
         -------
         None
             :attr:`spatial_function` is updated in place.
+
+        Raises
+        ------
+        ValueError
+            If :meth:`source_term` has not been called yet.
         """
+        if self.source_measure is None:
+            raise ValueError(
+                "No form holds the point-source term: call source_term first."
+            )
         V = self.function_space
         mass = fire.TrialFunction(V) * fire.TestFunction(V) \
-            * fire.dx(**quadrature_rule)
+            * self.source_measure
         fire.solve(mass == source_cofunction, self.spatial_function,
                    solver_parameters=solver_parameters)
 
