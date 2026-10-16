@@ -718,18 +718,15 @@ class AutomaticMesh:
                         parallel_print=parallel_print,
                     )
 
-                if padding_type in ("rectangular", "hyperelliptical"):
-                    z_translation = 0.0
-                else:
-                    z_translation = -domain_zmin
-
-                rotate_xyz_to_zxy = [
-                    0.0, 0.0, 1.0, z_translation,
-                    -1.0, 0.0, 0.0, domain_xmax,
-                    0.0, -1.0, 0.0, domain_ymax,
+                # gmsh builds the model in physical coordinates (x, y, z=depth).
+                # Spyro uses (z, x, y)
+                gmsh_xyz_to_spyro_zxy = [
+                    0.0, 0.0, 1.0, 0.0,
+                    1.0, 0.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0, 0.0,
                     0.0, 0.0, 0.0, 1.0,
                 ]
-                gmsh.model.mesh.affineTransform(rotate_xyz_to_zxy)
+                gmsh.model.mesh.affineTransform(gmsh_xyz_to_spyro_zxy)
                 gmsh.write(output_file)
                 parallel_print(
                     f"Gmsh 3D mesh written to {output_file}",
