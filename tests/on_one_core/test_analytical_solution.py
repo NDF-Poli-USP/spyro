@@ -36,13 +36,9 @@ def test_analytical_solution(use_vertex_only_mesh):
         "receiver_locations": [(-1.5 - offset, 1.5)],
         "use_vertex_only_mesh": use_vertex_only_mesh,
     }
-    wave = spyro.examples.Rectangle_acoustic(
-        dictionary=dictionary, periodic=True
-    )
+    wave = spyro.examples.Rectangle_acoustic(dictionary=dictionary, periodic=True)
     wave.set_initial_velocity_model(constant=c_value)
-    analytical_p = spyro.utils.nodal_homogeneous_analytical(
-        wave, offset, c_value
-    )
+    analytical_p = spyro.utils.nodal_homogeneous_analytical(wave, offset, c_value)
 
     wave.forward_solve()
     numerical_p = wave.forward_solution_receivers
@@ -50,11 +46,17 @@ def test_analytical_solution(use_vertex_only_mesh):
 
     # Computing errors
     peak_error = MeasureError.calculate_peak_error(numerical_p, analytical_p)[0]
-    integral_error = MeasureError.calculate_integral_error(numerical_p, analytical_p, wave.dt)
-    normalized_l2_error = MeasureError.calculate_normalized_L2_error(numerical_p, analytical_p)
+    integral_error = MeasureError.calculate_integral_error(
+        numerical_p, analytical_p, wave.dt
+    )
+    normalized_l2_error = MeasureError.calculate_normalized_L2_error(
+        numerical_p, analytical_p
+    )
 
     vom_label = "VOM" if use_vertex_only_mesh else "NO VOM"
-    pprint(f"Normalized L2 Error ({vom_label}) = {normalized_l2_error:.4e}", comm=wave.comm)
+    pprint(
+        f"Normalized L2 Error ({vom_label}) = {normalized_l2_error:.4e}", comm=wave.comm
+    )
     pprint(f"Integral Error ({vom_label}) = {integral_error:.4e}", comm=wave.comm)
     pprint(f"Peak Error ({vom_label}) = {peak_error:.4e}", comm=wave.comm)
 
