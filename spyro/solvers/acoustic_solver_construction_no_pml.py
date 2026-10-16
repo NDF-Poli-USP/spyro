@@ -45,9 +45,6 @@ def construct_solver_or_matrix_no_pml(wave):
     q = wave.source_expression
     if q is not None:
         le += - q * v * dx(**quad_rule)
-    wave.point_source_in_form = (
-        wave.sources is not None and wave.use_vertex_only_mesh
-    )
     if wave.point_source_in_form:
         # See Sources.source_term. The time function is zero until a forward
         # solve sets it, and the implemented adjoint switches it off again.

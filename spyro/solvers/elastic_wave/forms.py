@@ -31,6 +31,10 @@ def isotropic_elastic_without_pml(wave):
     if b is not None:
         F_s += dot(b, v)*dx(**quad_rule)
 
+    if wave.point_source_in_form:
+        # See Sources.source_term.
+        F_s += wave.sources.source_term(v, dx(**quad_rule))
+
     F_t = local_abc_form(wave)
 
     F = F_m + F_k - F_s - F_t

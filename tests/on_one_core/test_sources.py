@@ -206,7 +206,7 @@ def _check_cofunction_values(wave, source_locations, test_exprs,
                 f"Source {source_id} at {sl}: <c, f> = {action}, expected {expected}"
             if spatial_function:
                 action = fire.assemble(
-                    wave.sources.spatial_function * f
+                    fire.inner(wave.sources.spatial_function, f)
                     * wave.sources.source_measure
                 )
                 assert math.isclose(action, expected, abs_tol=1e-6), \
@@ -256,7 +256,13 @@ def test_cofunction_values_elastic(cell_type):
         (fire.Function(V).interpolate(fire.as_vector([0.0, x[1]])), lambda sl: sl[1]),
         (fire.Function(V).interpolate(fire.as_vector([x[0], x[1]])), lambda sl: sl[0] + sl[1]),
     ]
-    _check_cofunction_values(wave, source_locations, test_exprs)
+    # Building the time-step form puts the source term in it.
+    wave._initialize_model_parameters()
+    wave.matrix_building()
+    assert wave.point_source_in_form
+    _check_cofunction_values(
+        wave, source_locations, test_exprs, spatial_function=True,
+    )
 
 
 @pytest.mark.parametrize("cell_type", ["T", "Q"])

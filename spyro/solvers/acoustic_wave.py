@@ -73,7 +73,6 @@ class AcousticWave(Wave):
         self.u_nm1 = None
         self.u_n = None
         self.u_np1 = fire.Function(self.function_space)
-        self.point_source_in_form = False
         self.lhs = None
         self.solver = None
         self.rhs = None

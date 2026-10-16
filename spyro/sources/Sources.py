@@ -148,7 +148,8 @@ class Sources(Delta_projector):
         Parameters
         ----------
         test_function : ufl.Argument
-            Test function of the pressure in the form.
+            Test function of the pressure (acoustic) or displacement
+            (elastic) in the form.
         measure : ufl.Measure
             Cell measure of the form, with its quadrature.
 
@@ -158,8 +159,9 @@ class Sources(Delta_projector):
             The source term, to be added to the right-hand side.
         """
         self.source_measure = measure
-        return self.time_function * self.spatial_function * test_function \
-            * measure
+        return fire.inner(
+            self.time_function * self.spatial_function, test_function
+        ) * measure
 
     def update_time_function(self, step: int) -> None:
         """Set :attr:`time_function` to the wavelet at ``step``.
@@ -210,7 +212,7 @@ class Sources(Delta_projector):
                 "No form holds the point-source term: call source_term first."
             )
         V = self.function_space
-        mass = fire.TrialFunction(V) * fire.TestFunction(V) \
+        mass = fire.inner(fire.TrialFunction(V), fire.TestFunction(V)) \
             * self.source_measure
         fire.solve(mass == source_cofunction, self.spatial_function,
                    solver_parameters=solver_parameters)
