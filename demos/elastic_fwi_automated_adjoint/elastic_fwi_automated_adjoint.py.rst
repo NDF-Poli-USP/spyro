@@ -482,7 +482,7 @@ Running the inversion
 -------------------------
 
 Give each velocity its own bounds, in control order: :math:`v_p`, then
-:math:`v_s`. These bounds keep both speeds positive and ensure
+:math:`v_s`. At the model nodes, these bounds keep both speeds positive and ensure
 :math:`v_p/v_s \geq 2.3/1.6 > \sqrt{2}`, so :math:`\lambda > 0`.
 If you change the bounds or mesh, also check the time-step stability using
 the largest allowed P-wave speed, rather than just the starting velocity.
@@ -493,8 +493,9 @@ the largest allowed P-wave speed, rather than just the starting velocity.
     vs_bounds = (1.0, 1.6)   # km/s
 
 ``run_fwi`` records the starting forward solve and passes its reduced
-functional to PETSc/TAO's bound-constrained quasi-Newton method, BLMVM
-[Benson2001]_, with a lumped mass metric. ``maxiter`` is an upper limit of
+functional to PETSc/TAO's bound-constrained quasi-Newton line-search
+method, BQNLS, with a lumped mass metric. See the `TAO BQNLS documentation
+<https://petsc.org/release/manualpages/Tao/TAOBQNLS/>`__. ``maxiter`` is an upper limit of
 20 iterations; TAO can stop earlier. If it reaches the limit, the driver
 warns and returns the last iterate.
 
@@ -520,6 +521,36 @@ in ParaView.
         f"Controls: {[control.name() for control in controls]}", comm,
     )
     parallel_print(f"Functional history: {fwi.functional_history}", comm)
+
+Normalizing the controls (optional)
+----------------------------------
+
+Add ``normalized=True`` to the ``run_fwi`` call above to measure updates
+relative to each velocity's bound interval. Here the scales are 1.2 km/s
+for P-wave velocity and 0.6 km/s for S-wave velocity. This can help balance
+a joint inversion; it does not guarantee faster convergence or equal
+updates in the two velocities.
+
+The implementation uses
+
+.. math::
+
+    s = u-\ell, \qquad x = M_L^{1/2}(m/s), \qquad
+    \nabla_x J = s M_L^{-1/2}\nabla_m J.
+
+The bounds are scaled in the same way. The lower bound is not subtracted:
+these variables are not restricted to the unit interval. The physical
+objective and the returned velocity fields are unchanged. There is no
+sigmoid or proximal penalty. Finite, ordered bounds are required; equal
+bounds keep a degree of freedom fixed, using scale 1 there. Bounds constrain
+model coefficients, not necessarily every point inside a high-order element.
+
+Parameter scaling is established in multiparameter FWI. Wittkamp
+[Wittkamp2016]_ normalizes parameter classes by representative mean values;
+Gao et al. [Gao2021]_ discuss parameter scaling in a truncated-Newton
+preconditioner. These references motivate scaling, but do not describe this
+specific bound-width and lumped-mass BQNLS implementation. ``PN`` is only a
+label used in our experiments, not a separate optimizer.
 
 Results
 -----------
@@ -635,10 +666,16 @@ is an exercise for you!
 
 .. rubric:: References
 
-.. [Benson2001] Benson, S. J., & Moré, J. J. (2001). A limited memory
-    variable metric method in subspaces and bound constrained optimization
-    problems. Technical Report ANL/MCS-P909-0901, Argonne National
-    Laboratory.
+.. [Wittkamp2016] Wittkamp, F. (2016). Individual and joint 2-D elastic
+    full-waveform inversion of Rayleigh and Love waves. Master's thesis,
+    Karlsruhe Institute of Technology.
+    https://doi.org/10.5445/IR/1000058955
+
+.. [Gao2021] Gao, L., Pan, Y., Rieder, A., & Bohlen, T. (2021).
+    Multiparameter viscoelastic full-waveform inversion of shallow-seismic
+    surface waves with a pre-conditioned truncated Newton method.
+    Geophysical Journal International, 227(3), 2044–2057.
+    https://doi.org/10.1093/gji/ggab311
 
 .. [Komatitsch1998] Komatitsch, D., & Vilotte, J.-P. (1998). The spectral
     element method: an efficient tool to simulate the seismic response of 2D

@@ -1,6 +1,7 @@
 """A reduced functional over controls rescaled by their lumped mass."""
 
 import firedrake as fire
+import numpy as np
 
 from pyadjoint import Control, no_annotations
 from pyadjoint.enlisting import Enlist
@@ -68,12 +69,53 @@ def _inverse_sqrt_lumped_mass(
     return inverse_sqrt_mass
 
 
+def _scale_array(scale: float | fire.Function, space: fire.FunctionSpace) -> np.ndarray:
+    """Return a control's scale as values at the degrees of freedom of ``space``.
+
+    Parameters
+    ----------
+    scale : float or firedrake.Function
+        The scale.
+    space : firedrake.FunctionSpace
+        Space of the control.
+
+    Returns
+    -------
+    numpy.ndarray
+        One value per degree of freedom owned by this process.
+
+    Raises
+    ------
+    ValueError
+        If the scale does not match the space, or is not finite and positive
+        everywhere.
+    """
+    shape = fire.Function(space).dat.data_ro.shape
+    if isinstance(scale, fire.Function):
+        if scale.function_space() != space:
+            raise ValueError("Each scale field must be in its control's space.")
+        values = scale.dat.data_ro.copy()
+    else:
+        values = np.full(shape, float(scale))
+    invalid = values.shape != shape or not np.all(np.isfinite(values) & (values > 0.0))
+    if space.mesh().comm.allreduce(int(invalid)):
+        raise ValueError("Each scale must be finite and positive, a number or a "
+                         "field in its control's space.")
+    return values
+
+
 class LumpedL2ReducedFunctional(AbstractReducedFunctional):
     r"""A reduced functional over controls rescaled by their lumped mass.
 
     Represents :math:`\hat{J}(\tilde{m}) = J(M_L^{-1/2} \tilde{m})`: each control :math:`m`
     of the wrapped functional is replaced by :math:`\tilde{m} = M_L^{1/2} m`, with
     :math:`M_L` its lumped mass.
+
+    Optional positive ``scales`` change the optimizer's variables to
+    :math:`\tilde{m} = M_L^{1/2} m / s`. Choosing :math:`s = u-l`
+    measures changes relative to each control's bound interval. This does
+    not change the physical objective or guarantee equal updates across
+    controls. Bounds must be transformed with the same scale.
 
     :math:`M_L` is the mass matrix assembled with the quadrature spyro adopts
     for each element (:func:`spyro.domains.quadrature.quadrature_rules`). For
@@ -85,16 +127,21 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
     ----------
     reduced_functional : pyadjoint.reduced_functional.AbstractReducedFunctional
         Functional of the model controls.
+    scales : sequence, optional
+        :math:`s`, one per control: a positive number, or a field of positive
+        values in the control's space. Default 1 for every control.
 
     Raises
     ------
     ValueError
         If the quadrature spyro adopts for a control space does not give a
-        diagonal mass matrix.
+        diagonal mass matrix, or a scale is not finite and positive or does
+        not match its control.
     """
 
     @no_annotations
-    def __init__(self, reduced_functional: AbstractReducedFunctional):
+    def __init__(self, reduced_functional: AbstractReducedFunctional,
+                 scales: list | tuple | None = None):
         super().__init__()
         self._functional = reduced_functional
         model_controls = reduced_functional.controls
@@ -102,11 +149,17 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
             model_controls = Enlist(model_controls)
         self._model_controls = model_controls
 
+        if scales is None:
+            scales = [1.0] * len(model_controls)
+        if len(scales) != len(model_controls):
+            raise ValueError("scales must contain one entry per control.")
+
         # One M_L^{-1/2} per space: controls in the same space share it.
         inverse_sqrt_masses = {}
         self._inverse_sqrt_masses = []
+        self._scales = []
         m_tilde_controls = []
-        for control in model_controls:
+        for control, scale in zip(model_controls, scales):
             # The tape value, not ``control.control``: between stages the
             # controls move through ``Control.update``, which only changes it.
             model = control.tape_value()
@@ -115,25 +168,29 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
                 inverse_sqrt_masses[space] = _inverse_sqrt_lumped_mass(space)
             inverse_sqrt_mass = inverse_sqrt_masses[space]
             self._inverse_sqrt_masses.append(inverse_sqrt_mass)
+            scale = _scale_array(scale, space)
+            self._scales.append(scale)
             m_tilde = fire.Function(space)
-            m_tilde.dat.data_wo[:] = model.dat.data_ro / inverse_sqrt_mass.dat.data_ro
+            m_tilde.dat.data_wo[:] = model.dat.data_ro / (
+                scale * inverse_sqrt_mass.dat.data_ro)
             m_tilde_controls.append(Control(m_tilde, riesz_map="l2"))
         self._controls = Enlist(model_controls.delist(m_tilde_controls))
 
     @property
     def controls(self) -> Enlist:
-        r""":class:`pyadjoint.enlisting.Enlist`: the controls :math:`\tilde{m} = M_L^{1/2} m`.
+        r"""Return the optimizer controls.
 
-        Each is a model control :math:`m` scaled by the square root of its
-        lumped mass, so the Euclidean inner product of :math:`\tilde{m}` is
-        the lumped :math:`L^2` inner product of :math:`m`.
+        Returns
+        -------
+        pyadjoint.enlisting.Enlist
+            Controls :math:`\tilde{m} = M_L^{1/2} m / s`.
         """
         return self._controls
 
-    def _apply_inverse_sqrt_mass(self, values, dual: bool) -> list:
-        r"""Multiply each value by the inverse square root of its control's lumped mass.
+    def _apply_scaled_inverse_sqrt_mass(self, values, dual: bool) -> list:
+        r"""Multiply each value by its control's scale and inverse square root of lumped mass.
 
-        That is :math:`M_L^{-1/2}` times each value: it takes the controls
+        That is :math:`s\,M_L^{-1/2}` times each value: it takes the controls
         :math:`\tilde{m}` to the model :math:`m`, and the derivative
         :math:`DJ(m)` to the derivative in :math:`\tilde{m}`.
 
@@ -150,15 +207,17 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
             The products, one per control.
         """
         products = []
-        for value, inverse_sqrt_mass in zip(Enlist(values), self._inverse_sqrt_masses):
+        for value, inverse_sqrt_mass, scale in zip(
+            Enlist(values), self._inverse_sqrt_masses, self._scales,
+        ):
             space = inverse_sqrt_mass.function_space()
             out = fire.Cofunction(space.dual()) if dual else fire.Function(space)
-            out.dat.data_wo[:] = value.dat.data_ro * inverse_sqrt_mass.dat.data_ro
+            out.dat.data_wo[:] = value.dat.data_ro * scale * inverse_sqrt_mass.dat.data_ro
             products.append(out)
         return products
 
     def __call__(self, values):
-        r"""Return :math:`\hat{J}(\tilde{m}) = J(M_L^{-1/2} \tilde{m})`.
+        r"""Return :math:`\hat{J}(\tilde{m}) = J(s\,M_L^{-1/2} \tilde{m})`.
 
         Parameters
         ----------
@@ -170,11 +229,11 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         pyadjoint.AdjFloat
             The functional value.
         """
-        models = self._apply_inverse_sqrt_mass(values, dual=False)
+        models = self._apply_scaled_inverse_sqrt_mass(values, dual=False)
         return self._functional(self._model_controls.delist(models))
 
     def derivative(self, adj_input=1.0, apply_riesz: bool = False):
-        r"""Return :math:`D\hat{J}(\tilde{m}) = M_L^{-1/2} DJ(m)`.
+        r"""Return :math:`D\hat{J}(\tilde{m}) = s\,M_L^{-1/2} DJ(m)`.
 
         Parameters
         ----------
@@ -189,7 +248,7 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
             One per control.
         """
         derivative = self._functional.derivative(adj_input=adj_input)
-        derivatives = self._apply_inverse_sqrt_mass(derivative, dual=True)
+        derivatives = self._apply_scaled_inverse_sqrt_mass(derivative, dual=True)
         if apply_riesz:
             derivatives = [
                 control.control._ad_convert_riesz(value, riesz_map="l2")
@@ -243,20 +302,21 @@ class LumpedL2ReducedFunctional(AbstractReducedFunctional):
         )
 
     def map_result(self, values) -> list:
-        r"""Return the model controls :math:`m = M_L^{-1/2} \tilde{m}`.
+        r"""Return the model controls :math:`m = s\,M_L^{-1/2} \tilde{m}`.
 
         Parameters
         ----------
         values : firedrake.Function or sequence of firedrake.Function
-            :math:`\tilde{m}`, the model controls scaled by the square root
-            of their lumped mass, one per control.
+            :math:`\tilde{m}`, the model controls divided by their scales
+            and multiplied by the square root of their lumped mass, one per
+            control.
 
         Returns
         -------
         list of firedrake.Function
             :math:`m`, one per control, named after the model controls.
         """
-        models = self._apply_inverse_sqrt_mass(values, dual=False)
+        models = self._apply_scaled_inverse_sqrt_mass(values, dual=False)
         for model, control in zip(models, self._model_controls):
             model.rename(control.control.name())
         return models

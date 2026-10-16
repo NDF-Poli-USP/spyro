@@ -13,6 +13,7 @@ from pyadjoint.optimization.tao_solver import (
     PETScVecInterface,
     TAOConvergenceError,
 )
+from pyadjoint.enlisting import Enlist
 from pyadjoint.reduced_functional import AbstractReducedFunctional
 
 from ..reduced_functionals import LumpedL2ReducedFunctional
@@ -86,10 +87,11 @@ def tao_bounds(bound, controls):
     return shaped
 
 
-def _bound_to_field(bound, inverse_sqrt_mass: fire.Function) -> fire.Function | None:
+def _bound_to_field(bound, inverse_sqrt_mass: fire.Function,
+                    scale=1.0) -> fire.Function | None:
     r"""Return a bound on the model as a field on the controls TAO optimizes.
 
-    The bound on :math:`m` becomes a field on :math:`\tilde{m} = M_L^{1/2} m`.
+    The bound on :math:`m` becomes a field on :math:`\tilde{m} = M_L^{1/2} m / s`.
 
     Parameters
     ----------
@@ -97,6 +99,8 @@ def _bound_to_field(bound, inverse_sqrt_mass: fire.Function) -> fire.Function | 
         The bound on :math:`m`.
     inverse_sqrt_mass : firedrake.Function
         :math:`M_L^{-1/2}` in the space of the control it bounds.
+    scale : float or numpy.ndarray, optional
+        :math:`s` of the control it bounds. Default 1.
 
     Returns
     -------
@@ -107,14 +111,14 @@ def _bound_to_field(bound, inverse_sqrt_mass: fire.Function) -> fire.Function | 
         return None
     field = fire.Function(inverse_sqrt_mass.function_space())
     values = bound.dat.data_ro if isinstance(bound, fire.Function) else bound
-    field.dat.data_wo[:] = values / inverse_sqrt_mass.dat.data_ro
+    field.dat.data_wo[:] = values / (scale * inverse_sqrt_mass.dat.data_ro)
     return field
 
 
-def _lumped_bounds(bounds: list, controls) -> list:
+def _lumped_bounds(bounds: list, controls, scales: list | None = None) -> list:
     r"""Return the bounds on the model as bounds on the controls TAO optimizes.
 
-    Bounds on :math:`m` become bounds on :math:`\tilde{m} = M_L^{1/2} m`.
+    Bounds on :math:`m` become bounds on :math:`\tilde{m} = M_L^{1/2} m / s`.
     The change of variables is diagonal and positive, so a box on :math:`m`
     is a box on :math:`\tilde{m}`, with each bound scaled the same way.
 
@@ -126,25 +130,85 @@ def _lumped_bounds(bounds: list, controls) -> list:
     controls : pyadjoint.enlisting.Enlist
         Controls of the :class:`LumpedL2ReducedFunctional`, over
         :math:`\tilde{m}`.
+    scales : sequence, optional
+        :math:`s` of each control, as given to the
+        :class:`LumpedL2ReducedFunctional`: numbers or fields. Default 1.
 
     Returns
     -------
     list of tuple
         ``(lower, upper)`` on :math:`\tilde{m}`, one per control.
     """
+    if scales is None:
+        scales = [1.0] * len(controls)
     # One M_L^{-1/2} per space: controls in the same space share it.
     inverse_sqrt_masses = {}
     m_tilde_bounds = []
-    for (lower, upper), control in zip(bounds, controls):
+    for (lower, upper), control, scale in zip(bounds, controls, scales):
         space = control.control.function_space()
         if space not in inverse_sqrt_masses:
             inverse_sqrt_masses[space] = _inverse_sqrt_lumped_mass(space)
         inverse_sqrt_mass = inverse_sqrt_masses[space]
+        if isinstance(scale, fire.Function):
+            scale = scale.dat.data_ro
         m_tilde_bounds.append((
-            _bound_to_field(lower, inverse_sqrt_mass),
-            _bound_to_field(upper, inverse_sqrt_mass),
+            _bound_to_field(lower, inverse_sqrt_mass, scale),
+            _bound_to_field(upper, inverse_sqrt_mass, scale),
         ))
     return m_tilde_bounds
+
+
+def _box_widths(bounds: list | None, controls: Enlist) -> list:
+    """Return the width of each control's box, to scale the control by.
+
+    Parameters
+    ----------
+    bounds : sequence of tuple or None
+        ``(lower, upper)`` on the model, one per control, each a number or a
+        field.
+    controls : pyadjoint.enlisting.Enlist
+        The model controls.
+
+    Returns
+    -------
+    list
+        A number per control whose bounds are numbers, a field otherwise.
+        Where a box has no width the control is fixed by its bounds, and its
+        scale is 1.
+
+    Raises
+    ------
+    ValueError
+        If a control lacks a finite lower or upper bound, or a lower bound
+        exceeds its upper bound, or a bound field belongs to another space.
+    """
+    if bounds is None or len(bounds) != len(controls):
+        raise ValueError("normalized needs a lower and an upper bound for every control.")
+    widths = []
+    for control, (lower, upper) in zip(controls, bounds):
+        if lower is None or upper is None:
+            raise ValueError("normalized needs a lower and an upper bound for every control.")
+        if not any(isinstance(bound, fire.Function) for bound in (lower, upper)):
+            width = float(upper) - float(lower)
+            if not np.isfinite(width) or width < 0.0:
+                raise ValueError("Bounds must be finite and ordered to normalize by them.")
+            widths.append(width if width > 0.0 else 1.0)
+            continue
+        space = control.control.function_space()
+        if any(isinstance(bound, fire.Function) and bound.function_space() != space
+               for bound in (lower, upper)):
+            raise ValueError("Each bound field must be in its control's space.")
+        values = [bound.dat.data_ro if isinstance(bound, fire.Function)
+                  else np.full(fire.Function(space).dat.data_ro.shape, float(bound))
+                  for bound in (lower, upper)]
+        width = values[1] - values[0]
+        invalid = not np.all(np.isfinite(width)) or np.any(width < 0.0)
+        if space.mesh().comm.allreduce(int(invalid)):
+            raise ValueError("Bounds must be finite and ordered to normalize by them.")
+        field = fire.Function(space)
+        field.dat.data_wo[:] = np.where(width > 0.0, width, 1.0)
+        widths.append(field)
+    return widths
 
 
 def minimize_with_tao(
@@ -153,6 +217,7 @@ def minimize_with_tao(
     comm=None,
     options: dict | None = None,
     record=None,
+    normalized: bool = False,
 ) -> list:
     """Minimize a reduced functional with PETSc TAO, in the lumped L2 metric.
 
@@ -182,6 +247,11 @@ def minimize_with_tao(
         iteration TAO accepts, with the controls it stands at as a list of
         fresh fields. The starting point is not reported: it is the value the
         caller already has, from evaluating the functional to get here.
+    normalized : bool, optional
+        Divide each control by its bound interval width before applying the
+        mass scaling. Requires finite, ordered bounds. Equal bounds keep a
+        degree of freedom fixed with scale 1. Returned fields retain their
+        physical units. Default False.
 
     Returns
     -------
@@ -202,7 +272,8 @@ def minimize_with_tao(
     ------
     ValueError
         If the options or the PETSc command line ask for a TAO type other
-        than BQNLS.
+        than BQNLS, or ``normalized`` is asked for without finite, ordered
+        bounds on every control.
 
     See Also
     --------
@@ -215,9 +286,12 @@ def minimize_with_tao(
         raise ValueError(
             f"minimize_with_tao always uses BQNLS, not '{tao_type}'.",
         )
-    lumped_functional = LumpedL2ReducedFunctional(reduced_functional)
+    scales = None
+    if normalized:
+        scales = _box_widths(bounds, Enlist(reduced_functional.controls))
+    lumped_functional = LumpedL2ReducedFunctional(reduced_functional, scales=scales)
     if bounds is not None:
-        bounds = _lumped_bounds(bounds, lumped_functional.controls)
+        bounds = _lumped_bounds(bounds, lumped_functional.controls, scales)
     problem = MinimizationProblem(lumped_functional, bounds=bounds)
     solver = TAOSolver(problem, options, comm=comm)
     # The PETSc command line can still set the type.

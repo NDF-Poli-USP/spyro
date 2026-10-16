@@ -1687,6 +1687,12 @@ class FullWaveformInversion:
                 Each stage starts from the complete model produced by the
                 previous one. Its iteration limit takes precedence over
                 ``tao_options["tao_max_it"]``.
+            normalized : bool, optional
+                Scale each control by ``vmax - vmin`` for optimization.
+                Requires the automated adjoint and finite, ordered bounds.
+                The objective and returned physical fields are unchanged.
+                This can help balance controls with different scales, but
+                does not guarantee faster convergence. Default False.
             scipy_options : dict, optional
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
@@ -1773,6 +1779,7 @@ class FullWaveformInversion:
             },
         }
         tao_options = kwargs.pop("tao_options", None)
+        normalized = kwargs.pop("normalized", False)
         self._save_controls = kwargs.pop("save_controls", True)
         self.adjoint_type = kwargs.pop("adjoint_type", self.adjoint_type)
         # The settings reach the solver at the first forward solve of the run,
@@ -1799,6 +1806,12 @@ class FullWaveformInversion:
                 )
         parameters.update(kwargs)
 
+        if normalized and self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
+            raise ValueError(
+                "normalized controls are run by the automated adjoint's "
+                "optimizer, so they need "
+                "adjoint_type=AdjointType.AUTOMATED_ADJOINT.",
+            )
         if stages is not None:
             if self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
                 raise ValueError(
@@ -1827,6 +1840,7 @@ class FullWaveformInversion:
                     parameters,
                     tao_options=tao_options,
                     stages=stages,
+                    normalized=normalized,
                 ),
             )
             self.control_parameter_result = self.control_parameters
@@ -1860,7 +1874,8 @@ class FullWaveformInversion:
         np.save("result", self._flatten_control(self.control_parameter_result))
         return result
 
-    def _run_fwi_tao(self, parameters, tao_options=None, stages=None):
+    def _run_fwi_tao(self, parameters, tao_options=None, stages=None,
+                     normalized: bool = False):
         """Optimize the recorded reduced functional with PETSc TAO.
 
         The forward solve is recorded once, here, and every functional value
@@ -1889,6 +1904,9 @@ class FullWaveformInversion:
             on the one recording; see :meth:`run_fwi`. Each listed stage builds
             a reduced functional containing only its active controls. ``None``
             uses the complete reduced functional for ``maxiter`` iterations.
+        normalized : bool, optional
+            Whether TAO measures each control in units of the width of its
+            box; see :meth:`run_fwi`.
 
         Returns
         -------
@@ -1943,6 +1961,7 @@ class FullWaveformInversion:
                 comm=self.wave.comm.comm,
                 options=options,
                 record=self._record_iterate,
+                normalized=normalized,
             )
             return automated_adjoint.label_derivatives(solution)
 
@@ -2007,6 +2026,7 @@ class FullWaveformInversion:
                     "tao_max_it": iterations,
                 },
                 record=record,
+                normalized=normalized,
             )
             # TAO leaves the active checkpoints at the last point it
             # evaluated, and the next stage starts from the checkpoints.
