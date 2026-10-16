@@ -490,7 +490,7 @@ class AutomaticMesh:
                     f"but received shape {vp.shape}."
                 )
 
-            vp_for_gmsh = np.ascontiguousarray(vp[::-1, :])
+            vp_for_gmsh = np.ascontiguousarray(vp)
 
             filename = "tmp_velocity_model.segy"
             create_segy_from_grid(vp_for_gmsh, filename)
@@ -639,31 +639,13 @@ class AutomaticMesh:
                     b_val=b_val, xc=xc, zc=zc, apply_winslow=apply_winslow
                 )
             # Rotating mesh for axis (z,x,y)
-            if padding_type in ["rectangular", "hyperelliptical"]:
-                rotate_xz = [
-                    0.0, 1.0, 0.0, 0.0,
-                    -1.0, 0.0, 0.0, domain_xmax,
-                    0.0, 0.0, 1.0, 0.0,
-                    0.0, 0.0, 0.0, 1.0
-                ]
-            else:
-                rotate_xz = [
-                    0.0, 1.0, 0.0, -domain_zmin,
-                    -1.0, 0.0, 0.0, domain_xmax,
-                    0.0, 0.0, 1.0, 0.0,
-                    0.0, 0.0, 0.0, 1.0
-                ]
-
-            gmsh.model.mesh.affineTransform(rotate_xz)
-
-            # Flip the x-axis after the rotation (mirror the second coordinate).
-            flip_x = [
+            gmsh_xy_to_spyro_zx = [
+                0.0, 1.0, 0.0, 0.0,
                 1.0, 0.0, 0.0, 0.0,
-                0.0, -1.0, 0.0, domain_xmax,
                 0.0, 0.0, 1.0, 0.0,
                 0.0, 0.0, 0.0, 1.0,
             ]
-            gmsh.model.mesh.affineTransform(flip_x)
+            gmsh.model.mesh.affineTransform(gmsh_xy_to_spyro_zx)
             gmsh.write(output_file)
             parallel_print(f"Gmsh mesh written to {output_file}", comm=self.comm)
             gmsh.finalize()
@@ -931,18 +913,15 @@ class AutomaticMesh:
                         parallel_print=parallel_print,
                     )
 
-                if padding_type in ("rectangular", "hyperelliptical"):
-                    z_translation = 0.0
-                else:
-                    z_translation = -domain_zmin
-
-                rotate_xyz_to_zxy = [
-                    0.0, 0.0, 1.0, z_translation,
-                    -1.0, 0.0, 0.0, domain_xmax,
-                    0.0, -1.0, 0.0, domain_ymax,
+                # gmsh builds the model in physical coordinates (x, y, z=depth).
+                # Spyro uses (z, x, y)
+                gmsh_xyz_to_spyro_zxy = [
+                    0.0, 0.0, 1.0, 0.0,
+                    1.0, 0.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0, 0.0,
                     0.0, 0.0, 0.0, 1.0,
                 ]
-                gmsh.model.mesh.affineTransform(rotate_xyz_to_zxy)
+                gmsh.model.mesh.affineTransform(gmsh_xyz_to_spyro_zxy)
                 gmsh.write(output_file)
                 parallel_print(
                     f"Gmsh 3D mesh written to {output_file}",
