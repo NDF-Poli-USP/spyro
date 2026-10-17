@@ -3,7 +3,7 @@ from collections import defaultdict, deque
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-from ..io.basicio import _read_velocity_binary3D
+from ..io.basicio import read_velocity_binary3d
 
 try:
     import SeismicMesh
@@ -336,7 +336,7 @@ def create_sizing_function3D(
         except (TypeError, ValueError, RuntimeError):
             pass
 
-    velocity = _read_velocity_binary3D(
+    velocity = read_velocity_binary3d(
         fname=fname,
         nz=nz,
         nx=nx,

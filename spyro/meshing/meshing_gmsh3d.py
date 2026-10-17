@@ -73,8 +73,6 @@ def build_gmsh_geometry_and_groups3D(
         Velocity value used to identify the water layer.
     structured_mesh : bool
         Whether a structured hexahedral mesh is requested.
-    minElementSize : float or None
-        Minimum element-size input retained by the geometry API.
     nz : int
         Number of velocity samples in the z direction.
     nx : int
@@ -275,6 +273,7 @@ def build_gmsh_geometry_and_groups3D(
             z_min=z_min,
             z_max=z_max,
             byte_order=byte_order,
+            axes_order=axes_order,
             order=axes_order_sort,
             dtype=dtype,
             comm=comm,
@@ -356,12 +355,6 @@ def build_gmsh_geometry_and_groups3D(
     return {
         "vol_subsoil": vol_subsoil,
         "vol_water": vol_water,
-        "padding_type3D": padding_type,
-        "water_interface": bool(water_interface),
-        "water_delimited": bool(water_interface),
-        "contains_water_from_velocity_model": True,
-        "structured_mesh_supported": padding_type != "hyperelliptical",
-        "winslow_supported": padding_type != "hyperelliptical",
         "ellipse_a": ellipse_a,
         "ellipse_b": ellipse_b,
         "ellipse_c": ellipse_c,
@@ -447,12 +440,8 @@ def configure_gmsh_mesh_size3D(
     None
         The Gmsh sizing callback or background field is configured in place.
     """
-    ef_segy2 = ef_segy3
-
     if structured_mesh is False:
         if parallel is False:
-            callback_calls = 0
-
             def mesh_size_callback3D(dim, tag, x, y, z, lc):
                 """Evaluate the serial Gmsh mesh-size callback at one mesh point.
 
@@ -476,15 +465,12 @@ def configure_gmsh_mesh_size3D(
                 float
                     Element size assigned to the queried mesh point.
                 """
-                nonlocal callback_calls
-                callback_calls += 1
-
                 if extend_segy:
                     # Edge-extended sizing
 
                     coords = np.array([[z, x, y]], dtype=float)
                     return checked_mesh_size(
-                        ef_segy2,
+                        ef_segy3,
                         coords,
                         "extend_segy=True",
                     )
@@ -505,7 +491,7 @@ def configure_gmsh_mesh_size3D(
                     if in_x and in_y and in_z:
                         coords = np.array([[z, x, y]], dtype=float)
                         return checked_mesh_size(
-                            ef_segy2,
+                            ef_segy3,
                             coords,
                             "inside velocity model",
                         )
@@ -521,7 +507,7 @@ def configure_gmsh_mesh_size3D(
                             dtype=float,
                         )
                         base_size = checked_mesh_size(
-                            ef_segy2,
+                            ef_segy3,
                             coords_proj,
                             "projected padding boundary",
                         )
@@ -569,7 +555,7 @@ def configure_gmsh_mesh_size3D(
             XX_c, YY_c, ZZ_c = np.meshgrid(x_core, y_core, z_core, indexing="ij")
             coords_c = np.column_stack((ZZ_c.ravel(), XX_c.ravel(), YY_c.ravel()))
 
-            size_core = ef_segy2(coords_c).ravel()
+            size_core = ef_segy3(coords_c).ravel()
 
             sp_data_core = np.empty((XX_c.size, 4), dtype=np.float64)
             sp_data_core[:, 0] = XX_c.ravel()
@@ -616,7 +602,7 @@ def configure_gmsh_mesh_size3D(
             if extend_segy:
 
                 coords_p = np.column_stack((ZZ_out, XX_out, YY_out))
-                size_pad = ef_segy2(coords_p).ravel()
+                size_pad = ef_segy3(coords_p).ravel()
             else:
 
                 XX_proj = np.clip(XX_out, bbox[2], bbox[3])
@@ -624,7 +610,7 @@ def configure_gmsh_mesh_size3D(
                 ZZ_proj = np.clip(ZZ_out, bbox[0], bbox[1])
 
                 coords_p = np.column_stack((ZZ_proj, XX_proj, YY_proj))
-                base_size_pad = ef_segy2(coords_p).ravel()
+                base_size_pad = ef_segy3(coords_p).ravel()
 
                 tx = (
                     np.abs(XX_out - XX_proj) / padding_x
@@ -678,10 +664,38 @@ def configure_gmsh_mesh_size3D(
             gmsh.option.setNumber("Mesh.MaxNumThreads2D", 1)
 
 
+def configure_gmsh_3d_meshing_mode(
+    gmsh, structured_mesh: bool, min_element_size: float
+) -> None:
+    """Set the Gmsh options for the requested 3-D meshing mode.
+
+    Parameters
+    ----------
+    gmsh : module
+        Initialized Gmsh Python module.
+    structured_mesh : bool
+        Whether a structured (transfinite) hexahedral mesh is requested.
+    min_element_size : float
+        Element size used for the structured mesh.
+    """
+    if structured_mesh:
+        gmsh.option.setNumber("Mesh.MeshSizeMin", min_element_size)
+        gmsh.option.setNumber("Mesh.MeshSizeMax", min_element_size)
+        gmsh.model.mesh.setTransfiniteAutomatic(
+            [],
+            np.pi,
+            True,
+        )
+
+    gmsh.option.setNumber("Mesh.Algorithm3D", 10)
+    gmsh.option.setNumber("Mesh.OptimizeThreshold", 0.5)
+    gmsh.option.setNumber("Mesh.Optimize", 1)
+    gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
+
+
 def apply_structured_winslow_smoothing3D(
     gmsh,
     comm,
-    geom_params,
     length_x,
     length_y,
     depth_z,
@@ -690,20 +704,10 @@ def apply_structured_winslow_smoothing3D(
     padding_y,
     padding_z,
     water_interface,
-    hyper_n,
     winslow_implementation,
     apply_winslow,
     winslow_iterations,
     winslow_omega,
-    n_samples,
-    n_traces_x,
-    n_traces_y,
-    domain_xmin,
-    domain_xmax,
-    domain_ymin,
-    domain_ymax,
-    domain_zmin,
-    domain_zmax,
     ef_segy3,
     parallel_print,
 ):
@@ -715,8 +719,6 @@ def apply_structured_winslow_smoothing3D(
         Initialized Gmsh Python module used to build or query the mesh.
     comm : mpi4py.MPI.Comm or None
         MPI communicator forwarded to rank-aware output.
-    geom_params : dict
-        Geometry metadata returned by the Gmsh geometry builder.
     length_x : float
         Physical domain length in the x direction.
     length_y : float
@@ -733,8 +735,6 @@ def apply_structured_winslow_smoothing3D(
         Bottom padding thickness in the z direction.
     water_interface : bool
         Whether the water/subsurface interface is geometrically delimited.
-    hyper_n : float
-        Hyperellipsoid exponent used by the padding geometry and sizing law.
     winslow_implementation : str or None
         Requested Winslow implementation.
     apply_winslow : bool
@@ -743,24 +743,6 @@ def apply_structured_winslow_smoothing3D(
         Number of Winslow smoothing iterations.
     winslow_omega : float
         Winslow relaxation coefficient.
-    n_samples : int
-        Velocity-model sample count retained for API compatibility.
-    n_traces_x : int
-        Velocity-model x-trace count retained for API compatibility.
-    n_traces_y : int
-        Velocity-model y-trace count retained for API compatibility.
-    domain_xmin : float
-        Minimum model x coordinate retained for API compatibility.
-    domain_xmax : float
-        Maximum model x coordinate retained for API compatibility.
-    domain_ymin : float
-        Minimum model y coordinate retained for API compatibility.
-    domain_ymax : float
-        Maximum model y coordinate retained for API compatibility.
-    domain_zmin : float
-        Minimum model z coordinate retained for API compatibility.
-    domain_zmax : float
-        Maximum model z coordinate retained for API compatibility.
     ef_segy3 : callable
         Three-dimensional mesh-sizing function in ``(z, x, y)`` coordinates.
     parallel_print : callable

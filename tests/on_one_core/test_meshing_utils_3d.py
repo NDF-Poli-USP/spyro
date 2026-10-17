@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from spyro.io.basicio import _read_velocity_binary3D
+from spyro.io.basicio import read_velocity_binary3d
 from spyro.meshing.meshing_utils3d import (
     create_sizing_function3D,
     define_winslow_points_3d,
@@ -208,7 +208,7 @@ def test_read_velocity_binary3d_round_trip(
         axes_order_sort=axes_order_sort,
     )
 
-    actual = _read_velocity_binary3D(
+    actual = read_velocity_binary3d(
         filename,
         nz=2,
         nx=3,
@@ -229,10 +229,10 @@ def test_read_velocity_binary3d_validation(tmp_path):
     np.ones(8, dtype=">f4").tofile(filename)
 
     with pytest.raises(FileNotFoundError, match="Velocity model not found"):
-        _read_velocity_binary3D(tmp_path / "missing.bin", 2, 2, 2)
+        read_velocity_binary3d(tmp_path / "missing.bin", 2, 2, 2)
 
     with pytest.raises(ValueError, match="byte_order"):
-        _read_velocity_binary3D(
+        read_velocity_binary3d(
             filename,
             2,
             2,
@@ -241,7 +241,7 @@ def test_read_velocity_binary3d_validation(tmp_path):
         )
 
     with pytest.raises(ValueError, match="axes_order_sort"):
-        _read_velocity_binary3D(
+        read_velocity_binary3d(
             filename,
             2,
             2,
@@ -250,7 +250,7 @@ def test_read_velocity_binary3d_validation(tmp_path):
         )
 
     with pytest.raises(ValueError, match="axes_order must be a permutation"):
-        _read_velocity_binary3D(
+        read_velocity_binary3d(
             filename,
             2,
             2,
@@ -259,7 +259,7 @@ def test_read_velocity_binary3d_validation(tmp_path):
         )
 
     with pytest.raises(ValueError, match="expected 27"):
-        _read_velocity_binary3D(filename, 3, 3, 3)
+        read_velocity_binary3d(filename, 3, 3, 3)
 
 
 @pytest.mark.slow
@@ -267,7 +267,7 @@ def test_read_vs_example_3d_binary():
     if not VS_EXAMPLE_3D_BIN.exists():
         pytest.skip(f"Missing {VS_EXAMPLE_3D_BIN}")
 
-    velocity = _read_velocity_binary3D(
+    velocity = read_velocity_binary3d(
         VS_EXAMPLE_3D_BIN,
         nz=101,
         nx=101,

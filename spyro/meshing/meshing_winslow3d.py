@@ -126,8 +126,7 @@ def run_selected_winslow(
         parallel_print(
             "WARNING: the sizing field is effectively constant on the "
             "movable nodes. A uniform structured mesh will remain "
-            "unchanged. Reduce hmin_segy; the supplied reference uses "
-            "a 250 m initial mesh and no 500 m sizing floor.",
+            "unchanged. Consider reducing hmin_segy.",
             comm=comm,)
 
     if selected_winslow != "numba":
@@ -146,7 +145,7 @@ def run_selected_winslow(
             "Using Winslow implementation without Numba.",
             comm=comm,
         )
-    smoothed = winslow_smooth_3d55(
+    smoothed = winslow_smooth_3d(
         points=points,
         hexes=hexes,
         move_all=move_all,
@@ -182,7 +181,7 @@ def run_selected_winslow(
 
     if moved_count == 0:
         parallel_print(
-            "WARNING: winslow_smooth_3d55 completed but no movable node "
+            "WARNING: winslow_smooth_3d completed but no movable node "
             "changed position. Inspect the sizing statistics above.",
             comm=comm,)
 
@@ -446,7 +445,45 @@ def _numba_winslow_3d_step(
     return x_new, y_new, z_new
 
 
-def winslow_smooth_3d55(
+def _shared_neighbor(
+    node_to_neighbors: dict[int, set[int]],
+    node: int,
+    first_neighbor: int | None,
+    second_neighbor: int | None,
+) -> int | None:
+    """Return the diagonal stencil node shared by two cardinal neighbors.
+
+    Parameters
+    ----------
+    node_to_neighbors : dict of int to set of int
+        Edge-connected neighbors of every mesh node.
+    node : int
+        Index of the stencil centre, excluded from the result.
+    first_neighbor : int or None
+        First cardinal-neighbor node index.
+    second_neighbor : int or None
+        Second cardinal-neighbor node index.
+
+    Returns
+    -------
+    int or None
+        Smallest shared neighbor index, or ``None`` when no shared neighbor exists.
+    """
+    if first_neighbor is None or second_neighbor is None:
+        return None
+
+    shared = node_to_neighbors[first_neighbor].intersection(
+        node_to_neighbors[second_neighbor]
+    )
+    shared.discard(node)
+
+    if not shared:
+        return None
+
+    return min(shared)
+
+
+def winslow_smooth_3d(
     points: np.ndarray,
     hexes: np.ndarray,
     move_all: set[int],
@@ -597,55 +634,19 @@ def winslow_smooth_3d55(
 
             cardinals[direction] = neighbor
 
-        def get_shared_neighbor(
-            first_neighbor,
-            second_neighbor,
-        ):
-            """Return the common neighbor associated with stencil entry.
-
-            Parameters
-            ----------
-            first_neighbor : int or None
-                First cardinal-neighbor node index.
-            second_neighbor : int or None
-                Second cardinal-neighbor node index.
-
-            Returns
-            -------
-            int or None
-                Shared neighbor index, or ``None`` when no shared neighbor exists.
-            """
-            if (
-                first_neighbor is None
-                or second_neighbor is None
-            ):
-                return None
-
-            shared = node_to_neighbors[
-                first_neighbor
-            ].intersection(
-                node_to_neighbors[second_neighbor]
-            )
-            shared.discard(node)  # noqa: B023
-
-            if not shared:
-                return None
-
-            return min(shared)
-
         corners = {
-            "NE": get_shared_neighbor(cardinals["N"], cardinals["E"]),
-            "NW": get_shared_neighbor(cardinals["N"], cardinals["W"]),
-            "SE": get_shared_neighbor(cardinals["S"], cardinals["E"]),
-            "SW": get_shared_neighbor(cardinals["S"], cardinals["W"]),
-            "NT": get_shared_neighbor(cardinals["N"], cardinals["T"]),
-            "NB": get_shared_neighbor(cardinals["N"], cardinals["B"]),
-            "ST": get_shared_neighbor(cardinals["S"], cardinals["T"]),
-            "SB": get_shared_neighbor(cardinals["S"], cardinals["B"]),
-            "ET": get_shared_neighbor(cardinals["E"], cardinals["T"]),
-            "EB": get_shared_neighbor(cardinals["E"], cardinals["B"]),
-            "WT": get_shared_neighbor(cardinals["W"], cardinals["T"]),
-            "WB": get_shared_neighbor(cardinals["W"], cardinals["B"]),
+            "NE": _shared_neighbor(node_to_neighbors, node, cardinals["N"], cardinals["E"]),
+            "NW": _shared_neighbor(node_to_neighbors, node, cardinals["N"], cardinals["W"]),
+            "SE": _shared_neighbor(node_to_neighbors, node, cardinals["S"], cardinals["E"]),
+            "SW": _shared_neighbor(node_to_neighbors, node, cardinals["S"], cardinals["W"]),
+            "NT": _shared_neighbor(node_to_neighbors, node, cardinals["N"], cardinals["T"]),
+            "NB": _shared_neighbor(node_to_neighbors, node, cardinals["N"], cardinals["B"]),
+            "ST": _shared_neighbor(node_to_neighbors, node, cardinals["S"], cardinals["T"]),
+            "SB": _shared_neighbor(node_to_neighbors, node, cardinals["S"], cardinals["B"]),
+            "ET": _shared_neighbor(node_to_neighbors, node, cardinals["E"], cardinals["T"]),
+            "EB": _shared_neighbor(node_to_neighbors, node, cardinals["E"], cardinals["B"]),
+            "WT": _shared_neighbor(node_to_neighbors, node, cardinals["W"], cardinals["T"]),
+            "WB": _shared_neighbor(node_to_neighbors, node, cardinals["W"], cardinals["B"]),
         }
         stencils[node] = {
             **cardinals,

@@ -65,7 +65,7 @@ def cells_per_wavelength(method, degree, dimension):
     return cell_per_wavelength_dictionary.get(key)
 
 
-class MeshingParameters():  # noqa: UP039
+class MeshingParameters:
 
     """Manage mesh parameters and configuration for seismic wave simulations.
 
