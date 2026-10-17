@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from spyro.io.basicio import read_velocity_binary3d
+from spyro.meshing import meshing_utils3d
 from spyro.meshing.meshing_utils3d import (
     create_sizing_function3D,
     define_winslow_points_3d,
@@ -11,7 +12,9 @@ from spyro.meshing.meshing_utils3d import (
 )
 
 
-VS_EXAMPLE_3D_BIN = Path("velocity_models/vs_example_3D.bin")
+VS_EXAMPLE_3D_BIN = (
+    Path(__file__).resolve().parents[2] / "velocity_models" / "vs_example_3D.bin"
+)
 VS_EXAMPLE_3D_SHAPE = (101, 101, 101)
 VS_EXAMPLE_3D_BBOX = (-3000.0, 0.0, 0.0, 5000.0, 0.0, 5000.0)
 
@@ -381,6 +384,45 @@ def test_create_sizing_function3d_fallback_interpolator(tmp_path):
 
     with pytest.raises(ValueError, match="contain NaN or infinity"):
         ef(np.array([np.nan, 0.0, 0.0]))
+
+
+@pytest.mark.skipif(
+    meshing_utils3d.SeismicMesh is None, reason="SeismicMesh is not installed."
+)
+@pytest.mark.xfail(
+    strict=True,
+    raises=TypeError,
+    reason=(
+        "Known bug: the SeismicMesh path wraps a SizeFunction object, which is "
+        "not callable. Gmsh swallows the error in its size callback and never "
+        "finishes meshing."
+    ),
+)
+def test_create_sizing_function3d_seismicmesh_path(tmp_path):
+    """Evaluate the sizing function when SeismicMesh accepts the model.
+
+    A float32 model without water and a ``vp_water`` inside SeismicMesh's
+    1300-1800 m/s range makes SeismicMesh build the size function itself.
+    """
+    velocity = np.full((5, 6, 7), 3000.0)
+    filename = tmp_path / "velocity_float32.bin"
+    _write_velocity_binary(filename, velocity)
+
+    ef, *_ = create_sizing_function3D(
+        fname=filename,
+        hmin=0.0,
+        bbox=(-400.0, 0.0, 0.0, 500.0, 0.0, 600.0),
+        wl=2.0,
+        freq=5.0,
+        grade=0.0,
+        vp_water=1500.0,
+        nz=5,
+        nx=6,
+        ny=7,
+    )
+
+    values = ef(np.array([[-200.0, 250.0, 300.0], [-10.0, 10.0, 590.0]]))
+    np.testing.assert_allclose(values, 3000.0 / (5.0 * 2.0))
 
 
 def test_create_sizing_function3d_replaces_zero_velocity_with_water(tmp_path):

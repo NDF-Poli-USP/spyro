@@ -1,15 +1,38 @@
 import importlib.util
-import math
 
 import pytest
 
-from spyro.meshing.meshing_functions import AutomaticMesh
-from spyro.meshing.meshing_parameters import MeshingParameters
+from .gmsh_mesh_checks import (
+    VELOCITY_MODELS_DIR,
+    assert_bounds,
+    assert_cell_count,
+    assert_cell_regions,
+    assert_cell_type,
+    assert_measure,
+    assert_no_degenerate_cells,
+    assert_region_above,
+    create_gmsh_mesh,
+    hyperellipsoid_volume,
+    measure,
+    physical_groups,
+)
 
 
 HAS_NUMBA = importlib.util.find_spec("numba") is not None
 
-CELL_COUNT_TOLERANCE = 0.25
+LENGTH_Z = 3000.0
+LENGTH_X = 5000.0
+LENGTH_Y = 5000.0
+PADDING = 1000.0
+HYPER_N = 4.0
+
+# Structured meshes are transfinite, so their cell count is exact. Unstructured
+# counts may change slightly between Gmsh versions; the baselines were made
+# with Gmsh 4.13.1.
+UNSTRUCTURED_CELL_COUNT_RTOL = 0.02
+# The hyperellipsoid is a coarse B-spline surface, so its volume is slightly
+# smaller than the exact hyperellipsoid.
+HYPERELLIPSOID_VOLUME_RTOL = 0.02
 
 
 WATER_INTERFACE_CASES = pytest.mark.parametrize(
@@ -29,19 +52,33 @@ STRUCTURED_EXPECTED_CELLS = {
 
 
 UNSTRUCTURED_EXPECTED_CELLS = {
-    # (extend_segy, water_interface, padding_type): expected_cells
-    (True, True, None): 21443,
-    (True, True, "rectangular"): 50080,
-    (True, True, "hyperelliptical"): 42361,
-    (True, False, None): 21881,
-    (True, False, "rectangular"): 50649,
-    (True, False, "hyperelliptical"): 42954,
-    (False, True, None): 21443,
-    (False, True, "rectangular"): 34420,
-    (False, True, "hyperelliptical"): 30324,
-    (False, False, None): 21881,
-    (False, False, "rectangular"): 34260,
-    (False, False, "hyperelliptical"): 30730,
+    # (extend_segy, water_interface, padding_type, gmsh_parallel): expected_cells
+    # The parallel sizing path samples the size field on a grid, so its counts
+    # differ from the serial callback by up to about 1%.
+    (True, True, None, False): 21443,
+    (True, True, None, True): 21613,
+    (True, True, "rectangular", False): 50080,
+    (True, True, "rectangular", True): 50694,
+    (True, True, "hyperelliptical", False): 42361,
+    (True, True, "hyperelliptical", True): 42369,
+    (True, False, None, False): 21881,
+    (True, False, None, True): 21887,
+    (True, False, "rectangular", False): 50649,
+    (True, False, "rectangular", True): 50873,
+    (True, False, "hyperelliptical", False): 42954,
+    (True, False, "hyperelliptical", True): 43080,
+    (False, True, None, False): 21443,
+    (False, True, None, True): 21613,
+    (False, True, "rectangular", False): 34420,
+    (False, True, "rectangular", True): 34546,
+    (False, True, "hyperelliptical", False): 30324,
+    (False, True, "hyperelliptical", True): 30519,
+    (False, False, None, False): 21881,
+    (False, False, None, True): 21887,
+    (False, False, "rectangular", False): 34260,
+    (False, False, "rectangular", True): 34118,
+    (False, False, "hyperelliptical", False): 30730,
+    (False, False, "hyperelliptical", True): 30822,
 }
 
 
@@ -49,11 +86,11 @@ def _base_gmsh3d_parameters(output_filename):
     return {
         "mesh_type": "gmsh_mesh",
         "dimension": 3,
-        "length_z": 3000.0,
-        "length_x": 5000.0,
-        "length_y": 5000.0,
+        "length_z": LENGTH_Z,
+        "length_x": LENGTH_X,
+        "length_y": LENGTH_Y,
         "output_filename": str(output_filename),
-        "segy_velocity_model": "velocity_models/vs_example_3D.bin",
+        "segy_velocity_model": str(VELOCITY_MODELS_DIR / "vs_example_3D.bin"),
         "segy_nz": 101,
         "segy_nx": 101,
         "segy_ny": 101,
@@ -66,10 +103,10 @@ def _base_gmsh3d_parameters(output_filename):
         "segy_dtype": "float32",
         "cells_per_wavelength": 2.0,
         "source_frequency": 3.0,
-        "padding_x": 1000.0,
-        "padding_y": 1000.0,
-        "padding_z": 1000.0,
-        "hyper_n": 4.0,
+        "padding_x": PADDING,
+        "padding_y": PADDING,
+        "padding_z": PADDING,
+        "hyper_n": HYPER_N,
         "hmin_segy": 0.0,
         "grade": 0.05,
         "water_search_value": 0.0,
@@ -82,50 +119,53 @@ def _base_gmsh3d_parameters(output_filename):
     }
 
 
-def _create_mesh_and_count_cells(parameters):
-    mesh_params = MeshingParameters(input_mesh_dictionary=parameters)
-    mesh_generator = AutomaticMesh(mesh_parameters=mesh_params)
-    firedrake_mesh = mesh_generator.create_mesh()
-
-    if (
-        not hasattr(firedrake_mesh.topology, "_entity_classes")
-        and hasattr(firedrake_mesh, "init")
-    ):
-        firedrake_mesh.init()
-
-    return firedrake_mesh.cell_set.core_size
-
-
-def _assert_cell_count(
-    actual_cells: int,
-    expected_cells: int,
-    relative_tolerance: float = CELL_COUNT_TOLERANCE,
-) -> None:
-    """Assert that a cell count lies within a relative tolerance of a baseline.
+def _check_mesh(mesh, msh_file, water_interface, padding_type) -> None:
+    """Check the geometry and regions of a 3D Gmsh mesh.
 
     Parameters
     ----------
-    actual_cells : int
-        Number of cells in the generated mesh.
-    expected_cells : int
-        Baseline number of cells.
-    relative_tolerance : float, optional
-        Allowed relative deviation from ``expected_cells``.
-
-    Raises
-    ------
-    AssertionError
-        If ``actual_cells`` is outside the allowed interval.
+    mesh : firedrake.MeshGeometry
+        Mesh returned by ``AutomaticMesh``.
+    msh_file : pathlib.Path
+        Gmsh file the mesh was read from.
+    water_interface : bool
+        Whether the water layer is a separate region.
+    padding_type : str or None
+        Padding geometry.
     """
-    lower_bound = math.floor(expected_cells * (1.0 - relative_tolerance))
-    upper_bound = math.ceil(expected_cells * (1.0 + relative_tolerance))
+    box_volume = LENGTH_Z * LENGTH_X * LENGTH_Y
+    if padding_type is None:
+        lower, upper = (-LENGTH_Z, 0.0, 0.0), (0.0, LENGTH_X, LENGTH_Y)
+        total_volume, volume_rtol, bounds_rtol = box_volume, 1e-9, 1e-9
+    else:
+        lower = (-LENGTH_Z - PADDING, -PADDING, -PADDING)
+        upper = (0.0, LENGTH_X + PADDING, LENGTH_Y + PADDING)
+        if padding_type == "rectangular":
+            total_volume = (
+                (LENGTH_Z + PADDING) * (LENGTH_X + 2 * PADDING)
+                * (LENGTH_Y + 2 * PADDING)
+            )
+            volume_rtol, bounds_rtol = 1e-9, 1e-9
+        else:
+            total_volume = hyperellipsoid_volume(
+                LENGTH_Z, LENGTH_X, LENGTH_Y, PADDING, PADDING, PADDING, HYPER_N
+            )
+            volume_rtol, bounds_rtol = HYPERELLIPSOID_VOLUME_RTOL, 1e-3
 
-    assert lower_bound <= actual_cells <= upper_bound, (
-        f"Got {actual_cells} cells, expected approximately "
-        f"{expected_cells} cells "
-        f"(allowed interval: {lower_bound} to {upper_bound}, "
-        f"tolerance: +/-{100.0 * relative_tolerance:.1f}%)."
-    )
+    assert_bounds(mesh, lower, upper, rtol=bounds_rtol)
+    assert_measure(mesh, total_volume, rtol=volume_rtol)
+    assert_no_degenerate_cells(mesh)
+
+    cell_groups = physical_groups(msh_file)[3]
+    core = ("Subsurface", "Water") if water_interface else ("SubsurfaceAndWater",)
+    expected_measures = {core: box_volume}
+    if padding_type is not None:
+        # The total was checked above; the box faces are flat, so the split
+        # between model and padding is exact.
+        expected_measures[("Padding",)] = measure(mesh) - box_volume
+    assert_cell_regions(mesh, cell_groups, expected_measures)
+    if water_interface:
+        assert_region_above(mesh, cell_groups["Water"], cell_groups["Subsurface"])
 
 
 @pytest.mark.slow
@@ -161,10 +201,11 @@ def test_gmsh3d_structured(
         }
     )
 
-    _assert_cell_count(
-        _create_mesh_and_count_cells(parameters),
-        STRUCTURED_EXPECTED_CELLS[(water_interface, padding_type)],
-    )
+    mesh = create_gmsh_mesh(parameters)
+
+    assert_cell_type(mesh, "hexahedron")
+    assert_cell_count(mesh, STRUCTURED_EXPECTED_CELLS[(water_interface, padding_type)])
+    _check_mesh(mesh, parameters["output_filename"], water_interface, padding_type)
 
 
 @pytest.mark.slow
@@ -196,18 +237,22 @@ def test_gmsh3d_unstructured(
         }
     )
 
-    _assert_cell_count(
-        _create_mesh_and_count_cells(parameters),
+    mesh = create_gmsh_mesh(parameters)
+
+    assert_cell_type(mesh, "tetrahedron")
+    assert_cell_count(
+        mesh,
         UNSTRUCTURED_EXPECTED_CELLS[
-            (extend_segy, water_interface, padding_type)
+            (extend_segy, water_interface, padding_type, gmsh_parallel)
         ],
+        rtol=UNSTRUCTURED_CELL_COUNT_RTOL,
     )
+    _check_mesh(mesh, parameters["output_filename"], water_interface, padding_type)
 
 
 @pytest.mark.slow
 def test_gmsh3d_structured_winslow_zero_iterations(tmp_path):
     """Exercise the 3-D Winslow path without requiring JIT compilation."""
-    print("STARTING 3-D STRUCTURED WINSLOW ZERO-ITERATION COVERAGE TEST")
 
     output_filename = (
         tmp_path / "example3d_struct_winslow_zero_iterations.msh"
@@ -227,16 +272,16 @@ def test_gmsh3d_structured_winslow_zero_iterations(tmp_path):
         }
     )
 
-    _assert_cell_count(
-        _create_mesh_and_count_cells(parameters),
-        STRUCTURED_EXPECTED_CELLS[(False, None)],
-    )
+    mesh = create_gmsh_mesh(parameters)
+
+    assert_cell_type(mesh, "hexahedron")
+    assert_cell_count(mesh, STRUCTURED_EXPECTED_CELLS[(False, None)])
+    _check_mesh(mesh, parameters["output_filename"], False, None)
 
 
 @pytest.mark.slow
 def test_gmsh3d_structured_hyperelliptical_rejected(tmp_path):
     """Check the guard for unsupported structured padding."""
-    print("TESTING 3-D STRUCTURED HYPERELLIPTICAL VALIDATION")
 
     output_filename = (
         tmp_path / "example3d_struct_hyperelliptical_invalid.msh"
@@ -259,13 +304,12 @@ def test_gmsh3d_structured_hyperelliptical_rejected(tmp_path):
         ValueError,
         match="Hyperelliptical 3-D padding currently supports only",
     ):
-        _create_mesh_and_count_cells(parameters)
+        create_gmsh_mesh(parameters)
 
 
 @pytest.mark.slow
 def test_gmsh3d_water_interface_rejects_noncanonical_axes(tmp_path):
     """Check the real water geometry axis-order validation."""
-    print("TESTING 3-D WATER-INTERFACE AXIS-ORDER VALIDATION")
 
     output_filename = (
         tmp_path / "example3d_water_invalid_axes_order.msh"
@@ -289,13 +333,12 @@ def test_gmsh3d_water_interface_rejects_noncanonical_axes(tmp_path):
         ValueError,
         match=r"axes_order must therefore be \(0, 1, 2\)",
     ):
-        _create_mesh_and_count_cells(parameters)
+        create_gmsh_mesh(parameters)
 
 
 @pytest.mark.slow
 def test_gmsh3d_structured_rejects_non_numba_winslow(tmp_path):
     """Exercise the 3-D Winslow implementation validation."""
-    print("TESTING 3-D STRUCTURED WINSLOW IMPLEMENTATION VALIDATION")
 
     output_filename = (
         tmp_path / "example3d_struct_invalid_winslow.msh"
@@ -319,4 +362,4 @@ def test_gmsh3d_structured_rejects_non_numba_winslow(tmp_path):
         ValueError,
         match="Only winslow_implementation='numba'",
     ):
-        _create_mesh_and_count_cells(parameters)
+        create_gmsh_mesh(parameters)
