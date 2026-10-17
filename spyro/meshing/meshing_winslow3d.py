@@ -1,5 +1,3 @@
-import sys
-
 import numpy as np
 
 try:
@@ -21,6 +19,7 @@ except ImportError:  # pragma: no cover
 
 
 from .meshing_utils3d import sizing_function_xyz
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 def run_selected_winslow(
@@ -36,8 +35,6 @@ def run_selected_winslow(
     depth_z,
     winslow_iterations,
     winslow_omega,
-    comm,
-    parallel_print,
     selected_winslow="numba",
 ):
     """Run the selected three-dimensional Winslow smoother and report its effect.
@@ -68,10 +65,6 @@ def run_selected_winslow(
         Number of Winslow smoothing iterations.
     winslow_omega : float
         Winslow relaxation coefficient.
-    comm : mpi4py.MPI.Comm or None
-        MPI communicator forwarded to rank-aware output.
-    parallel_print : callable
-        Rank-aware print function accepting a ``comm`` keyword argument.
     selected_winslow : str
         Winslow implementation selector.
 
@@ -109,25 +102,25 @@ def run_selected_winslow(
     size_std = float(np.std(movable_sizes))
     size_span = size_max - size_min
 
-    parallel_print(
+    SpyroEnsemble.print(
         "Winslow sizing on movable nodes | "
         f"min={size_min:.9g}, max={size_max:.9g}, "
         f"mean={size_mean:.9g}, std={size_std:.9g}",
-        comm=comm,)
-    parallel_print(
+    )
+    SpyroEnsemble.print(
         "Winslow movable-node counts | "
         f"all={len(move_all)}, X={len(move_X_only)}, "
         f"Y={len(move_Y_only)}, Z={len(move_Z_only)}, "
         f"union={len(movable_nodes)}",
-        comm=comm,)
+    )
 
     relative_span = size_span / max(abs(size_mean), 1.0)
     if relative_span <= 1.0e-10:
-        parallel_print(
+        SpyroEnsemble.print(
             "WARNING: the sizing field is effectively constant on the "
             "movable nodes. A uniform structured mesh will remain "
             "unchanged. Consider reducing hmin_segy.",
-            comm=comm,)
+        )
 
     if selected_winslow != "numba":
         raise ValueError(
@@ -136,15 +129,9 @@ def run_selected_winslow(
         )
 
     if NUMBA_AVAILABLE:
-        parallel_print(
-            "Using Numba accelerated 3D Winslow implementation.",
-            comm=comm,
-        )
+        SpyroEnsemble.print("Using Numba accelerated 3D Winslow implementation.")
     else:
-        parallel_print(
-            "Using Winslow implementation without Numba.",
-            comm=comm,
-        )
+        SpyroEnsemble.print("Using Winslow implementation without Numba.")
     smoothed = winslow_smooth_3d(
         points=points,
         hexes=hexes,
@@ -158,8 +145,6 @@ def run_selected_winslow(
         length_x=length_x,
         length_y=length_y,
         depth_z=depth_z,
-        comm=comm,
-        parallel_print=parallel_print,
     )
 
     displacement = np.linalg.norm(
@@ -172,18 +157,18 @@ def run_selected_winslow(
     max_displacement = float(np.max(movable_displacement))
     mean_displacement = float(np.mean(movable_displacement))
 
-    parallel_print(
+    SpyroEnsemble.print(
         "Winslow displacement | "
         f"moved={moved_count}/{len(movable_indices)}, "
         f"max={max_displacement:.9g}, "
         f"mean={mean_displacement:.9g}",
-        comm=comm,)
+    )
 
     if moved_count == 0:
-        parallel_print(
+        SpyroEnsemble.print(
             "WARNING: winslow_smooth_3d completed but no movable node "
             "changed position. Inspect the sizing statistics above.",
-            comm=comm,)
+        )
 
     return smoothed
 
@@ -494,8 +479,6 @@ def winslow_smooth_3d(
     length_x,
     length_y,
     depth_z,
-    comm,
-    parallel_print,
     iterations: int = 50,
     omega: float = 0.5,
 ) -> np.ndarray:
@@ -523,10 +506,6 @@ def winslow_smooth_3d(
         Physical domain length in the y direction.
     depth_z : float
         Physical domain depth.
-    comm : mpi4py.MPI.Comm or None
-        MPI communicator forwarded to rank-aware output.
-    parallel_print : callable
-        Rank-aware print function accepting a ``comm`` keyword argument.
     iterations : int
         Number of smoothing iterations.
     omega : float
@@ -701,16 +680,8 @@ def winslow_smooth_3d(
     y_coordinates = np.ascontiguousarray(points[:, 1])
     z_coordinates = np.ascontiguousarray(points[:, 2])
 
-    if comm is None:
-        progress_rank = 0
-    else:
-        progress_comm = getattr(comm, "comm", comm)
-        progress_rank = getattr(progress_comm, "rank", 0)
-
     for iteration in range(1, iterations + 1):
-        if progress_rank == 0:
-            sys.stdout.write(f"\rIteration: {iteration}/{iterations}")
-            sys.stdout.flush()
+        SpyroEnsemble.print(f"\rIteration: {iteration}/{iterations}", end="")
 
         sizing_values = np.asarray(
             sizing_function_xyz(
@@ -755,11 +726,9 @@ def winslow_smooth_3d(
             omega,
         )
 
-    if progress_rank == 0:
-        sys.stdout.write("\n")
-        sys.stdout.flush()
+    SpyroEnsemble.print("")
 
-    parallel_print("Smoothing Complete.", comm=comm)
+    SpyroEnsemble.print("Smoothing Complete.")
 
     return np.column_stack(
         (

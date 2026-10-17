@@ -13,6 +13,7 @@ from .meshing_utils3d import (
 )
 from .meshing_water3d import generate_water_interface_volumes
 from .meshing_winslow3d import run_selected_winslow
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 def build_gmsh_geometry_and_groups3D(
@@ -39,9 +40,6 @@ def build_gmsh_geometry_and_groups3D(
     axes_order=(0, 1, 2),
     axes_order_sort="F",
     dtype="float32",
-    *,
-    comm=None,
-    parallel_print,
 ):
     """Build the three-dimensional Gmsh geometry and physical groups for all supported padding and water cases.
 
@@ -93,10 +91,6 @@ def build_gmsh_geometry_and_groups3D(
         Memory order used to reshape the binary velocity data.
     dtype : str or numpy.dtype
         Numeric data type stored in the velocity-model file.
-    comm : mpi4py.MPI.Comm or None
-        MPI communicator forwarded to rank-aware output.
-    parallel_print : callable
-        Rank-aware print function accepting a ``comm`` keyword argument.
 
     Returns
     -------
@@ -148,9 +142,8 @@ def build_gmsh_geometry_and_groups3D(
 
     if not water_interface and padding_type is None:
         # No padding
-        parallel_print(
+        SpyroEnsemble.print(
             "Generating undelimited water+subsurface rectangular domain (no padding)...",
-            comm=comm,
         )
         occ = gmsh.model.occ
         vol_subsoil = occ.addBox(
@@ -167,10 +160,9 @@ def build_gmsh_geometry_and_groups3D(
         vol_water = None
 
     elif not water_interface and padding_type == "rectangular":
-        parallel_print(
+        SpyroEnsemble.print(
             "Generating undelimited water+subsurface domain "
             "with rectangular padding...",
-            comm=comm,
         )
         vol_subsoil, vol_water = generate_rectangular_padding_no_water(
             gmsh,
@@ -184,10 +176,9 @@ def build_gmsh_geometry_and_groups3D(
 
     elif not water_interface and padding_type == "hyperelliptical":
         # Hyperelliptical padding
-        parallel_print(
+        SpyroEnsemble.print(
             "Generating undelimited water+subsurface domain with "
             "hyperelliptical padding...",
-            comm=comm,
         )
         occ = gmsh.model.occ
 
@@ -208,8 +199,6 @@ def build_gmsh_geometry_and_groups3D(
             xc=xc,
             yc=yc,
             zc=zc,
-            comm=comm,
-            parallel_print=parallel_print,
         )
         if ellipsoid_tag is None:
             raise RuntimeError("Could not create the hyperelliptical outer volume.")
@@ -276,8 +265,6 @@ def build_gmsh_geometry_and_groups3D(
             axes_order=axes_order,
             order=axes_order_sort,
             dtype=dtype,
-            comm=comm,
-            parallel_print=parallel_print,
         )
 
         if padding_type is None:
@@ -305,8 +292,6 @@ def build_gmsh_geometry_and_groups3D(
                 xc=xc,
                 yc=yc,
                 zc=zc,
-                comm=comm,
-                parallel_print=parallel_print,
             )
             gmsh.model.occ.synchronize()
             gmsh.model.occ.fragment(
@@ -347,8 +332,6 @@ def build_gmsh_geometry_and_groups3D(
                 padding_x=padding_x,
                 padding_y=padding_y,
                 padding_z=padding_z,
-                comm=comm,
-                parallel_print=parallel_print,
             )
 
     gmsh.model.occ.synchronize()
@@ -385,8 +368,6 @@ def configure_gmsh_mesh_size3D(
     ny,
     *,
     gmsh_num_threads=1,
-    comm=None,
-    parallel_print,
 ):
     """Configure serial or parallel Gmsh mesh sizing from the velocity-model sizing function.
 
@@ -430,10 +411,6 @@ def configure_gmsh_mesh_size3D(
         Number of velocity samples in the y direction.
     gmsh_num_threads : int
         Number of threads used by parallel 3-D Gmsh/HXT meshing. Default is 1.
-    comm : mpi4py.MPI.Comm or None
-        MPI communicator forwarded to rank-aware output.
-    parallel_print : callable
-        Rank-aware print function accepting a ``comm`` keyword argument.
 
     Returns
     -------
@@ -542,10 +519,9 @@ def configure_gmsh_mesh_size3D(
             if num_threads < 1:
                 raise ValueError("gmsh_num_threads must be a positive integer.")
 
-            parallel_print(
+            SpyroEnsemble.print(
                 f"Computing mesh size callback for parallel meshing "
                 f"with {num_threads} Gmsh thread(s)...",
-                comm=comm,
             )
 
             x_core = np.linspace(bbox[2], bbox[3], nx)
@@ -647,7 +623,7 @@ def configure_gmsh_mesh_size3D(
 
             sp_list = sp_data_combined.ravel().tolist()
 
-            parallel_print(f"Loading {total_points} total points into Gmsh PostView...", comm=comm)
+            SpyroEnsemble.print(f"Loading {total_points} total points into Gmsh PostView...")
             view_tag = gmsh.view.add("background_size")
 
             gmsh.view.addListData(view_tag, "SP", total_points, sp_list)
@@ -695,7 +671,6 @@ def configure_gmsh_3d_meshing_mode(
 
 def apply_structured_winslow_smoothing3D(
     gmsh,
-    comm,
     length_x,
     length_y,
     depth_z,
@@ -709,7 +684,6 @@ def apply_structured_winslow_smoothing3D(
     winslow_iterations,
     winslow_omega,
     ef_segy3,
-    parallel_print,
 ):
     """Apply the configured Winslow smoother to a structured three-dimensional Gmsh mesh.
 
@@ -717,8 +691,6 @@ def apply_structured_winslow_smoothing3D(
     ----------
     gmsh : module
         Initialized Gmsh Python module used to build or query the mesh.
-    comm : mpi4py.MPI.Comm or None
-        MPI communicator forwarded to rank-aware output.
     length_x : float
         Physical domain length in the x direction.
     length_y : float
@@ -745,8 +717,6 @@ def apply_structured_winslow_smoothing3D(
         Winslow relaxation coefficient.
     ef_segy3 : callable
         Three-dimensional mesh-sizing function in ``(z, x, y)`` coordinates.
-    parallel_print : callable
-        Rank-aware print function accepting a ``comm`` keyword argument.
 
     Returns
     -------
@@ -757,13 +727,10 @@ def apply_structured_winslow_smoothing3D(
     aligned_water_tags = set()
     if water_interface and padding_type in (None, "rectangular"):
         aligned_water_tags = align_water_columns3d(gmsh, padding_type)
-        parallel_print(
-            f"Aligned 3D water columns ({len(aligned_water_tags)} water nodes).",
-            comm=comm,
-        )
+        SpyroEnsemble.print(f"Aligned 3D water columns ({len(aligned_water_tags)} water nodes).")
 
     if not apply_winslow:
-        parallel_print("Skipping 3D Winslow smoothing.", comm=comm)
+        SpyroEnsemble.print("Skipping 3D Winslow smoothing.")
         return
 
     if padding_type == "hyperelliptical":
@@ -793,7 +760,7 @@ def apply_structured_winslow_smoothing3D(
         + ", "
         + ("Rectangular Padding" if padding_type == "rectangular" else "No Padding")
     )
-    parallel_print(f"Extracting nodes for 3D smoothing ({geometry_name})...", comm=comm)
+    SpyroEnsemble.print(f"Extracting nodes for 3D smoothing ({geometry_name})...")
 
     node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
     points_3d = np.asarray(node_coords, dtype=float).reshape(-1, 3)
@@ -849,7 +816,7 @@ def apply_structured_winslow_smoothing3D(
     move_Z_only = winslow_points["move_Z_only"]
     movable_nodes = winslow_points["movable_nodes"]
 
-    parallel_print("Applying 3D Winslow smoothing...", comm=comm)
+    SpyroEnsemble.print("Applying 3D Winslow smoothing...")
     smoothed_points_3d = run_selected_winslow(
         points=points_3d,
         hexes=hexes,
@@ -864,11 +831,9 @@ def apply_structured_winslow_smoothing3D(
         winslow_iterations=winslow_iterations,
         winslow_omega=winslow_omega,
         selected_winslow=selected_winslow,
-        comm=comm,
-        parallel_print=parallel_print,
     )
 
-    parallel_print("Updating Winslow-smoothed nodes back into Gmsh...", comm=comm)
+    SpyroEnsemble.print("Updating Winslow-smoothed nodes back into Gmsh...")
     for node_index, node_tag in enumerate(node_tags):
         if node_index in movable_nodes:
             gmsh.model.mesh.setNode(
