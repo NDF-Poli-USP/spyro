@@ -12,46 +12,42 @@ HAS_NUMBA = importlib.util.find_spec("numba") is not None
 CELL_COUNT_TOLERANCE = 0.25
 
 
-STRUCTURED_CONFIGURATIONS = [
-    # water_interface, padding_type, expected_cells
-
-    (True, None, 770),
-    (True, 'rectangular', 1421),
-    (True, 'hyperelliptical', 1323),
-    (False, None, 735),
-    (False, 'rectangular', 1372),
-    (False, 'hyperelliptical', 1225),
-]
+WATER_INTERFACE_CASES = pytest.mark.parametrize(
+    "water_interface", [True, False], ids=["water", "no_water"]
+)
+PADDING_CASES = pytest.mark.parametrize(
+    "padding_type", [None, "rectangular", "hyperelliptical"]
+)
 
 
-UNSTRUCTURED_CONFIGURATIONS = [
-    # extend_segy, water_interface, padding_type, expected_cells
-
-    (True, True, None, 17196),
-    (True, True, 'rectangular', 24932),
-    (True, True, 'hyperelliptical', 24526),
-    (True, False, None, 17304),
-    (True, False, 'rectangular', 25113),
-    (True, False, 'hyperelliptical', 24653),
-    (False, True, None, 17196),
-    (False, True, 'rectangular', 18086),
-    (False, True, 'hyperelliptical', 18115),
-    (False, False, None, 17304),
-    (False, False, 'rectangular', 18218),
-    (False, False, 'hyperelliptical', 18215),
-]
+# Winslow smoothing moves nodes but does not change the topology, so the
+# structured cell count does not depend on the Winslow implementation.
+STRUCTURED_EXPECTED_CELLS = {
+    # (water_interface, padding_type): expected_cells
+    (True, None): 770,
+    (True, "rectangular"): 1421,
+    (True, "hyperelliptical"): 1323,
+    (False, None): 735,
+    (False, "rectangular"): 1372,
+    (False, "hyperelliptical"): 1225,
+}
 
 
-STRUCTURED_NO_WINSLOW_CONFIGURATIONS = [
-    # water_interface, padding_type, expected_cells
-
-    (True, None, 770),
-    (True, 'rectangular', 1421),
-    (True, 'hyperelliptical', 1323),
-    (False, None, 735),
-    (False, 'rectangular', 1372),
-    (False, 'hyperelliptical', 1225),
-]
+UNSTRUCTURED_EXPECTED_CELLS = {
+    # (extend_segy, water_interface, padding_type): expected_cells
+    (True, True, None): 17196,
+    (True, True, "rectangular"): 24932,
+    (True, True, "hyperelliptical"): 24526,
+    (True, False, None): 17304,
+    (True, False, "rectangular"): 25113,
+    (True, False, "hyperelliptical"): 24653,
+    (False, True, None): 17196,
+    (False, True, "rectangular"): 18086,
+    (False, True, "hyperelliptical"): 18115,
+    (False, False, None): 17304,
+    (False, False, "rectangular"): 18218,
+    (False, False, "hyperelliptical"): 18215,
+}
 
 
 def _base_gmsh2d_parameters(output_filename):
@@ -93,40 +89,31 @@ def _create_mesh_and_count_cells(parameters):
     return firedrake_mesh.cell_set.core_size
 
 
-def _check_or_collect_baseline(
-    *,
-    actual_cells,
-    expected_cells,
-    description,
-    baseline_row,
-    missing_baselines,
-    relative_tolerance=CELL_COUNT_TOLERANCE,
-):
-    """Assert a cell-count baseline within an allowed relative interval."""
-    if expected_cells is None:
-        print(
-            f"     Cells actual: {actual_cells}"
-            " | Expected: not defined"
-            " | Baseline collected"
-        )
-        missing_baselines.append((*baseline_row, actual_cells))
-        return
+def _assert_cell_count(
+    actual_cells: int,
+    expected_cells: int,
+    relative_tolerance: float = CELL_COUNT_TOLERANCE,
+) -> None:
+    """Assert that a cell count lies within a relative tolerance of a baseline.
 
-    lower_bound = math.floor(
-        expected_cells * (1.0 - relative_tolerance)
-    )
-    upper_bound = math.ceil(
-        expected_cells * (1.0 + relative_tolerance)
-    )
+    Parameters
+    ----------
+    actual_cells : int
+        Number of cells in the generated mesh.
+    expected_cells : int
+        Baseline number of cells.
+    relative_tolerance : float, optional
+        Allowed relative deviation from ``expected_cells``.
 
-    print(
-        f"     Cells actual: {actual_cells}"
-        f" | Expected: {expected_cells}"
-        f" | Allowed: [{lower_bound}, {upper_bound}]"
-    )
+    Raises
+    ------
+    AssertionError
+        If ``actual_cells`` is outside the allowed interval.
+    """
+    lower_bound = math.floor(expected_cells * (1.0 - relative_tolerance))
+    upper_bound = math.ceil(expected_cells * (1.0 + relative_tolerance))
 
     assert lower_bound <= actual_cells <= upper_bound, (
-        f"FAILED: {description}. "
         f"Got {actual_cells} cells, expected approximately "
         f"{expected_cells} cells "
         f"(allowed interval: {lower_bound} to {upper_bound}, "
@@ -134,237 +121,71 @@ def _check_or_collect_baseline(
     )
 
 
-def _fail_with_baselines(table_name, missing_baselines):
-    """Report collected baselines after every configuration has run."""
-    if not missing_baselines:
-        return
-
-    lines = [
-        "",
-        f"Cell-count baselines are not filled for {table_name}.",
-        "Replace the None values with these measured baselines:",
-        "",
-    ]
-
-    for row in missing_baselines:
-        lines.append(f"    {row},")
-
-    lines.append("")
-
-    pytest.fail(
-        "\n".join(lines),
-        pytrace=False,
-    )
-
-
 @pytest.mark.slow
-def test_gmsh2d_structured(tmp_path):
-    """Structured quadrilateral meshes"""
-    print("STARTING STRUCTURED MESH TESTS")
-
-    winslow_implementations = ["default", "fast"]
-
-    if HAS_NUMBA:
-        print("Numba is installed, making numba test")
-        winslow_implementations.append("numba")
-    else:
-        print(
-            "\n[INFO] Numba is not installed. "
-            "Skipping 'numba' Winslow implementation."
-        )
-
-    missing_baselines = []
-
-    for winslow_impl in winslow_implementations:
-        for (
-            water_interface,
-            padding_type,
-            expected_cells,
-        ) in STRUCTURED_CONFIGURATIONS:
-            print(
-                "\nTesting Struct"
-                f" | Winslow: {winslow_impl:<7}"
-                f" | Water: {str(water_interface):<5}"
-                f" | Padding: {padding_type}"
-            )
-
-            output_filename = (
-                tmp_path
-                / (
-                    "vs_example_2d_struct"
-                    f"_{winslow_impl}"
-                    f"_wat_{water_interface}"
-                    f"_pad_{padding_type}.msh"
-                )
-            )
-
-            parameters = _base_gmsh2d_parameters(output_filename)
-            parameters.update(
-                {
-                    "padding_type": padding_type,
-                    "water_interface": water_interface,
-                    "structured_mesh": True,
-                    "apply_winslow": True,
-                    "winslow_implementation": winslow_impl,
-                    "extend_segy": False,
-                }
-            )
-
-            actual_cells = _create_mesh_and_count_cells(parameters)
-
-            description = (
-                "2-D Struct"
-                f" | Winslow: {winslow_impl}"
-                f" | Wat: {water_interface}"
-                f" | Pad: {padding_type}"
-            )
-
-            _check_or_collect_baseline(
-                actual_cells=actual_cells,
-                expected_cells=expected_cells,
-                description=description,
-                baseline_row=(
-                    winslow_impl,
-                    water_interface,
-                    padding_type,
-                ),
-                missing_baselines=missing_baselines,
-            )
-
-    _fail_with_baselines(
-        "STRUCTURED_CONFIGURATIONS",
-        missing_baselines,
-    )
-
-
-@pytest.mark.slow
-def test_gmsh2d_unstructured(tmp_path):
-    """Unstructured triangular meshes"""
-    print("STARTING UNSTRUCTURED MESH TESTS")
-
-    missing_baselines = []
-
-    for (
-        extend_segy,
-        water_interface,
-        padding_type,
-        expected_cells,
-    ) in UNSTRUCTURED_CONFIGURATIONS:
-        print(
-            "\nTesting Unstruct"
-            f" | Ext SEGY: {str(extend_segy):<5}"
-            f" | Water: {str(water_interface):<5}"
-            f" | Padding: {padding_type}"
-        )
-
-        output_filename = (
-            tmp_path
-            / (
-                "vs_example_2d_unstruct"
-                f"_ext_{extend_segy}"
-                f"_wat_{water_interface}"
-                f"_pad_{padding_type}.msh"
-            )
-        )
-
-        parameters = _base_gmsh2d_parameters(output_filename)
-        parameters.update(
-            {
-                "padding_type": padding_type,
-                "water_interface": water_interface,
-                "structured_mesh": False,
-                "apply_winslow": False,
-                "winslow_implementation": "default",
-                "extend_segy": extend_segy,
-            }
-        )
-
-        actual_cells = _create_mesh_and_count_cells(parameters)
-
-        description = (
-            "2-D Unstruct"
-            f" | Ext: {extend_segy}"
-            f" | Wat: {water_interface}"
-            f" | Pad: {padding_type}"
-        )
-
-        _check_or_collect_baseline(
-            actual_cells=actual_cells,
-            expected_cells=expected_cells,
-            description=description,
-            baseline_row=(
-                extend_segy,
-                water_interface,
-                padding_type,
+@pytest.mark.parametrize(
+    "winslow_implementation",
+    [
+        None,
+        "default",
+        "fast",
+        pytest.param(
+            "numba",
+            marks=pytest.mark.skipif(
+                not HAS_NUMBA, reason="Numba is not installed."
             ),
-            missing_baselines=missing_baselines,
-        )
+        ),
+    ],
+    ids=["no_winslow", "default", "fast", "numba"],
+)
+@PADDING_CASES
+@WATER_INTERFACE_CASES
+def test_gmsh2d_structured(
+    tmp_path, water_interface, padding_type, winslow_implementation
+):
+    """Structured quadrilateral meshes, with and without Winslow smoothing."""
+    parameters = _base_gmsh2d_parameters(tmp_path / "mesh.msh")
+    parameters.update(
+        {
+            "padding_type": padding_type,
+            "water_interface": water_interface,
+            "structured_mesh": True,
+            "apply_winslow": winslow_implementation is not None,
+            "winslow_implementation": winslow_implementation or "default",
+            "extend_segy": False,
+        }
+    )
 
-    _fail_with_baselines(
-        "UNSTRUCTURED_CONFIGURATIONS",
-        missing_baselines,
+    _assert_cell_count(
+        _create_mesh_and_count_cells(parameters),
+        STRUCTURED_EXPECTED_CELLS[(water_interface, padding_type)],
     )
 
 
 @pytest.mark.slow
-def test_gmsh2d_structured_no_winslow(tmp_path):
-    """Structured quadrilateral meshes without Winslow smoothing."""
-    print("STARTING STRUCTURED MESH (NO WINSLOW) TESTS")
+@PADDING_CASES
+@WATER_INTERFACE_CASES
+@pytest.mark.parametrize(
+    "extend_segy", [True, False], ids=["extend_segy", "no_extend_segy"]
+)
+def test_gmsh2d_unstructured(
+    tmp_path, extend_segy, water_interface, padding_type
+):
+    """Unstructured triangular meshes."""
+    parameters = _base_gmsh2d_parameters(tmp_path / "mesh.msh")
+    parameters.update(
+        {
+            "padding_type": padding_type,
+            "water_interface": water_interface,
+            "structured_mesh": False,
+            "apply_winslow": False,
+            "winslow_implementation": "default",
+            "extend_segy": extend_segy,
+        }
+    )
 
-    missing_baselines = []
-
-    for (
-        water_interface,
-        padding_type,
-        expected_cells,
-    ) in STRUCTURED_NO_WINSLOW_CONFIGURATIONS:
-        print(
-            "\nTesting Struct (No Winslow)"
-            f" | Water: {str(water_interface):<5}"
-            f" | Padding: {padding_type}"
-        )
-
-        output_filename = (
-            tmp_path
-            / (
-                "vs_example_2d_struct_nowinslow"
-                f"_wat_{water_interface}"
-                f"_pad_{padding_type}.msh"
-            )
-        )
-
-        parameters = _base_gmsh2d_parameters(output_filename)
-        parameters.update(
-            {
-                "padding_type": padding_type,
-                "water_interface": water_interface,
-                "structured_mesh": True,
-                "apply_winslow": False,
-                "winslow_implementation": "default",
-                "extend_segy": False,
-            }
-        )
-
-        actual_cells = _create_mesh_and_count_cells(parameters)
-
-        description = (
-            "2-D Struct (No Winslow)"
-            f" | Wat: {water_interface}"
-            f" | Pad: {padding_type}"
-        )
-
-        _check_or_collect_baseline(
-            actual_cells=actual_cells,
-            expected_cells=expected_cells,
-            description=description,
-            baseline_row=(
-                water_interface,
-                padding_type,
-            ),
-            missing_baselines=missing_baselines,
-        )
-
-    _fail_with_baselines(
-        "STRUCTURED_NO_WINSLOW_CONFIGURATIONS",
-        missing_baselines,
+    _assert_cell_count(
+        _create_mesh_and_count_cells(parameters),
+        UNSTRUCTURED_EXPECTED_CELLS[
+            (extend_segy, water_interface, padding_type)
+        ],
     )
