@@ -4,6 +4,7 @@ from ..io.basicio import parallel_print
 from .meshing_gmsh3d import (
     apply_structured_winslow_smoothing3D,
     build_gmsh_geometry_and_groups3D,
+    configure_gmsh_3d_meshing_mode,
     configure_gmsh_mesh_size3D,
 )
 from .meshing_utils3d import create_sizing_function3D
@@ -45,7 +46,7 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
     length_y = mesh_parameters.length_y
     padding_z = mesh_parameters.padding_z
     padding_x = mesh_parameters.padding_x
-    padding_y = getattr(mesh_parameters, "padding_y", padding_x)
+    padding_y = mesh_parameters.padding_y
     hyper_n = mesh_parameters.hyper_n
     hmin_segy = mesh_parameters.hmin_segy
     wl = mesh_parameters.cells_per_wavelength
@@ -64,27 +65,23 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
     winslow_omega = mesh_parameters.winslow_omega
     extend_segy = mesh_parameters.extend_segy
     h_padding = mesh_parameters.h_padding
-    parallel = getattr(mesh_parameters, "gmsh_parallel", False)
-    gmsh_num_threads = getattr(mesh_parameters, "gmsh_num_threads", 1)
+    parallel = mesh_parameters.gmsh_parallel
+    gmsh_num_threads = mesh_parameters.gmsh_num_threads
 
-    byte_order = getattr(mesh_parameters, "segy_byte_order", "big")
-    axes_order = tuple(
-        getattr(mesh_parameters, "segy_axes_order", (0, 1, 2))
-    )
-    axes_order_sort = getattr(
-        mesh_parameters, "segy_axes_order_sort", "F"
-    )
-    binary_dtype = getattr(mesh_parameters, "segy_dtype", "float32")
+    byte_order = mesh_parameters.segy_byte_order
+    axes_order = tuple(mesh_parameters.segy_axes_order)
+    axes_order_sort = mesh_parameters.segy_axes_order_sort
+    binary_dtype = mesh_parameters.segy_dtype
 
     if mesh_parameters.segy_velocity_model is not None:
         velocity_model_file = mesh_parameters.segy_velocity_model
         fname = velocity_model_file
-        nz = getattr(mesh_parameters, "segy_nz", None)
-        nx = getattr(mesh_parameters, "segy_nx", None)
-        ny = getattr(mesh_parameters, "segy_ny", None)
-        dz = getattr(mesh_parameters, "segy_dz", None)
-        dx = getattr(mesh_parameters, "segy_dx", None)
-        dy = getattr(mesh_parameters, "segy_dy", None)
+        nz = mesh_parameters.segy_nz
+        nx = mesh_parameters.segy_nx
+        ny = mesh_parameters.segy_ny
+        dz = mesh_parameters.segy_dz
+        dx = mesh_parameters.segy_dx
+        dy = mesh_parameters.segy_dy
         if any(value is None for value in (nz, nx, ny, dz, dx, dy)):
             raise ValueError(
                 "3-D binary Gmsh meshing requires segy_nz, segy_nx, "
@@ -135,21 +132,13 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
             0.0, length_y,
         )
 
-        if padding_type is None:
-            domain_xmin, domain_xmax = 0.0, length_x
-            domain_ymin, domain_ymax = 0.0, length_y
-            domain_zmin, domain_zmax = depth_z, 0.0
-        elif padding_type in ("rectangular", "hyperelliptical"):
-            domain_xmin, domain_xmax = -padding_x, length_x + padding_x
-            domain_ymin, domain_ymax = -padding_y, length_y + padding_y
-            domain_zmin, domain_zmax = depth_z - padding_z, 0.0
-        else:
+        if padding_type not in (None, "rectangular", "hyperelliptical"):
             raise ValueError(
                 "padding_type must be None, 'rectangular', or "
                 "'hyperelliptical'."
             )
 
-        ef_segy3, f_min, f_max, n_samples, n_traces_x, n_traces_y = (  # noqa: RUF059
+        ef_segy3, *_ = (
             create_sizing_function3D(
                 fname=fname,
                 hmin=hmin_segy,
@@ -179,7 +168,7 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
         gmsh.model.add("3d_Velocity_Model_Water_Interface")
 
         try:
-            geom_params = build_gmsh_geometry_and_groups3D(
+            build_gmsh_geometry_and_groups3D(
                 gmsh=gmsh,
                 fname=fname,
                 length_x=length_x,
@@ -231,30 +220,21 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
                 parallel_print=parallel_print,
             )
 
-            if structured_mesh:
-                gmsh.option.setNumber("Mesh.MeshSizeMin", minElementSize)
-                gmsh.option.setNumber("Mesh.MeshSizeMax", minElementSize)
-                gmsh.model.mesh.setTransfiniteAutomatic(
-                    [],
-                    np.pi,
-                    True,
-                )
-
+            configure_gmsh_3d_meshing_mode(
+                gmsh=gmsh,
+                structured_mesh=structured_mesh,
+                min_element_size=minElementSize,
+            )
             gmsh.option.setNumber("Mesh.SaveWithoutOrphans", 1)
             gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
             gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
             gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
-            gmsh.option.setNumber("Mesh.Algorithm3D", 10)
-            gmsh.option.setNumber("Mesh.OptimizeThreshold", 0.5)
-            gmsh.option.setNumber("Mesh.Optimize", 1)
-            gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
             gmsh.model.mesh.generate(3)
 
             if structured_mesh:
                 apply_structured_winslow_smoothing3D(
                     gmsh=gmsh,
                     comm=mesh_parameters.comm,
-                    geom_params=geom_params,
                     length_x=length_x,
                     length_y=length_y,
                     depth_z=depth_z,
@@ -263,20 +243,10 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
                     padding_y=padding_y,
                     padding_z=padding_z,
                     water_interface=water_interface,
-                    hyper_n=hyper_n,
                     winslow_implementation=winslow_implementation,
                     apply_winslow=apply_winslow,
                     winslow_iterations=winslow_iterations,
                     winslow_omega=winslow_omega,
-                    n_samples=n_samples,
-                    n_traces_x=n_traces_x,
-                    n_traces_y=n_traces_y,
-                    domain_xmin=domain_xmin,
-                    domain_xmax=domain_xmax,
-                    domain_ymin=domain_ymin,
-                    domain_ymax=domain_ymax,
-                    domain_zmin=domain_zmin,
-                    domain_zmax=domain_zmax,
                     ef_segy3=ef_segy3,
                     parallel_print=parallel_print,
                 )
