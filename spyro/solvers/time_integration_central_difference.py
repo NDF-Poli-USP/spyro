@@ -1,9 +1,11 @@
 import firedrake as fire
+from pyadjoint import annotate_tape
 import numpy as np
+from firedrake import *
 
 from . import helpers
 from .. import utils
-from ..utils.typing import FunctionalEvaluationMode, AdjointType, AbsorbingBCsType
+from ..utils.typing import FunctionalEvaluationMode, AdjointType, AbsorbingBCsType, WaveType
 
 
 def _propagate_forward_central_difference(wave, source_ids):
@@ -92,6 +94,16 @@ def _propagate_forward_central_difference(wave, source_ids):
         # fresh one, sized by this loop's ``nt``.
         wave.automated_adjoint.start_recording(total_steps=nt)
 
+    viscoelastic = (
+        wave.wave_type != WaveType.ISOTROPIC_ACOUSTIC
+        and getattr(wave, "viscoelastic", False)
+    )
+    if viscoelastic:
+        # Zera a memória a cada solve. Num único solve não muda nada; com
+        # vários tiros/iterações, evita herdar a memória do solve anterior.
+        for zeta in wave.zeta_list:
+            zeta.assign(0.0)
+
     for step in range(nt):
         # Basic way of applying sources
         wave.update_source_expression(t)
@@ -126,6 +138,23 @@ def _propagate_forward_central_difference(wave, source_ids):
 
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
+
+        if viscoelastic:
+            # eps^n = sym(grad(u^n)) em DG0, com a interpolação pré-montada.
+            fire.assemble(wave.eps_interp, tensor=wave.eps_n)
+
+            # zeta_l <- a_l zeta_l + b_l eps^n (mesma conta do original).
+            if annotate_tape():
+                # Adjunto automático: operações gravadas na fita.
+                for zeta, a, b in zip(wave.zeta_list, wave.zeta_a, wave.zeta_b):
+                    zeta.assign(a * zeta + b * wave.eps_n)
+            else:
+                # Problema direto: direto nos vetores PETSc.
+                with wave.eps_n.dat.vec_ro as ve:
+                    for zeta, a, b in zip(wave.zeta_list, wave.zeta_a,
+                                          wave.zeta_b):
+                        with zeta.dat.vec as vz:
+                            vz.axpby(b, a, ve)   # vz = b*ve + a*vz
 
         if wave.use_vertex_only_mesh:
             if receiver_buffer is None:
