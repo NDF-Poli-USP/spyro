@@ -1,15 +1,98 @@
 import importlib.util
-import math
+import json
+import subprocess
+import sys
 
+import firedrake as fire
 import pytest
 
-from spyro.meshing.meshing_functions import AutomaticMesh
-from spyro.meshing.meshing_parameters import MeshingParameters
+from .gmsh_mesh_checks import (
+    VELOCITY_MODELS_DIR,
+    assert_bounds,
+    assert_cell_count,
+    assert_cell_regions,
+    assert_cell_type,
+    assert_facets_on_lines,
+    assert_measure,
+    assert_no_degenerate_cells,
+    assert_region_above,
+    create_gmsh_mesh,
+    hyperellipse_area,
+    measure,
+    physical_groups,
+)
 
 
 HAS_NUMBA = importlib.util.find_spec("numba") is not None
 
-CELL_COUNT_TOLERANCE = 0.25
+LENGTH_Z = 3000.0
+LENGTH_X = 5000.0
+PADDING = 1000.0
+HYPER_N = 4.0
+
+# Structured meshes are transfinite, so their cell count is exact. Unstructured
+# counts may change slightly between Gmsh versions; the baselines were made
+# with Gmsh 4.13.1.
+UNSTRUCTURED_CELL_COUNT_RTOL = 0.02
+# The hyperelliptical boundary is a polyline, so its area is slightly smaller
+# than the exact hyperellipse.
+HYPERELLIPSE_AREA_RTOL = 0.01
+
+# Coordinate line, as (axis, value) in spyro (z, x) order, of every straight
+# boundary group.
+FACET_LINES = {
+    **dict.fromkeys(
+        ["Top", "InternalTop", "PaddingTopLeft", "PaddingTopRight"], (0, 0.0)
+    ),
+    **dict.fromkeys(["Bottom", "InternalBottom"], (0, -LENGTH_Z)),
+    **dict.fromkeys(
+        ["Left", "InternalLeft", "InternalWaterLeft", "InternalRockLeft"], (1, 0.0)
+    ),
+    **dict.fromkeys(
+        ["Right", "InternalRight", "InternalWaterRight", "InternalRockRight"],
+        (1, LENGTH_X),
+    ),
+    **dict.fromkeys(["PaddingLeftUpper", "PaddingLeftLower"], (1, -PADDING)),
+    **dict.fromkeys(
+        ["PaddingRightUpper", "PaddingRightLower"], (1, LENGTH_X + PADDING)
+    ),
+    **dict.fromkeys(
+        ["PaddingBottomLeft", "PaddingBottomCenter", "PaddingBottomRight"],
+        (0, -LENGTH_Z - PADDING),
+    ),
+}
+
+RECTANGULAR_PADDING_FACETS = {
+    "PaddingTopLeft", "PaddingLeftUpper", "PaddingLeftLower",
+    "PaddingBottomLeft", "PaddingBottomCenter", "PaddingBottomRight",
+    "PaddingRightLower", "PaddingRightUpper", "PaddingTopRight",
+}
+HYPERELLIPTICAL_PADDING_FACETS = {
+    "PaddingTopLeft", "PaddingTopRight", "HyperellipseLeft",
+    "HyperellipseBottomLeft", "HyperellipseBottomCenter",
+    "HyperellipseBottomRight", "HyperellipseRight",
+}
+NO_WATER_INTERNAL_FACETS = {
+    "InternalTop", "InternalLeft", "InternalRight", "InternalBottom",
+}
+WATER_INTERNAL_FACETS = {
+    "InternalTop", "InternalWaterLeft", "InternalWaterRight", "WaterInterface",
+    "InternalRockLeft", "InternalRockRight", "InternalBottom",
+}
+
+EXPECTED_FACET_GROUPS = {
+    # (water_interface, padding_type): boundary group names
+    (False, None): {"Bottom", "Top", "Left", "Right"},
+    (False, "rectangular"): RECTANGULAR_PADDING_FACETS | NO_WATER_INTERNAL_FACETS,
+    (False, "hyperelliptical"): (
+        HYPERELLIPTICAL_PADDING_FACETS | NO_WATER_INTERNAL_FACETS
+    ),
+    (True, None): WATER_INTERNAL_FACETS,
+    (True, "rectangular"): RECTANGULAR_PADDING_FACETS | WATER_INTERNAL_FACETS,
+    (True, "hyperelliptical"): (
+        HYPERELLIPTICAL_PADDING_FACETS | WATER_INTERNAL_FACETS
+    ),
+}
 
 
 WATER_INTERFACE_CASES = pytest.mark.parametrize(
@@ -55,15 +138,15 @@ def _base_gmsh2d_parameters(output_filename):
     return {
         "mesh_type": "gmsh_mesh",
         "dimension": 2,
-        "length_z": 3000.0,
-        "length_x": 5000.0,
+        "length_z": LENGTH_Z,
+        "length_x": LENGTH_X,
         "output_filename": str(output_filename),
-        "segy_velocity_model": "velocity_models/vs_example_2D.segy",
+        "segy_velocity_model": str(VELOCITY_MODELS_DIR / "vs_example_2D.segy"),
         "cells_per_wavelength": 2.0,
         "source_frequency": 10.0,
-        "padding_x": 1000.0,
-        "padding_z": 1000.0,
-        "hyper_n": 4.0,
+        "padding_x": PADDING,
+        "padding_z": PADDING,
+        "hyper_n": HYPER_N,
         "hmin_segy": 0.0,
         "grade": 0.1,
         "water_search_value": 0.0,
@@ -75,50 +158,56 @@ def _base_gmsh2d_parameters(output_filename):
     }
 
 
-def _create_mesh_and_count_cells(parameters):
-    mesh_params = MeshingParameters(input_mesh_dictionary=parameters)
-    mesh_generator = AutomaticMesh(mesh_parameters=mesh_params)
-    firedrake_mesh = mesh_generator.create_mesh()
-
-    if (
-        not hasattr(firedrake_mesh.topology, "_entity_classes")
-        and hasattr(firedrake_mesh, "init")
-    ):
-        firedrake_mesh.init()
-
-    return firedrake_mesh.cell_set.core_size
-
-
-def _assert_cell_count(
-    actual_cells: int,
-    expected_cells: int,
-    relative_tolerance: float = CELL_COUNT_TOLERANCE,
-) -> None:
-    """Assert that a cell count lies within a relative tolerance of a baseline.
+def _check_mesh(mesh, msh_file, water_interface, padding_type) -> None:
+    """Check the geometry, regions and boundary tags of a 2D Gmsh mesh.
 
     Parameters
     ----------
-    actual_cells : int
-        Number of cells in the generated mesh.
-    expected_cells : int
-        Baseline number of cells.
-    relative_tolerance : float, optional
-        Allowed relative deviation from ``expected_cells``.
-
-    Raises
-    ------
-    AssertionError
-        If ``actual_cells`` is outside the allowed interval.
+    mesh : firedrake.MeshGeometry
+        Mesh returned by ``AutomaticMesh``.
+    msh_file : pathlib.Path
+        Gmsh file the mesh was read from.
+    water_interface : bool
+        Whether the water layer is a separate region.
+    padding_type : str or None
+        Padding geometry.
     """
-    lower_bound = math.floor(expected_cells * (1.0 - relative_tolerance))
-    upper_bound = math.ceil(expected_cells * (1.0 + relative_tolerance))
+    box_area = LENGTH_Z * LENGTH_X
+    if padding_type is None:
+        lower, upper = (-LENGTH_Z, 0.0), (0.0, LENGTH_X)
+        total_area, area_rtol, bounds_rtol = box_area, 1e-9, 1e-9
+    else:
+        # The hyperellipse reaches the same extremes as the rectangle.
+        lower, upper = (-LENGTH_Z - PADDING, -PADDING), (0.0, LENGTH_X + PADDING)
+        if padding_type == "rectangular":
+            total_area, area_rtol, bounds_rtol = (
+                (LENGTH_Z + PADDING) * (LENGTH_X + 2 * PADDING), 1e-9, 1e-9,
+            )
+        else:
+            total_area = hyperellipse_area(
+                LENGTH_Z, LENGTH_X, PADDING, PADDING, HYPER_N
+            )
+            area_rtol, bounds_rtol = HYPERELLIPSE_AREA_RTOL, 1e-3
 
-    assert lower_bound <= actual_cells <= upper_bound, (
-        f"Got {actual_cells} cells, expected approximately "
-        f"{expected_cells} cells "
-        f"(allowed interval: {lower_bound} to {upper_bound}, "
-        f"tolerance: +/-{100.0 * relative_tolerance:.1f}%)."
-    )
+    assert_bounds(mesh, lower, upper, rtol=bounds_rtol)
+    assert_measure(mesh, total_area, rtol=area_rtol)
+    assert_no_degenerate_cells(mesh)
+
+    groups = physical_groups(msh_file)
+    core = ("WaterSurface", "SubSurface") if water_interface else ("SubSurface",)
+    expected_measures = {core: box_area}
+    if padding_type is not None:
+        # The total was checked above; the box edges are straight, so the
+        # split between model and padding is exact.
+        expected_measures[("Padding",)] = measure(mesh) - box_area
+    assert_cell_regions(mesh, groups[2], expected_measures)
+    if water_interface:
+        assert_region_above(
+            mesh, groups[2]["WaterSurface"], groups[2]["SubSurface"]
+        )
+
+    assert set(groups[1]) == EXPECTED_FACET_GROUPS[(water_interface, padding_type)]
+    assert_facets_on_lines(mesh, groups[1], FACET_LINES)
 
 
 @pytest.mark.slow
@@ -155,10 +244,11 @@ def test_gmsh2d_structured(
         }
     )
 
-    _assert_cell_count(
-        _create_mesh_and_count_cells(parameters),
-        STRUCTURED_EXPECTED_CELLS[(water_interface, padding_type)],
-    )
+    mesh = create_gmsh_mesh(parameters)
+
+    assert_cell_type(mesh, "quadrilateral")
+    assert_cell_count(mesh, STRUCTURED_EXPECTED_CELLS[(water_interface, padding_type)])
+    _check_mesh(mesh, parameters["output_filename"], water_interface, padding_type)
 
 
 @pytest.mark.slow
@@ -183,9 +273,77 @@ def test_gmsh2d_unstructured(
         }
     )
 
-    _assert_cell_count(
-        _create_mesh_and_count_cells(parameters),
-        UNSTRUCTURED_EXPECTED_CELLS[
-            (extend_segy, water_interface, padding_type)
-        ],
+    mesh = create_gmsh_mesh(parameters)
+
+    assert_cell_type(mesh, "triangle")
+    assert_cell_count(
+        mesh,
+        UNSTRUCTURED_EXPECTED_CELLS[(extend_segy, water_interface, padding_type)],
+        rtol=UNSTRUCTURED_CELL_COUNT_RTOL,
     )
+    _check_mesh(mesh, parameters["output_filename"], water_interface, padding_type)
+
+
+def _generate_in_subprocess(parameters: dict) -> None:
+    """Write a 2D Gmsh mesh from a separate Python process.
+
+    Gmsh aborts the interpreter when a second ``unstructured_quad_mesh`` is
+    generated in the same process (see mfe_6_repeated_quad_meshing_aborts.py),
+    so each quad mesh is made in a fresh process.
+
+    Parameters
+    ----------
+    parameters : dict
+        JSON-serialisable input mesh dictionary.
+    """
+    script = (
+        "import json, sys\n"
+        "from spyro.meshing.meshing_parameters import MeshingParameters\n"
+        "from spyro.meshing.meshing_2d import generate_gmsh_2d_mesh\n"
+        "generate_gmsh_2d_mesh(\n"
+        "    MeshingParameters(input_mesh_dictionary=json.loads(sys.argv[1]))\n"
+        ")\n"
+    )
+    subprocess.run(
+        [sys.executable, "-c", script, json.dumps(parameters)],
+        check=True,
+        capture_output=True,
+    )
+
+
+@pytest.mark.slow
+@PADDING_CASES
+@WATER_INTERFACE_CASES
+def test_gmsh2d_unstructured_quad(tmp_path, request, water_interface, padding_type):
+    """Unstructured all-quadrilateral meshes."""
+    if water_interface and padding_type is None:
+        request.applymarker(
+            pytest.mark.xfail(
+                strict=True,
+                reason=(
+                    "Known bug: recombination leaves two triangles. Firedrake "
+                    "either fails to read the mixed mesh or reads it as a "
+                    "triangle mesh (see mfe_5_quad_mesh_leaves_triangles.py)."
+                ),
+            )
+        )
+    parameters = _base_gmsh2d_parameters(tmp_path / "mesh.msh")
+    parameters.update(
+        {
+            "padding_type": padding_type,
+            "water_interface": water_interface,
+            "structured_mesh": False,
+            "unstructured_quad_mesh": True,
+            "apply_winslow": False,
+            "winslow_implementation": "default",
+            "extend_segy": True,
+        }
+    )
+
+    _generate_in_subprocess(parameters)
+    mesh = fire.Mesh(parameters["output_filename"])
+
+    # No cell-count baseline: quad recombination is not deterministic, and
+    # repeated runs with the same input differ by more than 10%.
+    assert_cell_type(mesh, "quadrilateral")
+    _check_mesh(mesh, parameters["output_filename"], water_interface, padding_type)
