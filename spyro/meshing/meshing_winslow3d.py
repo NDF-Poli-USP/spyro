@@ -20,7 +20,7 @@ except ImportError:  # pragma: no cover
         return decorator
 
 
-from .meshing_utils3D import sizing_function_xyz
+from .meshing_utils3d import sizing_function_xyz
 
 
 def run_selected_winslow(

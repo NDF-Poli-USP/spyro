@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 
 from spyro.io.basicio import parallel_print
-from spyro.meshing.meshing_utils3D import create_sizing_function3D
-from spyro.meshing.meshing_winslow3D import (
+from spyro.meshing.meshing_utils3d import create_sizing_function3D
+from spyro.meshing.meshing_winslow3d import (
     NUMBA_AVAILABLE,
     _numba_winslow_3d_step,
     _resolve_stencil_coordinates,
