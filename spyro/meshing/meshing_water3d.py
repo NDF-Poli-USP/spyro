@@ -1,6 +1,7 @@
 import numpy as np
 
 from ..io.basicio import read_velocity_binary3d
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 def _water_interface_grid(
@@ -356,9 +357,6 @@ def generate_water_interface_volumes(
     tolerance=1.0,
     x_chunk=64,
     y_chunk=None,
-    *,
-    comm,
-    parallel_print,
 ):
     """Generate geometrically delimited water and subsurface volumes from a velocity model.
 
@@ -408,17 +406,13 @@ def generate_water_interface_volumes(
         Number of x samples processed per interface-extraction chunk.
     y_chunk : int or None
         Number of y samples processed per chunk; ``None`` uses the full span.
-    comm : mpi4py.MPI.Comm or None
-        MPI communicator forwarded to rank-aware output.
-    parallel_print : callable
-        Rank-aware print function accepting a ``comm`` keyword argument.
 
     Returns
     -------
     tuple of int
         Subsurface and water volume tags.
     """
-    parallel_print("Generating geometrically delimited water and subsurface volumes...", comm=comm)
+    SpyroEnsemble.print("Generating geometrically delimited water and subsurface volumes...")
 
     nz, nx, ny = int(nz), int(nx), int(ny)
     cube = read_velocity_binary3d(

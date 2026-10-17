@@ -1,6 +1,5 @@
 import numpy as np
 
-from ..io.basicio import parallel_print
 from .meshing_gmsh3d import (
     apply_structured_winslow_smoothing3D,
     build_gmsh_geometry_and_groups3D,
@@ -8,6 +7,7 @@ from .meshing_gmsh3d import (
     configure_gmsh_mesh_size3D,
 )
 from .meshing_utils3d import create_sizing_function3D
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 try:
     import gmsh
@@ -124,7 +124,7 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
         )
 
     if mesh_parameters.comm is None or mesh_parameters.comm.ensemble_comm.rank == 0:
-        parallel_print("Generating 3D Gmsh mesh...", comm=mesh_parameters.comm)
+        SpyroEnsemble.print("Generating 3D Gmsh mesh...")
 
         segy_bbox = (
             depth_z, 0.0,
@@ -192,8 +192,6 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
                 axes_order=axes_order,
                 axes_order_sort=axes_order_sort,
                 dtype=binary_dtype,
-                comm=mesh_parameters.comm,
-                parallel_print=parallel_print,
             )
 
             configure_gmsh_mesh_size3D(
@@ -216,8 +214,6 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
                 nx=nx,
                 ny=ny,
                 gmsh_num_threads=gmsh_num_threads,
-                comm=mesh_parameters.comm,
-                parallel_print=parallel_print,
             )
 
             configure_gmsh_3d_meshing_mode(
@@ -234,7 +230,6 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
             if structured_mesh:
                 apply_structured_winslow_smoothing3D(
                     gmsh=gmsh,
-                    comm=mesh_parameters.comm,
                     length_x=length_x,
                     length_y=length_y,
                     depth_z=depth_z,
@@ -248,7 +243,6 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
                     winslow_iterations=winslow_iterations,
                     winslow_omega=winslow_omega,
                     ef_segy3=ef_segy3,
-                    parallel_print=parallel_print,
                 )
 
             # gmsh builds the model in physical coordinates (x, y, z=depth).
@@ -261,10 +255,7 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
             ]
             gmsh.model.mesh.affineTransform(gmsh_xyz_to_spyro_zxy)
             gmsh.write(output_file)
-            parallel_print(
-                f"Gmsh 3D mesh written to {output_file}",
-                comm=mesh_parameters.comm,
-            )
+            SpyroEnsemble.print(f"Gmsh 3D mesh written to {output_file}")
         finally:
             gmsh.finalize()
 
