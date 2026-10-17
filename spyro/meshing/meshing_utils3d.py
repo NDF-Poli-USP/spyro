@@ -674,3 +674,40 @@ def define_winslow_points_3d(
         "water_nodes": water_nodes,
         "movable_nodes": movable_nodes,
     }
+
+
+def checked_mesh_size(ef_segy, coords, context):
+    """Evaluate and validate a three-dimensional mesh-size query.
+
+    Parameters
+    ----------
+    ef_segy : callable
+        Mesh-sizing function evaluated in ``(z, x, y)`` coordinates.
+    coords : numpy.ndarray
+        Coordinates passed to the sizing callback.
+    context : str
+        Description of the sizing-query context used in error messages.
+
+    Returns
+    -------
+    float
+        Validated positive mesh size.
+    """
+    values = np.asarray(ef_segy(coords), dtype=float).reshape(-1)
+
+    if values.size != 1:
+        raise ValueError(
+            "The 3-D mesh sizing callback expected one value, "
+            f"received {values.size} in {context}."
+        )
+
+    value = float(values[0])
+    if not np.isfinite(value) or value <= 0.0:
+        raise ValueError(
+            "The 3-D mesh sizing callback produced an invalid "
+            f"element size {value} in {context} at coordinate "
+            f"(z, x, y)={np.asarray(coords)[0].tolist()}. "
+            "Gmsh requires a finite strictly positive size."
+        )
+
+    return value
