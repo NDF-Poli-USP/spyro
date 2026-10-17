@@ -393,10 +393,12 @@ def build_gmsh_geometry_and_groups(
                 elif abs(ymin) <= tol and abs(ymax) <= tol:
                     top_curves.append(curve)
 
-            gmsh.model.addPhysicalGroup(1, left_curves, 1, "Left")
-            gmsh.model.addPhysicalGroup(1, right_curves, 2, "Right")
-            gmsh.model.addPhysicalGroup(1, bottom_curves, 3, "Bottom")
-            gmsh.model.addPhysicalGroup(1, top_curves, 4, "Top")
+            # Same ids as Firedrake's RectangleMesh in spyro's (z, x) order,
+            # which the local ABCs rely on: 1 z=-Lz, 2 z=0, 3 x=0, 4 x=Lx.
+            gmsh.model.addPhysicalGroup(1, bottom_curves, 1, "Bottom")
+            gmsh.model.addPhysicalGroup(1, top_curves, 2, "Top")
+            gmsh.model.addPhysicalGroup(1, left_curves, 3, "Left")
+            gmsh.model.addPhysicalGroup(1, right_curves, 4, "Right")
 
         if padding_type == "rectangular":
             pt_tl = gmsh.model.occ.addPoint(0.0, 0.0, 0.0)
