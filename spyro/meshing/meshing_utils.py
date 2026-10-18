@@ -627,7 +627,7 @@ def generate_water_profile_from_segy(
         xe = min(xs + x_chunk, Nx + 1)
         ix_tile = ix_min + np.arange(xs, xe, dtype=int)
 
-        block = plane_zx[iz_top : iz_bot + 1, ix_tile]
+        block = plane_zx[iz_top: iz_bot + 1, ix_tile]
         block = np.asarray(block, dtype=np.float32)
 
         in_water = np.abs(block - target) <= tol
