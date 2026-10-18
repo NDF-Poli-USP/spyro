@@ -3,7 +3,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from spyro.io.basicio import parallel_print
 from spyro.meshing.meshing_utils3d import create_sizing_function3D
 from spyro.meshing.meshing_winslow3d import (
     NUMBA_AVAILABLE,
@@ -414,8 +413,6 @@ def test_winslow_smooth_rejects_invalid_point_shape(bad_points):
             length_x=2.0,
             length_y=2.0,
             depth_z=2.0,
-            comm=None,
-            parallel_print=parallel_print,
             iterations=1,
             omega=0.5,
         )
@@ -447,8 +444,6 @@ def test_winslow_smooth_rejects_invalid_hex_shape(bad_hexes):
             length_x=2.0,
             length_y=2.0,
             depth_z=2.0,
-            comm=None,
-            parallel_print=parallel_print,
             iterations=1,
             omega=0.5,
         )
@@ -473,8 +468,6 @@ def test_winslow_smooth_rejects_negative_iterations():
             length_x=2.0,
             length_y=2.0,
             depth_z=2.0,
-            comm=None,
-            parallel_print=parallel_print,
             iterations=-1,
             omega=0.5,
         )
@@ -500,8 +493,6 @@ def test_winslow_smooth_rejects_invalid_omega(omega):
             length_x=2.0,
             length_y=2.0,
             depth_z=2.0,
-            comm=None,
-            parallel_print=parallel_print,
             iterations=1,
             omega=omega,
         )
@@ -526,8 +517,6 @@ def test_winslow_smooth_rejects_invalid_movement_indices(invalid_node):
             length_x=2.0,
             length_y=2.0,
             depth_z=2.0,
-            comm=None,
-            parallel_print=parallel_print,
             iterations=0,
             omega=0.5,
         )
@@ -548,8 +537,6 @@ def test_winslow_smooth_zero_iterations_preserves_real_hex_mesh(capsys):
         length_x=2.0,
         length_y=2.0,
         depth_z=2.0,
-        comm=None,
-        parallel_print=parallel_print,
         iterations=0,
         omega=0.5,
     )
@@ -581,8 +568,6 @@ def test_winslow_smooth_isolated_movable_node_is_safe():
         length_x=1.0,
         length_y=1.0,
         depth_z=1.0,
-        comm=None,
-        parallel_print=parallel_print,
         iterations=1,
         omega=0.5,
     )
@@ -616,8 +601,6 @@ def test_winslow_smooth_respects_directional_movement(movement_set):
         length_x=2.0,
         length_y=2.0,
         depth_z=2.0,
-        comm=None,
-        parallel_print=parallel_print,
         iterations=2,
         omega=0.5,
     )
@@ -660,8 +643,6 @@ def test_winslow_smooth_move_all_changes_distorted_interior():
         length_x=2.0,
         length_y=2.0,
         depth_z=2.0,
-        comm=None,
-        parallel_print=parallel_print,
         iterations=3,
         omega=0.4,
     )
@@ -673,39 +654,6 @@ def test_winslow_smooth_move_all_changes_distorted_interior():
 
     fixed = np.arange(len(points)) != center
     np.testing.assert_allclose(smoothed[fixed], distorted[fixed])
-
-
-class _RankOneCommunicator:
-    rank = 1
-
-
-class _CommunicatorWrapper:
-    comm = _RankOneCommunicator()
-
-
-def test_winslow_smooth_accepts_wrapped_communicator():
-    points, hexes, node = _structured_hex_mesh()
-    center = node(1, 1, 1)
-
-    result = winslow_smooth_3d55(
-        points=points,
-        hexes=hexes,
-        move_all={center},
-        move_X_only=set(),
-        move_Y_only=set(),
-        move_Z_only=set(),
-        ef_segy=_constant_sizing,
-        length_x=2.0,
-        length_y=2.0,
-        depth_z=2.0,
-        comm=_CommunicatorWrapper(),
-        parallel_print=parallel_print,
-        iterations=1,
-        omega=0.5,
-    )
-
-    assert result.shape == points.shape
-    assert np.all(np.isfinite(result))
 
 
 def test_run_selected_winslow_rejects_empty_movable_union():
@@ -728,8 +676,6 @@ def test_run_selected_winslow_rejects_empty_movable_union():
             depth_z=2.0,
             winslow_iterations=1,
             winslow_omega=0.5,
-            comm=None,
-            parallel_print=parallel_print,
             selected_winslow="numba",
         )
 
@@ -755,8 +701,6 @@ def test_run_selected_winslow_rejects_unknown_implementation(capsys):
             depth_z=2.0,
             winslow_iterations=0,
             winslow_omega=0.5,
-            comm=None,
-            parallel_print=parallel_print,
             selected_winslow="python",
         )
 
@@ -784,8 +728,6 @@ def test_run_selected_winslow_real_algorithm_reports_displacement(capsys):
         depth_z=2.0,
         winslow_iterations=2,
         winslow_omega=0.5,
-        comm=None,
-        parallel_print=parallel_print,
         selected_winslow="numba",
     )
 
@@ -816,8 +758,6 @@ def test_run_selected_winslow_zero_iterations_reports_no_movement(capsys):
         depth_z=2.0,
         winslow_iterations=0,
         winslow_omega=0.5,
-        comm=None,
-        parallel_print=parallel_print,
         selected_winslow="numba",
     )
 
@@ -889,8 +829,6 @@ def test_run_selected_winslow_with_vs_example_3d():
         depth_z=3000.0,
         winslow_iterations=0,
         winslow_omega=0.5,
-        comm=None,
-        parallel_print=parallel_print,
         selected_winslow="numba",
     )
 
