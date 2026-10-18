@@ -16,18 +16,12 @@ with h = vp / (frequency * cells_per_wavelength). The arrays use the spyro
 Lengths are in metres, unlike most spyro tests: the 3D Gmsh sizing assumes
 metres (SeismicMesh defaults to ``hmin = 150`` m and checks that ``vp_water``
 lies between 1300 and 1800 m/s).
-
-The SeismicMesh sizing path is switched off in these tests, because the size
-function it returns cannot be evaluated and Gmsh then never finishes meshing.
-``test_create_sizing_function3d_seismicmesh_path`` in
-``test_meshing_utils_3d.py`` tracks that bug.
 """
 
 import firedrake as fire
 import numpy as np
 import pytest
 
-import spyro.meshing.meshing_utils3d
 
 from .gmsh_mesh_checks import (
     assert_bounds,
@@ -208,7 +202,7 @@ def adapted_mesh(tmp_path_factory) -> fire.MeshGeometry:
     tmp_path = tmp_path_factory.mktemp("synthetic_3d")
     velocity_file = tmp_path / "four_regions.bin"
     _write_binary(velocity_file, _velocity_cube())
-    return _mesh_without_seismicmesh(_parameters(tmp_path, velocity_file))
+    return create_gmsh_mesh(_parameters(tmp_path, velocity_file))
 
 
 def test_gmsh_3d_synthetic_domain_uses_spyro_axes(adapted_mesh) -> None:
@@ -303,24 +297,6 @@ def test_gmsh_3d_synthetic_element_size(adapted_mesh, region: str) -> None:
     )
 
 
-def _mesh_without_seismicmesh(parameters: dict) -> fire.MeshGeometry:
-    """Build a mesh with the SeismicMesh sizing path switched off.
-
-    Parameters
-    ----------
-    parameters : dict
-        Input mesh dictionary.
-
-    Returns
-    -------
-    firedrake.MeshGeometry
-        The generated mesh.
-    """
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(spyro.meshing.meshing_utils3d, "SeismicMesh", None)
-        return create_gmsh_mesh(parameters)
-
-
 @pytest.fixture(
     scope="module",
     params=[
@@ -354,7 +330,7 @@ def water_mesh(request, tmp_path_factory) -> tuple:
         water_interface=True,
         padding_type=padding_type,
     )
-    mesh = _mesh_without_seismicmesh(parameters)
+    mesh = create_gmsh_mesh(parameters)
     return padding_type, mesh, parameters["output_filename"]
 
 
@@ -492,7 +468,7 @@ def test_gmsh_3d_grid_velocity_model_matches_binary_file(
         velocity_model={"vp_values": _velocity_cube()},
         segy_axes_order=axes_order,
     )
-    mesh = _mesh_without_seismicmesh(parameters)
+    mesh = create_gmsh_mesh(parameters)
 
     assert mesh.num_cells() == adapted_mesh.num_cells()
     np.testing.assert_allclose(

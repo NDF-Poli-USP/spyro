@@ -389,15 +389,6 @@ def test_create_sizing_function3d_fallback_interpolator(tmp_path):
 @pytest.mark.skipif(
     meshing_utils3d.SeismicMesh is None, reason="SeismicMesh is not installed."
 )
-@pytest.mark.xfail(
-    strict=True,
-    raises=TypeError,
-    reason=(
-        "Known bug: the SeismicMesh path wraps a SizeFunction object, which is "
-        "not callable. Gmsh swallows the error in its size callback and never "
-        "finishes meshing."
-    ),
-)
 def test_create_sizing_function3d_seismicmesh_path(tmp_path):
     """Evaluate the sizing function when SeismicMesh accepts the model.
 

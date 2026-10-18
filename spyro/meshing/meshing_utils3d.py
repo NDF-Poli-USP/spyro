@@ -1,3 +1,4 @@
+import warnings
 from collections import defaultdict, deque
 
 import numpy as np
@@ -315,15 +316,16 @@ def create_sizing_function3D(
                 "axes_order": tuple(axes_order),
                 "axes_order_sort": axes_order_sort,
             }
-            if requested_hmin is not None:
-                seismic_kwargs["hmin"] = requested_hmin
+            # Pass the floor explicitly: SeismicMesh otherwise enforces its
+            # own default minimum of 150 m.
+            seismic_kwargs["hmin"] = physical_positive_floor
 
             base_ef = SeismicMesh.get_sizing_function_from_segy(
                 str(fname),
                 bbox,
                 **seismic_kwargs,
             )
-            ef = edge_extended_callable(base_ef)
+            ef = edge_extended_callable(base_ef.eval)
 
             return (
                 ef,
@@ -333,8 +335,13 @@ def create_sizing_function3D(
                 int(nx),
                 int(ny),
             )
-        except (TypeError, ValueError, RuntimeError):
-            pass
+        except (TypeError, ValueError, RuntimeError) as error:
+            warnings.warn(
+                f"SeismicMesh could not build the 3-D sizing function ({error}); "
+                "using linear interpolation of the velocity model instead, "
+                "without gradation.",
+                stacklevel=2,
+            )
 
     velocity = read_velocity_binary3d(
         fname=fname,
