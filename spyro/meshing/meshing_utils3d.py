@@ -60,9 +60,7 @@ def sizing_function_xyz(
 
     finite_coordinates = np.isfinite(X) & np.isfinite(Y) & np.isfinite(Z)
     if not np.all(finite_coordinates):
-        bad_count = int(
-            finite_coordinates.size - np.count_nonzero(finite_coordinates)
-        )
+        bad_count = int(finite_coordinates.size - np.count_nonzero(finite_coordinates))
         raise FloatingPointError(
             "Winslow generated NaN or infinite coordinates before "
             f"sizing evaluation ({bad_count} invalid nodes). Reduce "
@@ -176,8 +174,7 @@ def create_sizing_function3D(
     zmin, zmax, xmin, xmax, ymin, ymax = map(float, bbox)
     if not (zmin < zmax and xmin < xmax and ymin < ymax):
         raise ValueError(
-            "bbox must be ordered as "
-            "(zmin, zmax, xmin, xmax, ymin, ymax)."
+            "bbox must be ordered as " "(zmin, zmax, xmin, xmax, ymin, ymax)."
         )
 
     requested_hmin = None
@@ -185,9 +182,7 @@ def create_sizing_function3D(
         requested_hmin = float(hmin)
 
     if vp_water is not None and float(vp_water) > 0.0:
-        physical_positive_floor = (
-            float(vp_water) / (float(freq) * float(wl))
-        )
+        physical_positive_floor = float(vp_water) / (float(freq) * float(wl))
     elif requested_hmin is not None:
         physical_positive_floor = requested_hmin
     else:
@@ -212,6 +207,7 @@ def create_sizing_function3D(
         callable
             Sizing function that clamps queries to the velocity-model bounds.
         """
+
         def evaluate(coordinates):
             """Evaluate the edge-extended sizing function at one or more coordinates.
 
@@ -237,20 +233,12 @@ def create_sizing_function3D(
                     "in (z, x, y) order."
                 )
             if not np.all(np.isfinite(points)):
-                raise ValueError(
-                    "3-D sizing coordinates contain NaN or infinity."
-                )
+                raise ValueError("3-D sizing coordinates contain NaN or infinity.")
 
             projected = points.copy()
-            projected[:, 0] = np.clip(
-                projected[:, 0], zmin, zmax
-            )
-            projected[:, 1] = np.clip(
-                projected[:, 1], xmin, xmax
-            )
-            projected[:, 2] = np.clip(
-                projected[:, 2], ymin, ymax
-            )
+            projected[:, 0] = np.clip(projected[:, 0], zmin, zmax)
+            projected[:, 1] = np.clip(projected[:, 1], xmin, xmax)
+            projected[:, 2] = np.clip(projected[:, 2], ymin, ymax)
 
             values = np.asarray(
                 base_callable(projected),
@@ -264,9 +252,7 @@ def create_sizing_function3D(
                     f"{projected.shape[0]} coordinates."
                 )
             if not np.all(np.isfinite(values)):
-                first = int(
-                    np.flatnonzero(~np.isfinite(values))[0]
-                )
+                first = int(np.flatnonzero(~np.isfinite(values))[0])
                 raise ValueError(
                     "The 3-D sizing function returned NaN or infinity "
                     "inside the velocity-model box. First projected "
@@ -355,9 +341,7 @@ def create_sizing_function3D(
         )
 
     if np.any(~np.isfinite(velocity)):
-        raise ValueError(
-            "The velocity model contains NaN or infinity."
-        )
+        raise ValueError("The velocity model contains NaN or infinity.")
     if np.any(velocity <= 0.0):
         raise ValueError(
             "The velocity model contains non-positive values. Set vp_water "
@@ -410,9 +394,15 @@ def align_water_columns3d(gmsh, padding_type=None):
     for name in names:
         vols = gmsh.model.getEntitiesForPhysicalGroup(3, groups[name])
         volumes.append(vols)
-        boundaries.append(set(gmsh.model.getBoundary(
-            [(3, int(v)) for v in vols], combined=True, oriented=False,
-        )))
+        boundaries.append(
+            set(
+                gmsh.model.getBoundary(
+                    [(3, int(v)) for v in vols],
+                    combined=True,
+                    oriented=False,
+                )
+            )
+        )
     interface = set()
     for dim, face in boundaries[0] & boundaries[1]:
         tags, _, _ = gmsh.model.mesh.getNodes(dim, face, True, False)
@@ -533,9 +523,7 @@ def define_winslow_points_3d(
 
     if water_interface:
         water_group_name = (
-            "Water_with_padding"
-            if padding_type == "rectangular"
-            else "Water"
+            "Water_with_padding" if padding_type == "rectangular" else "Water"
         )
 
         group_found = False
@@ -591,9 +579,7 @@ def define_winslow_points_3d(
                 float(length_y) + float(padding_y),
             ]
         )
-        z_planes.append(
-            -abs(float(depth_z)) - float(padding_z)
-        )
+        z_planes.append(-abs(float(depth_z)) - float(padding_z))
 
     if not water_interface:
         z_planes.append(0.0)
@@ -653,17 +639,10 @@ def define_winslow_points_3d(
 
         move_all.add(node_index)
 
-    movable_nodes = (
-        move_all
-        | move_X_only
-        | move_Y_only
-        | move_Z_only
-    )
+    movable_nodes = move_all | move_X_only | move_Y_only | move_Z_only
 
     if not movable_nodes:
-        raise RuntimeError(
-            "No movable nodes were found for 3-D Winslow smoothing."
-        )
+        raise RuntimeError("No movable nodes were found for 3-D Winslow smoothing.")
 
     return {
         "locked": locked,

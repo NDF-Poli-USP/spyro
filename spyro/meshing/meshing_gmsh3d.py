@@ -104,11 +104,9 @@ def build_gmsh_geometry_and_groups3D(
     Supported padding types are ``None``, ``"rectangular"``, and ``"hyperelliptical"``.
     Hyperelliptical padding is restricted to unstructured meshing.
     """
-
     if padding_type not in (None, "rectangular", "hyperelliptical"):
         raise ValueError(
-            "padding_type must be None, 'rectangular', "
-            "or 'hyperelliptical'."
+            "padding_type must be None, 'rectangular', " "or 'hyperelliptical'."
         )
 
     # Hyperelliptical padding
@@ -512,9 +510,7 @@ def configure_gmsh_mesh_size3D(
                         dz = abs(z - z_proj)
 
                         tx = dx / padding_x if padding_x > 0 else 0.0
-                        ty = (
-                            dy / padding_y if padding_y > 0 else 0.0
-                        )
+                        ty = dy / padding_y if padding_y > 0 else 0.0
                         tz = dz / padding_z if padding_z > 0 else 0.0
 
                         if padding_type == "hyperelliptical":
@@ -568,9 +564,18 @@ def configure_gmsh_mesh_size3D(
             dy_core = (bbox[5] - bbox[4]) / max(ny - 1, 1)
             dz_core = (bbox[1] - bbox[0]) / max(nz - 1, 1)
 
-            nx_pad = max(2, int(np.ceil((xmax_pad - xmin_pad) / dx_core)) + 1,)
-            ny_pad = max(2, int(np.ceil((ymax_pad - ymin_pad) / dy_core)) + 1,)
-            nz_pad = max(2, int(np.ceil((zmax_pad - zmin_pad) / dz_core)) + 1,)
+            nx_pad = max(
+                2,
+                int(np.ceil((xmax_pad - xmin_pad) / dx_core)) + 1,
+            )
+            ny_pad = max(
+                2,
+                int(np.ceil((ymax_pad - ymin_pad) / dy_core)) + 1,
+            )
+            nz_pad = max(
+                2,
+                int(np.ceil((zmax_pad - zmin_pad) / dz_core)) + 1,
+            )
 
             x_pad = np.linspace(xmin_pad, xmax_pad, nx_pad)
             y_pad = np.linspace(ymin_pad, ymax_pad, ny_pad)
@@ -807,10 +812,7 @@ def apply_structured_winslow_smoothing3D(
             "an 8-node hexahedral mesh."
         )
 
-    tag_to_index = {
-        int(tag): index
-        for index, tag in enumerate(node_tags)
-    }
+    tag_to_index = {int(tag): index for index, tag in enumerate(node_tags)}
     hexes = np.asarray(
         [tag_to_index[int(tag)] for tag in all_hex_nodes],
         dtype=np.int64,
@@ -834,7 +836,11 @@ def apply_structured_winslow_smoothing3D(
     if aligned_water_tags:
         water_nodes = {tag_to_index[tag] for tag in aligned_water_tags}
         for key in (
-            "move_all", "move_X_only", "move_Y_only", "move_Z_only", "movable_nodes",
+            "move_all",
+            "move_X_only",
+            "move_Y_only",
+            "move_Z_only",
+            "movable_nodes",
         ):
             winslow_points[key].difference_update(water_nodes)
         winslow_points["locked"].update(water_nodes)

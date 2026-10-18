@@ -153,7 +153,7 @@ def _water_interface_grid(
             j1 = min(j0 + y_chunk, ny_cells + 1)
             iy_tile = iy_min + np.arange(j0, j1, dtype=int)
 
-            block = cube_zxy[iz_top: iz_bot + 1][:, ix_tile][:, :, iy_tile]
+            block = cube_zxy[iz_top : iz_bot + 1][:, ix_tile][:, :, iy_tile]
             block = np.asarray(block, dtype=np.float32)
             non_water = np.abs(block - target) > tolerance
 
@@ -203,7 +203,12 @@ def _create_interface_bspline(gmsh, xs, ys, z_bottom):
         ny_cells + 1,
         min(3, nx_cells),
         min(3, ny_cells),
-        [], [], [], [], [], [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
     )
     occ.synchronize()
     return surface, south_pts, north_pts, west_pts
@@ -351,9 +356,7 @@ def _build_water_subsoil_volumes(
     lBot_E = occ.addLine(pB_SE, pB_NE)
     lBot_N = occ.addLine(pB_NE, pB_NW)
     lBot_W = occ.addLine(pB_NW, pB_SW)
-    s_bot_flat = occ.addBSplineFilling(
-        occ.addWire([lBot_S, lBot_E, lBot_N, lBot_W])
-    )
+    s_bot_flat = occ.addBSplineFilling(occ.addWire([lBot_S, lBot_E, lBot_N, lBot_W]))
 
     v_SW2 = occ.addLine(south_pts[0], pB_SW)
     v_SE2 = occ.addLine(south_pts[-1], pB_SE)
@@ -369,10 +372,18 @@ def _build_water_subsoil_volumes(
     occ.synchronize()
 
     vol_subsoil = occ.addVolume(
-        [occ.addSurfaceLoop([s_bottom, s_bot_flat, s_side_S2, s_side_E2, s_side_N2, s_side_W2])]
+        [
+            occ.addSurfaceLoop(
+                [s_bottom, s_bot_flat, s_side_S2, s_side_E2, s_side_N2, s_side_W2]
+            )
+        ]
     )
     vol_water = occ.addVolume(
-        [occ.addSurfaceLoop([s_top, s_bottom, s_side_S, s_side_E, s_side_N, s_side_W], sewing=True)]
+        [
+            occ.addSurfaceLoop(
+                [s_top, s_bottom, s_side_S, s_side_E, s_side_N, s_side_W], sewing=True
+            )
+        ]
     )
     occ.synchronize()
 
@@ -454,7 +465,9 @@ def generate_water_interface_volumes(
     tuple of int
         Subsurface and water volume tags.
     """
-    SpyroEnsemble.print("Generating geometrically delimited water and subsurface volumes...")
+    SpyroEnsemble.print(
+        "Generating geometrically delimited water and subsurface volumes..."
+    )
 
     dtype_string = np.dtype(dtype).newbyteorder(">" if byte_order == "big" else "<").str
     cube, nz, nx, ny = _read_velocity_cube(fname, nz, nx, ny, dtype_string, order)

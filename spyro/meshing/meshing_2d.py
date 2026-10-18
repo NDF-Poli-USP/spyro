@@ -50,9 +50,7 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
             )
 
         if "vp_values" not in velocity_model:
-            raise ValueError(
-                "Grid velocity_model must contain the key 'vp_values'."
-            )
+            raise ValueError("Grid velocity_model must contain the key 'vp_values'.")
 
         vp = np.asarray(velocity_model["vp_values"])
 
@@ -130,9 +128,16 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
 
         # Interpolating sizing function from segy file
         ef_segy2, _, _, n_samples, n_traces = create_sizing_function(
-            fname=fname, hmin=hmin_segy, bbox=segy_bbox, wl=wl, freq=freq,
-            pad_type=padding_type, pad_size_x=padding_x, pad_size_z=padding_z,
-            grade=grade, vp_water=vp_water
+            fname=fname,
+            hmin=hmin_segy,
+            bbox=segy_bbox,
+            wl=wl,
+            freq=freq,
+            pad_type=padding_type,
+            pad_size_x=padding_x,
+            pad_size_z=padding_z,
+            grade=grade,
+            vp_water=vp_water,
         )
 
         gmsh.initialize()
@@ -170,9 +175,7 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
                 return float(ef_segy2(np.array([x]), np.array([y]))[0])
             else:
                 z_min_segy, z_max_segy, x_min_segy, x_max_segy = segy_bbox
-                if (x_min_segy <= x <= x_max_segy) and (
-                    z_min_segy <= y <= z_max_segy
-                ):
+                if (x_min_segy <= x <= x_max_segy) and (z_min_segy <= y <= z_max_segy):
                     return float(ef_segy2(np.array([x]), np.array([y]))[0])
                 else:
                     x_proj, y_proj = min(max(x, x_min_segy), x_max_segy), min(

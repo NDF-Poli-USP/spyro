@@ -280,9 +280,7 @@ def _add_padding_box(occ, x0, y0, z0, lx, ly, lz):
     """
     if lx <= 0.0 or ly <= 0.0 or lz <= 0.0:
         return None
-    return occ.addBox(
-        float(x0), float(y0), float(z0), float(lx), float(ly), float(lz)
-    )
+    return occ.addBox(float(x0), float(y0), float(z0), float(lx), float(ly), float(lz))
 
 
 def create_rectangular_padding_boxes(
@@ -314,9 +312,7 @@ def create_rectangular_padding_boxes(
     """
     occ = gmsh.model.occ
 
-    vol_subsoil = occ.addBox(
-        0.0, 0.0, -abs(depth_z), length_x, length_y, abs(depth_z)
-    )
+    vol_subsoil = occ.addBox(0.0, 0.0, -abs(depth_z), length_x, length_y, abs(depth_z))
 
     x_cells = [
         (-padding_x, padding_x),
@@ -395,12 +391,7 @@ def generate_rectangular_padding_no_water(
 
         core_fragments = sorted({tag for dim, tag in fragment_map[0] if dim == 3})
         padding_fragments = sorted(
-            {
-                tag
-                for mapping in fragment_map[1:]
-                for dim, tag in mapping
-                if dim == 3
-            }
+            {tag for mapping in fragment_map[1:] for dim, tag in mapping if dim == 3}
             - set(core_fragments)
         )
 
@@ -616,10 +607,9 @@ def generate_structured_rectangular_padding_water(
     if padding_y > 0.0:
         water_row = sorted(water.items(), key=lambda item: item[0][0])
         soil_row = sorted(soil.items(), key=lambda item: item[0][0])
-        sources = (
-            [volume for _, volume in water_row]
-            + [volume for _, volume in soil_row]
-        )
+        sources = [volume for _, volume in water_row] + [
+            volume for _, volume in soil_row
+        ]
 
         for side in (-1, +1):
             mapping = sweep_volume_faces(
@@ -665,10 +655,9 @@ def generate_structured_rectangular_padding_water(
     ]
     soil_vols = soil_xy + soil_bottom
 
-    pad_vols = (
-        [volume for volume in water_vols if volume != vol_water]
-        + [volume for volume in soil_vols if volume != vol_subsoil]
-    )
+    pad_vols = [volume for volume in water_vols if volume != vol_water] + [
+        volume for volume in soil_vols if volume != vol_subsoil
+    ]
 
     water_vols = list(dict.fromkeys(water_vols))
     soil_vols = list(dict.fromkeys(soil_vols))
