@@ -327,7 +327,7 @@ def _read_velocity_binary3D(
         raise ValueError("byte_order must be 'big' or 'little'.")
     if axes_order_sort not in ("C", "F"):
         raise ValueError("axes_order_sort must be 'C' or 'F'.")
-    if sorted(tuple(axes_order)) != [0, 1, 2]:  # noqa: C414
+    if sorted(axes_order) != [0, 1, 2]:
         raise ValueError("axes_order must be a permutation of (0, 1, 2).")
 
     dt = np.dtype(dtype).newbyteorder(">" if byte_order == "big" else "<")

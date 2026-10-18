@@ -112,7 +112,7 @@ def _water_interface_grid(
     """
     try:
         dz, dx, dy = float(dz), float(dx), float(dy)
-    except Exception as exc:
+    except (TypeError, ValueError) as exc:
         raise RuntimeError("dz, dx, and dy must be valid spacing arguments.") from exc
 
     z_top, z_bot = float(max(z_min, z_max)), float(min(z_min, z_max))
