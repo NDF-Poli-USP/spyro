@@ -1,15 +1,18 @@
 import numpy as np
 
-from .meshing_gmsh_3d_functions import (
+from .meshing_gmsh3d_geometry import (
     boundary_faces_of_volume,
-    checked_mesh_size,
     create_hyperellipsoid_volume,
     generate_rectangular_padding_no_water,
     generate_structured_rectangular_padding_water,
-    generate_water_interface_volumes,
 )
-from .meshing_utils3D import align_water_columns3d, define_winslow_points_3d
-from .meshing_winslow3D import run_selected_winslow
+from .meshing_utils3d import (
+    align_water_columns3d,
+    checked_mesh_size,
+    define_winslow_points_3d,
+)
+from .meshing_water3d import generate_water_interface_volumes
+from .meshing_winslow3d import run_selected_winslow
 
 
 def build_gmsh_geometry_and_groups3D(
