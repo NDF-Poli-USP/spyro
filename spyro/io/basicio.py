@@ -283,7 +283,7 @@ def saving_source_and_receiver_location_in_csv(model, folder_name=None):
     return None
 
 
-def _read_velocity_binary3D(
+def read_velocity_binary3d(
     fname,
     nz,
     nx,

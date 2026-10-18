@@ -40,12 +40,12 @@ def configure_gmsh_2d_meshing_mode(
         Padding geometry: ``None``, ``"rectangular"`` or ``"hyperelliptical"``.
     min_element_size : float
         Element size used for the structured mesh.
-    """
-    if structured_mesh and unstructured_quad_mesh:
-        raise ValueError(
-            "'structured_mesh' and 'unstructured_quad_mesh' are mutually exclusive."
-        )
 
+    Returns
+    -------
+    None
+        The Gmsh options are set in place.
+    """
     if structured_mesh and padding_type != "hyperelliptical":
         gmsh.option.setNumber("Mesh.MeshSizeMin", min_element_size)
         gmsh.option.setNumber("Mesh.MeshSizeMax", min_element_size)
@@ -61,6 +61,43 @@ def configure_gmsh_2d_meshing_mode(
         gmsh.model.mesh.optimize("Relocate2D", niter=1)
         gmsh.option.setNumber("Mesh.QuadqsTopologyOptimizationMethods", 111)
         gmsh.option.setNumber("Mesh.QuadqsSizemapMethod", 0)
+
+
+def _classify_rectangular_curves(
+    gmsh, curves: list[int], length_x: float, depth_z: float
+) -> tuple[list[int], list[int], list[int], list[int]]:
+    """Sort boundary curves by the side of the ``[0, length_x] x [depth_z, 0]`` box they lie on.
+
+    Parameters
+    ----------
+    gmsh : module
+        Initialized Gmsh Python module with a synchronized model.
+    curves : list of int
+        Tags of the dimension-1 entities to classify.
+    length_x : float
+        Box length in the x direction.
+    depth_z : float
+        Box depth; the box occupies ``depth_z <= y <= 0``.
+
+    Returns
+    -------
+    top, left, right, bottom : list of int
+        Curve tags lying on ``y = 0``, ``x = 0``, ``x = length_x`` and
+        ``y = depth_z``. Curves on none of these sides are dropped.
+    """
+    tol = 1.0e-6 * max(1.0, abs(length_x), abs(depth_z))
+    top, left, right, bottom = [], [], [], []
+    for curve in curves:
+        xmin, ymin, _, xmax, ymax, _ = gmsh.model.getBoundingBox(1, curve)
+        if abs(ymin) <= tol and abs(ymax) <= tol:
+            top.append(curve)
+        elif abs(xmin) <= tol and abs(xmax) <= tol:
+            left.append(curve)
+        elif abs(xmin - length_x) <= tol and abs(xmax - length_x) <= tol:
+            right.append(curve)
+        elif abs(ymin - depth_z) <= tol and abs(ymax - depth_z) <= tol:
+            bottom.append(curve)
+    return top, left, right, bottom
 
 
 def build_gmsh_geometry_and_groups(
@@ -169,27 +206,11 @@ def build_gmsh_geometry_and_groups(
                 rock_boundary_curves - set(water_interface_curves)
             )
 
-            tol = 1.0e-6 * max(1.0, abs(length_x), abs(depth_z))
-
-            def _classify_rectangular_curves(curves):
-                top, left, right, bottom = [], [], [], []
-                for curve in curves:
-                    xmin, ymin, _, xmax, ymax, _ = gmsh.model.getBoundingBox(1, curve)
-                    if abs(ymin) <= tol and abs(ymax) <= tol:
-                        top.append(curve)
-                    elif abs(xmin) <= tol and abs(xmax) <= tol:
-                        left.append(curve)
-                    elif abs(xmin - length_x) <= tol and abs(xmax - length_x) <= tol:
-                        right.append(curve)
-                    elif abs(ymin - depth_z) <= tol and abs(ymax - depth_z) <= tol:
-                        bottom.append(curve)
-                return top, left, right, bottom
-
             water_top, water_left, water_right, _ = _classify_rectangular_curves(
-                water_outer_curves
+                gmsh, water_outer_curves, length_x, depth_z
             )
             _, rock_left, rock_right, rock_bottom = _classify_rectangular_curves(
-                rock_outer_curves
+                gmsh, rock_outer_curves, length_x, depth_z
             )
 
             gmsh.model.addPhysicalGroup(1, water_top, 1, "InternalTop")
@@ -741,22 +762,9 @@ def build_gmsh_geometry_and_groups(
                 )
                 if dim == 1
             ]
-            tol = 1.0e-6 * max(1.0, abs(length_x), abs(depth_z))
-            left_curves = []
-            right_curves = []
-            bottom_curves = []
-            top_curves = []
-
-            for curve in boundary_curves:
-                xmin, ymin, _, xmax, ymax, _ = gmsh.model.getBoundingBox(1, curve)
-                if abs(xmin) <= tol and abs(xmax) <= tol:
-                    left_curves.append(curve)
-                elif abs(xmin - length_x) <= tol and abs(xmax - length_x) <= tol:
-                    right_curves.append(curve)
-                elif abs(ymin - depth_z) <= tol and abs(ymax - depth_z) <= tol:
-                    bottom_curves.append(curve)
-                elif abs(ymin) <= tol and abs(ymax) <= tol:
-                    top_curves.append(curve)
+            top_curves, left_curves, right_curves, bottom_curves = (
+                _classify_rectangular_curves(gmsh, boundary_curves, length_x, depth_z)
+            )
 
             gmsh.model.addPhysicalGroup(1, left_curves, 1, "Left")
             gmsh.model.addPhysicalGroup(1, right_curves, 2, "Right")

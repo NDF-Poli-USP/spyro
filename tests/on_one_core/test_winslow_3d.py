@@ -9,7 +9,7 @@ from spyro.meshing.meshing_winslow3d import (
     _numba_winslow_3d_step,
     _resolve_stencil_coordinates,
     run_selected_winslow,
-    winslow_smooth_3d55,
+    winslow_smooth_3d,
 )
 
 
@@ -402,7 +402,7 @@ def test_winslow_smooth_rejects_invalid_point_shape(bad_points):
         ValueError,
         match="points must have shape",
     ):
-        winslow_smooth_3d55(
+        winslow_smooth_3d(
             points=bad_points,
             hexes=hexes,
             move_all={0},
@@ -433,7 +433,7 @@ def test_winslow_smooth_rejects_invalid_hex_shape(bad_hexes):
         ValueError,
         match="hexes must have shape",
     ):
-        winslow_smooth_3d55(
+        winslow_smooth_3d(
             points=points,
             hexes=bad_hexes,
             move_all={13},
@@ -457,7 +457,7 @@ def test_winslow_smooth_rejects_negative_iterations():
         ValueError,
         match="iterations must be non-negative",
     ):
-        winslow_smooth_3d55(
+        winslow_smooth_3d(
             points=points,
             hexes=hexes,
             move_all={center},
@@ -482,7 +482,7 @@ def test_winslow_smooth_rejects_invalid_omega(omega):
         ValueError,
         match="omega must satisfy",
     ):
-        winslow_smooth_3d55(
+        winslow_smooth_3d(
             points=points,
             hexes=hexes,
             move_all={center},
@@ -506,7 +506,7 @@ def test_winslow_smooth_rejects_invalid_movement_indices(invalid_node):
         ValueError,
         match="Movement sets contain node indices outside the mesh",
     ):
-        winslow_smooth_3d55(
+        winslow_smooth_3d(
             points=points,
             hexes=hexes,
             move_all={invalid_node},
@@ -526,7 +526,7 @@ def test_winslow_smooth_zero_iterations_preserves_real_hex_mesh(capsys):
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
-    smoothed = winslow_smooth_3d55(
+    smoothed = winslow_smooth_3d(
         points=points,
         hexes=hexes,
         move_all={center},
@@ -557,7 +557,7 @@ def test_winslow_smooth_isolated_movable_node_is_safe():
     )
     hexes = np.empty((0, 8), dtype=np.int64)
 
-    smoothed = winslow_smooth_3d55(
+    smoothed = winslow_smooth_3d(
         points=points,
         hexes=hexes,
         move_all={0},
@@ -590,7 +590,7 @@ def test_winslow_smooth_respects_directional_movement(movement_set):
     move_y = {center} if movement_set == "Y" else set()
     move_z = {center} if movement_set == "Z" else set()
 
-    smoothed = winslow_smooth_3d55(
+    smoothed = winslow_smooth_3d(
         points=distorted,
         hexes=hexes,
         move_all=set(),
@@ -632,7 +632,7 @@ def test_winslow_smooth_move_all_changes_distorted_interior():
     distorted = points.copy()
     distorted[center] += np.array([0.16, -0.12, 0.09])
 
-    smoothed = winslow_smooth_3d55(
+    smoothed = winslow_smooth_3d(
         points=distorted,
         hexes=hexes,
         move_all={center},

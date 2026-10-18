@@ -1,52 +1,7 @@
-from pathlib import Path
-
 import numpy as np
 
+from ..io.basicio import read_velocity_binary3d
 from spyro.mpi.spyro_mpi import SpyroEnsemble
-
-
-def _read_velocity_cube(fname, nz, nx, ny, dtype_string, order):
-    """Memory-map a binary velocity model as a ``(z, x, y)`` cube.
-
-    Parameters
-    ----------
-    fname : str or pathlib.Path
-        Path to the binary velocity model.
-    nz : int
-        Number of velocity samples in the z direction.
-    nx : int
-        Number of velocity samples in the x direction.
-    ny : int
-        Number of velocity samples in the y direction.
-    dtype_string : str
-        NumPy dtype string including the required byte order.
-    order : {"C", "F"}
-        Array reshape order used for the binary velocity model.
-
-    Returns
-    -------
-    tuple
-        Memory-mapped velocity cube and validated ``nz``, ``nx``, and ``ny`` sizes.
-    """
-    try:
-        nz, nx, ny = int(nz), int(nx), int(ny)
-    except Exception as exc:
-        raise RuntimeError("nz, nx, and ny must be valid integer arguments.") from exc
-
-    path = Path(fname)
-    if not path.exists():
-        raise FileNotFoundError(f"Binary not found: {path}")
-
-    mm = np.memmap(path, dtype=np.dtype(dtype_string), mode="r")
-    expected = nz * nx * ny
-    if mm.size != expected:
-        raise ValueError(
-            f"File size mismatch for {path}:\n"
-            f"  got {mm.size} floats, expected {expected} for "
-            f"shape (nz,nx,ny)=({nz},{nx},{ny})"
-        )
-
-    return mm.reshape((nz, nx, ny), order=order), nz, nx, ny
 
 
 def _water_interface_grid(
@@ -469,8 +424,16 @@ def generate_water_interface_volumes(
         "Generating geometrically delimited water and subsurface volumes..."
     )
 
-    dtype_string = np.dtype(dtype).newbyteorder(">" if byte_order == "big" else "<").str
-    cube, nz, nx, ny = _read_velocity_cube(fname, nz, nx, ny, dtype_string, order)
+    nz, nx, ny = int(nz), int(nx), int(ny)
+    cube = read_velocity_binary3d(
+        fname,
+        nz,
+        nx,
+        ny,
+        byte_order=byte_order,
+        axes_order_sort=order,
+        dtype=dtype,
+    )
 
     xs, ys, z_bottom, z_top = _water_interface_grid(
         cube,
