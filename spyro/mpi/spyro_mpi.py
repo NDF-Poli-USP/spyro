@@ -144,13 +144,24 @@ class SpyroEnsemble:
         return cls.ensemble.comm.rank
 
     @classmethod
-    def print(cls, string: str):
+    def print(cls, string: str, end: str = "\n") -> None:
+        """Print a string once, from global rank 0.
+
+        Parameters
+        ----------
+        string : str
+            Text to print.
+        end : str, optional
+            String appended after ``string``, as in the built-in ``print``.
+            Pass ``""`` together with a leading ``"\\r"`` to redraw a progress
+            line in place.
+        """
         if cls.ensemble is None:
-            print(string, flush=True)
+            print(string, end=end, flush=True)
             return
 
         if cls.get_global_rank() == 0:
-            print(string, flush=True)
+            print(string, end=end, flush=True)
 
     @classmethod
     def run_in_one_core_and_broadcast(cls, fun):
