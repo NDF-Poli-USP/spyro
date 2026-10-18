@@ -153,7 +153,7 @@ def _water_interface_grid(
             j1 = min(j0 + y_chunk, ny_cells + 1)
             iy_tile = iy_min + np.arange(j0, j1, dtype=int)
 
-            block = cube_zxy[iz_top : iz_bot + 1][:, ix_tile][:, :, iy_tile]
+            block = cube_zxy[iz_top: iz_bot + 1][:, ix_tile][:, :, iy_tile]
             block = np.asarray(block, dtype=np.float32)
             non_water = np.abs(block - target) > tolerance
 
