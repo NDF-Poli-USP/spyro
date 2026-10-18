@@ -10,7 +10,6 @@ from .gmsh_based_methods import build_big_rect_with_inner_element_group
 from .meshing_2d import generate_gmsh_2d_mesh
 from .meshing_3d import generate_gmsh_3d_mesh
 
-
 try:
     import SeismicMesh
 except ImportError:
@@ -193,7 +192,6 @@ class AutomaticMesh:
         -------
         None
         """
-
         # Adjusting coordinates
         if self.dimension == 3:  # 3D
             min_y = mesh.coordinates.dat.data_with_halos[:, 2].min()
@@ -256,7 +254,6 @@ class AutomaticMesh:
             Number of elements in each dimension of the mesh.
             Structure: (nz, nx) for 2D and (nz, nx, ny) for 3D
         """
-
         # Compute the edge length if there is no one
         if (
             self.edge_length is None
@@ -345,7 +342,6 @@ class AutomaticMesh:
         Uses the edge_length parameter to determine the number of elements
         in each direction(x, y, z).
         """
-
         # Define the discretization
         nz, nx, ny = self.define_discretization_for_mesh()
 

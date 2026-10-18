@@ -68,12 +68,8 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
     gmsh_num_threads = getattr(mesh_parameters, "gmsh_num_threads", 1)
 
     byte_order = getattr(mesh_parameters, "segy_byte_order", "big")
-    axes_order = tuple(
-        getattr(mesh_parameters, "segy_axes_order", (0, 1, 2))
-    )
-    axes_order_sort = getattr(
-        mesh_parameters, "segy_axes_order_sort", "F"
-    )
+    axes_order = tuple(getattr(mesh_parameters, "segy_axes_order", (0, 1, 2)))
+    axes_order_sort = getattr(mesh_parameters, "segy_axes_order_sort", "F")
     binary_dtype = getattr(mesh_parameters, "segy_dtype", "float32")
 
     if mesh_parameters.segy_velocity_model is not None:
@@ -99,9 +95,7 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
                 "segy_velocity_model is not provided."
             )
         if "vp_values" not in velocity_model:
-            raise ValueError(
-                "Grid velocity_model must contain the key 'vp_values'."
-            )
+            raise ValueError("Grid velocity_model must contain the key 'vp_values'.")
         vp = np.asarray(velocity_model["vp_values"])
         if vp.ndim != 3:
             raise ValueError(
@@ -113,12 +107,8 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
         dx = length_x / max(nx - 1, 1)
         dy = length_y / max(ny - 1, 1)
         fname = "tmp_velocity_model3D.bin"
-        dtype = np.dtype(binary_dtype).newbyteorder(
-            ">" if byte_order == "big" else "<"
-        )
-        np.asarray(vp, dtype=dtype).ravel(
-            order=axes_order_sort
-        ).tofile(fname)
+        dtype = np.dtype(binary_dtype).newbyteorder(">" if byte_order == "big" else "<")
+        np.asarray(vp, dtype=dtype).ravel(order=axes_order_sort).tofile(fname)
         velocity_model_file = fname
     else:
         raise ValueError(
@@ -145,8 +135,7 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
             domain_zmin, domain_zmax = depth_z - padding_z, 0.0
         else:
             raise ValueError(
-                "padding_type must be None, 'rectangular', or "
-                "'hyperelliptical'."
+                "padding_type must be None, 'rectangular', or " "'hyperelliptical'."
             )
 
         ef_segy3, f_min, f_max, n_samples, n_traces_x, n_traces_y = (  # noqa: RUF059

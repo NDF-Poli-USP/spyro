@@ -2,6 +2,7 @@ import numpy as np
 
 try:
     from numba import njit, prange
+
     NUMBA_AVAILABLE = True
 except ImportError:  # pragma: no cover
     NUMBA_AVAILABLE = False
@@ -105,12 +106,14 @@ def run_selected_winslow(
     SpyroEnsemble.print(
         "Winslow sizing on movable nodes | "
         f"min={size_min:.9g}, max={size_max:.9g}, "
-        f"mean={size_mean:.9g}, std={size_std:.9g}")
+        f"mean={size_mean:.9g}, std={size_std:.9g}"
+    )
     SpyroEnsemble.print(
         "Winslow movable-node counts | "
         f"all={len(move_all)}, X={len(move_X_only)}, "
         f"Y={len(move_Y_only)}, Z={len(move_Z_only)}, "
-        f"union={len(movable_nodes)}")
+        f"union={len(movable_nodes)}"
+    )
 
     relative_span = size_span / max(abs(size_mean), 1.0)
     if relative_span <= 1.0e-10:
@@ -118,7 +121,8 @@ def run_selected_winslow(
             "WARNING: the sizing field is effectively constant on the "
             "movable nodes. A uniform structured mesh will remain "
             "unchanged. Reduce hmin_segy; the supplied reference uses "
-            "a 250 m initial mesh and no 500 m sizing floor.")
+            "a 250 m initial mesh and no 500 m sizing floor."
+        )
 
     if selected_winslow != "numba":
         raise ValueError(
@@ -163,12 +167,14 @@ def run_selected_winslow(
         "Winslow displacement | "
         f"moved={moved_count}/{len(movable_indices)}, "
         f"max={max_displacement:.9g}, "
-        f"mean={mean_displacement:.9g}")
+        f"mean={mean_displacement:.9g}"
+    )
 
     if moved_count == 0:
         SpyroEnsemble.print(
             "WARNING: winslow_smooth_3d55 completed but no movable node "
-            "changed position. Inspect the sizing statistics above.")
+            "changed position. Inspect the sizing statistics above."
+        )
 
     return smoothed
 
@@ -202,34 +208,34 @@ def _resolve_stencil_coordinates(coordinates, center, stencil):
     east, west, north, south, top, bottom = stencil[:6]
 
     east_value = (
-        coordinates[east] if east != -1
-        else 2.0 * center - coordinates[west] if west != -1
-        else center
+        coordinates[east]
+        if east != -1
+        else 2.0 * center - coordinates[west] if west != -1 else center
     )
     west_value = (
-        coordinates[west] if west != -1
-        else 2.0 * center - coordinates[east] if east != -1
-        else center
+        coordinates[west]
+        if west != -1
+        else 2.0 * center - coordinates[east] if east != -1 else center
     )
     north_value = (
-        coordinates[north] if north != -1
-        else 2.0 * center - coordinates[south] if south != -1
-        else center
+        coordinates[north]
+        if north != -1
+        else 2.0 * center - coordinates[south] if south != -1 else center
     )
     south_value = (
-        coordinates[south] if south != -1
-        else 2.0 * center - coordinates[north] if north != -1
-        else center
+        coordinates[south]
+        if south != -1
+        else 2.0 * center - coordinates[north] if north != -1 else center
     )
     top_value = (
-        coordinates[top] if top != -1
-        else 2.0 * center - coordinates[bottom] if bottom != -1
-        else center
+        coordinates[top]
+        if top != -1
+        else 2.0 * center - coordinates[bottom] if bottom != -1 else center
     )
     bottom_value = (
-        coordinates[bottom] if bottom != -1
-        else 2.0 * center - coordinates[top] if top != -1
-        else center
+        coordinates[bottom]
+        if bottom != -1
+        else 2.0 * center - coordinates[top] if top != -1 else center
     )
 
     ne, nw, se, sw, nt, nb, st, sb, et, eb, wt, wb = stencil[6:]
@@ -248,9 +254,24 @@ def _resolve_stencil_coordinates(coordinates, center, stencil):
     wb_value = coordinates[wb] if wb != -1 else west_value + bottom_value - center
 
     return (
-        east_value, west_value, north_value, south_value, top_value, bottom_value,
-        ne_value, nw_value, se_value, sw_value, nt_value, nb_value,
-        st_value, sb_value, et_value, eb_value, wt_value, wb_value,
+        east_value,
+        west_value,
+        north_value,
+        south_value,
+        top_value,
+        bottom_value,
+        ne_value,
+        nw_value,
+        se_value,
+        sw_value,
+        nt_value,
+        nb_value,
+        st_value,
+        sb_value,
+        et_value,
+        eb_value,
+        wt_value,
+        wb_value,
     )
 
 
@@ -308,11 +329,7 @@ def _numba_winslow_3d_step(
         y_new[node] = y_coordinates[node]
         z_new[node] = z_coordinates[node]
 
-        if not (
-            move_x[node]
-            or move_y[node]
-            or move_z[node]
-        ):
+        if not (move_x[node] or move_y[node] or move_z[node]):
             continue
 
         x_center = x_coordinates[node]
@@ -323,21 +340,66 @@ def _numba_winslow_3d_step(
         east, west, north, south, top, bottom = stencil[:6]
 
         (
-            x_east, x_west, x_north, x_south, x_top, x_bottom,
-            x_ne, x_nw, x_se, x_sw, x_nt, x_nb,
-            x_st, x_sb, x_et, x_eb, x_wt, x_wb,
+            x_east,
+            x_west,
+            x_north,
+            x_south,
+            x_top,
+            x_bottom,
+            x_ne,
+            x_nw,
+            x_se,
+            x_sw,
+            x_nt,
+            x_nb,
+            x_st,
+            x_sb,
+            x_et,
+            x_eb,
+            x_wt,
+            x_wb,
         ) = _resolve_stencil_coordinates(x_coordinates, x_center, stencil)
 
         (
-            y_east, y_west, y_north, y_south, y_top, y_bottom,
-            y_ne, y_nw, y_se, y_sw, y_nt, y_nb,
-            y_st, y_sb, y_et, y_eb, y_wt, y_wb,
+            y_east,
+            y_west,
+            y_north,
+            y_south,
+            y_top,
+            y_bottom,
+            y_ne,
+            y_nw,
+            y_se,
+            y_sw,
+            y_nt,
+            y_nb,
+            y_st,
+            y_sb,
+            y_et,
+            y_eb,
+            y_wt,
+            y_wb,
         ) = _resolve_stencil_coordinates(y_coordinates, y_center, stencil)
 
         (
-            z_east, z_west, z_north, z_south, z_top, z_bottom,
-            z_ne, z_nw, z_se, z_sw, z_nt, z_nb,
-            z_st, z_sb, z_et, z_eb, z_wt, z_wb,
+            z_east,
+            z_west,
+            z_north,
+            z_south,
+            z_top,
+            z_bottom,
+            z_ne,
+            z_nw,
+            z_se,
+            z_sw,
+            z_nt,
+            z_nb,
+            z_st,
+            z_sb,
+            z_et,
+            z_eb,
+            z_wt,
+            z_wb,
         ) = _resolve_stencil_coordinates(z_coordinates, z_center, stencil)
 
         x_xi = 0.5 * (x_east - x_west)
@@ -379,19 +441,34 @@ def _numba_winslow_3d_step(
         z_xi_zeta = 0.25 * (z_et - z_eb - z_wt + z_wb)
 
         size_center = sizing_values[node]
-        size_east = sizing_values[east] if east != -1 and is_movable[east] else size_center
-        size_west = sizing_values[west] if west != -1 and is_movable[west] else size_center
-        size_north = sizing_values[north] if north != -1 and is_movable[north] else size_center
-        size_south = sizing_values[south] if south != -1 and is_movable[south] else size_center
+        size_east = (
+            sizing_values[east] if east != -1 and is_movable[east] else size_center
+        )
+        size_west = (
+            sizing_values[west] if west != -1 and is_movable[west] else size_center
+        )
+        size_north = (
+            sizing_values[north] if north != -1 and is_movable[north] else size_center
+        )
+        size_south = (
+            sizing_values[south] if south != -1 and is_movable[south] else size_center
+        )
         size_top = sizing_values[top] if top != -1 and is_movable[top] else size_center
-        size_bottom = sizing_values[bottom] if bottom != -1 and is_movable[bottom] else size_center
+        size_bottom = (
+            sizing_values[bottom]
+            if bottom != -1 and is_movable[bottom]
+            else size_center
+        )
 
         size_xi = 0.5 * (size_east - size_west)
         size_eta = 0.5 * (size_north - size_south)
         size_zeta = 0.5 * (size_top - size_bottom)
 
-        jacobian = x_xi * (y_eta * z_zeta - z_eta * y_zeta) - y_xi * (x_eta * z_zeta - z_eta * x_zeta) \
+        jacobian = (
+            x_xi * (y_eta * z_zeta - z_eta * y_zeta)
+            - y_xi * (x_eta * z_zeta - z_eta * x_zeta)
             + z_xi * (x_eta * y_zeta - y_eta * x_zeta)
+        )
         jacobian_over_size = jacobian / (size_center + 1.0e-12)
 
         adjoint_11 = y_eta * z_zeta - z_eta * y_zeta
@@ -404,27 +481,63 @@ def _numba_winslow_3d_step(
         adjoint_23 = y_xi * x_zeta - x_xi * y_zeta
         adjoint_33 = x_xi * y_eta - y_xi * x_eta
 
-        source_x = jacobian_over_size * (size_xi * adjoint_11 + size_eta * adjoint_21 + size_zeta * adjoint_31)
-        source_y = jacobian_over_size * (size_xi * adjoint_12 + size_eta * adjoint_22 + size_zeta * adjoint_32)
-        source_z = jacobian_over_size * (size_xi * adjoint_13 + size_eta * adjoint_23 + size_zeta * adjoint_33)
+        source_x = jacobian_over_size * (
+            size_xi * adjoint_11 + size_eta * adjoint_21 + size_zeta * adjoint_31
+        )
+        source_y = jacobian_over_size * (
+            size_xi * adjoint_12 + size_eta * adjoint_22 + size_zeta * adjoint_32
+        )
+        source_z = jacobian_over_size * (
+            size_xi * adjoint_13 + size_eta * adjoint_23 + size_zeta * adjoint_33
+        )
 
         denominator = 2.0 * (coefficient_a + coefficient_b + coefficient_c)
         if denominator < 1.0e-12:
             continue
 
         if move_x[node]:
-            x_target = (coefficient_a * (x_east + x_west) + coefficient_b * (x_north + x_south) + coefficient_c * (x_top + x_bottom)
-                        + 2.0 * (coefficient_d * x_xi_eta + coefficient_e * x_eta_zeta + coefficient_f * x_xi_zeta) - source_x) / denominator
+            x_target = (
+                coefficient_a * (x_east + x_west)
+                + coefficient_b * (x_north + x_south)
+                + coefficient_c * (x_top + x_bottom)
+                + 2.0
+                * (
+                    coefficient_d * x_xi_eta
+                    + coefficient_e * x_eta_zeta
+                    + coefficient_f * x_xi_zeta
+                )
+                - source_x
+            ) / denominator
             x_new[node] = (1.0 - omega) * x_center + omega * x_target
 
         if move_y[node]:
-            y_target = (coefficient_a * (y_east + y_west) + coefficient_b * (y_north + y_south) + coefficient_c * (y_top + y_bottom)
-                        + 2.0 * (coefficient_d * y_xi_eta + coefficient_e * y_eta_zeta + coefficient_f * y_xi_zeta) - source_y) / denominator
+            y_target = (
+                coefficient_a * (y_east + y_west)
+                + coefficient_b * (y_north + y_south)
+                + coefficient_c * (y_top + y_bottom)
+                + 2.0
+                * (
+                    coefficient_d * y_xi_eta
+                    + coefficient_e * y_eta_zeta
+                    + coefficient_f * y_xi_zeta
+                )
+                - source_y
+            ) / denominator
             y_new[node] = (1.0 - omega) * y_center + omega * y_target
 
         if move_z[node]:
-            z_target = (coefficient_a * (z_east + z_west) + coefficient_b * (z_north + z_south) + coefficient_c * (z_top + z_bottom)
-                        + 2.0 * (coefficient_d * z_xi_eta + coefficient_e * z_eta_zeta + coefficient_f * z_xi_zeta) - source_z) / denominator
+            z_target = (
+                coefficient_a * (z_east + z_west)
+                + coefficient_b * (z_north + z_south)
+                + coefficient_c * (z_top + z_bottom)
+                + 2.0
+                * (
+                    coefficient_d * z_xi_eta
+                    + coefficient_e * z_eta_zeta
+                    + coefficient_f * z_xi_zeta
+                )
+                - source_z
+            ) / denominator
             z_new[node] = (1.0 - omega) * z_center + omega * z_target
 
     return x_new, y_new, z_new
@@ -487,23 +600,16 @@ def winslow_smooth_3d55(
     hexes = np.asarray(hexes, dtype=np.int64)
 
     if points.ndim != 2 or points.shape[1] != 3:
-        raise ValueError(
-            "points must have shape (number_of_nodes, 3)."
-        )
+        raise ValueError("points must have shape (number_of_nodes, 3).")
     if hexes.ndim != 2 or hexes.shape[1] != 8:
-        raise ValueError(
-            "hexes must have shape (number_of_hexes, 8)."
-        )
+        raise ValueError("hexes must have shape (number_of_hexes, 8).")
     if iterations < 0:
         raise ValueError("iterations must be non-negative.")
     if not 0.0 < omega <= 1.0:
         raise ValueError("omega must satisfy 0 < omega <= 1.")
 
     num_nodes = len(points)
-    node_to_neighbors = {
-        node: set()
-        for node in range(num_nodes)
-    }
+    node_to_neighbors = {node: set() for node in range(num_nodes)}
 
     hex_edges = (
         (0, 1),
@@ -529,17 +635,10 @@ def winslow_smooth_3d55(
             node_to_neighbors[second_node].add(first_node)
 
     movable_nodes = (
-        set(move_all)
-        | set(move_X_only)
-        | set(move_Y_only)
-        | set(move_Z_only)
+        set(move_all) | set(move_X_only) | set(move_Y_only) | set(move_Z_only)
     )
 
-    invalid_nodes = {
-        node
-        for node in movable_nodes
-        if node < 0 or node >= num_nodes
-    }
+    invalid_nodes = {node for node in movable_nodes if node < 0 or node >= num_nodes}
     if invalid_nodes:
         raise ValueError(
             "Movement sets contain node indices outside the mesh: "
@@ -593,15 +692,10 @@ def winslow_smooth_3d55(
             int or None
                 Shared neighbor index, or ``None`` when no shared neighbor exists.
             """
-            if (
-                first_neighbor is None
-                or second_neighbor is None
-            ):
+            if first_neighbor is None or second_neighbor is None:
                 return None
 
-            shared = node_to_neighbors[
-                first_neighbor
-            ].intersection(
+            shared = node_to_neighbors[first_neighbor].intersection(
                 node_to_neighbors[second_neighbor]
             )
             shared.discard(node)  # noqa: B023
@@ -695,17 +789,11 @@ def winslow_smooth_3d55(
         )
 
         if sizing_values.shape != (num_nodes,):
-            raise ValueError(
-                "sizing_function_xyz must return one value per mesh node."
-            )
+            raise ValueError("sizing_function_xyz must return one value per mesh node.")
         if not np.all(np.isfinite(sizing_values)):
-            raise ValueError(
-                "sizing_function_xyz returned NaN or infinity."
-            )
+            raise ValueError("sizing_function_xyz returned NaN or infinity.")
         if np.any(sizing_values <= 0.0):
-            raise ValueError(
-                "sizing_function_xyz returned a non-positive value."
-            )
+            raise ValueError("sizing_function_xyz returned a non-positive value.")
 
         (
             x_coordinates,

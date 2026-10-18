@@ -3,7 +3,6 @@ from .meshing_utils import check_seismicmesh
 from firedrake import Mesh as FireMeshReader
 from firedrake import DistributedMeshOverlapType
 
-
 try:
     import SeismicMesh
 except ImportError:
@@ -54,7 +53,7 @@ def create_seismicmesh_2D_mesh_with_velocity_model(mesh_parameters):
             grade=0.15,
             domain_pad=domain_pad,
             pad_style="edge",
-            units='km/s',
+            units="km/s",
             comm=mesh_parameters.comm.comm,
         )
         mesh_parameters.comm.comm.barrier()
@@ -69,29 +68,24 @@ def create_seismicmesh_2D_mesh_with_velocity_model(mesh_parameters):
         )
         mesh_parameters.comm.comm.barrier()
 
-        print('entering spatial rank 0 after mesh generation')
+        print("entering spatial rank 0 after mesh generation")
         if mesh_parameters.comm.comm.rank == 0:
             meshio.write_points_cells(
                 "automatic_mesh.msh",
                 points,
                 [("triangle", cells)],
                 file_format="gmsh22",
-                binary=False
+                binary=False,
             )
 
             meshio.write_points_cells(
-                "automatic_mesh.vtk",
-                points,
-                [("triangle", cells)],
-                file_format="vtk"
+                "automatic_mesh.vtk", points, [("triangle", cells)], file_format="vtk"
             )
 
     mesh_parameters.comm.comm.barrier()
     mesh = FireMeshReader(
-        'automatic_mesh.msh',
-        distribution_parameters={
-            "overlap_type": (DistributedMeshOverlapType.NONE, 0)
-        },
+        "automatic_mesh.msh",
+        distribution_parameters={"overlap_type": (DistributedMeshOverlapType.NONE, 0)},
         comm=mesh_parameters.comm.comm,
     )
 
@@ -128,7 +122,9 @@ def create_seismicmesh_2D_mesh_homogeneous(mesh_parameters):
 
     edge_length = mesh_parameters.edge_length
     if edge_length is None:
-        edge_length = mesh_parameters.minimum_velocity / (mesh_parameters.source_frequency * mesh_parameters.cpw)
+        edge_length = mesh_parameters.minimum_velocity / (
+            mesh_parameters.source_frequency * mesh_parameters.cpw
+        )
 
     bbox = (-real_lz, 0.0, -pad, real_lx - pad)
     rectangle = SeismicMesh.Rectangle(bbox)

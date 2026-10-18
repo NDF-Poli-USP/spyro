@@ -3,6 +3,7 @@ from typing import Callable, Tuple
 
 try:
     from numba import njit, prange
+
     NUMBA_AVAILABLE = True  # pragma: no cover
 except ImportError:
     NUMBA_AVAILABLE = False
@@ -19,7 +20,7 @@ def winslow_smooth_default(
     hyperellipse_params: tuple = None,
     iterations: int = 1500,
     omega: float = 0.05,
-    plot_sources: bool = True
+    plot_sources: bool = True,
 ) -> np.ndarray:
     """Apply Winslow mesh smoothing using a default Python implementation.
 
@@ -57,7 +58,6 @@ def winslow_smooth_default(
     ndarray
         Updated node coordinates array of shape (N, 2).
     """
-
     if move_hyperellipse is None:
         move_hyperellipse = set()
 
@@ -83,13 +83,13 @@ def winslow_smooth_default(
         sort_idx = np.argsort(angles)
         sorted_neighbors = [neighbors[idx] for idx in sort_idx]
         sorted_angles = angles[sort_idx]
-        cardinals = {'E': None, 'N': None, 'W': None, 'S': None}
+        cardinals = {"E": None, "N": None, "W": None, "S": None}
 
         if len(sorted_neighbors) == 4:
-            cardinals['E'] = sorted_neighbors[0]
-            cardinals['N'] = sorted_neighbors[1]
-            cardinals['W'] = sorted_neighbors[2]
-            cardinals['S'] = sorted_neighbors[3]
+            cardinals["E"] = sorted_neighbors[0]
+            cardinals["N"] = sorted_neighbors[1]
+            cardinals["W"] = sorted_neighbors[2]
+            cardinals["S"] = sorted_neighbors[3]
         elif len(sorted_neighbors) > 0:
             diffs = np.diff(sorted_angles)
             diffs = np.append(diffs, sorted_angles[0] - sorted_angles[-1] + 2 * np.pi)
@@ -97,12 +97,12 @@ def winslow_smooth_default(
             rolled_neighbors = np.roll(sorted_neighbors, -(gap_idx + 1))
 
             if len(sorted_neighbors) == 3:
-                cardinals['E'] = rolled_neighbors[0]
-                cardinals['N'] = rolled_neighbors[1]
-                cardinals['W'] = rolled_neighbors[2]
+                cardinals["E"] = rolled_neighbors[0]
+                cardinals["N"] = rolled_neighbors[1]
+                cardinals["W"] = rolled_neighbors[2]
             elif len(sorted_neighbors) == 2:
-                cardinals['E'] = rolled_neighbors[0]
-                cardinals['N'] = rolled_neighbors[1]
+                cardinals["E"] = rolled_neighbors[0]
+                cardinals["N"] = rolled_neighbors[1]
 
         def get_shared(nA, nB):
             if nA is None or nB is None:
@@ -112,10 +112,10 @@ def winslow_smooth_default(
             return list(shared)[0] if shared else None
 
         corners = {
-            'NE': get_shared(cardinals['N'], cardinals['E']),
-            'NW': get_shared(cardinals['N'], cardinals['W']),
-            'SE': get_shared(cardinals['S'], cardinals['E']),
-            'SW': get_shared(cardinals['S'], cardinals['W'])
+            "NE": get_shared(cardinals["N"], cardinals["E"]),
+            "NW": get_shared(cardinals["N"], cardinals["W"]),
+            "SE": get_shared(cardinals["S"], cardinals["E"]),
+            "SW": get_shared(cardinals["S"], cardinals["W"]),
         }
         stencils[i] = {**cardinals, **corners}
 
@@ -128,7 +128,7 @@ def winslow_smooth_default(
     jj = 0
     for _ in range(iterations):
         jj += 1
-        print(f"Iteration: {jj}", end='\r')
+        print(f"Iteration: {jj}", end="\r")
         h = sizing_fn(X, Z)
 
         for i, st in stencils.items():
@@ -140,29 +140,34 @@ def winslow_smooth_default(
             if not (is_all or is_X or is_Z or is_hyperellipse):
                 continue
 
-            C = {'X': {}, 'Z': {}}
+            C = {"X": {}, "Z": {}}
 
-            for d, opp in [('E', 'W'), ('W', 'E'), ('N', 'S'), ('S', 'N')]:
+            for d, opp in [("E", "W"), ("W", "E"), ("N", "S"), ("S", "N")]:
                 idx = st[d]
                 if idx is not None:
-                    C['X'][d] = X[idx]
-                    C['Z'][d] = Z[idx]
+                    C["X"][d] = X[idx]
+                    C["Z"][d] = Z[idx]
                 else:
                     opp_idx = st[opp]
-                    C['X'][d] = 2 * X[i] - X[opp_idx] if opp_idx is not None else X[i]
-                    C['Z'][d] = 2 * Z[i] - Z[opp_idx] if opp_idx is not None else Z[i]
+                    C["X"][d] = 2 * X[i] - X[opp_idx] if opp_idx is not None else X[i]
+                    C["Z"][d] = 2 * Z[i] - Z[opp_idx] if opp_idx is not None else Z[i]
 
-            for d, d1, d2 in [('NE', 'N', 'E'), ('NW', 'N', 'W'), ('SE', 'S', 'E'), ('SW', 'S', 'W')]:
+            for d, d1, d2 in [
+                ("NE", "N", "E"),
+                ("NW", "N", "W"),
+                ("SE", "S", "E"),
+                ("SW", "S", "W"),
+            ]:
                 idx = st[d]
                 if idx is not None:
-                    C['X'][d] = X[idx]
-                    C['Z'][d] = Z[idx]
+                    C["X"][d] = X[idx]
+                    C["Z"][d] = Z[idx]
                 else:
-                    C['X'][d] = C['X'][d1] + C['X'][d2] - X[i]
-                    C['Z'][d] = C['Z'][d1] + C['Z'][d2] - Z[i]
+                    C["X"][d] = C["X"][d1] + C["X"][d2] - X[i]
+                    C["Z"][d] = C["Z"][d1] + C["Z"][d2] - Z[i]
 
-            X_E, X_W, X_N, X_S = C['X']['E'], C['X']['W'], C['X']['N'], C['X']['S']
-            Z_E, Z_W, Z_N, Z_S = C['Z']['E'], C['Z']['W'], C['Z']['N'], C['Z']['S']
+            X_E, X_W, X_N, X_S = C["X"]["E"], C["X"]["W"], C["X"]["N"], C["X"]["S"]
+            Z_E, Z_W, Z_N, Z_S = C["Z"]["E"], C["Z"]["W"], C["Z"]["N"], C["Z"]["S"]
 
             X_xi = 0.5 * (X_E - X_W)
             X_eta = 0.5 * (X_N - X_S)
@@ -171,14 +176,30 @@ def winslow_smooth_default(
             alpha = X_eta**2 + Z_eta**2
             beta = X_xi * X_eta + Z_xi * Z_eta
             gamma = X_xi**2 + Z_xi**2
-            X_xita = 0.25 * (C['X']['NE'] - C['X']['NW'] - C['X']['SE'] + C['X']['SW'])
-            Z_xita = 0.25 * (C['Z']['NE'] - C['Z']['NW'] - C['Z']['SE'] + C['Z']['SW'])
+            X_xita = 0.25 * (C["X"]["NE"] - C["X"]["NW"] - C["X"]["SE"] + C["X"]["SW"])
+            Z_xita = 0.25 * (C["Z"]["NE"] - C["Z"]["NW"] - C["Z"]["SE"] + C["Z"]["SW"])
 
             D_C = h[i]
-            D_E = h[st['E']] if (st['E'] is not None and st['E'] in movable_nodes) else D_C
-            D_W = h[st['W']] if (st['W'] is not None and st['W'] in movable_nodes) else D_C
-            D_N = h[st['N']] if (st['N'] is not None and st['N'] in movable_nodes) else D_C
-            D_S = h[st['S']] if (st['S'] is not None and st['S'] in movable_nodes) else D_C
+            D_E = (
+                h[st["E"]]
+                if (st["E"] is not None and st["E"] in movable_nodes)
+                else D_C
+            )
+            D_W = (
+                h[st["W"]]
+                if (st["W"] is not None and st["W"] in movable_nodes)
+                else D_C
+            )
+            D_N = (
+                h[st["N"]]
+                if (st["N"] is not None and st["N"] in movable_nodes)
+                else D_C
+            )
+            D_S = (
+                h[st["S"]]
+                if (st["S"] is not None and st["S"] in movable_nodes)
+                else D_C
+            )
 
             D_phi = 0.5 * (D_E - D_W)
             D_psi = 0.5 * (D_N - D_S)
@@ -195,10 +216,20 @@ def winslow_smooth_default(
             Z_target = Z[i]
 
             if is_all or is_X or is_hyperellipse:
-                X_target = (alpha * (X_E + X_W) + gamma * (X_N + X_S) - 2.0 * beta * X_xita - Source_X) / Denominator
+                X_target = (
+                    alpha * (X_E + X_W)
+                    + gamma * (X_N + X_S)
+                    - 2.0 * beta * X_xita
+                    - Source_X
+                ) / Denominator
 
             if is_all or is_Z or is_hyperellipse:
-                Z_target = (alpha * (Z_E + Z_W) + gamma * (Z_N + Z_S) - 2.0 * beta * Z_xita - Source_Z) / Denominator
+                Z_target = (
+                    alpha * (Z_E + Z_W)
+                    + gamma * (Z_N + Z_S)
+                    - 2.0 * beta * Z_xita
+                    - Source_Z
+                ) / Denominator
 
             if is_hyperellipse and hyperellipse_params is not None:
                 a_e, b_e, xc_e, zc_e, n_e = hyperellipse_params
@@ -209,7 +240,9 @@ def winslow_smooth_default(
                     X_new[i] = X[i]
                     Z_new[i] = Z[i]
                 else:
-                    scale = (abs(dx / a_e)**n_e + abs(dz / b_e)**n_e)**(-1.0 / n_e)
+                    scale = (abs(dx / a_e) ** n_e + abs(dz / b_e) ** n_e) ** (
+                        -1.0 / n_e
+                    )
                     X_proj = xc_e + scale * dx
                     Z_proj = zc_e + scale * dz
 
@@ -230,6 +263,7 @@ def winslow_smooth_default(
 
 
 if NUMBA_AVAILABLE:  # pragma: no cover
+
     @njit(cache=True)
     def bilinear_interp_2d(x, z, grid_x, grid_z, grid_vals):
         """Perform 2D bilinear interpolation for a single point.
@@ -265,10 +299,12 @@ if NUMBA_AVAILABLE:  # pragma: no cover
             raise ValueError("grid_x and grid_z must each have at least 2 points.")
 
         gv0, gv1 = grid_vals.shape
-        vals_are_nx_nz = (gv0 == nx and gv1 == nz)
-        vals_are_nz_nx = (gv0 == nz and gv1 == nx)
+        vals_are_nx_nz = gv0 == nx and gv1 == nz
+        vals_are_nz_nx = gv0 == nz and gv1 == nx
         if not vals_are_nx_nz and not vals_are_nz_nx:
-            raise ValueError("grid_vals shape must be (len(grid_x), len(grid_z)) or (len(grid_z), len(grid_x)).")
+            raise ValueError(
+                "grid_vals shape must be (len(grid_x), len(grid_z)) or (len(grid_z), len(grid_x))."
+            )
 
         x_asc = grid_x[0] < grid_x[nx - 1]
         z_asc = grid_z[0] < grid_z[nz - 1]
@@ -298,7 +334,7 @@ if NUMBA_AVAILABLE:  # pragma: no cover
             zq = z
 
         if x_asc:
-            i = np.searchsorted(grid_x, xq, side='right') - 1
+            i = np.searchsorted(grid_x, xq, side="right") - 1
         else:
             lo = 0
             hi = nx
@@ -312,7 +348,7 @@ if NUMBA_AVAILABLE:  # pragma: no cover
             i = lo - 1
 
         if z_asc:
-            j = np.searchsorted(grid_z, zq, side='right') - 1
+            j = np.searchsorted(grid_z, zq, side="right") - 1
         else:
             lo = 0
             hi = nz
@@ -390,14 +426,33 @@ if NUMBA_AVAILABLE:  # pragma: no cover
         return c0 * (1.0 - zd) + c1 * zd
 
     @njit(cache=True, parallel=True)
-    def _numba_winslow_loop2(X, Z, grid_x, grid_z, grid_vals, stencils, is_movable,
-                             move_X, move_Z, move_hyperellipse, hyperellipse_params, omega, iterations):
+    def _numba_winslow_loop2(
+        X,
+        Z,
+        grid_x,
+        grid_z,
+        grid_vals,
+        stencils,
+        is_movable,
+        move_X,
+        move_Z,
+        move_hyperellipse,
+        hyperellipse_params,
+        omega,
+        iterations,
+    ):
         """Internal Numba-accelerated inner loop for Winslow smoothing."""
         num_nodes = len(X)
         X_new = np.empty_like(X)
         Z_new = np.empty_like(Z)
         h = np.empty_like(X)
-        a_e, b_e, xc_e, zc_e, n_e = hyperellipse_params[0], hyperellipse_params[1], hyperellipse_params[2], hyperellipse_params[3], hyperellipse_params[4]
+        a_e, b_e, xc_e, zc_e, n_e = (
+            hyperellipse_params[0],
+            hyperellipse_params[1],
+            hyperellipse_params[2],
+            hyperellipse_params[3],
+            hyperellipse_params[4],
+        )
 
         for jj in range(iterations):
             for i in prange(num_nodes):
@@ -410,8 +465,18 @@ if NUMBA_AVAILABLE:  # pragma: no cover
                 if not (move_X[i] or move_Z[i] or move_hyperellipse[i]):
                     continue
 
-                iE, iW, iN, iS = stencils[i, 0], stencils[i, 1], stencils[i, 2], stencils[i, 3]
-                iNE, iNW, iSE, iSW = stencils[i, 4], stencils[i, 5], stencils[i, 6], stencils[i, 7]
+                iE, iW, iN, iS = (
+                    stencils[i, 0],
+                    stencils[i, 1],
+                    stencils[i, 2],
+                    stencils[i, 3],
+                )
+                iNE, iNW, iSE, iSW = (
+                    stencils[i, 4],
+                    stencils[i, 5],
+                    stencils[i, 6],
+                    stencils[i, 7],
+                )
 
                 xE = X[iE] if iE != -1 else (2.0 * X[i] - X[iW] if iW != -1 else X[i])
                 xW = X[iW] if iW != -1 else (2.0 * X[i] - X[iE] if iE != -1 else X[i])
@@ -468,10 +533,20 @@ if NUMBA_AVAILABLE:  # pragma: no cover
                 Z_target = Z[i]
 
                 if move_X[i] or move_hyperellipse[i]:
-                    X_target = (alpha * (xE + xW) + gamma * (xN + xS) - 2.0 * beta * X_xita - Source_X) / Denominator
+                    X_target = (
+                        alpha * (xE + xW)
+                        + gamma * (xN + xS)
+                        - 2.0 * beta * X_xita
+                        - Source_X
+                    ) / Denominator
 
                 if move_Z[i] or move_hyperellipse[i]:
-                    Z_target = (alpha * (zE + zW) + gamma * (zN + zS) - 2.0 * beta * Z_xita - Source_Z) / Denominator
+                    Z_target = (
+                        alpha * (zE + zW)
+                        + gamma * (zN + zS)
+                        - 2.0 * beta * Z_xita
+                        - Source_Z
+                    ) / Denominator
 
                 if move_hyperellipse[i]:
                     dx = X_target - xc_e
@@ -481,7 +556,9 @@ if NUMBA_AVAILABLE:  # pragma: no cover
                         X_new[i] = X[i]
                         Z_new[i] = Z[i]
                     else:
-                        scale = (abs(dx / a_e)**n_e + abs(dz / b_e)**n_e)**(-1.0 / n_e)
+                        scale = (abs(dx / a_e) ** n_e + abs(dz / b_e) ** n_e) ** (
+                            -1.0 / n_e
+                        )
                         X_proj = xc_e + scale * dx
                         Z_proj = zc_e + scale * dz
                         X_new[i] = (1.0 - omega) * X[i] + omega * X_proj
@@ -510,7 +587,7 @@ if NUMBA_AVAILABLE:  # pragma: no cover
         move_hyperellipse: set = None,
         hyperellipse_params: tuple = None,
         iterations: int = 1500,
-        omega: float = 0.05
+        omega: float = 0.05,
     ) -> np.ndarray:
         """Apply Winslow mesh smoothing using Numba JIT compilation.
 
@@ -546,7 +623,6 @@ if NUMBA_AVAILABLE:  # pragma: no cover
         ndarray
             Updated node coordinates array of shape (N, 2).
         """
-
         if move_hyperellipse is None:
             move_hyperellipse = set()
 
@@ -569,7 +645,9 @@ if NUMBA_AVAILABLE:  # pragma: no cover
         for i in range(num_nodes):
             neighbors = list(node_to_neighbors[i])
             if not neighbors:
-                stencils[i] = {d: None for d in ['E', 'N', 'W', 'S', 'NE', 'NW', 'SE', 'SW']}
+                stencils[i] = {
+                    d: None for d in ["E", "N", "W", "S", "NE", "NW", "SE", "SW"]
+                }
                 continue
 
             vecs = points[neighbors] - points[i]
@@ -577,26 +655,28 @@ if NUMBA_AVAILABLE:  # pragma: no cover
             sort_idx = np.argsort(angles)
             sorted_neighbors = [neighbors[idx] for idx in sort_idx]
             sorted_angles = angles[sort_idx]
-            cardinals = {'E': None, 'N': None, 'W': None, 'S': None}
+            cardinals = {"E": None, "N": None, "W": None, "S": None}
 
             if len(sorted_neighbors) == 4:
-                cardinals['E'] = sorted_neighbors[0]
-                cardinals['N'] = sorted_neighbors[1]
-                cardinals['W'] = sorted_neighbors[2]
-                cardinals['S'] = sorted_neighbors[3]
+                cardinals["E"] = sorted_neighbors[0]
+                cardinals["N"] = sorted_neighbors[1]
+                cardinals["W"] = sorted_neighbors[2]
+                cardinals["S"] = sorted_neighbors[3]
             elif len(sorted_neighbors) > 0:
                 diffs = np.diff(sorted_angles)
-                diffs = np.append(diffs, sorted_angles[0] - sorted_angles[-1] + 2 * np.pi)
+                diffs = np.append(
+                    diffs, sorted_angles[0] - sorted_angles[-1] + 2 * np.pi
+                )
                 gap_idx = np.argmax(diffs)
                 rolled_neighbors = np.roll(sorted_neighbors, -(gap_idx + 1))
 
                 if len(sorted_neighbors) == 3:
-                    cardinals['E'] = rolled_neighbors[0]
-                    cardinals['N'] = rolled_neighbors[1]
-                    cardinals['W'] = rolled_neighbors[2]
+                    cardinals["E"] = rolled_neighbors[0]
+                    cardinals["N"] = rolled_neighbors[1]
+                    cardinals["W"] = rolled_neighbors[2]
                 elif len(sorted_neighbors) == 2:
-                    cardinals['E'] = rolled_neighbors[0]
-                    cardinals['N'] = rolled_neighbors[1]
+                    cardinals["E"] = rolled_neighbors[0]
+                    cardinals["N"] = rolled_neighbors[1]
 
             def get_shared(nA, nB):
                 if nA is None or nB is None:
@@ -606,14 +686,14 @@ if NUMBA_AVAILABLE:  # pragma: no cover
                 return list(shared)[0] if shared else None
 
             corners = {
-                'NE': get_shared(cardinals['N'], cardinals['E']),
-                'NW': get_shared(cardinals['N'], cardinals['W']),
-                'SE': get_shared(cardinals['S'], cardinals['E']),
-                'SW': get_shared(cardinals['S'], cardinals['W'])
+                "NE": get_shared(cardinals["N"], cardinals["E"]),
+                "NW": get_shared(cardinals["N"], cardinals["W"]),
+                "SE": get_shared(cardinals["S"], cardinals["E"]),
+                "SW": get_shared(cardinals["S"], cardinals["W"]),
             }
             stencils[i] = {**cardinals, **corners}
 
-        dir_map = {'E': 0, 'W': 1, 'N': 2, 'S': 3, 'NE': 4, 'NW': 5, 'SE': 6, 'SW': 7}
+        dir_map = {"E": 0, "W": 1, "N": 2, "S": 3, "NE": 4, "NW": 5, "SE": 6, "SW": 7}
         stencil_arr = np.full((num_nodes, 8), -1, dtype=np.int32)
 
         for i, st in stencils.items():
@@ -645,18 +725,32 @@ if NUMBA_AVAILABLE:  # pragma: no cover
             step_iters = min(print_interval, iterations - current_iter)
 
             X, Z = _numba_winslow_loop2(
-                X, Z,
-                segy_grid_x, segy_grid_z, segy_grid_vals,
-                stencil_arr, is_movable, move_X_mask, move_Z_mask, move_hyperellipse_mask, e_params, omega, step_iters
+                X,
+                Z,
+                segy_grid_x,
+                segy_grid_z,
+                segy_grid_vals,
+                stencil_arr,
+                is_movable,
+                move_X_mask,
+                move_Z_mask,
+                move_hyperellipse_mask,
+                e_params,
+                omega,
+                step_iters,
             )
 
             current_iter += step_iters
 
             percent = (current_iter / iterations) * 100
-            print(f"Iteration: {current_iter} / {iterations} [{percent:.1f}%]   ", end='\r')
+            print(
+                f"Iteration: {current_iter} / {iterations} [{percent:.1f}%]   ",
+                end="\r",
+            )
 
         print("\nSmoothing Complete.")
         return np.column_stack((X, Z))
+
 
 # Define a fallback if Numba is not available
 else:
@@ -681,7 +775,7 @@ def vectorized_bilinear_interp(
     z: np.ndarray,
     grid_x: np.ndarray,
     grid_z: np.ndarray,
-    grid_vals: np.ndarray
+    grid_vals: np.ndarray,
 ) -> np.ndarray:
     """Perform vectorized 2D bilinear interpolation over multiple points.
 
@@ -780,18 +874,35 @@ def vectorized_bilinear_interp(
 
 
 def _vectorized_winslow_loop(
-    X: np.ndarray, Z: np.ndarray,
-    grid_x: np.ndarray, grid_z: np.ndarray, grid_vals: np.ndarray,
-    stencil_arr: np.ndarray, is_movable: np.ndarray,
-    move_X_mask: np.ndarray, move_Z_mask: np.ndarray, move_hyperellipse_mask: np.ndarray,
-    hyperellipse_params: np.ndarray, omega: float, iterations: int
+    X: np.ndarray,
+    Z: np.ndarray,
+    grid_x: np.ndarray,
+    grid_z: np.ndarray,
+    grid_vals: np.ndarray,
+    stencil_arr: np.ndarray,
+    is_movable: np.ndarray,
+    move_X_mask: np.ndarray,
+    move_Z_mask: np.ndarray,
+    move_hyperellipse_mask: np.ndarray,
+    hyperellipse_params: np.ndarray,
+    omega: float,
+    iterations: int,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Internal NumPy-vectorized inner loop for fast Winslow smoothing."""
-
     a_e, b_e, xc_e, zc_e, n_e = hyperellipse_params
 
-    iE, iW, iN, iS = stencil_arr[:, 0], stencil_arr[:, 1], stencil_arr[:, 2], stencil_arr[:, 3]
-    iNE, iNW, iSE, iSW = stencil_arr[:, 4], stencil_arr[:, 5], stencil_arr[:, 6], stencil_arr[:, 7]
+    iE, iW, iN, iS = (
+        stencil_arr[:, 0],
+        stencil_arr[:, 1],
+        stencil_arr[:, 2],
+        stencil_arr[:, 3],
+    )
+    iNE, iNW, iSE, iSW = (
+        stencil_arr[:, 4],
+        stencil_arr[:, 5],
+        stencil_arr[:, 6],
+        stencil_arr[:, 7],
+    )
 
     mE, mW = iE != -1, iW != -1
     mN, mS = iN != -1, iS != -1
@@ -861,25 +972,31 @@ def _vectorized_winslow_loop(
 
         X_target = np.where(
             valid_denom_mask & (move_X_mask | move_hyperellipse_mask),
-            (alpha * (xE + xW) + gamma * (xN + xS) - 2.0 * beta * X_xita - Source_X) / Denom_safe,
-            X
+            (alpha * (xE + xW) + gamma * (xN + xS) - 2.0 * beta * X_xita - Source_X)
+            / Denom_safe,
+            X,
         )
         Z_target = np.where(
             valid_denom_mask & (move_Z_mask | move_hyperellipse_mask),
-            (alpha * (zE + zW) + gamma * (zN + zS) - 2.0 * beta * Z_xita - Source_Z) / Denom_safe,
-            Z
+            (alpha * (zE + zW) + gamma * (zN + zS) - 2.0 * beta * Z_xita - Source_Z)
+            / Denom_safe,
+            Z,
         )
 
         dx = X_target - xc_e
         dz = Z_target - zc_e
         zero_dist_mask = (np.abs(dx) < 1e-12) & (np.abs(dz) < 1e-12)
-        dist_term = np.abs(dx / a_e)**n_e + np.abs(dz / b_e)**n_e
+        dist_term = np.abs(dx / a_e) ** n_e + np.abs(dz / b_e) ** n_e
         dist_safe = np.where(dist_term < 1e-12, 1.0, dist_term)  # Prevent DivZero
         scale = dist_safe ** (-1.0 / n_e)
         X_proj = xc_e + scale * dx
         Z_proj = zc_e + scale * dz
-        X_hyperellipse_new = np.where(zero_dist_mask, X, (1.0 - omega) * X + omega * X_proj)
-        Z_hyperellipse_new = np.where(zero_dist_mask, Z, (1.0 - omega) * Z + omega * Z_proj)
+        X_hyperellipse_new = np.where(
+            zero_dist_mask, X, (1.0 - omega) * X + omega * X_proj
+        )
+        Z_hyperellipse_new = np.where(
+            zero_dist_mask, Z, (1.0 - omega) * Z + omega * Z_proj
+        )
         X_reg_new = np.where(move_X_mask, (1.0 - omega) * X + omega * X_target, X)
         Z_reg_new = np.where(move_Z_mask, (1.0 - omega) * Z + omega * Z_target, Z)
         X = np.where(move_hyperellipse_mask, X_hyperellipse_new, X_reg_new)
@@ -900,7 +1017,7 @@ def winslow_smooth_vectorized(
     move_hyperellipse: set = None,
     hyperellipse_params: tuple = None,
     iterations: int = 1500,
-    omega: float = 0.05
+    omega: float = 0.05,
 ) -> np.ndarray:
     """Apply Winslow mesh smoothing using vectorized NumPy operations.
 
@@ -936,7 +1053,6 @@ def winslow_smooth_vectorized(
     ndarray
         Updated node coordinates array of shape (N, 2).
     """
-
     if move_hyperellipse is None:
         move_hyperellipse = set()
 
@@ -959,7 +1075,9 @@ def winslow_smooth_vectorized(
     for i in range(num_nodes):
         neighbors = list(node_to_neighbors[i])
         if not neighbors:
-            stencils[i] = {d: None for d in ['E', 'N', 'W', 'S', 'NE', 'NW', 'SE', 'SW']}
+            stencils[i] = {
+                d: None for d in ["E", "N", "W", "S", "NE", "NW", "SE", "SW"]
+            }
             continue
 
         vecs = points[neighbors] - points[i]
@@ -967,13 +1085,13 @@ def winslow_smooth_vectorized(
         sort_idx = np.argsort(angles)
         sorted_neighbors = [neighbors[idx] for idx in sort_idx]
         sorted_angles = angles[sort_idx]
-        cardinals = {'E': None, 'N': None, 'W': None, 'S': None}
+        cardinals = {"E": None, "N": None, "W": None, "S": None}
 
         if len(sorted_neighbors) == 4:
-            cardinals['E'] = sorted_neighbors[0]
-            cardinals['N'] = sorted_neighbors[1]
-            cardinals['W'] = sorted_neighbors[2]
-            cardinals['S'] = sorted_neighbors[3]
+            cardinals["E"] = sorted_neighbors[0]
+            cardinals["N"] = sorted_neighbors[1]
+            cardinals["W"] = sorted_neighbors[2]
+            cardinals["S"] = sorted_neighbors[3]
         elif len(sorted_neighbors) > 0:
             diffs = np.diff(sorted_angles)
             diffs = np.append(diffs, sorted_angles[0] - sorted_angles[-1] + 2 * np.pi)
@@ -981,12 +1099,12 @@ def winslow_smooth_vectorized(
             rolled_neighbors = np.roll(sorted_neighbors, -(gap_idx + 1))
 
             if len(sorted_neighbors) == 3:
-                cardinals['E'] = rolled_neighbors[0]
-                cardinals['N'] = rolled_neighbors[1]
-                cardinals['W'] = rolled_neighbors[2]
+                cardinals["E"] = rolled_neighbors[0]
+                cardinals["N"] = rolled_neighbors[1]
+                cardinals["W"] = rolled_neighbors[2]
             elif len(sorted_neighbors) == 2:
-                cardinals['E'] = rolled_neighbors[0]
-                cardinals['N'] = rolled_neighbors[1]
+                cardinals["E"] = rolled_neighbors[0]
+                cardinals["N"] = rolled_neighbors[1]
 
         def get_shared(nA, nB):
             if nA is None or nB is None:
@@ -996,14 +1114,14 @@ def winslow_smooth_vectorized(
             return list(shared)[0] if shared else None
 
         corners = {
-            'NE': get_shared(cardinals['N'], cardinals['E']),
-            'NW': get_shared(cardinals['N'], cardinals['W']),
-            'SE': get_shared(cardinals['S'], cardinals['E']),
-            'SW': get_shared(cardinals['S'], cardinals['W'])
+            "NE": get_shared(cardinals["N"], cardinals["E"]),
+            "NW": get_shared(cardinals["N"], cardinals["W"]),
+            "SE": get_shared(cardinals["S"], cardinals["E"]),
+            "SW": get_shared(cardinals["S"], cardinals["W"]),
         }
         stencils[i] = {**cardinals, **corners}
 
-    dir_map = {'E': 0, 'W': 1, 'N': 2, 'S': 3, 'NE': 4, 'NW': 5, 'SE': 6, 'SW': 7}
+    dir_map = {"E": 0, "W": 1, "N": 2, "S": 3, "NE": 4, "NW": 5, "SE": 6, "SW": 7}
     stencil_arr = np.full((num_nodes, 8), -1, dtype=np.int32)
 
     for i, st in stencils.items():
@@ -1035,14 +1153,24 @@ def winslow_smooth_vectorized(
         step_iters = min(print_interval, iterations - current_iter)
 
         X, Z = _vectorized_winslow_loop(
-            X, Z,
-            segy_grid_x, segy_grid_z, segy_grid_vals,
-            stencil_arr, is_movable, move_X_mask, move_Z_mask, move_hyperellipse_mask, e_params, omega, step_iters
+            X,
+            Z,
+            segy_grid_x,
+            segy_grid_z,
+            segy_grid_vals,
+            stencil_arr,
+            is_movable,
+            move_X_mask,
+            move_Z_mask,
+            move_hyperellipse_mask,
+            e_params,
+            omega,
+            step_iters,
         )
 
         current_iter += step_iters
         percent = (current_iter / iterations) * 100
-        print(f"Iteration: {current_iter} / {iterations} [{percent:.1f}%]   ", end='\r')
+        print(f"Iteration: {current_iter} / {iterations} [{percent:.1f}%]   ", end="\r")
 
     print("\nSmoothing Complete.")
     return np.column_stack((X, Z))
