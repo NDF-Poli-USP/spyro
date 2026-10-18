@@ -1,14 +1,145 @@
-"""Constructs Firedrake solver for the acosutic wave with typical BCs, NRBCs or HABCs."""
+"""Constructs Firedrake solver for the acoustic wave.
+
+Handles typical BCs, NRBCs or HABCs.
+"""
 
 import firedrake as fire
-from firedrake import ds, dx, dot, grad
+from firedrake import ds, dx, dot, grad, sqrt
 from ..utils.typing import AbsorbingBCsType
+from ..utils.error_management import (
+    mutually_exclusive_parameter_error,
+    required_together_parameter_error,
+)
+
+
+def velocity_fluid(wave):
+    """Resolve the acoustic wave velocity.
+
+    Uses either an explicit value or the fluid bulk modulus and density.
+
+    Parameters
+    ----------
+    wave : `acoustic_wave.AcousticWave`
+        An instance of the :class:`~spyro.solver.acoustic_wave.AcousticWave`
+
+    Returns
+    -------
+    c : UFL expression
+        The resolved wave velocity.
+
+    Raises
+    ------
+    ValueError
+        If `wave.c` is given together with `wave.K` or `wave.rho_fluid`, or
+        if only one of `wave.K`/`wave.rho_fluid` is given.
+    """
+    c = wave.c
+    K = wave.K
+    rho_fluid = wave.rho_fluid
+
+    combined_k_and_rho_fluid = K if K is not None else rho_fluid
+    mutually_exclusive_parameter_error(
+        ["velocity_fluid", "bulk_modulus/density_fluid"], [c, combined_k_and_rho_fluid]
+    )
+    required_together_parameter_error(["bulk_modulus", "density_fluid"], [K, rho_fluid])
+
+    if c is None:
+        c = sqrt(K / rho_fluid)
+
+    return c
+
+
+def build_acoustic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
+    """Build the weak form of the acoustic wave equation for one time step.
+
+    Parameters
+    ----------
+    wave : `acoustic_wave.AcousticWave`
+        An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
+    u_trial : `firedrake.TrialFunction`
+        Trial function for the pressure field at the next time step.
+    v_test : `firedrake.TestFunction`
+        Test function for the pressure field.
+    u_n : `firedrake.Function`
+        Pressure field at the current time step.
+    u_nm1 : `firedrake.Function`
+        Pressure field at the previous time step.
+    quad_rule : dict
+        Quadrature rule for volume integration.
+
+    Returns
+    -------
+    form : UFL form
+        The combined weak form (mass + stiffness + source + absorbing terms).
+
+    Raises
+    ------
+    ValueError
+        If `c` is given together with `K` or `rho_fluid` (ambiguous), or if
+        only one of `K`/`rho_fluid` is given (incomplete).
+    """
+    c = velocity_fluid(wave)
+    dt = wave.dt
+
+    m1 = (
+        (1 / (c * c))
+        * ((u_trial - 2.0 * u_n + u_nm1) / dt**2)
+        * v_test
+        * dx(**quad_rule)
+    )
+    a = dot(grad(u_n), grad(v_test)) * dx(**quad_rule)
+
+    le = 0.0
+    q = wave.source_expression
+    if q is not None:
+        le += -q * v_test * dx(**quad_rule)
+
+    if wave.abc_active and not wave.abc_get_ref_model:
+        weak_expr_abc = dot((u_n - u_nm1) / dt, v_test)
+
+        f_abc = (1 / c) * weak_expr_abc
+        qr_s = wave.surface_quadrature_rule
+
+        if wave.abc_type == AbsorbingBCsType.HYBRID:
+
+            # NRBC
+            le += wave.cosHig * f_abc * ds(**qr_s)
+
+            # Damping
+            le += (
+                wave.eta_mask
+                * weak_expr_abc
+                * (1 / (c * c))
+                * wave.eta_habc
+                * dx(**quad_rule)
+            )
+
+        else:
+            if wave.absorb_top:
+                le += f_abc * ds(1, **qr_s)
+            if wave.absorb_bottom:
+                le += f_abc * ds(2, **qr_s)
+            if wave.absorb_right:
+                le += f_abc * ds(3, **qr_s)
+            if wave.absorb_left:
+                le += f_abc * ds(4, **qr_s)
+            if wave.dimension == 3:
+                if wave.absorb_front:
+                    le += f_abc * ds(5, **qr_s)
+                if wave.absorb_back:
+                    le += f_abc * ds(6, **qr_s)
+
+    # form = m1 + a - le
+    # Signal for le is + in derivation, see Salas et al (2022)
+    # doi: https://doi.org/10.1016/j.apm.2022.09.014
+    # TODO: Add citation
+    return m1 + a + le
 
 
 def construct_solver_or_matrix_no_pml(wave):
-    """Builds solver operators for wave propagator with typical BCs, NRBCs or HABCs.
+    """Build the Firedrake solver for the acoustic wave, without PML.
 
-    Doesn't create mass matrices if matrix_free option is on, which it is by default.
+    Handles typical BCs, NRBCs or HABCs.
 
     Parameters
     ----------
@@ -30,68 +161,19 @@ def construct_solver_or_matrix_no_pml(wave):
     wave.u_np1 = u_np1
 
     wave.current_time = 0.0
-    dt = wave.dt
 
-    # -------------------------------------------------------
-    m1 = (
-        (1 / (wave.c * wave.c))
-        * ((u - 2.0 * u_n + u_nm1) / dt**2)
-        * v
-        * dx(**quad_rule)
-    )
-    a = dot(grad(u_n), grad(v)) * dx(**quad_rule)  # explicit
+    form = build_acoustic_form(wave, u, v, u_n, u_nm1, quad_rule)
 
-    le = 0.0
-    q = wave.source_expression
-    if q is not None:
-        le += - q * v * dx(**quad_rule)
-
-    if wave.abc_active and not wave.abc_get_ref_model:
-        weak_expr_abc = dot((u_n - u_nm1) / dt, v)
-
-        f_abc = (1 / wave.c) * weak_expr_abc
-        qr_s = wave.surface_quadrature_rule
-
-        if wave.abc_type == AbsorbingBCsType.HYBRID:
-
-            # NRBC
-            le += wave.cosHig * f_abc * ds(**qr_s)
-
-            # Damping
-            le += wave.eta_mask * weak_expr_abc * \
-                (1 / (wave.c * wave.c)) * \
-                wave.eta_habc * dx(**quad_rule)
-
-        else:
-            if wave.absorb_top:
-                le += f_abc*ds(1, **qr_s)
-            if wave.absorb_bottom:
-                le += f_abc*ds(2, **qr_s)
-            if wave.absorb_right:
-                le += f_abc*ds(3, **qr_s)
-            if wave.absorb_left:
-                le += f_abc*ds(4, **qr_s)
-            if wave.dimension == 3:
-                if wave.absorb_front:
-                    le += f_abc*ds(5, **qr_s)
-                if wave.absorb_back:
-                    le += f_abc*ds(6, **qr_s)
-
-    # form = m1 + a - le
-    # Signal for le is + in derivation, see Salas et al (2022)
-    # doi: https://doi.org/10.1016/j.apm.2022.09.014
-    # TODO: Add citation
-    form = m1 + a + le
     wave.rhs = fire.rhs(form)
     wave.lhs = fire.lhs(form)
     wave.source_function = fire.Cofunction(V.dual())
 
     lin_var = fire.LinearVariationalProblem(
-        wave.lhs,
-        wave.rhs + wave.source_function,
-        u_np1, constant_jacobian=True)
+        wave.lhs, wave.rhs + wave.source_function, u_np1, constant_jacobian=True
+    )
     solver_parameters = dict(wave.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
     wave.solver = fire.LinearVariationalSolver(
-        lin_var, solver_parameters=solver_parameters,
+        lin_var,
+        solver_parameters=solver_parameters,
     )
