@@ -204,7 +204,35 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
                     )
                     return float(base_size + t * (h_padding - base_size))
 
-        gmsh.model.mesh.setSizeCallback(mesh_size_callback)
+        if unstructured_quad_mesh:
+            # The quad mesh is subdivided once after recombination, which
+            # halves the element size, so mesh at twice the target size.
+            def quad_size_callback(
+                dim: int, tag: int, x: float, y: float, z: float, lc: float
+            ) -> float:
+                """Return twice the target element size at a point.
+
+                Parameters
+                ----------
+                dim : int
+                    Dimension of the Gmsh entity being meshed.
+                tag : int
+                    Tag of the Gmsh entity being meshed.
+                x, y, z : float
+                    Coordinates of the point, in Gmsh's (x, z) plane.
+                lc : float
+                    Element size Gmsh would otherwise use.
+
+                Returns
+                -------
+                float
+                    Twice the element size from ``mesh_size_callback``.
+                """
+                return 2.0 * mesh_size_callback(dim, tag, x, y, z, lc)
+
+            gmsh.model.mesh.setSizeCallback(quad_size_callback)
+        else:
+            gmsh.model.mesh.setSizeCallback(mesh_size_callback)
         gmsh.option.setNumber("Mesh.SaveWithoutOrphans", 1)
         gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
         gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)

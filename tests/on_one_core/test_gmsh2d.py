@@ -1,9 +1,11 @@
 import importlib.util
 import json
+from pathlib import Path
 import subprocess
 import sys
 
 import firedrake as fire
+import numpy as np
 import pytest
 
 from .gmsh_mesh_checks import (
@@ -243,29 +245,33 @@ def _generate_in_subprocess(parameters: dict) -> None:
         "    MeshingParameters(input_mesh_dictionary=json.loads(sys.argv[1]))\n"
         ")\n"
     )
+    # Run next to the mesh file, since the mesher writes a temporary velocity
+    # file to the current working directory.
     subprocess.run(
         [sys.executable, "-c", script, json.dumps(parameters)],
         check=True,
         capture_output=True,
+        cwd=Path(parameters["output_filename"]).parent,
     )
 
 
 @pytest.mark.slow
 @PADDING_CASES
 @WATER_INTERFACE_CASES
-def test_gmsh2d_unstructured_quad(tmp_path, request, water_interface, padding_type):
-    """Unstructured all-quadrilateral meshes."""
-    if water_interface and padding_type is None:
-        request.applymarker(
-            pytest.mark.xfail(
-                strict=True,
-                reason=(
-                    "Known bug: recombination leaves two triangles. Firedrake "
-                    "either fails to read the mixed mesh or reads it as a "
-                    "triangle mesh (see mfe_5_quad_mesh_leaves_triangles.py)."
-                ),
-            )
-        )
+def test_gmsh2d_unstructured_quad(
+    tmp_path: Path, water_interface: bool, padding_type: str | None
+) -> None:
+    """Check that the unstructured quad mesher writes only quadrilaterals.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory.
+    water_interface : bool
+        Whether the mesh has a water layer above the rock.
+    padding_type : str or None
+        Padding geometry: ``None``, ``"rectangular"`` or ``"hyperelliptical"``.
+    """
     parameters = _base_gmsh2d_parameters(tmp_path / "mesh.msh")
     parameters.update(
         {
@@ -286,3 +292,48 @@ def test_gmsh2d_unstructured_quad(tmp_path, request, water_interface, padding_ty
     # repeated runs with the same input differ by more than 10%.
     assert_cell_type(mesh, "quadrilateral")
     _check_mesh(mesh, parameters["output_filename"], water_interface, padding_type)
+
+
+def test_gmsh2d_unstructured_quad_element_size(tmp_path) -> None:
+    """Check that quad edges match the wavelength-based target size.
+
+    The quad mesh is subdivided after recombination, which halves the element
+    size, so the mesher requests twice the target size. Lengths are in km and
+    velocities in km/s.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory.
+    """
+    vp, frequency, cells_per_wavelength = 1.5, 5.0, 2.0
+    length_z, length_x = 2.0, 3.0
+    parameters = {
+        "mesh_type": "gmsh_mesh",
+        "dimension": 2,
+        "length_z": length_z,
+        "length_x": length_x,
+        "output_filename": str(tmp_path / "homogeneous_quad.msh"),
+        "velocity_model": {"vp_values": np.full((41, 61), vp).tolist()},
+        "cells_per_wavelength": cells_per_wavelength,
+        "source_frequency": frequency,
+        "padding_type": None,
+        "water_interface": False,
+        "structured_mesh": False,
+        "unstructured_quad_mesh": True,
+        "apply_winslow": False,
+    }
+    _generate_in_subprocess(parameters)
+    mesh = fire.Mesh(parameters["output_filename"])
+
+    assert_cell_type(mesh, "quadrilateral")
+    assert_measure(mesh, length_z * length_x)
+    assert_no_degenerate_cells(mesh)
+
+    # Firedrake numbers quad vertices as a tensor product; reorder them into a
+    # cycle to get the four edges.
+    vertices = mesh.coordinates.dat.data_ro[mesh.coordinates.cell_node_map().values]
+    cycle = vertices[:, [0, 1, 3, 2]]
+    edges = np.linalg.norm(cycle - np.roll(cycle, 1, axis=1), axis=2)
+    ratio = np.median(edges) / (vp / (frequency * cells_per_wavelength))
+    assert 0.8 <= ratio <= 1.1, f"Median quad edge is {ratio:.3f} times the target size."
