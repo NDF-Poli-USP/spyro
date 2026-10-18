@@ -35,7 +35,9 @@ def configure_gmsh_2d_meshing_mode(
     structured_mesh : bool
         Whether a structured (transfinite) quadrilateral mesh is requested.
     unstructured_quad_mesh : bool
-        Whether an unstructured all-quadrilateral mesh is requested.
+        Whether an unstructured all-quadrilateral mesh is requested. The mesh
+        is subdivided after recombination, so the size callback must return
+        twice the target element size.
     padding_type : str or None
         Padding geometry: ``None``, ``"rectangular"`` or ``"hyperelliptical"``.
     min_element_size : float
@@ -51,9 +53,16 @@ def configure_gmsh_2d_meshing_mode(
         gmsh.option.setNumber("Mesh.MeshSizeMax", min_element_size)
         gmsh.model.mesh.setTransfiniteAutomatic([], np.pi, True)
     elif unstructured_quad_mesh:
+        # Recombination alone can leave a few triangles, and Firedrake cannot
+        # read meshes that mix triangles and quadrilaterals. Subdividing every
+        # element into quadrilaterals guarantees an all-quad mesh, with
+        # elements half the requested size, which the caller compensates for.
         gmsh.option.setNumber("Mesh.Algorithm", 8)
         gmsh.option.setNumber("Mesh.RecombineAll", 1)
-        gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 3)
+        # Plain Blossom: the full-quad variant (3) did not remove every
+        # triangle, and the subdivision below now does that.
+        gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 1)
+        gmsh.option.setNumber("Mesh.SubdivisionAlgorithm", 1)
         gmsh.option.setNumber("Mesh.Smoothing", 10)
         gmsh.option.setNumber("Mesh.RecombineOptimizeTopology", 1)
         gmsh.option.setNumber("Mesh.RecombineNodeRepositioning", 1)
