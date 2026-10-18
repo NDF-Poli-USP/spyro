@@ -115,8 +115,11 @@ def create_grid_based_velocity_field(grid_spacing, length_z, length_x):
 
 
 @pytest.mark.older_firedrake
-def test_gmsh_adaptation():
+def test_gmsh_adaptation(tmp_path, monkeypatch):
     import gmsh  # noqa: F401
+    # The mesher writes the mesh and a temporary SEG-Y file to the current
+    # working directory, so run in tmp_path to keep the repository clean.
+    monkeypatch.chdir(tmp_path)
     """Test Gmsh mesh adaptation with conditional velocity field.
 
     Validates that Gmsh mesh adaptation correctly adjusts element sizes
