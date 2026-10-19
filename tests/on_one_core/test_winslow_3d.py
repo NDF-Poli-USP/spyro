@@ -67,6 +67,19 @@ def _structured_hex_mesh(
 
 
 def _constant_sizing(coordinates):
+    """Uniform sizing law returning one at every coordinate.
+
+    Parameters
+    ----------
+    coordinates : array_like
+        A single `(z, x, y)` point of shape `(3,)` or an array of points
+        of shape `(n, 3)`.
+
+    Returns
+    -------
+    float or numpy.ndarray
+        `1.0` for a single point, otherwise an array of ones of length `n`.
+    """
     coordinates = np.asarray(coordinates, dtype=float)
     if coordinates.ndim == 1:
         return 1.0
@@ -96,6 +109,7 @@ def _python_implementation(function):
 
 
 def test_resolve_stencil_coordinates_complete_neighbors():
+    """Check that a fully populated stencil returns its 18 neighbor coordinates."""
     function = _python_implementation(_resolve_stencil_coordinates)
 
     coordinates = np.arange(30, dtype=float)
@@ -112,6 +126,10 @@ def test_resolve_stencil_coordinates_complete_neighbors():
 
 
 def test_resolve_stencil_coordinates_reflects_missing_cardinals():
+    """Check that missing cardinals are reflected through the center node.
+
+    Missing diagonal neighbors must then be rebuilt from the resolved cardinals.
+    """
     function = _python_implementation(_resolve_stencil_coordinates)
 
     coordinates = np.array(
@@ -158,6 +176,7 @@ def test_resolve_stencil_coordinates_reflects_missing_cardinals():
 
 
 def test_resolve_stencil_coordinates_all_missing_returns_center():
+    """Check that a stencil with no neighbors resolves every entry to the center."""
     function = _python_implementation(_resolve_stencil_coordinates)
 
     coordinates = np.array([7.0], dtype=float)
@@ -240,6 +259,7 @@ def _kernel_stencil_problem():
 
 
 def test_numba_step_python_path_updates_only_movable_center():
+    """Check that one Python kernel step moves only the movable center node."""
     function = _python_implementation(_numba_winslow_3d_step)
 
     (
@@ -275,6 +295,7 @@ def test_numba_step_python_path_updates_only_movable_center():
 
 
 def test_numba_step_python_path_skips_fixed_nodes():
+    """Check that the Python kernel leaves nodes fixed when no axis is movable."""
     function = _python_implementation(_numba_winslow_3d_step)
 
     (
@@ -310,6 +331,7 @@ def test_numba_step_python_path_skips_fixed_nodes():
 
 
 def test_numba_step_python_path_handles_degenerate_denominator():
+    """Check that the Python kernel skips a node whose update denominator vanishes."""
     function = _python_implementation(_numba_winslow_3d_step)
 
     num_nodes = 7
@@ -358,6 +380,7 @@ def test_numba_step_python_path_handles_degenerate_denominator():
     reason="Numba is not installed in this environment.",
 )
 def test_numba_step_compiled_path_executes():
+    """Check that the compiled Numba kernel returns three finite coordinate arrays."""
     (
         points,
         sizing_values,
@@ -396,6 +419,13 @@ def test_numba_step_compiled_path_executes():
     ],
 )
 def test_winslow_smooth_rejects_invalid_point_shape(bad_points):
+    """Check that `winslow_smooth_3d` rejects points not shaped `(n, 3)`.
+
+    Parameters
+    ----------
+    bad_points : numpy.ndarray
+        Point array with an invalid shape.
+    """
     _, hexes, _ = _structured_hex_mesh()
 
     with pytest.raises(
@@ -427,6 +457,13 @@ def test_winslow_smooth_rejects_invalid_point_shape(bad_points):
     ],
 )
 def test_winslow_smooth_rejects_invalid_hex_shape(bad_hexes):
+    """Check that `winslow_smooth_3d` rejects connectivity not shaped `(m, 8)`.
+
+    Parameters
+    ----------
+    bad_hexes : numpy.ndarray
+        Hexahedral connectivity array with an invalid shape.
+    """
     points, _, _ = _structured_hex_mesh()
 
     with pytest.raises(
@@ -450,6 +487,7 @@ def test_winslow_smooth_rejects_invalid_hex_shape(bad_hexes):
 
 
 def test_winslow_smooth_rejects_negative_iterations():
+    """Check that `winslow_smooth_3d` rejects a negative iteration count."""
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
@@ -475,6 +513,13 @@ def test_winslow_smooth_rejects_negative_iterations():
 
 @pytest.mark.parametrize("omega", [0.0, -0.1, 1.01, 2.0])
 def test_winslow_smooth_rejects_invalid_omega(omega):
+    """Check that `winslow_smooth_3d` rejects relaxation factors outside `(0, 1]`.
+
+    Parameters
+    ----------
+    omega : float
+        Invalid relaxation factor.
+    """
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
@@ -500,6 +545,13 @@ def test_winslow_smooth_rejects_invalid_omega(omega):
 
 @pytest.mark.parametrize("invalid_node", [-1, 27, 100])
 def test_winslow_smooth_rejects_invalid_movement_indices(invalid_node):
+    """Check that `winslow_smooth_3d` rejects movement sets with out-of-range nodes.
+
+    Parameters
+    ----------
+    invalid_node : int
+        Node index lying outside the mesh.
+    """
     points, hexes, _ = _structured_hex_mesh()
 
     with pytest.raises(
@@ -523,6 +575,13 @@ def test_winslow_smooth_rejects_invalid_movement_indices(invalid_node):
 
 
 def test_winslow_smooth_zero_iterations_preserves_real_hex_mesh(capsys):
+    """Check that zero iterations leave the mesh unchanged and report completion.
+
+    Parameters
+    ----------
+    capsys : pytest.CaptureFixture
+        Pytest fixture capturing standard output.
+    """
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
@@ -548,6 +607,7 @@ def test_winslow_smooth_zero_iterations_preserves_real_hex_mesh(capsys):
 
 
 def test_winslow_smooth_isolated_movable_node_is_safe():
+    """Check that a movable node with no hexahedral neighbors is left in place."""
     points = np.array(
         [
             [0.0, 0.0, 0.0],
@@ -580,6 +640,13 @@ def test_winslow_smooth_isolated_movable_node_is_safe():
     ["X", "Y", "Z"],
 )
 def test_winslow_smooth_respects_directional_movement(movement_set):
+    """Check that a direction-restricted node moves only along its allowed axis.
+
+    Parameters
+    ----------
+    movement_set : str
+        Allowed movement axis, one of `"X"`, `"Y"` or `"Z"`.
+    """
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
@@ -626,6 +693,7 @@ def test_winslow_smooth_respects_directional_movement(movement_set):
 
 
 def test_winslow_smooth_move_all_changes_distorted_interior():
+    """Check that a fully movable distorted interior node moves while others stay."""
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
@@ -657,6 +725,7 @@ def test_winslow_smooth_move_all_changes_distorted_interior():
 
 
 def test_run_selected_winslow_rejects_empty_movable_union():
+    """Check that `run_selected_winslow` raises when no node is movable."""
     points, hexes, _ = _structured_hex_mesh()
 
     with pytest.raises(
@@ -681,6 +750,15 @@ def test_run_selected_winslow_rejects_empty_movable_union():
 
 
 def test_run_selected_winslow_rejects_unknown_implementation(capsys):
+    """Check that `run_selected_winslow` rejects implementations other than Numba.
+
+    The constant sizing field must also trigger the constant-sizing warning.
+
+    Parameters
+    ----------
+    capsys : pytest.CaptureFixture
+        Pytest fixture capturing standard output.
+    """
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
@@ -709,6 +787,13 @@ def test_run_selected_winslow_rejects_unknown_implementation(capsys):
 
 
 def test_run_selected_winslow_real_algorithm_reports_displacement(capsys):
+    """Check that `run_selected_winslow` moves a distorted node and logs diagnostics.
+
+    Parameters
+    ----------
+    capsys : pytest.CaptureFixture
+        Pytest fixture capturing standard output.
+    """
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
@@ -742,6 +827,13 @@ def test_run_selected_winslow_real_algorithm_reports_displacement(capsys):
 
 
 def test_run_selected_winslow_zero_iterations_reports_no_movement(capsys):
+    """Check that zero iterations keep the mesh and report that no node moved.
+
+    Parameters
+    ----------
+    capsys : pytest.CaptureFixture
+        Pytest fixture capturing standard output.
+    """
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
@@ -769,6 +861,7 @@ def test_run_selected_winslow_zero_iterations_reports_no_movement(capsys):
 
 @pytest.mark.slow
 def test_run_selected_winslow_with_vs_example_3d():
+    """Check `run_selected_winslow` with sizing from the 3-D example model."""
     if not VS_EXAMPLE_3D.exists():
         pytest.skip(
             f"Required velocity model not found: {VS_EXAMPLE_3D}"

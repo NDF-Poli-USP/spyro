@@ -29,6 +29,13 @@ def gmsh_session():
 
 
 def test_classify_rectangular_curves(gmsh_session):
+    """Check that rectangle boundary curves are sorted by side and others dropped.
+
+    Parameters
+    ----------
+    gmsh_session : module
+        Initialized Gmsh module with an empty model.
+    """
     length_x, depth_z = 5.0, -3.0
     rectangle = gmsh_session.model.occ.addRectangle(0, 0, 0, length_x, depth_z)
     # A curve away from the box sides must be dropped.
@@ -75,6 +82,15 @@ def test_classify_rectangular_curves(gmsh_session):
 
 @pytest.mark.parametrize("structured_mesh", [False, True])
 def test_configure_gmsh_3d_meshing_mode(gmsh_session, structured_mesh):
+    """Check the Gmsh options set for structured and unstructured 3-D meshing.
+
+    Parameters
+    ----------
+    gmsh_session : module
+        Initialized Gmsh module with an empty model.
+    structured_mesh : bool
+        Whether the structured meshing mode is requested.
+    """
     gmsh_session.model.occ.addBox(0, 0, 0, 1, 1, 1)
     gmsh_session.model.occ.synchronize()
 
@@ -102,12 +118,22 @@ def test_configure_gmsh_3d_meshing_mode(gmsh_session, structured_mesh):
     ],
 )
 def test_padding_grading_factor_scalar(padding_type, expected):
+    """Check the scalar padding grading factor for each padding type.
+
+    Parameters
+    ----------
+    padding_type : str or None
+        Padding geometry passed to `padding_grading_factor`.
+    expected : float
+        Expected grading factor.
+    """
     t = padding_grading_factor(50.0, 50.0, 0.0, 100.0, 200.0, 300.0, padding_type, 2.0)
 
     assert float(t) == pytest.approx(expected)
 
 
 def test_padding_grading_factor_array_clamps_and_ignores_zero_padding():
+    """Check that array grading factors are clamped to one and zero padding ignored."""
     distances = np.array([0.0, 50.0, 100.0, 400.0])
 
     t = padding_grading_factor(

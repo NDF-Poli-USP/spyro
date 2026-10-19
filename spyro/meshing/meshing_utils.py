@@ -864,7 +864,48 @@ def align_water_columns_to_interface_x(
     return points_2d, snapped, n_cols
 
 
-def intersect(x0, z0, dx, dz, xc, zc, a_val, b_val, hyper_n):
+def intersect(
+    x0: float,
+    z0: float,
+    dx: float,
+    dz: float,
+    xc: float,
+    zc: float,
+    a_val: float,
+    b_val: float,
+    hyper_n: float,
+) -> tuple[float, float]:
+    """Intersect a ray with a hyperellipse using bisection.
+
+    The ray is `(x0, z0) + s * (dx, dz)` with `s >= 0` and the
+    hyperellipse is `|x - xc|^n / a^n + |z - zc|^n / b^n = 1`.
+
+    Parameters
+    ----------
+    x0 : float
+        x coordinate of the ray origin, assumed inside the hyperellipse.
+    z0 : float
+        z coordinate of the ray origin, assumed inside the hyperellipse.
+    dx : float
+        x component of the ray direction.
+    dz : float
+        z component of the ray direction.
+    xc : float
+        x coordinate of the hyperellipse centre.
+    zc : float
+        z coordinate of the hyperellipse centre.
+    a_val : float
+        Hyperellipse semi-axis in x.
+    b_val : float
+        Hyperellipse semi-axis in z.
+    hyper_n : float
+        Hyperellipse exponent.
+
+    Returns
+    -------
+    tuple of float
+        `(x, z)` coordinates of the intersection point.
+    """
     def f(s):
         x, z = x0 + s * dx, z0 + s * dz
         return (abs(x - xc) / a_val) ** hyper_n + (abs(z - zc) / b_val) ** hyper_n - 1.0
@@ -881,7 +922,43 @@ def intersect(x0, z0, dx, dz, xc, zc, a_val, b_val, hyper_n):
     return x0 + s_mid * dx, z0 + s_mid * dz
 
 
-def get_theta(x, z, xc, zc, a_val, b_val, hyper_n):
+def get_theta(
+    x: float,
+    z: float,
+    xc: float,
+    zc: float,
+    a_val: float,
+    b_val: float,
+    hyper_n: float,
+) -> float:
+    """Return the hyperellipse parametric angle of a boundary point.
+
+    This is the inverse of the parametrization
+    `x = xc + a sgn(cos t) |cos t|^(2/n)`,
+    `z = zc + b sgn(sin t) |sin t|^(2/n)` used by :func:`make_arc`.
+
+    Parameters
+    ----------
+    x : float
+        x coordinate of the point.
+    z : float
+        z coordinate of the point.
+    xc : float
+        x coordinate of the hyperellipse centre.
+    zc : float
+        z coordinate of the hyperellipse centre.
+    a_val : float
+        Hyperellipse semi-axis in x.
+    b_val : float
+        Hyperellipse semi-axis in z.
+    hyper_n : float
+        Hyperellipse exponent.
+
+    Returns
+    -------
+    float
+        Parametric angle `t` in `[-pi, pi]`.
+    """
     vx, vz = (x - xc) / a_val, (z - zc) / b_val
     vx = vx if abs(vx) > 1e-12 else 0.0
     vz = vz if abs(vz) > 1e-12 else 0.0
@@ -891,7 +968,58 @@ def get_theta(x, z, xc, zc, a_val, b_val, hyper_n):
     )
 
 
-def make_arc(p1_tag, p2_tag, x1, z1, x2, z2, xc, zc, a_val, b_val, hyper_n, num_pts=25):
+def make_arc(
+    p1_tag: int,
+    p2_tag: int,
+    x1: float,
+    z1: float,
+    x2: float,
+    z2: float,
+    xc: float,
+    zc: float,
+    a_val: float,
+    b_val: float,
+    hyper_n: float,
+    num_pts: int = 25,
+) -> int:
+    """Add a Gmsh spline that follows a hyperellipse between two points.
+
+    The arc goes the short way round (at most `pi` in parametric angle)
+    from `p1_tag` to `p2_tag`. Both end points must already exist in the
+    OCC model and lie on the hyperellipse.
+
+    Parameters
+    ----------
+    p1_tag : int
+        Gmsh OCC tag of the start point.
+    p2_tag : int
+        Gmsh OCC tag of the end point.
+    x1 : float
+        x coordinate of the start point.
+    z1 : float
+        z coordinate of the start point.
+    x2 : float
+        x coordinate of the end point.
+    z2 : float
+        z coordinate of the end point.
+    xc : float
+        x coordinate of the hyperellipse centre.
+    zc : float
+        z coordinate of the hyperellipse centre.
+    a_val : float
+        Hyperellipse semi-axis in x.
+    b_val : float
+        Hyperellipse semi-axis in z.
+    hyper_n : float
+        Hyperellipse exponent.
+    num_pts : int, optional
+        Number of spline points, end points included. Default is 25.
+
+    Returns
+    -------
+    int
+        Gmsh OCC tag of the new spline curve.
+    """
     t1, t2 = get_theta(x1, z1, xc, zc, a_val, b_val, hyper_n), get_theta(
         x2, z2, xc, zc, a_val, b_val, hyper_n
     )

@@ -40,6 +40,20 @@ def _write_velocity_binary(
 
 
 def _extract_gmsh_points(gmsh):
+    """Extract the current Gmsh mesh nodes as an array and tag lookup.
+
+    Parameters
+    ----------
+    gmsh : module
+        Initialized `gmsh` module whose current model has a generated mesh.
+
+    Returns
+    -------
+    points : numpy.ndarray
+        Node coordinates with shape `(N, 3)`, in Gmsh order.
+    tag_to_index : dict
+        Mapping from each Gmsh node tag to its row index in `points`.
+    """
     node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
     points = np.asarray(node_coords, dtype=float).reshape(-1, 3)
     tag_to_index = {
@@ -51,6 +65,16 @@ def _extract_gmsh_points(gmsh):
 
 @pytest.fixture
 def gmsh_session():
+    """Provide a fresh, silent Gmsh session with an empty model.
+
+    Any session left open is finalized first, and the session is finalized
+    again on teardown.
+
+    Yields
+    ------
+    gmsh : module
+        Initialized `gmsh` module with the `meshing_utils_3d_test` model.
+    """
     gmsh = pytest.importorskip("gmsh")
 
     if gmsh.isInitialized():
@@ -88,6 +112,12 @@ def _build_water_and_subsurface_mesh(gmsh, water_group_name="Water"):
 
 
 def test_sizing_function_xyz_projects_to_model_edges():
+    """Check that sizing_function_xyz clips points into the model as (z, x, y).
+
+    Out-of-domain coordinates are projected onto the domain boundary and the
+    sizing field is queried once with positive, finite sizes returned in the
+    input grid shape.
+    """
     received = []
 
     def sizing_field(points):
@@ -125,6 +155,7 @@ def test_sizing_function_xyz_projects_to_model_edges():
 
 
 def test_sizing_function_xyz_rejects_shape_mismatch():
+    """Check that sizing_function_xyz rejects coordinate grids of unequal shape."""
     with pytest.raises(ValueError, match="matching shapes"):
         sizing_function_xyz(
             np.zeros((2, 2)),
@@ -139,6 +170,13 @@ def test_sizing_function_xyz_rejects_shape_mismatch():
 
 @pytest.mark.parametrize("bad_value", [np.nan, np.inf, -np.inf])
 def test_sizing_function_xyz_rejects_nonfinite_coordinates(bad_value):
+    """Check that sizing_function_xyz rejects NaN or infinite coordinates.
+
+    Parameters
+    ----------
+    bad_value : float
+        Non-finite value written into the `X` coordinate grid.
+    """
     X = np.zeros((2, 2))
     X[0, 0] = bad_value
 
@@ -155,6 +193,7 @@ def test_sizing_function_xyz_rejects_nonfinite_coordinates(bad_value):
 
 
 def test_sizing_function_xyz_rejects_nonfinite_sizes():
+    """Check that sizing_function_xyz rejects a field returning NaN sizes."""
     def bad_sizing(points):
         values = np.ones(len(points))
         values[0] = np.nan
@@ -174,6 +213,13 @@ def test_sizing_function_xyz_rejects_nonfinite_sizes():
 
 @pytest.mark.parametrize("bad_size", [0.0, -1.0])
 def test_sizing_function_xyz_requires_positive_sizes(bad_size):
+    """Check that sizing_function_xyz rejects zero or negative sizes.
+
+    Parameters
+    ----------
+    bad_size : float
+        Non-positive size returned by the sizing field for every point.
+    """
     with pytest.raises(ValueError, match="must be positive"):
         sizing_function_xyz(
             np.zeros(2),
@@ -200,6 +246,19 @@ def test_read_velocity_binary3d_round_trip(
     axes_order,
     axes_order_sort,
 ):
+    """Check that read_velocity_binary3d recovers a written (z, x, y) model.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Temporary directory for the binary velocity file.
+    byte_order : str
+        Byte order used to write and read the file.
+    axes_order : tuple of int
+        On-disk axis permutation of the canonical `(z, x, y)` array.
+    axes_order_sort : str
+        Memory layout (`"C"` or `"F"`) used to flatten the data.
+    """
     expected = np.arange(2 * 3 * 4, dtype=float).reshape(2, 3, 4) + 1400.0
     filename = tmp_path / "velocity.bin"
 
@@ -228,6 +287,16 @@ def test_read_velocity_binary3d_round_trip(
 
 
 def test_read_velocity_binary3d_validation(tmp_path):
+    """Check that read_velocity_binary3d rejects bad files and read options.
+
+    Covers a missing file, an invalid byte order, an invalid flattening
+    order, a non-permutation axes order and a size mismatch.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Temporary directory for the binary velocity file.
+    """
     filename = tmp_path / "velocity.bin"
     np.ones(8, dtype=">f4").tofile(filename)
 
@@ -264,9 +333,16 @@ def test_read_velocity_binary3d_validation(tmp_path):
     with pytest.raises(ValueError, match="expected 27"):
         read_velocity_binary3d(filename, 3, 3, 3)
 
+    with pytest.raises(ValueError, match="'nx' must be greater than 0"):
+        read_velocity_binary3d(filename, 2, 0, 2)
+
+    with pytest.raises(ValueError, match="'ny' must be greater than 0"):
+        read_velocity_binary3d(filename, 2, 2, -4)
+
 
 @pytest.mark.slow
 def test_read_vs_example_3d_binary():
+    """Check that the bundled 3-D example model reads with the expected shape."""
     if not VS_EXAMPLE_3D_BIN.exists():
         pytest.skip(f"Missing {VS_EXAMPLE_3D_BIN}")
 
@@ -304,6 +380,17 @@ def test_read_vs_example_3d_binary():
     ],
 )
 def test_create_sizing_function3d_input_validation(tmp_path, kwargs, error_match):
+    """Check that create_sizing_function3D rejects invalid arguments.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Temporary directory for the (unused) velocity file path.
+    kwargs : dict
+        Arguments overriding the valid baseline arguments.
+    error_match : str
+        Pattern expected in the raised `ValueError` message.
+    """
     filename = tmp_path / "unused.bin"
     base = {
         "fname": filename,
@@ -322,7 +409,13 @@ def test_create_sizing_function3d_input_validation(tmp_path, kwargs, error_match
 
 
 def test_create_sizing_function3d_fallback_interpolator(tmp_path):
-    """Use float64 data so SeismicMesh's default float32 reader falls back."""
+    """Use float64 data so SeismicMesh's default float32 reader falls back.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the velocity file.
+    """
     velocity = np.linspace(1200.0, 3600.0, 3 * 4 * 5).reshape(3, 4, 5)
     filename = tmp_path / "velocity_float64.raw"
 
@@ -394,6 +487,11 @@ def test_create_sizing_function3d_seismicmesh_path(tmp_path):
 
     A float32 model without water and a ``vp_water`` inside SeismicMesh's
     1300-1800 m/s range makes SeismicMesh build the size function itself.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the velocity file.
     """
     velocity = np.full((5, 6, 7), 3000.0)
     filename = tmp_path / "velocity_float32.bin"
@@ -417,6 +515,13 @@ def test_create_sizing_function3d_seismicmesh_path(tmp_path):
 
 
 def test_create_sizing_function3d_replaces_zero_velocity_with_water(tmp_path):
+    """Check that zero velocities are replaced by `vp_water` before sizing.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Temporary directory for the float64 velocity file.
+    """
     velocity = np.full((2, 2, 2), 1800.0)
     velocity[0, 0, 0] = 0.0
     filename = tmp_path / "water_velocity_float64.raw"
@@ -449,6 +554,20 @@ def test_create_sizing_function3d_rejects_nonpositive_velocity(
     bad_value,
     error_match,
 ):
+    """Check that create_sizing_function3D rejects non-positive velocities.
+
+    Without `vp_water` there is no water replacement, so zero or negative
+    velocities must raise.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Temporary directory for the float64 velocity file.
+    bad_value : float
+        Non-positive velocity written into one cell of the model.
+    error_match : str
+        Pattern expected in the raised `ValueError` message.
+    """
     velocity = np.full((2, 2, 2), 1800.0)
     velocity[0, 0, 0] = bad_value
     filename = tmp_path / "bad_velocity_float64.raw"
@@ -470,6 +589,13 @@ def test_create_sizing_function3d_rejects_nonpositive_velocity(
 
 
 def test_create_sizing_function3d_rejects_nonfinite_velocity(tmp_path):
+    """Check that create_sizing_function3D rejects a model containing NaN.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Temporary directory for the float64 velocity file.
+    """
     velocity = np.full((2, 2, 2), 1800.0)
     velocity[0, 0, 0] = np.nan
     filename = tmp_path / "nan_velocity_float64.raw"
@@ -492,6 +618,11 @@ def test_create_sizing_function3d_rejects_nonfinite_velocity(tmp_path):
 
 @pytest.mark.slow
 def test_create_sizing_function3d_vs_example():
+    """Check the sizing function built from the bundled 3-D example model.
+
+    Sizes inside the model respect `hmin` and points outside the model get
+    the size at their projection onto the model boundary.
+    """
     if not VS_EXAMPLE_3D_BIN.exists():
         pytest.skip(f"Missing {VS_EXAMPLE_3D_BIN}")
 
@@ -531,6 +662,11 @@ def test_create_sizing_function3d_vs_example():
 
 
 def test_define_winslow_points_3d_classifies_no_water_boundaries():
+    """Check how define_winslow_points_3d classifies nodes with no water or padding.
+
+    Corners are locked, edge nodes move along one axis, face nodes move in
+    their plane and interior nodes move freely.
+    """
     points = np.array(
         [
             [0.0, 0.0, -8.0],   # corner -> locked
@@ -570,6 +706,11 @@ def test_define_winslow_points_3d_classifies_no_water_boundaries():
 
 
 def test_define_winslow_points_3d_rectangular_padding_planes():
+    """Check that rectangular padding moves the boundary planes outward.
+
+    Nodes on the padded boundary planes get the same per-axis constraints
+    as nodes on the unpadded domain boundary.
+    """
     points = np.array(
         [
             [-2.0, -3.0, -12.0],
@@ -606,6 +747,11 @@ def test_define_winslow_points_3d_rectangular_padding_planes():
 
 
 def test_define_winslow_points_3d_validation():
+    """Check that define_winslow_points_3d rejects invalid inputs.
+
+    Covers a wrong points shape, hyperelliptical padding, a non-positive
+    tolerance and a mesh with no movable nodes.
+    """
     with pytest.raises(ValueError, match=r"shape \(N, 3\)"):
         define_winslow_points_3d(
             None,
@@ -671,6 +817,13 @@ def test_define_winslow_points_3d_validation():
 
 @pytest.mark.slow
 def test_define_winslow_points_3d_real_water_group(gmsh_session):
+    """Check that nodes of a real `Water` group are locked and not movable.
+
+    Parameters
+    ----------
+    gmsh_session : module
+        Initialized `gmsh` module with an empty model.
+    """
     gmsh = gmsh_session
     points, tag_to_index = _build_water_and_subsurface_mesh(gmsh, "Water")
 
@@ -697,6 +850,13 @@ def test_define_winslow_points_3d_real_water_group(gmsh_session):
 
 @pytest.mark.slow
 def test_define_winslow_points_3d_real_water_with_padding_group(gmsh_session):
+    """Check that rectangular padding locks nodes of `Water_with_padding`.
+
+    Parameters
+    ----------
+    gmsh_session : module
+        Initialized `gmsh` module with an empty model.
+    """
     gmsh = gmsh_session
     points, tag_to_index = _build_water_and_subsurface_mesh(
         gmsh,
@@ -724,6 +884,13 @@ def test_define_winslow_points_3d_real_water_with_padding_group(gmsh_session):
 
 
 def test_define_winslow_points_3d_missing_water_group(gmsh_session):
+    """Check that a missing `Water` physical group raises an error.
+
+    Parameters
+    ----------
+    gmsh_session : module
+        Initialized `gmsh` module with an empty model.
+    """
     gmsh = gmsh_session
     points = np.array([[5.0, 6.0, -4.0]])
 
@@ -745,6 +912,13 @@ def test_define_winslow_points_3d_missing_water_group(gmsh_session):
 
 
 def test_define_winslow_points_3d_empty_water_group(gmsh_session):
+    """Check that a `Water` group with no mesh nodes raises an error.
+
+    Parameters
+    ----------
+    gmsh_session : module
+        Initialized `gmsh` module with an empty model.
+    """
     gmsh = gmsh_session
     water = gmsh.model.occ.addBox(0.0, 0.0, -2.0, 10.0, 12.0, 2.0)
     gmsh.model.occ.synchronize()
@@ -770,6 +944,13 @@ def test_define_winslow_points_3d_empty_water_group(gmsh_session):
 
 @pytest.mark.slow
 def test_define_winslow_points_3d_rejects_all_water_nodes(gmsh_session):
+    """Check that a mesh made only of water nodes raises an error.
+
+    Parameters
+    ----------
+    gmsh_session : module
+        Initialized `gmsh` module with an empty model.
+    """
     gmsh = gmsh_session
     water = gmsh.model.occ.addBox(0.0, 0.0, -8.0, 10.0, 12.0, 8.0)
     gmsh.model.occ.synchronize()

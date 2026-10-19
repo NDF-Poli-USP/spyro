@@ -137,6 +137,18 @@ class AutomaticMesh:
         self.output_file_name = mesh_parameters.output_filename
 
     def _resolved_edge_length(self, axis):
+        """Return the edge length for one axis, falling back to the global one.
+
+        Parameters
+        ----------
+        axis : str
+            Axis name: `"z"`, `"x"` or `"y"`.
+
+        Returns
+        -------
+        float or None
+            `edge_length_<axis>` when set, otherwise `edge_length`.
+        """
         axis_value = getattr(self, f"edge_length_{axis}", None)
         if axis_value is not None:
             return axis_value
