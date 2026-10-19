@@ -388,7 +388,7 @@ def validate_string(parameter_name, parameter_value, accept_parameter_as_none=Fa
 def validate_boolean(parameter_name, parameter_value, accept_parameter_as_none=False):
     """Validate boolean parameters and raise a TypeError if invalid.
 
-    Unlike ``validate_parameter(name, value, [True, False])``, this rejects
+    Unlike `validate_parameter(name, value, [True, False])`, this rejects
     integers such as 0 and 1.
 
     Parameters

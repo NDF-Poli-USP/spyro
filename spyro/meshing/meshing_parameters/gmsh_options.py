@@ -13,9 +13,9 @@ from ...utils.error_management import (
 
 @dataclass
 class GmshOptions:
-    """Options for Gmsh-based mesh generation (``mesh_type='gmsh_mesh'``).
+    """Options for Gmsh-based mesh generation (`mesh_type='gmsh_mesh'`).
 
-    Padding sizes, ``h_padding`` and ``min_element_size`` are lengths whose
+    Padding sizes, `h_padding` and `min_element_size` are lengths whose
     defaults depend on the domain unit, so they stay on
     :class:`~spyro.meshing.MeshingParameters`.
 

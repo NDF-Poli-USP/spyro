@@ -29,7 +29,7 @@ LENGTHS = DOMAIN_LENGTHS + (
     "h_padding",
     "min_element_size",
 )
-# Lengths that fall back to ``abc_pad_length`` when unset.
+# Lengths that fall back to `abc_pad_length` when unset.
 PADDINGS = frozenset({"padding_x", "padding_y", "padding_z"})
 # Lengths whose default is given in meters and converted to the domain unit.
 DEFAULTS_IN_METERS = {"h_padding": 500.0, "min_element_size": 35.0}

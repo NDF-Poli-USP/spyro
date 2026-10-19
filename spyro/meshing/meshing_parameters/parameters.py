@@ -31,12 +31,12 @@ from .gmsh_options import GmshOptions
 
 
 def _length_property(name: str, doc: str) -> property:
-    """Build a property for a length stored in ``MeshingParameters._lengths``.
+    """Build a property for a length stored in `MeshingParameters._lengths`.
 
     Parameters
     ----------
     name : str
-        Name of the length, a key of ``_lengths``.
+        Name of the length, a key of `_lengths`.
     doc : str
         Docstring of the property.
 
@@ -107,7 +107,7 @@ class MeshingParameters:
     quadrilateral : bool
         Whether to use quadrilateral (True) or triangular (False) elements.
     method : str or None
-        Finite element method, one of ``METHODS``.
+        Finite element method, one of `METHODS`.
     degree : int or None
         Polynomial degree of finite element basis functions.
     negative_z : bool
@@ -116,7 +116,7 @@ class MeshingParameters:
         How the mesh is provided or generated. Strings such as 'gmsh_mesh'
         are accepted and converted.
     automatic_mesh : bool
-        Whether spyro generates the mesh itself. Derived from ``mesh_type``.
+        Whether spyro generates the mesh itself. Derived from `mesh_type`.
     periodic : bool
         Whether the mesh has periodic boundary conditions.
     mesh_file : str or None
@@ -133,13 +133,13 @@ class MeshingParameters:
     abc_pad_length : float or None
         Length of the absorbing boundary condition padding layer.
     padding_x, padding_y, padding_z : float or None
-        Gmsh padding sizes. Each falls back to ``abc_pad_length``.
+        Gmsh padding sizes. Each falls back to `abc_pad_length`.
     source_frequency : float or None
         Source frequency in Hz for wavelength calculations.
     edge_length : float or None
         Target edge length for mesh elements.
     edge_length_z, edge_length_x, edge_length_y : float or None
-        Direction-specific edge lengths, overriding ``edge_length``.
+        Direction-specific edge lengths, overriding `edge_length`.
     cells_per_wavelength : float or None
         Number of cells per wavelength for mesh sizing.
     minimum_velocity : float or None
@@ -148,7 +148,7 @@ class MeshingParameters:
         Velocity model for mesh sizing, for example a grid dictionary with a
         'vp_values' key or a path to a SEGY file.
     segy_velocity_model : str or None
-        Deprecated SEGY path. Setting it also sets ``velocity_model``.
+        Deprecated SEGY path. Setting it also sets `velocity_model`.
     grid_velocity_data : dict or None
         Gridded velocity data with a 'vp_values' key and grid spacing keys.
     gradient_mask : dict or None
@@ -156,7 +156,7 @@ class MeshingParameters:
     is_complete : bool
         Whether all parameters needed to build the mesh are set. Derived.
     h_padding : float
-        Constant padding element size used if ``extend_segy`` is False.
+        Constant padding element size used if `extend_segy` is False.
         Defaults to 500 m in the domain unit.
     min_element_size : float
         Gmsh structured element size. Defaults to 35 m in the domain unit.
@@ -166,22 +166,22 @@ class MeshingParameters:
 
     Notes
     -----
-    Lengths, edge lengths, ``cells_per_wavelength``, ``source_frequency``,
-    ``mesh_file`` and ``output_filename`` are checked when assigned. Every
+    Lengths, edge lengths, `cells_per_wavelength`, `source_frequency`,
+    `mesh_file` and `output_filename` are checked when assigned. Every
     other parameter, and every rule involving several parameters, is checked
-    by :meth:`validate`. It runs at the end of ``__init__`` and
-    :meth:`set_mesh`, when ``mesh_type`` or ``periodic`` are assigned, and
+    by :meth:`validate`. It runs at the end of `__init__` and
+    :meth:`set_mesh`, when `mesh_type` or `periodic` are assigned, and
     before a mesh is generated, so checks do not depend on assignment order.
 
-    ``edge_length`` (and its directional variants) and
-    ``cells_per_wavelength`` are mutually exclusive: setting one clears the
+    `edge_length` (and its directional variants) and
+    `cells_per_wavelength` are mutually exclusive: setting one clears the
     other with a warning.
 
     The length unit is inferred from the domain lengths unless 'unit' is
     given. Lengths that look inconsistent with it produce a warning.
     """
 
-    # Keys accepted in ``input_mesh_dictionary`` and by ``set_mesh``.
+    # Keys accepted in `input_mesh_dictionary` and by `set_mesh`.
     INPUT_KEYS = (
         "unit",
         "dimension",
@@ -248,13 +248,13 @@ class MeshingParameters:
         """Initialize the MeshingParameters class.
 
         Explicit keyword arguments take precedence over the same key in
-        ``input_mesh_dictionary``.
+        `input_mesh_dictionary`.
 
         Parameters
         ----------
         input_mesh_dictionary : dict, optional
             Initial mesh parameters. Accepted keys are listed in
-            ``MeshingParameters.INPUT_KEYS``. Default is None.
+            `MeshingParameters.INPUT_KEYS`. Default is None.
         dimension : int, optional
             Spatial dimension of the mesh (2 or 3). Default is None.
         source_frequency : float, optional
@@ -266,7 +266,7 @@ class MeshingParameters:
             If True, uses quadrilateral or hexahedral elements. Default is
             None, which means False unless the dictionary says otherwise.
         method : str, optional
-            Finite element method, one of ``METHODS``. Default is None.
+            Finite element method, one of `METHODS`. Default is None.
         degree : int, optional
             Polynomial degree of finite element basis functions.
             Default is None.
@@ -406,9 +406,9 @@ class MeshingParameters:
         """List the reasons why the mesh cannot be built yet.
 
         Automatic meshes need the domain lengths and either an edge length or
-        ``cells_per_wavelength``, which in turn needs ``source_frequency`` and
-        a velocity input. File meshes need ``mesh_file`` and user meshes need
-        ``user_mesh``.
+        `cells_per_wavelength`, which in turn needs `source_frequency` and
+        a velocity input. File meshes need `mesh_file` and user meshes need
+        `user_mesh`.
 
         Returns
         -------
@@ -501,16 +501,16 @@ class MeshingParameters:
             A user-provided mesh object. Default is None.
         input_mesh_parameters : dict, optional
             Mesh parameters to update. Accepted keys are listed in
-            ``MeshingParameters.INPUT_KEYS``. Default is None.
+            `MeshingParameters.INPUT_KEYS`. Default is None.
         abc_pad_length : float, optional
             Length of absorbing boundary condition padding layer. Takes
-            precedence over the same key in ``input_mesh_parameters``.
+            precedence over the same key in `input_mesh_parameters`.
             Default is None.
 
         Raises
         ------
         ValueError
-            If ``input_mesh_parameters`` contains an unknown key, a value is
+            If `input_mesh_parameters` contains an unknown key, a value is
             invalid, or the resulting parameters are inconsistent.
 
         Examples
@@ -598,7 +598,7 @@ class MeshingParameters:
         Returns
         -------
         float or None
-            ``value`` unchanged.
+            `value` unchanged.
 
         Raises
         ------
@@ -610,7 +610,7 @@ class MeshingParameters:
         Warns
         -----
         UserWarning
-            If the guessed unit of ``value`` disagrees with the domain unit.
+            If the guessed unit of `value` disagrees with the domain unit.
         """
         validate_numeric(
             name,
@@ -647,7 +647,7 @@ class MeshingParameters:
         -------
         float or None
             The stored value. If unset, paddings fall back to
-            ``abc_pad_length`` and ``h_padding``/``min_element_size`` to their
+            `abc_pad_length` and `h_padding`/`min_element_size` to their
             metre defaults converted to the domain unit.
         """
         value = self._lengths[name]
@@ -672,12 +672,12 @@ class MeshingParameters:
         -------
         float or None
             The direction-specific edge length if set, otherwise
-            ``edge_length``.
+            `edge_length`.
 
         Raises
         ------
         ValueError
-            If ``axis`` is not 'z', 'x' or 'y'.
+            If `axis` is not 'z', 'x' or 'y'.
         """
         validate_parameter("axis", axis, ["z", "x", "y"])
         value = self._edge_lengths[f"edge_length_{axis}"]
@@ -734,7 +734,7 @@ class MeshingParameters:
 
     @property
     def automatic_mesh(self) -> bool:
-        """Whether spyro generates the mesh itself (see ``MeshType.is_automatic``)."""
+        """Whether spyro generates the mesh itself (see `MeshType.is_automatic`)."""
         return self.mesh_type is not None and self.mesh_type.is_automatic
 
     @property
@@ -766,7 +766,7 @@ class MeshingParameters:
 
     @property
     def user_mesh(self) -> Any:
-        """User-provided mesh; setting one also sets ``mesh_type`` to 'user_mesh'."""
+        """User-provided mesh; setting one also sets `mesh_type` to 'user_mesh'."""
         return self._user_mesh
 
     @user_mesh.setter
@@ -794,7 +794,7 @@ class MeshingParameters:
     # Velocity inputs
     @property
     def segy_velocity_model(self) -> str | None:
-        """Deprecated SEGY path; setting one warns and also sets ``velocity_model``."""
+        """Deprecated SEGY path; setting one warns and also sets `velocity_model`."""
         return self._segy_velocity_model
 
     @segy_velocity_model.setter

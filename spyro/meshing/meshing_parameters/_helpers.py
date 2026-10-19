@@ -35,7 +35,7 @@ def get_parameter(
     dictionary : dict
         Input dictionary.
     key : str
-        Key of the entry in ``dictionary``.
+        Key of the entry in `dictionary`.
     default : Any, optional
         Value used when neither source provides one. Default is None.
     keyword_value : Any, optional
@@ -46,7 +46,7 @@ def get_parameter(
     -------
     Any
         The keyword value if it is not None, otherwise the dictionary value
-        if it is not None, otherwise ``default``.
+        if it is not None, otherwise `default`.
 
     Warns
     -----
@@ -64,7 +64,7 @@ def get_parameter(
         if conflict:
             warn(
                 f"'{key}' was given both as a keyword argument ({keyword_value!r}) "
-                f"and in input_mesh_dictionary ({dict_value!r})."
+                f"and in input_mesh_dictionary ({dict_value!r}). "
                 "Using the keyword argument."
             )
     return keyword_value
