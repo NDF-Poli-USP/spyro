@@ -179,6 +179,101 @@ def run_selected_winslow(
 
 
 @njit(cache=True, inline="always")
+def _cardinal_coordinate(
+    coordinates: np.ndarray, center: float, neighbor: int, opposite: int
+) -> float:
+    """Return a cardinal-neighbor coordinate, reflecting it when missing.
+
+    Parameters
+    ----------
+    coordinates : numpy.ndarray
+        Coordinate values for one spatial direction at all mesh nodes.
+    center : float
+        Coordinate of the current stencil-center node.
+    neighbor : int
+        Node index of the cardinal neighbor, or -1 when it is missing.
+    opposite : int
+        Node index of the opposite cardinal neighbor, or -1 when it is missing.
+
+    Returns
+    -------
+    float
+        The neighbor coordinate; if missing, the opposite neighbor reflected
+        through the center; if both are missing, the center.
+    """
+    if neighbor != -1:
+        return coordinates[neighbor]
+    if opposite != -1:
+        return 2.0 * center - coordinates[opposite]
+    return center
+
+
+@njit(cache=True, inline="always")
+def _mixed_coordinate(
+    coordinates: np.ndarray,
+    center: float,
+    neighbor: int,
+    first_value: float,
+    second_value: float,
+) -> float:
+    """Return a mixed (diagonal) neighbor coordinate, rebuilding it when missing.
+
+    Parameters
+    ----------
+    coordinates : numpy.ndarray
+        Coordinate values for one spatial direction at all mesh nodes.
+    center : float
+        Coordinate of the current stencil-center node.
+    neighbor : int
+        Node index of the mixed neighbor, or -1 when it is missing.
+    first_value : float
+        Resolved coordinate of the first cardinal direction (e.g. N for NE).
+    second_value : float
+        Resolved coordinate of the second cardinal direction (e.g. E for NE).
+
+    Returns
+    -------
+    float
+        The neighbor coordinate, or `first_value + second_value - center`
+        when it is missing.
+    """
+    if neighbor != -1:
+        return coordinates[neighbor]
+    return first_value + second_value - center
+
+
+@njit(cache=True, inline="always")
+def _neighbor_size(
+    sizing_values: np.ndarray,
+    is_movable: np.ndarray,
+    neighbor: int,
+    size_center: float,
+) -> float:
+    """Return a neighbor's sizing value, or the center value if not usable.
+
+    Parameters
+    ----------
+    sizing_values : numpy.ndarray
+        Sizing-field value associated with each mesh node.
+    is_movable : numpy.ndarray
+        Boolean mask identifying nodes involved in smoothing.
+    neighbor : int
+        Node index of the neighbor, or -1 when it is missing.
+    size_center : float
+        Sizing value at the current stencil-center node.
+
+    Returns
+    -------
+    float
+        `sizing_values[neighbor]` for an existing movable neighbor,
+        otherwise `size_center`.
+    """
+    if neighbor != -1 and is_movable[neighbor]:
+        return sizing_values[neighbor]
+    return size_center
+
+
+@njit(cache=True, inline="always")
 def _resolve_stencil_coordinates(coordinates, center, stencil):
     """Resolve cardinal and mixed stencil coordinates for one spatial axis.
 
@@ -205,53 +300,17 @@ def _resolve_stencil_coordinates(coordinates, center, stencil):
     from their two resolved cardinal coordinates.
     """
     east, west, north, south, top, bottom = stencil[:6]
-
-    east_value = (
-        coordinates[east]
-        if east != -1
-        else 2.0 * center - coordinates[west] if west != -1 else center
-    )
-    west_value = (
-        coordinates[west]
-        if west != -1
-        else 2.0 * center - coordinates[east] if east != -1 else center
-    )
-    north_value = (
-        coordinates[north]
-        if north != -1
-        else 2.0 * center - coordinates[south] if south != -1 else center
-    )
-    south_value = (
-        coordinates[south]
-        if south != -1
-        else 2.0 * center - coordinates[north] if north != -1 else center
-    )
-    top_value = (
-        coordinates[top]
-        if top != -1
-        else 2.0 * center - coordinates[bottom] if bottom != -1 else center
-    )
-    bottom_value = (
-        coordinates[bottom]
-        if bottom != -1
-        else 2.0 * center - coordinates[top] if top != -1 else center
-    )
-
     ne, nw, se, sw, nt, nb, st, sb, et, eb, wt, wb = stencil[6:]
 
-    ne_value = coordinates[ne] if ne != -1 else north_value + east_value - center
-    nw_value = coordinates[nw] if nw != -1 else north_value + west_value - center
-    se_value = coordinates[se] if se != -1 else south_value + east_value - center
-    sw_value = coordinates[sw] if sw != -1 else south_value + west_value - center
-    nt_value = coordinates[nt] if nt != -1 else north_value + top_value - center
-    nb_value = coordinates[nb] if nb != -1 else north_value + bottom_value - center
-    st_value = coordinates[st] if st != -1 else south_value + top_value - center
-    sb_value = coordinates[sb] if sb != -1 else south_value + bottom_value - center
-    et_value = coordinates[et] if et != -1 else east_value + top_value - center
-    eb_value = coordinates[eb] if eb != -1 else east_value + bottom_value - center
-    wt_value = coordinates[wt] if wt != -1 else west_value + top_value - center
-    wb_value = coordinates[wb] if wb != -1 else west_value + bottom_value - center
+    east_value = _cardinal_coordinate(coordinates, center, east, west)
+    west_value = _cardinal_coordinate(coordinates, center, west, east)
+    north_value = _cardinal_coordinate(coordinates, center, north, south)
+    south_value = _cardinal_coordinate(coordinates, center, south, north)
+    top_value = _cardinal_coordinate(coordinates, center, top, bottom)
+    bottom_value = _cardinal_coordinate(coordinates, center, bottom, top)
 
+    # Explicit calls rather than a lookup table: this runs per node inside
+    # the Numba hot loop, and a table would need an array allocation.
     return (
         east_value,
         west_value,
@@ -259,18 +318,18 @@ def _resolve_stencil_coordinates(coordinates, center, stencil):
         south_value,
         top_value,
         bottom_value,
-        ne_value,
-        nw_value,
-        se_value,
-        sw_value,
-        nt_value,
-        nb_value,
-        st_value,
-        sb_value,
-        et_value,
-        eb_value,
-        wt_value,
-        wb_value,
+        _mixed_coordinate(coordinates, center, ne, north_value, east_value),
+        _mixed_coordinate(coordinates, center, nw, north_value, west_value),
+        _mixed_coordinate(coordinates, center, se, south_value, east_value),
+        _mixed_coordinate(coordinates, center, sw, south_value, west_value),
+        _mixed_coordinate(coordinates, center, nt, north_value, top_value),
+        _mixed_coordinate(coordinates, center, nb, north_value, bottom_value),
+        _mixed_coordinate(coordinates, center, st, south_value, top_value),
+        _mixed_coordinate(coordinates, center, sb, south_value, bottom_value),
+        _mixed_coordinate(coordinates, center, et, east_value, top_value),
+        _mixed_coordinate(coordinates, center, eb, east_value, bottom_value),
+        _mixed_coordinate(coordinates, center, wt, west_value, top_value),
+        _mixed_coordinate(coordinates, center, wb, west_value, bottom_value),
     )
 
 
@@ -440,24 +499,12 @@ def _numba_winslow_3d_step(
         z_xi_zeta = 0.25 * (z_et - z_eb - z_wt + z_wb)
 
         size_center = sizing_values[node]
-        size_east = (
-            sizing_values[east] if east != -1 and is_movable[east] else size_center
-        )
-        size_west = (
-            sizing_values[west] if west != -1 and is_movable[west] else size_center
-        )
-        size_north = (
-            sizing_values[north] if north != -1 and is_movable[north] else size_center
-        )
-        size_south = (
-            sizing_values[south] if south != -1 and is_movable[south] else size_center
-        )
-        size_top = sizing_values[top] if top != -1 and is_movable[top] else size_center
-        size_bottom = (
-            sizing_values[bottom]
-            if bottom != -1 and is_movable[bottom]
-            else size_center
-        )
+        size_east = _neighbor_size(sizing_values, is_movable, east, size_center)
+        size_west = _neighbor_size(sizing_values, is_movable, west, size_center)
+        size_north = _neighbor_size(sizing_values, is_movable, north, size_center)
+        size_south = _neighbor_size(sizing_values, is_movable, south, size_center)
+        size_top = _neighbor_size(sizing_values, is_movable, top, size_center)
+        size_bottom = _neighbor_size(sizing_values, is_movable, bottom, size_center)
 
         size_xi = 0.5 * (size_east - size_west)
         size_eta = 0.5 * (size_north - size_south)

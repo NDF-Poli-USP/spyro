@@ -6,6 +6,9 @@ import pytest
 from spyro.meshing.meshing_utils3d import create_sizing_function3D
 from spyro.meshing.meshing_winslow3d import (
     NUMBA_AVAILABLE,
+    _cardinal_coordinate,
+    _mixed_coordinate,
+    _neighbor_size,
     _numba_winslow_3d_step,
     _resolve_stencil_coordinates,
     run_selected_winslow,
@@ -106,6 +109,82 @@ def _varying_sizing(coordinates):
 def _python_implementation(function):
     """Return the original Python implementation of a Numba dispatcher."""
     return getattr(function, "py_func", function)
+
+
+@pytest.mark.parametrize("compiled", [False, True])
+@pytest.mark.parametrize(
+    "neighbor, opposite, expected",
+    [(1, 2, -2.0), (-1, 2, 8.0), (-1, -1, 3.0)],
+)
+def test_cardinal_coordinate(compiled, neighbor, opposite, expected):
+    """Check the neighbor, reflected-opposite and center cases of a cardinal.
+
+    Parameters
+    ----------
+    compiled : bool
+        If True, call the Numba dispatcher; otherwise its Python function.
+    neighbor : int
+        Index of the cardinal neighbor, or -1 when it is missing.
+    opposite : int
+        Index of the opposite neighbor, or -1 when it is missing.
+    expected : float
+        Expected resolved coordinate.
+    """
+    function = (
+        _cardinal_coordinate if compiled
+        else _python_implementation(_cardinal_coordinate)
+    )
+    coordinates = np.array([0.0, -2.0, -2.0])
+    assert function(coordinates, 3.0, neighbor, opposite) == expected
+
+
+@pytest.mark.parametrize("compiled", [False, True])
+@pytest.mark.parametrize("neighbor, expected", [(1, 9.0), (-1, 4.0)])
+def test_mixed_coordinate(compiled, neighbor, expected):
+    """Check that a missing diagonal is rebuilt from its two cardinals.
+
+    Parameters
+    ----------
+    compiled : bool
+        If True, call the Numba dispatcher; otherwise its Python function.
+    neighbor : int
+        Index of the diagonal neighbor, or -1 when it is missing.
+    expected : float
+        Expected resolved coordinate.
+    """
+    function = (
+        _mixed_coordinate if compiled
+        else _python_implementation(_mixed_coordinate)
+    )
+    coordinates = np.array([0.0, 9.0])
+    # Missing: first + second - center = 5.0 + 2.0 - 3.0.
+    assert function(coordinates, 3.0, neighbor, 5.0, 2.0) == expected
+
+
+@pytest.mark.parametrize("compiled", [False, True])
+@pytest.mark.parametrize(
+    "neighbor, expected",
+    [(0, 7.0), (1, 1.0), (-1, 1.0)],
+)
+def test_neighbor_size(compiled, neighbor, expected):
+    """Check that only existing movable neighbors contribute their size.
+
+    Parameters
+    ----------
+    compiled : bool
+        If True, call the Numba dispatcher; otherwise its Python function.
+    neighbor : int
+        Index of the neighbor, or -1 when it is missing.
+    expected : float
+        Expected sizing value.
+    """
+    function = (
+        _neighbor_size if compiled
+        else _python_implementation(_neighbor_size)
+    )
+    sizing_values = np.array([7.0, 8.0])
+    is_movable = np.array([True, False])
+    assert function(sizing_values, is_movable, neighbor, 1.0) == expected
 
 
 def test_resolve_stencil_coordinates_complete_neighbors():
