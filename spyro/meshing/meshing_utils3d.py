@@ -13,9 +13,9 @@ except ImportError:
 
 
 def sizing_function_xyz(
-    X,
-    Y,
-    Z,
+    x,
+    y,
+    z,
     ef_segy,
     length_x,
     length_y,
@@ -25,12 +25,12 @@ def sizing_function_xyz(
 
     Parameters
     ----------
-    X : numpy.ndarray
-        X coordinates of the structured mesh nodes.
-    Y : numpy.ndarray
-        Y coordinates of the structured mesh nodes.
-    Z : numpy.ndarray
-        Z coordinates of the structured mesh nodes.
+    x : numpy.ndarray
+        x coordinates of the structured mesh nodes.
+    y : numpy.ndarray
+        y coordinates of the structured mesh nodes.
+    z : numpy.ndarray
+        z coordinates of the structured mesh nodes.
     ef_segy : callable
         Mesh-sizing function evaluated in ``(z, x, y)`` coordinates.
     length_x : float
@@ -50,16 +50,16 @@ def sizing_function_xyz(
     Queries outside the physical model are projected to the nearest model edge before
     evaluating the sizing field.
     """
-    X = np.asarray(X, dtype=float)
-    Y = np.asarray(Y, dtype=float)
-    Z = np.asarray(Z, dtype=float)
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    z = np.asarray(z, dtype=float)
 
-    if X.shape != Y.shape or X.shape != Z.shape:
+    if x.shape != y.shape or x.shape != z.shape:
         raise ValueError(
-            "Winslow sizing coordinates X, Y and Z must have matching shapes."
+            "Winslow sizing coordinates x, y and z must have matching shapes."
         )
 
-    finite_coordinates = np.isfinite(X) & np.isfinite(Y) & np.isfinite(Z)
+    finite_coordinates = np.isfinite(x) & np.isfinite(y) & np.isfinite(z)
     if not np.all(finite_coordinates):
         bad_count = int(finite_coordinates.size - np.count_nonzero(finite_coordinates))
         raise FloatingPointError(
@@ -68,16 +68,16 @@ def sizing_function_xyz(
             "winslow_omega or inspect the structured topology."
         )
 
-    X_edge = np.clip(X.reshape(-1), 0.0, length_x)
-    Y_edge = np.clip(Y.reshape(-1), 0.0, length_y)
-    Z_edge = np.clip(Z.reshape(-1), -abs(depth_z), 0.0)
+    x_edge = np.clip(x.reshape(-1), 0.0, length_x)
+    y_edge = np.clip(y.reshape(-1), 0.0, length_y)
+    z_edge = np.clip(z.reshape(-1), -abs(depth_z), 0.0)
 
-    queries_zxy = np.column_stack((Z_edge, X_edge, Y_edge))
+    queries_zxy = np.column_stack((z_edge, x_edge, y_edge))
 
     sizes = np.asarray(
         ef_segy(queries_zxy),
         dtype=float,
-    ).reshape(X.shape)
+    ).reshape(x.shape)
 
     if not np.all(np.isfinite(sizes)):
         invalid = np.flatnonzero(~np.isfinite(sizes))
@@ -99,7 +99,7 @@ def sizing_function_xyz(
     return sizes
 
 
-def create_sizing_function3D(
+def create_sizing_function3d(
     fname,
     hmin,
     bbox,
@@ -419,10 +419,10 @@ def align_water_columns3d(gmsh, padding_type=None):
         if set(gmsh.model.mesh.getElementTypes(3, int(volume))) != {5}:
             raise ValueError("Water alignment requires only 8-node hexahedra.")
         edges = gmsh.model.mesh.getElementEdgeNodes(5, int(volume), primary=True)
-        for a, b in np.asarray(edges).reshape(-1, 2):
-            a, b = int(a), int(b)
-            adjacency[a].add(b)
-            adjacency[b].add(a)
+        for start_node, end_node in np.asarray(edges).reshape(-1, 2):
+            start_node, end_node = int(start_node), int(end_node)
+            adjacency[start_node].add(end_node)
+            adjacency[end_node].add(start_node)
     if not interface or not interface.issubset(adjacency):
         raise ValueError("No valid shared water/subsurface interface was found.")
     owner = {node: (node, 0) for node in interface}
@@ -522,9 +522,9 @@ def define_winslow_points_3d(
         raise ValueError("Winslow point-selection tolerance must be positive.")
 
     locked = set()
-    move_X_only = set()
-    move_Y_only = set()
-    move_Z_only = set()
+    move_x_only = set()
+    move_y_only = set()
+    move_z_only = set()
     move_all = set()
     water_nodes = set()
 
@@ -625,28 +625,28 @@ def define_winslow_points_3d(
 
         if contact_count == 2:
             if on_x_plane and on_y_plane:
-                move_Z_only.add(node_index)
+                move_z_only.add(node_index)
             elif on_x_plane and on_z_plane:
-                move_Y_only.add(node_index)
+                move_y_only.add(node_index)
             elif on_y_plane and on_z_plane:
-                move_X_only.add(node_index)
+                move_x_only.add(node_index)
             continue
 
         if contact_count == 1:
             if on_x_plane:
-                move_Y_only.add(node_index)
-                move_Z_only.add(node_index)
+                move_y_only.add(node_index)
+                move_z_only.add(node_index)
             elif on_y_plane:
-                move_X_only.add(node_index)
-                move_Z_only.add(node_index)
+                move_x_only.add(node_index)
+                move_z_only.add(node_index)
             elif on_z_plane:
-                move_X_only.add(node_index)
-                move_Y_only.add(node_index)
+                move_x_only.add(node_index)
+                move_y_only.add(node_index)
             continue
 
         move_all.add(node_index)
 
-    movable_nodes = move_all | move_X_only | move_Y_only | move_Z_only
+    movable_nodes = move_all | move_x_only | move_y_only | move_z_only
 
     if not movable_nodes:
         raise RuntimeError("No movable nodes were found for 3-D Winslow smoothing.")
@@ -654,9 +654,9 @@ def define_winslow_points_3d(
     return {
         "locked": locked,
         "move_all": move_all,
-        "move_X_only": move_X_only,
-        "move_Y_only": move_Y_only,
-        "move_Z_only": move_Z_only,
+        "move_x_only": move_x_only,
+        "move_y_only": move_y_only,
+        "move_z_only": move_z_only,
         "water_nodes": water_nodes,
         "movable_nodes": movable_nodes,
     }

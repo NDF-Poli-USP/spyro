@@ -27,9 +27,9 @@ def run_selected_winslow(
     points,
     hexes,
     move_all,
-    move_X_only,
-    move_Y_only,
-    move_Z_only,
+    move_x_only,
+    move_y_only,
+    move_z_only,
     ef_segy,
     length_x,
     length_y,
@@ -48,11 +48,11 @@ def run_selected_winslow(
         Eight-node hexahedral connectivity using zero-based node indices.
     move_all : set of int
         Nodes allowed to move in x, y, and z.
-    move_X_only : set of int
+    move_x_only : set of int
         Nodes whose x coordinate may move.
-    move_Y_only : set of int
+    move_y_only : set of int
         Nodes whose y coordinate may move.
-    move_Z_only : set of int
+    move_z_only : set of int
         Nodes whose z coordinate may move.
     ef_segy : callable
         Mesh-sizing function evaluated in ``(z, x, y)`` coordinates.
@@ -75,7 +75,7 @@ def run_selected_winslow(
         Smoothed node coordinates.
     """
     movable_nodes = (
-        set(move_all) | set(move_X_only) | set(move_Y_only) | set(move_Z_only)
+        set(move_all) | set(move_x_only) | set(move_y_only) | set(move_z_only)
     )
 
     if not movable_nodes:
@@ -110,8 +110,8 @@ def run_selected_winslow(
     )
     SpyroEnsemble.print(
         "Winslow movable-node counts | "
-        f"all={len(move_all)}, X={len(move_X_only)}, "
-        f"Y={len(move_Y_only)}, Z={len(move_Z_only)}, "
+        f"all={len(move_all)}, X={len(move_x_only)}, "
+        f"Y={len(move_y_only)}, Z={len(move_z_only)}, "
         f"union={len(movable_nodes)}"
     )
 
@@ -141,9 +141,9 @@ def run_selected_winslow(
         points=points,
         hexes=hexes,
         move_all=move_all,
-        move_X_only=move_X_only,
-        move_Y_only=move_Y_only,
-        move_Z_only=move_Z_only,
+        move_x_only=move_x_only,
+        move_y_only=move_y_only,
+        move_z_only=move_z_only,
         iterations=winslow_iterations,
         omega=winslow_omega,
         ef_segy=ef_segy,
@@ -631,9 +631,9 @@ def winslow_smooth_3d(
     points: np.ndarray,
     hexes: np.ndarray,
     move_all: set[int],
-    move_X_only: set[int],
-    move_Y_only: set[int],
-    move_Z_only: set[int],
+    move_x_only: set[int],
+    move_y_only: set[int],
+    move_z_only: set[int],
     ef_segy,
     length_x,
     length_y,
@@ -651,11 +651,11 @@ def winslow_smooth_3d(
         Eight-node hexahedral connectivity using zero-based node indices.
     move_all : set of int
         Nodes allowed to move in x, y, and z.
-    move_X_only : set of int
+    move_x_only : set of int
         Nodes whose x coordinate may move.
-    move_Y_only : set of int
+    move_y_only : set of int
         Nodes whose y coordinate may move.
-    move_Z_only : set of int
+    move_z_only : set of int
         Nodes whose z coordinate may move.
     ef_segy : callable
         Mesh-sizing function evaluated in ``(z, x, y)`` coordinates.
@@ -719,7 +719,7 @@ def winslow_smooth_3d(
             node_to_neighbors[second_node].add(first_node)
 
     movable_nodes = (
-        set(move_all) | set(move_X_only) | set(move_Y_only) | set(move_Z_only)
+        set(move_all) | set(move_x_only) | set(move_y_only) | set(move_z_only)
     )
 
     invalid_nodes = {node for node in movable_nodes if node < 0 or node >= num_nodes}
@@ -841,9 +841,9 @@ def winslow_smooth_3d(
     move_y_mask = np.zeros(num_nodes, dtype=np.bool_)
     move_z_mask = np.zeros(num_nodes, dtype=np.bool_)
 
-    move_x_mask[list(set(move_all) | set(move_X_only))] = True
-    move_y_mask[list(set(move_all) | set(move_Y_only))] = True
-    move_z_mask[list(set(move_all) | set(move_Z_only))] = True
+    move_x_mask[list(set(move_all) | set(move_x_only))] = True
+    move_y_mask[list(set(move_all) | set(move_y_only))] = True
+    move_z_mask[list(set(move_all) | set(move_z_only))] = True
 
     x_coordinates = np.ascontiguousarray(points[:, 0])
     y_coordinates = np.ascontiguousarray(points[:, 1])

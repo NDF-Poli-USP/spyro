@@ -16,7 +16,7 @@ from .meshing_winslow3d import run_selected_winslow
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
-def build_gmsh_geometry_and_groups3D(
+def build_gmsh_geometry_and_groups3d(
     gmsh,
     fname,
     length_x,
@@ -396,7 +396,7 @@ def padding_grading_factor(
     return np.minimum(t, 1.0)
 
 
-def configure_gmsh_mesh_size3D(
+def configure_gmsh_mesh_size3d(
     gmsh,
     ef_segy3,
     bbox,
@@ -468,7 +468,7 @@ def configure_gmsh_mesh_size3D(
     """
     if structured_mesh is False:
         if parallel is False:
-            def mesh_size_callback3D(dim, tag, x, y, z, lc):
+            def mesh_size_callback3d(dim, tag, x, y, z, lc):
                 """Evaluate the serial Gmsh mesh-size callback at one mesh point.
 
                 Parameters
@@ -552,7 +552,7 @@ def configure_gmsh_mesh_size3D(
 
                         return float(graded_size)
 
-            gmsh.model.mesh.setSizeCallback(mesh_size_callback3D)
+            gmsh.model.mesh.setSizeCallback(mesh_size_callback3d)
 
         if parallel:
             num_threads = gmsh_num_threads
@@ -568,15 +568,15 @@ def configure_gmsh_mesh_size3D(
             y_core = np.linspace(bbox[4], bbox[5], ny)
             z_core = np.linspace(bbox[0], bbox[1], nz)
 
-            XX_c, YY_c, ZZ_c = np.meshgrid(x_core, y_core, z_core, indexing="ij")
-            coords_c = np.column_stack((ZZ_c.ravel(), XX_c.ravel(), YY_c.ravel()))
+            xx_c, yy_c, zz_c = np.meshgrid(x_core, y_core, z_core, indexing="ij")
+            coords_c = np.column_stack((zz_c.ravel(), xx_c.ravel(), yy_c.ravel()))
 
             size_core = ef_segy3(coords_c).ravel()
 
-            sp_data_core = np.empty((XX_c.size, 4), dtype=np.float64)
-            sp_data_core[:, 0] = XX_c.ravel()
-            sp_data_core[:, 1] = YY_c.ravel()
-            sp_data_core[:, 2] = ZZ_c.ravel()
+            sp_data_core = np.empty((xx_c.size, 4), dtype=np.float64)
+            sp_data_core[:, 0] = xx_c.ravel()
+            sp_data_core[:, 1] = yy_c.ravel()
+            sp_data_core[:, 2] = zz_c.ravel()
             sp_data_core[:, 3] = size_core
 
             xmin_pad = -padding_x
@@ -607,40 +607,40 @@ def configure_gmsh_mesh_size3D(
             y_pad = np.linspace(ymin_pad, ymax_pad, ny_pad)
             z_pad = np.linspace(zmin_pad, zmax_pad, nz_pad)
 
-            XX_p, YY_p, ZZ_p = np.meshgrid(x_pad, y_pad, z_pad, indexing="ij")
+            xx_p, yy_p, zz_p = np.meshgrid(x_pad, y_pad, z_pad, indexing="ij")
 
             eps = 1e-8
             out_mask = ~(
-                (XX_p >= bbox[2] - eps)
-                & (XX_p <= bbox[3] + eps)
-                & (YY_p >= bbox[4] - eps)
-                & (YY_p <= bbox[5] + eps)
-                & (ZZ_p >= bbox[0] - eps)
-                & (ZZ_p <= bbox[1] + eps)
+                (xx_p >= bbox[2] - eps)
+                & (xx_p <= bbox[3] + eps)
+                & (yy_p >= bbox[4] - eps)
+                & (yy_p <= bbox[5] + eps)
+                & (zz_p >= bbox[0] - eps)
+                & (zz_p <= bbox[1] + eps)
             )
 
-            XX_out = XX_p[out_mask]
-            YY_out = YY_p[out_mask]
-            ZZ_out = ZZ_p[out_mask]
+            xx_out = xx_p[out_mask]
+            yy_out = yy_p[out_mask]
+            zz_out = zz_p[out_mask]
 
             # Padding sizing
             if extend_segy:
 
-                coords_p = np.column_stack((ZZ_out, XX_out, YY_out))
+                coords_p = np.column_stack((zz_out, xx_out, yy_out))
                 size_pad = ef_segy3(coords_p).ravel()
             else:
 
-                XX_proj = np.clip(XX_out, bbox[2], bbox[3])
-                YY_proj = np.clip(YY_out, bbox[4], bbox[5])
-                ZZ_proj = np.clip(ZZ_out, bbox[0], bbox[1])
+                xx_proj = np.clip(xx_out, bbox[2], bbox[3])
+                yy_proj = np.clip(yy_out, bbox[4], bbox[5])
+                zz_proj = np.clip(zz_out, bbox[0], bbox[1])
 
-                coords_p = np.column_stack((ZZ_proj, XX_proj, YY_proj))
+                coords_p = np.column_stack((zz_proj, xx_proj, yy_proj))
                 base_size_pad = ef_segy3(coords_p).ravel()
 
                 t = padding_grading_factor(
-                    np.abs(XX_out - XX_proj),
-                    np.abs(YY_out - YY_proj),
-                    np.abs(ZZ_out - ZZ_proj),
+                    np.abs(xx_out - xx_proj),
+                    np.abs(yy_out - yy_proj),
+                    np.abs(zz_out - zz_proj),
                     padding_x,
                     padding_y,
                     padding_z,
@@ -649,10 +649,10 @@ def configure_gmsh_mesh_size3D(
                 )
                 size_pad = base_size_pad + t * (h_padding - base_size_pad)
 
-            sp_data_pad = np.empty((XX_out.size, 4), dtype=np.float64)
-            sp_data_pad[:, 0] = XX_out
-            sp_data_pad[:, 1] = YY_out
-            sp_data_pad[:, 2] = ZZ_out
+            sp_data_pad = np.empty((xx_out.size, 4), dtype=np.float64)
+            sp_data_pad[:, 0] = xx_out
+            sp_data_pad[:, 1] = yy_out
+            sp_data_pad[:, 2] = zz_out
             sp_data_pad[:, 3] = size_pad
 
             sp_data_combined = np.vstack((sp_data_core, sp_data_pad))
@@ -713,7 +713,7 @@ def configure_gmsh_3d_meshing_mode(
     gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
 
 
-def apply_structured_winslow_smoothing3D(
+def apply_structured_winslow_smoothing3d(
     gmsh,
     length_x,
     length_y,
@@ -848,9 +848,9 @@ def apply_structured_winslow_smoothing3D(
         water_nodes = {tag_to_index[tag] for tag in aligned_water_tags}
         for key in (
             "move_all",
-            "move_X_only",
-            "move_Y_only",
-            "move_Z_only",
+            "move_x_only",
+            "move_y_only",
+            "move_z_only",
             "movable_nodes",
         ):
             winslow_points[key].difference_update(water_nodes)
@@ -858,9 +858,9 @@ def apply_structured_winslow_smoothing3D(
         winslow_points["water_nodes"].update(water_nodes)
 
     move_all = winslow_points["move_all"]
-    move_X_only = winslow_points["move_X_only"]
-    move_Y_only = winslow_points["move_Y_only"]
-    move_Z_only = winslow_points["move_Z_only"]
+    move_x_only = winslow_points["move_x_only"]
+    move_y_only = winslow_points["move_y_only"]
+    move_z_only = winslow_points["move_z_only"]
     movable_nodes = winslow_points["movable_nodes"]
 
     SpyroEnsemble.print("Applying 3D Winslow smoothing...")
@@ -868,9 +868,9 @@ def apply_structured_winslow_smoothing3D(
         points=points_3d,
         hexes=hexes,
         move_all=move_all,
-        move_X_only=move_X_only,
-        move_Y_only=move_Y_only,
-        move_Z_only=move_Z_only,
+        move_x_only=move_x_only,
+        move_y_only=move_y_only,
+        move_z_only=move_z_only,
         ef_segy=ef_segy3,
         length_x=length_x,
         length_y=length_y,

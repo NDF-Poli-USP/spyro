@@ -83,7 +83,7 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
         hyper_n = mesh_parameters.hyper_n
         fname = velocity_model_file
         hmin_segy = mesh_parameters.hmin_segy
-        wl = mesh_parameters.cells_per_wavelength
+        cells_per_wavelength = mesh_parameters.cells_per_wavelength
         freq = mesh_parameters.source_frequency
         grade = mesh_parameters.grade
         water_search_value = mesh_parameters.water_search_value
@@ -93,7 +93,7 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
         vp_water = mesh_parameters.vp_water
         structured_mesh = mesh_parameters.structured_mesh
         unstructured_quad_mesh = mesh_parameters.unstructured_quad_mesh
-        minElementSize = mesh_parameters.min_element_size
+        min_element_size = mesh_parameters.min_element_size
         winslow_implementation = mesh_parameters.winslow_implementation
         apply_winslow = mesh_parameters.apply_winslow
         winslow_iterations = mesh_parameters.winslow_iterations
@@ -131,7 +131,7 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
             fname=fname,
             hmin=hmin_segy,
             bbox=segy_bbox,
-            wl=wl,
+            wl=cells_per_wavelength,
             freq=freq,
             pad_type=padding_type,
             pad_size_x=padding_x,
@@ -156,12 +156,12 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
             water_interface=water_interface,
             water_search_value=water_search_value,
             structured_mesh=structured_mesh,
-            minElementSize=minElementSize,
+            min_element_size=min_element_size,
         )
 
         # Standard Params
-        z_water_L = geom_params.get("z_water_L")
-        z_water_R = geom_params.get("z_water_R")
+        z_water_left = geom_params.get("z_water_left")
+        z_water_right = geom_params.get("z_water_right")
         pad_x_min = geom_params.get("pad_x_min")
         pad_x_max = geom_params.get("pad_x_max")
         pad_z_min = geom_params.get("pad_z_min")
@@ -206,7 +206,7 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
             structured_mesh=structured_mesh,
             unstructured_quad_mesh=unstructured_quad_mesh,
             padding_type=padding_type,
-            min_element_size=minElementSize,
+            min_element_size=min_element_size,
         )
         gmsh.model.mesh.generate(2)
         if unstructured_quad_mesh:
@@ -235,8 +235,8 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
                 domain_zmin=domain_zmin,
                 domain_zmax=domain_zmax,
                 ef_segy2=ef_segy2,
-                z_water_L=z_water_L,
-                z_water_R=z_water_R,
+                z_water_left=z_water_left,
+                z_water_right=z_water_right,
                 pad_x_min=pad_x_min,
                 pad_x_max=pad_x_max,
                 pad_z_min=pad_z_min,
