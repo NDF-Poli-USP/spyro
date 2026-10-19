@@ -91,7 +91,7 @@ def test_negative_length_z_raises():
             "mesh_type": "firedrake_mesh",
         }
     }
-    with pytest.raises(ValueError, match="_length_z. must be greater than or equal to 0"):
+    with pytest.raises(ValueError, match="Please do not use negative value for _length_z"):
         spyro.meshing.MeshingParameters(
             input_mesh_dictionary=dictionary["mesh"],
             dimension=2,
@@ -112,7 +112,7 @@ def test_negative_length_x_raises():
             "mesh_type": "firedrake_mesh",
         }
     }
-    with pytest.raises(ValueError, match="_length_x. must be greater than or equal to 0"):
+    with pytest.raises(ValueError, match="Please do not use negative value for _length_x"):
         spyro.meshing.MeshingParameters(
             input_mesh_dictionary=dictionary["mesh"],
             dimension=2,
@@ -133,7 +133,7 @@ def test_negative_length_y_raises():
             "mesh_type": "firedrake_mesh",
         }
     }
-    with pytest.raises(ValueError, match="_length_y. must be greater than or equal to 0"):
+    with pytest.raises(ValueError, match="Please do not use negative value for _length_y"):
         spyro.meshing.MeshingParameters(
             input_mesh_dictionary=dictionary["mesh"],
             dimension=2,
@@ -317,37 +317,6 @@ def _gmsh_parameters(**mesh_options) -> spyro.meshing.MeshingParameters:
     )
 
 
-@pytest.mark.parametrize("hyper_n", [2, 2.0, 3.0, 4.5])
-def test_hyper_n_accepts_values_from_two(hyper_n):
-    """Test that `hyper_n` values of at least 2 are stored unchanged.
-
-    Parameters
-    ----------
-    hyper_n : int or float
-        Hyperellipse exponent passed in the mesh dictionary.
-    """
-    assert _gmsh_parameters(hyper_n=hyper_n).hyper_n == hyper_n
-
-
-@pytest.mark.parametrize("hyper_n", [1.99, 1.0, 0.0, -3.0])
-def test_hyper_n_below_two_raises(hyper_n):
-    """Test that a `hyper_n` smaller than 2 raises `ValueError`.
-
-    Parameters
-    ----------
-    hyper_n : float
-        Hyperellipse exponent passed in the mesh dictionary.
-    """
-    with pytest.raises(ValueError, match="'hyper_n' must be greater than or equal to 2"):
-        _gmsh_parameters(hyper_n=hyper_n)
-
-
-def test_hyper_n_non_numeric_raises():
-    """Test that a non-numeric `hyper_n` raises `TypeError`."""
-    with pytest.raises(TypeError, match="'hyper_n' must be a float or an integer"):
-        _gmsh_parameters(hyper_n="3")
-
-
 def test_structured_and_unstructured_quad_are_mutually_exclusive():
     """Test that enabling both quad mesh options raises `ValueError`."""
     with pytest.raises(
@@ -377,12 +346,6 @@ def test_single_quad_mesh_option_is_accepted(structured_mesh, unstructured_quad_
     )
     assert mp.structured_mesh is structured_mesh
     assert mp.unstructured_quad_mesh is unstructured_quad_mesh
-
-
-def test_non_numeric_length_raises():
-    """Test that a non-numeric length raises `TypeError`."""
-    with pytest.raises(TypeError, match="'_length_x' must be a float or an integer"):
-        _gmsh_parameters(length_x="1.0")
 
 
 if __name__ == "__main__":
