@@ -1,6 +1,7 @@
 """Options that only affect Gmsh-based mesh generation."""
 
 from dataclasses import dataclass, fields
+from typing import get_args
 
 import numpy as np
 
@@ -27,8 +28,9 @@ class GmshOptions:
         Hyperellipse exponent for hyperelliptical padding.
     hmin_segy : float
         Minimum element size for SEGY interpolation.
-    grade : float
-        Sizing function grading for smooth element transition.
+    grade : float or None
+        Sizing function grading for smooth element transition. None
+        disables the smoothing.
     water_interface : bool
         If True, detects and implements the water interface curve.
     water_search_value : float
@@ -70,7 +72,7 @@ class GmshOptions:
     padding_type: str | None = None
     hyper_n: float = 3.0
     hmin_segy: float = 0.0
-    grade: float = 0.9
+    grade: float | None = 0.9
     water_interface: bool = False
     water_search_value: float = 0.0
     vp_water: float | None = None
@@ -109,8 +111,9 @@ class GmshOptions:
     def from_dictionary(cls, dictionary: dict) -> "GmshOptions":
         """Build options from a mesh input dictionary.
 
-        Keys that are not options are ignored, and None values mean "use the
-        default".
+        Keys that are not options are ignored. A None value means "use the
+        default", except for options that accept None (such as ``grade``),
+        where an explicit None is kept.
 
         Parameters
         ----------
@@ -124,9 +127,10 @@ class GmshOptions:
         """
         return cls(
             **{
-                key: dictionary[key]
-                for key in cls.keys()
-                if dictionary.get(key) is not None
+                field.name: dictionary[field.name]
+                for field in fields(cls)
+                if field.name in dictionary
+                and (dictionary[field.name] is not None or type(None) in get_args(field.type))
             }
         )
 
@@ -177,7 +181,7 @@ class GmshOptions:
             upper_bound=1,
             include_upper_bound=True,
         )
-        validate_numeric("grade", self.grade, lower_bound=0)
+        validate_numeric("grade", self.grade, accept_parameter_as_none=True, lower_bound=0)
         validate_numeric("hyper_n", self.hyper_n, lower_bound=0)
         validate_numeric(
             "hmin_segy", self.hmin_segy, lower_bound=0, include_lower_bound=True

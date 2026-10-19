@@ -352,6 +352,13 @@ def test_single_quad_mesh_option_is_accepted(structured_mesh, unstructured_quad_
     assert mp.gmsh.unstructured_quad_mesh is unstructured_quad_mesh
 
 
+def test_gmsh_explicit_none_grade_is_kept():
+    """Test that an explicit `grade=None` disables smoothing instead of using the default."""
+    assert _gmsh_parameters().gmsh.grade == 0.9
+    assert _gmsh_parameters(grade=None).gmsh.grade is None
+    assert _gmsh_parameters(hyper_n=None).gmsh.hyper_n == 3.0
+
+
 def _mp(**mesh_dictionary):
     """Build MeshingParameters from keyword arguments used as the input dictionary.
 
