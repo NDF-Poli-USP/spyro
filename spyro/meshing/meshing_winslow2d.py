@@ -1,6 +1,8 @@
 import numpy as np
 from typing import Callable, Tuple
 
+from .meshing_winslow3d import _cardinal_coordinate, _mixed_coordinate, _neighbor_size
+
 try:
     from numba import njit, prange
 
@@ -478,25 +480,26 @@ if NUMBA_AVAILABLE:  # pragma: no cover
                     stencils[i, 7],
                 )
 
-                xE = X[iE] if iE != -1 else (2.0 * X[i] - X[iW] if iW != -1 else X[i])
-                xW = X[iW] if iW != -1 else (2.0 * X[i] - X[iE] if iE != -1 else X[i])
-                xN = X[iN] if iN != -1 else (2.0 * X[i] - X[iS] if iS != -1 else X[i])
-                xS = X[iS] if iS != -1 else (2.0 * X[i] - X[iN] if iN != -1 else X[i])
+                xC, zC = X[i], Z[i]
+                xE = _cardinal_coordinate(X, xC, iE, iW)
+                xW = _cardinal_coordinate(X, xC, iW, iE)
+                xN = _cardinal_coordinate(X, xC, iN, iS)
+                xS = _cardinal_coordinate(X, xC, iS, iN)
 
-                zE = Z[iE] if iE != -1 else (2.0 * Z[i] - Z[iW] if iW != -1 else Z[i])
-                zW = Z[iW] if iW != -1 else (2.0 * Z[i] - Z[iE] if iE != -1 else Z[i])
-                zN = Z[iN] if iN != -1 else (2.0 * Z[i] - Z[iS] if iS != -1 else Z[i])
-                zS = Z[iS] if iS != -1 else (2.0 * Z[i] - Z[iN] if iN != -1 else Z[i])
+                zE = _cardinal_coordinate(Z, zC, iE, iW)
+                zW = _cardinal_coordinate(Z, zC, iW, iE)
+                zN = _cardinal_coordinate(Z, zC, iN, iS)
+                zS = _cardinal_coordinate(Z, zC, iS, iN)
 
-                xNE = X[iNE] if iNE != -1 else (xN + xE - X[i])
-                xNW = X[iNW] if iNW != -1 else (xN + xW - X[i])
-                xSE = X[iSE] if iSE != -1 else (xS + xE - X[i])
-                xSW = X[iSW] if iSW != -1 else (xS + xW - X[i])
+                xNE = _mixed_coordinate(X, xC, iNE, xN, xE)
+                xNW = _mixed_coordinate(X, xC, iNW, xN, xW)
+                xSE = _mixed_coordinate(X, xC, iSE, xS, xE)
+                xSW = _mixed_coordinate(X, xC, iSW, xS, xW)
 
-                zNE = Z[iNE] if iNE != -1 else (zN + zE - Z[i])
-                zNW = Z[iNW] if iNW != -1 else (zN + zW - Z[i])
-                zSE = Z[iSE] if iSE != -1 else (zS + zE - Z[i])
-                zSW = Z[iSW] if iSW != -1 else (zS + zW - Z[i])
+                zNE = _mixed_coordinate(Z, zC, iNE, zN, zE)
+                zNW = _mixed_coordinate(Z, zC, iNW, zN, zW)
+                zSE = _mixed_coordinate(Z, zC, iSE, zS, zE)
+                zSW = _mixed_coordinate(Z, zC, iSW, zS, zW)
 
                 X_xi = 0.5 * (xE - xW)
                 X_eta = 0.5 * (xN - xS)
@@ -511,10 +514,10 @@ if NUMBA_AVAILABLE:  # pragma: no cover
                 gamma = X_xi**2 + Z_xi**2
 
                 DC = h[i]
-                DE = h[iE] if (iE != -1 and is_movable[iE]) else DC
-                DW = h[iW] if (iW != -1 and is_movable[iW]) else DC
-                DN = h[iN] if (iN != -1 and is_movable[iN]) else DC
-                DS = h[iS] if (iS != -1 and is_movable[iS]) else DC
+                DE = _neighbor_size(h, is_movable, iE, DC)
+                DW = _neighbor_size(h, is_movable, iW, DC)
+                DN = _neighbor_size(h, is_movable, iN, DC)
+                DS = _neighbor_size(h, is_movable, iS, DC)
 
                 D_phi = 0.5 * (DE - DW)
                 D_psi = 0.5 * (DN - DS)
