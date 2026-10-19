@@ -6,7 +6,8 @@ messages to the user or to prevent numerical instability in objects.
 
 from firedrake import Function, FunctionSpace, Mesh
 from firedrake.functionspaceimpl import WithGeometry
-from numpy import float32, float64, inf, int32, int64, isinf, isnan, ndarray
+from numbers import Integral, Real
+from numpy import bool_, float32, float64, inf, int32, int64, isinf, isnan, ndarray
 from os import path
 from ufl.form import Form
 from ufl.geometry import SpatialCoordinate
@@ -182,7 +183,8 @@ def validate_numeric(
     parameter_name : `str`
         Name of the parameter to be validated (used in error messages).
     parameter_value : `int` or `float`
-        Value of the parameter to be validated.
+        Value of the parameter to be validated. Numpy scalars are accepted;
+        booleans are not.
     float_num : `bool`, optional
         If `True`, the parameter can be a float. Default is `True`.
     integer_num : `bool`, optional
@@ -215,8 +217,12 @@ def validate_numeric(
     if parameter_value is None and accept_parameter_as_none:
         return parameter_value
 
+    # Booleans are integers in Python, but never valid numeric parameters.
+    is_integer = isinstance(parameter_value, Integral) and not isinstance(parameter_value, bool)
+    is_float = isinstance(parameter_value, Real) and not isinstance(parameter_value, (Integral, bool))
+
     # Not int or float
-    if not isinstance(parameter_value, (int, float)):
+    if not (is_integer or is_float):
         if float_num and integer_num:
             str_type = "float or an integer"
         elif float_num:
@@ -230,14 +236,14 @@ def validate_numeric(
         )
 
     # Check if float is allowed when value is integer
-    if isinstance(parameter_value, float) and (integer_num and not float_num):
+    if is_float and (integer_num and not float_num):
         raise TypeError(
             f"'{parameter_name}' must be an integer, "
             f"got {type(parameter_value).__name__}."
         )
 
     # Check if integer is allowed when value is integer
-    if isinstance(parameter_value, int) and (not integer_num and float_num):
+    if is_integer and (not integer_num and float_num):
         raise TypeError(
             f"'{parameter_name}' must be a float, "
             f"got {type(parameter_value).__name__}."
@@ -377,6 +383,42 @@ def validate_string(parameter_name, parameter_value, accept_parameter_as_none=Fa
         raise TypeError(f"'{parameter_name}' must be a string, got {value_type}.")
 
     return parameter_value
+
+
+def validate_boolean(parameter_name, parameter_value, accept_parameter_as_none=False):
+    """Validate boolean parameters and raise a TypeError if invalid.
+
+    Unlike ``validate_parameter(name, value, [True, False])``, this rejects
+    integers such as 0 and 1.
+
+    Parameters
+    ----------
+    parameter_name : `str`
+        Name of the parameter to be validated (used in error messages).
+    parameter_value : `object`
+        Value of the parameter to be validated. Numpy booleans are accepted.
+    accept_parameter_as_none : `bool`, optional
+        If `True`, the parameter value is allowed to be validated as `None`.
+        Default is `False`, in which case `None` is not allowed.
+
+    Returns
+    -------
+    parameter_value : `bool` or `None`
+        The validated parameter value, converted to a Python `bool`.
+
+    Raises
+    ------
+    TypeError
+        If the parameter value is not a boolean.
+    """
+    if parameter_value is None and accept_parameter_as_none:
+        return parameter_value
+
+    if not isinstance(parameter_value, (bool, bool_)):
+        value_type = type(parameter_value).__name__
+        raise TypeError(f"'{parameter_name}' must be a boolean, got {value_type}.")
+
+    return bool(parameter_value)
 
 
 def validate_data_structure(
@@ -616,7 +658,8 @@ def validate_file(
     ValueError
         If the file extension is not in the list of valid extensions.
     FileNotFoundError
-        If the file does not exist and check_exists is True
+        If the extension is valid, the file does not exist and
+        check_file_existence is True.
     """
     parameter_value = validate_string(
         parameter_name,
@@ -627,13 +670,15 @@ def validate_file(
     if parameter_value is None and accept_parameter_as_none:
         return parameter_value
 
+    file_extension = path.splitext(parameter_value)[1].lower()
+    validate_parameter(
+        f"extension_type for '{parameter_name}'", file_extension, valid_extensions
+    )
+
     if not path.exists(parameter_value) and check_file_existence:
         raise FileNotFoundError(
             f"'{parameter_name}' '{parameter_value}' does not exist"
         )
-
-    file_extension = path.splitext(parameter_value)[1].lower()
-    validate_parameter("extension_type", file_extension, valid_extensions)
 
     return parameter_value
 

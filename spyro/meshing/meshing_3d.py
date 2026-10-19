@@ -47,41 +47,41 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
     padding_z = mesh_parameters.padding_z
     padding_x = mesh_parameters.padding_x
     padding_y = mesh_parameters.padding_y
-    hyper_n = mesh_parameters.hyper_n
-    hmin_segy = mesh_parameters.hmin_segy
+    hyper_n = mesh_parameters.gmsh.hyper_n
+    hmin_segy = mesh_parameters.gmsh.hmin_segy
     cells_per_wavelength = mesh_parameters.cells_per_wavelength
     freq = mesh_parameters.source_frequency
-    grade = mesh_parameters.grade
-    water_search_value = mesh_parameters.water_search_value
-    padding_type = mesh_parameters.padding_type
+    grade = mesh_parameters.gmsh.grade
+    water_search_value = mesh_parameters.gmsh.water_search_value
+    padding_type = mesh_parameters.gmsh.padding_type
     output_file = mesh_parameters.output_filename
-    water_interface = mesh_parameters.water_interface
-    vp_water = mesh_parameters.vp_water
-    structured_mesh = mesh_parameters.structured_mesh
+    water_interface = mesh_parameters.gmsh.water_interface
+    vp_water = mesh_parameters.gmsh.vp_water
+    structured_mesh = mesh_parameters.gmsh.structured_mesh
     min_element_size = mesh_parameters.min_element_size
-    winslow_implementation = mesh_parameters.winslow_implementation
-    apply_winslow = mesh_parameters.apply_winslow
-    winslow_iterations = mesh_parameters.winslow_iterations
-    winslow_omega = mesh_parameters.winslow_omega
-    extend_segy = mesh_parameters.extend_segy
+    winslow_implementation = mesh_parameters.gmsh.winslow_implementation
+    apply_winslow = mesh_parameters.gmsh.apply_winslow
+    winslow_iterations = mesh_parameters.gmsh.winslow_iterations
+    winslow_omega = mesh_parameters.gmsh.winslow_omega
+    extend_segy = mesh_parameters.gmsh.extend_segy
     h_padding = mesh_parameters.h_padding
-    parallel = mesh_parameters.gmsh_parallel
-    gmsh_num_threads = mesh_parameters.gmsh_num_threads
+    parallel = mesh_parameters.gmsh.gmsh_parallel
+    gmsh_num_threads = mesh_parameters.gmsh.gmsh_num_threads
 
-    byte_order = mesh_parameters.segy_byte_order
-    axes_order = tuple(mesh_parameters.segy_axes_order)
-    axes_order_sort = mesh_parameters.segy_axes_order_sort
-    binary_dtype = mesh_parameters.segy_dtype
+    byte_order = mesh_parameters.gmsh.segy_byte_order
+    axes_order = tuple(mesh_parameters.gmsh.segy_axes_order)
+    axes_order_sort = mesh_parameters.gmsh.segy_axes_order_sort
+    binary_dtype = mesh_parameters.gmsh.segy_dtype
 
     if mesh_parameters.segy_velocity_model is not None:
         velocity_model_file = mesh_parameters.segy_velocity_model
         fname = velocity_model_file
-        nz = mesh_parameters.segy_nz
-        nx = mesh_parameters.segy_nx
-        ny = mesh_parameters.segy_ny
-        dz = mesh_parameters.segy_dz
-        dx = mesh_parameters.segy_dx
-        dy = mesh_parameters.segy_dy
+        nz = mesh_parameters.gmsh.segy_nz
+        nx = mesh_parameters.gmsh.segy_nx
+        ny = mesh_parameters.gmsh.segy_ny
+        dz = mesh_parameters.gmsh.segy_dz
+        dx = mesh_parameters.gmsh.segy_dx
+        dy = mesh_parameters.gmsh.segy_dy
         if any(value is None for value in (nz, nx, ny, dz, dx, dy)):
             raise ValueError(
                 "3-D binary Gmsh meshing requires segy_nz, segy_nx, "

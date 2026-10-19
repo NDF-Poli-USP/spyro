@@ -118,9 +118,9 @@ class AutomaticMesh:
         self.comm = mesh_parameters.comm
         self.mesh_type = mesh_parameters.mesh_type
         self.edge_length = mesh_parameters.edge_length
-        self.edge_length_z = getattr(mesh_parameters, "edge_length_z", None)
-        self.edge_length_x = getattr(mesh_parameters, "edge_length_x", None)
-        self.edge_length_y = getattr(mesh_parameters, "edge_length_y", None)
+        self.edge_length_z = mesh_parameters.edge_length_z
+        self.edge_length_x = mesh_parameters.edge_length_x
+        self.edge_length_y = mesh_parameters.edge_length_y
         self.abc_pad = mesh_parameters.abc_pad_length
         self.mesh_parameters = mesh_parameters
 
@@ -136,7 +136,7 @@ class AutomaticMesh:
         self.velocity_model = mesh_parameters.velocity_model
         self.output_file_name = mesh_parameters.output_filename
 
-    def _resolved_edge_length(self, axis):
+    def _resolved_edge_length(self, axis: str) -> float | None:
         """Return the edge length for one axis, falling back to the global one.
 
         Parameters
@@ -149,7 +149,7 @@ class AutomaticMesh:
         float or None
             `edge_length_<axis>` when set, otherwise `edge_length`.
         """
-        axis_value = getattr(self, f"edge_length_{axis}", None)
+        axis_value = {"z": self.edge_length_z, "x": self.edge_length_x, "y": self.edge_length_y}[axis]
         if axis_value is not None:
             return axis_value
         return self.edge_length
@@ -163,8 +163,8 @@ class AutomaticMesh:
         mesh : Mesh
             Mesh
         """
-        self.mesh_parameters.check_completeness()
-        if self.mesh_parameters.is_complete is False:
+        self.mesh_parameters.validate()
+        if not self.mesh_parameters.check_completeness():
             SpyroEnsemble.print(
                 "Skipping mesh generation, since we don't have all the parameters"
             )
