@@ -24,8 +24,10 @@ validated with a Taylor test.
 """
 import firedrake as fire
 import firedrake.adjoint as fire_ad
+import numpy as np
 import spyro
 import pytest
+from mpi4py import MPI
 from pyadjoint import taylor_test
 
 from checkpoint_schedules import SingleMemoryStorageSchedule
@@ -113,6 +115,41 @@ def build_direction(wave):
     # Smooth O(1) field, deterministic and identical on every ensemble member.
     direction.interpolate(1.0 + 0.25 * fire.sin(3.0 * x) * fire.cos(3.0 * z))
     return direction
+
+
+def control_layout_mismatch(wave):
+    """Measure how much the control DOF layout differs across ensemble members.
+
+    ``EnsembleReducedFunctional.derivative`` sums the members' gradients with
+    an ``allreduce`` over the raw local DOF arrays, which is only correct if
+    every member distributed its copy of the mesh with the same partition and
+    DOF numbering. This probes that assumption by comparing the coordinates
+    of each rank's owned control DOFs with those of the matching rank on
+    ensemble member 0.
+
+    Parameters
+    ----------
+    wave : spyro.AcousticWave
+        Wave object whose control function space and mesh coordinates are
+        compared.
+
+    Returns
+    -------
+    float
+        Largest coordinate-probe difference over all ranks, identical on every
+        rank. ``0.0`` means identical layouts; ``inf`` means some rank owns a
+        different number of DOFs than its counterpart on member 0.
+    """
+    comm = wave.comm
+    probe = fire.Function(wave.c.function_space())
+    probe.interpolate(wave.mesh_x + 10.0 * wave.mesh_z)
+    local = probe.dat.data_ro.copy()
+    reference = comm.ensemble_comm.bcast(local, root=0)
+    if reference.shape != local.shape:
+        mismatch = float("inf")
+    else:
+        mismatch = float(np.abs(local - reference).max(initial=0.0))
+    return comm.global_comm.allreduce(mismatch, op=MPI.MAX)
 
 
 def get_forward_model(checkpointing=False, snapshots=None):
@@ -258,9 +295,24 @@ def _verify_ensemble_gradient(Wave_obj_guess, checkpointing):
     # consistent (do not pass dJdm here).
     rate = taylor_test(stage_functional, Wave_obj_guess.c, direction)
     print(f"Automated-adjoint Taylor convergence rate: {rate}", flush=True)
+
+    # Diagnostic for an intermittent CI failure: the ensemble gradient is only
+    # correct if both members laid out the control DOFs identically. Both
+    # values are global, so every rank fails (or passes) the same way and no
+    # rank is left waiting in a collective.
+    layout_mismatch = control_layout_mismatch(Wave_obj_guess)
+    print(f"Control DOF layout mismatch across ensemble members: "
+          f"{layout_mismatch}", flush=True)
+    assert layout_mismatch == 0.0, (
+        "Ensemble members distributed the mesh with different control DOF "
+        f"layouts (coordinate-probe mismatch {layout_mismatch}); the "
+        "EnsembleReducedFunctional gradient sums mismatched DOFs. Taylor "
+        f"convergence rate was {rate}."
+    )
     assert rate > 1.9, (
         "Automated adjoint gradient verification failed: Taylor convergence "
-        f"rate {rate} is below the expected second-order rate."
+        f"rate {rate} is below the expected second-order rate, although the "
+        "control DOF layouts match across ensemble members."
     )
 
 
