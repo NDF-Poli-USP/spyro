@@ -83,6 +83,21 @@ UNSTRUCTURED_EXPECTED_CELLS = {
 
 
 def _base_gmsh3d_parameters(output_filename):
+    """Build the baseline mesh parameters for the 3-D Gmsh tests.
+
+    The parameters use the bundled `vs_example_3D.bin` model; tests
+    override entries as needed.
+
+    Parameters
+    ----------
+    output_filename : str or pathlib.Path
+        Path where the generated mesh file is written.
+
+    Returns
+    -------
+    dict
+        Mesh parameter dictionary for `gmsh_mesh` with `dimension` 3.
+    """
     return {
         "mesh_type": "gmsh_mesh",
         "dimension": 3,

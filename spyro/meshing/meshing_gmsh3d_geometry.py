@@ -233,24 +233,21 @@ def create_hyperellipsoid_volume(
     int or None
         Generated hyperellipsoid volume tag.
     """
-    try:
-        volume_tag = create_closed_surface(
-            gmsh,
-            a,
-            b,
-            c,
-            n,
-            xc,
-            yc,
-            zc,
+    volume_tag = create_closed_surface(
+        gmsh,
+        a,
+        b,
+        c,
+        n,
+        xc,
+        yc,
+        zc,
+    )
+    if volume_tag:
+        SpyroEnsemble.print(
+            "Successfully created volume using closed B-spline surface",
         )
-        if volume_tag:
-            SpyroEnsemble.print(
-                "Successfully created volume using closed B-spline surface",
-            )
-        return volume_tag
-    except Exception as exc:
-        raise RuntimeError("B-spline surface creation failed.") from exc
+    return volume_tag
 
 
 def _add_padding_box(occ, x0, y0, z0, lx, ly, lz):
@@ -673,49 +670,3 @@ def generate_structured_rectangular_padding_water(
     occ.synchronize()
 
     return water_vols, soil_vols, pad_vols
-
-
-def report_quality(
-    gmsh,
-    dim=3,
-    quality_type=2,
-):
-    """Compute and report Gmsh element-quality statistics.
-
-    Parameters
-    ----------
-    gmsh : module
-        Initialized Gmsh Python module used to build or query the mesh.
-    dim : int
-        Topological dimension of the elements or callback entity.
-    quality_type : int
-        Gmsh element-quality metric identifier.
-
-    Returns
-    -------
-    None
-        This function reports mesh-quality statistics and does not return a value.
-    """
-    gmsh.option.setNumber("Mesh.QualityType", quality_type)  # choose metric
-
-    # Get elements
-    _elem_types, elem_tags, _elem_node_tags = gmsh.model.mesh.getElements(dim)
-
-    # Collect element tags
-    all_tags = []
-    for tags in elem_tags:
-        all_tags.extend(tags.tolist() if hasattr(tags, "tolist") else list(tags))
-
-    if not all_tags:
-        SpyroEnsemble.print(f"[quality] No elements found for dim={dim}")
-        return
-
-    # Element quality
-    q = gmsh.model.mesh.getElementQualities(all_tags)
-
-    q = np.asarray(q, dtype=float)
-    SpyroEnsemble.print(
-        f"[quality] count={q.size}  min={q.min():.6g}  p1={np.percentile(q, 1):.6g}  "
-        f"p5={np.percentile(q, 5):.6g}  median={np.median(q):.6g}  "
-        f"p95={np.percentile(q, 95):.6g}  max={q.max():.6g}  mean={q.mean():.6g}",
-    )

@@ -1,52 +1,7 @@
-from pathlib import Path
-
 import numpy as np
 
+from ..io.basicio import read_velocity_binary3d
 from spyro.mpi.spyro_mpi import SpyroEnsemble
-
-
-def _read_velocity_cube(fname, nz, nx, ny, dtype_string, order):
-    """Memory-map a binary velocity model as a ``(z, x, y)`` cube.
-
-    Parameters
-    ----------
-    fname : str or pathlib.Path
-        Path to the binary velocity model.
-    nz : int
-        Number of velocity samples in the z direction.
-    nx : int
-        Number of velocity samples in the x direction.
-    ny : int
-        Number of velocity samples in the y direction.
-    dtype_string : str
-        NumPy dtype string including the required byte order.
-    order : {"C", "F"}
-        Array reshape order used for the binary velocity model.
-
-    Returns
-    -------
-    tuple
-        Memory-mapped velocity cube and validated ``nz``, ``nx``, and ``ny`` sizes.
-    """
-    try:
-        nz, nx, ny = int(nz), int(nx), int(ny)
-    except Exception as exc:
-        raise RuntimeError("nz, nx, and ny must be valid integer arguments.") from exc
-
-    path = Path(fname)
-    if not path.exists():
-        raise FileNotFoundError(f"Binary not found: {path}")
-
-    mm = np.memmap(path, dtype=np.dtype(dtype_string), mode="r")
-    expected = nz * nx * ny
-    if mm.size != expected:
-        raise ValueError(
-            f"File size mismatch for {path}:\n"
-            f"  got {mm.size} floats, expected {expected} for "
-            f"shape (nz,nx,ny)=({nz},{nx},{ny})"
-        )
-
-    return mm.reshape((nz, nx, ny), order=order), nz, nx, ny
 
 
 def _water_interface_grid(
@@ -271,10 +226,10 @@ def _build_water_subsoil_volumes(
     south_pts,
     north_pts,
     west_pts,
-    lB_S,
-    lB_E,
-    lB_N,
-    lB_W,
+    interface_line_s,
+    interface_line_e,
+    interface_line_n,
+    interface_line_w,
     x_low,
     x_high,
     y_low,
@@ -296,13 +251,13 @@ def _build_water_subsoil_volumes(
         Point tags along the north edge of the interface.
     west_pts : sequence of int
         Point tags along the west edge of the interface.
-    lB_S : int
+    interface_line_s : int
         Oriented south boundary-curve tag.
-    lB_E : int
+    interface_line_e : int
         Oriented east boundary-curve tag.
-    lB_N : int
+    interface_line_n : int
         Oriented north boundary-curve tag.
-    lB_W : int
+    interface_line_w : int
         Oriented west boundary-curve tag.
     x_low : float
         Minimum x coordinate of the interface.
@@ -325,48 +280,48 @@ def _build_water_subsoil_volumes(
     occ = gmsh.model.occ
 
     # Top rectangle and water side walls.
-    pT_SW = occ.addPoint(x_low, y_low, z_top)
-    pT_SE = occ.addPoint(x_high, y_low, z_top)
-    pT_NE = occ.addPoint(x_high, y_high, z_top)
-    pT_NW = occ.addPoint(x_low, y_high, z_top)
+    top_point_sw = occ.addPoint(x_low, y_low, z_top)
+    top_point_se = occ.addPoint(x_high, y_low, z_top)
+    top_point_ne = occ.addPoint(x_high, y_high, z_top)
+    top_point_nw = occ.addPoint(x_low, y_high, z_top)
 
-    lT_S = occ.addLine(pT_SW, pT_SE)
-    lT_E = occ.addLine(pT_SE, pT_NE)
-    lT_N = occ.addLine(pT_NE, pT_NW)
-    lT_W = occ.addLine(pT_NW, pT_SW)
-    s_top = occ.addBSplineFilling(occ.addWire([lT_S, lT_E, lT_N, lT_W]))
+    top_line_s = occ.addLine(top_point_sw, top_point_se)
+    top_line_e = occ.addLine(top_point_se, top_point_ne)
+    top_line_n = occ.addLine(top_point_ne, top_point_nw)
+    top_line_w = occ.addLine(top_point_nw, top_point_sw)
+    s_top = occ.addBSplineFilling(occ.addWire([top_line_s, top_line_e, top_line_n, top_line_w]))
 
-    v_SW = occ.addLine(pT_SW, south_pts[0])
-    v_SE = occ.addLine(pT_SE, south_pts[-1])
-    v_NE = occ.addLine(pT_NE, north_pts[0])
-    v_NW = occ.addLine(pT_NW, west_pts[0])
+    upper_vertical_sw = occ.addLine(top_point_sw, south_pts[0])
+    upper_vertical_se = occ.addLine(top_point_se, south_pts[-1])
+    upper_vertical_ne = occ.addLine(top_point_ne, north_pts[0])
+    upper_vertical_nw = occ.addLine(top_point_nw, west_pts[0])
 
-    s_side_S = occ.addBSplineFilling(occ.addWire([lT_S, v_SE, -lB_S, -v_SW]))
-    s_side_E = occ.addBSplineFilling(occ.addWire([lT_E, v_NE, -lB_E, -v_SE]))
-    s_side_N = occ.addBSplineFilling(occ.addWire([lT_N, v_NW, -lB_N, -v_NE]))
-    s_side_W = occ.addBSplineFilling(occ.addWire([lT_W, v_SW, -lB_W, -v_NW]))
+    water_side_s = occ.addBSplineFilling(occ.addWire([top_line_s, upper_vertical_se, -interface_line_s, -upper_vertical_sw]))
+    water_side_e = occ.addBSplineFilling(occ.addWire([top_line_e, upper_vertical_ne, -interface_line_e, -upper_vertical_se]))
+    water_side_n = occ.addBSplineFilling(occ.addWire([top_line_n, upper_vertical_nw, -interface_line_n, -upper_vertical_ne]))
+    water_side_w = occ.addBSplineFilling(occ.addWire([top_line_w, upper_vertical_sw, -interface_line_w, -upper_vertical_nw]))
 
     # Flat domain bottom and lower side walls.
-    pB_SW = occ.addPoint(x_low, y_low, z_min)
-    pB_SE = occ.addPoint(x_high, y_low, z_min)
-    pB_NE = occ.addPoint(x_high, y_high, z_min)
-    pB_NW = occ.addPoint(x_low, y_high, z_min)
+    bottom_point_sw = occ.addPoint(x_low, y_low, z_min)
+    bottom_point_se = occ.addPoint(x_high, y_low, z_min)
+    bottom_point_ne = occ.addPoint(x_high, y_high, z_min)
+    bottom_point_nw = occ.addPoint(x_low, y_high, z_min)
 
-    lBot_S = occ.addLine(pB_SW, pB_SE)
-    lBot_E = occ.addLine(pB_SE, pB_NE)
-    lBot_N = occ.addLine(pB_NE, pB_NW)
-    lBot_W = occ.addLine(pB_NW, pB_SW)
-    s_bot_flat = occ.addBSplineFilling(occ.addWire([lBot_S, lBot_E, lBot_N, lBot_W]))
+    bottom_line_s = occ.addLine(bottom_point_sw, bottom_point_se)
+    bottom_line_e = occ.addLine(bottom_point_se, bottom_point_ne)
+    bottom_line_n = occ.addLine(bottom_point_ne, bottom_point_nw)
+    bottom_line_w = occ.addLine(bottom_point_nw, bottom_point_sw)
+    s_bot_flat = occ.addBSplineFilling(occ.addWire([bottom_line_s, bottom_line_e, bottom_line_n, bottom_line_w]))
 
-    v_SW2 = occ.addLine(south_pts[0], pB_SW)
-    v_SE2 = occ.addLine(south_pts[-1], pB_SE)
-    v_NE2 = occ.addLine(north_pts[0], pB_NE)
-    v_NW2 = occ.addLine(west_pts[0], pB_NW)
+    lower_vertical_sw = occ.addLine(south_pts[0], bottom_point_sw)
+    lower_vertical_se = occ.addLine(south_pts[-1], bottom_point_se)
+    lower_vertical_ne = occ.addLine(north_pts[0], bottom_point_ne)
+    lower_vertical_nw = occ.addLine(west_pts[0], bottom_point_nw)
 
-    s_side_S2 = occ.addBSplineFilling(occ.addWire([lB_S, v_SE2, -lBot_S, -v_SW2]))
-    s_side_E2 = occ.addBSplineFilling(occ.addWire([lB_E, v_NE2, -lBot_E, -v_SE2]))
-    s_side_N2 = occ.addBSplineFilling(occ.addWire([lB_N, v_NW2, -lBot_N, -v_NE2]))
-    s_side_W2 = occ.addBSplineFilling(occ.addWire([lB_W, v_SW2, -lBot_W, -v_NW2]))
+    subsoil_side_s = occ.addBSplineFilling(occ.addWire([interface_line_s, lower_vertical_se, -bottom_line_s, -lower_vertical_sw]))
+    subsoil_side_e = occ.addBSplineFilling(occ.addWire([interface_line_e, lower_vertical_ne, -bottom_line_e, -lower_vertical_se]))
+    subsoil_side_n = occ.addBSplineFilling(occ.addWire([interface_line_n, lower_vertical_nw, -bottom_line_n, -lower_vertical_ne]))
+    subsoil_side_w = occ.addBSplineFilling(occ.addWire([interface_line_w, lower_vertical_sw, -bottom_line_w, -lower_vertical_nw]))
 
     occ.removeAllDuplicates()
     occ.synchronize()
@@ -374,14 +329,14 @@ def _build_water_subsoil_volumes(
     vol_subsoil = occ.addVolume(
         [
             occ.addSurfaceLoop(
-                [s_bottom, s_bot_flat, s_side_S2, s_side_E2, s_side_N2, s_side_W2]
+                [s_bottom, s_bot_flat, subsoil_side_s, subsoil_side_e, subsoil_side_n, subsoil_side_w]
             )
         ]
     )
     vol_water = occ.addVolume(
         [
             occ.addSurfaceLoop(
-                [s_top, s_bottom, s_side_S, s_side_E, s_side_N, s_side_W], sewing=True
+                [s_top, s_bottom, water_side_s, water_side_e, water_side_n, water_side_w], sewing=True
             )
         ]
     )
@@ -469,8 +424,16 @@ def generate_water_interface_volumes(
         "Generating geometrically delimited water and subsurface volumes..."
     )
 
-    dtype_string = np.dtype(dtype).newbyteorder(">" if byte_order == "big" else "<").str
-    cube, nz, nx, ny = _read_velocity_cube(fname, nz, nx, ny, dtype_string, order)
+    nz, nx, ny = int(nz), int(nx), int(ny)
+    cube = read_velocity_binary3d(
+        fname,
+        nz,
+        nx,
+        ny,
+        byte_order=byte_order,
+        axes_order_sort=order,
+        dtype=dtype,
+    )
 
     xs, ys, z_bottom, z_top = _water_interface_grid(
         cube,
@@ -501,7 +464,7 @@ def generate_water_interface_volumes(
 
     x_low, x_high = float(xs[0]), float(xs[-1])
     y_low, y_high = float(ys[0]), float(ys[-1])
-    lB_S, lB_E, lB_N, lB_W = _oriented_interface_curves(
+    interface_line_s, interface_line_e, interface_line_n, interface_line_w = _oriented_interface_curves(
         gmsh, s_bottom, x_low, x_high, y_low, y_high
     )
 
@@ -511,10 +474,10 @@ def generate_water_interface_volumes(
         south_pts,
         north_pts,
         west_pts,
-        lB_S,
-        lB_E,
-        lB_N,
-        lB_W,
+        interface_line_s,
+        interface_line_e,
+        interface_line_n,
+        interface_line_w,
         x_low,
         x_high,
         y_low,

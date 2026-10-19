@@ -11,6 +11,7 @@ import firedrake as fire
 import gmsh
 import numpy as np
 
+from spyro.abc.hyp_lay import HyperLayer
 from spyro.meshing.meshing_functions import AutomaticMesh
 from spyro.meshing.meshing_parameters import MeshingParameters
 
@@ -354,13 +355,13 @@ def hyperellipse_area(
     float
         Area of the part of the hyperellipse with ``z <= 0``.
     """
-    z_centre = -length_z / 2.0
-    a = length_z / 2.0 + padding_z
-    b = length_x / 2.0 + padding_x
-    x = np.linspace(-b, b, 200_001)
-    half_height = a * np.clip(1.0 - np.abs(x / b) ** n, 0.0, None) ** (1.0 / n)
-    height = np.minimum(0.0, z_centre + half_height) - (z_centre - half_height)
-    return float(np.trapezoid(height, x))
+    semi_z = length_z / 2.0 + padding_z
+    semi_x = length_x / 2.0 + padding_x
+    # Lower half plus the slab between the centre and the cut at z = 0.
+    return float(
+        HyperLayer.half_hyp_area(semi_x, semi_z, n)
+        + HyperLayer.trunc_half_hyp_area(semi_x, semi_z, n, length_z / 2.0)
+    )
 
 
 def hyperellipsoid_volume(
@@ -396,16 +397,13 @@ def hyperellipsoid_volume(
     float
         Volume of the part of the hyperellipsoid with ``z <= 0``.
     """
-    z_centre = -length_z / 2.0
-    a = length_x / 2.0 + padding_x
-    b = length_y / 2.0 + padding_y
-    c = length_z / 2.0 + padding_z
-    x = np.linspace(-a, a, 1201)
-    y = np.linspace(-b, b, 1201)
-    X, Y = np.meshgrid(x, y, indexing="ij")
-    remainder = np.clip(1.0 - np.abs(X / a) ** n - np.abs(Y / b) ** n, 0.0, None)
-    half_height = c * remainder ** (1.0 / n)
-    height = np.clip(
-        np.minimum(0.0, z_centre + half_height) - (z_centre - half_height), 0.0, None
+    semi_x = length_x / 2.0 + padding_x
+    semi_y = length_y / 2.0 + padding_y
+    semi_z = length_z / 2.0 + padding_z
+    # Lower half plus the slab between the centre and the cut at z = 0.
+    return float(
+        HyperLayer.half_hyp_volume(semi_x, semi_y, semi_z, n)
+        + HyperLayer.trunc_half_hyp_volume(
+            semi_x, semi_z, semi_y, n, length_z / 2.0
+        )
     )
-    return float(np.trapezoid(np.trapezoid(height, y, axis=1), x))

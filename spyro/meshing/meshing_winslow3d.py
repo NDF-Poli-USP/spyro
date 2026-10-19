@@ -27,9 +27,9 @@ def run_selected_winslow(
     points,
     hexes,
     move_all,
-    move_X_only,
-    move_Y_only,
-    move_Z_only,
+    move_x_only,
+    move_y_only,
+    move_z_only,
     ef_segy,
     length_x,
     length_y,
@@ -48,11 +48,11 @@ def run_selected_winslow(
         Eight-node hexahedral connectivity using zero-based node indices.
     move_all : set of int
         Nodes allowed to move in x, y, and z.
-    move_X_only : set of int
+    move_x_only : set of int
         Nodes whose x coordinate may move.
-    move_Y_only : set of int
+    move_y_only : set of int
         Nodes whose y coordinate may move.
-    move_Z_only : set of int
+    move_z_only : set of int
         Nodes whose z coordinate may move.
     ef_segy : callable
         Mesh-sizing function evaluated in ``(z, x, y)`` coordinates.
@@ -75,7 +75,7 @@ def run_selected_winslow(
         Smoothed node coordinates.
     """
     movable_nodes = (
-        set(move_all) | set(move_X_only) | set(move_Y_only) | set(move_Z_only)
+        set(move_all) | set(move_x_only) | set(move_y_only) | set(move_z_only)
     )
 
     if not movable_nodes:
@@ -110,8 +110,8 @@ def run_selected_winslow(
     )
     SpyroEnsemble.print(
         "Winslow movable-node counts | "
-        f"all={len(move_all)}, X={len(move_X_only)}, "
-        f"Y={len(move_Y_only)}, Z={len(move_Z_only)}, "
+        f"all={len(move_all)}, X={len(move_x_only)}, "
+        f"Y={len(move_y_only)}, Z={len(move_z_only)}, "
         f"union={len(movable_nodes)}"
     )
 
@@ -120,8 +120,7 @@ def run_selected_winslow(
         SpyroEnsemble.print(
             "WARNING: the sizing field is effectively constant on the "
             "movable nodes. A uniform structured mesh will remain "
-            "unchanged. Reduce hmin_segy; the supplied reference uses "
-            "a 250 m initial mesh and no 500 m sizing floor."
+            "unchanged. Consider reducing hmin_segy."
         )
 
     if selected_winslow != "numba":
@@ -138,13 +137,13 @@ def run_selected_winslow(
         SpyroEnsemble.print(
             "Using Winslow implementation without Numba.",
         )
-    smoothed = winslow_smooth_3d55(
+    smoothed = winslow_smooth_3d(
         points=points,
         hexes=hexes,
         move_all=move_all,
-        move_X_only=move_X_only,
-        move_Y_only=move_Y_only,
-        move_Z_only=move_Z_only,
+        move_x_only=move_x_only,
+        move_y_only=move_y_only,
+        move_z_only=move_z_only,
         iterations=winslow_iterations,
         omega=winslow_omega,
         ef_segy=ef_segy,
@@ -172,11 +171,106 @@ def run_selected_winslow(
 
     if moved_count == 0:
         SpyroEnsemble.print(
-            "WARNING: winslow_smooth_3d55 completed but no movable node "
+            "WARNING: winslow_smooth_3d completed but no movable node "
             "changed position. Inspect the sizing statistics above."
         )
 
     return smoothed
+
+
+@njit(cache=True, inline="always")
+def _cardinal_coordinate(
+    coordinates: np.ndarray, center: float, neighbor: int, opposite: int
+) -> float:
+    """Return a cardinal-neighbor coordinate, reflecting it when missing.
+
+    Parameters
+    ----------
+    coordinates : numpy.ndarray
+        Coordinate values for one spatial direction at all mesh nodes.
+    center : float
+        Coordinate of the current stencil-center node.
+    neighbor : int
+        Node index of the cardinal neighbor, or -1 when it is missing.
+    opposite : int
+        Node index of the opposite cardinal neighbor, or -1 when it is missing.
+
+    Returns
+    -------
+    float
+        The neighbor coordinate; if missing, the opposite neighbor reflected
+        through the center; if both are missing, the center.
+    """
+    if neighbor != -1:
+        return coordinates[neighbor]
+    if opposite != -1:
+        return 2.0 * center - coordinates[opposite]
+    return center
+
+
+@njit(cache=True, inline="always")
+def _mixed_coordinate(
+    coordinates: np.ndarray,
+    center: float,
+    neighbor: int,
+    first_value: float,
+    second_value: float,
+) -> float:
+    """Return a mixed (diagonal) neighbor coordinate, rebuilding it when missing.
+
+    Parameters
+    ----------
+    coordinates : numpy.ndarray
+        Coordinate values for one spatial direction at all mesh nodes.
+    center : float
+        Coordinate of the current stencil-center node.
+    neighbor : int
+        Node index of the mixed neighbor, or -1 when it is missing.
+    first_value : float
+        Resolved coordinate of the first cardinal direction (e.g. N for NE).
+    second_value : float
+        Resolved coordinate of the second cardinal direction (e.g. E for NE).
+
+    Returns
+    -------
+    float
+        The neighbor coordinate, or `first_value + second_value - center`
+        when it is missing.
+    """
+    if neighbor != -1:
+        return coordinates[neighbor]
+    return first_value + second_value - center
+
+
+@njit(cache=True, inline="always")
+def _neighbor_size(
+    sizing_values: np.ndarray,
+    is_movable: np.ndarray,
+    neighbor: int,
+    size_center: float,
+) -> float:
+    """Return a neighbor's sizing value, or the center value if not usable.
+
+    Parameters
+    ----------
+    sizing_values : numpy.ndarray
+        Sizing-field value associated with each mesh node.
+    is_movable : numpy.ndarray
+        Boolean mask identifying nodes involved in smoothing.
+    neighbor : int
+        Node index of the neighbor, or -1 when it is missing.
+    size_center : float
+        Sizing value at the current stencil-center node.
+
+    Returns
+    -------
+    float
+        `sizing_values[neighbor]` for an existing movable neighbor,
+        otherwise `size_center`.
+    """
+    if neighbor != -1 and is_movable[neighbor]:
+        return sizing_values[neighbor]
+    return size_center
 
 
 @njit(cache=True, inline="always")
@@ -206,53 +300,17 @@ def _resolve_stencil_coordinates(coordinates, center, stencil):
     from their two resolved cardinal coordinates.
     """
     east, west, north, south, top, bottom = stencil[:6]
-
-    east_value = (
-        coordinates[east]
-        if east != -1
-        else 2.0 * center - coordinates[west] if west != -1 else center
-    )
-    west_value = (
-        coordinates[west]
-        if west != -1
-        else 2.0 * center - coordinates[east] if east != -1 else center
-    )
-    north_value = (
-        coordinates[north]
-        if north != -1
-        else 2.0 * center - coordinates[south] if south != -1 else center
-    )
-    south_value = (
-        coordinates[south]
-        if south != -1
-        else 2.0 * center - coordinates[north] if north != -1 else center
-    )
-    top_value = (
-        coordinates[top]
-        if top != -1
-        else 2.0 * center - coordinates[bottom] if bottom != -1 else center
-    )
-    bottom_value = (
-        coordinates[bottom]
-        if bottom != -1
-        else 2.0 * center - coordinates[top] if top != -1 else center
-    )
-
     ne, nw, se, sw, nt, nb, st, sb, et, eb, wt, wb = stencil[6:]
 
-    ne_value = coordinates[ne] if ne != -1 else north_value + east_value - center
-    nw_value = coordinates[nw] if nw != -1 else north_value + west_value - center
-    se_value = coordinates[se] if se != -1 else south_value + east_value - center
-    sw_value = coordinates[sw] if sw != -1 else south_value + west_value - center
-    nt_value = coordinates[nt] if nt != -1 else north_value + top_value - center
-    nb_value = coordinates[nb] if nb != -1 else north_value + bottom_value - center
-    st_value = coordinates[st] if st != -1 else south_value + top_value - center
-    sb_value = coordinates[sb] if sb != -1 else south_value + bottom_value - center
-    et_value = coordinates[et] if et != -1 else east_value + top_value - center
-    eb_value = coordinates[eb] if eb != -1 else east_value + bottom_value - center
-    wt_value = coordinates[wt] if wt != -1 else west_value + top_value - center
-    wb_value = coordinates[wb] if wb != -1 else west_value + bottom_value - center
+    east_value = _cardinal_coordinate(coordinates, center, east, west)
+    west_value = _cardinal_coordinate(coordinates, center, west, east)
+    north_value = _cardinal_coordinate(coordinates, center, north, south)
+    south_value = _cardinal_coordinate(coordinates, center, south, north)
+    top_value = _cardinal_coordinate(coordinates, center, top, bottom)
+    bottom_value = _cardinal_coordinate(coordinates, center, bottom, top)
 
+    # Explicit calls rather than a lookup table: this runs per node inside
+    # the Numba hot loop, and a table would need an array allocation.
     return (
         east_value,
         west_value,
@@ -260,18 +318,18 @@ def _resolve_stencil_coordinates(coordinates, center, stencil):
         south_value,
         top_value,
         bottom_value,
-        ne_value,
-        nw_value,
-        se_value,
-        sw_value,
-        nt_value,
-        nb_value,
-        st_value,
-        sb_value,
-        et_value,
-        eb_value,
-        wt_value,
-        wb_value,
+        _mixed_coordinate(coordinates, center, ne, north_value, east_value),
+        _mixed_coordinate(coordinates, center, nw, north_value, west_value),
+        _mixed_coordinate(coordinates, center, se, south_value, east_value),
+        _mixed_coordinate(coordinates, center, sw, south_value, west_value),
+        _mixed_coordinate(coordinates, center, nt, north_value, top_value),
+        _mixed_coordinate(coordinates, center, nb, north_value, bottom_value),
+        _mixed_coordinate(coordinates, center, st, south_value, top_value),
+        _mixed_coordinate(coordinates, center, sb, south_value, bottom_value),
+        _mixed_coordinate(coordinates, center, et, east_value, top_value),
+        _mixed_coordinate(coordinates, center, eb, east_value, bottom_value),
+        _mixed_coordinate(coordinates, center, wt, west_value, top_value),
+        _mixed_coordinate(coordinates, center, wb, west_value, bottom_value),
     )
 
 
@@ -441,24 +499,12 @@ def _numba_winslow_3d_step(
         z_xi_zeta = 0.25 * (z_et - z_eb - z_wt + z_wb)
 
         size_center = sizing_values[node]
-        size_east = (
-            sizing_values[east] if east != -1 and is_movable[east] else size_center
-        )
-        size_west = (
-            sizing_values[west] if west != -1 and is_movable[west] else size_center
-        )
-        size_north = (
-            sizing_values[north] if north != -1 and is_movable[north] else size_center
-        )
-        size_south = (
-            sizing_values[south] if south != -1 and is_movable[south] else size_center
-        )
-        size_top = sizing_values[top] if top != -1 and is_movable[top] else size_center
-        size_bottom = (
-            sizing_values[bottom]
-            if bottom != -1 and is_movable[bottom]
-            else size_center
-        )
+        size_east = _neighbor_size(sizing_values, is_movable, east, size_center)
+        size_west = _neighbor_size(sizing_values, is_movable, west, size_center)
+        size_north = _neighbor_size(sizing_values, is_movable, north, size_center)
+        size_south = _neighbor_size(sizing_values, is_movable, south, size_center)
+        size_top = _neighbor_size(sizing_values, is_movable, top, size_center)
+        size_bottom = _neighbor_size(sizing_values, is_movable, bottom, size_center)
 
         size_xi = 0.5 * (size_east - size_west)
         size_eta = 0.5 * (size_north - size_south)
@@ -543,13 +589,51 @@ def _numba_winslow_3d_step(
     return x_new, y_new, z_new
 
 
-def winslow_smooth_3d55(
+def _shared_neighbor(
+    node_to_neighbors: dict[int, set[int]],
+    node: int,
+    first_neighbor: int | None,
+    second_neighbor: int | None,
+) -> int | None:
+    """Return the diagonal stencil node shared by two cardinal neighbors.
+
+    Parameters
+    ----------
+    node_to_neighbors : dict of int to set of int
+        Edge-connected neighbors of every mesh node.
+    node : int
+        Index of the stencil centre, excluded from the result.
+    first_neighbor : int or None
+        First cardinal-neighbor node index.
+    second_neighbor : int or None
+        Second cardinal-neighbor node index.
+
+    Returns
+    -------
+    int or None
+        Smallest shared neighbor index, or ``None`` when no shared neighbor exists.
+    """
+    if first_neighbor is None or second_neighbor is None:
+        return None
+
+    shared = node_to_neighbors[first_neighbor].intersection(
+        node_to_neighbors[second_neighbor]
+    )
+    shared.discard(node)
+
+    if not shared:
+        return None
+
+    return min(shared)
+
+
+def winslow_smooth_3d(
     points: np.ndarray,
     hexes: np.ndarray,
     move_all: set[int],
-    move_X_only: set[int],
-    move_Y_only: set[int],
-    move_Z_only: set[int],
+    move_x_only: set[int],
+    move_y_only: set[int],
+    move_z_only: set[int],
     ef_segy,
     length_x,
     length_y,
@@ -567,11 +651,11 @@ def winslow_smooth_3d55(
         Eight-node hexahedral connectivity using zero-based node indices.
     move_all : set of int
         Nodes allowed to move in x, y, and z.
-    move_X_only : set of int
+    move_x_only : set of int
         Nodes whose x coordinate may move.
-    move_Y_only : set of int
+    move_y_only : set of int
         Nodes whose y coordinate may move.
-    move_Z_only : set of int
+    move_z_only : set of int
         Nodes whose z coordinate may move.
     ef_segy : callable
         Mesh-sizing function evaluated in ``(z, x, y)`` coordinates.
@@ -635,7 +719,7 @@ def winslow_smooth_3d55(
             node_to_neighbors[second_node].add(first_node)
 
     movable_nodes = (
-        set(move_all) | set(move_X_only) | set(move_Y_only) | set(move_Z_only)
+        set(move_all) | set(move_x_only) | set(move_y_only) | set(move_z_only)
     )
 
     invalid_nodes = {node for node in movable_nodes if node < 0 or node >= num_nodes}
@@ -674,50 +758,43 @@ def winslow_smooth_3d55(
 
             cardinals[direction] = neighbor
 
-        def get_shared_neighbor(
-            first_neighbor,
-            second_neighbor,
-        ):
-            """Return the common neighbor associated with stencil entry.
-
-            Parameters
-            ----------
-            first_neighbor : int or None
-                First cardinal-neighbor node index.
-            second_neighbor : int or None
-                Second cardinal-neighbor node index.
-
-            Returns
-            -------
-            int or None
-                Shared neighbor index, or ``None`` when no shared neighbor exists.
-            """
-            if first_neighbor is None or second_neighbor is None:
-                return None
-
-            shared = node_to_neighbors[first_neighbor].intersection(
-                node_to_neighbors[second_neighbor]
-            )
-            shared.discard(node)  # noqa: B023
-
-            if not shared:
-                return None
-
-            return min(shared)
-
         corners = {
-            "NE": get_shared_neighbor(cardinals["N"], cardinals["E"]),
-            "NW": get_shared_neighbor(cardinals["N"], cardinals["W"]),
-            "SE": get_shared_neighbor(cardinals["S"], cardinals["E"]),
-            "SW": get_shared_neighbor(cardinals["S"], cardinals["W"]),
-            "NT": get_shared_neighbor(cardinals["N"], cardinals["T"]),
-            "NB": get_shared_neighbor(cardinals["N"], cardinals["B"]),
-            "ST": get_shared_neighbor(cardinals["S"], cardinals["T"]),
-            "SB": get_shared_neighbor(cardinals["S"], cardinals["B"]),
-            "ET": get_shared_neighbor(cardinals["E"], cardinals["T"]),
-            "EB": get_shared_neighbor(cardinals["E"], cardinals["B"]),
-            "WT": get_shared_neighbor(cardinals["W"], cardinals["T"]),
-            "WB": get_shared_neighbor(cardinals["W"], cardinals["B"]),
+            "NE": _shared_neighbor(
+                node_to_neighbors, node, cardinals["N"], cardinals["E"]
+            ),
+            "NW": _shared_neighbor(
+                node_to_neighbors, node, cardinals["N"], cardinals["W"]
+            ),
+            "SE": _shared_neighbor(
+                node_to_neighbors, node, cardinals["S"], cardinals["E"]
+            ),
+            "SW": _shared_neighbor(
+                node_to_neighbors, node, cardinals["S"], cardinals["W"]
+            ),
+            "NT": _shared_neighbor(
+                node_to_neighbors, node, cardinals["N"], cardinals["T"]
+            ),
+            "NB": _shared_neighbor(
+                node_to_neighbors, node, cardinals["N"], cardinals["B"]
+            ),
+            "ST": _shared_neighbor(
+                node_to_neighbors, node, cardinals["S"], cardinals["T"]
+            ),
+            "SB": _shared_neighbor(
+                node_to_neighbors, node, cardinals["S"], cardinals["B"]
+            ),
+            "ET": _shared_neighbor(
+                node_to_neighbors, node, cardinals["E"], cardinals["T"]
+            ),
+            "EB": _shared_neighbor(
+                node_to_neighbors, node, cardinals["E"], cardinals["B"]
+            ),
+            "WT": _shared_neighbor(
+                node_to_neighbors, node, cardinals["W"], cardinals["T"]
+            ),
+            "WB": _shared_neighbor(
+                node_to_neighbors, node, cardinals["W"], cardinals["B"]
+            ),
         }
         stencils[node] = {
             **cardinals,
@@ -764,9 +841,9 @@ def winslow_smooth_3d55(
     move_y_mask = np.zeros(num_nodes, dtype=np.bool_)
     move_z_mask = np.zeros(num_nodes, dtype=np.bool_)
 
-    move_x_mask[list(set(move_all) | set(move_X_only))] = True
-    move_y_mask[list(set(move_all) | set(move_Y_only))] = True
-    move_z_mask[list(set(move_all) | set(move_Z_only))] = True
+    move_x_mask[list(set(move_all) | set(move_x_only))] = True
+    move_y_mask[list(set(move_all) | set(move_y_only))] = True
+    move_z_mask[list(set(move_all) | set(move_z_only))] = True
 
     x_coordinates = np.ascontiguousarray(points[:, 0])
     y_coordinates = np.ascontiguousarray(points[:, 1])

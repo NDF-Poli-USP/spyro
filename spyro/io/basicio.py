@@ -283,7 +283,7 @@ def saving_source_and_receiver_location_in_csv(model, folder_name=None):
     return None
 
 
-def _read_velocity_binary3D(
+def read_velocity_binary3d(
     fname,
     nz,
     nx,
@@ -318,28 +318,41 @@ def _read_velocity_binary3D(
     -------
     numpy.ndarray
         Velocity array in canonical ``(z, x, y)`` ordering.
+
+    Raises
+    ------
+    FileNotFoundError
+        If `fname` does not exist.
+    ValueError
+        If a grid size is not positive, an option is invalid, or the file
+        size does not match `nz * nx * ny` values.
     """
+    # Imported here because spyro.utils imports this module.
+    from ..utils.error_management import validate_numeric, validate_parameter
+
     path = Path(fname)
     if not path.exists():
         raise FileNotFoundError(f"Velocity model not found: {path}")
 
-    if byte_order not in ("big", "little"):
-        raise ValueError("byte_order must be 'big' or 'little'.")
-    if axes_order_sort not in ("C", "F"):
-        raise ValueError("axes_order_sort must be 'C' or 'F'.")
+    nz, nx, ny = (
+        validate_numeric(name, int(value), float_num=False, lower_bound=0)
+        for name, value in (("nz", nz), ("nx", nx), ("ny", ny))
+    )
+    validate_parameter("byte_order", byte_order, ("big", "little"))
+    validate_parameter("axes_order_sort", axes_order_sort, ("C", "F"))
     if sorted(axes_order) != [0, 1, 2]:
         raise ValueError("axes_order must be a permutation of (0, 1, 2).")
 
     dt = np.dtype(dtype).newbyteorder(">" if byte_order == "big" else "<")
     raw = np.fromfile(path, dtype=dt)
-    expected = int(nz) * int(nx) * int(ny)
+    expected = nz * nx * ny
     if raw.size != expected:
         raise ValueError(
             f"Velocity file contains {raw.size} values; expected {expected} "
             f"for shape ({nz}, {nx}, {ny})."
         )
 
-    canonical_shape = (int(nz), int(nx), int(ny))
+    canonical_shape = (nz, nx, ny)
     inverse = np.argsort(np.asarray(axes_order, dtype=int))
     raw_shape = tuple(canonical_shape[i] for i in inverse)
     values = raw.reshape(raw_shape, order=axes_order_sort)

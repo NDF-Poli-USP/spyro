@@ -195,10 +195,10 @@ def create_sizing_function(
 
         dz = (bbox[1] - bbox[0]) / (n_samples - 1)
         dx = (bbox[3] - bbox[2]) / (n_traces - 1)
-        nnz = int(pad_size_z / dz)
-        nnx = int(pad_size_x / dx)
+        pad_cells_z = int(pad_size_z / dz)
+        pad_cells_x = int(pad_size_x / dx)
 
-        padding = ((0, nnz), (nnx, nnx))
+        padding = ((0, pad_cells_z), (pad_cells_x, pad_cells_x))
         cell_size = np.pad(cell_size, padding, "edge")
         bbox = (
             bbox[0] - pad_size_z,
@@ -555,8 +555,8 @@ def generate_water_profile_from_segy(
     -------
     tuple
         A tuple containing:
-        - Xs (ndarray): 1D array of physical X coordinates.
-        - Z_bottom (ndarray): 1D array of the corresponding Z coordinates
+        - x_coords (ndarray): 1D array of physical X coordinates.
+        - z_bottom (ndarray): 1D array of the corresponding Z coordinates
           representing the water interface depth.
 
     Raises
@@ -591,13 +591,13 @@ def generate_water_profile_from_segy(
     z_bot = float(min(z_min, z_max))
     x_low, x_high = sorted([float(x_min), float(x_max)])
 
-    Lx = (nx_tot - 1) * _dx
-    Lz = (nz_tot - 1) * _dz
+    lx = (nx_tot - 1) * _dx
+    lz = (nz_tot - 1) * _dz
 
-    x_low = np.clip(x_low, 0.0, Lx)
-    x_high = np.clip(x_high, 0.0, Lx)
-    z_top = np.clip(z_top, -Lz, 0.0)
-    z_bot = np.clip(z_bot, -Lz, 0.0)
+    x_low = np.clip(x_low, 0.0, lx)
+    x_high = np.clip(x_high, 0.0, lx)
+    z_top = np.clip(z_top, -lz, 0.0)
+    z_bot = np.clip(z_bot, -lz, 0.0)
 
     # Map meters → nearest indices
     ix_min = int(np.rint(x_low / _dx))
@@ -614,18 +614,18 @@ def generate_water_profile_from_segy(
         iz_top, iz_bot = iz_bot, iz_top
 
     # Physical X coordinates for the points
-    Xs = _dx * np.arange(ix_min, ix_max + 1, dtype=np.float64)
-    Nx = ix_max - ix_min
+    x_coords = _dx * np.arange(ix_min, ix_max + 1, dtype=np.float64)
+    nx = ix_max - ix_min
     x_chunk = int(max(1, x_chunk))
 
-    Z_bottom = np.empty(Nx + 1, dtype=np.float64)
+    z_bottom = np.empty(nx + 1, dtype=np.float64)
     target = float(value)
     tol = float(tolerance)
 
     # Water Interface Search
-    for xs in range(0, Nx + 1, x_chunk):
-        xe = min(xs + x_chunk, Nx + 1)
-        ix_tile = ix_min + np.arange(xs, xe, dtype=int)
+    for chunk_start in range(0, nx + 1, x_chunk):
+        chunk_end = min(chunk_start + x_chunk, nx + 1)
+        ix_tile = ix_min + np.arange(chunk_start, chunk_end, dtype=int)
 
         block = plane_zx[iz_top: iz_bot + 1, ix_tile]
         block = np.asarray(block, dtype=np.float32)
@@ -642,13 +642,13 @@ def generate_water_profile_from_segy(
 
         k_global = iz_top + first_non_idx
         z_phys = -k_global.astype(np.float64) * _dz
-        Z_bottom[xs:xe] = z_phys
+        z_bottom[chunk_start:chunk_end] = z_phys
 
     # Calculate Final Shifted Coordinates
     x_shift = float(min(x_min, x_max))
-    Xs = Xs + x_shift
+    x_coords = x_coords + x_shift
 
-    return Xs, Z_bottom
+    return x_coords, z_bottom
 
 
 # Functions for water block alignment
@@ -782,10 +782,10 @@ def align_water_columns_to_interface_x(
     for q in quads:
         if not all(n in water_surface_nodes for n in q):
             continue
-        pair_A = [frozenset((q[0], q[1])), frozenset((q[2], q[3]))]
-        pair_B = [frozenset((q[1], q[2])), frozenset((q[3], q[0]))]
+        pair_a = [frozenset((q[0], q[1])), frozenset((q[2], q[3]))]
+        pair_b = [frozenset((q[1], q[2])), frozenset((q[3], q[0]))]
         q_tuple = tuple(q)
-        for edge in pair_A + pair_B:
+        for edge in pair_a + pair_b:
             if edge not in edge_to_quads:
                 edge_to_quads[edge] = []
             edge_to_quads[edge].append(q_tuple)
@@ -808,14 +808,14 @@ def align_water_columns_to_interface_x(
             if q in visited_quads:
                 continue
             visited_quads.add(q)
-            pair_A = [frozenset((q[0], q[1])), frozenset((q[2], q[3]))]
-            pair_B = [frozenset((q[1], q[2])), frozenset((q[3], q[0]))]
-            if curr_e in pair_A:
-                opp = pair_A[1] if curr_e == pair_A[0] else pair_A[0]
-                vert1, vert2 = pair_B[0], pair_B[1]
-            elif curr_e in pair_B:
-                opp = pair_B[1] if curr_e == pair_B[0] else pair_B[0]
-                vert1, vert2 = pair_A[0], pair_A[1]
+            pair_a = [frozenset((q[0], q[1])), frozenset((q[2], q[3]))]
+            pair_b = [frozenset((q[1], q[2])), frozenset((q[3], q[0]))]
+            if curr_e in pair_a:
+                opp = pair_a[1] if curr_e == pair_a[0] else pair_a[0]
+                vert1, vert2 = pair_b[0], pair_b[1]
+            elif curr_e in pair_b:
+                opp = pair_b[1] if curr_e == pair_b[0] else pair_b[0]
+                vert1, vert2 = pair_a[0], pair_a[1]
             else:
                 continue
 
@@ -864,7 +864,48 @@ def align_water_columns_to_interface_x(
     return points_2d, snapped, n_cols
 
 
-def intersect(x0, z0, dx, dz, xc, zc, a_val, b_val, hyper_n):
+def intersect(
+    x0: float,
+    z0: float,
+    dx: float,
+    dz: float,
+    xc: float,
+    zc: float,
+    a_val: float,
+    b_val: float,
+    hyper_n: float,
+) -> tuple[float, float]:
+    """Intersect a ray with a hyperellipse using bisection.
+
+    The ray is `(x0, z0) + s * (dx, dz)` with `s >= 0` and the
+    hyperellipse is `|x - xc|^n / a^n + |z - zc|^n / b^n = 1`.
+
+    Parameters
+    ----------
+    x0 : float
+        x coordinate of the ray origin, assumed inside the hyperellipse.
+    z0 : float
+        z coordinate of the ray origin, assumed inside the hyperellipse.
+    dx : float
+        x component of the ray direction.
+    dz : float
+        z component of the ray direction.
+    xc : float
+        x coordinate of the hyperellipse centre.
+    zc : float
+        z coordinate of the hyperellipse centre.
+    a_val : float
+        Hyperellipse semi-axis in x.
+    b_val : float
+        Hyperellipse semi-axis in z.
+    hyper_n : float
+        Hyperellipse exponent.
+
+    Returns
+    -------
+    tuple of float
+        `(x, z)` coordinates of the intersection point.
+    """
     def f(s):
         x, z = x0 + s * dx, z0 + s * dz
         return (abs(x - xc) / a_val) ** hyper_n + (abs(z - zc) / b_val) ** hyper_n - 1.0
@@ -881,7 +922,43 @@ def intersect(x0, z0, dx, dz, xc, zc, a_val, b_val, hyper_n):
     return x0 + s_mid * dx, z0 + s_mid * dz
 
 
-def get_theta(x, z, xc, zc, a_val, b_val, hyper_n):
+def get_theta(
+    x: float,
+    z: float,
+    xc: float,
+    zc: float,
+    a_val: float,
+    b_val: float,
+    hyper_n: float,
+) -> float:
+    """Return the hyperellipse parametric angle of a boundary point.
+
+    This is the inverse of the parametrization
+    `x = xc + a sgn(cos t) |cos t|^(2/n)`,
+    `z = zc + b sgn(sin t) |sin t|^(2/n)` used by :func:`make_arc`.
+
+    Parameters
+    ----------
+    x : float
+        x coordinate of the point.
+    z : float
+        z coordinate of the point.
+    xc : float
+        x coordinate of the hyperellipse centre.
+    zc : float
+        z coordinate of the hyperellipse centre.
+    a_val : float
+        Hyperellipse semi-axis in x.
+    b_val : float
+        Hyperellipse semi-axis in z.
+    hyper_n : float
+        Hyperellipse exponent.
+
+    Returns
+    -------
+    float
+        Parametric angle `t` in `[-pi, pi]`.
+    """
     vx, vz = (x - xc) / a_val, (z - zc) / b_val
     vx = vx if abs(vx) > 1e-12 else 0.0
     vz = vz if abs(vz) > 1e-12 else 0.0
@@ -891,7 +968,58 @@ def get_theta(x, z, xc, zc, a_val, b_val, hyper_n):
     )
 
 
-def make_arc(p1_tag, p2_tag, x1, z1, x2, z2, xc, zc, a_val, b_val, hyper_n, num_pts=25):
+def make_arc(
+    p1_tag: int,
+    p2_tag: int,
+    x1: float,
+    z1: float,
+    x2: float,
+    z2: float,
+    xc: float,
+    zc: float,
+    a_val: float,
+    b_val: float,
+    hyper_n: float,
+    num_pts: int = 25,
+) -> int:
+    """Add a Gmsh spline that follows a hyperellipse between two points.
+
+    The arc goes the short way round (at most `pi` in parametric angle)
+    from `p1_tag` to `p2_tag`. Both end points must already exist in the
+    OCC model and lie on the hyperellipse.
+
+    Parameters
+    ----------
+    p1_tag : int
+        Gmsh OCC tag of the start point.
+    p2_tag : int
+        Gmsh OCC tag of the end point.
+    x1 : float
+        x coordinate of the start point.
+    z1 : float
+        z coordinate of the start point.
+    x2 : float
+        x coordinate of the end point.
+    z2 : float
+        z coordinate of the end point.
+    xc : float
+        x coordinate of the hyperellipse centre.
+    zc : float
+        z coordinate of the hyperellipse centre.
+    a_val : float
+        Hyperellipse semi-axis in x.
+    b_val : float
+        Hyperellipse semi-axis in z.
+    hyper_n : float
+        Hyperellipse exponent.
+    num_pts : int, optional
+        Number of spline points, end points included. Default is 25.
+
+    Returns
+    -------
+    int
+        Gmsh OCC tag of the new spline curve.
+    """
     t1, t2 = get_theta(x1, z1, xc, zc, a_val, b_val, hyper_n), get_theta(
         x2, z2, xc, zc, a_val, b_val, hyper_n
     )
