@@ -6,7 +6,7 @@ import pytest
 from spyro.io.basicio import read_velocity_binary3d
 from spyro.meshing import meshing_utils3d
 from spyro.meshing.meshing_utils3d import (
-    create_sizing_function3D,
+    create_sizing_function3d,
     define_winslow_points_3d,
     sizing_function_xyz,
 )
@@ -380,7 +380,7 @@ def test_read_vs_example_3d_binary():
     ],
 )
 def test_create_sizing_function3d_input_validation(tmp_path, kwargs, error_match):
-    """Check that create_sizing_function3D rejects invalid arguments.
+    """Check that create_sizing_function3d rejects invalid arguments.
 
     Parameters
     ----------
@@ -405,7 +405,7 @@ def test_create_sizing_function3d_input_validation(tmp_path, kwargs, error_match
     base.update(kwargs)
 
     with pytest.raises(ValueError, match=error_match):
-        create_sizing_function3D(**base)
+        create_sizing_function3d(**base)
 
 
 def test_create_sizing_function3d_fallback_interpolator(tmp_path):
@@ -428,7 +428,7 @@ def test_create_sizing_function3d_fallback_interpolator(tmp_path):
         dtype="float64",
     )
 
-    ef, hmin, hmax, nz, nx, ny = create_sizing_function3D(
+    ef, hmin, hmax, nz, nx, ny = create_sizing_function3d(
         fname=filename,
         hmin=250.0,
         bbox=(-2.0, 0.0, 0.0, 3.0, 0.0, 4.0),
@@ -497,7 +497,7 @@ def test_create_sizing_function3d_seismicmesh_path(tmp_path):
     filename = tmp_path / "velocity_float32.bin"
     _write_velocity_binary(filename, velocity)
 
-    ef, *_ = create_sizing_function3D(
+    ef, *_ = create_sizing_function3d(
         fname=filename,
         hmin=0.0,
         bbox=(-400.0, 0.0, 0.0, 500.0, 0.0, 600.0),
@@ -528,7 +528,7 @@ def test_create_sizing_function3d_replaces_zero_velocity_with_water(tmp_path):
 
     _write_velocity_binary(filename, velocity, dtype="float64")
 
-    ef, hmin, hmax, nz, nx, ny = create_sizing_function3D(
+    ef, hmin, hmax, nz, nx, ny = create_sizing_function3d(
         fname=filename,
         hmin=None,
         bbox=(-1.0, 0.0, 0.0, 1.0, 0.0, 1.0),
@@ -554,7 +554,7 @@ def test_create_sizing_function3d_rejects_nonpositive_velocity(
     bad_value,
     error_match,
 ):
-    """Check that create_sizing_function3D rejects non-positive velocities.
+    """Check that create_sizing_function3d rejects non-positive velocities.
 
     Without `vp_water` there is no water replacement, so zero or negative
     velocities must raise.
@@ -574,7 +574,7 @@ def test_create_sizing_function3d_rejects_nonpositive_velocity(
     _write_velocity_binary(filename, velocity, dtype="float64")
 
     with pytest.raises(ValueError, match=error_match):
-        create_sizing_function3D(
+        create_sizing_function3d(
             fname=filename,
             hmin=None,
             bbox=(-1.0, 0.0, 0.0, 1.0, 0.0, 1.0),
@@ -589,7 +589,7 @@ def test_create_sizing_function3d_rejects_nonpositive_velocity(
 
 
 def test_create_sizing_function3d_rejects_nonfinite_velocity(tmp_path):
-    """Check that create_sizing_function3D rejects a model containing NaN.
+    """Check that create_sizing_function3d rejects a model containing NaN.
 
     Parameters
     ----------
@@ -602,7 +602,7 @@ def test_create_sizing_function3d_rejects_nonfinite_velocity(tmp_path):
     _write_velocity_binary(filename, velocity, dtype="float64")
 
     with pytest.raises(ValueError, match="contains NaN or infinity"):
-        create_sizing_function3D(
+        create_sizing_function3d(
             fname=filename,
             hmin=None,
             bbox=(-1.0, 0.0, 0.0, 1.0, 0.0, 1.0),
@@ -626,7 +626,7 @@ def test_create_sizing_function3d_vs_example():
     if not VS_EXAMPLE_3D_BIN.exists():
         pytest.skip(f"Missing {VS_EXAMPLE_3D_BIN}")
 
-    ef, hmin, hmax, nz, nx, ny = create_sizing_function3D(
+    ef, hmin, hmax, nz, nx, ny = create_sizing_function3d(
         fname=VS_EXAMPLE_3D_BIN,
         hmin=150.0,
         bbox=VS_EXAMPLE_3D_BBOX,
@@ -698,9 +698,9 @@ def test_define_winslow_points_3d_classifies_no_water_boundaries():
 
     assert result["locked"] == {0}
     assert result["move_all"] == {7}
-    assert result["move_X_only"] == {3, 5, 6, 8}
-    assert result["move_Y_only"] == {2, 4, 6, 8}
-    assert result["move_Z_only"] == {1, 4, 5}
+    assert result["move_x_only"] == {3, 5, 6, 8}
+    assert result["move_y_only"] == {2, 4, 6, 8}
+    assert result["move_z_only"] == {1, 4, 5}
     assert result["water_nodes"] == set()
     assert result["movable_nodes"] == set(range(1, 9))
 
@@ -737,12 +737,12 @@ def test_define_winslow_points_3d_rectangular_padding_planes():
     )
 
     assert 0 in result["locked"]
-    assert 1 in result["move_Y_only"]
-    assert 1 in result["move_Z_only"]
-    assert 2 in result["move_X_only"]
-    assert 2 in result["move_Z_only"]
-    assert 3 in result["move_X_only"]
-    assert 3 in result["move_Y_only"]
+    assert 1 in result["move_y_only"]
+    assert 1 in result["move_z_only"]
+    assert 2 in result["move_x_only"]
+    assert 2 in result["move_z_only"]
+    assert 3 in result["move_x_only"]
+    assert 3 in result["move_y_only"]
     assert result["move_all"] == {4}
 
 

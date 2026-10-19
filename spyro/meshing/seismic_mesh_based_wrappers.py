@@ -10,7 +10,7 @@ except ImportError:
 
 
 @check_seismicmesh
-def create_seismicmesh_2D_mesh_with_velocity_model(mesh_parameters):
+def create_seismicmesh_2d_mesh_with_velocity_model(mesh_parameters):
     """
     Creates a 2D mesh with velocity-based refinement using SeismicMesh.
 
@@ -31,24 +31,24 @@ def create_seismicmesh_2D_mesh_with_velocity_model(mesh_parameters):
         v_min = mesh_parameters.minimum_velocity
         frequency = mesh_parameters.source_frequency
 
-        C = mesh_parameters.cpw
+        cells_per_wavelength = mesh_parameters.cpw
 
         length_z = mesh_parameters.length_z
         length_x = mesh_parameters.length_x
         domain_pad = mesh_parameters.abc_pad
-        lbda_min = v_min / frequency
+        min_wavelength = v_min / frequency
 
         bbox = (-length_z, 0.0, 0.0, length_x)
         domain = SeismicMesh.Rectangle(bbox)
 
-        hmin = lbda_min / C
+        hmin = min_wavelength / cells_per_wavelength
         mesh_parameters.comm.comm.barrier()
 
         ef = SeismicMesh.get_sizing_function_from_segy(
             mesh_parameters.velocity_model,
             bbox,
             hmin=hmin,
-            wl=C,
+            wl=cells_per_wavelength,
             freq=frequency,
             grade=0.15,
             domain_pad=domain_pad,
@@ -92,7 +92,7 @@ def create_seismicmesh_2D_mesh_with_velocity_model(mesh_parameters):
     return mesh
 
 
-def create_seismicmesh_2D_mesh_homogeneous(mesh_parameters):
+def create_seismicmesh_2d_mesh_homogeneous(mesh_parameters):
     """
     Creates a 2D mesh based on SeismicMesh meshing utilities, with homogeneous velocity model.
 

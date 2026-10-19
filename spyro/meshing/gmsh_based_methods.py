@@ -85,8 +85,8 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     boundary_tag_map = {}
     for edge_tag in edge_tags:
         # Get center of mass of the edge
-        com = gmsh.model.occ.getCenterOfMass(1, edge_tag)
-        x_center, y_center = com[0], com[1]
+        center_of_mass = gmsh.model.occ.getCenterOfMass(1, edge_tag)
+        x_center, y_center = center_of_mass[0], center_of_mass[1]
 
         # Classify edges based on position
         # Top edge: z ≈ 0
@@ -136,7 +136,7 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     # --- Collect elements & classify by centroid into inner/outer ---
     if mesh_parameters.gradient_mask is not None:
         # Get elements of the (onlength_x) geometric surface
-        types, elemTags, nodeTags = gmsh.model.mesh.getElements(2, surf_tag)
+        types, elem_tags, node_tags = gmsh.model.mesh.getElements(2, surf_tag)
         # Build a node coordinate map
         node_ids, node_xyz, _ = gmsh.model.mesh.getNodes()
         # node_ids may be unsorted; build dict id->(x,y,z)
@@ -155,17 +155,17 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         outer_elem_by_type = []
         outer_conn_by_type = []
 
-        for t, tags, conn in zip(types, elemTags, nodeTags):
+        for t, tags, conn in zip(types, elem_tags, node_tags):
             tags = np.array(tags, dtype=np.int64)
             # number of nodes per element type t:
-            nPer = gmsh.model.mesh.getElementProperties(t)[
+            n_per = gmsh.model.mesh.getElementProperties(t)[
                 3
             ]  # returns (name, dim, order, numNodes, ...)[3]
-            conn = np.array(conn, dtype=np.int64).reshape(-1, nPer)
+            conn = np.array(conn, dtype=np.int64).reshape(-1, n_per)
 
             # Compute centroids
             # (x_c, y_c) = average of node coords
-            xyz = coords[[id2idx[int(n)] for n in conn.flatten()]].reshape(-1, nPer, 3)
+            xyz = coords[[id2idx[int(n)] for n in conn.flatten()]].reshape(-1, n_per, 3)
             centroids = xyz.mean(axis=1)  # (nelem, 3)
             cz_e = centroids[:, 0]
             cx_e = centroids[:, 1]

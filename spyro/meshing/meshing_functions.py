@@ -4,8 +4,8 @@ from firedrake import Mesh as FireMeshReader
 from .firedrake_based_wrappers import box_mesh, periodic_rectangle_mesh, rectangle_mesh
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .meshing_utils import calculate_edge_length
-from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_with_velocity_model
-from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_homogeneous
+from .seismic_mesh_based_wrappers import create_seismicmesh_2d_mesh_with_velocity_model
+from .seismic_mesh_based_wrappers import create_seismicmesh_2d_mesh_homogeneous
 from .gmsh_based_methods import build_big_rect_with_inner_element_group
 from .meshing_2d import generate_gmsh_2d_mesh
 from .meshing_3d import generate_gmsh_3d_mesh
@@ -57,15 +57,15 @@ class AutomaticMesh:
         Creates the mesh.
     create_firedrake_mesh()
         Creates a mesh based on Firedrake meshing utilities.
-    create_firedrake_2D_mesh()
+    create_firedrake_2d_mesh()
         Creates a 2D mesh based on Firedrake meshing utilities.
-    create_firedrake_3D_mesh()
+    create_firedrake_3d_mesh()
         Creates a 3D mesh based on Firedrake meshing utilities.
     create_seismicmesh_mesh()
         Creates a mesh based on SeismicMesh meshing utilities.
-    create_seimicmesh_2d_mesh()
+    create_seismicmesh_2d_mesh()
         Creates a 2D mesh based on SeismicMesh meshing utilities.
-    create_gmsh_2D_mesh()
+    create_gmsh_2d_mesh()
         Creates a 2D mesh using Gmsh with padding and smoothing.
     """
 
@@ -184,9 +184,9 @@ class AutomaticMesh:
             return self._load_mesh_file()
         elif self.mesh_type == "gmsh_mesh":
             if self.dimension == 2:
-                return self.create_gmsh_2D_mesh()
+                return self.create_gmsh_2d_mesh()
             elif self.dimension == 3:
-                return self.create_gmsh_3D_mesh()
+                return self.create_gmsh_3d_mesh()
         else:
             raise ValueError("mesh_type is not supported")
 
@@ -236,11 +236,11 @@ class AutomaticMesh:
         """
         if self.dimension == 2:
             typ_ele_str = "Area Elements"
-            mesh = self.create_firedrake_2D_mesh()
+            mesh = self.create_firedrake_2d_mesh()
 
         elif self.dimension == 3:
             typ_ele_str = "Volume Elements"
-            mesh = self.create_firedrake_3D_mesh()
+            mesh = self.create_firedrake_3d_mesh()
 
         else:
             raise ValueError("dimension is not supported")
@@ -296,7 +296,7 @@ class AutomaticMesh:
 
         return discretization
 
-    def create_firedrake_2D_mesh(self):
+    def create_firedrake_2d_mesh(self):
         """
         Creates a 2D mesh based on Firedrake meshing utilities.
 
@@ -340,7 +340,7 @@ class AutomaticMesh:
                 pad=self.abc_pad,
             )
 
-    def create_firedrake_3D_mesh(self):
+    def create_firedrake_3d_mesh(self):
         """
         Creates a 3D mesh based on Firedrake meshing utilities.
 
@@ -384,14 +384,14 @@ class AutomaticMesh:
             Mesh
         """
         if self.dimension == 2:
-            return self.create_seimicmesh_2d_mesh()
+            return self.create_seismicmesh_2d_mesh()
         elif self.dimension == 3:
             raise NotImplementedError("Not implemented yet")
             # return self.create_seismicmesh_3D_mesh()
         else:
             raise ValueError("dimension is not supported")
 
-    def create_seimicmesh_2d_mesh(self):
+    def create_seismicmesh_2d_mesh(self):
         """
         Creates a 2D mesh based on SeismicMesh meshing utilities.
 
@@ -407,9 +407,9 @@ class AutomaticMesh:
         """
         print(f"velocity_model{self.velocity_model}", flush=True)
         if self.velocity_model is None:
-            return create_seismicmesh_2D_mesh_homogeneous(self)
+            return create_seismicmesh_2d_mesh_homogeneous(self)
         else:
-            return create_seismicmesh_2D_mesh_with_velocity_model(self)
+            return create_seismicmesh_2d_mesh_with_velocity_model(self)
 
     def create_spyro_mesh(self):
         """
@@ -440,7 +440,7 @@ class AutomaticMesh:
         else:
             raise ValueError("dimension is not supported")
 
-    def create_gmsh_2D_mesh(self):
+    def create_gmsh_2d_mesh(self):
         """
         Creates a 2D mesh using Gmsh with optional water interface,
         hyperelliptical/rectangular padding, structured Winslow smoothing,
@@ -454,7 +454,7 @@ class AutomaticMesh:
         self.velocity_model = generate_gmsh_2d_mesh(self.mesh_parameters)
         return self._load_mesh_file()
 
-    def create_gmsh_3D_mesh(self):
+    def create_gmsh_3d_mesh(self):
         """Create a 3-D Gmsh mesh with the supplied volumetric logic."""
         self.velocity_model = generate_gmsh_3d_mesh(self.mesh_parameters)
         return self._load_mesh_file()

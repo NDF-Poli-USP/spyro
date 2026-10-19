@@ -1,12 +1,12 @@
 import numpy as np
 
 from .meshing_gmsh3d import (
-    apply_structured_winslow_smoothing3D,
-    build_gmsh_geometry_and_groups3D,
+    apply_structured_winslow_smoothing3d,
+    build_gmsh_geometry_and_groups3d,
     configure_gmsh_3d_meshing_mode,
-    configure_gmsh_mesh_size3D,
+    configure_gmsh_mesh_size3d,
 )
-from .meshing_utils3d import create_sizing_function3D
+from .meshing_utils3d import create_sizing_function3d
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 try:
@@ -37,7 +37,7 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
 
     if mesh_parameters.dimension != 3:
         raise ValueError(
-            "create_gmsh_3D_mesh requires dimension=3, "
+            "create_gmsh_3d_mesh requires dimension=3, "
             f"not {mesh_parameters.dimension}."
         )
 
@@ -49,7 +49,7 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
     padding_y = mesh_parameters.padding_y
     hyper_n = mesh_parameters.hyper_n
     hmin_segy = mesh_parameters.hmin_segy
-    wl = mesh_parameters.cells_per_wavelength
+    cells_per_wavelength = mesh_parameters.cells_per_wavelength
     freq = mesh_parameters.source_frequency
     grade = mesh_parameters.grade
     water_search_value = mesh_parameters.water_search_value
@@ -58,7 +58,7 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
     water_interface = mesh_parameters.water_interface
     vp_water = mesh_parameters.vp_water
     structured_mesh = mesh_parameters.structured_mesh
-    minElementSize = mesh_parameters.min_element_size
+    min_element_size = mesh_parameters.min_element_size
     winslow_implementation = mesh_parameters.winslow_implementation
     apply_winslow = mesh_parameters.apply_winslow
     winslow_iterations = mesh_parameters.winslow_iterations
@@ -132,11 +132,11 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
             )
 
         ef_segy3, *_ = (
-            create_sizing_function3D(
+            create_sizing_function3d(
                 fname=fname,
                 hmin=hmin_segy,
                 bbox=segy_bbox,
-                wl=wl,
+                wl=cells_per_wavelength,
                 freq=freq,
                 pad_type=padding_type,
                 pad_size_x=padding_x,
@@ -161,7 +161,7 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
         gmsh.model.add("3d_Velocity_Model_Water_Interface")
 
         try:
-            build_gmsh_geometry_and_groups3D(
+            build_gmsh_geometry_and_groups3d(
                 gmsh=gmsh,
                 fname=fname,
                 length_x=length_x,
@@ -187,7 +187,7 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
                 dtype=binary_dtype,
             )
 
-            configure_gmsh_mesh_size3D(
+            configure_gmsh_mesh_size3d(
                 gmsh=gmsh,
                 ef_segy3=ef_segy3,
                 bbox=segy_bbox,
@@ -212,7 +212,7 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
             configure_gmsh_3d_meshing_mode(
                 gmsh=gmsh,
                 structured_mesh=structured_mesh,
-                min_element_size=minElementSize,
+                min_element_size=min_element_size,
             )
             gmsh.option.setNumber("Mesh.SaveWithoutOrphans", 1)
             gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
@@ -221,7 +221,7 @@ def generate_gmsh_3d_mesh(mesh_parameters) -> str:
             gmsh.model.mesh.generate(3)
 
             if structured_mesh:
-                apply_structured_winslow_smoothing3D(
+                apply_structured_winslow_smoothing3d(
                     gmsh=gmsh,
                     length_x=length_x,
                     length_y=length_y,
