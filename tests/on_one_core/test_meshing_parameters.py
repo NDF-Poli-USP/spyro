@@ -1,6 +1,7 @@
 import pytest
 import spyro
 from spyro.meshing.meshing_parameters import cells_per_wavelength
+from spyro.utils.typing import MeshType
 import warnings
 import numpy as np
 from pathlib import Path
@@ -576,6 +577,28 @@ def test_init_does_not_print(capsys):
 def test_invalid_parameters_raise(dictionary):
     with pytest.raises(ValueError):
         spyro.meshing.MeshingParameters(input_mesh_dictionary=dictionary)
+
+
+def test_mesh_type_is_enum():
+    mp = _mp(mesh_type="gmsh_mesh")
+    assert mp.mesh_type is MeshType.GMSH
+    assert mp.mesh_type == "gmsh_mesh"
+    mp.mesh_type = MeshType.FILE
+    assert mp.automatic_mesh is False
+    with pytest.raises(TypeError):
+        mp.mesh_type = 3
+
+
+@pytest.mark.parametrize("mesh_type", list(MeshType))
+def test_mesh_type_is_automatic(mesh_type):
+    expected = mesh_type not in (MeshType.USER, MeshType.FILE)
+    assert mesh_type.is_automatic is expected
+
+
+def test_package_exports():
+    from spyro.meshing.meshing_parameters import GmshOptions, MeshingParameters
+    assert MeshingParameters is spyro.meshing.MeshingParameters
+    assert isinstance(MeshingParameters().gmsh, GmshOptions)
 
 
 if __name__ == "__main__":

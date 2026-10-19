@@ -4,7 +4,11 @@ from dataclasses import dataclass, fields
 
 import numpy as np
 
-from ..utils.error_management import validate_boolean, validate_numeric, validate_parameter
+from ...utils.error_management import (
+    validate_boolean,
+    validate_numeric,
+    validate_parameter,
+)
 
 
 @dataclass
@@ -118,7 +122,13 @@ class GmshOptions:
         GmshOptions
             The options. They are not validated yet.
         """
-        return cls(**{key: dictionary[key] for key in cls.keys() if dictionary.get(key) is not None})
+        return cls(
+            **{
+                key: dictionary[key]
+                for key in cls.keys()
+                if dictionary.get(key) is not None
+            }
+        )
 
     def validate(self, dimension: int | None = None) -> None:
         """Check every option and the rules between them.
@@ -136,33 +146,71 @@ class GmshOptions:
         TypeError
             If an option has the wrong type.
         """
-        for name in ("water_interface", "structured_mesh", "unstructured_quad_mesh",
-                     "apply_winslow", "extend_segy", "gmsh_parallel"):
+        for name in (
+            "water_interface",
+            "structured_mesh",
+            "unstructured_quad_mesh",
+            "apply_winslow",
+            "extend_segy",
+            "gmsh_parallel",
+        ):
             validate_boolean(name, getattr(self, name))
-        validate_parameter("padding_type", self.padding_type, [None, "rectangular", "hyperelliptical"])
-        validate_parameter("winslow_implementation", self.winslow_implementation,
-                           [None, "default", "fast", "numba"])
-        validate_numeric("winslow_iterations", self.winslow_iterations, float_num=False,
-                         lower_bound=0, include_lower_bound=True)
-        validate_numeric("winslow_omega", self.winslow_omega, lower_bound=0, upper_bound=1,
-                         include_upper_bound=True)
+        validate_parameter(
+            "padding_type", self.padding_type, [None, "rectangular", "hyperelliptical"]
+        )
+        validate_parameter(
+            "winslow_implementation",
+            self.winslow_implementation,
+            [None, "default", "fast", "numba"],
+        )
+        validate_numeric(
+            "winslow_iterations",
+            self.winslow_iterations,
+            float_num=False,
+            lower_bound=0,
+            include_lower_bound=True,
+        )
+        validate_numeric(
+            "winslow_omega",
+            self.winslow_omega,
+            lower_bound=0,
+            upper_bound=1,
+            include_upper_bound=True,
+        )
         validate_numeric("grade", self.grade, lower_bound=0)
         validate_numeric("hyper_n", self.hyper_n, lower_bound=0)
-        validate_numeric("hmin_segy", self.hmin_segy, lower_bound=0, include_lower_bound=True)
-        validate_numeric("gmsh_num_threads", self.gmsh_num_threads, float_num=False,
-                         lower_bound=1, include_lower_bound=True)
+        validate_numeric(
+            "hmin_segy", self.hmin_segy, lower_bound=0, include_lower_bound=True
+        )
+        validate_numeric(
+            "gmsh_num_threads",
+            self.gmsh_num_threads,
+            float_num=False,
+            lower_bound=1,
+            include_lower_bound=True,
+        )
         validate_parameter("segy_byte_order", self.segy_byte_order, ["big", "little"])
-        validate_parameter("segy_axes_order_sort", self.segy_axes_order_sort, ["C", "F"])
+        validate_parameter(
+            "segy_axes_order_sort", self.segy_axes_order_sort, ["C", "F"]
+        )
         if sorted(self.segy_axes_order) != [0, 1, 2]:
             raise ValueError(
-                f"segy_axes_order must be a permutation of (0, 1, 2), got {self.segy_axes_order!r}"
+                f"segy_axes_order must be a permutation of (0, 1, 2),"
+                f"got {self.segy_axes_order!r}"
             )
         try:
             np.dtype(self.segy_dtype)
         except TypeError as error:
-            raise ValueError(f"segy_dtype {self.segy_dtype!r} is not a valid numpy dtype") from error
+            raise ValueError(
+                f"segy_dtype {self.segy_dtype!r} is not a valid numpy dtype"
+            ) from error
 
         if self.structured_mesh and self.unstructured_quad_mesh:
-            raise ValueError("'structured_mesh' and 'unstructured_quad_mesh' are mutually exclusive.")
+            raise ValueError(
+                "'structured_mesh' and 'unstructured_quad_mesh' are mutually exclusive."
+            )
         if self.unstructured_quad_mesh and dimension == 3:
-            raise ValueError("'unstructured_quad_mesh' is currently supported only for 2D Gmsh meshes.")
+            raise ValueError(
+                "'unstructured_quad_mesh' is currently supported only"
+                "for 2D Gmsh meshes."
+            )

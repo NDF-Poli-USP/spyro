@@ -1,142 +1,33 @@
-"""Meshing parameters module for Spyro.
-
-This module provides classes and functions for managing mesh parameters,
-including mesh type selection, dimension handling, and automatic mesh
-generation based on wavelength constraints.
-"""
+"""The MeshingParameters class."""
 
 import difflib
 import os
 from typing import Any
 from warnings import warn
 
-from ..mpi.spyro_mpi import SpyroEnsemble
-from .gmsh_options import GmshOptions
-from ..utils.error_management import (
+from spyro.mpi.spyro_mpi import SpyroEnsemble
+from ...utils.error_management import (
     validate_boolean,
     validate_data_structure,
+    validate_enum,
     validate_file,
     validate_numeric,
     validate_parameter,
 )
-
-
-_CELLS_PER_WAVELENGTH = {
-    ("mass_lumped_triangle", 2, 2): 7.02,
-    ("mass_lumped_triangle", 3, 2): 3.70,
-    ("mass_lumped_triangle", 4, 2): 2.67,
-    ("mass_lumped_triangle", 5, 2): 2.03,
-    ("mass_lumped_triangle", 2, 3): 6.12,
-    ("mass_lumped_triangle", 3, 3): 3.72,
-}
-
-MESH_TYPES = ("firedrake_mesh", "user_mesh", "SeismicMesh", "file", "spyro_mesh", "gmsh_mesh")
-AUTOMATIC_MESH_TYPES = frozenset({"firedrake_mesh", "SeismicMesh", "spyro_mesh", "gmsh_mesh"})
-METHODS = ("mass_lumped_triangle", "DG_triangle", "spectral_quadrilateral", "DG_quadrilateral", "CG")
-_QUADRILATERAL_METHODS = frozenset({"spectral_quadrilateral", "DG_quadrilateral"})
-_TRIANGLE_METHODS = frozenset({"mass_lumped_triangle", "DG_triangle"})
-_UNIT_ALIASES = {"m": "meters", "meters": "meters", "km": "km"}
-
-_DOMAIN_LENGTHS = ("length_z", "length_x", "length_y")
-_LENGTHS = _DOMAIN_LENGTHS + (
-    "abc_pad_length", "padding_x", "padding_y", "padding_z", "h_padding", "min_element_size",
+from ...utils.typing import MeshType
+from ._helpers import get_parameter, guess_unit
+from .constants import (
+    DEFAULTS_IN_METERS,
+    DOMAIN_LENGTHS,
+    EDGE_LENGTHS,
+    LENGTHS,
+    METHODS,
+    PADDINGS,
+    QUADRILATERAL_METHODS,
+    TRIANGLE_METHODS,
+    UNIT_ALIASES,
 )
-# Lengths that fall back to ``abc_pad_length`` when unset.
-_PADDINGS = frozenset({"padding_x", "padding_y", "padding_z"})
-# Lengths whose default is given in meters and converted to the domain unit.
-_DEFAULTS_IN_METERS = {"h_padding": 500.0, "min_element_size": 35.0}
-_EDGE_LENGTHS = ("edge_length", "edge_length_z", "edge_length_x", "edge_length_y")
-
-
-def cells_per_wavelength(method: str, degree: int, dimension: int) -> float | None:
-    """Retrieve the number of cells per wavelength for a given method configuration.
-
-    Parameters
-    ----------
-    method : str
-        The finite element method, for example 'mass_lumped_triangle'.
-    degree : int
-        The polynomial degree of the finite element basis functions.
-    dimension : int
-        The spatial dimension of the problem (2 or 3).
-
-    Returns
-    -------
-    float or None
-        The minimum number of cells per wavelength needed for accuracy, or
-        None if no value is known for this configuration.
-
-    Examples
-    --------
-    >>> cells_per_wavelength('mass_lumped_triangle', 2, 2)
-    7.02
-    >>> cells_per_wavelength('mass_lumped_triangle', 3, 3)
-    3.72
-    """
-    return _CELLS_PER_WAVELENGTH.get((method, degree, dimension))
-
-
-def _guess_unit(value: float | None) -> str | None:
-    """Guess the length unit of a value from its magnitude.
-
-    Parameters
-    ----------
-    value : float or None
-        A length.
-
-    Returns
-    -------
-    str or None
-        'meters' for values greater than 100, 'km' for other positive values,
-        and None for None or zero, which carry no unit information.
-    """
-    if value is None or value == 0:
-        return None
-    return "meters" if value > 100 else "km"
-
-
-def _get(dictionary: dict, key: str, default: Any = None, keyword_value: Any = None) -> Any:
-    """Read a parameter from a dictionary, with an optional keyword override.
-
-    A None entry in the dictionary is treated as missing.
-
-    Parameters
-    ----------
-    dictionary : dict
-        Input dictionary.
-    key : str
-        Key of the entry in ``dictionary``.
-    default : Any, optional
-        Value used when neither source provides one. Default is None.
-    keyword_value : Any, optional
-        Value given as an explicit keyword argument, or None if it was not
-        given. Default is None.
-
-    Returns
-    -------
-    Any
-        The keyword value if it is not None, otherwise the dictionary value
-        if it is not None, otherwise ``default``.
-
-    Warns
-    -----
-    UserWarning
-        If both sources provide different values.
-    """
-    dict_value = dictionary.get(key)
-    if keyword_value is None:
-        return default if dict_value is None else dict_value
-    if dict_value is not None and dict_value is not keyword_value:
-        try:
-            conflict = bool(dict_value != keyword_value)
-        except (TypeError, ValueError):
-            conflict = True
-        if conflict:
-            warn(
-                f"'{key}' was given both as a keyword argument ({keyword_value!r}) "
-                f"and in input_mesh_dictionary ({dict_value!r}). Using the keyword argument."
-            )
-    return keyword_value
+from .gmsh_options import GmshOptions
 
 
 def _length_property(name: str, doc: str) -> property:
@@ -156,6 +47,7 @@ def _length_property(name: str, doc: str) -> property:
         :meth:`MeshingParameters._length` and whose setter validates the
         value with :meth:`MeshingParameters._check_length`.
     """
+
     def getter(self: "MeshingParameters") -> float | None:
         return self._length(name)
 
@@ -166,15 +58,15 @@ def _length_property(name: str, doc: str) -> property:
 
 
 def _edge_length_property(name: str, doc: str) -> property:
-    """Build a property for an edge length stored in ``MeshingParameters._edge_lengths``.
+    """Build a property for an edge length stored in `MeshingParameters._edge_lengths`.
 
-    Setting a value clears ``cells_per_wavelength`` with a warning, since
+    Setting a value clears `cells_per_wavelength` with a warning, since
     both control the mesh size.
 
     Parameters
     ----------
     name : str
-        Name of the edge length, a key of ``_edge_lengths``.
+        Name of the edge length, a key of `_edge_lengths`.
     doc : str
         Docstring of the property.
 
@@ -183,6 +75,7 @@ def _edge_length_property(name: str, doc: str) -> property:
     property
         Property that reads and validates the edge length.
     """
+
     def getter(self: "MeshingParameters") -> float | None:
         return self._edge_lengths[name]
 
@@ -219,10 +112,11 @@ class MeshingParameters:
         Polynomial degree of finite element basis functions.
     negative_z : bool
         Whether the z-axis is always negative (True) or positive (False).
-    mesh_type : str or None
-        Mesh generation method, one of ``MESH_TYPES``.
+    mesh_type : MeshType or None
+        How the mesh is provided or generated. Strings such as 'gmsh_mesh'
+        are accepted and converted.
     automatic_mesh : bool
-        Whether the mesh is generated automatically. Derived from ``mesh_type``.
+        Whether spyro generates the mesh itself. Derived from ``mesh_type``.
     periodic : bool
         Whether the mesh has periodic boundary conditions.
     mesh_file : str or None
@@ -289,22 +183,50 @@ class MeshingParameters:
 
     # Keys accepted in ``input_mesh_dictionary`` and by ``set_mesh``.
     INPUT_KEYS = (
-        "unit", "dimension", "quadrilateral", "method", "degree", "negative_z",
-        "mesh_type", "periodic", "mesh_file", "user_mesh", "output_filename",
-        *_LENGTHS, "source_frequency", "cells_per_wavelength", *_EDGE_LENGTHS,
-        "minimum_velocity", "velocity_model", "segy_velocity_model",
-        "grid_velocity_data", "gradient_mask", *GmshOptions.keys(),
+        "unit",
+        "dimension",
+        "quadrilateral",
+        "method",
+        "degree",
+        "negative_z",
+        "mesh_type",
+        "periodic",
+        "mesh_file",
+        "user_mesh",
+        "output_filename",
+        *LENGTHS,
+        "source_frequency",
+        "cells_per_wavelength",
+        *EDGE_LENGTHS,
+        "minimum_velocity",
+        "velocity_model",
+        "segy_velocity_model",
+        "grid_velocity_data",
+        "gradient_mask",
+        *GmshOptions.keys(),
     )
 
     length_z = _length_property("length_z", "Mesh extent in the z-direction.")
     length_x = _length_property("length_x", "Mesh extent in the x-direction.")
     length_y = _length_property("length_y", "Mesh extent in the y-direction.")
-    abc_pad_length = _length_property("abc_pad_length", "Absorbing boundary layer length.")
-    padding_x = _length_property("padding_x", "Padding in x; defaults to abc_pad_length.")
-    padding_y = _length_property("padding_y", "Padding in y; defaults to abc_pad_length.")
-    padding_z = _length_property("padding_z", "Padding in z; defaults to abc_pad_length.")
-    h_padding = _length_property("h_padding", "Padding element size; defaults to 500 m.")
-    min_element_size = _length_property("min_element_size", "Structured element size; defaults to 35 m.")
+    abc_pad_length = _length_property(
+        "abc_pad_length", "Absorbing boundary layer length."
+    )
+    padding_x = _length_property(
+        "padding_x", "Padding in x; defaults to abc_pad_length."
+    )
+    padding_y = _length_property(
+        "padding_y", "Padding in y; defaults to abc_pad_length."
+    )
+    padding_z = _length_property(
+        "padding_z", "Padding in z; defaults to abc_pad_length."
+    )
+    h_padding = _length_property(
+        "h_padding", "Padding element size; defaults to 500 m."
+    )
+    min_element_size = _length_property(
+        "min_element_size", "Structured element size; defaults to 35 m."
+    )
     edge_length = _edge_length_property("edge_length", "Target edge length.")
     edge_length_z = _edge_length_property("edge_length_z", "Target edge length in z.")
     edge_length_x = _edge_length_property("edge_length_x", "Target edge length in x.")
@@ -371,8 +293,8 @@ class MeshingParameters:
 
         # Storage for properties, declared before any setter runs.
         self._unit = None
-        self._lengths = dict.fromkeys(_LENGTHS)
-        self._edge_lengths = dict.fromkeys(_EDGE_LENGTHS)
+        self._lengths = dict.fromkeys(LENGTHS)
+        self._edge_lengths = dict.fromkeys(EDGE_LENGTHS)
         self._cells_per_wavelength = None
         self._source_frequency = None
         self._mesh_type = None
@@ -384,37 +306,43 @@ class MeshingParameters:
         self._grid_velocity_data = None
 
         # Discretization
-        self.dimension = _get(d, "dimension", keyword_value=dimension)
-        self.quadrilateral = _get(d, "quadrilateral", False, keyword_value=quadrilateral)
-        self.method = _get(d, "method", keyword_value=method)
-        self.degree = _get(d, "degree", keyword_value=degree)
-        self.negative_z = _get(d, "negative_z", True, keyword_value=negative_z)
+        self.dimension = get_parameter(d, "dimension", keyword_value=dimension)
+        self.quadrilateral = get_parameter(
+            d, "quadrilateral", False, keyword_value=quadrilateral
+        )
+        self.method = get_parameter(d, "method", keyword_value=method)
+        self.degree = get_parameter(d, "degree", keyword_value=degree)
+        self.negative_z = get_parameter(d, "negative_z", True, keyword_value=negative_z)
 
         # Mesh source
-        self.mesh_type = _get(d, "mesh_type")
-        self.periodic = _get(d, "periodic", False)
-        self.mesh_file = _get(d, "mesh_file")
-        self.user_mesh = _get(d, "user_mesh")
-        self.output_filename = _get(d, "output_filename", "automatic_mesh.msh")
+        self.mesh_type = get_parameter(d, "mesh_type")
+        self.periodic = get_parameter(d, "periodic", False)
+        self.mesh_file = get_parameter(d, "mesh_file")
+        self.user_mesh = get_parameter(d, "user_mesh")
+        self.output_filename = get_parameter(d, "output_filename", "automatic_mesh.msh")
 
         # Lengths: the unit and domain lengths first, since they define the unit.
-        self.unit = _get(d, "unit")
-        for name in _LENGTHS:
+        self.unit = get_parameter(d, "unit")
+        for name in LENGTHS:
             keyword = abc_pad_length if name == "abc_pad_length" else None
-            setattr(self, name, _get(d, name, keyword_value=keyword))
+            setattr(self, name, get_parameter(d, name, keyword_value=keyword))
 
         # Mesh size
-        self.source_frequency = _get(d, "source_frequency", keyword_value=source_frequency)
-        self.cells_per_wavelength = _get(d, "cells_per_wavelength")
-        for name in _EDGE_LENGTHS:
-            setattr(self, name, _get(d, name))
+        self.source_frequency = get_parameter(
+            d, "source_frequency", keyword_value=source_frequency
+        )
+        self.cells_per_wavelength = get_parameter(d, "cells_per_wavelength")
+        for name in EDGE_LENGTHS:
+            setattr(self, name, get_parameter(d, name))
 
         # Velocity inputs
-        self.minimum_velocity = _get(d, "minimum_velocity")
-        self.velocity_model = _get(d, "velocity_model", keyword_value=velocity_model)
-        self.segy_velocity_model = _get(d, "segy_velocity_model")
-        self.grid_velocity_data = _get(d, "grid_velocity_data")
-        self.gradient_mask = _get(d, "gradient_mask")
+        self.minimum_velocity = get_parameter(d, "minimum_velocity")
+        self.velocity_model = get_parameter(
+            d, "velocity_model", keyword_value=velocity_model
+        )
+        self.segy_velocity_model = get_parameter(d, "segy_velocity_model")
+        self.grid_velocity_data = get_parameter(d, "grid_velocity_data")
+        self.gradient_mask = get_parameter(d, "gradient_mask")
 
         self.gmsh = GmshOptions.from_dictionary(d)
 
@@ -434,21 +362,33 @@ class MeshingParameters:
         """
         validate_parameter("dimension", self.dimension, [None, 2, 3])
         validate_parameter("method", self.method, [*METHODS, None])
-        validate_numeric("degree", self.degree, float_num=False, accept_parameter_as_none=True,
-                         lower_bound=1, include_lower_bound=True)
-        validate_numeric("minimum_velocity", self.minimum_velocity,
-                         accept_parameter_as_none=True, lower_bound=0)
+        validate_numeric(
+            "degree",
+            self.degree,
+            float_num=False,
+            accept_parameter_as_none=True,
+            lower_bound=1,
+            include_lower_bound=True,
+        )
+        validate_numeric(
+            "minimum_velocity",
+            self.minimum_velocity,
+            accept_parameter_as_none=True,
+            lower_bound=0,
+        )
         validate_boolean("quadrilateral", self.quadrilateral)
         validate_boolean("negative_z", self.negative_z)
         self.gmsh.validate(self.dimension)
 
-        if self.periodic and self.mesh_type != "firedrake_mesh":
-            raise ValueError("Periodic meshes are only supported with Firedrake meshes for now.")
-        if self.mesh_type == "SeismicMesh" and self.quadrilateral:
+        if self.periodic and self.mesh_type != MeshType.FIREDRAKE:
+            raise ValueError(
+                "Periodic meshes are only supported with Firedrake meshes for now."
+            )
+        if self.mesh_type == MeshType.SEISMICMESH and self.quadrilateral:
             raise ValueError("SeismicMesh does not work with quads.")
-        if self.method in _QUADRILATERAL_METHODS and not self.quadrilateral:
+        if self.method in QUADRILATERAL_METHODS and not self.quadrilateral:
             raise ValueError(f"Method '{self.method}' requires quadrilateral=True.")
-        if self.method in _TRIANGLE_METHODS and self.quadrilateral:
+        if self.method in TRIANGLE_METHODS and self.quadrilateral:
             raise ValueError(f"Method '{self.method}' requires quadrilateral=False.")
 
     def _validate_if_not_batch(self) -> None:
@@ -477,23 +417,41 @@ class MeshingParameters:
         """
         if self.mesh_type is None:
             return ["'mesh_type' is not set."]
-        if self.mesh_type == "file":
-            return [] if self.mesh_file is not None else ["'mesh_type' is 'file' but 'mesh_file' is not set."]
-        if self.mesh_type == "user_mesh":
-            return [] if self.user_mesh is not None else ["'mesh_type' is 'user_mesh' but 'user_mesh' object is not set."]
+        if self.mesh_type == MeshType.FILE:
+            return (
+                []
+                if self.mesh_file is not None
+                else ["'mesh_type' is 'file' but 'mesh_file' is not set."]
+            )
+        if self.mesh_type == MeshType.USER:
+            return (
+                []
+                if self.user_mesh is not None
+                else ["'mesh_type' is 'user_mesh' but 'user_mesh' object is not set."]
+            )
 
         missing = []
-        required = _DOMAIN_LENGTHS if self.dimension == 3 else _DOMAIN_LENGTHS[:2]
-        missing += [f"'{self.mesh_type}' requires '{name}'." for name in required if self._lengths[name] is None]
+        required = DOMAIN_LENGTHS if self.dimension == 3 else DOMAIN_LENGTHS[:2]
+        missing += [
+            f"'{self.mesh_type}' requires '{name}'."
+            for name in required
+            if self._lengths[name] is None
+        ]
 
         has_edge_length = any(v is not None for v in self._edge_lengths.values())
         if not has_edge_length and self.cells_per_wavelength is None:
-            missing.append(f"'{self.mesh_type}' requires either 'edge_length' or 'cells_per_wavelength'.")
+            missing.append(
+                f"'{self.mesh_type}' requires either 'edge_length' or 'cells_per_wavelength'."
+            )
 
         if self.cells_per_wavelength is not None:
             if self.source_frequency is None:
                 missing.append("'cells_per_wavelength' requires 'source_frequency'.")
-            if self.minimum_velocity is None and self.grid_velocity_data is None and self.velocity_model is None:
+            if (
+                self.minimum_velocity is None
+                and self.grid_velocity_data is None
+                and self.velocity_model is None
+            ):
                 missing.append(
                     "'cells_per_wavelength' requires 'minimum_velocity', "
                     "'grid_velocity_data', or 'velocity_model'."
@@ -568,11 +526,15 @@ class MeshingParameters:
             hints = []
             for key in unknown:
                 close = difflib.get_close_matches(key, self.INPUT_KEYS, n=1)
-                hints.append(f"'{key}'" + (f" (did you mean '{close[0]}'?)" if close else ""))
+                hints.append(
+                    f"'{key}'" + (f" (did you mean '{close[0]}'?)" if close else "")
+                )
             raise ValueError(f"Unknown mesh parameter(s): {', '.join(hints)}.")
 
-        updates["abc_pad_length"] = _get(updates, "abc_pad_length", keyword_value=abc_pad_length)
-        first = ("unit",) + _DOMAIN_LENGTHS
+        updates["abc_pad_length"] = get_parameter(
+            updates, "abc_pad_length", keyword_value=abc_pad_length
+        )
+        first = ("unit",) + DOMAIN_LENGTHS
         ordered_keys = [key for key in first if key in updates]
         ordered_keys += [key for key in updates if key not in first]
 
@@ -591,13 +553,13 @@ class MeshingParameters:
     # Units and lengths
     @property
     def unit(self) -> str | None:
-        """Length unit, 'meters' or 'km', given explicitly or inferred from the domain lengths."""
+        """Length unit, 'meters' or 'km', given explicitly or inferred."""
         return self._unit if self._unit is not None else self._infer_unit()
 
     @unit.setter
     def unit(self, value: str | None) -> None:
         if value is not None:
-            value = _UNIT_ALIASES[validate_parameter("unit", value, list(_UNIT_ALIASES))]
+            value = UNIT_ALIASES[validate_parameter("unit", value, list(UNIT_ALIASES))]
         self._unit = value
 
     def _infer_unit(self, exclude: str | None = None) -> str | None:
@@ -613,8 +575,8 @@ class MeshingParameters:
         str or None
             The unit guessed from the first non-zero domain length, or None.
         """
-        for name in _DOMAIN_LENGTHS:
-            unit = _guess_unit(self._lengths[name]) if name != exclude else None
+        for name in DOMAIN_LENGTHS:
+            unit = guess_unit(self._lengths[name]) if name != exclude else None
             if unit is not None:
                 return unit
         return None
@@ -650,12 +612,19 @@ class MeshingParameters:
         UserWarning
             If the guessed unit of ``value`` disagrees with the domain unit.
         """
-        validate_numeric(name, value, accept_parameter_as_none=True,
-                         lower_bound=0.0, include_lower_bound=True)
-        reference = self._unit if self._unit is not None else self._infer_unit(exclude=name)
-        guessed = _guess_unit(value)
+        validate_numeric(
+            name,
+            value,
+            accept_parameter_as_none=True,
+            lower_bound=0.0,
+            include_lower_bound=True,
+        )
+        reference = (
+            self._unit if self._unit is not None else self._infer_unit(exclude=name)
+        )
+        guessed = guess_unit(value)
         if reference is not None and guessed is not None:
-            if name in _DOMAIN_LENGTHS:
+            if name in DOMAIN_LENGTHS:
                 mismatch = guessed != reference
             else:
                 mismatch = guessed == "meters" and reference == "km"
@@ -682,10 +651,10 @@ class MeshingParameters:
             metre defaults converted to the domain unit.
         """
         value = self._lengths[name]
-        if value is None and name in _PADDINGS:
+        if value is None and name in PADDINGS:
             value = self._lengths["abc_pad_length"]
-        if value is None and name in _DEFAULTS_IN_METERS:
-            value = _DEFAULTS_IN_METERS[name]
+        if value is None and name in DEFAULTS_IN_METERS:
+            value = DEFAULTS_IN_METERS[name]
             if self.unit == "km":
                 value /= 1000.0
         return value
@@ -721,10 +690,14 @@ class MeshingParameters:
 
     @cells_per_wavelength.setter
     def cells_per_wavelength(self, value: float | None) -> None:
-        validate_numeric("cells_per_wavelength", value, accept_parameter_as_none=True, lower_bound=0)
-        if value is not None and any(v is not None for v in self._edge_lengths.values()):
+        validate_numeric(
+            "cells_per_wavelength", value, accept_parameter_as_none=True, lower_bound=0
+        )
+        if value is not None and any(
+            v is not None for v in self._edge_lengths.values()
+        ):
             warn("Setting cells_per_wavelength removes edge_length parameters")
-            self._edge_lengths = dict.fromkeys(_EDGE_LENGTHS)
+            self._edge_lengths = dict.fromkeys(EDGE_LENGTHS)
         self._cells_per_wavelength = value
 
     @property
@@ -734,28 +707,35 @@ class MeshingParameters:
 
     @source_frequency.setter
     def source_frequency(self, value: float | None) -> None:
-        validate_numeric("source_frequency", value, accept_parameter_as_none=True, lower_bound=0)
+        validate_numeric(
+            "source_frequency", value, accept_parameter_as_none=True, lower_bound=0
+        )
         if value is not None and value < 1.5:
             warn(f"Source frequency of {value} too low for realistic FWI case")
         elif value is not None and value > 50:
-            warn(f"Source frequency of {value} too high for realistic FWI case, please low-pass filter")
+            warn(
+                f"Source frequency of {value} too high for realistic FWI case,"
+                "please low-pass filter"
+            )
         self._source_frequency = value
 
     # Mesh source
     @property
-    def mesh_type(self) -> str | None:
-        """Mesh generation type, one of ``MESH_TYPES``."""
+    def mesh_type(self) -> MeshType | None:
+        """How the mesh is provided or generated; strings are converted to MeshType."""
         return self._mesh_type
 
     @mesh_type.setter
-    def mesh_type(self, value: str | None) -> None:
-        self._mesh_type = validate_parameter("mesh_type", value, [*MESH_TYPES, None])
+    def mesh_type(self, value: MeshType | str | None) -> None:
+        self._mesh_type = (
+            None if value is None else validate_enum("mesh_type", value, MeshType)
+        )
         self._validate_if_not_batch()
 
     @property
     def automatic_mesh(self) -> bool:
-        """Whether ``mesh_type`` is one of ``AUTOMATIC_MESH_TYPES``."""
-        return self.mesh_type in AUTOMATIC_MESH_TYPES
+        """Whether spyro generates the mesh itself (see ``MeshType.is_automatic``)."""
+        return self.mesh_type is not None and self.mesh_type.is_automatic
 
     @property
     def periodic(self) -> bool:
@@ -776,8 +756,13 @@ class MeshingParameters:
     def mesh_file(self, value: str | os.PathLike | None) -> None:
         if isinstance(value, os.PathLike):
             value = os.fspath(value)
-        self._mesh_file = validate_file("mesh_file", value, [".msh"], accept_parameter_as_none=True,
-                                        check_file_existence=True)
+        self._mesh_file = validate_file(
+            "mesh_file",
+            value,
+            [".msh"],
+            accept_parameter_as_none=True,
+            check_file_existence=True,
+        )
 
     @property
     def user_mesh(self) -> Any:
@@ -787,7 +772,7 @@ class MeshingParameters:
     @user_mesh.setter
     def user_mesh(self, value: Any) -> None:
         if value is not None:
-            self.mesh_type = "user_mesh"
+            self.mesh_type = MeshType.USER
         self._user_mesh = value
 
     @property
@@ -799,7 +784,9 @@ class MeshingParameters:
     def output_filename(self, value: str | os.PathLike | None) -> None:
         if isinstance(value, os.PathLike):
             value = os.fspath(value)
-        validate_file("output_filename", value, [".msh", ".vtk"], accept_parameter_as_none=True)
+        validate_file(
+            "output_filename", value, [".msh", ".vtk"], accept_parameter_as_none=True
+        )
         if value is not None and value.lower().endswith(".vtk"):
             warn("VTK meshes for visualization only, will not run a simulation.")
         self._output_filename = value
@@ -813,7 +800,10 @@ class MeshingParameters:
     @segy_velocity_model.setter
     def segy_velocity_model(self, value: str | None) -> None:
         if value is not None:
-            warn("Passing SEGY directly to the mesher is deprecated. Please use grid point velocity inputs.")
+            warn(
+                "Passing SEGY directly to the mesher is deprecated."
+                "Please use grid point velocity inputs."
+            )
             self.velocity_model = value
         self._segy_velocity_model = value
 
@@ -824,14 +814,18 @@ class MeshingParameters:
 
     @grid_velocity_data.setter
     def grid_velocity_data(self, value: dict | None) -> None:
-        validate_data_structure("grid_velocity_data", value, "dict", accept_parameter_as_none=True)
+        validate_data_structure(
+            "grid_velocity_data", value, "dict", accept_parameter_as_none=True
+        )
         if value is not None:
             if "vp_values" not in value:
                 raise ValueError("Grid velocity data needs vp_values key.")
             spacing_keys = ["grid_spacing_z", "grid_spacing_x"]
             if value.get("length_y") not in (None, 0.0):
                 spacing_keys.append("grid_spacing_y")
-            if "grid_spacing" not in value and not all(key in value for key in spacing_keys):
+            if "grid_spacing" not in value and not all(
+                key in value for key in spacing_keys
+            ):
                 raise ValueError(
                     "Grid velocity data needs either grid_spacing or directional "
                     "grid_spacing_z/grid_spacing_x keys."
