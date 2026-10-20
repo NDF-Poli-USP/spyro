@@ -107,6 +107,12 @@ class CpwParameters:
     save_shot_records : bool
         Save the shot record of every search solve to
         ``test_shot_record<cpw>``. Default is False.
+    velocity_adapted_mesh : bool
+        Size the triangles of every SeismicMesh mesh by the local P-wavelength
+        of the case's SEG-Y P-wave velocity, instead of uniformly by the
+        minimum one. Acoustic heterogeneous only. Quadrilateral meshes, such
+        as the default threshold discretization, stay uniform. Default is
+        False.
     """
 
     source_frequency: float
@@ -137,6 +143,7 @@ class CpwParameters:
     load_reference: bool = False
     reference_solution_file: str | None = None
     save_shot_records: bool = False
+    velocity_adapted_mesh: bool = False
 
     def __post_init__(self) -> None:
         """Convert the enum and threshold fields, and check the settings.
@@ -147,7 +154,9 @@ class CpwParameters:
             If ``mesh_frequency_factor`` is not positive, both or neither of
             ``accepted_error_threshold`` and ``threshold_discretization`` are
             given, or ``fixed_timestep`` is given without
-            ``TimeStepCalculationType.FIXED`` or missing with it.
+            ``TimeStepCalculationType.FIXED`` or missing with it, or
+            ``velocity_adapted_mesh`` is set for a problem other than the
+            acoustic heterogeneous one.
         """
         if self.velocity_profile_type is None:
             profile = (
@@ -200,6 +209,14 @@ class CpwParameters:
             raise ValueError(
                 "Give a timestep exactly when timestep_calculation is "
                 f"{TimeStepCalculationType.FIXED.value!r}."
+            )
+        if self.velocity_adapted_mesh and (
+            self.wave_type is not WaveType.ISOTROPIC_ACOUSTIC
+            or self.velocity_profile_type is not VelocityProfileType.HETEROGENEOUS
+        ):
+            raise ValueError(
+                "velocity_adapted_mesh is only supported for acoustic "
+                "heterogeneous problems."
             )
 
     @classmethod

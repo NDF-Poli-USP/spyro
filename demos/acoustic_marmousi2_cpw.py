@@ -1,3 +1,8 @@
+# from mpi4py.MPI import COMM_WORLD
+# import debugpy
+# debugpy.listen(3000 + COMM_WORLD.rank)
+# debugpy.wait_for_client()
+
 """Demo: minimum cells-per-wavelength for the 2D acoustic Marmousi2 case.
 
 The calculator compares the receiver data of each mesh against a numerical
@@ -7,6 +12,11 @@ threshold is the error of a degree 4 spectral quadrilateral mesh at 2
 cells-per-wavelength, so the result is the resolution at which the
 evaluated element matches that accuracy. The wavelength is that of the
 water, the slowest P-wave velocity in the model.
+
+The triangle meshes are adapted to the velocity model with SeismicMesh: each
+cell is sized for ``cpw`` cells per local P-wavelength, with a limited size
+gradation between slow and fast regions. The quadrilateral meshes of the
+default threshold discretization cannot be adapted and stay uniform.
 
 The model is the 17 km by 3.5 km Marmousi2 of Martin, Wiley and Marfurt
 (2006), doi: 10.1190/1.2172306, with its 0.45 km water layer. The
@@ -52,6 +62,7 @@ def run(
     cpw_reference: float = 3.0,
     load_reference: bool = False,
     velocity_file: str = MARMOUSI2_P_WAVE_VELOCITY_FILE,
+    velocity_adapted_mesh: bool = True,
 ) -> spyro.tools.MeshingParameterCalculator:
     """Search for the minimum cells-per-wavelength of one discretization.
 
@@ -86,6 +97,9 @@ def run(
     velocity_file : str, optional
         Marmousi2 P-wave velocity SEG-Y, in m/s or km/s. Default is
         :data:`~spyro.tools.cells_per_wavelength_calculator.MARMOUSI2_P_WAVE_VELOCITY_FILE`.
+    velocity_adapted_mesh : bool, optional
+        If True, size the triangles by the local P-wavelength; if False,
+        uniformly by the minimum one. Default is True.
 
     Returns
     -------
@@ -119,6 +133,7 @@ def run(
         "save_reference": not load_reference,
         "load_reference": load_reference,
         "reference_solution_file": f"{case.name}_cpw_reference.npy",
+        "velocity_adapted_mesh": velocity_adapted_mesh,
         **threshold,
     }
 

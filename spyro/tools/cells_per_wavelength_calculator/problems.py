@@ -307,10 +307,24 @@ class HeterogeneousCpwProblem(CpwProblem):
         -------
         np.ndarray
             The reference receiver data.
+
+        Notes
+        -----
+        The pressure field is saved for visualization in
+        ``results/<case name>_reference_forward_outputsn0.pvd``, every
+        ``output_frequency`` time steps of the model dictionary.
         """
-        wave = self.build_wave(
-            self.model_dictionary(method, self.reference_degree), self.cpw_reference
+        dictionary = self.model_dictionary(method, self.reference_degree)
+        dictionary["visualization"].update(
+            forward_output=True,
+            forward_output_filename=(
+                f"results/{self.heterogeneous_case.name}_reference_forward_output.pvd"
+            ),
         )
+        wave = self.build_wave(dictionary, self.cpw_reference)
+        from firedrake import VTKFile
+        out = VTKFile("debug.pvd")
+        out.write(wave.c)
         wave.forward_solve()
         return wave.forward_solution_receivers
 
@@ -553,11 +567,75 @@ class ElasticHomogeneousProblem(HomogeneousCpwProblem):
 class AcousticHeterogeneousProblem(HeterogeneousCpwProblem):
     """Acoustic wave in the P-wave velocity of a heterogeneous case.
 
-    The mesh is uniform, sized by the minimum P-wavelength in the domain,
-    as in :class:`ElasticHeterogeneousProblem`.
+    By default the mesh is uniform, sized by the minimum P-wavelength in the
+    domain, as in :class:`ElasticHeterogeneousProblem`. With
+    ``velocity_adapted_mesh``, SeismicMesh triangle meshes are instead sized
+    by the local P-wavelength.
+
+    Attributes
+    ----------
+    velocity_adapted_mesh : bool
+        Size SeismicMesh meshes by the local P-wavelength.
     """
 
     physics = ACOUSTIC
+
+    def __init__(self, parameters: CpwParameters) -> None:
+        """Read the heterogeneous case and the meshing choice.
+
+        Parameters
+        ----------
+        parameters : CpwParameters
+            The calculator parameters.
+        """
+        super().__init__(parameters)
+        self.velocity_adapted_mesh: bool = parameters.velocity_adapted_mesh
+
+    def setup_wave(self, wave: Wave, cpw: float) -> None:
+        """Build the mesh, adapted to the P-wave velocity if requested, and load the velocity.
+
+        The adapted mesh has, everywhere, ``cpw`` cells per local
+        P-wavelength at the meshing frequency, limited by SeismicMesh's
+        size gradation, which only refines. Only SeismicMesh meshes can be
+        adapted, so a quadrilateral mesh stays uniform. The forward solve
+        does not read the velocity file itself with a PML, so it is
+        interpolated onto the mesh nodes here.
+
+        Parameters
+        ----------
+        wave : Wave
+            Wave object to set up.
+        cpw : float
+            Cells-per-wavelength of the mesh, at the meshing frequency.
+
+        Raises
+        ------
+        ValueError
+            If the case's P-wave velocity file is not a SEG-Y, the only
+            format SeismicMesh sizes from here.
+        """
+        velocity_file = self.heterogeneous_case.write_material_files(
+            ("p_wave_velocity",)
+        )["p_wave_velocity"]
+        if not self.velocity_adapted_mesh or wave.mesh_parameters.mesh_type != "SeismicMesh":
+            super().setup_wave(wave, cpw)
+        elif not velocity_file.endswith(".segy"):
+            raise ValueError(
+                f"A velocity adapted mesh needs a SEG-Y velocity, got {velocity_file!r}."
+            )
+        else:
+            wave.set_mesh(
+                input_mesh_parameters={
+                    "velocity_model": velocity_file,
+                    "cells_per_wavelength": cpw,
+                    "minimum_velocity": self.minimum_wavelength_velocity,
+                    # Meshing only, the source keeps its own frequency
+                    "source_frequency": self.mesh_frequency,
+                }
+            )
+        # Fast interpolation reads the velocity at the mesh nodes directly,
+        # without building a grid mesh to project from
+        wave.set_initial_velocity_model(new_file=velocity_file, fast_interpolate=True)
 
     def model_dictionary(self, method: str, degree: int) -> dict:
         """Build the heterogeneous acoustic model dictionary.
