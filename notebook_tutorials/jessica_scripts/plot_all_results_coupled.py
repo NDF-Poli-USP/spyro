@@ -28,7 +28,7 @@ from sparsity_plots import load_sparsity_matrices
 # "case_small_2d", "case_large_2d", "case_3d",
 # "case_small_2d_irregular_topography", "case_large_2d_irregular_topography",
 # "case_3d_irregular_topography"
-CASE_NAME = "case_large_2d_irregular_topography"
+CASE_NAME = "case_3d"
 DIMENSION = 3 if CASE_NAME.startswith("case_3d") else 2
 
 # Results computed before the axis change (x vertical, z horizontal):
@@ -73,8 +73,8 @@ if DIMENSION == 2:
     ]
 else:
     COMPONENTS = [
-        ("uz", COL_UZ, "Uz.dat", -1.0),
-        ("ux", COL_UX, "Ux.dat", -1.0 if FLIP_UX else 1.0),
+        ("uz", COL_UZ, "Uz.dat", 1.0),
+        ("ux", COL_UX, "Ux.dat", 1.0),
         ("uy", 2, "Uy.dat", 1.0),
     ]
 
@@ -182,7 +182,7 @@ for label, (tag, style) in CASES.items():
         r["uz_fluid_raw"] = np.asarray(d["u_fluid_z"]).ravel()
 
     if SHOW_GAR6:
-        r["p_g"] = ref_on(t_p, *gar6["p"])
+        r["p_g"] = ref_on(t_p, *gar6["p"], 1.0 if DIMENSION == 2 else -1.0)
         r["err_p_g"] = MeasureError.calculate_normalized_L2_error(r["p"], r["p_g"])
         for comp, _, _, sign in COMPONENTS:
             r[f"{comp}_g"] = ref_on(t_u, *gar6[comp], sign)
