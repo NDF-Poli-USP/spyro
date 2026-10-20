@@ -29,7 +29,7 @@ class GmshOptions:
     hmin_segy : float
         Minimum element size for SEGY interpolation.
     grade : float or None
-        Sizing function grading for smooth element transition. None
+        Sizing function grading for smooth element transition. None or 0
         disables the smoothing.
     water_interface : bool
         If True, detects and implements the water interface curve.
@@ -181,7 +181,9 @@ class GmshOptions:
             upper_bound=1,
             include_upper_bound=True,
         )
-        validate_numeric("grade", self.grade, accept_parameter_as_none=True, lower_bound=0)
+        validate_numeric(
+            "grade", self.grade, accept_parameter_as_none=True, lower_bound=0, include_lower_bound=True
+        )
         validate_numeric("hyper_n", self.hyper_n, lower_bound=0)
         validate_numeric(
             "hmin_segy", self.hmin_segy, lower_bound=0, include_lower_bound=True

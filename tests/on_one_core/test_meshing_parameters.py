@@ -353,9 +353,10 @@ def test_single_quad_mesh_option_is_accepted(structured_mesh, unstructured_quad_
 
 
 def test_gmsh_explicit_none_grade_is_kept():
-    """Test that an explicit `grade=None` disables smoothing instead of using the default."""
+    """Test that `grade` keeps an explicit None or 0, which disable smoothing."""
     assert _gmsh_parameters().gmsh.grade == 0.9
     assert _gmsh_parameters(grade=None).gmsh.grade is None
+    assert _gmsh_parameters(grade=0.0).gmsh.grade == 0.0
     assert _gmsh_parameters(hyper_n=None).gmsh.hyper_n == 3.0
 
 
@@ -567,7 +568,7 @@ def test_init_does_not_print(capsys):
 @pytest.mark.parametrize("dictionary", [
     {"winslow_omega": 2.0},
     {"winslow_iterations": -1},
-    {"grade": 0.0},
+    {"grade": -0.1},
     {"gmsh_num_threads": 0},
     {"segy_byte_order": "middle"},
     {"segy_axes_order_sort": "A"},
