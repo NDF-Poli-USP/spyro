@@ -103,7 +103,10 @@ def assert_cell_type(mesh: fire.MeshGeometry, cellname: str) -> None:
     AssertionError
         If the mesh has a different cell type.
     """
-    assert mesh.ufl_cell().cellname() == cellname
+    actual = mesh.ufl_cell().cellname
+    if callable(actual):
+        actual = actual()
+    assert actual == cellname
 
 
 def assert_bounds(
