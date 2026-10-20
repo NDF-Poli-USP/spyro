@@ -47,21 +47,20 @@ def _propagate_forward_central_difference(wave, source_ids):
         # instability check below) no longer has to first allocate the whole
         # nt-step wavefield, which for fine meshes/small dt is many GB.
         usol = []
-    source_cof = None
     interpolate_receivers = None
-    if wave.sources is not None and wave.use_vertex_only_mesh:
-        # source_cof is a cofunction that represents a point source,
-        # being one at a point and zero elsewhere.
-        source_cof = wave.sources.source_cofunction()
-
+    if wave.use_vertex_only_mesh:
         if wave.abc_type == AbsorbingBCsType.PML:
             pressure_expr = fire.split(wave.X_n)[0]
         else:
             pressure_expr = wave.u_n
         interpolate_receivers = wave.receivers.receiver_interpolator(
             pressure_expr)
-        # Only the time function of the source changes from one step to the
-        # next, so the tape records a scalar per step for it.
+    if wave.point_source_in_form:
+        # source_cof is a cofunction that represents a point source,
+        # being one at a point and zero elsewhere. Only the time function of
+        # the source changes from one step to the next, so the tape records
+        # a scalar per step for it.
+        source_cof = wave.sources.source_cofunction()
         wave.sources.update_spatial_function(
             source_cof, wave.solver_parameters,
         )
@@ -88,12 +87,11 @@ def _propagate_forward_central_difference(wave, source_ids):
         # Basic way of applying sources
         wave.update_source_expression(t)
 
-        if wave.sources is not None:
-            if wave.point_source_in_form:
-                wave.sources.update_time_function(step)
-            else:
-                wave.rhs_no_pml_source().assign(
-                    wave.sources.apply_source(rhs_forcing, step))
+        if wave.point_source_in_form:
+            wave.sources.update_time_function(step)
+        elif wave.sources is not None:
+            wave.rhs_no_pml_source().assign(
+                wave.sources.apply_source(rhs_forcing, step))
 
         wave.solver.solve()
 
