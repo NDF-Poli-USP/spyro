@@ -8,7 +8,7 @@ from scipy.special import (beta, betainc, gamma, jn_zeros, jnp_zeros,
 from scipy.stats import norm as sn
 from sys import float_info
 from ...io.basicio import parallel_print as pprint
-from .modal_forms_and_matrices import weak_forms
+from .modal_forms_and_matrices import acoustic_weak_forms_c_in_stiffness
 from ...utils.error_management import (validate_data_structure, validate_firedrake_parameter,
                                        validate_numeric, validate_parameter)
 from ...utils.stats_tools import coeff_of_determination
@@ -607,8 +607,9 @@ class Modal_Analytical_Solver():
             # Equivalent velocity by energy-equivalent homogenization
 
             # Weak forms
-            a, L = weak_forms(c, V, quad_rule=quad_rule, source=True,
-                              user_load=static_load_for_ceq)
+            a, L = acoustic_weak_forms_c_in_stiffness(
+                c, V, quad_rule=quad_rule, source=True, user_load=static_load_for_ceq,
+            )
 
             # Solve static load problem for the energy-equivalent homogenization
             lin_var = LinearVariationalProblem(a, L, u, constant_jacobian=True)
