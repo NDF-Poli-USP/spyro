@@ -195,9 +195,7 @@ def _check_cofunction_values(wave, source_locations, test_exprs,
         wave.sources.current_sources = [0]
         cofunction = wave.sources.source_cofunction()
         if spatial_function:
-            wave.sources.update_spatial_function(
-                cofunction, wave.solver_parameters,
-            )
+            wave.sources.update_spatial_function(wave.solver_parameters)
 
         for f, expected_fn in test_exprs:
             expected = expected_fn(sl)

@@ -61,8 +61,8 @@ class Sources(Delta_projector):
         Returns the point-source term of a time-step form
     update_time_function(step)
         Sets time_function to the wavelet at a time step
-    update_spatial_function(source_cofunction, solver_parameters)
-        Sets spatial_function from the point-source cofunction
+    update_spatial_function(solver_parameters)
+        Sets spatial_function from the active point sources
     """
 
     def __init__(self, wave):
@@ -178,22 +178,20 @@ class Sources(Delta_projector):
         """
         self.time_function.assign(self.wavelet[step])
 
-    def update_spatial_function(self, source_cofunction: fire.Cofunction,
-                                solver_parameters: dict | None) -> None:
-        r"""Set :attr:`spatial_function` from the point-source cofunction.
+    def update_spatial_function(self, solver_parameters: dict | None) -> None:
+        r"""Set :attr:`spatial_function` from the active point sources.
 
         The term built by :meth:`source_term` is
         :math:`s(t) \int q_h v \, dx`, with :math:`s` the
         :attr:`time_function` and :math:`q_h` the :attr:`spatial_function`.
-        This solves :math:`M q_h = q` with the mass matrix of the measure of
-        that term, so the term assembles back to :math:`s(t)\, q`, and a
-        pyadjoint tape records one scalar per time step for the source
-        instead of a cofunction.
+        This solves :math:`M q_h = q`, with :math:`q` the
+        :meth:`source_cofunction` of the active sources and :math:`M` the
+        mass matrix of the measure of that term, so the term assembles back
+        to :math:`s(t)\, q`, and a pyadjoint tape records one scalar per time
+        step for the source instead of a cofunction.
 
         Parameters
         ----------
-        source_cofunction : firedrake.Cofunction
-            The point source :math:`q`, from :meth:`source_cofunction`.
         solver_parameters : dict or None
             Solver parameters for the mass solve.
 
@@ -205,7 +203,8 @@ class Sources(Delta_projector):
         Raises
         ------
         ValueError
-            If :meth:`source_term` has not been called yet.
+            If :meth:`source_term` has not been called yet, or no source is
+            active.
         """
         if self.source_measure is None:
             raise ValueError(
@@ -214,7 +213,7 @@ class Sources(Delta_projector):
         V = self.function_space
         mass = fire.inner(fire.TrialFunction(V), fire.TestFunction(V)) \
             * self.source_measure
-        fire.solve(mass == source_cofunction, self.spatial_function,
+        fire.solve(mass == self.source_cofunction(), self.spatial_function,
                    solver_parameters=solver_parameters)
 
     def apply_source(self, rhs_forcing, step):

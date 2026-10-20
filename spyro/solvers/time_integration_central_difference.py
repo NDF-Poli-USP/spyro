@@ -56,14 +56,9 @@ def _propagate_forward_central_difference(wave, source_ids):
         interpolate_receivers = wave.receivers.receiver_interpolator(
             pressure_expr)
     if wave.point_source_in_form:
-        # source_cof is a cofunction that represents a point source,
-        # being one at a point and zero elsewhere. Only the time function of
-        # the source changes from one step to the next, so the tape records
-        # a scalar per step for it.
-        source_cof = wave.sources.source_cofunction()
-        wave.sources.update_spatial_function(
-            source_cof, wave.solver_parameters,
-        )
+        # Only the time function of the source changes from one step to the
+        # next, so the tape records a scalar per step for it.
+        wave.sources.update_spatial_function(wave.solver_parameters)
 
     usol_recv = []
     receiver_array = None
