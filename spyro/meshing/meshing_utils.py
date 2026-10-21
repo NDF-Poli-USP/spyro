@@ -21,6 +21,7 @@ def check_seismicmesh(func):
 
     If SeismicMesh isn't available raises ImportError
     """
+
     def wrapper(*args, **kwargs):
         if SeismicMesh is None:
             raise ImportError(
@@ -38,6 +39,7 @@ def check_gmsh(func):
 
     If gmsh isn't available raises ImportError
     """
+
     def wrapper(*args, **kwargs):
         if gmsh is None:
             raise ImportError("Please install gmsh to use this function.")
@@ -165,7 +167,6 @@ def create_sizing_function(
         - n_samples (int): Number of depth samples per trace (rows).
         - n_traces (int): Number of lateral traces (columns).
     """
-
     # Read velocity model with provided bbox
     vp, n_samples, n_traces = read_segy_velocity_model(fname)
     # Set water velocity if value = 0
@@ -263,7 +264,7 @@ def create_sizing_function(
             cell_size,
             window_length_x=window_length_x,
             window_length_z=window_length_z,
-            polyorder=polyorder
+            polyorder=polyorder,
         )
 
     print("Function Minimum and Maximum values:")
@@ -271,15 +272,15 @@ def create_sizing_function(
 
     # Create interpolation function
     def sizing_function(x, y):
-        """Return element size at position (x, y)
+        """Return element size at position (x, y).
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         x, y : float or array-like
             Coordinates where to evaluate element size
 
-        Returns:
-        --------
+        Returns
+        -------
         float or array
             Element size at the given position(s)
         """
@@ -304,11 +305,10 @@ def read_segy_velocity_model(fname):
         - n_traces (int): Number of traces (columns).
         - n_samples (int): Number of samples per trace (rows).
     """
-
     print(f"Reading SEGY file: {fname}")
 
     # Open SEGY file
-    with segyio.open(fname, 'r', ignore_geometry=True) as segy:
+    with segyio.open(fname, "r", ignore_geometry=True) as segy:
 
         n_traces = len(segy.trace)
         n_samples = len(segy.samples)
@@ -378,9 +378,9 @@ def interpolate_size(x, y, cell_size, bbox):
     interpolator = RegularGridInterpolator(
         (z_coords, x_coords),
         cell_size_flipped,
-        method='linear',
+        method="linear",
         bounds_error=False,
-        fill_value=None
+        fill_value=None,
     )
 
     # Handle scalar or array inputs
@@ -436,14 +436,11 @@ def apply_savitzky_golay_filter_2d(
 
     if grid_values.ndim != 2:
         raise ValueError(
-            f"grid_values must be a 2D array, received shape "
-            f"{grid_values.shape}."
+            f"grid_values must be a 2D array, received shape " f"{grid_values.shape}."
         )
 
     if not np.all(np.isfinite(grid_values)):
-        raise ValueError(
-            "Sizing field contains NaN or Inf values before filtering."
-        )
+        raise ValueError("Sizing field contains NaN or Inf values before filtering.")
 
     if window_length_z is None or window_length_x is None:
         return grid_values.copy()
@@ -506,9 +503,7 @@ def apply_savitzky_golay_filter_2d(
     )
 
     if not np.all(np.isfinite(filtered_values)):
-        raise ValueError(
-            "Sizing field contains NaN or Inf values after filtering."
-        )
+        raise ValueError("Sizing field contains NaN or Inf values after filtering.")
 
     negative_mask = filtered_values < 0.0
     n_negative = int(np.count_nonzero(negative_mask))
@@ -529,7 +524,9 @@ def apply_savitzky_golay_filter_2d(
     return filtered_values
 
 
-def generate_water_profile_from_segy(segy_path, z_min, z_max, x_min, x_max, value=0.0, tolerance=1e-3, x_chunk=1024):
+def generate_water_profile_from_segy(
+    segy_path, z_min, z_max, x_min, x_max, value=0.0, tolerance=1e-3, x_chunk=1024
+):
     """Generate a water interface profile from a SEGY file.
 
     Reads a 2D SEGY file, computes grid spacing from physical domain bounds,
@@ -574,7 +571,7 @@ def generate_water_profile_from_segy(segy_path, z_min, z_max, x_min, x_max, valu
     print(f"Reading SEGY file: {segy_path}")
 
     # Extract SEGY Data and Compute Spacing
-    with segyio.open(segy_path, 'r', ignore_geometry=True) as segy:
+    with segyio.open(segy_path, "r", ignore_geometry=True) as segy:
         nx_tot = segy.tracecount
         nz_tot = len(segy.samples)
 
@@ -618,7 +615,7 @@ def generate_water_profile_from_segy(segy_path, z_min, z_max, x_min, x_max, valu
 
     # Physical X coordinates for the points
     Xs = _dx * np.arange(ix_min, ix_max + 1, dtype=np.float64)
-    Nx = (ix_max - ix_min)
+    Nx = ix_max - ix_min
     x_chunk = int(max(1, x_chunk))
 
     Z_bottom = np.empty(Nx + 1, dtype=np.float64)
@@ -630,7 +627,7 @@ def generate_water_profile_from_segy(segy_path, z_min, z_max, x_min, x_max, valu
         xe = min(xs + x_chunk, Nx + 1)
         ix_tile = ix_min + np.arange(xs, xe, dtype=int)
 
-        block = plane_zx[iz_top:iz_bot + 1, ix_tile]
+        block = plane_zx[iz_top: iz_bot + 1, ix_tile]
         block = np.asarray(block, dtype=np.float32)
 
         in_water = np.abs(block - target) <= tol
@@ -639,7 +636,9 @@ def generate_water_profile_from_segy(segy_path, z_min, z_max, x_min, x_max, valu
         any_non_water = np.any(non_water, axis=0)
         first_non_idx = np.argmax(non_water, axis=0).astype(np.int32)
 
-        first_non_idx = np.where(any_non_water, first_non_idx, (iz_bot - iz_top)).astype(np.int32)
+        first_non_idx = np.where(
+            any_non_water, first_non_idx, (iz_bot - iz_top)
+        ).astype(np.int32)
 
         k_global = iz_top + first_non_idx
         z_phys = -k_global.astype(np.float64) * _dz
@@ -701,7 +700,9 @@ def get_nodes_on_surface_entities(tag_to_index, surface_entities):
 
 
 @check_gmsh
-def get_water_interface_node_indices(tag_to_index, water_surface_entities, length_x, tol=1e-8):
+def get_water_interface_node_indices(
+    tag_to_index, water_surface_entities, length_x, tol=1e-8
+):
     """Identify node indices lying on the water interface.
 
     Scans the boundaries of water region surface entities and extracts nodes
@@ -730,7 +731,9 @@ def get_water_interface_node_indices(tag_to_index, water_surface_entities, lengt
         for dim, curve_tag in boundary:
             if dim != 1:
                 continue
-            n_tags, coords, _ = gmsh.model.mesh.getNodes(1, curve_tag, includeBoundary=True)
+            n_tags, coords, _ = gmsh.model.mesh.getNodes(
+                1, curve_tag, includeBoundary=True
+            )
             if len(n_tags) == 0:
                 continue
             xy = np.asarray(coords, dtype=float).reshape(-1, 3)[:, :2]
@@ -745,7 +748,9 @@ def get_water_interface_node_indices(tag_to_index, water_surface_entities, lengt
     return interface_nodes
 
 
-def align_water_columns_to_interface_x(points_2d, water_surface_nodes, interface_nodes, quads):
+def align_water_columns_to_interface_x(
+    points_2d, water_surface_nodes, interface_nodes, quads
+):
     """Align water nodes vertically with the interface nodes.
 
     Adjusts the x-coordinates of nodes within the water column so that they
@@ -862,7 +867,8 @@ def align_water_columns_to_interface_x(points_2d, water_surface_nodes, interface
 def intersect(x0, z0, dx, dz, xc, zc, a_val, b_val, hyper_n):
     def f(s):
         x, z = x0 + s * dx, z0 + s * dz
-        return (abs(x - xc) / a_val)**hyper_n + (abs(z - zc) / b_val)**hyper_n - 1.0
+        return (abs(x - xc) / a_val) ** hyper_n + (abs(z - zc) / b_val) ** hyper_n - 1.0
+
     s_low, s_high = 0.0, 1.0
     while f(s_high) < 0:
         s_high *= 2.0
@@ -879,11 +885,16 @@ def get_theta(x, z, xc, zc, a_val, b_val, hyper_n):
     vx, vz = (x - xc) / a_val, (z - zc) / b_val
     vx = vx if abs(vx) > 1e-12 else 0.0
     vz = vz if abs(vz) > 1e-12 else 0.0
-    return np.arctan2(np.sign(vz) * np.abs(vz)**(hyper_n / 2.0), np.sign(vx) * np.abs(vx)**(hyper_n / 2.0))
+    return np.arctan2(
+        np.sign(vz) * np.abs(vz) ** (hyper_n / 2.0),
+        np.sign(vx) * np.abs(vx) ** (hyper_n / 2.0),
+    )
 
 
 def make_arc(p1_tag, p2_tag, x1, z1, x2, z2, xc, zc, a_val, b_val, hyper_n, num_pts=25):
-    t1, t2 = get_theta(x1, z1, xc, zc, a_val, b_val, hyper_n), get_theta(x2, z2, xc, zc, a_val, b_val, hyper_n)
+    t1, t2 = get_theta(x1, z1, xc, zc, a_val, b_val, hyper_n), get_theta(
+        x2, z2, xc, zc, a_val, b_val, hyper_n
+    )
     if t2 - t1 > np.pi:
         t1 += 2 * np.pi
     elif t1 - t2 > np.pi:
@@ -891,8 +902,8 @@ def make_arc(p1_tag, p2_tag, x1, z1, x2, z2, xc, zc, a_val, b_val, hyper_n, num_
     pts = [p1_tag]
     for t in np.linspace(t1, t2, num_pts)[1:-1]:
         cos_t, sin_t = np.cos(t), np.sin(t)
-        x = xc + a_val * np.sign(cos_t) * np.abs(cos_t)**(2.0 / hyper_n)
-        z = zc + b_val * np.sign(sin_t) * np.abs(sin_t)**(2.0 / hyper_n)
+        x = xc + a_val * np.sign(cos_t) * np.abs(cos_t) ** (2.0 / hyper_n)
+        z = zc + b_val * np.sign(sin_t) * np.abs(sin_t) ** (2.0 / hyper_n)
         pts.append(gmsh.model.occ.addPoint(x, z, 0.0))
     pts.append(p2_tag)
     return gmsh.model.occ.addSpline(pts)

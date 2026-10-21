@@ -44,20 +44,20 @@ def cells_per_wavelength(method, degree, dimension):
     3.72
     """
     cell_per_wavelength_dictionary = {
-        'mass_lumped_triangle2dim2': 7.02,
-        'mass_lumped_triangle3dim2': 3.70,
-        'mass_lumped_triangle4dim2': 2.67,
-        'mass_lumped_triangle5dim2': 2.03,
-        'mass_lumped_triangle2dim3': 6.12,
-        'mass_lumped_triangle3dim3': 3.72,
-        'spectral_quadrilateral2dim2': None,
-        'spectral_quadrilateral4dim2': None,
-        'spectral_quadrilateral6dim2': None,
-        'spectral_quadrilateral8dim2': None,
-        'spectral_quadrilateral2dim3': None,
-        'spectral_quadrilateral4dim3': None,
-        'spectral_quadrilateral6dim3': None,
-        'spectral_quadrilateral8dim3': None,
+        "mass_lumped_triangle2dim2": 7.02,
+        "mass_lumped_triangle3dim2": 3.70,
+        "mass_lumped_triangle4dim2": 2.67,
+        "mass_lumped_triangle5dim2": 2.03,
+        "mass_lumped_triangle2dim3": 6.12,
+        "mass_lumped_triangle3dim3": 3.72,
+        "spectral_quadrilateral2dim2": None,
+        "spectral_quadrilateral4dim2": None,
+        "spectral_quadrilateral6dim2": None,
+        "spectral_quadrilateral8dim2": None,
+        "spectral_quadrilateral2dim3": None,
+        "spectral_quadrilateral4dim3": None,
+        "spectral_quadrilateral6dim3": None,
+        "spectral_quadrilateral8dim3": None,
     }
 
     key = f"{method}{degree}dim{dimension}"
@@ -65,8 +65,7 @@ def cells_per_wavelength(method, degree, dimension):
     return cell_per_wavelength_dictionary.get(key)
 
 
-class MeshingParameters():
-
+class MeshingParameters:
     """Manage mesh parameters and configuration for seismic wave simulations.
 
     This class handles all aspects of mesh configuration including mesh type
@@ -145,7 +144,9 @@ class MeshingParameters():
     vp_water : float
         Substitute Water speed value if vs = 0.0.
     structured_mesh : bool
-        If True, uses a structured quadrilateral mesh; False uses triangular unstructured.
+        If True, uses a structured quadrilateral mesh.
+    unstructured_quad_mesh : bool
+        If True, uses a 2D unstructured full-quadrilateral Gmsh mesh.
     min_element_size : float
         Element size constraint for structured mesh spacing.
     winslow_implementation : str
@@ -160,6 +161,8 @@ class MeshingParameters():
         Whether to extend the SEGY function sizing into the padding region.
     h_padding : float
         Constant padding element size used if extend_segy is False.
+    gmsh_num_threads : int
+        Number of threads used by parallel 3-D Gmsh/HXT meshing. Default is 1.
 
     Notes
     -----
@@ -171,7 +174,19 @@ class MeshingParameters():
     the same unit system.
     """
 
-    def __init__(self, input_mesh_dictionary=None, dimension=None, source_frequency=None, comm=None, quadrilateral=False, method=None, degree=None, velocity_model=None, abc_pad_length=None, negative_z=True):
+    def __init__(
+        self,
+        input_mesh_dictionary=None,
+        dimension=None,
+        source_frequency=None,
+        comm=None,
+        quadrilateral=False,
+        method=None,
+        degree=None,
+        velocity_model=None,
+        abc_pad_length=None,
+        negative_z=True,
+    ):
         """Initialize the MeshingParameters class.
 
         Parameters
@@ -207,7 +222,6 @@ class MeshingParameters():
             If True, z-axis points downward; if False, z-axis points upward.
             Default is True.
         """
-
         self.input_mesh_dictionary = input_mesh_dictionary or {}
         self.dimension = dimension
         self.comm = comm
@@ -234,6 +248,7 @@ class MeshingParameters():
 
         # Initialize private attributes for gmsh mesh properties
         self._padding_x = None
+        self._padding_y = None
         self._padding_z = None
         self._h_padding = None
         self._padding_type = None
@@ -252,8 +267,12 @@ class MeshingParameters():
         self.minimum_velocity = self.input_mesh_dictionary.get("minimum_velocity", None)
 
         # Apply parameters from input_mesh_dictionary and direct arguments
-        self.source_frequency = self.input_mesh_dictionary.get("source_frequency", source_frequency)
-        self.abc_pad_length = self.input_mesh_dictionary.get("abc_pad_length", abc_pad_length)
+        self.source_frequency = self.input_mesh_dictionary.get(
+            "source_frequency", source_frequency
+        )
+        self.abc_pad_length = self.input_mesh_dictionary.get(
+            "abc_pad_length", abc_pad_length
+        )
         self.degree = self.input_mesh_dictionary.get("degree", degree)
         self.mesh_type = self.input_mesh_dictionary.get("mesh_type")
         self.periodic = self.input_mesh_dictionary.get("periodic", False)
@@ -263,8 +282,12 @@ class MeshingParameters():
         self.length_y = self.input_mesh_dictionary.get("length_y")
         self.user_mesh = self.input_mesh_dictionary.get("user_mesh")
         self.dimension = self.input_mesh_dictionary.get("dimension", self.dimension)
-        self.output_filename = self.input_mesh_dictionary.get("output_filename", "automatic_mesh.msh")
-        self.cells_per_wavelength = self.input_mesh_dictionary.get("cells_per_wavelength")
+        self.output_filename = self.input_mesh_dictionary.get(
+            "output_filename", "automatic_mesh.msh"
+        )
+        self.cells_per_wavelength = self.input_mesh_dictionary.get(
+            "cells_per_wavelength"
+        )
         self.edge_length = self.input_mesh_dictionary.get("edge_length")
         self.edge_length_z = self.input_mesh_dictionary.get("edge_length_z")
         self.edge_length_x = self.input_mesh_dictionary.get("edge_length_x")
@@ -274,27 +297,81 @@ class MeshingParameters():
         # Apply gmsh meshing properties
         self.padding_type = self.input_mesh_dictionary.get("padding_type")
         self.padding_x = self.input_mesh_dictionary.get("padding_x")
+        self.padding_y = self.input_mesh_dictionary.get("padding_y")
         self.padding_z = self.input_mesh_dictionary.get("padding_z")
 
         # Gmsh only parameters
         if self.mesh_type == "gmsh_mesh":
-            self.winslow_implementation = self.input_mesh_dictionary.get("winslow_implementation", "numba")
+            self.winslow_implementation = self.input_mesh_dictionary.get(
+                "winslow_implementation", "numba"
+            )
             self.h_padding = self.input_mesh_dictionary.get("h_padding", 500.0)
             self.vp_water = self.input_mesh_dictionary.get("vp_water", None)
-            self.structured_mesh = self.input_mesh_dictionary.get("structured_mesh", False)
+            self.structured_mesh = self.input_mesh_dictionary.get(
+                "structured_mesh", False
+            )
+            self.unstructured_quad_mesh = self.input_mesh_dictionary.get(
+                "unstructured_quad_mesh", False
+            )
             self.hyper_n = self.input_mesh_dictionary.get("hyper_n", 3.0)
             self.hmin_segy = self.input_mesh_dictionary.get("hmin_segy", 0.0)
             self.grade = self.input_mesh_dictionary.get("grade", 0.9)
-            self.water_interface = self.input_mesh_dictionary.get("water_interface", False)
-            self.water_search_value = self.input_mesh_dictionary.get("water_search_value", 0.0)
-            self.min_element_size = self.input_mesh_dictionary.get("min_element_size", 35.0)
-            self.winslow_iterations = self.input_mesh_dictionary.get("winslow_iterations", 5000)
+            self.water_interface = self.input_mesh_dictionary.get(
+                "water_interface", False
+            )
+            self.water_search_value = self.input_mesh_dictionary.get(
+                "water_search_value", 0.0
+            )
+            self.min_element_size = self.input_mesh_dictionary.get(
+                "min_element_size", 35.0
+            )
+            self.winslow_iterations = self.input_mesh_dictionary.get(
+                "winslow_iterations", 5000
+            )
             self.winslow_omega = self.input_mesh_dictionary.get("winslow_omega", 0.5)
             self.extend_segy = self.input_mesh_dictionary.get("extend_segy", True)
             self.apply_winslow = self.input_mesh_dictionary.get("apply_winslow", True)
-            self.segy_velocity_model = self.input_mesh_dictionary.get("segy_velocity_model", None)
+            self.segy_velocity_model = self.input_mesh_dictionary.get(
+                "segy_velocity_model", None
+            )
 
-        self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh", "gmsh_mesh"}
+            # 3d Meshing parameters
+            self.segy_nz = self.input_mesh_dictionary.get("segy_nz", None)
+            self.segy_nx = self.input_mesh_dictionary.get("segy_nx", None)
+            self.segy_ny = self.input_mesh_dictionary.get("segy_ny", None)
+            self.segy_dz = self.input_mesh_dictionary.get("segy_dz", None)
+            self.segy_dx = self.input_mesh_dictionary.get("segy_dx", None)
+            self.segy_dy = self.input_mesh_dictionary.get("segy_dy", None)
+            self.segy_byte_order = self.input_mesh_dictionary.get(
+                "segy_byte_order", "big"
+            )
+            self.segy_axes_order = self.input_mesh_dictionary.get(
+                "segy_axes_order", (0, 1, 2)
+            )
+            self.segy_axes_order_sort = self.input_mesh_dictionary.get(
+                "segy_axes_order_sort", "F"
+            )
+            self.segy_dtype = self.input_mesh_dictionary.get("segy_dtype", "float32")
+            self.gmsh_parallel = self.input_mesh_dictionary.get("gmsh_parallel", False)
+            self.gmsh_num_threads = self.input_mesh_dictionary.get(
+                "gmsh_num_threads", 1
+            )
+
+            if self.structured_mesh and self.unstructured_quad_mesh:
+                raise ValueError(
+                    "'structured_mesh' and 'unstructured_quad_mesh' are mutually exclusive."
+                )
+            if self.unstructured_quad_mesh and self.dimension == 3:
+                raise ValueError(
+                    "'unstructured_quad_mesh' is currently supported only for 2D Gmsh meshes."
+                )
+
+        self.automatic_mesh = self.mesh_type in {
+            "firedrake_mesh",
+            "SeismicMesh",
+            "spyro_mesh",
+            "gmsh_mesh",
+        }
         self.is_complete = None
         self.check_completeness()
 
@@ -344,7 +421,9 @@ class MeshingParameters():
             )
             if not has_size_param:
                 if verbose:
-                    print(f"Mesh incomplete: '{self.mesh_type}' requires either 'edge_length' or 'cells_per_wavelength'.")
+                    print(
+                        f"Mesh incomplete: '{self.mesh_type}' requires either 'edge_length' or 'cells_per_wavelength'."
+                    )
                 self.is_complete = False
                 return
 
@@ -352,7 +431,9 @@ class MeshingParameters():
             if self.cells_per_wavelength is not None:
                 if self.source_frequency is None:
                     if verbose:
-                        print("Mesh incomplete: 'cells_per_wavelength' requires 'source_frequency'.")
+                        print(
+                            "Mesh incomplete: 'cells_per_wavelength' requires 'source_frequency'."
+                        )
                     self.is_complete = False
                     return
 
@@ -364,7 +445,9 @@ class MeshingParameters():
 
                 if not has_velocity:
                     if verbose:
-                        print("Mesh incomplete: 'cells_per_wavelength' requires 'minimum_velocity', 'grid_velocity_data', or 'velocity_model'.")
+                        print(
+                            "Mesh incomplete: 'cells_per_wavelength' requires 'minimum_velocity', 'grid_velocity_data', or 'velocity_model'."
+                        )
                     self.is_complete = False
                     return
 
@@ -374,7 +457,9 @@ class MeshingParameters():
             # For file-based meshes, need mesh_file
             if self.mesh_file is None:
                 if verbose:
-                    print("Mesh incomplete: 'mesh_type' is 'file' but 'mesh_file' is not set.")
+                    print(
+                        "Mesh incomplete: 'mesh_type' is 'file' but 'mesh_file' is not set."
+                    )
                 self.is_complete = False
             else:
                 self.is_complete = True
@@ -383,7 +468,9 @@ class MeshingParameters():
             # For user-provided meshes, need user_mesh object
             if self.user_mesh is None:
                 if verbose:
-                    print("Mesh incomplete: 'mesh_type' is 'user_mesh' but 'user_mesh' object is not set.")
+                    print(
+                        "Mesh incomplete: 'mesh_type' is 'user_mesh' but 'user_mesh' object is not set."
+                    )
                 self.is_complete = False
             else:
                 self.is_complete = True
@@ -421,7 +508,6 @@ class MeshingParameters():
         The unit is inferred from the magnitude: values > 100 are assumed to
         be in meters, while values <= 100 are assumed to be in kilometers.
         """
-
         if value is not None:
             if value > 100:
                 new_unit = "meters"
@@ -438,8 +524,7 @@ class MeshingParameters():
                 f"{self._unit}. Please check for consistency."
             )
         if value is not None and value < 0.0:
-            raise ValueError(
-                f"Please do not use negative value for {attr_name}")
+            raise ValueError(f"Please do not use negative value for {attr_name}")
         setattr(self, attr_name, value)
 
     @property
@@ -519,9 +604,9 @@ class MeshingParameters():
         visualization only and cannot be used for simulation.
         """
         if value is not None:
-            if isinstance(value, str) and value.endswith('.vtk'):
+            if isinstance(value, str) and value.endswith(".vtk"):
                 warn("VTK meshes for visualization only, will not run a simulation.")
-            elif not (isinstance(value, str) and value.endswith('.msh')):
+            elif not (isinstance(value, str) and value.endswith(".msh")):
                 raise ValueError(f"mesh_file '{value}' must be a .msh file")
         self._output_filename = value
 
@@ -568,7 +653,7 @@ class MeshingParameters():
             self._cells_per_wavelength = None
 
         self._edge_length = value
-        if hasattr(self, 'is_complete'):
+        if hasattr(self, "is_complete"):
             self.check_completeness()
 
     def _resolved_edge_length(self, axis):
@@ -584,7 +669,7 @@ class MeshingParameters():
     @edge_length_z.setter
     def edge_length_z(self, value):
         self._edge_length_z = value
-        if hasattr(self, 'is_complete'):
+        if hasattr(self, "is_complete"):
             self.check_completeness()
 
     @property
@@ -594,7 +679,7 @@ class MeshingParameters():
     @edge_length_x.setter
     def edge_length_x(self, value):
         self._edge_length_x = value
-        if hasattr(self, 'is_complete'):
+        if hasattr(self, "is_complete"):
             self.check_completeness()
 
     @property
@@ -604,7 +689,7 @@ class MeshingParameters():
     @edge_length_y.setter
     def edge_length_y(self, value):
         self._edge_length_y = value
-        if hasattr(self, 'is_complete'):
+        if hasattr(self, "is_complete"):
             self.check_completeness()
 
     @property
@@ -638,12 +723,11 @@ class MeshingParameters():
         Setting this property will automatically set edge_length to None.
         """
         if value is not None and self.edge_length is not None:
-            warn("Setting cells_per_wavelength "
-                 "removes edge_length parameter")
+            warn("Setting cells_per_wavelength " "removes edge_length parameter")
             self._edge_length = None
 
         self._cells_per_wavelength = value
-        if hasattr(self, 'is_complete'):
+        if hasattr(self, "is_complete"):
             self.check_completeness()
 
     @property
@@ -713,12 +797,12 @@ class MeshingParameters():
             If the specified file does not exist.
         """
         if value is not None:
-            if not (isinstance(value, str) and value.endswith('.msh')):
+            if not (isinstance(value, str) and value.endswith(".msh")):
                 raise ValueError(f"mesh_file '{value}' must be a .msh file")
             if not path.exists(value):
                 raise FileNotFoundError(f"mesh_file '{value}' does not exist")
         self._mesh_file = value
-        if hasattr(self, 'is_complete'):
+        if hasattr(self, "is_complete"):
             self.check_completeness()
 
     @property
@@ -749,7 +833,14 @@ class MeshingParameters():
             'SeismicMesh' is selected with quadrilateral elements
             (not supported).
         """
-        allowed_types = ["firedrake_mesh", "user_mesh", "SeismicMesh", "file", "spyro_mesh", "gmsh_mesh"]
+        allowed_types = [
+            "firedrake_mesh",
+            "user_mesh",
+            "SeismicMesh",
+            "file",
+            "spyro_mesh",
+            "gmsh_mesh",
+        ]
         if value is not None and value not in allowed_types:
             validate_parameter("mesh_type", value, allowed_types)
 
@@ -760,7 +851,7 @@ class MeshingParameters():
         if value in ["firedrake_mesh", "SeismicMesh", "spyro_mesh"]:
             self.automatic_mesh = True
 
-        if hasattr(self, 'is_complete'):
+        if hasattr(self, "is_complete"):
             self.check_completeness()
 
     @property
@@ -797,17 +888,19 @@ class MeshingParameters():
         if value is None:
             self._source_frequency = value
         elif not isinstance(value, (int, float)):
-            raise TypeError("Source frequency must be a number"
-                            f", got {type(value).__name__}")
+            raise TypeError(
+                "Source frequency must be a number" f", got {type(value).__name__}"
+            )
         else:
             if value < 1.5:
-                warn(f"Source frequency of {value} "
-                     "too low for realistic FWI case")
+                warn(f"Source frequency of {value} " "too low for realistic FWI case")
             elif value > 50:
-                warn(f"Source frequency of {value} too high for "
-                     "realistic FWI case, please low-pass filter")
+                warn(
+                    f"Source frequency of {value} too high for "
+                    "realistic FWI case, please low-pass filter"
+                )
             self._source_frequency = value
-        if hasattr(self, 'is_complete'):
+        if hasattr(self, "is_complete"):
             self.check_completeness()
 
     @property
@@ -949,7 +1042,7 @@ class MeshingParameters():
         if value is not None:
             self.mesh_type = "user_mesh"
         self._user_mesh = value
-        if hasattr(self, 'is_complete'):
+        if hasattr(self, "is_complete"):
             self.check_completeness()
 
     @property
@@ -979,8 +1072,9 @@ class MeshingParameters():
             as periodic meshes are only supported with Firedrake meshes.
         """
         if self.mesh_type != "firedrake_mesh" and value is True:
-            raise ValueError("Periodic meshes are only supported "
-                             "with Firedrake meshes for now.")
+            raise ValueError(
+                "Periodic meshes are only supported " "with Firedrake meshes for now."
+            )
         self._periodic = value
 
     @property
@@ -1004,6 +1098,24 @@ class MeshingParameters():
     @padding_x.setter
     def padding_x(self, value):
         self._set_length_with_unit_check("_padding_x", value)
+
+    @property
+    def padding_y(self):
+        """Pad length in the y-direction.
+
+        Returns
+        -------
+        float or None
+            The y-direction padding. If it is not set, the
+            absorbing-boundary padding length is returned.
+        """
+        if self._padding_y is None:
+            return self._abc_pad_length
+        return self._padding_y
+
+    @padding_y.setter
+    def padding_y(self, value):
+        self._set_length_with_unit_check("_padding_y", value)
 
     @property
     def padding_z(self):
@@ -1095,7 +1207,9 @@ class MeshingParameters():
     @apply_winslow.setter
     def apply_winslow(self, value):
         if value is not None and not isinstance(value, bool):
-            raise TypeError(f"apply_winslow must be a boolean, got {type(value).__name__}")
+            raise TypeError(
+                f"apply_winslow must be a boolean, got {type(value).__name__}"
+            )
 
         self._apply_winslow = value
 
@@ -1144,7 +1258,12 @@ class MeshingParameters():
                 setattr(self, key, value)
 
         # Update automatic_mesh flag based on final mesh_type
-        self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh", "gmsh_mesh"}
+        self.automatic_mesh = self.mesh_type in {
+            "firedrake_mesh",
+            "SeismicMesh",
+            "spyro_mesh",
+            "gmsh_mesh",
+        }
 
     @property
     def velocity_model(self):
@@ -1153,7 +1272,7 @@ class MeshingParameters():
     @velocity_model.setter
     def velocity_model(self, value):
         self._velocity_model = value
-        if hasattr(self, 'is_complete'):
+        if hasattr(self, "is_complete"):
             self.check_completeness()
 
     @property
@@ -1162,9 +1281,11 @@ class MeshingParameters():
 
     @segy_velocity_model.setter
     def segy_velocity_model(self, value):
-        warn("Passing SEGY directly to the mesher is deprecated. Please use grid point velocity inputs.")
+        warn(
+            "Passing SEGY directly to the mesher is deprecated. Please use grid point velocity inputs."
+        )
         self._segy_velocity_model = value
         if value is not None:
             self.velocity_model = value
-        if hasattr(self, 'is_complete'):
+        if hasattr(self, "is_complete"):
             self.check_completeness()

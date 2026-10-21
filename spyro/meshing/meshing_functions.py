@@ -1,22 +1,14 @@
 import numpy as np
 from firedrake import Mesh as FireMeshReader
+
+from .firedrake_based_wrappers import box_mesh, periodic_rectangle_mesh, rectangle_mesh
 from spyro.mpi.spyro_mpi import SpyroEnsemble
-from ..io.segy_io import create_segy_from_grid
-from .meshing_gmsh2d import (
-    build_gmsh_geometry_and_groups,
-    apply_structured_winslow_smoothing2d,
-)
-from .meshing_utils import create_sizing_function, calculate_edge_length
-from .firedrake_based_wrappers import rectangle_mesh, periodic_rectangle_mesh, box_mesh
+from .meshing_utils import calculate_edge_length
 from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_with_velocity_model
 from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_homogeneous
 from .gmsh_based_methods import build_big_rect_with_inner_element_group
-
-try:
-    import gmsh
-except ImportError:
-    gmsh = None
-
+from .meshing_2d import generate_gmsh_2d_mesh
+from .meshing_3d import generate_gmsh_3d_mesh
 
 try:
     import SeismicMesh
@@ -177,18 +169,12 @@ class AutomaticMesh:
             return self.create_seismicmesh_mesh()
         elif self.mesh_type == "spyro_mesh":
             self.create_spyro_mesh()
-            if self.comm is not None:
-                # Ensure all processes wait for mesh creation to complete
-                # Need to sync both ensemble and spatial communicators
-                if hasattr(self.comm, "ensemble_comm"):
-                    self.comm.ensemble_comm.barrier()
-                self.comm.comm.barrier()
-                SpyroEnsemble.print("Loading mesh.")
-                return FireMeshReader(self.output_file_name, comm=self.comm.comm)
-            else:
-                return FireMeshReader(self.output_file_name)
+            return self._load_mesh_file()
         elif self.mesh_type == "gmsh_mesh":
-            return self.create_gmsh_2D_mesh()
+            if self.dimension == 2:
+                return self.create_gmsh_2D_mesh()
+            elif self.dimension == 3:
+                return self.create_gmsh_3D_mesh()
         else:
             raise ValueError("mesh_type is not supported")
 
@@ -206,7 +192,6 @@ class AutomaticMesh:
         -------
         None
         """
-
         # Adjusting coordinates
         if self.dimension == 3:  # 3D
             min_y = mesh.coordinates.dat.data_with_halos[:, 2].min()
@@ -269,7 +254,6 @@ class AutomaticMesh:
             Number of elements in each dimension of the mesh.
             Structure: (nz, nx) for 2D and (nz, nx, ny) for 3D
         """
-
         # Compute the edge length if there is no one
         if (
             self.edge_length is None
@@ -358,7 +342,6 @@ class AutomaticMesh:
         Uses the edge_length parameter to determine the number of elements
         in each direction(x, y, z).
         """
-
         # Define the discretization
         nz, nx, ny = self.define_discretization_for_mesh()
 
@@ -448,270 +431,36 @@ class AutomaticMesh:
     def create_gmsh_2D_mesh(self):
         """
         Creates a 2D mesh using Gmsh with optional water interface,
-        hyperelliptical/rectangular padding, and Winslow smoothing.
+        hyperelliptical/rectangular padding, structured Winslow smoothing,
+        or unstructured full-quadrilateral meshing.
 
         Returns
         -------
         mesh : Firedrake Mesh
             The loaded Firedrake mesh object.
         """
-        if gmsh is None:
-            raise ImportError("gmsh is not available. Please install it.")
+        self.velocity_model = generate_gmsh_2d_mesh(self.mesh_parameters)
+        return self._load_mesh_file()
 
-        if self.mesh_parameters.segy_velocity_model is not None:
-            self.velocity_model = self.mesh_parameters.segy_velocity_model
+    def create_gmsh_3D_mesh(self):
+        """Create a 3-D Gmsh mesh with the supplied volumetric logic."""
+        self.velocity_model = generate_gmsh_3d_mesh(self.mesh_parameters)
+        return self._load_mesh_file()
 
-        elif self.mesh_parameters.velocity_model is not None:
-            velocity_model = self.mesh_parameters.velocity_model
+    def _load_mesh_file(self):
+        """Wait for the mesh-writing rank, then load the mesh file.
 
-            if not isinstance(velocity_model, dict):
-                raise TypeError(
-                    "velocity_model must be a grid dictionary when "
-                    "segy_velocity_model is not provided."
-                )
-
-            if "vp_values" not in velocity_model:
-                raise ValueError(
-                    "Grid velocity_model must contain the key 'vp_values'."
-                )
-
-            vp = np.asarray(velocity_model["vp_values"])
-
-            if vp.ndim != 2:
-                raise ValueError(
-                    "Grid velocity_model['vp_values'] must be a 2-D array, "
-                    f"but received shape {vp.shape}."
-                )
-
-            vp_for_gmsh = np.ascontiguousarray(vp[::-1, :])
-
-            filename = "tmp_velocity_model.segy"
-            create_segy_from_grid(vp_for_gmsh, filename)
-
-            self.velocity_model = filename
-
-        else:
-            raise ValueError(
-                "Gmsh meshing requires either 'segy_velocity_model' "
-                "or a grid 'velocity_model'."
-            )
-
-        if self.comm is None or self.comm.ensemble_comm.rank == 0:
-            SpyroEnsemble.print("Generating Gmsh mesh...")
-
-            depth_z = -abs(self.length_z)
-            length_x = self.length_x
-            padding_z = self.mesh_parameters.padding_z
-            padding_x = self.mesh_parameters.padding_x
-            hyper_n = self.mesh_parameters.hyper_n
-            fname = self.velocity_model
-            hmin_segy = self.mesh_parameters.hmin_segy
-            wl = self.cpw
-            freq = self.source_frequency
-            grade = self.mesh_parameters.grade
-            water_search_value = self.mesh_parameters.water_search_value
-            padding_type = self.mesh_parameters.padding_type
-            output_file = self.output_file_name
-            water_interface = self.mesh_parameters.water_interface
-            vp_water = self.mesh_parameters.vp_water
-            structured_mesh = self.mesh_parameters.structured_mesh
-            minElementSize = self.mesh_parameters.min_element_size
-            winslow_implementation = self.mesh_parameters.winslow_implementation
-            apply_winslow = self.mesh_parameters.apply_winslow
-            winslow_iterations = self.mesh_parameters.winslow_iterations
-            winslow_omega = self.mesh_parameters.winslow_omega
-            extend_segy = self.mesh_parameters.extend_segy
-            h_padding = self.mesh_parameters.h_padding
-            segy_bbox = (depth_z, 0, 0, length_x)
-
-            # Calculating domain bounding box according to selected padding
-            box_xmax = length_x
-            box_zmin = depth_z
-            xc = box_xmax / 2.0
-            zc = box_zmin / 2.0
-
-            if padding_type is None:
-                domain_xmin, domain_xmax = 0.0, length_x
-                domain_zmax, domain_zmin = depth_z, 0.0
-
-            if padding_type == "hyperelliptical":
-                hyper_a = (box_zmin / 2.0) - padding_z
-                hyper_b = (box_xmax / 2.0) + padding_x
-                domain_zmin = zc + hyper_a
-                domain_zmax = 0.0
-                domain_xmin = xc - hyper_b
-                domain_xmax = xc + hyper_b
-
-            if padding_type == "rectangular":
-                domain_zmin = box_zmin - padding_z
-                domain_zmax = 0.0
-                domain_xmin = 0.0 - padding_x
-                domain_xmax = box_xmax + padding_x
-
-            # Interpolating sizing function from segy file
-            ef_segy2, f_min, f_max, n_samples, n_traces = create_sizing_function(
-                fname=fname,
-                hmin=hmin_segy,
-                bbox=segy_bbox,
-                wl=wl,
-                freq=freq,
-                pad_type=padding_type,
-                pad_size_x=padding_x,
-                pad_size_z=padding_z,
-                grade=grade,
-                vp_water=vp_water,
-            )
-
-            gmsh.initialize()
-            gmsh.option.setNumber("Geometry.Tolerance", 1e-16)
-            gmsh.model.add("seismic_model")
-
-            geom_params = build_gmsh_geometry_and_groups(
-                gmsh=gmsh,
-                fname=fname,
-                length_x=length_x,
-                depth_z=depth_z,
-                padding_type=padding_type,
-                padding_x=padding_x,
-                padding_z=padding_z,
-                hyper_n=hyper_n,
-                water_interface=water_interface,
-                water_search_value=water_search_value,
-                structured_mesh=structured_mesh,
-                minElementSize=minElementSize,
-            )
-
-            # Standard Params
-            z_water_L = geom_params.get("z_water_L")
-            z_water_R = geom_params.get("z_water_R")
-            pad_x_min = geom_params.get("pad_x_min")
-            pad_x_max = geom_params.get("pad_x_max")
-            pad_z_min = geom_params.get("pad_z_min")
-            a_val = geom_params.get("a_val")
-            b_val = geom_params.get("b_val")
-            xc = geom_params.get("xc")
-            zc = geom_params.get("zc")
-
-            def mesh_size_callback(dim, tag, x, y, z, lc):
-                if extend_segy:
-                    return float(ef_segy2(np.array([x]), np.array([y]))[0])
-                else:
-                    z_min_segy, z_max_segy, x_min_segy, x_max_segy = segy_bbox
-                    if (x_min_segy <= x <= x_max_segy) and (
-                        z_min_segy <= y <= z_max_segy
-                    ):
-                        return float(ef_segy2(np.array([x]), np.array([y]))[0])
-                    else:
-                        x_proj, y_proj = min(max(x, x_min_segy), x_max_segy), min(
-                            max(y, z_min_segy), z_max_segy
-                        )
-                        base_size = float(
-                            ef_segy2(np.array([x_proj]), np.array([y_proj]))[0]
-                        )
-                        tx = abs(x - x_proj) / padding_x if padding_x > 0 else 0.0
-                        ty = abs(y - y_proj) / padding_z if padding_z > 0 else 0.0
-                        t = min(
-                            (
-                                (tx**hyper_n + ty**hyper_n) ** (1.0 / hyper_n)
-                                if padding_type == "hyperelliptical"
-                                else max(tx, ty)
-                            ),
-                            1.0,
-                        )
-                        return float(base_size + t * (h_padding - base_size))
-
-            gmsh.model.mesh.setSizeCallback(mesh_size_callback)
-            gmsh.option.setNumber("Mesh.SaveWithoutOrphans", 1)
-            gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
-            gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
-            gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
-            if structured_mesh and padding_type != "hyperelliptical":
-                gmsh.option.setNumber("Mesh.MeshSizeMin", minElementSize)
-                gmsh.option.setNumber("Mesh.MeshSizeMax", minElementSize)
-                gmsh.model.mesh.setTransfiniteAutomatic()
-            gmsh.model.mesh.generate(2)
-
-            if structured_mesh:
-                apply_structured_winslow_smoothing2d(
-                    gmsh=gmsh,
-                    geom_params=geom_params,
-                    length_x=length_x,
-                    depth_z=depth_z,
-                    padding_type=padding_type,
-                    water_interface=water_interface,
-                    hyper_n=hyper_n,
-                    winslow_implementation=winslow_implementation,
-                    winslow_iterations=winslow_iterations,
-                    winslow_omega=winslow_omega,
-                    n_samples=n_samples,
-                    n_traces=n_traces,
-                    domain_xmin=domain_xmin,
-                    domain_xmax=domain_xmax,
-                    domain_zmin=domain_zmin,
-                    domain_zmax=domain_zmax,
-                    ef_segy2=ef_segy2,
-                    z_water_L=z_water_L,
-                    z_water_R=z_water_R,
-                    pad_x_min=pad_x_min,
-                    pad_x_max=pad_x_max,
-                    pad_z_min=pad_z_min,
-                    a_val=a_val,
-                    b_val=b_val,
-                    xc=xc,
-                    zc=zc,
-                    apply_winslow=apply_winslow,
-                )
-            # Rotating mesh for axis (z,x,y)
-            if padding_type in ["rectangular", "hyperelliptical"]:
-                rotate_xz = [
-                    0.0,
-                    1.0,
-                    0.0,
-                    0.0,
-                    -1.0,
-                    0.0,
-                    0.0,
-                    domain_xmax,
-                    0.0,
-                    0.0,
-                    1.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    1.0,
-                ]
-            else:
-                rotate_xz = [
-                    0.0,
-                    1.0,
-                    0.0,
-                    -domain_zmin,
-                    -1.0,
-                    0.0,
-                    0.0,
-                    domain_xmax,
-                    0.0,
-                    0.0,
-                    1.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    1.0,
-                ]
-
-            gmsh.model.mesh.affineTransform(rotate_xz)
-            gmsh.write(output_file)
-            SpyroEnsemble.print(f"Gmsh mesh written to {output_file}")
-            gmsh.finalize()
-
-        # MPI Sync
+        Returns
+        -------
+        firedrake.MeshGeometry
+            Mesh read from ``self.output_file_name``.
+        """
         if self.comm is not None:
+            # Ensure all processes wait for mesh creation to complete
+            # Need to sync both ensemble and spatial communicators
             if hasattr(self.comm, "ensemble_comm"):
                 self.comm.ensemble_comm.barrier()
             self.comm.comm.barrier()
             SpyroEnsemble.print("Loading mesh into Firedrake.")
             return FireMeshReader(self.output_file_name, comm=self.comm.comm)
-        else:
-            return FireMeshReader(self.output_file_name)
+        return FireMeshReader(self.output_file_name)

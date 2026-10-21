@@ -115,8 +115,11 @@ def create_grid_based_velocity_field(grid_spacing, length_z, length_x):
 
 
 @pytest.mark.older_firedrake
-def test_gmsh_adaptation():
+def test_gmsh_adaptation(tmp_path, monkeypatch):
     import gmsh  # noqa: F401
+    # The mesher writes the mesh and a temporary SEG-Y file to the current
+    # working directory, so run in tmp_path to keep the repository clean.
+    monkeypatch.chdir(tmp_path)
     """Test Gmsh mesh adaptation with conditional velocity field.
 
     Validates that Gmsh mesh adaptation correctly adjusts element sizes
@@ -206,7 +209,7 @@ def test_gmsh_adaptation():
     dictionary["acquisition"] = {
         "source_type": "ricker",
         "source_locations": [(-0.2, length_x/2.0)],
-        "frequency": 20.0,
+        "frequency": 25.0,
         "delay": 0.3,
         "receiver_locations": [(-0.5, length_x/2.0)],
         "delay_type": "time",
@@ -238,7 +241,7 @@ def test_gmsh_adaptation():
     f = fire.assemble(fire.interpolate(fire.CellSize(wave.mesh), DG0))
 
     # at centre of minas cheese (gold square):
-    lbda_centre = 3.0/20.0  # vp/freq
+    lbda_centre = 3.0/25.0  # vp/freq
     h_centre = lbda_centre/cells_per_wavelength
     cell_diam_centre = float(f.at(-1.0, 1.0))
     print(f'Using Firedrake version {version("firedrake")}')
@@ -247,13 +250,13 @@ def test_gmsh_adaptation():
     assert math.isclose(h_centre, cell_diam_centre, rel_tol=1e-1)
 
     # at circle of minas cheese (meia cura cheesy goodness):
-    lbda_circle = 2.0/20.0  # vp/freq
+    lbda_circle = 2.0/25.0  # vp/freq
     h_circle = lbda_circle/cells_per_wavelength
     cell_diam_circle = float(f.at(-1.0, 1.3))
     assert math.isclose(h_circle, cell_diam_circle, rel_tol=1e-1)
 
     # outside the cheese
-    lbda_outside = 1.5/20.0
+    lbda_outside = 1.5/25.0
     h_outside = lbda_outside/cells_per_wavelength
     cell_diam_outside = float(f.at(-1.0, 1.7))
     assert math.isclose(h_outside, cell_diam_outside, rel_tol=1e-2)
