@@ -365,3 +365,48 @@ def hyperellipse_area(
         HyperLayer.half_hyp_area(semi_x, semi_z, n)
         + HyperLayer.trunc_half_hyp_area(semi_x, semi_z, n, length_z / 2.0)
     )
+
+
+def hyperellipsoid_volume(
+    length_z: float,
+    length_x: float,
+    length_y: float,
+    padding_z: float,
+    padding_x: float,
+    padding_y: float,
+    n: float,
+) -> float:
+    """Volume of the 3D hyperellipsoidal domain cut at `z = 0`.
+
+    Parameters
+    ----------
+    length_z : float
+        Model depth.
+    length_x : float
+        Model length in x.
+    length_y : float
+        Model length in y.
+    padding_z : float
+        Padding below the model.
+    padding_x : float
+        Padding on each side of the model in x.
+    padding_y : float
+        Padding on each side of the model in y.
+    n : float
+        Hyperellipsoid exponent.
+
+    Returns
+    -------
+    float
+        Volume of the part of the hyperellipsoid with `z <= 0`.
+    """
+    semi_x = length_x / 2.0 + padding_x
+    semi_y = length_y / 2.0 + padding_y
+    semi_z = length_z / 2.0 + padding_z
+    # Lower half plus the slab between the centre and the cut at z = 0.
+    return float(
+        HyperLayer.half_hyp_volume(semi_x, semi_y, semi_z, n)
+        + HyperLayer.trunc_half_hyp_volume(
+            semi_x, semi_z, semi_y, n, length_z / 2.0
+        )
+    )

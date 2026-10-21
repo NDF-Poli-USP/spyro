@@ -3,14 +3,16 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from spyro.io.basicio import parallel_print
 from spyro.meshing.meshing_utils3d import create_sizing_function3d
-from spyro.meshing.meshing_winslow3D import (
+from spyro.meshing.meshing_winslow3d import (
     NUMBA_AVAILABLE,
+    _cardinal_coordinate,
+    _mixed_coordinate,
+    _neighbor_size,
     _numba_winslow_3d_step,
     _resolve_stencil_coordinates,
     run_selected_winslow,
-    winslow_smooth_3d55,
+    winslow_smooth_3d,
 )
 
 
@@ -68,6 +70,19 @@ def _structured_hex_mesh(
 
 
 def _constant_sizing(coordinates):
+    """Uniform sizing law returning one at every coordinate.
+
+    Parameters
+    ----------
+    coordinates : array_like
+        A single `(z, x, y)` point of shape `(3,)` or an array of points
+        of shape `(n, 3)`.
+
+    Returns
+    -------
+    float or numpy.ndarray
+        `1.0` for a single point, otherwise an array of ones of length `n`.
+    """
     coordinates = np.asarray(coordinates, dtype=float)
     if coordinates.ndim == 1:
         return 1.0
@@ -96,7 +111,84 @@ def _python_implementation(function):
     return getattr(function, "py_func", function)
 
 
+@pytest.mark.parametrize("compiled", [False, True])
+@pytest.mark.parametrize(
+    "neighbor, opposite, expected",
+    [(1, 2, -2.0), (-1, 2, 8.0), (-1, -1, 3.0)],
+)
+def test_cardinal_coordinate(compiled, neighbor, opposite, expected):
+    """Check the neighbor, reflected-opposite and center cases of a cardinal.
+
+    Parameters
+    ----------
+    compiled : bool
+        If True, call the Numba dispatcher; otherwise its Python function.
+    neighbor : int
+        Index of the cardinal neighbor, or -1 when it is missing.
+    opposite : int
+        Index of the opposite neighbor, or -1 when it is missing.
+    expected : float
+        Expected resolved coordinate.
+    """
+    function = (
+        _cardinal_coordinate if compiled
+        else _python_implementation(_cardinal_coordinate)
+    )
+    coordinates = np.array([0.0, -2.0, -2.0])
+    assert function(coordinates, 3.0, neighbor, opposite) == expected
+
+
+@pytest.mark.parametrize("compiled", [False, True])
+@pytest.mark.parametrize("neighbor, expected", [(1, 9.0), (-1, 4.0)])
+def test_mixed_coordinate(compiled, neighbor, expected):
+    """Check that a missing diagonal is rebuilt from its two cardinals.
+
+    Parameters
+    ----------
+    compiled : bool
+        If True, call the Numba dispatcher; otherwise its Python function.
+    neighbor : int
+        Index of the diagonal neighbor, or -1 when it is missing.
+    expected : float
+        Expected resolved coordinate.
+    """
+    function = (
+        _mixed_coordinate if compiled
+        else _python_implementation(_mixed_coordinate)
+    )
+    coordinates = np.array([0.0, 9.0])
+    # Missing: first + second - center = 5.0 + 2.0 - 3.0.
+    assert function(coordinates, 3.0, neighbor, 5.0, 2.0) == expected
+
+
+@pytest.mark.parametrize("compiled", [False, True])
+@pytest.mark.parametrize(
+    "neighbor, expected",
+    [(0, 7.0), (1, 1.0), (-1, 1.0)],
+)
+def test_neighbor_size(compiled, neighbor, expected):
+    """Check that only existing movable neighbors contribute their size.
+
+    Parameters
+    ----------
+    compiled : bool
+        If True, call the Numba dispatcher; otherwise its Python function.
+    neighbor : int
+        Index of the neighbor, or -1 when it is missing.
+    expected : float
+        Expected sizing value.
+    """
+    function = (
+        _neighbor_size if compiled
+        else _python_implementation(_neighbor_size)
+    )
+    sizing_values = np.array([7.0, 8.0])
+    is_movable = np.array([True, False])
+    assert function(sizing_values, is_movable, neighbor, 1.0) == expected
+
+
 def test_resolve_stencil_coordinates_complete_neighbors():
+    """Check that a fully populated stencil returns its 18 neighbor coordinates."""
     function = _python_implementation(_resolve_stencil_coordinates)
 
     coordinates = np.arange(30, dtype=float)
@@ -113,6 +205,10 @@ def test_resolve_stencil_coordinates_complete_neighbors():
 
 
 def test_resolve_stencil_coordinates_reflects_missing_cardinals():
+    """Check that missing cardinals are reflected through the center node.
+
+    Missing diagonal neighbors must then be rebuilt from the resolved cardinals.
+    """
     function = _python_implementation(_resolve_stencil_coordinates)
 
     coordinates = np.array(
@@ -159,6 +255,7 @@ def test_resolve_stencil_coordinates_reflects_missing_cardinals():
 
 
 def test_resolve_stencil_coordinates_all_missing_returns_center():
+    """Check that a stencil with no neighbors resolves every entry to the center."""
     function = _python_implementation(_resolve_stencil_coordinates)
 
     coordinates = np.array([7.0], dtype=float)
@@ -241,6 +338,7 @@ def _kernel_stencil_problem():
 
 
 def test_numba_step_python_path_updates_only_movable_center():
+    """Check that one Python kernel step moves only the movable center node."""
     function = _python_implementation(_numba_winslow_3d_step)
 
     (
@@ -276,6 +374,7 @@ def test_numba_step_python_path_updates_only_movable_center():
 
 
 def test_numba_step_python_path_skips_fixed_nodes():
+    """Check that the Python kernel leaves nodes fixed when no axis is movable."""
     function = _python_implementation(_numba_winslow_3d_step)
 
     (
@@ -311,6 +410,7 @@ def test_numba_step_python_path_skips_fixed_nodes():
 
 
 def test_numba_step_python_path_handles_degenerate_denominator():
+    """Check that the Python kernel skips a node whose update denominator vanishes."""
     function = _python_implementation(_numba_winslow_3d_step)
 
     num_nodes = 7
@@ -359,6 +459,7 @@ def test_numba_step_python_path_handles_degenerate_denominator():
     reason="Numba is not installed in this environment.",
 )
 def test_numba_step_compiled_path_executes():
+    """Check that the compiled Numba kernel returns three finite coordinate arrays."""
     (
         points,
         sizing_values,
@@ -397,25 +498,30 @@ def test_numba_step_compiled_path_executes():
     ],
 )
 def test_winslow_smooth_rejects_invalid_point_shape(bad_points):
+    """Check that `winslow_smooth_3d` rejects points not shaped `(n, 3)`.
+
+    Parameters
+    ----------
+    bad_points : numpy.ndarray
+        Point array with an invalid shape.
+    """
     _, hexes, _ = _structured_hex_mesh()
 
     with pytest.raises(
         ValueError,
         match="points must have shape",
     ):
-        winslow_smooth_3d55(
+        winslow_smooth_3d(
             points=bad_points,
             hexes=hexes,
             move_all={0},
-            move_X_only=set(),
-            move_Y_only=set(),
-            move_Z_only=set(),
+            move_x_only=set(),
+            move_y_only=set(),
+            move_z_only=set(),
             ef_segy=_constant_sizing,
             length_x=2.0,
             length_y=2.0,
             depth_z=2.0,
-            comm=None,
-            parallel_print=parallel_print,
             iterations=1,
             omega=0.5,
         )
@@ -430,31 +536,37 @@ def test_winslow_smooth_rejects_invalid_point_shape(bad_points):
     ],
 )
 def test_winslow_smooth_rejects_invalid_hex_shape(bad_hexes):
+    """Check that `winslow_smooth_3d` rejects connectivity not shaped `(m, 8)`.
+
+    Parameters
+    ----------
+    bad_hexes : numpy.ndarray
+        Hexahedral connectivity array with an invalid shape.
+    """
     points, _, _ = _structured_hex_mesh()
 
     with pytest.raises(
         ValueError,
         match="hexes must have shape",
     ):
-        winslow_smooth_3d55(
+        winslow_smooth_3d(
             points=points,
             hexes=bad_hexes,
             move_all={13},
-            move_X_only=set(),
-            move_Y_only=set(),
-            move_Z_only=set(),
+            move_x_only=set(),
+            move_y_only=set(),
+            move_z_only=set(),
             ef_segy=_constant_sizing,
             length_x=2.0,
             length_y=2.0,
             depth_z=2.0,
-            comm=None,
-            parallel_print=parallel_print,
             iterations=1,
             omega=0.5,
         )
 
 
 def test_winslow_smooth_rejects_negative_iterations():
+    """Check that `winslow_smooth_3d` rejects a negative iteration count."""
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
@@ -462,19 +574,17 @@ def test_winslow_smooth_rejects_negative_iterations():
         ValueError,
         match="iterations must be non-negative",
     ):
-        winslow_smooth_3d55(
+        winslow_smooth_3d(
             points=points,
             hexes=hexes,
             move_all={center},
-            move_X_only=set(),
-            move_Y_only=set(),
-            move_Z_only=set(),
+            move_x_only=set(),
+            move_y_only=set(),
+            move_z_only=set(),
             ef_segy=_constant_sizing,
             length_x=2.0,
             length_y=2.0,
             depth_z=2.0,
-            comm=None,
-            parallel_print=parallel_print,
             iterations=-1,
             omega=0.5,
         )
@@ -482,6 +592,13 @@ def test_winslow_smooth_rejects_negative_iterations():
 
 @pytest.mark.parametrize("omega", [0.0, -0.1, 1.01, 2.0])
 def test_winslow_smooth_rejects_invalid_omega(omega):
+    """Check that `winslow_smooth_3d` rejects relaxation factors outside `(0, 1]`.
+
+    Parameters
+    ----------
+    omega : float
+        Invalid relaxation factor.
+    """
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
@@ -489,19 +606,17 @@ def test_winslow_smooth_rejects_invalid_omega(omega):
         ValueError,
         match="omega must satisfy",
     ):
-        winslow_smooth_3d55(
+        winslow_smooth_3d(
             points=points,
             hexes=hexes,
             move_all={center},
-            move_X_only=set(),
-            move_Y_only=set(),
-            move_Z_only=set(),
+            move_x_only=set(),
+            move_y_only=set(),
+            move_z_only=set(),
             ef_segy=_constant_sizing,
             length_x=2.0,
             length_y=2.0,
             depth_z=2.0,
-            comm=None,
-            parallel_print=parallel_print,
             iterations=1,
             omega=omega,
         )
@@ -509,47 +624,57 @@ def test_winslow_smooth_rejects_invalid_omega(omega):
 
 @pytest.mark.parametrize("invalid_node", [-1, 27, 100])
 def test_winslow_smooth_rejects_invalid_movement_indices(invalid_node):
+    """Check that `winslow_smooth_3d` rejects movement sets with out-of-range nodes.
+
+    Parameters
+    ----------
+    invalid_node : int
+        Node index lying outside the mesh.
+    """
     points, hexes, _ = _structured_hex_mesh()
 
     with pytest.raises(
         ValueError,
         match="Movement sets contain node indices outside the mesh",
     ):
-        winslow_smooth_3d55(
+        winslow_smooth_3d(
             points=points,
             hexes=hexes,
             move_all={invalid_node},
-            move_X_only=set(),
-            move_Y_only=set(),
-            move_Z_only=set(),
+            move_x_only=set(),
+            move_y_only=set(),
+            move_z_only=set(),
             ef_segy=_constant_sizing,
             length_x=2.0,
             length_y=2.0,
             depth_z=2.0,
-            comm=None,
-            parallel_print=parallel_print,
             iterations=0,
             omega=0.5,
         )
 
 
 def test_winslow_smooth_zero_iterations_preserves_real_hex_mesh(capsys):
+    """Check that zero iterations leave the mesh unchanged and report completion.
+
+    Parameters
+    ----------
+    capsys : pytest.CaptureFixture
+        Pytest fixture capturing standard output.
+    """
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
-    smoothed = winslow_smooth_3d55(
+    smoothed = winslow_smooth_3d(
         points=points,
         hexes=hexes,
         move_all={center},
-        move_X_only=set(),
-        move_Y_only=set(),
-        move_Z_only=set(),
+        move_x_only=set(),
+        move_y_only=set(),
+        move_z_only=set(),
         ef_segy=_varying_sizing,
         length_x=2.0,
         length_y=2.0,
         depth_z=2.0,
-        comm=None,
-        parallel_print=parallel_print,
         iterations=0,
         omega=0.5,
     )
@@ -561,6 +686,7 @@ def test_winslow_smooth_zero_iterations_preserves_real_hex_mesh(capsys):
 
 
 def test_winslow_smooth_isolated_movable_node_is_safe():
+    """Check that a movable node with no hexahedral neighbors is left in place."""
     points = np.array(
         [
             [0.0, 0.0, 0.0],
@@ -570,19 +696,17 @@ def test_winslow_smooth_isolated_movable_node_is_safe():
     )
     hexes = np.empty((0, 8), dtype=np.int64)
 
-    smoothed = winslow_smooth_3d55(
+    smoothed = winslow_smooth_3d(
         points=points,
         hexes=hexes,
         move_all={0},
-        move_X_only=set(),
-        move_Y_only=set(),
-        move_Z_only=set(),
+        move_x_only=set(),
+        move_y_only=set(),
+        move_z_only=set(),
         ef_segy=_constant_sizing,
         length_x=1.0,
         length_y=1.0,
         depth_z=1.0,
-        comm=None,
-        parallel_print=parallel_print,
         iterations=1,
         omega=0.5,
     )
@@ -595,6 +719,13 @@ def test_winslow_smooth_isolated_movable_node_is_safe():
     ["X", "Y", "Z"],
 )
 def test_winslow_smooth_respects_directional_movement(movement_set):
+    """Check that a direction-restricted node moves only along its allowed axis.
+
+    Parameters
+    ----------
+    movement_set : str
+        Allowed movement axis, one of `"X"`, `"Y"` or `"Z"`.
+    """
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
@@ -605,19 +736,17 @@ def test_winslow_smooth_respects_directional_movement(movement_set):
     move_y = {center} if movement_set == "Y" else set()
     move_z = {center} if movement_set == "Z" else set()
 
-    smoothed = winslow_smooth_3d55(
+    smoothed = winslow_smooth_3d(
         points=distorted,
         hexes=hexes,
         move_all=set(),
-        move_X_only=move_x,
-        move_Y_only=move_y,
-        move_Z_only=move_z,
+        move_x_only=move_x,
+        move_y_only=move_y,
+        move_z_only=move_z,
         ef_segy=_varying_sizing,
         length_x=2.0,
         length_y=2.0,
         depth_z=2.0,
-        comm=None,
-        parallel_print=parallel_print,
         iterations=2,
         omega=0.5,
     )
@@ -643,25 +772,24 @@ def test_winslow_smooth_respects_directional_movement(movement_set):
 
 
 def test_winslow_smooth_move_all_changes_distorted_interior():
+    """Check that a fully movable distorted interior node moves while others stay."""
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
     distorted = points.copy()
     distorted[center] += np.array([0.16, -0.12, 0.09])
 
-    smoothed = winslow_smooth_3d55(
+    smoothed = winslow_smooth_3d(
         points=distorted,
         hexes=hexes,
         move_all={center},
-        move_X_only=set(),
-        move_Y_only=set(),
-        move_Z_only=set(),
+        move_x_only=set(),
+        move_y_only=set(),
+        move_z_only=set(),
         ef_segy=_varying_sizing,
         length_x=2.0,
         length_y=2.0,
         depth_z=2.0,
-        comm=None,
-        parallel_print=parallel_print,
         iterations=3,
         omega=0.4,
     )
@@ -675,40 +803,8 @@ def test_winslow_smooth_move_all_changes_distorted_interior():
     np.testing.assert_allclose(smoothed[fixed], distorted[fixed])
 
 
-class _RankOneCommunicator:
-    rank = 1
-
-
-class _CommunicatorWrapper:
-    comm = _RankOneCommunicator()
-
-
-def test_winslow_smooth_accepts_wrapped_communicator():
-    points, hexes, node = _structured_hex_mesh()
-    center = node(1, 1, 1)
-
-    result = winslow_smooth_3d55(
-        points=points,
-        hexes=hexes,
-        move_all={center},
-        move_X_only=set(),
-        move_Y_only=set(),
-        move_Z_only=set(),
-        ef_segy=_constant_sizing,
-        length_x=2.0,
-        length_y=2.0,
-        depth_z=2.0,
-        comm=_CommunicatorWrapper(),
-        parallel_print=parallel_print,
-        iterations=1,
-        omega=0.5,
-    )
-
-    assert result.shape == points.shape
-    assert np.all(np.isfinite(result))
-
-
 def test_run_selected_winslow_rejects_empty_movable_union():
+    """Check that `run_selected_winslow` raises when no node is movable."""
     points, hexes, _ = _structured_hex_mesh()
 
     with pytest.raises(
@@ -719,22 +815,29 @@ def test_run_selected_winslow_rejects_empty_movable_union():
             points=points,
             hexes=hexes,
             move_all=set(),
-            move_X_only=set(),
-            move_Y_only=set(),
-            move_Z_only=set(),
+            move_x_only=set(),
+            move_y_only=set(),
+            move_z_only=set(),
             ef_segy=_constant_sizing,
             length_x=2.0,
             length_y=2.0,
             depth_z=2.0,
             winslow_iterations=1,
             winslow_omega=0.5,
-            comm=None,
-            parallel_print=parallel_print,
             selected_winslow="numba",
         )
 
 
 def test_run_selected_winslow_rejects_unknown_implementation(capsys):
+    """Check that `run_selected_winslow` rejects implementations other than Numba.
+
+    The constant sizing field must also trigger the constant-sizing warning.
+
+    Parameters
+    ----------
+    capsys : pytest.CaptureFixture
+        Pytest fixture capturing standard output.
+    """
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
@@ -746,17 +849,15 @@ def test_run_selected_winslow_rejects_unknown_implementation(capsys):
             points=points,
             hexes=hexes,
             move_all={center},
-            move_X_only=set(),
-            move_Y_only=set(),
-            move_Z_only=set(),
+            move_x_only=set(),
+            move_y_only=set(),
+            move_z_only=set(),
             ef_segy=_constant_sizing,
             length_x=2.0,
             length_y=2.0,
             depth_z=2.0,
             winslow_iterations=0,
             winslow_omega=0.5,
-            comm=None,
-            parallel_print=parallel_print,
             selected_winslow="python",
         )
 
@@ -765,6 +866,13 @@ def test_run_selected_winslow_rejects_unknown_implementation(capsys):
 
 
 def test_run_selected_winslow_real_algorithm_reports_displacement(capsys):
+    """Check that `run_selected_winslow` moves a distorted node and logs diagnostics.
+
+    Parameters
+    ----------
+    capsys : pytest.CaptureFixture
+        Pytest fixture capturing standard output.
+    """
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
@@ -775,17 +883,15 @@ def test_run_selected_winslow_real_algorithm_reports_displacement(capsys):
         points=distorted,
         hexes=hexes,
         move_all={center},
-        move_X_only=set(),
-        move_Y_only=set(),
-        move_Z_only=set(),
+        move_x_only=set(),
+        move_y_only=set(),
+        move_z_only=set(),
         ef_segy=_varying_sizing,
         length_x=2.0,
         length_y=2.0,
         depth_z=2.0,
         winslow_iterations=2,
         winslow_omega=0.5,
-        comm=None,
-        parallel_print=parallel_print,
         selected_winslow="numba",
     )
 
@@ -800,6 +906,13 @@ def test_run_selected_winslow_real_algorithm_reports_displacement(capsys):
 
 
 def test_run_selected_winslow_zero_iterations_reports_no_movement(capsys):
+    """Check that zero iterations keep the mesh and report that no node moved.
+
+    Parameters
+    ----------
+    capsys : pytest.CaptureFixture
+        Pytest fixture capturing standard output.
+    """
     points, hexes, node = _structured_hex_mesh()
     center = node(1, 1, 1)
 
@@ -807,17 +920,15 @@ def test_run_selected_winslow_zero_iterations_reports_no_movement(capsys):
         points=points,
         hexes=hexes,
         move_all={center},
-        move_X_only=set(),
-        move_Y_only=set(),
-        move_Z_only=set(),
+        move_x_only=set(),
+        move_y_only=set(),
+        move_z_only=set(),
         ef_segy=_varying_sizing,
         length_x=2.0,
         length_y=2.0,
         depth_z=2.0,
         winslow_iterations=0,
         winslow_omega=0.5,
-        comm=None,
-        parallel_print=parallel_print,
         selected_winslow="numba",
     )
 
@@ -829,6 +940,7 @@ def test_run_selected_winslow_zero_iterations_reports_no_movement(capsys):
 
 @pytest.mark.slow
 def test_run_selected_winslow_with_vs_example_3d():
+    """Check `run_selected_winslow` with sizing from the 3-D example model."""
     if not VS_EXAMPLE_3D.exists():
         pytest.skip(
             f"Required velocity model not found: {VS_EXAMPLE_3D}"
@@ -880,17 +992,15 @@ def test_run_selected_winslow_with_vs_example_3d():
         points=points,
         hexes=hexes,
         move_all={center},
-        move_X_only=set(),
-        move_Y_only=set(),
-        move_Z_only=set(),
+        move_x_only=set(),
+        move_y_only=set(),
+        move_z_only=set(),
         ef_segy=ef_segy,
         length_x=5000.0,
         length_y=5000.0,
         depth_z=3000.0,
         winslow_iterations=0,
         winslow_omega=0.5,
-        comm=None,
-        parallel_print=parallel_print,
         selected_winslow="numba",
     )
 
