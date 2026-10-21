@@ -115,46 +115,44 @@ def create_grid_based_velocity_field(grid_spacing, length_z, length_x):
 
 
 @pytest.mark.older_firedrake
-def test_gmsh_adaptation():
-    import gmsh  # noqa: F401
-    """Test Gmsh mesh adaptation with conditional velocity field.
+def test_gmsh_adaptation(tmp_path, monkeypatch):
+    """Test that Gmsh adaptation sizes cells by the local velocity wavelength.
 
-    Validates that Gmsh mesh adaptation correctly adjusts element sizes
-    based on local velocity variations in a synthetic velocity model.
-    Performs element size verification at three locations: within a
-    high-velocity square, within a medium-velocity circle, and in a
-    low-velocity background region.
+    Element sizes are checked at three locations of a synthetic velocity
+    model: inside a high-velocity square, inside a medium-velocity circle,
+    and in the low-velocity background.
 
-    Returns
-    -------
-    None
-        Implicitly returns None. Passes if all assertions succeed.
-
-    Raises
-    ------
-    AssertionError
-        If element diameters deviate from expected values based on
-        wavelength and cells-per-wavelength requirements.
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory used as the working directory.
+    monkeypatch : pytest.MonkeyPatch
+        Pytest fixture used to change the working directory.
 
     Notes
     -----
     Test configuration:
+
     - 2D domain: 2.0 km (depth) x 2.5 km (width)
     - Cells per wavelength: 2.6
-    - Frequency: 20 Hz
+    - Frequency: 25 Hz
     - Time step: 0.001 s
     - Polynomial degree: 4
     - Winslow smoothing enabled with 3000 iterations
 
-    Expected wavelengths (lambda = vp/frequency):
-    - Center (square, vp=3.0): lambda = 0.15 km → h = 0.0577 km
-    - Circle (vp=2.0): lambda = 0.1 km → h = 0.0385 km
-    - Outside (vp=1.5): lambda = 0.075 km → h = 0.0288 km
+    Expected sizes (lambda = vp / frequency, h = lambda / 2.6):
 
-    The test uses 10% relative tolerance for central and circle regions,
-    due to potentional grading and smoothing effects and 1% for outside
-    region.
+    - Centre (square, vp = 3.0): lambda = 0.12 km, h = 0.0462 km
+    - Circle (vp = 2.0): lambda = 0.08 km, h = 0.0308 km
+    - Outside (vp = 1.5): lambda = 0.06 km, h = 0.0231 km
+
+    The centre and circle checks use a 10% relative tolerance because of
+    grading and smoothing effects; the outside check uses 1%.
     """
+    import gmsh  # noqa: F401
+    # The mesher writes the mesh and a temporary SEG-Y file to the current
+    # working directory, so run in tmp_path to keep the repository clean.
+    monkeypatch.chdir(tmp_path)
     quadrilateral = False
     mesh_type = "gmsh_mesh"
     cells_per_wavelength = 2.6

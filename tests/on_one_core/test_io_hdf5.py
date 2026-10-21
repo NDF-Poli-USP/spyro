@@ -22,6 +22,18 @@ VS_EXAMPLE_3D_NY = 101
 
 
 def _require_file(path):
+    """Return a test input path, skipping the test if the file is missing.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        Path to the required test input file.
+
+    Returns
+    -------
+    pathlib.Path
+        The existing input file path.
+    """
     path = Path(path)
     if not path.exists():
         pytest.skip(f"Missing test input file: {path}")
@@ -29,6 +41,20 @@ def _require_file(path):
 
 
 def _read_hdf5_velocity_model(filename):
+    """Read the velocity model dataset and file attributes from an HDF5 file.
+
+    Parameters
+    ----------
+    filename : str or pathlib.Path
+        Path to the HDF5 file written by `write_velocity_model`.
+
+    Returns
+    -------
+    data : numpy.ndarray
+        Contents of the `velocity_model` dataset.
+    attrs : dict
+        File-level HDF5 attributes.
+    """
     with h5py.File(filename, "r") as h5:
         data = h5["velocity_model"][:]
         attrs = dict(h5.attrs)
@@ -36,6 +62,18 @@ def _read_hdf5_velocity_model(filename):
 
 
 def _assert_hdf5_matches_expected(hdf5_file, expected):
+    """Assert an HDF5 velocity model matches the expected array and metadata.
+
+    Checks the dataset shape, `float32` dtype and values (NaN-aware), and that
+    the `shape` and `units` (`"m/s"`) attributes are present and correct.
+
+    Parameters
+    ----------
+    hdf5_file : str or pathlib.Path
+        Path to the HDF5 file to check.
+    expected : numpy.ndarray
+        Expected velocity model in canonical orientation.
+    """
     data, attrs = _read_hdf5_velocity_model(hdf5_file)
     assert data.shape == expected.shape
     assert data.dtype == np.float32
@@ -105,6 +143,22 @@ def _expected_binary_model(
 
 
 def _expected_segy_model(filename):
+    """Build the expected canonical 2D model directly from a SEG-Y file.
+
+    Reads each trace with `segyio` (skipping the test if it is unavailable)
+    into a `(nz, nx)` array and flips it vertically, independently of
+    `read_segy_velocity_model`.
+
+    Parameters
+    ----------
+    filename : str or pathlib.Path
+        Path to the SEG-Y file.
+
+    Returns
+    -------
+    numpy.ndarray
+        Expected `float32` velocity model of shape `(nz, nx)`.
+    """
     segyio = pytest.importorskip("segyio")
 
     with segyio.open(str(filename), "r", ignore_geometry=True) as segy:
@@ -154,6 +208,15 @@ def vs_example_2d_binary(tmp_path):
     ],
 )
 def test_parse_axes_order_valid_cases(axes_order, expected):
+    """Test that valid 3D axis-order specifications are parsed to axis names.
+
+    Parameters
+    ----------
+    axes_order : str, tuple or list
+        Axis-order specification passed to `_parse_axes_order`.
+    expected : tuple of str
+        Expected axis names.
+    """
     assert _parse_axes_order(axes_order) == expected
 
 
@@ -171,6 +234,15 @@ def test_parse_axes_order_valid_cases(axes_order, expected):
     ],
 )
 def test_parse_axes_order_2d_valid_cases(axes_order, expected):
+    """Test that valid 2D axis orders parse correctly and 3D ones drop the y axis.
+
+    Parameters
+    ----------
+    axes_order : str, tuple or list
+        Axis-order specification passed to `_parse_axes_order` with `ndim=2`.
+    expected : tuple of str
+        Expected 2D axis names.
+    """
     assert _parse_axes_order(axes_order, ndim=2) == expected
 
 
@@ -187,6 +259,15 @@ def test_parse_axes_order_2d_valid_cases(axes_order, expected):
     ],
 )
 def test_parse_axes_order_2d_invalid_cases(axes_order, error_type):
+    """Test that invalid 2D axis-order specifications raise the expected error.
+
+    Parameters
+    ----------
+    axes_order : str or tuple
+        Invalid axis-order specification passed with `ndim=2`.
+    error_type : type
+        Expected exception class.
+    """
     with pytest.raises(error_type):
         _parse_axes_order(axes_order, ndim=2)
 
@@ -205,11 +286,27 @@ def test_parse_axes_order_2d_invalid_cases(axes_order, error_type):
     ],
 )
 def test_parse_axes_order_invalid_cases(axes_order, error_type):
+    """Test that invalid 3D axis-order specifications raise the expected error.
+
+    Parameters
+    ----------
+    axes_order : object
+        Invalid axis-order specification passed to `_parse_axes_order`.
+    error_type : type
+        Expected exception class.
+    """
     with pytest.raises(error_type):
         _parse_axes_order(axes_order)
 
 
 def test_read_vs_example_2d_binary(vs_example_2d_binary):
+    """Test that a little-endian 2D binary model is read silently and correctly.
+
+    Parameters
+    ----------
+    vs_example_2d_binary : dict
+        Fixture with the binary file path, dimensions and expected model.
+    """
     bin_file = vs_example_2d_binary["filename"]
     nz_expected = vs_example_2d_binary["nz"]
     nx_expected = vs_example_2d_binary["nx"]
@@ -249,6 +346,13 @@ def test_read_vs_example_2d_binary(vs_example_2d_binary):
 
 
 def test_read_vs_example_2d_accepts_three_axis_order(vs_example_2d_binary):
+    """Test that a 2D binary model is read correctly with a 3-axis order tuple.
+
+    Parameters
+    ----------
+    vs_example_2d_binary : dict
+        Fixture with the binary file path, dimensions and expected model.
+    """
     bin_file = vs_example_2d_binary["filename"]
     nz_expected = vs_example_2d_binary["nz"]
     nx_expected = vs_example_2d_binary["nx"]
@@ -285,6 +389,15 @@ def test_write_velocity_model_vs_example_2d_binary_hdf5(
     tmp_path,
     vs_example_2d_binary,
 ):
+    """Test that converting a 2D binary model writes a matching 2D HDF5 file.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the output file.
+    vs_example_2d_binary : dict
+        Fixture with the binary file path, dimensions and expected model.
+    """
     bin_file = vs_example_2d_binary["filename"]
     nz_expected = vs_example_2d_binary["nz"]
     nx_expected = vs_example_2d_binary["nx"]
@@ -355,6 +468,7 @@ def test_read_binary_switches_wrong_little_to_big(tmp_path):
 
 
 def test_read_vs_example_3d_binary_correct_big_order_has_no_warning():
+    """Test that reading the 3D model as big-endian emits no warning."""
     bin_file = _require_file(VS_EXAMPLE_3D_BIN)
 
     with warnings.catch_warnings(record=True) as recorded:
@@ -385,6 +499,7 @@ def test_read_vs_example_3d_binary_correct_big_order_has_no_warning():
 
 
 def test_read_vs_example_3d_binary_corrects_wrong_dtype_by_file_size():
+    """Test that a wrong `float64` dtype is corrected to `float32` by file size."""
     bin_file = _require_file(VS_EXAMPLE_3D_BIN)
 
     with pytest.warns(UserWarning, match="Using dtype=float32"):
@@ -413,6 +528,13 @@ def test_read_vs_example_3d_binary_corrects_wrong_dtype_by_file_size():
 
 
 def test_read_binary_keeps_selected_byte_order_when_other_is_not_better(tmp_path):
+    """Test that the requested byte order is kept, with a warning, if neither is better.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the all-NaN binary file.
+    """
     # 0xffffffff is NaN as both little-endian and big-endian float32.
     filename = tmp_path / "all_nan_both_endians.bin"
     filename.write_bytes(b"\xff\xff\xff\xff")
@@ -435,6 +557,13 @@ def test_read_binary_keeps_selected_byte_order_when_other_is_not_better(tmp_path
 
 
 def test_read_binary_axis_permutation_with_temporary_file(tmp_path):
+    """Test that a binary file stored in x-z-y order is permuted to canonical z-x-y.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the binary file.
+    """
     filename = tmp_path / "axis_permutation.bin"
 
     nz, nx, ny = 2, 3, 4
@@ -461,6 +590,16 @@ def test_read_binary_axis_permutation_with_temporary_file(tmp_path):
 
 
 def test_read_binary_errors(tmp_path):
+    """Test that missing dimensions and invalid read options raise `ValueError`.
+
+    Covers a missing `nz`, an invalid `byte_order`, an invalid
+    `axes_order_sort` and a negative `ny`.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the binary file.
+    """
     filename = tmp_path / "tiny.bin"
     np.array([1.0], dtype=np.float32).tofile(filename)
 
@@ -500,6 +639,13 @@ def test_read_binary_errors(tmp_path):
 
 
 def test_read_binary_file_size_mismatch_raises(tmp_path):
+    """Test that a file size inconsistent with the dimensions raises `ValueError`.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the binary file.
+    """
     filename = tmp_path / "bad_size.bin"
     filename.write_bytes(b"abc")
 
@@ -517,6 +663,13 @@ def test_read_binary_file_size_mismatch_raises(tmp_path):
 
 
 def test_write_velocity_model_vs_example_3d_binary_hdf5(tmp_path):
+    """Test that converting the 3D binary model writes a matching HDF5 file silently.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the output file.
+    """
     bin_file = _require_file(VS_EXAMPLE_3D_BIN)
     output_stem = tmp_path / "vs_example_3d"
 
@@ -552,6 +705,7 @@ def test_write_velocity_model_vs_example_3d_binary_hdf5(tmp_path):
 
 
 def test_read_vs_example_2d_segy_velocity_model():
+    """Test that reading the 2D SEG-Y model returns the expected array and sizes."""
     segy_file = _require_file(VS_EXAMPLE_2D_SEGY)
 
     vp, nz, nx = read_segy_velocity_model(str(segy_file))
@@ -564,6 +718,13 @@ def test_read_vs_example_2d_segy_velocity_model():
 
 
 def test_write_velocity_model_vs_example_2d_segy_hdf5(tmp_path):
+    """Test that converting the 2D SEG-Y model writes a matching HDF5 file.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the output file.
+    """
     segy_file = _require_file(VS_EXAMPLE_2D_SEGY)
     output_stem = tmp_path / "vs_example_2d_segy"
 
@@ -580,6 +741,13 @@ def test_write_velocity_model_vs_example_2d_segy_hdf5(tmp_path):
 
 
 def test_write_velocity_model_invalid_model_type(tmp_path):
+    """Test that an unknown `model_type` raises `ValueError`.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the input and output files.
+    """
     filename = tmp_path / "tiny.bin"
     np.array([1.0], dtype=np.float32).tofile(filename)
 
@@ -592,6 +760,13 @@ def test_write_velocity_model_invalid_model_type(tmp_path):
 
 
 def test_write_velocity_model_default_output_name_warning(tmp_path):
+    """Test that omitting `ofname` warns and writes `<filename>.hdf5`.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the input and output files.
+    """
     filename = tmp_path / "tiny.bin"
     np.array([1.0], dtype=np.float32).tofile(filename)
 
