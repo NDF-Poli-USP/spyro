@@ -686,8 +686,7 @@ class FullWaveformInversion:
                 names = ", ".join(parameter.value for parameter in parameters)
                 raise ValueError(
                     f"This inversion controls {len(parameters)} parameters "
-                    f"({names}), so it takes that many values
-                "
+                    f"({names}), so it takes that many values "
                     f"{len(control)} were given.",
                 )
             return dict(zip(parameters, control))
