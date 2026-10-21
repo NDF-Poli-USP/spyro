@@ -279,6 +279,59 @@ def assert_region_above(
     assert mean_z(upper_tag) > mean_z(lower_tag)
 
 
+def assert_facets_on_lines(
+    mesh: fire.MeshGeometry,
+    facet_groups: dict[str, int],
+    lines: dict[str, tuple[int, float]],
+) -> None:
+    """Assert that tagged facets lie on the expected coordinate lines.
+
+    Also checks that every exterior facet carries exactly one tag.
+
+    Parameters
+    ----------
+    mesh : firedrake.MeshGeometry
+        Mesh to check.
+    facet_groups : dict of str to int
+        Map from facet physical-group name to tag.
+    lines : dict of str to tuple of (int, float)
+        For each group that should be straight, the coordinate index and value
+        it lies on. Groups not listed (curved ones) are only counted.
+
+    Raises
+    ------
+    AssertionError
+        If a group is empty, lies off its line, or the exterior facets are not
+        tagged exactly once.
+    """
+    coordinates = fire.SpatialCoordinate(mesh)
+    data = mesh.coordinates.dat.data_ro
+    tolerance = 1e-6 * float(np.max(data.max(axis=0) - data.min(axis=0)))
+    one = fire.Constant(1.0)
+    tagged_exterior = 0.0
+    for name, tag in facet_groups.items():
+        exterior = fire.assemble(one * fire.ds(tag, domain=mesh))
+        interior = fire.assemble(one * fire.dS(tag, domain=mesh))
+        assert exterior + interior > 0.0, f"Facet group {name!r} is empty."
+        tagged_exterior += exterior
+        if name in lines:
+            axis, value = lines[name]
+            offset = coordinates[axis] - value
+            squared = fire.assemble(
+                offset**2 * fire.ds(tag, domain=mesh)
+            ) + fire.assemble(fire.avg(offset) ** 2 * fire.dS(tag, domain=mesh))
+            rms = np.sqrt(squared / (exterior + interior))
+            assert rms <= tolerance, (
+                f"Facet group {name!r} is {rms} away from coordinate "
+                f"{axis} = {value}."
+            )
+    total_exterior = fire.assemble(one * fire.ds(domain=mesh))
+    assert np.isclose(tagged_exterior, total_exterior, rtol=1e-12, atol=0.0), (
+        f"Tagged exterior facets measure {tagged_exterior}, "
+        f"but the boundary measures {total_exterior}."
+    )
+
+
 def hyperellipse_area(
     length_z: float, length_x: float, padding_z: float, padding_x: float, n: float
 ) -> float:
