@@ -223,13 +223,3 @@ class SourceType(StrEnum):
 
     FORCE = "force_source"
     EXPLOSIVE = "explosive_source"
-
-
-class NRBCBoundaryType(Enum):
-    """Enum for different types of boundaries where NRBCs can be applied.
-
-    STRAIGHT: Straight boundary.
-    HYPERSHAPE: Hypershape boundary.
-    """
-    STRAIGHT = "straight"
-    HYPERSHAPE = "hypershape"
