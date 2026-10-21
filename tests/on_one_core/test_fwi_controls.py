@@ -1,9 +1,10 @@
 import numpy as np
 import firedrake as fire
 import pytest
+from scipy.optimize import OptimizeResult
 
 import spyro
-from spyro.utils.typing import (AcousticMaterialParameter,
+from spyro.utils.typing import (AcousticMaterialParameter, AdjointType,
                                 ElasticMaterialParameter)
 
 
@@ -408,3 +409,85 @@ def test_misfit_without_a_configured_control_raises():
 
     with pytest.raises(ValueError, match="No guess control parameter"):
         fwi.calculate_misfit()
+
+
+def test_run_fwi_rejects_unknown_options():
+    """A misspelled option fails before the driver is touched.
+
+    ``max_iter`` for ``maxiter`` used to be dropped, and the inversion ran
+    the default 20 iterations with no word about it.
+    """
+    fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
+    fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
+    fwi.set_guess_velocity_model(constant=2.0)
+
+    with pytest.raises(TypeError, match="max_iter"):
+        fwi.run_fwi(adjoint_type=AdjointType.AUTOMATED_ADJOINT, max_iter=5)
+
+    # Rejected before any option was read, the valid one included.
+    assert fwi.adjoint_type is AdjointType.NONE
+
+
+@pytest.mark.parametrize(
+    "options, expected",
+    [
+        (
+            {"maxiter": 2, "eps": 1e-12, "ftol": 1e-9},
+            {"maxiter": 2, "eps": 1e-12, "ftol": 1e-9},
+        ),
+        (
+            {"scipy_options": {"maxiter": 2, "gtol": 1e-6}},
+            {"maxiter": 2, "gtol": 1e-6},
+        ),
+    ],
+)
+def test_run_fwi_passes_scipy_options_to_scipy(
+    options, expected, tmp_path, monkeypatch,
+):
+    """The options the implemented adjoint path accepts reach L-BFGS-B.
+
+    Parameters
+    ----------
+    options : dict
+        Keyword arguments given to ``run_fwi``.
+    expected : dict
+        Entries the ``options`` handed to :func:`scipy.optimize.minimize`
+        must contain.
+    tmp_path : pathlib.Path
+        Directory the run writes its final model into.
+    monkeypatch : pytest.MonkeyPatch
+        Replaces the scipy optimizer, so no wave is propagated.
+    """
+    monkeypatch.chdir(tmp_path)
+    received = {}
+
+    def fake_minimize(fun, x0, **kwargs):
+        """Record the call and stop at the starting point.
+
+        Parameters
+        ----------
+        fun : callable
+            Objective, never evaluated.
+        x0 : numpy.ndarray
+            Starting point, returned as the solution.
+        **kwargs : dict
+            Remaining arguments of :func:`scipy.optimize.minimize`.
+
+        Returns
+        -------
+        scipy.optimize.OptimizeResult
+            A result whose solution is ``x0``.
+        """
+        received.update(kwargs)
+        return OptimizeResult(x=x0)
+
+    monkeypatch.setattr(
+        "spyro.solvers.inversion.scipy_minimize", fake_minimize,
+    )
+    fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
+    fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
+    fwi.set_guess_velocity_model(constant=2.0)
+
+    fwi.run_fwi(vmin=1.5, vmax=3.0, **options)
+
+    assert received["options"].items() >= expected.items()
