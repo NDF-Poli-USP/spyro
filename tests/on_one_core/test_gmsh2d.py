@@ -108,7 +108,7 @@ def _check_mesh(mesh, msh_file, water_interface, padding_type) -> None:
     Parameters
     ----------
     mesh : firedrake.MeshGeometry
-        Mesh returned by ``AutomaticMesh``.
+        Mesh returned by `AutomaticMesh`.
     msh_file : pathlib.Path
         Gmsh file the mesh was read from.
     water_interface : bool
@@ -228,7 +228,7 @@ def test_gmsh2d_unstructured(
 def _generate_in_subprocess(parameters: dict) -> None:
     """Write a 2D Gmsh mesh from a separate Python process.
 
-    Gmsh aborts the interpreter when a second ``unstructured_quad_mesh`` is
+    Gmsh aborts the interpreter when a second `unstructured_quad_mesh` is
     generated in the same process (see mfe_6_repeated_quad_meshing_aborts.py),
     so each quad mesh is made in a fresh process.
 
@@ -270,7 +270,7 @@ def test_gmsh2d_unstructured_quad(
     water_interface : bool
         Whether the mesh has a water layer above the rock.
     padding_type : str or None
-        Padding geometry: ``None``, ``"rectangular"`` or ``"hyperelliptical"``.
+        Padding geometry: `None`, `"rectangular"` or `"hyperelliptical"`.
     """
     parameters = _base_gmsh2d_parameters(tmp_path / "mesh.msh")
     parameters.update(
