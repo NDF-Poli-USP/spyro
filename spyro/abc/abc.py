@@ -19,9 +19,6 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
 
     Attributes
     ----------
-    comm : `object`
-        An object representing the communication interface for parallel processing.
-        Default is `None`.
     dimension : `int`, optional
         Model dimension (2D or 3D). Default is 2D.
     domain_dim : `tuple`
