@@ -1,7 +1,6 @@
 import firedrake as fire
 from pyadjoint import annotate_tape
 import numpy as np
-from firedrake import *
 
 from . import helpers
 from .. import utils
