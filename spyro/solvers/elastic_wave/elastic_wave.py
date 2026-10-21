@@ -51,7 +51,9 @@ class ElasticWave(Wave, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def initialize_model_parameters_from_file(self, synthetic_data_dict):
+    def initialize_model_parameters_from_file(
+        self, synthetic_data_dict, fast_interpolate=True,
+    ):
         pass
 
     def set_physical_parameterization(self, parameterization) -> None:

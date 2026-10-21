@@ -21,6 +21,8 @@ from .forms import (
     isotropic_elastic_without_pml, isotropic_elastic_with_pml,
 )
 from .functionals import mechanical_energy_form
+from ...io import interpolate
+from ...utils import write_hdf5_velocity_model
 from ...utils.physical_parameters import PhysicalParameters
 from ...utils.typing import (
     AdjointType, ElasticMaterialParameter,
@@ -356,8 +358,53 @@ class IsotropicWave(ElasticWave):
             )
         return self.automated_adjoint.label_derivatives(derivatives)
 
-    def initialize_model_parameters_from_file(self, synthetic_data_dict):
-        raise NotImplementedError
+    def initialize_model_parameters_from_file(
+        self, synthetic_data_dict: dict, fast_interpolate: bool = True,
+    ):
+        """Initialize isotropic elastic material parameters from model files.
+
+        Every file is interpolated onto the scalar space of the mesh, and
+        the parameters are then set as in
+        :meth:`initialize_model_parameters_from_object`, which also sets
+        when this runs and why it reads the files only once.
+
+        Parameters
+        ----------
+        synthetic_data_dict : dict
+            Material parameter dictionary with the keys of
+            :meth:`initialize_model_parameters_from_object`. A string value
+            is a ``.segy`` or ``.hdf5`` file; any other value is used as
+            given.
+        fast_interpolate : bool, optional
+            If True, sample the file grid at the nodes of the scalar space.
+            If False, project it from a mesh built at the grid resolution,
+            which is slow for fine grids. Default is True.
+
+        Returns
+        -------
+        None
+            The method assigns ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s``, and
+            the active physical parameterization on ``self``.
+        """
+        if self._physical_parameters:
+            return
+
+        space = create_function_space(self.mesh, self.method, self.degree, dim=1)
+
+        def load(value):
+            """Interpolate ``value`` if it names a file."""
+            if not isinstance(value, str):
+                return value
+            if value.endswith(".segy"):
+                value = write_hdf5_velocity_model(value)
+            return interpolate(
+                self, value, space, fast_interpolate=fast_interpolate,
+            )
+
+        self.initialize_model_parameters_from_object(
+            {key: load(value) for key, value in synthetic_data_dict.items()
+             if key != "type"}
+        )
 
     def _create_function_space(self):
         return create_function_space(self.mesh, self.method, self.degree,

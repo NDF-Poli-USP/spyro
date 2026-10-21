@@ -18,6 +18,7 @@ from .heterogeneous_case import HeterogeneousCase
 from .input_models import (
     create_acoustic_model_for_meshing_parameter_2D_heterogeneous,
     create_acoustic_model_for_meshing_parameter_2D_homogeneous,
+    create_elastic_model_for_meshing_parameter_2D_heterogeneous,
     create_elastic_model_for_meshing_parameter_2D_homogeneous,
 )
 from .parameters import CpwParameters
@@ -660,6 +661,38 @@ class AcousticHeterogeneousProblem(HeterogeneousCpwProblem):
         )
 
 
+class ElasticHeterogeneousProblem(HeterogeneousCpwProblem):
+    """Isotropic elastic wave in the material of a heterogeneous case.
+
+    The case must define the P- and S-wave velocities and the density. The
+    mesh is uniform, sized by the minimum S-wavelength in the domain.
+    """
+
+    physics = ISOTROPIC_ELASTIC
+
+    def model_dictionary(self, method: str, degree: int) -> dict:
+        """Build the heterogeneous isotropic elastic model dictionary.
+
+        Parameters
+        ----------
+        method : str
+            Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+        degree : int
+            Spatial polynomial degree.
+
+        Returns
+        -------
+        dict
+            Spyro model dictionary for :class:`spyro.IsotropicWave`.
+        """
+        return create_elastic_model_for_meshing_parameter_2D_heterogeneous(
+            method=method,
+            degree=degree,
+            frequency=self.source_frequency,
+            case=self.heterogeneous_case,
+        )
+
+
 #: Cells-per-wavelength problems, selected by the ``"wave_type"`` and
 #: ``"velocity_profile_type"`` parameters.
 CPW_PROBLEMS: dict[tuple[WaveType, VelocityProfileType], type[CpwProblem]] = {
@@ -675,4 +708,8 @@ CPW_PROBLEMS: dict[tuple[WaveType, VelocityProfileType], type[CpwProblem]] = {
         WaveType.ISOTROPIC_ELASTIC,
         VelocityProfileType.HOMOGENEOUS,
     ): ElasticHomogeneousProblem,
+    (
+        WaveType.ISOTROPIC_ELASTIC,
+        VelocityProfileType.HETEROGENEOUS,
+    ): ElasticHeterogeneousProblem,
 }
