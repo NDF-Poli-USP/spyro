@@ -1,6 +1,8 @@
 import numpy as np
 from typing import Callable, Tuple
 
+from .meshing_winslow3d import _cardinal_coordinate, _mixed_coordinate, _neighbor_size
+
 try:
     from numba import njit, prange
 
@@ -424,98 +426,6 @@ if NUMBA_AVAILABLE:  # pragma: no cover
         c1 = c01 * (1.0 - xd) + c11 * xd
 
         return c0 * (1.0 - zd) + c1 * zd
-
-    @njit(cache=True, inline="always")
-    def _cardinal_coordinate(
-        coordinates: np.ndarray, center: float, neighbor: int, opposite: int
-    ) -> float:
-        """Return a cardinal-neighbor coordinate, reflecting it when missing.
-
-        Parameters
-        ----------
-        coordinates : numpy.ndarray
-            Coordinate values for one spatial direction at all mesh nodes.
-        center : float
-            Coordinate of the current stencil-center node.
-        neighbor : int
-            Node index of the cardinal neighbor, or -1 when it is missing.
-        opposite : int
-            Node index of the opposite cardinal neighbor, or -1 when it is missing.
-
-        Returns
-        -------
-        float
-            The neighbor coordinate; if missing, the opposite neighbor reflected
-            through the center; if both are missing, the center.
-        """
-        if neighbor != -1:
-            return coordinates[neighbor]
-        if opposite != -1:
-            return 2.0 * center - coordinates[opposite]
-        return center
-
-    @njit(cache=True, inline="always")
-    def _mixed_coordinate(
-        coordinates: np.ndarray,
-        center: float,
-        neighbor: int,
-        first_value: float,
-        second_value: float,
-    ) -> float:
-        """Return a mixed (diagonal) neighbor coordinate, rebuilding it when missing.
-
-        Parameters
-        ----------
-        coordinates : numpy.ndarray
-            Coordinate values for one spatial direction at all mesh nodes.
-        center : float
-            Coordinate of the current stencil-center node.
-        neighbor : int
-            Node index of the mixed neighbor, or -1 when it is missing.
-        first_value : float
-            Resolved coordinate of the first cardinal direction (e.g. N for NE).
-        second_value : float
-            Resolved coordinate of the second cardinal direction (e.g. E for NE).
-
-        Returns
-        -------
-        float
-            The neighbor coordinate, or `first_value + second_value - center`
-            when it is missing.
-        """
-        if neighbor != -1:
-            return coordinates[neighbor]
-        return first_value + second_value - center
-
-    @njit(cache=True, inline="always")
-    def _neighbor_size(
-        sizing_values: np.ndarray,
-        is_movable: np.ndarray,
-        neighbor: int,
-        size_center: float,
-    ) -> float:
-        """Return a neighbor's sizing value, or the center value if not usable.
-
-        Parameters
-        ----------
-        sizing_values : numpy.ndarray
-            Sizing-field value associated with each mesh node.
-        is_movable : numpy.ndarray
-            Boolean mask identifying nodes involved in smoothing.
-        neighbor : int
-            Node index of the neighbor, or -1 when it is missing.
-        size_center : float
-            Sizing value at the current stencil-center node.
-
-        Returns
-        -------
-        float
-            `sizing_values[neighbor]` for an existing movable neighbor,
-            otherwise `size_center`.
-        """
-        if neighbor != -1 and is_movable[neighbor]:
-            return sizing_values[neighbor]
-        return size_center
 
     @njit(cache=True, parallel=True)
     def _numba_winslow_loop2(

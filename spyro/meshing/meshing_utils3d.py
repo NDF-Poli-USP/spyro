@@ -1,4 +1,6 @@
 import warnings
+from collections import defaultdict, deque
+
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
@@ -383,6 +385,72 @@ def create_sizing_function3d(
     )
 
 
+def align_water_columns3d(gmsh, padding_type=None):
+    """Align linear, layered water hexes in place; return their Gmsh node tags."""
+    if padding_type not in (None, "rectangular"):
+        raise ValueError("Water alignment supports None or rectangular padding.")
+    suffix = "_with_padding" if padding_type == "rectangular" else ""
+    names = ("Water" + suffix, "Subsurface" + suffix)
+    groups = {
+        gmsh.model.getPhysicalName(dim, tag): tag
+        for dim, tag in gmsh.model.getPhysicalGroups(3)
+    }
+    if any(name not in groups for name in names):
+        raise ValueError(f"Water alignment requires physical groups {names}.")
+    volumes, boundaries = [], []
+    for name in names:
+        vols = gmsh.model.getEntitiesForPhysicalGroup(3, groups[name])
+        volumes.append(vols)
+        boundaries.append(
+            set(
+                gmsh.model.getBoundary(
+                    [(3, int(v)) for v in vols],
+                    combined=True,
+                    oriented=False,
+                )
+            )
+        )
+    interface = set()
+    for dim, face in boundaries[0] & boundaries[1]:
+        tags, _, _ = gmsh.model.mesh.getNodes(dim, face, True, False)
+        interface.update(map(int, tags))
+    adjacency = defaultdict(set)
+    for volume in volumes[0]:
+        if set(gmsh.model.mesh.getElementTypes(3, int(volume))) != {5}:
+            raise ValueError("Water alignment requires only 8-node hexahedra.")
+        edges = gmsh.model.mesh.getElementEdgeNodes(5, int(volume), primary=True)
+        for start_node, end_node in np.asarray(edges).reshape(-1, 2):
+            start_node, end_node = int(start_node), int(end_node)
+            adjacency[start_node].add(end_node)
+            adjacency[end_node].add(start_node)
+    if not interface or not interface.issubset(adjacency):
+        raise ValueError("No valid shared water/subsurface interface was found.")
+    owner = {node: (node, 0) for node in interface}
+    queue = deque(interface)
+    while queue:
+        node = queue.popleft()
+        root, layer = owner[node]
+        for other in adjacency[node]:
+            if other not in owner:
+                owner[other] = (root, layer + 1)
+                queue.append(other)
+            elif owner[other][1] == layer + 1 and owner[other][0] != root:
+                raise ValueError("Water topology does not define unique columns.")
+    if len(owner) != len(adjacency):
+        raise ValueError("Some water nodes are disconnected from the interface.")
+    tags, coordinates = gmsh.model.mesh.getNodesForPhysicalGroup(3, groups[names[0]])
+    coordinates = np.asarray(coordinates, dtype=float).reshape(-1, 3)
+    points = {int(tag): point for tag, point in zip(tags, coordinates)}
+    if set(points) != set(owner) or not np.isfinite(coordinates).all():
+        raise ValueError("Invalid water-node coordinates or connectivity.")
+    for node, (root, _) in owner.items():
+        if not np.array_equal(points[node][:2], points[root][:2]):
+            point = points[node].copy()
+            point[:2] = points[root][:2]
+            gmsh.model.mesh.setNode(node, point.tolist(), [])
+    return set(owner)
+
+
 def define_winslow_points_3d(
     gmsh,
     points_3d,
@@ -592,3 +660,40 @@ def define_winslow_points_3d(
         "water_nodes": water_nodes,
         "movable_nodes": movable_nodes,
     }
+
+
+def checked_mesh_size(ef_segy, coords, context):
+    """Evaluate and validate a three-dimensional mesh-size query.
+
+    Parameters
+    ----------
+    ef_segy : callable
+        Mesh-sizing function evaluated in `(z, x, y)` coordinates.
+    coords : numpy.ndarray
+        Coordinates passed to the sizing callback.
+    context : str
+        Description of the sizing-query context used in error messages.
+
+    Returns
+    -------
+    float
+        Validated positive mesh size.
+    """
+    values = np.asarray(ef_segy(coords), dtype=float).reshape(-1)
+
+    if values.size != 1:
+        raise ValueError(
+            "The 3-D mesh sizing callback expected one value, "
+            f"received {values.size} in {context}."
+        )
+
+    value = float(values[0])
+    if not np.isfinite(value) or value <= 0.0:
+        raise ValueError(
+            "The 3-D mesh sizing callback produced an invalid "
+            f"element size {value} in {context} at coordinate "
+            f"(z, x, y)={np.asarray(coords)[0].tolist()}. "
+            "Gmsh requires a finite strictly positive size."
+        )
+
+    return value

@@ -8,6 +8,7 @@ from .seismic_mesh_based_wrappers import create_seismicmesh_2d_mesh_with_velocit
 from .seismic_mesh_based_wrappers import create_seismicmesh_2d_mesh_homogeneous
 from .gmsh_based_methods import build_big_rect_with_inner_element_group
 from .meshing_2d import generate_gmsh_2d_mesh
+from .meshing_3d import generate_gmsh_3d_mesh
 
 try:
     import SeismicMesh
@@ -182,7 +183,10 @@ class AutomaticMesh:
             self.create_spyro_mesh()
             return self._load_mesh_file()
         elif self.mesh_type == "gmsh_mesh":
-            return self.create_gmsh_2d_mesh()
+            if self.dimension == 2:
+                return self.create_gmsh_2d_mesh()
+            elif self.dimension == 3:
+                return self.create_gmsh_3d_mesh()
         else:
             raise ValueError("mesh_type is not supported")
 
@@ -448,6 +452,11 @@ class AutomaticMesh:
             The loaded Firedrake mesh object.
         """
         self.velocity_model = generate_gmsh_2d_mesh(self.mesh_parameters)
+        return self._load_mesh_file()
+
+    def create_gmsh_3d_mesh(self):
+        """Create a 3-D Gmsh mesh with the supplied volumetric logic."""
+        self.velocity_model = generate_gmsh_3d_mesh(self.mesh_parameters)
         return self._load_mesh_file()
 
     def _load_mesh_file(self):
