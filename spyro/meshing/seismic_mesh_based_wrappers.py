@@ -3,7 +3,6 @@ from .meshing_utils import check_seismicmesh
 from firedrake import Mesh as FireMeshReader
 from firedrake import DistributedMeshOverlapType
 
-
 try:
     import SeismicMesh
 except ImportError:
@@ -11,7 +10,7 @@ except ImportError:
 
 
 @check_seismicmesh
-def create_seismicmesh_2D_mesh_with_velocity_model(mesh_parameters):
+def create_seismicmesh_2d_mesh_with_velocity_model(mesh_parameters):
     """
     Creates a 2D mesh with velocity-based refinement using SeismicMesh.
 
@@ -32,29 +31,29 @@ def create_seismicmesh_2D_mesh_with_velocity_model(mesh_parameters):
         v_min = mesh_parameters.minimum_velocity
         frequency = mesh_parameters.source_frequency
 
-        C = mesh_parameters.cpw
+        cells_per_wavelength = mesh_parameters.cpw
 
         length_z = mesh_parameters.length_z
         length_x = mesh_parameters.length_x
         domain_pad = mesh_parameters.abc_pad
-        lbda_min = v_min / frequency
+        min_wavelength = v_min / frequency
 
         bbox = (-length_z, 0.0, 0.0, length_x)
         domain = SeismicMesh.Rectangle(bbox)
 
-        hmin = lbda_min / C
+        hmin = min_wavelength / cells_per_wavelength
         mesh_parameters.comm.comm.barrier()
 
         ef = SeismicMesh.get_sizing_function_from_segy(
             mesh_parameters.velocity_model,
             bbox,
             hmin=hmin,
-            wl=C,
+            wl=cells_per_wavelength,
             freq=frequency,
             grade=0.15,
             domain_pad=domain_pad,
             pad_style="edge",
-            units='km/s',
+            units="km/s",
             comm=mesh_parameters.comm.comm,
         )
         mesh_parameters.comm.comm.barrier()
@@ -69,36 +68,31 @@ def create_seismicmesh_2D_mesh_with_velocity_model(mesh_parameters):
         )
         mesh_parameters.comm.comm.barrier()
 
-        print('entering spatial rank 0 after mesh generation')
+        print("entering spatial rank 0 after mesh generation")
         if mesh_parameters.comm.comm.rank == 0:
             meshio.write_points_cells(
                 "automatic_mesh.msh",
                 points,
                 [("triangle", cells)],
                 file_format="gmsh22",
-                binary=False
+                binary=False,
             )
 
             meshio.write_points_cells(
-                "automatic_mesh.vtk",
-                points,
-                [("triangle", cells)],
-                file_format="vtk"
+                "automatic_mesh.vtk", points, [("triangle", cells)], file_format="vtk"
             )
 
     mesh_parameters.comm.comm.barrier()
     mesh = FireMeshReader(
-        'automatic_mesh.msh',
-        distribution_parameters={
-            "overlap_type": (DistributedMeshOverlapType.NONE, 0)
-        },
+        "automatic_mesh.msh",
+        distribution_parameters={"overlap_type": (DistributedMeshOverlapType.NONE, 0)},
         comm=mesh_parameters.comm.comm,
     )
 
     return mesh
 
 
-def create_seismicmesh_2D_mesh_homogeneous(mesh_parameters):
+def create_seismicmesh_2d_mesh_homogeneous(mesh_parameters):
     """
     Creates a 2D mesh based on SeismicMesh meshing utilities, with homogeneous velocity model.
 
@@ -128,7 +122,9 @@ def create_seismicmesh_2D_mesh_homogeneous(mesh_parameters):
 
     edge_length = mesh_parameters.edge_length
     if edge_length is None:
-        edge_length = mesh_parameters.minimum_velocity / (mesh_parameters.source_frequency * mesh_parameters.cpw)
+        edge_length = mesh_parameters.minimum_velocity / (
+            mesh_parameters.source_frequency * mesh_parameters.cpw
+        )
 
     bbox = (-real_lz, 0.0, -pad, real_lx - pad)
     rectangle = SeismicMesh.Rectangle(bbox)
