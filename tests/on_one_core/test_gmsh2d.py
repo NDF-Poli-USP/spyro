@@ -14,6 +14,7 @@ from .gmsh_mesh_checks import (
     assert_cell_count,
     assert_cell_regions,
     assert_cell_type,
+    assert_facets_on_lines,
     assert_measure,
     assert_no_degenerate_cells,
     assert_region_above,
@@ -38,6 +39,63 @@ UNSTRUCTURED_CELL_COUNT_RTOL = 0.02
 # The hyperelliptical boundary is a polyline, so its area is slightly smaller
 # than the exact hyperellipse.
 HYPERELLIPSE_AREA_RTOL = 0.01
+
+# Coordinate line, as (axis, value) in spyro (z, x) order, of every straight
+# boundary group.
+FACET_LINES = {
+    **dict.fromkeys(
+        ["Top", "InternalTop", "PaddingTopLeft", "PaddingTopRight"], (0, 0.0)
+    ),
+    **dict.fromkeys(["Bottom", "InternalBottom"], (0, -LENGTH_Z)),
+    **dict.fromkeys(
+        ["Left", "InternalLeft", "InternalWaterLeft", "InternalRockLeft"], (1, 0.0)
+    ),
+    **dict.fromkeys(
+        ["Right", "InternalRight", "InternalWaterRight", "InternalRockRight"],
+        (1, LENGTH_X),
+    ),
+    **dict.fromkeys(["PaddingLeftUpper", "PaddingLeftLower"], (1, -PADDING)),
+    **dict.fromkeys(
+        ["PaddingRightUpper", "PaddingRightLower"], (1, LENGTH_X + PADDING)
+    ),
+    **dict.fromkeys(
+        ["PaddingBottomLeft", "PaddingBottomCenter", "PaddingBottomRight"],
+        (0, -LENGTH_Z - PADDING),
+    ),
+}
+
+RECTANGULAR_PADDING_FACETS = {
+    "PaddingTopLeft", "PaddingLeftUpper", "PaddingLeftLower",
+    "PaddingBottomLeft", "PaddingBottomCenter", "PaddingBottomRight",
+    "PaddingRightLower", "PaddingRightUpper", "PaddingTopRight",
+}
+HYPERELLIPTICAL_PADDING_FACETS = {
+    "PaddingTopLeft", "PaddingTopRight", "HyperellipseLeft",
+    "HyperellipseBottomLeft", "HyperellipseBottomCenter",
+    "HyperellipseBottomRight", "HyperellipseRight",
+}
+NO_WATER_INTERNAL_FACETS = {
+    "InternalTop", "InternalLeft", "InternalRight", "InternalBottom",
+}
+WATER_INTERNAL_FACETS = {
+    "InternalTop", "InternalWaterLeft", "InternalWaterRight", "WaterInterface",
+    "InternalRockLeft", "InternalRockRight", "InternalBottom",
+}
+
+EXPECTED_FACET_GROUPS = {
+    # (water_interface, padding_type): boundary group names
+    (False, None): {"Bottom", "Top", "Left", "Right"},
+    (False, "rectangular"): RECTANGULAR_PADDING_FACETS | NO_WATER_INTERNAL_FACETS,
+    (False, "hyperelliptical"): (
+        HYPERELLIPTICAL_PADDING_FACETS | NO_WATER_INTERNAL_FACETS
+    ),
+    (True, None): WATER_INTERNAL_FACETS,
+    (True, "rectangular"): RECTANGULAR_PADDING_FACETS | WATER_INTERNAL_FACETS,
+    (True, "hyperelliptical"): (
+        HYPERELLIPTICAL_PADDING_FACETS | WATER_INTERNAL_FACETS
+    ),
+}
+
 
 WATER_INTERFACE_CASES = pytest.mark.parametrize(
     "water_interface", [True, False], ids=["water", "no_water"]
@@ -103,7 +161,7 @@ def _base_gmsh2d_parameters(output_filename):
 
 
 def _check_mesh(mesh, msh_file, water_interface, padding_type) -> None:
-    """Check the geometry and regions of a 2D Gmsh mesh.
+    """Check the geometry, regions and boundary tags of a 2D Gmsh mesh.
 
     Parameters
     ----------
@@ -149,6 +207,9 @@ def _check_mesh(mesh, msh_file, water_interface, padding_type) -> None:
         assert_region_above(
             mesh, groups[2]["WaterSurface"], groups[2]["SubSurface"]
         )
+
+    assert set(groups[1]) == EXPECTED_FACET_GROUPS[(water_interface, padding_type)]
+    assert_facets_on_lines(mesh, groups[1], FACET_LINES)
 
 
 @pytest.mark.slow
