@@ -17,13 +17,35 @@ from .meshing_utils import (
 
 
 def configure_gmsh_2d_meshing_mode(
-    gmsh, structured_mesh, unstructured_quad_mesh, padding_type, min_element_size
-):
-    if structured_mesh and unstructured_quad_mesh:
-        raise ValueError(
-            "'structured_mesh' and 'unstructured_quad_mesh' are mutually exclusive."
-        )
+    gmsh,
+    structured_mesh: bool,
+    unstructured_quad_mesh: bool,
+    padding_type: str | None,
+    min_element_size: float,
+) -> None:
+    """Set the Gmsh options for the requested 2-D meshing mode.
 
+    ``MeshingParameters`` guarantees that ``structured_mesh`` and
+    ``unstructured_quad_mesh`` are not both set.
+
+    Parameters
+    ----------
+    gmsh : module
+        Initialized Gmsh Python module.
+    structured_mesh : bool
+        Whether a structured (transfinite) quadrilateral mesh is requested.
+    unstructured_quad_mesh : bool
+        Whether an unstructured all-quadrilateral mesh is requested.
+    padding_type : str or None
+        Padding geometry: ``None``, ``"rectangular"`` or ``"hyperelliptical"``.
+    min_element_size : float
+        Element size used for the structured mesh.
+
+    Returns
+    -------
+    None
+        The Gmsh options are set in place.
+    """
     if structured_mesh and padding_type != "hyperelliptical":
         gmsh.option.setNumber("Mesh.MeshSizeMin", min_element_size)
         gmsh.option.setNumber("Mesh.MeshSizeMax", min_element_size)
