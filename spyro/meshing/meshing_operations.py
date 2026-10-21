@@ -283,7 +283,7 @@ class MeshOps():
             node_positions = self.extract_node_positions(mesh, function_space)
 
             # Verify numerical ids
-            exterior_markers = set(mesh.exterior_facets.unique_markers)
+            exterior_markers = set(mesh.facet_markers)
             # print("Available boundary markers:", exterior_markers)
 
             # Boundary nodes indices
