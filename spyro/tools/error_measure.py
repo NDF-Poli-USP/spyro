@@ -508,10 +508,12 @@ class MeasureError:
                 Transient signal modified with zero padding at the start or end
                 to match the length of the other signal to compare.
             """
-            pad_distribution = (
+            pad_distribution = [
                 (0, delta_len) if padding_type == "end" else (delta_len, 0)
+            ] + [(0, 0)] * (np.ndim(signal) - 1)
+            return np.pad(
+                signal, pad_distribution, "constant", constant_values=0,
             )
-            return np.pad(signal, pad_distribution, "constant", constant_values=0)
 
         # Pad the shorter signal with zeros if the lengths are different
 
@@ -615,9 +617,14 @@ class MeasureError:
         Parameters
         ----------
         signal_model : `np.ndarray`
-            Transient response at the receiver for the model.
+            Transient response at the receiver for the model. Time must be
+            the first axis, e.g. ``(n_time,)``, ``(n_time, n_receivers)`` or
+            ``(n_time, n_receivers, dimension)``. For multidimensional
+            signals, the integrals are summed over all traces before taking
+            the ratio.
         signal_reference : `np.ndarray`
-            Transient response at the receiver for the reference model.
+            Transient response at the receiver for the reference model, with
+            the same shape as ``signal_model``.
         dt : `float`
             Time step used in the simulation.
         error_if_different_length : `bool`, optional
@@ -638,13 +645,13 @@ class MeasureError:
         # Check the input parameters
         validate_data_structure(
             "signal_model",
-            signal_model,
+            np.ravel(signal_model),
             "array",
             expected_type_element=("float", "int"),
         )
         validate_data_structure(
             "signal_reference",
-            signal_reference,
+            np.ravel(signal_reference),
             "array",
             expected_type_element=("float", "int"),
         )
@@ -659,9 +666,11 @@ class MeasureError:
             end_padding=end_padding,
         )
 
-        # Integral error
-        numerator = np.trapezoid((signal_model - signal_reference) ** 2, dx=dt)
-        denominator = np.trapezoid(signal_reference**2, dx=dt)
+        # Integral error, summed over all traces for multidimensional signals
+        numerator = np.sum(
+            np.trapezoid((signal_model - signal_reference) ** 2, dx=dt, axis=0)
+        )
+        denominator = np.sum(np.trapezoid(signal_reference**2, dx=dt, axis=0))
         integral_error = numerator / denominator if denominator != 0 else np.inf
 
         return integral_error
@@ -727,6 +736,41 @@ class MeasureError:
 
         return nrms_error
 
+    @staticmethod
+    def calculate_receiver_error(
+        signal_model: np.ndarray,
+        signal_reference: np.ndarray,
+        dt: float,
+    ) -> float:
+        """Calculate the relative squared L2 error over all receivers.
+
+        The error is the time integral of the squared difference between
+        the model and reference signals, summed over all receivers (and
+        directions, for displacement data), divided by the time integral of
+        the squared reference signal summed in the same way. See
+        :meth:`calculate_integral_error`.
+
+        Parameters
+        ----------
+        signal_model : np.ndarray
+            Receiver data from the model. Shape ``(n_time, n_receivers)``
+            for scalar data or ``(n_time, n_receivers, dimension)`` for
+            displacement data.
+        signal_reference : np.ndarray
+            Reference receiver data, with the same shape as
+            ``signal_model``.
+        dt : float
+            Time step used for the trapezoidal integration.
+
+        Returns
+        -------
+        float
+            Relative squared L2 error between the model and reference
+            signals.
+        """
+        return MeasureError.calculate_integral_error(
+            signal_model, signal_reference, dt
+        )
 
 #     """
 #     Plot the comparison between the HABC scheme and the reference model.
