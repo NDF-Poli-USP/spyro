@@ -13,9 +13,12 @@ from spyro.receivers.Receivers import RECEIVER_STEP_OFFSET
 from spyro.tools.cells_per_wavelength_calculator import (
     ACOUSTIC,
     CPW_PROBLEMS,
+    AcousticHeterogeneousProblem,
     AcousticHomogeneousProblem,
     CpwParameters,
     CpwProblem,
+    HeterogeneousCpwProblem,
+    MaterialFileCase,
     WavePhysics,
 )
 from spyro.tools.cells_per_wavelength_calculator import calculator as calculator_module
@@ -40,14 +43,26 @@ CALCULATOR_PARAMETERS = {
     "accepted_error_threshold": 0.05,
 }
 
+#: Heterogeneous case with a given minimum velocity, so no file is read.
+VELOCITY_FILE_CASE = MaterialFileCase(
+    name="velocity",
+    length_z=3.0,
+    length_x=17.0,
+    material_files={"p_wave_velocity": "velocity.segy"},
+    minimum_velocity=1.5,
+)
 
 PROBLEM_CLASSES = [
     AcousticHomogeneousProblem,
+    AcousticHeterogeneousProblem,
 ]
 
 
 def make_problem(problem_class: type[CpwProblem], **overrides) -> CpwProblem:
     """Build a problem with typical settings and no file access.
+
+    A heterogeneous problem gets :data:`VELOCITY_FILE_CASE`, so no
+    material file is read.
 
     Parameters
     ----------
@@ -61,7 +76,14 @@ def make_problem(problem_class: type[CpwProblem], **overrides) -> CpwProblem:
     CpwProblem
         The problem.
     """
-    parameters = {**CALCULATOR_PARAMETERS, **overrides}
+    parameters = {
+        **CALCULATOR_PARAMETERS,
+        "reference_degree": 5,
+        "C_reference": 6.0,
+    }
+    if issubclass(problem_class, HeterogeneousCpwProblem):
+        parameters["heterogeneous_case"] = VELOCITY_FILE_CASE
+    parameters.update(overrides)
     return problem_class(CpwParameters(**parameters))
 
 
@@ -89,6 +111,7 @@ def test_interpolate_time_series_keeps_trailing_axes() -> None:
     "wave_type, physics, profile",
     [
         (WaveType.ISOTROPIC_ACOUSTIC, ACOUSTIC, VelocityProfileType.HOMOGENEOUS),
+        (WaveType.ISOTROPIC_ACOUSTIC, ACOUSTIC, VelocityProfileType.HETEROGENEOUS),
     ],
 )
 def test_cpw_problems_registry(
@@ -139,6 +162,29 @@ def test_problem_rejects_non_positive_mesh_frequency_factor(
     """The meshing frequency must be a positive multiple of the peak."""
     with pytest.raises(ValueError, match="mesh_frequency_factor"):
         make_problem(problem_class, mesh_frequency_factor=-1.0)
+
+
+@pytest.mark.parametrize(
+    "problem_class, case",
+    [
+        (AcousticHomogeneousProblem, VELOCITY_FILE_CASE),
+        (AcousticHeterogeneousProblem, None),
+    ],
+)
+def test_problem_matches_case_to_profile(
+    problem_class: type[CpwProblem], case: MaterialFileCase | None,
+) -> None:
+    """Only heterogeneous problems have a heterogeneous case.
+
+    Parameters
+    ----------
+    problem_class : type[CpwProblem]
+        Problem to build.
+    case : MaterialFileCase or None
+        Case given to the problem, of the wrong kind for its profile.
+    """
+    with pytest.raises(ValueError, match="heterogeneous_case should be given"):
+        make_problem(problem_class, heterogeneous_case=case)
 
 
 def test_calculator_rejects_unregistered_problem(monkeypatch) -> None:
@@ -246,6 +292,7 @@ def test_interpolate_time_series_applies_time_shift() -> None:
     "problem_class, expected_steps",
     [
         (AcousticHomogeneousProblem, RECEIVER_STEP_OFFSET),
+        (AcousticHeterogeneousProblem, 0.0),
     ],
 )
 def test_reference_time_shift(
@@ -264,6 +311,7 @@ def test_reference_time_shift(
     "problem_class, expected",
     [
         (AcousticHomogeneousProblem, "acoustic_homogeneous_cpw_reference.npz"),
+        (AcousticHeterogeneousProblem, "acoustic_heterogeneous_cpw_reference.npz"),
     ],
 )
 def test_default_reference_file(
@@ -292,6 +340,45 @@ def test_homogeneous_reference_is_analytical(monkeypatch) -> None:
     )
 
     assert problem.reference_solution(initial_wave, "mass_lumped_triangle") is reference
+
+
+def test_heterogeneous_reference_uses_reference_discretization(monkeypatch) -> None:
+    """A heterogeneous reference is solved at the reference degree and cpw."""
+    problem = make_problem(AcousticHeterogeneousProblem)
+    reference = np.ones((3, 2))
+    built = {}
+
+    def build_wave(dictionary: dict, cpw: float) -> SimpleNamespace:
+        """Record the reference discretization instead of building a wave.
+
+        Parameters
+        ----------
+        dictionary : dict
+            Model dictionary of the reference.
+        cpw : float
+            Cells-per-wavelength of the reference.
+
+        Returns
+        -------
+        SimpleNamespace
+            Stand-in wave whose solve returns ``reference``.
+        """
+        built.update(dictionary, cpw=cpw)
+        return SimpleNamespace(
+            forward_solve=lambda: None, forward_solution_receivers=reference
+        )
+
+    monkeypatch.setattr(
+        problem,
+        "model_dictionary",
+        lambda method, degree: {"method": method, "degree": degree},
+    )
+    monkeypatch.setattr(problem, "build_wave", build_wave)
+
+    result = problem.reference_solution(None, "mass_lumped_triangle")
+
+    assert result is reference
+    assert built == {"method": "mass_lumped_triangle", "degree": 5, "cpw": 6.0}
 
 
 def test_acoustic_analytical_reference_has_no_receiver_offset(monkeypatch) -> None:
@@ -594,6 +681,15 @@ def test_parameters_from_dict_rejects_unknown_keys() -> None:
     """Unknown keys, such as typos, are rejected."""
     with pytest.raises(ValidationError, match="C_inital"):
         CpwParameters(**{**CALCULATOR_PARAMETERS, "C_inital": 2.0})
+
+
+def test_parameters_infer_heterogeneous_profile() -> None:
+    """A heterogeneous case makes the profile heterogeneous by default."""
+    parameters = CpwParameters(
+        **{**CALCULATOR_PARAMETERS, "heterogeneous_case": VELOCITY_FILE_CASE}
+    )
+
+    assert parameters.velocity_profile_type is VelocityProfileType.HETEROGENEOUS
 
 
 def test_parameters_from_dict_names_missing_keys() -> None:
