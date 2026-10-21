@@ -23,16 +23,18 @@ from .problems import (
     AcousticHeterogeneousProblem,
     AcousticHomogeneousProblem,
     CpwProblem,
+    ElasticHomogeneousProblem,
     HeterogeneousCpwProblem,
     HomogeneousCpwProblem,
 )
 from .threshold_discretization import ThresholdDiscretization
-from .wave_physics import ACOUSTIC, WavePhysics
+from .wave_physics import ACOUSTIC, ISOTROPIC_ELASTIC, WavePhysics
 
 __all__ = [
     "ACOUSTIC",
     "COARSE_STEP_FRACTION",
     "CPW_PROBLEMS",
+    "ISOTROPIC_ELASTIC",
     "LINE_SEARCHES",
     "MARMOUSI2_P_WAVE_VELOCITY_FILE",
     "MAX_CPW",
@@ -42,6 +44,7 @@ __all__ = [
     "CpwEvaluation",
     "CpwParameters",
     "CpwProblem",
+    "ElasticHomogeneousProblem",
     "HeterogeneousCase",
     "HeterogeneousCpwProblem",
     "HomogeneousCpwProblem",
