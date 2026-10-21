@@ -359,6 +359,22 @@ class FullWaveformInversion:
         )
     """
 
+    # The keyword arguments ``run_fwi`` reads. Anything else is a misspelling
+    # that would otherwise be dropped without a word.
+    _RUN_FWI_OPTIONS: frozenset[str] = frozenset({
+        "adjoint_options",
+        "adjoint_type",
+        "eps",
+        "ftol",
+        "maxiter",
+        "save_controls",
+        "scipy_options",
+        "stages",
+        "tao_options",
+        "vmax",
+        "vmin",
+    })
+
     def __init__(self, dictionary=None, comm=None, wave_class=AcousticWave, wave=None):
         """Initialize the full waveform inversion driver.
 
@@ -1687,6 +1703,12 @@ class FullWaveformInversion:
                 Each stage starts from the complete model produced by the
                 previous one. Its iteration limit takes precedence over
                 ``tao_options["tao_max_it"]``.
+            eps : float, optional
+                Passed to L-BFGS-B as its finite-difference step. Default is
+                1e-15. Only used under the implemented adjoint.
+            ftol : float, optional
+                Relative reduction of the functional at which L-BFGS-B stops.
+                Default is 1e-11. Only used under the implemented adjoint.
             scipy_options : dict, optional
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
@@ -1745,6 +1767,9 @@ class FullWaveformInversion:
 
         Raises
         ------
+        TypeError
+            If a keyword argument is not one of those listed above. Nothing
+            on the driver is changed when it is raised.
         NotImplementedError
             If the medium has no hand-implemented adjoint and the automated
             one was not enabled.
@@ -1759,6 +1784,15 @@ class FullWaveformInversion:
         --------
         >>> fwi.run_fwi(maxiter=100, vmin=1.5, vmax=5.0)
         """
+        # Checked before anything is read, so a rejected call leaves the
+        # driver as it found it.
+        unknown = sorted(set(kwargs) - self._RUN_FWI_OPTIONS)
+        if unknown:
+            raise TypeError(
+                f"run_fwi() got unexpected keyword arguments {unknown}; it "
+                f"takes {sorted(self._RUN_FWI_OPTIONS)}.",
+            )
+
         stages = kwargs.pop("stages", None)
         maxiter = kwargs.pop("maxiter", 20)
         parameters = {
@@ -1797,7 +1831,8 @@ class FullWaveformInversion:
                     f"{unknown} are not settings of the automated adjoint, "
                     f"which takes {sorted(accepted)}.",
                 )
-        parameters.update(kwargs)
+        if "scipy_options" in kwargs:
+            parameters["scipy_options"] = kwargs.pop("scipy_options")
 
         if stages is not None:
             if self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
