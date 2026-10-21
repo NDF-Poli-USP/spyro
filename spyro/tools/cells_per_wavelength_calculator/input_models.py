@@ -38,6 +38,15 @@ HETEROGENEOUS_RECEIVER_QUANTITY = 500
 HETEROGENEOUS_FINAL_TIME = 7.5
 HETEROGENEOUS_DT = 1e-4
 
+# Acquisition of the heterogeneous isotropic elastic model, in km and s.
+ELASTIC_HETEROGENEOUS_SOURCE_LOCATION = (-0.5, 5.0)
+#: Depth and horizontal span of the receiver line.
+ELASTIC_HETEROGENEOUS_RECEIVER_DEPTH = -4.0
+ELASTIC_HETEROGENEOUS_RECEIVER_X_RANGE = (3.0, 6.9)
+ELASTIC_HETEROGENEOUS_RECEIVER_QUANTITY = 40
+ELASTIC_HETEROGENEOUS_FINAL_TIME = 2.0
+ELASTIC_HETEROGENEOUS_DT = 1e-4
+
 
 #: Time step of the homogeneous elastic analytical reference, in Ricker
 #: periods, when the solver time step is not fixed. Fine enough that
@@ -423,6 +432,7 @@ def _build_elastic_model_dictionary(
     dt: float,
     synthetic_data: dict,
     periodic: bool = False,
+    stacey_boundaries: bool = False,
     forward_output: bool = False,
 ) -> dict:
     """Assemble a 2D isotropic elastic model dictionary for the cpw calculator.
@@ -454,6 +464,9 @@ def _build_elastic_model_dictionary(
         The ``"synthetic_data"`` section, giving the material.
     periodic : bool, optional
         If True, use a periodic mesh. Default is False.
+    stacey_boundaries : bool, optional
+        If True, use first-order Stacey absorbing boundaries. Default is
+        False, for no absorbing boundary.
     forward_output : bool, optional
         If True, write the forward solution to disk. Default is False.
 
@@ -468,6 +481,14 @@ def _build_elastic_model_dictionary(
         If ``method`` is not supported.
     """
     _check_method(method)
+    if stacey_boundaries:
+        absorbing_boundary_conditions = {
+            "status": True,
+            "abc_type": "nrbc",
+            "nrbc": {"type": "Stacey", "dt_scheme": "backward"},
+        }
+    else:
+        absorbing_boundary_conditions = {"status": False}
 
     return {
         "options": {
@@ -479,11 +500,12 @@ def _build_elastic_model_dictionary(
         "mesh": {
             "length_z": length_z,
             "length_x": length_x,
-            # Uniform for both methods
+            # Uniform for both methods; its boundary ids are the ones the
+            # Stacey boundary terms integrate over
             "mesh_type": "firedrake_mesh",
             "periodic": periodic,
         },
-        "absorving_boundary_conditions": {"status": False},
+        "absorving_boundary_conditions": absorbing_boundary_conditions,
         "acquisition": {
             "source_type": "ricker",
             "source_locations": source_locations,
@@ -619,4 +641,76 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
         },
         periodic=True,
         forward_output=True,
+    )
+
+
+def create_elastic_model_for_meshing_parameter_2D_heterogeneous(
+    method: str,
+    degree: int,
+    frequency: float,
+    case: HeterogeneousCase,
+) -> dict:
+    """Create a 2D heterogeneous isotropic elastic model for the cpw calculator.
+
+    By default, a horizontal (x-direction) point force at
+    :data:`ELASTIC_HETEROGENEOUS_SOURCE_LOCATION` records on a horizontal
+    line of receivers at :data:`ELASTIC_HETEROGENEOUS_RECEIVER_DEPTH`; the
+    case can replace the acquisition and time axis. The domain has
+    first-order Stacey absorbing boundaries and no absorbing layer. The
+    reference is numerical, so the same boundaries are present in the
+    reference and in every evaluated solve.
+
+    The P-wave velocity, S-wave velocity and density files of the case are
+    written, if needed, before the dictionary is returned, and the
+    dictionary reads the material from them.
+
+    Parameters
+    ----------
+    method : str
+        Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+    degree : int
+        Spatial polynomial degree.
+    frequency : float
+        Ricker source peak frequency.
+    case : HeterogeneousCase
+        Domain, material and acquisition overrides.
+
+    Returns
+    -------
+    dict
+        Spyro model dictionary for :class:`spyro.IsotropicWave`.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not supported.
+    """
+    # Checked before the material files are written
+    _check_method(method)
+    receiver_locations = case.receiver_locations
+    if receiver_locations is None:
+        receiver_x_first, receiver_x_last = ELASTIC_HETEROGENEOUS_RECEIVER_X_RANGE
+        receiver_locations = spyro.create_transect(
+            (ELASTIC_HETEROGENEOUS_RECEIVER_DEPTH, receiver_x_first),
+            (ELASTIC_HETEROGENEOUS_RECEIVER_DEPTH, receiver_x_last),
+            ELASTIC_HETEROGENEOUS_RECEIVER_QUANTITY,
+        )
+    material_files = case.write_material_files(
+        ("p_wave_velocity", "s_wave_velocity", "density")
+    )
+
+    return _build_elastic_model_dictionary(
+        method=method,
+        degree=degree,
+        length_z=case.length_z,
+        length_x=case.length_x,
+        source_locations=_or_default(
+            case.source_locations, [ELASTIC_HETEROGENEOUS_SOURCE_LOCATION]
+        ),
+        receiver_locations=receiver_locations,
+        frequency=frequency,
+        final_time=_or_default(case.final_time, ELASTIC_HETEROGENEOUS_FINAL_TIME),
+        dt=_or_default(case.dt, ELASTIC_HETEROGENEOUS_DT),
+        synthetic_data={"type": "file", **material_files},
+        stacey_boundaries=True,
     )

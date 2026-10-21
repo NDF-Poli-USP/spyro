@@ -212,7 +212,7 @@ def make_heterogeneous_problem(
 
 @pytest.mark.parametrize(
     "wave_type, expected",
-    [(WaveType.ISOTROPIC_ACOUSTIC, 2.0)],
+    [(WaveType.ISOTROPIC_ACOUSTIC, 2.0), (WaveType.ISOTROPIC_ELASTIC, 1.0)],
 )
 def test_problem_minimum_wavelength_velocity_of_case(
     wave_type: WaveType, expected: float,
@@ -224,7 +224,7 @@ def test_problem_minimum_wavelength_velocity_of_case(
 
 
 @pytest.mark.parametrize(
-    "wave_type", [WaveType.ISOTROPIC_ACOUSTIC]
+    "wave_type", [WaveType.ISOTROPIC_ACOUSTIC, WaveType.ISOTROPIC_ELASTIC]
 )
 def test_problem_minimum_wavelength_velocity_override(wave_type: WaveType) -> None:
     """A case minimum velocity replaces the material minimum.
@@ -241,7 +241,7 @@ def test_problem_minimum_wavelength_velocity_override(wave_type: WaveType) -> No
 
 
 @pytest.mark.parametrize(
-    "wave_type", [WaveType.ISOTROPIC_ACOUSTIC]
+    "wave_type", [WaveType.ISOTROPIC_ACOUSTIC, WaveType.ISOTROPIC_ELASTIC]
 )
 @pytest.mark.parametrize(
     "profile, give_case",
