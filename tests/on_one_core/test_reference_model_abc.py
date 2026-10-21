@@ -9,9 +9,9 @@ are consistent with expected values. The tests cover both 2D and 3D cases.
 import pytest
 from firedrake import conditional, ConvergenceError
 from numpy import all, sum
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
-from spyro.io.basicio import parallel_print as pprint
 
 
 def wave_dict(element_geometry, dimension, calc_eik, abc_type, dt_usu):
@@ -180,14 +180,13 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
 
     # Create the acoustic wave object with HABCs
     wave = AcousticWave(dictionary=dictionary)
-    comm = wave.comm
 
     # Get simulation parameters
-    pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
-    pprint(f"Element Geometry: {element_geometry}", comm=comm)
-    pprint(f"Eikonal Stabilizing Factor: {f_est:.2f}", comm=comm)
-    pprint(f"Timestep Size: {1e3 * dt_usu:.3f} ms", comm=comm)
-    pprint(f"Maximum Divisor of Final Time: {max_divisor_tf}", comm=comm)
+    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length: .4f} m")
+    SpyroEnsemble.print(f"Element Geometry: {element_geometry}")
+    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est: .2f}")
+    SpyroEnsemble.print(f"Timestep Size: {1e3 * dt_usu: .3f} ms")
+    SpyroEnsemble.print(f"Maximum Divisor of Final Time: {max_divisor_tf}")
 
     # ============ MESH FEATURES ============
 
@@ -303,16 +302,15 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
                 calc_eik,
             )
 
-            pprint(f"\nAbsorbing Boundary Condition: {abc_type}", comm=wave.comm)
+            SpyroEnsemble.print(f"\nAbsorbing Boundary Condition: {abc_type}")
 
-            pprint(
+            SpyroEnsemble.print(
                 "\n"
                 + 60 * "="
                 + f"\nTesting Reference Model with {element_geometry} "
                 + f"elements for ABCs\nand {dimension}D case."
                 + f"Eikonal analysis: {act_eik}\n"
                 + 60 * "=",
-                comm=wave.comm,
             )
 
             # Computing reference get_reference_signal
@@ -357,24 +355,19 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
 
         assert sum(errIt) == 0.0 and max_errIt == 0.0, (
             "✗ Integral Error check for 'hybrid' and 'PML' solvers in Reference Model "
-            f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
-        )
-        pprint(
-            "✓ Integral Error Verified for 'hybrid' and 'PML' solvers", comm=wave.comm
-        )
+            f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case.")
+        SpyroEnsemble.print(
+            "✓ Integral Error Verified for 'hybrid' and 'PML' solvers")
         assert sum(errPk) == 0.0 and max_errPK == 0.0 and all(pkMax) > 0.0, (
             "✗ Peak Error check for 'hybrid' and 'PML' solvers in Reference Model "
-            f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
-        )
-        pprint("✓ Peak Error Verified for 'hybrid' and 'PML' solvers", comm=wave.comm)
+            f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case.")
+        SpyroEnsemble.print("✓ Peak Error Verified for 'hybrid' and 'PML' solvers")
         assert final_ener > 0.0 and dsspt_ener == 0.0, (
             "✗ Final Energy check for 'hybrid' and 'PML' solvers in Reference Model "
-            f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
-        )
-        pprint("✓ Final Energy Verified for 'hybrid' and 'PML' solvers", comm=wave.comm)
+            f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case.")
+        SpyroEnsemble.print("✓ Final Energy Verified for 'hybrid' and 'PML' solvers")
 
     except ConvergenceError as e:
         pytest.fail(
             f"Checking Reference Model with {element_geometry} elements for "
-            f"{dimension}D and Eikonal {act_eik} case raised an exception: {str(e)}",
-        )
+            f"{dimension}D and Eikonal {act_eik} case raised an exception: {str(e)}")

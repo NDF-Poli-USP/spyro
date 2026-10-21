@@ -91,8 +91,6 @@ class FieldLogger:
 
     Parameters
     ----------
-    comm : object
-        Communication wrapper with ``comm`` MPI communicator and rank support.
     visualization_dict : dict
         Visualization and logging configuration dictionary. Keys control which
         outputs are enabled and the associated output filenames.
@@ -103,8 +101,6 @@ class FieldLogger:
 
         Parameters
         ----------
-        comm : object
-            Communication wrapper with ``comm`` MPI communicator and rank support.
         visualization_dict : dict
             Visualization and logging configuration dictionary. Keys control which
             outputs are enabled and the associated output filenames.

@@ -3,7 +3,7 @@ from mpi4py.MPI import COMM_WORLD
 from mpi4py import MPI
 from firedrake import conditional
 import spyro
-from spyro.io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.tools.error_measure import MeasureError
 
 
@@ -87,8 +87,8 @@ def test_forward_3_shots():
 
     # Computing errors
     error_L2 = MeasureError.calculate_normalized_L2_error(arr0[:430], analytical_p[:430])
-    pprint(f"NRMS Error for shot {wave.current_sources} is {error_L2:.4e} and test "
-           f"has passed equals {abs(error_L2) < 0.01}", comm=comm)
+    SpyroEnsemble.print(f"NRMS Error for shot {wave.current_sources} is {error_L2: .4e} "
+                        f"and test has passed equals {abs(error_L2) < 0.01}")
 
     error_L2_all = COMM_WORLD.allreduce(error_L2, op=MPI.SUM) / 3.
 
