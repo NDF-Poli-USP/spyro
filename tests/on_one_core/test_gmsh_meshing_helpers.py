@@ -1,8 +1,13 @@
+import numpy as np
 import pytest
 
 gmsh = pytest.importorskip("gmsh")
 
 from spyro.meshing.meshing_gmsh2d import _classify_rectangular_curves  # noqa: E402
+from spyro.meshing.meshing_gmsh3d import (  # noqa: E402
+    configure_gmsh_3d_meshing_mode,
+    padding_grading_factor,
+)
 
 
 @pytest.fixture
@@ -73,3 +78,66 @@ def test_classify_rectangular_curves(gmsh_session):
     assert bbox(right)[0] == pytest.approx(length_x, abs=tol)
     assert bbox(bottom)[1] == pytest.approx(depth_z, abs=tol)
     assert interior not in top + left + right + bottom
+
+
+@pytest.mark.parametrize("structured_mesh", [False, True])
+def test_configure_gmsh_3d_meshing_mode(gmsh_session, structured_mesh):
+    """Check the Gmsh options set for structured and unstructured 3-D meshing.
+
+    Parameters
+    ----------
+    gmsh_session : module
+        Initialized Gmsh module with an empty model.
+    structured_mesh : bool
+        Whether the structured meshing mode is requested.
+    """
+    gmsh_session.model.occ.addBox(0, 0, 0, 1, 1, 1)
+    gmsh_session.model.occ.synchronize()
+
+    configure_gmsh_3d_meshing_mode(
+        gmsh=gmsh_session, structured_mesh=structured_mesh, min_element_size=0.25
+    )
+
+    assert gmsh_session.option.getNumber("Mesh.Algorithm3D") == 10
+    assert gmsh_session.option.getNumber("Mesh.Optimize") == 1
+    assert gmsh_session.option.getNumber("Mesh.OptimizeNetgen") == 1
+    assert gmsh_session.option.getNumber("Mesh.OptimizeThreshold") == 0.5
+    if structured_mesh:
+        assert gmsh_session.option.getNumber("Mesh.MeshSizeMin") == 0.25
+        assert gmsh_session.option.getNumber("Mesh.MeshSizeMax") == 0.25
+    else:
+        assert gmsh_session.option.getNumber("Mesh.MeshSizeMax") != 0.25
+
+
+@pytest.mark.parametrize(
+    "padding_type, expected",
+    [
+        ("rectangular", 0.5),
+        (None, 0.5),
+        ("hyperelliptical", (0.5**2 + 0.25**2 + 0.0**2) ** 0.5),
+    ],
+)
+def test_padding_grading_factor_scalar(padding_type, expected):
+    """Check the scalar padding grading factor for each padding type.
+
+    Parameters
+    ----------
+    padding_type : str or None
+        Padding geometry passed to `padding_grading_factor`.
+    expected : float
+        Expected grading factor.
+    """
+    t = padding_grading_factor(50.0, 50.0, 0.0, 100.0, 200.0, 300.0, padding_type, 2.0)
+
+    assert float(t) == pytest.approx(expected)
+
+
+def test_padding_grading_factor_array_clamps_and_ignores_zero_padding():
+    """Check that array grading factors are clamped to one and zero padding ignored."""
+    distances = np.array([0.0, 50.0, 100.0, 400.0])
+
+    t = padding_grading_factor(
+        distances, distances, distances, 100.0, 0.0, 0.0, "rectangular", 3.0
+    )
+
+    np.testing.assert_array_equal(t, [0.0, 0.5, 1.0, 1.0])
