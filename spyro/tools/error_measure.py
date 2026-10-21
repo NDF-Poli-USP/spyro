@@ -35,9 +35,6 @@ class MeasureError:
 
     Attributes
     ----------
-    comm : `object`
-        An object representing the communication interface for parallel processing.
-        Default is `None`.
     path_reference : `str`
         Path to save the reference signal.
     path_save_error : `str`

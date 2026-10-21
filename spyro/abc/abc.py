@@ -19,9 +19,6 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
 
     Attributes
     ----------
-    comm : `object`
-        An object representing the communication interface for parallel processing.
-        Default is `None`.
     dimension : `int`, optional
         Model dimension (2D or 3D). Default is 2D.
     domain_dim : `tuple`
@@ -136,7 +133,7 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         # Type of function space
         self.func_space_type = func_space_type
 
-   def critical_boundary_points(self, wave):
+    def critical_boundary_points(self, wave):
         """Determine critical boundary points using the Eikonal criterion.
 
         Use original-domain boundaries to size the absorbing layer.
