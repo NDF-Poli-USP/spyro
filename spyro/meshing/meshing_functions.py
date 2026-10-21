@@ -3,25 +3,23 @@ from firedrake import Mesh as FireMeshReader
 
 from ..io.basicio import parallel_print
 from ..io.segy_io import create_segy_from_grid
-from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .firedrake_based_wrappers import box_mesh, periodic_rectangle_mesh, rectangle_mesh
+from spyro.mpi.spyro_mpi import SpyroEnsemble
+from .meshing_utils import create_sizing_function, calculate_edge_length
+from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_with_velocity_model
+from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_homogeneous
 from .gmsh_based_methods import build_big_rect_with_inner_element_group
-from .meshing_gmsh2d import (
-    apply_structured_winslow_smoothing2d,
-    build_gmsh_geometry_and_groups,
-    configure_gmsh_2d_meshing_mode,
-)
 from .meshing_gmsh3D import (
     apply_structured_winslow_smoothing3D,
     build_gmsh_geometry_and_groups3D,
     configure_gmsh_mesh_size3D,
 )
-from .meshing_utils import calculate_edge_length, create_sizing_function
-from .meshing_utils3D import create_sizing_function3D
-from .seismic_mesh_based_wrappers import (
-    create_seismicmesh_2D_mesh_homogeneous,
-    create_seismicmesh_2D_mesh_with_velocity_model,
+from .meshing_gmsh2d import (
+    build_gmsh_geometry_and_groups,
+    apply_structured_winslow_smoothing2d,
+    configure_gmsh_2d_meshing_mode,
 )
+from .meshing_utils3D import create_sizing_function3D
 
 try:
     import gmsh
