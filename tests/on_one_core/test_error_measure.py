@@ -49,22 +49,13 @@ class TestMeasureError:
         return numerical, reference, dt
 
     @pytest.fixture
-    def elastic_receiver_data(self):
+    def elastic_receiver_data(self, acoustic_receiver_data):
         """Create synthetic elastic seismic receiver data."""
-        dt = 0.001
-        ricker = full_ricker_wavelet(
-            dt, final_time=20.0, frequency=10.0, delay=2.0, delay_type="time",
-        )
-        receiver_amplitudes = np.linspace(1.0, 0.7, 40)
+        _, acoustic_reference, dt = acoustic_receiver_data
 
         # Different amplitudes for the two displacement directions
         direction_amplitudes = np.array([1.0, 0.6])
-
-        reference = (
-            ricker[:, np.newaxis, np.newaxis]
-            * receiver_amplitudes[np.newaxis, :, np.newaxis]
-            * direction_amplitudes[np.newaxis, np.newaxis, :]
-        )
+        reference = acoustic_reference[:, :, np.newaxis] * direction_amplitudes
 
         rng = np.random.default_rng(42)
         numerical = reference + 0.01 * rng.standard_normal(reference.shape)
