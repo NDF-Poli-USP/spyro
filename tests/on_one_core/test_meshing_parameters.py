@@ -273,6 +273,67 @@ def test_periodic_only_for_firedrake_mesh():
         mp.periodic = True
 
 
+def _gmsh_parameters(**mesh_options) -> spyro.meshing.MeshingParameters:
+    """Build 2D `gmsh_mesh` parameters with extra mesh options.
+
+    Parameters
+    ----------
+    **mesh_options
+        Entries added to, or overriding, the base mesh dictionary.
+
+    Returns
+    -------
+    spyro.meshing.MeshingParameters
+        The constructed meshing parameters.
+    """
+    mesh_dictionary = {
+        "length_z": 1.0,
+        "length_x": 1.0,
+        "length_y": 0.0,
+        "mesh_file": None,
+        "mesh_type": "gmsh_mesh",
+        "edge_length": 0.1,
+        "h_padding": 0.1,
+        **mesh_options,
+    }
+    return spyro.meshing.MeshingParameters(
+        input_mesh_dictionary=mesh_dictionary,
+        dimension=2,
+        source_frequency=5.0,
+    )
+
+
+def test_structured_and_unstructured_quad_are_mutually_exclusive():
+    """Test that enabling both quad mesh options raises `ValueError`."""
+    with pytest.raises(
+        ValueError,
+        match="'structured_mesh' and 'unstructured_quad_mesh' are mutually exclusive",
+    ):
+        _gmsh_parameters(structured_mesh=True, unstructured_quad_mesh=True)
+
+
+@pytest.mark.parametrize(
+    "structured_mesh, unstructured_quad_mesh",
+    [(False, False), (True, False), (False, True)],
+)
+def test_single_quad_mesh_option_is_accepted(structured_mesh, unstructured_quad_mesh):
+    """Test that at most one enabled quad mesh option is accepted.
+
+    Parameters
+    ----------
+    structured_mesh : bool
+        Value of the `structured_mesh` option.
+    unstructured_quad_mesh : bool
+        Value of the `unstructured_quad_mesh` option.
+    """
+    mp = _gmsh_parameters(
+        structured_mesh=structured_mesh,
+        unstructured_quad_mesh=unstructured_quad_mesh,
+    )
+    assert mp.structured_mesh is structured_mesh
+    assert mp.unstructured_quad_mesh is unstructured_quad_mesh
+
+
 if __name__ == "__main__":
     test_initialize_mesh_pam()
     test_negative_length_z_raises()

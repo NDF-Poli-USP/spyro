@@ -1,5 +1,9 @@
 import importlib.util
+import json
+import subprocess
+import sys
 
+import firedrake as fire
 import pytest
 
 from .gmsh_mesh_checks import (
@@ -216,4 +220,69 @@ def test_gmsh2d_unstructured(
         UNSTRUCTURED_EXPECTED_CELLS[(extend_segy, water_interface, padding_type)],
         rtol=UNSTRUCTURED_CELL_COUNT_RTOL,
     )
+    _check_mesh(mesh, parameters["output_filename"], water_interface, padding_type)
+
+
+def _generate_in_subprocess(parameters: dict) -> None:
+    """Write a 2D Gmsh mesh from a separate Python process.
+
+    Gmsh aborts the interpreter when a second ``unstructured_quad_mesh`` is
+    generated in the same process (see mfe_6_repeated_quad_meshing_aborts.py),
+    so each quad mesh is made in a fresh process.
+
+    Parameters
+    ----------
+    parameters : dict
+        JSON-serialisable input mesh dictionary.
+    """
+    script = (
+        "import json, sys\n"
+        "from spyro.meshing.meshing_parameters import MeshingParameters\n"
+        "from spyro.meshing.meshing_2d import generate_gmsh_2d_mesh\n"
+        "generate_gmsh_2d_mesh(\n"
+        "    MeshingParameters(input_mesh_dictionary=json.loads(sys.argv[1]))\n"
+        ")\n"
+    )
+    subprocess.run(
+        [sys.executable, "-c", script, json.dumps(parameters)],
+        check=True,
+        capture_output=True,
+    )
+
+
+@pytest.mark.slow
+@PADDING_CASES
+@WATER_INTERFACE_CASES
+def test_gmsh2d_unstructured_quad(tmp_path, request, water_interface, padding_type):
+    """Unstructured all-quadrilateral meshes."""
+    if water_interface and padding_type is None:
+        request.applymarker(
+            pytest.mark.xfail(
+                strict=True,
+                reason=(
+                    "Known bug: recombination leaves two triangles. Firedrake "
+                    "either fails to read the mixed mesh or reads it as a "
+                    "triangle mesh (see mfe_5_quad_mesh_leaves_triangles.py)."
+                ),
+            )
+        )
+    parameters = _base_gmsh2d_parameters(tmp_path / "mesh.msh")
+    parameters.update(
+        {
+            "padding_type": padding_type,
+            "water_interface": water_interface,
+            "structured_mesh": False,
+            "unstructured_quad_mesh": True,
+            "apply_winslow": False,
+            "winslow_implementation": "default",
+            "extend_segy": True,
+        }
+    )
+
+    _generate_in_subprocess(parameters)
+    mesh = fire.Mesh(parameters["output_filename"])
+
+    # No cell-count baseline: quad recombination is not deterministic, and
+    # repeated runs with the same input differ by more than 10%.
+    assert_cell_type(mesh, "quadrilateral")
     _check_mesh(mesh, parameters["output_filename"], water_interface, padding_type)
