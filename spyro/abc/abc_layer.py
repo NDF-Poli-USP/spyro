@@ -96,7 +96,7 @@ class ABCLayer(AbsorbingBC):
                  abc_boundary_layer_type=AbsorbingBCsType.HYBRID,
                  abc_reference_freq=LayerSizeRefFrequency.SOURCE,
                  abc_degree_type=HyperLayerDegreeType.REAL,
-                 abc_deg_layer=None, output_folder=None, comm=None):
+                 abc_deg_layer=None, output_folder=None):
         """Initialize the ABCLayer class.
 
         Parameters
@@ -136,9 +136,6 @@ class ABCLayer(AbsorbingBC):
             equal to 2. `None` is used only for rectangular layers. Default is `None`.
         output_folder : `str`, optional
             The folder where output data will be saved. Default is None.
-        comm : `object`, optional
-            An object representing the communication interface for parallel processing.
-            Default is `None`.
 
         Returns
         -------
@@ -147,7 +144,7 @@ class ABCLayer(AbsorbingBC):
 
         AbsorbingBC.__init__(self, domain_dim, frequency=frequency, dt=dt,
                              dimension=dimension, quadrilateral=quadrilateral,
-                             func_space_type=func_space_type, comm=comm)
+                             func_space_type=func_space_type)
 
         # ABC layer parameters
         self.abc_boundary_layer_type = validate_enum("abc_boundary_layer_type",
@@ -178,11 +175,9 @@ class ABCLayer(AbsorbingBC):
         # Define the shape of the absorbing layer.
         self.layer_geometry = self._define_layer_shape()
 
-        """"
-        Create the path to save data
-        The required abc_type argument from path_to_save_abc_layer_case() method is set to
-        self.abc_boundary_layer_type since it is an instance of `typing.AbsorbingBCsType`.
-        """
+        # Create the path to save data
+        # The required abc_type argument from path_to_save_abc_layer_case() method is set to
+        # self.abc_boundary_layer_type since it is an instance of `typing.AbsorbingBCsType`.
         self.path_save, self.case_absl, self.path_case_absl = \
             path_to_save_abc_case(self.abc_boundary_layer_type,
                                   abc_boundary_layer_shape=self.abc_boundary_layer_shape,

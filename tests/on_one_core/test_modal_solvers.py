@@ -6,11 +6,11 @@ both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
 """
 
 from pytest import fail, fixture, mark, param
-from firedrake import COMM_WORLD as comm, conditional, ConvergenceError
+from firedrake import conditional, ConvergenceError
 from numpy import isclose
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
-from spyro.io.basicio import parallel_print as pprint
 
 
 def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneous):
@@ -161,12 +161,12 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     layer_shape = "rectangular" if degree_layer is None else "hypershape"
 
     # Get simulation parameters
-    pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
-    pprint(f"Element Geometry: {element_geometry}", comm=comm)
-    pprint(f"Eikonal Stabilizing Factor: {f_est:.2f}", comm=comm)
-    pprint(f"Layer Shape: {layer_shape}", comm=comm)
+    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length: .4f} m")
+    SpyroEnsemble.print(f"Element Geometry: {element_geometry}")
+    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est: .2f}")
+    SpyroEnsemble.print(f"Layer Shape: {layer_shape}")
     fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
-    pprint((fit_str + "{:.1f}\n").format(*fitting_c), comm=comm)
+    SpyroEnsemble.print((fit_str + "{:.1f}\n").format(*fitting_c))
 
     # Create dictionary with parameters for the model
     dictionary = wave_dict(
@@ -255,7 +255,7 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
     for modal_solver in modal_solver_lst:
 
         # Modal solver
-        pprint(f"\nModal Solver: {modal_solver}", comm=comm)
+        SpyroEnsemble.print(f"\nModal Solver: {modal_solver}")
 
         # Reference to resource usage
         tRef = comp_cost("tini")
@@ -274,13 +274,13 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
 
         abc_str = wave.case_abc if wave.layer_ops.layer_geometry.n_hyp is None \
             else f"{wave.case_abc[:2]}" + \
-            f"{wave.layer_ops.layer_geometry.n_hyp:.1f}{wave.case_abc[-4:]}"
+            f"{wave.layer_ops.layer_geometry.n_hyp: .1f}{wave.case_abc[-4:]}"
         met_str = f"Fundamental Frequency {abc_str} {wave.dimension}D. "
         met_str += f"Method {modal_solver}"
-        cmp_str = f"Expected {exp_value:.5f}, got = {wave.fundam_freq:.5f}"
+        cmp_str = f"Expected {exp_value: .5f}, got = {wave.fundam_freq: .5f}"
         assert isclose(wave.fundam_freq / exp_value, 1., atol=tol), \
             "✗ " + met_str + "  → " + cmp_str
-        pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
+        SpyroEnsemble.print("✓ " + met_str + " Verified: " + cmp_str)
 
 
 @mark.older_firedrake
@@ -498,9 +498,9 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     c_hom = "Homogeneous" if homogeneous else "Heterogeneous"
     n_hyp = f"HyperShape N{degree_layer}" if degree_layer is not None else "Rectangular"
 
-    pprint("\n" + 60 * "=" + f"\nTesting Modal Solvers with {element_geometry} elements "
-           + f"for {dimension}D case\nand {n_hyp} layer. Propagation Speed: {c_hom}\n"
-           + 60 * "=", comm=comm)
+    SpyroEnsemble.print("\n" + 60 * "=" + f"\nTesting Modal Solvers with {element_geometry} "
+                        + f"elements for {dimension}D case\nand {n_hyp} layer. Propagation "
+                        + f"Speed: {c_hom}\n" + 60 * "=")
 
     # ============ SIMULATION PARAMETERS ============
 

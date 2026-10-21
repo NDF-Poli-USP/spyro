@@ -686,7 +686,8 @@ class FullWaveformInversion:
                 names = ", ".join(parameter.value for parameter in parameters)
                 raise ValueError(
                     f"This inversion controls {len(parameters)} parameters "
-                    f"({names}), so it takes that many values; "
+                    f"({names}), so it takes that many values
+                "
                     f"{len(control)} were given.",
                 )
             return dict(zip(parameters, control))
@@ -1553,7 +1554,7 @@ class FullWaveformInversion:
                 )
 
             with open("peak_memory.txt", "a") as file:
-                file.write(f"Peak memory usage: {peak_memory_mb:.2f} MB \n")
+                file.write(f"Peak memory usage: {peak_memory_mb: .2f} MB \n")
 
         return Jm
 
@@ -2162,7 +2163,7 @@ class FullWaveformInversion:
                 )
 
             with open("peak_memory.txt", "a") as file:
-                file.write(f"Peak memory usage: {get_peak_memory():.2f} MB \n")
+                file.write(f"Peak memory usage: {get_peak_memory(): .2f} MB \n")
 
     def run_fwi_rol(self, **kwargs):
         """
