@@ -109,7 +109,8 @@ class Receivers(Delta_projector):
         """
         for rid in range(self.number_of_points):
             value = residual[IT][rid]
-            if self.is_local[rid]:
+            # A local receiver can sit in cell 0, so only None means non-local
+            if self.is_local[rid] is not None:
                 idx = np.int_(self.cellNodeMaps[rid])
                 phis = self.cell_tabulations[rid]
 

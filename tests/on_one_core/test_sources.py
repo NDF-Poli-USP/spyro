@@ -106,6 +106,7 @@ def _build_wave(
     synthetic_data=None,
     initial_velocity=None,
     cell_type="T",
+    use_vertex_only_mesh=True,
 ):
     receiver_location = (-0.2, 0.6) if dimension == 2 else (-0.2, 0.6, 0.6)
     model = {
@@ -127,7 +128,7 @@ def _build_wave(
             "delay": 1.0,
             "amplitude": amplitude,
             "receiver_locations": [receiver_location],
-            "use_vertex_only_mesh": True,
+            "use_vertex_only_mesh": use_vertex_only_mesh,
         },
         "time_axis": _base_time_axis(),
         "visualization": _base_visualization(),
@@ -161,7 +162,7 @@ def _build_elastic_wave(amplitude, source_locations, dimension=2, cell_type="T")
     )
 
 
-def _build_acoustic_wave(amplitude, source_locations, cell_type="T"):
+def _build_acoustic_wave(amplitude, source_locations, cell_type="T", use_vertex_only_mesh=True):
     return _build_wave(
         AcousticWave,
         amplitude,
@@ -170,6 +171,7 @@ def _build_acoustic_wave(amplitude, source_locations, cell_type="T"):
         degree=4,
         initial_velocity=1.5,
         cell_type=cell_type,
+        use_vertex_only_mesh=use_vertex_only_mesh,
     )
 
 
@@ -281,3 +283,53 @@ def test_cofunction_values_elastic_3d(cell_type):
 
 if __name__ == "__main__":
     test_ricker_varies_in_time()
+
+
+def _first_cell_centroid(mesh: fire.MeshGeometry) -> tuple[float, ...]:
+    """Return the centroid of the cell numbered 0 on this rank.
+
+    Parameters
+    ----------
+    mesh : firedrake.MeshGeometry
+        The mesh.
+
+    Returns
+    -------
+    tuple of float
+        The centroid coordinates.
+    """
+    cell_nodes = mesh.coordinates.cell_node_map().values[0]
+    return tuple(mesh.coordinates.dat.data_ro[cell_nodes].mean(axis=0))
+
+
+def test_source_in_first_cell_is_applied() -> None:
+    """A source located in cell 0 is still injected into the right hand side.
+
+    Cell 0 is falsy, and was once mistaken for a source outside this rank.
+    """
+    wave = _build_acoustic_wave(1.0, [(-0.5, 0.5)], use_vertex_only_mesh=False)
+    wave.sources.point_locations = [_first_cell_centroid(wave.mesh)]
+    wave.sources.build_maps()
+    assert wave.sources.is_local[0] == 0
+
+    rhs_forcing = fire.Cofunction(wave.function_space.dual())
+    peak_step = int(np.argmax(np.abs(wave.sources.wavelet)))
+    wave.sources.apply_source(rhs_forcing, peak_step)
+
+    assert np.abs(rhs_forcing.dat.data_ro).max() > 0.0
+
+
+def test_receiver_in_first_cell_is_injected() -> None:
+    """A receiver located in cell 0 still injects its residual as a source.
+
+    Cell 0 is falsy, and was once mistaken for a receiver outside this rank.
+    """
+    wave = _build_acoustic_wave(1.0, [(-0.5, 0.5)], use_vertex_only_mesh=False)
+    wave.receivers.point_locations = [_first_cell_centroid(wave.mesh)]
+    wave.receivers.build_maps()
+    assert wave.receivers.is_local[0] == 0
+
+    rhs_forcing = fire.Cofunction(wave.function_space.dual())
+    wave.receivers.apply_receivers_as_source(rhs_forcing, [[1.0]], 0)
+
+    assert np.abs(rhs_forcing.dat.data_ro).max() > 0.0

@@ -1,5 +1,7 @@
 import meshio
+from mpi4py import MPI
 from .meshing_utils import check_seismicmesh
+from ..mpi.spyro_mpi import SpyroEnsemble
 from firedrake import Mesh as FireMeshReader
 from firedrake import DistributedMeshOverlapType
 
@@ -133,28 +135,73 @@ def create_seismicmesh_2D_mesh_homogeneous(mesh_parameters):
     bbox = (-real_lz, 0.0, -pad, real_lx - pad)
     rectangle = SeismicMesh.Rectangle(bbox)
 
+    if mesh_parameters.comm is None:
+        _generate_and_write_homogeneous_mesh(
+            rectangle, edge_length, mesh_parameters.output_file_name
+        )
+        return FireMeshReader(mesh_parameters.output_file_name)
+
+    # Every ensemble member reads the same file, so only ensemble rank 0
+    # generates it, in parallel over its spatial communicator.
+    spatial_comm = SpyroEnsemble.ensemble.comm
+    if SpyroEnsemble.get_ensemble_rank() == 0:
+        _generate_and_write_homogeneous_mesh(
+            rectangle, edge_length, mesh_parameters.output_file_name,
+            comm=spatial_comm,
+        )
+    SpyroEnsemble.ensemble.ensemble_comm.barrier()
+    SpyroEnsemble.barrier()
+    return FireMeshReader(mesh_parameters.output_file_name, comm=spatial_comm)
+
+
+def _generate_and_write_homogeneous_mesh(
+    rectangle: "SeismicMesh.Rectangle",
+    edge_length: float,
+    output_file_name: str,
+    comm: MPI.Comm | None = None,
+) -> None:
+    """Generate a uniform SeismicMesh triangle mesh and write it to disk.
+
+    Parameters
+    ----------
+    rectangle : SeismicMesh.Rectangle
+        Domain to mesh.
+    edge_length : float
+        Uniform target edge length.
+    output_file_name : str
+        Name of the gmsh file to write. A ``.vtk`` copy is written next to it.
+    comm : mpi4py.MPI.Comm, optional
+        Communicator SeismicMesh generates the mesh over. SeismicMesh gathers
+        the mesh onto its rank 0, which alone writes the files. The default,
+        None, is SeismicMesh's own default, ``MPI.COMM_WORLD``.
+
+    Returns
+    -------
+    None
+    """
     points, cells = SeismicMesh.generate_mesh(
         domain=rectangle,
         edge_length=edge_length,
         verbose=0,
+        comm=comm,
     )
+    if comm is not None and comm.rank != 0:
+        return
 
     points, cells = SeismicMesh.geometry.delete_boundary_entities(
         points, cells, min_qual=0.6
     )
 
     meshio.write_points_cells(
-        mesh_parameters.output_file_name,
+        output_file_name,
         points,
         [("triangle", cells)],
         file_format="gmsh22",
         binary=False,
     )
     meshio.write_points_cells(
-        mesh_parameters.output_file_name + ".vtk",
+        output_file_name + ".vtk",
         points,
         [("triangle", cells)],
         file_format="vtk",
     )
-
-    return FireMeshReader(mesh_parameters.output_file_name)

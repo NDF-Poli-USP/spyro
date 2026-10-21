@@ -105,7 +105,8 @@ class Sources(Delta_projector):
             The right hand side of the wave equation with the source applied
         """
         for source_id in range(self.number_of_points):
-            if self.is_local[source_id] and source_id in self.current_sources:
+            # A local source can sit in cell 0, so only None means non-local
+            if self.is_local[source_id] is not None and source_id in self.current_sources:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     rhs_forcing.dat.data_with_halos[
                         int(self.cellNodeMaps[source_id][i])
@@ -261,13 +262,10 @@ def full_ricker_wavelet(
         list of ricker values at each time step
     """
     nt = round(final_time / dt) + 1  # number of timesteps
-    time = 0.0
-    full_wavelet = np.zeros((nt,))
-    for t in range(nt):
-        full_wavelet[t] = ricker_wavelet(
-            time, frequency, 1, delay=delay, delay_type=delay_type
-        )
-        time += dt
+    time = dt * np.arange(nt)
+    full_wavelet = ricker_wavelet(
+        time, frequency, 1, delay=delay, delay_type=delay_type
+    )
     if cutoff is not None:
         fs = 1.0 / dt
         order = 2

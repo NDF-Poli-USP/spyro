@@ -11,6 +11,21 @@ from spyro.mpi.spyro_mpi import (
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
+@pytest.fixture(autouse=True)
+def restore_spyro_ensemble():
+    """Restore the class-level ensemble state that tests here replace.
+
+    Yields
+    ------
+    None
+        Control to the test, then the original state is put back so mocks
+        do not leak into tests in other modules.
+    """
+    ensemble, config = SpyroEnsemble.ensemble, SpyroEnsemble.config
+    yield
+    SpyroEnsemble.ensemble, SpyroEnsemble.config = ensemble, config
+
+
 def test_parallelism_config_shot_ids():
     config = ParallelismConfig(number_of_sources=3)
 
@@ -187,3 +202,100 @@ def test_write_vtk_skipped_on_other_ensemble_members(monkeypatch):
     SpyroEnsemble.write_vtk("out.pvd", object())
 
     vtk_file.assert_not_called()
+
+
+class BroadcastComm:
+    """Stand-in for ``COMM_WORLD`` that records broadcasts.
+
+    Attributes
+    ----------
+    rank : int
+        Rank of this process.
+    broadcasts : list
+        Values passed to :meth:`bcast`.
+    root_value : object
+        Value received by ranks other than the root.
+    """
+
+    def __init__(self, rank: int, root_value: object = None) -> None:
+        """Set the rank and the value the root broadcasts.
+
+        Parameters
+        ----------
+        rank : int
+            Rank of this process.
+        root_value : object, optional
+            Value received by ranks other than the root. Default is None.
+        """
+        self.rank = rank
+        self.broadcasts = []
+        self.root_value = root_value
+
+    def bcast(self, value: object, root: int = 0) -> object:
+        """Return the root's value, as an MPI broadcast does.
+
+        Parameters
+        ----------
+        value : object
+            Value sent by this rank.
+        root : int, optional
+            Broadcasting rank. Default is 0.
+
+        Returns
+        -------
+        object
+            ``value`` on the root, ``root_value`` elsewhere.
+        """
+        self.broadcasts.append(value)
+        return value if self.rank == root else self.root_value
+
+
+def test_run_in_one_core_and_broadcast_without_ensemble_runs_on_rank_0(
+    monkeypatch,
+):
+    """Before the ensemble exists, rank 0 runs the function, with kwargs."""
+    comm = BroadcastComm(rank=0)
+    monkeypatch.setattr("spyro.mpi.spyro_mpi.COMM_WORLD", comm)
+    monkeypatch.setattr(SpyroEnsemble, "ensemble", None)
+    calls = []
+
+    @SpyroEnsemble.run_in_one_core_and_broadcast
+    def add(a, b=0):
+        calls.append((a, b))
+        return a + b
+
+    assert add(1, b=2) == 3
+    assert calls == [(1, 2)]
+    assert comm.broadcasts == [3]
+
+
+def test_run_in_one_core_and_broadcast_without_ensemble_skips_other_ranks(
+    monkeypatch,
+):
+    """Before the ensemble exists, other ranks receive rank 0's result."""
+    comm = BroadcastComm(rank=1, root_value=3)
+    monkeypatch.setattr("spyro.mpi.spyro_mpi.COMM_WORLD", comm)
+    monkeypatch.setattr(SpyroEnsemble, "ensemble", None)
+    calls = []
+
+    @SpyroEnsemble.run_in_one_core_and_broadcast
+    def add(a, b=0):
+        calls.append((a, b))
+        return a + b
+
+    assert add(1, b=2) == 3
+    assert calls == []
+    assert comm.broadcasts == [None]
+
+
+def test_run_in_one_core_passes_keyword_arguments(monkeypatch):
+    """Keyword arguments reach the function as keywords."""
+    ensemble = MagicMock()
+    ensemble.global_comm.rank = 0
+    monkeypatch.setattr(SpyroEnsemble, "ensemble", ensemble)
+
+    @SpyroEnsemble.run_in_one_core
+    def subtract(a, b=0):
+        return a - b
+
+    assert subtract(5, b=2) == 3
