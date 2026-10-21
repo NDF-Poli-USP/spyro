@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
@@ -9,7 +10,6 @@ from ..domains.space import check_function_space_type, create_function_space
 from ..io import Model_parameters
 from ..io import material_properties_io
 from ..io.parallelism_wrappers import ensemble_propagator
-from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
@@ -232,11 +232,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # Getting parameters from the mesh
         if self.mesh is not None:
-            self.building_mesh_derived_paramenters()
+            self.building_mesh_derived_parameters()
         elif self.mesh_parameters.mesh_type == "firedrake_mesh":
-            warnings.warn(
-                "No mesh file, Firedrake mesh will be automatically generated."
-            )
+            warnings.warn("No mesh file, Firedrake mesh will be automatically generated.")
         else:
             warnings.warn("No mesh found. Please define a mesh.")
 
@@ -245,7 +243,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.abcs_manager()
 
         # Logger
-        self.field_logger = FieldLogger(self.comm, self.input_dictionary["visualization"])
+        self.field_logger = FieldLogger(self.read_outputs)
         self.field_logger.add_field("forward", self.get_function_name(),
                                     lambda: self.get_function())
 
@@ -265,7 +263,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         -------
         None
         """
-        parallel_print("\nSolving Forward Problem", comm=self.comm)
+        SpyroEnsemble.print("\nSolving Forward Problem")
 
         if self.function_space is None:
             self.building_mesh_derived_paramenters()
@@ -305,7 +303,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         return boundaries
 
-    def building_mesh_derived_paramenters(self):
+    def building_mesh_derived_parameters(self, include_model_parameters=False):
         """Build parameters that are derived from the mesh."""
         if self.mesh is None:
             self.mesh = self.get_mesh()
@@ -375,7 +373,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         )
 
         self.mesh = self.get_mesh()
-        self.building_mesh_derived_paramenters()
+        self._physical_parameters = PhysicalParameters()
+        self.building_mesh_derived_parameters()
 
     def set_solver_parameters(self, parameters=None):
         """Set the solver parameters.
@@ -424,7 +423,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         new_file=None,
         output=False,
         dg_velocity_model=True,
-        fast_interpolate=False,
+        fast_interpolate=False,  # TODO Documentation in PR206
     ):
         """Define the new user velocity model or file. It is optional.
 
@@ -433,11 +432,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         conditional:  (optional)
             Firedrake conditional object.
         velocity_model_function: Firedrake function (optional)
-            Firedrake function to be used as the velocity model. Has to be in the same function space as the object.
+            Firedrake function to be used as the velocity model. Has to be in the same
+            function space as the object.
         expression:  str (optional)
             If you use an expression, you can use the following variables:
             x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
-            It will be interpoalte into either the same function space as the object or a DG0 function space in the same mesh.
+            It will be interpolate into either the same function space as the object or a DG0 function space in the same mesh.
         new_file:  str (optional)
             Name of the file containing the velocity model.
         output:  bool (optional)
@@ -784,9 +784,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         stored. It is built at the start of each forward solve.
         """
         self.store_forward_time_steps = False
-        self.enable_compute_functional(
-            mode=FunctionalEvaluationMode.PER_TIMESTEP
-        )
+        self.enable_compute_functional(mode=FunctionalEvaluationMode.PER_TIMESTEP)
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
         self._initialize_model_parameters()
@@ -827,9 +825,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Store the forward solution at the receivers."""
         self._forward_solution_receivers = value
 
-    def enable_compute_functional(
-        self, mode=FunctionalEvaluationMode.AFTER_SOLVE
-    ):
+    def enable_compute_functional(self, mode=FunctionalEvaluationMode.AFTER_SOLVE):
         """Enable functional evaluation during forward solves.
 
         Parameters:
@@ -865,14 +861,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.abc_active:  # If ABC scheme is used
             from ..meshing.meshing_habc import HABCMesh
             self.mesh_ops = HABCMesh(domain_dim, dimension=self.dimension,
-                                     quadrilateral=self.mesh_parameters.quadrilateral,
-                                     comm=self.mesh_parameters.comm)
+                                     quadrilateral=self.mesh_parameters.quadrilateral)
 
         else:  # If no ABC scheme is used
             from ..meshing.meshing_operations import MeshOps
             self.mesh_ops = MeshOps(domain_dim, dimension=self.dimension,
-                                    quadrilateral=self.mesh_parameters.quadrilateral,
-                                    comm=self.mesh_parameters.comm)
+                                    quadrilateral=self.mesh_parameters.quadrilateral)
 
     def layer_manager(self, domain_dim):
         """Create the layer operations manager for the wave solver.
@@ -949,11 +943,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         Parameters
         ----------
-        guess : firedrake.Function, optional
+        guess: firedrake.Function, optional
             Control value used by solvers that accept an explicit guess.
-        misfit : array_like, optional
+        misfit: array_like, optional
             Difference between observed and simulated receiver data.
-        forward_solution : firedrake.Function, optional
+        forward_solution: firedrake.Function, optional
             Forward wavefield used by adjoint solvers that need it explicitly.
 
         Returns
@@ -967,9 +961,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         NotImplementedError
             Always raised by the base class.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement gradient_solve().",
-        )
+        raise NotImplementedError(f"{type(self).__name__} does "
+                                  "not implement gradient_solve().")
 
     @property
     def physical_parameters(self):

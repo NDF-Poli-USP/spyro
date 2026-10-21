@@ -197,3 +197,42 @@ def test_gradient_matches_across_schedules(observed_record) -> None:
     assert all(error < 1e-12 for error in errors.values()), (
         f"Gradients differ between schedules: {errors}"
     )
+
+
+@pytest.mark.newer_firedrake
+@pytest.mark.parametrize("schedule", list(SCHEDULES))
+def test_new_recording_starts_from_current_control(observed_record, schedule: str) -> None:
+    """A second recording reports the control's current value, not a stale one.
+
+    Evaluating the reduced functional at a perturbed control leaves that
+    value as a checkpoint on the control's block variable, and it survives
+    the field being reset. The next recording has to read the field as it
+    is: that is what an optimizer starts from.
+
+    Parameters
+    ----------
+    observed_record : numpy.ndarray
+        Receiver data used as the real shot record.
+    schedule : str
+        Key into :data:`SCHEDULES` selecting the checkpointing settings.
+    """
+    wave = taped_guess(observed_record, schedule)
+    functional = wave.automated_adjoint.create_reduced_functional(
+        wave.functional_value,
+    )
+    perturbed = fire.Function(wave.c.function_space()).assign(wave.c)
+    perturbed.dat.data[:] += 0.1
+    functional(perturbed)
+
+    # The field is put back, and a new recording made from it.
+    wave.c.assign(2.0)
+    wave.forward_solve()
+    wave.automated_adjoint.stop_recording()
+    functional = wave.automated_adjoint.create_reduced_functional(
+        wave.functional_value,
+    )
+    (control,) = functional.controls
+    assert np.allclose(control.tape_value().dat.data_ro, 2.0), (
+        "the new reduced functional reports the previous evaluation's "
+        "control, not the field's current value"
+    )

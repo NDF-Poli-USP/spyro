@@ -6,6 +6,7 @@ that error calculations and file operations work as expected.
 
 import numpy as np
 import pytest
+from pathlib import Path
 from unittest.mock import patch
 from spyro.tools.error_measure import MeasureError
 
@@ -52,19 +53,17 @@ class TestMeasureError:
         assert error.path_save_err_case.name == "output"
         assert error.path_reference.name == "preamble"
         assert error.path_reference.parent.name == "output"
-        assert error.comm is None
 
     def test_initialization_custom_paths(self):
         """Test initialization with custom paths."""
         output_folder = "/custom/path"
-        output_case = "case123"
+        output_case = "/custom/path/case123/"
         error = MeasureError()
-        error.initialize_paths_for_error(
-            output_folder=output_folder,
-            output_case=output_case,
-        )
-        assert str(error.path_save_error) == "/custom/path"
-        assert str(error.path_save_err_case) == "case123"
+        error.initialize_paths_for_error(output_folder=output_folder,
+                                         output_case=output_case)
+        assert error.path_save_error == Path("/custom/path")
+        assert error.path_save_err_case == Path("/custom/path/case123")
+        assert error.path_reference == Path("/custom/path/preamble")
 
     def test_pad_signal_lengths_equal(self):
         """Test when signals have equal lengths."""
@@ -80,7 +79,9 @@ class TestMeasureError:
         signal1 = np.array([1, 2, 3])
         signal2 = np.array([4, 5, 6, 7, 8])
         # Default is error_if_different_length=True
-        with pytest.raises(ValueError, match="The lengths of the model and reference signals"):
+        with pytest.raises(
+            ValueError, match="The lengths of the model and reference signals"
+        ):
             MeasureError.pad_signal_lengths(signal1, signal2)
 
     def test_pad_signal_lengths_both_padding_error(self):
@@ -319,6 +320,8 @@ class TestMeasureError:
             output_folder=str(tmp_path / "output" / "test_output"), output_case="test_case",
         )
         with patch("spyro.tools.error_measure.getcwd", return_value=str(tmp_path)):
+            measure_error = MeasureError()
+            measure_error.initialize_paths_for_error()
             n_time = 100
             n_rec = 1
             dt = 0.01
@@ -369,7 +372,8 @@ class TestMeasureError:
             # Create MeasureError instance inside the patch context
             measure_error = MeasureError()
             measure_error.initialize_paths_for_error(
-                output_folder="test_output", output_case="preamble"
+                output_folder="test_output",
+                output_case="preamble",
             )
             # Create mock reference files
             with patch("numpy.load") as mock_load:

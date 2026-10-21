@@ -7,6 +7,7 @@ ensuring that they meet expected analytical results and known values from docume
 
 from unittest import TestCase
 from numpy import ceil
+import pytest
 from spyro.abc.lay_len import calc_size_lay, calc_zero, f_layer, loop_roots, roundFL
 
 
@@ -117,6 +118,7 @@ class TestAbsorbingLayer(TestCase):
         x_fine = calc_zero(0.1, a_par, tol_fine, nz=1)
         self.assertAlmostEqual(x_fine, self.FL_s1[0], places=4)
 
+    @pytest.mark.slow
     def test_loop_roots(self):
         """Test loop_roots function for multiple roots."""
         a_par = self.a_par

@@ -139,13 +139,7 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         # Type of function space
         self.func_space_type = func_space_type
 
-        # Communicator MPI
-        self.comm = comm
-
-        # Initializing the error measure class
-        MeasureError.__init__(self, comm=self.comm)
-
-    def critical_boundary_points(self, wave):
+   def critical_boundary_points(self, wave):
         """Determine critical boundary points using the Eikonal criterion.
 
         Use original-domain boundaries to size the absorbing layer.
@@ -437,8 +431,8 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
 
         # User timestep
         usr_dt = wave.get_dt()
-        pprint(f"Current Nyquist Frequency: {self.freq_Nyquist:.5f} Hz", comm=self.comm)
-        pprint(f"Current Timestep Size: {1e3 * usr_dt:.{mag_add}f} ms", comm=self.comm)
+        pprint(f"Current Nyquist Frequency: {self.freq_Nyquist: .5f} Hz", comm=self.comm)
+        pprint(f"Current Timestep Size: {1e3 * usr_dt: .{mag_add}f} ms", comm=self.comm)
 
         # Maximum timestep size
         dt_sol = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
@@ -463,15 +457,15 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         dt_ms = 1e3 * wave.dt
         if set_max_dt:
             case_div = f"{min(max_divisor_tf, n_div)} of {n_div}"
-            str_dt = f"Selected Timestep Size ({case_div}): {dt_ms:.{mag_add}f} ms"
+            str_dt = f"Selected Timestep Size ({case_div}): {dt_ms: .{mag_add}f} ms"
         else:
-            str_dt = f"Selected Timestep Size: {dt_ms:.{mag_add}f} ms"
+            str_dt = f"Selected Timestep Size: {dt_ms: .{mag_add}f} ms"
 
         pprint(str_dt, comm=self.comm)
 
         # Updating Nyquist frequency
         self.freq_Nyquist = 1. / (2. * wave.dt)
-        pprint(f"New Nyquist Frequency: {self.freq_Nyquist:.5f} Hz", comm=self.comm)
+        pprint(f"New Nyquist Frequency: {self.freq_Nyquist: .5f} Hz", comm=self.comm)
 
     def layer_infinite_model(self, lmin, c_bnd_max, final_time, source_locations=None):
         """Determine the domain extension size for the infinite domain model.
@@ -573,7 +567,7 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         # Size of the domain extension
         self.abc_pad_length = self.layer_infinite_model(lmin, c_bnd_max, final_time,
                                                         source_locations=source_locations)
-        pprint(f"Infinite Domain Extension (km): {self.abc_pad_length:.4f}", comm=self.comm)
+        pprint(f"Infinite Domain Extension (km): {self.abc_pad_length: .4f}", comm=self.comm)
 
         # New dimensions
         self.abc_new_geometry()

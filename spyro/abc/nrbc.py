@@ -3,8 +3,8 @@
 from firedrake import Function, VTKFile
 from numpy import abs, asarray, cos, maximum, pi, sign, sqrt, sum
 from numpy.linalg import norm
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .abc import AbsorbingBC
-from ..io.basicio import parallel_print as pprint
 from ..tools.abc_set_path_cases import path_to_save_abc_case
 from ..utils.error_management import validate_enum, validate_numeric, validate_parameter
 from ..utils.typing import AbsorbingBCsType, BoundaryConditionsType, NRBCBoundaryType
@@ -86,9 +86,6 @@ class NRBC(AbsorbingBC):
             the original domain boundaries. Default is `False`.
         output_folder : `str`, optional
             The folder where output data will be saved. Default is `None`.
-        comm : `object`, optional
-            An object representing the communication interface for parallel processing.
-            Default is `None`.
 
         Returns
         -------
@@ -273,7 +270,7 @@ class NRBC(AbsorbingBC):
         None
         """
 
-        pprint(f"Creating Field for NRBC: {self.non_reflect_bc.value}", comm=self.comm)
+        SpyroEnsemble.print(f"Creating Field for NRBC: {self.non_reflect_bc.value}")
 
         # Initialize field for the cosine of the incidence angle
         self.cosHig = Function(V, name='cosHig')

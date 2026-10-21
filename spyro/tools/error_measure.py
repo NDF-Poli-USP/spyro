@@ -4,7 +4,8 @@ from numpy.linalg import norm
 from pathlib import Path
 from scipy.signal import find_peaks
 from warnings import warn
-from ..io.basicio import parallel_print as pprint
+
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..utils.error_management import (
     mutually_exclusive_parameter_error,
     validate_data_structure,
@@ -68,14 +69,31 @@ class MeasureError:
         Get the optimal heuristic factor for the quadratic damping
     """
 
-    def __init__(self, comm=None):
+    def __init__(self):
         """Initialize the MeasureError class.
 
         Parameters
         ----------
-        comm : `object`, optional
-            An object representing the communication interface for parallel processing.
-            Default is `None`.
+        None
+
+        Returns
+        -------
+        None
+        """
+
+    def initialize_paths_for_error(
+        self,
+        output_folder: Path | str | None = None,
+        output_case: Path | str | None = None,
+    ):
+        """Initialize the paths for saving data and reference signals.
+
+        Parameters
+        ----------
+        output_folder : pathlib.Path or `str`, optional
+            The folder where output data will be saved. Default is `None`.
+        output_case : pathlib.Path or `str`, optional
+            The folder for the current case study. Default is `None`.
 
         Returns
         -------
@@ -178,7 +196,7 @@ class MeasureError:
             lower_bound=0.0,
         )
 
-        pprint("\nSaving Reference Output", comm=self.comm)
+        SpyroEnsemble.print("\nSaving Reference Output")
 
         # File name for saving the reference signal
         self.path_reference.mkdir(parents=True, exist_ok=True)
@@ -218,7 +236,7 @@ class MeasureError:
         receivers_ref_fft : `array`
           Frequency response at the receivers in the reference model.
         """
-        pprint("\nLoading Reference Signal from Reference Model", comm=self.comm)
+        SpyroEnsemble.print("\nLoading Reference Signal from Reference Model")
 
         # Path to the reference data folder with reference signals
         if input_file is not None:
@@ -368,7 +386,7 @@ class MeasureError:
             lower_bound=0.0,
         )
 
-        pprint("\nComputing Error Measures", comm=self.comm)
+        SpyroEnsemble.print("\nComputing Error Measures")
 
         # Initializing error measures
         reference_peak_values = []
@@ -412,29 +430,25 @@ class MeasureError:
             maximum_integral_error,
             maximum_peak_error,
         ]
-        pprint(
-            f"Maximum Integral Error: {maximum_integral_error:.2%}",
-            comm=self.comm,
+        SpyroEnsemble.print(
+            f"Maximum Integral Error: {maximum_integral_error: .2%}"
         )
-        pprint(
-            f"Maximum Peak Error: {maximum_peak_error:.2%}",
-            comm=self.comm,
+        SpyroEnsemble.print(
+            f"Maximum Peak Error: {maximum_peak_error: .2%}"
         )
         # Final energy
         if final_energy is not None:
             scalar_values.append(final_energy)
-            pprint(
-                f"Final Energy (J): {final_energy:.2e}",
-                comm=self.comm,
+            SpyroEnsemble.print(
+                f"Final Energy (J): {final_energy: .2e}"
             )
 
             # Dissipated energy
             if final_energy_reference is not None:
                 dissipated_energy = 1 - final_energy / final_energy_reference
                 scalar_values.append(dissipated_energy)
-                pprint(
-                    f"Dissipated Energy: {dissipated_energy:.2%}",
-                    comm=self.comm,
+                SpyroEnsemble.print(
+                    f"Dissipated Energy: {dissipated_energy: .2%}"
                 )
 
         error_measures.extend(scalar_values)

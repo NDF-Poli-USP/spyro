@@ -1,7 +1,13 @@
 from numpy import inf
+<< << << < HEAD
 from .abc import AbsorbingBC
 from .nrbc import NRBC
 from ..io.basicio import parallel_print as pprint
+== == == =
+from spyro.mpi.spyro_mpi import SpyroEnsemble
+from .abc import AbsorbingBC
+from .nrbc import NRBC
+>>>>>> > da7a5d9ff67af7fb44a18e28011fbb5560f461b9
 from .lay_len import calc_size_lay
 from ..plots.plots_habc import plot_function_layer_size
 from ..tools.abc_set_path_cases import formatting_abc_layer_type, path_to_save_abc_case
@@ -240,7 +246,7 @@ class ABCLayer(AbsorbingBC):
         None
         """
 
-        pprint("\nDetermining Reference Frequency", comm=self.comm)
+        SpyroEnsemble.print("\nDetermining Reference Frequency")
 
         if self.abc_reference_freq == LayerSizeRefFrequency.SOURCE:
 
@@ -260,12 +266,11 @@ class ABCLayer(AbsorbingBC):
                 # Get the minimum frequency excited at each critical point
                 freq_ref = freq_response(histPcrit, self.freq_Nyquist,
                                          fpad=fpad, get_dominant_freq=True)
-                pprint(f"Frequency at Critical Point {n_crit:>2.0f}: {freq_ref:.5f}",
-                       comm=self.comm)
+                SpyroEnsemble.print(f"Frequency at Critical Point {n_crit: >2.0f}: {freq_ref: .5f}")
 
                 self.freq_ref = min(self.freq_ref, freq_ref)
 
-        pprint(f"Reference Frequency (Hz): {self.freq_ref:.5f}", comm=self.comm)
+        SpyroEnsemble.print(f"Reference Frequency (Hz): {self.freq_ref: .5f}")
 
     def layer_size_criterion(self, lmin, fpad=4, n_root=1, layer_based_on_mesh=True):
         """Determine the absorbing layer size using the Eikonal criterion for HABCs.
@@ -319,7 +324,7 @@ class ABCLayer(AbsorbingBC):
         # Layer type
         lay_str = "\nDetermining New Geometry with {}"
         lay_str = formatting_abc_layer_type(lay_str, self.abc_boundary_layer_type)
-        pprint(lay_str, comm=self.comm)
+        SpyroEnsemble.print(lay_str)
 
         # New geometry with layer
         self.abc_new_geometry()
@@ -376,7 +381,7 @@ class ABCLayer(AbsorbingBC):
                           dimension=self.dimension, nrbc_in_habc=True,
                           output_folder=self.path_case_absl, comm=self.comm)
 
-            pprint("\nApplying Non-Reflecting Boundary Conditions", comm=self.comm)
+            SpyroEnsemble.print("\nApplying Non-Reflecting Boundary Conditions")
 
             # Getting boundary data from the layer boundaries
             if non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
@@ -399,4 +404,4 @@ class ABCLayer(AbsorbingBC):
                                   bnd_nodes_nfs, hyp_par=hyp_par, save_file=save_file)
 
         else:
-            pprint("\nNot Non-Reflecting Boundary Conditions Prescribed", comm=self.comm)
+            SpyroEnsemble.print("\nNot Non-Reflecting Boundary Conditions Prescribed")
