@@ -29,8 +29,8 @@ fire.set_log_level(fire.ERROR)
 class Wave(Model_parameters, metaclass=ABCMeta):
     """Base class for wave equation solvers.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     TODO: Update attributes and their descriptions.
     comm : `object`
         An object representing the communication interface.
@@ -69,8 +69,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     layer_ops : `habc.HABCLayer` or `pml_nsnc.PMLLayer`
         ABC layer operation manager.
 
-    Methods:
-    --------
+    Methods
+    -------
     _build_function_space()
         Build the function space parameters for the wave solver.
     _create_function_space()
@@ -280,12 +280,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def get_absorbing_boundaries(self):
         """Get the absorbing boundaries for the problem.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         None
 
-        Returns:
-        --------
+        Returns
+        -------
         boundaries : `tuple`
             Tuple containing the boundary boolean labels for applying absorbing BCs.
             - (absorb_top, absorb_bottom, absorb_right, absorb_left) for 2D
@@ -342,15 +342,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def set_mesh(self, user_mesh=None, input_mesh_parameters=None):
         """Set the mesh for the solver.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         user_mesh : `Firedrake.Mesh`, optional
             User-defined mesh. Defaults to None.
         mesh_parameters : `dict`, optional
             Parameters for generating a mesh. Defaults to `None`.
 
-        Returns:
-        --------
+        Returns
+        -------
         None
         """
 
@@ -369,13 +369,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def set_solver_parameters(self, parameters=None):
         """Set the solver parameters.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         parameters: `dict`, optional
             A dictionary containing the solver parameters.
 
-        Returns:
-        --------
+        Returns
+        -------
         None
         """
         if parameters is not None:
@@ -410,8 +410,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             fast_interpolate=False):
         """Define the new user velocity model or file. It is optional.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         conditional:  (optional)
             Firedrake conditional object.
         velocity_model_function: Firedrake function (optional)
@@ -430,8 +430,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             If True, uses a DG0 function space for the velocity model. Otherwise,
             uses the same function space as the object. Default is `True`.
 
-        Returns:
-        --------
+        Returns
+        -------
         None
         """
         # Resseting old velocity model
@@ -527,15 +527,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def get_and_set_maximum_dt(self, fraction=0.7, estimate_max_eigenvalue=False):
         """Calculate and set the maximum stable time step (dt) for the wave solver.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         fraction : `float`, optional
             Fraction of the estimated time step to use. Defaults to 0.7.
         estimate_max_eigenvalue : `bool`, optional
             Whether to estimate the maximum eigenvalue. Defaults to `False`.
 
-        Returns:
-        --------
+        Returns
+        -------
         max_dt :``float`
             The calculated maximum time step (dt).
         """
@@ -636,8 +636,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def wave_propagator(self, dt=None, final_time=None, source_nums=None):
         """Propagate the wave forward in time. Currently uses central differences.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         dt: Python 'float' (optional)
             Time step to be used explicitly. If not mentioned uses the default,
             that was estabilished in the wave object.
@@ -647,8 +647,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         source_nums: list of int (optional)
             List of source numbers to be simulated. If not mentioned, simulates all sources.
 
-        Returns:
-        --------
+        Returns
+        -------
         usol: Firedrake 'Function'
             Wavefield at the final time.
         u_rec: numpy array
@@ -666,8 +666,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def set_dt(self, dt):
         """Set the time step for the wave solver.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         dt : `float`
             Time step used in the simulation.
         """
@@ -806,8 +806,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def enable_compute_functional(self, mode=FunctionalEvaluationMode.AFTER_SOLVE):
         """Enable functional evaluation during forward solves.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         mode: FunctionalEvaluationMode, optional
             The mode in which to evaluate the functional.
             Default is : attribute: `FunctionalEvaluationMode.AFTER_SOLVE`.
