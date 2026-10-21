@@ -10,15 +10,20 @@ from spyro.io.time_io import interpolate_time_series
 from spyro.tools.cells_per_wavelength_calculator import (
     ACOUSTIC,
     CPW_PROBLEMS,
+    ISOTROPIC_ELASTIC,
     AcousticHeterogeneousProblem,
     AcousticHomogeneousProblem,
     CpwParameters,
     CpwProblem,
+    ElasticHomogeneousProblem,
     HeterogeneousCpwProblem,
     MaterialFileCase,
     WavePhysics,
 )
 from spyro.tools.cells_per_wavelength_calculator import calculator as calculator_module
+from spyro.tools.cells_per_wavelength_calculator.input_models import (
+    create_elastic_model_for_meshing_parameter_2D_homogeneous,
+)
 from spyro.utils.typing import (
     CpwSearchDirection,
     TimeStepCalculationType,
@@ -52,6 +57,7 @@ VELOCITY_FILE_CASE = MaterialFileCase(
 PROBLEM_CLASSES = [
     AcousticHomogeneousProblem,
     AcousticHeterogeneousProblem,
+    ElasticHomogeneousProblem,
 ]
 
 
@@ -75,6 +81,9 @@ def make_problem(problem_class: type[CpwProblem], **overrides) -> CpwProblem:
     """
     parameters = {
         **CALCULATOR_PARAMETERS,
+        "p_wave_velocity": 5.6,
+        "s_wave_velocity": 2.75,
+        "density": 2.0,
         "reference_degree": 5,
         "C_reference": 6.0,
     }
@@ -109,6 +118,7 @@ def test_interpolate_time_series_keeps_trailing_axes() -> None:
     [
         (WaveType.ISOTROPIC_ACOUSTIC, ACOUSTIC, VelocityProfileType.HOMOGENEOUS),
         (WaveType.ISOTROPIC_ACOUSTIC, ACOUSTIC, VelocityProfileType.HETEROGENEOUS),
+        (WaveType.ISOTROPIC_ELASTIC, ISOTROPIC_ELASTIC, VelocityProfileType.HOMOGENEOUS),
     ],
 )
 def test_cpw_problems_registry(
@@ -133,7 +143,7 @@ def test_cpw_problems_registry(
 
 @pytest.mark.parametrize(
     "problem_class, expected",
-    [(AcousticHomogeneousProblem, 1.5)],
+    [(AcousticHomogeneousProblem, 1.5), (ElasticHomogeneousProblem, 2.75)],
 )
 def test_homogeneous_minimum_wavelength_velocity(
     problem_class: type[CpwProblem], expected: float,
@@ -163,6 +173,7 @@ def test_problem_rejects_non_positive_mesh_frequency_factor(
     [
         (AcousticHomogeneousProblem, VELOCITY_FILE_CASE),
         (AcousticHeterogeneousProblem, None),
+        (ElasticHomogeneousProblem, VELOCITY_FILE_CASE),
     ],
 )
 def test_problem_matches_case_to_profile(
@@ -189,6 +200,133 @@ def test_calculator_rejects_unregistered_problem(monkeypatch) -> None:
         spyro.tools.MeshingParameterCalculator(CALCULATOR_PARAMETERS)
 
 
+def test_elastic_model_geometry_avoids_periodic_images() -> None:
+    """No periodic-image P-wave reaches a receiver before the final time."""
+    vp, vs, frequency = 5.6, 2.75, 10.0
+    dictionary = create_elastic_model_for_meshing_parameter_2D_homogeneous(
+        method="mass_lumped_triangle",
+        degree=2,
+        frequency=frequency,
+        p_wave_velocity=vp,
+        s_wave_velocity=vs,
+        density=2.0,
+        dt=1e-4,
+    )
+
+    length = dictionary["mesh"]["length_z"]
+    assert dictionary["mesh"]["length_x"] == length
+    assert dictionary["mesh"]["periodic"]
+    final_time = dictionary["time_axis"]["final_time"]
+    source = np.array(dictionary["acquisition"]["source_locations"][0])
+    receivers = np.array(dictionary["acquisition"]["receiver_locations"])
+    assert len(receivers) == 11
+
+    # All receivers lie inside the box
+    assert np.all((receivers[:, 0] < 0.0) & (receivers[:, 0] > -length))
+    assert np.all((receivers[:, 1] > 0.0) & (receivers[:, 1] < length))
+
+    # The S-wave reaches the farthest receiver before the final time
+    distances = np.linalg.norm(receivers - source, axis=1)
+    assert distances.max() / vs < final_time
+
+    # Nearest periodic image of the source, over the 8 neighbouring copies
+    shifts = np.array(
+        [(i, j) for i in (-1, 0, 1) for j in (-1, 0, 1) if (i, j) != (0, 0)]
+    ) * length
+    images = source + shifts
+    image_distance = np.linalg.norm(
+        receivers[:, None, :] - images[None, :, :], axis=2,
+    ).min()
+    assert image_distance / vp > final_time
+
+
+def test_elastic_maximum_dt_uses_elastic_operator() -> None:
+    """The elastic stable dt sits between the acoustic ones at vp and vs."""
+    vp, vs = 2.0, 1.0
+    dictionary = create_elastic_model_for_meshing_parameter_2D_homogeneous(
+        method="mass_lumped_triangle",
+        degree=2,
+        frequency=5.0,
+        p_wave_velocity=vp,
+        s_wave_velocity=vs,
+        density=1.0,
+        dt=1e-3,
+        reduced=True,
+    )
+    dictionary["mesh"]["length_z"] = 1.0
+    dictionary["mesh"]["length_x"] = 1.0
+    dictionary["acquisition"]["source_locations"] = [(-0.5, 0.5)]
+    dictionary["acquisition"]["receiver_locations"] = [(-0.6, 0.5)]
+    dictionary["time_axis"]["final_time"] = 0.1
+
+    elastic = spyro.IsotropicWave(dictionary)
+    elastic.set_mesh(input_mesh_parameters={"edge_length": 0.1, "periodic": True})
+    elastic.initialize_physical_parameters()
+    elastic_dt = elastic.get_and_set_maximum_dt(fraction=1.0)
+
+    acoustic_dictionary = {
+        key: value for key, value in dictionary.items() if key != "synthetic_data"
+    }
+    acoustic_dictionary["acquisition"] = {**dictionary["acquisition"], "amplitude": 1.0}
+    acoustic_dts = []
+    for velocity in (vp, vs):
+        acoustic = spyro.AcousticWave(acoustic_dictionary)
+        acoustic.set_mesh(input_mesh_parameters={"edge_length": 0.1, "periodic": True})
+        acoustic.set_initial_velocity_model(constant=velocity)
+        acoustic.initialize_physical_parameters()
+        acoustic_dts.append(acoustic.get_and_set_maximum_dt(fraction=1.0))
+
+    assert acoustic_dts[0] < elastic_dt * 1.05
+    assert elastic_dt < acoustic_dts[1]
+
+    # For a constant velocity, the solver-consistent acoustic forms (velocity
+    # in the mass) give the same dt as the modal solver's default forms
+    # (velocity in the stiffness).
+    dt_solver = spyro.solvers.modal.modal_sol.Modal_Solver(
+        2, method="ARNOLDI", calc_max_dt=True,
+    )
+    default_forms_dt = dt_solver.estimate_timestep(
+        acoustic.c, acoustic.function_space, acoustic.final_time,
+        quad_rule=acoustic.quadrature_rule, fraction=1.0,
+    )
+    assert np.isclose(acoustic_dts[1], default_forms_dt)
+
+
+@pytest.mark.slow
+def test_elastic_cpw_search_meets_threshold() -> None:
+    """The elastic search result passes, and one step coarser fails."""
+    parameters = {
+        "wave_type": WaveType.ISOTROPIC_ELASTIC,
+        "source_frequency": 10.0,
+        "mesh_frequency_factor": 2.0,
+        "p_wave_velocity": 5.6,
+        "s_wave_velocity": 2.75,
+        "density": 2.0,
+        "velocity_profile_type": "homogeneous",
+        "FEM_method_to_evaluate": "mass_lumped_triangle",
+        "dimension": 2,
+        "receiver_setup": "line",
+        "testing": True,
+        "timestep_calculation": "exact",
+        "reference_degree": None,
+        "C_reference": None,
+        "desired_degree": 4,
+        "C_initial": 1.0,
+        "C_max": 3.0,
+        "search_direction": "forward",
+        "accepted_error_threshold": 0.05,
+        "C_accuracy": 0.5,
+    }
+    calculator = spyro.tools.MeshingParameterCalculator(parameters)
+    assert calculator.reference_solution.shape[1:] == (3, 2)
+
+    cpw = calculator.find_minimum()
+
+    errors = {e.cpw: e.error for e in calculator.search_history}
+    assert errors[cpw] <= 0.05
+    assert errors[cpw - 0.5] > 0.05
+
+
 @pytest.mark.parametrize(
     "threshold_settings",
     [{}, {"accepted_error_threshold": 0.05, "threshold_discretization": True}],
@@ -207,7 +345,7 @@ def test_calculator_needs_exactly_one_threshold(threshold_settings: dict) -> Non
 
 
 @pytest.mark.parametrize(
-    "problem_class", [AcousticHomogeneousProblem]
+    "problem_class", [AcousticHomogeneousProblem, ElasticHomogeneousProblem]
 )
 def test_problem_builds_dictionary_for_requested_discretization(
     problem_class: type[CpwProblem],
@@ -290,6 +428,7 @@ def test_interpolate_time_series_applies_time_shift() -> None:
     [
         (AcousticHomogeneousProblem, 1.0),
         (AcousticHeterogeneousProblem, 0.0),
+        (ElasticHomogeneousProblem, 0.0),
     ],
 )
 def test_reference_time_shift(
@@ -308,6 +447,7 @@ def test_reference_time_shift(
     [
         (AcousticHomogeneousProblem, "acoustic_homogeneous_cpw_reference.npy"),
         (AcousticHeterogeneousProblem, "acoustic_heterogeneous_cpw_reference.npy"),
+        (ElasticHomogeneousProblem, "elastic_homogeneous_cpw_reference.npy"),
     ],
 )
 def test_default_reference_file(

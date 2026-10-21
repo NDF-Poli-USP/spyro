@@ -32,3 +32,10 @@ ACOUSTIC = WavePhysics(
     wave_class=spyro.AcousticWave,
     wavelength_parameter="p_wave_velocity",
 )
+
+#: Isotropic elastic physics, whose slowest body wave is the S-wave.
+ISOTROPIC_ELASTIC = WavePhysics(
+    name="elastic",
+    wave_class=spyro.IsotropicWave,
+    wavelength_parameter="s_wave_velocity",
+)
