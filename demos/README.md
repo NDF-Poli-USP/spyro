@@ -36,6 +36,14 @@ acoustic case, against the analytical solution. Edit the arguments of
 python3 demos/acoustic_homogeneous_cpw.py
 ```
 
+[elastic_homogeneous_cpw.py](elastic_homogeneous_cpw.py) does the same
+for the 2D homogeneous isotropic elastic case, sizing the mesh by the
+S-wavelength and comparing against the analytical point-force solution:
+
+```bash
+python3 demos/elastic_homogeneous_cpw.py
+```
+
 [acoustic_marmousi2_cpw.py](acoustic_marmousi2_cpw.py) finds the minimum
 cells-per-wavelength of a discretization on the Marmousi2 model with its
 water layer (Martin et al., 2006, doi: 10.1190/1.2172306), against a

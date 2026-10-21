@@ -18,9 +18,10 @@ from .heterogeneous_case import HeterogeneousCase
 from .input_models import (
     create_acoustic_model_for_meshing_parameter_2D_heterogeneous,
     create_acoustic_model_for_meshing_parameter_2D_homogeneous,
+    create_elastic_model_for_meshing_parameter_2D_homogeneous,
 )
 from .parameters import CpwParameters
-from .wave_physics import ACOUSTIC, WavePhysics
+from .wave_physics import ACOUSTIC, ISOTROPIC_ELASTIC, WavePhysics
 from ...solvers.wave import Wave
 from ...utils.typing import VelocityProfileType, WaveType
 
@@ -431,6 +432,137 @@ class AcousticHomogeneousProblem(HomogeneousCpwProblem):
         return analytical
 
 
+class ElasticHomogeneousProblem(HomogeneousCpwProblem):
+    """Isotropic elastic wave in a constant material.
+
+    Needs the ``p_wave_velocity``, ``s_wave_velocity`` and ``density``
+    parameters. The wavelength is the S-wavelength.
+
+    Attributes
+    ----------
+    p_wave_velocity : float
+        P-wave velocity.
+    s_wave_velocity : float
+        S-wave velocity.
+    density : float
+        Density.
+
+    Notes
+    -----
+    The elastic analytical solution is already shifted one reference step,
+    so :meth:`reference_time_shift` keeps the default of no shift.
+    """
+
+    physics = ISOTROPIC_ELASTIC
+
+    def __init__(self, parameters: CpwParameters) -> None:
+        """Read the material.
+
+        A fixed solver time step is also used as the time step of the
+        analytical reference.
+
+        Parameters
+        ----------
+        parameters : CpwParameters
+            The calculator parameters.
+
+        Raises
+        ------
+        ValueError
+            If a material parameter is not given.
+        """
+        super().__init__(parameters)
+        self.p_wave_velocity: float = parameters.require("p_wave_velocity")
+        self.s_wave_velocity: float = parameters.require("s_wave_velocity")
+        self.density: float = parameters.require("density")
+
+    @property
+    def minimum_wavelength_velocity(self) -> float:
+        """The S-wave velocity, the slowest body wave.
+
+        Returns
+        -------
+        float
+            ``s_wave_velocity``.
+        """
+        return self.s_wave_velocity
+
+    def model_dictionary(self, method: str, degree: int) -> dict:
+        """Build the homogeneous isotropic elastic model dictionary.
+
+        Parameters
+        ----------
+        method : str
+            Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+        degree : int
+            Spatial polynomial degree.
+
+        Returns
+        -------
+        dict
+            Spyro model dictionary for :class:`spyro.IsotropicWave`.
+        """
+        return create_elastic_model_for_meshing_parameter_2D_homogeneous(
+            method=method,
+            degree=degree,
+            frequency=self.source_frequency,
+            p_wave_velocity=self.p_wave_velocity,
+            s_wave_velocity=self.s_wave_velocity,
+            density=self.density,
+            dt=self.fixed_timestep,
+            reduced=self.reduced_obj_for_testing,
+        )
+
+    def analytical_solution(self, wave: Wave) -> np.ndarray:
+        """Compute the 2D point-force analytical receiver displacement.
+
+        Parameters
+        ----------
+        wave : Wave
+            Wave object holding the acquisition and time axis.
+
+        Returns
+        -------
+        np.ndarray
+            Displacement at the receivers, shaped
+            ``(n_time, n_receivers, 2)``.
+
+        Raises
+        ------
+        ValueError
+            If the source amplitude is not aligned with a single axis.
+        """
+        amplitude = np.asarray(wave.amplitude, dtype=float)
+        force_directions = np.flatnonzero(amplitude)
+        if len(force_directions) != 1:
+            raise ValueError(
+                "The analytical elastic solution needs a source amplitude "
+                f"along a single axis, got {amplitude}."
+            )
+        force_direction = int(force_directions[0])
+
+        num_t = round(wave.final_time / wave.dt) + 1
+        analytical = np.zeros((num_t, wave.number_of_receivers, wave.dimension))
+        source = np.asarray(wave.source_locations[0])
+        for i, receiver in enumerate(wave.receiver_locations):
+            components = spyro.utils.analytical_solution_elastic(
+                source_type="force_source",
+                offsets=source - np.asarray(receiver),
+                p_wave_velocity=self.p_wave_velocity,
+                s_wave_velocity=self.s_wave_velocity,
+                density=self.density,
+                amplitude=amplitude[force_direction],
+                frequency=wave.frequency,
+                time_delay=wave.delay,
+                final_time=wave.final_time,
+                dt=wave.dt,
+                force_direction=force_direction,
+                dimension=wave.dimension,
+            )
+            analytical[:, i, :] = np.column_stack(components)
+        return analytical
+
+
 class AcousticHeterogeneousProblem(HeterogeneousCpwProblem):
     """Acoustic wave in the P-wave velocity of a heterogeneous case.
 
@@ -539,4 +671,8 @@ CPW_PROBLEMS: dict[tuple[WaveType, VelocityProfileType], type[CpwProblem]] = {
         WaveType.ISOTROPIC_ACOUSTIC,
         VelocityProfileType.HETEROGENEOUS,
     ): AcousticHeterogeneousProblem,
+    (
+        WaveType.ISOTROPIC_ELASTIC,
+        VelocityProfileType.HOMOGENEOUS,
+    ): ElasticHomogeneousProblem,
 }
