@@ -202,7 +202,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         SpyroEnsemble.print("\nSolving Forward Problem")
 
         if self.function_space is None:
-            self.building_mesh_derived_paramenters()
+            self.building_mesh_derived_parameters()
 
         # TODO: Delete any dependency on _initialize_model_parameters()
         if self.abc_type in [AbsorbingBCsType.NOABCS]:
@@ -785,16 +785,16 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def layer_manager(self, domain_dim, time_step):
         """Create the layer operations manager for the wave solver.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
             or (length_z, length_x, length_y) for 3D.
         time_step : `float`
             Time step used in the simulation.
 
-        Returns:
-        --------
+        Returns
+        -------
         None
         """
 
