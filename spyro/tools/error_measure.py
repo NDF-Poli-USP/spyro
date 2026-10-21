@@ -90,28 +90,6 @@ class MeasureError:
 
         Parameters
         ----------
-        output_folder : pathlib.Path or `str`, optional
-            The folder where output data will be saved. Default is `None`.
-        output_case : pathlib.Path or `str`, optional
-            The folder for the current case study. Default is `None`.
-
-        Returns
-        -------
-        None
-        """
-
-        # Communicator MPI
-        self.comm = comm
-
-    def initialize_paths_for_error(
-        self,
-        output_folder: Path | str | None = None,
-        output_case: Path | str | None = None,
-    ):
-        """Initialize the paths for saving data and reference signals.
-
-        Parameters
-        ----------
         output_folder : `str`, optional
             The folder where output data will be saved. Default is `None`.
         output_case : `str`, optional
