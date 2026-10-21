@@ -439,7 +439,8 @@ class AutomaticMesh:
     def create_gmsh_2d_mesh(self):
         """
         Creates a 2D mesh using Gmsh with optional water interface,
-        hyperelliptical/rectangular padding, and Winslow smoothing.
+        hyperelliptical/rectangular padding, structured Winslow smoothing,
+        or unstructured full-quadrilateral meshing.
 
         Returns
         -------
@@ -455,7 +456,7 @@ class AutomaticMesh:
         Returns
         -------
         firedrake.MeshGeometry
-            Mesh read from ``self.output_file_name``.
+            Mesh read from `self.output_file_name`.
         """
         if self.comm is not None:
             # Ensure all processes wait for mesh creation to complete

@@ -145,7 +145,9 @@ class MeshingParameters():
     vp_water : float
         Substitute Water speed value if vs = 0.0.
     structured_mesh : bool
-        If True, uses a structured quadrilateral mesh; False uses triangular unstructured.
+        If True, uses a structured quadrilateral mesh.
+    unstructured_quad_mesh : bool
+        If True, uses a 2D unstructured full-quadrilateral Gmsh mesh.
     min_element_size : float
         Element size constraint for structured mesh spacing.
     winslow_implementation : str
@@ -282,6 +284,7 @@ class MeshingParameters():
             self.h_padding = self.input_mesh_dictionary.get("h_padding", 500.0)
             self.vp_water = self.input_mesh_dictionary.get("vp_water", None)
             self.structured_mesh = self.input_mesh_dictionary.get("structured_mesh", False)
+            self.unstructured_quad_mesh = self.input_mesh_dictionary.get("unstructured_quad_mesh", False)
             self.hyper_n = self.input_mesh_dictionary.get("hyper_n", 3.0)
             self.hmin_segy = self.input_mesh_dictionary.get("hmin_segy", 0.0)
             self.grade = self.input_mesh_dictionary.get("grade", 0.9)
@@ -293,6 +296,15 @@ class MeshingParameters():
             self.extend_segy = self.input_mesh_dictionary.get("extend_segy", True)
             self.apply_winslow = self.input_mesh_dictionary.get("apply_winslow", True)
             self.segy_velocity_model = self.input_mesh_dictionary.get("segy_velocity_model", None)
+
+            if self.structured_mesh and self.unstructured_quad_mesh:
+                raise ValueError(
+                    "'structured_mesh' and 'unstructured_quad_mesh' are mutually exclusive."
+                )
+            if self.unstructured_quad_mesh and self.dimension == 3:
+                raise ValueError(
+                    "'unstructured_quad_mesh' is currently supported only for 2D Gmsh meshes."
+                )
 
         self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh", "gmsh_mesh"}
         self.is_complete = None
