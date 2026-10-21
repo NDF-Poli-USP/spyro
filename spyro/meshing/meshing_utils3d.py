@@ -1,7 +1,8 @@
+import warnings
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-from ..io.basicio import _read_velocity_binary3D
+from ..io.basicio import read_velocity_binary3d
 
 try:
     import SeismicMesh
@@ -10,9 +11,9 @@ except ImportError:
 
 
 def sizing_function_xyz(
-    X,
-    Y,
-    Z,
+    x,
+    y,
+    z,
     ef_segy,
     length_x,
     length_y,
@@ -22,14 +23,14 @@ def sizing_function_xyz(
 
     Parameters
     ----------
-    X : numpy.ndarray
-        X coordinates of the structured mesh nodes.
-    Y : numpy.ndarray
-        Y coordinates of the structured mesh nodes.
-    Z : numpy.ndarray
-        Z coordinates of the structured mesh nodes.
+    x : numpy.ndarray
+        x coordinates of the structured mesh nodes.
+    y : numpy.ndarray
+        y coordinates of the structured mesh nodes.
+    z : numpy.ndarray
+        z coordinates of the structured mesh nodes.
     ef_segy : callable
-        Mesh-sizing function evaluated in ``(z, x, y)`` coordinates.
+        Mesh-sizing function evaluated in `(z, x, y)` coordinates.
     length_x : float
         Physical domain length in the x direction.
     length_y : float
@@ -47,36 +48,34 @@ def sizing_function_xyz(
     Queries outside the physical model are projected to the nearest model edge before
     evaluating the sizing field.
     """
-    X = np.asarray(X, dtype=float)
-    Y = np.asarray(Y, dtype=float)
-    Z = np.asarray(Z, dtype=float)
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    z = np.asarray(z, dtype=float)
 
-    if X.shape != Y.shape or X.shape != Z.shape:
+    if x.shape != y.shape or x.shape != z.shape:
         raise ValueError(
-            "Winslow sizing coordinates X, Y and Z must have matching shapes."
+            "Winslow sizing coordinates x, y and z must have matching shapes."
         )
 
-    finite_coordinates = np.isfinite(X) & np.isfinite(Y) & np.isfinite(Z)
+    finite_coordinates = np.isfinite(x) & np.isfinite(y) & np.isfinite(z)
     if not np.all(finite_coordinates):
-        bad_count = int(
-            finite_coordinates.size - np.count_nonzero(finite_coordinates)
-        )
+        bad_count = int(finite_coordinates.size - np.count_nonzero(finite_coordinates))
         raise FloatingPointError(
             "Winslow generated NaN or infinite coordinates before "
             f"sizing evaluation ({bad_count} invalid nodes). Reduce "
             "winslow_omega or inspect the structured topology."
         )
 
-    X_edge = np.clip(X.reshape(-1), 0.0, length_x)
-    Y_edge = np.clip(Y.reshape(-1), 0.0, length_y)
-    Z_edge = np.clip(Z.reshape(-1), -abs(depth_z), 0.0)
+    x_edge = np.clip(x.reshape(-1), 0.0, length_x)
+    y_edge = np.clip(y.reshape(-1), 0.0, length_y)
+    z_edge = np.clip(z.reshape(-1), -abs(depth_z), 0.0)
 
-    queries_zxy = np.column_stack((Z_edge, X_edge, Y_edge))
+    queries_zxy = np.column_stack((z_edge, x_edge, y_edge))
 
     sizes = np.asarray(
         ef_segy(queries_zxy),
         dtype=float,
-    ).reshape(X.shape)
+    ).reshape(x.shape)
 
     if not np.all(np.isfinite(sizes)):
         invalid = np.flatnonzero(~np.isfinite(sizes))
@@ -98,7 +97,7 @@ def sizing_function_xyz(
     return sizes
 
 
-def create_sizing_function3D(
+def create_sizing_function3d(
     fname,
     hmin,
     bbox,
@@ -127,7 +126,7 @@ def create_sizing_function3D(
     hmin : float or None
         Requested minimum element size.
     bbox : sequence of float
-        Bounding box ordered as ``(zmin, zmax, xmin, xmax, ymin, ymax)``.
+        Bounding box ordered as `(zmin, zmax, xmin, xmax, ymin, ymax)`.
     wl : float
         Number of mesh points per wavelength.
     freq : float
@@ -153,7 +152,7 @@ def create_sizing_function3D(
     byte_order : {"big", "little"}
         Byte order of the velocity-model binary file.
     axes_order : tuple of int
-        Permutation mapping binary axes to Spyro ``(z, x, y)`` order.
+        Permutation mapping binary axes to Spyro `(z, x, y)` order.
     axes_order_sort : {"C", "F"}
         Memory order used to reshape the binary velocity data.
     dtype : str or numpy.dtype
@@ -174,8 +173,7 @@ def create_sizing_function3D(
     zmin, zmax, xmin, xmax, ymin, ymax = map(float, bbox)
     if not (zmin < zmax and xmin < xmax and ymin < ymax):
         raise ValueError(
-            "bbox must be ordered as "
-            "(zmin, zmax, xmin, xmax, ymin, ymax)."
+            "bbox must be ordered as " "(zmin, zmax, xmin, xmax, ymin, ymax)."
         )
 
     requested_hmin = None
@@ -183,9 +181,7 @@ def create_sizing_function3D(
         requested_hmin = float(hmin)
 
     if vp_water is not None and float(vp_water) > 0.0:
-        physical_positive_floor = (
-            float(vp_water) / (float(freq) * float(wl))
-        )
+        physical_positive_floor = float(vp_water) / (float(freq) * float(wl))
     elif requested_hmin is not None:
         physical_positive_floor = requested_hmin
     else:
@@ -210,13 +206,14 @@ def create_sizing_function3D(
         callable
             Sizing function that clamps queries to the velocity-model bounds.
         """
+
         def evaluate(coordinates):
             """Evaluate the edge-extended sizing function at one or more coordinates.
 
             Parameters
             ----------
             coordinates : numpy.ndarray
-                Coordinates with shape ``(N, 3)`` in ``(z, x, y)`` order.
+                Coordinates with shape `(N, 3)` in `(z, x, y)` order.
 
             Returns
             -------
@@ -235,20 +232,12 @@ def create_sizing_function3D(
                     "in (z, x, y) order."
                 )
             if not np.all(np.isfinite(points)):
-                raise ValueError(
-                    "3-D sizing coordinates contain NaN or infinity."
-                )
+                raise ValueError("3-D sizing coordinates contain NaN or infinity.")
 
             projected = points.copy()
-            projected[:, 0] = np.clip(
-                projected[:, 0], zmin, zmax
-            )
-            projected[:, 1] = np.clip(
-                projected[:, 1], xmin, xmax
-            )
-            projected[:, 2] = np.clip(
-                projected[:, 2], ymin, ymax
-            )
+            projected[:, 0] = np.clip(projected[:, 0], zmin, zmax)
+            projected[:, 1] = np.clip(projected[:, 1], xmin, xmax)
+            projected[:, 2] = np.clip(projected[:, 2], ymin, ymax)
 
             values = np.asarray(
                 base_callable(projected),
@@ -262,9 +251,7 @@ def create_sizing_function3D(
                     f"{projected.shape[0]} coordinates."
                 )
             if not np.all(np.isfinite(values)):
-                first = int(
-                    np.flatnonzero(~np.isfinite(values))[0]
-                )
+                first = int(np.flatnonzero(~np.isfinite(values))[0])
                 raise ValueError(
                     "The 3-D sizing function returned NaN or infinity "
                     "inside the velocity-model box. First projected "
@@ -313,15 +300,16 @@ def create_sizing_function3D(
                 "axes_order": tuple(axes_order),
                 "axes_order_sort": axes_order_sort,
             }
-            if requested_hmin is not None:
-                seismic_kwargs["hmin"] = requested_hmin
+            # Pass the floor explicitly: SeismicMesh otherwise enforces its
+            # own default minimum of 150 m.
+            seismic_kwargs["hmin"] = physical_positive_floor
 
             base_ef = SeismicMesh.get_sizing_function_from_segy(
                 str(fname),
                 bbox,
                 **seismic_kwargs,
             )
-            ef = edge_extended_callable(base_ef)
+            ef = edge_extended_callable(base_ef.eval)
 
             return (
                 ef,
@@ -331,10 +319,15 @@ def create_sizing_function3D(
                 int(nx),
                 int(ny),
             )
-        except (TypeError, ValueError, RuntimeError):
-            pass
+        except (TypeError, ValueError, RuntimeError) as error:
+            warnings.warn(
+                f"SeismicMesh could not build the 3-D sizing function ({error}); "
+                "using linear interpolation of the velocity model instead, "
+                "without gradation.",
+                stacklevel=2,
+            )
 
-    velocity = _read_velocity_binary3D(
+    velocity = read_velocity_binary3d(
         fname=fname,
         nz=nz,
         nx=nx,
@@ -353,9 +346,7 @@ def create_sizing_function3D(
         )
 
     if np.any(~np.isfinite(velocity)):
-        raise ValueError(
-            "The velocity model contains NaN or infinity."
-        )
+        raise ValueError("The velocity model contains NaN or infinity.")
     if np.any(velocity <= 0.0):
         raise ValueError(
             "The velocity model contains non-positive values. Set vp_water "
@@ -413,7 +404,7 @@ def define_winslow_points_3d(
     gmsh : module
         Initialized Gmsh Python module used to build or query the mesh.
     points_3d : numpy.ndarray
-        Mesh-node coordinates with shape ``(N, 3)``.
+        Mesh-node coordinates with shape `(N, 3)`.
     tag_to_index : dict
         Mapping from Gmsh node tags to zero-based point indices.
     length_x : float
@@ -423,7 +414,7 @@ def define_winslow_points_3d(
     depth_z : float
         Physical domain depth; the model occupies negative z.
     padding_type : str or None
-        Padding geometry, either ``None`` or ``"rectangular"`` for Winslow.
+        Padding geometry, either `None` or `"rectangular"` for Winslow.
     padding_x : float
         Padding thickness in the x direction.
     padding_y : float
@@ -463,17 +454,15 @@ def define_winslow_points_3d(
         raise ValueError("Winslow point-selection tolerance must be positive.")
 
     locked = set()
-    move_X_only = set()
-    move_Y_only = set()
-    move_Z_only = set()
+    move_x_only = set()
+    move_y_only = set()
+    move_z_only = set()
     move_all = set()
     water_nodes = set()
 
     if water_interface:
         water_group_name = (
-            "Water_with_padding"
-            if padding_type == "rectangular"
-            else "Water"
+            "Water_with_padding" if padding_type == "rectangular" else "Water"
         )
 
         group_found = False
@@ -529,9 +518,7 @@ def define_winslow_points_3d(
                 float(length_y) + float(padding_y),
             ]
         )
-        z_planes.append(
-            -abs(float(depth_z)) - float(padding_z)
-        )
+        z_planes.append(-abs(float(depth_z)) - float(padding_z))
 
     if not water_interface:
         z_planes.append(0.0)
@@ -549,7 +536,7 @@ def define_winslow_points_3d(
         Returns
         -------
         bool
-            ``True`` when the coordinate is within tolerance of any supplied plane.
+            `True` when the coordinate is within tolerance of any supplied plane.
         """
         return any(abs(value - plane) < tol for plane in planes)
 
@@ -570,45 +557,38 @@ def define_winslow_points_3d(
 
         if contact_count == 2:
             if on_x_plane and on_y_plane:
-                move_Z_only.add(node_index)
+                move_z_only.add(node_index)
             elif on_x_plane and on_z_plane:
-                move_Y_only.add(node_index)
+                move_y_only.add(node_index)
             elif on_y_plane and on_z_plane:
-                move_X_only.add(node_index)
+                move_x_only.add(node_index)
             continue
 
         if contact_count == 1:
             if on_x_plane:
-                move_Y_only.add(node_index)
-                move_Z_only.add(node_index)
+                move_y_only.add(node_index)
+                move_z_only.add(node_index)
             elif on_y_plane:
-                move_X_only.add(node_index)
-                move_Z_only.add(node_index)
+                move_x_only.add(node_index)
+                move_z_only.add(node_index)
             elif on_z_plane:
-                move_X_only.add(node_index)
-                move_Y_only.add(node_index)
+                move_x_only.add(node_index)
+                move_y_only.add(node_index)
             continue
 
         move_all.add(node_index)
 
-    movable_nodes = (
-        move_all
-        | move_X_only
-        | move_Y_only
-        | move_Z_only
-    )
+    movable_nodes = move_all | move_x_only | move_y_only | move_z_only
 
     if not movable_nodes:
-        raise RuntimeError(
-            "No movable nodes were found for 3-D Winslow smoothing."
-        )
+        raise RuntimeError("No movable nodes were found for 3-D Winslow smoothing.")
 
     return {
         "locked": locked,
         "move_all": move_all,
-        "move_X_only": move_X_only,
-        "move_Y_only": move_Y_only,
-        "move_Z_only": move_Z_only,
+        "move_x_only": move_x_only,
+        "move_y_only": move_y_only,
+        "move_z_only": move_z_only,
         "water_nodes": water_nodes,
         "movable_nodes": movable_nodes,
     }
