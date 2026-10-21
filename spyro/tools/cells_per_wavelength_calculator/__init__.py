@@ -1,7 +1,7 @@
 import numpy as np
 import time as timinglib
 import copy
-from .input_models import create_initial_model_for_meshing_parameter
+from ..input_models import create_initial_model_for_meshing_parameter
 import spyro
 
 
