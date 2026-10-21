@@ -1,5 +1,6 @@
 from firedrake import as_vector, assemble, CellDiameter, DirichletBC, SpatialCoordinate
-from numpy import allclose, clip, column_stack, linspace, log10, min, max
+from mpi4py import MPI
+from numpy import allclose, clip, column_stack, empty_like, linspace, log10, min, max
 from ..utils.error_management import validate_parameter
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..version_control import is_firedrake_new
@@ -160,11 +161,21 @@ class MeshOps():
             Array containing the minimum coordinates in each dimension (z, x, y).
         max_coordinates : `array`
             Array containing the maximum coordinates in each dimension (z, x, y).
+
+        Notes
+        -----
+        The extremes are reduced over ``mesh.comm``, so every rank gets the
+        limits of the whole mesh and not only those of its own partition.
         """
 
         coords = mesh.coordinates.dat.data_with_halos
-        min_coordinates = min(coords, axis=0)
-        max_coordinates = max(coords, axis=0)
+        local_min = min(coords, axis=0)
+        local_max = max(coords, axis=0)
+
+        min_coordinates = empty_like(local_min)
+        max_coordinates = empty_like(local_max)
+        mesh.comm.Allreduce(local_min, min_coordinates, op=MPI.MIN)
+        mesh.comm.Allreduce(local_max, max_coordinates, op=MPI.MAX)
 
         return min_coordinates, max_coordinates
 
