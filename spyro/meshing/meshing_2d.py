@@ -21,18 +21,18 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
     Supports an optional water interface, hyperelliptical or rectangular
     padding, structured Winslow smoothing, or unstructured
     full-quadrilateral meshing. The mesh is written to
-    ``mesh_parameters.output_filename`` by ensemble rank 0 only.
+    `mesh_parameters.output_filename` by ensemble rank 0 only.
 
     Parameters
     ----------
     mesh_parameters : MeshingParameters
-        Complete meshing parameters for a 2-D ``gmsh_mesh``.
+        Complete meshing parameters for a 2-D `gmsh_mesh`.
 
     Returns
     -------
     str
         Path to the velocity model used for meshing (the SEG-Y input, or a
-        temporary SEG-Y file written from a grid ``velocity_model``).
+        temporary SEG-Y file written from a grid `velocity_model`).
     """
     if gmsh is None:
         raise ImportError("gmsh is not available. Please install it.")
@@ -218,7 +218,7 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
                 Returns
                 -------
                 float
-                    Twice the element size from ``mesh_size_callback``.
+                    Twice the element size from `mesh_size_callback`.
                 """
                 return 2.0 * mesh_size_callback(dim, tag, x, y, z, lc)
 

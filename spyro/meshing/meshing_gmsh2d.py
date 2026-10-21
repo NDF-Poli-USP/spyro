@@ -25,8 +25,8 @@ def configure_gmsh_2d_meshing_mode(
 ) -> None:
     """Set the Gmsh options for the requested 2-D meshing mode.
 
-    ``MeshingParameters`` guarantees that ``structured_mesh`` and
-    ``unstructured_quad_mesh`` are not both set.
+    `MeshingParameters` guarantees that `structured_mesh` and
+    `unstructured_quad_mesh` are not both set.
 
     Parameters
     ----------
@@ -39,7 +39,7 @@ def configure_gmsh_2d_meshing_mode(
         is subdivided after recombination, so the size callback must return
         twice the target element size.
     padding_type : str or None
-        Padding geometry: ``None``, ``"rectangular"`` or ``"hyperelliptical"``.
+        Padding geometry: `None`, `"rectangular"` or `"hyperelliptical"`.
     min_element_size : float
         Element size used for the structured mesh.
 
