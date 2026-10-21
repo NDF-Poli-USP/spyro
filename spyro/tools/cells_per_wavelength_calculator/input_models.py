@@ -1,0 +1,294 @@
+"""Model dictionaries used by the cells-per-wavelength calculator."""
+
+import math
+import warnings
+
+import numpy as np
+
+import spyro
+
+#: Mesh type used for each supported finite element method.
+MESH_TYPES = {
+    "mass_lumped_triangle": "SeismicMesh",
+    "spectral_quadrilateral": "firedrake_mesh",
+}
+
+#: Velocities above this value are assumed to be in m/s instead of km/s.
+METERS_PER_SECOND_THRESHOLD = 500.0
+
+# Acquisition of the homogeneous acoustic model, in wavelengths. The
+# receivers form a square grid centred below the source.
+#: Vertical distance from the source to the centre of the receiver grid.
+HOMOGENEOUS_RECEIVER_GRID_DEPTH = 10.0
+#: Side of the square receiver grid.
+HOMOGENEOUS_RECEIVER_GRID_WIDTH = 5.0
+#: Receivers per side of the grid, and in reduced (testing) mode.
+HOMOGENEOUS_RECEIVERS_PER_SIDE = 6
+HOMOGENEOUS_RECEIVERS_PER_SIDE_REDUCED = 2
+
+#: Time step of the homogeneous acoustic analytical reference, in s.
+HOMOGENEOUS_REFERENCE_DT = 5e-4
+
+
+def _check_method(method: str) -> None:
+    """Check that a finite element method is supported.
+
+    Parameters
+    ----------
+    method : str
+        Finite element method.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not a key of :data:`MESH_TYPES`.
+    """
+    if method not in MESH_TYPES:
+        raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
+
+
+def set_mesh_type(method: str) -> str:
+    """Return the mesh type used for a finite element method.
+
+    Parameters
+    ----------
+    method : str
+        Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+
+    Returns
+    -------
+    str
+        ``"SeismicMesh"`` for triangles, ``"firedrake_mesh"`` for
+        quadrilaterals.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not supported.
+    """
+    _check_method(method)
+    return MESH_TYPES[method]
+
+
+def _warn_if_meters_per_second(velocity: float) -> None:
+    """Warn if a velocity looks like it is in m/s instead of km/s.
+
+    Parameters
+    ----------
+    velocity : float
+        Velocity to check.
+    """
+    if velocity > METERS_PER_SECOND_THRESHOLD:
+        warnings.warn("Velocity in meters per second")
+
+
+def _round_up_to_time_step(time: float, dt: float) -> float:
+    """Round a time up to a whole number of time steps.
+
+    A time series of ``round(time / dt) + 1`` samples then ends exactly at
+    the returned time, which :func:`~spyro.io.time_io.interpolate_time_series`
+    assumes when it resamples the reference.
+
+    Parameters
+    ----------
+    time : float
+        Time to round.
+    dt : float
+        Time step.
+
+    Returns
+    -------
+    float
+        Smallest multiple of ``dt`` not below ``time``.
+    """
+    # The small tolerance keeps times already on the grid in place
+    return math.ceil(time / dt - 1e-9) * dt
+
+
+def _build_acoustic_model_dictionary(
+    *,
+    method: str,
+    degree: int,
+    length_z: float,
+    length_x: float,
+    source_locations: list[tuple[float, float]],
+    receiver_locations: list[tuple[float, float]],
+    frequency: float,
+    final_time: float,
+    dt: float,
+    periodic: bool = False,
+) -> dict:
+    """Assemble a 2D acoustic model dictionary for the cpw calculator.
+
+    Parameters
+    ----------
+    method : str
+        Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+    degree : int
+        Spatial polynomial degree.
+    length_z : float
+        Domain length in the z direction, without absorbing layer.
+    length_x : float
+        Domain length in the x direction, without absorbing layer.
+    source_locations : list of tuple of float
+        Source ``(z, x)`` locations.
+    receiver_locations : list of tuple of float
+        Receiver ``(z, x)`` locations.
+    frequency : float
+        Ricker source peak frequency.
+    final_time : float
+        Final time of the simulation.
+    dt : float
+        Time step of the simulation.
+    periodic : bool, optional
+        If True, use a periodic ``"firedrake_mesh"`` for either method.
+        Default is False, with the mesh type given by :func:`set_mesh_type`.
+
+    Returns
+    -------
+    dict
+        Spyro model dictionary for :class:`spyro.AcousticWave`.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is not supported.
+    """
+    mesh_type = set_mesh_type(method)
+    if periodic:
+        # Only Firedrake meshes can be periodic
+        mesh_type = "firedrake_mesh"
+
+    return {
+        "options": {
+            "method": method,
+            "degree": degree,
+            "dimension": 2,
+            "automatic_adjoint": False,
+        },
+        "parallelism": {"type": "automatic"},
+        "mesh": {
+            "length_z": length_z,
+            "length_x": length_x,
+            "length_y": 0.0,
+            "mesh_type": mesh_type,
+            "periodic": periodic,
+        },
+        "absorving_boundary_conditions": {"status": False},
+        "acquisition": {
+            "source_type": "ricker",
+            "source_locations": source_locations,
+            "frequency": frequency,
+            "receiver_locations": receiver_locations,
+            "use_vertex_only_mesh": True,
+        },
+        "synthetic_data": {
+            "real_velocity_file": None,
+        },
+        "time_axis": {
+            "initial_time": 0.0,
+            "final_time": final_time,
+            "dt": dt,
+            "amplitude": 1,
+            "output_frequency": 1000,
+            "gradient_sampling_frequency": 100,
+        },
+        "visualization": {
+            "forward_output": False,
+            "fwi_velocity_model_output": False,
+            "velocity_model_filename": None,
+            "gradient_output": False,
+            "gradient_filename": None,
+        },
+    }
+
+
+def create_acoustic_model_for_meshing_parameter_2D_homogeneous(
+    method: str,
+    degree: int,
+    frequency: float,
+    velocity: float,
+    dt: float = HOMOGENEOUS_REFERENCE_DT,
+    reduced: bool = False,
+) -> dict:
+    """Create a 2D homogeneous acoustic model for the cpw calculator.
+
+    The receivers form a square grid of side
+    :data:`HOMOGENEOUS_RECEIVER_GRID_WIDTH` wavelengths, centred
+    :data:`HOMOGENEOUS_RECEIVER_GRID_DEPTH` wavelengths below the source.
+    The final time lets the wave reach the farthest receiver, rounded up
+    to a whole number of time steps. The domain is
+    a periodic box without absorbing layer, sized so that no wave from a
+    periodic image of the source reaches a receiver before the final time.
+    The receiver data then matches the free-space analytical solution.
+
+    Parameters
+    ----------
+    method : str
+        Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+    degree : int
+        Spatial polynomial degree.
+    frequency : float
+        Ricker source peak frequency.
+    velocity : float
+        Constant acoustic velocity, which sets the wavelength.
+    dt : float, optional
+        Time step used by the initial object and the analytical reference.
+        Default is :data:`HOMOGENEOUS_REFERENCE_DT`.
+    reduced : bool, optional
+        If True, use a 2 by 2 receiver grid instead of 6 by 6, for testing.
+        Default is False.
+
+    Returns
+    -------
+    dict
+        Spyro model dictionary for :class:`spyro.AcousticWave`.
+    """
+    _warn_if_meters_per_second(velocity)
+    wavelength = velocity / frequency
+
+    grid_depth = HOMOGENEOUS_RECEIVER_GRID_DEPTH * wavelength
+    half_width = HOMOGENEOUS_RECEIVER_GRID_WIDTH * wavelength / 2.0
+    deepest_offset = grid_depth + half_width
+    farthest_offset = np.hypot(deepest_offset, half_width)
+
+    # The wavelet delay is about 1.2 periods, plus two periods of wavelet tail
+    final_time = _round_up_to_time_step(
+        farthest_offset / velocity + 3.0 / frequency, dt
+    )
+
+    # A periodic image is one box length away along an axis, so it is at
+    # least (length - source-receiver span) away from every receiver. Keep
+    # its arrival one wavelength past the final time.
+    image_distance = velocity * final_time + wavelength
+    length_z = image_distance + deepest_offset
+    length_x = image_distance + half_width
+
+    # Centre the acquisition in the box
+    source_z = -(length_z - deepest_offset) / 2.0
+    source_x = length_x / 2.0
+    receivers_per_side = (
+        HOMOGENEOUS_RECEIVERS_PER_SIDE_REDUCED
+        if reduced
+        else HOMOGENEOUS_RECEIVERS_PER_SIDE
+    )
+    receiver_locations = spyro.create_2d_grid(
+        source_z - grid_depth + half_width,
+        source_z - deepest_offset,
+        source_x - half_width,
+        source_x + half_width,
+        receivers_per_side,
+    )
+
+    return _build_acoustic_model_dictionary(
+        method=method,
+        degree=degree,
+        length_z=length_z,
+        length_x=length_x,
+        source_locations=[(source_z, source_x)],
+        receiver_locations=receiver_locations,
+        frequency=frequency,
+        final_time=final_time,
+        dt=dt,
+        periodic=True,
+    )
