@@ -873,7 +873,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.nrbc_ops = NRBC(domain_dim, frequency=self.frequency,
                                  dt=time_step, dimension=self.dimension,
                                  quadrilateral=self.mesh_parameters.quadrilateral,
-                                 output_folder=self.output_folder, comm=self.comm)
+                                 output_folder=self.output_folder)
 
     @abstractmethod
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
