@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 import firedrake as fire
-from firedrake import TrialFunction, TestFunction, dot, div, dx
+from firedrake import TrialFunction, TestFunction, dot, dx
 from firedrake.petsc import PETSc
 
 

@@ -11,8 +11,6 @@ from firedrake import (
 from spyro.solvers.acoustic_solver_construction_no_pml import build_acoustic_form
 from spyro.solvers.elastic_wave.forms import build_elastic_form
 
-from matplotlib.ticker import MaxNLocator
-
 
 def construct_acoustic_elastic(Wave_obj):
     p_nm1, u_nm1 = fire.split(Wave_obj.X_nm1)
