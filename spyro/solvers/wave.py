@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
+from pyadjoint import AdjFloat, Tape
 
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
@@ -18,6 +19,7 @@ from ..utils import eval_functions_to_ufl
 from ..utils.physical_parameters import PhysicalParameters
 from ..utils.error_management import validate_enum
 from ..utils.typing import (AdjointType, FunctionalEvaluationMode, AbsorbingBCsType,
+                            RieszMapType,
                             LayerShapeType, WaveType)
 from .modal.modal_sol import Modal_Solver
 from .automatic_differentiation_solver import AutomatedAdjoint
@@ -716,6 +718,72 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         )
         self.functional_value = None
         self.misfit = None
+
+    def receiver_field(self):
+        """Return the field sampled at the receivers on a vertex-only mesh.
+
+        The expression has to refer to the state function itself, not to a
+        copy of it, so that the interpolation recorded on the adjoint tape
+        follows the state as it is updated in time.
+
+        Returns
+        -------
+        ufl.core.expr.Expr
+            The current state, or its first component for a mixed state.
+        """
+        if self.abc_type == AbsorbingBCsType.PML:
+            return fire.split(self.X_n)[0]
+        return self.u_n
+
+    def _automated_adjoint_derivatives(
+        self, riesz_map: RieszMapType = RieszMapType.L2,
+    ) -> PhysicalParameters:
+        """Differentiate the recorded functional with respect to the controls.
+
+        Parameters
+        ----------
+        riesz_map : RieszMapType, optional
+            ``L2`` returns primal gradients and ``l2`` raw derivatives.
+
+        Returns
+        -------
+        PhysicalParameters
+            Derivatives keyed by the selected physical parameters.
+
+        Raises
+        ------
+        ValueError
+            If no annotated functional is available, or the automated adjoint
+            was not enabled before the forward solve.
+        NotImplementedError
+            If the Riesz map is not supported.
+        """
+        if not isinstance(self.functional_value, AdjFloat):
+            raise ValueError(
+                "Functional value must be an AdjFloat for automated adjoint "
+                "gradient computation.",
+            )
+        if self.automated_adjoint is None:
+            raise ValueError(
+                "Enable the automated adjoint before the forward solve.",
+            )
+        if (
+            self.automated_adjoint.reduced_functional is None
+            and isinstance(self.automated_adjoint._tape, Tape)
+        ):
+            self.automated_adjoint.create_reduced_functional(
+                self.functional_value,
+            )
+
+        if riesz_map is RieszMapType.L2:
+            derivatives = self.automated_adjoint.compute_gradient()
+        elif riesz_map is RieszMapType.l2:
+            derivatives = self.automated_adjoint.compute_derivative()
+        else:
+            raise NotImplementedError(
+                f"Riesz map {riesz_map} not implemented for automated adjoint.",
+            )
+        return self.automated_adjoint.label_derivatives(derivatives)
 
     def enable_implemented_adjoint(self):
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT

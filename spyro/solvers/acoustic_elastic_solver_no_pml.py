@@ -11,8 +11,6 @@ from firedrake import (
 from spyro.solvers.acoustic_solver_construction_no_pml import build_acoustic_form
 from spyro.solvers.elastic_wave.forms import build_elastic_form
 
-from matplotlib.ticker import MaxNLocator
-
 
 def construct_acoustic_elastic(Wave_obj):
     p_nm1, u_nm1 = fire.split(Wave_obj.X_nm1)
@@ -68,7 +66,12 @@ def construct_acoustic_elastic(Wave_obj):
     )
 
     u_tt = (Wave_obj.X_np1.sub(1) - 2.0 * u_n + u_nm1) / dt**2
-    F_interface_acoustic = -dot(u_tt, n_s) * v_f * ds_int(iface)
+    # The fluid form is the pressure equation multiplied by rho_f, so the
+    # normal pressure gradient it leaves on the interface is rho_f times the
+    # normal acceleration of the solid.
+    F_interface_acoustic = (
+        -Wave_obj.rho_fluid * dot(u_tt, n_s) * v_f * ds_int(iface)
+    )
     F_fluid = F_acoustic + F_interface_acoustic
 
     fluid_lhs = fire.lhs(F_fluid)

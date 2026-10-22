@@ -338,6 +338,7 @@ def plot_function(function: Function, **kwargs) -> None:
     plt.colorbar(contours)
     axes.axis("equal")
 
+
 def plot_model_jessica(
     wave: "Wave",
     filename: str = "model.png",

@@ -18,7 +18,8 @@ from .solvers.elastic_wave.isotropic_wave import IsotropicWave
 from .solvers.inversion import FullWaveformInversion
 from .utils.typing import (AcousticMaterialParameter,
                            ElasticMaterialParameter,
-                           ElasticMaterialParameterization, WaveType)
+                           ElasticMaterialParameterization,
+                           FluidMaterialParameter, WaveType)
 from .utils.physical_parameters import PhysicalParameters
 
 # from .solvers.dg_wave import DG_Wave
@@ -61,6 +62,7 @@ __all__ = [
     "FullWaveformInversion",
     "AcousticMaterialParameter",
     "ElasticMaterialParameter",
+    "FluidMaterialParameter",
     "PhysicalParameters",
     "ElasticMaterialParameterization",
     "WaveType",

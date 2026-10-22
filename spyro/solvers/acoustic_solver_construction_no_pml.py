@@ -15,7 +15,9 @@ from ..utils.error_management import (
 def velocity_fluid(wave):
     """Resolve the acoustic wave velocity.
 
-    Uses either an explicit value or the fluid bulk modulus and density.
+    Uses either an explicit value or the fluid bulk modulus and density. The
+    density may also accompany an explicit velocity, as the coupled
+    fluid-solid wave needs it for the interface condition.
 
     Parameters
     ----------
@@ -30,20 +32,19 @@ def velocity_fluid(wave):
     Raises
     ------
     ValueError
-        If `wave.c` is given together with `wave.K` or `wave.rho_fluid`, or
-        if only one of `wave.K`/`wave.rho_fluid` is given.
+        If `wave.c` is given together with `wave.K` (ambiguous), or if `wave.c`
+        is not given and only one of `wave.K`/`wave.rho_fluid` is.
     """
     c = wave.c
     K = wave.K
     rho_fluid = wave.rho_fluid
 
-    combined_k_and_rho_fluid = K if K is not None else rho_fluid
-    mutually_exclusive_parameter_error(
-        ["velocity_fluid", "bulk_modulus/density_fluid"], [c, combined_k_and_rho_fluid]
-    )
-    required_together_parameter_error(["bulk_modulus", "density_fluid"], [K, rho_fluid])
+    mutually_exclusive_parameter_error(["velocity_fluid", "bulk_modulus"], [c, K])
 
     if c is None:
+        required_together_parameter_error(
+            ["bulk_modulus", "density_fluid"], [K, rho_fluid]
+        )
         c = sqrt(K / rho_fluid)
 
     return c
@@ -77,8 +78,8 @@ def build_acoustic_form(
     Raises
     ------
     ValueError
-        If `c` is given together with `K` or `rho_fluid` (ambiguous), or if
-        only one of `K`/`rho_fluid` is given (incomplete).
+        If `c` is given together with `K` (ambiguous), or if `c` is not given
+        and only one of `K`/`rho_fluid` is (incomplete).
     """
     c = velocity_fluid(wave)
     dt = wave.dt
