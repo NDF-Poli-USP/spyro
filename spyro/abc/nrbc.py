@@ -60,7 +60,7 @@ class NRBC(AbsorbingBC):
 
     def __init__(self, domain_dim, non_reflect_bc=BoundaryConditionsType.HIGDON,
                  angle_max=pi/4., abc_boundary_type=NRBCBoundaryType.STRAIGHT,
-                 dimension=2, nrbc_in_habc=False, output_folder=None, comm=None):
+                 dimension=2, nrbc_in_habc=False, output_folder=None):
         """Initialize the NRBC class.
 
         Parameters
@@ -94,7 +94,7 @@ class NRBC(AbsorbingBC):
 
         # Initializing the AbsorbingBC class if NRBCs are not in HABC scheme
         if not nrbc_in_habc:
-            AbsorbingBC.__init__(self, domain_dim, dimension=dimension, comm=comm)
+            AbsorbingBC.__init__(self, domain_dim, dimension=dimension)
 
             # Non-reflective BC type
         self.non_reflect_bc = validate_parameter('non_reflect_bc', non_reflect_bc,
