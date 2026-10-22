@@ -890,7 +890,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                       quadrilateral=self.mesh_parameters.quadrilateral,
                                       func_space_type=self.mesh_ops.func_space_type,
                                       abc_reference_freq=self.abc_reference_freq,
-                                      output_folder=self.output_folder, comm=self.comm)
+                                      output_folder=self.output_folder)
 
         if self.abc_type == AbsorbingBCsType.HYBRID:  # HABC
             from ..habc.habc import HABCLayer
@@ -902,7 +902,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                        abc_reference_freq=self.abc_reference_freq,
                                        abc_degree_type=self.abc_degree_type,
                                        abc_deg_layer=self.abc_deg_layer,
-                                       output_folder=self.output_folder, comm=self.comm)
+                                       output_folder=self.output_folder)
 
     def abcs_manager(self):
         """Create the ABCs operations manager for the wave solver."""
@@ -923,7 +923,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         elif self.abc_type == AbsorbingBCsType.NRBC:
             from ..abc.nrbc import NRBC
             self.nrbc_ops = NRBC(domain_dim, dimension=self.dimension,
-                                 output_folder=self.output_folder, comm=self.comm)
+                                 output_folder=self.output_folder)
 
             # Identifier for the current case study
             self.case_abc = self.nrbc_ops.case_nrbc
