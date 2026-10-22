@@ -1,10 +1,11 @@
 """Taylor tests for the automated adjoint of the coupled acoustic-elastic wave.
 
 The fluid and the solid are solved on two submeshes of one parent mesh, and
-the elastic material parameters are fields on the solid submesh. These tests
-check that the gradient with respect to those fields is consistent with the
-functional recorded on the tape, for both the sequential and the monolithic
-coupled solvers.
+the material parameters of each medium are fields on its submesh. These
+tests check that all of them are physical parameters of the equation, and
+that the gradient with respect to the solid ones, selected as controls, is
+consistent with the functional recorded on the tape, for both the sequential
+and the monolithic coupled solvers.
 """
 
 from importlib.metadata import version
@@ -31,6 +32,13 @@ pytestmark = [
 ]
 
 Parameter = spyro.ElasticMaterialParameter
+FluidParameter = spyro.FluidMaterialParameter
+FLUID = {"bulk_modulus": 2.25, "density_fluid": 1.0}
+SOLID_CONTROLS = (
+    Parameter.DENSITY,
+    Parameter.P_WAVE_VELOCITY,
+    Parameter.S_WAVE_VELOCITY,
+)
 TRUE_SOLID = {"density": 2.0, "p_wave_velocity": 2.0, "s_wave_velocity": 1.2}
 GUESS_SOLID = {"density": 2.2, "p_wave_velocity": 2.2, "s_wave_velocity": 1.1}
 
@@ -100,8 +108,7 @@ def make_dictionary(solid: dict) -> dict:
         "synthetic_data": {
             "type": "object",
             "velocity_fluid": None,
-            "bulk_modulus": 2.25,
-            "density_fluid": 1.0,
+            **FLUID,
             "density_solid": solid["density"],
             "p_wave_velocity": solid["p_wave_velocity"],
             "s_wave_velocity": solid["s_wave_velocity"],
@@ -124,32 +131,54 @@ def exact_receiver_data() -> np.ndarray:
     return wave.forward_solution_receivers
 
 
-def test_elastic_parameters_are_solid_submesh_fields():
-    """The elastic parameters are fields on the solid submesh only."""
+def test_physical_parameters_are_submesh_fields():
+    """Each medium's parameters are physical parameters on its submesh."""
     wave = AcousticElasticWave(make_dictionary(TRUE_SOLID))
     parameters = wave.initialize_physical_parameters()
 
     independent = parameters.select()
     assert tuple(independent) == (
-        Parameter.DENSITY,
-        Parameter.P_WAVE_VELOCITY,
-        Parameter.S_WAVE_VELOCITY,
+        FluidParameter.DENSITY,
+        FluidParameter.BULK_MODULUS,
+        *SOLID_CONTROLS,
     )
-    for name, field in independent.items():
+    for name in (FluidParameter.DENSITY, FluidParameter.BULK_MODULUS):
+        field = independent[name]
+        assert field.function_space().mesh() is wave.submesh_fluid
+        assert np.allclose(field.dat.data_ro, FLUID[name.value])
+    for name in SOLID_CONTROLS:
+        field = independent[name]
         assert field.function_space().mesh() is wave.submesh_solid
         assert np.allclose(field.dat.data_ro, TRUE_SOLID[name.value])
 
-    # The Lame parameters the elastic form reads are computed from them.
+    def mean(expression, measure):
+        """Return the mean of ``expression`` over ``measure``.
+
+        Parameters
+        ----------
+        expression : ufl.core.expr.Expr
+            Field to average.
+        measure : ufl.Measure
+            Integration measure over one submesh.
+
+        Returns
+        -------
+        float
+            Integral of ``expression`` divided by the measure of the domain.
+        """
+        area = fire.assemble(fire.Constant(1.0) * measure)
+        return fire.assemble(expression * measure) / area
+
+    # The dependent parameters the forms read are computed from them.
+    velocity_fluid = np.sqrt(FLUID["bulk_modulus"] / FLUID["density_fluid"])
+    assert np.isclose(
+        mean(parameters[FluidParameter.P_WAVE_VELOCITY], wave.dx_fluid),
+        velocity_fluid,
+    )
     mu = TRUE_SOLID["density"] * TRUE_SOLID["s_wave_velocity"]**2
     lmbda = TRUE_SOLID["density"] * TRUE_SOLID["p_wave_velocity"]**2 - 2 * mu
-    dx_solid = wave.dx_solid
-    area = fire.assemble(fire.Constant(1.0) * dx_solid)
-    assert np.isclose(
-        fire.assemble(parameters[Parameter.MU] * dx_solid) / area, mu,
-    )
-    assert np.isclose(
-        fire.assemble(parameters[Parameter.LAMBDA] * dx_solid) / area, lmbda,
-    )
+    assert np.isclose(mean(parameters[Parameter.MU], wave.dx_solid), mu)
+    assert np.isclose(mean(parameters[Parameter.LAMBDA], wave.dx_solid), lmbda)
 
 
 @pytest.mark.parametrize("use_monolithic", [False, True],
@@ -158,6 +187,9 @@ def test_acoustic_elastic_automated_adjoint(
     exact_receiver_data: np.ndarray, use_monolithic: bool,
 ):
     """Taylor-test the gradient with respect to the solid parameters.
+
+    The fluid parameters are physical parameters too, but only the solid
+    ones are selected as controls.
 
     Parameters
     ----------
@@ -169,26 +201,21 @@ def test_acoustic_elastic_automated_adjoint(
     wave = AcousticElasticWave(make_dictionary(GUESS_SOLID))
     wave.use_monolithic = use_monolithic
     wave.real_shot_record = exact_receiver_data
-    wave.enable_automated_adjoint()
+    wave.enable_automated_adjoint(control_parameters=SOLID_CONTROLS)
 
     try:
         wave.forward_solve()
 
         assert isinstance(wave.automated_adjoint._tape, Tape)
         assert isinstance(wave.functional_value, AdjFloat)
-        expected_parameters = (
-            Parameter.DENSITY,
-            Parameter.P_WAVE_VELOCITY,
-            Parameter.S_WAVE_VELOCITY,
-        )
         assert tuple(wave.automated_adjoint.control_parameter_names) == (
-            expected_parameters
+            SOLID_CONTROLS
         )
         for control in wave.automated_adjoint.controls:
             assert control.function_space().mesh() is wave.submesh_solid
 
         gradients = wave.gradient_solve()
-        assert tuple(gradients) == expected_parameters
+        assert tuple(gradients) == SOLID_CONTROLS
         for gradient in gradients.values():
             assert isinstance(gradient, fire.Function)
             assert gradient.function_space().mesh() is wave.submesh_solid

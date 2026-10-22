@@ -4,11 +4,13 @@ import numpy as np
 from .wave import Wave
 from .acoustic_elastic_solver_no_pml import construct_acoustic_elastic
 from .acoustic_elastic_solver_monolithic import construct_acoustic_elastic_monolithic
+from .acoustic_solver_construction_no_pml import velocity_fluid
 from ..utils.physical_parameters import PhysicalParameters
 from ..utils.typing import (
     override,
     AdjointType,
     ElasticMaterialParameter,
+    FluidMaterialParameter,
     RieszMapType,
     WaveType,
 )
@@ -27,10 +29,11 @@ def _extract_interface_markers(parent_mesh, child_mesh):
 class AcousticElasticWave(Wave):
     """Acoplamento fluido-sólido (formulação P - u_s)."""
 
-    #: The physical parameters are those of the elastic part: density plus
-    #: the two wave speeds, carried as fields on the solid submesh, with the
-    #: Lame parameters computed from them.
-    _physical_parameter_names = frozenset(ElasticMaterialParameter)
+    #: The physical parameters are those of both media: the fluid ones are
+    #: fields on the fluid submesh and the elastic ones on the solid submesh.
+    _physical_parameter_names = frozenset(FluidMaterialParameter) | frozenset(
+        ElasticMaterialParameter
+    )
 
     def __init__(self, dictionary, comm=None):
         self.fluid_id = 1
@@ -263,12 +266,16 @@ class AcousticElasticWave(Wave):
     def _initialize_model_parameters(self):
         """Initialize the fluid and solid material parameters.
 
-        The fluid parameters are scalar ``Constant`` objects. The solid ones
-        are fields on the solid submesh: density and the P- and S-wave
-        velocities are independent ``Function`` objects, and the Lame
-        parameters are UFL expressions of them. All five are registered as
-        the physical parameters of the equation, so the elastic part can be
-        selected as the control of the automated adjoint.
+        Every material parameter is a field on the submesh of its medium and
+        is registered as a physical parameter of the equation, so any of
+        them can be selected as a control of the automated adjoint.
+
+        - Fluid, on the fluid submesh: either the wave speed alone, or the
+          bulk modulus and the density, independent ``Function`` objects
+          from which the wave speed is computed.
+        - Solid, on the solid submesh: density and the P- and S-wave
+          velocities are independent ``Function`` objects, and the Lame
+          parameters are UFL expressions of them.
 
         This runs more than once: :meth:`enable_automated_adjoint` and the
         forward solve both call it. The model is read only on the first call,
@@ -284,29 +291,55 @@ class AcousticElasticWave(Wave):
             return
 
         synthetic_data = self.input_dictionary.get("synthetic_data", {})
-
-        K_value = synthetic_data.get("bulk_modulus")
-        rho_fluid_value = synthetic_data.get("density_fluid")
-        velocity_fluid_value = synthetic_data.get("velocity_fluid")
-
-        self.K = fire.Constant(K_value) if K_value is not None else None
-        self.rho_fluid = (
-            fire.Constant(rho_fluid_value) if rho_fluid_value is not None else None
+        fluid_space = create_function_space(
+            self.submesh_fluid, self.method, self.degree, dim=1
         )
-        self.c = (
-            fire.Constant(velocity_fluid_value)
-            if velocity_fluid_value is not None
-            else None
-        )
-
         solid_space = create_function_space(
             self.submesh_solid, self.method, self.degree, dim=1
         )
 
+        def field(space, parameter):
+            """Return the field of an optional fluid parameter.
+
+            Parameters
+            ----------
+            space : firedrake.functionspaceimpl.WithGeometry
+                Scalar space on the fluid submesh.
+            parameter : FluidMaterialParameter
+                Parameter to read, keyed in the model by its value.
+
+            Returns
+            -------
+            firedrake.Function or None
+                The parameter as a field, or ``None`` if the model does not
+                declare it.
+            """
+            value = synthetic_data.get(parameter.value)
+            if value is None:
+                return None
+            return fire.Function(space, name=parameter.value).assign(value)
+
+        self.K = field(fluid_space, FluidMaterialParameter.BULK_MODULUS)
+        self.rho_fluid = field(fluid_space, FluidMaterialParameter.DENSITY)
+        self.c = field(fluid_space, FluidMaterialParameter.P_WAVE_VELOCITY)
+
         def solid_field(parameter, key):
-            """Return the solid field of ``parameter`` read from ``key``."""
-            field = fire.Function(solid_space, name=parameter.value)
-            return field.assign(synthetic_data[key])
+            """Return the field of a solid parameter.
+
+            Parameters
+            ----------
+            parameter : ElasticMaterialParameter
+                Parameter the field carries, which also names it.
+            key : str
+                Model key the value is read from.
+
+            Returns
+            -------
+            firedrake.Function
+                The parameter as a field on the solid submesh.
+            """
+            solid = fire.Function(solid_space, name=parameter.value)
+            return solid.assign(synthetic_data[key])
 
         self.rho = solid_field(ElasticMaterialParameter.DENSITY, "density_solid")
         self.c_p = solid_field(
@@ -319,6 +352,14 @@ class AcousticElasticWave(Wave):
         self.lmbda = self.rho * self.c_p**2 - 2.0 * self.mu
 
         add = self._physical_parameters.add
+        # Only the fluid parameters the model declares are registered: the
+        # bulk modulus and the density, or neither of them.
+        if self.rho_fluid is not None:
+            add(FluidMaterialParameter.DENSITY, self.rho_fluid)
+        if self.K is not None:
+            add(FluidMaterialParameter.BULK_MODULUS, self.K)
+        # Also validates the combination of fluid parameters the model gives.
+        add(FluidMaterialParameter.P_WAVE_VELOCITY, velocity_fluid(self))
         add(ElasticMaterialParameter.DENSITY, self.rho)
         add(ElasticMaterialParameter.LAMBDA, self.lmbda)
         add(ElasticMaterialParameter.MU, self.mu)
@@ -410,10 +451,10 @@ class AcousticElasticWave(Wave):
         adjoint_type: AdjointType = AdjointType.AUTOMATED_ADJOINT,
         riesz_map: RieszMapType = RieszMapType.L2,
     ) -> PhysicalParameters:
-        """Compute automated-adjoint derivatives of the elastic parameters.
+        """Compute automated-adjoint derivatives of the material parameters.
 
-        The controls are the elastic parameters selected through
-        :meth:`enable_automated_adjoint`, which are fields on the solid
+        The controls are the physical parameters selected through
+        :meth:`enable_automated_adjoint`, fields on the fluid or the solid
         submesh. ``misfit`` and ``forward_solution`` belong to the
         hand-implemented adjoint, which does not exist for the coupled
         problem; they are kept so the signature matches the other solvers.
@@ -432,7 +473,7 @@ class AcousticElasticWave(Wave):
         Returns
         -------
         PhysicalParameters
-            Derivatives keyed by the selected elastic parameters.
+            Derivatives keyed by the selected physical parameters.
 
         Raises
         ------
@@ -514,10 +555,9 @@ class AcousticElasticWave(Wave):
     def _record_fluid_displacement_from_pressure(self):
         self.gradP_function.interpolate(fire.grad(self.X_np1.sub(0)))
         dt = self.dt
-        rho_f_val = float(self.rho_fluid)
         step_uf = []
         for i, loc in enumerate(self.receiver_locations):
-            af_z = -self.gradP_function.at(loc)[0] / rho_f_val
+            af_z = -self.gradP_function.at(loc)[0] / self.rho_fluid.at(loc)
             self._vf_normal[i] += dt * af_z
             self._uf_normal[i] += dt * self._vf_normal[i]
             step_uf.append(self._uf_normal[i])

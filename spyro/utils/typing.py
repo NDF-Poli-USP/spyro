@@ -107,6 +107,20 @@ class ElasticMaterialParameter(StrEnum):
     S_WAVE_VELOCITY = "s_wave_velocity"
 
 
+class FluidMaterialParameter(StrEnum):
+    """Material parameter names of the fluid in a coupled fluid-solid medium.
+
+    The fluid is described either by its wave speed alone, or by its bulk
+    modulus and density, from which the wave speed is computed. The values
+    are the model-dictionary keys they are read from, which keeps them
+    distinct from the elastic parameters of the solid.
+    """
+
+    DENSITY = "density_fluid"
+    BULK_MODULUS = "bulk_modulus"
+    P_WAVE_VELOCITY = "velocity_fluid"
+
+
 class ElasticMaterialParameterization(StrEnum):
     """Supported isotropic elastic inversion control parameterizations."""
 
