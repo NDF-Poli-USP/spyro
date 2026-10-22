@@ -31,6 +31,8 @@ class Delta_projector:
         Mesh object
     space : firedrake.FunctionSpace
         Function space to be used
+    sub_index : int
+        Index of ``space`` within ``function_space`` when the latter is mixed
     my_ensemble : mpi4py.MPI.Intracomm
         MPI communicator
     dimension : int
@@ -70,8 +72,8 @@ class Delta_projector:
         self.function_space = wave.function_space
         self.wave_type = wave.wave_type
         # self.space = self.function_space.sub(0)
-        sub_index = getattr(wave, "delta_projector_sub_index", 0)
-        self.space = self.function_space.sub(sub_index)
+        self.sub_index = getattr(wave, "delta_projector_sub_index", 0)
+        self.space = self.function_space.sub(self.sub_index)
         self.mesh = self.space.mesh()
         self.my_ensemble = wave.comm
         self.dimension = wave.dimension

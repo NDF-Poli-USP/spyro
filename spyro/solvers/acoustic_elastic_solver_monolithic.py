@@ -59,7 +59,7 @@ def construct_acoustic_elastic_monolithic(Wave_obj):
         "mat_type": "matfree",
         "ksp_type": "preonly",
         "pc_type": "fieldsplit",
-        "pc_fieldsplit_type": "multiplicative",
+        "pc_fieldsplit_type": "symmetric_multiplicative",
         "pc_fieldsplit_0_fields": "1",
         "pc_fieldsplit_1_fields": "0",
         "fieldsplit_0_ksp_type": "preonly",

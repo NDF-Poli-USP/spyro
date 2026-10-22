@@ -155,9 +155,16 @@ class Sources(Delta_projector):
         else:
             raise ValueError("Invalid wave type")
 
-        return fire.Cofunction(self.function_space.dual()).interpolate(
-            fire.assemble(source_form)
-        )
+        point_source = fire.assemble(source_form)
+        if len(self.function_space) == 1:
+            return fire.Cofunction(self.function_space.dual()).interpolate(
+                point_source
+            )
+        # In a mixed space the source only drives the field the projector was
+        # built on; the other fields are left without forcing.
+        source_cofunction = fire.Cofunction(self.function_space.dual())
+        source_cofunction.sub(self.sub_index).interpolate(point_source)
+        return source_cofunction
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):

@@ -55,12 +55,8 @@ def _propagate_forward_central_difference(wave, source_ids):
         # being one at a point and zero elsewhere.
         source_cof = wave.sources.source_cofunction()
 
-        if wave.abc_type == AbsorbingBCsType.PML:
-            pressure_expr = fire.split(wave.X_n)[0]
-        else:
-            pressure_expr = wave.u_n
         interpolate_receivers = wave.receivers.receiver_interpolator(
-            pressure_expr)
+            wave.receiver_field())
         if (
             wave.abc_type == AbsorbingBCsType.PML
             and wave.source_function is not None

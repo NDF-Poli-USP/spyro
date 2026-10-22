@@ -4,7 +4,14 @@ import numpy as np
 from .wave import Wave
 from .acoustic_elastic_solver_no_pml import construct_acoustic_elastic
 from .acoustic_elastic_solver_monolithic import construct_acoustic_elastic_monolithic
-from ..utils.typing import override, WaveType
+from ..utils.physical_parameters import PhysicalParameters
+from ..utils.typing import (
+    override,
+    AdjointType,
+    ElasticMaterialParameter,
+    RieszMapType,
+    WaveType,
+)
 from ..domains.space import create_function_space
 from ..domains.quadrature import quadrature_rules
 from ..receivers.Receivers import Receivers
@@ -19,6 +26,11 @@ def _extract_interface_markers(parent_mesh, child_mesh):
 
 class AcousticElasticWave(Wave):
     """Acoplamento fluido-sólido (formulação P - u_s)."""
+
+    #: The physical parameters are those of the elastic part: density plus
+    #: the two wave speeds, carried as fields on the solid submesh, with the
+    #: Lame parameters computed from them.
+    _physical_parameter_names = frozenset(ElasticMaterialParameter)
 
     def __init__(self, dictionary, comm=None):
         self.fluid_id = 1
@@ -55,6 +67,8 @@ class AcousticElasticWave(Wave):
         self.rho_fluid = None
         self.c = None
         self.rho = None
+        self.c_p = None
+        self.c_s = None
         self.lmbda = None
         self.mu = None
         self.body_forces = None
@@ -210,6 +224,23 @@ class AcousticElasticWave(Wave):
         self.receiver_locations = saved_locs
         self.number_of_receivers = saved_n
 
+    @override
+    def _map_sources_and_receivers(self):
+        """Map the sources and the fluid receivers onto the fluid field.
+
+        Both sit in the fluid and act on the scalar pressure, so they are
+        handled as acoustic ones.
+
+        Returns
+        -------
+        None
+            ``self.sources`` and ``self.receivers`` are set in place.
+        """
+        super()._map_sources_and_receivers()
+        if self.sources is not None:
+            self.sources.wave_type = WaveType.ISOTROPIC_ACOUSTIC
+        self.receivers.wave_type = WaveType.ISOTROPIC_ACOUSTIC
+
     # =====BEGIN TEMPORARY=====
     @override
     def building_mesh_derived_paramenters(self):
@@ -230,14 +261,33 @@ class AcousticElasticWave(Wave):
     # ------------------------------------------------------------------
     @override
     def _initialize_model_parameters(self):
+        """Initialize the fluid and solid material parameters.
+
+        The fluid parameters are scalar ``Constant`` objects. The solid ones
+        are fields on the solid submesh: density and the P- and S-wave
+        velocities are independent ``Function`` objects, and the Lame
+        parameters are UFL expressions of them. All five are registered as
+        the physical parameters of the equation, so the elastic part can be
+        selected as the control of the automated adjoint.
+
+        This runs more than once: :meth:`enable_automated_adjoint` and the
+        forward solve both call it. The model is read only on the first call,
+        so the fields the assembled forms and the adjoint refer to are not
+        replaced afterwards.
+
+        Returns
+        -------
+        None
+            The material parameters are assigned on ``self``.
+        """
+        if self._physical_parameters:
+            return
+
         synthetic_data = self.input_dictionary.get("synthetic_data", {})
 
         K_value = synthetic_data.get("bulk_modulus")
         rho_fluid_value = synthetic_data.get("density_fluid")
         velocity_fluid_value = synthetic_data.get("velocity_fluid")
-        rho_value = synthetic_data["density_solid"]
-        p_wave_velocity_value = synthetic_data["p_wave_velocity"]
-        s_wave_velocity_value = synthetic_data["s_wave_velocity"]
 
         self.K = fire.Constant(K_value) if K_value is not None else None
         self.rho_fluid = (
@@ -248,11 +298,32 @@ class AcousticElasticWave(Wave):
             if velocity_fluid_value is not None
             else None
         )
-        self.rho = fire.Constant(rho_value)
-        mu_value = rho_value * s_wave_velocity_value**2
-        lmbda_value = rho_value * p_wave_velocity_value**2 - 2.0 * mu_value
-        self.mu = fire.Constant(mu_value)
-        self.lmbda = fire.Constant(lmbda_value)
+
+        solid_space = create_function_space(
+            self.submesh_solid, self.method, self.degree, dim=1
+        )
+
+        def solid_field(parameter, key):
+            """Return the solid field of ``parameter`` read from ``key``."""
+            field = fire.Function(solid_space, name=parameter.value)
+            return field.assign(synthetic_data[key])
+
+        self.rho = solid_field(ElasticMaterialParameter.DENSITY, "density_solid")
+        self.c_p = solid_field(
+            ElasticMaterialParameter.P_WAVE_VELOCITY, "p_wave_velocity"
+        )
+        self.c_s = solid_field(
+            ElasticMaterialParameter.S_WAVE_VELOCITY, "s_wave_velocity"
+        )
+        self.mu = self.rho * self.c_s**2
+        self.lmbda = self.rho * self.c_p**2 - 2.0 * self.mu
+
+        add = self._physical_parameters.add
+        add(ElasticMaterialParameter.DENSITY, self.rho)
+        add(ElasticMaterialParameter.LAMBDA, self.lmbda)
+        add(ElasticMaterialParameter.MU, self.mu)
+        add(ElasticMaterialParameter.P_WAVE_VELOCITY, self.c_p)
+        add(ElasticMaterialParameter.S_WAVE_VELOCITY, self.c_s)
 
     @override
     def matrix_building(self):
@@ -270,7 +341,9 @@ class AcousticElasticWave(Wave):
             self.submesh_fluid, "CG", self.degree
         )
         self.gradP_function = fire.Function(self.gradP_space, name="gradP")
-        n_recv = len(self.receiver_locations) if self.receiver_locations else 0
+        n_recv = (
+            len(self.receiver_locations) if self.receiver_locations is not None else 0
+        )
         self._vf_normal = [0.0] * n_recv
         self._uf_normal = [0.0] * n_recv
 
@@ -330,8 +403,48 @@ class AcousticElasticWave(Wave):
         raise NotImplementedError
 
     @override
-    def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
-        raise NotImplementedError
+    def gradient_solve(
+        self,
+        misfit=None,
+        forward_solution=None,
+        adjoint_type: AdjointType = AdjointType.AUTOMATED_ADJOINT,
+        riesz_map: RieszMapType = RieszMapType.L2,
+    ) -> PhysicalParameters:
+        """Compute automated-adjoint derivatives of the elastic parameters.
+
+        The controls are the elastic parameters selected through
+        :meth:`enable_automated_adjoint`, which are fields on the solid
+        submesh. ``misfit`` and ``forward_solution`` belong to the
+        hand-implemented adjoint, which does not exist for the coupled
+        problem; they are kept so the signature matches the other solvers.
+
+        Parameters
+        ----------
+        misfit : array_like, optional
+            Unused by the automated adjoint.
+        forward_solution : firedrake.Function, optional
+            Unused by the automated adjoint.
+        adjoint_type : AdjointType, optional
+            Must be :attr:`AdjointType.AUTOMATED_ADJOINT`.
+        riesz_map : RieszMapType, optional
+            ``L2`` returns primal gradients and ``l2`` raw derivatives.
+
+        Returns
+        -------
+        PhysicalParameters
+            Derivatives keyed by the selected elastic parameters.
+
+        Raises
+        ------
+        NotImplementedError
+            If a hand-implemented adjoint is requested.
+        """
+        if adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
+            raise NotImplementedError(
+                "The coupled acoustic-elastic solver only supports the "
+                "automated adjoint.",
+            )
+        return self._automated_adjoint_derivatives(riesz_map)
 
     @override
     def get_control_parameter_function_space(self):
@@ -350,7 +463,7 @@ class AcousticElasticWave(Wave):
         if self.solid_receivers is not None:
             self.solid_receiver_history.append(self._sample_solid_receivers())
 
-        if self.record_fluid_displacement and self.receiver_locations:
+        if self.record_fluid_displacement and self.receiver_locations is not None:
             self._record_fluid_displacement_from_pressure()
 
         if self.use_monolithic:
@@ -359,6 +472,23 @@ class AcousticElasticWave(Wave):
             self.source_function_fluid.assign(self.source_function.sub(0))
             self.solid_solver.solve()
             self.fluid_solver.solve()
+
+    @override
+    def receiver_field(self):
+        """Return the pressure, the field the fluid receivers sample.
+
+        The fluid subfunction is used rather than ``split(self.X_n)[0]``:
+        the latter is defined on the mixed fluid-solid mesh, and Firedrake
+        cannot interpolate it onto a vertex-only mesh of the fluid submesh.
+        The adjoint tape re-reads a subfunction from its parent every time
+        it is used, so it follows the state as it is updated in time.
+
+        Returns
+        -------
+        firedrake.Function
+            Fluid component of the coupled state.
+        """
+        return self.X_n.sub(0)
 
     @override
     def get_forward_solution_receivers(self):

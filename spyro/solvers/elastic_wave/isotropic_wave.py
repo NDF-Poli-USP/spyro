@@ -2,7 +2,6 @@ import numpy as np
 
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
                        project)
-from pyadjoint import AdjFloat, Tape
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
@@ -314,32 +313,7 @@ class IsotropicWave(ElasticWave):
             raise NotImplementedError(
                 "Elastic gradients only support the automated adjoint.",
             )
-        if not isinstance(self.functional_value, AdjFloat):
-            raise ValueError(
-                "Functional value must be an AdjFloat for automated adjoint "
-                "gradient computation.",
-            )
-        if self.automated_adjoint is None:
-            raise ValueError(
-                "Enable the automated adjoint before the elastic forward solve.",
-            )
-        if (
-            self.automated_adjoint.reduced_functional is None
-            and isinstance(self.automated_adjoint._tape, Tape)
-        ):
-            self.automated_adjoint.create_reduced_functional(
-                self.functional_value,
-            )
-
-        if riesz_map is RieszMapType.L2:
-            derivatives = self.automated_adjoint.compute_gradient()
-        elif riesz_map is RieszMapType.l2:
-            derivatives = self.automated_adjoint.compute_derivative()
-        else:
-            raise NotImplementedError(
-                f"Riesz map {riesz_map} not implemented for automated adjoint.",
-            )
-        return self.automated_adjoint.label_derivatives(derivatives)
+        return self._automated_adjoint_derivatives(riesz_map)
 
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
         raise NotImplementedError
