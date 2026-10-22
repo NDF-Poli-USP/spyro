@@ -40,18 +40,15 @@ def test_spyro_seimicmesh_2d_homogeneous_generation():
         "length_z": Lz,
         "length_x": Lx,
         "length_y": 0.0,
-        "cell_type": "triangle",
         "mesh_type": "SeismicMesh",
         "periodic": False,
-        "velocity_model_file": None,
         "cells_per_wavelength": cpw,
         "source_frequency": freq,
         "minimum_velocity": c,
         "abc_pad_length": pad,
-        "lbda": lbda,
         "dimension": 2,
         "edge_length": lbda/cpw,
-        "output_file_name": "test.msh",
+        "output_filename": "test.msh",
     }
     mesh_parameters = spyro.meshing.MeshingParameters()
     mesh_parameters.set_mesh(input_mesh_parameters=input_mesh_parameters)

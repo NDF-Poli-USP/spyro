@@ -3,7 +3,7 @@
 from pytest import fail, raises, mark
 from firedrake import Function, FunctionSpace, Mesh
 from firedrake.functionspaceimpl import WithGeometry
-from numpy import array, inf, nan
+from numpy import array, bool_, float32, inf, int64, nan
 from numpy.testing import assert_array_equal
 from os import path  # noqa: F401
 from unittest.mock import Mock, patch
@@ -11,6 +11,7 @@ from ufl.form import Form
 from ufl.geometry import SpatialCoordinate
 from enum import Enum
 from spyro.utils.error_management import (
+    validate_boolean,
     validate_enum,
     mutually_exclusive_parameter_error,
     sanitize_num_array,
@@ -256,6 +257,18 @@ class TestValueNumericalError:
         """Test with valid integer value."""
         result = validate_numeric("test_param", 42)
         assert result == 42
+
+    def test_numpy_scalars(self):
+        """Test that numpy integers and floats are accepted."""
+        assert validate_numeric("test_param", int64(5), float_num=False) == 5
+        assert validate_numeric("test_param", float32(0.5), integer_num=False) == float32(0.5)
+        with raises(TypeError):
+            validate_numeric("test_param", int64(5), integer_num=False)
+
+    def test_boolean_rejected(self):
+        """Test that booleans are not accepted as numbers."""
+        with raises(TypeError, match="got bool"):
+            validate_numeric("test_param", True)
 
     def test_float_and_integer_allowed(self):
         """Test with both float and integer allowed."""
@@ -888,6 +901,13 @@ class TestValueFileError:
             )
         assert "does not exist" in str(exc_info.value)
 
+    @patch("os.path.exists")
+    def test_extension_checked_before_existence(self, mock_exists):
+        """Test that a wrong extension is reported even if the file is missing."""
+        mock_exists.return_value = False
+        with raises(ValueError, match="extension_type for 'test_param'"):
+            validate_file("test_param", "missing.pdf", [".txt"], check_file_existence=True)
+
     def test_empty_string(self):
         """Test with empty string value."""
         with raises(ValueError) as exc_info:
@@ -904,3 +924,20 @@ class TestValueFileError:
         """Test with multiple valid extensions."""
         result = validate_file("data", "data.csv", [".txt", ".csv", ".json"])
         assert result == "data.csv"
+
+
+class TestBooleanError:
+    def test_valid_booleans(self):
+        """Test that Python and numpy booleans are accepted and converted."""
+        assert validate_boolean("test_param", True) is True
+        assert validate_boolean("test_param", bool_(False)) is False
+
+    @mark.parametrize("value", [0, 1, 1.0, "True", None])
+    def test_invalid_values(self, value):
+        """Test that non-boolean values, including 0 and 1, are rejected."""
+        with raises(TypeError, match="'test_param' must be a boolean"):
+            validate_boolean("test_param", value)
+
+    def test_none_allowed(self):
+        """Test with None when accept_parameter_as_none is True."""
+        assert validate_boolean("test_param", None, accept_parameter_as_none=True) is None

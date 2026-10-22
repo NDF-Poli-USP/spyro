@@ -6,15 +6,15 @@ wave propagation, including file I/O for shots, receivers, and mesh data.
 
 from __future__ import with_statement
 
+import os
 import pickle
-import firedrake as fire
+import warnings
 from pathlib import Path
+
+import firedrake as fire
 import h5py
 import numpy as np
 from scipy.interpolate import griddata
-import os
-import warnings
-
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .parallelism_wrappers import ensemble_save, ensemble_load
 from ..version_control import is_firedrake_new
@@ -281,6 +281,83 @@ def saving_source_and_receiver_location_in_csv(model, folder_name=None):
     file_obj.close()
 
     return None
+
+
+def read_velocity_binary3d(
+    fname,
+    nz,
+    nx,
+    ny,
+    byte_order="big",
+    axes_order=(0, 1, 2),
+    axes_order_sort="F",
+    dtype="float32",
+):
+    """Read a three-dimensional velocity model using Spyro ``(z, x, y)`` ordering.
+
+    Parameters
+    ----------
+    fname : str or pathlib.Path
+        Path to the binary velocity model.
+    nz : int
+        Number of velocity samples in the z direction.
+    nx : int
+        Number of velocity samples in the x direction.
+    ny : int
+        Number of velocity samples in the y direction.
+    byte_order : {"big", "little"}
+        Byte order of the velocity-model binary file.
+    axes_order : tuple of int
+        Permutation mapping binary axes to Spyro ``(z, x, y)`` order.
+    axes_order_sort : {"C", "F"}
+        Memory order used to reshape the binary velocity data.
+    dtype : str or numpy.dtype
+        Numeric data type stored in the velocity-model file.
+
+    Returns
+    -------
+    numpy.ndarray
+        Velocity array in canonical ``(z, x, y)`` ordering.
+
+    Raises
+    ------
+    FileNotFoundError
+        If `fname` does not exist.
+    ValueError
+        If a grid size is not positive, an option is invalid, or the file
+        size does not match `nz * nx * ny` values.
+    """
+    # Imported here because spyro.utils imports this module.
+    from ..utils.error_management import validate_numeric, validate_parameter
+
+    path = Path(fname)
+    if not path.exists():
+        raise FileNotFoundError(f"Velocity model not found: {path}")
+
+    nz, nx, ny = (
+        validate_numeric(name, int(value), float_num=False, lower_bound=0)
+        for name, value in (("nz", nz), ("nx", nx), ("ny", ny))
+    )
+    validate_parameter("byte_order", byte_order, ("big", "little"))
+    validate_parameter("axes_order_sort", axes_order_sort, ("C", "F"))
+    if sorted(axes_order) != [0, 1, 2]:
+        raise ValueError("axes_order must be a permutation of (0, 1, 2).")
+
+    dt = np.dtype(dtype).newbyteorder(">" if byte_order == "big" else "<")
+    raw = np.fromfile(path, dtype=dt)
+    expected = nz * nx * ny
+    if raw.size != expected:
+        raise ValueError(
+            f"Velocity file contains {raw.size} values; expected {expected} "
+            f"for shape ({nz}, {nx}, {ny})."
+        )
+
+    canonical_shape = (nz, nx, ny)
+    inverse = np.argsort(np.asarray(axes_order, dtype=int))
+    raw_shape = tuple(canonical_shape[i] for i in inverse)
+    values = raw.reshape(raw_shape, order=axes_order_sort)
+    values = values.transpose(tuple(axes_order))
+    return np.asarray(values, dtype=np.float64)
 
 
 def _parse_axes_order(axes_order, ndim=3):

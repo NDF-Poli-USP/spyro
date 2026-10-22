@@ -1,8 +1,11 @@
 import numpy as np
 from typing import Callable, Tuple
 
+from .meshing_winslow3d import _cardinal_coordinate, _mixed_coordinate, _neighbor_size
+
 try:
     from numba import njit, prange
+
     NUMBA_AVAILABLE = True  # pragma: no cover
 except ImportError:
     NUMBA_AVAILABLE = False
@@ -13,13 +16,13 @@ def winslow_smooth_default(
     quads: np.ndarray,
     sizing_fn: Callable[[np.ndarray, np.ndarray], np.ndarray],
     move_all: set,
-    move_X_only: set,
-    move_Z_only: set,
+    move_x_only: set,
+    move_z_only: set,
     move_hyperellipse: set = None,
     hyperellipse_params: tuple = None,
     iterations: int = 1500,
     omega: float = 0.05,
-    plot_sources: bool = True
+    plot_sources: bool = True,
 ) -> np.ndarray:
     """Apply Winslow mesh smoothing using a default Python implementation.
 
@@ -37,9 +40,9 @@ def winslow_smooth_default(
         Function f(X, Z) returning the target element size at coordinates X, Z.
     move_all : set
         Set of node indices permitted to move in both X and Z directions.
-    move_X_only : set
+    move_x_only : set
         Set of node indices constrained to move only along the X-axis.
-    move_Z_only : set
+    move_z_only : set
         Set of node indices constrained to move only along the Z-axis.
     move_hyperellipse : set, optional
         Set of node indices constrained to move along an elliptical boundary.
@@ -57,7 +60,6 @@ def winslow_smooth_default(
     ndarray
         Updated node coordinates array of shape (N, 2).
     """
-
     if move_hyperellipse is None:
         move_hyperellipse = set()
 
@@ -66,10 +68,10 @@ def winslow_smooth_default(
     node_to_neighbors = {i: set() for i in range(num_nodes)}
     for quad in quads:
         for i in range(4):
-            n1 = quad[i]
-            n2 = quad[(i + 1) % 4]
-            node_to_neighbors[n1].add(n2)
-            node_to_neighbors[n2].add(n1)
+            start_node = quad[i]
+            end_node = quad[(i + 1) % 4]
+            node_to_neighbors[start_node].add(end_node)
+            node_to_neighbors[end_node].add(start_node)
 
     stencils = {}
 
@@ -83,13 +85,13 @@ def winslow_smooth_default(
         sort_idx = np.argsort(angles)
         sorted_neighbors = [neighbors[idx] for idx in sort_idx]
         sorted_angles = angles[sort_idx]
-        cardinals = {'E': None, 'N': None, 'W': None, 'S': None}
+        cardinals = {"E": None, "N": None, "W": None, "S": None}
 
         if len(sorted_neighbors) == 4:
-            cardinals['E'] = sorted_neighbors[0]
-            cardinals['N'] = sorted_neighbors[1]
-            cardinals['W'] = sorted_neighbors[2]
-            cardinals['S'] = sorted_neighbors[3]
+            cardinals["E"] = sorted_neighbors[0]
+            cardinals["N"] = sorted_neighbors[1]
+            cardinals["W"] = sorted_neighbors[2]
+            cardinals["S"] = sorted_neighbors[3]
         elif len(sorted_neighbors) > 0:
             diffs = np.diff(sorted_angles)
             diffs = np.append(diffs, sorted_angles[0] - sorted_angles[-1] + 2 * np.pi)
@@ -97,139 +99,173 @@ def winslow_smooth_default(
             rolled_neighbors = np.roll(sorted_neighbors, -(gap_idx + 1))
 
             if len(sorted_neighbors) == 3:
-                cardinals['E'] = rolled_neighbors[0]
-                cardinals['N'] = rolled_neighbors[1]
-                cardinals['W'] = rolled_neighbors[2]
+                cardinals["E"] = rolled_neighbors[0]
+                cardinals["N"] = rolled_neighbors[1]
+                cardinals["W"] = rolled_neighbors[2]
             elif len(sorted_neighbors) == 2:
-                cardinals['E'] = rolled_neighbors[0]
-                cardinals['N'] = rolled_neighbors[1]
+                cardinals["E"] = rolled_neighbors[0]
+                cardinals["N"] = rolled_neighbors[1]
 
-        def get_shared(nA, nB):
-            if nA is None or nB is None:
+        def get_shared(first_neighbor, second_neighbor):
+            if first_neighbor is None or second_neighbor is None:
                 return None
-            shared = node_to_neighbors[nA].intersection(node_to_neighbors[nB])
+            shared = node_to_neighbors[first_neighbor].intersection(node_to_neighbors[second_neighbor])
             shared.discard(i)
             return list(shared)[0] if shared else None
 
         corners = {
-            'NE': get_shared(cardinals['N'], cardinals['E']),
-            'NW': get_shared(cardinals['N'], cardinals['W']),
-            'SE': get_shared(cardinals['S'], cardinals['E']),
-            'SW': get_shared(cardinals['S'], cardinals['W'])
+            "NE": get_shared(cardinals["N"], cardinals["E"]),
+            "NW": get_shared(cardinals["N"], cardinals["W"]),
+            "SE": get_shared(cardinals["S"], cardinals["E"]),
+            "SW": get_shared(cardinals["S"], cardinals["W"]),
         }
         stencils[i] = {**cardinals, **corners}
 
-    X = points[:, 0].copy()
-    Z = points[:, 1].copy()
-    X_new = X.copy()
-    Z_new = Z.copy()
-    movable_nodes = move_all | move_X_only | move_Z_only | move_hyperellipse
-    j_dc_arr = np.zeros(num_nodes)
-    jj = 0
+    x = points[:, 0].copy()
+    z = points[:, 1].copy()
+    x_new = x.copy()
+    z_new = z.copy()
+    movable_nodes = move_all | move_x_only | move_z_only | move_hyperellipse
+    jacobian_over_size_values = np.zeros(num_nodes)
+    iteration = 0
     for _ in range(iterations):
-        jj += 1
-        print(f"Iteration: {jj}", end='\r')
-        h = sizing_fn(X, Z)
+        iteration += 1
+        print(f"Iteration: {iteration}", end="\r")
+        sizing_values = sizing_fn(x, z)
 
-        for i, st in stencils.items():
+        for i, stencil in stencils.items():
             is_all = i in move_all
-            is_X = i in move_X_only
-            is_Z = i in move_Z_only
+            is_x_only = i in move_x_only
+            is_z_only = i in move_z_only
             is_hyperellipse = i in move_hyperellipse
 
-            if not (is_all or is_X or is_Z or is_hyperellipse):
+            if not (is_all or is_x_only or is_z_only or is_hyperellipse):
                 continue
 
-            C = {'X': {}, 'Z': {}}
+            stencil_coords = {"X": {}, "Z": {}}
 
-            for d, opp in [('E', 'W'), ('W', 'E'), ('N', 'S'), ('S', 'N')]:
-                idx = st[d]
+            for direction, opposite in [("E", "W"), ("W", "E"), ("N", "S"), ("S", "N")]:
+                idx = stencil[direction]
                 if idx is not None:
-                    C['X'][d] = X[idx]
-                    C['Z'][d] = Z[idx]
+                    stencil_coords["X"][direction] = x[idx]
+                    stencil_coords["Z"][direction] = z[idx]
                 else:
-                    opp_idx = st[opp]
-                    C['X'][d] = 2 * X[i] - X[opp_idx] if opp_idx is not None else X[i]
-                    C['Z'][d] = 2 * Z[i] - Z[opp_idx] if opp_idx is not None else Z[i]
+                    opp_idx = stencil[opposite]
+                    stencil_coords["X"][direction] = 2 * x[i] - x[opp_idx] if opp_idx is not None else x[i]
+                    stencil_coords["Z"][direction] = 2 * z[i] - z[opp_idx] if opp_idx is not None else z[i]
 
-            for d, d1, d2 in [('NE', 'N', 'E'), ('NW', 'N', 'W'), ('SE', 'S', 'E'), ('SW', 'S', 'W')]:
-                idx = st[d]
+            for direction, first_cardinal, second_cardinal in [
+                ("NE", "N", "E"),
+                ("NW", "N", "W"),
+                ("SE", "S", "E"),
+                ("SW", "S", "W"),
+            ]:
+                idx = stencil[direction]
                 if idx is not None:
-                    C['X'][d] = X[idx]
-                    C['Z'][d] = Z[idx]
+                    stencil_coords["X"][direction] = x[idx]
+                    stencil_coords["Z"][direction] = z[idx]
                 else:
-                    C['X'][d] = C['X'][d1] + C['X'][d2] - X[i]
-                    C['Z'][d] = C['Z'][d1] + C['Z'][d2] - Z[i]
+                    stencil_coords["X"][direction] = stencil_coords["X"][first_cardinal] + stencil_coords["X"][second_cardinal] - x[i]
+                    stencil_coords["Z"][direction] = stencil_coords["Z"][first_cardinal] + stencil_coords["Z"][second_cardinal] - z[i]
 
-            X_E, X_W, X_N, X_S = C['X']['E'], C['X']['W'], C['X']['N'], C['X']['S']
-            Z_E, Z_W, Z_N, Z_S = C['Z']['E'], C['Z']['W'], C['Z']['N'], C['Z']['S']
+            x_e, x_w, x_n, x_s = stencil_coords["X"]["E"], stencil_coords["X"]["W"], stencil_coords["X"]["N"], stencil_coords["X"]["S"]
+            z_e, z_w, z_n, z_s = stencil_coords["Z"]["E"], stencil_coords["Z"]["W"], stencil_coords["Z"]["N"], stencil_coords["Z"]["S"]
 
-            X_xi = 0.5 * (X_E - X_W)
-            X_eta = 0.5 * (X_N - X_S)
-            Z_xi = 0.5 * (Z_E - Z_W)
-            Z_eta = 0.5 * (Z_N - Z_S)
-            alpha = X_eta**2 + Z_eta**2
-            beta = X_xi * X_eta + Z_xi * Z_eta
-            gamma = X_xi**2 + Z_xi**2
-            X_xita = 0.25 * (C['X']['NE'] - C['X']['NW'] - C['X']['SE'] + C['X']['SW'])
-            Z_xita = 0.25 * (C['Z']['NE'] - C['Z']['NW'] - C['Z']['SE'] + C['Z']['SW'])
+            x_xi = 0.5 * (x_e - x_w)
+            x_eta = 0.5 * (x_n - x_s)
+            z_xi = 0.5 * (z_e - z_w)
+            z_eta = 0.5 * (z_n - z_s)
+            alpha = x_eta**2 + z_eta**2
+            beta = x_xi * x_eta + z_xi * z_eta
+            gamma = x_xi**2 + z_xi**2
+            x_xita = 0.25 * (stencil_coords["X"]["NE"] - stencil_coords["X"]["NW"] - stencil_coords["X"]["SE"] + stencil_coords["X"]["SW"])
+            z_xita = 0.25 * (stencil_coords["Z"]["NE"] - stencil_coords["Z"]["NW"] - stencil_coords["Z"]["SE"] + stencil_coords["Z"]["SW"])
 
-            D_C = h[i]
-            D_E = h[st['E']] if (st['E'] is not None and st['E'] in movable_nodes) else D_C
-            D_W = h[st['W']] if (st['W'] is not None and st['W'] in movable_nodes) else D_C
-            D_N = h[st['N']] if (st['N'] is not None and st['N'] in movable_nodes) else D_C
-            D_S = h[st['S']] if (st['S'] is not None and st['S'] in movable_nodes) else D_C
+            size_center = sizing_values[i]
+            size_east = (
+                sizing_values[stencil["E"]]
+                if (stencil["E"] is not None and stencil["E"] in movable_nodes)
+                else size_center
+            )
+            size_west = (
+                sizing_values[stencil["W"]]
+                if (stencil["W"] is not None and stencil["W"] in movable_nodes)
+                else size_center
+            )
+            size_north = (
+                sizing_values[stencil["N"]]
+                if (stencil["N"] is not None and stencil["N"] in movable_nodes)
+                else size_center
+            )
+            size_south = (
+                sizing_values[stencil["S"]]
+                if (stencil["S"] is not None and stencil["S"] in movable_nodes)
+                else size_center
+            )
 
-            D_phi = 0.5 * (D_E - D_W)
-            D_psi = 0.5 * (D_N - D_S)
-            J = X_xi * Z_eta - X_eta * Z_xi
-            j_dc_arr[i] = J / (D_C + 1e-12)
-            Source_X = (J / (D_C + 1e-12)) * (D_phi * Z_eta - D_psi * Z_xi)
-            Source_Z = (J / (D_C + 1e-12)) * (D_psi * X_xi - D_phi * X_eta)
-            Denominator = 2.0 * (alpha + gamma)
+            size_xi = 0.5 * (size_east - size_west)
+            size_eta = 0.5 * (size_north - size_south)
+            jacobian = x_xi * z_eta - x_eta * z_xi
+            jacobian_over_size_values[i] = jacobian / (size_center + 1e-12)
+            source_x = (jacobian / (size_center + 1e-12)) * (size_xi * z_eta - size_eta * z_xi)
+            source_z = (jacobian / (size_center + 1e-12)) * (size_eta * x_xi - size_xi * x_eta)
+            denominator = 2.0 * (alpha + gamma)
 
-            if Denominator < 1e-12:
+            if denominator < 1e-12:
                 continue
 
-            X_target = X[i]
-            Z_target = Z[i]
+            x_target = x[i]
+            z_target = z[i]
 
-            if is_all or is_X or is_hyperellipse:
-                X_target = (alpha * (X_E + X_W) + gamma * (X_N + X_S) - 2.0 * beta * X_xita - Source_X) / Denominator
+            if is_all or is_x_only or is_hyperellipse:
+                x_target = (
+                    alpha * (x_e + x_w)
+                    + gamma * (x_n + x_s)
+                    - 2.0 * beta * x_xita
+                    - source_x
+                ) / denominator
 
-            if is_all or is_Z or is_hyperellipse:
-                Z_target = (alpha * (Z_E + Z_W) + gamma * (Z_N + Z_S) - 2.0 * beta * Z_xita - Source_Z) / Denominator
+            if is_all or is_z_only or is_hyperellipse:
+                z_target = (
+                    alpha * (z_e + z_w)
+                    + gamma * (z_n + z_s)
+                    - 2.0 * beta * z_xita
+                    - source_z
+                ) / denominator
 
             if is_hyperellipse and hyperellipse_params is not None:
                 a_e, b_e, xc_e, zc_e, n_e = hyperellipse_params
-                dx = X_target - xc_e
-                dz = Z_target - zc_e
+                dx = x_target - xc_e
+                dz = z_target - zc_e
 
                 if abs(dx) < 1e-12 and abs(dz) < 1e-12:
-                    X_new[i] = X[i]
-                    Z_new[i] = Z[i]
+                    x_new[i] = x[i]
+                    z_new[i] = z[i]
                 else:
-                    scale = (abs(dx / a_e)**n_e + abs(dz / b_e)**n_e)**(-1.0 / n_e)
-                    X_proj = xc_e + scale * dx
-                    Z_proj = zc_e + scale * dz
+                    scale = (abs(dx / a_e) ** n_e + abs(dz / b_e) ** n_e) ** (
+                        -1.0 / n_e
+                    )
+                    x_proj = xc_e + scale * dx
+                    z_proj = zc_e + scale * dz
 
-                    X_new[i] = (1.0 - omega) * X[i] + omega * X_proj
-                    Z_new[i] = (1.0 - omega) * Z[i] + omega * Z_proj
+                    x_new[i] = (1.0 - omega) * x[i] + omega * x_proj
+                    z_new[i] = (1.0 - omega) * z[i] + omega * z_proj
 
             else:
-                if is_all or is_X:
-                    X_new[i] = (1.0 - omega) * X[i] + omega * X_target
+                if is_all or is_x_only:
+                    x_new[i] = (1.0 - omega) * x[i] + omega * x_target
 
-                if is_all or is_Z:
-                    Z_new[i] = (1.0 - omega) * Z[i] + omega * Z_target
+                if is_all or is_z_only:
+                    z_new[i] = (1.0 - omega) * z[i] + omega * z_target
 
-        X[:] = X_new[:]
-        Z[:] = Z_new[:]
+        x[:] = x_new[:]
+        z[:] = z_new[:]
 
-    return np.column_stack((X, Z))
+    return np.column_stack((x, z))
 
 
 if NUMBA_AVAILABLE:  # pragma: no cover
+
     @njit(cache=True)
     def bilinear_interp_2d(x, z, grid_x, grid_z, grid_vals):
         """Perform 2D bilinear interpolation for a single point.
@@ -265,10 +301,12 @@ if NUMBA_AVAILABLE:  # pragma: no cover
             raise ValueError("grid_x and grid_z must each have at least 2 points.")
 
         gv0, gv1 = grid_vals.shape
-        vals_are_nx_nz = (gv0 == nx and gv1 == nz)
-        vals_are_nz_nx = (gv0 == nz and gv1 == nx)
+        vals_are_nx_nz = gv0 == nx and gv1 == nz
+        vals_are_nz_nx = gv0 == nz and gv1 == nx
         if not vals_are_nx_nz and not vals_are_nz_nx:
-            raise ValueError("grid_vals shape must be (len(grid_x), len(grid_z)) or (len(grid_z), len(grid_x)).")
+            raise ValueError(
+                "grid_vals shape must be (len(grid_x), len(grid_z)) or (len(grid_z), len(grid_x))."
+            )
 
         x_asc = grid_x[0] < grid_x[nx - 1]
         z_asc = grid_z[0] < grid_z[nz - 1]
@@ -298,7 +336,7 @@ if NUMBA_AVAILABLE:  # pragma: no cover
             zq = z
 
         if x_asc:
-            i = np.searchsorted(grid_x, xq, side='right') - 1
+            i = np.searchsorted(grid_x, xq, side="right") - 1
         else:
             lo = 0
             hi = nx
@@ -312,7 +350,7 @@ if NUMBA_AVAILABLE:  # pragma: no cover
             i = lo - 1
 
         if z_asc:
-            j = np.searchsorted(grid_z, zq, side='right') - 1
+            j = np.searchsorted(grid_z, zq, side="right") - 1
         else:
             lo = 0
             hi = nz
@@ -390,113 +428,155 @@ if NUMBA_AVAILABLE:  # pragma: no cover
         return c0 * (1.0 - zd) + c1 * zd
 
     @njit(cache=True, parallel=True)
-    def _numba_winslow_loop2(X, Z, grid_x, grid_z, grid_vals, stencils, is_movable,
-                             move_X, move_Z, move_hyperellipse, hyperellipse_params, omega, iterations):
+    def _numba_winslow_loop2(
+        x,
+        z,
+        grid_x,
+        grid_z,
+        grid_vals,
+        stencils,
+        is_movable,
+        move_x,
+        move_z,
+        move_hyperellipse,
+        hyperellipse_params,
+        omega,
+        iterations,
+    ):
         """Internal Numba-accelerated inner loop for Winslow smoothing."""
-        num_nodes = len(X)
-        X_new = np.empty_like(X)
-        Z_new = np.empty_like(Z)
-        h = np.empty_like(X)
-        a_e, b_e, xc_e, zc_e, n_e = hyperellipse_params[0], hyperellipse_params[1], hyperellipse_params[2], hyperellipse_params[3], hyperellipse_params[4]
+        num_nodes = len(x)
+        x_new = np.empty_like(x)
+        z_new = np.empty_like(z)
+        sizing_values = np.empty_like(x)
+        a_e, b_e, xc_e, zc_e, n_e = (
+            hyperellipse_params[0],
+            hyperellipse_params[1],
+            hyperellipse_params[2],
+            hyperellipse_params[3],
+            hyperellipse_params[4],
+        )
 
-        for jj in range(iterations):
+        for iteration in range(iterations):
             for i in prange(num_nodes):
-                h[i] = bilinear_interp_2d(X[i], Z[i], grid_x, grid_z, grid_vals)
+                sizing_values[i] = bilinear_interp_2d(x[i], z[i], grid_x, grid_z, grid_vals)
 
             for i in prange(num_nodes):
-                X_new[i] = X[i]
-                Z_new[i] = Z[i]
+                x_new[i] = x[i]
+                z_new[i] = z[i]
 
-                if not (move_X[i] or move_Z[i] or move_hyperellipse[i]):
+                if not (move_x[i] or move_z[i] or move_hyperellipse[i]):
                     continue
 
-                iE, iW, iN, iS = stencils[i, 0], stencils[i, 1], stencils[i, 2], stencils[i, 3]
-                iNE, iNW, iSE, iSW = stencils[i, 4], stencils[i, 5], stencils[i, 6], stencils[i, 7]
+                i_e, i_w, i_n, i_s = (
+                    stencils[i, 0],
+                    stencils[i, 1],
+                    stencils[i, 2],
+                    stencils[i, 3],
+                )
+                i_ne, i_nw, i_se, i_sw = (
+                    stencils[i, 4],
+                    stencils[i, 5],
+                    stencils[i, 6],
+                    stencils[i, 7],
+                )
 
-                xE = X[iE] if iE != -1 else (2.0 * X[i] - X[iW] if iW != -1 else X[i])
-                xW = X[iW] if iW != -1 else (2.0 * X[i] - X[iE] if iE != -1 else X[i])
-                xN = X[iN] if iN != -1 else (2.0 * X[i] - X[iS] if iS != -1 else X[i])
-                xS = X[iS] if iS != -1 else (2.0 * X[i] - X[iN] if iN != -1 else X[i])
+                x_c, z_c = x[i], z[i]
+                x_e = _cardinal_coordinate(x, x_c, i_e, i_w)
+                x_w = _cardinal_coordinate(x, x_c, i_w, i_e)
+                x_n = _cardinal_coordinate(x, x_c, i_n, i_s)
+                x_s = _cardinal_coordinate(x, x_c, i_s, i_n)
 
-                zE = Z[iE] if iE != -1 else (2.0 * Z[i] - Z[iW] if iW != -1 else Z[i])
-                zW = Z[iW] if iW != -1 else (2.0 * Z[i] - Z[iE] if iE != -1 else Z[i])
-                zN = Z[iN] if iN != -1 else (2.0 * Z[i] - Z[iS] if iS != -1 else Z[i])
-                zS = Z[iS] if iS != -1 else (2.0 * Z[i] - Z[iN] if iN != -1 else Z[i])
+                z_e = _cardinal_coordinate(z, z_c, i_e, i_w)
+                z_w = _cardinal_coordinate(z, z_c, i_w, i_e)
+                z_n = _cardinal_coordinate(z, z_c, i_n, i_s)
+                z_s = _cardinal_coordinate(z, z_c, i_s, i_n)
 
-                xNE = X[iNE] if iNE != -1 else (xN + xE - X[i])
-                xNW = X[iNW] if iNW != -1 else (xN + xW - X[i])
-                xSE = X[iSE] if iSE != -1 else (xS + xE - X[i])
-                xSW = X[iSW] if iSW != -1 else (xS + xW - X[i])
+                x_ne = _mixed_coordinate(x, x_c, i_ne, x_n, x_e)
+                x_nw = _mixed_coordinate(x, x_c, i_nw, x_n, x_w)
+                x_se = _mixed_coordinate(x, x_c, i_se, x_s, x_e)
+                x_sw = _mixed_coordinate(x, x_c, i_sw, x_s, x_w)
 
-                zNE = Z[iNE] if iNE != -1 else (zN + zE - Z[i])
-                zNW = Z[iNW] if iNW != -1 else (zN + zW - Z[i])
-                zSE = Z[iSE] if iSE != -1 else (zS + zE - Z[i])
-                zSW = Z[iSW] if iSW != -1 else (zS + zW - Z[i])
+                z_ne = _mixed_coordinate(z, z_c, i_ne, z_n, z_e)
+                z_nw = _mixed_coordinate(z, z_c, i_nw, z_n, z_w)
+                z_se = _mixed_coordinate(z, z_c, i_se, z_s, z_e)
+                z_sw = _mixed_coordinate(z, z_c, i_sw, z_s, z_w)
 
-                X_xi = 0.5 * (xE - xW)
-                X_eta = 0.5 * (xN - xS)
-                Z_xi = 0.5 * (zE - zW)
-                Z_eta = 0.5 * (zN - zS)
+                x_xi = 0.5 * (x_e - x_w)
+                x_eta = 0.5 * (x_n - x_s)
+                z_xi = 0.5 * (z_e - z_w)
+                z_eta = 0.5 * (z_n - z_s)
 
-                X_xita = 0.25 * (xNE - xNW - xSE + xSW)
-                Z_xita = 0.25 * (zNE - zNW - zSE + zSW)
+                x_xita = 0.25 * (x_ne - x_nw - x_se + x_sw)
+                z_xita = 0.25 * (z_ne - z_nw - z_se + z_sw)
 
-                alpha = X_eta**2 + Z_eta**2
-                beta = X_xi * X_eta + Z_xi * Z_eta
-                gamma = X_xi**2 + Z_xi**2
+                alpha = x_eta**2 + z_eta**2
+                beta = x_xi * x_eta + z_xi * z_eta
+                gamma = x_xi**2 + z_xi**2
 
-                DC = h[i]
-                DE = h[iE] if (iE != -1 and is_movable[iE]) else DC
-                DW = h[iW] if (iW != -1 and is_movable[iW]) else DC
-                DN = h[iN] if (iN != -1 and is_movable[iN]) else DC
-                DS = h[iS] if (iS != -1 and is_movable[iS]) else DC
+                size_center = sizing_values[i]
+                size_east = _neighbor_size(sizing_values, is_movable, i_e, size_center)
+                size_west = _neighbor_size(sizing_values, is_movable, i_w, size_center)
+                size_north = _neighbor_size(sizing_values, is_movable, i_n, size_center)
+                size_south = _neighbor_size(sizing_values, is_movable, i_s, size_center)
 
-                D_phi = 0.5 * (DE - DW)
-                D_psi = 0.5 * (DN - DS)
+                size_xi = 0.5 * (size_east - size_west)
+                size_eta = 0.5 * (size_north - size_south)
 
-                J = X_xi * Z_eta - X_eta * Z_xi
-                j_dc = J / (DC + 1e-12)
+                jacobian = x_xi * z_eta - x_eta * z_xi
+                jacobian_over_size = jacobian / (size_center + 1e-12)
 
-                Source_X = j_dc * (D_phi * Z_eta - D_psi * Z_xi)
-                Source_Z = j_dc * (D_psi * X_xi - D_phi * X_eta)
+                source_x = jacobian_over_size * (size_xi * z_eta - size_eta * z_xi)
+                source_z = jacobian_over_size * (size_eta * x_xi - size_xi * x_eta)
 
-                Denominator = 2.0 * (alpha + gamma)
-                if Denominator < 1e-12:
+                denominator = 2.0 * (alpha + gamma)
+                if denominator < 1e-12:
                     continue
 
-                X_target = X[i]
-                Z_target = Z[i]
+                x_target = x[i]
+                z_target = z[i]
 
-                if move_X[i] or move_hyperellipse[i]:
-                    X_target = (alpha * (xE + xW) + gamma * (xN + xS) - 2.0 * beta * X_xita - Source_X) / Denominator
+                if move_x[i] or move_hyperellipse[i]:
+                    x_target = (
+                        alpha * (x_e + x_w)
+                        + gamma * (x_n + x_s)
+                        - 2.0 * beta * x_xita
+                        - source_x
+                    ) / denominator
 
-                if move_Z[i] or move_hyperellipse[i]:
-                    Z_target = (alpha * (zE + zW) + gamma * (zN + zS) - 2.0 * beta * Z_xita - Source_Z) / Denominator
+                if move_z[i] or move_hyperellipse[i]:
+                    z_target = (
+                        alpha * (z_e + z_w)
+                        + gamma * (z_n + z_s)
+                        - 2.0 * beta * z_xita
+                        - source_z
+                    ) / denominator
 
                 if move_hyperellipse[i]:
-                    dx = X_target - xc_e
-                    dz = Z_target - zc_e
+                    dx = x_target - xc_e
+                    dz = z_target - zc_e
 
                     if abs(dx) < 1e-12 and abs(dz) < 1e-12:
-                        X_new[i] = X[i]
-                        Z_new[i] = Z[i]
+                        x_new[i] = x[i]
+                        z_new[i] = z[i]
                     else:
-                        scale = (abs(dx / a_e)**n_e + abs(dz / b_e)**n_e)**(-1.0 / n_e)
-                        X_proj = xc_e + scale * dx
-                        Z_proj = zc_e + scale * dz
-                        X_new[i] = (1.0 - omega) * X[i] + omega * X_proj
-                        Z_new[i] = (1.0 - omega) * Z[i] + omega * Z_proj
+                        scale = (abs(dx / a_e) ** n_e + abs(dz / b_e) ** n_e) ** (
+                            -1.0 / n_e
+                        )
+                        x_proj = xc_e + scale * dx
+                        z_proj = zc_e + scale * dz
+                        x_new[i] = (1.0 - omega) * x[i] + omega * x_proj
+                        z_new[i] = (1.0 - omega) * z[i] + omega * z_proj
                 else:
-                    if move_X[i]:
-                        X_new[i] = (1.0 - omega) * X[i] + omega * X_target
-                    if move_Z[i]:
-                        Z_new[i] = (1.0 - omega) * Z[i] + omega * Z_target
+                    if move_x[i]:
+                        x_new[i] = (1.0 - omega) * x[i] + omega * x_target
+                    if move_z[i]:
+                        z_new[i] = (1.0 - omega) * z[i] + omega * z_target
 
             for i in prange(num_nodes):
-                X[i] = X_new[i]
-                Z[i] = Z_new[i]
+                x[i] = x_new[i]
+                z[i] = z_new[i]
 
-        return X, Z
+        return x, z
 
     def winslow_smooth_numba(
         points: np.ndarray,
@@ -505,12 +585,12 @@ if NUMBA_AVAILABLE:  # pragma: no cover
         segy_grid_z: np.ndarray,
         segy_grid_vals: np.ndarray,
         move_all: set,
-        move_X_only: set,
-        move_Z_only: set,
+        move_x_only: set,
+        move_z_only: set,
         move_hyperellipse: set = None,
         hyperellipse_params: tuple = None,
         iterations: int = 1500,
-        omega: float = 0.05
+        omega: float = 0.05,
     ) -> np.ndarray:
         """Apply Winslow mesh smoothing using Numba JIT compilation.
 
@@ -528,9 +608,9 @@ if NUMBA_AVAILABLE:  # pragma: no cover
             2D array of element sizing values.
         move_all : set
             Set of node indices permitted to move in both X and Z directions.
-        move_X_only : set
+        move_x_only : set
             Set of node indices constrained to move only along the X-axis.
-        move_Z_only : set
+        move_z_only : set
             Set of node indices constrained to move only along the Z-axis.
         move_hyperellipse : set, optional
             Set of node indices constrained to move along an elliptical boundary.
@@ -546,7 +626,6 @@ if NUMBA_AVAILABLE:  # pragma: no cover
         ndarray
             Updated node coordinates array of shape (N, 2).
         """
-
         if move_hyperellipse is None:
             move_hyperellipse = set()
 
@@ -560,16 +639,18 @@ if NUMBA_AVAILABLE:  # pragma: no cover
         node_to_neighbors = {i: set() for i in range(num_nodes)}
         for quad in quads:
             for i in range(4):
-                n1 = quad[i]
-                n2 = quad[(i + 1) % 4]
-                node_to_neighbors[n1].add(n2)
-                node_to_neighbors[n2].add(n1)
+                start_node = quad[i]
+                end_node = quad[(i + 1) % 4]
+                node_to_neighbors[start_node].add(end_node)
+                node_to_neighbors[end_node].add(start_node)
 
         stencils = {}
         for i in range(num_nodes):
             neighbors = list(node_to_neighbors[i])
             if not neighbors:
-                stencils[i] = {d: None for d in ['E', 'N', 'W', 'S', 'NE', 'NW', 'SE', 'SW']}
+                stencils[i] = {
+                    direction: None for direction in ["E", "N", "W", "S", "NE", "NW", "SE", "SW"]
+                }
                 continue
 
             vecs = points[neighbors] - points[i]
@@ -577,64 +658,66 @@ if NUMBA_AVAILABLE:  # pragma: no cover
             sort_idx = np.argsort(angles)
             sorted_neighbors = [neighbors[idx] for idx in sort_idx]
             sorted_angles = angles[sort_idx]
-            cardinals = {'E': None, 'N': None, 'W': None, 'S': None}
+            cardinals = {"E": None, "N": None, "W": None, "S": None}
 
             if len(sorted_neighbors) == 4:
-                cardinals['E'] = sorted_neighbors[0]
-                cardinals['N'] = sorted_neighbors[1]
-                cardinals['W'] = sorted_neighbors[2]
-                cardinals['S'] = sorted_neighbors[3]
+                cardinals["E"] = sorted_neighbors[0]
+                cardinals["N"] = sorted_neighbors[1]
+                cardinals["W"] = sorted_neighbors[2]
+                cardinals["S"] = sorted_neighbors[3]
             elif len(sorted_neighbors) > 0:
                 diffs = np.diff(sorted_angles)
-                diffs = np.append(diffs, sorted_angles[0] - sorted_angles[-1] + 2 * np.pi)
+                diffs = np.append(
+                    diffs, sorted_angles[0] - sorted_angles[-1] + 2 * np.pi
+                )
                 gap_idx = np.argmax(diffs)
                 rolled_neighbors = np.roll(sorted_neighbors, -(gap_idx + 1))
 
                 if len(sorted_neighbors) == 3:
-                    cardinals['E'] = rolled_neighbors[0]
-                    cardinals['N'] = rolled_neighbors[1]
-                    cardinals['W'] = rolled_neighbors[2]
+                    cardinals["E"] = rolled_neighbors[0]
+                    cardinals["N"] = rolled_neighbors[1]
+                    cardinals["W"] = rolled_neighbors[2]
                 elif len(sorted_neighbors) == 2:
-                    cardinals['E'] = rolled_neighbors[0]
-                    cardinals['N'] = rolled_neighbors[1]
+                    cardinals["E"] = rolled_neighbors[0]
+                    cardinals["N"] = rolled_neighbors[1]
 
-            def get_shared(nA, nB):
-                if nA is None or nB is None:
+            def get_shared(first_neighbor, second_neighbor):
+                if first_neighbor is None or second_neighbor is None:
                     return None
-                shared = node_to_neighbors[nA].intersection(node_to_neighbors[nB])
+                shared = node_to_neighbors[first_neighbor].intersection(node_to_neighbors[second_neighbor])
                 shared.discard(i)
                 return list(shared)[0] if shared else None
 
             corners = {
-                'NE': get_shared(cardinals['N'], cardinals['E']),
-                'NW': get_shared(cardinals['N'], cardinals['W']),
-                'SE': get_shared(cardinals['S'], cardinals['E']),
-                'SW': get_shared(cardinals['S'], cardinals['W'])
+                "NE": get_shared(cardinals["N"], cardinals["E"]),
+                "NW": get_shared(cardinals["N"], cardinals["W"]),
+                "SE": get_shared(cardinals["S"], cardinals["E"]),
+                "SW": get_shared(cardinals["S"], cardinals["W"]),
             }
             stencils[i] = {**cardinals, **corners}
 
-        dir_map = {'E': 0, 'W': 1, 'N': 2, 'S': 3, 'NE': 4, 'NW': 5, 'SE': 6, 'SW': 7}
+        dir_map = {"E": 0, "W": 1, "N": 2, "S": 3, "NE": 4, "NW": 5, "SE": 6, "SW": 7}
         stencil_arr = np.full((num_nodes, 8), -1, dtype=np.int32)
 
-        for i, st in stencils.items():
-            for d, col_idx in dir_map.items():
-                if st[d] is not None:
-                    stencil_arr[i, col_idx] = st[d]
+        for i, stencil in stencils.items():
+            for direction, col_idx in dir_map.items():
+                if stencil[direction] is not None:
+                    stencil_arr[i, col_idx] = stencil[direction]
 
-        movable_nodes = move_all | move_X_only | move_Z_only | move_hyperellipse
+        movable_nodes = move_all | move_x_only | move_z_only | move_hyperellipse
         is_movable = np.zeros(num_nodes, dtype=np.bool_)
         is_movable[list(movable_nodes)] = True
 
-        move_X_mask = np.zeros(num_nodes, dtype=np.bool_)
-        move_Z_mask = np.zeros(num_nodes, dtype=np.bool_)
+        move_x_mask = np.zeros(num_nodes, dtype=np.bool_)
+        move_z_mask = np.zeros(num_nodes, dtype=np.bool_)
         move_hyperellipse_mask = np.zeros(num_nodes, dtype=np.bool_)
 
-        move_X_mask[list(move_all | move_X_only)] = True
-        move_Z_mask[list(move_all | move_Z_only)] = True
+        move_x_mask[list(move_all | move_x_only)] = True
+        move_z_mask[list(move_all | move_z_only)] = True
         move_hyperellipse_mask[list(move_hyperellipse)] = True
 
-        X = np.ascontiguousarray(points[:, 0], dtype=np.float64)
-        Z = np.ascontiguousarray(points[:, 1], dtype=np.float64)
+        x = np.ascontiguousarray(points[:, 0], dtype=np.float64)
+        z = np.ascontiguousarray(points[:, 1], dtype=np.float64)
 
         print(f"Starting {iterations} Winslow iterations...")
 
@@ -644,19 +727,33 @@ if NUMBA_AVAILABLE:  # pragma: no cover
         while current_iter < iterations:
             step_iters = min(print_interval, iterations - current_iter)
 
-            X, Z = _numba_winslow_loop2(
-                X, Z,
-                segy_grid_x, segy_grid_z, segy_grid_vals,
-                stencil_arr, is_movable, move_X_mask, move_Z_mask, move_hyperellipse_mask, e_params, omega, step_iters
+            x, z = _numba_winslow_loop2(
+                x,
+                z,
+                segy_grid_x,
+                segy_grid_z,
+                segy_grid_vals,
+                stencil_arr,
+                is_movable,
+                move_x_mask,
+                move_z_mask,
+                move_hyperellipse_mask,
+                e_params,
+                omega,
+                step_iters,
             )
 
             current_iter += step_iters
 
             percent = (current_iter / iterations) * 100
-            print(f"Iteration: {current_iter} / {iterations} [{percent:.1f}%]   ", end='\r')
+            print(
+                f"Iteration: {current_iter} / {iterations} [{percent:.1f}%]   ",
+                end="\r",
+            )
 
         print("\nSmoothing Complete.")
-        return np.column_stack((X, Z))
+        return np.column_stack((x, z))
+
 
 # Define a fallback if Numba is not available
 else:
@@ -681,7 +778,7 @@ def vectorized_bilinear_interp(
     z: np.ndarray,
     grid_x: np.ndarray,
     grid_z: np.ndarray,
-    grid_vals: np.ndarray
+    grid_vals: np.ndarray,
 ) -> np.ndarray:
     """Perform vectorized 2D bilinear interpolation over multiple points.
 
@@ -780,112 +877,135 @@ def vectorized_bilinear_interp(
 
 
 def _vectorized_winslow_loop(
-    X: np.ndarray, Z: np.ndarray,
-    grid_x: np.ndarray, grid_z: np.ndarray, grid_vals: np.ndarray,
-    stencil_arr: np.ndarray, is_movable: np.ndarray,
-    move_X_mask: np.ndarray, move_Z_mask: np.ndarray, move_hyperellipse_mask: np.ndarray,
-    hyperellipse_params: np.ndarray, omega: float, iterations: int
+    x: np.ndarray,
+    z: np.ndarray,
+    grid_x: np.ndarray,
+    grid_z: np.ndarray,
+    grid_vals: np.ndarray,
+    stencil_arr: np.ndarray,
+    is_movable: np.ndarray,
+    move_x_mask: np.ndarray,
+    move_z_mask: np.ndarray,
+    move_hyperellipse_mask: np.ndarray,
+    hyperellipse_params: np.ndarray,
+    omega: float,
+    iterations: int,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Internal NumPy-vectorized inner loop for fast Winslow smoothing."""
-
     a_e, b_e, xc_e, zc_e, n_e = hyperellipse_params
 
-    iE, iW, iN, iS = stencil_arr[:, 0], stencil_arr[:, 1], stencil_arr[:, 2], stencil_arr[:, 3]
-    iNE, iNW, iSE, iSW = stencil_arr[:, 4], stencil_arr[:, 5], stencil_arr[:, 6], stencil_arr[:, 7]
+    i_e, i_w, i_n, i_s = (
+        stencil_arr[:, 0],
+        stencil_arr[:, 1],
+        stencil_arr[:, 2],
+        stencil_arr[:, 3],
+    )
+    i_ne, i_nw, i_se, i_sw = (
+        stencil_arr[:, 4],
+        stencil_arr[:, 5],
+        stencil_arr[:, 6],
+        stencil_arr[:, 7],
+    )
 
-    mE, mW = iE != -1, iW != -1
-    mN, mS = iN != -1, iS != -1
-    mNE, mNW = iNE != -1, iNW != -1
-    mSE, mSW = iSE != -1, iSW != -1
+    has_e, has_w = i_e != -1, i_w != -1
+    has_n, has_s = i_n != -1, i_s != -1
+    has_ne, has_nw = i_ne != -1, i_nw != -1
+    has_se, has_sw = i_se != -1, i_sw != -1
 
-    safe_iE, safe_iW = np.maximum(iE, 0), np.maximum(iW, 0)
-    safe_iN, safe_iS = np.maximum(iN, 0), np.maximum(iS, 0)
-    safe_iNE, safe_iNW = np.maximum(iNE, 0), np.maximum(iNW, 0)
-    safe_iSE, safe_iSW = np.maximum(iSE, 0), np.maximum(iSW, 0)
+    safe_i_e, safe_i_w = np.maximum(i_e, 0), np.maximum(i_w, 0)
+    safe_i_n, safe_i_s = np.maximum(i_n, 0), np.maximum(i_s, 0)
+    safe_i_ne, safe_i_nw = np.maximum(i_ne, 0), np.maximum(i_nw, 0)
+    safe_i_se, safe_i_sw = np.maximum(i_se, 0), np.maximum(i_sw, 0)
 
-    movable_E = mE & is_movable[safe_iE]
-    movable_W = mW & is_movable[safe_iW]
-    movable_N = mN & is_movable[safe_iN]
-    movable_S = mS & is_movable[safe_iS]
+    movable_e = has_e & is_movable[safe_i_e]
+    movable_w = has_w & is_movable[safe_i_w]
+    movable_n = has_n & is_movable[safe_i_n]
+    movable_s = has_s & is_movable[safe_i_s]
 
     for _ in range(iterations):
-        h = vectorized_bilinear_interp(X, Z, grid_x, grid_z, grid_vals)
+        sizing_values = vectorized_bilinear_interp(x, z, grid_x, grid_z, grid_vals)
 
-        xE = np.where(mE, X[safe_iE], np.where(mW, 2.0 * X - X[safe_iW], X))
-        xW = np.where(mW, X[safe_iW], np.where(mE, 2.0 * X - X[safe_iE], X))
-        xN = np.where(mN, X[safe_iN], np.where(mS, 2.0 * X - X[safe_iS], X))
-        xS = np.where(mS, X[safe_iS], np.where(mN, 2.0 * X - X[safe_iN], X))
+        x_e = np.where(has_e, x[safe_i_e], np.where(has_w, 2.0 * x - x[safe_i_w], x))
+        x_w = np.where(has_w, x[safe_i_w], np.where(has_e, 2.0 * x - x[safe_i_e], x))
+        x_n = np.where(has_n, x[safe_i_n], np.where(has_s, 2.0 * x - x[safe_i_s], x))
+        x_s = np.where(has_s, x[safe_i_s], np.where(has_n, 2.0 * x - x[safe_i_n], x))
 
-        zE = np.where(mE, Z[safe_iE], np.where(mW, 2.0 * Z - Z[safe_iW], Z))
-        zW = np.where(mW, Z[safe_iW], np.where(mE, 2.0 * Z - Z[safe_iE], Z))
-        zN = np.where(mN, Z[safe_iN], np.where(mS, 2.0 * Z - Z[safe_iS], Z))
-        zS = np.where(mS, Z[safe_iS], np.where(mN, 2.0 * Z - Z[safe_iN], Z))
+        z_e = np.where(has_e, z[safe_i_e], np.where(has_w, 2.0 * z - z[safe_i_w], z))
+        z_w = np.where(has_w, z[safe_i_w], np.where(has_e, 2.0 * z - z[safe_i_e], z))
+        z_n = np.where(has_n, z[safe_i_n], np.where(has_s, 2.0 * z - z[safe_i_s], z))
+        z_s = np.where(has_s, z[safe_i_s], np.where(has_n, 2.0 * z - z[safe_i_n], z))
 
-        xNE = np.where(mNE, X[safe_iNE], xN + xE - X)
-        xNW = np.where(mNW, X[safe_iNW], xN + xW - X)
-        xSE = np.where(mSE, X[safe_iSE], xS + xE - X)
-        xSW = np.where(mSW, X[safe_iSW], xS + xW - X)
+        x_ne = np.where(has_ne, x[safe_i_ne], x_n + x_e - x)
+        x_nw = np.where(has_nw, x[safe_i_nw], x_n + x_w - x)
+        x_se = np.where(has_se, x[safe_i_se], x_s + x_e - x)
+        x_sw = np.where(has_sw, x[safe_i_sw], x_s + x_w - x)
 
-        zNE = np.where(mNE, Z[safe_iNE], zN + zE - Z)
-        zNW = np.where(mNW, Z[safe_iNW], zN + zW - Z)
-        zSE = np.where(mSE, Z[safe_iSE], zS + zE - Z)
-        zSW = np.where(mSW, Z[safe_iSW], zS + zW - Z)
+        z_ne = np.where(has_ne, z[safe_i_ne], z_n + z_e - z)
+        z_nw = np.where(has_nw, z[safe_i_nw], z_n + z_w - z)
+        z_se = np.where(has_se, z[safe_i_se], z_s + z_e - z)
+        z_sw = np.where(has_sw, z[safe_i_sw], z_s + z_w - z)
 
-        X_xi = 0.5 * (xE - xW)
-        X_eta = 0.5 * (xN - xS)
-        Z_xi = 0.5 * (zE - zW)
-        Z_eta = 0.5 * (zN - zS)
+        x_xi = 0.5 * (x_e - x_w)
+        x_eta = 0.5 * (x_n - x_s)
+        z_xi = 0.5 * (z_e - z_w)
+        z_eta = 0.5 * (z_n - z_s)
 
-        X_xita = 0.25 * (xNE - xNW - xSE + xSW)
-        Z_xita = 0.25 * (zNE - zNW - zSE + zSW)
+        x_xita = 0.25 * (x_ne - x_nw - x_se + x_sw)
+        z_xita = 0.25 * (z_ne - z_nw - z_se + z_sw)
 
-        alpha = X_eta**2 + Z_eta**2
-        beta = X_xi * X_eta + Z_xi * Z_eta
-        gamma = X_xi**2 + Z_xi**2
+        alpha = x_eta**2 + z_eta**2
+        beta = x_xi * x_eta + z_xi * z_eta
+        gamma = x_xi**2 + z_xi**2
 
-        DC = h
-        DE = np.where(movable_E, h[safe_iE], DC)
-        DW = np.where(movable_W, h[safe_iW], DC)
-        DN = np.where(movable_N, h[safe_iN], DC)
-        DS = np.where(movable_S, h[safe_iS], DC)
+        size_center = sizing_values
+        size_east = np.where(movable_e, sizing_values[safe_i_e], size_center)
+        size_west = np.where(movable_w, sizing_values[safe_i_w], size_center)
+        size_north = np.where(movable_n, sizing_values[safe_i_n], size_center)
+        size_south = np.where(movable_s, sizing_values[safe_i_s], size_center)
 
-        D_phi = 0.5 * (DE - DW)
-        D_psi = 0.5 * (DN - DS)
-        J = X_xi * Z_eta - X_eta * Z_xi
-        j_dc = J / (DC + 1e-12)
-        Source_X = j_dc * (D_phi * Z_eta - D_psi * Z_xi)
-        Source_Z = j_dc * (D_psi * X_xi - D_phi * X_eta)
-        Denominator = 2.0 * (alpha + gamma)
-        valid_denom_mask = Denominator >= 1e-12
-        Denom_safe = np.where(valid_denom_mask, Denominator, 1.0)  # Prevent DivZero
+        size_xi = 0.5 * (size_east - size_west)
+        size_eta = 0.5 * (size_north - size_south)
+        jacobian = x_xi * z_eta - x_eta * z_xi
+        jacobian_over_size = jacobian / (size_center + 1e-12)
+        source_x = jacobian_over_size * (size_xi * z_eta - size_eta * z_xi)
+        source_z = jacobian_over_size * (size_eta * x_xi - size_xi * x_eta)
+        denominator = 2.0 * (alpha + gamma)
+        valid_denom_mask = denominator >= 1e-12
+        denom_safe = np.where(valid_denom_mask, denominator, 1.0)  # Prevent DivZero
 
-        X_target = np.where(
-            valid_denom_mask & (move_X_mask | move_hyperellipse_mask),
-            (alpha * (xE + xW) + gamma * (xN + xS) - 2.0 * beta * X_xita - Source_X) / Denom_safe,
-            X
+        x_target = np.where(
+            valid_denom_mask & (move_x_mask | move_hyperellipse_mask),
+            (alpha * (x_e + x_w) + gamma * (x_n + x_s) - 2.0 * beta * x_xita - source_x)
+            / denom_safe,
+            x,
         )
-        Z_target = np.where(
-            valid_denom_mask & (move_Z_mask | move_hyperellipse_mask),
-            (alpha * (zE + zW) + gamma * (zN + zS) - 2.0 * beta * Z_xita - Source_Z) / Denom_safe,
-            Z
+        z_target = np.where(
+            valid_denom_mask & (move_z_mask | move_hyperellipse_mask),
+            (alpha * (z_e + z_w) + gamma * (z_n + z_s) - 2.0 * beta * z_xita - source_z)
+            / denom_safe,
+            z,
         )
 
-        dx = X_target - xc_e
-        dz = Z_target - zc_e
+        dx = x_target - xc_e
+        dz = z_target - zc_e
         zero_dist_mask = (np.abs(dx) < 1e-12) & (np.abs(dz) < 1e-12)
-        dist_term = np.abs(dx / a_e)**n_e + np.abs(dz / b_e)**n_e
+        dist_term = np.abs(dx / a_e) ** n_e + np.abs(dz / b_e) ** n_e
         dist_safe = np.where(dist_term < 1e-12, 1.0, dist_term)  # Prevent DivZero
         scale = dist_safe ** (-1.0 / n_e)
-        X_proj = xc_e + scale * dx
-        Z_proj = zc_e + scale * dz
-        X_hyperellipse_new = np.where(zero_dist_mask, X, (1.0 - omega) * X + omega * X_proj)
-        Z_hyperellipse_new = np.where(zero_dist_mask, Z, (1.0 - omega) * Z + omega * Z_proj)
-        X_reg_new = np.where(move_X_mask, (1.0 - omega) * X + omega * X_target, X)
-        Z_reg_new = np.where(move_Z_mask, (1.0 - omega) * Z + omega * Z_target, Z)
-        X = np.where(move_hyperellipse_mask, X_hyperellipse_new, X_reg_new)
-        Z = np.where(move_hyperellipse_mask, Z_hyperellipse_new, Z_reg_new)
+        x_proj = xc_e + scale * dx
+        z_proj = zc_e + scale * dz
+        x_hyperellipse_new = np.where(
+            zero_dist_mask, x, (1.0 - omega) * x + omega * x_proj
+        )
+        z_hyperellipse_new = np.where(
+            zero_dist_mask, z, (1.0 - omega) * z + omega * z_proj
+        )
+        x_reg_new = np.where(move_x_mask, (1.0 - omega) * x + omega * x_target, x)
+        z_reg_new = np.where(move_z_mask, (1.0 - omega) * z + omega * z_target, z)
+        x = np.where(move_hyperellipse_mask, x_hyperellipse_new, x_reg_new)
+        z = np.where(move_hyperellipse_mask, z_hyperellipse_new, z_reg_new)
 
-    return X, Z
+    return x, z
 
 
 def winslow_smooth_vectorized(
@@ -895,12 +1015,12 @@ def winslow_smooth_vectorized(
     segy_grid_z: np.ndarray,
     segy_grid_vals: np.ndarray,
     move_all: set,
-    move_X_only: set,
-    move_Z_only: set,
+    move_x_only: set,
+    move_z_only: set,
     move_hyperellipse: set = None,
     hyperellipse_params: tuple = None,
     iterations: int = 1500,
-    omega: float = 0.05
+    omega: float = 0.05,
 ) -> np.ndarray:
     """Apply Winslow mesh smoothing using vectorized NumPy operations.
 
@@ -918,9 +1038,9 @@ def winslow_smooth_vectorized(
         2D array of element sizing values.
     move_all : set
         Set of node indices permitted to move in both X and Z directions.
-    move_X_only : set
+    move_x_only : set
         Set of node indices constrained to move only along the X-axis.
-    move_Z_only : set
+    move_z_only : set
         Set of node indices constrained to move only along the Z-axis.
     move_hyperellipse : set, optional
         Set of node indices constrained to move along an elliptical boundary.
@@ -936,7 +1056,6 @@ def winslow_smooth_vectorized(
     ndarray
         Updated node coordinates array of shape (N, 2).
     """
-
     if move_hyperellipse is None:
         move_hyperellipse = set()
 
@@ -950,16 +1069,18 @@ def winslow_smooth_vectorized(
     node_to_neighbors = {i: set() for i in range(num_nodes)}
     for quad in quads:
         for i in range(4):
-            n1 = quad[i]
-            n2 = quad[(i + 1) % 4]
-            node_to_neighbors[n1].add(n2)
-            node_to_neighbors[n2].add(n1)
+            start_node = quad[i]
+            end_node = quad[(i + 1) % 4]
+            node_to_neighbors[start_node].add(end_node)
+            node_to_neighbors[end_node].add(start_node)
 
     stencils = {}
     for i in range(num_nodes):
         neighbors = list(node_to_neighbors[i])
         if not neighbors:
-            stencils[i] = {d: None for d in ['E', 'N', 'W', 'S', 'NE', 'NW', 'SE', 'SW']}
+            stencils[i] = {
+                direction: None for direction in ["E", "N", "W", "S", "NE", "NW", "SE", "SW"]
+            }
             continue
 
         vecs = points[neighbors] - points[i]
@@ -967,13 +1088,13 @@ def winslow_smooth_vectorized(
         sort_idx = np.argsort(angles)
         sorted_neighbors = [neighbors[idx] for idx in sort_idx]
         sorted_angles = angles[sort_idx]
-        cardinals = {'E': None, 'N': None, 'W': None, 'S': None}
+        cardinals = {"E": None, "N": None, "W": None, "S": None}
 
         if len(sorted_neighbors) == 4:
-            cardinals['E'] = sorted_neighbors[0]
-            cardinals['N'] = sorted_neighbors[1]
-            cardinals['W'] = sorted_neighbors[2]
-            cardinals['S'] = sorted_neighbors[3]
+            cardinals["E"] = sorted_neighbors[0]
+            cardinals["N"] = sorted_neighbors[1]
+            cardinals["W"] = sorted_neighbors[2]
+            cardinals["S"] = sorted_neighbors[3]
         elif len(sorted_neighbors) > 0:
             diffs = np.diff(sorted_angles)
             diffs = np.append(diffs, sorted_angles[0] - sorted_angles[-1] + 2 * np.pi)
@@ -981,50 +1102,50 @@ def winslow_smooth_vectorized(
             rolled_neighbors = np.roll(sorted_neighbors, -(gap_idx + 1))
 
             if len(sorted_neighbors) == 3:
-                cardinals['E'] = rolled_neighbors[0]
-                cardinals['N'] = rolled_neighbors[1]
-                cardinals['W'] = rolled_neighbors[2]
+                cardinals["E"] = rolled_neighbors[0]
+                cardinals["N"] = rolled_neighbors[1]
+                cardinals["W"] = rolled_neighbors[2]
             elif len(sorted_neighbors) == 2:
-                cardinals['E'] = rolled_neighbors[0]
-                cardinals['N'] = rolled_neighbors[1]
+                cardinals["E"] = rolled_neighbors[0]
+                cardinals["N"] = rolled_neighbors[1]
 
-        def get_shared(nA, nB):
-            if nA is None or nB is None:
+        def get_shared(first_neighbor, second_neighbor):
+            if first_neighbor is None or second_neighbor is None:
                 return None
-            shared = node_to_neighbors[nA].intersection(node_to_neighbors[nB])
+            shared = node_to_neighbors[first_neighbor].intersection(node_to_neighbors[second_neighbor])
             shared.discard(i)
             return list(shared)[0] if shared else None
 
         corners = {
-            'NE': get_shared(cardinals['N'], cardinals['E']),
-            'NW': get_shared(cardinals['N'], cardinals['W']),
-            'SE': get_shared(cardinals['S'], cardinals['E']),
-            'SW': get_shared(cardinals['S'], cardinals['W'])
+            "NE": get_shared(cardinals["N"], cardinals["E"]),
+            "NW": get_shared(cardinals["N"], cardinals["W"]),
+            "SE": get_shared(cardinals["S"], cardinals["E"]),
+            "SW": get_shared(cardinals["S"], cardinals["W"]),
         }
         stencils[i] = {**cardinals, **corners}
 
-    dir_map = {'E': 0, 'W': 1, 'N': 2, 'S': 3, 'NE': 4, 'NW': 5, 'SE': 6, 'SW': 7}
+    dir_map = {"E": 0, "W": 1, "N": 2, "S": 3, "NE": 4, "NW": 5, "SE": 6, "SW": 7}
     stencil_arr = np.full((num_nodes, 8), -1, dtype=np.int32)
 
-    for i, st in stencils.items():
-        for d, col_idx in dir_map.items():
-            if st[d] is not None:
-                stencil_arr[i, col_idx] = st[d]
+    for i, stencil in stencils.items():
+        for direction, col_idx in dir_map.items():
+            if stencil[direction] is not None:
+                stencil_arr[i, col_idx] = stencil[direction]
 
-    movable_nodes = move_all | move_X_only | move_Z_only | move_hyperellipse
+    movable_nodes = move_all | move_x_only | move_z_only | move_hyperellipse
     is_movable = np.zeros(num_nodes, dtype=np.bool_)
     is_movable[list(movable_nodes)] = True
 
-    move_X_mask = np.zeros(num_nodes, dtype=np.bool_)
-    move_Z_mask = np.zeros(num_nodes, dtype=np.bool_)
+    move_x_mask = np.zeros(num_nodes, dtype=np.bool_)
+    move_z_mask = np.zeros(num_nodes, dtype=np.bool_)
     move_hyperellipse_mask = np.zeros(num_nodes, dtype=np.bool_)
 
-    move_X_mask[list(move_all | move_X_only)] = True
-    move_Z_mask[list(move_all | move_Z_only)] = True
+    move_x_mask[list(move_all | move_x_only)] = True
+    move_z_mask[list(move_all | move_z_only)] = True
     move_hyperellipse_mask[list(move_hyperellipse)] = True
 
-    X = np.ascontiguousarray(points[:, 0], dtype=np.float64)
-    Z = np.ascontiguousarray(points[:, 1], dtype=np.float64)
+    x = np.ascontiguousarray(points[:, 0], dtype=np.float64)
+    z = np.ascontiguousarray(points[:, 1], dtype=np.float64)
 
     print(f"Starting {iterations} Fast Winslow iterations...")
 
@@ -1034,15 +1155,25 @@ def winslow_smooth_vectorized(
     while current_iter < iterations:
         step_iters = min(print_interval, iterations - current_iter)
 
-        X, Z = _vectorized_winslow_loop(
-            X, Z,
-            segy_grid_x, segy_grid_z, segy_grid_vals,
-            stencil_arr, is_movable, move_X_mask, move_Z_mask, move_hyperellipse_mask, e_params, omega, step_iters
+        x, z = _vectorized_winslow_loop(
+            x,
+            z,
+            segy_grid_x,
+            segy_grid_z,
+            segy_grid_vals,
+            stencil_arr,
+            is_movable,
+            move_x_mask,
+            move_z_mask,
+            move_hyperellipse_mask,
+            e_params,
+            omega,
+            step_iters,
         )
 
         current_iter += step_iters
         percent = (current_iter / iterations) * 100
-        print(f"Iteration: {current_iter} / {iterations} [{percent:.1f}%]   ", end='\r')
+        print(f"Iteration: {current_iter} / {iterations} [{percent:.1f}%]   ", end="\r")
 
     print("\nSmoothing Complete.")
-    return np.column_stack((X, Z))
+    return np.column_stack((x, z))
