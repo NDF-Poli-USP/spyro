@@ -1,6 +1,7 @@
 """Options that only affect Gmsh-based mesh generation."""
 
-from dataclasses import dataclass, fields
+from dataclasses import fields
+from pydantic.dataclasses import dataclass
 from typing import get_args
 
 import numpy as np
@@ -166,13 +167,6 @@ class GmshOptions:
             "winslow_implementation",
             self.winslow_implementation,
             [None, "default", "fast", "numba"],
-        )
-        validate_numeric(
-            "winslow_iterations",
-            self.winslow_iterations,
-            float_num=False,
-            lower_bound=0,
-            include_lower_bound=True,
         )
         validate_numeric(
             "winslow_omega",
