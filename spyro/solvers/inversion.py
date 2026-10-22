@@ -17,7 +17,9 @@ from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..utils.typing import AdjointType, WaveType
 from ..utils.physical_parameters import (
-    PhysicalParameters, as_list, _as_parameter,
+    PhysicalParameters,
+    as_list,
+    _as_parameter,
 )
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..plots import plot_model as spyro_plot_model
@@ -26,10 +28,10 @@ from ..io.basicio import load_shots, save_shots
 from ..io.parallelism_wrappers import switch_serial_shot
 from ..io import create_segy
 
-
 try:
     from ROL.firedrake_vector import FiredrakeVector as FireVector
     import ROL
+
     RObjective = ROL.Objective
 except ImportError:
     ROL = None
@@ -95,8 +97,7 @@ class L2Inner(object):
         V = wave.function_space
         dxlump = fire.dx(**wave.quadrature_rule)
         self.A = fire.assemble(
-            fire.TrialFunction(V) * fire.TestFunction(V) * dxlump,
-            mat_type="matfree"
+            fire.TrialFunction(V) * fire.TestFunction(V) * dxlump, mat_type="matfree"
         )
         self.Ap = fire.as_backend_type(self.A).mat()
 
@@ -266,6 +267,38 @@ class FullWaveformInversion:
     isotropic elastic one through the automated adjoint, which is the only
     adjoint written for it.
 
+    Methods
+    -------
+    calculate_misfit(c=None)
+        Calculate the receiver-data residual for the current guess model.
+    generate_real_shot_record(plot_model=False, ...)
+        Generate synthetic observed data from the configured real model.
+    set_real_velocity_model(constant=None, ...)
+        Configure the acoustic model used to generate synthetic observations.
+    set_guess_velocity_model(constant=None, ...)
+        Configure the acoustic model used as the inversion starting point.
+    set_real_model(material)
+        Configure the material values, of any medium, that generate the
+        synthetic observations.
+    set_guess_control(control)
+        Configure the material values, of any medium, the inversion starts
+        from.
+    set_real_mesh(user_mesh=None, input_mesh_parameters=None)
+        Set the mesh used by the real model.
+    set_guess_mesh(user_mesh=None, input_mesh_parameters=None)
+        Set the mesh used by the inversion guess model.
+    get_functional(c=None)
+        Compute the objective functional.
+    get_gradient(c=None, save=True, calculate_functional=True)
+        Compute the acoustic adjoint gradient.
+    return_functional_and_gradient(c)
+        Return the functional and flattened gradient for scipy optimizers.
+    run_fwi(**kwargs)
+        Run full waveform inversion with scipy L-BFGS-B, or with PETSc TAO
+        when the automated adjoint is enabled.
+    run_fwi_rol(**kwargs)
+        Run the deprecated ROL-based inversion path.
+
     Notes
     -----
     The inversion driver composes a wave solver instead of inheriting from one.
@@ -274,6 +307,14 @@ class FullWaveformInversion:
 
     The inversion can be run using either ``scipy.optimize.minimize`` (L-BFGS-B)
     via ``run_fwi()`` or the deprecated ROL library via ``run_fwi_rol()``.
+
+    Examples
+    --------
+    >>> fwi = FullWaveformInversion(dictionary=config_dict, comm=comm)
+    >>> fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.1})
+    >>> fwi.set_guess_velocity_model(constant=2.0)
+    >>> fwi.load_real_shot_record("shots/observed_")
+    >>> fwi.run_fwi(maxiter=50, vmin=1.5, vmax=4.5)
 
     Adjoint types
     -------------
@@ -316,51 +357,25 @@ class FullWaveformInversion:
             },
             vmin=..., vmax=..., maxiter=20,
         )
-
-    Methods
-    -------
-    calculate_misfit(c=None)
-        Calculate the receiver-data residual for the current guess model.
-    generate_real_shot_record(plot_model=False, ...)
-        Generate synthetic observed data from the configured real model.
-    set_real_velocity_model(constant=None, ...)
-        Configure the acoustic model used to generate synthetic observations.
-    set_guess_velocity_model(constant=None, ...)
-        Configure the acoustic model used as the inversion starting point.
-    set_real_model(material)
-        Configure the material values, of any medium, that generate the
-        synthetic observations.
-    set_guess_control(control)
-        Configure the material values, of any medium, the inversion starts
-        from.
-    set_real_mesh(user_mesh=None, input_mesh_parameters=None)
-        Set the mesh used by the real model.
-    set_guess_mesh(user_mesh=None, input_mesh_parameters=None)
-        Set the mesh used by the inversion guess model.
-    get_functional(c=None)
-        Compute the objective functional.
-    get_gradient(c=None, save=True, calculate_functional=True)
-        Compute the acoustic adjoint gradient.
-    return_functional_and_gradient(c)
-        Return the functional and flattened gradient for scipy optimizers.
-    run_fwi(**kwargs)
-        Run full waveform inversion with scipy L-BFGS-B, or with PETSc TAO
-        when the automated adjoint is enabled.
-    run_fwi_rol(**kwargs)
-        Run the deprecated ROL-based inversion path.
-
-    Examples
-    --------
-    >>> fwi = FullWaveformInversion(dictionary=config_dict, comm=comm)
-    >>> fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.1})
-    >>> fwi.set_guess_velocity_model(constant=2.0)
-    >>> fwi.load_real_shot_record("shots/observed_")
-    >>> fwi.run_fwi(maxiter=50, vmin=1.5, vmax=4.5)
     """
 
-    def __init__(
-        self, dictionary=None, comm=None, wave_class=AcousticWave, wave=None
-    ):
+    # The keyword arguments ``run_fwi`` reads. Anything else is a misspelling
+    # that would otherwise be dropped without a word.
+    _RUN_FWI_OPTIONS: frozenset[str] = frozenset({
+        "adjoint_options",
+        "adjoint_type",
+        "eps",
+        "ftol",
+        "maxiter",
+        "save_controls",
+        "scipy_options",
+        "stages",
+        "tao_options",
+        "vmax",
+        "vmin",
+    })
+
+    def __init__(self, dictionary=None, comm=None, wave_class=AcousticWave, wave=None):
         """Initialize the full waveform inversion driver.
 
         Parameters
@@ -391,13 +406,11 @@ class FullWaveformInversion:
             self.wave_class = type(wave)
         else:
             self.wave_class = AcousticWave if wave_class is None else wave_class
-            if (
-                not isinstance(self.wave_class, type)
-                or not issubclass(self.wave_class, Wave)
+            if not isinstance(self.wave_class, type) or not issubclass(
+                self.wave_class, Wave
             ):
                 raise TypeError(
-                    "wave_class must be a Wave subclass. "
-                    f"Received {self.wave_class}.",
+                    f"wave_class must be a Wave subclass. Received {self.wave_class}.",
                 )
             self.wave = self.wave_class(dictionary=dictionary, comm=comm)
         self.wave_type = self.wave.wave_type
@@ -412,10 +425,12 @@ class FullWaveformInversion:
         self.comm = self.wave.comm
 
         default_optimization_parameters = {
-            "General": {"Secant": {
-                "Type": "Limited-Memory BFGS",
-                "Maximum Storage": 10,
-            }},
+            "General": {
+                "Secant": {
+                    "Type": "Limited-Memory BFGS",
+                    "Maximum Storage": 10,
+                }
+            },
             "Step": {
                 "Type": "Augmented Lagrangian",
                 "Augmented Lagrangian": {
@@ -447,8 +462,14 @@ class FullWaveformInversion:
         self._control_parameters = PhysicalParameters()
         self._real_model_parameters = PhysicalParameters()
 
-        self.control_out = fire.VTKFile(inversion_dictionary["control_output_file"])
-        self.gradient_out = fire.VTKFile(inversion_dictionary["gradient_output_file"])
+        self.control_out = fire.VTKFile(
+            inversion_dictionary["control_output_file"],
+            comm=SpyroEnsemble.ensemble.global_comm,
+        )
+        self.gradient_out = fire.VTKFile(
+            inversion_dictionary["gradient_output_file"],
+            comm=SpyroEnsemble.ensemble.global_comm,
+        )
         self.real_velocity_model_file = inversion_dictionary["real_velocity_model_file"]
         self.real_shot_record = None
         self.real_shot_record_files = inversion_dictionary["real_shot_record_file"]
@@ -516,8 +537,7 @@ class FullWaveformInversion:
         if not self._control_parameters:
             return None
         controls = [
-            self._control_parameters[name]
-            for name in self._controlled_parameters()
+            self._control_parameters[name] for name in self._controlled_parameters()
         ]
         if len(controls) == 1:
             (control,) = controls
@@ -711,7 +731,8 @@ class FullWaveformInversion:
             # it writes every later iterate.
             (parameter,) = self._controlled_parameters()
             control = fire.Function(
-                self._control_function_space(wave), name=parameter.value,
+                self._control_function_space(wave),
+                name=parameter.value,
             )
             wave.set_initial_velocity_model(velocity_model_function=control)
             parameters = wave.initialize_physical_parameters()
@@ -791,10 +812,12 @@ class FullWaveformInversion:
                     "FWI control must be a firedrake Function. "
                     f"Received {type(value).__name__}.",
                 )
-        return np.concatenate([
-            np.asarray(value.dat.data_ro, dtype=float).reshape(-1)
-            for value in controls
-        ])
+        return np.concatenate(
+            [
+                np.asarray(value.dat.data_ro, dtype=float).reshape(-1)
+                for value in controls
+            ]
+        )
 
     def _rebuild_control_from_vector(self, control_reference, flat_vector):
         """Rebuild a control ``Function`` from an optimizer vector.
@@ -835,10 +858,14 @@ class FullWaveformInversion:
         reference_shape = np.asarray(control_reference.dat.data_ro).shape
         expected = int(np.prod(reference_shape))
         if flat_vector.size != expected:
-            raise ValueError("Control vector size does not match the configured control.")
+            raise ValueError(
+                "Control vector size does not match the configured control."
+            )
         return fire.Function(
-            control_reference.function_space(), name=control_reference.name(),
-            val=flat_vector.reshape(reference_shape))
+            control_reference.function_space(),
+            name=control_reference.name(),
+            val=flat_vector.reshape(reference_shape),
+        )
 
     def _expand_bound(self, bound, control_reference):
         """Expand one bound specification to match a control component.
@@ -913,8 +940,7 @@ class FullWaveformInversion:
             # Storing an empty mapping would drop the selection and leave the
             # inversion looking unconfigured, several calls away from here.
             raise ValueError(
-                "A guess control value is required. Received "
-                f"{control!r}.",
+                f"A guess control value is required. Received {control!r}.",
             )
         self._write_parameters_into_wave(self.wave, control)
         self.guess_mesh = self.wave.get_mesh()
@@ -977,7 +1003,9 @@ class FullWaveformInversion:
                         "before set_real_model().",
                     )
                 value = generate_ufl_functions(
-                    self.real_mesh, value, self.wave.dimension,
+                    self.real_mesh,
+                    value,
+                    self.wave.dimension,
                 )
             real_parameters.add(name, value)
         self._real_model_parameters = real_parameters
@@ -1164,8 +1192,8 @@ class FullWaveformInversion:
         self.wave.forward_solve()
 
         current_control = self.control_parameters
-        fire.VTKFile(f"control_{self.current_iteration}.pvd").write(
-            *as_list(current_control),
+        SpyroEnsemble.write_vtk(
+            f"control_{self.current_iteration}.pvd", *as_list(current_control)
         )
         np.save(
             f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
@@ -1508,7 +1536,8 @@ class FullWaveformInversion:
             # besides: the recorded ``AdjFloat`` carries a tape node with it,
             # and the history would keep the whole tape alive.
             Jm = self.comm.ensemble_comm.allreduce(
-                float(self.wave.functional_value), op=MPI.SUM,
+                float(self.wave.functional_value),
+                op=MPI.SUM,
             )
         else:
             self._compute_misfit()
@@ -1597,8 +1626,8 @@ class FullWaveformInversion:
             )
         self._apply_gradient_mask()
         if save:
-            fire.VTKFile(f"gradient_{self.current_iteration}.pvd").write(
-                *as_list(self.gradient),
+            SpyroEnsemble.write_vtk(
+                f"gradient_{self.current_iteration}.pvd", *as_list(self.gradient)
             )
         self.current_iteration += 1
         comm.comm.barrier()
@@ -1677,6 +1706,12 @@ class FullWaveformInversion:
                 Each stage starts from the complete model produced by the
                 previous one. Its iteration limit takes precedence over
                 ``tao_options["tao_max_it"]``.
+            eps : float, optional
+                Passed to L-BFGS-B as its finite-difference step. Default is
+                1e-15. Only used under the implemented adjoint.
+            ftol : float, optional
+                Relative reduction of the functional at which L-BFGS-B stops.
+                Default is 1e-11. Only used under the implemented adjoint.
             scipy_options : dict, optional
                 Additional options passed to scipy.optimize.minimize.
                 Default includes disp=True, eps=1e-15, ftol=1e-11.
@@ -1735,6 +1770,9 @@ class FullWaveformInversion:
 
         Raises
         ------
+        TypeError
+            If a keyword argument is not one of those listed above. Nothing
+            on the driver is changed when it is raised.
         NotImplementedError
             If the medium has no hand-implemented adjoint and the automated
             one was not enabled.
@@ -1749,6 +1787,15 @@ class FullWaveformInversion:
         --------
         >>> fwi.run_fwi(maxiter=100, vmin=1.5, vmax=5.0)
         """
+        # Checked before anything is read, so a rejected call leaves the
+        # driver as it found it.
+        unknown = sorted(set(kwargs) - self._RUN_FWI_OPTIONS)
+        if unknown:
+            raise TypeError(
+                f"run_fwi() got unexpected keyword arguments {unknown}; it "
+                f"takes {sorted(self._RUN_FWI_OPTIONS)}.",
+            )
+
         stages = kwargs.pop("stages", None)
         maxiter = kwargs.pop("maxiter", 20)
         parameters = {
@@ -1787,7 +1834,8 @@ class FullWaveformInversion:
                     f"{unknown} are not settings of the automated adjoint, "
                     f"which takes {sorted(accepted)}.",
                 )
-        parameters.update(kwargs)
+        if "scipy_options" in kwargs:
+            parameters["scipy_options"] = kwargs.pop("scipy_options")
 
         if stages is not None:
             if self.adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
@@ -1814,7 +1862,9 @@ class FullWaveformInversion:
             # keyed by the parameter each one belongs to.
             self.set_guess_control(
                 self._run_fwi_tao(
-                    parameters, tao_options=tao_options, stages=stages,
+                    parameters,
+                    tao_options=tao_options,
+                    stages=stages,
                 ),
             )
             self.control_parameter_result = self.control_parameters
@@ -1841,8 +1891,8 @@ class FullWaveformInversion:
             )
             self.set_guess_control(self.control_parameter_result)
 
-        fire.VTKFile("control_end.pvd").write(
-            *as_list(self.control_parameter_result),
+        SpyroEnsemble.write_vtk(
+            "control_end.pvd", *as_list(self.control_parameter_result)
         )
 
         np.save("result", self._flatten_control(self.control_parameter_result))
@@ -1939,7 +1989,8 @@ class FullWaveformInversion:
         upper_by_name = dict(zip(control_names, upper))
         for moving, _ in stages:
             unknown = sorted(
-                moving - set(control_names), key=lambda name: name.value,
+                moving - set(control_names),
+                key=lambda name: name.value,
             )
             if unknown:
                 raise ValueError(
@@ -1961,9 +2012,7 @@ class FullWaveformInversion:
         # on the tape. Iterations are numbered through all stages as one run.
         done = 0
         for moving, iterations in stages:
-            active_control_names = [
-                name for name in control_names if name in moving
-            ]
+            active_control_names = [name for name in control_names if name in moving]
             stage_functional = automated_adjoint.create_partial_reduced_functional(
                 self.wave.functional_value,
                 active_control_names,
@@ -2041,7 +2090,8 @@ class FullWaveformInversion:
             # parameter; the enums are strings, so a bare one must not be
             # read as a sequence of characters either.
             if (
-                isinstance(stage, tuple) and len(stage) == 2
+                isinstance(stage, tuple)
+                and len(stage) == 2
                 and not isinstance(stage[1], Enum)
             ):
                 moving, iterations = stage
@@ -2100,11 +2150,9 @@ class FullWaveformInversion:
 
         # Shaped like ``control_parameters``: the single field of an acoustic
         # inversion, a list for one with several controls.
-        self.control_parameter_result = (
-            controls[0] if len(controls) == 1 else controls
-        )
+        self.control_parameter_result = controls[0] if len(controls) == 1 else controls
         if self._save_controls:
-            fire.VTKFile(f"control_{iteration}.pvd").write(*controls)
+            SpyroEnsemble.write_vtk(f"control_{iteration}.pvd", *controls)
 
         parallel_print(
             f"Functional: {functional} at iteration: {iteration}",
@@ -2168,7 +2216,9 @@ class FullWaveformInversion:
             "vmin": 1.429,
             "vmax": 6.0,
             "ROL_options": {
-                "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
+                "General": {
+                    "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
+                },
                 "Step": {
                     "Type": "Augmented Lagrangian",
                     "Augmented Lagrangian": {
@@ -2330,7 +2380,7 @@ class FullWaveformInversion:
         ----------
         file_name : str, optional
             Output SEG-Y file name. Default is "final_vp.segy".
-        grid_spacing: float, optional
+        grid_spacing : float, optional
             Segy grid spacing, default is 0.01 km.
 
         Notes
@@ -2356,14 +2406,14 @@ class SyntheticRealAcousticWave(AcousticWave):
     The SyntheticRealAcousticWave class is a subclass of the AcousticWave class.
     It is used to generate synthetic real acoustic wave data.
 
-    Attributes:
-    -----------
-    dictionary: (dict)
+    Attributes
+    ----------
+    dictionary : (dict)
         A dictionary containing parameters for the inversion.
-    comm: MPI communicator
+    comm : MPI communicator
 
-    Methods:
-    --------
+    Methods
+    -------
     __init__(self, dictionary=None, comm=None):
         Initializes a new instance of the SyntheticRealAcousticWave class.
     forward_solve():
