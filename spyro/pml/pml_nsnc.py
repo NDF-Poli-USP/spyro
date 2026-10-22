@@ -277,8 +277,7 @@ class PMLLayer(ABCLayer):
 
         # Compute the maximum damping coefficient
         abc_pml_cmax = wave.abc_pml_cmax if wave.abc_user_pml_cmax else wave.c_bnd_max
-
-        self.calc_pml_damping(wave.abc_pml_R, abc_pml_cmax, .
+        self.calc_pml_damping(wave.abc_pml_R, abc_pml_cmax,
                               wave.abc_pad_length,
                               degree_prof=wave.abc_pml_exponent)
 
