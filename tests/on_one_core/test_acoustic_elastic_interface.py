@@ -1,14 +1,20 @@
-"""Reflection of a plane wave at the fluid-solid interface.
+r"""Reflection of a plane wave at the fluid-solid interface.
 
 A plane pressure pulse in the fluid hits the interface at normal incidence.
 The pressure it reflects is the incident one times
 
 .. math::
 
-    R = \\frac{\\rho_s v_p - \\rho_f c_f}{\\rho_s v_p + \\rho_f c_f},
+    R = \frac{\rho_s v_p - \rho_f c_f}{\rho_s v_p + \rho_f c_f},
 
 so the test checks the impedance of both media enters the interface
 condition, the fluid density included.
+
+The particle velocity of a plane wave is its pressure over the fluid
+impedance, so the fluid displacement the solver records at the receiver is
+checked as well: the incident pulse leaves it at
+:math:`-\sigma\sqrt{\pi} / (\rho_f c_f^2)`, and the reflected one takes back
+a fraction :math:`R` of that.
 """
 
 import firedrake as fire
@@ -97,7 +103,7 @@ def make_dictionary() -> dict:
 @pytest.mark.parametrize("use_monolithic", [False, True],
                          ids=["sequential", "monolithic"])
 def test_normal_incidence_reflection_coefficient(use_monolithic: bool):
-    """The reflected pressure matches the impedance contrast.
+    """The reflected pressure and the fluid displacement match a plane wave.
 
     Parameters
     ----------
@@ -117,6 +123,7 @@ def test_normal_incidence_reflection_coefficient(use_monolithic: bool):
     wave.X_nm1.sub(0).interpolate(
         fire.exp(-((z - previous_center) / PULSE_WIDTH)**2),
     )
+    wave.record_fluid_displacement = True
     wave.wave_propagator()
 
     pressure = np.asarray(wave.forward_solution_receivers)[:, 0]
@@ -138,6 +145,18 @@ def test_normal_incidence_reflection_coefficient(use_monolithic: bool):
         / (impedance_solid + impedance_fluid)
     )
     assert measured == pytest.approx(expected, rel=0.01)
+
+    # Integrating the Gaussian pulse in time gives the displacement it leaves.
+    displacement = np.asarray(wave.fluid_displacement_history)[:, 0]
+    displacement_time = np.arange(len(displacement)) * wave.dt
+    incident_displacement = -PULSE_WIDTH * np.sqrt(np.pi) / (
+        DENSITY_FLUID * VELOCITY_FLUID**2
+    )
+    between_pulses = displacement[np.searchsorted(displacement_time, 0.2)]
+    assert between_pulses == pytest.approx(incident_displacement, rel=0.02)
+    assert displacement[-1] == pytest.approx(
+        (1.0 - expected) * incident_displacement, rel=0.03,
+    )
 
 
 if __name__ == "__main__":

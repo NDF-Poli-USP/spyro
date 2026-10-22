@@ -1,5 +1,6 @@
 import firedrake as fire
 import numpy as np
+from pyadjoint import stop_annotating
 
 from .wave import Wave
 from .acoustic_elastic_solver_no_pml import construct_acoustic_elastic
@@ -42,6 +43,8 @@ class AcousticElasticWave(Wave):
         self.use_monolithic = False
         self.record_fluid_displacement = False
         self.fluid_displacement_history = []
+        self.fluid_acceleration = None
+        self._fluid_receiver_evaluator = None
         self._vf_normal = None
         self._uf_normal = None
 
@@ -389,13 +392,17 @@ class AcousticElasticWave(Wave):
         else:
             construct_acoustic_elastic(self)
 
-        self.gradP_space = fire.VectorFunctionSpace(
-            self.submesh_fluid, "CG", self.degree
+        self.fluid_acceleration = fire.Function(
+            fire.VectorFunctionSpace(self.submesh_fluid, "CG", self.degree),
+            name="FluidAcceleration",
         )
-        self.gradP_function = fire.Function(self.gradP_space, name="gradP")
         n_recv = (
             len(self.receiver_locations) if self.receiver_locations is not None else 0
         )
+        if n_recv:
+            self._fluid_receiver_evaluator = fire.PointEvaluator(
+                self.submesh_fluid, self.receiver_locations
+            )
         self._vf_normal = [0.0] * n_recv
         self._uf_normal = [0.0] * n_recv
 
@@ -564,15 +571,34 @@ class AcousticElasticWave(Wave):
         return values
 
     def _record_fluid_displacement_from_pressure(self):
-        self.gradP_function.interpolate(fire.grad(self.X_np1.sub(0)))
+        """Record the normal fluid displacement at the fluid receivers.
+
+        The fluid acceleration is ``-grad(p) / rho_f``. Its normal (``z``)
+        component at the receivers is integrated twice in time, so the
+        displacement is directly comparable with the solid's.
+
+        The values are read into NumPy with a point evaluator, which is a
+        diagnostic only: it is kept off the adjoint tape, where point
+        evaluation is not allowed.
+
+        Returns
+        -------
+        None
+            The displacement of this step is appended to
+            ``fluid_displacement_history``.
+        """
+        with stop_annotating():
+            self.fluid_acceleration.interpolate(
+                -fire.grad(self.X_np1.sub(0)) / self.rho_fluid
+            )
+            acceleration = self._fluid_receiver_evaluator.evaluate(
+                self.fluid_acceleration
+            )
         dt = self.dt
-        step_uf = []
-        for i, loc in enumerate(self.receiver_locations):
-            af_z = -self.gradP_function.at(loc)[0] / self.rho_fluid.at(loc)
+        for i, af_z in enumerate(acceleration[:, 0]):
             self._vf_normal[i] += dt * af_z
             self._uf_normal[i] += dt * self._vf_normal[i]
-            step_uf.append(self._uf_normal[i])
-        self.fluid_displacement_history.append(step_uf)
+        self.fluid_displacement_history.append(list(self._uf_normal))
 
     # ------------------------------------------------------------------
     # Campos derivados
