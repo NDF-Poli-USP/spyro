@@ -208,6 +208,8 @@ def main() -> None:
     parser.add_argument("--degree", type=int, default=4)
     parser.add_argument("--iterations", type=int, default=3)
     parser.add_argument("--gradation", type=float, default=1.3)
+    parser.add_argument("--cpw-factor", type=float, default=1.0,
+                        help="safety factor applied to cpw for the Animate mesh only")
     parser.add_argument("--final-time", type=float, default=2.0)
     parser.add_argument("--forward", action="store_true")
     parser.add_argument("--output-dir", default="results/animate_marmousi")
@@ -219,11 +221,12 @@ def main() -> None:
     cpw = cells_per_wavelength("mass_lumped_triangle", args.degree, 2)
     h_min = float(vp_grid.min()) / (args.frequency * cpw)
     print(f"vp in [{vp_grid.min():.3f}, {vp_grid.max():.3f}] km/s, "
-          f"cpw = {cpw}, h_min = {h_min * 1e3:.1f} m", flush=True)
+          f"cpw = {cpw}, h_min = {h_min * 1e3:.1f} m, "
+          f"Animate cpw = {cpw * args.cpw_factor:.3f}", flush=True)
 
     start = time.perf_counter()
     adapted = create_animate_velocity_mesh(
-        vp_grid, bbox, args.frequency, cpw,
+        vp_grid, bbox, args.frequency, cpw * args.cpw_factor,
         num_iterations=args.iterations, gradation_factor=args.gradation,
     )
     adapt_time = time.perf_counter() - start
