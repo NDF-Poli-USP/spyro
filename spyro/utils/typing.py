@@ -110,8 +110,8 @@ class ElasticMaterialParameter(StrEnum):
 class FluidMaterialParameter(StrEnum):
     """Material parameter names of the fluid in a coupled fluid-solid medium.
 
-    The fluid is described either by its wave speed alone, or by its bulk
-    modulus and density, from which the wave speed is computed. The values
+    The fluid is described by its density with either its wave speed or its
+    bulk modulus, from which the wave speed is then computed. The values
     are the model-dictionary keys they are read from, which keeps them
     distinct from the elastic parameters of the solid.
     """

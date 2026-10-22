@@ -66,7 +66,12 @@ def construct_acoustic_elastic(Wave_obj):
     )
 
     u_tt = (Wave_obj.X_np1.sub(1) - 2.0 * u_n + u_nm1) / dt**2
-    F_interface_acoustic = -dot(u_tt, n_s) * v_f * ds_int(iface)
+    # The fluid form is the pressure equation multiplied by rho_f, so the
+    # normal pressure gradient it leaves on the interface is rho_f times the
+    # normal acceleration of the solid.
+    F_interface_acoustic = (
+        -Wave_obj.rho_fluid * dot(u_tt, n_s) * v_f * ds_int(iface)
+    )
     F_fluid = F_acoustic + F_interface_acoustic
 
     fluid_lhs = fire.lhs(F_fluid)

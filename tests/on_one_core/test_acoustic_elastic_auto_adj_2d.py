@@ -33,7 +33,7 @@ pytestmark = [
 
 Parameter = spyro.ElasticMaterialParameter
 FluidParameter = spyro.FluidMaterialParameter
-FLUID = {"bulk_modulus": 2.25, "density_fluid": 1.0}
+FLUID = {"bulk_modulus": 2.25, "density_fluid": 1.5}
 SOLID_CONTROLS = (
     Parameter.DENSITY,
     Parameter.P_WAVE_VELOCITY,

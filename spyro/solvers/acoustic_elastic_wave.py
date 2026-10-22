@@ -270,9 +270,10 @@ class AcousticElasticWave(Wave):
         is registered as a physical parameter of the equation, so any of
         them can be selected as a control of the automated adjoint.
 
-        - Fluid, on the fluid submesh: either the wave speed alone, or the
-          bulk modulus and the density, independent ``Function`` objects
-          from which the wave speed is computed.
+        - Fluid, on the fluid submesh: the density, which the interface
+          condition needs, with either the wave speed or the bulk modulus,
+          from which the wave speed is then computed. The ones the model
+          declares are independent ``Function`` objects.
         - Solid, on the solid submesh: density and the P- and S-wave
           velocities are independent ``Function`` objects, and the Lame
           parameters are UFL expressions of them.
@@ -286,6 +287,12 @@ class AcousticElasticWave(Wave):
         -------
         None
             The material parameters are assigned on ``self``.
+
+        Raises
+        ------
+        ValueError
+            If the model does not give the fluid density, or gives an
+            ambiguous or incomplete set of fluid parameters.
         """
         if self._physical_parameters:
             return
@@ -322,6 +329,11 @@ class AcousticElasticWave(Wave):
         self.K = field(fluid_space, FluidMaterialParameter.BULK_MODULUS)
         self.rho_fluid = field(fluid_space, FluidMaterialParameter.DENSITY)
         self.c = field(fluid_space, FluidMaterialParameter.P_WAVE_VELOCITY)
+        if self.rho_fluid is None:
+            raise ValueError(
+                "The coupled fluid-solid wave needs 'density_fluid': the "
+                "fluid density enters the interface condition."
+            )
 
         def solid_field(parameter, key):
             """Return the field of a solid parameter.
@@ -352,10 +364,9 @@ class AcousticElasticWave(Wave):
         self.lmbda = self.rho * self.c_p**2 - 2.0 * self.mu
 
         add = self._physical_parameters.add
-        # Only the fluid parameters the model declares are registered: the
-        # bulk modulus and the density, or neither of them.
-        if self.rho_fluid is not None:
-            add(FluidMaterialParameter.DENSITY, self.rho_fluid)
+        add(FluidMaterialParameter.DENSITY, self.rho_fluid)
+        # The bulk modulus is registered only when the model gives it in
+        # place of the velocity.
         if self.K is not None:
             add(FluidMaterialParameter.BULK_MODULUS, self.K)
         # Also validates the combination of fluid parameters the model gives.
