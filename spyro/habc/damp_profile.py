@@ -1,5 +1,5 @@
 # from numpy import asarray, clip, cos, isreal, pi, polyfit, roots, sin, tan
-# from ..io.basicio import parallel_print as pprint
+# from spyro.mpi.spyro_mpi import SpyroEnsemble
 # from spyro.utils.error_management import validate_parameter
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -18,9 +18,6 @@ class HABC_Damping():
     ----------
     alpha : `float`
         Ratio between the representative mesh dimensions
-    comm : `object`
-        An object representing the communication interface for parallel processing.
-        Default is `None`.
     d_norm : `float`
         Normalized element size (lmin / pad_len).
     dimension : `int`
@@ -56,7 +53,7 @@ class HABC_Damping():
         Determine the initial search range for the heuristic factor xCR
     """
 
-    def __init__(self, domain_layer, layer_par, mesh_par, wave_par, dimension=2, comm=None):
+    def __init__(self, domain_layer, layer_par, mesh_par, wave_par, dimension=2):
         """
         Initialize the HABC_Damping class
 
@@ -108,9 +105,6 @@ class HABC_Damping():
 
     #     # Model dimension
     #     self.dimension = dimension
-
-    #     # Communicator MPI
-    #     self.comm = comm
 
     #     # Adimensional wave numbers
     #     self.adim_reflection_parameters(layer_par[:2], mesh_par[:2], wave_par)
@@ -400,11 +394,11 @@ class HABC_Damping():
     #     # Critical damping coefficient
     #     eta_crt = 2 * pi * fundam_freq
     #     eta_max = psi_damp * eta_crt
-    #     pprint(f"Critical Damping Coefficient (1/s): {eta_crt:.5f}", self.comm)
+    #     SpyroEnsemble.print(f"Critical Damping Coefficient (1/s): {eta_crt:.5f}")
 
     #     # Maximum damping ratio and coefficient
-    #     pprint(f"Maximum Damping Ratio: {psi_damp:.3%}", self.comm)
-    #     pprint(f"Maximum Damping Coefficient (1/s): {eta_max:.5f}", self.comm)
+    #     SpyroEnsemble.print(f"Maximum Damping Ratio: {psi_damp:.3%}")
+    #     SpyroEnsemble.print(f"Maximum Damping Coefficient (1/s): {eta_max:.5f}")
 
     #     # Minimum damping ratio and the associated heuristic factor
     #     psi_min, xCR_est, xCR_lim, CRmin = self.est_min_damping()
@@ -421,16 +415,16 @@ class HABC_Damping():
 
     #     # Minimum damping ratio and coefficient
     #     eta_min = psi_min * eta_crt
-    #     pprint("Minimum Damping Ratio: {psi_min:.3%}", self.comm)
+    #     SpyroEnsemble.print("Minimum Damping Ratio: {psi_min:.3%}")
     #     psi_str = "Range for Minimum Damping Ratio. " \
     #         + f"Min:{xCR_inf * self.d_norm:.5f} - Max:{xCR_sup * self.d_norm:.5f}"
-    #     pprint(psi_str, self.comm)
-    #     pprint(f"Minimum Damping Coefficient (1/s): {eta_min:.5f}", self.comm)
+    #     SpyroEnsemble.print(psi_str)
+    #     SpyroEnsemble.print(f"Minimum Damping Coefficient (1/s): {eta_min:.5f}")
 
     #     # Heuristic factor and its range
-    #     pprint(xcr_str, self.comm)
+    #     SpyroEnsemble.print(xcr_str)
     #     xrg_str = f"Range Values for xCR Factor. Min:{xCR_inf:.3f} - Max:{xCR_sup:.3f}"
-    #     pprint(xrg_str, self.comm)
+    #     SpyroEnsemble.print(xrg_str)
 
     #     return eta_crt, psi_min, xCR, xCR_lim, CRmin
 
@@ -538,7 +532,7 @@ class HABC_Damping():
     #     xCR_max = clip(xCR_max * fmax, xCR_inf, xCR_sup)
 
     #     lim_str = f"Initial Range for xCR Factor. Min:{xCR_min:.3f} - Max:{xCR_max:.3f}"
-    #     pprint(lim_str, self.comm)
+    #     SpyroEnsemble.print(lim_str)
 
     #     # ToDo: Use for update xCR in FWI iterations
     #     return (xCR_min, xCR_max)

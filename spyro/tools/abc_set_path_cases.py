@@ -1,7 +1,7 @@
 """Methods to set paths for the case study of the ABC scheme (HABC or PML)."""
 from os import getcwd
 from pathlib import Path
-from ..io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..utils.error_management import (validate_enum, validate_numeric,
                                       validate_parameter, validate_string)
 from ..utils.typing import AbsorbingBCsType, LayerShapeType, LayerSizeRefFrequency
@@ -98,7 +98,7 @@ def identify_abc_layer_case(abc_type, abc_boundary_layer_shape,
         case_absl = "REC"
 
     elif abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-        case_absl = "HN" + f"{abc_deg_layer:.1f}"
+        case_absl = "HN" + f"{abc_deg_layer: .1f}"
 
     # Labeling for the reference frequency for the absorbing layer
     if abc_reference_freq == LayerSizeRefFrequency.SOURCE:
@@ -112,7 +112,7 @@ def identify_abc_layer_case(abc_type, abc_boundary_layer_shape,
         f"{abc_boundary_layer_shape.value.capitalize()}" + (
         f" - Degree: {abc_deg_layer}"
         if abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else "")
-    pprint(layer_str)
+    SpyroEnsemble.print(layer_str)
 
     return case_absl
 

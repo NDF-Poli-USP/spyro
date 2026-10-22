@@ -824,7 +824,7 @@ class MeasureError:
 #         xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts-1))
 
 #     format_xCR = ', '.join(['{:.3f}'.format(x) for x in xCR_cand])
-#     pprint(f"Candidates for Heuristic Factor xCR: [{format_xCR}]", comm=self.comm)
+#     SpyroEnsemble.print(f"Candidates for Heuristic Factor xCR: [{format_xCR}]")
 
 #     return xCR_cand
 
@@ -894,6 +894,6 @@ class MeasureError:
 #         vtx = - eq_xCR[1] / (2 * eq_xCR[0])
 #         xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
 
-#     pprint(f"Optimal Heuristic Factor xCR: {xCR_opt:.3f}", comm=self.comm)
+#     SpyroEnsemble.print(f"Optimal Heuristic Factor xCR: {xCR_opt:.3f}")
 
 #     return xCR_opt
