@@ -69,7 +69,7 @@ class NRBC(AbsorbingBC):
                  abc_boundary_type=NRBCBoundaryType.STRAIGHT,
                  non_reflect_bc=BoundaryConditionsType.HIGDON,
                  angle_max=pi/4., dimension=2, quadrilateral=False,
-                 nrbc_in_habc=False, output_folder=None, comm=None):
+                 nrbc_in_habc=False, output_folder=None):
         """Initialize the NRBC class.
 
         Parameters
@@ -112,7 +112,7 @@ class NRBC(AbsorbingBC):
         if not nrbc_in_habc:
             AbsorbingBC.__init__(self, domain_dim, frequency=frequency,
                                  dt=dt, dimension=dimension,
-                                 quadrilateral=quadrilateral, comm=comm)
+                                 quadrilateral=quadrilateral)
 
             # Set sthe pad to rectangular shape in case the infinite model is needed.
             self.abc_boundary_layer_shape = LayerShapeType.RECTANGULAR
