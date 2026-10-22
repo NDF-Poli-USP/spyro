@@ -5,7 +5,6 @@ from shutil import rmtree
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..abc.abc_layer import ABCLayer
 from .damp_profile import HABC_Damping
-from ..io.basicio import parallel_print as SpyroEnsemble.print
 from ..solvers.modal.modal_sol import Modal_Solver
 # from ..tools.habc_tools import layer_mask_field
 from ..utils.typing import (HyperLayerDegreeType, AbsorbingBCsType,
