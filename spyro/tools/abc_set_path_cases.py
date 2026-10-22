@@ -2,7 +2,7 @@
 from numpy import pi
 from os import getcwd
 from pathlib import Path
-from ..io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..utils.error_management import (mutually_exclusive_parameter_error, validate_enum,
                                       validate_numeric, validate_parameter, validate_string)
 from ..utils.typing import (AbsorbingBCsType, BoundaryConditionsType, LayerShapeType,
@@ -100,7 +100,7 @@ def identify_abc_layer_case(abc_type, abc_boundary_layer_shape,
         case_absl = "REC"
 
     elif abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-        case_absl = "HN" + f"{abc_deg_layer:.1f}"
+        case_absl = "HN" + f"{abc_deg_layer: .1f}"
 
     # Labeling for the reference frequency for the absorbing layer
     if abc_reference_freq == LayerSizeRefFrequency.SOURCE:
@@ -114,7 +114,7 @@ def identify_abc_layer_case(abc_type, abc_boundary_layer_shape,
         f"{abc_boundary_layer_shape.value.capitalize()}" + (
         f" - Degree: {abc_deg_layer}"
         if abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else "")
-    pprint(layer_str)
+    SpyroEnsemble.print(layer_str)
 
     return case_absl
 
@@ -172,9 +172,9 @@ def identify_nrbc_case(non_reflect_bc, angle_max, abc_boundary_type):
     # Printing NRBC info on screen
     nrbc_str = f"\nNRBC Type: {non_reflect_bc.value.capitalize()}" + \
         f"\nBoundary Type: {abc_boundary_type.value.capitalize()}" + \
-        (f"\nMaximum Incidence Angle: {180. * angle_max / pi:.1f}°"
+        (f"\nMaximum Incidence Angle: {180. * angle_max / pi: .1f}°"
          if non_reflect_bc == BoundaryConditionsType.HIGDON else "")
-    pprint(nrbc_str)
+    SpyroEnsemble.print(nrbc_str)
 
     return case_nrbc
 

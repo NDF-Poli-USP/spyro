@@ -213,9 +213,7 @@ class HABCMesh(MeshOps):
 
         # Velocity profile model
         c = fire.Function(function_space, name="c_orig [km/s])")
-        c.assign(
-            fire.assemble(fire.interpolate(initial_velocity_model, function_space))
-        )
+        c.assign(fire.assemble(fire.interpolate(initial_velocity_model, function_space)))
 
         # Get extreme values of the velocity model
         c_min = initial_velocity_model.dat.data_with_halos.min()
@@ -318,10 +316,8 @@ class HABCMesh(MeshOps):
         SpyroEnsemble.print("\nCreating Mesh and Initial Velocity Model")
 
         # Mesh data
-        SpyroEnsemble.print(
-            f"Original Mesh with {wave.mesh.num_vertices()} Nodes and "
-            f"{wave.mesh.num_cells()} Volume Elements"
-        )
+        SpyroEnsemble.print(f"Original Mesh with {wave.mesh.num_vertices()} Nodes "
+                            f"and {wave.mesh.num_cells()} Volume Elements")
 
         # Save a copy of the original mesh
         wave.mesh_original = wave.mesh
@@ -538,12 +534,12 @@ class HABCMesh(MeshOps):
                 p2 = geo.PointData()[2][idp + 1]
                 p3 = geo.PointData()[2][idp + 2]
                 curves.append(["spline3", p1, p2, p3, ltrunc])
-                # pprint(p1, p2, p3)
+                # SpyroEnsemble.print(p1, p2, p3)
 
             for idp in range(ini_trunc, end_trunc):
                 p1 = geo.PointData()[2][idp]
                 p2 = geo.PointData()[2][idp + 1]
-                # pprint(p1, p2)
+                # SpyroEnsemble.print(p1, p2)
 
                 if idp == ini_trunc or idp == end_trunc - 1:
                     curves.append(["line", p1, p2, ltrunc])
@@ -555,14 +551,14 @@ class HABCMesh(MeshOps):
                 p2 = geo.PointData()[2][idp + 1]
                 p3 = geo.PointData()[2][idp + 2]
                 curves.append(["spline3", p1, p2, p3, ltrunc])
-                # pprint(p1, p2, p3)
+                # SpyroEnsemble.print(p1, p2, p3)
 
         else:
             # Mesh with line segments
             for idp in range(0, num_bnd_pts - 1, 2):
                 p1 = geo.PointData()[2][idp]
                 p2 = geo.PointData()[2][idp + 1]
-                # pprint(p1, p2)
+                # SpyroEnsemble.print(p1, p2)
 
                 if ini_trunc + 1 <= idp <= end_trunc - 2:
                     curves.append(["line", p1, p2, self.lmin])
@@ -758,10 +754,8 @@ class HABCMesh(MeshOps):
         try:
             # Mesh data
             final_mesh.Compress()
-            SpyroEnsemble.print(
-                f"Mesh created with {len(final_mesh.Points())} points "
-                f"and {len(final_mesh.Elements2D())} elements"
-            )
+            SpyroEnsemble.print(f"Mesh created with {len(final_mesh.Points())} "
+                                f"points and {len(final_mesh.Elements2D())} elements")
 
             # Mesh is transformed into a firedrake mesh
             q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
@@ -967,9 +961,9 @@ class HABCMesh(MeshOps):
         min_z, min_x, min_y = np.min(coords, axis=0)
         max_z, max_x, max_y = np.max(coords, axis=0)
         SpyroEnsemble.print("Mesh Bounds Detected:")
-        SpyroEnsemble.print(f"       X: [{min_x:.4f}, {max_x:.4f}]")
-        SpyroEnsemble.print(f"       Y: [{min_y:.4f}, {max_y:.4f}]")
-        SpyroEnsemble.print(f"       Z: [{min_z:.4f}, {max_z:.4f}]")
+        SpyroEnsemble.print(f"       X: [{min_x: .4f}, {max_x: .4f}]")
+        SpyroEnsemble.print(f"       Y: [{min_y: .4f}, {max_y: .4f}]")
+        SpyroEnsemble.print(f"       Z: [{min_z: .4f}, {max_z: .4f}]")
 
         # Select nodes to snap
         mask_min_z = np.isclose(coords[:, 0], min_z, atol=plane_tol)
