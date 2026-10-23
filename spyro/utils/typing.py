@@ -1,6 +1,15 @@
 """Defines the enums and decorators used for typing in Spyro."""
 
-from enum import Enum, StrEnum
+# Change to: compatible with Python 3.10
+# from enum import Enum, StrEnum
+from enum import Enum
+
+try:
+    from enum import StrEnum
+except ImportError:
+    class StrEnum(str, Enum):
+        """Backport of enum.StrEnum for Python 3.10."""
+        pass
 
 
 def override(func):
