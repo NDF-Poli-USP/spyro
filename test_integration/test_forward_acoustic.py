@@ -89,7 +89,7 @@ def test_forward_3_shots():
     SpyroEnsemble.print(f"NRMS Error for shot {wave.current_sources} is {error_L2: .4e} "
                         f"and test has passed equals {abs(error_L2) < 0.01}")
 
-    error_L2_all = COMM_WORLD.allreduce(error_L2, op=MPI.SUM) / 3.
+    error_L2_all = MPI.COMM_WORLD.allreduce(error_L2, op=MPI.SUM) / 3.
 
     assert abs(error_L2_all) < 0.01
 
