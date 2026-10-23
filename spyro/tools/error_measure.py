@@ -48,6 +48,8 @@ class MeasureError:
         Compute the error measures at the receivers for comparison between models.
     get_reference_signal()
         Acquire the reference signal for comparison between models.
+    initialize_paths_for_error()
+        Initialize the paths for saving data and reference signals.
     integral_error()
         Compute the integral error between the model and reference signals.
     normalized_root_mean_square_error()
@@ -64,24 +66,37 @@ class MeasureError:
         Get the optimal heuristic factor for the quadratic damping
     """
 
-    def __init__(
-        self,
-        output_folder: Path | str | None = None,
-        output_case: Path | str | None = None,
-    ):
+    def __init__(self):
         """Initialize the MeasureError class.
 
         Parameters
         ----------
-        output_folder : pathlib.Path or `str`, optional
+        None
+
+        Returns
+        -------
+        None
+        """
+
+    def initialize_paths_for_error(
+        self,
+        output_folder: Path | str | None = None,
+        output_case: Path | str | None = None,
+    ):
+        """Initialize the paths for saving data and reference signals.
+
+        Parameters
+        ----------
+        output_folder : `str`, optional
             The folder where output data will be saved. Default is `None`.
-        output_case : pathlib.Path or `str`, optional
+        output_case : `str`, optional
             The folder for the current case study. Default is `None`.
 
         Returns
         -------
         None
         """
+
         # Path to save data
         if output_folder is None:
             output_folder = Path(getcwd()) / "output"
@@ -101,7 +116,7 @@ class MeasureError:
     def save_reference_signal(
         self,
         receiver_locations,
-        forward_solution_receivers: np.ndarray,
+        forward_solution_receivers,
         number_of_receivers,
         nyquist_frequency: float,
         output_file_prefix="reference",
@@ -116,8 +131,8 @@ class MeasureError:
             Receiver waveform data acquired from forward proeblem.
         number_of_receivers : `int`
             Number of receivers used in the simulation.
-        freq_Nyquist : `float`
-            Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt).
+        nyquist_frequency : `float`
+            Nyquist frequency according to the time step. nyquist_frequency = 1 / (2 * dt).
         output_file_prefix : `str`, optional
             Name of the file to save the reference signal without any extension.
             Default is "ref_rec.npy".
@@ -391,16 +406,16 @@ class MeasureError:
             maximum_peak_error,
         ]
         SpyroEnsemble.print(
-            f"Maximum Integral Error: {maximum_integral_error:.2%}"
+            f"Maximum Integral Error: {maximum_integral_error: .2%}"
         )
         SpyroEnsemble.print(
-            f"Maximum Peak Error: {maximum_peak_error:.2%}"
+            f"Maximum Peak Error: {maximum_peak_error: .2%}"
         )
         # Final energy
         if final_energy is not None:
             scalar_values.append(final_energy)
             SpyroEnsemble.print(
-                f"Final Energy (J): {final_energy:.2e}"
+                f"Final Energy (J): {final_energy: .2e}"
             )
 
             # Dissipated energy
@@ -408,7 +423,7 @@ class MeasureError:
                 dissipated_energy = 1 - final_energy / final_energy_reference
                 scalar_values.append(dissipated_energy)
                 SpyroEnsemble.print(
-                    f"Dissipated Energy: {dissipated_energy:.2%}"
+                    f"Dissipated Energy: {dissipated_energy: .2%}"
                 )
 
         error_measures.extend(scalar_values)
@@ -812,7 +827,7 @@ class MeasureError:
 #         xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts-1))
 
 #     format_xCR = ', '.join(['{:.3f}'.format(x) for x in xCR_cand])
-#     pprint(f"Candidates for Heuristic Factor xCR: [{format_xCR}]", comm=self.comm)
+#     SpyroEnsemble.print(f"Candidates for Heuristic Factor xCR: [{format_xCR}]")
 
 #     return xCR_cand
 
@@ -882,6 +897,6 @@ class MeasureError:
 #         vtx = - eq_xCR[1] / (2 * eq_xCR[0])
 #         xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
 
-#     pprint(f"Optimal Heuristic Factor xCR: {xCR_opt:.3f}", comm=self.comm)
+#     SpyroEnsemble.print(f"Optimal Heuristic Factor xCR: {xCR_opt:.3f}")
 
 #     return xCR_opt

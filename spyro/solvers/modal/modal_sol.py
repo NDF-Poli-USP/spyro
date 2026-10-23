@@ -124,9 +124,7 @@ class Modal_Solver:
         if not self.calc_max_dt and self.method == "ANALYTICAL":
             from .modal_ana_sol import Modal_Analytical_Solver
 
-            self.AnaModSol = Modal_Analytical_Solver(
-                dimension=self.dimension, comm=comm
-            )
+            self.AnaModSol = Modal_Analytical_Solver(dimension=self.dimension)
 
         SpyroEnsemble.print(f"Solver Method: {self.method}")
 
@@ -590,9 +588,7 @@ class Modal_Solver:
         # Maximum stable timestep
         max_dt = float(real(2.0 / sqrt(max_eigval)))
         SpyroEnsemble.print(
-            "Maximum Stable Timestep Should Be Approximately "
-            f"(ms): {1e3 * max_dt:.3f}"
-        )
+            f"Maximum Stable Timestep Should Be Approximately (ms): {1e3 * max_dt: .3f}")
 
         max_dt *= fraction
         nt = int(final_time / max_dt) + 1

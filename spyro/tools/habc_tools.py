@@ -3,8 +3,8 @@
 from firedrake import assemble, conditional, Function, VertexOnlyMesh
 from firedrake import sqrt as fire_sqrt
 from numpy import clip, where
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..domains.space import create_function_space
-from ..io.basicio import parallel_print as pprint
 from ..utils.error_management import validate_numeric, validate_parameter
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..version_control import is_firedrake_new
@@ -212,7 +212,7 @@ def clipping_coordinates_lay_field(domain_dim, mesh, dimension,
         Mask for the absorbing layer.
     """
 
-    pprint("Clipping Coordinates Inside Layer")
+    SpyroEnsemble.print("Clipping Coordinates Inside Layer")
 
     # Domain dimensions
     length_z, length_x = domain_dim[:2]
@@ -318,7 +318,7 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
         Extended scalar field defined on the same function space as `lay_field`.
     """
 
-    pprint("Extending Profile Inside Layer")
+    SpyroEnsemble.print("Extending Profile Inside Layer")
 
     # Extracting the nodes from the layer field
     lay_nodes = lay_field.dat.data_with_halos[:]
@@ -331,7 +331,7 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
     validate_parameter('method', method, ["point_cloud", "nearest_point"])
     if method == "point_cloud":
 
-        pprint(f"Using Cloud Points Method to Extend {name_prop} Profile")
+        SpyroEnsemble.print(f"Using Cloud Points Method to Extend {name_prop} Profile")
 
         vel_to_extend = \
             point_cloud_field(mesh_original, pts_to_extend,
@@ -339,7 +339,7 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
 
     elif method == "nearest_point":
 
-        pprint(f"Using Nearest Point Method to Extend {name_prop} Profile")
+        SpyroEnsemble.print(f"Using Nearest Point Method to Extend {name_prop} Profile")
 
         vel_to_extend = field_to_extend.at(pts_to_extend, dont_raise=True)
         del pts_to_extend

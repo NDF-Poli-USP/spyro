@@ -2,7 +2,7 @@ import numpy as np
 from scipy.integrate import dblquad, quad
 from scipy.special import beta, betainc, gamma
 from sys import float_info
-from ..io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..utils.error_management import (validate_enum, validate_model_dimension,
                                       validate_numeric, validate_parameter)
 from ..utils.typing import HyperLayerDegreeType
@@ -88,8 +88,7 @@ class HyperLayer():
         Compute the truncated volume of hyperellipsoid for 0 <= z0 / b <= 1.
     """
 
-    def __init__(self, domain_dim, n_hyp=2., n_type=HyperLayerDegreeType.REAL,
-                 dimension=2, comm=None):
+    def __init__(self, domain_dim, n_hyp=2., n_type=HyperLayerDegreeType.REAL, dimension=2):
         """Initialize the HyperLayer class.
 
         Parameters
@@ -104,9 +103,6 @@ class HyperLayer():
             'HyperLayerDegreeType.INTEGER'. Default is 'HyperLayerDegreeType.REAL'.
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
-        comm : `object`, optional
-            An object representing the communication interface for parallel processing.
-            Default is `None`.
 
         Returns
         -------
@@ -138,9 +134,6 @@ class HyperLayer():
 
         # Type of the hypereshape degree
         self.n_type = validate_enum('n_type', n_type, HyperLayerDegreeType)
-
-        # Communicator MPI
-        self.comm = comm
 
     def define_hyperaxes(self, domain_hyp):
         """Define the hyperlayer semi-axes.
@@ -289,9 +282,9 @@ class HyperLayer():
 
         if monitor:
             # Central tendency criteria
-            pprint(f"'Harm' Superness. r: {rh:>5.3f} - n: {h:>.1f}")
-            pprint(f"'Geom' Superness. r: {rg:>5.3f} - n: {g:>.1f}")
-            pprint(f"'Arit' Superness. r: {rz:>5.3f} - n: {z:>.1f}")
+            SpyroEnsemble.print(f"'Harm' Superness. r: {rh: >5.3f} - n: {h: >.1f}")
+            SpyroEnsemble.print(f"'Geom' Superness. r: {rg: >5.3f} - n: {g: >.1f}")
+            SpyroEnsemble.print(f"'Arit' Superness. r: {rz: >5.3f} - n: {z: >.1f}")
 
         crit_tend = []
         crit_tend.append(round(float(h), 1)) if rh <= 1 else None
@@ -340,7 +333,7 @@ class HyperLayer():
             n += 1
             r = self.radial_parameter(spness, n)
             if monitor:
-                pprint(f"ParHypEll - r: {r:>5.3f} - n: {n:>.1f}")
+                SpyroEnsemble.print(f"ParHypEll - r: {r: >5.3f} - n: {n: >.1f}")
 
         # Real limits (difference of at least 1)
         n_min = max(round(float(n_min), 1), 2.)
@@ -355,7 +348,7 @@ class HyperLayer():
                 n += 0.1
                 r = self.radial_parameter(spness, round(n, 1))
                 if monitor:
-                    pprint(f"ParHypEll - r: {r:>5.3f} - n: {n:>.1f}".format(r, n))
+                    SpyroEnsemble.print(f"ParHypEll - r: {r: >5.3f} - n: {n: >.1f}".format(r, n))
 
         return round(float(n), 1), n_min, n_max
 
@@ -421,14 +414,14 @@ class HyperLayer():
             lim_str = "min" if limit_type == 'MIN' else "max"
             pr0_str = shp_str + " Parameters. r_" + lim_str
             pr1_str = ": {:>5.3f} - n_" + lim_str + ": {:>.1f}"
-            pprint(pr0_str + pr1_str.format(r, n))
+            SpyroEnsemble.print(pr0_str + pr1_str.format(r, n))
 
         # Superness s = 2^(-1/n): Extreme points of the hyperellipse
         snss_str = "Superness Coordinates (km): ({:5.3f}, {:5.3f})"
         if self.dimension == 3:  # 3D
             # Superness s = 3^(-1/n): Extreme points of the hyperellipsoid
             snss_str = snss_str[:-1] + ", {:5.3f})"
-        pprint(snss_str.format(*spness))
+        SpyroEnsemble.print(snss_str.format(*spness))
 
         return n
 
@@ -465,27 +458,27 @@ class HyperLayer():
 
         # Verification of hypershape degree
         ndeg_str = "Checking Current Hypershape Degree n_hyp: {:>.1f}"
-        pprint(ndeg_str.format(n_hyp))
+        SpyroEnsemble.print(ndeg_str.format(n_hyp))
         axes_str = "Semi-axes (km): a_hyp:{:5.3f} - b_hyp:{:5.3f}"
         if self.dimension == 3:  # 3D
             length_y = self.domain_dim[2]
             axes_str += " - c_hyp:{:5.3f}"
-        pprint(axes_str.format(*self.hyper_axes))
+        SpyroEnsemble.print(axes_str.format(*self.hyper_axes))
 
         # Minimum allowed exponent
         # n_min ensures to add lmin in the domain diagonal direction
-        pprint("Determining the Minimum Degree for Hypershape Layer")
+        SpyroEnsemble.print("Determining the Minimum Degree for Hypershape Layer")
         x_min = (0.5 * length_x + lmin, 0.5 * length_z + lmin)
 
         if self.dimension == 3:  # 3D
             x_min += (0.5 * length_y + lmin,)
 
         n_min = self.calc_degree_hypershape(x_min, 'MIN', monitor=monitor)
-        pprint(f"Minimum Degree for Hypershape n_min: {n_min:>.1f}")
+        SpyroEnsemble.print(f"Minimum Degree for Hypershape n_min: {n_min: >.1f}")
 
         # Maximum allowed exponent
         # n_max ensures to add pad_len in the domain diagonal direction
-        pprint("Determining the Maximum Degree for Hypershape Layer")
+        SpyroEnsemble.print("Determining the Maximum Degree for Hypershape Layer")
         theta = np.arctan2(length_z, length_x)
 
         if self.dimension == 2:  # 2D
@@ -499,16 +492,16 @@ class HyperLayer():
                      0.5 * length_y + pad_len * np.cos(phi))
 
         n_max = self.calc_degree_hypershape(x_max, 'MAX', n_min=n_min, monitor=monitor)
-        pprint(f"Maximum Degree for Hypershape n_max: {n_max:>.1f}")
+        SpyroEnsemble.print(f"Maximum Degree for Hypershape n_max: {n_max: >.1f}")
 
         if n_min <= n_hyp <= n_max:
-            pprint(f"Current Hypershape Degree n_hyp: {n_hyp:>.1f}")
+            SpyroEnsemble.print(f"Current Hypershape Degree n_hyp: {n_hyp: >.1f}")
         else:
             hyp_str = "Degree for Hypershape Layer. Setting to "
             if n_hyp < n_min:
-                pprint("Low " + hyp_str + f"n_min: {n_min:>.1f}")
+                SpyroEnsemble.print("Low " + hyp_str + f"n_min: {n_min: >.1f}")
             elif n_hyp > n_max:
-                pprint("High " + hyp_str + f"n_max: {n_max:>.1f}")
+                SpyroEnsemble.print("High " + hyp_str + f"n_max: {n_max: >.1f}")
 
         self.n_hyp = np.clip(n_hyp, n_min, n_max)
         self.n_bounds = (n_min, n_max)
@@ -539,7 +532,7 @@ class HyperLayer():
         """
 
         if z0 < 0 or z0 > b:
-            err = f"Truncation plane must be 0 <= z0 <= {b:.3f}, got {z0:.3f}"
+            err = f"Truncation plane must be 0 <= z0 <= {b: .3f}, got {z0: .3f}"
             raise ValueError(err)
 
         w = max((z0 / b) ** n, float_info.min)  # w <= 1
@@ -605,7 +598,7 @@ class HyperLayer():
         """
 
         if z0 < 0 or z0 > b:
-            err = f"Truncation plane must be 0 <= z0 <= {b:.3f}, got {z0:.3f}"
+            err = f"Truncation plane must be 0 <= z0 <= {b: .3f}, got {z0: .3f}"
             raise ValueError(err)
 
         w = max((z0 / b) ** n, float_info.min)   # w <= 1
@@ -786,7 +779,7 @@ class HyperLayer():
         None
         """
 
-        pprint("Determining Hypershape Layer Parameters")
+        SpyroEnsemble.print("Determining Hypershape Layer Parameters")
 
         # Domain dimensions w/o layer
         validate_model_dimension(('domain_dim', 'domain_hyp'),
@@ -814,7 +807,7 @@ class HyperLayer():
 
             # Area ratio
             self.area_ratio = self.area / (length_x * length_z)
-            pprint(f"Area Ratio: {self.area_ratio:5.3f}")
+            SpyroEnsemble.print(f"Area Ratio: {self.area_ratio: 5.3f}")
 
             # Area factor
             self.f_Ah = self.area / (a_hyp * b_hyp)
@@ -832,7 +825,7 @@ class HyperLayer():
 
             # Volume ratio
             self.vol_ratio = self.vol / (length_x * length_z * length_y)
-            pprint(f"Volume Ratio: {self.vol_ratio:5.3f}")
+            SpyroEnsemble.print(f"Volume Ratio: {self.vol_ratio: 5.3f}")
 
             # Volume factor
             self.f_Vh = self.vol / (a_hyp * b_hyp * c_hyp)
