@@ -307,7 +307,6 @@ class Delta_projector:
         num_recv = self.number_of_points
 
         cell_node_map = self.space.cell_node_list
-        # cell_node_map = fdrake_cell_node_map.values_with_halo
         num_cells, nodes_per_cell = cell_node_map.shape
         node_locations = self.__func_node_locations()
         self.nodes_per_cell = nodes_per_cell
@@ -359,7 +358,6 @@ class Delta_projector:
         num_recv = self.number_of_points
 
         cell_node_map = self.space.cell_node_list
-        # cell_node_map = fdrake_cell_node_map.values_with_halo
         if self.quadrilateral is True:
             cell_node_map = get_hexa_real_cell_node_map(self.space, self.mesh)
         num_cells, nodes_per_cell = cell_node_map.shape
