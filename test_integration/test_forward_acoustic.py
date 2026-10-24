@@ -34,6 +34,7 @@ def test_forward_3_shots():
         "delay": 0.2,
         "delay_type": "time",
         "receiver_locations": spyro.create_transect((-1.3, 1.2), (-1.3, 1.8), 301),
+        "use_vertex_only_mesh": True,
     }
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
