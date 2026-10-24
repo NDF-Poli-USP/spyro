@@ -2,7 +2,7 @@ from pytest import mark
 from mpi4py import MPI
 from firedrake import conditional
 import spyro
-from spyro.io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.tools.error_measure import MeasureError
 
 
@@ -61,24 +61,22 @@ def test_forward_3_shots():
 
     wave.forward_solve()
 
-    comm = wave.comm
-
     arr = wave.forward_solution_receivers
 
-    if comm.ensemble_comm.rank == 0:
+    if SpyroEnsemble.ensemble_comm.rank == 0:
         analytical_p = spyro.utils.nodal_homogeneous_analytical(
             wave, 0.2, 1.5, n_extra=100
         )
     else:
         analytical_p = None
-    analytical_p = comm.ensemble_comm.bcast(analytical_p, root=0)
+    analytical_p = SpyroEnsemble.ensemble_comm.bcast(analytical_p, root=0)
 
     # Checking if error before reflection matches
-    if comm.ensemble_comm.rank == 0:
+    if SpyroEnsemble.ensemble_comm.rank == 0:
         rec_id = 0
-    elif comm.ensemble_comm.rank == 1:
+    elif SpyroEnsemble.ensemble_comm.rank == 1:
         rec_id = 150
-    elif comm.ensemble_comm.rank == 2:
+    elif SpyroEnsemble.ensemble_comm.rank == 2:
         rec_id = 300
 
     arr0 = arr[:, rec_id]
@@ -86,9 +84,9 @@ def test_forward_3_shots():
 
     # Calculating errors
     error_L2 = MeasureError.calculate_normalized_L2_error(arr0[:430], analytical_p[:430])
-    pprint(f"L2 Error for shot {wave.current_sources} is {error_L2:.4e} and test "
-           f"has passed equals {abs(error_L2) < 0.01}", comm=comm)
-    error_L2_all = comm.ensemble_comm.allreduce(error_L2, op=MPI.SUM) / 3.
+    SpyroEnsemble.print(f"L2 Error for shot {wave.current_sources} is {error_L2:.4e} and test "
+           f"has passed equals {abs(error_L2) < 0.01}")
+    error_L2_all = SpyroEnsemble.ensemble_comm.allreduce(error_L2, op=MPI.SUM) / 3.
 
     assert abs(error_L2_all) < 0.01
 
