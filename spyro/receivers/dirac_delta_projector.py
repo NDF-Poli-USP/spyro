@@ -107,6 +107,8 @@ class Delta_projector:
         cell_tabulations : list
             List of tabulations for each receiver
         """
+        self.number_of_points = len(self.point_locations)
+
         for rid in range(self.number_of_points):
             cell_id = self.mesh.locate_cell(self.point_locations[rid], tolerance=1e-6)
             self.is_local[rid] = cell_id
@@ -121,7 +123,6 @@ class Delta_projector:
         else:
             self.cell_tabulations = None
 
-        self.number_of_points = len(self.point_locations)
 
     def interpolate(self, field):
         """Interpolate the solution to receiver coordinates.
@@ -306,7 +307,7 @@ class Delta_projector:
         """
         num_recv = self.number_of_points
 
-        fdrake_cell_node_map = self.space.cell_node_map()
+        fdrake_cell_node_map = self.space.cell_node_list
         cell_node_map = fdrake_cell_node_map.values_with_halo
         num_cells, nodes_per_cell = cell_node_map.shape
         node_locations = self.__func_node_locations()
@@ -358,7 +359,7 @@ class Delta_projector:
         """
         num_recv = self.number_of_points
 
-        fdrake_cell_node_map = self.space.cell_node_map()
+        fdrake_cell_node_map = self.space.cell_node_list
         cell_node_map = fdrake_cell_node_map.values_with_halo
         if self.quadrilateral is True:
             cell_node_map = get_hexa_real_cell_node_map(self.space, self.mesh)
