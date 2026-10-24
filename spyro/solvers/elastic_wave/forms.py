@@ -23,8 +23,10 @@ def isotropic_elastic_without_pml(wave):
     F_m = (rho/(dt**2))*dot(u - 2*u_n + u_nm1, v)*dx(**quad_rule)
 
     eps = lambda v: 0.5*(grad(v) + grad(v).T)
-    F_k = lmbda*div(u_n)*div(v)*dx(**quad_rule) \
+    F_k = (
+        lmbda*div(u_n)*div(v)*dx(**quad_rule)
         + 2*mu*inner(eps(u_n), eps(v))*dx(**quad_rule)
+    )
 
     F_s = 0
     b = wave.body_forces
@@ -35,6 +37,8 @@ def isotropic_elastic_without_pml(wave):
 
     F = F_m + F_k - F_s - F_t
 
+    wave.mass_matrix_form = F_m
+    wave.stiffness_matrix_form = F_k
     wave.lhs = lhs(F)
     wave.rhs = rhs(F)
     wave.B = Cofunction(V.dual())

@@ -131,6 +131,8 @@ def forms_pml(wave, W, X_n, X_nm1):
     fix_bnd = DirichletBC(W.sub(0), 0., bc_surf) if \
         bc_bndr == BoundaryConditionsType.DIRICHLET and get_ref_model_negat else None
 
+    wave.mass_matrix_form = m1
+    wave.stiffness_matrix_form = a
     return FF, fix_bnd
 
 
@@ -157,8 +159,11 @@ def construct_solver_or_matrix_with_pml(wave):
 
     # Build mixed function space
     V = wave.function_space
-    Z = create_function_space(wave.mesh, V.ufl_element(),
-                              dim=wave.dimension)
+    Z = create_function_space(
+        wave.mesh,
+        V.ufl_element(),
+        dim=wave.dimension,
+    )
     wave.vector_function_space = Z
     if wave.dimension == 2:
         W = V * Z
@@ -192,8 +197,13 @@ def construct_solver_or_matrix_with_pml(wave):
     wave.B = Cofunction(W.dual())
 
     # Build solver
-    lin_var = LinearVariationalProblem(wave.lhs, wave.rhs + wave.source_function,
-                                       X_np1, bcs=fix_bnd, constant_jacobian=True)
+    lin_var = LinearVariationalProblem(
+        wave.lhs,
+        wave.rhs + wave.source_function,
+        X_np1,
+        bcs=fix_bnd,
+        constant_jacobian=True,
+    )
     solver_parameters = dict(wave.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
     wave.solver = LinearVariationalSolver(lin_var, solver_parameters=solver_parameters)

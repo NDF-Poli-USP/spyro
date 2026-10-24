@@ -2,17 +2,8 @@ import numpy as np
 
 import firedrake as fire
 from firedrake import (
-    assemble,
-    Constant,
     curl,
-    DirichletBC,
     div,
-    dot,
-    dx,
-    Function,
-    grad,
-    inner,
-    project,
 )
 from pyadjoint import AdjFloat, Tape
 
@@ -104,8 +95,10 @@ class IsotropicWave(ElasticWave):
                                     lambda: self.update_s_wave())
 
         self.mechanical_energy = None
-        self.field_logger.add_functional("mechanical_energy",
-                                         lambda: assemble(self.mechanical_energy))
+        self.field_logger.add_functional(
+            "mechanical_energy",
+            lambda: fire.assemble(self.mechanical_energy),
+        )
 
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
         """Initialize isotropic elastic material parameters from a dictionary.
@@ -149,7 +142,7 @@ class IsotropicWave(ElasticWave):
             for key in (parameter.value, *aliases):
                 if key in synthetic_data_dict:
                     value = synthetic_data_dict[key]
-                    return Constant(value) if np.isscalar(value) else value
+                    return fire.Constant(value) if np.isscalar(value) else value
             return None
 
         self.rho = declared(ElasticMaterialParameter.DENSITY)
@@ -245,9 +238,9 @@ class IsotropicWave(ElasticWave):
             in, so the value is left as the scalar or ``Constant`` it came
             in as, and this set still carries the data.
             """
-            if space is None or isinstance(value, Function):
+            if space is None or isinstance(value, fire.Function):
                 return value
-            return Function(space, name=parameter.value).interpolate(value)
+            return fire.Function(space, name=parameter.value).interpolate(value)
 
         if parameterization is ElasticMaterialParameterization.LAME:
             self.rho = as_function(self.rho, ElasticMaterialParameter.DENSITY)
@@ -360,8 +353,9 @@ class IsotropicWave(ElasticWave):
         raise NotImplementedError
 
     def _create_function_space(self):
-        return create_function_space(self.mesh, self.method, self.degree,
-                                     dim=self.dimension)
+        return create_function_space(
+            self.mesh, self.method, self.degree, dim=self.dimension,
+        )
 
     def _set_vstate(self, vstate):
         self.u_n.assign(vstate)
@@ -390,32 +384,6 @@ class IsotropicWave(ElasticWave):
             data_with_halos = self.u_n.dat.data_ro_with_halos[:]
         return self.receivers.interpolate(data_with_halos)
 
-    def modal_weak_forms(self) -> tuple[fire.Form, fire.Form]:
-        """Build the isotropic elastic stiffness and mass forms.
-
-        Returns
-        -------
-        a : firedrake.Form
-            Elastic stiffness form
-            ``lmbda * div(u) * div(v) + 2 * mu * eps(u) : eps(v)``.
-        m : firedrake.Form
-            Mass form ``rho * u . v``.
-        """
-        V = self.function_space
-        u = fire.TrialFunction(V)
-        v = fire.TestFunction(V)
-        quad_rule = self.quadrature_rule
-
-        def eps(w):
-            return 0.5*(grad(w) + grad(w).T)
-
-        a = (
-            self.lmbda*div(u)*div(v)*dx(**quad_rule)
-            + 2*self.mu*inner(eps(u), eps(v))*dx(**quad_rule)
-        )
-        m = self.rho*dot(u, v)*dx(**quad_rule)
-        return a, m
-
     def get_function(self):
         return self.u_n
 
@@ -425,12 +393,15 @@ class IsotropicWave(ElasticWave):
     def matrix_building(self):
         self.current_time = 0.0
 
-        self.u_n = Function(self.function_space,
-                            name=self.get_function_name())
-        self.u_nm1 = Function(self.function_space,
-                              name=self.get_function_name())
-        self.u_np1 = Function(self.function_space,
-                              name=self.get_function_name())
+        self.u_n = fire.Function(
+            self.function_space, name=self.get_function_name(),
+        )
+        self.u_nm1 = fire.Function(
+            self.function_space, name=self.get_function_name(),
+        )
+        self.u_np1 = fire.Function(
+            self.function_space, name=self.get_function_name(),
+        )
 
         abc_dict = self.input_dictionary.get("absorving_boundary_conditions", None)
         if abc_dict is not None:
@@ -438,8 +409,9 @@ class IsotropicWave(ElasticWave):
             if abc_active:
                 dt_scheme = abc_dict.get("nrbc", {}).get("dt_scheme", None)
                 if dt_scheme == "backward_2nd":
-                    self.u_nm2 = Function(self.function_space,
-                                          name=self.get_function_name())
+                    self.u_nm2 = fire.Function(
+                        self.function_space, name=self.get_function_name(),
+                    )
 
         self.mechanical_energy = mechanical_energy_form(self)
 
@@ -486,7 +458,7 @@ class IsotropicWave(ElasticWave):
             else:
                 raise Exception(
                     f"Unsupported boundary condition with tag: {tag}")
-            self.bcs.append(DirichletBC(subspace, value, idbc))
+            self.bcs.append(fire.DirichletBC(subspace, value, idbc))
 
     def parse_volumetric_forces(self):
         acquisition_dict = self.input_dictionary["acquisition"]
@@ -498,9 +470,9 @@ class IsotropicWave(ElasticWave):
     def update_p_wave(self):
         if self.p_wave is None:
             self.D_h = create_function_space(self.mesh, "DG0", 0)
-            self.p_wave = Function(self.D_h)
+            self.p_wave = fire.Function(self.D_h)
 
-        self.p_wave.assign(project(div(self.get_function()), self.D_h))
+        self.p_wave.assign(fire.project(div(self.get_function()), self.D_h))
 
         return self.p_wave
 
@@ -509,11 +481,12 @@ class IsotropicWave(ElasticWave):
             if self.dimension == 2:
                 self.C_h = create_function_space(self.mesh, "DG0", 0)
             else:
-                self.C_h = create_function_space(self.mesh, "DG0", 0,
-                                                 dim=self.dimension)
-            self.s_wave = Function(self.C_h)
+                self.C_h = create_function_space(
+                    self.mesh, "DG0", 0, dim=self.dimension,
+                )
+            self.s_wave = fire.Function(self.C_h)
 
-        self.s_wave.assign(project(curl(self.get_function()), self.C_h))
+        self.s_wave.assign(fire.project(curl(self.get_function()), self.C_h))
 
         return self.s_wave
 
