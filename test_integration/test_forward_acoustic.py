@@ -63,21 +63,22 @@ def test_forward_3_shots():
     wave.forward_solve()
 
     arr = wave.forward_solution_receivers
+    ensemble_comm = SpyroEnsemble.ensemble.ensemble_comm
 
-    if SpyroEnsemble.ensemble_comm.rank == 0:
+    if ensemble_comm.rank == 0:
         analytical_p = spyro.utils.nodal_homogeneous_analytical(
             wave, 0.2, 1.5, n_extra=100
         )
     else:
         analytical_p = None
-    analytical_p = SpyroEnsemble.ensemble_comm.bcast(analytical_p, root=0)
+    analytical_p = ensemble_comm.bcast(analytical_p, root=0)
 
     # Checking if error before reflection matches
-    if SpyroEnsemble.ensemble_comm.rank == 0:
+    if ensemble_comm.rank == 0:
         rec_id = 0
-    elif SpyroEnsemble.ensemble_comm.rank == 1:
+    elif ensemble_comm.rank == 1:
         rec_id = 150
-    elif SpyroEnsemble.ensemble_comm.rank == 2:
+    elif ensemble_comm.rank == 2:
         rec_id = 300
 
     arr0 = arr[:, rec_id]
@@ -89,7 +90,7 @@ def test_forward_3_shots():
         f"L2 Error for shot {wave.current_sources} is {error_L2:.4e} and test "
         f"has passed equals {abs(error_L2) < 0.01}"
     )
-    error_L2_all = SpyroEnsemble.ensemble_comm.allreduce(error_L2, op=MPI.SUM) / 3.
+    error_L2_all = ensemble_comm.allreduce(error_L2, op=MPI.SUM) / 3.
 
     assert abs(error_L2_all) < 0.01
 
