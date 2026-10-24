@@ -10,7 +10,7 @@ on:
 jobs:
   linter:
     name: "Run linter"
-    runs-on: ubuntu:24.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Setup python
