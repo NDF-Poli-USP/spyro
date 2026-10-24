@@ -123,7 +123,6 @@ class Delta_projector:
         else:
             self.cell_tabulations = None
 
-
     def interpolate(self, field):
         """Interpolate the solution to receiver coordinates.
 
