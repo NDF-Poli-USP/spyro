@@ -500,8 +500,7 @@ def get_hexa_real_cell_node_map(V, mesh):
         Integer array with shape ``(num_cells, nodes_per_cell)`` containing
         global node indices for each cell in all layers.
     """
-    weird_cnm_func = V.cell_node_map()
-    weird_cnm = weird_cnm_func.values_with_halo
+    weird_cnm = V.cell_node_list
     cells_per_layer, nodes_per_cell = np.shape(weird_cnm)
     layers = mesh.cell_set.layers - 1
     ufl_element = V.ufl_element()
