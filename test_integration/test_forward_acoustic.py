@@ -84,8 +84,10 @@ def test_forward_3_shots():
 
     # Calculating errors
     error_L2 = MeasureError.calculate_normalized_L2_error(arr0[:430], analytical_p[:430])
-    SpyroEnsemble.print(f"L2 Error for shot {wave.current_sources} is {error_L2:.4e} and test "
-           f"has passed equals {abs(error_L2) < 0.01}")
+    SpyroEnsemble.print(
+        f"L2 Error for shot {wave.current_sources} is {error_L2:.4e} and test "
+        f"has passed equals {abs(error_L2) < 0.01}"
+    )
     error_L2_all = SpyroEnsemble.ensemble_comm.allreduce(error_L2, op=MPI.SUM) / 3.
 
     assert abs(error_L2_all) < 0.01
