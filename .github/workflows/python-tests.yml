@@ -149,6 +149,7 @@ jobs:
           mpiexec -n 2 python3 -m coverage run --parallel-mode --source=spyro -m pytest tests/parallel/test_parallel_io.py
           mpiexec -n 2 python3 -m coverage run --parallel-mode --source=spyro -m pytest tests/parallel/test_forward_multiple_serial_shots.py
           mpiexec -n 2 python3 -m coverage run --parallel-mode --source=spyro -m pytest tests/parallel/test_vom_receivers.py
+          mpiexec -n 2 python3 -m coverage run --parallel-mode --source=spyro -m pytest tests/parallel/test_modal_matrices_parallel.py
 
     - name: Running parallel tests for inversion
       run: |
@@ -228,6 +229,7 @@ jobs:
           mpiexec -n 2 pytest tests/parallel/test_parallel_io.py
           mpiexec -n 2 pytest tests/parallel/test_forward_multiple_serial_shots.py
           mpiexec -n 2 pytest tests/parallel/test_vom_receivers.py
+          mpiexec -n 2 pytest tests/parallel/test_modal_matrices_parallel.py
     
     - name: Running parallel tests for inversion
       run: |
