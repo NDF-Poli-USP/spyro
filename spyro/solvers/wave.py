@@ -465,24 +465,35 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def get_and_set_maximum_dt(
         self,
-        fraction=0.7,
-        estimate_max_eigenvalue=False,
-    ):
-        """
-        Calculates and sets the maximum stable time step (dt) for the wave solver.
+        fraction: float = 0.7,
+        estimate_max_eigenvalue: bool = False,
+    ) -> float:
+        """Calculate and set the maximum stable time step of the wave solver.
 
-        Args:
-            fraction (float, optional):
-                Fraction of the estimated time step to use. Defaults to 0.7.
-            estimate_max_eigenvalue (bool, optional):
-                Whether to estimate the maximum eigenvalue. Defaults to False.
+        The largest eigenvalue is computed with SciPy on a single rank in
+        serial, and distributed with SLEPc when the mesh is distributed.
 
-        Returns:
-            float: The calculated maximum time step (dt).
+        Parameters
+        ----------
+        fraction : float, optional
+            Fraction of the estimated time step to use. Default is 0.7.
+        estimate_max_eigenvalue : bool, optional
+            Whether to estimate the maximum eigenvalue from the matrix
+            diagonals instead of computing it. Default is `False`.
+
+        Returns
+        -------
+        float
+            The calculated maximum time step, also stored in ``self.dt``.
         """
 
         # Maximum timestep size
-        method = 'ANALYTICAL' if estimate_max_eigenvalue else 'ARNOLDI'
+        if estimate_max_eigenvalue:
+            method = 'ANALYTICAL'
+        elif self.function_space.mesh().comm.size > 1:
+            method = 'KRYLOVSCH_CH'
+        else:
+            method = 'ARNOLDI'
         dt_solver = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
         # The forms carry the material parameters, so no velocity is passed
         max_dt = dt_solver.estimate_timestep(

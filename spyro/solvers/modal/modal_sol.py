@@ -1,8 +1,11 @@
 import warnings
 
-from firedrake import LinearEigenproblem, LinearEigensolver
-from numpy import array, asarray, eye, imag, real, sqrt, unique
+from firedrake import (
+    ConvergenceError, Form, LinearEigenproblem, LinearEigensolver, assemble,
+)
+from numpy import array, asarray, eye, imag, ndarray, real, sqrt, unique
 from scipy.sparse.linalg import eigs, eigsh, lobpcg, spilu
+from slepc4py import SLEPc
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .modal_forms_and_matrices import (
     assemble_sparse_matrices,
@@ -25,6 +28,14 @@ from ...utils.error_management import (
 # doi: https://doi.org/10.1016/j.apm.2022.09.014
 # TODO: citation
 # With additions by Alexandre Olender
+
+# Krylov solver and preconditioner of each "KRYLOVSCH_(K)(P)" method
+KRYLOVSCH_CONFIG = {
+    "KRYLOVSCH_CH": {"ksp": "cg", "pc": "hypre"},
+    "KRYLOVSCH_CG": {"ksp": "cg", "pc": "gamg"},
+    "KRYLOVSCH_GH": {"ksp": "gmres", "pc": "hypre"},
+    "KRYLOVSCH_GG": {"ksp": "gmres", "pc": "gamg"},
+}
 
 
 class Modal_Solver:
@@ -57,6 +68,11 @@ class Modal_Solver:
         Residual (gmres). (P) indicates the preconditioner to use: "H" for
         Hypre (hypre) or "G" for Geometric Algebraic Multigrid (gamg). For
         example, "KRYLOVSCH_CH" uses cg solver with hypre preconditioner.
+        "KRYLOVSCH" methods solve the problem distributed with SLEPc,
+        while "ARNOLDI", "LANCZOS" and "LOBPCG" gather the whole problem
+        and solve it with SciPy on one rank, which broadcasts the
+        eigenvalues. "RAYLEIGH" is unavailable when `calc_max_dt` is
+        `True`.
 
     Methods
     -------
@@ -72,6 +88,8 @@ class Modal_Solver:
         Solve the eigenvalue problem with sparse matrices using Scipy.
     solver_with_ufl()
             Solve the eigenvalue problem using UFL forms with SLEPc.
+    solver_largest_with_slepc()
+        Compute the largest eigenvalues of the distributed problem with SLEPc.
     """
 
     def __init__(self, dimension=2, method=None, calc_max_dt=False, comm=None):
@@ -93,6 +111,11 @@ class Modal_Solver:
             Residual (gmres). (P) indicates the preconditioner to use: "H" for
             Hypre (hypre) or "G" for Geometric Algebraic Multigrid (gamg). For
             example, "KRYLOVSCH_CH" uses cg solver with hypre preconditioner.
+            "KRYLOVSCH" methods solve the problem distributed with SLEPc,
+            while "ARNOLDI", "LANCZOS" and "LOBPCG" gather the whole problem
+            and solve it with SciPy on one rank, which broadcasts the
+            eigenvalues. "RAYLEIGH" is unavailable when `calc_max_dt` is
+            `True`.
         calc_max_dt : `bool`
             Option to estimate the maximum stable timestep for the computation
             of the transient response. Default is `False`.
@@ -116,10 +139,10 @@ class Modal_Solver:
 
         # Valid methods for solving the eigenproblem
         def_methods = ["ANALYTICAL", "ARNOLDI", "LANCZOS", "LOBPCG"]
-        self.valid_methods = def_methods + (
-            ["KRYLOVSCH_CH", "KRYLOVSCH_CG", "KRYLOVSCH_GH", "KRYLOVSCH_GG", "RAYLEIGH"]
-            if not self.calc_max_dt
-            else []
+        self.valid_methods = (
+            def_methods
+            + list(KRYLOVSCH_CONFIG)
+            + ([] if self.calc_max_dt else ["RAYLEIGH"])
         )
 
         # Method for solving the eigenproblem
@@ -136,8 +159,13 @@ class Modal_Solver:
 
         SpyroEnsemble.print(f"Solver Method: {self.method}")
 
+    @SpyroEnsemble.run_in_one_core_and_broadcast
     def solver_with_sparse_matrix(self, Asp, Msp, method, k=2, inv_oper=False):
         """Solve the eigenvalue problem with sparse matrices using Scipy.
+
+        Every rank holds the whole matrices, so the problem is solved on a
+        single rank and its eigenvalues are broadcast to the other ranks and
+        ensemble members, which must all call this method.
 
         Parameters
         ----------
@@ -261,16 +289,8 @@ class Modal_Solver:
             Array containing the computed eigenvalues.
         """
 
-        krylovsch_config = {
-            "KRYLOVSCH_CH": {"ksp": "cg", "pc": "hypre"},
-            "KRYLOVSCH_CG": {"ksp": "cg", "pc": "gamg"},
-            "KRYLOVSCH_GH": {"ksp": "gmres", "pc": "hypre"},
-            "KRYLOVSCH_GG": {"ksp": "gmres", "pc": "gamg"},
-        }
-
-        if self.method in krylovsch_config:
-            ksp_type = krylovsch_config[self.method]["ksp"]
-            pc_type = krylovsch_config[self.method]["pc"]
+        ksp_type = KRYLOVSCH_CONFIG[self.method]["ksp"]
+        pc_type = KRYLOVSCH_CONFIG[self.method]["pc"]
 
         opts = {
             "eps_gen_hermitian": None,  # Problem is Hermitian
@@ -282,15 +302,8 @@ class Modal_Solver:
             "eps_monitor": "ascii",  # Print convergence info
             "ksp_type": ksp_type,  # Options for large problems
             "pc_type": pc_type,  # Options for large problems
+            "eps_smallest_magnitude": None,  # Smallest eigenvalues magnitude
         }
-
-        if self.calc_max_dt:
-            # Largest eigenvalues magnitude
-            opts.update({"eps_largest_magnitude": None})
-            # subspace, arnoldi, krylovschur, lapack
-        else:
-            # Smallest eigenvalues magnitude
-            opts.update({"eps_smallest_magnitude": None})
 
         eigenproblem = LinearEigenproblem(a, M=m)
         eigensolver = LinearEigensolver(eigenproblem, n_evals=k, solver_parameters=opts)
@@ -298,6 +311,63 @@ class Modal_Solver:
         Lsp = asarray([eigensolver.eigenvalue(mod) for mod in range(k)])
 
         return Lsp
+
+    def solver_largest_with_slepc(self, a: Form, m: Form, k: int = 2) -> ndarray:
+        """Compute the largest eigenvalues of the distributed problem with SLEPc.
+
+        Firedrake's ``LinearEigensolver`` always sets a target, which makes
+        SLEPc look for the eigenvalues closest to it instead of the largest
+        ones, so the SLEPc solver is built directly on the assembled
+        matrices. No spectral transformation is used, so each iteration only
+        solves a system with the mass matrix, with the Krylov solver and
+        preconditioner of ``method``.
+
+        Parameters
+        ----------
+        a : firedrake.Form
+            Weak form representing the stiffness matrix.
+        m : firedrake.Form
+            Weak form representing the mass matrix.
+        k : int, optional
+            Number of eigenvalues to compute. Default is 2.
+
+        Returns
+        -------
+        numpy.ndarray
+            Real converged eigenvalues of largest magnitude, identical on
+            every rank.
+
+        Raises
+        ------
+        firedrake.ConvergenceError
+            If SLEPc does not converge any eigenvalue.
+        """
+        A = assemble(a).petscmat
+        M = assemble(m).petscmat
+
+        eps = SLEPc.EPS().create(comm=A.comm)
+        try:
+            eps.setOperators(A, M)
+            eps.setProblemType(SLEPc.EPS.ProblemType.GHEP)
+            eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
+            eps.setWhichEigenpairs(SLEPc.EPS.Which.LARGEST_MAGNITUDE)
+            eps.setDimensions(nev=k)
+            eps.setTolerances(1e-6, 200)
+            ksp = eps.getST().getKSP()
+            ksp.setType(KRYLOVSCH_CONFIG[self.method]["ksp"])
+            ksp.getPC().setType(KRYLOVSCH_CONFIG[self.method]["pc"])
+            ksp.setTolerances(rtol=1e-10)
+            eps.solve()
+
+            n_converged = eps.getConverged()
+            if n_converged == 0:
+                raise ConvergenceError("SLEPc did not converge any eigenvalue.")
+            return asarray(
+                [eps.getEigenvalue(i).real for i in range(n_converged)]
+            )
+        finally:
+            # Destroyed explicitly, since SLEPc objects are collective
+            eps.destroy()
 
     def solver_rayleigh_quotient(
         self, c, ufl_coordinates, V, mesh_limits, k=2, quad_rule=None
@@ -543,7 +613,10 @@ class Modal_Solver:
             )
 
         if self.method.startswith("KRYLOVSCH"):
-            Lsp = self.solver_with_ufl(a, m, k=k)
+            if self.calc_max_dt:
+                Lsp = self.solver_largest_with_slepc(a, m, k=k)
+            else:
+                Lsp = self.solver_with_ufl(a, m, k=k)
 
         elif self.method in ["ARNOLDI", "LANCZOS", "LOBPCG"]:
             Asp, Msp = assemble_sparse_matrices(a, m)
