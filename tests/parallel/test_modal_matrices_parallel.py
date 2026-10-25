@@ -14,7 +14,10 @@ from spyro.solvers.modal.modal_forms_and_matrices import (
     maximum_diagonal_ratio,
     acoustic_weak_forms_c_in_stiffness,
 )
+from spyro.solvers import wave as wave_module
+from spyro.solvers.modal import modal_sol
 from spyro.solvers.modal.modal_sol import Modal_Solver
+from tests.on_one_core.test_modal_weak_forms import _elastic_wave
 
 
 def _forms(comm) -> tuple:
@@ -93,7 +96,7 @@ def test_modal_matrices_match_serial():
 
 
 @pytest.mark.parallel(2)
-@pytest.mark.parametrize("method", ["ANALYTICAL", "ARNOLDI"])
+@pytest.mark.parametrize("method", ["ANALYTICAL", "ARNOLDI", "KRYLOVSCH_CH"])
 def test_estimated_timestep_is_identical_on_every_rank(method: str):
     """Every rank gets the same time step, so all take the same steps."""
     a, m = _forms(COMM_WORLD)
@@ -101,4 +104,66 @@ def test_estimated_timestep_is_identical_on_every_rank(method: str):
     solver = Modal_Solver(2, method=method, calc_max_dt=True)
     dt = solver.estimate_timestep(None, V, 1.0, forms=(a, m))
     assert dt > 0.0
+    assert COMM_WORLD.allgather(dt) == [dt, dt]
+
+
+@pytest.mark.parallel(2)
+def test_slepc_timestep_matches_serial_scipy():
+    """The distributed SLEPc estimate matches SciPy on a serial copy."""
+    a, m = _forms(COMM_WORLD)
+    a_serial, m_serial = _forms(COMM_SELF)
+    V = a.arguments()[0].function_space()
+    V_serial = a_serial.arguments()[0].function_space()
+
+    slepc_solver = Modal_Solver(2, method="KRYLOVSCH_CH", calc_max_dt=True)
+    scipy_solver = Modal_Solver(2, method="ARNOLDI", calc_max_dt=True)
+    slepc_dt = slepc_solver.estimate_timestep(None, V, 1.0, forms=(a, m))
+    scipy_dt = scipy_solver.estimate_timestep(
+        None, V_serial, 1.0, forms=(a_serial, m_serial)
+    )
+    assert np.isclose(slepc_dt, scipy_dt, rtol=1e-6)
+
+
+@pytest.mark.parallel(2)
+def test_wave_uses_slepc_on_a_distributed_mesh(monkeypatch):
+    """A wave on a distributed mesh estimates its time step with SLEPc."""
+    methods = []
+
+    def recording_modal_solver(*args, method=None, **kwargs):
+        methods.append(method)
+        return Modal_Solver(*args, method=method, **kwargs)
+
+    monkeypatch.setattr(wave_module, "Modal_Solver", recording_modal_solver)
+    wave = _elastic_wave(1.5, 1.0)
+    dt = wave.get_and_set_maximum_dt(fraction=1.0)
+    assert methods == ["KRYLOVSCH_CH"]
+    assert COMM_WORLD.allgather(dt) == [dt, dt]
+
+    # The distributed vector-valued problem matches SciPy's solution
+    scipy_solver = Modal_Solver(2, method="ARNOLDI", calc_max_dt=True)
+    scipy_dt = scipy_solver.estimate_timestep(
+        None, wave.function_space, wave.final_time, fraction=1.0,
+        forms=wave.modal_weak_forms(),
+    )
+    assert np.isclose(dt, scipy_dt, rtol=1e-6)
+
+
+@pytest.mark.parallel(2)
+def test_scipy_eigensolve_runs_on_one_rank(monkeypatch):
+    """SciPy solves the gathered problem once and broadcasts the result."""
+    calls = []
+    original_eigs = modal_sol.eigs
+
+    def counting_eigs(*args, **kwargs):
+        calls.append(1)
+        return original_eigs(*args, **kwargs)
+
+    monkeypatch.setattr(modal_sol, "eigs", counting_eigs)
+    # Building the wave sets up the ensemble the solve is restricted by
+    wave = _elastic_wave(1.5, 1.0)
+    solver = Modal_Solver(2, method="ARNOLDI", calc_max_dt=True)
+    dt = solver.estimate_timestep(
+        None, wave.function_space, 1.0, forms=wave.modal_weak_forms()
+    )
+    assert COMM_WORLD.allgather(len(calls)) == [1, 0]
     assert COMM_WORLD.allgather(dt) == [dt, dt]
