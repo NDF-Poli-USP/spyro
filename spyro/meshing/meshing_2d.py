@@ -6,7 +6,7 @@ from .meshing_gmsh2d import (
     build_gmsh_geometry_and_groups,
     apply_structured_winslow_smoothing2d,
 )
-from .meshing_utils import create_sizing_function
+from .meshing_utils import check_gmsh, create_sizing_function
 
 try:
     import gmsh
@@ -14,6 +14,7 @@ except ImportError:
     gmsh = None
 
 
+@check_gmsh
 def generate_gmsh_2d_mesh(mesh_parameters) -> str:
     """Generate a 2-D Gmsh mesh file from a velocity model.
 
@@ -32,31 +33,11 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
         Path to the velocity model used for meshing (the SEG-Y input, or a
         temporary SEG-Y file written from a grid ``velocity_model``).
     """
-    if gmsh is None:
-        raise ImportError("gmsh is not available. Please install it.")
-
     if mesh_parameters.segy_velocity_model is not None:
         velocity_model_file = mesh_parameters.segy_velocity_model
 
     elif mesh_parameters.velocity_model is not None:
-        velocity_model = mesh_parameters.velocity_model
-
-        if not isinstance(velocity_model, dict):
-            raise TypeError(
-                "velocity_model must be a grid dictionary when "
-                "segy_velocity_model is not provided."
-            )
-
-        if "vp_values" not in velocity_model:
-            raise ValueError("Grid velocity_model must contain the key 'vp_values'.")
-
-        vp = np.asarray(velocity_model["vp_values"])
-
-        if vp.ndim != 2:
-            raise ValueError(
-                "Grid velocity_model['vp_values'] must be a 2-D array, "
-                f"but received shape {vp.shape}."
-            )
+        vp = np.asarray(mesh_parameters.velocity_model["vp_values"])
 
         vp_for_gmsh = np.ascontiguousarray(vp)
 
@@ -168,6 +149,33 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
         zc = geom_params.get("zc")
 
         def mesh_size_callback(dim, tag, x, y, z, lc):
+            """Return the target element size at a point, for Gmsh.
+
+            Inside the velocity model box, or everywhere when `extend_segy`
+            is set, the size comes from the velocity-based sizing
+            `ef_segy2`. In the padding it goes linearly from the size at the
+            closest point of the box to `h_padding` at the outer edge.
+
+            Parameters
+            ----------
+            dim : int
+                Dimension of the entity being meshed (unused).
+            tag : int
+                Tag of the entity being meshed (unused).
+            x : float
+                x coordinate of the point.
+            y : float
+                Depth (z) coordinate of the point.
+            z : float
+                Gmsh z coordinate, always 0 here (unused).
+            lc : float
+                Size Gmsh would use without the callback (unused).
+
+            Returns
+            -------
+            float
+                Target element size at the point.
+            """
             if extend_segy:
                 return float(ef_segy2(np.array([x]), np.array([y]))[0])
             else:
