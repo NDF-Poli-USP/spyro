@@ -128,3 +128,28 @@ def test_maximum_diagonal_ratio_rejects_zero_stiffness():
     m = u*v*dx
     with pytest.raises(ValueError, match="no nonzero ratio"):
         maximum_diagonal_ratio(a, m)
+
+
+@pytest.mark.parametrize(
+    "method", ["KRYLOVSCH_CH", "KRYLOVSCH_CG", "KRYLOVSCH_GH", "KRYLOVSCH_GG"]
+)
+def test_slepc_timestep_matches_scipy(method: str):
+    """SLEPc finds the same largest eigenvalue as SciPy's ARNOLDI."""
+    mesh = UnitSquareMesh(6, 6, quadrilateral=True)
+    V = FunctionSpace(mesh, "CG", 2)
+    x, y = mesh.coordinates
+    c = Function(V).interpolate(1.5 + x + y)
+    forms = acoustic_weak_forms_c_in_stiffness(c, V)
+
+    scipy_solver = Modal_Solver(2, method="ARNOLDI", calc_max_dt=True)
+    slepc_solver = Modal_Solver(2, method=method, calc_max_dt=True)
+    scipy_dt = scipy_solver.estimate_timestep(c, V, 1.0, forms=forms)
+    slepc_dt = slepc_solver.estimate_timestep(c, V, 1.0, forms=forms)
+    assert np.isclose(slepc_dt, scipy_dt, rtol=1e-6)
+
+
+def test_timestep_methods():
+    """SLEPc methods can estimate the time step, the Rayleigh quotient not."""
+    assert Modal_Solver(calc_max_dt=True).method == "KRYLOVSCH_CH"
+    with pytest.raises(ValueError):
+        Modal_Solver(method="RAYLEIGH", calc_max_dt=True)
