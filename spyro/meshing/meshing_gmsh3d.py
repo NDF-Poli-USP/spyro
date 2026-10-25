@@ -1,0 +1,890 @@
+import numpy as np
+
+from .meshing_gmsh3d_geometry import (
+    boundary_faces_of_volume,
+    create_hyperellipsoid_volume,
+    generate_rectangular_padding_no_water,
+    generate_structured_rectangular_padding_water,
+)
+from .meshing_utils3d import (
+    align_water_columns3d,
+    checked_mesh_size,
+    define_winslow_points_3d,
+)
+from .meshing_water3d import generate_water_interface_volumes
+from .meshing_winslow3d import run_selected_winslow
+from spyro.mpi.spyro_mpi import SpyroEnsemble
+
+
+def build_gmsh_geometry_and_groups3d(
+    gmsh,
+    fname,
+    length_x,
+    length_y,
+    depth_z,
+    padding_type,
+    padding_x,
+    padding_y,
+    padding_z,
+    hyper_n,
+    water_interface,
+    water_search_value,
+    structured_mesh,
+    nz,
+    nx,
+    ny,
+    dz,
+    dx,
+    dy,
+    byte_order="big",
+    axes_order=(0, 1, 2),
+    axes_order_sort="F",
+    dtype="float32",
+):
+    """Build the three-dimensional Gmsh geometry and physical groups for all supported padding and water cases.
+
+    Parameters
+    ----------
+    gmsh : module
+        Initialized Gmsh Python module used to build or query the mesh.
+    fname : str or pathlib.Path
+        Path to the binary velocity model.
+    length_x : float
+        Physical domain length in the x direction.
+    length_y : float
+        Physical domain length in the y direction.
+    depth_z : float
+        Physical domain depth; the model occupies negative z.
+    padding_type : str or None
+        Padding geometry, either `None` or `"rectangular"` for Winslow.
+    padding_x : float
+        Padding thickness in the x direction.
+    padding_y : float
+        Padding thickness in the y direction.
+    padding_z : float
+        Bottom padding thickness in the z direction.
+    hyper_n : float
+        Hyperellipsoid exponent used by the padding geometry and sizing law.
+    water_interface : bool
+        Whether the water/subsurface interface is geometrically delimited.
+    water_search_value : float
+        Velocity value used to identify the water layer.
+    structured_mesh : bool
+        Whether a structured hexahedral mesh is requested.
+    nz : int
+        Number of velocity samples in the z direction.
+    nx : int
+        Number of velocity samples in the x direction.
+    ny : int
+        Number of velocity samples in the y direction.
+    dz : float
+        Velocity-model spacing in the z direction.
+    dx : float
+        Velocity-model spacing in the x direction.
+    dy : float
+        Velocity-model spacing in the y direction.
+    byte_order : {"big", "little"}
+        Byte order of the velocity-model binary file.
+    axes_order : tuple of int
+        Permutation mapping binary axes to Spyro `(z, x, y)` order.
+    axes_order_sort : {"C", "F"}
+        Memory order used to reshape the binary velocity data.
+    dtype : str or numpy.dtype
+        Numeric data type stored in the velocity-model file.
+
+    Returns
+    -------
+    dict
+        Geometry metadata and volume tags required by mesh generation and smoothing.
+
+    Notes
+    -----
+    Supported padding types are `None`, `"rectangular"`, and `"hyperelliptical"`.
+    Hyperelliptical padding is restricted to unstructured meshing.
+    """
+    if padding_type not in (None, "rectangular", "hyperelliptical"):
+        raise ValueError(
+            "padding_type must be None, 'rectangular', " "or 'hyperelliptical'."
+        )
+
+    # Hyperelliptical padding
+    if padding_type == "hyperelliptical" and structured_mesh:
+        raise ValueError(
+            "Hyperelliptical 3-D padding currently supports only "
+            "structured_mesh=False. Winslow smoothing is not available "
+            "for this geometry."
+        )
+
+    if water_interface and tuple(axes_order) != (0, 1, 2):
+        raise ValueError(
+            "The supplied water-interface geometry reads the binary directly "
+            "in (z, x, y) order; axes_order must therefore be (0, 1, 2)."
+        )
+
+    box_xmin = 0.0
+    box_xmax = length_x
+    box_ymin = 0.0
+    box_ymax = length_y
+    box_zmin = -abs(depth_z)
+    box_zmax = 0.0
+    ellipse_a = length_x / 2.0 + padding_x
+    ellipse_b = length_y / 2.0 + padding_y
+    ellipse_c = abs(depth_z) / 2.0 + padding_z
+    xc = length_x / 2.0
+    yc = length_y / 2.0
+    zc = -abs(depth_z) / 2.0
+
+    z_min, z_max = depth_z, 0.0
+    x_min, x_max = 0.0, length_x
+    y_min, y_max = 0.0, length_y
+
+    if not water_interface and padding_type is None:
+        # No padding
+        SpyroEnsemble.print(
+            "Generating undelimited water+subsurface rectangular domain (no padding)...",
+        )
+        occ = gmsh.model.occ
+        vol_subsoil = occ.addBox(
+            x_min,
+            y_min,
+            z_min,
+            x_max - x_min,
+            y_max - y_min,
+            z_max - z_min,
+        )
+        occ.synchronize()
+
+        gmsh.model.addPhysicalGroup(3, [vol_subsoil], name="SubsurfaceAndWater")
+        vol_water = None
+
+    elif not water_interface and padding_type == "rectangular":
+        SpyroEnsemble.print(
+            "Generating undelimited water+subsurface domain "
+            "with rectangular padding...",
+        )
+        vol_subsoil, vol_water = generate_rectangular_padding_no_water(
+            gmsh,
+            length_x,
+            length_y,
+            depth_z,
+            padding_x,
+            padding_y,
+            padding_z,
+        )
+
+    elif not water_interface and padding_type == "hyperelliptical":
+        # Hyperelliptical padding
+        SpyroEnsemble.print(
+            "Generating undelimited water+subsurface domain with "
+            "hyperelliptical padding...",
+        )
+        occ = gmsh.model.occ
+
+        cube_volume_tag = occ.addBox(
+            box_xmin,
+            box_ymin,
+            box_zmin,
+            box_xmax - box_xmin,
+            box_ymax - box_ymin,
+            box_zmax - box_zmin,
+        )
+        ellipsoid_tag = create_hyperellipsoid_volume(
+            gmsh=gmsh,
+            a=ellipse_a,
+            b=ellipse_b,
+            c=ellipse_c,
+            n=hyper_n,
+            xc=xc,
+            yc=yc,
+            zc=zc,
+        )
+        if ellipsoid_tag is None:
+            raise RuntimeError("Could not create the hyperelliptical outer volume.")
+
+        occ.synchronize()
+        _fragment_result, fragment_map = occ.fragment(
+            [(3, ellipsoid_tag)],
+            [(3, cube_volume_tag)],
+            removeObject=True,
+            removeTool=True,
+        )
+        occ.synchronize()
+
+        ellipsoid_fragments = {tag for dim, tag in fragment_map[0] if dim == 3}
+        cube_fragments = {tag for dim, tag in fragment_map[1] if dim == 3}
+
+        if not cube_fragments:
+            raise RuntimeError(
+                "The internal water+subsurface rectangle was lost during "
+                "the hyperellipsoid fragment operation."
+            )
+
+        padding_fragments = sorted(ellipsoid_fragments - cube_fragments)
+        core_fragments = sorted(cube_fragments)
+
+        if not padding_fragments:
+            raise RuntimeError(
+                "The hyperellipsoid fragment produced no padding volume."
+            )
+
+        vol_subsoil = core_fragments[0]
+        vol_water = None
+
+        # both water and subsurface.
+        gmsh.model.addPhysicalGroup(3, core_fragments, name="SubsurfaceAndWater")
+        gmsh.model.addPhysicalGroup(3, padding_fragments, name="Padding")
+
+        ellipsoid_faces = set()
+        for volume_tag in padding_fragments:
+            ellipsoid_faces.update(boundary_faces_of_volume(gmsh, volume_tag))
+
+        for surface_tag in ellipsoid_faces:
+            gmsh.model.mesh.setAlgorithm(2, int(surface_tag), 1)
+
+    else:
+        # Cases 4-6: water delimitation enabled.
+        vol_subsoil, vol_water = generate_water_interface_volumes(
+            gmsh=gmsh,
+            fname=fname,
+            water_search_value=water_search_value,
+            nz=nz,
+            nx=nx,
+            ny=ny,
+            dz=dz,
+            dx=dx,
+            dy=dy,
+            x_min=x_min,
+            x_max=x_max,
+            y_min=y_min,
+            y_max=y_max,
+            z_min=z_min,
+            z_max=z_max,
+            byte_order=byte_order,
+            order=axes_order_sort,
+            dtype=dtype,
+        )
+
+        if padding_type is None:
+
+            gmsh.model.addPhysicalGroup(3, [vol_subsoil], name="Subsurface")
+            gmsh.model.addPhysicalGroup(3, [vol_water], name="Water")
+        if padding_type == "hyperelliptical":
+            cube_volume_tag = gmsh.model.occ.addBox(
+                box_xmin,
+                box_ymin,
+                box_zmin,  # x, y, z of corner
+                box_xmax - box_xmin,  # width in x
+                box_ymax - box_ymin,  # width in y
+                box_zmax - box_zmin,  # width in z
+            )
+
+            gmsh.model.occ.removeAllDuplicates()
+            gmsh.model.occ.synchronize()
+            ellipsoid_tag = create_hyperellipsoid_volume(
+                gmsh,
+                a=ellipse_a,
+                b=ellipse_b,
+                c=ellipse_c,
+                n=hyper_n,
+                xc=xc,
+                yc=yc,
+                zc=zc,
+            )
+            gmsh.model.occ.synchronize()
+            gmsh.model.occ.fragment(
+                [
+                    (3, ellipsoid_tag),
+                    (3, cube_volume_tag),
+                    (3, vol_subsoil),
+                    (3, vol_water),
+                ],
+                [],  # Tool volumes (empty for self-fragmentation)
+                removeObject=True,
+                removeTool=False,
+            )
+            gmsh.model.occ.synchronize()
+            volumes = gmsh.model.getEntities(3)
+            volume_tags = [tag for dim, tag in volumes if dim == 3]
+
+            water_volumes = [volume_tags[1]] if len(volume_tags) > 0 else []
+            ellipsoid_volumes = [volume_tags[2]] if len(volume_tags) > 1 else []
+            cube_volumes = [volume_tags[0]] if len(volume_tags) > 2 else []
+
+            gmsh.model.addPhysicalGroup(3, cube_volumes, name="Subsurface")
+            gmsh.model.addPhysicalGroup(3, water_volumes, name="Water")
+            gmsh.model.addPhysicalGroup(3, ellipsoid_volumes, name="Padding")
+
+            ellipsoid_faces = []
+            for v in ellipsoid_volumes:
+                ellipsoid_faces.extend(boundary_faces_of_volume(gmsh, v))
+            ellipsoid_faces = set(ellipsoid_faces)
+            algo_id = 1.0
+            for surf_tag in ellipsoid_faces:
+                gmsh.model.mesh.setAlgorithm(2, int(surf_tag), int(algo_id))
+        if padding_type == "rectangular":
+            generate_structured_rectangular_padding_water(
+                gmsh=gmsh,
+                vol_water=vol_water,
+                vol_subsoil=vol_subsoil,
+                padding_x=padding_x,
+                padding_y=padding_y,
+                padding_z=padding_z,
+            )
+
+    gmsh.model.occ.synchronize()
+    return {
+        "vol_subsoil": vol_subsoil,
+        "vol_water": vol_water,
+        "ellipse_a": ellipse_a,
+        "ellipse_b": ellipse_b,
+        "ellipse_c": ellipse_c,
+        "xc": xc,
+        "yc": yc,
+        "zc": zc,
+    }
+
+
+def padding_grading_factor(
+    dist_x: float | np.ndarray,
+    dist_y: float | np.ndarray,
+    dist_z: float | np.ndarray,
+    padding_x: float,
+    padding_y: float,
+    padding_z: float,
+    padding_type: str | None,
+    hyper_n: float,
+) -> float | np.ndarray:
+    """Return how far into the padding a point is, as a factor in `[0, 1]`.
+
+    The factor blends the projected velocity-model size (`0`) into
+    `h_padding` (`1`) at the outer padding boundary.
+
+    Parameters
+    ----------
+    dist_x : float or numpy.ndarray
+        Distance in x from the point(s) to the velocity-model box.
+    dist_y : float or numpy.ndarray
+        Distance in y from the point(s) to the velocity-model box.
+    dist_z : float or numpy.ndarray
+        Distance in z from the point(s) to the velocity-model box.
+    padding_x : float
+        Padding thickness in the x direction.
+    padding_y : float
+        Padding thickness in the y direction.
+    padding_z : float
+        Bottom padding thickness in the z direction.
+    padding_type : str or None
+        Padding geometry; `"hyperelliptical"` uses an `hyper_n`-norm of
+        the normalized distances, any other value their maximum.
+    hyper_n : float
+        Hyperellipsoid exponent used by the hyperelliptical sizing law.
+
+    Returns
+    -------
+    float or numpy.ndarray
+        Grading factor clamped to at most `1`.
+    """
+    tx = dist_x / padding_x if padding_x > 0 else np.zeros_like(dist_x)
+    ty = dist_y / padding_y if padding_y > 0 else np.zeros_like(dist_y)
+    tz = dist_z / padding_z if padding_z > 0 else np.zeros_like(dist_z)
+
+    if padding_type == "hyperelliptical":
+        t = (tx**hyper_n + ty**hyper_n + tz**hyper_n) ** (1.0 / hyper_n)
+    else:
+        t = np.maximum(np.maximum(tx, ty), tz)
+
+    return np.minimum(t, 1.0)
+
+
+def configure_gmsh_mesh_size3d(
+    gmsh,
+    ef_segy3,
+    bbox,
+    structured_mesh,
+    parallel,
+    extend_segy,
+    padding_type,
+    padding_x,
+    padding_y,
+    padding_z,
+    hyper_n,
+    h_padding,
+    length_x,
+    length_y,
+    depth_z,
+    nz,
+    nx,
+    ny,
+    *,
+    gmsh_num_threads=1,
+):
+    """Configure serial or parallel Gmsh mesh sizing from the velocity-model sizing function.
+
+    Parameters
+    ----------
+    gmsh : module
+        Initialized Gmsh Python module used to build or query the mesh.
+    ef_segy3 : callable
+        Three-dimensional mesh-sizing function in `(z, x, y)` coordinates.
+    bbox : sequence of float
+        Bounding box ordered as `(zmin, zmax, xmin, xmax, ymin, ymax)`.
+    structured_mesh : bool
+        Whether a structured hexahedral mesh is requested.
+    parallel : bool
+        Whether to build a point-cloud background field for parallel meshing.
+    extend_segy : bool
+        Whether velocity-model sizing is extended by nearest-edge projection.
+    padding_type : str or None
+        Padding geometry, either `None` or `"rectangular"` for Winslow.
+    padding_x : float
+        Padding thickness in the x direction.
+    padding_y : float
+        Padding thickness in the y direction.
+    padding_z : float
+        Bottom padding thickness in the z direction.
+    hyper_n : float
+        Hyperellipsoid exponent used by the padding geometry and sizing law.
+    h_padding : float
+        Target element size at the outer padding boundary.
+    length_x : float
+        Physical domain length in the x direction.
+    length_y : float
+        Physical domain length in the y direction.
+    depth_z : float
+        Physical domain depth; the model occupies negative z.
+    nz : int
+        Number of velocity samples in the z direction.
+    nx : int
+        Number of velocity samples in the x direction.
+    ny : int
+        Number of velocity samples in the y direction.
+    gmsh_num_threads : int
+        Number of threads used by parallel 3-D Gmsh/HXT meshing. Default is 1.
+
+    Returns
+    -------
+    None
+        The Gmsh sizing callback or background field is configured in place.
+    """
+    if structured_mesh is False:
+        if parallel is False:
+            def mesh_size_callback3d(dim, tag, x, y, z, lc):
+                """Evaluate the serial Gmsh mesh-size callback at one mesh point.
+
+                Parameters
+                ----------
+                dim : int
+                    Dimension of the Gmsh entity requesting the size.
+                tag : int
+                    Tag of the Gmsh entity requesting the size.
+                x : float
+                    X coordinate of the Gmsh sizing query.
+                y : float
+                    Y coordinate of the Gmsh sizing query.
+                z : float
+                    Z coordinate of the Gmsh sizing query.
+                lc : float
+                    Element size proposed by Gmsh before applying the callback.
+
+                Returns
+                -------
+                float
+                    Element size assigned to the queried mesh point.
+                """
+                if extend_segy:
+                    # Edge-extended sizing
+
+                    coords = np.array([[z, x, y]], dtype=float)
+                    return checked_mesh_size(
+                        ef_segy3,
+                        coords,
+                        "extend_segy=True",
+                    )
+                else:
+                    (
+                        z_min_segy,
+                        z_max_segy,
+                        x_min_segy,
+                        x_max_segy,
+                        y_min_segy,
+                        y_max_segy,
+                    ) = bbox
+
+                    in_x = (x >= x_min_segy) and (x <= x_max_segy)
+                    in_y = (y >= y_min_segy) and (y <= y_max_segy)
+                    in_z = (z >= z_min_segy) and (z <= z_max_segy)
+
+                    if in_x and in_y and in_z:
+                        coords = np.array([[z, x, y]], dtype=float)
+                        return checked_mesh_size(
+                            ef_segy3,
+                            coords,
+                            "inside velocity model",
+                        )
+
+                    else:
+
+                        x_proj = min(max(x, x_min_segy), x_max_segy)
+                        y_proj = min(max(y, y_min_segy), y_max_segy)
+                        z_proj = min(max(z, z_min_segy), z_max_segy)
+
+                        coords_proj = np.array(
+                            [[z_proj, x_proj, y_proj]],
+                            dtype=float,
+                        )
+                        base_size = checked_mesh_size(
+                            ef_segy3,
+                            coords_proj,
+                            "projected padding boundary",
+                        )
+
+                        t = padding_grading_factor(
+                            abs(x - x_proj),
+                            abs(y - y_proj),
+                            abs(z - z_proj),
+                            padding_x,
+                            padding_y,
+                            padding_z,
+                            padding_type,
+                            hyper_n,
+                        )
+                        graded_size = base_size + t * (h_padding - base_size)
+
+                        return float(graded_size)
+
+            gmsh.model.mesh.setSizeCallback(mesh_size_callback3d)
+
+        if parallel:
+            num_threads = gmsh_num_threads
+            if num_threads < 1:
+                raise ValueError("gmsh_num_threads must be a positive integer.")
+
+            SpyroEnsemble.print(
+                f"Computing mesh size callback for parallel meshing "
+                f"with {num_threads} Gmsh thread(s)...",
+            )
+
+            x_core = np.linspace(bbox[2], bbox[3], nx)
+            y_core = np.linspace(bbox[4], bbox[5], ny)
+            z_core = np.linspace(bbox[0], bbox[1], nz)
+
+            xx_c, yy_c, zz_c = np.meshgrid(x_core, y_core, z_core, indexing="ij")
+            coords_c = np.column_stack((zz_c.ravel(), xx_c.ravel(), yy_c.ravel()))
+
+            size_core = ef_segy3(coords_c).ravel()
+
+            sp_data_core = np.empty((xx_c.size, 4), dtype=np.float64)
+            sp_data_core[:, 0] = xx_c.ravel()
+            sp_data_core[:, 1] = yy_c.ravel()
+            sp_data_core[:, 2] = zz_c.ravel()
+            sp_data_core[:, 3] = size_core
+
+            xmin_pad = -padding_x
+            xmax_pad = length_x + padding_x
+            ymin_pad = -padding_y
+            ymax_pad = length_y + padding_y
+            zmin_pad = -abs(depth_z) - padding_z
+            zmax_pad = 0.0
+
+            dx_core = (bbox[3] - bbox[2]) / max(nx - 1, 1)
+            dy_core = (bbox[5] - bbox[4]) / max(ny - 1, 1)
+            dz_core = (bbox[1] - bbox[0]) / max(nz - 1, 1)
+
+            nx_pad = max(
+                2,
+                int(np.ceil((xmax_pad - xmin_pad) / dx_core)) + 1,
+            )
+            ny_pad = max(
+                2,
+                int(np.ceil((ymax_pad - ymin_pad) / dy_core)) + 1,
+            )
+            nz_pad = max(
+                2,
+                int(np.ceil((zmax_pad - zmin_pad) / dz_core)) + 1,
+            )
+
+            x_pad = np.linspace(xmin_pad, xmax_pad, nx_pad)
+            y_pad = np.linspace(ymin_pad, ymax_pad, ny_pad)
+            z_pad = np.linspace(zmin_pad, zmax_pad, nz_pad)
+
+            xx_p, yy_p, zz_p = np.meshgrid(x_pad, y_pad, z_pad, indexing="ij")
+
+            eps = 1e-8
+            out_mask = ~(
+                (xx_p >= bbox[2] - eps)
+                & (xx_p <= bbox[3] + eps)
+                & (yy_p >= bbox[4] - eps)
+                & (yy_p <= bbox[5] + eps)
+                & (zz_p >= bbox[0] - eps)
+                & (zz_p <= bbox[1] + eps)
+            )
+
+            xx_out = xx_p[out_mask]
+            yy_out = yy_p[out_mask]
+            zz_out = zz_p[out_mask]
+
+            # Padding sizing
+            if extend_segy:
+
+                coords_p = np.column_stack((zz_out, xx_out, yy_out))
+                size_pad = ef_segy3(coords_p).ravel()
+            else:
+
+                xx_proj = np.clip(xx_out, bbox[2], bbox[3])
+                yy_proj = np.clip(yy_out, bbox[4], bbox[5])
+                zz_proj = np.clip(zz_out, bbox[0], bbox[1])
+
+                coords_p = np.column_stack((zz_proj, xx_proj, yy_proj))
+                base_size_pad = ef_segy3(coords_p).ravel()
+
+                t = padding_grading_factor(
+                    np.abs(xx_out - xx_proj),
+                    np.abs(yy_out - yy_proj),
+                    np.abs(zz_out - zz_proj),
+                    padding_x,
+                    padding_y,
+                    padding_z,
+                    padding_type,
+                    hyper_n,
+                )
+                size_pad = base_size_pad + t * (h_padding - base_size_pad)
+
+            sp_data_pad = np.empty((xx_out.size, 4), dtype=np.float64)
+            sp_data_pad[:, 0] = xx_out
+            sp_data_pad[:, 1] = yy_out
+            sp_data_pad[:, 2] = zz_out
+            sp_data_pad[:, 3] = size_pad
+
+            sp_data_combined = np.vstack((sp_data_core, sp_data_pad))
+            total_points = len(sp_data_combined)
+
+            sp_list = sp_data_combined.ravel().tolist()
+
+            SpyroEnsemble.print(
+                f"Loading {total_points} total points into Gmsh PostView...",
+            )
+            view_tag = gmsh.view.add("background_size")
+
+            gmsh.view.addListData(view_tag, "SP", total_points, sp_list)
+
+            # Apply background field
+            gmsh.model.mesh.field.add("PostView", 1)
+            gmsh.model.mesh.field.setNumber(1, "ViewIndex", view_tag)
+            gmsh.model.mesh.field.setAsBackgroundMesh(1)
+            # Parallel HXT in 3D
+            gmsh.option.setNumber("General.NumThreads", np.int64(num_threads))
+            gmsh.option.setNumber("Mesh.MaxNumThreads3D", np.int64(num_threads))
+            # Serialize the boundary mesh generation for deterministic results
+            gmsh.option.setNumber("Mesh.MaxNumThreads1D", 1)
+            gmsh.option.setNumber("Mesh.MaxNumThreads2D", 1)
+
+
+def configure_gmsh_3d_meshing_mode(
+    gmsh, structured_mesh: bool, min_element_size: float
+) -> None:
+    """Set the Gmsh options for the requested 3-D meshing mode.
+
+    Parameters
+    ----------
+    gmsh : module
+        Initialized Gmsh Python module.
+    structured_mesh : bool
+        Whether a structured (transfinite) hexahedral mesh is requested.
+    min_element_size : float
+        Element size used for the structured mesh.
+
+    Returns
+    -------
+    None
+        The Gmsh options are set in place.
+    """
+    if structured_mesh:
+        gmsh.option.setNumber("Mesh.MeshSizeMin", min_element_size)
+        gmsh.option.setNumber("Mesh.MeshSizeMax", min_element_size)
+        gmsh.model.mesh.setTransfiniteAutomatic(
+            [],
+            np.pi,
+            True,
+        )
+
+    gmsh.option.setNumber("Mesh.Algorithm3D", 10)
+    gmsh.option.setNumber("Mesh.OptimizeThreshold", 0.5)
+    gmsh.option.setNumber("Mesh.Optimize", 1)
+    gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
+
+
+def apply_structured_winslow_smoothing3d(
+    gmsh,
+    length_x,
+    length_y,
+    depth_z,
+    padding_type,
+    padding_x,
+    padding_y,
+    padding_z,
+    water_interface,
+    winslow_implementation,
+    apply_winslow,
+    winslow_iterations,
+    winslow_omega,
+    ef_segy3,
+):
+    """Apply the configured Winslow smoother to a structured three-dimensional Gmsh mesh.
+
+    Parameters
+    ----------
+    gmsh : module
+        Initialized Gmsh Python module used to build or query the mesh.
+    length_x : float
+        Physical domain length in the x direction.
+    length_y : float
+        Physical domain length in the y direction.
+    depth_z : float
+        Physical domain depth; the model occupies negative z.
+    padding_type : str or None
+        Padding geometry, either `None` or `"rectangular"` for Winslow.
+    padding_x : float
+        Padding thickness in the x direction.
+    padding_y : float
+        Padding thickness in the y direction.
+    padding_z : float
+        Bottom padding thickness in the z direction.
+    water_interface : bool
+        Whether the water/subsurface interface is geometrically delimited.
+    winslow_implementation : str or None
+        Requested Winslow implementation.
+    apply_winslow : bool
+        Whether Winslow smoothing should be applied.
+    winslow_iterations : int
+        Number of Winslow smoothing iterations.
+    winslow_omega : float
+        Winslow relaxation coefficient.
+    ef_segy3 : callable
+        Three-dimensional mesh-sizing function in `(z, x, y)` coordinates.
+
+    Returns
+    -------
+    None
+        Water columns are aligned in place when delimited. Non-water nodes
+        are smoothed only when smoothing is enabled.
+    """
+    aligned_water_tags = set()
+    if water_interface and padding_type in (None, "rectangular"):
+        aligned_water_tags = align_water_columns3d(gmsh, padding_type)
+        SpyroEnsemble.print(
+            f"Aligned 3D water columns ({len(aligned_water_tags)} water nodes).",
+        )
+
+    if not apply_winslow:
+        SpyroEnsemble.print("Skipping 3D Winslow smoothing.")
+        return
+
+    if padding_type == "hyperelliptical":
+        raise ValueError(
+            "3-D Winslow smoothing is not available for hyperelliptical padding."
+        )
+    if padding_type not in (None, "rectangular"):
+        raise ValueError(
+            "3-D Winslow smoothing supports only padding_type=None "
+            "or padding_type='rectangular'."
+        )
+
+    selected_winslow = (
+        "numba"
+        if winslow_implementation is None
+        else str(winslow_implementation).strip().lower()
+    )
+    if selected_winslow != "numba":
+        raise ValueError(
+            "Only winslow_implementation='numba' is currently available "
+            "for 3-D structured smoothing. Received "
+            f"{winslow_implementation!r}."
+        )
+
+    geometry_name = (
+        ("Water Interface" if water_interface else "No Water Interface")
+        + ", "
+        + ("Rectangular Padding" if padding_type == "rectangular" else "No Padding")
+    )
+    SpyroEnsemble.print(f"Extracting nodes for 3D smoothing ({geometry_name})...")
+
+    node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+    points_3d = np.asarray(node_coords, dtype=float).reshape(-1, 3)
+
+    elem_types, _elem_tags, elem_node_tags = gmsh.model.mesh.getElements(dim=3)
+    all_hex_nodes = []
+    for element_index, element_type in enumerate(elem_types):
+        if element_type == 5:  # Gmsh type 5 = 8-node hexahedron
+            all_hex_nodes.extend(elem_node_tags[element_index])
+
+    if not all_hex_nodes:
+        raise ValueError(
+            "No hexahedra found. 3-D Winslow smoothing requires "
+            "an 8-node hexahedral mesh."
+        )
+
+    tag_to_index = {int(tag): index for index, tag in enumerate(node_tags)}
+    hexes = np.asarray(
+        [tag_to_index[int(tag)] for tag in all_hex_nodes],
+        dtype=np.int64,
+    ).reshape(-1, 8)
+
+    winslow_points = define_winslow_points_3d(
+        gmsh=gmsh,
+        points_3d=points_3d,
+        tag_to_index=tag_to_index,
+        length_x=length_x,
+        length_y=length_y,
+        depth_z=depth_z,
+        padding_type=padding_type,
+        padding_x=padding_x,
+        padding_y=padding_y,
+        padding_z=padding_z,
+        water_interface=water_interface,
+        tol=2.0,
+    )
+
+    if aligned_water_tags:
+        water_nodes = {tag_to_index[tag] for tag in aligned_water_tags}
+        for key in (
+            "move_all",
+            "move_x_only",
+            "move_y_only",
+            "move_z_only",
+            "movable_nodes",
+        ):
+            winslow_points[key].difference_update(water_nodes)
+        winslow_points["locked"].update(water_nodes)
+        winslow_points["water_nodes"].update(water_nodes)
+
+    move_all = winslow_points["move_all"]
+    move_x_only = winslow_points["move_x_only"]
+    move_y_only = winslow_points["move_y_only"]
+    move_z_only = winslow_points["move_z_only"]
+    movable_nodes = winslow_points["movable_nodes"]
+
+    SpyroEnsemble.print("Applying 3D Winslow smoothing...")
+    smoothed_points_3d = run_selected_winslow(
+        points=points_3d,
+        hexes=hexes,
+        move_all=move_all,
+        move_x_only=move_x_only,
+        move_y_only=move_y_only,
+        move_z_only=move_z_only,
+        ef_segy=ef_segy3,
+        length_x=length_x,
+        length_y=length_y,
+        depth_z=depth_z,
+        winslow_iterations=winslow_iterations,
+        winslow_omega=winslow_omega,
+        selected_winslow=selected_winslow,
+    )
+
+    SpyroEnsemble.print("Updating Winslow-smoothed nodes back into Gmsh...")
+    for node_index, node_tag in enumerate(node_tags):
+        if node_index in movable_nodes:
+            gmsh.model.mesh.setNode(
+                int(node_tag),
+                smoothed_points_3d[node_index].tolist(),
+                [],
+            )
