@@ -640,13 +640,17 @@ class Modal_Solver:
 
         # Maximum stable timestep
         max_dt = float(real(2.0 / sqrt(max_eigval)))
+        # Every rank must take the same number of time steps, so rank 0's
+        # estimate is shared in case the ranks' eigensolves differ in the
+        # last bits
+        max_dt = V.mesh().comm.bcast(max_dt, root=0)
         SpyroEnsemble.print(
             "Maximum Stable Timestep Should Be Approximately "
             f"(ms): {1e3 * max_dt:.3f}"
         )
 
         max_dt *= fraction
-        nt = int(final_time / max_dt) + 1
+        nt = round(final_time / max_dt) + 1
         max_dt = final_time / (nt - 1)
 
         return max_dt

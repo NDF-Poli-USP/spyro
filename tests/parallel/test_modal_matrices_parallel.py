@@ -14,6 +14,7 @@ from spyro.solvers.modal.modal_forms_and_matrices import (
     maximum_diagonal_ratio,
     acoustic_weak_forms_c_in_stiffness,
 )
+from spyro.solvers.modal.modal_sol import Modal_Solver
 
 
 def _forms(comm) -> tuple:
@@ -64,6 +65,8 @@ def test_modal_matrices_match_serial():
     """Gathered matrices and the diagonal ratio match a serial assembly."""
     assert COMM_WORLD.size == 2
     a, m = _forms(COMM_WORLD)
+    # COMM_SELF holds only the calling rank, so each rank builds an
+    # undistributed copy of the mesh as the serial reference
     a_serial, m_serial = _forms(COMM_SELF)
 
     Asp, Msp = assemble_sparse_matrices(a, m)
@@ -87,3 +90,15 @@ def test_modal_matrices_match_serial():
     assert np.isclose(ratio, expected)
     assert np.isclose(ratio, maximum_diagonal_ratio(a_serial, m_serial))
     assert COMM_WORLD.allgather(ratio) == [ratio, ratio]
+
+
+@pytest.mark.parallel(2)
+@pytest.mark.parametrize("method", ["ANALYTICAL", "ARNOLDI"])
+def test_estimated_timestep_is_identical_on_every_rank(method: str):
+    """Every rank gets the same time step, so all take the same steps."""
+    a, m = _forms(COMM_WORLD)
+    V = a.arguments()[0].function_space()
+    solver = Modal_Solver(2, method=method, calc_max_dt=True)
+    dt = solver.estimate_timestep(None, V, 1.0, forms=(a, m))
+    assert dt > 0.0
+    assert COMM_WORLD.allgather(dt) == [dt, dt]

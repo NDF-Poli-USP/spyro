@@ -3,7 +3,10 @@ import warnings
 
 import numpy as np
 import pytest
-from firedrake import Function, FunctionSpace, UnitSquareMesh
+from firedrake import (
+    Constant, Function, FunctionSpace, TestFunction, TrialFunction,
+    UnitSquareMesh, dx, grad, inner,
+)
 
 import spyro
 from spyro.solvers.modal.modal_forms_and_matrices import (
@@ -114,3 +117,14 @@ def test_elastic_analytical_timestep_uses_elastic_forms():
         )
     assert np.isclose(dt, 2.0 / np.sqrt(max_eigval), rtol=1e-2)
     assert wave.dt == dt
+
+
+def test_maximum_diagonal_ratio_rejects_zero_stiffness():
+    """A zero stiffness gives no finite time step, so it is rejected."""
+    mesh = UnitSquareMesh(4, 4, quadrilateral=True)
+    V = FunctionSpace(mesh, "CG", 1)
+    u, v = TrialFunction(V), TestFunction(V)
+    a = Constant(0.0)*inner(grad(u), grad(v))*dx
+    m = u*v*dx
+    with pytest.raises(ValueError, match="no nonzero ratio"):
+        maximum_diagonal_ratio(a, m)
