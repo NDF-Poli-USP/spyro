@@ -1,4 +1,5 @@
 import copy
+import functools
 from enum import Enum
 from typing import Dict
 from pydantic import BaseModel, computed_field
@@ -154,6 +155,7 @@ class SpyroEnsemble:
 
     @classmethod
     def run_in_one_core_and_broadcast(cls, fun):
+        @functools.wraps(fun)
         def wrapper(*args, **kwargs):
             if cls.ensemble is None:
                 return fun(*args, **kwargs)
