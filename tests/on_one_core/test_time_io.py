@@ -61,5 +61,61 @@ def test_interpolate_time_series_three_receivers_half_dt():
     assert np.allclose(interpolated, expected)
 
 
+def test_interpolate_time_series_displacement_shape() -> None:
+    """Interpolate ``(time, receiver, direction)`` data and keep its shape.
+
+    Each receiver and direction holds a different linear signal, so the
+    expected values on the coarser grid are known exactly.
+    """
+    initial_time = 0.0
+    final_time = 4.0
+    time_vector = np.linspace(initial_time, final_time, 9)
+    target_time_vector = np.linspace(initial_time, final_time, 5)
+
+    slopes = np.arange(1.0, 7.0).reshape(3, 2)
+    values = time_vector[:, None, None] * slopes[None, :, :]
+    expected = target_time_vector[:, None, None] * slopes[None, :, :]
+
+    interpolated = interpolate_time_series(
+        values,
+        target_dt=1.0,
+        initial_time=initial_time,
+        final_time=final_time,
+    )
+
+    assert interpolated.shape == (5, 3, 2)
+    assert np.allclose(interpolated, expected)
+
+
+def test_interpolate_time_series_time_shift() -> None:
+    """Shift the target grid and clamp samples past the end of the data.
+
+    A linear signal sampled with ``time_shift`` should match the signal
+    evaluated at the shifted times, and target times beyond
+    ``final_time`` should take the last data value.
+    """
+    initial_time = 0.0
+    final_time = 4.0
+    time_vector = np.linspace(initial_time, final_time, 9)
+    values = 2.0 * time_vector + 1.0
+    time_shift = 0.25
+
+    interpolated = interpolate_time_series(
+        values,
+        target_dt=1.0,
+        initial_time=initial_time,
+        final_time=final_time,
+        time_shift=time_shift,
+    )
+
+    shifted_times = np.minimum(np.arange(5) * 1.0 + time_shift, final_time)
+    expected = 2.0 * shifted_times + 1.0
+
+    assert interpolated.shape == (5,)
+    assert np.allclose(interpolated, expected)
+
+
 if __name__ == "__main__":
     test_interpolate_time_series_three_receivers_half_dt()
+    test_interpolate_time_series_displacement_shape()
+    test_interpolate_time_series_time_shift()
