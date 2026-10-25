@@ -82,8 +82,6 @@ def construct_solver_or_matrix_no_pml(wave):
     # doi: https://doi.org/10.1016/j.apm.2022.09.014
     # TODO: Add citation
     form = m1 + a + le
-    wave.mass_matrix_form = m1
-    wave.stiffness_matrix_form = a
     wave.rhs = fire.rhs(form)
     wave.lhs = fire.lhs(form)
     wave.source_function = fire.Cofunction(V.dual())
