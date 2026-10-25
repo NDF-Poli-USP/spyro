@@ -144,7 +144,7 @@ def assemble_sparse_matrices(a, m, return_M_inv=False):
     return Asp, Msp
 
 
-def maximum_diagonal_ratio(a, m) -> float:
+def maximum_diagonal_ratio(a: fire.Form, m: fire.Form) -> float:
     """Return the largest ratio of the stiffness and mass matrix diagonals.
 
     This is ``max |A_ii / M_ii|`` over the rows with a nonzero mass
@@ -162,6 +162,12 @@ def maximum_diagonal_ratio(a, m) -> float:
     -------
     float
         The largest diagonal ratio, identical on every rank.
+
+    Raises
+    ------
+    ValueError
+        If no row has both a nonzero mass and a nonzero stiffness diagonal,
+        since the ratio would then give an infinite time step.
     """
     a_diagonal = fire.assemble(a).petscmat.getDiagonal()
     m_diagonal = fire.assemble(m).petscmat.getDiagonal()
@@ -170,4 +176,10 @@ def maximum_diagonal_ratio(a, m) -> float:
     nonzero = m_values != 0.0
     ratios = np.abs(a_values[nonzero] / m_values[nonzero])
     local_maximum = ratios.max() if ratios.size else 0.0
-    return a_diagonal.comm.tompi4py().allreduce(local_maximum, op=MPI.MAX)
+    maximum = a_diagonal.comm.tompi4py().allreduce(local_maximum, op=MPI.MAX)
+    if maximum == 0.0:
+        raise ValueError(
+            "The stiffness and mass diagonals have no nonzero ratio, so no "
+            "time step can be estimated from them."
+        )
+    return maximum
