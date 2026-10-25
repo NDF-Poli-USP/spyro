@@ -16,6 +16,62 @@ from .meshing_utils import (
 )
 
 
+def configure_gmsh_2d_meshing_mode(
+    gmsh,
+    structured_mesh: bool,
+    unstructured_quad_mesh: bool,
+    padding_type: str | None,
+    min_element_size: float,
+) -> None:
+    """Set the Gmsh options for the requested 2-D meshing mode.
+
+    `MeshingParameters` guarantees that `structured_mesh` and
+    `unstructured_quad_mesh` are not both set.
+
+    Parameters
+    ----------
+    gmsh : module
+        Initialized Gmsh Python module.
+    structured_mesh : bool
+        Whether a structured (transfinite) quadrilateral mesh is requested.
+    unstructured_quad_mesh : bool
+        Whether an unstructured all-quadrilateral mesh is requested. The mesh
+        is subdivided after recombination, so the size callback must return
+        twice the target element size.
+    padding_type : str or None
+        Padding geometry: `None`, `"rectangular"` or `"hyperelliptical"`.
+    min_element_size : float
+        Element size used for the structured mesh.
+
+    Returns
+    -------
+    None
+        The Gmsh options are set in place.
+    """
+    if structured_mesh and padding_type != "hyperelliptical":
+        gmsh.option.setNumber("Mesh.MeshSizeMin", min_element_size)
+        gmsh.option.setNumber("Mesh.MeshSizeMax", min_element_size)
+        gmsh.model.mesh.setTransfiniteAutomatic([], np.pi, True)
+    elif unstructured_quad_mesh:
+        # Recombination alone can leave a few triangles, and Firedrake cannot
+        # read meshes that mix triangles and quadrilaterals. Subdividing every
+        # element into quadrilaterals guarantees an all-quad mesh, with
+        # elements half the requested size, which the caller compensates for.
+        gmsh.option.setNumber("Mesh.Algorithm", 8)
+        gmsh.option.setNumber("Mesh.RecombineAll", 1)
+        # Plain Blossom: the full-quad variant (3) did not remove every
+        # triangle, and the subdivision below now does that.
+        gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 1)
+        gmsh.option.setNumber("Mesh.SubdivisionAlgorithm", 1)
+        gmsh.option.setNumber("Mesh.Smoothing", 10)
+        gmsh.option.setNumber("Mesh.RecombineOptimizeTopology", 1)
+        gmsh.option.setNumber("Mesh.RecombineNodeRepositioning", 1)
+        gmsh.option.setNumber("Mesh.RecombineMinimumQuality", 0.85)
+        gmsh.model.mesh.optimize("Relocate2D", niter=1)
+        gmsh.option.setNumber("Mesh.QuadqsTopologyOptimizationMethods", 111)
+        gmsh.option.setNumber("Mesh.QuadqsSizemapMethod", 0)
+
+
 def build_gmsh_geometry_and_groups(
     gmsh,
     fname,

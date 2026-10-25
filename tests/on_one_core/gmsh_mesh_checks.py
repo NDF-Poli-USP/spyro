@@ -1,8 +1,8 @@
 """Shared helpers for the Gmsh meshing tests.
 
-The checks work on the Firedrake mesh that ``AutomaticMesh`` returns and on the
-physical groups stored in the ``.msh`` file. Coordinates follow the spyro
-convention: ``(z, x)`` in 2D and ``(z, x, y)`` in 3D, with ``z <= 0``.
+The checks work on the Firedrake mesh that `AutomaticMesh` returns and on the
+physical groups stored in the `.msh` file. Coordinates follow the spyro
+convention: `(z, x)` in 2D and `(z, x, y)` in 3D, with `z <= 0`.
 """
 
 from pathlib import Path
@@ -20,12 +20,12 @@ VELOCITY_MODELS_DIR = Path(__file__).resolve().parents[2] / "velocity_models"
 
 
 def create_gmsh_mesh(parameters: dict) -> fire.MeshGeometry:
-    """Build a mesh through ``MeshingParameters`` and ``AutomaticMesh``.
+    """Build a mesh through `MeshingParameters` and `AutomaticMesh`.
 
     Parameters
     ----------
     parameters : dict
-        Input mesh dictionary for ``MeshingParameters``.
+        Input mesh dictionary for `MeshingParameters`.
 
     Returns
     -------
@@ -37,7 +37,7 @@ def create_gmsh_mesh(parameters: dict) -> fire.MeshGeometry:
 
 
 def physical_groups(msh_file: str | Path) -> dict[int, dict[str, int]]:
-    """Read the physical groups stored in a ``.msh`` file.
+    """Read the physical groups stored in a `.msh` file.
 
     Parameters
     ----------
@@ -73,7 +73,7 @@ def assert_cell_count(
     expected : int
         Baseline number of cells.
     rtol : float, optional
-        Allowed relative deviation. ``0.0`` requires an exact match.
+        Allowed relative deviation. `0.0` requires an exact match.
 
     Raises
     ------
@@ -96,7 +96,7 @@ def assert_cell_type(mesh: fire.MeshGeometry, cellname: str) -> None:
     mesh : firedrake.MeshGeometry
         Mesh to check.
     cellname : str
-        Expected UFL cell name, for example ``"triangle"`` or ``"hexahedron"``.
+        Expected UFL cell name, for example `"triangle"` or `"hexahedron"`.
 
     Raises
     ------
@@ -147,7 +147,7 @@ def measure(mesh: fire.MeshGeometry, subdomain_id: int | str = "everywhere") -> 
     mesh : firedrake.MeshGeometry
         Mesh to integrate over.
     subdomain_id : int or str, optional
-        Cell physical-group tag, or ``"everywhere"`` for the whole mesh.
+        Cell physical-group tag, or `"everywhere"` for the whole mesh.
 
     Returns
     -------
@@ -177,7 +177,7 @@ def assert_measure(
     Raises
     ------
     AssertionError
-        If the measure differs from ``expected``.
+        If the measure differs from `expected`.
     """
     actual = measure(mesh)
     assert np.isclose(actual, expected, rtol=rtol, atol=0.0), (
@@ -215,7 +215,7 @@ def assert_cell_regions(
 ) -> None:
     """Assert the measure of the cell physical groups.
 
-    The groups named in ``expected_measures`` must be exactly the groups that
+    The groups named in `expected_measures` must be exactly the groups that
     Firedrake sees as cell markers, and together they must cover the mesh
     exactly once.
 
@@ -227,7 +227,7 @@ def assert_cell_regions(
         Map from cell physical-group name to tag.
     expected_measures : dict of tuple of str to float
         Expected combined area or volume of each tuple of group names, for
-        example ``{("Water", "Subsurface"): box, ("Padding",): padding}``.
+        example `{("Water", "Subsurface"): box, ("Padding",): padding}`.
     rtol : float, optional
         Allowed relative deviation for each combined measure.
 
@@ -269,7 +269,7 @@ def assert_region_above(
     Raises
     ------
     AssertionError
-        If the mean depth of ``upper_tag`` is not above that of ``lower_tag``.
+        If the mean depth of `upper_tag` is not above that of `lower_tag`.
     """
     z = fire.SpatialCoordinate(mesh)[0]
 
@@ -282,10 +282,10 @@ def assert_region_above(
 def hyperellipse_area(
     length_z: float, length_x: float, padding_z: float, padding_x: float, n: float
 ) -> float:
-    """Area of the 2D hyperelliptical domain cut at ``z = 0``.
+    """Area of the 2D hyperelliptical domain cut at `z = 0`.
 
     The hyperellipse is centred on the model box and its semi-axes reach
-    ``padding_x`` beyond each side and ``padding_z`` below the bottom.
+    `padding_x` beyond each side and `padding_z` below the bottom.
 
     Parameters
     ----------
@@ -303,7 +303,7 @@ def hyperellipse_area(
     Returns
     -------
     float
-        Area of the part of the hyperellipse with ``z <= 0``.
+        Area of the part of the hyperellipse with `z <= 0`.
     """
     semi_z = length_z / 2.0 + padding_z
     semi_x = length_x / 2.0 + padding_x

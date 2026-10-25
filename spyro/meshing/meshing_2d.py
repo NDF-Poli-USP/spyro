@@ -5,6 +5,7 @@ from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .meshing_gmsh2d import (
     build_gmsh_geometry_and_groups,
     apply_structured_winslow_smoothing2d,
+    configure_gmsh_2d_meshing_mode,
 )
 from .meshing_utils import check_gmsh, create_sizing_function
 
@@ -19,19 +20,20 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
     """Generate a 2-D Gmsh mesh file from a velocity model.
 
     Supports an optional water interface, hyperelliptical or rectangular
-    padding, and structured Winslow smoothing. The mesh is written to
-    ``mesh_parameters.output_filename`` by ensemble rank 0 only.
+    padding, structured Winslow smoothing, or unstructured
+    full-quadrilateral meshing. The mesh is written to
+    `mesh_parameters.output_filename` by ensemble rank 0 only.
 
     Parameters
     ----------
     mesh_parameters : MeshingParameters
-        Complete meshing parameters for a 2-D ``gmsh_mesh``.
+        Complete meshing parameters for a 2-D `gmsh_mesh`.
 
     Returns
     -------
     str
         Path to the velocity model used for meshing (the SEG-Y input, or a
-        temporary SEG-Y file written from a grid ``velocity_model``).
+        temporary SEG-Y file written from a grid `velocity_model`).
     """
     if mesh_parameters.segy_velocity_model is not None:
         velocity_model_file = mesh_parameters.segy_velocity_model
@@ -71,6 +73,7 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
         water_interface = mesh_parameters.water_interface
         vp_water = mesh_parameters.vp_water
         structured_mesh = mesh_parameters.structured_mesh
+        unstructured_quad_mesh = mesh_parameters.unstructured_quad_mesh
         min_element_size = mesh_parameters.min_element_size
         winslow_implementation = mesh_parameters.winslow_implementation
         apply_winslow = mesh_parameters.apply_winslow
@@ -201,16 +204,53 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
                     )
                     return float(base_size + t * (h_padding - base_size))
 
-        gmsh.model.mesh.setSizeCallback(mesh_size_callback)
+        if unstructured_quad_mesh:
+            # The quad mesh is subdivided once after recombination, which
+            # halves the element size, so mesh at twice the target size.
+            def quad_size_callback(
+                dim: int, tag: int, x: float, y: float, z: float, lc: float
+            ) -> float:
+                """Return twice the target element size at a point.
+
+                Parameters
+                ----------
+                dim : int
+                    Dimension of the Gmsh entity being meshed.
+                tag : int
+                    Tag of the Gmsh entity being meshed.
+                x, y, z : float
+                    Coordinates of the point, in Gmsh's (x, z) plane.
+                lc : float
+                    Element size Gmsh would otherwise use.
+
+                Returns
+                -------
+                float
+                    Twice the element size from `mesh_size_callback`.
+                """
+                return 2.0 * mesh_size_callback(dim, tag, x, y, z, lc)
+
+            gmsh.model.mesh.setSizeCallback(quad_size_callback)
+        else:
+            gmsh.model.mesh.setSizeCallback(mesh_size_callback)
         gmsh.option.setNumber("Mesh.SaveWithoutOrphans", 1)
         gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
         gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
         gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
-        if structured_mesh and padding_type != "hyperelliptical":
-            gmsh.option.setNumber("Mesh.MeshSizeMin", min_element_size)
-            gmsh.option.setNumber("Mesh.MeshSizeMax", min_element_size)
-            gmsh.model.mesh.setTransfiniteAutomatic([], np.pi, True)
+        configure_gmsh_2d_meshing_mode(
+            gmsh=gmsh,
+            structured_mesh=structured_mesh,
+            unstructured_quad_mesh=unstructured_quad_mesh,
+            padding_type=padding_type,
+            min_element_size=min_element_size,
+        )
         gmsh.model.mesh.generate(2)
+        if unstructured_quad_mesh:
+            gmsh.model.mesh.optimize(
+                "QuadQuasiStructured",
+                force=False,
+                niter=50,
+            )
 
         if structured_mesh:
             apply_structured_winslow_smoothing2d(
