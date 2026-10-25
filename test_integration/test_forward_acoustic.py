@@ -34,6 +34,7 @@ def test_forward_3_shots():
         "delay": 0.2,
         "delay_type": "time",
         "receiver_locations": spyro.create_transect((-1.3, 1.2), (-1.3, 1.8), 301),
+        "use_vertex_only_mesh": True,
     }
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
@@ -61,24 +62,23 @@ def test_forward_3_shots():
 
     wave.forward_solve()
 
-    comm = wave.comm
-
     arr = wave.forward_solution_receivers
+    ensemble_comm = SpyroEnsemble.ensemble.ensemble_comm
 
-    if comm.ensemble_comm.rank == 0:
+    if ensemble_comm.rank == 0:
         analytical_p = spyro.utils.nodal_homogeneous_analytical(
             wave, 0.2, 1.5, n_extra=100
         )
     else:
         analytical_p = None
-    analytical_p = comm.ensemble_comm.bcast(analytical_p, root=0)
+    analytical_p = ensemble_comm.bcast(analytical_p, root=0)
 
     # Checking if error before reflection matches
-    if comm.ensemble_comm.rank == 0:
+    if ensemble_comm.rank == 0:
         rec_id = 0
-    elif comm.ensemble_comm.rank == 1:
+    elif ensemble_comm.rank == 1:
         rec_id = 150
-    elif comm.ensemble_comm.rank == 2:
+    elif ensemble_comm.rank == 2:
         rec_id = 300
 
     arr0 = arr[:, rec_id]
@@ -86,11 +86,11 @@ def test_forward_3_shots():
 
     # Computing errors
     error_L2 = MeasureError.calculate_normalized_L2_error(arr0[:430], analytical_p[:430])
-    SpyroEnsemble.print(f"NRMS Error for shot {wave.current_sources} is {error_L2: .4e} "
-                        f"and test has passed equals {abs(error_L2) < 0.01}")
-
-    error_L2_all = MPI.COMM_WORLD.allreduce(error_L2, op=MPI.SUM) / 3.
-
+    SpyroEnsemble.print(
+        f"L2 Error for shot {wave.current_sources} is {error_L2: .4e} and test "
+        f"has passed equals {abs(error_L2) < 0.01}"
+    )
+    error_L2_all = ensemble_comm.allreduce(error_L2, op=MPI.SUM) / 3.
     assert abs(error_L2_all) < 0.01
 
 
