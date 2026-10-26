@@ -10,7 +10,7 @@ else:
     from firedrake.__future__ import interpolate
 
 
-class MeshOps():
+class MeshOps:
     """Class for general mesh operations for domains w/o an absorbing layer.
 
     Attributes
@@ -40,8 +40,9 @@ class MeshOps():
         Get the representative mesh dimensions from a mesh.
     """
 
-    def __init__(self, domain_dim, dimension=2, quadrilateral=False,
-                 func_space_type=None):
+    def __init__(
+        self, domain_dim, dimension=2, quadrilateral=False, func_space_type=None
+    ):
         """Initialize the MeshOps class.
 
         Parameters
@@ -57,11 +58,11 @@ class MeshOps():
         func_space_type, `str`, optional
             Type of function space for the state variable.
             Options: 'scalar' or 'vector'. Default is `None`.
+
         Returns
         -------
         None
         """
-
         # Original domain dimensions
         self.domain_dim = domain_dim
 
@@ -86,9 +87,9 @@ class MeshOps():
         -------
         mesh_z : `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate z of the mesh object.
-        mesh_x: `ufl.geometry.SpatialCoordinate`
+        mesh_x : `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate x of the mesh object.
-        mesh_y: `ufl.geometry.SpatialCoordinate`
+        mesh_y : `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate y of the mesh object.
         """
         if self.dimension == 2:
@@ -122,7 +123,6 @@ class MeshOps():
         tol : `float`
             Tolerance for searching nodes in the mesh.
         """
-
         # Mesh cell diameters
         diam_mesh = CellDiameter(mesh)
 
@@ -141,7 +141,7 @@ class MeshOps():
         alpha = lmax / lmin
 
         # Tolerance for searching nodes in the mesh
-        tol = 10. ** min([int(log10(lmin / 10)), -6])
+        tol = 10.0 ** min([int(log10(lmin / 10)), -6])
 
         return (diam, lmin, lmax, alpha, tol)
 
@@ -161,7 +161,6 @@ class MeshOps():
         max_coordinates : `array`
             Array containing the maximum coordinates in each dimension (z, x, y).
         """
-
         coords = mesh.coordinates.dat.data_with_halos
         min_coordinates = min(coords, axis=0)
         max_coordinates = max(coords, axis=0)
@@ -192,24 +191,24 @@ class MeshOps():
                 - array of shape (num_nodes, 2) and coordinates (z, x) for 2D.
                 - array of shape (num_nodes, 3) and coordinates (z, x, y) for 3D.
         """
-
         # Interpolate the coordinates according to the function space
         coords = []
-        coord_expression = ['z', 'x', 'y']
+        coord_expression = ["z", "x", "y"]
         for i in range(self.dimension):
-            ufl_input = generate_ufl_functions(mesh, coord_expression[i],
-                                               self.dimension)
+            ufl_input = generate_ufl_functions(
+                mesh, coord_expression[i], self.dimension
+            )
 
-            if self.func_space_type == 'scalar':
+            if self.func_space_type == "scalar":
                 V = function_space
 
-            if self.func_space_type == 'vector':
+            if self.func_space_type == "vector":
                 V = function_space.sub(i)
 
             coords.append(assemble(interpolate(ufl_input, V)))
 
         # Get the node positions
-        validate_parameter('output_type', output_type, ["tuple", "array"])
+        validate_parameter("output_type", output_type, ["tuple", "array"])
         if output_type == "tuple":
             z_data = coords[0].dat.data_with_halos[:]
             x_data = coords[1].dat.data_with_halos[:]
@@ -219,16 +218,23 @@ class MeshOps():
                 node_positions += (y_data,)
 
         elif output_type == "array":
-            node_positions = column_stack([comp.dat.data_with_halos[:]
-                                           for comp in coords])
+            node_positions = column_stack(
+                [comp.dat.data_with_halos[:] for comp in coords]
+            )
         del coords
 
         # TODO: either put wave's similar method here or just remove the one from wave
         # to decouple it from wave altogether.
         return node_positions
 
-    def mapping_boundary_ids(self, mesh, function_space, boundaries,
-                             box_domain=True, get_boundary_node_ids=True):
+    def mapping_boundary_ids(
+        self,
+        mesh,
+        function_space,
+        boundaries,
+        box_domain=True,
+        get_boundary_node_ids=True,
+    ):
         """Map the boundaries of the a mesh.
 
         Parameters
@@ -251,22 +257,21 @@ class MeshOps():
 
         Returns
         -------
-        boundary_ids_map: `dict`
+        boundary_ids_map : `dict`
             Mapping of boundary IDs for applying absorbing boundary conditions.
-        boundary_nodes_ids: `dict`
+        boundary_nodes_ids : `dict`
             IDs of the boundary nodes according to the function space provide and their
             status to apply absorbing boundary conditions. Structure is a `tuple`:
             boundary_nodes_ids[key_bnd] = (bnd_node_ids, status) where key_bnd is 'Imin'
             or 'Imax' with I = Z, X or Y, and status is a boolean from boundary_ids_map.
         """
-
         if box_domain:
 
             # Simulating a Dirichlet BC at each boundary
             if self.func_space_type == "scalar":
-                bc_val = 0.
+                bc_val = 0.0
             else:
-                bc_val = as_vector((0.,) * self.dimension)
+                bc_val = as_vector((0.0,) * self.dimension)
 
             num_boundaries = 4
             min_coordinates, max_coordinates = self.extract_extreme_coordinates(mesh)
@@ -290,10 +295,12 @@ class MeshOps():
 
             # Boundary nodes indices
             if len(exterior_markers) == 0:
-                boundary_ids_map = {idx_bdn: None for idx_bdn
-                                    in range(1, num_boundaries + 1)}
+                boundary_ids_map = {
+                    idx_bdn: None for idx_bdn in range(1, num_boundaries + 1)
+                }
                 boundary_keys = ["Zmin", "Zmax", "Xmin", "Xmax"] + (
-                    ["Ymin", "Ymax"] if self.dimension == 3 else [])
+                    ["Ymin", "Ymax"] if self.dimension == 3 else []
+                )
                 boundary_nodes_ids = {k_bnd: (None, None) for k_bnd in boundary_keys}
                 if get_boundary_node_ids:
                     return boundary_ids_map, boundary_nodes_ids
@@ -316,8 +323,9 @@ class MeshOps():
                     boundary_ids_map[idx_bdn] = None
                     continue
 
-                idx_test = linspace(0, len(bnd_node_ids) - 1,
-                                    clip(len(bnd_node_ids), 2, 10), dtype=int)
+                idx_test = linspace(
+                    0, len(bnd_node_ids) - 1, clip(len(bnd_node_ids), 2, 10), dtype=int
+                )
                 sample_nodes = bnd_node_ids[idx_test]
 
                 # Data for checking
@@ -347,8 +355,10 @@ class MeshOps():
 
                 # Boundary node coordinates
                 if get_boundary_node_ids:
-                    boundary_nodes_ids[key_bnd] = (bnd_node_ids,
-                                                   boundary_ids_map[idx_bdn])
+                    boundary_nodes_ids[key_bnd] = (
+                        bnd_node_ids,
+                        boundary_ids_map[idx_bdn],
+                    )
                 del bnd_node_ids
 
             if get_boundary_node_ids:
@@ -357,7 +367,9 @@ class MeshOps():
             else:
                 return boundary_ids_map
         else:
-            raise NotImplementedError("Mapping of boundary ids for other type of "
-                                      "domains is not implemented yet. Only box "
-                                      "domains are supported. The numbering the "
-                                      "future boundary ids must start at 7.")
+            raise NotImplementedError(
+                "Mapping of boundary ids for other type of "
+                "domains is not implemented yet. Only box "
+                "domains are supported. The numbering the "
+                "future boundary ids must start at 7."
+            )

@@ -213,3 +213,34 @@ class SourceType(StrEnum):
 
     FORCE = "force_source"
     EXPLOSIVE = "explosive_source"
+
+
+class MeshType(StrEnum):
+    """Enum for the ways a mesh can be provided or generated.
+
+    FIREDRAKE: Structured mesh from Firedrake's utility meshes.
+    USER: Mesh object supplied by the user.
+    SEISMICMESH: Mesh generated with SeismicMesh.
+    FILE: Mesh read from a .msh file.
+    SPYRO: Mesh generated with spyro's own Gmsh-based mesher.
+    GMSH: Velocity-adapted mesh generated with Gmsh.
+    """
+
+    FIREDRAKE = "firedrake_mesh"
+    USER = "user_mesh"
+    SEISMICMESH = "SeismicMesh"
+    FILE = "file"
+    SPYRO = "spyro_mesh"
+    GMSH = "gmsh_mesh"
+
+    @property
+    def is_automatic(self) -> bool:
+        """Whether spyro generates this type of mesh itself.
+
+        Returns
+        -------
+        bool
+            False for meshes supplied by the user or read from a file,
+            True otherwise.
+        """
+        return self not in (MeshType.USER, MeshType.FILE)
