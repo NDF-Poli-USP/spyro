@@ -263,7 +263,6 @@ def plot_comparison_of_receivers_to_reference(
     plot_compare_receivers_array
         Generic plotting function that compares two receiver arrays.
     """
-    dt = wave.dt
     final_time = wave.final_time
     num_timesteps = wave.num_timesteps
     time_values = np.linspace(0.0, final_time, num_timesteps)

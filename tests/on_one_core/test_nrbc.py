@@ -323,9 +323,9 @@ def test_nrbc(element_geometry, dimension, calc_eik):
         if get_nrbc_model:
 
             # Acquiring reference for signal and acoustic energy
-            output_file = wave.abc_type.value + "_ref"
+            input_file = wave.abc_type.value + "_ref"
             receivers_reference, receivers_ref_fft, energy_reference = \
-                wave.nrbc_ops.get_reference_signal(output_file=output_file,
+                wave.nrbc_ops.get_reference_signal(input_file=input_file,
                                                    get_energy_reference=True,
                                                    energy_reference_file=energy_name)
             final_energy_reference = energy_reference[-1]
@@ -372,12 +372,11 @@ def test_nrbc(element_geometry, dimension, calc_eik):
                 energy = load(energy_nrbc + ".npy").T
 
                 # Calculating error measures between the NRB and the reference models
-                error_measures = wave.nrbc_ops.error_measures(
+                error_measures = wave.nrbc_ops.calculate_error_measures(
                     wave.forward_solution_receivers, receivers_reference, dt,
                     wave.number_of_receivers, final_energy=final_energy,
                     final_energy_reference=final_energy_reference)
-                errIt, errPk, pkMax, max_errIt, \
-                    max_errPK, final_ener, dsspt_ener = error_measures
+                errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener = error_measures
 
                 # Plotting the solution at receivers and the error measures
                 wave.nrbc_ops.comparison_plots(wave, receivers_reference, receivers_ref_fft)
