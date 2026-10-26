@@ -70,7 +70,8 @@ class Modal_Solver:
         while "ARNOLDI", "LANCZOS" and "LOBPCG" gather the whole problem
         and solve it with SciPy on one rank, which broadcasts the
         eigenvalues. "RAYLEIGH" is unavailable when `calc_max_dt` is
-        `True`.
+        `True`. With `calc_max_dt`, every "KRYLOVSCH" method solves the
+        mass matrix systems with cg and a Jacobi preconditioner.
 
     Methods
     -------
@@ -111,7 +112,8 @@ class Modal_Solver:
             while "ARNOLDI", "LANCZOS" and "LOBPCG" gather the whole problem
             and solve it with SciPy on one rank, which broadcasts the
             eigenvalues. "RAYLEIGH" is unavailable when `calc_max_dt` is
-            `True`.
+            `True`. With `calc_max_dt`, every "KRYLOVSCH" method solves the
+            mass matrix systems with cg and a Jacobi preconditioner.
         calc_max_dt : `bool`
             Option to estimate the maximum stable timestep for the computation
             of the transient response. Default is `False`.
@@ -272,8 +274,12 @@ class Modal_Solver:
 
         With `calc_max_dt`, the eigenvalues of largest magnitude are
         computed without a spectral transformation, so each iteration only
-        solves a system with the mass matrix. Otherwise, the smallest ones
-        are computed with shift-and-invert.
+        solves a system with the mass matrix. Whatever the method, that
+        system is solved with cg and a Jacobi preconditioner, which is exact
+        for a lumped (diagonal) mass matrix, and the eigenvalues to a
+        relative tolerance of 1e-4. Otherwise, the smallest ones are computed
+        with shift-and-invert, with the Krylov solver and preconditioner of
+        the method.
 
         Parameters
         ----------
@@ -295,29 +301,32 @@ class Modal_Solver:
             If SLEPc does not converge any eigenvalue.
         """
 
-        ksp_type = KRYLOVSCH_CONFIG[self.method]["ksp"]
-        pc_type = KRYLOVSCH_CONFIG[self.method]["pc"]
-
         opts = {
             "eps_gen_hermitian": None,  # Problem is Hermitian
             "eps_type": "krylovschur",  # Robust, widely used eigensolver
-            "eps_tol": 1e-6,  # Tight tolerance for accuracy
             "eps_max_it": 200,  # Reasonable iteration cap
         }
         if self.calc_max_dt:
             opts.update({
+                # The largest eigenvalues of a uniform mesh are tightly
+                # clustered, so 1e-6 may need more than eps_max_it
+                # iterations. 1e-4 changes the time step by about 1e-5
+                "eps_tol": 1e-4,
                 "st_type": "shift",  # No inversion, only mass matrix solves
-                "st_ksp_type": ksp_type,
-                "st_pc_type": pc_type,
+                # Jacobi is exact for a lumped (diagonal) mass matrix, and a
+                # consistent one scaled by its diagonal is well conditioned
+                "st_ksp_type": "cg",
+                "st_pc_type": "jacobi",
                 "st_ksp_rtol": 1e-10,
             })
         else:
             opts.update({
+                "eps_tol": 1e-6,  # Tight tolerance for accuracy
                 "st_shift": 1e-6,  # Stabilizes Neumann BC null space
                 "st_type": "sinvert",  # Useful for interior eigenvalues
                 "eps_monitor": "ascii",  # Print convergence info
-                "ksp_type": ksp_type,
-                "pc_type": pc_type,
+                "ksp_type": KRYLOVSCH_CONFIG[self.method]["ksp"],
+                "pc_type": KRYLOVSCH_CONFIG[self.method]["pc"],
                 "eps_smallest_magnitude": None,  # Smallest eigenvalues magnitude
             })
 
