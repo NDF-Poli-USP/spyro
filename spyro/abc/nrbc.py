@@ -6,10 +6,19 @@ from numpy.linalg import norm
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .abc import AbsorbingBC
 from ..tools.abc_set_path_cases import path_to_save_abc_case
+<< << << < HEAD
 from ..utils.error_management import (validate_enum, validate_numeric,
                                       validate_parameter, validate_string)
 from ..utils.typing import (AbsorbingBCsType, BoundaryConditionsType,
                             LayerShapeType, NRBCBoundaryType)
+== == == =
+from ..utils.error_management import (
+    validate_enum, validate_numeric, validate_parameter, validate_string,
+)
+from ..utils.typing import (
+    AbsorbingBCsType, BoundaryConditionsType, LayerShapeType, NRBCBoundaryType,
+)
+>>>>>> > 878011693b7c2fc3a6ad4be8fff152067fafb295
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -64,18 +73,9 @@ class NRBC(AbsorbingBC):
         Compute a unitary direction vector from the source to a boundary point.
     """
 
-
-<< << << < HEAD
-    def __init__(self, domain_dim, frequency=None, dt=None,
-                 abc_boundary_type=NRBCBoundaryType.STRAIGHT,
-                 non_reflect_bc=BoundaryConditionsType.HIGDON,
-                 angle_max=pi/4., dimension=2, quadrilateral=False,
-                 nrbc_in_habc=False, output_folder=None, comm=None):
-== == == =
     def __init__(self, domain_dim, non_reflect_bc=BoundaryConditionsType.HIGDON,
                  angle_max=pi/4., abc_boundary_type=NRBCBoundaryType.STRAIGHT,
                  dimension=2, nrbc_in_habc=False, output_folder=None):
->>>>>> > ruben/nrbc_refactoring
         """Initialize the NRBC class.
 
         Parameters
@@ -116,7 +116,15 @@ class NRBC(AbsorbingBC):
 
         # Initializing the AbsorbingBC class if NRBCs are not in HABC scheme
         if not nrbc_in_habc:
+
+
+<< << << < HEAD
             AbsorbingBC.__init__(self, domain_dim, dimension=dimension)
+== == == =
+            AbsorbingBC.__init__(self, domain_dim, frequency=frequency,
+                                 dt=dt, dimension=dimension,
+                                 quadrilateral=quadrilateral, comm=comm)
+>>>>>> > 878011693b7c2fc3a6ad4be8fff152067fafb295
 
             # Set sthe pad to rectangular shape in case the infinite model is needed.
             self.abc_boundary_layer_shape = LayerShapeType.RECTANGULAR
@@ -430,7 +438,7 @@ class NRBC(AbsorbingBC):
         None
         """
 
-        pprint("\nApplying Non-Reflecting Boundary Conditions", comm=self.comm)
+        SpyroEnsemble.print("\nApplying Non-Reflecting Boundary Conditions")
 
         # Getting boundary data from the layer boundaries
         if self.non_reflect_bc == BoundaryConditionsType.SOMMERFELD:

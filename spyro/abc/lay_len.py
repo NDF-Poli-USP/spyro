@@ -183,18 +183,34 @@ def loop_roots(a_par, lmin, lref, max_roots, tol_rel=1e-3, show_ig=True, monitor
     """
 
     # Checking input parameters
-    validate_numeric("Parameter a", a_par, float_num=True,
-                     integer_num=False, lower_bound=0.)
-    validate_numeric("lmin", lmin, float_num=True, integer_num=False, lower_bound=0)
+<< << << < HEAD
+  validate_numeric("Parameter a", a_par, float_num=True,
+                    integer_num=False, lower_bound=0.)
+   validate_numeric("lmin", lmin, float_num=True, integer_num=False, lower_bound=0)
     validate_numeric("lref", lref, float_num=True, integer_num=False, lower_bound=0)
     validate_numeric("max_roots", max_roots, float_num=False, integer_num=True,
                      lower_bound=1, include_lower_bound=True)
     validate_numeric("tol_rel", tol_rel, float_num=True, integer_num=False,
                      lower_bound=0., upper_bound=0.01)
+== == == =
+  validate_numeric(
+       "Parameter a", a_par, float_num=True, integer_num=False, lower_bound=0.
+       )
+   validate_numeric("lmin", lmin, float_num=True, integer_num=False, lower_bound=0)
+    validate_numeric("lref", lref, float_num=True, integer_num=False, lower_bound=0)
+    validate_numeric(
+        "max_roots", max_roots, float_num=False, integer_num=True,
+        lower_bound=1, include_lower_bound=True,
+    )
+    validate_numeric(
+        "tol_rel", tol_rel, float_num=True, integer_num=False,
+        lower_bound=0., upper_bound=0.01,
+    )
+>>>>>> > 878011693b7c2fc3a6ad4be8fff152067fafb295
 
-    # Initial guess
-    FLmin = 0.5 * lmin / lref
-    if show_ig:
+  # Initial guess
+  FLmin = 0.5 * lmin / lref
+   if show_ig:
         SpyroEnsemble.print(f"Initial Guess for Size Parameter: {FLmin: .4f}")
 
     # Number of digits to round the size parameter

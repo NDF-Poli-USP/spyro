@@ -369,20 +369,6 @@ class ABCLayer(AbsorbingBC):
                           quadrilateral=self.quadrilateral, nrbc_in_habc=True,
                           output_folder=self.path_case_absl, comm=self.comm)
 
-            SpyroEnsemble.print("\nApplying Non-Reflecting Boundary Conditions")
-
-            # Getting boundary data from the layer boundaries
-            if non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
-                bnd_nod_ids_nfs = wave.mesh_ops.layer_boundary_data(wave.mesh,
-                                                                    wave.function_space,
-                                                                    wave.mesh_parameters)[0]
-
-            if non_reflect_bc == BoundaryConditionsType.HIGDON:
-                crit_source = self.crit_source
-                bnd_nod_ids_nfs, bnd_nodes_nfs = wave.mesh_ops.layer_boundary_data(wave.mesh,
-                                                                                   wave.function_space,
-                                                                                   wave.mesh_parameters)
-
             # Hypershape parameters
             hyp_par = (self.layer_geometry.n_hyp, *self.layer_geometry.hyper_axes) \
                 if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else None

@@ -118,8 +118,7 @@ class HABCMesh(MeshOps):
         )
 
     def original_boundary_data(
-        self, mesh, function_space, mesh_parameters, initial_velocity_model
-    ):
+            self, mesh, function_space, mesh_parameters, initial_velocity_model):
         """Generate the boundary data from the original domain mesh.
 
         Parameters
@@ -187,8 +186,7 @@ class HABCMesh(MeshOps):
         return c_bnd_min, c_bnd_max, coord_bnd_nodes
 
     def creating_velocity_profile(
-        self, function_space, initial_velocity_model, path_save
-    ):
+            self, function_space, initial_velocity_model, path_save=None, save_file=True):
         """Create the velocity profile for the original domain.
 
         Parameters
@@ -1079,62 +1077,8 @@ class HABCMesh(MeshOps):
 
         return mesh_habc
 
-
-<< << << < HEAD
-== == == =
-
-
-def layer_boundary_data(self, mesh, V, mesh_parameters):
-    """Generate the boundary data from the domain with the absorbing layer.
-
-        Parameters
-        ----------
-        mesh : `Firedrake.Mesh`
-            Current mesh.
-        V : `Firedrake.FunctionSpace`
-            Function space for the boundary of the domain with absorbing layer.
-        mesh_parameters : `meshing_parameters.MeshingParameters`
-            Contains mesh parameters.
-
-        Returns
-        -------
-        bnd_nod_ids_nfs : 'array'
-            Mesh node indices on non-free surfaces of the domain with absorbing layer.
-        bnd_nodes_nfs : `tuple`
-            Mesh node coordinates on non-free surfaces of the domain with absorbing layer.
-        """
-    # Boundary nodes indices
-    bnd_nod_ids_nfs = np.unique(
-        np.concatenate(
-            [
-                 bnd_ids
-                 for bnd_ids, status in mesh_parameters.boundary_nodes_ids.values()
-                 if status
-                 ]
-            )
-    )
-
-    # Extract node positions
-    node_positions = self.extract_node_positions(mesh, V, output_type="array")
-    coord_msh = mesh.coordinates.dat.data_with_halos
-     coord_bnd_nodes = node_positions[bnd_nod_ids_nfs, :]
-
-      # Identify the boundary nodes
-      tree = cKDTree(coord_msh)
-       indices = tree.query(
-            coord_bnd_nodes, k=1, distance_upper_bound=mesh_parameters.tol
-        )[1]
-        mask_boundary = indices[indices < len(coord_msh)]
-        bnd_nodes_nfs = mesh.coordinates.dat.data_with_halos[mask_boundary, :]
-
-        return bnd_nod_ids_nfs, bnd_nodes_nfs
-
-
->>>>>> > ruben/nrbc_refactoring
-
-
-def get_spatial_coordinates_abc(self, mesh, domain_layer, return_mesh_limits=False):
-    """Get the ufl coordinates of the mesh with absorbing layer.
+    def get_spatial_coordinates_abc(self, mesh, domain_layer, return_mesh_limits=False):
+        """Get the ufl coordinates of the mesh with absorbing layer.
 
         Parameters
         ----------
@@ -1156,21 +1100,21 @@ def get_spatial_coordinates_abc(self, mesh, domain_layer, return_mesh_limits=Fal
         max_coordinates : `array`
             Array containing the maximum coordinates in each dimension (z, x, y).
         """
-    # Mesh limits
-    min_coordinates, max_coordinates = self.extract_extreme_coordinates(mesh)
-    domain_abc = np.asarray(domain_layer)
-    domain_to_check = abs(max_coordinates - min_coordinates)
+        # Mesh limits
+        min_coordinates, max_coordinates = self.extract_extreme_coordinates(mesh)
+        domain_abc = np.asarray(domain_layer)
+        domain_to_check = abs(max_coordinates - min_coordinates)
 
-     assert np.allclose(domain_abc, domain_to_check, atol=0.01), (
-          "Mesh dimensions do not match with expected dimensions of "
-          f"domain with absorbing layer. Expected: {np.round(domain_abc, 3)}, "
-          f"Got: {np.round(domain_to_check, 3)}."
-          )
+        assert np.allclose(domain_abc, domain_to_check, atol=0.01), (
+            "Mesh dimensions do not match with expected dimensions of "
+            f"domain with absorbing layer. Expected: {np.round(domain_abc, 3)}, "
+            f"Got: {np.round(domain_to_check, 3)}."
+        )
 
-      # UFL coordinates for the mesh with absorbing layer
-      ufl_coordinates_abc = fire.SpatialCoordinate(mesh)
+        # UFL coordinates for the mesh with absorbing layer
+        ufl_coordinates_abc = fire.SpatialCoordinate(mesh)
 
-       if return_mesh_limits:
+        if return_mesh_limits:
             return ufl_coordinates_abc, min_coordinates, max_coordinates
         else:
             return ufl_coordinates_abc

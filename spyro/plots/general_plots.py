@@ -396,7 +396,6 @@ def plot_shots(
     filename = filename + str(shot_ids) + "." + file_format
     num_recvs = wave.number_of_receivers
 
-    dt = wave.dt
     tf = wave.final_time
 
     if out_index is None:
@@ -409,7 +408,7 @@ def plot_shots(
         scale = float(np.max(np.abs(arr)))
         vmin, vmax = -scale, scale
 
-    nt = int(tf / dt) + 1  # number of timesteps
+    nt = wave.num_timesteps  # number of timesteps
 
     if end_index == 0:
         end_index = num_recvs

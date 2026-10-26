@@ -40,7 +40,7 @@ def construct_solver_or_matrix_no_pml(wave):
     a = dot(grad(u_n), grad(v)) * dx
 
     # Load term for sources and ABCs
-    le = 0.
+    le = 0.0
 
     # Load term for sources
     q = wave.source_expression

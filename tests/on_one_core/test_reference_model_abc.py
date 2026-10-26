@@ -177,12 +177,12 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
     max_divisor_tf = 3 if dimension == 2 else 4
 
     # Get simulation parameters
-    pprint(f"\nMesh Size: {1e3 * edge_length: .4f} m", comm=comm)
-    pprint(f"Element Geometry: {element_geometry}", comm=comm)
-    pprint(f"Eikonal Degree: {degree_eik}", comm=comm)
-    pprint(f"Eikonal Stabilizing Factor: {f_est: .2f}", comm=comm)
-    pprint(f"Timestep Size: {1e3 * dt_usu: .3f} ms", comm=comm)
-    pprint(f"Maximum Divisor of Final Time: {max_divisor_tf}", comm=comm)
+    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length: .4f} m")
+    SpyroEnsemble.print(f"Element Geometry: {element_geometry}")
+    SpyroEnsemble.print(f"Eikonal Degree: {degree_eik}")
+    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est: .2f}")
+    SpyroEnsemble.print(f"Timestep Size: {1e3 * dt_usu: .3f} ms")
+    SpyroEnsemble.print(f"Maximum Divisor of Final Time: {max_divisor_tf}")
 
     # Create dictionary with parameters for the model
     dictionary = wave_dict(
@@ -190,13 +190,6 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
 
     # Create the acoustic wave object with HABCs
     wave = AcousticWave(dictionary=dictionary)
-
-    # Get simulation parameters
-    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length: .4f} m")
-    SpyroEnsemble.print(f"Element Geometry: {element_geometry}")
-    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est: .2f}")
-    SpyroEnsemble.print(f"Timestep Size: {1e3 * dt_usu: .3f} ms")
-    SpyroEnsemble.print(f"Maximum Divisor of Final Time: {max_divisor_tf}")
 
     # ============ MESH FEATURES ============
 
@@ -315,93 +308,48 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
                 + 60 * "=",
             )
 
+    # Computing reference get_reference_signal
+    wave.layer_ops.infinite_model(
+        wave,
+        check_dt=True,
+        max_divisor_tf=max_divisor_tf,
+    )
 
-<< << << < HEAD
-#     # Computing reference signal
-#     wave.layer_ops.infinite_model(wave, check_dt=True, max_divisor_tf=max_divisor_tf)
+    receivers_reference, receivers_ref_fft = (wave.layer_ops.get_reference_signal())
 
-#     # Estimating computational resource usage
-#     comp_cost("tfin", tRef=tRef, user_name=wave.path_save + "preamble/INF_")
-== == == =
-# Computing reference get_reference_signal
-wave.layer_ops.infinite_model(
-    wave,
-    check_dt=True,
-    max_divisor_tf=max_divisor_tf,
-)
+    # if abc_type == "hybrid":  # Hybrid is the reference
+    #     hybrid_signal = wave.layer_ops.get_reference_signal()[0]
+    #     hybrid_energy = wave.field_logger.get("acoustic_energy")
+    # else:  # PML is the comparison
+    #     pml_signal = wave.forward_solution_receivers
+    #     pml_energy = wave.field_logger.get("acoustic_energy")
 
-receivers_reference, receivers_ref_fft = (
-    wave.layer_ops.get_reference_signal()
-)
->>>>>> > ruben/nrbc_refactoring
+    # # Checking both signals
+    # assert hybrid_signal is not None, "Hybrid signal not found"
+    # assert pml_signal is not None, "PML signal not found"
+    # dt = wave.get_dt()
+    # error_measures = wave.layer_ops.error_measures(pml_signal, hybrid_signal, dt,
+    #                                                wave.number_of_receivers,
+    #                                                final_energy=pml_energy,
+    #                                                final_energy_reference=hybrid_energy,
+    #                                                save_in_case_folder=False)
+    # errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener = error_measures
 
-#     if abc_type == "hybrid":  # Hybrid is the reference
-#         hybrid_signal = wave.layer_ops.get_reference_signal()[0]
-#         hybrid_energy = wave.field_logger.get("acoustic_energy")
-#     else:  # PML is the comparison
-#         pml_signal = wave.forward_solution_receivers
-#         pml_energy = wave.field_logger.get("acoustic_energy")
+    # assert sum(errIt) == 0.0 and max_errIt == 0.0, (
+    #     "✗ Integral Error check for 'hybrid' and 'PML' solvers in Reference Model "
+    #     f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case.")
+    # SpyroEnsemble.print(
+    #     "✓ Integral Error Verified for 'hybrid' and 'PML' solvers")
+    # assert sum(errPk) == 0.0 and max_errPK == 0.0 and all(pkMax) > 0.0, (
+    #     "✗ Peak Error check for 'hybrid' and 'PML' solvers in Reference Model "
+    #     f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case.")
+    # SpyroEnsemble.print("✓ Peak Error Verified for 'hybrid' and 'PML' solvers")
+    # assert final_ener > 0.0 and dsspt_ener == 0.0, (
+    #     "✗ Final Energy check for 'hybrid' and 'PML' solvers in Reference Model "
+    #     f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case.")
+    # SpyroEnsemble.print("✓ Final Energy Verified for 'hybrid' and 'PML' solvers")
 
-# # Checking both signals
-# dt = wave.get_dt()
-# assert hybrid_signal is not None, "Hybrid signal not found"
-# assert pml_signal is not None, "PML signal not found"
-# error_measures = wave.layer_ops.error_measures(pml_signal, hybrid_signal, dt,
-#                                                wave.number_of_receivers,
-#                                                final_energy=pml_energy,
-#                                                final_energy_reference=hybrid_energy,
-#                                                save_in_case_folder=False)
-# errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener = error_measures
-
-<< << << < HEAD
-# assert sum(errIt) == 0. and max_errIt == 0., \
-#     "✗ Integral Error check for 'hybrid' and 'PML' solvers in Reference Model " \
-#     f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
-# pprint("✓ Integral Error Verified for 'hybrid' and 'PML' solvers", comm=comm)
-# assert sum(errPk) == 0. and max_errPK == 0. and all(pkMax) > 0., \
-#     "✗ Peak Error check for 'hybrid' and 'PML' solvers in Reference Model " \
-#     f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
-# pprint("✓ Peak Error Verified for 'hybrid' and 'PML' solvers", comm=comm)
-# assert final_ener > 0. and dsspt_ener == 0., \
-#     "✗ Final Energy check for 'hybrid' and 'PML' solvers in Reference Model " \
-#     f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case."
-# pprint("✓ Final Energy Verified for 'hybrid' and 'PML' solvers", comm=comm)
-== == == =
-# Checking both signals
-assert hybrid_signal is not None, "Hybrid signal not found"
-assert pml_signal is not None, "PML signal not found"
-
-dt = wave.get_dt()
-error_measures = wave.layer_ops.calculate_error_measures(
-    pml_signal,
-    hybrid_signal,
-    dt,
-    wave.number_of_receivers,
-    final_energy=pml_energy,
-    final_energy_reference=hybrid_energy,
-    save_in_case_folder=False,
-)
-
-errIt, errPk, pkMax, max_errIt, max_errPK, final_ener, dsspt_ener = (
-    error_measures
-)
-
-assert sum(errIt) == 0.0 and max_errIt == 0.0, (
-    "✗ Integral Error check for 'hybrid' and 'PML' solvers in Reference Model "
-    f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case.")
-SpyroEnsemble.print(
-    "✓ Integral Error Verified for 'hybrid' and 'PML' solvers")
-assert sum(errPk) == 0.0 and max_errPK == 0.0 and all(pkMax) > 0.0, (
-    "✗ Peak Error check for 'hybrid' and 'PML' solvers in Reference Model "
-    f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case.")
-SpyroEnsemble.print("✓ Peak Error Verified for 'hybrid' and 'PML' solvers")
-assert final_ener > 0.0 and dsspt_ener == 0.0, (
-    "✗ Final Energy check for 'hybrid' and 'PML' solvers in Reference Model "
-    f"{dimension}D with {element_geometry} elements and Eikonal {act_eik} case.")
-SpyroEnsemble.print("✓ Final Energy Verified for 'hybrid' and 'PML' solvers")
->>>>>> > ruben/nrbc_refactoring
-
-except ConvergenceError as e:
-    pytest.fail(
-        f"Checking Reference Model with {element_geometry} elements for "
-        f"{dimension}D and Eikonal {act_eik} case raised an exception: {str(e)}")
+    except ConvergenceError as e:
+        pytest.fail(
+            f"Checking Reference Model with {element_geometry} elements for "
+            f"{dimension}D and Eikonal {act_eik} case raised an exception: {str(e)}")

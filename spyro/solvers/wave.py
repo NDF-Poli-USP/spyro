@@ -941,6 +941,41 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             else:
                 return ops.path_case_absl
 
+    @property
+    def abc_ops(self):
+        """Return the active ABC operations object."""
+        if self.abc_type == AbsorbingBCsType.NRBC and hasattr(self, 'nrbc_ops'):
+            return self.nrbc_ops
+        elif hasattr(self, 'layer_ops'):
+            return self.layer_ops
+
+    @property
+    def case_abc(self):
+        """Get the current ABC case identifier."""
+        ops = self.abc_ops
+        if ops is not None:
+            if self.abc_type == AbsorbingBCsType.NRBC:
+                return ops.case_nrbc
+            else:
+                return ops.case_absl
+
+    @property
+    def path_save(self):
+        """Get the current ABC save path."""
+        ops = self.abc_ops
+        if ops is not None:
+            return ops.path_save
+
+    @property
+    def path_case_abc(self):
+        """Get the current ABC case path."""
+        ops = self.abc_ops
+        if ops is not None:
+            if self.abc_type == AbsorbingBCsType.NRBC:
+                return ops.path_case_nrbc
+            else:
+                return ops.path_case_absl
+
     def abcs_manager(self):
         """Create the ABCs operations manager for the wave solver."""
 

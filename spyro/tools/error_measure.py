@@ -12,7 +12,7 @@ from ..utils.error_management import (
     validate_numeric,
     validate_string,
 )
-from ..utils.freq_tools import freq_response
+from ..utils.freq_tools import fft_at_receivers
 
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -186,24 +186,33 @@ class MeasureError:
         )
 
         # Computing and saving FFT of the reference signal at receivers
-        receivers_ref_fft = []
-        for rec in range(number_of_receivers):
-            signal = forward_solution_receivers[:, rec]
-            yf = freq_response(signal, nyquist_frequency)
-            receivers_ref_fft.append(yf)
+        receivers_ref_fft = fft_at_receivers(
+            number_of_receivers, forward_solution_receivers, nyquist_frequency
+        )
         np.save(
             str(output_file_prefix) + "fft.npy",
             receivers_ref_fft,
         )
 
-    def get_reference_signal(self, input_file=None):
+    def get_reference_signal(
+        self,
+        input_file: str | None = None,
+        get_energy_reference: bool = False,
+        energy_reference_file: str | None = None,
+    ):
         """Acquire the reference signal for comparison between models.
 
         Parameters
         ----------
         input_file : `str`, optional
-            Name of the file to save the reference signal without any extension.
-            Default is "ref_rec.npy".
+            Name of the file to get the reference signal without any extension.
+            Default is `None`, which uses the prefix of the last saved reference.
+        get_energy_reference : `bool`, optional
+            If `True`, return the energy of the reference model during along the
+            transient response. Default is `False`.
+        energy_reference_file : `str`, optional
+            Name of the file to get the energy of the reference model without any
+            extension. Default is `None`.
 
         Returns
         -------
@@ -243,7 +252,20 @@ class MeasureError:
             [".npy"],
             check_file_existence=True,
         )
-        receivers_ref_fft = np.load(receivers_reference_fft_file).T
+        receivers_ref_fft = np.load(receivers_reference_fft_file)
+
+        if get_energy_reference:
+
+            # Energy of the reference model
+            energy_ref_file = validate_file(
+                "reference energy file",
+                str(self.path_reference / (energy_reference_file + ".npy")),
+                [".npy"],
+                check_file_existence=True,
+            )
+            energy_reference = np.load(energy_ref_file).T
+
+            return receivers_reference, receivers_ref_fft, energy_reference
 
         return receivers_reference, receivers_ref_fft
 
@@ -908,4 +930,3 @@ class MeasureError:
 
 
 #     return xCR_opt
-n xCR_opt

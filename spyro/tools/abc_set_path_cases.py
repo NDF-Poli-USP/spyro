@@ -155,7 +155,7 @@ def identify_nrbc_case(non_reflect_bc, angle_max, abc_boundary_type):
                      lower_bound=0., include_lower_bound=True)
     validate_enum("abc_boundary_type", abc_boundary_type, NRBCBoundaryType)
 
-    ang_degrees = round(180. * angle_max / pi, 1)  # Maximum incidence angle in degrees
+    ang_degrees = round(180. * angle_max / pi, 0)  # Maximum incidence angle in degrees
 
     # Labeling for the NRBC type
     if non_reflect_bc == BoundaryConditionsType.HIGDON:
