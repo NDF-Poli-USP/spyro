@@ -28,7 +28,7 @@ from sparsity_plots import load_sparsity_matrices
 # "case_small_2d", "case_large_2d", "case_3d",
 # "case_small_2d_irregular_topography", "case_large_2d_irregular_topography",
 # "case_3d_irregular_topography"
-CASE_NAME = "case_3d"
+CASE_NAME = "case_small_2d_irregular_topography"
 DIMENSION = 3 if CASE_NAME.startswith("case_3d") else 2
 
 # Results computed before the axis change (x vertical, z horizontal):
@@ -59,6 +59,7 @@ GAR6MORE_DIR_SOLID = f"{GAR6_BASE}/{CASE_NAME}/solid"
 GAR6_NAME = "Gar6more3D" if DIMENSION == 3 else "Gar6more2D"
 GAR6_STYLE = dict(color="red", lw=1.5, ls="--")
 SHOW_GAR6 = os.path.isfile(f"{GAR6MORE_DIR_FLUID}/P.dat")
+SHOW_GAR6 = False
 
 # The solid receiver is on the larger-x side of the source, which flips the
 # sign of the horizontal component relative to Gar6more.
@@ -83,6 +84,7 @@ SPECFEM_DIR = f"{SPECFEM_BASE}/{CASE_NAME}"
 SPECFEM_NAME = "SPECFEM2D"
 SPECFEM_STYLE = dict(color="black", lw=1.2, ls=":")
 SHOW_SPECFEM = DIMENSION == 2 and os.path.isfile(f"{SPECFEM_DIR}/AA.S0001.PRE.semp")
+SHOW_SPECFEM = True
 
 # SPECFEM centers the Ricker at t = 0; spyro centers it at t = delay = 1/f.
 SPECFEM_DELAY = {
@@ -90,6 +92,10 @@ SPECFEM_DELAY = {
     "case_small_2d_irregular_topography": 1 / 25,
     "case_large_2d": 1 / 10,
     "case_large_2d_irregular_topography": 1 / 10,
+}.get(CASE_NAME, 0.0)
+
+GAR6_DELAY = {
+    "case_3d": 2.8e-5,
 }.get(CASE_NAME, 0.0)
 
 # key -> (file, sign). S0001 = fluid receiver, S0002 = solid receiver.
@@ -146,9 +152,14 @@ print(f"=== Case: {CASE_NAME} ({DIMENSION}D) ===")
 if SHOW_GAR6:
     print(f"Gar6more fluid: {GAR6MORE_DIR_FLUID}")
     print(f"Gar6more solid: {GAR6MORE_DIR_SOLID}")
-    gar6 = {"p": load_trace(f"{GAR6MORE_DIR_FLUID}/P.dat")}
+    # gar6 = {"p": load_trace(f"{GAR6MORE_DIR_FLUID}/P.dat")}
+    # for comp, _, fname, _ in COMPONENTS:
+    #     gar6[comp] = load_trace(f"{GAR6MORE_DIR_SOLID}/{fname}")
+    t_g, v_g = load_trace(f"{GAR6MORE_DIR_FLUID}/P.dat")
+    gar6 = {"p": (t_g + GAR6_DELAY, v_g)}
     for comp, _, fname, _ in COMPONENTS:
-        gar6[comp] = load_trace(f"{GAR6MORE_DIR_SOLID}/{fname}")
+        t_g, v_g = load_trace(f"{GAR6MORE_DIR_SOLID}/{fname}")
+        gar6[comp] = (t_g + GAR6_DELAY, v_g)
 if SHOW_SPECFEM:
     print(f"SPECFEM: {SPECFEM_DIR}  (time shift +{SPECFEM_DELAY:.4f} s)")
     spec = {}

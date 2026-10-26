@@ -140,6 +140,19 @@ class AcousticElasticWave(Wave):
             * self.ds_int(self.interface_id)
         )
         assert check < 1e-12, f"Inconsistent interface normals: {check}"
+        self._print_boundary_info()
+
+    def _print_boundary_info(self):
+        for name, submesh in [("fluid", self.submesh_fluid),
+                               ("solid", self.submesh_solid)]:
+            markers = submesh.exterior_facets.unique_markers.tolist()
+            ext_markers = [m for m in markers if m != self.interface_id]
+            x = fire.SpatialCoordinate(submesh)
+            for m in ext_markers:
+                length = fire.assemble(fire.Constant(1) * fire.ds(m, domain=submesh))
+                cz = fire.assemble(x[0] * fire.ds(m, domain=submesh)) / length
+                cx = fire.assemble(x[1] * fire.ds(m, domain=submesh)) / length
+                print(f"{name} marker {m}: centroid z={cz:.3f}, x={cx:.3f}, length={length:.4f}")
 
     @override
     def _create_function_space(self):

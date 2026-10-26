@@ -13,6 +13,21 @@ from spyro.solvers.elastic_wave.forms import build_elastic_form
 
 from matplotlib.ticker import MaxNLocator
 
+import numpy as np
+import ufl
+
+
+def _drop_missing_facets(form):
+    kept = []
+    for itg in form.integrals():
+        sid = itg.subdomain_id()
+        if itg.integral_type() == "exterior_facet" and not isinstance(sid, str):
+            markers = set(itg.ufl_domain().exterior_facets.unique_markers.tolist())
+            if not set(np.atleast_1d(sid).tolist()) <= markers:
+                continue
+        kept.append(itg)
+    return ufl.Form(kept)
+
 
 def construct_acoustic_elastic(Wave_obj):
     p_nm1, u_nm1 = fire.split(Wave_obj.X_nm1)
@@ -27,12 +42,21 @@ def construct_acoustic_elastic(Wave_obj):
     u_trial = TrialFunction(Wave_obj.vector_function_space)
     v_s = TestFunction(Wave_obj.vector_function_space)
 
+    # F_elastic = build_elastic_form(
+    #     Wave_obj, u_trial, v_s, u_n, u_nm1, Wave_obj.quadrature_rule_solid
+    # )
+    c_p = fire.sqrt((Wave_obj.lmbda + 2.0 * Wave_obj.mu) / Wave_obj.rho)
+    c_s = fire.sqrt(Wave_obj.mu / Wave_obj.rho)
     F_elastic = build_elastic_form(
-        Wave_obj, u_trial, v_s, u_n, u_nm1, Wave_obj.quadrature_rule_solid
+        Wave_obj, u_trial, v_s, u_n, u_nm1, Wave_obj.quadrature_rule_solid,
+        abc_kwargs={"c_p": c_p, "c_s": c_s,
+                    "qr_s": Wave_obj.surface_quadrature_rule_solid,
+                    "boundary_ids": {"bottom": 2, "top": None, "left": 3, "right": 4}},
     )
 
     F_interface_elastic = +p_n * dot(v_s, n_s) * ds_int(iface)
-    F_solid = F_elastic + F_interface_elastic
+    # F_solid = F_elastic + F_interface_elastic
+    F_solid = _drop_missing_facets(F_elastic + F_interface_elastic)
 
     solid_lhs = fire.lhs(F_solid)
     solid_rhs = fire.rhs(F_solid)
@@ -58,6 +82,8 @@ def construct_acoustic_elastic(Wave_obj):
     p_trial = TrialFunction(Wave_obj.scalar_function_space)
     v_f = TestFunction(Wave_obj.scalar_function_space)
 
+    Wave_obj.surface_quadrature_rule = Wave_obj.surface_quadrature_rule_fluid
+
     F_acoustic = build_acoustic_form(
         Wave_obj,
         p_trial,
@@ -69,7 +95,8 @@ def construct_acoustic_elastic(Wave_obj):
 
     u_tt = (Wave_obj.X_np1.sub(1) - 2.0 * u_n + u_nm1) / dt**2
     F_interface_acoustic = -dot(u_tt, n_s) * v_f * ds_int(iface)
-    F_fluid = F_acoustic + F_interface_acoustic
+    # F_fluid = F_acoustic + F_interface_acoustic
+    F_fluid = _drop_missing_facets(F_acoustic + F_interface_acoustic)
 
     fluid_lhs = fire.lhs(F_fluid)
     fluid_rhs = fire.rhs(F_fluid)
