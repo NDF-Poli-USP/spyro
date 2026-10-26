@@ -1,9 +1,7 @@
 import warnings
 
-from firedrake import (
-    ConvergenceError, Form, LinearEigenproblem, LinearEigensolver, assemble,
-)
-from numpy import array, asarray, eye, imag, ndarray, real, sqrt, unique
+import firedrake as fire
+from numpy import array, asarray, eye, imag, real, sqrt, unique
 from scipy.sparse.linalg import eigs, eigsh, lobpcg, spilu
 from slepc4py import SLEPc
 from spyro.mpi.spyro_mpi import SpyroEnsemble
@@ -88,8 +86,6 @@ class Modal_Solver:
         Solve the eigenvalue problem with sparse matrices using Scipy.
     solver_with_ufl()
             Solve the eigenvalue problem using UFL forms with SLEPc.
-    solver_largest_with_slepc()
-        Compute the largest eigenvalues of the distributed problem with SLEPc.
     """
 
     def __init__(self, dimension=2, method=None, calc_max_dt=False, comm=None):
@@ -274,53 +270,10 @@ class Modal_Solver:
     def solver_with_ufl(self, a, m, k=2):
         """Solve the eigenvalue problem using UFL forms with SLEPc.
 
-        Parameters
-        ----------
-        a : `Firedrake.Form`
-            Weak form representing the stiffness matrix.
-        m : `Firedrake.Form`
-            Weak form  representing the mass matrix.
-        k : `int`, optional
-            Number of eigenvalues to compute. Default is 2.
-
-        Returns
-        -------
-        Lsp : `array`
-            Array containing the computed eigenvalues.
-        """
-
-        ksp_type = KRYLOVSCH_CONFIG[self.method]["ksp"]
-        pc_type = KRYLOVSCH_CONFIG[self.method]["pc"]
-
-        opts = {
-            "eps_gen_hermitian": None,  # Problem is Hermitian
-            "eps_type": "krylovschur",  # Robust, widely used eigensolver
-            "eps_tol": 1e-6,  # Tight tolerance for accuracy
-            "eps_max_it": 200,  # Reasonable iteration cap
-            "st_shift": 1e-6,  # Stabilizes Neumann BC null space
-            "st_type": "sinvert",  # Useful for interior eigenvalues
-            "eps_monitor": "ascii",  # Print convergence info
-            "ksp_type": ksp_type,  # Options for large problems
-            "pc_type": pc_type,  # Options for large problems
-            "eps_smallest_magnitude": None,  # Smallest eigenvalues magnitude
-        }
-
-        eigenproblem = LinearEigenproblem(a, M=m)
-        eigensolver = LinearEigensolver(eigenproblem, n_evals=k, solver_parameters=opts)
-        eigensolver.solve()
-        Lsp = asarray([eigensolver.eigenvalue(mod) for mod in range(k)])
-
-        return Lsp
-
-    def solver_largest_with_slepc(self, a: Form, m: Form, k: int = 2) -> ndarray:
-        """Compute the largest eigenvalues of the distributed problem with SLEPc.
-
-        Firedrake's ``LinearEigensolver`` always sets a target, which makes
-        SLEPc look for the eigenvalues closest to it instead of the largest
-        ones, so the SLEPc solver is built directly on the assembled
-        matrices. No spectral transformation is used, so each iteration only
-        solves a system with the mass matrix, with the Krylov solver and
-        preconditioner of ``method``.
+        With `calc_max_dt`, the eigenvalues of largest magnitude are
+        computed without a spectral transformation, so each iteration only
+        solves a system with the mass matrix. Otherwise, the smallest ones
+        are computed with shift-and-invert.
 
         Parameters
         ----------
@@ -334,40 +287,57 @@ class Modal_Solver:
         Returns
         -------
         numpy.ndarray
-            Real converged eigenvalues of largest magnitude, identical on
-            every rank.
+            The computed eigenvalues, identical on every rank.
 
         Raises
         ------
         firedrake.ConvergenceError
             If SLEPc does not converge any eigenvalue.
         """
-        A = assemble(a).petscmat
-        M = assemble(m).petscmat
 
-        eps = SLEPc.EPS().create(comm=A.comm)
-        try:
-            eps.setOperators(A, M)
-            eps.setProblemType(SLEPc.EPS.ProblemType.GHEP)
-            eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
-            eps.setWhichEigenpairs(SLEPc.EPS.Which.LARGEST_MAGNITUDE)
-            eps.setDimensions(nev=k)
-            eps.setTolerances(1e-6, 200)
-            ksp = eps.getST().getKSP()
-            ksp.setType(KRYLOVSCH_CONFIG[self.method]["ksp"])
-            ksp.getPC().setType(KRYLOVSCH_CONFIG[self.method]["pc"])
-            ksp.setTolerances(rtol=1e-10)
-            eps.solve()
+        ksp_type = KRYLOVSCH_CONFIG[self.method]["ksp"]
+        pc_type = KRYLOVSCH_CONFIG[self.method]["pc"]
 
-            n_converged = eps.getConverged()
-            if n_converged == 0:
-                raise ConvergenceError("SLEPc did not converge any eigenvalue.")
-            return asarray(
-                [eps.getEigenvalue(i).real for i in range(n_converged)]
-            )
-        finally:
-            # Destroyed explicitly, since SLEPc objects are collective
-            eps.destroy()
+        opts = {
+            "eps_gen_hermitian": None,  # Problem is Hermitian
+            "eps_type": "krylovschur",  # Robust, widely used eigensolver
+            "eps_tol": 1e-6,  # Tight tolerance for accuracy
+            "eps_max_it": 200,  # Reasonable iteration cap
+        }
+        if self.calc_max_dt:
+            opts.update({
+                "st_type": "shift",  # No inversion, only mass matrix solves
+                "st_ksp_type": ksp_type,
+                "st_pc_type": pc_type,
+                "st_ksp_rtol": 1e-10,
+            })
+        else:
+            opts.update({
+                "st_shift": 1e-6,  # Stabilizes Neumann BC null space
+                "st_type": "sinvert",  # Useful for interior eigenvalues
+                "eps_monitor": "ascii",  # Print convergence info
+                "ksp_type": ksp_type,
+                "pc_type": pc_type,
+                "eps_smallest_magnitude": None,  # Smallest eigenvalues magnitude
+            })
+
+        eigenproblem = fire.LinearEigenproblem(a, M=m)
+        eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=k, solver_parameters=opts)
+        if self.calc_max_dt:
+            # LinearEigensolver always sets a target, which makes SLEPc look
+            # for the eigenvalues closest to it even when the largest are
+            # requested in the options. The options are only applied when it
+            # is built, so the search is changed on the SLEPc solver itself
+            largest = SLEPc.EPS.Which.LARGEST_MAGNITUDE
+            eigensolver.es.setWhichEigenpairs(largest)
+
+        n_converged = eigensolver.solve()
+
+        Lsp = asarray(
+            [eigensolver.eigenvalue(mod) for mod in range(min(k, n_converged))]
+        )
+
+        return Lsp
 
     def solver_rayleigh_quotient(
         self, c, ufl_coordinates, V, mesh_limits, k=2, quad_rule=None
@@ -613,10 +583,7 @@ class Modal_Solver:
             )
 
         if self.method.startswith("KRYLOVSCH"):
-            if self.calc_max_dt:
-                Lsp = self.solver_largest_with_slepc(a, m, k=k)
-            else:
-                Lsp = self.solver_with_ufl(a, m, k=k)
+            Lsp = self.solver_with_ufl(a, m, k=k)
 
         elif self.method in ["ARNOLDI", "LANCZOS", "LOBPCG"]:
             Asp, Msp = assemble_sparse_matrices(a, m)
