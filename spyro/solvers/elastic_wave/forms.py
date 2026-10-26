@@ -21,7 +21,8 @@ from firedrake import (
 from .local_abc import local_abc_form
 
 
-def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
+# def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
+def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule, abc_kwargs=None):
     """Build the weak form of the isotropic elastic wave equation for one
     time step.
 
@@ -67,7 +68,8 @@ def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
     if b is not None:
         F_s += dot(b, v_test) * dx(**quad_rule)
 
-    F_t = local_abc_form(wave)
+    # F_t = local_abc_form(wave)
+    F_t = local_abc_form(wave, v=v_test, u_n=u_n, u_nm1=u_nm1, **(abc_kwargs or {}))
 
     return F_m + F_k - F_s - F_t
 

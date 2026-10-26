@@ -119,7 +119,7 @@ def plot_model_xz(wave, filename):
 # Settings
 # ===========================================================================
 USE_MONOLITHIC = False
-MESH_TYPE = "firedrake_mesh"   # "gmsh_mesh" ou "firedrake_mesh"
+MESH_TYPE = "gmsh_mesh"   # "gmsh_mesh" ou "firedrake_mesh"
 OUT = "results"
 os.makedirs(OUT, exist_ok=True)
 
@@ -138,7 +138,7 @@ case_small_2D = {
     "frequency": 25,
     "receiver_location": [(-0.49, 0.49)],
     "solid_receiver_locations": [(-0.51, 0.51)],
-    "final_time": 0.22,
+    "final_time": 0.8,
     "dt": 0.0001,
     "velocity_fluid": None,
     "bulk_modulus": 2.25,
@@ -234,7 +234,7 @@ cases = {1: ("case_small_2d", case_small_2D),
          3: ("case_3d", case_3D),
          4: ("case_small_2d_irregular_topography", case_small_2D_irregular),
          5: ("case_large_2d_irregular_topography", case_large_2D_irregular)}
-CASE_NUM = 3
+CASE_NUM = 4
 CASE_NAME, selected_case = cases[CASE_NUM]
 if callable(selected_case):
     selected_case = selected_case()
@@ -277,18 +277,19 @@ dictionary["mesh"] = {
     "mesh_type": MESH_TYPE,
     "edge_length": selected_case["edge_length"],
     "interface_z": selected_case["interface_z"],
-    "absorb_left": False,
-    "absorb_right": False,
-    "absorb_top": False,
-    "absorb_bottom": False,
 }
 
 if MESH_TYPE == "gmsh_mesh":
     segy_file = f"{OUT}/model_{TAG}.segy"
-    build_segy(segy_file, selected_case["length_z"], selected_case["length_x"],
-               selected_case["segy_dz"], selected_case["segy_interface"],
-               VP_WATER, selected_case["s_wave_velocity"],
-               dx=selected_case.get("segy_dx"))
+    build_segy(
+        segy_file,
+        selected_case["length_z"],
+        selected_case["length_x"],
+        selected_case["segy_dz"],
+        selected_case["segy_interface"],
+        VP_WATER, selected_case["s_wave_velocity"],
+        dx=selected_case.get("segy_dx")
+    )
     dictionary["mesh"].pop("edge_length")
     dictionary["mesh"].update({
         "output_filename": f"{OUT}/mesh_{TAG}.msh",
@@ -355,10 +356,25 @@ dictionary["synthetic_data"] = {
     "real_velocity_file": None,
 }
 
+dictionary["absorving_boundary_conditions"] = {
+    "status": True,
+    "abc_type": "nrbc",
+    "absorb_top": True,
+    "absorb_bottom": True,
+    "absorb_right": True,
+    "absorb_left": True,
+}
+
 # ===========================================================================
 # Run
 # ===========================================================================
 Wave_obj = AcousticElasticWave(dictionary=dictionary)
+
+# Checagem dos markers das submalhas
+print("Fluid exterior facet markers:",
+      Wave_obj.scalar_function_space.mesh().exterior_facets.unique_markers)
+print("Solid exterior facet markers:",
+      Wave_obj.vector_function_space.mesh().exterior_facets.unique_markers)
 
 import firedrake as fire
 for name, sub in (("fluido", Wave_obj.submesh_fluid), ("solido", Wave_obj.submesh_solid)):

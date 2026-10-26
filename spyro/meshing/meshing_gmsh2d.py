@@ -50,6 +50,27 @@ def build_gmsh_geometry_and_groups(
         water_surface = gmsh.model.occ.addPlaneSurface([curve_loop])
         gmsh.model.occ.synchronize()
 
+        # if padding_type is None:
+        #     rectangle_tag = gmsh.model.occ.addRectangle(0, 0, 0, length_x, depth_z)
+        #     gmsh.model.occ.synchronize()
+        #     fragment_result, fragment_map = gmsh.model.occ.fragment([(2, rectangle_tag), (2, water_surface)], [])
+        #     gmsh.model.occ.synchronize()
+        #     water_tags = [tag for dim, tag in fragment_map[1]]
+        #     clipped_rect_tags = [tag for dim, tag in fragment_map[0] if tag not in water_tags]
+        #     # gmsh.model.addPhysicalGroup(2, water_tags, name="WaterSurface")
+        #     # gmsh.model.addPhysicalGroup(2, clipped_rect_tags, name="SubSurface")
+        #     gmsh.model.addPhysicalGroup(2, water_tags, tag=5, name="WaterSurface")
+        #     gmsh.model.addPhysicalGroup(2, clipped_rect_tags, tag=6, name="SubSurface")
+
+        #     gmsh.model.addPhysicalGroup(1, [line_top], tag=1, name="Top")
+        #     gmsh.model.addPhysicalGroup(1, [line_left], tag=3, name="Left")
+        #     gmsh.model.addPhysicalGroup(1, [line_right], tag=4, name="Right")
+        #     # bottom da parte sólida: pegar via bounding box após fragment
+        #     eps = 1e-6
+        #     bot_curves = [t for dim, t in gmsh.model.getEntitiesInBoundingBox(
+        #         -eps, depth_z - eps, -eps, length_x + eps, depth_z + eps, eps, dim=1)]
+        #     gmsh.model.addPhysicalGroup(1, bot_curves, tag=2, name="Bottom")
+
         if padding_type is None:
             rectangle_tag = gmsh.model.occ.addRectangle(0, 0, 0, length_x, depth_z)
             gmsh.model.occ.synchronize()
@@ -57,8 +78,22 @@ def build_gmsh_geometry_and_groups(
             gmsh.model.occ.synchronize()
             water_tags = [tag for dim, tag in fragment_map[1]]
             clipped_rect_tags = [tag for dim, tag in fragment_map[0] if tag not in water_tags]
-            gmsh.model.addPhysicalGroup(2, water_tags, name="WaterSurface")
-            gmsh.model.addPhysicalGroup(2, clipped_rect_tags, name="SubSurface")
+            gmsh.model.addPhysicalGroup(2, water_tags, tag=5, name="WaterSurface")
+            gmsh.model.addPhysicalGroup(2, clipped_rect_tags, tag=6, name="SubSurface")
+
+            eps = 1e-6
+            top_c = [t for dim, t in gmsh.model.getEntitiesInBoundingBox(
+                -eps, -eps, -eps, length_x+eps, eps, eps, dim=1)]
+            bot_c = [t for dim, t in gmsh.model.getEntitiesInBoundingBox(
+                -eps, depth_z-eps, -eps, length_x+eps, depth_z+eps, eps, dim=1)]
+            left_c = [t for dim, t in gmsh.model.getEntitiesInBoundingBox(
+                -eps, depth_z-eps, -eps, eps, eps, eps, dim=1)]
+            right_c = [t for dim, t in gmsh.model.getEntitiesInBoundingBox(
+                length_x-eps, depth_z-eps, -eps, length_x+eps, eps, eps, dim=1)]
+            gmsh.model.addPhysicalGroup(1, top_c,   tag=1, name="Top")
+            gmsh.model.addPhysicalGroup(1, bot_c,   tag=2, name="Bottom")
+            gmsh.model.addPhysicalGroup(1, left_c,  tag=3, name="Left")
+            gmsh.model.addPhysicalGroup(1, right_c, tag=4, name="Right")
 
         if padding_type == "rectangular":
             pt_rock_bl = gmsh.model.occ.addPoint(0.0, depth_z, 0.0)
@@ -111,6 +146,11 @@ def build_gmsh_geometry_and_groups(
             gmsh.model.addPhysicalGroup(2, [water_surface], name="WaterSurface")
             gmsh.model.addPhysicalGroup(2, [surf_rock], name="SubSurface")
             gmsh.model.addPhysicalGroup(2, [surf_pad_tr, surf_pad_mr, surf_pad_tl, surf_pad_ml, surf_pad_bl, surf_pad_bc, surf_pad_br], name="Padding")
+
+            gmsh.model.addPhysicalGroup(1, [line_top], tag=1, name="Top")
+            gmsh.model.addPhysicalGroup(1, [pad_tl_left, pad_ml_left, pad_bl_left], tag=3, name="Left")
+            gmsh.model.addPhysicalGroup(1, [pad_tr_right, pad_mr_right, pad_br_right], tag=4, name="Right")
+            gmsh.model.addPhysicalGroup(1, [pad_bl_bot, pad_bc_bot, pad_br_bot], tag=2, name="Bottom")
 
         if padding_type == "hyperelliptical":
 
@@ -242,6 +282,20 @@ def build_gmsh_geometry_and_groups(
             gmsh.model.occ.synchronize()
             gmsh.model.addPhysicalGroup(2, [rectangle_tag], name="SubSurface")
 
+            eps = 1e-6
+            top_c = [t for dim, t in gmsh.model.getEntitiesInBoundingBox(
+                -eps, -eps, -eps, length_x+eps, eps, eps, dim=1)]
+            bot_c = [t for dim, t in gmsh.model.getEntitiesInBoundingBox(
+                -eps, depth_z-eps, -eps, length_x+eps, depth_z+eps, eps, dim=1)]
+            left_c = [t for dim, t in gmsh.model.getEntitiesInBoundingBox(
+                -eps, -eps, -eps, eps, depth_z+eps, eps, dim=1)]
+            right_c = [t for dim, t in gmsh.model.getEntitiesInBoundingBox(
+                length_x-eps, -eps, -eps, length_x+eps, depth_z+eps, eps, dim=1)]
+            gmsh.model.addPhysicalGroup(1, top_c,   tag=1, name="Top")
+            gmsh.model.addPhysicalGroup(1, bot_c,   tag=2, name="Bottom")
+            gmsh.model.addPhysicalGroup(1, left_c,  tag=3, name="Left")
+            gmsh.model.addPhysicalGroup(1, right_c, tag=4, name="Right")
+
         if padding_type == "rectangular":
             pt_tl = gmsh.model.occ.addPoint(0.0, 0.0, 0.0)
             pt_tr = gmsh.model.occ.addPoint(length_x, 0.0, 0.0)
@@ -299,6 +353,11 @@ def build_gmsh_geometry_and_groups(
 
             gmsh.model.addPhysicalGroup(2, [surf_internal], name="SubSurface")
             gmsh.model.addPhysicalGroup(2, [surf_pad_left, surf_pad_bl, surf_pad_bot, surf_pad_br, surf_pad_right], name="Padding")
+
+            gmsh.model.addPhysicalGroup(1, [line_top], tag=1, name="Top")
+            gmsh.model.addPhysicalGroup(1, [pad_left], tag=3, name="Left")
+            gmsh.model.addPhysicalGroup(1, [pad_right], tag=4, name="Right")
+            gmsh.model.addPhysicalGroup(1, [pad_corner_bl_bot, pad_bot_mid, pad_corner_br_bot], tag=2, name="Bottom")
 
         if padding_type == "hyperelliptical":
 
