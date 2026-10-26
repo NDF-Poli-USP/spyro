@@ -1,4 +1,4 @@
-from ..io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..utils.error_management import (validate_model_dimension, validate_numeric,
                                       validate_parameter)
 
@@ -135,7 +135,7 @@ class RectangLayer():
         None
         """
 
-        pprint("Determining Rectangular Layer Parameters", comm=self.comm)
+        SpyroEnsemble.print("Determining Rectangular Layer Parameters")
 
         # Checking inputs
         validate_model_dimension(('domain_dim', 'domain_layer'),
@@ -153,7 +153,7 @@ class RectangLayer():
             self.area = length_xabc * length_zabc
             self.area_ratio = self.area / (length_x * length_z)
             self.f_Ah = 4
-            pprint(f"Area Ratio: {self.area_ratio:5.3f}", comm=self.comm)
+            SpyroEnsemble.print(f"Area Ratio: {self.area_ratio: 5.3f}")
 
         if self.dimension == 3:  # 3D
             length_y = self.domain_dim[2]
@@ -161,4 +161,4 @@ class RectangLayer():
             self.vol = length_xabc * length_zabc * length_yabc
             self.vol_ratio = self.vol / (length_x * length_z * length_y)
             self.f_Vh = 8
-            pprint(f"Volume Ratio: {self.vol_ratio:5.3f}", comm=self.comm)
+            SpyroEnsemble.print(f"Volume Ratio: {self.vol_ratio: 5.3f}")

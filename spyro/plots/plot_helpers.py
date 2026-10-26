@@ -10,6 +10,7 @@ def _finalize_figure(
     *,
     formats: tuple[str, ...] | None = None,
     show: bool = False,
+    hold: bool = False,
     **savefig_kwargs,
 ):
     if filename is not None:
@@ -30,4 +31,7 @@ def _finalize_figure(
     if show:
         plt.show()
 
-    plt.close(fig)
+    if not hold:
+        plt.close(fig)
+
+    return fig

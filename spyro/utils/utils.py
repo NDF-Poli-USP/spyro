@@ -6,13 +6,14 @@ import os
 from scipy.signal import butter, filtfilt
 import warnings
 
+from spyro.mpi.spyro_mpi import SpyroEnsemble
+
 from ..io.basicio import parallel_print, write_velocity_model
 from ..io.parallelism_wrappers import (
     ensemble_functional,
-    run_in_one_core_and_broadcast,
 )
 from ..domains.space import create_function_space
-from .typing import FunctionalEvaluationMode, FunctionalType
+from .typing import FunctionalEvaluationMode, FunctionalType, WaveType
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
@@ -47,8 +48,12 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
 
 @ensemble_functional
 def compute_functional(
-    wave, misfit, evaluation_mode=FunctionalEvaluationMode.AFTER_SOLVE, step=None, nsteps=None,
-    functional_form=FunctionalType.L2Norm
+    wave,
+    misfit,
+    evaluation_mode=FunctionalEvaluationMode.AFTER_SOLVE,
+    step=None,
+    nsteps=None,
+    functional_form=FunctionalType.L2Norm,
 ):
     """Compute the functional value for the given misfit at receiver
     locations.
@@ -95,15 +100,13 @@ def compute_functional(
     if functional_form != FunctionalType.L2Norm:
         raise NotImplementedError(
             f"Functional form {functional_form} not implemented. Only L2Norm"
-            " is currently supported.")
+            " is currently supported."
+        )
     if evaluation_mode == FunctionalEvaluationMode.PER_TIMESTEP:
         weight = 0.5 if step == 0 or step == nsteps - 1 else 1.0
 
         if wave.use_vertex_only_mesh:
-            return assemble(
-                0.5 * wave.dt * weight
-                * inner(misfit, misfit) * dx
-            )
+            return assemble(0.5 * wave.dt * weight * inner(misfit, misfit) * dx)
         elif isinstance(misfit, np.ndarray):
             return np.sum(misfit**2) * (0.5 * wave.dt * weight)
         else:
@@ -291,7 +294,7 @@ def communicate(array, my_ensemble):
     return array_reduced
 
 
-class Mask():
+class Mask:
     """
     DEPRECATED: Spatial mask for selective gradient updates in wave simulations.
 
@@ -458,9 +461,17 @@ class Mask():
         for boundary in active_boundaries:
             axis = boundary[0]
             if boundary[-3:] == "min":
-                cond[0] = conditional(getattr(self, axis) < getattr(self, boundary), true_value[0], false_value[0])
+                cond[0] = conditional(
+                    getattr(self, axis) < getattr(self, boundary),
+                    true_value[0],
+                    false_value[0],
+                )
             elif boundary[-3:] == "max":
-                cond[0] = conditional(getattr(self, axis) > getattr(self, boundary), true_value[0], false_value[0])
+                cond[0] = conditional(
+                    getattr(self, axis) > getattr(self, boundary),
+                    true_value[0],
+                    false_value[0],
+                )
             else:
                 raise ValueError(f"Boundary of {boundary} not possible")
 
@@ -497,8 +508,12 @@ class Mask():
         of degrees of freedom where the mask value exceeds 0.3.
         """
         if self.in_dg:
-            raise ValueError("DG space can have different DoFs than the functional space")
-        warnings.warn("When applying a mask in a continuous space, expect some error in the element adjacent to the mask")
+            raise ValueError(
+                "DG space can have different DoFs than the functional space"
+            )
+        warnings.warn(
+            "When applying a mask in a continuous space, expect some error in the element adjacent to the mask"
+        )
         mask = Function(wave.function_space)
         mask.interpolate(self.cond)
         # Saving mask dofs
@@ -586,8 +601,8 @@ class Gradient_mask_for_pml(Mask):
         super().__init__(boundaries, wave)
 
 
-@run_in_one_core_and_broadcast
-def write_hdf5_velocity_model(obj_with_comm, segy_filename):
+@SpyroEnsemble.run_in_one_core_and_broadcast
+def write_hdf5_velocity_model(segy_filename):
     """Convert a SEG-Y velocity model to HDF5 format.
 
     Converts a SEG-Y velocity model file to HDF5 using the native
@@ -632,20 +647,12 @@ def write_hdf5_velocity_model(obj_with_comm, segy_filename):
     return output_filename
 
 
-# def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
-#     degree = model["opts"]["degree"]
-#     V = FunctionSpace(mesh, "CG", degree)  # noqa: F405
-#     z, x = SpatialCoordinate(mesh)  # noqa: F405
-#     p = Function(V).interpolate(  # noqa: F405
-#         (time**2) * sin(pi * z) * sin(pi * x)  # noqa: F405
-#     )
-#     return p
-
 def get_real_shot_record(wave):
     """Get the real shot record for the active sources.
 
     The returned object is typically an array with shape
-    ``(n_timesteps, n_receivers)`` for a single active shot.
+    ``(n_timesteps, n_receivers)`` for a scalar wave or
+    ``(n_timesteps, n_receivers, dimension)`` for a single elastic shot.
     """
     real_shot_record = wave.real_shot_record
 
@@ -664,10 +671,15 @@ def get_real_shot_record(wave):
             "before retrieving the real shot record."
         )
 
+    # Scalar single-shot records have two axes, while vector elastic ones have
+    # three. Multiple shots add exactly one leading axis. Comparing ranks
+    # therefore distinguishes a vector-valued shot from multishot scalar data
+    # without guessing from potentially equal axis lengths.
+    single_shot_ndim = 2 if wave.wave_type is WaveType.ISOTROPIC_ACOUSTIC else 3
     if isinstance(real_shot_record, np.ndarray):
-        if real_shot_record.ndim == 3:
+        if real_shot_record.ndim == single_shot_ndim + 1:
             return real_shot_record[wave.current_sources[0]]
-        if real_shot_record.ndim == 2:
+        if real_shot_record.ndim == single_shot_ndim:
             return real_shot_record
 
     if isinstance(real_shot_record, (list, tuple)):
@@ -676,7 +688,16 @@ def get_real_shot_record(wave):
             and len(real_shot_record) > wave.current_sources[0]
         ):
             source_record = real_shot_record[wave.current_sources[0]]
-            if isinstance(source_record, np.ndarray) and source_record.ndim == 2:
+            if (
+                isinstance(source_record, np.ndarray)
+                and source_record.ndim == single_shot_ndim
+            ):
                 return source_record
 
     return real_shot_record
+
+
+def get_time_vector(wave):
+    """Get a time vector representing the time axis of a wave object."""
+    number_timesteps = int(wave.final_time / wave.dt) + 1
+    return np.linspace(0.0, wave.final_time, number_timesteps)

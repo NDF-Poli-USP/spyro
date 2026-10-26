@@ -1,4 +1,5 @@
 import firedrake as fire
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 from .wave import Wave
 from pyadjoint import Tape, AdjFloat
@@ -15,13 +16,21 @@ from .backward_time_integration import (
 )
 from ..domains.space import create_function_space
 from ..utils.typing import (
-    AdjointType, RieszMapType, override, WaveType, AbsorbingBCsType,
+    AcousticMaterialParameter,
+    AdjointType,
+    RieszMapType,
+    override,
+    WaveType,
+    AbsorbingBCsType,
 )
 from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
 
 
 class AcousticWave(Wave):
+    #: An acoustic medium is described by its pressure wave velocity alone.
+    _physical_parameter_names = frozenset(AcousticMaterialParameter)
+
     def __init__(self, dictionary, comm=None):
         """Wave Acoustic object solver.
 
@@ -41,16 +50,15 @@ class AcousticWave(Wave):
 
         self.acoustic_energy = None
         self.field_logger.add_functional(
-            "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))
+            "acoustic_energy", lambda: fire.assemble(self.acoustic_energy)
+        )
 
     def save_current_velocity_model(self, file_name=None):
         if self.c is None:
             raise ValueError("C not loaded")
         if file_name is None:
             file_name = "velocity_model.pvd"
-        fire.VTKFile(file_name).write(
-            self.c, name="velocity"
-        )
+        SpyroEnsemble.write_vtk(file_name, self.c, name="velocity")
 
     @override
     def matrix_building(self):
@@ -82,33 +90,35 @@ class AcousticWave(Wave):
 
     @ensemble_gradient
     def gradient_solve(
-        self, misfit=None, forward_solution=None,
+        self,
+        misfit=None,
+        forward_solution=None,
         adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
         riesz_map=RieszMapType.L2,
     ):
         """Compute the adjoint-based gradient.
 
-        Parameters:
-        -----------
-        misfit: Firedrake 'Function' or numpy array (optional)
+        Parameters
+        ----------
+        misfit : Firedrake 'Function' or numpy array (optional)
             The misfit between the observed and predicted data. If not provided,
             it will be computed as the difference between the real shot record and
             the forward solution at the receivers. If the real shot record is not
             available, the method will raise an error.
-        forward_solution: Firedrake 'Function' (optional)
+        forward_solution : Firedrake 'Function' (optional)
             The forward solution of the wave equation. If not provided, it will be
             computed by calling the forward solver. Providing the forward solution
             can save computational time if it has already been
             computed for the current velocity model, as it avoids redundant forward solves.
-        adjoint_type: AdjointType enum (default: AdjointType.IMPLEMENTED_ADJOINT)
+        adjoint_type : AdjointType enum (default: AdjointType.IMPLEMENTED_ADJOINT)
             Whether to use automated adjoint differentiation.
-        riesz_map: RieszMapType enum (default: RieszMapType.L2)
+        riesz_map : RieszMapType enum (default: RieszMapType.L2)
             The type of Riesz map to use for the gradient. More details in the documentation of the
             :class:`RieszMapType` enum.
 
-        Returns:
-        --------
-        dJ: Firedrake 'Function' or Firedrake 'Cofunction'
+        Returns
+        -------
+        dJ : Firedrake 'Function' or Firedrake 'Cofunction'
             Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
             depending on the chosen Riesz map.
         """
@@ -138,12 +148,8 @@ class AcousticWave(Wave):
 
         if self.misfit is None:
             if self.real_shot_record is None:
-                raise ValueError(
-                    "Please load or calculate a real shot record first"
-                )
-            self.misfit = (
-                self.real_shot_record - self.forward_solution_receivers
-            )
+                raise ValueError("Please load or calculate a real shot record first")
+            self.misfit = self.real_shot_record - self.forward_solution_receivers
 
         if riesz_map != RieszMapType.L2:
             raise NotImplementedError(
@@ -154,15 +160,15 @@ class AcousticWave(Wave):
     def _automated_adjoint_gradient(self, riesz_map=RieszMapType.L2):
         """Compute the gradient using the automated adjoint.
 
-        Parameters:
-        -----------
-        riesz_map: RieszMapType enum (default: RieszMapType.L2)
+        Parameters
+        ----------
+        riesz_map : RieszMapType enum (default: RieszMapType.L2)
             The type of Riesz map to use for the gradient. More details in the documentation of the
             :class:`RieszMapType` enum.
 
-        Returns:
-        --------
-        dJ: Firedrake 'Function' or Firedrake 'Cofunction'
+        Returns
+        -------
+        dJ : Firedrake 'Function' or Firedrake 'Cofunction'
             Gradient (Function) or derivative (Cofunction) of the functional with respect to the velocity model,
             depending on the chosen Riesz map.
         """
@@ -175,16 +181,11 @@ class AcousticWave(Wave):
             self.enable_automated_adjoint()
             self.automated_adjoint.clear_tape()
             self.forward_solve()
-            self.automated_adjoint.create_reduced_functional(
-                self.functional_value
-            )
-        elif (
-            self.automated_adjoint.reduced_functional is None
-            and isinstance(self.automated_adjoint._tape, Tape)
+            self.automated_adjoint.create_reduced_functional(self.functional_value)
+        elif self.automated_adjoint.reduced_functional is None and isinstance(
+            self.automated_adjoint._tape, Tape
         ):
-            self.automated_adjoint.create_reduced_functional(
-                self.functional_value
-            )
+            self.automated_adjoint.create_reduced_functional(self.functional_value)
 
         if riesz_map == RieszMapType.L2:
             return self.automated_adjoint.compute_gradient()
@@ -207,22 +208,37 @@ class AcousticWave(Wave):
     def _initialize_model_parameters(self, fast_interpolate=False):
         if self.initial_velocity_model is None:
             if self.initial_velocity_model_file is None:
-                if getattr(self.mesh_parameters, "grid_velocity_data", None) is not None:
+                if (
+                    getattr(self.mesh_parameters, "grid_velocity_data", None)
+                    is not None
+                ):
                     self.initial_velocity_model = interpolate(
                         self,
                         self.mesh_parameters.grid_velocity_data,
                         self.function_space.sub(0),
                     )
                     if self.debug_output:
-                        fire.VTKFile("initial_velocity_model.pvd").write(
-                            self.initial_velocity_model, name="velocity"
+                        SpyroEnsemble.write_vtk(
+                            "initial_velocity_model.pvd",
+                            self.initial_velocity_model,
+                            name="velocity",
                         )
                     self.c = self.initial_velocity_model
+                    self._physical_parameters.add(
+                        AcousticMaterialParameter.P_WAVE_VELOCITY,
+                        self.c,
+                    )
                     return
-                raise ValueError("No velocity model or velocity file to load.")
+                raise ValueError(
+                    "No velocity model or velocity file to load. Set one "
+                    "with set_initial_velocity_model(), or assign the "
+                    "velocity field to self.c directly."
+                )
 
             if self.initial_velocity_model_file.endswith(".segy"):
-                self.initial_velocity_model_file = write_hdf5_velocity_model(self, self.initial_velocity_model_file)
+                self.initial_velocity_model_file = write_hdf5_velocity_model(
+                    self.initial_velocity_model_file
+                )
 
             if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
                 self.initial_velocity_model = interpolate(
@@ -233,11 +249,17 @@ class AcousticWave(Wave):
                 )
 
             if self.debug_output:
-                fire.VTKFile("initial_velocity_model.pvd").write(
-                    self.initial_velocity_model, name="velocity"
+                SpyroEnsemble.write_vtk(
+                    "initial_velocity_model.pvd",
+                    self.initial_velocity_model,
+                    name="velocity",
                 )
 
         self.c = self.initial_velocity_model
+        self._physical_parameters.add(
+            AcousticMaterialParameter.P_WAVE_VELOCITY,
+            self.c,
+        )
 
     @override
     def _set_vstate(self, vstate):
@@ -298,14 +320,14 @@ class AcousticWave(Wave):
         is `None`, return the wave field corresponding to the time step ``n``.
         For PML, this corresponds to the first component of X_n.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         state : Firedrake 'Function' (optional)
             The state for which to return the wave field. If None, returns the
             wave field corresponding to the time step ``n``.
 
-        Returns:
-        --------
+        Returns
+        -------
         Firedrake 'Function'
             The scalar wave field corresponding to the specified `state` or the time step ``n``.
         """

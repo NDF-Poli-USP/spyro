@@ -2,10 +2,15 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
+from pyadjoint import AdjFloat, taylor_test
 
 from spyro.solvers.acoustic_wave import AcousticWave
+from spyro.solvers.automatic_differentiation_solver import AutomatedAdjoint
 from spyro.solvers.wave import Wave
-from spyro.utils.typing import FunctionalEvaluationMode
+from spyro.utils import get_real_shot_record
+from spyro.utils.typing import (ElasticMaterialParameter,
+                                FunctionalEvaluationMode, WaveType)
 
 
 class DummyWave(Wave):
@@ -51,16 +56,7 @@ class DummyWave(Wave):
     def rhs_no_pml(self):
         return None
 
-    def get_control_parameters(self):
-        raise NotImplementedError
-
-    def set_control_parameters(self, controls):
-        raise NotImplementedError
-
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
-        raise NotImplementedError
-
-    def get_control_parameter_function_space(self):
         raise NotImplementedError
 
 
@@ -96,6 +92,167 @@ def test_compute_functional_accepts_after_solve_mode():
 
     wave.functional_evaluation_mode = FunctionalEvaluationMode.AFTER_SOLVE
     assert wave.functional_evaluation_mode == FunctionalEvaluationMode.AFTER_SOLVE
+
+
+def test_real_shot_record_keeps_single_elastic_vector_record():
+    """One elastic shot has three axes and must not be split by source."""
+    wave = SimpleNamespace(
+        real_shot_record=np.zeros((11, 4, 2)),
+        current_sources=[0],
+        wave_type=WaveType.ISOTROPIC_ELASTIC,
+    )
+
+    assert get_real_shot_record(wave) is wave.real_shot_record
+
+
+def test_real_shot_record_selects_elastic_source_axis():
+    """Stacked elastic shots add a leading axis, indexed by active source."""
+    records = np.stack((np.zeros((11, 4, 2)), np.ones((11, 4, 2))))
+    wave = SimpleNamespace(
+        real_shot_record=records,
+        current_sources=[1],
+        wave_type=WaveType.ISOTROPIC_ELASTIC,
+    )
+
+    assert np.array_equal(get_real_shot_record(wave), records[1])
+
+
+def test_automated_adjoint_stores_controls_as_a_list():
+    """Controls become ordered lists, labeled only when given by name."""
+    control = object()
+    parameter = ElasticMaterialParameter.MU
+
+    unlabeled = AutomatedAdjoint(None, control)
+    labeled = AutomatedAdjoint(None, {parameter: control})
+
+    assert unlabeled.controls == [control]
+    assert unlabeled.control_parameter_names == [None]
+    assert labeled.controls == [control]
+    assert labeled.control_parameter_names == [parameter]
+
+
+def test_automated_adjoint_rejects_empty_controls():
+    """There is nothing to differentiate with respect to without controls."""
+    automated_adjoint = AutomatedAdjoint(None)
+
+    with pytest.raises(ValueError, match="At least one control"):
+        automated_adjoint.create_reduced_functional(functional=None)
+
+
+class _SerialComm:
+    """Minimal one-rank communicator for scalar ensemble reductions."""
+
+    rank = 0
+    size = 1
+
+    def allreduce(self, sendobj: object, op: object = None) -> object:
+        """Return the only rank's value."""
+        return sendobj
+
+
+class _SerialEnsemble:
+    """Minimal ensemble carrying a scalar-reduction communicator."""
+
+    ensemble_comm = _SerialComm()
+
+
+def test_partial_reduced_functional_shares_tape_and_checkpoint() -> None:
+    """Partial functionals share tape nodes, ordering and held state."""
+    density = AdjFloat(2.0)
+    velocity = AdjFloat(3.0)
+    density_name = ElasticMaterialParameter.DENSITY
+    velocity_name = ElasticMaterialParameter.P_WAVE_VELOCITY
+    automated_adjoint = AutomatedAdjoint(
+        _SerialEnsemble(),
+        {density_name: density, velocity_name: velocity},
+    )
+    automated_adjoint.start_recording()
+    functional = density * density + density * velocity + velocity * velocity
+    automated_adjoint.stop_recording()
+
+    try:
+        density_stage = automated_adjoint.create_partial_reduced_functional(
+            functional, [density_name],
+        )
+
+        # The complete functional is neither needed nor created.
+        assert automated_adjoint.reduced_functional is None
+        assert len(density_stage.controls) == 1
+        assert density_stage.controls[0].block_variable is (
+            density.block_variable
+        )
+        assert float(density_stage(AdjFloat(4.0))) == pytest.approx(37.0)
+        assert float(density_stage.derivative()) == pytest.approx(11.0)
+
+        velocity_stage = automated_adjoint.create_partial_reduced_functional(
+            functional, [velocity_name],
+        )
+        assert velocity_stage.controls[0].block_variable is (
+            velocity.block_variable
+        )
+        assert float(velocity_stage(AdjFloat(5.0))) == pytest.approx(61.0)
+        assert float(velocity_stage.derivative()) == pytest.approx(14.0)
+        assert taylor_test(
+            velocity_stage, AdjFloat(5.0), AdjFloat(0.25),
+        ) > 1.9
+
+        reversed_request = automated_adjoint.create_partial_reduced_functional(
+            functional, [velocity_name, density_name],
+        )
+        assert [
+            control.block_variable for control in reversed_request.controls
+        ] == [density.block_variable, velocity.block_variable]
+    finally:
+        automated_adjoint.clear_tape()
+
+
+def test_partial_reduced_functional_validates_selection() -> None:
+    """Partial functionals reject empty, unknown, unlabeled and non-enum names."""
+    parameter = ElasticMaterialParameter.DENSITY
+    automated_adjoint = AutomatedAdjoint(None, {parameter: AdjFloat(2.0)})
+
+    with pytest.raises(ValueError, match="active control"):
+        automated_adjoint.create_partial_reduced_functional(None, [])
+    with pytest.raises(ValueError, match="available controls"):
+        automated_adjoint.create_partial_reduced_functional(
+            None, [ElasticMaterialParameter.MU],
+        )
+    # Elastic parameters are string enums, so a string equal to a control's
+    # label would otherwise be taken for it.
+    with pytest.raises(TypeError, match="enum"):
+        automated_adjoint.create_partial_reduced_functional(None, ["density"])
+
+    unlabeled = AutomatedAdjoint(None, AdjFloat(2.0))
+    with pytest.raises(ValueError, match="labeled controls"):
+        unlabeled.create_partial_reduced_functional(None, [parameter])
+
+
+def test_verify_gradient_normalizes_one_control(monkeypatch):
+    """A single control and direction reach pyadjoint as one-item lists."""
+    automated_adjoint = AutomatedAdjoint(None)
+    automated_adjoint.reduced_functional = object()
+    control = object()
+    direction = object()
+    captured = {}
+
+    def fake_taylor_test(functional, controls, directions, dJdm=None):
+        captured["arguments"] = (functional, controls, directions, dJdm)
+        return 2.0
+
+    monkeypatch.setattr(
+        "spyro.solvers.automatic_differentiation_solver.taylor_test",
+        fake_taylor_test,
+    )
+
+    rate = automated_adjoint.verify_gradient(control, direction=direction)
+
+    assert rate == 2.0
+    assert captured["arguments"] == (
+        automated_adjoint.reduced_functional,
+        [control],
+        [direction],
+        None,
+    )
 
 
 def _base_functional_dictionary():

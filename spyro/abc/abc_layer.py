@@ -1,7 +1,7 @@
 from numpy import inf
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .abc import AbsorbingBC
 from .nrbc import NRBC
-from ..io.basicio import parallel_print as pprint
 from .lay_len import calc_size_lay
 from ..plots.plots_habc import plot_function_layer_size
 from ..tools.abc_set_path_cases import formatting_abc_layer_type, path_to_save_abc_case
@@ -96,7 +96,7 @@ class ABCLayer(AbsorbingBC):
                  abc_boundary_layer_type=AbsorbingBCsType.HYBRID,
                  abc_reference_freq=LayerSizeRefFrequency.SOURCE,
                  abc_degree_type=HyperLayerDegreeType.REAL,
-                 abc_deg_layer=None, output_folder=None, comm=None):
+                 abc_deg_layer=None, output_folder=None):
         """Initialize the ABCLayer class.
 
         Parameters
@@ -136,9 +136,6 @@ class ABCLayer(AbsorbingBC):
             equal to 2. `None` is used only for rectangular layers. Default is `None`.
         output_folder : `str`, optional
             The folder where output data will be saved. Default is None.
-        comm : `object`, optional
-            An object representing the communication interface for parallel processing.
-            Default is `None`.
 
         Returns
         -------
@@ -147,7 +144,7 @@ class ABCLayer(AbsorbingBC):
 
         AbsorbingBC.__init__(self, domain_dim, frequency=frequency, dt=dt,
                              dimension=dimension, quadrilateral=quadrilateral,
-                             func_space_type=func_space_type, comm=comm)
+                             func_space_type=func_space_type)
 
         # ABC layer parameters
         self.abc_boundary_layer_type = validate_enum("abc_boundary_layer_type",
@@ -178,11 +175,9 @@ class ABCLayer(AbsorbingBC):
         # Define the shape of the absorbing layer.
         self.layer_geometry = self._define_layer_shape()
 
-        """"
-        Create the path to save data
-        The required abc_type argument from path_to_save_abc_layer_case() method is set to
-        self.abc_boundary_layer_type since it is an instance of `typing.AbsorbingBCsType`.
-        """
+        # Create the path to save data
+        # The required abc_type argument from path_to_save_abc_layer_case() method is set to
+        # self.abc_boundary_layer_type since it is an instance of `typing.AbsorbingBCsType`.
         self.path_save, self.case_absl, self.path_case_absl = \
             path_to_save_abc_case(self.abc_boundary_layer_type,
                                   abc_boundary_layer_shape=self.abc_boundary_layer_shape,
@@ -240,7 +235,7 @@ class ABCLayer(AbsorbingBC):
         None
         """
 
-        pprint("\nDetermining Reference Frequency", comm=self.comm)
+        SpyroEnsemble.print("\nDetermining Reference Frequency")
 
         if self.abc_reference_freq == LayerSizeRefFrequency.SOURCE:
 
@@ -260,12 +255,11 @@ class ABCLayer(AbsorbingBC):
                 # Get the minimum frequency excited at each critical point
                 freq_ref = freq_response(histPcrit, self.freq_Nyquist,
                                          fpad=fpad, get_dominant_freq=True)
-                pprint(f"Frequency at Critical Point {n_crit:>2.0f}: {freq_ref:.5f}",
-                       comm=self.comm)
+                SpyroEnsemble.print(f"Frequency at Critical Point {n_crit: >2.0f}: {freq_ref: .5f}")
 
                 self.freq_ref = min(self.freq_ref, freq_ref)
 
-        pprint(f"Reference Frequency (Hz): {self.freq_ref:.5f}", comm=self.comm)
+        SpyroEnsemble.print(f"Reference Frequency (Hz): {self.freq_ref: .5f}")
 
     def layer_size_criterion(self, lmin, fpad=4, n_root=1, layer_based_on_mesh=True):
         """Determine the absorbing layer size using the Eikonal criterion for HABCs.
@@ -319,7 +313,7 @@ class ABCLayer(AbsorbingBC):
         # Layer type
         lay_str = "\nDetermining New Geometry with {}"
         lay_str = formatting_abc_layer_type(lay_str, self.abc_boundary_layer_type)
-        pprint(lay_str, comm=self.comm)
+        SpyroEnsemble.print(lay_str)
 
         # New geometry with layer
         self.abc_new_geometry()
@@ -375,6 +369,20 @@ class ABCLayer(AbsorbingBC):
                           quadrilateral=self.quadrilateral, nrbc_in_habc=True,
                           output_folder=self.path_case_absl, comm=self.comm)
 
+            SpyroEnsemble.print("\nApplying Non-Reflecting Boundary Conditions")
+
+            # Getting boundary data from the layer boundaries
+            if non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
+                bnd_nod_ids_nfs = wave.mesh_ops.layer_boundary_data(wave.mesh,
+                                                                    wave.function_space,
+                                                                    wave.mesh_parameters)[0]
+
+            if non_reflect_bc == BoundaryConditionsType.HIGDON:
+                crit_source = self.crit_source
+                bnd_nod_ids_nfs, bnd_nodes_nfs = wave.mesh_ops.layer_boundary_data(wave.mesh,
+                                                                                   wave.function_space,
+                                                                                   wave.mesh_parameters)
+
             # Hypershape parameters
             hyp_par = (self.layer_geometry.n_hyp, *self.layer_geometry.hyper_axes) \
                 if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else None
@@ -386,4 +394,4 @@ class ABCLayer(AbsorbingBC):
                                   hyp_par=hyp_par, save_file=save_file)
 
         else:
-            pprint("\nNot Non-Reflecting Boundary Conditions Prescribed", comm=self.comm)
+            SpyroEnsemble.print("\nNot Non-Reflecting Boundary Conditions Prescribed")

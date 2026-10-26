@@ -5,7 +5,7 @@ coefficient and the attenuation amplitude factor. The size of the absorbing
 layer is determined by finding the roots of a function combining these factors.
 """
 
-from ..io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from numpy import array, ceil, cos, exp, floor, log10, pi, round, sin
 from ..utils.error_management import (sanitize_num_array, validate_data_structure,
                                       validate_parameter, validate_numeric)
@@ -195,7 +195,7 @@ def loop_roots(a_par, lmin, lref, max_roots, tol_rel=1e-3, show_ig=True, monitor
     # Initial guess
     FLmin = 0.5 * lmin / lref
     if show_ig:
-        pprint(f"Initial Guess for Size Parameter: {FLmin:.4f}")
+        SpyroEnsemble.print(f"Initial Guess for Size Parameter: {FLmin: .4f}")
 
     # Number of digits to round the size parameter
     dig_x = 13
@@ -220,8 +220,8 @@ def loop_roots(a_par, lmin, lref, max_roots, tol_rel=1e-3, show_ig=True, monitor
 
         # Monitoring the size parameter
         if monitor:
-            pprint("**************** Possible FL ****************")
-            pprint(f"Root {i + 1}: {x_rnd: >} - Res: {f_layer(x_rnd, a_par): >}")
+            SpyroEnsemble.print("**************** Possible FL ****************")
+            SpyroEnsemble.print(f"Root {i + 1}: {x_rnd: >} - Res: {f_layer(x_rnd, a_par): >}")
 
     return FLpos
 
@@ -273,14 +273,14 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
                      integer_num=False, lower_bound=0.)
 
     # Visualizing parameters for computing layer size
-    pprint("\nComputing Size for Absorbing Layer")
+    SpyroEnsemble.print("\nComputing Size for Absorbing Layer")
 
     # Parameters for the absorbing layer
     a_par = z_par / fref  # Adimensional parameter
-    pprint(f"Parameter 'z' (1/s): {z_par:.4f} - Parameter 'a' (adim): {a_par:.4f}")
+    SpyroEnsemble.print(f"Parameter 'z' (1/s): {z_par: .4f} - Parameter 'a' (adim): {a_par: .4f}")
 
     # Minimum and reference length of the layer
-    pprint(f"Minimum Mesh Length (km): {lmin:.4f} - Reference Length (km): {lref:.4f}")
+    SpyroEnsemble.print(f"Minimum Mesh Length (km): {lmin: .4f} - Reference Length (km): {lref: .4f}")
 
     # Maximum number of sizes to be computed
     nz = max(1, n_root + 1, nz)
@@ -292,22 +292,22 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
     CRpos = round(array([f_layer(x, a_par, function_type="CR") for x in FLpos]), 4)
 
     # Visualizing options for layer size
-    format_FL = ', '.join([f"{x:.4f}" for x in FLpos])
-    pprint(f"Options for FL: [{format_FL}]")
-    format_CR = ', '.join([f"{x:.4f}" for x in CRpos])
-    pprint(f"Options for CR: [{format_CR}]")
-    format_lay = ', '.join([f"{x * lref:.4f}" for x in FLpos])
-    pprint(f"Options for Layer Size (km): [{format_lay}]")
+    format_FL = ', '.join([f"{x: .4f}" for x in FLpos])
+    SpyroEnsemble.print(f"Options for FL: [{format_FL}]")
+    format_CR = ', '.join([f"{x: .4f}" for x in CRpos])
+    SpyroEnsemble.print(f"Options for CR: [{format_CR}]")
+    format_lay = ', '.join([f"{x * lref: .4f}" for x in FLpos])
+    SpyroEnsemble.print(f"Options for Layer Size (km): [{format_lay}]")
     format_ele = [int(x * lref / lmin) for x in FLpos]
-    pprint(f"Aprox. Number of Elements ({lmin:.3f} km) in Layer: {format_ele}")
+    SpyroEnsemble.print(f"Aprox. Number of Elements ({lmin: .3f} km) in Layer: {format_ele}")
 
     # Selecting a size
     factor_length_pad = FLpos[n_root - 1]
 
     # Size of the absorving layer
     pad_length = factor_length_pad * lref
-    pprint(f"Selected Parameter Size FL: {factor_length_pad:.4f}")
-    pprint(f"Selected Layer Size (km): {pad_length:.4f}")
+    SpyroEnsemble.print(f"Selected Parameter Size FL: {factor_length_pad: .4f}")
+    SpyroEnsemble.print(f"Selected Layer Size (km): {pad_length: .4f}")
 
     # Approximated number of elements in the layer of edge length 'lmin'
     ele_pad = format_ele[n_root - 1]
@@ -317,7 +317,7 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
 
     # Normalized element size
     d_norm = lmin / pad_length
-    pprint(f"Normalized Element Size (adim): {d_norm:.5f}")
+    SpyroEnsemble.print(f"Normalized Element Size (adim): {d_norm: .5f}")
 
     return factor_length_pad, pad_length, ele_pad, d_norm, a_par, FLpos
 
@@ -359,9 +359,9 @@ def roundFL(lmin, lref, factor_length_pad):
     # Number of elements in the layer
     ele_pad = int(round(pad_length / lmin, 15))  # Avoid floating point errors
 
-    pprint("\nModifying Layer Size Based on the Element Size")
-    pprint(f"Modified Parameter Size FL: {factor_length_pad:.4f}")
-    pprint(f"Modified Layer Size (km): {pad_length:.4f}")
-    pprint(f"Elements ({lmin:.3f} km) in Layer: {ele_pad}")
+    SpyroEnsemble.print("\nModifying Layer Size Based on the Element Size")
+    SpyroEnsemble.print(f"Modified Parameter Size FL: {factor_length_pad: .4f}")
+    SpyroEnsemble.print(f"Modified Layer Size (km): {pad_length: .4f}")
+    SpyroEnsemble.print(f"Elements ({lmin: .3f} km) in Layer: {ele_pad}")
 
     return factor_length_pad, pad_length, ele_pad

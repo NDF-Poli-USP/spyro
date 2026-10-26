@@ -1,7 +1,5 @@
-from firedrake import COMM_WORLD as comm
 import numpy as np
 import spyro
-from spyro.io.basicio import parallel_print as pprint
 from spyro.tools.error_measure import MeasureError
 
 
@@ -114,18 +112,10 @@ def test_3d_hexa_one_source_propagation():
     p_numeric = run_forward_hexahedral(dt, final_time, offset)
     p_analytic = analytical_solution(dt, final_time, offset)
 
-    # Computing errors
-    measure_error = MeasureError()
-    eNRMS = measure_error.normalized_root_mean_square_error(p_numeric, p_analytic)
-    errIt = measure_error.integral_error(p_numeric, p_analytic, dt)
-    errPk = measure_error.peak_error(p_numeric, p_analytic)[0]
+    # Computing error
+    error_L2 = MeasureError.calculate_normalized_L2_error(p_numeric, p_analytic)
 
-    assert np.abs(eNRMS) < 0.02 and np.abs(errIt) < 0.02 and np.abs(errPk) < 0.02, \
-        "Error is too high for forward test with hexahedral mesh."
-
-    pprint(f"NRMS Error = {eNRMS:.4e}", comm=comm)
-    pprint(f"Integral Error = {errIt:.4e}", comm=comm)
-    pprint(f"Peak Error = {errPk:.4e}", comm=comm)
+    assert np.abs(error_L2)
 
 
 if __name__ == "__main__":

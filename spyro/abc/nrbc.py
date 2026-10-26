@@ -3,8 +3,8 @@
 from firedrake import Function, VTKFile
 from numpy import abs, asarray, cos, maximum, pi, sign, sqrt, sum
 from numpy.linalg import norm
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .abc import AbsorbingBC
-from ..io.basicio import parallel_print as pprint
 from ..tools.abc_set_path_cases import path_to_save_abc_case
 from ..utils.error_management import (validate_enum, validate_numeric,
                                       validate_parameter, validate_string)
@@ -64,11 +64,18 @@ class NRBC(AbsorbingBC):
         Compute a unitary direction vector from the source to a boundary point.
     """
 
+
+<< << << < HEAD
     def __init__(self, domain_dim, frequency=None, dt=None,
                  abc_boundary_type=NRBCBoundaryType.STRAIGHT,
                  non_reflect_bc=BoundaryConditionsType.HIGDON,
                  angle_max=pi/4., dimension=2, quadrilateral=False,
                  nrbc_in_habc=False, output_folder=None, comm=None):
+== == == =
+    def __init__(self, domain_dim, non_reflect_bc=BoundaryConditionsType.HIGDON,
+                 angle_max=pi/4., abc_boundary_type=NRBCBoundaryType.STRAIGHT,
+                 dimension=2, nrbc_in_habc=False, output_folder=None):
+>>>>>> > ruben/nrbc_refactoring
         """Initialize the NRBC class.
 
         Parameters
@@ -101,9 +108,6 @@ class NRBC(AbsorbingBC):
             the original domain boundaries. Default is `False`.
         output_folder : `str`, optional
             The folder where output data will be saved. Default is `None`.
-        comm : `object`, optional
-            An object representing the communication interface for parallel processing.
-            Default is `None`.
 
         Returns
         -------
@@ -112,9 +116,7 @@ class NRBC(AbsorbingBC):
 
         # Initializing the AbsorbingBC class if NRBCs are not in HABC scheme
         if not nrbc_in_habc:
-            AbsorbingBC.__init__(self, domain_dim, frequency=frequency,
-                                 dt=dt, dimension=dimension,
-                                 quadrilateral=quadrilateral, comm=comm)
+            AbsorbingBC.__init__(self, domain_dim, dimension=dimension)
 
             # Set sthe pad to rectangular shape in case the infinite model is needed.
             self.abc_boundary_layer_shape = LayerShapeType.RECTANGULAR
@@ -356,7 +358,7 @@ class NRBC(AbsorbingBC):
         None
         """
 
-        pprint(f"Creating Field for NRBC: {self.non_reflect_bc.value}", comm=self.comm)
+        SpyroEnsemble.print(f"Creating Field for NRBC: {self.non_reflect_bc.value}")
 
         # Initialize field for the cosine of the incidence angle
         self.cosHig = Function(V, name='cosHig')

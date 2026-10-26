@@ -3,13 +3,17 @@ from firedrake import (ds as fire_ds, ds_b as quad_dsbottom, ds_t as quad_dstop,
                        ds_v as quad_ds, Function, VTKFile)
 from numpy import abs, array, ceil, log10, minimum, prod, sign, sum, where
 from sympy import divisors
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .eik_min import Minimum_Eikonal
 from ..solvers.modal.modal_sol import Modal_Solver
 from ..tools.error_measure import MeasureError
 from ..domains.space import create_function_space
+<< << << < HEAD
 from ..io.basicio import parallel_print as pprint
 from ..plots.plots_habc import plot_frequency_domain_receiver_responses
 from ..plots.receiver_plots import plot_comparison_of_receivers_to_reference
+== == == =
+>>>>>> > ruben/nrbc_refactoring
 from ..tools.abc_set_path_cases import formatting_abc_layer_type
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
 from ..utils.error_management import (validate_data_structure, validate_numeric,
@@ -23,9 +27,6 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
 
     Attributes
     ----------
-    comm : `object`
-        An object representing the communication interface for parallel processing.
-        Default is `None`.
     dimension : `int`, optional
         Model dimension (2D or 3D). Default is 2D.
     domain_dim : `tuple`
@@ -92,7 +93,7 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
     """
 
     def __init__(self, domain_dim, frequency=None, dt=None, dimension=2,
-                 quadrilateral=False, func_space_type=None, comm=None):
+                 quadrilateral=False, func_space_type=None):
         """Initialize the AbsorbingBC class.
 
         Parameters
@@ -100,7 +101,7 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         domain_dim : `tuple`
             Original domain dimensions: (length_z, length_x) for 2D
             or (length_z, length_x, length_y) for 3D.
-                frequency: `float`, optional
+        frequency: `float`, optional
             Frequency of the source.
         dt : `float`, optional
             Time step used in the simulation. Default is `None`.
@@ -112,9 +113,6 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         func_space_type, `str`, optional
             Type of function space for the state variable.
             Options: 'scalar' or 'vector'. Default is None.
-        comm : `object`, optional
-            An object representing the communication interface for parallel processing.
-            Default is `None`.
 
         Returns
         -------
@@ -146,12 +144,6 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
 
         # Type of function space
         self.func_space_type = func_space_type
-
-        # Communicator MPI
-        self.comm = comm
-
-        # Initializing the error measure class
-        MeasureError.__init__(self, comm=self.comm)
 
     def critical_boundary_points(self, wave):
         """Determine critical boundary points using the Eikonal criterion.
@@ -271,11 +263,11 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
 
         # Checking if the mesh for infinite model is requested
         if inf_model:
-            pprint("\nGenerating Mesh for Infinite Model", comm=self.comm)
+            SpyroEnsemble.print("\nGenerating Mesh for Infinite Model")
             layer_shape = LayerShapeType.RECTANGULAR
 
         else:
-            pprint("\nGenerating Mesh with Absorbing Layer", comm=self.comm)
+            SpyroEnsemble.print("\nGenerating Mesh with Absorbing Layer")
             layer_shape = self.abc_boundary_layer_shape
 
         # New mesh with layer
@@ -286,7 +278,7 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
 
             # Create the mesh
             wave.set_mesh()
-            pprint("Extended Rectangular Mesh Generated Successfully", comm=self.comm)
+            SpyroEnsemble.print("Extended Rectangular Mesh Generated Successfully")
 
         elif layer_shape == LayerShapeType.HYPERSHAPE:
 
@@ -310,7 +302,7 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
             # Updating the mesh with the absorbing layer
             wave.set_mesh(user_mesh=mesh_abc)
 
-        pprint("Mesh Generated Successfully", comm=self.comm)
+        SpyroEnsemble.print("Mesh Generated Successfully")
 
         if save_file:
             if inf_model:
@@ -363,7 +355,7 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         Used Memory: Current (MB):18.715, Peak (MB):25.298
         """
 
-        pprint("\nUpdating Velocity Profile", comm=self.comm)
+        SpyroEnsemble.print("\nUpdating Velocity Profile")
 
         # Scalar space for auxiliar field of clipped coordinates
         method_element = "DQ" if self.quadrilateral else "DG"
@@ -441,12 +433,12 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         validate_numeric("mag_add", mag_add, float_num=False, integer_num=True,
                          lower_bound=0., include_lower_bound=True)
 
-        pprint("\nChecking Timestep Size", comm=self.comm)
+        SpyroEnsemble.print("\nChecking Timestep Size")
 
         # User timestep
         usr_dt = wave.get_dt()
-        pprint(f"Current Nyquist Frequency: {self.freq_Nyquist:.5f} Hz", comm=self.comm)
-        pprint(f"Current Timestep Size: {1e3 * usr_dt:.{mag_add}f} ms", comm=self.comm)
+        SpyroEnsemble.print(f"Current Nyquist Frequency: {self.freq_Nyquist: .5f} Hz")
+        SpyroEnsemble.print(f"Current Timestep Size: {1e3 * usr_dt: .{mag_add}f} ms")
 
         # Maximum timestep size
         dt_sol = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
@@ -471,15 +463,15 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         dt_ms = 1e3 * wave.dt
         if set_max_dt:
             case_div = f"{min(max_divisor_tf, n_div)} of {n_div}"
-            str_dt = f"Selected Timestep Size ({case_div}): {dt_ms:.{mag_add}f} ms"
+            str_dt = f"Selected Timestep Size ({case_div}): {dt_ms: .{mag_add}f} ms"
         else:
-            str_dt = f"Selected Timestep Size: {dt_ms:.{mag_add}f} ms"
+            str_dt = f"Selected Timestep Size: {dt_ms: .{mag_add}f} ms"
 
-        pprint(str_dt, comm=self.comm)
+        SpyroEnsemble.print(str_dt)
 
         # Updating Nyquist frequency
         self.freq_Nyquist = 1. / (2. * wave.dt)
-        pprint(f"New Nyquist Frequency: {self.freq_Nyquist:.5f} Hz", comm=self.comm)
+        SpyroEnsemble.print(f"New Nyquist Frequency: {self.freq_Nyquist: .5f} Hz")
 
     def min_coord_differ_source_boundary(self, source_locations, get_crit_source=False):
         """Compute the minimum coordinate difference from sources to the nearest boundary.
@@ -642,7 +634,7 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
             # Minimum distance to the nearest boundary (not Euclidean distance)
             dist_to_bnd = self.min_coord_differ_source_boundary(source_locations)
 
-        pprint(str_pad, comm=self.comm)
+        SpyroEnsemble.print(str_pad)
 
         # Subtracting the distance already travelled by the wave
         add_dom -= dist_to_bnd
@@ -673,13 +665,19 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         # Size of the domain extension
         self.abc_pad_length = self.layer_infinite_model(lmin, c_bnd_max, final_time,
                                                         source_locations=source_locations)
-        pprint(f"Infinite Domain Extension (km): {self.abc_pad_length:.4f}", comm=self.comm)
+        SpyroEnsemble.print(f"Infinite Domain Extension (km): {self.abc_pad_length: .4f}")
 
         # New dimensions
         self.abc_new_geometry()
 
-    def infinite_model(self, wave, check_dt=False, max_divisor_tf=1,
-                       method='ANALYTICAL', mag_add=3):
+    def infinite_model(
+        self,
+        wave,
+        check_dt=False,
+        max_divisor_tf=1,
+        method='ANALYTICAL',
+        mag_add=3,
+    ):
         """Create a reference model for the ABC scheme for comparative purposes.
 
         Parameters
@@ -709,10 +707,14 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
 
         # Check the timestep size
         if check_dt:
-            self.check_timestep_abc(wave, max_divisor_tf=max_divisor_tf,
-                                    method=method, mag_add=mag_add)
+            self.check_timestep_abc(
+                wave,
+                max_divisor_tf=max_divisor_tf,
+                method=method,
+                mag_add=mag_add,
+            )
 
-        pprint("\nBuilding Infinite Domain Model", comm=self.comm)
+        SpyroEnsemble.print("\nBuilding Infinite Domain Model")
 
         # Defining geometry for infinite domain
         self.geometry_infinite_model(wave)
@@ -723,7 +725,7 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         # Updating velocity model
         self.velocity_abc(wave, inf_model=True)
 
-        pprint("\nSolving Infinite Model", comm=self.comm)
+        SpyroEnsemble.print("\nSolving Infinite Model")
 
         # Solving the forward problem
         wave.forward_solve()
@@ -840,3 +842,9 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         # # Plot the error measures
         # if regression_xCR:
         #     plot_xCR_opt(self, data_regr_xCR)
+
+        # wave.receiver_locations,
+        # wave.forward_solution_receivers,
+        # wave.number_of_receivers,
+        # self.freq_Nyquist,
+        # output_file_prefix=output_file,

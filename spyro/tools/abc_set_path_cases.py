@@ -2,7 +2,7 @@
 from numpy import pi
 from os import getcwd
 from pathlib import Path
-from ..io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..utils.error_management import (mutually_exclusive_parameter_error, validate_enum,
                                       validate_numeric, validate_parameter, validate_string)
 from ..utils.typing import (AbsorbingBCsType, BoundaryConditionsType, LayerShapeType,
@@ -100,7 +100,7 @@ def identify_abc_layer_case(abc_type, abc_boundary_layer_shape,
         case_absl = "REC"
 
     elif abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-        case_absl = "HN" + f"{abc_deg_layer:.1f}"
+        case_absl = "HN" + f"{abc_deg_layer: .1f}"
 
     # Labeling for the reference frequency for the absorbing layer
     if abc_reference_freq == LayerSizeRefFrequency.SOURCE:
@@ -114,7 +114,7 @@ def identify_abc_layer_case(abc_type, abc_boundary_layer_shape,
         f"{abc_boundary_layer_shape.value.capitalize()}" + (
         f" - Degree: {abc_deg_layer}"
         if abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else "")
-    pprint(layer_str)
+    SpyroEnsemble.print(layer_str)
 
     return case_absl
 
@@ -155,14 +155,14 @@ def identify_nrbc_case(non_reflect_bc, angle_max, abc_boundary_type):
                      lower_bound=0., include_lower_bound=True)
     validate_enum("abc_boundary_type", abc_boundary_type, NRBCBoundaryType)
 
-    ang_degrees = round(180. * angle_max / pi, 0)
+    ang_degrees = round(180. * angle_max / pi, 1)  # Maximum incidence angle in degrees
 
     # Labeling for the NRBC type
     if non_reflect_bc == BoundaryConditionsType.HIGDON:
-        case_nrbc = "HIG_" + f"{ang_degrees:.0f}"
+        case_nrbc = "HIG_" + f"{ang_degrees: .0f}"
 
     elif non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
-        case_nrbc = "SOM_" + f"{ang_degrees:.0f}"
+        case_nrbc = "SOM_" + f"{ang_degrees: .0f}"
 
     # Labeling for the boundary type
     if abc_boundary_type == NRBCBoundaryType.STRAIGHT:
@@ -176,7 +176,7 @@ def identify_nrbc_case(non_reflect_bc, angle_max, abc_boundary_type):
         f"\nBoundary Type: {abc_boundary_type.value.capitalize()}" + \
         (f"\nMaximum Incidence Angle: {ang_degrees}°"
          if non_reflect_bc == BoundaryConditionsType.HIGDON else "")
-    pprint(nrbc_str)
+    SpyroEnsemble.print(nrbc_str)
 
     return case_nrbc
 

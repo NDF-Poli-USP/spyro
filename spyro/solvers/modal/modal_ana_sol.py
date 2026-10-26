@@ -7,7 +7,7 @@ from scipy.special import (beta, betainc, gamma, jn_zeros, jnp_zeros,
                            mathieu_modcem1, spherical_jn)
 from scipy.stats import norm as sn
 from sys import float_info
-from ...io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .modal_forms_and_matrices import weak_forms
 from ...utils.error_management import (validate_data_structure, validate_firedrake_parameter,
                                        validate_numeric, validate_parameter)
@@ -29,9 +29,6 @@ class Modal_Analytical_Solver():
 
     Attributes
     ----------
-    comm : `object`, optional
-        An object representing the communication interface for parallel processing.
-        Default is `None`.
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D.
 
@@ -51,16 +48,13 @@ class Modal_Analytical_Solver():
         Compute the analytical eigenvalue for hypershapes by using homogenization.
     """
 
-    def __init__(self, dimension=2, comm=None):
+    def __init__(self, dimension=2):
         """Initialize the Modal_Analytical_Solver class.
 
         Parameters
         ----------
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D.
-        comm : `object`, optional
-            An object representing the communication interface for parallel processing.
-            Default is `None`.
 
         Returns
         -------
@@ -69,9 +63,6 @@ class Modal_Analytical_Solver():
 
         # Dimension of the problem
         self.dimension = validate_parameter("dimension", dimension, [2, 3])
-
-        # Communicator MPI
-        self.comm = comm
 
     @staticmethod
     def _freq_factor_rec(hyper_axes, bc="Neumann"):
@@ -155,7 +146,7 @@ class Modal_Analytical_Solver():
             psi0 = arccosh(a0 / f0)
             idx = int(bc == "Neumann")
             m = 1 if bc == "Neumann" else 0  # Order of the MMF
-            # pprint((bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx]), comm=self.comm)
+            # SpyroEnsemble.print((bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx]))
             return mathieu_modcem1(m, q, psi0)[idx]
 
         def ZBF(m=0, n=1):
@@ -175,7 +166,7 @@ class Modal_Analytical_Solver():
             """
             deriv = (bc == "Neumann")
             Jmz = jnp_zeros(m, n) if deriv else jn_zeros(m, n)
-            # pprint((bc, m, n, Jmz), comm=self.comm)
+            # SpyroEnsemble.print((bc, m, n, Jmz))
             return Jmz
 
         def SBF(q, m=0):
@@ -195,7 +186,7 @@ class Modal_Analytical_Solver():
             """
             deriv = (bc == "Neumann")
             m = int(deriv)  # Order of the SBF: 0 (False) or 1 (True)
-            # pprint((bc, m, q, spherical_jn(m, q, derivative=deriv)), comm=self.comm)
+            # SpyroEnsemble.print((bc, m, q, spherical_jn(m, q, derivative=deriv)))
             return spherical_jn(m, q, derivative=deriv)
 
         def ana_rq_ellipsoid(alpha):
@@ -219,7 +210,7 @@ class Modal_Analytical_Solver():
                    - (2. * alpha**2. - 2. * alpha)/9. + alpha**2./11.)
 
             RQ = (4./3.) * (1./a**2 + 1./b**2 + 1./c**2) * (I_r / J_r)
-            # pprint((bc, I_r, J_r, alpha, RQ), comm=self.comm)
+            # SpyroEnsemble.print((bc, I_r, J_r, alpha, RQ))
             return RQ
 
         # Semi-axes
@@ -415,15 +406,15 @@ class Modal_Analytical_Solver():
             delta_pn = pn_fit - sn.interval(0.95, loc=pn_fit, scale=perr[0])[0]
             delta_qn = qn_fit - sn.interval(0.95, loc=qn_fit, scale=perr[1])[0]
 
-            pprint("Nonlinear Curve Fit Successful!", comm=self.comm)
-            pprint(f"Fitted Parameters: pn = {pn_fit:.6f} ± {delta_pn:.6f}, "
-                   f"qn = {qn_fit:.6f} ± {delta_qn:.6f}", comm=self.comm)
-            pprint(f"R-Squared: {r_squared:.6f} - RMSE: {rmse:.6f}", comm=self.comm)
+            SpyroEnsemble.print("Nonlinear Curve Fit Successful!")
+            SpyroEnsemble.print(f"Fitted Parameters: pn = {pn_fit: .6f} ± {delta_pn: .6f}, "
+                                f"qn = {qn_fit: .6f} ± {delta_qn: .6f}")
+            SpyroEnsemble.print(f"R-Squared: {r_squared: .6f} - RMSE: {rmse: .6f}")
 
             return pn_fit, qn_fit, fr_ell, fr_rec
 
         except ConvergenceError as e:
-            pprint(f"Nonlinear Curve Fit Failed: {e}", comm=self.comm)
+            SpyroEnsemble.print(f"Nonlinear Curve Fit Failed: {e}")
 
     def _freq_factor_hyp(self, n_hyp, f_rec, f_ell, c_eq, bc="Neumann",
                          c_eqref=None, fitting_c=(0., 0., 0., 0.),
@@ -808,8 +799,8 @@ class Modal_Analytical_Solver():
                                              fbc_dirichlet=fbc_dirichlet,
                                              cut_plane_percent=cut_plane_percent)
 
-        pprint(f"Hypershape Equivalent Velocity c_eq (km/s) = {c_reg:.3f}", comm=self.comm)
-        pprint(f"Hypershape Frequency Factor f_hyp (1/km): {f_hyp:.3f}", comm=self.comm)
+        SpyroEnsemble.print(f"Hypershape Equivalent Velocity c_eq (km/s) = {c_reg: .3f}")
+        SpyroEnsemble.print(f"Hypershape Frequency Factor f_hyp (1/km): {f_hyp: .3f}")
 
         # Eigenvalue
         Lsp = (c_reg * f_hyp)**2

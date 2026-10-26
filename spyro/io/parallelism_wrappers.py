@@ -7,161 +7,7 @@ import numpy as np
 import firedrake as fire
 
 
-def run_in_one_core(func):
-    """Decorate to execute function only on rank 0.
-
-    Ensures the decorated function runs only on the root process (rank 0)
-    of the communicator. Other processes skip execution. Useful for I/O
-    operations and serial tasks in parallel environments.
-
-    Parameters
-    ----------
-    func : callable
-        Function to decorate. The first argument of func must be an object
-        with a `comm` attribute containing an MPI communicator.
-
-    Returns
-    -------
-    callable
-        Wrapped function that executes only on rank 0.
-
-    Notes
-    -----
-    The function checks for two types of communicators:
-    - Ensemble communicator: Runs only if both `ensemble_comm.rank` == 0
-      and comm.rank == 0.
-    - Regular communicator: Runs only if comm.rank == 0.
-    - If comm is None, the function runs normally without restrictions.
-
-    The function does not broadcast results to other processes.
-
-    See Also
-    --------
-    run_in_one_core_and_broadcast : Similar decorator that also broadcasts results.
-
-    Examples
-    --------
-    >>> @run_in_one_core
-    ... def save_file(obj, filename):
-    ...     # Only rank 0 writes the file
-    ...     with open(filename, 'w') as f:
-    ...         f.write(str(obj.data))
-    """
-
-    def wrapper(*args, **kwargs):
-        comm = args[0].comm
-        if comm is None:
-            return func(*args, **kwargs)
-        else:
-            if getattr(comm, "ensemble_comm", None) is not None:
-                if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-                    return func(*args, **kwargs)
-            elif getattr(comm, "rank", None) is not None:
-                if comm.rank == 0:
-                    return func(*args, **kwargs)
-
-    return wrapper
-
-
-def run_in_one_core_kwarg_comm(func):
-    """Decorate to execute function only on rank 0.
-
-    Ensures the decorated function runs only on the root process (rank 0)
-    of the communicator. Other processes skip execution. Useful for I/O
-    operations and serial tasks in parallel environments.
-
-    Parameters
-    ----------
-    func : callable
-        Function to decorate. The wrapped function must receive a `comm`
-        keyword argument containing an MPI communicator.
-
-    Returns
-    -------
-    callable
-        Wrapped function that executes only on rank 0.
-
-    Notes
-    -----
-    The function checks for two types of communicators:
-    - Ensemble communicator: Runs only if both `ensemble_comm.rank` == 0
-      and comm.rank == 0.
-    - Regular communicator: Runs only if comm.rank == 0.
-    - If comm is None, the function runs normally without restrictions.
-
-    The function does not broadcast results to other processes.
-
-    See Also
-    --------
-    run_in_one_core_and_broadcast : Similar decorator that also broadcasts results.
-
-    Examples
-    --------
-    >>> @run_in_one_core
-    ... def save_file(obj, filename):
-    ...     # Only rank 0 writes the file
-    ...     with open(filename, 'w') as f:
-    ...         f.write(str(obj.data))
-    """
-
-    def wrapper(*args, **kwargs):
-        comm = kwargs.get("comm")
-        if comm is None:
-            return func(*args, **kwargs)
-        else:
-            if getattr(comm, "ensemble_comm", None) is not None:
-                if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-                    return func(*args, **kwargs)
-            elif getattr(comm, "rank", None) is not None:
-                if comm.rank == 0:
-                    return func(*args, **kwargs)
-
-    return wrapper
-
-
 def run_in_one_core_and_broadcast(func):
-    """Decorate to execute function on rank 0 and broadcast result.
-
-    Ensures the decorated function runs only on the root process (rank 0)
-    and broadcasts the return value to all other processes. Useful for
-    file reading and other operations that should be performed once but
-    shared across all processes.
-
-    Parameters
-    ----------
-    func : callable
-        Function to decorate. The first argument of func must be an object
-        with a 'comm' attribute containing an MPI communicator.
-
-    Returns
-    -------
-    callable
-        Wrapped function that executes on rank 0 and broadcasts the result
-        to all processes.
-
-    Notes
-    -----
-    The function handles two types of communicators:
-    - Ensemble communicator: Executes on rank (0,0), broadcasts within
-      ensemble, then within spatial communicator.
-    - Regular communicator: Executes on rank 0, broadcasts to all.
-    - If comm is None, the function runs normally without MPI operations.
-
-    All processes receive the same return value from the broadcast.
-
-    See Also
-    --------
-    run_in_one_core : Similar decorator without broadcasting.
-
-    Examples
-    --------
-    >>> @run_in_one_core_and_broadcast
-    ... def load_config(obj, filename):
-    ...     # Only rank 0 reads the file, result shared with all
-    ...     with open(filename, 'r') as f:
-    ...         return json.load(f)
-    """
-
     def wrapper(*args, **kwargs):
         comm = args[0].comm
         if comm is None:
@@ -475,10 +321,14 @@ def save_serial_data(wave, propagation_id):
     -------
     None
     """
-    if wave.forward_solution:
-        # There are cases where forward_solution is empty, e.g. when running
-        # forward_solve for the true model. In that case, we skip saving the
-        # solution on the entire domain, which is not needed.
+    # Only the implemented adjoint stores the wavefield step by step, as a
+    # list. There is nothing to save when it was not stored -- the true model
+    # runs without storage, and the automated adjoint leaves a single
+    # ``Function`` here rather than a list. Test the type rather than the
+    # truth value: every UFL object, that ``Function`` included, is
+    # unconditionally true, so a truthiness check reaches the loop below and
+    # fails trying to iterate a scalar-valued expression.
+    if isinstance(wave.forward_solution, (list, tuple)) and wave.forward_solution:
         arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
         stacked_arrays = np.stack(arrays_list, axis=0)
         np.save(_shot_filename(propagation_id, wave, prefix="tmp_shot"), stacked_arrays)
@@ -546,6 +396,18 @@ def ensemble_gradient(func):
             starting_time = args[0].current_time
             grad_total = fire.Function(args[0].function_space)
             misfit_list = kwargs.get("misfit")
+
+            # Without saved per-shot wavefields, gradient_solve would re-run
+            # the forward for every shot inside the loop below and pair the
+            # first shot's adjoint with the last shot's wavefield.
+            if not all(
+                os.path.exists(
+                    _shot_filename(snum, args[0], prefix="tmp_shot")
+                )
+                for snum in range(num)
+            ):
+                args[0].enable_implemented_adjoint()
+                args[0].forward_solve()
 
             for snum in range(num):
                 switch_serial_shot(args[0], snum)

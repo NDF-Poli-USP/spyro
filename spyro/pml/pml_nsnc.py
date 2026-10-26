@@ -1,7 +1,7 @@
 from firedrake import as_tensor, conditional, Function, VTKFile
 from numpy import log
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..abc.abc_layer import ABCLayer
-from ..io.basicio import parallel_print as pprint
 from ..utils.error_management import validate_enum, validate_numeric
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..utils.typing import (BoundaryConditionsType, AbsorbingBCsType,
@@ -62,7 +62,7 @@ class PMLLayer(ABCLayer):
                  quadrilateral=False, func_space_type=None,
                  bc_boundary_pml=BoundaryConditionsType.NEUMANN,
                  abc_reference_freq=LayerSizeRefFrequency.SOURCE,
-                 output_folder=None, comm=None):
+                 output_folder=None):
         """
         Initialize the PML class.
 
@@ -96,9 +96,6 @@ class PMLLayer(ABCLayer):
             Default is 'LayerSizeRefFrequency.SOURCE'.
         output_folder : `str`, optional
             The folder where output data will be saved. Default is `None`.
-        comm : `object`, optional
-            An object representing the communication interface for parallel processing.
-            Default is `None`.
 
         Returns
         -------
@@ -112,7 +109,7 @@ class PMLLayer(ABCLayer):
                           abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
                           abc_boundary_layer_type=AbsorbingBCsType.PML,
                           abc_reference_freq=abc_reference_freq,
-                          output_folder=output_folder, comm=comm)
+                          output_folder=output_folder)
 
         # Type of boundary condition to apply on the PML boundaries
         self.bc_boundary_pml = validate_enum('bc_boundary_pml', bc_boundary_pml,
@@ -271,7 +268,7 @@ class PMLLayer(ABCLayer):
         if wave.c is None:
             wave.c = wave.initial_velocity_model
 
-        pprint("\nCreating Damping PML Profile", comm=self.comm)
+        SpyroEnsemble.print("\nCreating Damping PML Profile")
 
         # New geometry with layer if pad_length is provided by the user.
         if wave.abc_user_pad_len:
@@ -280,7 +277,6 @@ class PMLLayer(ABCLayer):
 
         # Compute the maximum damping coefficient
         abc_pml_cmax = wave.abc_pml_cmax if wave.abc_user_pml_cmax else wave.c_bnd_max
-
         self.calc_pml_damping(wave.abc_pml_R, abc_pml_cmax,
                               wave.abc_pad_length,
                               degree_prof=wave.abc_pml_exponent)

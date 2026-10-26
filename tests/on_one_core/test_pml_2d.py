@@ -1,11 +1,11 @@
 import pytest
 import spyro
-from firedrake import COMM_WORLD as comm, conditional
+from firedrake import conditional
 from numpy import asarray
 from pickle import load
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.tools.error_measure import MeasureError
 from spyro.utils.cost import comp_cost
-from spyro.io.basicio import parallel_print as pprint
 
 
 def run_forward():
@@ -115,13 +115,13 @@ def test_pml():
 
     # Computing errors
     measure_error = MeasureError()
-    errPk = measure_error.peak_error(p_r, extended_p_r)[0]
-    errIt = measure_error.integral_error(p_r, extended_p_r, dt)
-    eNRMS = measure_error.normalized_root_mean_square_error(p_r, extended_p_r)
+    errPk = measure_error.calculate_peak_error(p_r, extended_p_r)[0]
+    errIt = measure_error.calculate_integral_error(p_r, extended_p_r, dt)
+    eNRMS = measure_error.calculate_normalized_L2_error(p_r, extended_p_r)
 
-    pprint(f"NRMS Error = {eNRMS:.4e}", comm=comm)
-    pprint(f"Integral Error = {errIt:.4e}", comm=comm)
-    pprint(f"Peak Error = {errPk:.4e}", comm=comm)
+    SpyroEnsemble.print(f"NRMS Error = {eNRMS: .4e}")
+    SpyroEnsemble.print(f"Integral Error = {errIt: .4e}")
+    SpyroEnsemble.print(f"Peak Error = {errPk: .4e}")
 
     assert eNRMS < 0.05 and errIt < 0.05 and errPk < 0.05, "Error is too high for PML test."
 
