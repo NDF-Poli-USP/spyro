@@ -6,19 +6,10 @@ from numpy.linalg import norm
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .abc import AbsorbingBC
 from ..tools.abc_set_path_cases import path_to_save_abc_case
-<< << << < HEAD
 from ..utils.error_management import (validate_enum, validate_numeric,
                                       validate_parameter, validate_string)
 from ..utils.typing import (AbsorbingBCsType, BoundaryConditionsType,
                             LayerShapeType, NRBCBoundaryType)
-== == == =
-from ..utils.error_management import (
-    validate_enum, validate_numeric, validate_parameter, validate_string,
-)
-from ..utils.typing import (
-    AbsorbingBCsType, BoundaryConditionsType, LayerShapeType, NRBCBoundaryType,
-)
->>>>>> > 878011693b7c2fc3a6ad4be8fff152067fafb295
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
