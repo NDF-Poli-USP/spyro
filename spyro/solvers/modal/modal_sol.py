@@ -1,8 +1,15 @@
-from firedrake import LinearEigenproblem, LinearEigensolver
-from numpy import abs, amax, array, asarray, eye, imag, real, sqrt, unique
+import warnings
+
+import firedrake as fire
+from numpy import array, asarray, eye, imag, real, sqrt, unique
 from scipy.sparse.linalg import eigs, eigsh, lobpcg, spilu
+from slepc4py import SLEPc
 from spyro.mpi.spyro_mpi import SpyroEnsemble
-from .modal_forms_and_matrices import assemble_sparse_matrices, weak_forms
+from .modal_forms_and_matrices import (
+    assemble_sparse_matrices,
+    maximum_diagonal_ratio,
+    acoustic_weak_forms_c_in_stiffness,
+)
 from .modal_rq_matrices import generate_eigenfunctions, matrices_rayleigh_quotient
 from ...utils.error_management import (
     validate_data_structure,
@@ -19,6 +26,14 @@ from ...utils.error_management import (
 # doi: https://doi.org/10.1016/j.apm.2022.09.014
 # TODO: citation
 # With additions by Alexandre Olender
+
+# Krylov solver and preconditioner of each "KRYLOVSCH_(K)(P)" method
+KRYLOVSCH_CONFIG = {
+    "KRYLOVSCH_CH": {"ksp": "cg", "pc": "hypre"},
+    "KRYLOVSCH_CG": {"ksp": "cg", "pc": "gamg"},
+    "KRYLOVSCH_GH": {"ksp": "gmres", "pc": "hypre"},
+    "KRYLOVSCH_GG": {"ksp": "gmres", "pc": "gamg"},
+}
 
 
 class Modal_Solver:
@@ -51,6 +66,12 @@ class Modal_Solver:
         Residual (gmres). (P) indicates the preconditioner to use: "H" for
         Hypre (hypre) or "G" for Geometric Algebraic Multigrid (gamg). For
         example, "KRYLOVSCH_CH" uses cg solver with hypre preconditioner.
+        "KRYLOVSCH" methods solve the problem distributed with SLEPc,
+        while "ARNOLDI", "LANCZOS" and "LOBPCG" gather the whole problem
+        and solve it with SciPy on one rank, which broadcasts the
+        eigenvalues. "RAYLEIGH" is unavailable when `calc_max_dt` is
+        `True`. With `calc_max_dt`, every "KRYLOVSCH" method solves the
+        mass matrix systems with cg and a Jacobi preconditioner.
 
     Methods
     -------
@@ -87,6 +108,12 @@ class Modal_Solver:
             Residual (gmres). (P) indicates the preconditioner to use: "H" for
             Hypre (hypre) or "G" for Geometric Algebraic Multigrid (gamg). For
             example, "KRYLOVSCH_CH" uses cg solver with hypre preconditioner.
+            "KRYLOVSCH" methods solve the problem distributed with SLEPc,
+            while "ARNOLDI", "LANCZOS" and "LOBPCG" gather the whole problem
+            and solve it with SciPy on one rank, which broadcasts the
+            eigenvalues. "RAYLEIGH" is unavailable when `calc_max_dt` is
+            `True`. With `calc_max_dt`, every "KRYLOVSCH" method solves the
+            mass matrix systems with cg and a Jacobi preconditioner.
         calc_max_dt : `bool`
             Option to estimate the maximum stable timestep for the computation
             of the transient response. Default is `False`.
@@ -110,10 +137,10 @@ class Modal_Solver:
 
         # Valid methods for solving the eigenproblem
         def_methods = ["ANALYTICAL", "ARNOLDI", "LANCZOS", "LOBPCG"]
-        self.valid_methods = def_methods + (
-            ["KRYLOVSCH_CH", "KRYLOVSCH_CG", "KRYLOVSCH_GH", "KRYLOVSCH_GG", "RAYLEIGH"]
-            if not self.calc_max_dt
-            else []
+        self.valid_methods = (
+            def_methods
+            + list(KRYLOVSCH_CONFIG)
+            + ([] if self.calc_max_dt else ["RAYLEIGH"])
         )
 
         # Method for solving the eigenproblem
@@ -130,8 +157,13 @@ class Modal_Solver:
 
         SpyroEnsemble.print(f"Solver Method: {self.method}")
 
+    @SpyroEnsemble.run_in_one_core_and_broadcast
     def solver_with_sparse_matrix(self, Asp, Msp, method, k=2, inv_oper=False):
         """Solve the eigenvalue problem with sparse matrices using Scipy.
+
+        Every rank holds the whole matrices, so the problem is solved on a
+        single rank and its eigenvalues are broadcast to the other ranks and
+        ensemble members, which must all call this method.
 
         Parameters
         ----------
@@ -240,56 +272,79 @@ class Modal_Solver:
     def solver_with_ufl(self, a, m, k=2):
         """Solve the eigenvalue problem using UFL forms with SLEPc.
 
+        With `calc_max_dt`, the eigenvalues of largest magnitude are
+        computed without a spectral transformation, so each iteration only
+        solves a system with the mass matrix. Whatever the method, that
+        system is solved with cg and a Jacobi preconditioner, which is exact
+        for a lumped (diagonal) mass matrix, and the eigenvalues to a
+        relative tolerance of 1e-4. Otherwise, the smallest ones are computed
+        with shift-and-invert, with the Krylov solver and preconditioner of
+        the method.
+
         Parameters
         ----------
-        a : `Firedrake.Form`
+        a : firedrake.Form
             Weak form representing the stiffness matrix.
-        m : `Firedrake.Form`
-            Weak form  representing the mass matrix.
-        k : `int`, optional
+        m : firedrake.Form
+            Weak form representing the mass matrix.
+        k : int, optional
             Number of eigenvalues to compute. Default is 2.
 
         Returns
         -------
-        Lsp : `array`
-            Array containing the computed eigenvalues.
+        numpy.ndarray
+            The computed eigenvalues, identical on every rank.
+
+        Raises
+        ------
+        firedrake.ConvergenceError
+            If SLEPc does not converge any eigenvalue.
         """
-
-        krylovsch_config = {
-            "KRYLOVSCH_CH": {"ksp": "cg", "pc": "hypre"},
-            "KRYLOVSCH_CG": {"ksp": "cg", "pc": "gamg"},
-            "KRYLOVSCH_GH": {"ksp": "gmres", "pc": "hypre"},
-            "KRYLOVSCH_GG": {"ksp": "gmres", "pc": "gamg"},
-        }
-
-        if self.method in krylovsch_config:
-            ksp_type = krylovsch_config[self.method]["ksp"]
-            pc_type = krylovsch_config[self.method]["pc"]
 
         opts = {
             "eps_gen_hermitian": None,  # Problem is Hermitian
             "eps_type": "krylovschur",  # Robust, widely used eigensolver
-            "eps_tol": 1e-6,  # Tight tolerance for accuracy
             "eps_max_it": 200,  # Reasonable iteration cap
-            "st_shift": 1e-6,  # Stabilizes Neumann BC null space
-            "st_type": "sinvert",  # Useful for interior eigenvalues
-            "eps_monitor": "ascii",  # Print convergence info
-            "ksp_type": ksp_type,  # Options for large problems
-            "pc_type": pc_type,  # Options for large problems
         }
-
         if self.calc_max_dt:
-            # Largest eigenvalues magnitude
-            opts.update({"eps_largest_magnitude": None})
-            # subspace, arnoldi, krylovschur, lapack
+            opts.update({
+                # The largest eigenvalues of a uniform mesh are tightly
+                # clustered, so 1e-6 may need more than eps_max_it
+                # iterations. 1e-4 changes the time step by about 1e-5
+                "eps_tol": 1e-4,
+                "st_type": "shift",  # No inversion, only mass matrix solves
+                # Jacobi is exact for a lumped (diagonal) mass matrix, and a
+                # consistent one scaled by its diagonal is well conditioned
+                "st_ksp_type": "cg",
+                "st_pc_type": "jacobi",
+                "st_ksp_rtol": 1e-10,
+            })
         else:
-            # Smallest eigenvalues magnitude
-            opts.update({"eps_smallest_magnitude": None})
+            opts.update({
+                "eps_tol": 1e-6,  # Tight tolerance for accuracy
+                "st_shift": 1e-6,  # Stabilizes Neumann BC null space
+                "st_type": "sinvert",  # Useful for interior eigenvalues
+                "eps_monitor": "ascii",  # Print convergence info
+                "ksp_type": KRYLOVSCH_CONFIG[self.method]["ksp"],
+                "pc_type": KRYLOVSCH_CONFIG[self.method]["pc"],
+                "eps_smallest_magnitude": None,  # Smallest eigenvalues magnitude
+            })
 
-        eigenproblem = LinearEigenproblem(a, M=m)
-        eigensolver = LinearEigensolver(eigenproblem, n_evals=k, solver_parameters=opts)
-        eigensolver.solve()
-        Lsp = asarray([eigensolver.eigenvalue(mod) for mod in range(k)])
+        eigenproblem = fire.LinearEigenproblem(a, M=m)
+        eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=k, solver_parameters=opts)
+        if self.calc_max_dt:
+            # LinearEigensolver always sets a target, which makes SLEPc look
+            # for the eigenvalues closest to it even when the largest are
+            # requested in the options. The options are only applied when it
+            # is built, so the search is changed on the SLEPc solver itself
+            largest = SLEPc.EPS.Which.LARGEST_MAGNITUDE
+            eigensolver.es.setWhichEigenpairs(largest)
+
+        n_converged = eigensolver.solve()
+
+        Lsp = asarray(
+            [eigensolver.eigenvalue(mod) for mod in range(min(k, n_converged))]
+        )
 
         return Lsp
 
@@ -351,13 +406,13 @@ class Modal_Solver:
 
         return Lsp
 
-    def assemble_weak_forms(self, c, V, quad_rule=None, shift=0.0):
+    def assemble_weak_forms(self, c, V, quad_rule=None, shift=0.0, forms=None):
         """Build the weak forms for the modal problem solved using UFL or sparse matrices.
 
         Parameters
         ----------
         c : `Firedrake.Function`
-            Velocity model.
+            Velocity model. Ignored when ``forms`` is given.
         V : `Firedrake.FunctionSpace`
             Function space for the modal problem.
         quad_rule : `dict`, optional
@@ -365,6 +420,10 @@ class Modal_Solver:
             Default is `None`, which uses the default quadrature rule.
         shift: `float`, optional
             Value to stabilize the Neumann BC null space. Default is 0.
+        forms : `tuple` of `Firedrake.Form`, optional
+            Stiffness and mass forms ``(a, m)`` supplied by the wave
+            physics. Default is `None`, which builds the scalar acoustic
+            forms from ``c``.
 
         Returns
         -------
@@ -375,7 +434,6 @@ class Modal_Solver:
         """
 
         # Check input arguments
-        validate_firedrake_parameter("c", c, "Function")
         validate_firedrake_parameter("V", V, "FunctionSpace")
         validate_data_structure(
             "quad_rule", quad_rule, "dict", accept_parameter_as_none=True
@@ -390,7 +448,11 @@ class Modal_Solver:
         )
 
         # Get bilinear forms
-        a, m = weak_forms(c, V, quad_rule=quad_rule)
+        if forms is None:
+            validate_firedrake_parameter("c", c, "Function")
+            a, m = acoustic_weak_forms_c_in_stiffness(c, V, quad_rule=quad_rule)
+        else:
+            a, m = forms
 
         # Add shift to stabilize Neumann BC null space
         if shift > 0:
@@ -415,6 +477,7 @@ class Modal_Solver:
         dof_load=None,
         amplitude_load=None,
         fitting_c=(0.0, 0.0, 0.0, 0.0),
+        forms=None,
     ):
         """Solve the eigenvalue problem with Neumann boundary conditions.
 
@@ -480,6 +543,10 @@ class Modal_Solver:
                 Exponent factor for the minimum equivalent velocity.
             - fp2 : `float`
                 Exponent factor for the maximum equivalent velocity.
+        forms : `tuple` of `Firedrake.Form`, optional
+            Stiffness and mass forms ``(a, m)`` supplied by the wave
+            physics. Only used by the numerical eigensolvers. Default is
+            `None`, which builds the scalar acoustic forms from ``c``.
 
         Returns
         -------
@@ -520,7 +587,9 @@ class Modal_Solver:
             )
         else:
             # Get weak forms for the modal problem
-            a, m = self.assemble_weak_forms(c, V, quad_rule=quad_rule, shift=shift)
+            a, m = self.assemble_weak_forms(
+                c, V, quad_rule=quad_rule, shift=shift, forms=forms
+            )
 
         if self.method.startswith("KRYLOVSCH"):
             Lsp = self.solver_with_ufl(a, m, k=k)
@@ -536,7 +605,15 @@ class Modal_Solver:
         return Lsp
 
     def estimate_timestep(
-        self, c, V, final_time, shift=0.0, quad_rule=None, inv_oper=False, fraction=0.7
+        self,
+        c,
+        V,
+        final_time,
+        shift=0.0,
+        quad_rule=None,
+        inv_oper=False,
+        fraction=0.7,
+        forms=None,
     ):
         """Estimate the maximum stable timestep based on the spectral radius.
 
@@ -546,8 +623,9 @@ class Modal_Solver:
 
         Parameters
         ----------
-        c : `Firedrake.Function`
-            Velocity model.
+        c : `Firedrake.Function` or `None`
+            Velocity model. Ignored, and may be `None`, when ``forms`` is
+            given.
         V : `Firedrake.FunctionSpace`
             Function space for the modal problem.
         final_time : `float`
@@ -562,6 +640,11 @@ class Modal_Solver:
             Default is `False`.
         fraction : `float`, optional
             Fraction of the estimated timestep to use. Defaults to 0.7.
+        forms : `tuple` of `Firedrake.Form`, optional
+            Stiffness and mass forms ``(a, m)`` supplied by the wave
+            physics. Default is `None`, which is deprecated and builds the
+            acoustic forms with the velocity in the stiffness from ``c``
+            (see ``acoustic_weak_forms_c_in_stiffness``).
 
         Returns
         -------
@@ -569,33 +652,54 @@ class Modal_Solver:
             Estimated maximum stable timestep.
         """
 
+        if forms is None:
+            warnings.warn(
+                "Calling estimate_timestep without forms builds the acoustic "
+                "forms with the velocity in the stiffness "
+                "(acoustic_weak_forms_c_in_stiffness), which differ from the "
+                "forward problem for a heterogeneous velocity. This is "
+                "deprecated; pass the forms of the wave physics instead, e.g. "
+                "forms=wave.modal_weak_forms().",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         # Maximum eigenvalue
         if self.method == "ANALYTICAL":
             SpyroEnsemble.print("Estimating Maximum Eigenvalue")
 
-            a, m = self.assemble_weak_forms(c, V, quad_rule=quad_rule, shift=shift)
-            Asp, Msp_inv = assemble_sparse_matrices(a, m, return_M_inv=True)
-            Lsp = Msp_inv.multiply(Asp)
-            max_eigval = amax(abs(Lsp.diagonal())) - shift
+            a, m = self.assemble_weak_forms(
+                c, V, quad_rule=quad_rule, shift=shift, forms=forms
+            )
+            max_eigval = maximum_diagonal_ratio(a, m) - shift
 
         else:
             SpyroEnsemble.print("Computing Exact Maximum Eigenvalue")
 
             # (eig = 0 is a rigid body motion)
             Lsp = self.solve_eigenproblem(
-                c, V=V, shift=shift, quad_rule=quad_rule, inv_oper=inv_oper
+                c,
+                V=V,
+                shift=shift,
+                quad_rule=quad_rule,
+                inv_oper=inv_oper,
+                forms=forms,
             )
             max_eigval = max(unique(Lsp[(Lsp > 0.0) & (imag(Lsp) == 0.0)]))
 
         # Maximum stable timestep
         max_dt = float(real(2.0 / sqrt(max_eigval)))
+        # Every rank must take the same number of time steps, so rank 0's
+        # estimate is shared in case the ranks' eigensolves differ in the
+        # last bits
+        max_dt = V.mesh().comm.bcast(max_dt, root=0)
         SpyroEnsemble.print(
             "Maximum Stable Timestep Should Be Approximately "
             f"(ms): {1e3 * max_dt:.3f}"
         )
 
         max_dt *= fraction
-        nt = int(final_time / max_dt) + 1
+        nt = round(final_time / max_dt) + 1
         max_dt = final_time / (nt - 1)
 
         return max_dt
