@@ -10,7 +10,7 @@ from .plot_helpers import _finalize_figure
 from ..utils.error_management import (validate_data_structure,
                                       validate_equal_lengths_for_two_sequences)
 
-if TYPE_CHECKING:  # Avoinding circular imports lazily
+if TYPE_CHECKING:  # Avoiding circular imports lazily
     from ..solvers.wave import Wave
 
 
