@@ -7,6 +7,7 @@ import os
 
 
 def test_initialize_mesh_pam():
+    """Test that `MeshingParameters` stores the values given at construction."""
     dictionary = {}
     dictionary["options"] = {
         "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
@@ -80,6 +81,7 @@ def test_initialize_mesh_pam():
 
 
 def test_negative_length_z_raises():
+    """Test that a negative `length_z` raises `ValueError`."""
     dictionary = {
         "mesh": {
             "length_z": -1.0,
@@ -100,6 +102,7 @@ def test_negative_length_z_raises():
 
 
 def test_negative_length_x_raises():
+    """Test that a negative `length_x` raises `ValueError`."""
     dictionary = {
         "mesh": {
             "length_z": 3.0,
@@ -120,6 +123,7 @@ def test_negative_length_x_raises():
 
 
 def test_negative_length_y_raises():
+    """Test that a negative `length_y` raises `ValueError`."""
     dictionary = {
         "mesh": {
             "length_z": 3.0,
@@ -140,6 +144,7 @@ def test_negative_length_y_raises():
 
 
 def test_invalid_mesh_type_raises():
+    """Test that an unsupported `mesh_type` raises `ValueError`."""
     dictionary = {
         "mesh": {
             "length_z": 3.0,
@@ -160,6 +165,7 @@ def test_invalid_mesh_type_raises():
 
 
 def test_invalid_method_raises():
+    """Test that an unsupported `method` raises `ValueError`."""
     dictionary = {
         "mesh": {
             "length_z": 3.0,
@@ -180,16 +186,19 @@ def test_invalid_method_raises():
 
 
 def test_cells_per_wavelength_known_key():
+    """Test that `cells_per_wavelength` returns tabulated values or `None`."""
     assert cells_per_wavelength('mass_lumped_triangle', 2, 2) == 7.02
     assert cells_per_wavelength('mass_lumped_triangle', 3, 2) == 3.70
     assert cells_per_wavelength('spectral_quadrilateral', 2, 2) is None
 
 
 def test_cells_per_wavelength_unknown_key():
+    """Test that `cells_per_wavelength` returns `None` for an unknown method."""
     assert cells_per_wavelength('unknown', 1, 1) is None
 
 
 def test_meshing_parameters_init_defaults():
+    """Test the default attribute values of a `MeshingParameters` without input."""
     mp = spyro.meshing.MeshingParameters()
     assert mp.input_mesh_dictionary == {}
     assert mp.dimension is None
@@ -211,6 +220,7 @@ def test_meshing_parameters_init_defaults():
 
 
 def test_mesh_file_validation():
+    """Test that `mesh_file` rejects invalid or missing files and accepts a .msh."""
     mp = spyro.meshing.MeshingParameters()
     # Non-string or wrong extension
     with pytest.raises(ValueError):
@@ -230,6 +240,7 @@ def test_mesh_file_validation():
 
 
 def test_length_unit_check_warns():
+    """Test that mixing meter and km lengths warns that a length is in km."""
     mp = spyro.meshing.MeshingParameters()
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
@@ -239,6 +250,7 @@ def test_length_unit_check_warns():
 
 
 def test_source_frequency_warnings():
+    """Test that very low and very high source frequencies emit warnings."""
     mp = spyro.meshing.MeshingParameters()
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
@@ -249,6 +261,7 @@ def test_source_frequency_warnings():
 
 
 def test_cells_per_wavelength_and_edge_length_mutual_exclusion():
+    """Test that setting `edge_length` warns and clears `cells_per_wavelength`."""
     mp = spyro.meshing.MeshingParameters()
     mp._edge_length = None
     mp._cells_per_wavelength = None
@@ -264,6 +277,7 @@ def test_cells_per_wavelength_and_edge_length_mutual_exclusion():
 
 
 def test_periodic_only_for_firedrake_mesh():
+    """Test that `periodic` can be enabled only for `firedrake_mesh`."""
     mp = spyro.meshing.MeshingParameters()
     mp.mesh_type = "firedrake_mesh"
     mp.periodic = True
@@ -271,6 +285,67 @@ def test_periodic_only_for_firedrake_mesh():
     mp.mesh_type = "user_mesh"
     with pytest.raises(ValueError):
         mp.periodic = True
+
+
+def _gmsh_parameters(**mesh_options) -> spyro.meshing.MeshingParameters:
+    """Build 2D `gmsh_mesh` parameters with extra mesh options.
+
+    Parameters
+    ----------
+    **mesh_options
+        Entries added to, or overriding, the base mesh dictionary.
+
+    Returns
+    -------
+    spyro.meshing.MeshingParameters
+        The constructed meshing parameters.
+    """
+    mesh_dictionary = {
+        "length_z": 1.0,
+        "length_x": 1.0,
+        "length_y": 0.0,
+        "mesh_file": None,
+        "mesh_type": "gmsh_mesh",
+        "edge_length": 0.1,
+        "h_padding": 0.1,
+        **mesh_options,
+    }
+    return spyro.meshing.MeshingParameters(
+        input_mesh_dictionary=mesh_dictionary,
+        dimension=2,
+        source_frequency=5.0,
+    )
+
+
+def test_structured_and_unstructured_quad_are_mutually_exclusive():
+    """Test that enabling both quad mesh options raises `ValueError`."""
+    with pytest.raises(
+        ValueError,
+        match="'structured_mesh' and 'unstructured_quad_mesh' are mutually exclusive",
+    ):
+        _gmsh_parameters(structured_mesh=True, unstructured_quad_mesh=True)
+
+
+@pytest.mark.parametrize(
+    "structured_mesh, unstructured_quad_mesh",
+    [(False, False), (True, False), (False, True)],
+)
+def test_single_quad_mesh_option_is_accepted(structured_mesh, unstructured_quad_mesh):
+    """Test that at most one enabled quad mesh option is accepted.
+
+    Parameters
+    ----------
+    structured_mesh : bool
+        Value of the `structured_mesh` option.
+    unstructured_quad_mesh : bool
+        Value of the `unstructured_quad_mesh` option.
+    """
+    mp = _gmsh_parameters(
+        structured_mesh=structured_mesh,
+        unstructured_quad_mesh=unstructured_quad_mesh,
+    )
+    assert mp.structured_mesh is structured_mesh
+    assert mp.unstructured_quad_mesh is unstructured_quad_mesh
 
 
 if __name__ == "__main__":
