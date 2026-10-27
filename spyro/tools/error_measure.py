@@ -13,7 +13,7 @@ from ..utils.error_management import (
     validate_numeric,
     validate_string,
 )
-from ..utils.freq_tools import freq_response
+from ..utils.freq_tools import fft_at_receivers
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -132,7 +132,7 @@ class MeasureError:
             Nyquist frequency according to the time step. freq_Nyquist = 1 / (2 * dt).
         output_file_prefix : `str`, optional
             Name of the file to save the reference signal without any extension.
-            Default is "ref_rec.npy".
+            Default is "reference.npy".
 
         Returns
         -------
@@ -182,24 +182,33 @@ class MeasureError:
         )
 
         # Computing and saving FFT of the reference signal at receivers
-        receivers_ref_fft = []
-        for rec in range(number_of_receivers):
-            signal = forward_solution_receivers[:, rec]
-            yf = freq_response(signal, nyquist_frequency)
-            receivers_ref_fft.append(yf)
+        receivers_ref_fft = fft_at_receivers(
+            number_of_receivers, forward_solution_receivers, nyquist_frequency
+        )
         np.save(
             str(output_file_prefix) + "fft.npy",
             receivers_ref_fft,
         )
 
-    def get_reference_signal(self, input_file=None):
+    def get_reference_signal(
+        self,
+        input_file: str | None = None,
+        get_energy_reference: bool = False,
+        energy_reference_file: str | None = None,
+    ):
         """Acquire the reference signal for comparison between models.
 
         Parameters
         ----------
         input_file : `str`, optional
-            Name of the file to save the reference signal without any extension.
-            Default is "ref_rec.npy".
+            Name of the file to get the reference signal without any extension.
+            Default is `None`, which uses the prefix of the last saved reference.
+        get_energy_reference : `bool`, optional
+            If `True`, return the energy of the reference model during along the
+            transient response. Default is `False`.
+        energy_reference_file : `str`, optional
+            Name of the file to get the energy of the reference model without any
+            extension. Default is `None`.
 
         Returns
         -------
@@ -207,6 +216,9 @@ class MeasureError:
             Receiver waveform data in the reference model
         receivers_ref_fft : `array`
           Frequency response at the receivers in the reference model.
+        energy_reference : `array`
+            Energy of the reference model in the last time step. Only returned
+            if `get_energy_reference` is `True`.
         """
         SpyroEnsemble.print("\nLoading Reference Signal from Reference Model")
 
@@ -232,7 +244,20 @@ class MeasureError:
             [".npy"],
             check_file_existence=True,
         )
-        receivers_ref_fft = np.load(receivers_reference_fft_file).T
+        receivers_ref_fft = np.load(receivers_reference_fft_file)
+
+        if get_energy_reference:
+
+            # Energy of the reference model
+            energy_ref_file = validate_file(
+                "reference energy file",
+                str(self.path_reference / (energy_reference_file + ".npy")),
+                [".npy"],
+                check_file_existence=True,
+            )
+            energy_reference = np.load(energy_ref_file).T
+
+            return receivers_reference, receivers_ref_fft, energy_reference
 
         return receivers_reference, receivers_ref_fft
 
@@ -739,55 +764,6 @@ class MeasureError:
 
         return nrms_error
 
-
-#     """
-#     Plot the comparison between the HABC scheme and the reference model.
-
-#     Parameters
-#     ----------
-#     regression_xCR : `bool`, optional
-#         If True, Plot the regression for the error measure vs xCR
-#         Default is False.
-#     data_regr_xCR: `list`
-#         Data for the regression of the parameter xCR.
-#         Structure: [xCR, max_errIt, max_errPK, crit_opt]
-#         - xCR: Values of xCR used in the regression.
-#           The last value IS the optimal xCR
-#         - max_errIt: Values of the maximum integral error.
-#           The last value corresponds to the optimal xCR
-#         - max_errPK: Values of the maximum peak error.
-#           The last value corresponds to the optimal xCR
-#         - crit_opt : Criterion for the optimal heuristic factor.
-#           * 'err_difference' : Difference between integral and peak errors
-#           * 'err_integral' : Minimum integral error
-
-#     Returns
-#     -------
-#     None
-#     """
-
-#     # Time domain comparison
-#     plot_hist_receivers(self)
-
-#     forward_solution_receivers: `array`
-#     Receiver waveform data in the HABC scheme
-#     receivers_out_fft: `array`
-#     Frequency response at the receivers in the HABC scheme
-
-#     # Compute FFT for output signal at receivers
-#     self.receivers_out_fft = []
-#     for rec in range(self.number_of_receivers):
-#         signal = self.forward_solution_receivers[:, rec]
-#         yf = freq_response(signal, self.freq_Nyquist)
-#         self.receivers_out_fft.append(yf)
-#     self.receivers_out_fft = np.asarray(self.receivers_out_fft).T
-
-#     # Frequency domain comparison
-#     plot_rfft_receivers(self)
-
-#     # Plot the error measures
-#     if regression_xCR:
-#         plot_xCR_opt(self, data_regr_xCR)
 
 # def get_xCR_candidates(self, n_pts=3):
 #     """
