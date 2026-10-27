@@ -1,7 +1,7 @@
 from mpi4py.MPI import COMM_WORLD
 from mpi4py import MPI
 import spyro
-from spyro.io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.tools.error_measure import MeasureError
 
 
@@ -108,12 +108,12 @@ def test_forward_supershot():
     assert abs(error_rm) < 0.01 and abs(error_it) < 0.01 and abs(error_pk) < 0.01, \
         "Error is too high for forward test with supershot."
 
-    pprint(f"Combined NRMS error for shots {wave.current_sources} is {error_rm} "
-           f"and test has passed equals {abs(error_rm) < 0.01}", comm=comm)
-    pprint(f"Combined Integral error for shots {wave.current_sources} is {error_it} "
-           f"and test has passed equals {abs(error_it) < 0.01}", comm=comm)
-    pprint(f"Combined Peak error for shots {wave.current_sources} is {error_pk} "
-           f"and test has passed equals {abs(error_pk) < 0.01}", comm=comm)
+    SpyroEnsemble.print(f"Combined NRMS error for shots {wave.current_sources} is {error_rm} "
+                        f"and test has passed equals {abs(error_rm) < 0.01}")
+    SpyroEnsemble.print(f"Combined Integral error for shots {wave.current_sources} is {error_it} "
+                        f"and test has passed equals {abs(error_it) < 0.01}")
+    SpyroEnsemble.print(f"Combined Peak error for shots {wave.current_sources} is {error_pk} "
+                        f"and test has passed equals {abs(error_pk) < 0.01}")
 
 
 if __name__ == "__main__":

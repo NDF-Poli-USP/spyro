@@ -4,7 +4,7 @@ from firedrake import conditional
 from numpy import linspace
 import matplotlib.pyplot as plt
 import spyro
-from spyro.io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.tools.error_measure import MeasureError
 
 
@@ -114,9 +114,9 @@ def test_forward_3_shots():
         errIt.append(errIt_shot)
         errPk.append(errPk_shot)
 
-        pprint(f"Shot {i} produced NRMS error of {eNRMS_shot:.4e}", comm=comm)
-        pprint(f"Shot {i} produced Integral error of {errIt_shot:.4e}", comm=comm)
-        pprint(f"Shot {i} produced Peak error of {errPk_shot:.4e}", comm=comm)
+        SpyroEnsemble.print(f"Shot {i} produced NRMS error of {eNRMS_shot: .4e}")
+        SpyroEnsemble.print(f"Shot {i} produced Integral error of {errIt_shot: .4e}")
+        SpyroEnsemble.print(f"Shot {i} produced Peak error of {errPk_shot: .4e}")
 
     eNRMS = sum(eNRMS) / 3
     errIt = sum(errIt) / 3
@@ -127,12 +127,12 @@ def test_forward_3_shots():
     assert abs(eNRMS) < 0.01 and abs(errIt) < 0.01 and abs(errPk) < 0.01, \
         "Error is too high for forward test with multiple shots."
 
-    pprint(f"Combined NRMS error for all shots is {eNRMS:.4e} and test "
-           f"has passed equals {abs(eNRMS) < 0.01}", comm=comm)
-    pprint(f"Combined Integral error for all shots is {errIt:.4e} and test "
-           f"has passed equals {abs(errIt) < 0.01}", comm=comm)
-    pprint(f"Combined Peak error for all shots is {errPk:.4e} and test "
-           f"has passed equals {abs(errPk) < 0.01}", comm=comm)
+    SpyroEnsemble.print(f"Combined NRMS error for all shots is {eNRMS: .4e} and test "
+                        f"has passed equals {abs(eNRMS) < 0.01}")
+    SpyroEnsemble.print(f"Combined Integral error for all shots is {errIt: .4e} and test "
+                        f"has passed equals {abs(errIt) < 0.01}")
+    SpyroEnsemble.print(f"Combined Peak error for all shots is {errPk: .4e} and test "
+                        f"has passed equals {abs(errPk) < 0.01}")
 
 
 if __name__ == "__main__":

@@ -48,6 +48,8 @@ class MeasureError:
         Compute the error measures at the receivers for comparison between models.
     get_reference_signal()
         Acquire the reference signal for comparison between models.
+    initialize_paths_for_error()
+        Initialize the paths for saving data and reference signals.
     integral_error()
         Compute the integral error between the model and reference signals.
     normalized_root_mean_square_error()
@@ -63,13 +65,23 @@ class MeasureError:
     get_xCR_optimal()
         Get the optimal heuristic factor for the quadratic damping
     """
+    def __init__(self):
+        """Initialize the MeasureError class.
 
-    def __init__(
+        Parameters
+        ----------
+
+        Returns
+        -------
+        None
+        """
+
+    def initialize_paths_for_error(
         self,
         output_folder: Path | str | None = None,
         output_case: Path | str | None = None,
     ):
-        """Initialize the MeasureError class.
+        """Initialize the paths for saving data and reference signals.
 
         Parameters
         ----------
@@ -812,7 +824,7 @@ class MeasureError:
 #         xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts-1))
 
 #     format_xCR = ', '.join(['{:.3f}'.format(x) for x in xCR_cand])
-#     pprint(f"Candidates for Heuristic Factor xCR: [{format_xCR}]", comm=self.comm)
+#     SpyroEnsemble.print(f"Candidates for Heuristic Factor xCR: [{format_xCR}]")
 
 #     return xCR_cand
 
@@ -882,6 +894,6 @@ class MeasureError:
 #         vtx = - eq_xCR[1] / (2 * eq_xCR[0])
 #         xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
 
-#     pprint(f"Optimal Heuristic Factor xCR: {xCR_opt:.3f}", comm=self.comm)
+#     SpyroEnsemble.print(f"Optimal Heuristic Factor xCR: {xCR_opt:.3f}")
 
 #     return xCR_opt
