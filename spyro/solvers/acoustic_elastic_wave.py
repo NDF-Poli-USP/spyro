@@ -225,7 +225,7 @@ class AcousticElasticWave(Wave):
 
     # =====BEGIN TEMPORARY=====
     @override
-    def building_mesh_derived_paramenters(self):
+    def building_mesh_derived_parameters(self):
         coodinates = self.mesh_ops._set_spatial_coordinates(self.mesh)
         self.mesh_z, self.mesh_x = coodinates[0], coodinates[1]
         if self.dimension == 3:

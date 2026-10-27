@@ -254,8 +254,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._map_sources_and_receivers()
 
         # Function space type for the mesh operations
-        self.mesh_ops.func_space_type = 'scalar' \
-            if self.wave_type == WaveType.ISOTROPIC_ACOUSTIC else 'vector'
+        self.mesh_ops.func_space_type = 'scalar'
 
         # Get boundaries
         boundaries = self.get_absorbing_boundaries()
@@ -276,7 +275,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.mesh_ops.func_space_type == 'scalar' \
                 and not hasattr(self.mesh_parameters, 'diam_mesh'):
             data_mesh = self.mesh_ops.representative_mesh_dimensions(self.mesh,
-                                                                     self.function_space)
+                                                                     self.scalar_function_space)
             self.mesh_parameters.diam_mesh = data_mesh[0]
             self.mesh_parameters.lmin = data_mesh[1]
             self.mesh_parameters.lmax = data_mesh[2]

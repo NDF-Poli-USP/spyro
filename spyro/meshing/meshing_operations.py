@@ -200,10 +200,13 @@ class MeshOps():
             ufl_input = generate_ufl_functions(mesh, coord_expression[i],
                                                self.dimension)
 
-            if self.func_space_type == 'scalar':
+            fs_element = function_space.ufl_element()
+            if hasattr(fs_element, 'num_sub_elements') and fs_element.num_sub_elements > 0:
+                # Mixed space (e.g. coupled acoustic-elastic): use first scalar sub-space
+                V = function_space.sub(0)
+            elif self.func_space_type == 'scalar':
                 V = function_space
-
-            if self.func_space_type == 'vector':
+            else:
                 V = function_space.sub(i)
 
             coords.append(assemble(interpolate(ufl_input, V)))
@@ -263,9 +266,16 @@ class MeshOps():
         if box_domain:
 
             # Simulating a Dirichlet BC at each boundary
-            if self.func_space_type == "scalar":
+            fs_element = function_space.ufl_element()
+            if hasattr(fs_element, 'num_sub_elements') and fs_element.num_sub_elements > 0:
+                # Mixed space: use first scalar sub-space for BC
+                bc_function_space = function_space.sub(0)
+                bc_val = 0.
+            elif self.func_space_type == "scalar":
+                bc_function_space = function_space
                 bc_val = 0.
             else:
+                bc_function_space = function_space
                 bc_val = as_vector((0.,) * self.dimension)
 
             num_boundaries = 4
@@ -309,7 +319,12 @@ class MeshOps():
                     idx_bdn = "top" if idx_bdn == 6 else idx_bdn
 
                 # Applying a dummy Dirichlet BC
-                bnd_node_ids = DirichletBC(function_space, bc_val, idx_bdn).nodes
+                try:
+                    bnd_node_ids = DirichletBC(bc_function_space, bc_val, idx_bdn).nodes
+                except LookupError:
+                    # Marker not present in this sub-space (e.g. interface in coupled case)
+                    boundary_ids_map[idx_bdn] = None
+                    continue
 
                 if len(bnd_node_ids) == 0:
                     # For DG spaces, DirichletBC doesn't work
