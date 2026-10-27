@@ -7,6 +7,7 @@ generation based on wavelength constraints.
 
 from os import path
 from warnings import warn
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..utils.error_management import validate_parameter
 
 
@@ -326,7 +327,7 @@ class MeshingParameters():
         """
         if self.mesh_type is None:
             if verbose:
-                print("Mesh incomplete: 'mesh_type' is not set.")
+                SpyroEnsemble.print("Mesh incomplete: 'mesh_type' is not set.")
             self.is_complete = False
             return
 
@@ -344,7 +345,7 @@ class MeshingParameters():
             )
             if not has_size_param:
                 if verbose:
-                    print(f"Mesh incomplete: '{self.mesh_type}' requires either 'edge_length' or 'cells_per_wavelength'.")
+                    SpyroEnsemble.print(f"Mesh incomplete: '{self.mesh_type}' requires either 'edge_length' or 'cells_per_wavelength'.")
                 self.is_complete = False
                 return
 
@@ -352,7 +353,7 @@ class MeshingParameters():
             if self.cells_per_wavelength is not None:
                 if self.source_frequency is None:
                     if verbose:
-                        print("Mesh incomplete: 'cells_per_wavelength' requires 'source_frequency'.")
+                        SpyroEnsemble.print("Mesh incomplete: 'cells_per_wavelength' requires 'source_frequency'.")
                     self.is_complete = False
                     return
 
@@ -364,7 +365,7 @@ class MeshingParameters():
 
                 if not has_velocity:
                     if verbose:
-                        print("Mesh incomplete: 'cells_per_wavelength' requires 'minimum_velocity', 'grid_velocity_data', or 'velocity_model'.")
+                        SpyroEnsemble.print("Mesh incomplete: 'cells_per_wavelength' requires 'minimum_velocity', 'grid_velocity_data', or 'velocity_model'.")
                     self.is_complete = False
                     return
 
@@ -374,7 +375,7 @@ class MeshingParameters():
             # For file-based meshes, need mesh_file
             if self.mesh_file is None:
                 if verbose:
-                    print("Mesh incomplete: 'mesh_type' is 'file' but 'mesh_file' is not set.")
+                    SpyroEnsemble.print("Mesh incomplete: 'mesh_type' is 'file' but 'mesh_file' is not set.")
                 self.is_complete = False
             else:
                 self.is_complete = True
@@ -383,14 +384,14 @@ class MeshingParameters():
             # For user-provided meshes, need user_mesh object
             if self.user_mesh is None:
                 if verbose:
-                    print("Mesh incomplete: 'mesh_type' is 'user_mesh' but 'user_mesh' object is not set.")
+                    SpyroEnsemble.print("Mesh incomplete: 'mesh_type' is 'user_mesh' but 'user_mesh' object is not set.")
                 self.is_complete = False
             else:
                 self.is_complete = True
 
         else:
             if verbose:
-                print("Mesh incomplete: Unknown mesh_type '{self.mesh_type}'.")
+                SpyroEnsemble.print("Mesh incomplete: Unknown mesh_type '{self.mesh_type}'.")
             self.is_complete = False
 
     def _set_length_with_unit_check(self, attr_name, value):

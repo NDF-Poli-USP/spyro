@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import spyro
 
-from spyro.io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.tools.error_measure import MeasureError
 from spyro.utils.analytical_solution_nodal import (
     analytical_explosive_source,
@@ -54,11 +54,9 @@ def test_analytical_solution(use_vertex_only_mesh):
     )
 
     vom_label = "VOM" if use_vertex_only_mesh else "NO VOM"
-    pprint(
-        f"Normalized L2 Error ({vom_label}) = {normalized_l2_error:.4e}", comm=wave.comm
-    )
-    pprint(f"Integral Error ({vom_label}) = {integral_error:.4e}", comm=wave.comm)
-    pprint(f"Peak Error ({vom_label}) = {peak_error:.4e}", comm=wave.comm)
+    SpyroEnsemble.print(f"Normalized L2 Error ({vom_label}) = {normalized_l2_error: .4e}")
+    SpyroEnsemble.print(f"Integral Error ({vom_label}) = {integral_error: .4e}")
+    SpyroEnsemble.print(f"Peak Error ({vom_label}) = {peak_error: .4e}")
 
     assert normalized_l2_error < 1e-3 and integral_error < 1e-3 and peak_error < 1e-3
 
@@ -101,7 +99,7 @@ def test_analytical_force_source_3d_offset_symmetry():
 
 
 def test_analytical_explosive_source_direction():
-    """Tests if explosive source is zero outsie of the main direction."""
+    """Tests if explosive source is zero outside of the main direction."""
     offsets = np.array([1.0, 0.0, 0.0])
     time_vector = np.linspace(0.0, 2.0, 201)
 
