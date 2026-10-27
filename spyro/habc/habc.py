@@ -2,9 +2,9 @@
 from numpy import abs, imag, pi, real, sqrt, unique
 from os import path, rename
 from shutil import rmtree
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..abc.abc_layer import ABCLayer
 from .damp_profile import HABC_Damping
-from ..io.basicio import parallel_print as pprint
 from ..solvers.modal.modal_sol import Modal_Solver
 # from ..tools.habc_tools import layer_mask_field
 from ..utils.typing import (HyperLayerDegreeType, AbsorbingBCsType,
@@ -54,7 +54,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
                  abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
                  abc_reference_freq=LayerSizeRefFrequency.SOURCE,
                  abc_degree_type=HyperLayerDegreeType.REAL,
-                 abc_deg_layer=None, output_folder=None, comm=None):
+                 abc_deg_layer=None, output_folder=None):
         """Initialize the HABC class.
 
         Parameters
@@ -88,9 +88,6 @@ class HABCLayer(ABCLayer, HABC_Damping):
             equal to 2. `None` is used only for rectangular layers. Default is `None`.
         output_folder : `str`, optional
             The folder where output data will be saved. Default is `None`.
-        comm : `object`, optional
-            An object representing the communication interface for parallel processing.
-            Default is `None`.
 
         Returns
         -------
@@ -105,7 +102,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
                           abc_boundary_layer_type=AbsorbingBCsType.HYBRID,
                           abc_reference_freq=abc_reference_freq,
                           abc_degree_type=abc_degree_type, abc_deg_layer=abc_deg_layer,
-                          output_folder=output_folder, comm=comm)
+                          output_folder=output_folder)
 
     def fundamental_frequency(self, wave, method=None, fitting_c=(0., 0., 0., 0.)):
         """Compute the fundamental frequency in Hz via modal analysis.
@@ -212,7 +209,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
            0.47525      13.47       13.47
         """
 
-        pprint("\nSolving Eigenvalue Problem", comm=self.comm)
+        SpyroEnsemble.print("\nSolving Eigenvalue Problem")
         mod_sol = Modal_Solver(self.dimension, method=method)
 
         if method == 'ANALYTICAL':
@@ -255,12 +252,12 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
         for n_eig, eigval in enumerate(unique(Lsp)):
             f_eig = sqrt(abs(eigval)) / (2 * pi)
-            pprint(f"Frequency {n_eig} (Hz): {f_eig:.5f}", comm=self.comm)
+            SpyroEnsemble.print(f"Frequency {n_eig} (Hz): {f_eig: .5f}")
 
         # Fundamental frequency (eig = 0 is a rigid body motion)
         min_eigval = max(unique(Lsp[(Lsp > 0.) & (imag(Lsp) == 0.)]))
         wave.fundam_freq = real(sqrt(min_eigval) / (2 * pi))
-        pprint(f"Fundamental Frequency (Hz): {wave.fundam_freq:.5f}", comm=self.comm)
+        SpyroEnsemble.print(f"Fundamental Frequency (Hz): {wave.fundam_freq: .5f}")
 
     # def damping_layer(self, wave, xCR_usu=None, method=None,
     #                   fitting_c=(0., 0., 0., 0.), save_file=True):
@@ -311,7 +308,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
     #     None
     #     """
 
-    #     pprint("\nBuilding Mask for Damping Profile", comm=self.comm)
+    #     SpyroEnsemble.print("\nBuilding Mask for Damping Profile")
 
     #     # Damping mask
     #     V_mask = create_function_space(wave.mesh, "DG0", 0)
@@ -323,7 +320,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     #     # Save damping mask
     #     if save_file:
-    #         outfile = VTKFile(self.path_case_abc + "eta_mask.pvd")
+    #         outfile = VTKFile(self.path_case_absl + "eta_mask.pvd")
     #         outfile.write(self.eta_mask)
 
     #     # Domain dimensions with free surface truncation
@@ -343,12 +340,12 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     #     # Initializing the parent class for damping
     #     HABC_Damping.__init__(self, dom_lay_trunc, layer_par, mesh_par, wave_par,
-    #                           dimension=self.dimension, comm=self.comm)
+    #                           dimension=self.dimension)
 
     #     # Estimating fundamental frequency
     #     self.fundamental_frequency(wave, method=method, fitting_c=fitting_c)
 
-    #     pprint("\nCreating Damping Profile", comm=self.comm)
+    #     SpyroEnsemble.print("\nCreating Damping Profile")
 
     #     # Compute the minimum damping ratio and the associated heuristic factor
     #     eta_crt, self.psi_min, self.xCR, self.xCR_lim, self.CRmin \
@@ -366,7 +363,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
 
     #     # Save damping profile
     #     if save_file:
-    #         outfile = VTKFile(self.path_case_abc + "eta_habc.pvd")
+    #         outfile = VTKFile(self.path_case_absl + "eta_habc.pvd")
     #         outfile.write(self.eta_habc)
 
     def rename_folder_habc(self):
@@ -384,14 +381,14 @@ class HABCLayer(ABCLayer, HABC_Damping):
         if self.layer_geometry.n_hyp != self.abc_deg_layer and \
                 self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
 
-            pprint(f"\nHypershape Degree Changes from {self.abc_deg_layer} "
-                   f"to {self.layer_geometry.n_hyp}. "
-                   "Output Folder for Results Will Be Renamed.", comm=self.comm)
+            SpyroEnsemble.print(f"\nHypershape Degree Changes from {self.abc_deg_layer} "
+                                f"to {self.layer_geometry.n_hyp}. "
+                                "Output Folder for Results Will Be Renamed.")
 
             # Define the current and new folder names
-            old = self.path_case_abc
-            new = f"{self.path_case_abc[:-8]}{self.layer_geometry.n_hyp:.1f}" + \
-                f"{self.path_case_abc[-5:]}"
+            old = self.path_case_absl
+            new = f"{self.path_case_absl[:-8]}{self.layer_geometry.n_hyp: .1f}" + \
+                f"{self.path_case_absl[-5:]}"
 
             try:
                 if path.isdir(new):
@@ -399,7 +396,7 @@ class HABCLayer(ABCLayer, HABC_Damping):
                     rmtree(new)
 
                 rename(old, new)  # Rename the directory
-                pprint(f"Folder '{old}' Successfully Renamed to '{new}'\n", comm=self.comm)
+                SpyroEnsemble.print(f"Folder '{old}' Successfully Renamed to '{new}'\n")
 
             except OSError as e:
-                pprint(f"Error Renaming Folder: {e}", comm=self.comm)
+                SpyroEnsemble.print(f"Error Renaming Folder: {e}")
