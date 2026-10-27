@@ -600,7 +600,7 @@ class AutomaticMesh:
 
             if structured_mesh:
                 apply_structured_winslow_smoothing2d(
-                    gmsh=gmsh, comm=self.comm, geom_params=geom_params,
+                    gmsh=gmsh, geom_params=geom_params, ef_segy2=ef_segy2,
                     length_x=length_x, depth_z=depth_z, padding_type=padding_type,
                     water_interface=water_interface, hyper_n=hyper_n,
                     winslow_implementation=winslow_implementation,
@@ -608,7 +608,6 @@ class AutomaticMesh:
                     n_samples=n_samples, n_traces=n_traces,
                     domain_xmin=domain_xmin, domain_xmax=domain_xmax,
                     domain_zmin=domain_zmin, domain_zmax=domain_zmax,
-                    ef_segy2=ef_segy2, parallel_print=parallel_print,
                     z_water_L=z_water_L, z_water_R=z_water_R, pad_x_min=pad_x_min,
                     pad_x_max=pad_x_max, pad_z_min=pad_z_min, a_val=a_val,
                     b_val=b_val, xc=xc, zc=zc, apply_winslow=apply_winslow
