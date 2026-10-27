@@ -110,6 +110,8 @@ class Delta_projector:
         cell_tabulations : list
             List of tabulations for each receiver
         """
+        self.number_of_points = len(self.point_locations)
+
         for rid in range(self.number_of_points):
             cell_id = self.mesh.locate_cell(self.point_locations[rid], tolerance=1e-6)
             self.is_local[rid] = cell_id
@@ -123,8 +125,6 @@ class Delta_projector:
             self.cell_tabulations = self.__func_build_cell_tabulations(order)
         else:
             self.cell_tabulations = None
-
-        self.number_of_points = len(self.point_locations)
 
     def interpolate(self, field):
         """Interpolate the solution to receiver coordinates.
@@ -311,8 +311,7 @@ class Delta_projector:
         """
         num_recv = self.number_of_points
 
-        fdrake_cell_node_map = self.space.cell_node_map()
-        cell_node_map = fdrake_cell_node_map.values_with_halo
+        cell_node_map = self.space.cell_node_list
         num_cells, nodes_per_cell = cell_node_map.shape
         node_locations = self.__func_node_locations()
         self.nodes_per_cell = nodes_per_cell
@@ -363,8 +362,7 @@ class Delta_projector:
         """
         num_recv = self.number_of_points
 
-        fdrake_cell_node_map = self.space.cell_node_map()
-        cell_node_map = fdrake_cell_node_map.values_with_halo
+        cell_node_map = self.space.cell_node_list
         if self.quadrilateral is True:
             cell_node_map = get_hexa_real_cell_node_map(self.space, self.mesh)
         num_cells, nodes_per_cell = cell_node_map.shape
@@ -507,8 +505,7 @@ def get_hexa_real_cell_node_map(V, mesh):
         Integer array with shape ``(num_cells, nodes_per_cell)`` containing
         global node indices for each cell in all layers.
     """
-    weird_cnm_func = V.cell_node_map()
-    weird_cnm = weird_cnm_func.values_with_halo
+    weird_cnm = V.cell_node_list
     cells_per_layer, nodes_per_cell = np.shape(weird_cnm)
     layers = mesh.cell_set.layers - 1
     ufl_element = V.ufl_element()

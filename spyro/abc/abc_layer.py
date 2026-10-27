@@ -2,12 +2,13 @@ from firedrake import Function, VTKFile
 from numpy import abs, array, ceil, inf, log10, minimum
 from os import getcwd
 from sympy import divisors
+
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .eik_min import Minimum_Eikonal
 from .nrbc import NRBC
 from ..solvers.modal.modal_sol import Modal_Solver
 from ..tools.error_measure import MeasureError
 from ..domains.space import create_function_space
-from ..io.basicio import parallel_print as pprint
 from .lay_len import calc_size_lay
 from ..plots.plots_habc import plot_function_layer_size
 from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
@@ -280,7 +281,7 @@ class ABCLayer(NRBC, MeasureError):
 
         # Initializing the error measure class
         MeasureError.__init__(self, output_folder=self.path_save,
-                              output_case=self.path_case_abc, comm=self.comm)
+                              output_case=self.path_case_abc)
 
     def _define_layer_shape(self):
         """Define the shape of the absorbing layer.
@@ -385,7 +386,7 @@ class ABCLayer(NRBC, MeasureError):
             f"{self.abc_boundary_layer_shape.value.capitalize()}" + \
             (f" - Degree: {self.abc_deg_layer}"
              if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else "")
-        pprint(layer_str, comm=self.comm)
+        SpyroEnsemble.print(layer_str)
 
         return case_abc
 
@@ -465,7 +466,7 @@ class ABCLayer(NRBC, MeasureError):
         None
         """
 
-        pprint("\nDetermining Reference Frequency", comm=self.comm)
+        SpyroEnsemble.print("\nDetermining Reference Frequency")
 
         if self.abc_reference_freq == LayerSizeRefFrequency.SOURCE:
 
@@ -485,12 +486,11 @@ class ABCLayer(NRBC, MeasureError):
                 # Get the minimum frequency excited at each critical point
                 freq_ref = freq_response(histPcrit, self.freq_Nyquist,
                                          fpad=fpad, get_dominant_freq=True)
-                pprint(f"Frequency at Critical Point {n_crit:>2.0f}: {freq_ref:.5f}",
-                       comm=self.comm)
+                SpyroEnsemble.print(f"Frequency at Critical Point {n_crit:>2.0f}: {freq_ref:.5f}")
 
                 self.freq_ref = min(self.freq_ref, freq_ref)
 
-        pprint(f"Reference Frequency (Hz): {self.freq_ref:.5f}", comm=self.comm)
+        SpyroEnsemble.print(f"Reference Frequency (Hz): {self.freq_ref:.5f}")
 
     def abc_new_geometry(self):
         """Determine the new domain geometry with the absorbing layer.
@@ -605,7 +605,7 @@ class ABCLayer(NRBC, MeasureError):
         # Layer type
         lay_str = "\nDetermining New Geometry with {}"
         lay_str = self.formatting_abc_layer_type(lay_str)
-        pprint(lay_str, comm=self.comm)
+        SpyroEnsemble.print(lay_str)
 
         # New geometry with layer
         self.abc_new_geometry()
@@ -649,11 +649,11 @@ class ABCLayer(NRBC, MeasureError):
 
         # Checking if the mesh for infinite model is requested
         if inf_model:
-            pprint("\nGenerating Mesh for Infinite Model", comm=self.comm)
+            SpyroEnsemble.print("\nGenerating Mesh for Infinite Model")
             layer_shape = LayerShapeType.RECTANGULAR
 
         else:
-            pprint("\nGenerating Mesh with Absorbing Layer", comm=self.comm)
+            SpyroEnsemble.print("\nGenerating Mesh with Absorbing Layer")
             layer_shape = self.abc_boundary_layer_shape
 
         # New mesh with layer
@@ -664,7 +664,7 @@ class ABCLayer(NRBC, MeasureError):
 
             # Create the mesh
             wave.set_mesh()
-            pprint("Extended Rectangular Mesh Generated Successfully", comm=self.comm)
+            SpyroEnsemble.print("Extended Rectangular Mesh Generated Successfully")
 
         elif layer_shape == LayerShapeType.HYPERSHAPE:
 
@@ -688,7 +688,7 @@ class ABCLayer(NRBC, MeasureError):
             # Updating the mesh with the absorbing layer
             wave.set_mesh(user_mesh=mesh_abc)
 
-        pprint("Mesh Generated Successfully", comm=self.comm)
+        SpyroEnsemble.print("Mesh Generated Successfully")
 
         if save_file:
             if inf_model:
@@ -740,7 +740,7 @@ class ABCLayer(NRBC, MeasureError):
         Used Memory: Current (MB):18.715, Peak (MB):25.298
         """
 
-        pprint("\nUpdating Velocity Profile", comm=self.comm)
+        SpyroEnsemble.print("\nUpdating Velocity Profile")
 
         # Scalar space for auxiliar field of clipped coordinates
         method_element = "DQ" if self.quadrilateral else "DG"
@@ -808,14 +808,14 @@ class ABCLayer(NRBC, MeasureError):
         # Initializing the NRBC class
         NRBC.__init__(
             self, self.domain_dim, self.abc_boundary_layer_shape,
-            dimension=self.dimension, output_folder=self.path_case_abc, comm=self.comm)
+            dimension=self.dimension, output_folder=self.path_case_abc)
 
         # Applying NRBCs on outer boundary layer
         crit_source = bnd_nod_ids_nfs = bnd_nodes_nfs = None
         if non_reflect_bc == BoundaryConditionsType.SOMMERFELD or \
                 non_reflect_bc == BoundaryConditionsType.HIGDON:
 
-            pprint("\nApplying Non-Reflecting Boundary Conditions", comm=self.comm)
+            SpyroEnsemble.print("\nApplying Non-Reflecting Boundary Conditions")
 
             # Getting boundary data from the layer boundaries
             if non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
@@ -839,7 +839,7 @@ class ABCLayer(NRBC, MeasureError):
                                   bnd_nodes_nfs, non_reflect_bc,
                                   hyp_par=hyp_par, save_file=save_file)
         else:
-            pprint("\nNot Non-Reflecting Boundary Conditions Prescribed", comm=self.comm)
+            SpyroEnsemble.print("\nNot Non-Reflecting Boundary Conditions Prescribed")
 
     def check_timestep_abc(self, wave, max_divisor_tf=1,
                            set_max_dt=True, method='ANALYTICAL', mag_add=3):
@@ -875,12 +875,12 @@ class ABCLayer(NRBC, MeasureError):
         validate_numeric("mag_add", mag_add, float_num=False, integer_num=True,
                          lower_bound=0., include_lower_bound=True)
 
-        pprint("\nChecking Timestep Size", comm=self.comm)
+        SpyroEnsemble.print("\nChecking Timestep Size")
 
         # User timestep
         usr_dt = wave.get_dt()
-        pprint(f"Current Nyquist Frequency: {self.freq_Nyquist:.5f} Hz", comm=self.comm)
-        pprint(f"Current Timestep Size: {1e3 * usr_dt:.{mag_add}f} ms", comm=self.comm)
+        SpyroEnsemble.print(f"Current Nyquist Frequency: {self.freq_Nyquist:.5f} Hz")
+        SpyroEnsemble.print(f"Current Timestep Size: {1e3 * usr_dt:.{mag_add}f} ms")
 
         # Maximum timestep size
         dt_sol = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
@@ -909,11 +909,11 @@ class ABCLayer(NRBC, MeasureError):
         else:
             str_dt = f"Selected Timestep Size: {dt_ms:.{mag_add}f} ms"
 
-        pprint(str_dt, comm=self.comm)
+        SpyroEnsemble.print(str_dt)
 
         # Updating Nyquist frequency
         self.freq_Nyquist = 1. / (2. * wave.dt)
-        pprint(f"New Nyquist Frequency: {self.freq_Nyquist:.5f} Hz", comm=self.comm)
+        SpyroEnsemble.print(f"New Nyquist Frequency: {self.freq_Nyquist:.5f} Hz")
 
     def layer_infinite_model(self, lmin, c_bnd_max, final_time, source_locations=None):
         """Determine the domain extension size for the infinite domain model.
@@ -984,7 +984,7 @@ class ABCLayer(NRBC, MeasureError):
             # Minimum distance to the nearest boundary
             dist_to_bnd = float(min(cand_dist))
 
-        pprint(str_pad, comm=self.comm)
+        SpyroEnsemble.print(str_pad)
 
         # Subtracting the distance already travelled by the wave
         add_dom -= dist_to_bnd
@@ -1015,7 +1015,7 @@ class ABCLayer(NRBC, MeasureError):
         # Size of the domain extension
         self.abc_pad_length = self.layer_infinite_model(lmin, c_bnd_max, final_time,
                                                         source_locations=source_locations)
-        pprint(f"Infinite Domain Extension (km): {self.abc_pad_length:.4f}", comm=self.comm)
+        SpyroEnsemble.print(f"Infinite Domain Extension (km): {self.abc_pad_length:.4f}")
 
         # New dimensions
         self.abc_new_geometry()
@@ -1054,7 +1054,7 @@ class ABCLayer(NRBC, MeasureError):
             self.check_timestep_abc(wave, max_divisor_tf=max_divisor_tf,
                                     method=method, mag_add=mag_add)
 
-        pprint("\nBuilding Infinite Domain Model", comm=self.comm)
+        SpyroEnsemble.print("\nBuilding Infinite Domain Model")
 
         # Defining geometry for infinite domain
         self.geometry_infinite_model(wave)
@@ -1065,7 +1065,7 @@ class ABCLayer(NRBC, MeasureError):
         # Updating velocity model
         self.velocity_abc(wave, inf_model=True)
 
-        pprint("\nSolving Infinite Model", comm=self.comm)
+        SpyroEnsemble.print("\nSolving Infinite Model")
 
         # Solving the forward problem
         wave.forward_solve()

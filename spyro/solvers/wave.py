@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 from .time_integration_central_difference import \
     _propagate_forward_central_difference as _forward_time_integrator
@@ -9,7 +10,6 @@ from ..domains.space import check_function_space_type, create_function_space
 from ..io import Model_parameters
 from ..io import material_properties_io
 from ..io.parallelism_wrappers import ensemble_propagator
-from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
@@ -166,7 +166,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # Getting parameters from the mesh
         if self.mesh is not None:
-            self.building_mesh_derived_paramenters()
+            self.building_mesh_derived_parameters()
         elif self.mesh_parameters.mesh_type == "firedrake_mesh":
             warnings.warn(
                 "No mesh file, Firedrake mesh will be automatically generated."
@@ -179,8 +179,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.layer_manager()
 
         # Logger
-        self.field_logger = FieldLogger(self.comm,
-                                        self.input_dictionary["visualization"])
+        self.field_logger = FieldLogger(self.read_outputs)
         self.field_logger.add_field("forward", self.get_function_name(),
                                     lambda: self.get_function())
 
@@ -200,7 +199,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         -------
         None
         """
-        parallel_print("\nSolving Forward Problem", comm=self.comm)
+        SpyroEnsemble.print("\nSolving Forward Problem")
 
         if self.function_space is None:
             self.force_rebuild_function_space()
@@ -215,7 +214,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def force_rebuild_function_space(self):
         if self.mesh is None:
             self.mesh = self.get_mesh()
-        self.building_mesh_derived_paramenters()
+        self.building_mesh_derived_parameters(include_model_parameters=True)
 
     @abstractmethod
     def matrix_building(self):
@@ -245,7 +244,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         return boundaries
 
-    def building_mesh_derived_paramenters(self):
+    def building_mesh_derived_parameters(self, include_model_parameters=False):
         """Build parameters that are derived from the mesh."""
         coordinates = self.mesh_ops._set_spatial_coordinates(self.mesh)
         self.mesh_z, self.mesh_x = coordinates[0], coordinates[1]
@@ -307,7 +306,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         )
 
         self.mesh = self.get_mesh()
-        self.building_mesh_derived_paramenters()
+        self._physical_parameters = PhysicalParameters()
+        self.building_mesh_derived_parameters()
 
     def set_solver_parameters(self, parameters=None):
         """
@@ -426,9 +426,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 "firedrake function or new file name (segy or hdf5)."
             )
         if output:
-            fire.VTKFile("initial_velocity_model.pvd").write(
-                self.initial_velocity_model, name="velocity"
-            )
+            SpyroEnsemble.write_vtk("initial_velocity_model.pvd", self.initial_velocity_model, name="velocity")
 
     def _map_sources_and_receivers(self):
         if self.source_type == "ricker":
@@ -771,14 +769,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.abc_active:  # If ABC scheme is used
             from ..meshing.meshing_habc import HABCMesh
             self.mesh_ops = HABCMesh(domain_dim, dimension=self.dimension,
-                                     quadrilateral=self.mesh_parameters.quadrilateral,
-                                     comm=self.mesh_parameters.comm)
+                                     quadrilateral=self.mesh_parameters.quadrilateral)
 
         else:  # If no ABC scheme is used
             from ..meshing.meshing_operations import MeshOps
             self.mesh_ops = MeshOps(domain_dim, dimension=self.dimension,
-                                    quadrilateral=self.mesh_parameters.quadrilateral,
-                                    comm=self.mesh_parameters.comm)
+                                    quadrilateral=self.mesh_parameters.quadrilateral)
 
     def layer_manager(self):
         """Return the layer operations manager for the wave solver."""

@@ -3,8 +3,10 @@ import spyro
 import segyio
 import numpy as np
 import matplotlib.pyplot as plt
-from firedrake.__future__ import interpolate
-fire.interpolate = interpolate
+from spyro.version_control import is_firedrake_new
+if is_firedrake_new() is False:
+    from firedrake.__future__ import interpolate
+    fire.interpolate = interpolate
 
 
 def get_vp_from_2dsegy(filename):
