@@ -196,3 +196,6 @@ notebook_tutorials/jessica_scripts/gar6more2d/
 notebook_tutorials/jessica_scripts/gar6more3d/
 results/
 results/
+# Allow the figures of the literate demos
+!demos/elastic_fwi_automated_adjoint/*.png
+.vscode
