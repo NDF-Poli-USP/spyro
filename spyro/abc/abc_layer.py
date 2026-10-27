@@ -73,6 +73,9 @@ class ABCLayer(AbsorbingBC):
         Minimum mesh size.
     lref : `float`
         Reference length for the size of the absorbing layer.
+    nrbc : `nrbc.NRBC` or `None`
+        Non-Reflective BCs applied on the outer boundary of the absorbing layer.
+        It is `None` until `nrbc_on_boundary_layer()` is called.
     path_case_absl : `string`
         Path to save data for the current case study of ABCs based on absorbing layers.
     path_save : `string`
@@ -174,6 +177,9 @@ class ABCLayer(AbsorbingBC):
 
         # Define the shape of the absorbing layer.
         self.layer_geometry = self._define_layer_shape()
+
+        # Non-Reflective BCs on the outer layer boundary (see nrbc_on_boundary_layer)
+        self.nrbc = None
 
         # Create the path to save data
         # The required abc_type argument from path_to_save_abc_layer_case() method is set to
@@ -353,10 +359,9 @@ class ABCLayer(AbsorbingBC):
         None
         """
 
-        # Initializing the NRBC class
-        NRBC.__init__(
-            self, self.domain_dim, self.abc_boundary_layer_shape,
-            dimension=self.dimension, output_folder=self.path_case_absl)
+        # The layer owns an NRBC object instead of being one
+        self.nrbc = NRBC(self.domain_dim, self.abc_boundary_layer_shape,
+                         dimension=self.dimension, output_folder=self.path_case_absl)
 
         # Applying NRBCs on outer boundary layer
         crit_source = bnd_nod_ids_nfs = bnd_nodes_nfs = None
@@ -382,8 +387,8 @@ class ABCLayer(AbsorbingBC):
                 if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else None
 
             # Applying Higdon ABCs
-            self.cos_ang_HigdonBC(wave.function_space, crit_source, bnd_nod_ids_nfs,
-                                  bnd_nodes_nfs, non_reflect_bc,
-                                  hyp_par=hyp_par, save_file=save_file)
+            self.nrbc.cos_ang_HigdonBC(wave.function_space, crit_source, bnd_nod_ids_nfs,
+                                       bnd_nodes_nfs, non_reflect_bc,
+                                       hyp_par=hyp_par, save_file=save_file)
         else:
             SpyroEnsemble.print("\nNot Non-Reflecting Boundary Conditions Prescribed")

@@ -123,7 +123,7 @@ def forms_pml(wave, W, X_n, X_nm1):
         if bc_bndr in [BoundaryConditionsType.HIGDON, BoundaryConditionsType.SOMMERFELD]:
             ds = fire_ds(bc_surf, **quad_rule) if quad_rule else fire_ds(bc_surf)
             f_abc = c * ((u_n - u_nm1) / dt) * v
-            le = wave.layer_ops.cosHig * f_abc * ds
+            le = wave.layer_ops.nrbc.cosHig * f_abc * ds
             FF += le
 
     # Dirichlet BCs for PML model or Neumann BCs for the reference model
