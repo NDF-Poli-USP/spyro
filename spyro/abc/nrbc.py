@@ -108,12 +108,13 @@ class NRBC(AbsorbingBC):
         None
         """
 
-        # Initializing the AbsorbingBC class if NRBCs are not in HABC scheme
-        if not nrbc_in_habc:
-            AbsorbingBC.__init__(self, domain_dim, frequency=frequency,
-                                 dt=dt, dimension=dimension,
-                                 quadrilateral=quadrilateral)
+        # Initializing the AbsorbingBC class. In HABC schemes the NRBC is an object
+        # owned by the absorbing layer, so it also needs its own domain data.
+        AbsorbingBC.__init__(self, domain_dim, frequency=frequency,
+                             dt=dt, dimension=dimension,
+                             quadrilateral=quadrilateral)
 
+        if not nrbc_in_habc:
             # Set sthe pad to rectangular shape in case the infinite model is needed.
             self.abc_boundary_layer_shape = LayerShapeType.RECTANGULAR
 

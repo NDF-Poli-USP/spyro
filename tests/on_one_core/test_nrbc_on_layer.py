@@ -42,13 +42,8 @@ def pml_wave_dictionary() -> dict:
     }
 
 
-@pytest.mark.parametrize("non_reflect_bc", [
-    BoundaryConditionsType.SOMMERFELD,
-    pytest.param(BoundaryConditionsType.HIGDON, marks=pytest.mark.xfail(
-        strict=True, raises=ValueError,
-        reason="NRBC.source_to_bnd_reference_vector indexes the boundary coordinates "
-               "by row; fixed with the NRBC refactoring in ruben/test_nrbc_v2")),
-])
+@pytest.mark.parametrize("non_reflect_bc", [BoundaryConditionsType.SOMMERFELD,
+                                            BoundaryConditionsType.HIGDON])
 def test_nrbc_on_pml_layer(non_reflect_bc: BoundaryConditionsType,
                            tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Run a PML forward solve with NRBCs on the outer boundary of the layer.
@@ -98,6 +93,6 @@ def test_nrbc_on_pml_layer(non_reflect_bc: BoundaryConditionsType,
     else:
         assert (cos_bnd >= layer.nrbc.cos_min - 1e-12).all()
         assert (cos_bnd <= 1. + 1e-12).all()
-    assert Path(path_case_absl, "cosHig.pvd").is_file()
+    assert Path(layer.nrbc.path_case_nrbc, "cosHig.pvd").is_file()
 
     assert isfinite(wave.forward_solution_receivers).all()

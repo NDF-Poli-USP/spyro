@@ -286,6 +286,14 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
             wave, max_divisor_tf = wave_instance(element_geometry, dimension,
                                                  abc_type, calc_eik)
 
+            SpyroEnsemble.print(f"\nAbsorbing Boundary Condition: {abc_type}")
+
+            SpyroEnsemble.print(
+                "\n" + 60 * "=" + f"\nTesting Reference Model with {element_geometry} "
+                + f"elements for ABCs\nand {dimension}D case. Eikonal analysis: {act_eik}\n"
+                + 60 * "="
+            )
+
         #     # Computing reference signal
         #     wave.layer_ops.infinite_model(wave, check_dt=True, max_divisor_tf=max_divisor_tf)
 
