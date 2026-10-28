@@ -119,7 +119,7 @@ def plot_model_xz(wave, filename):
 # Settings
 # ===========================================================================
 USE_MONOLITHIC = False
-MESH_TYPE = "gmsh_mesh"   # "gmsh_mesh" ou "firedrake_mesh"
+MESH_TYPE = "firedrake_mesh" # "gmsh_mesh" or "firedrake_mesh"
 OUT = "results"
 os.makedirs(OUT, exist_ok=True)
 
@@ -138,7 +138,7 @@ case_small_2D = {
     "frequency": 25,
     "receiver_location": [(-0.49, 0.49)],
     "solid_receiver_locations": [(-0.51, 0.51)],
-    "final_time": 0.8,
+    "final_time": 0.22,
     "dt": 0.0001,
     "velocity_fluid": None,
     "bulk_modulus": 2.25,
@@ -149,6 +149,10 @@ case_small_2D = {
     "segy_dz": 0.002,
     "segy_interface": -0.5,
     "cells_per_wavelength": 6.0,
+    "epsilon": 0.3,
+    "delta": 0.15,
+    "gamma": 0.1,
+    "anisotropy_type": "weak",
 }
 
 case_large_2D = {
@@ -234,7 +238,7 @@ cases = {1: ("case_small_2d", case_small_2D),
          3: ("case_3d", case_3D),
          4: ("case_small_2d_irregular_topography", case_small_2D_irregular),
          5: ("case_large_2d_irregular_topography", case_large_2D_irregular)}
-CASE_NUM = 4
+CASE_NUM = 1
 CASE_NAME, selected_case = cases[CASE_NUM]
 if callable(selected_case):
     selected_case = selected_case()
@@ -347,13 +351,16 @@ dictionary["visualization"] = {
 
 dictionary["synthetic_data"] = {
     "type": "object",
-    "velocity_fluid": selected_case["velocity_fluid"],
     "bulk_modulus": selected_case["bulk_modulus"],
     "density_fluid": selected_case["density_fluid"],
     "density_solid": selected_case["density_solid"],
     "p_wave_velocity": selected_case["p_wave_velocity"],
     "s_wave_velocity": selected_case["s_wave_velocity"],
     "real_velocity_file": None,
+    "epsilon": selected_case.get("epsilon", None),
+    "delta": selected_case.get("delta", None),
+    "gamma": selected_case.get("gamma", None),
+    "anisotropy_type": selected_case.get("anisotropy_type", None),
 }
 
 dictionary["absorving_boundary_conditions"] = {

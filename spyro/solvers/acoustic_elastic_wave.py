@@ -9,6 +9,7 @@ from ..domains.space import create_function_space
 from ..domains.quadrature import quadrature_rules
 from ..receivers.Receivers import Receivers
 from ..io.segy_io import read_segy_velocity_model
+from spyro.solvers.elastic_wave.tensor_computation import C_vti_tensor
 
 
 def _extract_interface_markers(parent_mesh, child_mesh):
@@ -62,7 +63,7 @@ class AcousticElasticWave(Wave):
         self._setup_snapshots(dictionary)
 
     # ------------------------------------------------------------------
-    # Malha, submalhas e medidas
+    # Mesh, submeshes and measures
     # ------------------------------------------------------------------
     def _cell_centers(self):
         V = fire.VectorFunctionSpace(self.mesh, "DG", 0)
@@ -239,7 +240,7 @@ class AcousticElasticWave(Wave):
     # ======END TEMPORARY======
 
     # ------------------------------------------------------------------
-    # Parâmetros e montagem
+    # Parameters and building
     # ------------------------------------------------------------------
     @override
     def _initialize_model_parameters(self):
@@ -266,6 +267,10 @@ class AcousticElasticWave(Wave):
         lmbda_value = rho_value * p_wave_velocity_value**2 - 2.0 * mu_value
         self.mu = fire.Constant(mu_value)
         self.lmbda = fire.Constant(lmbda_value)
+        self.epsilon = synthetic_data.get("epsilon", None)
+        self.delta = synthetic_data.get("delta", None)
+        self.gamma = synthetic_data.get("gamma", None)
+        self.anisotropy_type = synthetic_data.get("anisotropy_type", None)
 
     @override
     def matrix_building(self):
@@ -274,6 +279,15 @@ class AcousticElasticWave(Wave):
         self.X_n = fire.Function(self.function_space)
         self.X_np1 = fire.Function(self.function_space)
 
+        if self.epsilon is not None and self.delta is not None:
+            self.c = fire.sqrt((self.lmbda + 2.0 * self.mu) / self.rho)
+            self.c_s = fire.sqrt(self.mu / self.rho)
+            self.wave_type = WaveType.ANISOTROPIC_VTI_ELASTIC
+            self.Elastic_C = C_vti_tensor(self, self.submesh_solid.topological_dimension)
+            self.c = None
+        else:
+            self.Elastic_C = None
+        
         if self.use_monolithic:
             construct_acoustic_elastic_monolithic(self)
         else:
@@ -288,7 +302,7 @@ class AcousticElasticWave(Wave):
         self._uf_normal = [0.0] * n_recv
 
     # ------------------------------------------------------------------
-    # Estados e interface com Wave
+    # States and interface
     # ------------------------------------------------------------------
     @override
     def _get_vstate(self):
@@ -357,7 +371,7 @@ class AcousticElasticWave(Wave):
         self._snapshot_step = 0
 
     # ------------------------------------------------------------------
-    # Passo de tempo e receptores
+    # Time step and receivers
     # ------------------------------------------------------------------
     def solve(self):
         if self.solid_receivers is not None:
@@ -407,7 +421,7 @@ class AcousticElasticWave(Wave):
         self.fluid_displacement_history.append(step_uf)
 
     # ------------------------------------------------------------------
-    # Campos derivados
+    # Derived fields
     # ------------------------------------------------------------------
     def _compute_p_equivalent(self):
         dim = self.dimension
