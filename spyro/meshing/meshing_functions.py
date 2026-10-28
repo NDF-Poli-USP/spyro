@@ -1,8 +1,11 @@
 import numpy as np
 from firedrake import Mesh as FireMeshReader
-from ..io.basicio import parallel_print
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..io.segy_io import create_segy_from_grid
-from .meshing_gmsh2d import build_gmsh_geometry_and_groups, apply_structured_winslow_smoothing2d
+from .meshing_gmsh2d import (
+    build_gmsh_geometry_and_groups,
+    apply_structured_winslow_smoothing2d,
+)
 from .meshing_utils import create_sizing_function, calculate_edge_length
 from .firedrake_based_wrappers import rectangle_mesh, periodic_rectangle_mesh, box_mesh
 from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_with_velocity_model
@@ -74,9 +77,7 @@ class AutomaticMesh:
         Creates a 2D mesh using Gmsh with padding and smoothing.
     """
 
-    def __init__(
-        self, mesh_parameters=None
-    ):
+    def __init__(self, mesh_parameters=None):
         """
         Initialize the MeshingFunctions class.
 
@@ -160,25 +161,29 @@ class AutomaticMesh:
         """
         self.mesh_parameters.check_completeness()
         if self.mesh_parameters.is_complete is False:
-            parallel_print("Skipping mesh generation, since we don't have all the parameters", comm=self.comm)
+            SpyroEnsemble.print(
+                "Skipping mesh generation, since we don't have all the parameters"
+            )
             return None
-        parallel_print(f"Creating {self.mesh_type} type mesh.", comm=self.comm)
+        SpyroEnsemble.print(f"Creating {self.mesh_type} type mesh.")
         if self.mesh_type == "firedrake_mesh":
             return self.create_firedrake_mesh()
         elif self.mesh_type == "SeismicMesh":
             if SeismicMesh is None:
-                raise ImportError("SeismicMesh is not available. Please "
-                                  + "install it to use this function.")
+                raise ImportError(
+                    "SeismicMesh is not available. Please "
+                    + "install it to use this function."
+                )
             return self.create_seismicmesh_mesh()
         elif self.mesh_type == "spyro_mesh":
             self.create_spyro_mesh()
             if self.comm is not None:
                 # Ensure all processes wait for mesh creation to complete
                 # Need to sync both ensemble and spatial communicators
-                if hasattr(self.comm, 'ensemble_comm'):
+                if hasattr(self.comm, "ensemble_comm"):
                     self.comm.ensemble_comm.barrier()
                 self.comm.comm.barrier()
-                parallel_print("Loading mesh.", comm=self.comm)
+                SpyroEnsemble.print("Loading mesh.")
                 return FireMeshReader(self.output_file_name, comm=self.comm.comm)
             else:
                 return FireMeshReader(self.output_file_name)
@@ -187,7 +192,7 @@ class AutomaticMesh:
         else:
             raise ValueError("mesh_type is not supported")
 
-    def ensure_common_origin(self, mesh, pad=0.):
+    def ensure_common_origin(self, mesh, pad=0.0):
         """Ensures that the mesh has a common origin.
 
         Parameters
@@ -205,17 +210,17 @@ class AutomaticMesh:
         # Adjusting coordinates
         if self.dimension == 3:  # 3D
             min_y = mesh.coordinates.dat.data_with_halos[:, 2].min()
-            if abs(min_y / pad) != 1.:  # Forcing node at (0,0,0)
-                parallel_print("Adjusting Mesh Y-coordinates", comm=self.comm)
-                err_y = (1. - abs(min_y / pad)) * pad
+            if abs(min_y / pad) != 1.0:  # Forcing node at (0,0,0)
+                SpyroEnsemble.print("Adjusting Mesh Y-coordinates")
+                err_y = (1.0 - abs(min_y / pad)) * pad
                 err_y *= -np.sign(err_y)
                 mesh.coordinates.dat.data_with_halos[:, 2] += err_y
 
         # Adjusting coordinates
         min_x = mesh.coordinates.dat.data_with_halos[:, 1].min()
-        if abs(min_x / pad) != 1.:  # Forcing node at (0,0)
-            parallel_print("Adjusting Mesh X-coordinates", comm=self.comm)
-            err_x = (1. - abs(min_x / pad)) * pad
+        if abs(min_x / pad) != 1.0:  # Forcing node at (0,0)
+            SpyroEnsemble.print("Adjusting Mesh X-coordinates")
+            err_x = (1.0 - abs(min_x / pad)) * pad
             err_x *= -np.sign(err_x)
             mesh.coordinates.dat.data_with_halos[:, 1] += err_x
 
@@ -243,12 +248,15 @@ class AutomaticMesh:
         else:
             raise ValueError("dimension is not supported")
 
-        if self.abc_pad is not None and self.abc_pad > 0.:
+        if self.abc_pad is not None and self.abc_pad > 0.0:
             self.ensure_common_origin(mesh, pad=self.abc_pad)
 
         # Mesh data
-        parallel_print(f"Mesh Created with {mesh.num_vertices()} Nodes and "
-                       + f"{mesh.num_cells()} " + typ_ele_str, comm=self.comm)
+        SpyroEnsemble.print(
+            f"Mesh Created with {mesh.num_vertices()} Nodes and "
+            + f"{mesh.num_cells()} "
+            + typ_ele_str
+        )
 
         return mesh
 
@@ -271,14 +279,15 @@ class AutomaticMesh:
             and self.cpw is not None
         ):
             self.edge_length = calculate_edge_length(
-                self.cpw, self.minimum_velocity, self.source_frequency)
+                self.cpw, self.minimum_velocity, self.source_frequency
+            )
 
         edge_length_z = self._resolved_edge_length("z")
         edge_length_x = self._resolved_edge_length("x")
         edge_length_y = self._resolved_edge_length("y")
 
         # Number of elements
-        pad = 0. if self.abc_pad is None else self.abc_pad
+        pad = 0.0 if self.abc_pad is None else self.abc_pad
         n_pad_z = round(pad / edge_length_z, 0) if edge_length_z is not None else 0
         n_pad_x = round(pad / edge_length_x, 0) if edge_length_x is not None else 0
         nz = int(round(self.length_z / edge_length_z, 0)) + int(n_pad_z)
@@ -367,7 +376,8 @@ class AutomaticMesh:
             self.length_y,
             pad=self.abc_pad,
             quadrilateral=self.quadrilateral,
-            comm=comm)
+            comm=comm,
+        )
 
     def create_seismicmesh_mesh(self):
         """
@@ -487,7 +497,7 @@ class AutomaticMesh:
             )
 
         if self.comm is None or self.comm.ensemble_comm.rank == 0:
-            parallel_print("Generating Gmsh mesh...", comm=self.comm)
+            SpyroEnsemble.print("Generating Gmsh mesh...")
 
             depth_z = -abs(self.length_z)
             length_x = self.length_x
@@ -540,9 +550,16 @@ class AutomaticMesh:
 
             # Interpolating sizing function from segy file
             ef_segy2, f_min, f_max, n_samples, n_traces = create_sizing_function(
-                fname=fname, hmin=hmin_segy, bbox=segy_bbox, wl=wl, freq=freq,
-                pad_type=padding_type, pad_size_x=padding_x, pad_size_z=padding_z,
-                grade=grade, vp_water=vp_water
+                fname=fname,
+                hmin=hmin_segy,
+                bbox=segy_bbox,
+                wl=wl,
+                freq=freq,
+                pad_type=padding_type,
+                pad_size_x=padding_x,
+                pad_size_z=padding_z,
+                grade=grade,
+                vp_water=vp_water,
             )
 
             gmsh.initialize()
@@ -550,11 +567,18 @@ class AutomaticMesh:
             gmsh.model.add("seismic_model")
 
             geom_params = build_gmsh_geometry_and_groups(
-                gmsh=gmsh, fname=fname, length_x=length_x, depth_z=depth_z,
-                padding_type=padding_type, padding_x=padding_x, padding_z=padding_z,
-                hyper_n=hyper_n, water_interface=water_interface,
-                water_search_value=water_search_value, structured_mesh=structured_mesh,
-                minElementSize=minElementSize
+                gmsh=gmsh,
+                fname=fname,
+                length_x=length_x,
+                depth_z=depth_z,
+                padding_type=padding_type,
+                padding_x=padding_x,
+                padding_z=padding_z,
+                hyper_n=hyper_n,
+                water_interface=water_interface,
+                water_search_value=water_search_value,
+                structured_mesh=structured_mesh,
+                minElementSize=minElementSize,
             )
 
             # Standard Params
@@ -573,14 +597,27 @@ class AutomaticMesh:
                     return float(ef_segy2(np.array([x]), np.array([y]))[0])
                 else:
                     z_min_segy, z_max_segy, x_min_segy, x_max_segy = segy_bbox
-                    if (x_min_segy <= x <= x_max_segy) and (z_min_segy <= y <= z_max_segy):
+                    if (x_min_segy <= x <= x_max_segy) and (
+                        z_min_segy <= y <= z_max_segy
+                    ):
                         return float(ef_segy2(np.array([x]), np.array([y]))[0])
                     else:
-                        x_proj, y_proj = min(max(x, x_min_segy), x_max_segy), min(max(y, z_min_segy), z_max_segy)
-                        base_size = float(ef_segy2(np.array([x_proj]), np.array([y_proj]))[0])
+                        x_proj, y_proj = min(max(x, x_min_segy), x_max_segy), min(
+                            max(y, z_min_segy), z_max_segy
+                        )
+                        base_size = float(
+                            ef_segy2(np.array([x_proj]), np.array([y_proj]))[0]
+                        )
                         tx = abs(x - x_proj) / padding_x if padding_x > 0 else 0.0
                         ty = abs(y - y_proj) / padding_z if padding_z > 0 else 0.0
-                        t = min((tx**hyper_n + ty**hyper_n)**(1.0 / hyper_n) if padding_type == "hyperelliptical" else max(tx, ty), 1.0)
+                        t = min(
+                            (
+                                (tx**hyper_n + ty**hyper_n) ** (1.0 / hyper_n)
+                                if padding_type == "hyperelliptical"
+                                else max(tx, ty)
+                            ),
+                            1.0,
+                        )
                         return float(base_size + t * (h_padding - base_size))
 
             gmsh.model.mesh.setSizeCallback(mesh_size_callback)
@@ -589,53 +626,92 @@ class AutomaticMesh:
             gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
             gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
             if structured_mesh and padding_type != "hyperelliptical":
-                gmsh.option.setNumber('Mesh.MeshSizeMin', minElementSize)
-                gmsh.option.setNumber('Mesh.MeshSizeMax', minElementSize)
+                gmsh.option.setNumber("Mesh.MeshSizeMin", minElementSize)
+                gmsh.option.setNumber("Mesh.MeshSizeMax", minElementSize)
                 gmsh.model.mesh.setTransfiniteAutomatic()
             gmsh.model.mesh.generate(2)
 
             if structured_mesh:
                 apply_structured_winslow_smoothing2d(
-                    gmsh=gmsh, comm=self.comm, geom_params=geom_params,
-                    length_x=length_x, depth_z=depth_z, padding_type=padding_type,
-                    water_interface=water_interface, hyper_n=hyper_n,
+                    gmsh=gmsh,
+                    geom_params=geom_params,
+                    length_x=length_x,
+                    depth_z=depth_z,
+                    padding_type=padding_type,
+                    water_interface=water_interface,
+                    hyper_n=hyper_n,
                     winslow_implementation=winslow_implementation,
-                    winslow_iterations=winslow_iterations, winslow_omega=winslow_omega,
-                    n_samples=n_samples, n_traces=n_traces,
-                    domain_xmin=domain_xmin, domain_xmax=domain_xmax,
-                    domain_zmin=domain_zmin, domain_zmax=domain_zmax,
-                    ef_segy2=ef_segy2, parallel_print=parallel_print,
-                    z_water_L=z_water_L, z_water_R=z_water_R, pad_x_min=pad_x_min,
-                    pad_x_max=pad_x_max, pad_z_min=pad_z_min, a_val=a_val,
-                    b_val=b_val, xc=xc, zc=zc, apply_winslow=apply_winslow
+                    winslow_iterations=winslow_iterations,
+                    winslow_omega=winslow_omega,
+                    n_samples=n_samples,
+                    n_traces=n_traces,
+                    domain_xmin=domain_xmin,
+                    domain_xmax=domain_xmax,
+                    domain_zmin=domain_zmin,
+                    domain_zmax=domain_zmax,
+                    ef_segy2=ef_segy2,
+                    z_water_L=z_water_L,
+                    z_water_R=z_water_R,
+                    pad_x_min=pad_x_min,
+                    pad_x_max=pad_x_max,
+                    pad_z_min=pad_z_min,
+                    a_val=a_val,
+                    b_val=b_val,
+                    xc=xc,
+                    zc=zc,
+                    apply_winslow=apply_winslow,
                 )
             # Rotating mesh for axis (z,x,y)
             if padding_type in ["rectangular", "hyperelliptical"]:
                 rotate_xz = [
-                    0.0, 1.0, 0.0, 0.0,
-                    -1.0, 0.0, 0.0, domain_xmax,
-                    0.0, 0.0, 1.0, 0.0,
-                    0.0, 0.0, 0.0, 1.0
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    -1.0,
+                    0.0,
+                    0.0,
+                    domain_xmax,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0,
                 ]
             else:
                 rotate_xz = [
-                    0.0, 1.0, 0.0, -domain_zmin,
-                    -1.0, 0.0, 0.0, domain_xmax,
-                    0.0, 0.0, 1.0, 0.0,
-                    0.0, 0.0, 0.0, 1.0
+                    0.0,
+                    1.0,
+                    0.0,
+                    -domain_zmin,
+                    -1.0,
+                    0.0,
+                    0.0,
+                    domain_xmax,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0,
                 ]
 
             gmsh.model.mesh.affineTransform(rotate_xz)
             gmsh.write(output_file)
-            parallel_print(f"Gmsh mesh written to {output_file}", comm=self.comm)
+            SpyroEnsemble.print(f"Gmsh mesh written to {output_file}")
             gmsh.finalize()
 
         # MPI Sync
         if self.comm is not None:
-            if hasattr(self.comm, 'ensemble_comm'):
+            if hasattr(self.comm, "ensemble_comm"):
                 self.comm.ensemble_comm.barrier()
             self.comm.comm.barrier()
-            parallel_print("Loading mesh into Firedrake.", comm=self.comm)
+            SpyroEnsemble.print("Loading mesh into Firedrake.")
             return FireMeshReader(self.output_file_name, comm=self.comm.comm)
         else:
             return FireMeshReader(self.output_file_name)
