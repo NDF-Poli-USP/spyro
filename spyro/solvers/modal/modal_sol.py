@@ -1,11 +1,15 @@
 from firedrake import LinearEigenproblem, LinearEigensolver
 from numpy import abs, amax, array, asarray, eye, imag, real, sqrt, unique
 from scipy.sparse.linalg import eigs, eigsh, lobpcg, spilu
-from ...io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .modal_forms_and_matrices import assemble_sparse_matrices, weak_forms
 from .modal_rq_matrices import generate_eigenfunctions, matrices_rayleigh_quotient
-from ...utils.error_management import (validate_data_structure, validate_firedrake_parameter,
-                                       validate_numeric, validate_parameter)
+from ...utils.error_management import (
+    validate_data_structure,
+    validate_firedrake_parameter,
+    validate_numeric,
+    validate_parameter,
+)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -17,7 +21,7 @@ from ...utils.error_management import (validate_data_structure, validate_firedra
 # With additions by Alexandre Olender
 
 
-class Modal_Solver():
+class Modal_Solver:
     """Class for the Modal problem with Neumann or Dirichlet boundary conditions.
 
     Attributes
@@ -106,9 +110,11 @@ class Modal_Solver():
 
         # Valid methods for solving the eigenproblem
         def_methods = ["ANALYTICAL", "ARNOLDI", "LANCZOS", "LOBPCG"]
-        self.valid_methods = def_methods + (["KRYLOVSCH_CH", "KRYLOVSCH_CG",
-                                             "KRYLOVSCH_GH", "KRYLOVSCH_GG",
-                                             "RAYLEIGH"] if not self.calc_max_dt else [])
+        self.valid_methods = def_methods + (
+            ["KRYLOVSCH_CH", "KRYLOVSCH_CG", "KRYLOVSCH_GH", "KRYLOVSCH_GG", "RAYLEIGH"]
+            if not self.calc_max_dt
+            else []
+        )
 
         # Method for solving the eigenproblem
         method = "KRYLOVSCH_CH" if method is None else method
@@ -117,9 +123,12 @@ class Modal_Solver():
         # Initializing the analytical solver
         if not self.calc_max_dt and self.method == "ANALYTICAL":
             from .modal_ana_sol import Modal_Analytical_Solver
-            self.AnaModSol = Modal_Analytical_Solver(dimension=self.dimension, comm=comm)
 
-        pprint(f"Solver Method: {self.method}", comm=self.comm)
+            self.AnaModSol = Modal_Analytical_Solver(
+                dimension=self.dimension, comm=comm
+            )
+
+        SpyroEnsemble.print(f"Solver Method: {self.method}")
 
     def solver_with_sparse_matrix(self, Asp, Msp, method, k=2, inv_oper=False):
         """Solve the eigenvalue problem with sparse matrices using Scipy.
@@ -158,20 +167,48 @@ class Modal_Solver():
         if method == "ARNOLDI":
             # Solve the eigenproblem using ARNOLDI (ARPACK)
             if self.calc_max_dt:
-                Lsp = eigs(Asp, k=k, M=Msp, which="LM", Minv=Minv,
-                           OPinv=OPinv, return_eigenvectors=False)
+                Lsp = eigs(
+                    Asp,
+                    k=k,
+                    M=Msp,
+                    which="LM",
+                    Minv=Minv,
+                    OPinv=OPinv,
+                    return_eigenvectors=False,
+                )
             else:
-                Lsp = eigs(Asp, k=k, M=Msp, sigma=0.0, Minv=Minv,
-                           OPinv=OPinv, return_eigenvectors=False)
+                Lsp = eigs(
+                    Asp,
+                    k=k,
+                    M=Msp,
+                    sigma=0.0,
+                    Minv=Minv,
+                    OPinv=OPinv,
+                    return_eigenvectors=False,
+                )
 
         if method == "LANCZOS":
             # Solve the eigenproblem using LANCZOS (ARPACK)
             if self.calc_max_dt:
-                Lsp = eigsh(Asp, k=k, M=Msp, which="LM", Minv=Minv,
-                            OPinv=OPinv, return_eigenvectors=False)
+                Lsp = eigsh(
+                    Asp,
+                    k=k,
+                    M=Msp,
+                    which="LM",
+                    Minv=Minv,
+                    OPinv=OPinv,
+                    return_eigenvectors=False,
+                )
             else:
-                Lsp = eigsh(Asp, k=k, M=Msp, sigma=0.0, Minv=Minv,
-                            OPinv=OPinv, return_eigenvectors=False)
+                Lsp = eigsh(
+                    Asp,
+                    k=k,
+                    M=Msp,
+                    sigma=0.0,
+                    Minv=Minv,
+                    OPinv=OPinv,
+                    return_eigenvectors=False,
+                )
 
         if method == "LOBPCG":
             # Initialize LI vectors for LOBPCG
@@ -182,8 +219,15 @@ class Modal_Solver():
             it_ext = 2
             mag = True if self.calc_max_dt else False
             for it in range(it_ext):
-                Lsp, X, resid = lobpcg(Asp, X, B=Msp, tol=5e-4, maxiter=it_mod,
-                                       largest=mag, retResidualNormsHistory=True)
+                Lsp, X, resid = lobpcg(
+                    Asp,
+                    X,
+                    B=Msp,
+                    tol=5e-4,
+                    maxiter=it_mod,
+                    largest=mag,
+                    retResidualNormsHistory=True,
+                )
 
                 it_mod //= 2  # Reduce iterations for next loop
                 rmin = array(resid)[:, 1].min()
@@ -211,25 +255,27 @@ class Modal_Solver():
             Array containing the computed eigenvalues.
         """
 
-        krylovsch_config = {"KRYLOVSCH_CH": {"ksp": "cg", "pc": "hypre"},
-                            "KRYLOVSCH_CG": {"ksp": "cg", "pc": "gamg"},
-                            "KRYLOVSCH_GH": {"ksp": "gmres", "pc": "hypre"},
-                            "KRYLOVSCH_GG": {"ksp": "gmres", "pc": "gamg"}}
+        krylovsch_config = {
+            "KRYLOVSCH_CH": {"ksp": "cg", "pc": "hypre"},
+            "KRYLOVSCH_CG": {"ksp": "cg", "pc": "gamg"},
+            "KRYLOVSCH_GH": {"ksp": "gmres", "pc": "hypre"},
+            "KRYLOVSCH_GG": {"ksp": "gmres", "pc": "gamg"},
+        }
 
         if self.method in krylovsch_config:
             ksp_type = krylovsch_config[self.method]["ksp"]
             pc_type = krylovsch_config[self.method]["pc"]
 
         opts = {
-            "eps_gen_hermitian": None,       # Problem is Hermitian
-            "eps_type": "krylovschur",       # Robust, widely used eigensolver
-            "eps_tol": 1e-6,                 # Tight tolerance for accuracy
-            "eps_max_it": 200,               # Reasonable iteration cap
-            "st_shift": 1e-6,                # Stabilizes Neumann BC null space
-            "st_type": "sinvert",            # Useful for interior eigenvalues
-            "eps_monitor": "ascii",          # Print convergence info
-            "ksp_type": ksp_type,            # Options for large problems
-            "pc_type": pc_type               # Options for large problems
+            "eps_gen_hermitian": None,  # Problem is Hermitian
+            "eps_type": "krylovschur",  # Robust, widely used eigensolver
+            "eps_tol": 1e-6,  # Tight tolerance for accuracy
+            "eps_max_it": 200,  # Reasonable iteration cap
+            "st_shift": 1e-6,  # Stabilizes Neumann BC null space
+            "st_type": "sinvert",  # Useful for interior eigenvalues
+            "eps_monitor": "ascii",  # Print convergence info
+            "ksp_type": ksp_type,  # Options for large problems
+            "pc_type": pc_type,  # Options for large problems
         }
 
         if self.calc_max_dt:
@@ -247,8 +293,9 @@ class Modal_Solver():
 
         return Lsp
 
-    def solver_rayleigh_quotient(self, c, ufl_coordinates, V,
-                                 mesh_limits, k=2, quad_rule=None):
+    def solver_rayleigh_quotient(
+        self, c, ufl_coordinates, V, mesh_limits, k=2, quad_rule=None
+    ):
         """Solve the eigenvalue problem using the Rayleigh Quotient method for Neumann Bcs.
 
         Parameters
@@ -280,24 +327,31 @@ class Modal_Solver():
 
         # Check input arguments
         validate_firedrake_parameter("c", c, "Function")
-        validate_firedrake_parameter("ufl_coordinates", ufl_coordinates, "SpatialCoordinate")
+        validate_firedrake_parameter(
+            "ufl_coordinates", ufl_coordinates, "SpatialCoordinate"
+        )
         validate_firedrake_parameter("V", V, "FunctionSpace")
         validate_data_structure("mesh_limits", mesh_limits, "tuple")
-        validate_data_structure("quad_rule", quad_rule, "dict", accept_parameter_as_none=True)
+        validate_data_structure(
+            "quad_rule", quad_rule, "dict", accept_parameter_as_none=True
+        )
 
         # Create eigenfunctions
-        eig_funcs, grad_eig = generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
-                                                      k=k, dimension=self.dimension)
+        eig_funcs, grad_eig = generate_eigenfunctions(
+            ufl_coordinates, V, mesh_limits, k=k, dimension=self.dimension
+        )
 
         # Assemble matrices for generalized eigenvalue problem
-        Asp, Msp = matrices_rayleigh_quotient(c, eig_funcs, grad_eig, quad_rule=quad_rule)
+        Asp, Msp = matrices_rayleigh_quotient(
+            c, eig_funcs, grad_eig, quad_rule=quad_rule
+        )
 
         # Solve the generalized eigenvalue problem
         Lsp = self.solver_with_sparse_matrix(Asp, Msp, "ARNOLDI", k=k)
 
         return Lsp
 
-    def assemble_weak_forms(self, c, V, quad_rule=None, shift=0.):
+    def assemble_weak_forms(self, c, V, quad_rule=None, shift=0.0):
         """Build the weak forms for the modal problem solved using UFL or sparse matrices.
 
         Parameters
@@ -323,9 +377,17 @@ class Modal_Solver():
         # Check input arguments
         validate_firedrake_parameter("c", c, "Function")
         validate_firedrake_parameter("V", V, "FunctionSpace")
-        validate_data_structure("quad_rule", quad_rule, "dict", accept_parameter_as_none=True)
-        validate_numeric("shift", shift, float_num=True, integer_num=True,
-                         lower_bound=0., include_lower_bound=True)
+        validate_data_structure(
+            "quad_rule", quad_rule, "dict", accept_parameter_as_none=True
+        )
+        validate_numeric(
+            "shift",
+            shift,
+            float_num=True,
+            integer_num=True,
+            lower_bound=0.0,
+            include_lower_bound=True,
+        )
 
         # Get bilinear forms
         a, m = weak_forms(c, V, quad_rule=quad_rule)
@@ -336,10 +398,24 @@ class Modal_Solver():
 
         return a, m
 
-    def solve_eigenproblem(self, c, V=None, k=2, shift=0., quad_rule=None, inv_oper=False,
-                           ufl_coordinates=None, mesh_limits=None, hyp_par=None,
-                           cut_plane_percent=1., c_ref=None, V_ref=None, dof_load=None,
-                           amplitude_load=None, fitting_c=(0., 0., 0., 0.)):
+    def solve_eigenproblem(
+        self,
+        c,
+        V=None,
+        k=2,
+        shift=0.0,
+        quad_rule=None,
+        inv_oper=False,
+        ufl_coordinates=None,
+        mesh_limits=None,
+        hyp_par=None,
+        cut_plane_percent=1.0,
+        c_ref=None,
+        V_ref=None,
+        dof_load=None,
+        amplitude_load=None,
+        fitting_c=(0.0, 0.0, 0.0, 0.0),
+    ):
         """Solve the eigenvalue problem with Neumann boundary conditions.
 
         Parameters
@@ -415,22 +491,33 @@ class Modal_Solver():
         validate_numeric("k", k, float_num=False, integer_num=True, lower_bound=0)
 
         if self.method in ["ANALYTICAL", "RAYLEIGH"]:
-            shift = 0.  # No shift for analytical and Rayleigh methods
+            shift = 0.0  # No shift for analytical and Rayleigh methods
 
         if self.method == "ANALYTICAL":
 
             # Compute equivalent homogenized velocities
             c_eq, c_eqref = self.AnaModSol.homogenized_velocities(
-                c, V, c_ref=c_ref, V_ref=V_ref, quad_rule=quad_rule,
-                dof_load=dof_load, amplitude_load=amplitude_load)
+                c,
+                V,
+                c_ref=c_ref,
+                V_ref=V_ref,
+                quad_rule=quad_rule,
+                dof_load=dof_load,
+                amplitude_load=amplitude_load,
+            )
 
-            Lsp = self.AnaModSol.solver_analytical(c_eq, hyp_par, c_eqref=c_eqref,
-                                                   fitting_c=fitting_c,
-                                                   cut_plane_percent=cut_plane_percent)
+            Lsp = self.AnaModSol.solver_analytical(
+                c_eq,
+                hyp_par,
+                c_eqref=c_eqref,
+                fitting_c=fitting_c,
+                cut_plane_percent=cut_plane_percent,
+            )
 
         elif self.method == "RAYLEIGH":
-            Lsp = self.solver_rayleigh_quotient(c, ufl_coordinates, V, mesh_limits,
-                                                k=k, quad_rule=quad_rule)
+            Lsp = self.solver_rayleigh_quotient(
+                c, ufl_coordinates, V, mesh_limits, k=k, quad_rule=quad_rule
+            )
         else:
             # Get weak forms for the modal problem
             a, m = self.assemble_weak_forms(c, V, quad_rule=quad_rule, shift=shift)
@@ -440,15 +527,17 @@ class Modal_Solver():
 
         elif self.method in ["ARNOLDI", "LANCZOS", "LOBPCG"]:
             Asp, Msp = assemble_sparse_matrices(a, m)
-            Lsp = self.solver_with_sparse_matrix(Asp, Msp, self.method,
-                                                 k=k, inv_oper=inv_oper)
+            Lsp = self.solver_with_sparse_matrix(
+                Asp, Msp, self.method, k=k, inv_oper=inv_oper
+            )
 
-        Lsp -= shift if shift > 0. else 0.
+        Lsp -= shift if shift > 0.0 else 0.0
 
         return Lsp
 
-    def estimate_timestep(self, c, V, final_time, shift=0.,
-                          quad_rule=None, inv_oper=False, fraction=0.7):
+    def estimate_timestep(
+        self, c, V, final_time, shift=0.0, quad_rule=None, inv_oper=False, fraction=0.7
+    ):
         """Estimate the maximum stable timestep based on the spectral radius.
 
         Optionally uses the Gershgorin Circle Theorem to estimate the
@@ -482,7 +571,7 @@ class Modal_Solver():
 
         # Maximum eigenvalue
         if self.method == "ANALYTICAL":
-            pprint("Estimating Maximum Eigenvalue", comm=self.comm)
+            SpyroEnsemble.print("Estimating Maximum Eigenvalue")
 
             a, m = self.assemble_weak_forms(c, V, quad_rule=quad_rule, shift=shift)
             Asp, Msp_inv = assemble_sparse_matrices(a, m, return_M_inv=True)
@@ -490,17 +579,20 @@ class Modal_Solver():
             max_eigval = amax(abs(Lsp.diagonal())) - shift
 
         else:
-            pprint("Computing Exact Maximum Eigenvalue", comm=self.comm)
+            SpyroEnsemble.print("Computing Exact Maximum Eigenvalue")
 
             # (eig = 0 is a rigid body motion)
             Lsp = self.solve_eigenproblem(
-                c, V=V, shift=shift, quad_rule=quad_rule, inv_oper=inv_oper)
-            max_eigval = max(unique(Lsp[(Lsp > 0.) & (imag(Lsp) == 0.)]))
+                c, V=V, shift=shift, quad_rule=quad_rule, inv_oper=inv_oper
+            )
+            max_eigval = max(unique(Lsp[(Lsp > 0.0) & (imag(Lsp) == 0.0)]))
 
         # Maximum stable timestep
-        max_dt = float(real(2. / sqrt(max_eigval)))
-        pprint("Maximum Stable Timestep Should Be Approximately "
-               f"(ms): {1e3 * max_dt:.3f}", comm=self.comm)
+        max_dt = float(real(2.0 / sqrt(max_eigval)))
+        SpyroEnsemble.print(
+            "Maximum Stable Timestep Should Be Approximately "
+            f"(ms): {1e3 * max_dt:.3f}"
+        )
 
         max_dt *= fraction
         nt = int(final_time / max_dt) + 1

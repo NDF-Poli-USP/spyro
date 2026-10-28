@@ -1,4 +1,5 @@
-from ..io.basicio import parallel_print as pprint
+from spyro.mpi.spyro_mpi import SpyroEnsemble
+
 from ..utils.error_management import validate_enum, validate_numeric
 from ..utils.typing import (HyperLayerDegreeType, AbsorbingBCsType,
                             LayerShapeType, LayerSizeRefFrequency)
@@ -60,19 +61,9 @@ class Read_boundary_layer:
         Dictionary containing the boundary layer information
     """
 
-    def __init__(self, comm=None):
+    def __init__(self):
         """
         Initialize the Read_boundary_layer class
-
-        Parameters
-        ----------
-        comm : `object`, optional
-            An object representing the communication interface for parallel processing.
-            Default is `None`.
-
-        Returns
-        -------
-        None
         """
 
         # General parameters
@@ -175,7 +166,7 @@ class Read_boundary_layer:
         """Set the maximum propagation speed in the PML layer with validation."""
         self.abc_user_pml_cmax = True
         if value is None:
-            pprint("Maximum propagation speed will get from model", comm=self.comm)
+            SpyroEnsemble.print("Maximum propagation speed will get from model")
             self.abc_user_pml_cmax = False
             pml_cmax = value
         else:
@@ -194,7 +185,7 @@ class Read_boundary_layer:
 
         # Cheking ABC type input
         if value is None:
-            pprint("No Absorbing Boundary Conditions (ABCs) applied.", comm=self.comm)
+            SpyroEnsemble.print("No Absorbing Boundary Conditions (ABCs) applied.")
             value = "no_abcs"
 
         self._abc_type = validate_enum("abc_type", value, AbsorbingBCsType)
@@ -261,12 +252,12 @@ class Read_boundary_layer:
 
         self.abc_user_pad_len = True
         if value is None:
-            pprint("Pad length will be determined with HABC criterion", comm=self.comm)
+            SpyroEnsemble.print("Pad length will be determined with HABC criterion")
             pad_length = 0.
             self.abc_user_pad_len = False
         else:
             pad_length = validate_numeric("abc_pad_length", value, float_num=True,
                                           integer_num=True, lower_bound=0.,
                                           include_lower_bound=True)
-            pprint(f"Pad length provided by user (km): {pad_length:.4f}", comm=self.comm)
+            SpyroEnsemble.print(f"Pad length provided by user (km): {pad_length:.4f}")
         self._abc_pad_length = pad_length
