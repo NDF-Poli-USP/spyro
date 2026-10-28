@@ -58,7 +58,9 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     are placed in an 'Outer' physical group.
     """
     if gmsh is None:
-        raise ImportError("gmsh is not available. Please install it to use this function.")
+        raise ImportError(
+            "gmsh is not available. Please install it to use this function."
+        )
 
     length_z = mesh_parameters.length_z
     length_x = mesh_parameters.length_x
@@ -83,8 +85,8 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     boundary_tag_map = {}
     for edge_tag in edge_tags:
         # Get center of mass of the edge
-        com = gmsh.model.occ.getCenterOfMass(1, edge_tag)
-        x_center, y_center = com[0], com[1]
+        center_of_mass = gmsh.model.occ.getCenterOfMass(1, edge_tag)
+        x_center, y_center = center_of_mass[0], center_of_mass[1]
 
         # Classify edges based on position
         # Top edge: z ≈ 0
@@ -107,6 +109,7 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         def mesh_size_callback(dim, tag, x, y, z, lc):
             h = x + y
             return float(h)
+
     else:
         frequency = mesh_parameters.source_frequency
         cpw = mesh_parameters.cells_per_wavelength
@@ -123,6 +126,7 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         def mesh_size_callback(dim, tag, x, y, z, lc):
             size = float(interpolator([[x, y]])[0])
             return size
+
     gmsh.model.mesh.setSizeCallback(mesh_size_callback)
 
     # --- Mesh the single surface ---
@@ -132,7 +136,7 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     # --- Collect elements & classify by centroid into inner/outer ---
     if mesh_parameters.gradient_mask is not None:
         # Get elements of the (onlength_x) geometric surface
-        types, elemTags, nodeTags = gmsh.model.mesh.getElements(2, surf_tag)
+        types, elem_tags, node_tags = gmsh.model.mesh.getElements(2, surf_tag)
         # Build a node coordinate map
         node_ids, node_xyz, _ = gmsh.model.mesh.getNodes()
         # node_ids may be unsorted; build dict id->(x,y,z)
@@ -151,20 +155,24 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         outer_elem_by_type = []
         outer_conn_by_type = []
 
-        for t, tags, conn in zip(types, elemTags, nodeTags):
+        for t, tags, conn in zip(types, elem_tags, node_tags):
             tags = np.array(tags, dtype=np.int64)
             # number of nodes per element type t:
-            nPer = gmsh.model.mesh.getElementProperties(t)[3]  # returns (name, dim, order, numNodes, ...)[3]
-            conn = np.array(conn, dtype=np.int64).reshape(-1, nPer)
+            n_per = gmsh.model.mesh.getElementProperties(t)[
+                3
+            ]  # returns (name, dim, order, numNodes, ...)[3]
+            conn = np.array(conn, dtype=np.int64).reshape(-1, n_per)
 
             # Compute centroids
             # (x_c, y_c) = average of node coords
-            xyz = coords[[id2idx[int(n)] for n in conn.flatten()]].reshape(-1, nPer, 3)
+            xyz = coords[[id2idx[int(n)] for n in conn.flatten()]].reshape(-1, n_per, 3)
             centroids = xyz.mean(axis=1)  # (nelem, 3)
             cz_e = centroids[:, 0]
             cx_e = centroids[:, 1]
 
-            inside = (cz_e >= z_min) & (cz_e <= z_max) & (cx_e >= x_min) & (cx_e <= x_max)
+            inside = (
+                (cz_e >= z_min) & (cz_e <= z_max) & (cx_e >= x_min) & (cx_e <= x_max)
+            )
 
             inner_elem_by_type.append(tags[inside])
             inner_conn_by_type.append(conn[inside])
@@ -180,7 +188,9 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         for t, tags, conn in zip(types, outer_elem_by_type, outer_conn_by_type):
             if tags.size == 0:
                 continue
-            gmsh.model.mesh.addElements(2, surf_tag, [t], [tags.tolist()], [conn.flatten().tolist()])
+            gmsh.model.mesh.addElements(
+                2, surf_tag, [t], [tags.tolist()], [conn.flatten().tolist()]
+            )
 
         # 3) Create a discrete surface and add the inner elements
         inner_surf_tag = gmsh.model.addDiscreteEntity(2)
@@ -188,7 +198,9 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         for t, tags, conn in zip(types, inner_elem_by_type, inner_conn_by_type):
             if tags.size == 0:
                 continue
-            gmsh.model.mesh.addElements(2, inner_surf_tag, [t], [tags.tolist()], [conn.flatten().tolist()])
+            gmsh.model.mesh.addElements(
+                2, inner_surf_tag, [t], [tags.tolist()], [conn.flatten().tolist()]
+            )
 
         # --- Define Physical groups on entities ---
         pg_outer = gmsh.model.addPhysicalGroup(2, [surf_tag])
@@ -199,9 +211,13 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     # Create physical groups for boundary edges (for absorbing boundary conditions)
     for edge_tag, boundary_id in boundary_tag_map.items():
         # Set physical group ID explicitly to match ds() tags (1=top, 2=bottom, 3=right, 4=left)
-        pg_boundary = gmsh.model.addPhysicalGroup(1, [edge_tag], boundary_id)  # noqa: F841
+        pg_boundary = gmsh.model.addPhysicalGroup(  # noqa: F841
+            1, [edge_tag], boundary_id
+        )
         boundary_names = {1: "Top", 2: "Bottom", 3: "Right", 4: "Left"}
-        gmsh.model.setPhysicalName(1, boundary_id, f"Boundary_{boundary_names.get(boundary_id, boundary_id)}")
+        gmsh.model.setPhysicalName(
+            1, boundary_id, f"Boundary_{boundary_names.get(boundary_id, boundary_id)}"
+        )
         # This ensures ds(1), ds(2), ds(3), ds(4) work correctly
 
     # Save
@@ -211,7 +227,9 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     print(f"Boundary tags created: {len(boundary_tag_map)} edges")
     for edge_tag, boundary_id in boundary_tag_map.items():
         boundary_names = {1: "Top", 2: "Bottom", 3: "Right", 4: "Left"}
-        print(f"  Edge {edge_tag} -> Boundary {boundary_id} ({boundary_names.get(boundary_id, 'Unknown')})")
+        print(
+            f"  Edge {edge_tag} -> Boundary {boundary_id} ({boundary_names.get(boundary_id, 'Unknown')})"
+        )
 
     if mesh_parameters.gradient_mask is not None:
         print(f"Geometric surface tag      (Outer): {surf_tag}")
