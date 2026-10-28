@@ -265,7 +265,13 @@ def winslow_smooth_default(
 if NUMBA_AVAILABLE:  # pragma: no cover
 
     @njit(cache=True)
-    def bilinear_interp_2d(x, z, grid_x, grid_z, grid_vals):
+    def bilinear_interp_2d(
+        x: float,
+        z: float,
+        grid_x: np.ndarray,
+        grid_z: np.ndarray,
+        grid_vals: np.ndarray,
+    ) -> float:
         """Perform 2D bilinear interpolation for a single point.
 
         Parameters
@@ -275,11 +281,13 @@ if NUMBA_AVAILABLE:  # pragma: no cover
         z : float
             Target z-coordinate for interpolation.
         grid_x : ndarray
-            1D array of x-coordinates defining the grid.
+            Monotonically increasing or decreasing x-coordinates of the grid.
         grid_z : ndarray
-            1D array of z-coordinates defining the grid.
+            Monotonically increasing or decreasing z-coordinates of the grid.
         grid_vals : ndarray
-            2D array containing values at the grid vertices.
+            Values indexed as ``grid_vals[x_index, z_index]``, with shape
+            ``(len(grid_x), len(grid_z))``. The transposed layout is also
+            accepted for non-square grids. Square grids always use x/z order.
 
         Returns
         -------
@@ -695,7 +703,9 @@ if NUMBA_AVAILABLE:  # pragma: no cover
         segy_grid_z : ndarray
             1D array of z-coordinates for the velocity/sizing field grid.
         segy_grid_vals : ndarray
-            2D array of element sizing values.
+            Element sizes in x/z order, with shape
+            ``(len(segy_grid_x), len(segy_grid_z))``. Transposed non-square
+            arrays are also accepted; square arrays always use x/z order.
         move_all : set
             Set of node indices permitted to move in both X and Z directions.
         move_x_only : set
@@ -879,11 +889,13 @@ def vectorized_bilinear_interp(
     z : ndarray
         1D array of target z-coordinates.
     grid_x : ndarray
-        1D array of grid x-coordinates.
+        Monotonically increasing or decreasing x-coordinates of the grid.
     grid_z : ndarray
-        1D array of grid z-coordinates.
+        Monotonically increasing or decreasing z-coordinates of the grid.
     grid_vals : ndarray
-        2D array containing values at the grid vertices.
+        Values indexed as ``grid_vals[x_index, z_index]``, with shape
+        ``(len(grid_x), len(grid_z))``. The transposed layout is also
+        accepted for non-square grids. Square grids always use x/z order.
 
     Returns
     -------
@@ -907,13 +919,13 @@ def vectorized_bilinear_interp(
     if nx < 2 or nz < 2:
         raise ValueError("grid_x and grid_z must each contain at least 2 points.")
 
-    if grid_vals.shape == (nz, nx):
-        grid_vals = grid_vals.T
-    elif grid_vals.shape != (nx, nz):
+    if grid_vals.shape not in ((nx, nz), (nz, nx)):
         raise ValueError(
             f"grid_vals has shape {grid_vals.shape}, but expected "
             f"({nx}, {nz}) or ({nz}, {nx})."
         )
+    if grid_vals.shape != (nx, nz):
+        grid_vals = grid_vals.T
 
     if np.any(np.diff(grid_x) == 0.0):
         raise ValueError("grid_x contains repeated coordinates.")
@@ -1125,7 +1137,9 @@ def winslow_smooth_vectorized(
     segy_grid_z : ndarray
         1D array of z-coordinates for the velocity/sizing field grid.
     segy_grid_vals : ndarray
-        2D array of element sizing values.
+        Element sizes in x/z order, with shape
+        ``(len(segy_grid_x), len(segy_grid_z))``. Transposed non-square
+        arrays are also accepted; square arrays always use x/z order.
     move_all : set
         Set of node indices permitted to move in both X and Z directions.
     move_x_only : set
