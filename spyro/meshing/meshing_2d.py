@@ -6,6 +6,7 @@ from .meshing_gmsh2d import (
     build_gmsh_geometry_and_groups,
     apply_structured_winslow_smoothing2d,
 )
+from .meshing_parameters import MeshingParameters
 from .meshing_utils import check_gmsh, create_sizing_function
 
 try:
@@ -15,12 +16,13 @@ except ImportError:
 
 
 @check_gmsh
-def generate_gmsh_2d_mesh(mesh_parameters) -> str:
+def generate_gmsh_2d_mesh(mesh_parameters: MeshingParameters) -> str:
     """Generate a 2-D Gmsh mesh file from a velocity model.
 
     Supports an optional water interface, hyperelliptical or rectangular
-    padding, and structured Winslow smoothing. The mesh is written to
-    ``mesh_parameters.output_filename`` by ensemble rank 0 only.
+    padding, and structured Winslow smoothing. The temporary SEG-Y file and
+    mesh are written only by the process with both ensemble and spatial
+    rank 0, or by the current process when no communicator is supplied.
 
     Parameters
     ----------
@@ -32,19 +34,26 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
     str
         Path to the velocity model used for meshing (the SEG-Y input, or a
         temporary SEG-Y file written from a grid ``velocity_model``).
+        Every rank returns the same path.
+
+    Notes
+    -----
+    The caller must synchronize ranks before loading the generated mesh.
     """
+    comm = mesh_parameters.comm
+    is_writer = comm is None or (
+        comm.ensemble_comm.rank == 0 and comm.comm.rank == 0
+    )
+
     if mesh_parameters.segy_velocity_model is not None:
         velocity_model_file = mesh_parameters.segy_velocity_model
 
     elif mesh_parameters.velocity_model is not None:
-        vp = np.asarray(mesh_parameters.velocity_model["vp_values"])
-
-        vp_for_gmsh = np.ascontiguousarray(vp)
-
-        filename = "tmp_velocity_model.segy"
-        create_segy_from_grid(vp_for_gmsh, filename)
-
-        velocity_model_file = filename
+        velocity_model_file = "tmp_velocity_model.segy"
+        if is_writer:
+            vp = np.asarray(mesh_parameters.velocity_model["vp_values"])
+            vp_for_gmsh = np.ascontiguousarray(vp)
+            create_segy_from_grid(vp_for_gmsh, velocity_model_file)
 
     else:
         raise ValueError(
@@ -52,7 +61,7 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
             "or a grid 'velocity_model'."
         )
 
-    if mesh_parameters.comm is None or mesh_parameters.comm.ensemble_comm.rank == 0:
+    if is_writer:
         SpyroEnsemble.print("Generating Gmsh mesh...")
 
         depth_z = -abs(mesh_parameters.length_z)
@@ -88,9 +97,9 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
 
         if padding_type is None:
             domain_xmin, domain_xmax = 0.0, length_x
-            domain_zmax, domain_zmin = depth_z, 0.0
+            domain_zmin, domain_zmax = depth_z, 0.0
 
-        if padding_type == "hyperelliptical":
+        elif padding_type == "hyperelliptical":
             hyper_a = (box_zmin / 2.0) - padding_z
             hyper_b = (box_xmax / 2.0) + padding_x
             domain_zmin = zc + hyper_a
@@ -98,7 +107,7 @@ def generate_gmsh_2d_mesh(mesh_parameters) -> str:
             domain_xmin = xc - hyper_b
             domain_xmax = xc + hyper_b
 
-        if padding_type == "rectangular":
+        elif padding_type == "rectangular":
             domain_zmin = box_zmin - padding_z
             domain_zmax = 0.0
             domain_xmin = 0.0 - padding_x

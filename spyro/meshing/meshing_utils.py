@@ -299,11 +299,12 @@ def read_segy_velocity_model(fname):
 
     Returns
     -------
-    tuple
-        A tuple containing:
-        - vp (ndarray): 2D Velocity model array of shape (n_samples, n_traces).
-        - n_traces (int): Number of traces (columns).
-        - n_samples (int): Number of samples per trace (rows).
+    vp : numpy.ndarray
+        Velocity model with shape ``(n_samples, n_traces)``.
+    n_samples : int
+        Number of depth samples per trace (rows).
+    n_traces : int
+        Number of lateral traces along x (columns).
     """
     print(f"Reading SEGY file: {fname}")
 
