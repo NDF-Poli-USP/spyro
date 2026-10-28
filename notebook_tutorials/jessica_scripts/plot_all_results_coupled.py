@@ -28,7 +28,7 @@ from sparsity_plots import load_sparsity_matrices
 # "case_small_2d", "case_large_2d", "case_3d",
 # "case_small_2d_irregular_topography", "case_large_2d_irregular_topography",
 # "case_3d_irregular_topography"
-CASE_NAME = "case_small_2d_irregular_topography"
+CASE_NAME = "case_small_2d"
 DIMENSION = 3 if CASE_NAME.startswith("case_3d") else 2
 
 # Results computed before the axis change (x vertical, z horizontal):

@@ -1,11 +1,11 @@
 from firedrake import (Cofunction, Constant, LinearVariationalProblem,
                        LinearVariationalSolver, div, dot, dx, grad, inner,
-                       lhs, rhs, TestFunction, TrialFunction)
+                       lhs, rhs, TestFunction, TrialFunction, as_vector,
+                       as_matrix)
 
 from .local_abc import local_abc_form
 
 
-# def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
 def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule, abc_kwargs=None):
     """Build the weak form of the isotropic elastic wave equation for one
     time step.
@@ -52,7 +52,61 @@ def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule, abc_kwargs=
     if b is not None:
         F_s += dot(b, v_test) * dx(**quad_rule)
 
-    # F_t = local_abc_form(wave)
+    F_t = local_abc_form(wave, v=v_test, u_n=u_n, u_nm1=u_nm1, **(abc_kwargs or {}))
+
+    return F_m + F_k - F_s - F_t
+
+
+def build_anisotropic_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule, abc_kwargs=None):
+    """Build the weak form of the anisotropic elastic wave equation using
+    the precomputed stiffness tensor Elastic_C in Voigt notation.
+
+    Drop-in replacement for build_elastic_form when wave.Elastic_C is set.
+
+    Parameters
+    ----------
+    wave : AcousticElasticWave or AnisotropicVTIWave
+        Wave object exposing rho, Elastic_C, dt, body_forces.
+    u_trial : firedrake.TrialFunction
+    v_test : firedrake.TestFunction
+    u_n : firedrake.Function  — displacement at current time step
+    u_nm1 : firedrake.Function — displacement at previous time step
+    quad_rule : dict
+    abc_kwargs : dict, optional
+
+    Returns
+    -------
+    UFL form
+    """
+    dt = Constant(wave.dt)
+    rho = wave.rho
+    Elastic_C = wave.Elastic_C
+    dim = v_test.function_space().mesh().topological_dimension()
+
+    def strain_vector(w):
+        g = grad(w)
+        if dim == 2:
+            return as_vector([g[0, 0], g[1, 1], g[0, 1] + g[1, 0]])
+        else:
+            return as_vector([g[0, 0], g[1, 1], g[2, 2],
+                              g[1, 2] + g[2, 1],
+                              g[0, 2] + g[2, 0],
+                              g[0, 1] + g[1, 0]])
+
+    # Inertial term
+    F_m = (rho / (dt**2)) * dot(u_trial - 2 * u_n + u_nm1, v_test) * dx(**quad_rule)
+
+    # Stiffness term via Voigt notation
+    e_n = strain_vector(u_n)
+    e_v = strain_vector(v_test)
+    F_k = dot(e_v, dot(Elastic_C, e_n)) * dx(**quad_rule)
+
+    # Source term
+    F_s = 0
+    if getattr(wave, "body_forces", None) is not None:
+        F_s += dot(wave.body_forces, v_test) * dx(**quad_rule)
+
+    # Absorbing boundary
     F_t = local_abc_form(wave, v=v_test, u_n=u_n, u_nm1=u_nm1, **(abc_kwargs or {}))
 
     return F_m + F_k - F_s - F_t
