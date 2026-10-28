@@ -152,7 +152,7 @@ case_small_2D = {
     "epsilon": 0.3,
     "delta": 0.15,
     "gamma": 0.1,
-    "anisotropy_type": "weak",
+    "anisotropy_type": "exact",
 }
 
 case_large_2D = {
