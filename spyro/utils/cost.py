@@ -4,6 +4,7 @@ from numpy import savetxt
 from os import getcwd
 from time import perf_counter  # For runtime
 from tracemalloc import get_traced_memory, start, stop  # For memory usage
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 def comp_cost(flag, tRef=None, user_name=None, save_time=True):
@@ -43,19 +44,19 @@ def comp_cost(flag, tRef=None, user_name=None, save_time=True):
         hifem_draw = 62
 
         # Total time
-        print('\n' + hifem_draw * '-')
-        print("Estimating Runtime and Used Memory")
+        SpyroEnsemble.print('\n' + hifem_draw * '-')
+        SpyroEnsemble.print("Estimating Runtime and Used Memory")
         tTotal = perf_counter() - tRef
         val_time = [tTotal, tTotal/60, tTotal/3600]
         cad_time = 'Runtime: (s):{:3.3f}, (m):{:3.3f}, (h):{:3.3f}'
-        print(cad_time.format(*val_time))
+        SpyroEnsemble.print(cad_time.format(*val_time))
 
         # Memory usage
         curr, peak = get_traced_memory()
         val_memo = [curr/1024**2, peak/1024**2]
         cad_memo = "Used Memory: Current (MB):{:3.3f}, Peak (MB):{:3.3f}"
-        print(cad_memo.format(*val_memo))
-        print(hifem_draw * '-' + '\n')
+        SpyroEnsemble.print(cad_memo.format(*val_memo))
+        SpyroEnsemble.print(hifem_draw * '-' + '\n')
         stop()
 
         # Save file for resource usage
