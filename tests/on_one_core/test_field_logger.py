@@ -9,11 +9,6 @@ from spyro.mpi.spyro_mpi import AutomaticParallelism, SpyroEnsemble
 
 
 @pytest.fixture
-def init_mpi():
-    SpyroEnsemble.initialize(AutomaticParallelism(1))
-
-
-@pytest.fixture
 def logger():
     mesh = fire.UnitIntervalMesh(2)
     V = fire.FunctionSpace(mesh, "DG", 0)
