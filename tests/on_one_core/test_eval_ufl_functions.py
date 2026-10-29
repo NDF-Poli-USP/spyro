@@ -9,14 +9,15 @@ any potentially dangerous operations that could compromise the security of the s
 """
 from firedrake import Function, FunctionSpace, UnitSquareMesh, UnitCubeMesh
 from numpy import all, isfinite
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
 
 
 def test_run_eval_ufl_functions_2d():
     # ==================== 2D MODELS ====================
-    print("\n" + "=" * 40)
-    print("2D MODELS TEST")
-    print("=" * 40)
+    SpyroEnsemble.print("\n" + "=" * 40)
+    SpyroEnsemble.print("2D MODELS TEST")
+    SpyroEnsemble.print("=" * 40)
 
     mesh_2d = UnitSquareMesh(10, 10)
     dimension_2d = 2
@@ -49,8 +50,8 @@ def test_run_eval_ufl_functions_2d():
         ("sin(x)**2 + cos(z)**2", "Trig identity"),
     ]
 
-    print(f"\nTesting {len(test_expressions_2d)} 2D expressions...")
-    print("-" * 80)
+    SpyroEnsemble.print(f"\nTesting {len(test_expressions_2d)} 2D expressions...")
+    SpyroEnsemble.print("-" * 80)
 
     success_2d = 0
     for expr, description in test_expressions_2d:
@@ -70,29 +71,29 @@ def test_run_eval_ufl_functions_2d():
         success_msg = (f"✓ {description}\n"
                        f"   Expression: {expr}\n"
                        f"   Type: {type(ufl_expr).__name__}\n"
-                       f"   Range: [{data.min():.4f}, {data.max():.4f}]\n"
-                       f"   Mean: {data.mean():.4f}")
-        print(success_msg)
+                       f"   Range: [{data.min(): .4f}, {data.max(): .4f}]\n"
+                       f"   Mean: {data.mean(): .4f}")
+        SpyroEnsemble.print(success_msg)
         success_2d += 1
-        print("-" * 80)
+        SpyroEnsemble.print("-" * 80)
 
     # ==================== SUMMARY ====================
-    print("\n" + "=" * 40)
-    print("TEST SUMMARY")
-    print("=" * 40)
+    SpyroEnsemble.print("\n" + "=" * 40)
+    SpyroEnsemble.print("TEST SUMMARY")
+    SpyroEnsemble.print("=" * 40)
 
     # Assert that all tests passed
     total_2d = len(test_expressions_2d)
     assert success_2d == total_2d, f"Only {success_2d}/{total_2d} tests passed"
-    print(f"\n2D Models: {success_2d}/{total_2d} successful "
-          f"({100*success_2d/total_2d:.1f}%)")
+    SpyroEnsemble.print(f"\n2D Models: {success_2d}/{total_2d} successful "
+                        f"({100*success_2d/total_2d: .1f}%)")
 
 
 def test_run_eval_ufl_functions_3d():
     # ==================== 3D MODELS ====================
-    print("\n" + "=" * 40)
-    print("3D MODELS TEST")
-    print("=" * 40)
+    SpyroEnsemble.print("\n" + "=" * 40)
+    SpyroEnsemble.print("3D MODELS TEST")
+    SpyroEnsemble.print("=" * 40)
 
     mesh_3d = UnitCubeMesh(10, 10, 10)
     dimension_3d = 3
@@ -114,8 +115,8 @@ def test_run_eval_ufl_functions_3d():
         ("sin(x)*cos(y) + cos(x)*sin(z) + sin(y)*cos(z)", "3D trig mix"),
     ]
 
-    print(f"\nTesting {len(test_expressions_3d)} 3D expressions...")
-    print("-" * 80)
+    SpyroEnsemble.print(f"\nTesting {len(test_expressions_3d)} 3D expressions...")
+    SpyroEnsemble.print("-" * 80)
 
     success_3d = 0
     for expr, description in test_expressions_3d:
@@ -135,29 +136,29 @@ def test_run_eval_ufl_functions_3d():
         success_msg = (f"✓ {description}\n"
                        f"   Expression: {expr}\n"
                        f"   Type: {type(ufl_expr).__name__}\n"
-                       f"   Range: [{data.min():.4f}, {data.max():.4f}]")
-        print(success_msg)
+                       f"   Range: [{data.min(): .4f}, {data.max(): .4f}]")
+        SpyroEnsemble.print(success_msg)
         success_3d += 1
-        print("-" * 80)
+        SpyroEnsemble.print("-" * 80)
 
     # ==================== SUMMARY ====================
-    print("\n" + "=" * 40)
-    print("TEST SUMMARY")
-    print("=" * 40)
+    SpyroEnsemble.print("\n" + "=" * 40)
+    SpyroEnsemble.print("TEST SUMMARY")
+    SpyroEnsemble.print("=" * 40)
 
     # Assert that all tests passed
     total_3d = len(test_expressions_3d)
     assert success_3d == total_3d, f"Only {success_3d}/{total_3d} tests passed"
-    print(f"3D Models: {success_3d}/{total_3d} successful "
-          f"({100*success_3d/total_3d:.1f}%)")
+    SpyroEnsemble.print(f"3D Models: {success_3d}/{total_3d} successful "
+                        f"({100*success_3d/total_3d: .1f}%)")
 
 
 def test_run_eval_danger_ops():
 
     # ==================== DANGEROUS OPERATIONS ====================
-    print("\n" + "=" * 40)
-    print("DANGEROUS OPERATIONS BLOCKING TEST")
-    print("=" * 40)
+    SpyroEnsemble.print("\n" + "=" * 40)
+    SpyroEnsemble.print("DANGEROUS OPERATIONS BLOCKING TEST")
+    SpyroEnsemble.print("=" * 40)
 
     dangerous_expressions = [
         # Code injection
@@ -215,9 +216,9 @@ def test_run_eval_danger_ops():
         ("locals()", "Local namespace"),
     ]
 
-    print(f"\nTesting {len(dangerous_expressions)} "
-          f"dangerous expressions (should all fail)...")
-    print("-" * 80)
+    SpyroEnsemble.print(f"\nTesting {len(dangerous_expressions)} "
+                        f"dangerous expressions (should all fail)...")
+    SpyroEnsemble.print("-" * 80)
 
     # Generate mesh
     mesh = UnitCubeMesh(10, 10, 10)
@@ -248,19 +249,19 @@ def test_run_eval_danger_ops():
 
         # Checking criation of ufl expression
         assert block_ufl, fail_msg
-        print(block_msg)
-        print("-" * 80)
+        SpyroEnsemble.print(block_msg)
+        SpyroEnsemble.print("-" * 80)
 
     # ==================== SUMMARY ====================
-    print("\n" + "=" * 40)
-    print("TEST SUMMARY")
-    print("=" * 40)
+    SpyroEnsemble.print("\n" + "=" * 40)
+    SpyroEnsemble.print("TEST SUMMARY")
+    SpyroEnsemble.print("=" * 40)
 
     total_dangerous = len(dangerous_expressions)
     assert blocked_dangerous == total_dangerous, f"Only {blocked_dangerous}" \
         + f"/{total_dangerous} tests passed"
-    print(f"Dangerous ops: {blocked_dangerous}/{total_dangerous} blocked "
-          f"({100*blocked_dangerous/total_dangerous:.1f}%)")
+    SpyroEnsemble.print(f"Dangerous ops: {blocked_dangerous}/{total_dangerous} blocked "
+                        f"({100*blocked_dangerous/total_dangerous: .1f}%)")
 
 
 if __name__ == "__main__":
@@ -268,9 +269,9 @@ if __name__ == "__main__":
     Run comprehensive tests for 2D/3D models and dangerous operations.
     '''
 
-    print("\n" + "=" * 80)
-    print("COMPREHENSIVE UFL EXPRESSION GENERATOR TEST SUITE")
-    print("=" * 80)
+    SpyroEnsemble.print("\n" + "=" * 80)
+    SpyroEnsemble.print("COMPREHENSIVE UFL EXPRESSION GENERATOR TEST SUITE")
+    SpyroEnsemble.print("=" * 80)
 
     test_run_eval_ufl_functions_2d()
     test_run_eval_ufl_functions_3d()
