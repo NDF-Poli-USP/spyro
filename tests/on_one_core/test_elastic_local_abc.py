@@ -1,22 +1,24 @@
 import pytest
 
 from spyro.examples.elastic_local_abc import build_solver
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 # This value was obtained empirically. It is supposed for backward compatibility
 expected_mechanical_energy = 0.25
 
 
-def has_sufficient_memory():
+def has_sufficient_memory(threshold_gb=16):
+    """Return True if available RAM plus free SWAP exceeds threshold_gb."""
     meminfo = {}
     with open('/proc/meminfo') as f:
         for line in f:
             parts = line.split(':')
             if len(parts) == 2:
                 meminfo[parts[0].strip()] = parts[1].strip()
-    total_memory_kb = int(meminfo.get('MemTotal', '0 kB').split()[0])
-    total_memory_gb = total_memory_kb / 1024 / 1024
-    print(f"Total system memory {total_memory_gb}")
-    return total_memory_gb > 16
+    total_memory_gb = int(meminfo.get('MemTotal', '0 kB').split()[0]) / 1024**2
+    total_mswap_gb = int(meminfo.get('SwapTotal', '0 kB').split()[0]) / 1024**2
+    SpyroEnsemble.print(f"Total system memory: {total_memory_gb + total_mswap_gb: .2f} GB")
+    return total_memory_gb > threshold_gb
 
 
 @pytest.mark.slow
