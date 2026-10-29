@@ -233,18 +233,22 @@ class TestMeasureError:
     def test_save_reference_signal(self, measure_error, receiver_data, tmp_path):
         """Test saving reference signal."""
         with patch("spyro.tools.error_measure.getcwd", return_value=str(tmp_path)):
+            # Create MeasureError instance inside the patch context
+            measure_error = MeasureError(
+                output_folder="test_output", output_case="preamble")
             # Mock save function to avoid actual file I/O
             with patch("numpy.save") as mock_save:
-                receiver_locations = [(1, 2), (3, 4), (5, 6)]
-                measure_error.save_reference_signal(
-                    receiver_locations=receiver_locations,
-                    forward_solution_receivers=receiver_data,
-                    number_of_receivers=3,
-                    nyquist_frequency=50.0,
-                    output_file_prefix="test_ref",
-                )
-                # Check that save was called twice (time and fft)
-                assert mock_save.call_count == 2
+                with patch("pathlib.Path.mkdir"):  # Avoid creating real directories
+                    receiver_locations = [(1, 2), (3, 4), (5, 6)]
+                    measure_error.save_reference_signal(
+                        receiver_locations=receiver_locations,
+                        forward_solution_receivers=receiver_data,
+                        number_of_receivers=3,
+                        nyquist_frequency=50.0,
+                        output_file_prefix="test_ref",
+                    )
+                    # Check that save was called twice (time and fft)
+                    assert mock_save.call_count == 2
 
     def test_error_measures_basic(self, measure_error, receiver_data):
         """Test basic error measures computation."""
@@ -314,7 +318,8 @@ class TestMeasureError:
             model = np.sin(2 * np.pi * 5 * t + 0.1)[:, np.newaxis]
 
             # Mock savetxt to avoid actual file writing
-            with patch("numpy.savetxt") as mock_savetxt:
+            with patch("numpy.savetxt") as mock_savetxt, patch("pathlib.Path.mkdir"), \
+                    patch("pathlib.Path.open"):  # Avoid creating real directories
                 measure_error.calculate_error_measures(
                     forward_solution_receivers=model,
                     receivers_reference=ref,
@@ -365,21 +370,22 @@ class TestMeasureError:
                     with patch(
                         "spyro.utils.error_management.path.exists", return_value=True
                     ):
-                        # First save the reference
-                        n_rec = receiver_data.shape[
-                            1
-                        ]  # Get the actual number of receivers
-                        measure_error.save_reference_signal(
-                            receiver_locations=[(1, 2)] * n_rec,
-                            forward_solution_receivers=receiver_data,
-                            number_of_receivers=n_rec,
-                            nyquist_frequency=50.0,
-                            output_file_prefix="test_ref",
-                        )
+                        with patch("pathlib.Path.mkdir"):  # Avoid creating real directories
+                            # First save the reference
+                            n_rec = receiver_data.shape[
+                                1
+                            ]  # Get the actual number of receivers
+                            measure_error.save_reference_signal(
+                                receiver_locations=[(1, 2)] * n_rec,
+                                forward_solution_receivers=receiver_data,
+                                number_of_receivers=n_rec,
+                                nyquist_frequency=50.0,
+                                output_file_prefix="test_ref",
+                            )
 
-                        # Then load it
-                        ref, ref_fft = measure_error.get_reference_signal()
+                            # Then load it
+                            ref, ref_fft = measure_error.get_reference_signal()
 
-                        # Check that load was called twice (time and fft)
-                        assert mock_load.call_count == 2
-                        np.testing.assert_array_equal(ref, receiver_data)
+                            # Check that load was called twice (time and fft)
+                            assert mock_load.call_count == 2
+                            np.testing.assert_array_equal(ref, receiver_data)
