@@ -1,6 +1,7 @@
+import math
 import spyro
 from spyro import create_transect
-import math
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 def test_estimate_timestep_mlt():
@@ -32,7 +33,7 @@ def test_estimate_timestep_mlt():
 
     # Tests value and if stable for 0.7 times estimated timestep
     maxdt = wave.get_and_set_maximum_dt(fraction=0.7)
-    print(f"Timestep (in ms) considering a fraction of 0.7: {1e3 * maxdt}")
+    SpyroEnsemble.print(f"Timestep (in ms) considering a fraction of 0.7: {1e3 * maxdt}")
     test1 = math.isclose(maxdt, 0.000644745, rel_tol=1e-3)
 
     test2 = False
@@ -45,7 +46,7 @@ def test_estimate_timestep_mlt():
     # Tests value and if unstable for 1.1 times estimated timestep
     wave.current_time = 0.0
     maxdt = wave.get_and_set_maximum_dt(fraction=1.1)
-    print(f"Timestep (in ms) considering a fraction of 1.1: {1e3 * maxdt}")
+    SpyroEnsemble.print(f"Timestep (in ms) considering a fraction of 1.1: {1e3 * maxdt}")
     test3 = math.isclose(maxdt, 0.00101317122593, rel_tol=1e-3)
 
     test4 = False
@@ -55,10 +56,10 @@ def test_estimate_timestep_mlt():
     except AssertionError:
         test4 = True
 
-    print("Test 1: ", test1)
-    print("Test 2: ", test2)
-    print("Test 3: ", test3)
-    print("Test 4: ", test4)
+    SpyroEnsemble.print(f"Test 1: {test1}")
+    SpyroEnsemble.print(f"Test 2: {test2}")
+    SpyroEnsemble.print(f"Test 3: {test3}")
+    SpyroEnsemble.print(f"Test 4: {test4}")
 
     assert all([test1, test2, test3, test4])
 
