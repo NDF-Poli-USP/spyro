@@ -199,7 +199,8 @@ def test_size_law_budget_and_bounds(cpw_mesh: str) -> None:
 
 @pytest.mark.slow
 def test_pilot_adjoint_identity(cpw_mesh: str) -> None:
-    """The adjoint indicator closes the dual-weighted-residual identity.
+    """The adjoint indicator closes the dual-weighted-residual identity, and
+    a checkpointed tape gives the same indicator.
 
     Parameters
     ----------
@@ -209,15 +210,21 @@ def test_pilot_adjoint_identity(cpw_mesh: str) -> None:
     pilot = TwoLevelPilot(dictionary(), two_layer, window=late_window)
     forward_only = pilot.run(cpw_mesh)
     with_adjoint = pilot.run(cpw_mesh, compute_indicator=True)
+    checkpointed = TwoLevelPilot(dictionary(), two_layer, window=late_window,
+                                 checkpointing=True, snapshots=8
+                                 ).run(cpw_mesh, compute_indicator=True)
 
     assert forward_only.dofs_fine > 3 * forward_only.dofs_coarse
     assert 0.0 < forward_only.trace_errors[0] < 1.0
     assert with_adjoint.trace_errors[0] == pytest.approx(forward_only.trace_errors[0])
     assert with_adjoint.identity_ratios[0] == pytest.approx(-1.0, abs=1e-8)
+    assert checkpointed.identity_ratios[0] == pytest.approx(-1.0, abs=1e-8)
     if fire.COMM_WORLD.rank == 0:
         n_cells = with_adjoint.centroids.shape[0]
         assert with_adjoint.indicators.shape == (1, n_cells)
         assert np.abs(with_adjoint.indicators).sum() > 0.0
+        assert np.allclose(checkpointed.indicators, with_adjoint.indicators,
+                           rtol=1e-8, atol=1e-12 * np.abs(with_adjoint.indicators).max())
 
 
 @pytest.mark.slow

@@ -50,7 +50,7 @@ import numpy as np
 import firedrake as fire
 import ufl
 from firedrake.adjoint_utils.blocks.solving import GenericSolveBlock
-from pyadjoint import continue_annotation, get_working_tape, pause_annotation
+from pyadjoint import get_working_tape
 
 from ..solvers.acoustic_wave import AcousticWave
 
@@ -243,6 +243,13 @@ class TwoLevelPilot:
         Accumulate the indicator every this many steps, weighting each sample
         accordingly. ``1`` (the default) is exact; larger values are cheaper
         and approximate.
+    checkpointing : bool, optional
+        Manage the refined tape with a checkpoint schedule (see
+        :meth:`spyro.solvers.wave.Wave.enable_automated_adjoint`). Default
+        ``False`` keeps every step on the tape.
+    snapshots : int, optional
+        Checkpoints kept in memory when ``checkpointing`` is on; ``None``
+        keeps every step and never recomputes. Default ``None``.
 
     Raises
     ------
@@ -253,7 +260,8 @@ class TwoLevelPilot:
     def __init__(self, dictionary: dict,
                  velocity: Callable[[np.ndarray, np.ndarray], np.ndarray],
                  window: Window | None = None, dt_fraction: float = 0.5,
-                 accumulate_every: int = 1) -> None:
+                 accumulate_every: int = 1, checkpointing: bool = False,
+                 snapshots: int | None = None) -> None:
         abc = dictionary.get("absorving_boundary_conditions", {})
         if abc.get("status", False) and str(abc.get("abc_type")).lower() == "pml":
             raise NotImplementedError("The adjoint indicator does not support PML.")
@@ -264,6 +272,8 @@ class TwoLevelPilot:
         self.window = window
         self.dt_fraction = dt_fraction
         self.accumulate_every = accumulate_every
+        self.checkpointing = checkpointing
+        self.snapshots = snapshots
         acquisition = self.dictionary["acquisition"]
         self.sources = [tuple(s) for s in acquisition["source_locations"]]
         self.receivers = np.asarray(acquisition["receiver_locations"], dtype=float)
@@ -410,6 +420,10 @@ class TwoLevelPilot:
                               result: PilotResult) -> np.ndarray:
         """Refined forward on the tape, its adjoint and the cell indicator.
 
+        The indicator is accumulated while pyadjoint runs the reverse sweep,
+        from a callback on each time-step solve, so the adjoint of a step is
+        used as soon as it exists and no adjoint trajectory is kept.
+
         Parameters
         ----------
         shot : int
@@ -432,12 +446,13 @@ class TwoLevelPilot:
         Raises
         ------
         RuntimeError
-            If the tape does not hold one solve per time step.
+            If the tape does not hold one solve per time step, or the reverse
+            sweep did not visit all of them.
         """
         V_f = fine.function_space
         states = coarse.forward_solution
         steps = len(states)
-        prolonged = [fire.Function(V_f) for _ in range(3)]
+        w_np1, w_n, w_nm1 = (fire.Function(V_f) for _ in range(3))
 
         def prolong(index: int, target: fire.Function) -> None:
             if index < 0:
@@ -448,29 +463,15 @@ class TwoLevelPilot:
         sampler = _ReceiverSampler(V_f, self.receivers)
         record = np.zeros((steps, len(self.receivers)))
         for n in range(steps):
-            prolong(n, prolonged[0])
-            record[n] = sampler(prolonged[0])
+            prolong(n, w_np1)
+            record[n] = sampler(w_np1)
 
         fine.real_shot_record = record
-        fine.enable_automated_adjoint()
+        fine.misfit_window = mask.astype(float)
+        fine.enable_automated_adjoint(checkpointing=self.checkpointing,
+                                      snapshots=self.snapshots)
         fine.forward_solve()
         t_start = time.perf_counter()
-
-        # The misfits are UFL expressions on the receivers' vertex-only mesh.
-        misfit_space = fire.FunctionSpace(
-            ufl.domain.extract_unique_domain(fine.misfit[0]), "DG", 0)
-        local_indices = fine.receivers.vom_input_indices
-        continue_annotation()
-        functional = 0.0
-        for n, misfit in enumerate(fine.misfit):
-            weight = 0.5 if n in (0, steps - 1) else 1.0
-            window = fire.Function(misfit_space)
-            window.dat.data_wo[:] = mask[n][local_indices]
-            functional += fire.assemble(0.5 * result.dt * weight * window
-                                        * misfit * misfit * fire.dx)
-        pause_annotation()
-        fine.automated_adjoint.create_reduced_functional(functional)
-        fine.automated_adjoint.compute_derivative()
 
         blocks = [b for b in get_working_tape().get_blocks()
                   if isinstance(b, GenericSolveBlock)]
@@ -481,7 +482,6 @@ class TwoLevelPilot:
         Q = fire.FunctionSpace(fine.mesh, "DG", 0)
         psi = fire.TestFunction(Q)
         lam = fire.Function(V_f)
-        w_np1, w_n, w_nm1 = prolonged
         test, _ = sorted(fine.lhs.arguments(), key=lambda a: a.number())
         residual = fire.action(fine.lhs, w_np1) - fine.rhs
         residual = ufl.replace(residual, {fine.u_n: w_n, fine.u_nm1: w_nm1,
@@ -490,35 +490,50 @@ class TwoLevelPilot:
         source = fine.sources.source_cofunction()
         wavelet = fine.sources.wavelet
         comm = V_f.mesh().comm
-
-        eta = np.zeros(buffer.dat.data_ro.shape[0])
-        source_sum = 0.0
         every = self.accumulate_every
-        for state in prolonged:
-            state.zero()
-        for n, block in enumerate(blocks):
-            if n % every:
-                continue
-            lam.assign(block.adj_sol)
+        eta = np.zeros(buffer.dat.data_ro.shape[0])
+        sweep = {"next": steps - 1, "source": 0.0}
+
+        def accumulate(n: int, block: GenericSolveBlock, adjoint: fire.Function) -> None:
+            """Add the contribution of time step ``n`` (called in reverse order)."""
+            if n != sweep["next"]:
+                raise RuntimeError("The reverse sweep skipped a time step.")
+            sweep["next"] = n - 1
+            if wavelet[n] != 0.0:
+                sweep["source"] += wavelet[n] * comm.allreduce(
+                    float(np.dot(source.dat.data_ro, adjoint.dat.data_ro)))
             if every == 1:
-                # Consecutive steps share two states: shift them, prolong one.
-                w_nm1.assign(w_n)
-                w_n.assign(w_np1)
-                prolong(n, w_np1)
-            else:
+                # Going backwards, consecutive steps share two states.
+                if n == steps - 1:
+                    prolong(n, w_np1)
+                    prolong(n - 1, w_n)
+                else:
+                    w_np1.assign(w_n)
+                    w_n.assign(w_nm1)
+                prolong(n - 2, w_nm1)
+            elif n % every == 0:
                 prolong(n, w_np1)
                 prolong(n - 1, w_n)
                 prolong(n - 2, w_nm1)
-            fire.assemble(residual, tensor=buffer)
-            eta += every * buffer.dat.data_ro
+            if n % every == 0:
+                lam.assign(adjoint)
+                fire.assemble(residual, tensor=buffer)
+                eta[:] += every * buffer.dat.data_ro
+            # The adjoint is consumed here: do not keep one per step.
+            block.adj_state = None
+
         for n, block in enumerate(blocks):
-            if wavelet[n] != 0.0:
-                source_sum += wavelet[n] * comm.allreduce(
-                    float(np.dot(source.dat.data_ro, block.adj_sol.dat.data_ro)))
+            block.adj_cb = (lambda adjoint, n=n, block=block:
+                            accumulate(n, block, adjoint))
+        functional = fine.functional_value
+        fine.automated_adjoint.create_reduced_functional(functional)
+        fine.automated_adjoint.compute_derivative()
+        if sweep["next"] != -1:
+            raise RuntimeError("The reverse sweep did not reach the first step.")
 
         two_j = 2.0 * float(functional)
-        total = comm.allreduce(float(eta.sum())) - source_sum
+        total = comm.allreduce(float(eta.sum())) - sweep["source"]
         result.identity_ratios[shot] = total / two_j if two_j else float("nan")
-        result.source_terms[shot] = source_sum
+        result.source_terms[shot] = sweep["source"]
         result.seconds[shot] = [time.perf_counter() - t_start]
         return eta

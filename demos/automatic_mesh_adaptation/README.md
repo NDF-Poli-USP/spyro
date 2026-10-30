@@ -41,9 +41,10 @@ growth, cost in DOF-steps and wall time) and the accepted mesh.
   because spyro requires `0 <= x <= length_x`.
 - Boundary conditions are spyro's first-order non-reflecting conditions on
   the bottom and sides, with a natural top boundary.
-- Without checkpointing, the tape keeps every refined time step in memory;
-  the adjoint pilot needs about as much memory as one refined trajectory
-  plus the stored coarse one.
+- The indicator is accumulated during the reverse sweep, so no adjoint
+  trajectory is kept. Without checkpointing the tape still keeps every
+  refined time step; `--snapshots N` checkpoints it, keeping `N` steps in
+  memory and recomputing the forward in between.
 - `--accumulate-every k` accumulates the indicator every `k` steps (cheaper,
   approximate); the default `1` is exact.
 

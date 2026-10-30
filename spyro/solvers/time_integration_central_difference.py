@@ -1,5 +1,6 @@
 import firedrake as fire
 import numpy as np
+import ufl
 
 from . import helpers
 from .. import utils
@@ -179,6 +180,8 @@ def _propagate_forward_central_difference(wave, source_ids):
                     )
             else:
                 misfit_step = real_shot_record[step] - usol_recv[-1]
+            if wave.misfit_window is not None:
+                misfit_step = _windowed(wave, misfit_step, step)
             wave.misfit.append(misfit_step)
             J += utils.compute_functional(
                 wave, misfit_step, evaluation_mode=FunctionalEvaluationMode.PER_TIMESTEP,
@@ -215,6 +218,8 @@ def _propagate_forward_central_difference(wave, source_ids):
 
     if functional_mode is FunctionalEvaluationMode.AFTER_SOLVE:
         wave.misfit = real_shot_record - usol_recv
+        if wave.misfit_window is not None:
+            wave.misfit = wave.misfit * np.asarray(wave.misfit_window)
         J = utils.compute_functional(wave, wave.misfit)
 
     if compute_functional:
@@ -223,3 +228,32 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.functional_value = None
 
     wave.field_logger.stop_logging()
+
+
+def _windowed(wave, misfit_step, step):
+    """Weight one time step of the misfit by ``wave.misfit_window``.
+
+    Parameters
+    ----------
+    wave : Wave
+        Wave whose ``misfit_window`` holds one weight per time step and
+        receiver, in input order.
+    misfit_step : ufl.core.expr.Expr or numpy.ndarray
+        Misfit of this time step: an expression on the receivers'
+        vertex-only mesh, or the values at all receivers.
+    step : int
+        Time step.
+
+    Returns
+    -------
+    ufl.core.expr.Expr or numpy.ndarray
+        The weighted misfit, of the same kind as ``misfit_step``.
+    """
+    weights = np.asarray(wave.misfit_window)[step]
+    if not wave.use_vertex_only_mesh:
+        return weights * misfit_step
+    mesh = ufl.domain.extract_unique_domain(misfit_step)
+    window = fire.Function(fire.FunctionSpace(mesh, "DG", 0))
+    # This rank holds only the receivers it owns (issue #315).
+    window.dat.data_wo[:] = weights[wave.receivers.vom_input_indices]
+    return window * misfit_step

@@ -86,6 +86,8 @@ def parse_arguments() -> argparse.Namespace:
                         help="s after the sea-floor reflection; negative for full traces")
     parser.add_argument("--dt-fraction", type=float, default=0.5)
     parser.add_argument("--accumulate-every", type=int, default=1)
+    parser.add_argument("--snapshots", type=int, default=None,
+                        help="checkpoint the refined tape keeping this many steps in memory")
     parser.add_argument("--seed", type=int, default=0)
     return parser.parse_args()
 
@@ -186,7 +188,9 @@ def main() -> None:
     }
     pilot = TwoLevelPilot(dictionary, velocity, window=window,
                           dt_fraction=args.dt_fraction,
-                          accumulate_every=args.accumulate_every)
+                          accumulate_every=args.accumulate_every,
+                          checkpointing=args.snapshots is not None,
+                          snapshots=args.snapshots)
     initial_cpw = args.initial_cpw if args.initial_cpw == "auto" else float(args.initial_cpw)
     parameters = LoopParameters(tolerance=args.tol, theta=args.theta,
                                 initial_cpw=initial_cpw,

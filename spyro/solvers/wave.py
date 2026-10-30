@@ -149,6 +149,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.automated_adjoint = None
         self.functional_value = None
         self.misfit = None
+        # Optional time-receiver weights of the misfit, shaped like the shot
+        # record of one propagation; ``None`` weighs every sample by one.
+        self.misfit_window = None
         self.current_time = 0.0
         self.source_expression = None  # Expression for sources using UFL (less efficient)
         self.set_solver_parameters()
