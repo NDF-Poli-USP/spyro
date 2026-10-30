@@ -459,6 +459,7 @@ def test_run_fwi_passes_scipy_options_to_scipy(
         Replaces the scipy optimizer, so no wave is propagated.
     """
     monkeypatch.chdir(tmp_path)
+    (tmp_path / "control_end").mkdir(exist_ok=True)
     received = {}
 
     def fake_minimize(fun, x0, **kwargs):
@@ -483,6 +484,10 @@ def test_run_fwi_passes_scipy_options_to_scipy(
 
     monkeypatch.setattr(
         "spyro.solvers.inversion.scipy_minimize", fake_minimize,
+    )
+    monkeypatch.setattr(
+        "spyro.solvers.inversion.FullWaveformInversion._rebuild_control_from_vector",
+        lambda self, control_reference, flat_vector: control_reference.copy(deepcopy=True),
     )
     fwi = spyro.FullWaveformInversion(dictionary=build_acoustic_dictionary())
     fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.25})
