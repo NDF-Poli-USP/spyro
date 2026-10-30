@@ -106,10 +106,21 @@ def test_parse_boundary_conditions():
     for bc in wave.bcs:
         bc.apply(u)
 
-    assert np.allclose([1, 1, 1], u.at(0.0, 0.5, 0.5))
-    assert np.allclose([2, 0, 0], u.at(-1.0, 0.5, 0.5))
-    assert np.allclose([0, 3, 0], u.at(-0.5, 0.0, 0.5))
-    assert np.allclose([0, 0, 4], u.at(-0.5, 1.0, 0.5))
+    points = np.array([
+        [0.0, 0.5, 0.5],
+        [-1.0, 0.5, 0.5],
+        [-0.5, 0.0, 0.5],
+        [-0.5, 1.0, 0.5],
+    ])
+    node_evaluator = fire.PointEvaluator(wave.mesh, points)
+    numeric = node_evaluator.evaluate(u)
+    expected = np.array([[1, 1, 1],
+                         [2, 0, 0],
+                         [0, 3, 0],
+                         [0, 0, 4],
+                         ], dtype=float)
+
+    assert np.allclose(numeric, expected)
 
 
 def test_parse_boundary_conditions_exception():
