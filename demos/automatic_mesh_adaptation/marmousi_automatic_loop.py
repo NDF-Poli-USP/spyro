@@ -68,6 +68,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--theta", type=float, default=0.8)
     parser.add_argument("--initial-cpw", default="auto")
     parser.add_argument("--max-iterations", type=int, default=6)
+    parser.add_argument("--eta-reliable", type=float, default=0.3,
+                        help="initial CPW phase stops when the pilot error is below this")
     parser.add_argument("--growth-min", type=float, default=1.15)
     parser.add_argument("--growth-safety", type=float, default=1.0)
     parser.add_argument("--frequency", type=float, default=7.0, help="Hz")
@@ -188,6 +190,7 @@ def main() -> None:
     initial_cpw = args.initial_cpw if args.initial_cpw == "auto" else float(args.initial_cpw)
     parameters = LoopParameters(tolerance=args.tol, theta=args.theta,
                                 initial_cpw=initial_cpw,
+                                eta_reliable=args.eta_reliable,
                                 max_iterations=args.max_iterations,
                                 growth_min=args.growth_min,
                                 growth_safety=args.growth_safety, seed=args.seed)
