@@ -3,6 +3,7 @@ from numpy import allclose, isclose
 from pytest import mark
 from spyro.domains.space import create_function_space
 from spyro.meshing.meshing_operations import MeshOps
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.solvers.acoustic_wave import AcousticWave
 
 
@@ -103,15 +104,15 @@ def test_representative_mesh_dimensions(element_type, dimension):
     wave.mesh_parameters.tol = mesh_derived_parameters[4]
 
     # Print mesh info and computed values
-    print("\nMesh Information:")
-    print(f"  - Mesh type: {element_type}")
-    print(f"  - Number of cells: {wave.mesh.num_cells()}")
-    print(f"  - Number of vertices: {wave.mesh.num_vertices()}")
-    print("\nComputed representative mesh dimensions:")
-    print(f"  - lmin (minimum mesh size): {wave.mesh_parameters.lmin:.6f}")
-    print(f"  - lmax (maximum mesh size): {wave.mesh_parameters.lmax:.6f}")
-    print(f"  - alpha (lmax/lmin ratio): {wave.mesh_parameters.alpha:.6f}")
-    print(f"  - tol (tolerance): {wave.mesh_parameters.tol:.2e}")
+    SpyroEnsemble.print("\nMesh Information:")
+    SpyroEnsemble.print(f" - Mesh type: {element_type}")
+    SpyroEnsemble.print(f" - Number of cells: {wave.mesh.num_cells()}")
+    SpyroEnsemble.print(f" - Number of vertices: {wave.mesh.num_vertices()}")
+    SpyroEnsemble.print("\nComputed representative mesh dimensions:")
+    SpyroEnsemble.print(f" - lmin (minimum mesh size): {wave.mesh_parameters.lmin: .6f}")
+    SpyroEnsemble.print(f" - lmax (maximum mesh size): {wave.mesh_parameters.lmax: .6f}")
+    SpyroEnsemble.print(f" - alpha (lmax/lmin ratio): {wave.mesh_parameters.alpha: .6f}")
+    SpyroEnsemble.print(f" - tol (tolerance): {wave.mesh_parameters.tol: .2e}")
 
     # Verify attributes are set
     assert hasattr(wave.mesh_parameters, 'diam_mesh'), "'diam_mesh' not set"
@@ -200,8 +201,8 @@ def test_boundary_ids(element_type, dimension):
         assert boundary_ids_map[key] == expected_value, \
             f"✗ Boundary ID {key} expected to be {expected_value} " + \
             f"but got {boundary_ids_map[key]}."
-    print(f"✓ Boundary ID mapping for {element_type} {dimension}D mesh is correct.",
-          flush=True)
+    SpyroEnsemble.print(f"✓ Boundary ID mapping for {element_type} "
+                        f"{dimension}D mesh is correct.")
 
     # Checking the boundary nodes
     assert boundary_nodes_ids is not None, "✗ Boundary nodes should not be None."
@@ -221,5 +222,5 @@ def test_boundary_ids(element_type, dimension):
                         rtol=1e-8), \
             f"{key} should be {val_expected} for all nodes, " + \
             f"but got {boundary_nodes_ids[key][:, idx]}"
-    print(f"✓ Boundary nodes for {element_type} {dimension}D mesh are "
-          + "correctly identified.", flush=True)
+    SpyroEnsemble.print(f"✓ Boundary nodes for {element_type} {dimension}D mesh are "
+                        + "correctly identified.")

@@ -5,7 +5,7 @@ from firedrake import *
 
 import spyro
 from spyro.domains import quadrature
-
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..inputfiles.Model1_gradient_3d_pml import model_pml
 
 # outfile_total_gradient = VTKFile(os.getcwd() + "/results/Gradient.pvd")
@@ -45,7 +45,7 @@ def _test_gradient(options, pml=False):
     vp_exact = _make_vp_exact_pml(V, mesh)
 
     # dt = spyro.estimate_timestep(mesh, V, vp_exact)
-    # print(dt, flush=True)
+    # SpyroEnsemble.print(dt)
 
     z, x, y = SpatialCoordinate(mesh)
     Lx = model_pml["mesh"]["length_x"]
@@ -103,7 +103,7 @@ def _test_gradient(options, pml=False):
     qr_x, _, _ = quadrature.quadrature_rules(V)
 
     Jm = functional(options, misfit)
-    print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
+    SpyroEnsemble.print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
 
     # compute the gradient of the control (to be verified)
     dJ = gradient(options, mesh, comm, vp_guess, receivers, p_guess, misfit)
@@ -137,7 +137,7 @@ def _test_gradient(options, pml=False):
         Jp = functional(options, p_exact_recv - p_guess_recv)
         projnorm = assemble(box1 * dJ * delta_m * dx(**qr_x))
         fd_grad = (Jp - Jm) / step
-        print(
+        SpyroEnsemble.print(
             "\n Cost functional for step "
             + str(step)
             + " : "

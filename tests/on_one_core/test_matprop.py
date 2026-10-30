@@ -14,6 +14,7 @@ import numpy as np
 from os import getcwd
 import pytest
 from spyro.io import create_segy
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 
 
@@ -189,7 +190,7 @@ def test_constant_mat_prop(wave_instance, cell_type):
         phiTTI_o,
     ]
 
-    print("\nTesting Constant Material Properties", flush=True)
+    SpyroEnsemble.print("\nTesting Constant Material Properties")
     for property_name, constant in zip(scalar_mat_prop, constant_lst):
         try:
             mat_property = wave.set_material_property(
@@ -211,10 +212,9 @@ def test_constant_mat_prop(wave_instance, cell_type):
             assert np.isclose(
                 mean_val, constant, rtol=1e-8
             ), f"{property_name}: Expected value {constant}, got {mean_val}"
-            print(
+            SpyroEnsemble.print(
                 f"{property_name} Verified: expected "
                 f"{constant}, got = {round(mean_val, 10)}",
-                flush=True,
             )
 
         except fire.ConvergenceError as e:
@@ -273,7 +273,7 @@ def test_random_mat_prop(wave_instance, cell_type):
         (-15, 15),
     ]
 
-    print("\nTesting Random Material Properties", flush=True)
+    SpyroEnsemble.print("\nTesting Random Material Properties")
     for property_name, random in zip(scalar_mat_prop, random_lst):
         try:
             mat_property = wave.set_material_property(
@@ -294,14 +294,14 @@ def test_random_mat_prop(wave_instance, cell_type):
             assert np.all(
                 mat_property_data >= min_val - 1e-8
             ), f"Values below minimum {min_val} for {property_name}"
-            print(
-                f"{property_name} Verified: Values " f">= minimum {min_val}", flush=True
+            SpyroEnsemble.print(
+                f"{property_name} Verified: Values " f">= minimum {min_val}"
             )
             assert np.all(
                 mat_property_data <= max_val + 1e-8
             ), f"Values above maximum {max_val} for {property_name}"
-            print(
-                f"{property_name} Verified: Values " f"<= maximum {max_val}", flush=True
+            SpyroEnsemble.print(
+                f"{property_name} Verified: Values " f"<= maximum {max_val}"
             )
 
         except fire.ConvergenceError as e:
@@ -462,7 +462,7 @@ def test_conditional_mat_prop(wave_instance, cell_type):
     # Get mesh vertices
     coords, mask_pnt = get_only_mesh_vertices(wave)
 
-    print("\nTesting Conditional Material Properties", flush=True)
+    SpyroEnsemble.print("\nTesting Conditional Material Properties")
     for property_name, cond_field in zip(scalar_mat_prop, cond_lst):
         try:
             mat_property = wave.set_material_property(
@@ -502,19 +502,17 @@ def test_conditional_mat_prop(wave_instance, cell_type):
                 f"Values does not match for {property_name}"
                 + f" for {coord_thrs} < {threshold}"
             )
-            print(
+            SpyroEnsemble.print(
                 f"{property_name} Verified: Conditional values "
                 f"{coord_thrs} < {threshold}",
-                flush=True,
             )
             assert np.allclose(exp_above, cnd_above, rtol=1e-8), (
                 f"Values does not match for {property_name}"
                 + f" for {coord_thrs} >= {threshold}"
             )
-            print(
+            SpyroEnsemble.print(
                 f"{property_name} Verified: Conditional values "
                 f"{coord_thrs} >= {threshold}",
-                flush=True,
             )
 
         except fire.ConvergenceError as e:
@@ -617,7 +615,7 @@ def test_expression_mat_prop(wave_instance, cell_type):
     # Get mesh vertices
     coords, mask_pnt = get_only_mesh_vertices(wave)
 
-    print("\nTesting Expression as Material Properties", flush=True)
+    SpyroEnsemble.print("\nTesting Expression as Material Properties")
     for property_name, expr_field in zip(scalar_mat_prop, expr_lst):
         try:
             mat_property = wave.set_material_property(
@@ -636,7 +634,7 @@ def test_expression_mat_prop(wave_instance, cell_type):
             assert np.allclose(
                 val_exp, exp_exp, rtol=1e-8
             ), f"Values of the expression does not match for {property_name}"
-            print(f"{property_name} Verified: Expression values", flush=True)
+            SpyroEnsemble.print(f"{property_name} Verified: Expression values")
 
         except fire.ConvergenceError as e:
             pytest.fail(f"Setting {property_name} raised an exception: {str(e)}")
@@ -688,7 +686,7 @@ def test_function_mat_prop(wave_instance, cell_type):
     """
     wave = wave_instance
 
-    print("\nTesting Firedrake Functions as Material Properties", flush=True)
+    SpyroEnsemble.print("\nTesting Firedrake Functions as Material Properties")
     dummy_expr = "7.5e2 * (1 + sqrt(x**2 + y**2 + z**2))"
     dummy = wave.set_material_property(
         "dummy", "scalar", expression=dummy_expr, output=False
@@ -714,7 +712,7 @@ def test_function_mat_prop(wave_instance, cell_type):
     assert np.allclose(
         val_fun, exp_fun, rtol=1e-8
     ), "Values of the firedrake function does not match for vel_S"
-    print("vel_S Verified: Firedrake function values", flush=True)
+    SpyroEnsemble.print("vel_S Verified: Firedrake function values")
 
     # Different function space (DG0)
     vel_S_dg0 = wave.set_material_property(
@@ -737,7 +735,7 @@ def test_function_mat_prop(wave_instance, cell_type):
     assert np.allclose(
         val_fun, exp_fun, rtol=1e-8
     ), "Values of the scalar function does not match for vel_S_DG0"
-    print("vel_S_DG0 Verified: Scalar function values", flush=True)
+    SpyroEnsemble.print("vel_S_DG0 Verified: Scalar function values")
 
 
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
@@ -762,7 +760,7 @@ def test_fromfile_mat_prop(wave_instance, cell_type):
     """
     wave = wave_instance
 
-    print("\nTesting Input Files as Material Properties", flush=True)
+    SpyroEnsemble.print("\nTesting Input Files as Material Properties")
     vel_P = wave.set_material_property(
         "vel_P",
         "scalar",
@@ -797,7 +795,7 @@ def test_fromfile_mat_prop(wave_instance, cell_type):
         exc_info.value
     ), f"Unexpected error message: {str(exc_info.value)}"
 
-    print(
+    SpyroEnsemble.print(
         "Material Property from file: Correctly raised "
         f"NotImplementedError: {exc_info.value}",
         flush=True,
@@ -824,12 +822,12 @@ def test_vector_mat_prop(wave_instance, cell_type):
     None
     """
     wave = wave_instance
-    print("\nTesting Vector Material Properties", flush=True)
-    print("Vector: Thermal Expansion Field", flush=True)
+    SpyroEnsemble.print("\nTesting Vector Material Properties")
+    SpyroEnsemble.print("Vector: Thermal Expansion Field")
 
     # Same function space
     alphaT_o = 1e-5
-    print("\nTesting Constant Material Properties", flush=True)
+    SpyroEnsemble.print("\nTesting Constant Material Properties")
     alphaT_cte = wave.set_material_property(
         "alphaT",
         "vector",
@@ -881,7 +879,7 @@ def test_vector_mat_prop(wave_instance, cell_type):
     assert (
         cond0 and cond1 and cond2
     ), "Values of the vectorial function does not match for alphaT_dg0"
-    print("alphaT_dg0 Verified: Vectorial function values", flush=True)
+    SpyroEnsemble.print("alphaT_dg0 Verified: Vectorial function values")
 
 
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
@@ -904,8 +902,8 @@ def test_tensor_mat_prop(wave_instance, cell_type):
     None
     """
     wave = wave_instance
-    print("\nTesting Tensor Material Properties", flush=True)
-    print("Vector: Elastic Anisotropic Tensor", flush=True)
+    SpyroEnsemble.print("\nTesting Tensor Material Properties")
+    SpyroEnsemble.print("Vector: Elastic Anisotropic Tensor")
 
     C11 = 3.15
     C33 = 2.25
@@ -959,7 +957,7 @@ def test_tensor_mat_prop(wave_instance, cell_type):
     )
 
     assert Celast is not None, "Failed to set Celast"
-    print("Celast Verified: Tensorial function assign", flush=True)
+    SpyroEnsemble.print("Celast Verified: Tensorial function assign")
 
     # Tensor 2x3
     dummy = wave.set_material_property(
@@ -999,7 +997,7 @@ def test_tensor_mat_prop(wave_instance, cell_type):
     )
 
     assert Celast_2x3 is not None, "Failed to set Celast_2x3"
-    print("Celast_2x3 Verified: Tensorial function saving", flush=True)
+    SpyroEnsemble.print("Celast_2x3 Verified: Tensorial function saving")
 
     # Different function space (DG0)
     Celast_dg0 = wave.set_material_property(
@@ -1013,4 +1011,4 @@ def test_tensor_mat_prop(wave_instance, cell_type):
     )
 
     assert Celast_dg0 is not None, "Failed to set Celast_dg0"
-    print("Celast_2x3 Verified: Tensorial function saving DG0", flush=True)
+    SpyroEnsemble.print("Celast_2x3 Verified: Tensorial function saving DG0")

@@ -1,9 +1,10 @@
 import pytest
 import spyro
-from spyro.meshing.meshing_parameters import cells_per_wavelength
+import os
 import warnings
 from pathlib import Path
-import os
+from spyro.meshing.meshing_parameters import cells_per_wavelength
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 def test_initialize_mesh_pam():
@@ -76,7 +77,7 @@ def test_initialize_mesh_pam():
     assert test_source_frequency, "Expected source_frequency to match input"
     assert test_length_y, "Expected length_y to match input"
 
-    print("END")
+    SpyroEnsemble.print("END")
 
 
 def test_negative_length_z_raises():

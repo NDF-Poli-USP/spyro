@@ -1,5 +1,6 @@
 import numpy as np
 import spyro
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 def expected_functional(residual, dt):
@@ -143,8 +144,8 @@ def test_misfit_2d():
         functional_second_calc,
     )
 
-    print(f"Misfit calculated with FWI object is close to the individually calculated: {test}")
-    print(
+    SpyroEnsemble.print(f"Misfit calculated with FWI object is close to the individually calculated: {test}")
+    SpyroEnsemble.print(
         "Functional accumulated during forward solve matches manual calculation: "
         f"{functional_matches_wave and functional_matches_fwi}"
     )
@@ -152,9 +153,9 @@ def test_misfit_2d():
     assert test
     assert functional_matches_wave
     assert functional_matches_fwi
-    print("functional value from FWI object:", functional_fwi)
-    print("functional value from wave object:", Wave_obj_guess.functional_value)
-    print("functional value from manual calculation:", functional_second_calc)
+    SpyroEnsemble.print(f"functional value from FWI object: {functional_fwi}")
+    SpyroEnsemble.print(f"functional value from wave object: {Wave_obj_guess.functional_value}")
+    SpyroEnsemble.print(f"functional value from manual calculation: {functional_second_calc}")
 
 
 if __name__ == "__main__":

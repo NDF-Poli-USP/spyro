@@ -1,3 +1,4 @@
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.utils import Mask
 from spyro.utils import Gradient_mask_for_pml
 from spyro.examples.rectangle import Rectangle_acoustic
@@ -241,21 +242,21 @@ def test_gradient_mask():
     #     if result not in interval(-2.1, 13):
     #         test1 = False
     # if test1 is False:
-    #     print("Boundary going crazy")
+    #     SpyroEnsemble.print("Boundary going crazy")
     #     assert False
     # Checking results in mask
     for result in masked_results:
         if np.isclose(result, 0.0) is False:
             test1 = False
     if test1 is False:
-        print("Mask not zero")
+        SpyroEnsemble.print("Mask not zero")
         assert False
     # Checking interior points
     for result in unmasked_results:
         if np.isclose(result, 10.0) is False:
             test1 = False
     if test1 is False:
-        print("Interior is masked")
+        SpyroEnsemble.print("Interior is masked")
         assert False
 
     assert test1

@@ -159,7 +159,7 @@ def test_2d_wave_adapted_marked_mesh():
 
     assert np.isclose(area_in, area_in_fire, rtol=1e-1)
 
-    print("END")
+    SpyroEnsemble.print("END")
 
 
 if __name__ == "__main__":

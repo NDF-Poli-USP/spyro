@@ -12,6 +12,7 @@ from pytest import fail, mark, param
 from firedrake import conditional, ConvergenceError
 from numpy import isclose, where
 from spyro.solvers.acoustic_wave import AcousticWave
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.domains.space import create_function_space
 from spyro.tools.habc_tools import layer_mask_field, point_cloud_field
 from spyro.utils.cost import comp_cost
@@ -245,10 +246,10 @@ def run_tools(wave, method_extend, n_root=1):
     region_names = ["Layer x<0.5", "Layer x>=0.5", "Original x<0.5", "Original x>=0.5"]
 
     for region, exp_value, mean_val in zip(region_names, expected_values, mean_val):
-        cmp_str = f"{region}: Expected {exp_value:.5f}, got = {mean_val:.5f}"
+        cmp_str = f"{region}: Expected {exp_value: .5f}, got = {mean_val: .5f}"
         assert isclose(mean_val / exp_value, 1., atol=tolerance), \
             "✗ " + met_str + "  → " + cmp_str
-        print("✓ " + met_str + "Verified: " + cmp_str, flush=True)
+        SpyroEnsemble.print("✓ " + met_str + "Verified: " + cmp_str)
 
     # Renaming the folder if degree_layer is modified
     wave.layer_ops.rename_folder_habc()
@@ -301,8 +302,8 @@ def test_habc_tools(element_geometry, dimension):
      0.08 91.876  84.377
     """
 
-    print("\n" + 50 * "=" + f"\nTesting HABC Tools with {element_geometry} "
-          + f"elements for {dimension}D case\n" + 50 * "=", flush=True)
+    SpyroEnsemble.print("\n" + 50 * "=" + f"\nTesting HABC Tools with {element_geometry} "
+                        + f"elements for {dimension}D case\n" + 50 * "=")
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -319,8 +320,8 @@ def test_habc_tools(element_geometry, dimension):
         f_est = 0.05 if dimension == 2 else 0.07
 
     # Get simulation parameters
-    print(f"\nMesh Size: {1e3 * edge_length:.3f} m", flush=True)
-    print(f"Eikonal Stabilizing Factor: {f_est:.2f}", flush=True)
+    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length: .3f} m")
+    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est: .2f}")
 
     # ============ HABC PARAMETERS ============
 
@@ -348,8 +349,8 @@ def test_habc_tools(element_geometry, dimension):
         # Testing tools for the HABC implementation
         for method_extend in ["point_cloud", "nearest_point"]:
             # Method to extend the velocity profile in the absorbing layer
-            print("\n" + 30 * "=" + f"\nTesting Method: {method_extend}\n"
-                  + 30 * "=", flush=True)
+            SpyroEnsemble.print("\n" + 30 * "=" + f"\nTesting Method: {method_extend}\n"
+                                + 30 * "=")
 
             # Determining the case for the folder name
             str_id = element_geometry + ("CL" if method_extend == "point_cloud" else "NP")

@@ -4,6 +4,7 @@ from copy import deepcopy
 from firedrake import *
 import spyro
 
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..inputfiles.Model1_2d_CG import model as oldmodel
 from ..inputfiles.Model1_3d_CG import model as oldmodel3D
 
@@ -318,4 +319,4 @@ if __name__ == "__main__":
     test_correct_receiver_to_cell_location3D()
     test_correct_at_value3D()
 
-    print("END")
+    SpyroEnsemble.print("END")

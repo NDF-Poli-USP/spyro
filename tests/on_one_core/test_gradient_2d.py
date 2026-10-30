@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-from copy import deepcopy
-from firedrake import VTKFile
 import firedrake as fire
 import spyro
+from copy import deepcopy
+from firedrake import VTKFile
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
@@ -53,15 +54,15 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     # Checking that the random-direction finite-difference error remains
     # below 1 percent across the tested step sizes.
     test1 = np.all(np.abs(errors) < 3)
-    print(f"Gradient error less than 1 percent for all steps: {test1}")
-    print(f"Error of {errors}")
+    SpyroEnsemble.print(f"Gradient error less than 1 percent for all steps: {test1}")
+    SpyroEnsemble.print(f"Error of {errors}")
 
     # Check that the first-order Taylor remainder decreases at least linearly
     # with the step length, without relying on the sign of the directional
     # error.
     test2 = np.all(remainders[1:] < 0.2 * remainders[:-1])
-    print(f"Taylor remainder decreases with step size: {test2}")
-    print(f"Taylor remainders {remainders}")
+    SpyroEnsemble.print(f"Taylor remainder decreases with step size: {test2}")
+    SpyroEnsemble.print(f"Taylor remainders {remainders}")
 
     assert all([test1, test2])
 
@@ -156,7 +157,7 @@ def test_gradient():
     misfit = rec_out_exact - rec_out_guess
 
     Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
-    print(f"Cost functional : {Jm}")
+    SpyroEnsemble.print(f"Cost functional: {Jm}")
 
     # compute the gradient of the control (to be verified)
     dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
@@ -218,7 +219,7 @@ def test_gradient_sampling_frequency(full_sampling_gradient, freq):
     g_full = full_sampling_gradient
     g_sub = _gradient_for_sampling_frequency(freq)
     rel_diff = np.linalg.norm(g_sub - g_full) / np.linalg.norm(g_full)
-    print(f"freq={freq}: relative gradient difference vs full sampling = {rel_diff:.4f}")
+    SpyroEnsemble.print(f"freq={freq}: relative gradient difference vs full sampling = {rel_diff: .4f}")
     assert rel_diff < 0.05
 
 

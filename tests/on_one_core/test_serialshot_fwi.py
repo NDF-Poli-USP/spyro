@@ -3,6 +3,7 @@ import firedrake as fire
 import spyro
 import pytest
 import warnings
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 warnings.filterwarnings("ignore")
@@ -120,17 +121,17 @@ def test_fwi(load_real_shot=False, use_rol=False):
     # simple mask test
     grad_test = FWI_obj.gradient
     test0 = np.isclose(grad_test.at((-0.1, 0.1)), 0.0)
-    print(f"PML looks masked: {test0}", flush=True)
+    SpyroEnsemble.print(f"PML looks masked: {test0}")
     test1 = np.abs(grad_test.at((-1.0, 1.0))) > 1e-5
-    print(f"Center looks unmasked: {test1}", flush=True)
+    SpyroEnsemble.print(f"Center looks unmasked: {test1}")
 
     # quick look at functional and if it reduced
     test2 = FWI_obj.functional < 1e-3
-    print(f"Last functional small: {test2}", flush=True)
+    SpyroEnsemble.print(f"Last functional small: {test2}")
     test3 = FWI_obj.functional_history[-1]/FWI_obj.functional_history[0] < 1e-2
-    print(f"Considerable functional reduction during test: {test3}", flush=True)
+    SpyroEnsemble.print(f"Considerable functional reduction during test: {test3}")
 
-    print("END", flush=True)
+    SpyroEnsemble.print("END")
     assert all([test0, test1, test2, test3])
 
 

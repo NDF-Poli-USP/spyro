@@ -3,6 +3,7 @@ import math
 from importlib.metadata import version
 import pytest
 import spyro
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 def make_minas_cheese_conditional(mesh_z, mesh_x):
@@ -241,9 +242,9 @@ def test_gmsh_adaptation():
     lbda_centre = 3.0/20.0  # vp/freq
     h_centre = lbda_centre/cells_per_wavelength
     cell_diam_centre = float(f.at(-1.0, 1.0))
-    print(f'Using Firedrake version {version("firedrake")}')
-    print(f'Using gmsh version {version("gmsh")}')
-    print(f"Cell diameter should be {h_centre}, and is measured at {cell_diam_centre}")
+    SpyroEnsemble.print(f'Using Firedrake version {version("firedrake")}')
+    SpyroEnsemble.print(f'Using gmsh version {version("gmsh")}')
+    SpyroEnsemble.print(f"Cell diameter should be {h_centre}, and is measured at {cell_diam_centre}")
     assert math.isclose(h_centre, cell_diam_centre, rel_tol=1e-1)
 
     # at circle of minas cheese (meia cura cheesy goodness):
@@ -258,7 +259,7 @@ def test_gmsh_adaptation():
     cell_diam_outside = float(f.at(-1.0, 1.7))
     assert math.isclose(h_outside, cell_diam_outside, rel_tol=1e-2)
 
-    print("END")
+    SpyroEnsemble.print("END")
 
 
 if __name__ == "__main__":
