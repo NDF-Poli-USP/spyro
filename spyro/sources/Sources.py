@@ -1,5 +1,7 @@
 """Source utilities for injecting wavelets into simulation meshes."""
 
+from functools import cached_property
+
 import numpy as np
 from scipy.signal import butter, filtfilt
 from spyro.receivers.dirac_delta_projector import Delta_projector
@@ -36,6 +38,16 @@ class Sources(Delta_projector):
         spatial paralelism
     wavelet : list of floats
         Values at timesteps of wavelet used in the simulation
+    time_function : Firedrake.Function
+        Value of the wavelet at the current time step, in the real space
+        ``R``. Built on first use.
+    spatial_function : Firedrake.Function
+        Spatial part :math:`q_h` of the active point sources, such that
+        :math:`\\int q_h v \\, dx` reproduces :meth:`source_cofunction`.
+        Built on first use.
+    source_measure : ufl.Measure or None
+        Measure of the time-step form the source term was put in by
+        :meth:`source_term`, also used by :meth:`update_spatial_function`.
 
     Methods
     -------
@@ -45,6 +57,12 @@ class Sources(Delta_projector):
         Interpolates field value at receiver locations
     apply_source(rhs_forcing, value)
         Applies value at source locations in rhs_forcing operator
+    source_term(test_function, measure)
+        Returns the point-source term of a time-step form
+    update_time_function(step)
+        Sets time_function to the wavelet at a time step
+    update_spatial_function(solver_parameters)
+        Sets spatial_function from the active point sources
     """
 
     def __init__(self, wave):
@@ -72,6 +90,7 @@ class Sources(Delta_projector):
         self.amplitude = wave.amplitude
         self.is_local = [0] * self.number_of_points
         self.current_sources = None
+        self.source_measure = None
         if wave.analysis == "transient":
             self.update_wavelet(wave)
         if np.isscalar(self.amplitude) or (self.amplitude.size <= 3):
@@ -88,6 +107,114 @@ class Sources(Delta_projector):
             delay=wave.delay,
             delay_type=wave.delay_type,
         )
+
+    @cached_property
+    def time_function(self) -> fire.Function:
+        """Value of the wavelet at the current time step.
+
+        Returns
+        -------
+        firedrake.Function
+            Function in the real space ``R``, set by
+            :meth:`update_time_function`.
+        """
+        return fire.Function(
+            fire.FunctionSpace(self.mesh, "R", 0), name="source time function"
+        )
+
+    @cached_property
+    def spatial_function(self) -> fire.Function:
+        """Spatial part of the active point sources.
+
+        Returns
+        -------
+        firedrake.Function
+            Function in :attr:`function_space`, set by
+            :meth:`update_spatial_function`.
+        """
+        return fire.Function(
+            self.function_space, name="source spatial function"
+        )
+
+    def source_term(self, test_function: object, measure: object) -> object:
+        """Return the point-source term of a time-step form.
+
+        The term is :math:`s(t) \\int q_h v`, with :math:`s` the
+        :attr:`time_function` and :math:`q_h` the :attr:`spatial_function`.
+        ``measure`` is kept, so that :meth:`update_spatial_function` solves
+        with the mass matrix of the same quadrature, which is what makes the
+        term reproduce :meth:`source_cofunction`.
+
+        Parameters
+        ----------
+        test_function : ufl.Argument
+            Test function of the pressure (acoustic) or displacement
+            (elastic) in the form.
+        measure : ufl.Measure
+            Cell measure of the form, with its quadrature.
+
+        Returns
+        -------
+        ufl.Form
+            The source term, to be added to the right-hand side.
+        """
+        self.source_measure = measure
+        return fire.inner(
+            self.time_function * self.spatial_function, test_function
+        ) * measure
+
+    def update_time_function(self, step: int) -> None:
+        """Set :attr:`time_function` to the wavelet at ``step``.
+
+        Parameters
+        ----------
+        step : int
+            Time step (index of the wavelet array).
+
+        Returns
+        -------
+        None
+            :attr:`time_function` is updated in place.
+        """
+        self.time_function.assign(self.wavelet[step])
+
+    def update_spatial_function(self, solver_parameters: dict | None) -> None:
+        r"""Set :attr:`spatial_function` from the active point sources.
+
+        The term built by :meth:`source_term` is
+        :math:`s(t) \int q_h v \, dx`, with :math:`s` the
+        :attr:`time_function` and :math:`q_h` the :attr:`spatial_function`.
+        This solves :math:`M q_h = q`, with :math:`q` the
+        :meth:`source_cofunction` of the active sources and :math:`M` the
+        mass matrix of the measure of that term, so the term assembles back
+        to :math:`s(t)\, q`, and a pyadjoint tape records one scalar per time
+        step for the source instead of a cofunction.
+
+        Parameters
+        ----------
+        solver_parameters : dict or None
+            Solver parameters for the mass solve.
+
+        Returns
+        -------
+        None
+            :attr:`spatial_function` is updated in place.
+
+        Raises
+        ------
+        ValueError
+            If :meth:`source_term` has not been called yet, or no source is
+            active.
+        """
+        if self.source_measure is None:
+            raise ValueError(
+                "No form holds the point-source term: call source_term first."
+            )
+        V = self.function_space
+        mass = fire.inner(fire.TrialFunction(V), fire.TestFunction(V)) \
+            * self.source_measure
+        fire.solve(mass == self.source_cofunction(), self.spatial_function,
+                   solver_parameters=solver_parameters)
 
     def apply_source(self, rhs_forcing, step):
         """Apply the source to an assembled right-hand side.
