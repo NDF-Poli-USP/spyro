@@ -29,11 +29,12 @@ the pad (8.7 km of Marmousi2 by default), because spyro requires
 
 Notes
 -----
-Boundary conditions are spyro's: first-order non-reflecting conditions on the
-bottom and sides (``abc_type: "nrbc"``) and a natural (Neumann) top boundary.
-The calibration study used a damping layer and a pressure-free top instead,
-so absolute errors are not comparable between the two codes; the comparison
-between strategies is.
+The top is a pressure-free surface (``u = 0``, ``free_surface: True``), as in
+the calibration study; ``--rigid-top`` uses the natural (Neumann) condition
+instead. The bottom and sides carry spyro's first-order non-reflecting
+conditions (``abc_type: "nrbc"``); the calibration study also had a damping
+layer there, so absolute errors are not directly comparable between the two
+codes; the comparison between strategies is.
 
 AI assistance: implementation by Claude (Anthropic), reviewed by the author.
 """
@@ -86,8 +87,14 @@ def parse_arguments() -> argparse.Namespace:
                         help="s after the sea-floor reflection; negative for full traces")
     parser.add_argument("--dt-fraction", type=float, default=0.5)
     parser.add_argument("--accumulate-every", type=int, default=1)
-    parser.add_argument("--snapshots", type=int, default=None,
-                        help="checkpoint the refined tape keeping this many steps in memory")
+    parser.add_argument("--snapshots", type=int, default=200,
+                        help="checkpoints of the refined tape kept in memory; the forward "
+                             "is recomputed in between (default 200)")
+    parser.add_argument("--no-checkpointing", action="store_true",
+                        help="keep every refined time step on the tape instead "
+                             "(no recomputation, memory grows with the number of steps)")
+    parser.add_argument("--rigid-top", action="store_true",
+                        help="natural (Neumann) top instead of the pressure-free surface")
     parser.add_argument("--seed", type=int, default=0)
     return parser.parse_args()
 
@@ -127,6 +134,8 @@ def main() -> None:
         The report and meshes are written to the output directory.
     """
     args = parse_arguments()
+    if not args.no_checkpointing and args.snapshots < 1:
+        raise ValueError("--snapshots must be a positive integer.")
     # spyro expects 0 <= x <= length_x, so the window is shifted to start at
     # the left end of the pad; meshes and reports use these local positions.
     offset = args.x_range[0] - args.pad
@@ -176,7 +185,8 @@ def main() -> None:
             "delay_type": "multiples_of_minimum",
             "receiver_locations": receivers,
         },
-        "absorving_boundary_conditions": {"status": True, "abc_type": "nrbc"},
+        "absorving_boundary_conditions": {"status": True, "abc_type": "nrbc",
+                                          "free_surface": not args.rigid_top},
         "time_axis": {"initial_time": 0.0, "final_time": args.final_time,
                       "dt": 1e-4, "amplitude": 1, "output_frequency": 10**9,
                       "gradient_sampling_frequency": 1},
@@ -189,8 +199,8 @@ def main() -> None:
     pilot = TwoLevelPilot(dictionary, velocity, window=window,
                           dt_fraction=args.dt_fraction,
                           accumulate_every=args.accumulate_every,
-                          checkpointing=args.snapshots is not None,
-                          snapshots=args.snapshots)
+                          checkpointing=not args.no_checkpointing,
+                          snapshots=None if args.no_checkpointing else args.snapshots)
     initial_cpw = args.initial_cpw if args.initial_cpw == "auto" else float(args.initial_cpw)
     parameters = LoopParameters(tolerance=args.tol, theta=args.theta,
                                 initial_cpw=initial_cpw,

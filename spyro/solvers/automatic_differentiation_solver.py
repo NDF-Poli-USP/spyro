@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Mapping
 
-from pyadjoint import Tape, continue_annotation, pause_annotation, taylor_test
+from pyadjoint import (AdjFloat, Tape, continue_annotation, pause_annotation,
+                       stop_annotating, taylor_test)
 
 import firedrake as fire
 import firedrake.adjoint as fire_ad
@@ -520,6 +521,65 @@ pyadjoint.ReducedFunctional or None
         if self.reduced_functional is None:
             raise ValueError("Reduced functional not created.")
         return self.reduced_functional.derivative(apply_riesz=False)
+
+    def compute_adjoint(self, functional: AdjFloat) -> None:
+        """Run only the adjoint of the recorded tape, without any derivative.
+
+        The reverse sweep solves the adjoint of every recorded step, as a
+        gradient computation does, but assembles no derivative with respect
+        to the controls. Use it when only the adjoint solution is wanted, for
+        instance read through the ``adj_cb`` callback of each solve block by a
+        goal-oriented error indicator. No reduced functional is needed.
+
+        Parameters
+        ----------
+        functional : pyadjoint.AdjFloat
+            Functional recorded on the tape, e.g. ``wave.functional_value``.
+            Its adjoint seed is one.
+
+        Returns
+        -------
+        None
+            The adjoints are left on the tape's block variables and handed to
+            the callbacks of the blocks.
+
+        Raises
+        ------
+        ValueError
+            If no forward solve has been recorded.
+
+        Notes
+        -----
+        With markings, pyadjoint evaluates the adjoint component of a block
+        only for the dependencies flagged ``is_control_dependent``. Here the
+        flag is set on every value the tape computed (the outputs of its
+        blocks), so the adjoint propagates through all the states. The
+        controls, and every other input the tape did not compute, stay
+        unflagged, so their components -- the per-step contributions a
+        gradient would assemble -- are skipped. Boundary conditions stay
+        unflagged too: their values are fixed, and flagging them would make
+        every solve also compute a boundary adjoint. A checkpoint schedule
+        recomputes the forward as for a gradient. Each ensemble member sweeps
+        its own tape; there is no sum over the ensemble.
+        """
+        if self._tape is None:
+            raise ValueError("No forward solve has been recorded.")
+        flagged = []
+        for block in self._tape.get_blocks():
+            for variable in block.get_outputs():
+                if isinstance(variable.output, fire.DirichletBC):
+                    continue
+                if not variable.is_control_dependent:
+                    variable.is_control_dependent = True
+                    flagged.append(variable)
+        try:
+            with stop_annotating():
+                self._tape.reset_variables()
+                functional.block_variable.adj_value = 1.0
+                self._tape.evaluate_adj(markings=True)
+        finally:
+            for variable in flagged:
+                variable.is_control_dependent = False
 
     def label_derivatives(self, derivatives: object) -> PhysicalParameters:
         """Associate computed derivatives with selected physical parameters.

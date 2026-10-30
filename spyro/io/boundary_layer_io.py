@@ -59,6 +59,11 @@ class Read_boundary_layer:
         If True, the maximum propagation speed in the PML layer is provided by the user.
     dictionary : `dict`
         Dictionary containing the boundary layer information
+    free_surface : `bool`
+        If True, the top boundary is a pressure-free surface (``u = 0``,
+        Dirichlet). If False (the default), the top keeps the natural
+        condition (zero normal derivative, a rigid surface) unless it is
+        absorbing. Read from ``absorving_boundary_conditions["free_surface"]``.
     """
 
     def __init__(self):
@@ -94,6 +99,15 @@ class Read_boundary_layer:
             "absorving_boundary_conditions"].get("absorb_front", True)
         self.absorb_back = self.input_dictionary[
             "absorving_boundary_conditions"].get("absorb_back", True)
+
+        # Top boundary: pressure-free surface (Dirichlet u = 0). Without it the
+        # top is natural, i.e. zero normal derivative: a rigid surface.
+        self.free_surface = self.input_dictionary[
+            "absorving_boundary_conditions"].get("free_surface", False)
+        if self.free_surface and self.absorb_top:
+            raise ValueError(
+                "The top boundary cannot be both absorbing and a free surface."
+            )
 
     @property
     def abc_boundary_layer_shape(self):

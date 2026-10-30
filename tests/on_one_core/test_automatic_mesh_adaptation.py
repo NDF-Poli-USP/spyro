@@ -19,6 +19,7 @@ from spyro.adaptivity import (AdaptiveSizeField, RectangularDomain,
                               read_triangulation)
 from spyro.adaptivity.automatic_loop import (AutomaticMeshAdaptation,
                                              LoopParameters)
+from spyro.adaptivity.mesh_generation import mean_edge_lengths
 from spyro.adaptivity.size_fields import VelocityGrid
 
 INTERFACE = -0.3
@@ -68,7 +69,8 @@ def velocity_grid(spacing: float = 0.01) -> VelocityGrid:
     return VelocityGrid(two_layer(Z - 1e-9, X), z[0], x[0], spacing, spacing)
 
 
-def dictionary(n_shots: int = 1, final_time: float = 0.6) -> dict:
+def dictionary(n_shots: int = 1, final_time: float = 0.6,
+               free_surface: bool = True) -> dict:
     """spyro dictionary of the small test problem.
 
     Parameters
@@ -77,6 +79,8 @@ def dictionary(n_shots: int = 1, final_time: float = 0.6) -> dict:
         Number of sources.
     final_time : float, optional
         Duration (s).
+    free_surface : bool, optional
+        Pressure-free top surface; ``False`` keeps the natural (rigid) top.
 
     Returns
     -------
@@ -94,7 +98,8 @@ def dictionary(n_shots: int = 1, final_time: float = 0.6) -> dict:
                         "frequency": 5.0, "delay": 1.5,
                         "delay_type": "multiples_of_minimum",
                         "receiver_locations": RECEIVERS},
-        "absorving_boundary_conditions": {"status": True, "abc_type": "nrbc"},
+        "absorving_boundary_conditions": {"status": True, "abc_type": "nrbc",
+                                          "free_surface": free_surface},
         "time_axis": {"initial_time": 0.0, "final_time": final_time,
                       "dt": 1e-3, "amplitude": 1, "output_frequency": 10**9,
                       "gradient_sampling_frequency": 1},
@@ -124,6 +129,26 @@ def late_window(times: np.ndarray, shot: int) -> np.ndarray:
     return np.broadcast_to(times[:, None] > 0.25, (len(times), len(RECEIVERS)))
 
 
+def cpw_size(cpw: float, frequency: float = 5.0) -> VelocityGrid:
+    """Uniform-CPW target size of the two-layer model.
+
+    Parameters
+    ----------
+    cpw : float
+        Cells per wavelength.
+    frequency : float, optional
+        Peak frequency (Hz).
+
+    Returns
+    -------
+    VelocityGrid
+        Target edge length :math:`v_p / (C f)` on a grid.
+    """
+    grid = velocity_grid()
+    return VelocityGrid(grid.values / (cpw * frequency), grid.z0, grid.x0,
+                        grid.dz, grid.dx)
+
+
 @pytest.fixture(scope="module")
 def cpw_mesh(tmp_path_factory: pytest.TempPathFactory) -> str:
     """A coarse CPW mesh conforming to the interface.
@@ -139,8 +164,7 @@ def cpw_mesh(tmp_path_factory: pytest.TempPathFactory) -> str:
         Path of the mesh file.
     """
     path = tmp_path_factory.mktemp("meshes") / "cpw3.msh"
-    generate_mesh(path, DOMAIN, lambda z, x: float(two_layer(z, x)) / (3.0 * 5.0),
-                  conforming_depths=[INTERFACE])
+    generate_mesh(path, DOMAIN, cpw_size(3.0), conforming_depths=[INTERFACE])
     return str(path)
 
 
@@ -164,6 +188,11 @@ def test_mesh_markers_interface_and_dofs(cpw_mesh: str) -> None:
     assert np.sum(np.isclose(z, INTERFACE)) >= 5
 
     points, triangles = read_triangulation(cpw_mesh)
+    # The structured size field is honoured: median edge close to v / (C f).
+    lengths = mean_edge_lengths(points, triangles)
+    above = points[triangles][:, :, 0].mean(axis=1) > INTERFACE
+    assert np.median(lengths[above]) == pytest.approx(1.5 / 15.0, rel=0.15)
+    assert np.median(lengths[~above]) == pytest.approx(2.5 / 15.0, rel=0.15)
     for degree in (2, 4):
         V = fire.FunctionSpace(mesh, "KMV", degree)
         assert count_kmv_dofs(triangles, degree) == V.dim()
@@ -203,9 +232,27 @@ def test_size_law_budget_and_bounds(cpw_mesh: str) -> None:
     assert np.median(field.h[near] / current[near]) < np.median(field.h[far] / current[far])
 
 
+def test_pilot_adjoint_identity_quick(cpw_mesh: str) -> None:
+    """The adjoint indicator closes the dual-weighted-residual identity on a
+    short propagation, quick enough to run by default.
+
+    Parameters
+    ----------
+    cpw_mesh : str
+        Mesh fixture.
+    """
+    pilot = TwoLevelPilot(dictionary(final_time=0.35), two_layer)
+    result = pilot.run(cpw_mesh, compute_indicator=True)
+    assert result.adjoint_shots == [0]
+    assert result.identity_ratios[0] == pytest.approx(-1.0, abs=1e-8)
+    if fire.COMM_WORLD.rank == 0:
+        assert result.indicators.shape == (1, result.centroids.shape[0])
+
+
 @pytest.mark.slow
 @heavy
-def test_pilot_adjoint_identity(cpw_mesh: str) -> None:
+@pytest.mark.parametrize("free_surface", [True, False])
+def test_pilot_adjoint_identity(cpw_mesh: str, free_surface: bool) -> None:
     """The adjoint indicator closes the dual-weighted-residual identity, and
     a checkpointed tape gives the same indicator.
 
@@ -213,11 +260,14 @@ def test_pilot_adjoint_identity(cpw_mesh: str) -> None:
     ----------
     cpw_mesh : str
         Mesh fixture.
+    free_surface : bool
+        Pressure-free or rigid top.
     """
-    pilot = TwoLevelPilot(dictionary(), two_layer, window=late_window)
+    case = dictionary(free_surface=free_surface)
+    pilot = TwoLevelPilot(case, two_layer, window=late_window)
     forward_only = pilot.run(cpw_mesh)
     with_adjoint = pilot.run(cpw_mesh, compute_indicator=True)
-    checkpointed = TwoLevelPilot(dictionary(), two_layer, window=late_window,
+    checkpointed = TwoLevelPilot(case, two_layer, window=late_window,
                                  checkpointing=True, snapshots=8
                                  ).run(cpw_mesh, compute_indicator=True)
 
@@ -232,6 +282,37 @@ def test_pilot_adjoint_identity(cpw_mesh: str) -> None:
         assert np.abs(with_adjoint.indicators).sum() > 0.0
         assert np.allclose(checkpointed.indicators, with_adjoint.indicators,
                            rtol=1e-8, atol=1e-12 * np.abs(with_adjoint.indicators).max())
+
+
+@pytest.mark.slow
+@heavy
+def test_pilot_skips_adjoint_of_accepted_mesh(cpw_mesh: str) -> None:
+    """The adjoint is skipped when the mesh is accepted and completed when
+    only some shots are below the threshold.
+
+    Parameters
+    ----------
+    cpw_mesh : str
+        Mesh fixture.
+    """
+    pilot = TwoLevelPilot(dictionary(n_shots=2), two_layer, window=late_window)
+    full = pilot.run(cpw_mesh, compute_indicator=True)
+    low, high = sorted(full.trace_errors.values())
+    assert low < high
+
+    accepted = pilot.run(cpw_mesh, compute_indicator=True,
+                         skip_indicator_below=1.01 * high)
+    assert accepted.adjoint_shots == []
+    assert accepted.indicators is None
+    assert accepted.trace_errors == pytest.approx(full.trace_errors)
+
+    mixed = pilot.run(cpw_mesh, compute_indicator=True,
+                      skip_indicator_below=0.5 * (low + high))
+    assert len(mixed.repeated_shots) == 1
+    assert sorted(mixed.adjoint_shots) == [0, 1]
+    if fire.COMM_WORLD.rank == 0:
+        assert np.allclose(mixed.indicators, full.indicators,
+                           rtol=1e-8, atol=1e-12 * np.abs(full.indicators).max())
 
 
 @pytest.mark.slow

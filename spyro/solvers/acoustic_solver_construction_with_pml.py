@@ -154,6 +154,10 @@ def construct_solver_or_matrix_with_pml(wave):
     ``.dat`` access for receiver output, etc.). They share storage with ``X_n``/``X_nm1``
     so writes to the mixed Functions are visible through these views.
     """
+    if wave.free_surface:
+        raise NotImplementedError(
+            "free_surface is not implemented together with a PML."
+        )
 
     # Build mixed function space
     V = wave.function_space

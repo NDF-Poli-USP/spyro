@@ -175,6 +175,9 @@ class AdaptiveSizeField:
     ----------
     h : numpy.ndarray or None
         Size on the grid for the last :meth:`set_scale`; ``None`` before.
+    grid : VelocityGrid or None
+        The same size as a grid that :func:`~spyro.adaptivity.generate_mesh`
+        accepts; ``None`` before :meth:`set_scale`.
     h_min : numpy.ndarray
         Lower bound of the size, set by :meth:`set_floor`.
     """
@@ -191,7 +194,7 @@ class AdaptiveSizeField:
         self.h_min = np.zeros_like(self.h_max)
         self.shape = self.h_max ** (order / (order + 2)) * rho ** (-1.0 / (order + 2))
         self.h = None
-        self._sampler = None
+        self.grid = None
 
     def set_floor(self, velocity: np.ndarray, frequency: float,
                   equivalent_cpw: float, cmax_ratio: float = 1.25) -> None:
@@ -270,7 +273,7 @@ class AdaptiveSizeField:
         return math.sqrt(lo * hi)
 
     def set_scale(self, scale: float) -> None:
-        """Fix the scale used by :meth:`__call__`.
+        """Fix the scale of the size handed to the mesh generator.
 
         Parameters
         ----------
@@ -280,32 +283,8 @@ class AdaptiveSizeField:
         Returns
         -------
         None
-            The size is stored in :attr:`h`.
+            The size is stored in :attr:`h` and :attr:`grid`.
         """
         self.h = self.size(scale)
-        self._sampler = VelocityGrid(self.h, self.z[0], self.x[0],
-                                     self.spacing, self.spacing)
-
-    def __call__(self, z: float, x: float) -> float:
-        """Bilinear interpolation of the size at a point.
-
-        Parameters
-        ----------
-        z : float
-            Depth.
-        x : float
-            Horizontal position.
-
-        Returns
-        -------
-        float
-            Target edge length.
-
-        Raises
-        ------
-        RuntimeError
-            If :meth:`set_scale` has not been called.
-        """
-        if self._sampler is None:
-            raise RuntimeError("Call set_scale before sampling the size field.")
-        return float(self._sampler(z, x))
+        self.grid = VelocityGrid(self.h, self.z[0], self.x[0],
+                                 self.spacing, self.spacing)

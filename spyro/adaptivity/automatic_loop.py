@@ -29,7 +29,12 @@ Iteration :math:`k`:
 With ``initial_cpw="auto"`` an initial CPW phase raises :math:`C` from
 ``cpw_start`` by ``cpw_factor`` until the pilot is reliable
 (:math:`\\eta \\le \\eta_{conf}`) or ``cpw_max`` is reached; its last mesh is
-the first mesh of the loop, common to the three strategies.
+the first mesh of the loop, common to the three strategies, and its pilot is
+reused when no indicator is needed.
+
+The adjoint is computed only when a new mesh will be built: it is skipped on
+the last allowed iteration and, through ``skip_indicator_below``, whenever the
+pilot accepts the mesh.
 """
 
 from __future__ import annotations
@@ -37,13 +42,15 @@ from __future__ import annotations
 import json
 import math
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
+from typing import TypeVar
 
 import numpy as np
 import firedrake as fire
+from mpi4py import MPI
 
 from .mesh_generation import (RectangularDomain, count_kmv_dofs,
                               generate_mesh, local_mesh_size,
@@ -51,6 +58,9 @@ from .mesh_generation import (RectangularDomain, count_kmv_dofs,
 from .pilot import PilotResult, TwoLevelPilot
 from .size_fields import (AdaptiveSizeField, VelocityGrid, adjoint_density,
                           gradient_density)
+
+
+T = TypeVar("T")
 
 
 class AdaptationStrategy(StrEnum):
@@ -162,7 +172,7 @@ class AutomaticMeshAdaptation:
                  frequency: float, degree: int, output_dir: str | Path,
                  parameters: LoopParameters,
                  conforming_depths: Sequence[float] = (),
-                 comm: object = None) -> None:
+                 comm: MPI.Comm | None = None) -> None:
         self.strategy = AdaptationStrategy(strategy)
         self.pilot = pilot
         self.velocity = velocity
@@ -191,7 +201,7 @@ class AutomaticMeshAdaptation:
         }
 
     # ------------------------------------------------------------ meshes
-    def _on_root(self, build: callable) -> object:
+    def _on_root(self, build: Callable[[], T]) -> T:
         """Run ``build`` on rank 0 and broadcast its result.
 
         Parameters
@@ -201,7 +211,7 @@ class AutomaticMeshAdaptation:
 
         Returns
         -------
-        object
+        T
             The broadcast result.
         """
         value = build() if self.comm.rank == 0 else None
@@ -240,10 +250,19 @@ class AutomaticMeshAdaptation:
         path = self.output_dir / "meshes" / f"{name}.msh"
 
         def build() -> tuple[Path, int]:
+            """Generate the mesh unless it exists, and count its DOFs.
+
+            Returns
+            -------
+            tuple
+                Mesh path and its number of degrees of freedom.
+            """
             if not path.exists():
-                generate_mesh(path, self.domain,
-                              lambda z, x: float(self.velocity(z, x)) / (cpw * self.frequency),
-                              self.conforming_depths, seed=self.parameters.seed)
+                spacing = self.parameters.grid_spacing
+                size = VelocityGrid(self.grid_velocity / (cpw * self.frequency),
+                                    self.z[0], self.x[0], spacing, spacing)
+                generate_mesh(path, self.domain, size, self.conforming_depths,
+                              seed=self.parameters.seed)
             return path, self._dofs(path)
 
         return self._on_root(build)
@@ -274,6 +293,13 @@ class AutomaticMeshAdaptation:
         p = self.parameters
 
         def build() -> tuple[Path, int]:
+            """Generate the mesh, rescaling until it meets the budget.
+
+            Returns
+            -------
+            tuple
+                Mesh path and its number of degrees of freedom.
+            """
             points, triangles = read_triangulation(current)
             current_size = local_mesh_size(points, triangles, self.z, self.x)
             field = AdaptiveSizeField(density, current_size, self.z, self.x, p.order)
@@ -286,7 +312,7 @@ class AutomaticMeshAdaptation:
             dofs = 0
             for _ in range(6):
                 field.set_scale(scale)
-                generate_mesh(path, self.domain, field, self.conforming_depths,
+                generate_mesh(path, self.domain, field.grid, self.conforming_depths,
                               seed=p.seed)
                 dofs = self._dofs(path)
                 if abs(dofs / target - 1.0) <= p.dof_tolerance:
@@ -298,26 +324,25 @@ class AutomaticMeshAdaptation:
 
     # ------------------------------------------------------------ pilots
     @staticmethod
-    def _work(result: PilotResult, adjoint: bool) -> dict:
+    def _work(result: PilotResult) -> dict:
         """Cost of a pilot in DOF-steps and wall time.
 
         Parameters
         ----------
         result : PilotResult
             The pilot.
-        adjoint : bool
-            Whether the adjoint was computed.
 
         Returns
         -------
         dict
-            Work and wall time of the forwards and of the adjoint.
+            Work and wall time of the forwards and of the adjoints. Shots
+            propagated twice (see :meth:`TwoLevelPilot.run`) count twice.
         """
-        shots = len(result.trace_errors)
+        runs = len(result.trace_errors) + len(result.repeated_shots)
         seconds = np.array(list(result.seconds.values()))
         return {
-            "work_forwards": (result.dofs_coarse + result.dofs_fine) * result.steps * shots,
-            "work_adjoint": result.dofs_fine * result.steps * shots if adjoint else 0,
+            "work_forwards": (result.dofs_coarse + result.dofs_fine) * result.steps * runs,
+            "work_adjoint": result.dofs_fine * result.steps * len(result.adjoint_shots),
             "wall_forwards_s": float(seconds[:, :2].sum()),
             "wall_adjoint_s": float(seconds[:, 2].sum()),
         }
@@ -336,19 +361,21 @@ class AutomaticMeshAdaptation:
             path.write_text(json.dumps(self.report, indent=1, default=str))
 
     # ------------------------------------------------------------ loop
-    def initial_mesh(self) -> tuple[Path, int, float]:
+    def initial_mesh(self) -> tuple[Path, int, float, PilotResult | None]:
         """First mesh of the loop, from a fixed CPW or the initial CPW phase.
 
         Returns
         -------
         tuple
-            Mesh path, its degrees of freedom and its cells per wavelength.
+            Mesh path, its degrees of freedom, its cells per wavelength and the
+            forward-only pilot of that mesh from the initial phase (``None``
+            with a fixed initial CPW, where no pilot has run yet).
         """
         p = self.parameters
         if str(p.initial_cpw).lower() != "auto":
             cpw = float(p.initial_cpw)
             path, dofs = self.cpw_mesh(cpw)
-            return path, dofs, cpw
+            return path, dofs, cpw, None
         cpw = p.cpw_start
         while True:
             path, dofs = self.cpw_mesh(cpw)
@@ -356,7 +383,7 @@ class AutomaticMeshAdaptation:
             eta = result.worst_trace_error
             record = {"cpw": cpw, "mesh": path.name, "dofs": dofs,
                       "eta_per_shot": result.trace_errors, "eta_worst": eta,
-                      **self._work(result, False)}
+                      **self._work(result)}
             if eta <= p.theta * p.tolerance:
                 record["decision"] = "tolerance already met"
             elif eta > p.eta_reliable and cpw * p.cpw_factor <= p.cpw_max + 1e-9:
@@ -368,7 +395,7 @@ class AutomaticMeshAdaptation:
             self.report["initial_phase"].append(record)
             self._write()
             if record["decision"] != "pilot not reliable: raise C":
-                return path, dofs, cpw
+                return path, dofs, cpw, result
             cpw *= p.cpw_factor
 
     def run(self) -> dict:
@@ -381,13 +408,28 @@ class AutomaticMeshAdaptation:
         """
         p = self.parameters
         start = time.perf_counter()
-        mesh, dofs, cpw0 = self.initial_mesh()
+        mesh, dofs, cpw0, initial_result = self.initial_mesh()
         self.report["initial_cpw_effective"] = cpw0
         dofs0, cpw = dofs, cpw0
         history = []
         adjoint = self.strategy is AdaptationStrategy.ADJOINT
+        threshold = p.theta * p.tolerance
+        reused_initial = False
         for k in range(p.max_iterations + 1):
-            result = self.pilot.run(str(mesh), compute_indicator=adjoint)
+            # The indicator only serves to build the next mesh: not needed on
+            # the last allowed iteration, and skipped by the pilot when the
+            # mesh turns out to be accepted.
+            need_indicator = adjoint and k < p.max_iterations
+            if k == 0 and initial_result is not None and (
+                    not need_indicator
+                    or initial_result.worst_trace_error <= threshold):
+                # The initial phase already ran this forward-only pilot.
+                result = initial_result
+                reused_initial = True
+            else:
+                result = self.pilot.run(
+                    str(mesh), compute_indicator=need_indicator,
+                    skip_indicator_below=threshold if need_indicator else None)
             eta = result.worst_trace_error
             history.append((dofs, eta))
             rate = p.p0
@@ -396,14 +438,17 @@ class AutomaticMeshAdaptation:
                             / math.log(history[-1][0] / history[-2][0]))
                 if 0.5 <= observed <= 6.0:
                     rate = observed
-            accept = eta <= p.theta * p.tolerance
+            accept = eta <= threshold
             iteration = {
                 "k": k, "mesh": mesh.name, "dofs": dofs,
                 "cpw_equivalent": cpw0 * math.sqrt(dofs / dofs0),
                 "eta_per_shot": result.trace_errors, "eta_worst": eta,
                 "steps": result.steps, "dt": result.dt, "rate_used": rate,
+                "pilot_reused": k == 0 and reused_initial,
+                "adjoint_shots": list(result.adjoint_shots),
+                "repeated_shots": list(result.repeated_shots),
                 "identity_ratios": result.identity_ratios,
-                **self._work(result, adjoint),
+                **self._work(result),
                 "decision": ("accept" if accept else
                              "iteration limit" if k == p.max_iterations else "refine"),
             }
@@ -413,7 +458,7 @@ class AutomaticMeshAdaptation:
                 break
 
             growth = min(max(p.growth_safety
-                             * (eta / (p.theta * p.tolerance)) ** (2.0 / rate),
+                             * (eta / threshold) ** (2.0 / rate),
                              p.growth_min), p.growth_max)
             target = int(dofs * growth)
             if self.strategy is AdaptationStrategy.CPW:
@@ -440,9 +485,9 @@ class AutomaticMeshAdaptation:
         self.report["accepted"] = final["decision"] == "accept"
         self.report["accepted_mesh"] = str(mesh)
         phase = self.report["initial_phase"]
-        # The last mesh of the initial phase is the first of the loop: its
-        # forward-only pilot is extra work only for the adjoint strategy.
-        counted = phase if adjoint else phase[:-1]
+        # The pilot of the last mesh of the initial phase is counted once: in
+        # iteration 0 when that iteration reused it, in the phase otherwise.
+        counted = phase[:-1] if reused_initial else phase
         iterations = self.report["iterations"]
         self.report["search_cost"] = {
             "work": sum(i["work_forwards"] + i["work_adjoint"] for i in iterations)

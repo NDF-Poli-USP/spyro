@@ -11,7 +11,7 @@ from .mesh_generation import (RectangularDomain, generate_mesh,
                               count_kmv_dofs)
 from .size_fields import (VelocityGrid, AdaptiveSizeField, gradient_density,
                           adjoint_density)
-from .pilot import TwoLevelPilot, PilotResult, critical_time_step
+from .pilot import TwoLevelPilot, PilotResult
 
 __all__ = [
     "RectangularDomain",
@@ -25,5 +25,4 @@ __all__ = [
     "adjoint_density",
     "TwoLevelPilot",
     "PilotResult",
-    "critical_time_step",
 ]

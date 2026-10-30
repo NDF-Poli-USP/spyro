@@ -86,10 +86,14 @@ def construct_solver_or_matrix_no_pml(wave):
     wave.lhs = fire.lhs(form)
     wave.source_function = fire.Cofunction(V.dual())
 
+    # Pressure-free top surface (marker 1). Without it the top is natural:
+    # zero normal derivative, i.e. a rigid surface.
+    bcs = fire.DirichletBC(V, 0.0, 1) if wave.free_surface else None
+
     lin_var = fire.LinearVariationalProblem(
         wave.lhs,
         wave.rhs + wave.source_function,
-        u_np1, constant_jacobian=True)
+        u_np1, bcs=bcs, constant_jacobian=True)
     solver_parameters = dict(wave.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
     wave.solver = fire.LinearVariationalSolver(

@@ -39,12 +39,20 @@ growth, cost in DOF-steps and wall time) and the accepted mesh.
 
 - Positions are local: `x` starts at the left end of the absorbing pad,
   because spyro requires `0 <= x <= length_x`.
-- Boundary conditions are spyro's first-order non-reflecting conditions on
-  the bottom and sides, with a natural top boundary.
+- The top is a pressure-free surface (`u = 0`), as in the calibration study;
+  `--rigid-top` uses the natural (Neumann) condition. The bottom and sides
+  carry spyro's first-order non-reflecting conditions.
+- The adjoint is computed only when a new mesh will be built: it is skipped
+  when the pilot accepts the mesh and on the last allowed iteration. The
+  forward-only pilot of the initial phase is reused by the first iteration
+  when no indicator is needed.
 - The indicator is accumulated during the reverse sweep, so no adjoint
-  trajectory is kept. Without checkpointing the tape still keeps every
-  refined time step; `--snapshots N` checkpoints it, keeping `N` steps in
-  memory and recomputing the forward in between.
+  trajectory is kept. The refined tape is checkpointed by default: `--snapshots N`
+  (default 200) keeps `N` checkpoints in memory and recomputes the forward in
+  between. `--no-checkpointing` keeps every refined time step on the tape
+  instead, which avoids the recomputation but needs memory for all steps.
+- Checkpointing covers the refined tape only: the coarse states, which the
+  indicator needs at every step, are still all kept in memory.
 - `--accumulate-every k` accumulates the indicator every `k` steps (cheaper,
   approximate); the default `1` is exact.
 

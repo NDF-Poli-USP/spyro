@@ -1,4 +1,4 @@
-"""Triangular meshes of a padded rectangle from a mesh-size function.
+"""Triangular meshes of a padded rectangle from a mesh-size grid.
 
 The meshes follow spyro's convention: the first coordinate is the depth ``z``
 (negative downwards, ``z = 0`` at the surface) and the second is ``x``.
@@ -19,12 +19,15 @@ edges, so that the velocity jump is not smeared across a layer of elements.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+import tempfile
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 
 import numpy as np
+
+from .size_fields import VelocityGrid
 
 try:
     import gmsh
@@ -118,7 +121,7 @@ class RectangularDomain:
 def generate_mesh(
     path: str | Path,
     domain: RectangularDomain,
-    size: Callable[[float, float], float],
+    size: VelocityGrid,
     conforming_depths: Sequence[float] = (),
     seed: int = 0,
     algorithm: int = 6,
@@ -134,8 +137,10 @@ def generate_mesh(
         Output ``.msh`` file (gmsh format 2.2).
     domain : RectangularDomain
         Domain to mesh.
-    size : callable
-        Target edge length ``size(z, x)`` in km.
+    size : VelocityGrid
+        Target edge length (km) on a regular ``(z, x)`` grid covering the
+        domain. gmsh interpolates it linearly as a structured background
+        field, without calling back into Python.
     conforming_depths : sequence of float, optional
         Depths of horizontal interfaces imposed as mesh edges.
     seed : int, optional
@@ -206,12 +211,47 @@ def generate_mesh(
         gmsh.option.setNumber("Mesh.Smoothing", 10)
         gmsh.option.setNumber("Mesh.RandomSeed", seed + 1)
         gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)
-        gmsh.model.mesh.setSizeCallback(
-            lambda dim, tag, z, x, y, lc: float(size(z, x)))
-        gmsh.model.mesh.generate(2)
+        with tempfile.TemporaryDirectory() as folder:
+            field = gmsh.model.mesh.field.add("Structured")
+            gmsh.model.mesh.field.setString(
+                field, "FileName", str(_write_structured_size(size, Path(folder))))
+            gmsh.model.mesh.field.setNumber(field, "TextFormat", 1)
+            gmsh.model.mesh.field.setAsBackgroundMesh(field)
+            gmsh.model.mesh.generate(2)
         gmsh.write(str(path))
     finally:
         gmsh.finalize()
+    return path
+
+
+def _write_structured_size(size: VelocityGrid, folder: Path) -> Path:
+    """Write a size grid in the text format of gmsh's ``Structured`` field.
+
+    The format is the origin, the spacings and the node counts in gmsh's
+    ``(x, y, z)`` order, followed by the values with the last index varying
+    fastest. gmsh's ``x`` and ``y`` are spyro's ``z`` and ``x``; the grid is
+    given two identical layers in gmsh's ``z``, one on each side of the
+    ``z = 0`` plane of the mesh.
+
+    Parameters
+    ----------
+    size : VelocityGrid
+        Target edge length on a regular ``(z, x)`` grid.
+    folder : pathlib.Path
+        Directory of the file.
+
+    Returns
+    -------
+    pathlib.Path
+        The written file.
+    """
+    n_z, n_x = size.values.shape
+    path = folder / "size.txt"
+    with path.open("w") as stream:
+        stream.write(f"{size.z0!r} {size.x0!r} -1.0\n")
+        stream.write(f"{size.dz!r} {size.dx!r} 2.0\n")
+        stream.write(f"{n_z} {n_x} 2\n")
+        np.savetxt(stream, np.repeat(size.values.ravel(), 2))
     return path
 
 
