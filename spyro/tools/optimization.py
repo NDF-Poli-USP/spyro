@@ -20,6 +20,23 @@ from ..reduced_functionals.lumped_l2 import _inverse_sqrt_lumped_mass
 from ..utils.physical_parameters import as_list
 
 
+# pyadjoint's TAOSolver._tao_reasons reads PETSc.TAO.Reason, which petsc4py 3.26
+# removed in favour of PETSc.TAO.ConvergedReason. PETSc.TAO is an immutable C
+# extension type that cannot be used as an attribute alias; instead the property
+# is overridden in the pyadjoint's TAOSolver class.
+from petsc4py import PETSc
+if not hasattr(PETSc.TAO, "Reason") and hasattr(PETSc.TAO, "ConvergedReason"):
+    from pyadjoint.optimization.tao_solver import TAOSolver
+
+    def _tao_reasons(self, _PETSc=PETSc):
+        return {
+            int(getattr(_PETSc.TAO.ConvergedReason, key)): key
+            for key in dir(_PETSc.TAO.ConvergedReason)
+            if not key.startswith("_")
+        }
+    TAOSolver._tao_reasons = property(_tao_reasons)
+
+
 def tao_bounds(bound, controls):
     """Shape a bound specification into what TAO takes.
 
@@ -59,7 +76,7 @@ def tao_bounds(bound, controls):
     if len(bounds) != len(controls):
         raise ValueError(
             f"{len(controls)} controls are being optimized, so the bounds "
-            f"take that many entries; {len(bounds)} were given.",
+            f"take that many entries {len(bounds)} were given.",
         )
 
     shaped = []
@@ -251,7 +268,7 @@ def minimize_with_tao(
         return lumped_functional.map_result(as_list(solver.solve()))
     except TAOConvergenceError as error:
         warnings.warn(
-            f"{error} Returning the last iterate; raise the iteration limit "
+            f"{error} Returning the last iterate raise the iteration limit "
             "or loosen the tolerances in the TAO options if the optimization "
             "is meant to run to convergence.",
         )
