@@ -8,6 +8,14 @@ mpiexec -n X_CORES python3 demoname.py
 
 where X_CORES is the required number of MPI processes and demo_name.py is the name of the demo script.
 
+## Automatic mesh adaptation
+
+[Automatic mesh loop on a Marmousi2 window](automatic_mesh_adaptation/README.md)
+refines KMV meshes until a two-level pilot estimate of the trace error meets a
+tolerance, choosing each mesh by uniform cells per wavelength, the velocity
+gradient or an adjoint (dual-weighted residual) indicator obtained with the
+automated adjoint.
+
 ## Literate demos
 
 [Elastic FWI with the automated adjoint](elastic_fwi_automated_adjoint/elastic_fwi_automated_adjoint.py.rst)
