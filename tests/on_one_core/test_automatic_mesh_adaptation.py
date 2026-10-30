@@ -7,6 +7,8 @@ weighted by the automated adjoint of the refined scheme, sums to
 ``-2 J`` of the refined solution.
 """
 
+import os
+
 import numpy as np
 import pytest
 
@@ -20,6 +22,10 @@ from spyro.adaptivity.automatic_loop import (AutomaticMeshAdaptation,
 from spyro.adaptivity.size_fields import VelocityGrid
 
 INTERFACE = -0.3
+# The pilot and loop tests take minutes (several refined adjoint solves);
+# they run only when SPYRO_HEAVY_TESTS=1.
+heavy = pytest.mark.skipif(os.environ.get("SPYRO_HEAVY_TESTS") != "1",
+                           reason="heavy test: set SPYRO_HEAVY_TESTS=1 to run")
 DOMAIN = RectangularDomain(z_min=-1.0, x_min=0.0, x_max=1.2, pad=0.2)
 RECEIVERS = [(-0.1, x) for x in np.linspace(0.2, 1.0, 9)]
 
@@ -198,6 +204,7 @@ def test_size_law_budget_and_bounds(cpw_mesh: str) -> None:
 
 
 @pytest.mark.slow
+@heavy
 def test_pilot_adjoint_identity(cpw_mesh: str) -> None:
     """The adjoint indicator closes the dual-weighted-residual identity, and
     a checkpointed tape gives the same indicator.
@@ -228,6 +235,7 @@ def test_pilot_adjoint_identity(cpw_mesh: str) -> None:
 
 
 @pytest.mark.slow
+@heavy
 @pytest.mark.parametrize("strategy", ["cpw", "gradient", "adjoint"])
 def test_automatic_loop(strategy: str, tmp_path: pytest.TempPathFactory) -> None:
     """Each strategy refines from the same initial mesh until it accepts.
