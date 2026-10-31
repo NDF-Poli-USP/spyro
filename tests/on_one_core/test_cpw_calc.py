@@ -42,11 +42,11 @@ def make_parameters(method: str, degree: int) -> dict:
         "timestep_calculation": "float",
         "timestep": 0.002,
         "desired_degree": degree,
-        "C_initial": 2.5,
+        "C_initial": 0.9,
         "C_max": 2.5,
         "accepted_error_threshold": 0.01,
         "C_accuracy": 0.1,
-        "search_direction": "backward",
+        "search_direction": "forward",
     }
 
 
@@ -70,6 +70,6 @@ def test_acoustic_cpw_search_quads() -> None:
     cpw = calculator.find_minimum()
 
     errors = {e.cpw: e.error for e in calculator.search_history}
-    assert np.isclose(cpw, 2.1)
+    assert np.isclose(cpw, 1.1)
     assert errors[cpw] <= 0.01
     assert errors[round(cpw - 0.1, 10)] > 0.01
