@@ -798,7 +798,6 @@ def test_fromfile_mat_prop(wave_instance, cell_type):
     SpyroEnsemble.print(
         "Material Property from file: Correctly raised "
         f"NotImplementedError: {exc_info.value}",
-        flush=True,
     )
 
 
