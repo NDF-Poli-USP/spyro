@@ -16,9 +16,13 @@ Run it with::
 
     python3 demos/acoustic_homogeneous_cpw.py
 
-It saves the search history to ``p<degree>_cpw_results.txt``. A full
-search takes several minutes per evaluated mesh.
+It reads the analytical reference from :data:`REFERENCE_FILE`, so it runs
+from any working directory, and saves the search history to
+``p<degree>_cpw_results.txt``. A full search takes several minutes per
+evaluated mesh.
 """
+
+from pathlib import Path
 
 import spyro
 from spyro.tools.cells_per_wavelength_calculator import (
@@ -30,6 +34,13 @@ from spyro.tools.cells_per_wavelength_calculator import (
 FREQUENCY = 5.0
 #: Acoustic velocity of the medium, in km/s.
 VELOCITY = 1.5
+#: Stored analytical receiver data of this demo's acquisition.
+REFERENCE_FILE = (
+    Path(__file__).resolve().parents[1]
+    / "tests"
+    / "inputfiles"
+    / "acoustic_homogeneous_cpw_reference.npy"
+)
 
 
 def run(
@@ -64,10 +75,10 @@ def run(
         Largest cells-per-wavelength evaluated. Default is
         :data:`~spyro.tools.cells_per_wavelength_calculator.MAX_CPW`.
     load_reference : bool, optional
-        Load the reference receiver data from
+        Load the reference receiver data from :data:`REFERENCE_FILE`. If
+        False, it is computed and saved to
         ``acoustic_homogeneous_cpw_reference.npy`` in the working
-        directory. If False, it is computed and saved there. Default is
-        True.
+        directory. Default is True.
 
     Returns
     -------
@@ -101,6 +112,10 @@ def run(
         "save_reference": not load_reference,
         **threshold,
     }
+    if load_reference:
+        # A computed reference goes to the working directory instead, so the
+        # stored file is never overwritten
+        parameters["reference_solution_file"] = str(REFERENCE_FILE)
 
     calculator = spyro.tools.MeshingParameterCalculator(parameters)
     cpw = calculator.find_minimum(savetxt=True)
