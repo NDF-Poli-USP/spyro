@@ -41,6 +41,7 @@ jobs:
         apt-get update \
         && apt-get -y install git python3 \
         && apt-get -y install gmsh patchelf \
+        && pip3 install gmsh \
         && pip3 install segyio \
         && apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk \
         && pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
@@ -104,6 +105,7 @@ jobs:
         apt-get update \
         && apt-get -y install git python3 \
         && apt-get -y install gmsh patchelf \
+        && pip3 install gmsh \
         && pip3 install segyio \
         && apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk \
         && pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
@@ -194,6 +196,7 @@ jobs:
         apt-get update \
         && apt-get -y install git python3 \
         && apt-get -y install gmsh patchelf \
+        && pip3 install gmsh \
         && pip3 install segyio \
         && apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk \
         && pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
