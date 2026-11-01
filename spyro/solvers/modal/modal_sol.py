@@ -1,15 +1,17 @@
 from firedrake import LinearEigenproblem, LinearEigensolver
 from numpy import abs, amax, array, asarray, eye, imag, real, sqrt, unique
 from scipy.sparse.linalg import eigs, eigsh, lobpcg, spilu
-from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .modal_forms_and_matrices import assemble_sparse_matrices, weak_forms
 from .modal_rq_matrices import generate_eigenfunctions, matrices_rayleigh_quotient
+from ...mpi.spyro_mpi import SpyroEnsemble
 from ...utils.error_management import (
     validate_data_structure,
     validate_firedrake_parameter,
     validate_numeric,
     validate_parameter,
 )
+from ...version_control import is_firedrake_new
+
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -266,32 +268,44 @@ class Modal_Solver:
             ksp_type = krylovsch_config[self.method]["ksp"]
             pc_type = krylovsch_config[self.method]["pc"]
 
-        opts = {
-            "eps_gen_hermitian": None,  # Problem is Hermitian
-            "eps_type": "krylovschur",  # Robust, widely used eigensolver
-            "eps_tol": 1e-6,  # Tight tolerance for accuracy
-            "eps_max_it": 200,  # Reasonable iteration cap
-            "eps_monitor": None,  # Print convergence info
-            "ksp_type": ksp_type,  # Options for large problems
-            "pc_type": pc_type,  # Options for large problems
-            "eps_converged_reason": None,  # Print stop reason
-            # "eps_monitor_all": None,   # More verbose than eps_monitor
-            # "eps_view": None,          # Print solver configuration before solving
-        }
+        opts = {"eps_gen_hermitian": None,  # Problem is Hermitian
+                "eps_type": "krylovschur",  # Robust, widely used eigensolver
+                # subspace, arnoldi, krylovschur, lapack
+                "eps_tol": 1e-6,  # Tight tolerance for accuracy
+                "eps_max_it": 200,  # Reasonable iteration cap
+                "eps_monitor": None,  # Print convergence info
+                "ksp_type": ksp_type,  # Options for large problems
+                "pc_type": pc_type,  # Options for large problems
+                "eps_converged_reason": None,  # Print stop reason
+                # "eps_monitor_all": None,   # More verbose than eps_monitor
+                # "eps_view": None,          # Print solver configuration before solving
+                }
 
-        if self.calc_max_dt:
-            # Largest eigenvalues magnitude
-            opts.update({"eps_largest_magnitude": None,  # Eigenvalues of largest |λ|
-                         "st_type": "shift",  # Override Firedrake's automatic sinvert
-                         })
-            # subspace, arnoldi, krylovschur, lapack
+        if is_firedrake_new():
+
+            if self.calc_max_dt:
+                # Largest eigenvalues magnitude
+                opts.update({"eps_largest_magnitude": None,  # Largest |λ|
+                             "st_type": "shift",  # Override Firedrake's automatic sinvert
+                             })
+            else:
+                # Smallest eigenvalues magnitude
+                opts.update({"st_type": "sinvert",  # Useful for interior eigenvalues
+                             "st_shift": 1e-6,  # Stabilizes Neumann BC null space
+                             "eps_target": 0.0,  # Target value for sorting
+                             "eps_target_magnitude": None  # Sort by distance to target
+                             })
         else:
-            # Smallest eigenvalues magnitude
-            opts.update({"st_type": "sinvert",  # Useful for interior eigenvalues
-                         "st_shift": 1e-6,  # Stabilizes Neumann BC null space
-                         "eps_target": 0.0,  # Target value for sorting
-                         "eps_target_magnitude": None  # Sort by distance to target
-                         })
+            opts = {"st_shift": 1e-6,  # Stabilizes Neumann BC null space
+                    "st_type": "sinvert",  # Useful for interior eigenvalues
+                    }
+
+            if self.calc_max_dt:
+                # Largest eigenvalues magnitude
+                opts.update({"eps_largest_magnitude": None})  # Largest |λ|
+            else:
+                # Smallest eigenvalues magnitude
+                opts.update({"eps_smallest_magnitude": None})  # Smallest |λ|
 
         eigenproblem = LinearEigenproblem(a, M=m)
         eigensolver = LinearEigensolver(eigenproblem, n_evals=k, solver_parameters=opts)
