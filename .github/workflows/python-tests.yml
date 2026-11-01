@@ -25,7 +25,7 @@ jobs:
     # Runs on all pushes and pull requests for quick feedback
 
     container:
-      image: firedrakeproject/firedrake:2026.4.0  # firedrake:2025.4.1
+      image: firedrakeproject/firedrake:2025.10.4  # firedrake:2025.4.1
       options: --user root  # Ensures it can install packages if needed
 
     steps:
@@ -89,7 +89,7 @@ jobs:
     # Only runs on non-draft PRs after fast tests pass - saves resources
 
     container:
-      image: firedrakeproject/firedrake:2026.4.0 # firedrake:2025.4.1
+      image: firedrakeproject/firedrake:2025.10.4 # firedrake:2025.4.1
       options: --user root  # Ensures it can install packages if needed
 
     steps:
