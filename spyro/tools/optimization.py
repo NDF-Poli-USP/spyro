@@ -26,8 +26,6 @@ from ..utils.physical_parameters import as_list
 # is overridden in the pyadjoint's TAOSolver class.
 from petsc4py import PETSc
 if not hasattr(PETSc.TAO, "Reason") and hasattr(PETSc.TAO, "ConvergedReason"):
-    from pyadjoint.optimization.tao_solver import TAOSolver
-
     def _tao_reasons(self, _PETSc=PETSc):
         return {
             int(getattr(_PETSc.TAO.ConvergedReason, key)): key

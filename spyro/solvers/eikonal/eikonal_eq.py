@@ -172,9 +172,6 @@ class Eikonal_Modeling():
             fdim = 3**0.5
         rf = np.round(np.arccosh(np.sqrt(1e4)) / (fdim * lmin), 0)
 
-        # Integration domain
-        dx = self.define_int_dom(V)
-
         sou_func = ""
         for source_coord in self.source_locations:
 
