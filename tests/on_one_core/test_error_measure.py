@@ -196,7 +196,8 @@ class TestMeasureError:
         """Test peak error with signal without peaks."""
         signal = np.array([0, 0, 0, 0])
         with pytest.warns(UserWarning, match="No peak observed"):
-            MeasureError.calculate_peak_error(signal, signal)
+            peak_error, _ = MeasureError.calculate_peak_error(signal, signal)
+        assert np.isnan(peak_error)
 
     def test_integral_error_identical_signals(self, sample_signals):
         """Test integral error with identical signals."""

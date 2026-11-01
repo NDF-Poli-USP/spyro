@@ -2,9 +2,13 @@ import spyro
 import math
 import pytest
 import numpy as np
-from firedrake import PointEvaluator
+import firedrake
+pnt_eval_available = hasattr(firedrake, "PointEvaluator")
+if pnt_eval_available:
+    from firedrake import PointEvaluator
 
 
+@pytest.mark.skipif(not pnt_eval_available, reason="PointEvaluator requires a newer Firedrake")
 @pytest.mark.newer_firedrake
 def test_camembert_forward():
     dictionary = {}
@@ -27,6 +31,7 @@ def test_camembert_forward():
     assert all([test1, test2, test3])
 
 
+@pytest.mark.skipif(not pnt_eval_available, reason="PointEvaluator requires a newer Firedrake")
 @pytest.mark.newer_firedrake
 def test_rectangle_forward():
     dictionary = {}
@@ -78,6 +83,7 @@ def test_acoustic_local_abc():
     assert last_acoustic_energy < 7e-7  # The expected value was found empirically
 
 
+@pytest.mark.skipif(not pnt_eval_available, reason="PointEvaluator requires a newer Firedrake")
 @pytest.mark.newer_firedrake
 def test_immersed_polygon_forward():
     from spyro.examples.immersed_polygon import Polygon_acoustic
