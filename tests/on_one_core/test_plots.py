@@ -62,7 +62,6 @@ def test_plot():
 
 
 @pytest.mark.skipif(not is_seismicmesh_installed(), reason="SeismicMesh is not installed")
-@pytest.mark.older_firedrake
 def test_plot_mesh_sizes():
     mesh_filename = "test_mesh_for_plots.msh"
     Lz = 1.0
