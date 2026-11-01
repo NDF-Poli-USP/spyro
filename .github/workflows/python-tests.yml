@@ -25,7 +25,7 @@ jobs:
     # Runs on all pushes and pull requests for quick feedback
 
     container:
-      image: firedrakeproject/firedrake:2025.4.1
+      image: firedrakeproject/firedrake:2026.4.0  # firedrake:2025.4.1
       options: --user root  # Ensures it can install packages if needed
 
     steps:
@@ -88,7 +88,7 @@ jobs:
     # Only runs on non-draft PRs after fast tests pass - saves resources
 
     container:
-      image: firedrakeproject/firedrake:2025.4.1
+      image: firedrakeproject/firedrake:2026.4.0 # firedrake:2025.4.1
       options: --user root  # Ensures it can install packages if needed
 
     steps:
@@ -169,7 +169,7 @@ jobs:
     - name: Post-run cleanup
       if: always()
       run: find . -delete
-  
+
   new-firedrake-tests:
     name: Updated Firedrake tests
     runs-on: self-hosted
@@ -228,7 +228,7 @@ jobs:
           mpiexec -n 2 pytest tests/parallel/test_parallel_io.py
           mpiexec -n 2 pytest tests/parallel/test_forward_multiple_serial_shots.py
           mpiexec -n 2 pytest tests/parallel/test_vom_receivers.py
-    
+
     - name: Running parallel tests for inversion
       run: |
           make clean
