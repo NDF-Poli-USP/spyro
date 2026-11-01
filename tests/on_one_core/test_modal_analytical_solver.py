@@ -160,9 +160,9 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     layer_shape = "rectangular" if degree_layer is None else "hypershape"
 
     # Get simulation parameters
-    pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
+    pprint(f"\nMesh Size: {1e3 * edge_length: .4f} m", comm=comm)
     pprint(f"Element Geometry: {element_geometry}", comm=comm)
-    pprint(f"Eikonal Stabilizing Factor: {f_est:.2f}", comm=comm)
+    pprint(f"Eikonal Stabilizing Factor: {f_est: .2f}", comm=comm)
     pprint(f"Layer Shape: {layer_shape}", comm=comm)
     fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
     pprint((fit_str + "{:.1f}\n").format(*fitting_c), comm=comm)
@@ -315,16 +315,16 @@ def run_modal(wave, fitting_c, exp_value, n_root=1):
     pprint((fit_str + "{:.3f}\n").format(*fitting_c), comm=comm)
     abc_str = wave.case_abc if wave.layer_ops.layer_geometry.n_hyp is None \
         else f"{wave.case_abc[:2]}" + \
-        f"{wave.layer_ops.layer_geometry.n_hyp:.1f}{wave.case_abc[-4:]}"
+        f"{wave.layer_ops.layer_geometry.n_hyp: .1f}{wave.case_abc[-4:]}"
     met_str = f"Fundamental Frequency {abc_str} {wave.dimension}D. "
     met_str += f"Method {modal_solver}"
-    cmp_str = f"Expected {exp_value:.5f}, got = {wave.fundam_freq:.5f}"
+    cmp_str = f"Expected {exp_value: .5f}, got = {wave.fundam_freq: .5f}"
     assert isclose(wave.fundam_freq / exp_value, 1., atol=tol), \
         "✗ " + met_str + "  → " + cmp_str
     pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
 
 
-@mark.older_firedrake
+# @mark.older_firedrake
 @mark.parametrize("element_geometry, dimension, degree_layer, homogeneous", [
     ("T", 2, 2.5, True),
     ("T", 2, None, True),

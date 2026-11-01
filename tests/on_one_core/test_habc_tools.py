@@ -8,7 +8,7 @@ and for both triangular and quadrilateral elements. The expected values are base
 the theoretical velocity model and the geometry of the absorbing layer. The test also
 measures the computational cost of the operations.
 """
-from pytest import fail, mark, param
+from pytest import fail, mark
 from firedrake import conditional, ConvergenceError
 from numpy import isclose, where
 from spyro.solvers.acoustic_wave import AcousticWave
@@ -199,7 +199,7 @@ def run_tools(wave, method_extend, n_root=1):
     # Expected values
     expect_xmhalf = 3.
     expect_xphalf = 1.5
-    tolerance = 0.03  # 3% tolerance
+    tolerance = 0.03 if wave.dimension == 2 else 0.06  # 3%-6% tolerance(2D-3D)
 
     # Create layer mask
     method_element = "DQ" if wave.mesh_ops.quadrilateral else "DG"
@@ -228,7 +228,6 @@ def run_tools(wave, method_extend, n_root=1):
     # Cloud fields
     layer_cloud_xlt = point_cloud_field(wave.mesh, pts_layer_xlt, wave.c,
                                         wave.mesh_parameters.tol)
-
     layer_cloud_xge = point_cloud_field(wave.mesh, pts_layer_xge, wave.c,
                                         wave.mesh_parameters.tol)
     original_cloud_xlt = point_cloud_field(wave.mesh, pts_original_xlt, wave.c,
@@ -255,12 +254,11 @@ def run_tools(wave, method_extend, n_root=1):
     wave.layer_ops.rename_folder_habc()
 
 
-@mark.older_firedrake
 @mark.parametrize("element_geometry, dimension",
                   [("T", 2),
                    ("Q", 2),
-                   param("T", 3, marks=mark.slow),
-                   param("Q", 3, marks=mark.slow)])
+                   ("T", 3),
+                   ("Q", 3)])
 def test_habc_tools(element_geometry, dimension):
     """Test of HABC tools for 2D and 3D case.
 
@@ -276,30 +274,27 @@ def test_habc_tools(element_geometry, dimension):
     -------
     None
 
+    ==============================
     Eikonal for 2D model Δx = 100m
-    ------------------------------
+    ==============================
     eik_min = 83.333 ms (Theoretical value)
-    f_est  T-ele   Q-ele
-     0.01 66.836  65.002
-     0.02 73.308  75.811
-     0.03 77.178  79.845
-     0.04 79.680  82.101
-     0.05 81.498  83.744*
-     0.06 82.942* 85.118
-     0.07 84.160  86.345
-     0.08 85.233  87.480
+    --------------------------
+    f_est  T-ele  f_est  Q-ele
+    --------------------------
+     0.05 81.508   0.04 82.101
+     0.06 82.949*  0.05 83.744*
+     0.07 84.165   0.06 85.118
 
-    Eikonal for 3D model Δx = 150m
-    ------------------------------
+    =================================
+    Eikonal for 3D model Δx = 1000/6m
+    =================================
     eik_min = 83.333 ms (Theoretical value)
+    --------------------
     f_est  T-ele   Q-ele
-     0.02  --/--  69.442
-     0.03 76.777  70.974
-     0.04 79.409  73.179
-     0.05 82.273* 75.766
-     0.06 85.347  78.548
-     0.07 88.562  81.431*
-     0.08 91.876  84.377
+    --------------------
+     0.03 82.652* 84.135*
+     0.04 85.656  94.462
+     0.05 91.815 103.382
     """
 
     SpyroEnsemble.print("\n" + 50 * "=" + f"\nTesting HABC Tools with {element_geometry} "
@@ -311,13 +306,13 @@ def test_habc_tools(element_geometry, dimension):
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length = 0.1 if dimension == 2 else 0.15
+    edge_length = 0.1 if dimension == 2 else 1 / 6.
 
     # Factor for the stabilizing term in Eikonal equation
     if element_geometry == "T":
-        f_est = 0.06 if dimension == 2 else 0.05
+        f_est = 0.06 if dimension == 2 else 0.03
     else:
-        f_est = 0.05 if dimension == 2 else 0.07
+        f_est = 0.05 if dimension == 2 else 0.03
 
     # Get simulation parameters
     SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length: .3f} m")

@@ -4,7 +4,7 @@ The test compares the minimum Eikonal value obtained from the simulation with th
 theoretical value for different mesh sizes, element geometries, and finite element types.
 The results are expected to be within a specified tolerance of the theoretical value.
 """
-from pytest import fail, mark, param
+from pytest import fail, mark
 from firedrake import conditional, ConvergenceError
 from numpy import isclose
 from spyro.mpi.spyro_mpi import SpyroEnsemble
@@ -165,10 +165,10 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
                    ("Q", 2, "consistent"),
                    ("T", 2, "underintegrated"),
                    ("Q", 2, "underintegrated"),
-                   param("T", 3, "consistent"),
-                   param("Q", 3, "consistent"),
-                   param("T", 3, "underintegrated"),
-                   param("Q", 3, "underintegrated")])
+                   ("T", 3, "consistent"),
+                   ("Q", 3, "consistent"),
+                   ("T", 3, "underintegrated"),
+                   ("Q", 3, "underintegrated")])
 def test_eikonal(element_geometry, dimension, element_type):
     """Testing of eikonal for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
@@ -223,7 +223,7 @@ def test_eikonal(element_geometry, dimension, element_type):
      0.05 91.815 103.382
 
     =========================================================
-    Eikonal for 3D model Δx = 150m - Underintegrated elements
+    Eikonal for 3D model Δx = 250m - Underintegrated elements
     =========================================================
     eik_min = 83.333 ms (Theoretical value)
     --------------------------
