@@ -78,6 +78,7 @@ def test_initialize_model_parameters_from_object_redundant():
         wave.initialize_model_parameters_from_object(synthetic_dict)
 
 
+@pytest.mark.newer_firedrake
 def test_parse_boundary_conditions():
     d = dummy_dict.copy()
     d["mesh"] = {
