@@ -373,7 +373,7 @@ class ABCLayer(NRBC, MeasureError):
             case_abc = "REC"
 
         elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-            case_abc = "HN" + f"{self.abc_deg_layer:.1f}"
+            case_abc = "HN" + f"{self.abc_deg_layer: .1f}"
 
         # Labeling for the reference frequency for the absorbing layer
         if self.abc_reference_freq == LayerSizeRefFrequency.SOURCE:
@@ -486,11 +486,11 @@ class ABCLayer(NRBC, MeasureError):
                 # Get the minimum frequency excited at each critical point
                 freq_ref = freq_response(histPcrit, self.freq_Nyquist,
                                          fpad=fpad, get_dominant_freq=True)
-                SpyroEnsemble.print(f"Frequency at Critical Point {n_crit:>2.0f}: {freq_ref:.5f}")
+                SpyroEnsemble.print(f"Frequency at Critical Point {n_crit: >2.0f}: {freq_ref: .5f}")
 
                 self.freq_ref = min(self.freq_ref, freq_ref)
 
-        SpyroEnsemble.print(f"Reference Frequency (Hz): {self.freq_ref:.5f}")
+        SpyroEnsemble.print(f"Reference Frequency (Hz): {self.freq_ref: .5f}")
 
     def abc_new_geometry(self):
         """Determine the new domain geometry with the absorbing layer.
@@ -879,8 +879,8 @@ class ABCLayer(NRBC, MeasureError):
 
         # User timestep
         usr_dt = wave.get_dt()
-        SpyroEnsemble.print(f"Current Nyquist Frequency: {self.freq_Nyquist:.5f} Hz")
-        SpyroEnsemble.print(f"Current Timestep Size: {1e3 * usr_dt:.{mag_add}f} ms")
+        SpyroEnsemble.print(f"Current Nyquist Frequency: {self.freq_Nyquist: .5f} Hz")
+        SpyroEnsemble.print(f"Current Timestep Size: {1e3 * usr_dt: .{mag_add}f} ms")
 
         # Maximum timestep size
         dt_sol = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
@@ -905,15 +905,15 @@ class ABCLayer(NRBC, MeasureError):
         dt_ms = 1e3 * wave.dt
         if set_max_dt:
             case_div = f"{min(max_divisor_tf, n_div)} of {n_div}"
-            str_dt = f"Selected Timestep Size ({case_div}): {dt_ms:.{mag_add}f} ms"
+            str_dt = f"Selected Timestep Size ({case_div}): {dt_ms: .{mag_add}f} ms"
         else:
-            str_dt = f"Selected Timestep Size: {dt_ms:.{mag_add}f} ms"
+            str_dt = f"Selected Timestep Size: {dt_ms: .{mag_add}f} ms"
 
         SpyroEnsemble.print(str_dt)
 
         # Updating Nyquist frequency
         self.freq_Nyquist = 1. / (2. * wave.dt)
-        SpyroEnsemble.print(f"New Nyquist Frequency: {self.freq_Nyquist:.5f} Hz")
+        SpyroEnsemble.print(f"New Nyquist Frequency: {self.freq_Nyquist: .5f} Hz")
 
     def layer_infinite_model(self, lmin, c_bnd_max, final_time, source_locations=None):
         """Determine the domain extension size for the infinite domain model.
@@ -1015,7 +1015,7 @@ class ABCLayer(NRBC, MeasureError):
         # Size of the domain extension
         self.abc_pad_length = self.layer_infinite_model(lmin, c_bnd_max, final_time,
                                                         source_locations=source_locations)
-        SpyroEnsemble.print(f"Infinite Domain Extension (km): {self.abc_pad_length:.4f}")
+        SpyroEnsemble.print(f"Infinite Domain Extension (km): {self.abc_pad_length: .4f}")
 
         # New dimensions
         self.abc_new_geometry()

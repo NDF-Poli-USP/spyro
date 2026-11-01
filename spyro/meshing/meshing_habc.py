@@ -170,9 +170,8 @@ class HABCMesh(MeshOps):
 
         # Create a point cloud to get the extreme velocity values on the boundary
         ptos_bnd = mesh.coordinates.dat.data_with_halos[mask_boundary, :]
-        vel_on_boundary = point_cloud_field(
-            mesh, ptos_bnd, initial_velocity_model, mesh_parameters.tol
-        ).dat.data_with_halos[:]
+        vel_on_boundary = point_cloud_field(mesh, ptos_bnd, initial_velocity_model,
+                                            mesh_parameters.tol).dat.data_with_halos[:]
 
         # Get extreme values of the velocity on the boundary excluding free surfaces
         decimal = int(abs(np.log10(mesh_parameters.tol)))
@@ -947,9 +946,9 @@ class HABCMesh(MeshOps):
         min_z, min_x, min_y = np.min(coords, axis=0)
         max_z, max_x, max_y = np.max(coords, axis=0)
         SpyroEnsemble.print("Mesh Bounds Detected:")
-        SpyroEnsemble.print(f"       X: [{min_x:.4f}, {max_x:.4f}]")
-        SpyroEnsemble.print(f"       Y: [{min_y:.4f}, {max_y:.4f}]")
-        SpyroEnsemble.print(f"       Z: [{min_z:.4f}, {max_z:.4f}]")
+        SpyroEnsemble.print(f"       X: [{min_x: .4f}, {max_x: .4f}]")
+        SpyroEnsemble.print(f"       Y: [{min_y: .4f}, {max_y: .4f}]")
+        SpyroEnsemble.print(f"       Z: [{min_z: .4f}, {max_z: .4f}]")
 
         # Select nodes to snap
         mask_min_z = np.isclose(coords[:, 0], min_z, atol=plane_tol)

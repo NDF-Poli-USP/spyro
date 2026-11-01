@@ -6,11 +6,10 @@ The results are expected to be within a specified tolerance of the theoretical v
 """
 from pytest import fail, mark, param
 from firedrake import conditional, ConvergenceError
-from firedrake import COMM_WORLD as comm
 from numpy import isclose
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
-from spyro.io.basicio import parallel_print as pprint
 
 
 def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
@@ -49,7 +48,7 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
     # spyro however supports both spatial parallelism and "shot" parallelism.
     # Options: automatic (same number of cores for evey processor) or spatial
     dictionary["parallelism"] = {
-        "type": "automatic",
+        "type": "spatial",  # "automatic",
     }
 
     # Define the domain size without the PML or AL. Here we'll assume a domain
@@ -161,16 +160,15 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
     return min_eik
 
 
-@mark.older_firedrake
 @mark.parametrize("element_geometry, dimension, element_type",
                   [("T", 2, "consistent"),
-                   ("T", 2, "underintegrated"),
                    ("Q", 2, "consistent"),
+                   ("T", 2, "underintegrated"),
                    ("Q", 2, "underintegrated"),
-                   param("T", 3, "consistent", marks=mark.slow),
-                   param("T", 3, "underintegrated", marks=mark.slow),
-                   param("Q", 3, "consistent", marks=mark.slow),
-                   param("Q", 3, "underintegrated", marks=mark.slow)])
+                   param("T", 3, "consistent"),
+                   param("Q", 3, "consistent"),
+                   param("T", 3, "underintegrated"),
+                   param("Q", 3, "underintegrated")])
 def test_eikonal(element_geometry, dimension, element_type):
     """Testing of eikonal for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
@@ -196,67 +194,49 @@ def test_eikonal(element_geometry, dimension, element_type):
     Eikonal for 2D model Δx = 100m
     ==============================
     eik_min = 83.333 ms (Theoretical value)
-
+    --------------------------
     Consistent elements
-    -------------------
-    f_est  T-ele   Q-ele
-     0.01 66.836  65.002
-     0.02 73.308  75.811
-     0.03 77.178  79.845
-     0.04 79.680  82.101
-     0.05 81.498  83.744*
-     0.06 82.942* 85.118
-     0.07 84.160  86.345
-     0.08 85.233  87.480
+    f_est  T-ele  f_est  Q-ele
+    --------------------------
+     0.05 81.508   0.04 82.101
+     0.06 82.949*  0.05 83.744*
+     0.07 84.165   0.06 85.118
 
+    --------------------------
     Underintegrated elements
-    ------------------------
     p = 2         p = 4
     f_est  T-ele  f_est  Q-ele
-     0.07 82.630*  0.03 84.245 *
+    --------------------------
+     0.07 82.630*  0.03 84.245*
      0.08 84.272   0.04 85.593
      0.09 85.654   0.05 86.887
 
-    ==============================
-    Eikonal for 3D model Δx = 150m
-    ==============================
+    =======================================================
+    Eikonal for 3D model Δx = 1000/6m - Consistent elements
+    =======================================================
     eik_min = 83.333 ms (Theoretical value)
-
-    Consistent elements
-    -------------------
+    --------------------
     f_est  T-ele   Q-ele
-     0.02  --/--  69.442
-     0.03 76.777  70.974
-     0.04 79.409  73.179
-     0.05 82.273* 75.766
-     0.06 85.347  78.548
-     0.07 88.562  81.431*
-     0.08 91.876  84.377
+    --------------------
+     0.03 82.652* 84.135*
+     0.04 85.656  94.462
+     0.05 91.815 103.382
 
-    Underintegrated elements
-    ------------------------
-    p = 2         p = 3
-    f_est  T-ele  f_est   Q-ele
-     0.07 85.178*  0.03 78.838
-     0.08 87.990   0.04 80.940
-     0.09 90.933   0.05 83.130*
-     0.10 93.988   0.06 85.408
-
-    p = 1-T-full integration
-    f_est  T-ele
-     0.06 96.300
-     0.07 96.845
-     0.08 97.277
-
-    p = 3-T-full integration
-    f_est   T-ele
-     0.03  96.223
-     0.04 101.550
-     0.05 107.164
+    =========================================================
+    Eikonal for 3D model Δx = 150m - Underintegrated elements
+    =========================================================
+    eik_min = 83.333 ms (Theoretical value)
+    --------------------------
+    p = 1         p = 1
+    f_est  T-ele  f_est  Q-ele
+    --------------------------
+    0.18  79.604   0.20 81.144
+    0.19  82.222*  0.21 84.007*
+    0.20  84.764   0.22 86.896
     """
 
-    pprint("\n" + 60 * "=" + f"\nTesting Eikonal with {element_geometry}-{element_type} "
-           + f"elements for {dimension}D case\n" + 60 * "=", comm=comm)
+    SpyroEnsemble.print("\n" + 60 * "=" + f"\nTesting Eikonal with {element_geometry}-"
+                        + f"{element_type} elements for {dimension}D case\n" + 60 * "=")
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -264,34 +244,34 @@ def test_eikonal(element_geometry, dimension, element_type):
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length = 0.1 if dimension == 2 else 0.15
 
     # Eikonal degree and factor for the stabilizing term in Eikonal equation
     if dimension == 2:
+        edge_length = 0.1
         atol = 5e-3 if element_type == 'consistent' else 1.5e-2
         if element_geometry == "T":
             p_eik = 2 if element_type == 'consistent' else 2
             f_est = 0.06 if element_type == 'consistent' else 0.07
-
         else:
             p_eik = 2 if element_type == 'consistent' else 4
             f_est = 0.05 if element_type == 'consistent' else 0.03
 
     if dimension == 3:
-        atol = 3e-2 if element_type == 'consistent' else 2.5e-2
+        edge_length = 1. / 6 if element_type == 'consistent' else 1. / 4
+        atol = 1e-2 if element_type == 'consistent' else 2e-2
         if element_geometry == "T":
-            p_eik = 2 if element_type == 'consistent' else 2
-            f_est = 0.05 if element_type == 'consistent' else 0.07
+            p_eik = 2 if element_type == 'consistent' else 1
+            f_est = 0.03 if element_type == 'consistent' else 0.19
         else:
-            p_eik = 2 if element_type == 'consistent' else 3
-            f_est = 0.07 if element_type == 'consistent' else 0.05
+            p_eik = 2 if element_type == 'consistent' else 1
+            f_est = 0.03 if element_type == 'consistent' else 0.21
 
     # Get simulation parameters
-    pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
-    pprint(f"Element Geometry: {element_geometry}", comm=comm)
-    pprint(f"Element Type: {element_type}", comm=comm)
-    pprint(f"Eikonal Degree: {p_eik}", comm=comm)
-    pprint(f"Eikonal Stabilizing Factor: {f_est:.2f}", comm=comm)
+    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length: .4f} m")
+    SpyroEnsemble.print(f"Element Geometry: {element_geometry}")
+    SpyroEnsemble.print(f"Element Type: {element_type}")
+    SpyroEnsemble.print(f"Eikonal Degree: {p_eik}")
+    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est: .2f}")
 
     try:
 
@@ -306,9 +286,9 @@ def test_eikonal(element_geometry, dimension, element_type):
         thr_val = 83.333  # in ms
         assert isclose(min_eik / thr_val, 1., atol=atol), \
             f"✗ Minimum Eikonal {dimension}D Element-{element_geometry}-" + \
-            f"{element_type} → Expected value {thr_val}, got {min_eik:.3f}"
-        pprint(f"✓ Minimum Eikonal {dimension}D Element-{element_geometry}-{element_type}"
-               f" Verified: expected {thr_val}, got {min_eik:.3f}", comm=comm)
+            f"{element_type} → Expected value {thr_val}, got {min_eik: .3f}"
+        SpyroEnsemble.print(f"✓ Minimum Eikonal {dimension}D Element-{element_geometry}-"
+                            f"{element_type} Verified: expected {thr_val}, got {min_eik: .3f}")
 
     except ConvergenceError as e:
         fail(f"Checking Eikonal {dimension}D Element-{element_geometry}-"
