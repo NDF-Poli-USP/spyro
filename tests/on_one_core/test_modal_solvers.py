@@ -142,9 +142,6 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     # edge_length = lba / cpw
     edge_length = 0.1 if dimension == 2 else 0.15
 
-    # Layer shape
-    layer_shape = "rectangular" if degree_layer is None else "hypershape"
-
     # f_est: Factor for the stabilizing term in Eikonal equation
     # fitting_c: Parameters for fitting equivalent velocity regression
     if dimension == 2:
@@ -154,12 +151,14 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
 
     if dimension == 3:
         if element_geometry == "T":
-            f_est = 0.02 if homogeneous else (0.05 if degree_layer is None else 0.29)
-            fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.5, 0.3, -1.3, -0.9)
+            f_est = 0.02 if homogeneous else 0.05
 
         else:
-            f_est = 0.04 if homogeneous else (0.08 if degree_layer is None else 0.28)
-            fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.5, 0.4, -1.7, -0.9)
+            f_est = 0.02 if homogeneous else 0.08
+        fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.5, 0.3, -1.3, -0.9)
+
+    # Layer shape
+    layer_shape = "rectangular" if degree_layer is None else "hypershape"
 
     # Get simulation parameters
     SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length: .4f} m")
@@ -203,6 +202,7 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     if dimension == 2:
         modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
                             'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
+
     if dimension == 3:
         if element_geometry == "T":
             modal_solver_lst = ['ANALYTICAL', 'KRYLOVSCH_CH', 'KRYLOVSCH_GH', 'RAYLEIGH']
@@ -283,26 +283,19 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
         SpyroEnsemble.print("✓ " + met_str + " Verified: " + cmp_str)
 
 
-@mark.newer_firedrake
+@mark.older_firedrake
 @mark.parametrize("element_geometry, dimension, degree_layer, homogeneous", [
     ("T", 2, 2.5, True),
     ("T", 2, None, True),
     ("T", 2, 2.0, False),
     ("T", 2, None, False),
-    ("T", 2, 2.5, True),
-    ("T", 3, 6.0, True),
-    ("T", 3, None, True),
-    ("Q", 3, None, True),
-    # ##########################################
-    # param("T", 2, 2.5, True, marks=mark.slow),
-    # param("T", 3, 6.0, True, marks=mark.slow),
-    # param("T", 3, None, True, marks=mark.slow),
-    # param("Q", 3, None, True, marks=mark.slow),
-    # ##########################################
-    # param("T", 3, 2.4, False, marks=mark.slow),
-    # param("T", 3, None, False, marks=mark.slow),
-    # param("Q", 3, None, False, marks=mark.slow)
-])
+    param("T", 2, 2.5, True, marks=mark.slow),
+    param("T", 3, 6.0, True, marks=mark.slow),
+    param("T", 3, None, True, marks=mark.slow),
+    param("T", 3, 2.4, False, marks=mark.slow),
+    param("T", 3, None, False, marks=mark.slow),
+    param("Q", 3, None, True, marks=mark.slow),
+    param("Q", 3, None, False, marks=mark.slow)])
 def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogeneous):
     """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
