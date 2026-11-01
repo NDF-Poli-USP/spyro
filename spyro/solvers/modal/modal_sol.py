@@ -271,20 +271,27 @@ class Modal_Solver:
             "eps_type": "krylovschur",  # Robust, widely used eigensolver
             "eps_tol": 1e-6,  # Tight tolerance for accuracy
             "eps_max_it": 200,  # Reasonable iteration cap
-            "st_shift": 1e-6,  # Stabilizes Neumann BC null space
-            "st_type": "sinvert",  # Useful for interior eigenvalues
-            "eps_monitor": "ascii",  # Print convergence info
+            "eps_monitor": None,  # Print convergence info
             "ksp_type": ksp_type,  # Options for large problems
             "pc_type": pc_type,  # Options for large problems
+            "eps_converged_reason": None,  # Print stop reason
+            # "eps_monitor_all": None,   # More verbose than eps_monitor
+            # "eps_view": None,          # Print solver configuration before solving
         }
 
         if self.calc_max_dt:
             # Largest eigenvalues magnitude
-            opts.update({"eps_largest_magnitude": None})
+            opts.update({"eps_largest_magnitude": None,  # Eigenvalues of largest |λ|
+                         "st_type": "shift",  # Override Firedrake's automatic sinvert
+                         })
             # subspace, arnoldi, krylovschur, lapack
         else:
             # Smallest eigenvalues magnitude
-            opts.update({"eps_smallest_magnitude": None})
+            opts.update({"st_type": "sinvert",  # Useful for interior eigenvalues
+                         "st_shift": 1e-6,  # Stabilizes Neumann BC null space
+                         "eps_target": 0.0,  # Target value for sorting
+                         "eps_target_magnitude": None  # Sort by distance to target
+                         })
 
         eigenproblem = LinearEigenproblem(a, M=m)
         eigensolver = LinearEigensolver(eigenproblem, n_evals=k, solver_parameters=opts)
@@ -591,7 +598,7 @@ class Modal_Solver:
         max_dt = float(real(2.0 / sqrt(max_eigval)))
         SpyroEnsemble.print(
             "Maximum Stable Timestep Should Be Approximately "
-            f"(ms): {1e3 * max_dt:.3f}"
+            f"(ms): {1e3 * max_dt: .3f}"
         )
 
         max_dt *= fraction
