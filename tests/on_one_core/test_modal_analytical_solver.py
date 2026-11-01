@@ -324,7 +324,6 @@ def run_modal(wave, fitting_c, exp_value, n_root=1):
     pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
 
 
-# @mark.older_firedrake
 @mark.parametrize("element_geometry, dimension, degree_layer, homogeneous", [
     ("T", 2, 2.5, True),
     ("T", 2, None, True),
