@@ -5,6 +5,7 @@ import numpy as np
 from firedrake import PointEvaluator
 
 
+@pytest.mark.newer_firedrake
 def test_camembert_forward():
     dictionary = {}
     wave = spyro.examples.Camembert_acoustic(dictionary=dictionary)
@@ -26,6 +27,7 @@ def test_camembert_forward():
     assert all([test1, test2, test3])
 
 
+@pytest.mark.newer_firedrake
 def test_rectangle_forward():
     dictionary = {}
     dictionary["absorving_boundary_conditions"] = {
@@ -76,6 +78,7 @@ def test_acoustic_local_abc():
     assert last_acoustic_energy < 7e-7  # The expected value was found empirically
 
 
+@pytest.mark.newer_firedrake
 def test_immersed_polygon_forward():
     from spyro.examples.immersed_polygon import Polygon_acoustic
     wave = Polygon_acoustic()
