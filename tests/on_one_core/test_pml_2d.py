@@ -119,9 +119,9 @@ def test_pml():
     errIt = measure_error.calculate_integral_error(p_r, extended_p_r, dt)
     eNRMS = measure_error.calculate_normalized_L2_error(p_r, extended_p_r)
 
-    SpyroEnsemble.print(f"NRMS Error = {eNRMS: .4e}")
-    SpyroEnsemble.print(f"Integral Error = {errIt: .4e}")
-    SpyroEnsemble.print(f"Peak Error = {errPk: .4e}")
+    SpyroEnsemble.print(f"NRMS Error = {eNRMS:.4e}")
+    SpyroEnsemble.print(f"Integral Error = {errIt:.4e}")
+    SpyroEnsemble.print(f"Peak Error = {errPk:.4e}")
 
     assert eNRMS < 0.05 and errIt < 0.05 and errPk < 0.05, "Error is too high for PML test."
 

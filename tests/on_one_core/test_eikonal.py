@@ -287,11 +287,11 @@ def test_eikonal(element_geometry, dimension, element_type):
             f_est = 0.07 if element_type == 'consistent' else 0.05
 
     # Get simulation parameters
-    pprint(f"\nMesh Size: {1e3 * edge_length: .4f} m", comm=comm)
+    pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
     pprint(f"Element Geometry: {element_geometry}", comm=comm)
     pprint(f"Element Type: {element_type}", comm=comm)
     pprint(f"Eikonal Degree: {p_eik}", comm=comm)
-    pprint(f"Eikonal Stabilizing Factor: {f_est: .2f}", comm=comm)
+    pprint(f"Eikonal Stabilizing Factor: {f_est:.2f}", comm=comm)
 
     try:
 
@@ -306,9 +306,9 @@ def test_eikonal(element_geometry, dimension, element_type):
         thr_val = 83.333  # in ms
         assert isclose(min_eik / thr_val, 1., atol=atol), \
             f"✗ Minimum Eikonal {dimension}D Element-{element_geometry}-" + \
-            f"{element_type} → Expected value {thr_val}, got {min_eik: .3f}"
+            f"{element_type} → Expected value {thr_val}, got {min_eik:.3f}"
         pprint(f"✓ Minimum Eikonal {dimension}D Element-{element_geometry}-{element_type}"
-               f" Verified: expected {thr_val}, got {min_eik: .3f}", comm=comm)
+               f" Verified: expected {thr_val}, got {min_eik:.3f}", comm=comm)
 
     except ConvergenceError as e:
         fail(f"Checking Eikonal {dimension}D Element-{element_geometry}-"

@@ -17,7 +17,7 @@ def has_sufficient_memory(threshold_gb=16):
                 meminfo[parts[0].strip()] = parts[1].strip()
     total_memory_gb = int(meminfo.get('MemTotal', '0 kB').split()[0]) / 1024**2
     total_mswap_gb = int(meminfo.get('SwapTotal', '0 kB').split()[0]) / 1024**2
-    SpyroEnsemble.print(f"Total system memory: {total_memory_gb + total_mswap_gb: .2f} GB")
+    SpyroEnsemble.print(f"Total system memory: {total_memory_gb + total_mswap_gb:.2f} GB")
     return total_memory_gb > threshold_gb
 
 

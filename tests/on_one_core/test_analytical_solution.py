@@ -54,9 +54,9 @@ def test_analytical_solution(use_vertex_only_mesh):
     )
 
     vom_label = "VOM" if use_vertex_only_mesh else "NO VOM"
-    SpyroEnsemble.print(f"Normalized L2 Error ({vom_label}) = {normalized_l2_error: .4e}")
-    SpyroEnsemble.print(f"Integral Error ({vom_label}) = {integral_error: .4e}")
-    SpyroEnsemble.print(f"Peak Error ({vom_label}) = {peak_error: .4e}")
+    SpyroEnsemble.print(f"Normalized L2 Error ({vom_label}) = {normalized_l2_error:.4e}")
+    SpyroEnsemble.print(f"Integral Error ({vom_label}) = {integral_error:.4e}")
+    SpyroEnsemble.print(f"Peak Error ({vom_label}) = {peak_error:.4e}")
 
     assert normalized_l2_error < 1e-3 and integral_error < 1e-3 and peak_error < 1e-3
 

@@ -946,9 +946,9 @@ class HABCMesh(MeshOps):
         min_z, min_x, min_y = np.min(coords, axis=0)
         max_z, max_x, max_y = np.max(coords, axis=0)
         SpyroEnsemble.print("Mesh Bounds Detected:")
-        SpyroEnsemble.print(f"       X: [{min_x: .4f}, {max_x: .4f}]")
-        SpyroEnsemble.print(f"       Y: [{min_y: .4f}, {max_y: .4f}]")
-        SpyroEnsemble.print(f"       Z: [{min_z: .4f}, {max_z: .4f}]")
+        SpyroEnsemble.print(f"       X: [{min_x:.4f}, {max_x:.4f}]")
+        SpyroEnsemble.print(f"       Y: [{min_y:.4f}, {max_y:.4f}]")
+        SpyroEnsemble.print(f"       Z: [{min_z:.4f}, {max_z:.4f}]")
 
         # Select nodes to snap
         mask_min_z = np.isclose(coords[:, 0], min_z, atol=plane_tol)

@@ -71,8 +71,8 @@ def test_run_eval_ufl_functions_2d():
         success_msg = (f"✓ {description}\n"
                        f"   Expression: {expr}\n"
                        f"   Type: {type(ufl_expr).__name__}\n"
-                       f"   Range: [{data.min(): .4f}, {data.max(): .4f}]\n"
-                       f"   Mean: {data.mean(): .4f}")
+                       f"   Range: [{data.min():.4f}, {data.max():.4f}]\n"
+                       f"   Mean: {data.mean():.4f}")
         SpyroEnsemble.print(success_msg)
         success_2d += 1
         SpyroEnsemble.print("-" * 80)
@@ -86,7 +86,7 @@ def test_run_eval_ufl_functions_2d():
     total_2d = len(test_expressions_2d)
     assert success_2d == total_2d, f"Only {success_2d}/{total_2d} tests passed"
     SpyroEnsemble.print(f"\n2D Models: {success_2d}/{total_2d} successful "
-                        f"({100*success_2d/total_2d: .1f}%)")
+                        f"({100*success_2d/total_2d:.1f}%)")
 
 
 def test_run_eval_ufl_functions_3d():
@@ -136,7 +136,7 @@ def test_run_eval_ufl_functions_3d():
         success_msg = (f"✓ {description}\n"
                        f"   Expression: {expr}\n"
                        f"   Type: {type(ufl_expr).__name__}\n"
-                       f"   Range: [{data.min(): .4f}, {data.max(): .4f}]")
+                       f"   Range: [{data.min():.4f}, {data.max():.4f}]")
         SpyroEnsemble.print(success_msg)
         success_3d += 1
         SpyroEnsemble.print("-" * 80)
@@ -150,7 +150,7 @@ def test_run_eval_ufl_functions_3d():
     total_3d = len(test_expressions_3d)
     assert success_3d == total_3d, f"Only {success_3d}/{total_3d} tests passed"
     SpyroEnsemble.print(f"3D Models: {success_3d}/{total_3d} successful "
-                        f"({100*success_3d/total_3d: .1f}%)")
+                        f"({100*success_3d/total_3d:.1f}%)")
 
 
 def test_run_eval_danger_ops():
@@ -261,7 +261,7 @@ def test_run_eval_danger_ops():
     assert blocked_dangerous == total_dangerous, f"Only {blocked_dangerous}" \
         + f"/{total_dangerous} tests passed"
     SpyroEnsemble.print(f"Dangerous ops: {blocked_dangerous}/{total_dangerous} blocked "
-                        f"({100*blocked_dangerous/total_dangerous: .1f}%)")
+                        f"({100*blocked_dangerous/total_dangerous:.1f}%)")
 
 
 if __name__ == "__main__":

@@ -612,7 +612,7 @@ class Modal_Solver:
         max_dt = float(real(2.0 / sqrt(max_eigval)))
         SpyroEnsemble.print(
             "Maximum Stable Timestep Should Be Approximately "
-            f"(ms): {1e3 * max_dt: .3f}"
+            f"(ms): {1e3 * max_dt:.3f}"
         )
 
         max_dt *= fraction

@@ -675,7 +675,7 @@ class Eikonal_Modeling():
         user_est = self.f_est
         while True:
             try:
-                print(f"Iteration for Festab: {user_est: .2f}", flush=True)
+                print(f"Iteration for Festab: {user_est:.2f}", flush=True)
 
                 # Preserving intial guess
                 yp = fire.Function(V, name='Eikonal (Time [s])')

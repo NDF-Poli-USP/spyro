@@ -245,7 +245,7 @@ def run_tools(wave, method_extend, n_root=1):
     region_names = ["Layer x<0.5", "Layer x>=0.5", "Original x<0.5", "Original x>=0.5"]
 
     for region, exp_value, mean_val in zip(region_names, expected_values, mean_val):
-        cmp_str = f"{region}: Expected {exp_value: .5f}, got = {mean_val: .5f}"
+        cmp_str = f"{region}: Expected {exp_value:.5f}, got = {mean_val:.5f}"
         assert isclose(mean_val / exp_value, 1., atol=tolerance), \
             "✗ " + met_str + "  → " + cmp_str
         SpyroEnsemble.print("✓ " + met_str + "Verified: " + cmp_str)
@@ -316,8 +316,8 @@ def test_habc_tools(element_geometry, dimension):
         f_est = 0.05 if dimension == 2 else 0.03
 
     # Get simulation parameters
-    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length: .3f} m")
-    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est: .2f}")
+    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length:.3f} m")
+    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est:.2f}")
 
     # ============ HABC PARAMETERS ============
 

@@ -109,10 +109,10 @@ def test_representative_mesh_dimensions(element_type, dimension):
     SpyroEnsemble.print(f" - Number of cells: {wave.mesh.num_cells()}")
     SpyroEnsemble.print(f" - Number of vertices: {wave.mesh.num_vertices()}")
     SpyroEnsemble.print("\nComputed representative mesh dimensions:")
-    SpyroEnsemble.print(f" - lmin (minimum mesh size): {wave.mesh_parameters.lmin: .6f}")
-    SpyroEnsemble.print(f" - lmax (maximum mesh size): {wave.mesh_parameters.lmax: .6f}")
-    SpyroEnsemble.print(f" - alpha (lmax/lmin ratio): {wave.mesh_parameters.alpha: .6f}")
-    SpyroEnsemble.print(f" - tol (tolerance): {wave.mesh_parameters.tol: .2e}")
+    SpyroEnsemble.print(f" - lmin (minimum mesh size): {wave.mesh_parameters.lmin:.6f}")
+    SpyroEnsemble.print(f" - lmax (maximum mesh size): {wave.mesh_parameters.lmax:.6f}")
+    SpyroEnsemble.print(f" - alpha (lmax/lmin ratio): {wave.mesh_parameters.alpha:.6f}")
+    SpyroEnsemble.print(f" - tol (tolerance): {wave.mesh_parameters.tol:.2e}")
 
     # Verify attributes are set
     assert hasattr(wave.mesh_parameters, 'diam_mesh'), "'diam_mesh' not set"
