@@ -65,3 +65,51 @@ class KSPWrapper:
 RIGHT — Declare a boolean attribute that describes the state directly, and check that instead
 
 # TODO: most of these topics come from the Firedrake repo and we need to ask them and cite it before merging in main
+
+## AI-Assisted Resolution of Long-Standing Issues
+
+This section applies to the initiative to address long-standing issues using AI assistance. It supplements, and does not override, the existing AI-assisted contribution rules above.
+
+### Eligibility and Scope
+
+* Only issues that have been open for at least one year are eligible.
+* Only project researchers/devs that have a good understanding of the codebase may initiate work under this initiative.
+* Issues labelled `good first issue` must not be selected.
+* A postdoc, PhD candidate, or Developer must assess the issue's relevance, define the intended outcome, and establish clear acceptance criteria before implementation begins. Ideally a clear issue resolution plan should be added to the issue as a comment.
+* Ambiguous, obsolete, or insufficiently specified issues must be clarified before implementation. AI agents must not invent requirements or independently expand the scope.
+* Work should be undertaken periodically when spare AI credits or tokens are available, without displacing higher-priority project work.
+* Each effort must target a single issue and produce a focused, reviewable proposed solution.
+
+### Implementation and Validation
+
+* Follow all coding conventions and testing requirements defined in this file.
+* Investigate the current implementation and relevant documentation before proposing changes. Do not rely on memorized APIs, particularly for Firedrake.
+* Add or update tests that demonstrate the reported problem and verify the proposed fix.
+* Preserve existing behavior and public APIs unless a change is explicitly required and approved.
+* Avoid unrelated refactoring, speculative abstractions, unnecessary dependencies, and modifications outside the issue's scope.
+* Run `make lint` and the relevant subset of the pytest suite. Report the actual results and clearly identify any checks that could not be completed.
+* Scientific and numerical changes require particular scrutiny of mathematical correctness, edge cases, and potential regressions.
+
+### Local-Only Changes
+
+During AI-assisted implementation:
+
+* Do not create Git commits or push changes to any remote.
+* Do not open a pull request or modify GitHub issues, comments, labels, or repository settings.
+* Do not overwrite, discard, or incorporate unrelated pre-existing working-tree changes.
+* Do not weaken or remove existing tests to make the implementation pass.
+* Do not claim that tests or checks succeeded unless they were actually executed successfully.
+
+All proposed changes must remain local for human review.
+
+### Required Deliverables
+
+Before handing the work back to the researcher, the AI agent must:
+
+1. Implement the proposed solution to the open issue and add or update relevant tests and documentation.
+2. Create an temporary untracked human readable `AI_PR_DESCRIPTION.md` file in the repository root containing a proposed PR description, a summary of the changes, the tests actually executed and their results, and any remaining concerns.
+3. Provide a concise summary of the diagnosis, implementation, modified files, validation, and limitations.
+
+The researcher must independently review the complete diff, understand every change, and verify the proposed solution before deciding whether to submit a pull request.
+
+AI-generated code is a proposal, not an approved contribution. The normal contribution and pull-request review process remains mandatory. The researcher has to answer all comments on the PR.
