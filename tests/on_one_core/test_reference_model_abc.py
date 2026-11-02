@@ -178,10 +178,10 @@ def wave_instance(element_geometry, dimension, abc_type, calc_eik):
     wave = AcousticWave(dictionary=dictionary)
 
     # Get simulation parameters
-    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length: .4f} m")
+    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length:.4f} m")
     SpyroEnsemble.print(f"Element Geometry: {element_geometry}")
-    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est: .2f}")
-    SpyroEnsemble.print(f"Timestep Size: {1e3 * dt_usu: .3f} ms")
+    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est:.2f}")
+    SpyroEnsemble.print(f"Timestep Size: {1e3 * dt_usu:.3f} ms")
     SpyroEnsemble.print(f"Maximum Divisor of Final Time: {max_divisor_tf}")
 
     # ============ MESH FEATURES ============

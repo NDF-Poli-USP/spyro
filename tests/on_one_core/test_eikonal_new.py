@@ -268,11 +268,11 @@ def test_eikonal(element_geometry, dimension, element_type):
             f_est = 0.03 if element_type == 'consistent' else 0.21
 
     # Get simulation parameters
-    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length: .4f} m")
+    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length:.4f} m")
     SpyroEnsemble.print(f"Element Geometry: {element_geometry}")
     SpyroEnsemble.print(f"Element Type: {element_type}")
     SpyroEnsemble.print(f"Eikonal Degree: {p_eik}")
-    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est: .2f}")
+    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est:.2f}")
 
     try:
 
@@ -287,9 +287,9 @@ def test_eikonal(element_geometry, dimension, element_type):
         thr_val = 83.333  # in ms
         assert isclose(min_eik / thr_val, 1., atol=atol), \
             f"✗ Minimum Eikonal {dimension}D Element-{element_geometry}-" + \
-            f"{element_type} → Expected value {thr_val}, got {min_eik: .3f}"
+            f"{element_type} → Expected value {thr_val}, got {min_eik:.3f}"
         SpyroEnsemble.print(f"✓ Minimum Eikonal {dimension}D Element-{element_geometry}-"
-                            f"{element_type} Verified: expected {thr_val}, got {min_eik: .3f}")
+                            f"{element_type} Verified: expected {thr_val}, got {min_eik:.3f}")
 
     except ConvergenceError as e:
         fail(f"Checking Eikonal {dimension}D Element-{element_geometry}-"

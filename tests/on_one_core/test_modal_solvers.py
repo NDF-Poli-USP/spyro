@@ -161,9 +161,9 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     layer_shape = "rectangular" if degree_layer is None else "hypershape"
 
     # Get simulation parameters
-    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length: .4f} m")
+    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length:.4f} m")
     SpyroEnsemble.print(f"Element Geometry: {element_geometry}")
-    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est: .2f}")
+    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est:.2f}")
     SpyroEnsemble.print(f"Layer Shape: {layer_shape}")
     fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
     SpyroEnsemble.print((fit_str + "{:.1f}\n").format(*fitting_c))
@@ -274,10 +274,10 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
 
         abc_str = wave.case_abc if wave.layer_ops.layer_geometry.n_hyp is None \
             else f"{wave.case_abc[:2]}" + \
-            f"{wave.layer_ops.layer_geometry.n_hyp: .1f}{wave.case_abc[-4:]}"
+            f"{wave.layer_ops.layer_geometry.n_hyp:.1f}{wave.case_abc[-4:]}"
         met_str = f"Fundamental Frequency {abc_str} {wave.dimension}D. "
         met_str += f"Method {modal_solver}"
-        cmp_str = f"Expected {exp_value: .5f}, got = {wave.fundam_freq: .5f}"
+        cmp_str = f"Expected {exp_value:.5f}, got = {wave.fundam_freq:.5f}"
         assert isclose(wave.fundam_freq / exp_value, 1., atol=tol), \
             "✗ " + met_str + "  → " + cmp_str
         SpyroEnsemble.print("✓ " + met_str + " Verified: " + cmp_str)

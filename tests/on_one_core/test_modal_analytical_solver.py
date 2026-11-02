@@ -318,7 +318,7 @@ def run_modal(wave, fitting_c, exp_value, n_root=1):
         f"{wave.layer_ops.layer_geometry.n_hyp: .1f}{wave.case_abc[-4:]}"
     met_str = f"Fundamental Frequency {abc_str} {wave.dimension}D. "
     met_str += f"Method {modal_solver}"
-    cmp_str = f"Expected {exp_value: .5f}, got = {wave.fundam_freq: .5f}"
+    cmp_str = f"Expected {exp_value: .5f}, got = {wave.fundam_freq:.5f}"
     assert isclose(wave.fundam_freq / exp_value, 1., atol=tol), \
         "✗ " + met_str + "  → " + cmp_str
     pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
