@@ -37,7 +37,6 @@ def test_seismicmesh_homogeneous_mesh_in_parallel(tmp_path) -> None:
         abc_pad=pad,
         edge_length=0.1,
         output_file_name=output_file_name,
-        comm=SpyroEnsemble.ensemble,
     )
 
     mesh = create_seismicmesh_2D_mesh_homogeneous(mesh_parameters)
