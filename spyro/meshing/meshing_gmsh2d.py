@@ -665,7 +665,7 @@ def apply_structured_winslow_smoothing2d(
     elem_types, elem_tags, elem_node_tags = gmsh.model.mesh.getElements(dim=2)
     all_quad_nodes = []
     for i, t_type in enumerate(elem_types):
-        if t_type == 3:
+        if t_type == 3:  # Gmsh element type 3 is the 4-node quadrangle
             all_quad_nodes.extend(elem_node_tags[i])
 
     if not all_quad_nodes:
@@ -998,12 +998,14 @@ def apply_structured_winslow_smoothing2d(
                 iterations=winslow_iterations,
                 omega=winslow_omega,
             )
-
-        smoothed_points_3d = np.zeros_like(points_3d)
-        smoothed_points_3d[:, :2] = smoothed_points_2d
-
-        SpyroEnsemble.print("Updating nodes in Gmsh...")
-        for i, tag in enumerate(node_tags):
-            gmsh.model.mesh.setNode(int(tag), smoothed_points_3d[i].tolist(), [])
     else:
         SpyroEnsemble.print("Skipping Winslow smoothing...")
+        # Still write back the water-column alignment done above.
+        smoothed_points_2d = points_2d
+
+    smoothed_points_3d = np.zeros_like(points_3d)
+    smoothed_points_3d[:, :2] = smoothed_points_2d
+
+    SpyroEnsemble.print("Updating nodes in Gmsh...")
+    for i, tag in enumerate(node_tags):
+        gmsh.model.mesh.setNode(int(tag), smoothed_points_3d[i].tolist(), [])

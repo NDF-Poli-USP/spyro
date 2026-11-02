@@ -300,7 +300,7 @@ def read_segy_velocity_model(fname):
     Returns
     -------
     vp : numpy.ndarray
-        Velocity model with shape ``(n_samples, n_traces)``.
+        Velocity model with shape `(n_samples, n_traces)`.
     n_samples : int
         Number of depth samples per trace (rows).
     n_traces : int
@@ -437,7 +437,7 @@ def apply_savitzky_golay_filter_2d(
 
     if grid_values.ndim != 2:
         raise ValueError(
-            f"grid_values must be a 2D array, received shape " f"{grid_values.shape}."
+            f"grid_values must be a 2D array, received shape {grid_values.shape}."
         )
 
     if not np.all(np.isfinite(grid_values)):

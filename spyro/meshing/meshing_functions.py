@@ -455,7 +455,7 @@ class AutomaticMesh:
         Returns
         -------
         firedrake.MeshGeometry
-            Mesh read from ``self.output_file_name``.
+            Mesh read from `self.output_file_name`.
         """
         if self.comm is not None:
             # Ensure all processes wait for mesh creation to complete

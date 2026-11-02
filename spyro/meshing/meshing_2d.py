@@ -27,13 +27,13 @@ def generate_gmsh_2d_mesh(mesh_parameters: MeshingParameters) -> str:
     Parameters
     ----------
     mesh_parameters : MeshingParameters
-        Complete meshing parameters for a 2-D ``gmsh_mesh``.
+        Complete meshing parameters for a 2-D `gmsh_mesh`.
 
     Returns
     -------
     str
         Path to the velocity model used for meshing (the SEG-Y input, or a
-        temporary SEG-Y file written from a grid ``velocity_model``).
+        temporary SEG-Y file written from a grid `velocity_model`).
         Every rank returns the same path.
 
     Notes
@@ -41,9 +41,7 @@ def generate_gmsh_2d_mesh(mesh_parameters: MeshingParameters) -> str:
     The caller must synchronize ranks before loading the generated mesh.
     """
     comm = mesh_parameters.comm
-    is_writer = comm is None or (
-        comm.ensemble_comm.rank == 0 and comm.comm.rank == 0
-    )
+    is_writer = comm is None or (comm.ensemble_comm.rank == 0 and comm.comm.rank == 0)
 
     if mesh_parameters.segy_velocity_model is not None:
         velocity_model_file = mesh_parameters.segy_velocity_model
@@ -251,7 +249,8 @@ def generate_gmsh_2d_mesh(mesh_parameters: MeshingParameters) -> str:
                 zc=zc,
                 apply_winslow=apply_winslow,
             )
-        # Rotating mesh for axis (z,x,y)
+        # Swap the axes from Gmsh (x, z) to spyro (z, x). This is a reflection, not a
+        # rotation, so the written cells are clockwise; Firedrake renumbers them.
         gmsh_xy_to_spyro_zx = [
             0.0, 1.0, 0.0, 0.0,
             1.0, 0.0, 0.0, 0.0,

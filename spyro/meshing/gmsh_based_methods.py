@@ -158,9 +158,8 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         for t, tags, conn in zip(types, elem_tags, node_tags):
             tags = np.array(tags, dtype=np.int64)
             # number of nodes per element type t:
-            n_per = gmsh.model.mesh.getElementProperties(t)[
-                3
-            ]  # returns (name, dim, order, numNodes, ...)[3]
+            # returns (name, dim, order, numNodes, ...)[3]
+            n_per = gmsh.model.mesh.getElementProperties(t)[3]
             conn = np.array(conn, dtype=np.int64).reshape(-1, n_per)
 
             # Compute centroids

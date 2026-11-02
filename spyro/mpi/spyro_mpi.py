@@ -152,8 +152,8 @@ class SpyroEnsemble:
         string : str
             Text to print.
         end : str, optional
-            String appended after ``string``, as in the built-in ``print``.
-            Pass ``""`` together with a leading ``"\\r"`` to redraw a progress
+            String appended after `string`, as in the built-in `print`.
+            Pass `""` together with a leading `"\\r"` to redraw a progress
             line in place.
         """
         if cls.ensemble is None:

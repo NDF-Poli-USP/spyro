@@ -20,7 +20,6 @@ def winslow_smooth_default(
     hyperellipse_params: tuple = None,
     iterations: int = 1500,
     omega: float = 0.05,
-    plot_sources: bool = True,
 ) -> np.ndarray:
     """Apply Winslow mesh smoothing using a default Python implementation.
 
@@ -50,8 +49,6 @@ def winslow_smooth_default(
         Total number of smoothing iterations. Default is 1500.
     omega : float, optional
         Relaxation factor for node movement (0 < omega <= 1). Default is 0.05.
-    plot_sources : bool, optional
-        Placeholder flag for enabling source tracking or plotting. Default is True.
 
     Returns
     -------
@@ -124,7 +121,6 @@ def winslow_smooth_default(
     x_new = x.copy()
     z_new = z.copy()
     movable_nodes = move_all | move_x_only | move_z_only | move_hyperellipse
-    jacobian_over_size_values = np.zeros(num_nodes)
     iteration = 0
     for _ in range(iterations):
         iteration += 1
@@ -204,7 +200,6 @@ def winslow_smooth_default(
             size_xi = 0.5 * (size_east - size_west)
             size_eta = 0.5 * (size_north - size_south)
             jacobian = x_xi * z_eta - x_eta * z_xi
-            jacobian_over_size_values[i] = jacobian / (size_center + 1e-12)
             source_x = (jacobian / (size_center + 1e-12)) * (size_xi * z_eta - size_eta * z_xi)
             source_z = (jacobian / (size_center + 1e-12)) * (size_eta * x_xi - size_xi * x_eta)
             denominator = 2.0 * (alpha + gamma)
@@ -285,8 +280,8 @@ if NUMBA_AVAILABLE:  # pragma: no cover
         grid_z : ndarray
             Monotonically increasing or decreasing z-coordinates of the grid.
         grid_vals : ndarray
-            Values indexed as ``grid_vals[x_index, z_index]``, with shape
-            ``(len(grid_x), len(grid_z))``. The transposed layout is also
+            Values indexed as `grid_vals[x_index, z_index]`, with shape
+            `(len(grid_x), len(grid_z))`. The transposed layout is also
             accepted for non-square grids. Square grids always use x/z order.
 
         Returns
@@ -704,7 +699,7 @@ if NUMBA_AVAILABLE:  # pragma: no cover
             1D array of z-coordinates for the velocity/sizing field grid.
         segy_grid_vals : ndarray
             Element sizes in x/z order, with shape
-            ``(len(segy_grid_x), len(segy_grid_z))``. Transposed non-square
+            `(len(segy_grid_x), len(segy_grid_z))`. Transposed non-square
             arrays are also accepted; square arrays always use x/z order.
         move_all : set
             Set of node indices permitted to move in both X and Z directions.
@@ -893,8 +888,8 @@ def vectorized_bilinear_interp(
     grid_z : ndarray
         Monotonically increasing or decreasing z-coordinates of the grid.
     grid_vals : ndarray
-        Values indexed as ``grid_vals[x_index, z_index]``, with shape
-        ``(len(grid_x), len(grid_z))``. The transposed layout is also
+        Values indexed as `grid_vals[x_index, z_index]`, with shape
+        `(len(grid_x), len(grid_z))`. The transposed layout is also
         accepted for non-square grids. Square grids always use x/z order.
 
     Returns
@@ -1138,7 +1133,7 @@ def winslow_smooth_vectorized(
         1D array of z-coordinates for the velocity/sizing field grid.
     segy_grid_vals : ndarray
         Element sizes in x/z order, with shape
-        ``(len(segy_grid_x), len(segy_grid_z))``. Transposed non-square
+        `(len(segy_grid_x), len(segy_grid_z))`. Transposed non-square
         arrays are also accepted; square arrays always use x/z order.
     move_all : set
         Set of node indices permitted to move in both X and Z directions.
