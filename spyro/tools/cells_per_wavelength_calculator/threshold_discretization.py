@@ -10,7 +10,7 @@ class ThresholdDiscretization:
     Attributes
     ----------
     method : str
-        Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+        Either `"mass_lumped_triangle"` or `"spectral_quadrilateral"`.
     degree : int
         Spatial polynomial degree.
     cpw : float
@@ -25,7 +25,7 @@ class ThresholdDiscretization:
 def _parse_threshold_discretization(
     value: "bool | dict | ThresholdDiscretization | None",
 ) -> ThresholdDiscretization | None:
-    """Convert the ``"threshold_discretization"`` parameter.
+    """Convert the `"threshold_discretization"` parameter.
 
     Parameters
     ----------
@@ -43,7 +43,7 @@ def _parse_threshold_discretization(
     Raises
     ------
     TypeError
-        If ``value`` is of an unsupported type, or a dict has unknown keys.
+        If `value` is of an unsupported type, or a dict has unknown keys.
     """
     if value is None or value is False:
         return None
