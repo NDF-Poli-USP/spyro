@@ -115,6 +115,9 @@ def create_seismicmesh_2D_mesh_homogeneous(mesh_parameters):
     The edge length is either user-specified or calculated based on the
     minimum velocity, source frequency, and cells per wavelength.
     Boundary entities with low quality are removed to improve mesh quality.
+    Only ensemble rank 0 generates the mesh, in parallel over its spatial
+    communicator, and every ensemble member reads the written file. Without
+    an initialized ensemble, the mesh is built serially on ``COMM_WORLD``.
     """
     length_z = mesh_parameters.length_z
     length_x = mesh_parameters.length_x
@@ -135,7 +138,7 @@ def create_seismicmesh_2D_mesh_homogeneous(mesh_parameters):
     bbox = (-real_lz, 0.0, -pad, real_lx - pad)
     rectangle = SeismicMesh.Rectangle(bbox)
 
-    if mesh_parameters.comm is None:
+    if SpyroEnsemble.ensemble is None:
         _generate_and_write_homogeneous_mesh(
             rectangle, edge_length, mesh_parameters.output_file_name
         )
