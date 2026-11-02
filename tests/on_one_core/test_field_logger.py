@@ -4,10 +4,13 @@ import pytest
 import warnings
 import uuid
 
-from mpi4py import MPI
 from spyro.io.field_logger import FieldLogger
+from spyro.mpi.spyro_mpi import AutomaticParallelism, SpyroEnsemble
 
-comm = fire.Ensemble(MPI.COMM_WORLD, 1)
+
+@pytest.fixture
+def init_mpi():
+    SpyroEnsemble.initialize(AutomaticParallelism(1))
 
 
 @pytest.fixture
@@ -21,7 +24,8 @@ def logger():
     b_str = "bsn" + rnd_str
     c_str = "csn" + rnd_str
     d = {a_str + "_output": True, b_str + "_output": True, c_str + "_output": False}
-    logger = FieldLogger(comm, d)
+    SpyroEnsemble.initialize(AutomaticParallelism(number_of_sources=1))
+    logger = FieldLogger(d)
     logger.rnd_str = rnd_str
     logger.add_field(a_str, "1st", lambda: u)
     logger.add_field(b_str, "2nd", lambda: u)

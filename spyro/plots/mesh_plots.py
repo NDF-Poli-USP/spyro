@@ -10,7 +10,7 @@ from firedrake import (
 import matplotlib.pyplot as plt
 from pathlib import Path
 from ..domains.space import create_function_space
-from ..tools.version_control import is_firedrake_new
+from ..version_control import is_firedrake_new
 from .plot_helpers import _finalize_figure
 
 if is_firedrake_new():

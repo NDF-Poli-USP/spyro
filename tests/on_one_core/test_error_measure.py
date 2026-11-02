@@ -46,7 +46,6 @@ class TestMeasureError:
         assert error.path_save_err_case.name == "output"
         assert error.path_reference.name == "preamble"
         assert error.path_reference.parent.name == "output"
-        assert error.comm is None
 
     def test_initialization_custom_paths(self):
         """Test initialization with custom paths."""

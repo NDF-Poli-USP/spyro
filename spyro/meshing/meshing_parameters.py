@@ -256,6 +256,7 @@ class MeshingParameters():
         self.abc_pad_length = self.input_mesh_dictionary.get("abc_pad_length", abc_pad_length)
         self.degree = self.input_mesh_dictionary.get("degree", degree)
         self.mesh_type = self.input_mesh_dictionary.get("mesh_type")
+        self.periodic = self.input_mesh_dictionary.get("periodic", False)
         self.mesh_file = self.input_mesh_dictionary.get("mesh_file")
         self.length_z = self.input_mesh_dictionary.get("length_z")
         self.length_x = self.input_mesh_dictionary.get("length_x")

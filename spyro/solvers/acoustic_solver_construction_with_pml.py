@@ -119,9 +119,6 @@ def forms_pml(wave, W, X_n, X_nm1):
         # -------------------------------------------------------
         FF += (mm1 + mm2 + c * c * dd1) * dx
 
-        # exterior_markers = set(wave.mesh.exterior_facets.unique_markers)
-        # print("Available boundary markers:", exterior_markers)
-
         # Apply NRBCs (Higdon or Sommerfeld) at PML boundaries
         if bc_bndr in [BoundaryConditionsType.HIGDON, BoundaryConditionsType.SOMMERFELD]:
             ds = fire_ds(bc_surf, **quad_rule) if quad_rule else fire_ds(bc_surf)

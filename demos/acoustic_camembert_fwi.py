@@ -142,7 +142,6 @@ def run_fwi(load_real_shot=True):
             dt=real_shot_record_dt,
             shot_filename=shots_filenames,
         )
-
     else:
         dictionary["time_axis"]["dt"] = simulation_dt
         dictionary["inversion"]["real_shot_record_file"] = shots_filenames
@@ -174,7 +173,7 @@ def run_fwi(load_real_shot=True):
     export_grid_spacing = 0.01
 
     # Let us have a look at our solution
-    spyro.io.export_scalar_field(fwi_obj.wave.c, export_grid_spacing, "camembert.png", comm=fwi_obj.wave.comm)
+    spyro.io.export_scalar_field(fwi_obj.wave.c, export_grid_spacing, "camembert.png")
 
     print("END", flush=True)
 
