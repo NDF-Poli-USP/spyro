@@ -20,7 +20,7 @@ from spyro.tools.cells_per_wavelength_calculator.threshold_discretization import
 def make_error_function(
     critical_cpw: float,
 ) -> tuple[Callable[[float], float], list[float]]:
-    """Build a monotonically decreasing error that crosses 1 at ``critical_cpw``.
+    """Build a monotonically decreasing error that crosses 1 at `critical_cpw`.
 
     Parameters
     ----------
@@ -32,7 +32,7 @@ def make_error_function(
     calculate_error : Callable[[float], float]
         Error as a function of the cells-per-wavelength.
     calls : list of float
-        Every value ``calculate_error`` was called with, in order.
+        Every value `calculate_error` was called with, in order.
     """
     calls = []
 
@@ -159,28 +159,36 @@ def test_forward_line_search_rejects_start_above_max_cpw() -> None:
 
 @pytest.mark.parametrize("line_search", [backward_line_search, forward_line_search])
 @pytest.mark.parametrize(
-    "starting_cpw, accuracy, coarse_step_fraction, name",
-    [
-        (0.0, 0.1, 0.1, "starting_cpw"),
-        (2.0, 0.0, 0.1, "accuracy"),
-        (2.0, 0.1, -0.1, "coarse_step_fraction"),
-    ],
+    "name",
+    ["starting_cpw", "threshold", "accuracy", "coarse_step_fraction", "max_cpw"],
 )
-def test_line_searches_reject_non_positive_settings(
-    line_search: Callable[..., float],
-    starting_cpw: float,
-    accuracy: float,
-    coarse_step_fraction: float,
-    name: str,
+@pytest.mark.parametrize("value", [0.0, -0.1, math.nan, math.inf])
+def test_line_searches_reject_invalid_settings(
+    line_search: Callable[..., float], name: str, value: float,
 ) -> None:
-    """Non-positive settings are rejected before any error is evaluated."""
-    calculate_error, calls = make_error_function(3.0)
+    """Settings that are not positive and finite are rejected before any solve.
 
-    with pytest.raises(ValueError, match=f"{name} must be positive"):
-        line_search(
-            calculate_error, starting_cpw, 1.0, accuracy,
-            coarse_step_fraction=coarse_step_fraction,
-        )
+    Parameters
+    ----------
+    line_search : Callable[..., float]
+        Line search under test.
+    name : str
+        Name of the setting given an invalid value.
+    value : float
+        Invalid value of the setting.
+    """
+    calculate_error, calls = make_error_function(3.0)
+    settings = {
+        "starting_cpw": 2.0,
+        "threshold": 1.0,
+        "accuracy": 0.1,
+        "coarse_step_fraction": 0.1,
+        "max_cpw": 5.0,
+    }
+    settings[name] = value
+
+    with pytest.raises(ValueError, match=f"{name} must be positive and finite"):
+        line_search(calculate_error, **settings)
 
     assert calls == []
 

@@ -13,7 +13,7 @@ MAX_CPW = 5.0
 
 
 def _floor_to_accuracy(value: float, accuracy: float) -> float:
-    """Floor a value onto the grid of multiples of ``accuracy``.
+    """Floor a value onto the grid of multiples of `accuracy`.
 
     Parameters
     ----------
@@ -25,14 +25,14 @@ def _floor_to_accuracy(value: float, accuracy: float) -> float:
     Returns
     -------
     float
-        Largest multiple of ``accuracy`` not above ``value``.
+        Largest multiple of `accuracy` not above `value`.
     """
     # The small tolerance keeps values already on the grid in place
     return round(math.floor(value / accuracy + 1e-9) * accuracy, 10)
 
 
 def _ceil_to_accuracy(value: float, accuracy: float) -> float:
-    """Ceil a value onto the grid of multiples of ``accuracy``.
+    """Ceil a value onto the grid of multiples of `accuracy`.
 
     Parameters
     ----------
@@ -44,7 +44,7 @@ def _ceil_to_accuracy(value: float, accuracy: float) -> float:
     Returns
     -------
     float
-        Smallest multiple of ``accuracy`` not below ``value``.
+        Smallest multiple of `accuracy` not below `value`.
     """
     # The small tolerance keeps values already on the grid in place
     return round(math.ceil(value / accuracy - 1e-9) * accuracy, 10)
@@ -93,7 +93,7 @@ class _CachedThresholdCheck:
         Returns
         -------
         bool
-            Whether the error of ``cpw`` meets the threshold.
+            Whether the error of `cpw` meets the threshold.
         """
         if cpw not in self.errors:
             self.errors[cpw] = self.calculate_error(cpw)
@@ -101,7 +101,11 @@ class _CachedThresholdCheck:
 
 
 def _check_search_settings(
-    starting_cpw: float, accuracy: float, coarse_step_fraction: float
+    starting_cpw: float,
+    threshold: float,
+    accuracy: float,
+    coarse_step_fraction: float,
+    max_cpw: float,
 ) -> None:
     """Check the settings shared by the line searches.
 
@@ -109,23 +113,30 @@ def _check_search_settings(
     ----------
     starting_cpw : float
         First value evaluated.
+    threshold : float
+        Largest accepted error.
     accuracy : float
         Resolution of the result.
     coarse_step_fraction : float
         Fraction of the current value moved per coarse step.
+    max_cpw : float
+        Largest value evaluated.
 
     Raises
     ------
     ValueError
-        If any setting is not positive.
+        If any setting is not positive and finite.
     """
     for name, value in (
         ("starting_cpw", starting_cpw),
+        ("threshold", threshold),
         ("accuracy", accuracy),
         ("coarse_step_fraction", coarse_step_fraction),
+        ("max_cpw", max_cpw),
     ):
-        if value <= 0.0:
-            raise ValueError(f"{name} must be positive, got {value}.")
+        # NaN fails every comparison, so test for validity instead of failure
+        if not (math.isfinite(value) and value > 0.0):
+            raise ValueError(f"{name} must be positive and finite, got {value}.")
 
 
 def _bisect_grid(
@@ -137,8 +148,8 @@ def _bisect_grid(
     """Bisect the grid for the smallest value meeting the threshold.
 
     The error is assumed to decrease as the cells-per-wavelength grows, so
-    every grid value up to ``failing`` fails and every value from
-    ``passing`` on passes. Only grid values strictly between them are
+    every grid value up to `failing` fails and every value from
+    `passing` on passes. Only grid values strictly between them are
     evaluated.
 
     Parameters
@@ -155,8 +166,8 @@ def _bisect_grid(
     Returns
     -------
     float
-        The smallest grid value in ``(failing, passing)`` that passes, or
-        ``passing`` if none does.
+        The smallest grid value in `(failing, passing)` that passes, or
+        `passing` if none does.
     """
     # Grid indices: values at or below low fail, values at or above high pass
     low = math.floor(failing / accuracy + 1e-9)
@@ -185,8 +196,8 @@ def backward_line_search(
 
     The error is assumed to decrease as the cells-per-wavelength grows.
     Starting from a passing value, a coarse phase removes
-    ``coarse_step_fraction`` of the current value per step, but at least
-    ``accuracy``, until the error first exceeds the threshold. A fine phase
+    `coarse_step_fraction` of the current value per step, but at least
+    `accuracy`, until the error first exceeds the threshold. A fine phase
     then bisects the grid between the last passing and the first failing
     value. Each value is evaluated at most once.
 
@@ -195,7 +206,7 @@ def backward_line_search(
     calculate_error : Callable[[float], float]
         Returns the error of a cells-per-wavelength value.
     starting_cpw : float
-        First value evaluated. Its error must meet ``threshold``.
+        First value evaluated. Its error must meet `threshold`.
     threshold : float
         Largest accepted error.
     accuracy : float
@@ -210,15 +221,17 @@ def backward_line_search(
     Returns
     -------
     float
-        The smallest evaluated value whose error meets ``threshold``.
+        The smallest evaluated value whose error meets `threshold`.
 
     Raises
     ------
     ValueError
-        If a setting is not positive, ``starting_cpw`` is above
-        ``max_cpw``, or ``starting_cpw`` does not meet ``threshold``.
+        If a setting is not positive and finite, `starting_cpw` is above
+        `max_cpw`, or `starting_cpw` does not meet `threshold`.
     """
-    _check_search_settings(starting_cpw, accuracy, coarse_step_fraction)
+    _check_search_settings(
+        starting_cpw, threshold, accuracy, coarse_step_fraction, max_cpw
+    )
     if starting_cpw > max_cpw:
         raise ValueError(
             f"Starting cells-per-wavelength {starting_cpw} is above "
@@ -261,10 +274,10 @@ def forward_line_search(
 
     The error is assumed to decrease as the cells-per-wavelength grows.
     Starting from a failing value, a coarse phase adds
-    ``coarse_step_fraction`` of the current value per step, but at least
-    ``accuracy``, until the error first meets the threshold. A fine phase
+    `coarse_step_fraction` of the current value per step, but at least
+    `accuracy`, until the error first meets the threshold. A fine phase
     then bisects the grid between the last failing and the first passing
-    value. No value above ``max_cpw`` is evaluated, and each value is
+    value. No value above `max_cpw` is evaluated, and each value is
     evaluated at most once.
 
     Parameters
@@ -272,7 +285,7 @@ def forward_line_search(
     calculate_error : Callable[[float], float]
         Returns the error of a cells-per-wavelength value.
     starting_cpw : float
-        First value evaluated. Its error must exceed ``threshold``.
+        First value evaluated. Its error must exceed `threshold`.
     threshold : float
         Largest accepted error.
     accuracy : float
@@ -287,16 +300,18 @@ def forward_line_search(
     Returns
     -------
     float
-        The smallest evaluated value whose error meets ``threshold``.
+        The smallest evaluated value whose error meets `threshold`.
 
     Raises
     ------
     ValueError
-        If a setting is not positive, ``starting_cpw`` already meets
-        ``threshold`` or is not below ``max_cpw``, or ``max_cpw`` does not
-        meet ``threshold``.
+        If a setting is not positive and finite, `starting_cpw` already
+        meets `threshold` or is not below `max_cpw`, or `max_cpw` does
+        not meet `threshold`.
     """
-    _check_search_settings(starting_cpw, accuracy, coarse_step_fraction)
+    _check_search_settings(
+        starting_cpw, threshold, accuracy, coarse_step_fraction, max_cpw
+    )
     if starting_cpw >= max_cpw:
         raise ValueError(
             f"Starting cells-per-wavelength {starting_cpw} is not below "
@@ -330,7 +345,7 @@ def forward_line_search(
 
 
 #: Line search run by :meth:`MeshingParameterCalculator.find_minimum`,
-#: selected by the ``"search_direction"`` parameter.
+#: selected by the `"search_direction"` parameter.
 LINE_SEARCHES: dict[CpwSearchDirection, Callable[..., float]] = {
     CpwSearchDirection.BACKWARD: backward_line_search,
     CpwSearchDirection.FORWARD: forward_line_search,
