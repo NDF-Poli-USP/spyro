@@ -296,9 +296,9 @@ class Modal_Solver:
                              "eps_target_magnitude": None  # Sort by distance to target
                              })
         else:
-            opts = {"st_shift": 1e-6,  # Stabilizes Neumann BC null space
-                    "st_type": "sinvert",  # Useful for interior eigenvalues
-                    }
+            opts.update({"st_shift": 1e-6,  # Stabilizes Neumann BC null space
+                         "st_type": "sinvert",  # Useful for interior eigenvalues
+                         })
 
             if self.calc_max_dt:
                 # Largest eigenvalues magnitude
