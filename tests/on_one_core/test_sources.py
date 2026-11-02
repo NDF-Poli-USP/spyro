@@ -281,10 +281,6 @@ def test_cofunction_values_elastic_3d(cell_type):
     _check_cofunction_values(wave, source_locations, test_exprs)
 
 
-if __name__ == "__main__":
-    test_ricker_varies_in_time()
-
-
 def _first_cell_centroid(mesh: fire.MeshGeometry) -> tuple[float, ...]:
     """Return the centroid of the cell numbered 0 on this rank.
 
@@ -333,3 +329,7 @@ def test_receiver_in_first_cell_is_injected() -> None:
     wave.receivers.apply_receivers_as_source(rhs_forcing, [[1.0]], 0)
 
     assert np.abs(rhs_forcing.dat.data_ro).max() > 0.0
+
+
+if __name__ == "__main__":
+    test_ricker_varies_in_time()
