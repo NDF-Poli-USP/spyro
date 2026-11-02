@@ -498,10 +498,9 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     c_hom = "Homogeneous" if homogeneous else "Heterogeneous"
     n_hyp = f"HyperShape N{degree_layer}" if degree_layer is not None else "Rectangular"
 
-    SpyroEnsemble.print(
-        "\n" + 60 * "=" + f"\nTesting Modal Solvers with {element_geometry} elements "
-        + f"for {dimension}D case\nand {n_hyp} layer. Propagation Speed: {c_hom}\n"
-        + 60 * "=")
+    SpyroEnsemble.print("\n" + 60 * "=" + "\nTesting Modal Solvers with "
+                        + f"{element_geometry} elements for {dimension}D case\nand "
+                        + f"{n_hyp} layer. Propagation Speed: {c_hom}\n" + 60 * "=")
 
     # ============ SIMULATION PARAMETERS ============
 
