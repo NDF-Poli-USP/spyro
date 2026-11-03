@@ -7,7 +7,7 @@ generation based on wavelength constraints.
 
 from os import path
 from warnings import warn
-from ..utils.error_management import value_parameter_error
+from ..utils.error_management import validate_parameter
 
 
 def cells_per_wavelength(method, degree, dimension):
@@ -256,6 +256,7 @@ class MeshingParameters():
         self.abc_pad_length = self.input_mesh_dictionary.get("abc_pad_length", abc_pad_length)
         self.degree = self.input_mesh_dictionary.get("degree", degree)
         self.mesh_type = self.input_mesh_dictionary.get("mesh_type")
+        self.periodic = self.input_mesh_dictionary.get("periodic", False)
         self.mesh_file = self.input_mesh_dictionary.get("mesh_file")
         self.length_z = self.input_mesh_dictionary.get("length_z")
         self.length_x = self.input_mesh_dictionary.get("length_x")
@@ -681,7 +682,7 @@ class MeshingParameters():
             None,
         ]
 
-        self._method = value_parameter_error("method", value, allowed_types)
+        self._method = validate_parameter("method", value, allowed_types)
 
     @property
     def mesh_file(self):
@@ -750,7 +751,7 @@ class MeshingParameters():
         """
         allowed_types = ["firedrake_mesh", "user_mesh", "SeismicMesh", "file", "spyro_mesh", "gmsh_mesh"]
         if value is not None and value not in allowed_types:
-            value_parameter_error("mesh_type", value, allowed_types)
+            validate_parameter("mesh_type", value, allowed_types)
 
         if value == "SeismicMesh" and self.quadrilateral:
             raise ValueError("SeismicMesh does not work with quads.")
@@ -1058,7 +1059,7 @@ class MeshingParameters():
     def padding_type(self, value):
         allowed_types = [None, "rectangular", "hyperelliptical"]
         if value not in allowed_types:
-            value_parameter_error("padding_type", value, allowed_types)
+            validate_parameter("padding_type", value, allowed_types)
         self._padding_type = value
 
     @property
@@ -1079,7 +1080,7 @@ class MeshingParameters():
     def winslow_implementation(self, value):
         allowed_types = ["default", "fast", "numba"]
         if value is not None and value not in allowed_types:
-            value_parameter_error("winslow_implementation", value, allowed_types)
+            validate_parameter("winslow_implementation", value, allowed_types)
         self._winslow_implementation = value
 
     @property

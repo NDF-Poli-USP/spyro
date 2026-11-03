@@ -1,5 +1,4 @@
 import firedrake as fire
-import numpy as np
 import spyro
 import pytest
 
@@ -23,10 +22,10 @@ def test_acoustic_camembert_fwi():
     length_z = 2.0
     length_x = 2.0
     grid_vp_data = spyro.io.segy_io.create_grid_dictionary_from_segy(
-            "camembert.segy",
-            length_z,
-            length_x,
-        )
+        "camembert.segy",
+        length_z,
+        length_x,
+    )
 
     mesh = fire.RectangleMesh(200, 200, length_z, length_x, comm=comm.comm)
     mesh.coordinates.dat.data[:, 0] *= -1.0

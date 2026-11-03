@@ -28,7 +28,7 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneou
    degree_layer : `int` or `float` or `None`
         Hypershape degree. `None` is used only for rectangular layers.
     homogeneous : `bool`
-        If `True`, the velocity model is homogeneous. If `False`, it is heterogeneous
+        If `True`, the velocity model is homogeneous. If `False`, it is heterogeneous.
 
     Returns
     -------
@@ -289,6 +289,7 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
     ("T", 2, None, True),
     ("T", 2, 2.0, False),
     ("T", 2, None, False),
+    param("T", 2, 2.5, True, marks=mark.slow),
     param("T", 3, 6.0, True, marks=mark.slow),
     param("T", 3, None, True, marks=mark.slow),
     param("T", 3, 2.4, False, marks=mark.slow),
@@ -459,7 +460,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     fana[Hz]  0.47741
     fray[Hz]  0.47727
 
-    *EIKONAL HOMOGENEOUS
+    *EIKONAL HETEROGENEOUS
     eik_min = 83.333 ms
     f_est  eik[ms]
      0.02  69.442
@@ -497,7 +498,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     c_hom = "Homogeneous" if homogeneous else "Heterogeneous"
     n_hyp = f"HyperShape N{degree_layer}" if degree_layer is not None else "Rectangular"
 
-    pprint("\n" + 60 * "=" + f"\nTesting Modal Solvers with {element_geometry} elements"
+    pprint("\n" + 60 * "=" + f"\nTesting Modal Solvers with {element_geometry} elements "
            + f"for {dimension}D case\nand {n_hyp} layer. Propagation Speed: {c_hom}\n"
            + 60 * "=", comm=comm)
 
@@ -535,5 +536,5 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
 
     except ConvergenceError as e:
         fail(f"Checking Modal Solvers with {element_geometry} elements "
-             f"for{dimension}D case, {n_hyp} layer and {c_hom} propagation "
+             f"for {dimension}D case, {n_hyp} layer and {c_hom} propagation "
              f"speed raised an exception: {str(e)}")

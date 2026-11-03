@@ -19,6 +19,11 @@ def _propagate_forward_central_difference(wave, source_ids):
         the forward solve.
     source_ids: list of int
         List of source IDs to simulate.
+
+    Returns
+    -------
+    None
+        The solver state, receiver data and functional are updated in place.
     """
     if wave.sources is not None:
         wave.sources.current_sources = source_ids
@@ -37,19 +42,20 @@ def _propagate_forward_central_difference(wave, source_ids):
     usol = None
     store_mixed_forward_state = False
     if wave.store_forward_time_steps:
-        state_space = wave.function_space
+        # A PML forward residual pairs the whole mixed state, so the UFL-derived
+        # adjoint needs the mixed snapshots rather than the pressure alone.
         if (
             wave.abc_type == AbsorbingBCsType.PML
             and wave.use_vertex_only_mesh
             and wave.forward_residual_form is not None
         ):
-            state_space = wave.mixed_function_space
             store_mixed_forward_state = True
-        usol = [
-            fire.Function(state_space, name=wave.get_function_name())
-            for t in range(nt)
-            if t % wave.gradient_sampling_frequency == 0
-        ]
+        # Snapshots are appended as the solve advances rather than allocated
+        # up front. The final footprint is the same, but nothing is reserved
+        # before it is needed: a solve that aborts early (e.g. the numerical
+        # instability check below) no longer has to first allocate the whole
+        # nt-step wavefield, which for fine meshes/small dt is many GB.
+        usol = []
     source_cof = None
     interpolate_receivers = None
     master_source_W = None
@@ -76,6 +82,10 @@ def _propagate_forward_central_difference(wave, source_ids):
     usol_recv = []
     receiver_array = None
     receiver_buffer = None
+    # Reused accumulator for the point-source cofunction, so the per-timestep
+    # source assembly writes into an existing tensor instead of allocating a
+    # fresh Cofunction on every step.
+    source_buffer = None
     save_step = 0
     real_shot_record = None
     if compute_functional:
@@ -87,7 +97,9 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.misfit = []
 
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-        wave.automated_adjoint.start_recording()
+        # A schedule is consumed as it executes, so each forward solve needs a
+        # fresh one, sized by this loop's ``nt``.
+        wave.automated_adjoint.start_recording(total_steps=nt)
 
     for step in range(nt):
         # Basic way of applying sources
@@ -100,13 +112,27 @@ def _propagate_forward_central_difference(wave, source_ids):
                         wave.sources.wavelet[step] * master_source_W
                     )
                 else:
-                    wave.rhs_no_pml_source().assign(fire.assemble(
-                        wave.sources.wavelet[step] * source_cof))
+                    if source_buffer is None:
+                        source_buffer = fire.assemble(
+                            wave.sources.wavelet[step] * source_cof)
+                    else:
+                        fire.assemble(
+                            wave.sources.wavelet[step] * source_cof,
+                            tensor=source_buffer)
+                    wave.rhs_no_pml_source().assign(source_buffer)
             else:
                 wave.rhs_no_pml_source().assign(
                     wave.sources.apply_source(rhs_forcing, step))
 
         wave.solver.solve()
+
+        # The time step has to close right after the solve: closing it after
+        # the state rotation below makes the solve output look disposable, and
+        # its checkpoint is dropped. The final step is closed by pyadjoint
+        # itself when taping ends, hence ``nt - 1``.
+        if adjoint_type == AdjointType.AUTOMATED_ADJOINT and step < nt - 1:
+            wave.automated_adjoint.end_timestep()
+
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
 
@@ -128,9 +154,16 @@ def _propagate_forward_central_difference(wave, source_ids):
             and step % wave.gradient_sampling_frequency == 0
         ):
             if store_mixed_forward_state:
-                usol[save_step].assign(wave.vstate)
+                snapshot = fire.Function(
+                    wave.mixed_function_space, name=wave.get_function_name()
+                )
+                snapshot.assign(wave.vstate)
             else:
-                usol[save_step].assign(wave.get_function())
+                snapshot = fire.Function(
+                    wave.function_space, name=wave.get_function_name()
+                )
+                snapshot.assign(wave.get_function())
+            usol.append(snapshot)
             save_step += 1
 
         if (step - 1) % wave.output_frequency == 0:
@@ -144,10 +177,13 @@ def _propagate_forward_central_difference(wave, source_ids):
         if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
             if wave.use_vertex_only_mesh:
                 if isinstance(real_shot_record[step], np.ndarray):
-                    real_shot = fire.Function(
-                        usol_recv[-1].function_space(),
-                        val=real_shot_record[step],
-                    )
+                    # This rank only samples the receivers it owns (issue
+                    # #315), so restrict the record to them. ``val=`` would
+                    # also need the halo points, hence ``data_wo``.
+                    real_shot = fire.Function(usol_recv[-1].function_space())
+                    real_shot.dat.data_wo[:] = real_shot_record[step][
+                        wave.receivers.vom_input_indices
+                    ]
                     misfit_step = real_shot - usol_recv[-1]
                 elif isinstance(real_shot_record[step], fire.Function):
                     misfit_step = real_shot_record[step] - usol_recv[-1]
@@ -172,13 +208,15 @@ def _propagate_forward_central_difference(wave, source_ids):
     wave.current_time = t
 
     helpers.display_progress(wave.comm, t)
-    if receiver_array is not None and functional_mode is not FunctionalEvaluationMode.PER_TIMESTEP:
-        usol_recv = receiver_array
-    usol_recv = helpers.fill(
-        usol_recv, wave.receivers.is_local, nt, wave.receivers.number_of_points
-    )
-
-    usol_recv = utils.utils.communicate(usol_recv, wave.comm)
+    if wave.use_vertex_only_mesh:
+        # Each rank sampled only its own receivers, in vertex-only-mesh
+        # order: gather the input-order record from all ranks (issue #315).
+        usol_recv = wave.receivers.gather_receiver_record(receiver_array)
+    else:
+        usol_recv = helpers.fill(
+            usol_recv, wave.receivers.is_local, nt, wave.receivers.number_of_points
+        )
+        usol_recv = utils.utils.communicate(usol_recv, wave.comm)
 
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         wave.automated_adjoint.stop_recording()

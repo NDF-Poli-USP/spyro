@@ -1,6 +1,7 @@
 from mpi4py.MPI import COMM_WORLD
 import numpy as np
 import firedrake as fire
+import pytest
 import random
 import spyro
 import warnings
@@ -63,9 +64,10 @@ dictionary["visualization"] = {
 }
 
 
-def get_gradient(parallelism_type, points):
+def get_gradient(parallelism_type, points, use_vertex_only_mesh=False):
 
     dictionary["parallelism"]["type"] = parallelism_type
+    dictionary["acquisition"]["use_vertex_only_mesh"] = use_vertex_only_mesh
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
 
@@ -102,7 +104,11 @@ def get_gradient(parallelism_type, points):
     return gradient_point_values
 
 
-def test_gradient_serialshots():
+# With two ranks, "automatic" runs one shot per core while "spatial" runs
+# both cores on each shot. The vertex-only-mesh case checks that receivers
+# split across the two cores still give the same gradient (issue #315).
+@pytest.mark.parametrize("use_vertex_only_mesh", [False, True])
+def test_gradient_serialshots(use_vertex_only_mesh):
     comm = COMM_WORLD
     rank = comm.Get_rank()
     if rank == 0:
@@ -110,15 +116,20 @@ def test_gradient_serialshots():
     else:
         points = None
     points = comm.bcast(points, root=0)
-    gradient_ensemble_parallelism = get_gradient("automatic", points)
-    gradient_serial_shot = get_gradient("spatial", points)
+    gradient_ensemble_parallelism = get_gradient(
+        "automatic", points, use_vertex_only_mesh
+    )
+    gradient_serial_shot = get_gradient(
+        "spatial", points, use_vertex_only_mesh
+    )
 
     # Check if the gradients are equal within a tolerance
     tolerance = 1e-8
-    test = all(np.isclose(a, b, atol=tolerance) for a, b in zip(gradient_ensemble_parallelism, gradient_serial_shot))
-
-    print(f"Gradient is equal: {test}", flush=True)
+    assert np.allclose(
+        gradient_ensemble_parallelism, gradient_serial_shot, atol=tolerance
+    )
 
 
 if __name__ == "__main__":
-    test_gradient_serialshots()
+    test_gradient_serialshots(use_vertex_only_mesh=False)
+    test_gradient_serialshots(use_vertex_only_mesh=True)

@@ -1,19 +1,12 @@
-from mpi4py.MPI import COMM_WORLD
+from pytest import mark
 from mpi4py import MPI
-import numpy as np
-import firedrake as fire
+from firedrake import conditional
 import spyro
-import pytest
+from spyro.mpi.spyro_mpi import SpyroEnsemble
+from spyro.tools.error_measure import MeasureError
 
 
-def error_calc(p_numerical, p_analytical, nt):
-    norm = np.linalg.norm(p_numerical, 2) / np.sqrt(nt)
-    error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
-    div_error_time = error_time / norm
-    return div_error_time
-
-
-@pytest.mark.parallel(6)
+@mark.parallel(6)
 def test_forward_3_shots():
     final_time = 1.0
 
@@ -41,6 +34,7 @@ def test_forward_3_shots():
         "delay": 0.2,
         "delay_type": "time",
         "receiver_locations": spyro.create_transect((-1.3, 1.2), (-1.3, 1.8), 301),
+        "use_vertex_only_mesh": True,
     }
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
@@ -63,43 +57,42 @@ def test_forward_3_shots():
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.1})
 
     mesh_z = wave.mesh_z
-    cond = fire.conditional(mesh_z < -1.5, 3.5, 1.5)
+    cond = conditional(mesh_z < -1.5, 3.5, 1.5)
     wave.set_initial_velocity_model(conditional=cond, output=True)
 
     wave.forward_solve()
 
-    comm = wave.comm
-
     arr = wave.forward_solution_receivers
+    ensemble_comm = SpyroEnsemble.ensemble.ensemble_comm
 
-    if comm.ensemble_comm.rank == 0:
+    if ensemble_comm.rank == 0:
         analytical_p = spyro.utils.nodal_homogeneous_analytical(
             wave, 0.2, 1.5, n_extra=100
         )
     else:
         analytical_p = None
-    analytical_p = comm.ensemble_comm.bcast(analytical_p, root=0)
+    analytical_p = ensemble_comm.bcast(analytical_p, root=0)
 
     # Checking if error before reflection matches
-    if comm.ensemble_comm.rank == 0:
+    if ensemble_comm.rank == 0:
         rec_id = 0
-    elif comm.ensemble_comm.rank == 1:
+    elif ensemble_comm.rank == 1:
         rec_id = 150
-    elif comm.ensemble_comm.rank == 2:
+    elif ensemble_comm.rank == 2:
         rec_id = 300
 
     arr0 = arr[:, rec_id]
     arr0 = arr0.flatten()
 
-    error = error_calc(arr0[:430], analytical_p[:430], 430)
-    if comm.comm.rank == 0:
-        print(f"Error for shot {wave.current_sources} is {error} and test has passed equals {np.abs(error) < 0.01}", flush=True)
-    error_all = COMM_WORLD.allreduce(error, op=MPI.SUM)
-    error_all /= 3
+    # Calculating errors
+    error_L2 = MeasureError.calculate_normalized_L2_error(arr0[:430], analytical_p[:430])
+    SpyroEnsemble.print(
+        f"L2 Error for shot {wave.current_sources} is {error_L2:.4e} and test "
+        f"has passed equals {abs(error_L2) < 0.01}"
+    )
+    error_L2_all = ensemble_comm.allreduce(error_L2, op=MPI.SUM) / 3.
 
-    test = np.abs(error_all) < 0.01
-
-    assert test
+    assert abs(error_L2_all) < 0.01
 
 
 if __name__ == "__main__":

@@ -1,12 +1,16 @@
+"""Camembert example models for acoustic forward and FWI workflows.
+
+This module defines reusable dictionary configurations and helper classes for setting up
+a 2D acoustic Camembert velocity model in spyro.
+"""
+
 from spyro import create_transect
 from spyro.examples.rectangle import Rectangle_acoustic, Rectangle_acoustic_FWI
 import firedrake as fire
 import copy
 
 camembert_optimization_parameters = {
-    "General": {
-        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
-    },
+    "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
     "Step": {
         "Type": "Augmented Lagrangian",
         "Augmented Lagrangian": {
@@ -120,7 +124,21 @@ camembert_dictionary_fwi["inversion"]["perform_fwi"] = True
 
 
 class CamembertVelocity:
+    """Mixin that builds the Camembert circular velocity distribution."""
+
     def _camembert_velocity_model(self):
+        """Set the initial velocity model using a circular inclusion.
+
+        The velocity is defined from ``camembert_options`` in
+        ``self.input_dictionary``. Points inside the circle use
+        ``inside_circle_velocity`` and points outside use ``outside_velocity``.
+
+        Returns
+        -------
+        None
+            The model is assigned in-place through
+            :meth:`set_initial_velocity_model`.
+        """
         camembert_dict = self.input_dictionary["camembert_options"]
         z = self.mesh_z
         x = self.mesh_x
@@ -136,27 +154,33 @@ class CamembertVelocity:
 
 
 class Camembert_acoustic(CamembertVelocity, Rectangle_acoustic):
-    """Camembert model.
-    This class is a child of the Example_model class.
-    It is used to create a dictionary with the parameters of the
-    Camembert model.
+    """Camembert acoustic example model.
 
-    Example Setup
-
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
-
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
-
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
-
-    Feel free to adapt these templates to your needs.
+    This class provides a reusable setup for a Camembert velocity model in
+    forward acoustic simulations.
 
     Parameters
     ----------
     dictionary : dict, optional
-        Dictionary with the parameters of the model that are different from
-        the default Camembert model. The default is None.
+        Dictionary containing values that override entries in the default
+        Camembert example configuration.
+    example_dictionary : dict, optional
+        Base dictionary used to configure the simulation. Defaults to
+        ``camembert_dictionary``.
+    comm : mpi4py.MPI.Comm, optional
+        MPI communicator passed to the parent model class.
+    periodic : bool, optional
+        Whether periodic boundaries are requested. This example currently
+        forwards ``False`` to the parent implementation.
 
+    Notes
+    -----
+    This example is intended as a reusable model configuration for
+    development and testing of numerical methods. It does not represent a
+    targeted validation case with a single expected output.
+
+    By isolating common model setup logic, this class reduces boilerplate and
+    encourages consistency across experiments.
     """
 
     def __init__(
@@ -176,27 +200,33 @@ class Camembert_acoustic(CamembertVelocity, Rectangle_acoustic):
 
 
 class Camembert_acoustic_FWI(CamembertVelocity, Rectangle_acoustic_FWI):
-    """Camembert model.
-    This class is a child of the Example_model class.
-    It is used to create a dictionary with the parameters of the
-    Camembert model.
+    """Camembert acoustic example model configured for FWI.
 
-    Example Setup
-
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
-
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
-
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
-
-    Feel free to adapt these templates to your needs.
+    This class provides a reusable Camembert setup for full-waveform
+    inversion workflows.
 
     Parameters
     ----------
     dictionary : dict, optional
-        Dictionary with the parameters of the model that are different from
-        the default Camembert model. The default is None.
+        Dictionary containing values that override entries in the default
+        Camembert FWI example configuration.
+    example_dictionary : dict, optional
+        Base dictionary used to configure the simulation. Defaults to
+        ``camembert_dictionary_fwi``.
+    comm : mpi4py.MPI.Comm, optional
+        MPI communicator passed to the parent model class.
+    periodic : bool, optional
+        Whether periodic boundaries are requested. This example currently
+        forwards ``False`` to the parent implementation.
 
+    Notes
+    -----
+    This example is intended as a reusable model configuration for
+    development and testing of inversion methods. It does not represent a
+    targeted validation case with a single expected output.
+
+    By isolating common model setup logic, this class reduces boilerplate and
+    encourages consistency across experiments.
     """
 
     def __init__(

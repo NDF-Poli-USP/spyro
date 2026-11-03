@@ -1,0 +1,1 @@
+"""Receiver and related methods for evaluating data in points."""

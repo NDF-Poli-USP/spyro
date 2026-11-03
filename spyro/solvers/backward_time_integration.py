@@ -1,9 +1,11 @@
 import firedrake as fire
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from . import helpers
 from .wave import Wave
-from ..io.basicio import parallel_print
+from ..utils.physical_parameters import PhysicalParameters
 from ..utils.typing import (
-    AbsorbingBCsType, AdjointType, ImplementedAdjointDerivation,
+    AbsorbingBCsType, AcousticMaterialParameter, AdjointType,
+    ImplementedAdjointDerivation,
 )
 
 # Key used to store a single-control (e.g. acoustic velocity) gradient in the
@@ -34,7 +36,7 @@ def backward_wave_propagator(
 
     Returns:
     --------
-    dJ : firedrake.Function or dict
+    dJ : firedrake.Function or PhysicalParameters
         Calculated gradient. Acoustic controls return one ``Function``.
         Isotropic elastic controls return a dictionary of ``Function`` objects
         keyed by material parameter.
@@ -54,12 +56,23 @@ def backward_wave_propagator(
     dt = wave.dt
     t = wave.current_time
     if t != wave.final_time:
-        parallel_print(
+        SpyroEnsemble.print(
             f"Current time of {t}, different than final_time of "
             f"{wave.final_time}. Setting final_time to current time "
-            f"in backwards propagation.", wave.comm,
+            f"in backwards propagation."
         )
     nt = int(t / dt) + 1
+
+    # The forward wavefield is stored only every ``gradient_sampling_frequency``
+    # steps, so consecutive stored samples are ``sample_dt = freq * dt`` apart in
+    # physical time. Every time-derivative stencil and every quadrature weight in
+    # the gradient must use ``sample_dt`` (not ``dt``); otherwise the gradient is
+    # off by a factor of ``freq**2`` (second derivative) and ``freq``
+    # (trapezoidal spacing). ``last_sample`` is the largest sampled step index,
+    # i.e. the last endpoint of the trapezoidal rule over sampled steps.
+    freq = wave.gradient_sampling_frequency
+    sample_dt = freq * dt
+    last_sample = ((nt - 1) // freq) * freq
 
     wave.comm.comm.barrier()
 
@@ -69,6 +82,13 @@ def backward_wave_propagator(
     )
     form_controls = None
     if use_ufl_differentiation:
+        if freq != 1:
+            # The residual of step n pairs u^{n+1}, u^n and u^{n-1}, so every
+            # forward step must be stored.
+            raise ValueError(
+                "The UFL-derived implemented adjoint needs "
+                "gradient_sampling_frequency = 1."
+            )
         form_controls = _require_ufl_differentiation_inputs(wave)
     # Initialize the reduced gradient accumulator with zero in the control
     # space(s).  During the backward time loop each step adds a contribution
@@ -111,6 +131,7 @@ def backward_wave_propagator(
             wave.next_vstate,
             wave.get_adjoint_source(),
             wave.solver_parameters,
+            bcs=getattr(wave, "bcs", None),
         )
     else:
         adjoint_solver = wave.solver
@@ -163,7 +184,7 @@ def backward_wave_propagator(
                 else:
                     forward_field.assign(0.0)
             else:
-                forward_field.assign(_compute_dufordt2(forward_solution, dt))
+                forward_field.assign(_compute_dufordt2(forward_solution, sample_dt))
             if use_ufl_differentiation:
                 for control_solver in grad_solver.values():
                     control_solver.solve()
@@ -171,7 +192,7 @@ def backward_wave_propagator(
                     dJ[parameter] += gradi[parameter]
             else:
                 grad_solver.solve()
-                _trapezoidal_gradient_integration(dJ, gradi, step, nt)
+                _trapezoidal_gradient_integration(dJ, gradi, step, last_sample)
 
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
@@ -185,10 +206,12 @@ def backward_wave_propagator(
     if use_ufl_differentiation:
         for gradient in dJ.values():
             gradient.assign(dt * gradient)
-        if not controls_are_dict:
+        if controls_are_dict:
+            dJ = PhysicalParameters(dJ)
+        else:
             dJ = dJ[_SINGLE_CONTROL_KEY]
     else:
-        dJ.assign((dt / 2) * dJ)
+        dJ.dat.data_with_halos[:] *= sample_dt / 2
     return dJ
 
 
@@ -260,9 +283,8 @@ def _build_gradient_solver(
                     wave, control, adjoint_field, dx,
                 )
             )
-        parallel_print(
-            "Using UFL-derived gradient from forward residual form",
-            wave.comm,
+        SpyroEnsemble.print(
+            "Using UFL-derived gradient from forward residual form"
         )
         return grad_solver, None, uadj, gradi
 
@@ -387,6 +409,7 @@ def build_adjoint_solver(
     adjoint_next_state,
     adjoint_source,
     solver_parameters,
+    bcs=None,
 ) -> fire.LinearVariationalSolver:
     """Build a one-step adjoint solver from a discrete forward residual.
 
@@ -423,6 +446,15 @@ def build_adjoint_solver(
         to the state.
     solver_parameters : dict
         Firedrake/PETSc solver parameters.
+    bcs : list of firedrake.DirichletBC, optional
+        Dirichlet conditions of the forward step. The adjoint takes their
+        homogeneous version on the same boundaries: a prescribed value is
+        not a degree of freedom, so its adjoint vanishes there.
+
+    Returns
+    -------
+    firedrake.LinearVariationalSolver
+        Solver of one adjoint step.
     """
     residual_np1, residual_n, residual_nm1 = forward_residual_states
     state_space = residual_np1.function_space()
@@ -443,10 +475,15 @@ def build_adjoint_solver(
         -fire.action(fire.adjoint(dR_dn), adjoint_current_state)
         - fire.action(fire.adjoint(dR_dnm1), adjoint_previous_state)
     )
+    adjoint_bcs = [
+        fire.DirichletBC(bc.function_space(), 0.0, bc.sub_domain)
+        for bc in (bcs or [])
+    ]
     problem = fire.LinearVariationalProblem(
         adjoint_lhs,
         adjoint_rhs + adjoint_source,
         adjoint_next_state,
+        bcs=adjoint_bcs or None,
         constant_jacobian=True,
     )
     solver_parameters = dict(solver_parameters)
@@ -458,25 +495,33 @@ def build_adjoint_solver(
 
 
 def _get_form_controls(wave: Wave):
-    """Return controls supported by the UFL residual backend.
+    """Return the controls of the UFL-derived gradient.
 
-    ``Wave.get_control_parameters()`` is the solver-level API for inversion
-    controls. Acoustic waves expose one control, the velocity model, as a
-    Firedrake ``Function``. Isotropic elastic waves expose a dictionary of
-    scalar material controls, so each entry gets its own Riesz solve.
+    The controls are the independent physical parameters selected with
+    :meth:`Wave.enable_implemented_adjoint` (all of them by default). An
+    acoustic wave has one control, the velocity, returned as a Firedrake
+    ``Function``; any other selection is returned as a dictionary keyed by
+    material parameter, so each entry gets its own Riesz solve.
+
+    Parameters
+    ----------
+    wave : Wave
+        Wave whose physical parameters are initialized.
+
+    Returns
+    -------
+    firedrake.Function or dict or None
+        The controls, or ``None`` when the wave has no physical parameters.
     """
     try:
-        controls = wave.get_control_parameters()
-    except NotImplementedError:
+        parameters = wave.physical_parameters
+    except ValueError:
         return None
-
-    if isinstance(controls, fire.Function):
-        return controls
-    if isinstance(controls, dict) and all(
-        isinstance(control, fire.Function) for control in controls.values()
-    ):
-        return controls
-    return None
+    controls = parameters.select(wave.implemented_adjoint_control_parameters)
+    names = list(controls)
+    if len(names) == 1 and isinstance(names[0], AcousticMaterialParameter):
+        return controls[names[0]]
+    return dict(controls.items())
 
 
 def _require_ufl_differentiation_inputs(wave: Wave):
@@ -495,8 +540,8 @@ def _require_ufl_differentiation_inputs(wave: Wave):
     controls = _get_form_controls(wave)
     if controls is None:
         raise ValueError(
-            "UFL-derived implemented adjoint requires Firedrake Function "
-            "control parameters from wave.get_control_parameters()."
+            "UFL-derived implemented adjoint requires initialized physical "
+            "parameters (wave.physical_parameters)."
         )
     return controls
 
@@ -513,21 +558,27 @@ def _control_map(controls) -> dict:
     return {_SINGLE_CONTROL_KEY: controls}
 
 
-def _compute_dufordt2(forward_solution: list, dt: float) -> fire.Function:
-    """Second time-derivative via 3-point central finite differences."""
+def _compute_dufordt2(forward_solution: list, sample_dt: float) -> fire.Function:
+    """Second time-derivative via 3-point finite differences.
+
+    ``sample_dt`` is the physical time between consecutive stored samples
+    (``gradient_sampling_frequency * dt``), which equals ``dt`` only when every
+    step is stored.
+    """
     if len(forward_solution) > 2:
         return (
             forward_solution.pop()
             - 2.0 * forward_solution[-1]
             + forward_solution[-2]
-        ) / fire.Constant(dt**2)
+        ) / fire.Constant(sample_dt**2)
     else:
-        return forward_solution.pop() / fire.Constant(dt**2)
+        return forward_solution.pop() / fire.Constant(sample_dt**2)
 
 
 def _trapezoidal_gradient_integration(
-        dJ: fire.Function, gradi: fire.Function, step: int, nt: int) -> None:
-    """Trapezoidal-rule gradient accumulation.
+        dJ: fire.Function, gradi: fire.Function, step: int,
+        last_sample: int) -> None:
+    """Trapezoidal-rule gradient accumulation over the stored (sampled) steps.
 
     Parameters:
     -----------
@@ -537,11 +588,12 @@ def _trapezoidal_gradient_integration(
         The gradient at the current time step.
     step : int
         The current time step.
-    nt : int
-        The total number of time steps.
+    last_sample : int
+        The largest sampled step index. Together with step 0 these are the two
+        endpoints of the trapezoidal rule (weight 1); interior samples weight 2.
     """
 
-    if step == nt - 1 or step == 0:
+    if step == last_sample or step == 0:
         dJ += gradi
     else:
         dJ += 2 * gradi

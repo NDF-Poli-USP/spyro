@@ -1,17 +1,8 @@
 from mpi4py.MPI import COMM_WORLD
 from mpi4py import MPI
-# import debugpy
-# debugpy.listen(3000 + COMM_WORLD.rank)
-# debugpy.wait_for_client()
 import spyro
-import numpy as np
-
-
-def error_calc(p_numerical, p_analytical, nt):
-    norm = np.linalg.norm(p_numerical, 2) / np.sqrt(nt)
-    error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
-    div_error_time = error_time / norm
-    return div_error_time
+from spyro.io.basicio import parallel_print as pprint
+from spyro.tools.error_measure import MeasureError
 
 
 def test_forward_supershot():
@@ -92,19 +83,37 @@ def test_forward_supershot():
     arr199 = rec_out[:, 199]
     arr199 = arr199.flatten()
 
-    error0 = error_calc(arr0[:430], analytical_p[:430], 430)
-    error199 = error_calc(arr199[:430], analytical_p[:430], 430)
-    error = error0 + error199
-    error_all = COMM_WORLD.allreduce(error, op=MPI.SUM)
-    error_all /= 2
+    # Computing errors
+    measure_error = MeasureError()
+    error0_nrms = measure_error.calculate_normalized_L2_error(
+        arr0[:430], analytical_p[:430]
+    )
+    error199_nrms = measure_error.calculate_normalized_L2_error(
+        arr199[:430], analytical_p[:430],
+    )
+    error0_it = measure_error.calculate_integral_error(arr0[:430], analytical_p[:430], wave.dt)
+    error199_it = measure_error.calculate_integral_error(arr199[:430], analytical_p[:430], wave.dt)
+    error0_pk = measure_error.calculate_peak_error(arr0[:430], analytical_p[:430])[0]
+    error199_pk = measure_error.calculate_peak_error(arr199[:430], analytical_p[:430])[0]
+
+    eNRMS = error0_nrms + error199_nrms
+    error_rm = COMM_WORLD.allreduce(eNRMS, op=MPI.SUM) / 2
+    errIt = error0_it + error199_it
+    error_it = COMM_WORLD.allreduce(errIt, op=MPI.SUM) / 2
+    errPk = error0_pk + error199_pk
+    error_pk = COMM_WORLD.allreduce(errPk, op=MPI.SUM) / 2
+
     comm.comm.barrier()
 
-    if comm.comm.rank == 0:
-        print(f"Combined error for shots {wave.current_sources} is {error_all} and test has passed equals {np.abs(error_all) < 0.01}", flush=True)
+    assert abs(error_rm) < 0.01 and abs(error_it) < 0.01 and abs(error_pk) < 0.01, \
+        "Error is too high for forward test with supershot."
 
-    test = np.abs(error_all) < 0.01
-
-    assert test
+    pprint(f"Combined NRMS error for shots {wave.current_sources} is {error_rm} "
+           f"and test has passed equals {abs(error_rm) < 0.01}", comm=comm)
+    pprint(f"Combined Integral error for shots {wave.current_sources} is {error_it} "
+           f"and test has passed equals {abs(error_it) < 0.01}", comm=comm)
+    pprint(f"Combined Peak error for shots {wave.current_sources} is {error_pk} "
+           f"and test has passed equals {abs(error_pk) < 0.01}", comm=comm)
 
 
 if __name__ == "__main__":

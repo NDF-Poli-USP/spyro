@@ -335,7 +335,8 @@ def run_modal(wave, fitting_c, exp_value, n_root=1):
     param("T", 3, 6.0, True, marks=mark.slow),
     param("T", 3, 2.4, False, marks=mark.slow),
     param("T", 3, None, False, marks=mark.slow),
-    param("Q", 3, None, False, marks=mark.slow)])
+    param("Q", 3, None, False, marks=mark.slow),
+    param("Q", 3, None, True, marks=mark.slow)])
 def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogeneous):
     """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
@@ -462,7 +463,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.02  138.931*
      0.02  142.020
 
-    *RESULTS HETEROGENEOUS (usr: without optimization)
+    *RESULTS HOMOGENEOUS (usr: without optimization)
     Frequency[Hz]     REC iter        (texe/pmem)
     ANALYTICAL    0.47741    5 ( 7.483s/14.672MB)
     ANALYTICAL    0.47741  usr ( 2.239s/ 9.275MB)
