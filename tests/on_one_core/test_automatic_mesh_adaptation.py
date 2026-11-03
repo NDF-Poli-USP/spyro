@@ -70,7 +70,7 @@ def velocity_grid(spacing: float = 0.01) -> VelocityGrid:
 
 
 def dictionary(n_shots: int = 1, final_time: float = 0.6,
-               free_surface: bool = True) -> dict:
+               free_surface: bool = True, damping: bool = False) -> dict:
     """spyro dictionary of the small test problem.
 
     Parameters
@@ -81,6 +81,8 @@ def dictionary(n_shots: int = 1, final_time: float = 0.6,
         Duration (s).
     free_surface : bool, optional
         Pressure-free top surface; ``False`` keeps the natural (rigid) top.
+    damping : bool, optional
+        Quadratic damping layer in the pad.
 
     Returns
     -------
@@ -98,8 +100,10 @@ def dictionary(n_shots: int = 1, final_time: float = 0.6,
                         "frequency": 5.0, "delay": 1.5,
                         "delay_type": "multiples_of_minimum",
                         "receiver_locations": RECEIVERS},
-        "absorving_boundary_conditions": {"status": True, "abc_type": "nrbc",
-                                          "free_surface": free_surface},
+        "absorving_boundary_conditions": {
+            "status": True, "abc_type": "nrbc", "free_surface": free_surface,
+            "damping_layer": ({"pad_length": DOMAIN.pad, "reflection": 1e-3}
+                              if damping else None)},
         "time_axis": {"initial_time": 0.0, "final_time": final_time,
                       "dt": 1e-3, "amplitude": 1, "output_frequency": 10**9,
                       "gradient_sampling_frequency": 1},
@@ -232,7 +236,8 @@ def test_size_law_budget_and_bounds(cpw_mesh: str) -> None:
     assert np.median(field.h[near] / current[near]) < np.median(field.h[far] / current[far])
 
 
-def test_pilot_adjoint_identity_quick(cpw_mesh: str) -> None:
+@pytest.mark.parametrize("damping", [False, True])
+def test_pilot_adjoint_identity_quick(cpw_mesh: str, damping: bool) -> None:
     """The adjoint indicator closes the dual-weighted-residual identity on a
     short propagation, quick enough to run by default.
 
@@ -240,8 +245,10 @@ def test_pilot_adjoint_identity_quick(cpw_mesh: str) -> None:
     ----------
     cpw_mesh : str
         Mesh fixture.
+    damping : bool
+        Damping layer in the pad.
     """
-    pilot = TwoLevelPilot(dictionary(final_time=0.35), two_layer)
+    pilot = TwoLevelPilot(dictionary(final_time=0.35, damping=damping), two_layer)
     result = pilot.run(cpw_mesh, compute_indicator=True)
     assert result.adjoint_shots == [0]
     assert result.identity_ratios[0] == pytest.approx(-1.0, abs=1e-8)
@@ -249,12 +256,32 @@ def test_pilot_adjoint_identity_quick(cpw_mesh: str) -> None:
         assert result.indicators.shape == (1, result.centroids.shape[0])
 
 
+def test_shot_records_reproduce_pilot_error(cpw_mesh: str) -> None:
+    """Records taken mesh by mesh give the pilot's two-level trace error.
+
+    Parameters
+    ----------
+    cpw_mesh : str
+        Mesh fixture.
+    """
+    pilot = TwoLevelPilot(dictionary(final_time=0.35), two_layer)
+    result = pilot.run(cpw_mesh)
+    coarse_mesh, fine_mesh = pilot.load_meshes(cpw_mesh, levels=1)
+    assert result.dt == pytest.approx(
+        pilot.dt_fraction * pilot.critical_time_step(fine_mesh), rel=1e-6)
+    coarse = pilot.shot_record(0, coarse_mesh, result.dt)
+    fine = pilot.shot_record(0, fine_mesh, result.dt)
+    assert coarse.shape == fine.shape == (result.steps, len(RECEIVERS))
+    error = np.linalg.norm(coarse - fine) / np.linalg.norm(fine)
+    assert error == pytest.approx(result.trace_errors[0], rel=1e-10)
+
+
 @pytest.mark.slow
 @heavy
 @pytest.mark.parametrize("free_surface", [True, False])
 def test_pilot_adjoint_identity(cpw_mesh: str, free_surface: bool) -> None:
     """The adjoint indicator closes the dual-weighted-residual identity, and
-    a checkpointed tape gives the same indicator.
+    accumulating every few steps keeps the indicator close.
 
     Parameters
     ----------
@@ -267,21 +294,20 @@ def test_pilot_adjoint_identity(cpw_mesh: str, free_surface: bool) -> None:
     pilot = TwoLevelPilot(case, two_layer, window=late_window)
     forward_only = pilot.run(cpw_mesh)
     with_adjoint = pilot.run(cpw_mesh, compute_indicator=True)
-    checkpointed = TwoLevelPilot(case, two_layer, window=late_window,
-                                 checkpointing=True, snapshots=8
-                                 ).run(cpw_mesh, compute_indicator=True)
+    sampled = TwoLevelPilot(case, two_layer, window=late_window,
+                            accumulate_every=4).run(cpw_mesh, compute_indicator=True)
 
     assert forward_only.dofs_fine > 3 * forward_only.dofs_coarse
     assert 0.0 < forward_only.trace_errors[0] < 1.0
     assert with_adjoint.trace_errors[0] == pytest.approx(forward_only.trace_errors[0])
     assert with_adjoint.identity_ratios[0] == pytest.approx(-1.0, abs=1e-8)
-    assert checkpointed.identity_ratios[0] == pytest.approx(-1.0, abs=1e-8)
     if fire.COMM_WORLD.rank == 0:
         n_cells = with_adjoint.centroids.shape[0]
         assert with_adjoint.indicators.shape == (1, n_cells)
         assert np.abs(with_adjoint.indicators).sum() > 0.0
-        assert np.allclose(checkpointed.indicators, with_adjoint.indicators,
-                           rtol=1e-8, atol=1e-12 * np.abs(with_adjoint.indicators).max())
+        exact = np.abs(with_adjoint.indicators[0])
+        approximate = np.abs(sampled.indicators[0])
+        assert np.corrcoef(exact, approximate)[0, 1] > 0.9
 
 
 @pytest.mark.slow

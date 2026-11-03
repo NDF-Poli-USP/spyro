@@ -6,8 +6,7 @@ same element and the same time step. The relative difference of the receiver
 traces, restricted to a time window, estimates the discretization error of
 :math:`M_h`.
 
-For the adjoint strategy the refined solve is recorded with spyro's
-automated adjoint (pyadjoint), with the functional
+For the adjoint strategy the misfit of the refined solve is the functional
 
 .. math::
 
@@ -16,10 +15,15 @@ automated adjoint (pyadjoint), with the functional
 
 where :math:`d(Pu_h)` are the traces of the prolonged coarse solution sampled
 on :math:`M_f`, :math:`m` is the window and :math:`w_n` the trapezoidal
-weights. The reverse sweep of the tape
-(:meth:`~spyro.solvers.automatic_differentiation_solver.AutomatedAdjoint.compute_adjoint`,
-which skips the velocity derivative) gives, on each time-step solve, the
-discrete adjoint :math:`\\lambda^n` of the refined scheme. The
+weights. spyro's implemented adjoint
+(:func:`~spyro.solvers.backward_time_integration.backward_wave_propagator`)
+runs the refined solver backwards with the misfit injected at the receivers,
+without accumulating a gradient. Because the explicit scheme is run with the
+same operators in reverse, the state it produces at step :math:`n` is the
+exact discrete adjoint of the forward solve of that step, scaled by
+:math:`-1/\\Delta t` (the injected misfit carries neither the time step nor
+the sign of the derivative of :math:`J`); the pilot rescales it to give
+:math:`\\lambda^n`. The
 dual-weighted residual of the prolonged coarse trajectory is then localized
 on the refined cells :math:`K`,
 
@@ -37,8 +41,8 @@ quadratic, the identity
     \\sum_K \\eta_K - \\sum_n f^n(\\lambda^n) = \\pm 2 J(u_f)
 
 holds to round-off (:math:`f^n` is the point source), and is reported as a
-check. No adjoint equation is written by hand. With a free surface the
-Dirichlet nodes carry a zero adjoint, so they add nothing to :math:`\\eta_K`.
+check. With a free surface the Dirichlet nodes carry a zero adjoint, so they
+add nothing to :math:`\\eta_K`.
 
 The indicator is only needed to build a new mesh. With
 ``skip_indicator_below`` the adjoint of a shot is skipped when its trace error
@@ -57,10 +61,10 @@ from dataclasses import dataclass, field
 import numpy as np
 import firedrake as fire
 import ufl
-from firedrake.adjoint_utils.blocks.solving import GenericSolveBlock
-from pyadjoint import get_working_tape
+from firedrake.progress_bar import ProgressBar
 
 from ..solvers.acoustic_wave import AcousticWave
+from ..solvers.backward_time_integration import backward_wave_propagator
 
 #: ``window(times, shot)`` returns a boolean array ``(n_times, n_receivers)``.
 Window = Callable[[np.ndarray, int], np.ndarray]
@@ -158,6 +162,50 @@ def nodal_velocity(function_space: fire.FunctionSpace,
     return c
 
 
+def _critical_time_step(wave: AcousticWave, iterations: int = 80) -> float:
+    """Stability limit of the explicit scheme, by power iteration.
+
+    Estimates :math:`2/\\sqrt{\\lambda_{\\max}(M^{-1}K)}` with the lumped mass
+    and the stiffness of the wave's quadrature rule. spyro's own estimator
+    (:meth:`~spyro.solvers.wave.Wave.get_and_set_maximum_dt`) assembles SciPy
+    matrices from the local part of the operators and fails when the mesh is
+    distributed over several processes; this estimate only uses
+    matrix-vector products and reductions, so it runs under MPI.
+
+    Parameters
+    ----------
+    wave : AcousticWave
+        Wave whose mesh, space and initial velocity are set.
+    iterations : int, optional
+        Number of power iterations. Default ``80``.
+
+    Returns
+    -------
+    float
+        Critical time step (s).
+    """
+    V = wave.function_space
+    c = wave.initial_velocity_model
+    v = fire.TestFunction(V)
+    u = fire.TrialFunction(V)
+    measure = fire.dx(**wave.quadrature_rule)
+    mass = fire.assemble((1.0 / (c * c)) * v * measure).dat.data_ro.copy()
+    stiffness = fire.inner(fire.grad(u), fire.grad(v)) * measure
+    vector = fire.Function(V)
+    comm = V.mesh().comm
+    rng = np.random.default_rng(1234 + comm.rank)
+    vector.dat.data[:] = rng.standard_normal(vector.dat.data.shape)
+    eigenvalue = 0.0
+    for _ in range(iterations):
+        product = fire.assemble(fire.action(stiffness, vector)).dat.data_ro
+        current = vector.dat.data_ro
+        eigenvalue = (comm.allreduce(float(np.dot(current, product)))
+                      / comm.allreduce(float(np.dot(current, mass * current))))
+        nxt = product / mass
+        vector.dat.data[:] = nxt / np.sqrt(comm.allreduce(float(np.dot(nxt, nxt))))
+    return 2.0 / np.sqrt(eigenvalue)
+
+
 class _ReceiverSampler:
     """Sample a field at the receivers, in input order, on every rank.
 
@@ -199,8 +247,7 @@ class TwoLevelPilot:
     """Run two-level pilots on meshes, with spyro's acoustic solver.
 
     Each shot is propagated by its own :class:`~spyro.AcousticWave`, built from
-    ``dictionary`` with that single source, so every shot has its own tape and
-    its own adjoint.
+    ``dictionary`` with that single source, so every shot has its own adjoint.
 
     Parameters
     ----------
@@ -219,13 +266,9 @@ class TwoLevelPilot:
         Accumulate the indicator every this many steps, weighting each sample
         accordingly. ``1`` (the default) is exact; larger values are cheaper
         and approximate.
-    checkpointing : bool, optional
-        Manage the refined tape with a checkpoint schedule (see
-        :meth:`spyro.solvers.wave.Wave.enable_automated_adjoint`). Default
-        ``False`` keeps every step on the tape.
-    snapshots : int, optional
-        Checkpoints kept in memory when ``checkpointing`` is on; ``None``
-        keeps every step and never recomputes. Default ``None``.
+    progress_bar : bool, optional
+        Show Firedrake's progress bar during the backward propagation of each
+        adjoint, on rank 0. Default ``False``.
 
     Raises
     ------
@@ -236,8 +279,8 @@ class TwoLevelPilot:
     def __init__(self, dictionary: dict,
                  velocity: Callable[[np.ndarray, np.ndarray], np.ndarray],
                  window: Window | None = None, dt_fraction: float = 0.5,
-                 accumulate_every: int = 1, checkpointing: bool = False,
-                 snapshots: int | None = None) -> None:
+                 accumulate_every: int = 1,
+                 progress_bar: bool = False) -> None:
         abc = dictionary.get("absorving_boundary_conditions", {})
         if abc.get("status", False) and str(abc.get("abc_type")).lower() == "pml":
             raise NotImplementedError("The adjoint indicator does not support PML.")
@@ -248,8 +291,7 @@ class TwoLevelPilot:
         self.window = window
         self.dt_fraction = dt_fraction
         self.accumulate_every = accumulate_every
-        self.checkpointing = checkpointing
-        self.snapshots = snapshots
+        self.progress_bar = progress_bar
         acquisition = self.dictionary["acquisition"]
         self.sources = [tuple(s) for s in acquisition["source_locations"]]
         self.receivers = np.asarray(acquisition["receiver_locations"], dtype=float)
@@ -296,6 +338,80 @@ class TwoLevelPilot:
                 velocity_model_function=nodal_velocity(wave.function_space,
                                                        self.velocity))
         return wave
+
+    def load_meshes(self, mesh_file: str, levels: int = 0
+                    ) -> list[fire.MeshGeometry]:
+        """Read a mesh and its uniform refinements on the pilot's processes.
+
+        The meshes stay valid for later calls of :meth:`critical_time_step`
+        and :meth:`shot_record`, until this method is called again.
+
+        Parameters
+        ----------
+        mesh_file : str
+            Gmsh file in spyro's ``(z, x)`` convention.
+        levels : int, optional
+            Number of uniform refinements. Default ``0``.
+
+        Returns
+        -------
+        list of firedrake.MeshGeometry
+            The mesh followed by its ``levels`` refinements.
+        """
+        # Every spyro wave installs a new ensemble and drops the previous one,
+        # so the meshes live on an ensemble held by the pilot.
+        self._ensemble = self._wave(0, None).comm
+        mesh = fire.Mesh(str(mesh_file), comm=self._ensemble.comm)
+        if levels == 0:
+            return [mesh]
+        return list(fire.MeshHierarchy(mesh, levels))
+
+    def critical_time_step(self, mesh: fire.MeshGeometry) -> float:
+        """Stability limit of the explicit scheme on a mesh.
+
+        Parameters
+        ----------
+        mesh : firedrake.MeshGeometry
+            Mesh from :meth:`load_meshes`.
+
+        Returns
+        -------
+        float
+            Critical time step (s), by power iteration.
+        """
+        wave = self._wave(0, mesh)
+        dt = _critical_time_step(wave)
+        del wave
+        gc.collect()
+        return dt
+
+    def shot_record(self, shot: int, mesh: fire.MeshGeometry, dt: float
+                    ) -> np.ndarray:
+        """Propagate one shot and return its receiver record.
+
+        Parameters
+        ----------
+        shot : int
+            Source index.
+        mesh : firedrake.MeshGeometry
+            Mesh from :meth:`load_meshes`.
+        dt : float
+            Time step (s).
+
+        Returns
+        -------
+        numpy.ndarray
+            ``(steps, n_receivers)``; sample ``n`` is the state at
+            ``(n + 1) dt``, the same on every process.
+        """
+        wave = self._wave(shot, mesh)
+        wave.dt = dt
+        wave.store_forward_time_steps = False
+        wave.forward_solve()
+        record = np.array(wave.forward_solution_receivers)
+        del wave
+        gc.collect()
+        return record
 
     def _mask(self, shot: int, steps: int, dt: float) -> np.ndarray:
         """Window of one shot on the record time axis.
@@ -395,9 +511,7 @@ class TwoLevelPilot:
         """
         coarse = self._wave(0, coarse_mesh)
         fine = self._wave(0, fine_mesh)
-        # spyro's estimate of the stability limit, rounded down so that the
-        # final time is a whole number of steps.
-        dt = fine.get_and_set_maximum_dt(fraction=self.dt_fraction)
+        dt = self.dt_fraction * _critical_time_step(fine)
         result = PilotResult(mesh_file=mesh_file,
                              dofs_coarse=coarse.function_space.dim(),
                              dofs_fine=fine.function_space.dim(),
@@ -493,11 +607,12 @@ class TwoLevelPilot:
                               fine: AcousticWave, mask: np.ndarray,
                               result: PilotResult, skip_below: float | None = None
                               ) -> tuple[np.ndarray | None, float]:
-        """Refined forward on the tape, its adjoint and the cell indicator.
+        """Refined forward, its implemented adjoint and the cell indicator.
 
-        The indicator is accumulated while pyadjoint runs the reverse sweep,
-        from a callback on each time-step solve, so the adjoint of a step is
-        used as soon as it exists and no adjoint trajectory is kept.
+        The indicator is accumulated from a callback on each step of spyro's
+        backward propagation, so the adjoint of a step is used as soon as it
+        exists and no adjoint trajectory is kept. No gradient is computed, so
+        the refined forward states are not stored.
 
         Parameters
         ----------
@@ -524,8 +639,8 @@ class TwoLevelPilot:
         Raises
         ------
         RuntimeError
-            If the tape does not hold one solve per time step, or the reverse
-            sweep did not visit all of them.
+            If the backward propagation did not visit every step once, in
+            reverse order.
         """
         V_f = fine.function_space
         states = coarse.forward_solution
@@ -561,19 +676,15 @@ class TwoLevelPilot:
 
         fine.real_shot_record = record
         fine.misfit_window = mask.astype(float)
-        fine.enable_automated_adjoint(checkpointing=self.checkpointing,
-                                      snapshots=self.snapshots)
+        fine.enable_implemented_adjoint()
+        # Only the adjoint is needed, not a gradient: no forward states.
+        fine.store_forward_time_steps = False
+        fine.enable_compute_functional()
         fine.forward_solve()
         if skip_below is not None and self._trace_error(coarse, fine, mask) <= skip_below:
             # The mesh may be accepted: the adjoint is deferred (see :meth:`run`).
             return None, 0.0
         t_start = time.perf_counter()
-
-        blocks = [b for b in get_working_tape().get_blocks()
-                  if isinstance(b, GenericSolveBlock)]
-        if len(blocks) != steps:
-            raise RuntimeError(f"Expected {steps} time-step solves on the tape, "
-                               f"found {len(blocks)}.")
 
         Q = fire.FunctionSpace(fine.mesh, "DG", 0)
         psi = fire.TestFunction(Q)
@@ -589,19 +700,26 @@ class TwoLevelPilot:
         every = self.accumulate_every
         eta = np.zeros(buffer.dat.data_ro.shape[0])
         sweep = {"next": steps - 1, "source": 0.0}
+        # The implemented adjoint injects the misfit without the time step and
+        # with the opposite sign of dJ/du: its state is -lambda / dt.
+        scale = -float(fine.dt)
+        # Firedrake draws the bar on rank 0 only; the stand-in it hands the
+        # other ranks cannot advance, so they get none.
+        bar = (ProgressBar("Adjoint", max=steps)
+               if self.progress_bar and fire.COMM_WORLD.rank == 0 else None)
 
         def accumulate(n: int, adjoint: fire.Function) -> None:
             """Add the contribution of one time step to the indicator.
 
-            Called by pyadjoint right after it solves the adjoint of step
-            ``n``, in reverse order of the steps.
+            Called by spyro's backward propagation right after it solves the
+            adjoint of step ``n``, in reverse order of the steps.
 
             Parameters
             ----------
             n : int
                 Time step.
             adjoint : firedrake.Function
-                Adjoint of the step.
+                Implemented adjoint of the step, :math:`-\\lambda^n/\\Delta t`.
 
             Returns
             -------
@@ -616,9 +734,10 @@ class TwoLevelPilot:
             if n != sweep["next"]:
                 raise RuntimeError("The reverse sweep skipped a time step.")
             sweep["next"] = n - 1
+            lam.assign(scale * adjoint)
             if wavelet[n] != 0.0:
                 sweep["source"] += wavelet[n] * comm.allreduce(
-                    float(np.dot(source.dat.data_ro, adjoint.dat.data_ro)))
+                    float(np.dot(source.dat.data_ro, lam.dat.data_ro)))
             if every == 1:
                 # Going backwards, consecutive steps share two states.
                 if n == steps - 1:
@@ -633,27 +752,18 @@ class TwoLevelPilot:
                 prolong(n - 1, w_n)
                 prolong(n - 2, w_nm1)
             if n % every == 0:
-                lam.assign(adjoint)
                 fire.assemble(residual, tensor=buffer)
                 eta[:] += every * buffer.dat.data_ro
-            # The block of this step still reads its adjoint after this
-            # callback, but the block of the next step is done with its own:
-            # drop it, so that the adjoints of all steps are not kept. When
-            # the blocks share one adjoint function (as the blocks of one
-            # solver may), there is nothing to drop, and dropping it would
-            # take this step's adjoint away from its own block.
-            if n + 1 < steps and blocks[n + 1].adj_state is not blocks[n].adj_state:
-                blocks[n + 1].adj_state = None
+            if bar is not None:
+                bar.next()
 
-        for n, block in enumerate(blocks):
-            block.adj_cb = lambda adjoint, n=n: accumulate(n, adjoint)
         functional = fine.functional_value
-        # Only the adjoint states are needed: no velocity derivative.
-        fine.automated_adjoint.compute_adjoint(functional)
+        backward_wave_propagator(fine, step_callback=accumulate,
+                                 compute_gradient=False)
+        if bar is not None:
+            bar.finish()
         if sweep["next"] != -1:
-            raise RuntimeError("The reverse sweep did not reach the first step.")
-        if steps > 1 and blocks[0].adj_state is not blocks[1].adj_state:
-            blocks[0].adj_state = None
+            raise RuntimeError("The backward propagation did not reach the first step.")
 
         two_j = 2.0 * float(functional)
         total = comm.allreduce(float(eta.sum())) - sweep["source"]

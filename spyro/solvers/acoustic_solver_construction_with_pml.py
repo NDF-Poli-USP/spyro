@@ -158,6 +158,10 @@ def construct_solver_or_matrix_with_pml(wave):
         raise NotImplementedError(
             "free_surface is not implemented together with a PML."
         )
+    if wave.damping_layer is not None:
+        raise NotImplementedError(
+            "damping_layer is not implemented together with a PML."
+        )
 
     # Build mixed function space
     V = wave.function_space

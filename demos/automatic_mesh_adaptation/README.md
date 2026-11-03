@@ -41,18 +41,19 @@ growth, cost in DOF-steps and wall time) and the accepted mesh.
   because spyro requires `0 <= x <= length_x`.
 - The top is a pressure-free surface (`u = 0`), as in the calibration study;
   `--rigid-top` uses the natural (Neumann) condition. The bottom and sides
-  carry spyro's first-order non-reflecting conditions.
+  carry spyro's first-order non-reflecting conditions;
+  `--damping-reflection 1e-3` adds the calibration study's quadratic damping
+  layer in the pad.
 - The adjoint is computed only when a new mesh will be built: it is skipped
   when the pilot accepts the mesh and on the last allowed iteration. The
   forward-only pilot of the initial phase is reused by the first iteration
   when no indicator is needed.
-- The indicator is accumulated during the reverse sweep, so no adjoint
-  trajectory is kept. The refined tape is checkpointed by default: `--snapshots N`
-  (default 200) keeps `N` checkpoints in memory and recomputes the forward in
-  between. `--no-checkpointing` keeps every refined time step on the tape
-  instead, which avoids the recomputation but needs memory for all steps.
-- Checkpointing covers the refined tape only: the coarse states, which the
-  indicator needs at every step, are still all kept in memory.
+- The adjoint is spyro's implemented adjoint: the refined solver run
+  backwards with the misfit injected at the receivers, without a gradient.
+  The indicator is accumulated as it runs, so no adjoint trajectory and no
+  refined forward state are kept; the coarse states, which the indicator needs
+  at every step, are all kept in memory. `--no-progress-bar` hides its
+  progress bar.
 - `--accumulate-every k` accumulates the indicator every `k` steps (cheaper,
   approximate); the default `1` is exact.
 

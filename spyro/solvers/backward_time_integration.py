@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 import firedrake as fire
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from . import helpers
@@ -6,7 +8,10 @@ from ..receivers.Receivers import Receivers
 from ..utils.typing import AbsorbingBCsType
 
 
-def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
+def backward_wave_propagator(
+        wave: Wave, dt: float = None,
+        step_callback: Callable[[int, fire.Function], None] | None = None,
+        compute_gradient: bool = True) -> fire.Function | None:
     """Propagates the adjoint wave backwards in time.
 
     Currently uses central differences.
@@ -18,11 +23,20 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
     dt : float (optional)
         Time step to be used explicitly. If not mentioned uses the default,
         that was estabilished in the wave object for the adjoint model.
+    step_callback : callable (optional)
+        Called as ``step_callback(step, adjoint)`` right after the adjoint of
+        each time step is solved, in reverse order of the steps. ``adjoint``
+        is the adjoint state of the forward solve of that step; it is
+        overwritten afterwards, so copy it to keep it.
+    compute_gradient : bool (optional)
+        Accumulate the gradient. Default True. With False only the adjoint
+        is propagated (for ``step_callback``), the stored forward solution is
+        not needed and nothing is returned.
 
     Returns:
     --------
-    dJ : Firedrake 'Function'
-        Calculated gradient
+    dJ : Firedrake 'Function' or None
+        Calculated gradient, or None when ``compute_gradient`` is False
 
     Notes:
     ------
@@ -64,11 +78,14 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
     dJ = fire.Function(gradient_space)
     rhs_forcing = fire.Cofunction(gradient_space.dual())
 
-    grad_solver, forward_field, uadj, gradi = _build_gradient_solver(
-        wave, mask_available,
-    )
-
-    forward_solution = wave.forward_solution
+    if compute_gradient:
+        grad_solver, forward_field, uadj, gradi = _build_gradient_solver(
+            wave, mask_available,
+        )
+        forward_solution = wave.forward_solution
+    else:
+        _use_point_receivers(wave)
+        uadj = fire.Function(gradient_space)
     receivers = wave.receivers
 
     for step in range(nt - 1, -1, -1):
@@ -82,8 +99,10 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
             receiver_source
         )
         wave.solver.solve()
+        if step_callback is not None:
+            step_callback(step, wave.get_function(state=wave.next_vstate))
 
-        if step % wave.gradient_sampling_frequency == 0:
+        if compute_gradient and step % wave.gradient_sampling_frequency == 0:
             # Assign the adjoint solution at the step `np1` to `uadj`.
             uadj.assign(wave.get_function(state=wave.next_vstate))
 
@@ -109,13 +128,36 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
             wave.u_n.assign(wave.u_np1)
         t = step * float(dt)
 
+    if not compute_gradient:
+        uadj.assign(wave.get_function(state=wave.vstate))
     wave.adjoint_solution = uadj
     wave.current_time = t
 
     helpers.display_progress(wave.comm, t)
 
+    if not compute_gradient:
+        return None
     dJ.dat.data_with_halos[:] *= sample_dt / 2
     return dJ
+
+
+def _use_point_receivers(wave: Wave) -> None:
+    """Rebuild the receivers without a vertex-only mesh.
+
+    Injecting the misfit as a source uses the receivers' cell tabulations,
+    which only the receivers built without a vertex-only mesh have.
+
+    Parameters:
+    -----------
+    wave : Wave
+        Wave whose receivers are rebuilt in place when needed.
+    """
+    if wave.use_vertex_only_mesh and wave.automatic_adjoint is False:
+        # WARNING: Mega ultra gambiarra
+        # TODO: open issue and fix this in another PR
+        wave.use_vertex_only_mesh = False
+        wave.receivers = Receivers(wave)
+        wave.use_vertex_only_mesh = True
 
 
 def _pml_interior_indicator(wave: Wave) -> fire.conditional:
@@ -157,12 +199,7 @@ def _build_gradient_solver(wave: Wave, mask_available: bool) -> tuple[
     --------
     grad_solver, forward_field, uadj, gradi
     """
-    if wave.use_vertex_only_mesh and wave.automatic_adjoint is False:
-        # WARNING: Mega ultra gambiarra
-        # TODO: open issue and fix this in another PR
-        wave.use_vertex_only_mesh = False
-        wave.receivers = Receivers(wave)
-        wave.use_vertex_only_mesh = True
+    _use_point_receivers(wave)
     V = wave.get_scalar_function_space()
     qr = wave.quadrature_rule
 

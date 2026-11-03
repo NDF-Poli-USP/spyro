@@ -5,7 +5,7 @@ builds a sequence of meshes until the two-level pilot estimate of the worst
 shot falls below ``theta * tol``. The three strategies share the pilot, the
 estimate and the stopping rule; they differ in how the next mesh is chosen
 (see :mod:`spyro.adaptivity.automatic_loop`). The adjoint strategy obtains
-its indicator from spyro's automated adjoint.
+its indicator from spyro's implemented adjoint.
 
 Default case (same window and acquisition as the KMV4 calibration study):
 KMV4 triangles, 7 Hz Ricker, 2 s, a 2 km x 1.6 km window of Marmousi2 with
@@ -32,9 +32,10 @@ Notes
 The top is a pressure-free surface (``u = 0``, ``free_surface: True``), as in
 the calibration study; ``--rigid-top`` uses the natural (Neumann) condition
 instead. The bottom and sides carry spyro's first-order non-reflecting
-conditions (``abc_type: "nrbc"``); the calibration study also had a damping
-layer there, so absolute errors are not directly comparable between the two
-codes; the comparison between strategies is.
+conditions (``abc_type: "nrbc"``). ``--damping-reflection 1e-3`` adds the
+calibration study's quadratic damping layer in the pad; without it absolute
+errors are not directly comparable between the two codes, while the
+comparison between strategies is.
 
 AI assistance: implementation by Claude (Anthropic), reviewed by the author.
 """
@@ -42,6 +43,8 @@ AI assistance: implementation by Claude (Anthropic), reviewed by the author.
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
+from typing import Callable
 
 import numpy as np
 
@@ -51,28 +54,17 @@ from spyro.adaptivity.automatic_loop import (AutomaticMeshAdaptation,
                                              LoopParameters)
 
 
-def parse_arguments() -> argparse.Namespace:
-    """Read the command line.
+def add_problem_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add the options of the model, acquisition, boundaries and pilot.
 
-    Returns
-    -------
-    argparse.Namespace
-        The parsed arguments.
+    Shared by this loop and by ``validate_against_reference.py``.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser that receives the options.
     """
-    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--model", required=True, help="velocity window (.npz)")
-    parser.add_argument("--strategy", choices=["cpw", "gradient", "adjoint"],
-                        required=True)
-    parser.add_argument("--tol", type=float, required=True,
-                        help="relative trace-error tolerance, e.g. 0.05")
-    parser.add_argument("--output", required=True, help="output directory")
-    parser.add_argument("--theta", type=float, default=0.8)
-    parser.add_argument("--initial-cpw", default="auto")
-    parser.add_argument("--max-iterations", type=int, default=6)
-    parser.add_argument("--eta-reliable", type=float, default=0.3,
-                        help="initial CPW phase stops when the pilot error is below this")
-    parser.add_argument("--growth-min", type=float, default=1.15)
-    parser.add_argument("--growth-safety", type=float, default=1.0)
     parser.add_argument("--frequency", type=float, default=7.0, help="Hz")
     parser.add_argument("--final-time", type=float, default=2.0, help="s")
     parser.add_argument("--degree", type=int, default=4, help="KMV degree")
@@ -87,16 +79,63 @@ def parse_arguments() -> argparse.Namespace:
                         help="s after the sea-floor reflection; negative for full traces")
     parser.add_argument("--dt-fraction", type=float, default=0.5)
     parser.add_argument("--accumulate-every", type=int, default=1)
-    parser.add_argument("--snapshots", type=int, default=200,
-                        help="checkpoints of the refined tape kept in memory; the forward "
-                             "is recomputed in between (default 200)")
-    parser.add_argument("--no-checkpointing", action="store_true",
-                        help="keep every refined time step on the tape instead "
-                             "(no recomputation, memory grows with the number of steps)")
+    parser.add_argument("--no-progress-bar", action="store_true",
+                        help="hide the progress bar of the adjoint propagations")
+    parser.add_argument("--damping-reflection", type=float, default=None,
+                        help="add a quadratic damping layer of the pad's thickness "
+                             "with this theoretical reflection (e.g. 1e-3, as in the "
+                             "calibration study); default none")
     parser.add_argument("--rigid-top", action="store_true",
                         help="natural (Neumann) top instead of the pressure-free surface")
+
+
+def parse_arguments() -> argparse.Namespace:
+    """Read the command line.
+
+    Returns
+    -------
+    argparse.Namespace
+        The parsed arguments.
+    """
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    add_problem_arguments(parser)
+    parser.add_argument("--strategy", choices=["cpw", "gradient", "adjoint"],
+                        required=True)
+    parser.add_argument("--tol", type=float, required=True,
+                        help="relative trace-error tolerance, e.g. 0.05")
+    parser.add_argument("--output", required=True, help="output directory")
+    parser.add_argument("--theta", type=float, default=0.8)
+    parser.add_argument("--initial-cpw", default="auto")
+    parser.add_argument("--max-iterations", type=int, default=6)
+    parser.add_argument("--eta-reliable", type=float, default=0.3,
+                        help="initial CPW phase stops when the pilot error is below this")
+    parser.add_argument("--growth-min", type=float, default=1.15)
+    parser.add_argument("--growth-safety", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=0)
     return parser.parse_args()
+
+
+@dataclass
+class MarmousiProblem:
+    """Pilot, velocity, domain and trace window of the Marmousi2 case.
+
+    Attributes
+    ----------
+    pilot : TwoLevelPilot
+        Two-level pilot with the acquisition and boundaries.
+    velocity : VelocityGrid
+        Velocity in local ``(z, x)`` positions.
+    domain : RectangularDomain
+        Mesh domain, pad included.
+    window : callable
+        ``window(times, shot)``: boolean ``(n_times, n_receivers)`` window of
+        the trace error.
+    """
+
+    pilot: TwoLevelPilot
+    velocity: VelocityGrid
+    domain: RectangularDomain
+    window: Callable[[np.ndarray, int], np.ndarray]
 
 
 def velocity_from_npz(path: str, offset: float) -> VelocityGrid:
@@ -125,17 +164,19 @@ def velocity_from_npz(path: str, offset: float) -> VelocityGrid:
                         x0=float(data["x_origin"]) - offset, dz=h, dx=h)
 
 
-def main() -> None:
-    """Run the loop with the command-line settings.
+def build_problem(args: argparse.Namespace) -> MarmousiProblem:
+    """Build the pilot and the geometry from the problem options.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Options added by :func:`add_problem_arguments`.
 
     Returns
     -------
-    None
-        The report and meshes are written to the output directory.
+    MarmousiProblem
+        Pilot, velocity, domain and trace window.
     """
-    args = parse_arguments()
-    if not args.no_checkpointing and args.snapshots < 1:
-        raise ValueError("--snapshots must be a positive integer.")
     # spyro expects 0 <= x <= length_x, so the window is shifted to start at
     # the left end of the pad; meshes and reports use these local positions.
     offset = args.x_range[0] - args.pad
@@ -185,8 +226,11 @@ def main() -> None:
             "delay_type": "multiples_of_minimum",
             "receiver_locations": receivers,
         },
-        "absorving_boundary_conditions": {"status": True, "abc_type": "nrbc",
-                                          "free_surface": not args.rigid_top},
+        "absorving_boundary_conditions": {
+            "status": True, "abc_type": "nrbc", "free_surface": not args.rigid_top,
+            "damping_layer": (None if args.damping_reflection is None else
+                              {"pad_length": args.pad,
+                               "reflection": args.damping_reflection})},
         "time_axis": {"initial_time": 0.0, "final_time": args.final_time,
                       "dt": 1e-4, "amplitude": 1, "output_frequency": 10**9,
                       "gradient_sampling_frequency": 1},
@@ -199,8 +243,20 @@ def main() -> None:
     pilot = TwoLevelPilot(dictionary, velocity, window=window,
                           dt_fraction=args.dt_fraction,
                           accumulate_every=args.accumulate_every,
-                          checkpointing=not args.no_checkpointing,
-                          snapshots=None if args.no_checkpointing else args.snapshots)
+                          progress_bar=not args.no_progress_bar)
+    return MarmousiProblem(pilot, velocity, domain, window)
+
+
+def main() -> None:
+    """Run the loop with the command-line settings.
+
+    Returns
+    -------
+    None
+        The report and meshes are written to the output directory.
+    """
+    args = parse_arguments()
+    problem = build_problem(args)
     initial_cpw = args.initial_cpw if args.initial_cpw == "auto" else float(args.initial_cpw)
     parameters = LoopParameters(tolerance=args.tol, theta=args.theta,
                                 initial_cpw=initial_cpw,
@@ -208,7 +264,8 @@ def main() -> None:
                                 max_iterations=args.max_iterations,
                                 growth_min=args.growth_min,
                                 growth_safety=args.growth_safety, seed=args.seed)
-    loop = AutomaticMeshAdaptation(args.strategy, pilot, velocity, domain,
+    loop = AutomaticMeshAdaptation(args.strategy, problem.pilot,
+                                   problem.velocity, problem.domain,
                                    args.frequency, args.degree, args.output,
                                    parameters, args.conforming_depths)
     report = loop.run()
