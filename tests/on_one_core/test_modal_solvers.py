@@ -8,9 +8,9 @@ both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
 from pytest import fail, fixture, mark, param
 from firedrake import conditional, ConvergenceError
 from numpy import isclose
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
-from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneous):
