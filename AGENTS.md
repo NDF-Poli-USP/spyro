@@ -27,6 +27,15 @@ AI should not be used to close issues labelled 'good first issue'. These issues 
   is precisely the wrong instinct. Give every parameter and every return value its
   `numpydoc` entry, however small the helper.
 * **Type Hints:** New code should include type hints on function/method signatures.
+* **Formatting:** Every line you add or change must be identical to what `make format`
+  produces for it (`black`, `ruff`, `pydocstringformatter`; line length 88, set in
+  `pyproject.toml`). Passing `make lint` is not enough: flake8 accepts layouts that
+  `black` rewrites, such as hanging-indent call arguments. Much of spyro predates
+  `make format`, so do not run it, `black` or `pydocstringformatter` on whole
+  repository files; that adds unrelated changes, and `pydocstringformatter` rewrites
+  files in place. Instead, run the formatters on scratch copies of the touched files
+  (together with `pyproject.toml`) and apply only the differences on your own lines.
+
 
 ## Testing Requirements
 
@@ -37,8 +46,9 @@ AI should not be used to close issues labelled 'good first issue'. These issues 
 
 * All changes are expected to arrive through GitHub Pull Requests.
 * Keep diffs reviewable and focused.
-* Before concluding work, ensure `make lint` passes, and verify that the relevant subset of the
-  pytest test suite succeeds locally.
+* Before concluding work, ensure `make lint` passes, that your changed lines match
+  `make format` (see Formatting), and verify that the relevant subset of the pytest
+  test suite succeeds locally.
 
 
 ## Anti-Patterns
@@ -87,7 +97,9 @@ This section applies to the initiative to address long-standing issues using AI 
 * Add or update tests that demonstrate the reported problem and verify the proposed fix.
 * Preserve existing behavior and public APIs unless a change is explicitly required and approved.
 * Avoid unrelated refactoring, speculative abstractions, unnecessary dependencies, and modifications outside the issue's scope.
-* Run `make lint` and the relevant subset of the pytest suite. Report the actual results and clearly identify any checks that could not be completed.
+* Run `make lint`, check that changed lines match `make format`, and run the relevant
+  subset of the pytest suite. Report the actual results and clearly identify any checks
+  that could not be completed.
 * Scientific and numerical changes require particular scrutiny of mathematical correctness, edge cases, and potential regressions.
 
 ### Local-Only Changes
