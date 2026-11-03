@@ -24,7 +24,7 @@ def has_sufficient_memory():
 def test_stacey_abc():
     wave = build_solver("Stacey", "backward")
     wave.forward_solve()
-    last_mechanical_energy = wave.field_logger.get("mechanical_energy")
+    last_mechanical_energy = wave.simulation_logger.get("mechanical_energy")
     assert last_mechanical_energy < expected_mechanical_energy
 
 
@@ -33,7 +33,7 @@ def test_stacey_abc():
 def test_clayton_engquist_abc():
     wave = build_solver("CE_A1", "backward")
     wave.forward_solve()
-    last_mechanical_energy = wave.field_logger.get("mechanical_energy")
+    last_mechanical_energy = wave.simulation_logger.get("mechanical_energy")
     assert last_mechanical_energy < expected_mechanical_energy
 
 
@@ -42,7 +42,7 @@ def test_clayton_engquist_abc():
 def test_with_central():
     wave = build_solver("Stacey", "central")
     wave.forward_solve()
-    last_mechanical_energy = wave.field_logger.get("mechanical_energy")
+    last_mechanical_energy = wave.simulation_logger.get("mechanical_energy")
     assert last_mechanical_energy < expected_mechanical_energy
 
 
@@ -51,5 +51,5 @@ def test_with_central():
 def test_with_backward_2nd():
     wave = build_solver("Stacey", "backward_2nd")
     wave.forward_solve()
-    last_mechanical_energy = wave.field_logger.get("mechanical_energy")
+    last_mechanical_energy = wave.simulation_logger.get("mechanical_energy")
     assert last_mechanical_energy < expected_mechanical_energy
