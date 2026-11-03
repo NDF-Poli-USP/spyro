@@ -66,7 +66,7 @@ def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
         raise NotImplementedError(
             "local_abc_form does not yet support the coupled acoustic-elastic case."
         )
-    F_t = local_abc_form(wave, v=v_test, u_n=u_n, u_nm1=u_nm1)
+    F_t = local_abc_form(wave)
 
     return F_m + F_k - F_s - F_t
 
