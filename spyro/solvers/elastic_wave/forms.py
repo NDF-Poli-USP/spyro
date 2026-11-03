@@ -27,11 +27,7 @@ def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
 
     Parameters
     ----------
-    wave : `elastic_wave.IsotropicWave` or
-        `acoustic_elastic_wave.AcousticElasticWave`
-        An instance exposing `rho`, `lmbda`, `mu`, `dt`, `body_forces`,
-        and the absorbing-boundary attributes consumed by
-        `local_abc_form`.
+    wave : `elastic_wave.IsotropicWave`.
     u_trial : `firedrake.TrialFunction`
         Trial function for the displacement field at the next time step.
     v_test : `firedrake.TestFunction`
@@ -66,7 +62,11 @@ def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
     if b is not None:
         F_s += dot(b, v_test) * dx(**quad_rule)
 
-    F_t = local_abc_form(wave)
+    if hasattr(wave, 'X_n'):
+        raise NotImplementedError(
+            "local_abc_form does not yet support the coupled acoustic-elastic case."
+        )
+    F_t = local_abc_form(wave, v=v_test, u_n=u_n, u_nm1=u_nm1)
 
     return F_m + F_k - F_s - F_t
 
