@@ -91,11 +91,21 @@ def construct_solver_or_matrix_no_pml(wave):
     form = m1 + a + le
     wave.rhs = fire.rhs(form)
     wave.lhs = fire.lhs(form)
+    wave.set_forward_residual_form(
+        fire.action(wave.lhs, u_np1) - wave.rhs,
+        (u_np1, u_n, u_nm1),
+        state_space=V,
+        state_name="residual pressure",
+    )
+
     wave.source_function = fire.Cofunction(V.dual())
 
     # Pressure-free top surface (marker 1). Without it the top is natural:
     # zero normal derivative, i.e. a rigid surface.
     bcs = fire.DirichletBC(V, 0.0, 1) if wave.free_surface else None
+    # Kept on the wave so that the UFL-derived adjoint applies the same
+    # boundaries, homogeneous.
+    wave.bcs = [] if bcs is None else [bcs]
 
     lin_var = fire.LinearVariationalProblem(
         wave.lhs,

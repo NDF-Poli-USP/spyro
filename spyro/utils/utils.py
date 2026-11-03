@@ -681,6 +681,11 @@ def get_real_shot_record(wave):
             return real_shot_record[wave.current_sources[0]]
         if real_shot_record.ndim == single_shot_ndim:
             return real_shot_record
+        if (
+            real_shot_record.ndim >= 3
+            and real_shot_record.shape[2] == wave.number_of_receivers
+        ):
+            return real_shot_record[wave.current_sources[0]]
 
     if isinstance(real_shot_record, (list, tuple)):
         if (

@@ -271,10 +271,13 @@ def test_gradient_auto_adjoint(
 
 
 @pytest.mark.slow
-def test_gradient_implemented_adjoint(PML=False):
+def test_gradient_implemented_adjoint(
+    PML=False,
+    adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+):
     dictionary = set_dictionary(PML=PML)
     rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(
-        dictionary=dictionary, adjoint_type=AdjointType.IMPLEMENTED_ADJOINT
+        dictionary=dictionary, adjoint_type=adjoint_type
     )
 
     forward_solution = Wave_obj_guess.forward_solution
@@ -288,8 +291,17 @@ def test_gradient_implemented_adjoint(PML=False):
     dJ = Wave_obj_guess.gradient_solve(
         misfit=misfit,
         forward_solution=forward_solution_guess,
-        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+        adjoint_type=adjoint_type,
     )
+
+    if adjoint_type is AdjointType.UFL_DERIVED_ADJOINT:
+        assert Wave_obj_guess.forward_residual_form is not None
+        if PML:
+            residual_np1, _, _ = Wave_obj_guess.forward_residual_states
+            assert residual_np1.function_space() == (
+                Wave_obj_guess.mixed_function_space
+            )
+
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
 
 
@@ -312,7 +324,10 @@ def test_gradient_pml_auto_adjoint(checkpointing: bool, snapshots: int | None) -
 @pytest.mark.slow
 @pytest.mark.skip(reason="PML formulation subject to another PR")
 def test_gradient_pml_implemented_adjoint():
-    test_gradient_implemented_adjoint(PML=True)
+    test_gradient_implemented_adjoint(
+        PML=True,
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+    )
 
 
 if __name__ == "__main__":

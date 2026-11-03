@@ -11,7 +11,7 @@ from .functionals import mechanical_energy_form
 from ...utils.physical_parameters import PhysicalParameters
 from ...utils.typing import (AdjointType, ElasticMaterialParameter,
                              ElasticMaterialParameterization, AbsorbingBCsType,
-                             RieszMapType)
+                             RieszMapType, override)
 from ...domains.space import create_function_space
 
 
@@ -270,15 +270,13 @@ class IsotropicWave(ElasticWave):
         adjoint_type=AdjointType.AUTOMATED_ADJOINT,
         riesz_map=RieszMapType.L2,
     ) -> PhysicalParameters:
-        """Compute automated-adjoint elastic material derivatives.
+        """Compute elastic material derivatives.
 
-        Only the automated adjoint is available for the elastic wave so far.
-        The implemented adjoint -- the backward integration written out by
-        hand, which the acoustic solver already offers -- is intended to
-        follow, and ``misfit`` and ``forward_solution`` are the two inputs it
-        needs. They are part of the signature so that callers written against
-        :meth:`~spyro.solvers.acoustic_wave.AcousticWave.gradient_solve` keep
-        working once it lands, and are unused until then.
+        Two adjoints are available: the automated one, which differentiates
+        the functional recorded on the pyadjoint tape, and the implemented
+        one derived by UFL differentiation of the forward residual
+        (:attr:`AdjointType.UFL_DERIVED_ADJOINT`), which integrates the
+        discrete adjoint backwards with ``misfit`` as its source.
 
         Parameters
         ----------
@@ -293,8 +291,8 @@ class IsotropicWave(ElasticWave):
             equation backwards against it, so passing it saves a forward
             solve. The automated adjoint recovers the wavefield on its own.
         adjoint_type : AdjointType, optional
-            Must be :attr:`AdjointType.AUTOMATED_ADJOINT` until the
-            implemented adjoint is available for elastic waves.
+            :attr:`AdjointType.AUTOMATED_ADJOINT` (default) or
+            :attr:`AdjointType.UFL_DERIVED_ADJOINT`.
         riesz_map : RieszMapType, optional
             ``L2`` returns primal gradients and ``l2`` raw derivatives.
 
@@ -306,13 +304,20 @@ class IsotropicWave(ElasticWave):
         Raises
         ------
         NotImplementedError
-            If a hand-implemented adjoint or unsupported Riesz map is requested.
+            If the hand-derived adjoint or an unsupported Riesz map is
+            requested.
         ValueError
             If no valid annotated functional is available.
         """
+        if adjoint_type is AdjointType.UFL_DERIVED_ADJOINT:
+            return super().gradient_solve(
+                misfit=misfit, forward_solution=forward_solution,
+                adjoint_type=adjoint_type, riesz_map=riesz_map,
+            )
         if adjoint_type is not AdjointType.AUTOMATED_ADJOINT:
             raise NotImplementedError(
-                "Elastic gradients only support the automated adjoint.",
+                "Elastic gradients support the automated adjoint and the "
+                "UFL-derived implemented adjoint.",
             )
         if not isinstance(self.functional_value, AdjFloat):
             raise ValueError(
@@ -375,8 +380,11 @@ class IsotropicWave(ElasticWave):
             data_with_halos = self.u_n.dat.data_ro_with_halos[:]
         return self.receivers.interpolate(data_with_halos)
 
-    def get_function(self):
-        return self.u_n
+    @override
+    def get_function(self, state=None):
+        if state is None:
+            return self.u_n
+        return state
 
     def get_function_name(self):
         return "Displacement"

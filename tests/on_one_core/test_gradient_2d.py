@@ -5,9 +5,16 @@ from copy import deepcopy
 from firedrake import VTKFile
 import firedrake as fire
 import spyro
+from spyro.utils.typing import AdjointType
 
 
 def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
+    # gradient_solve() enables the implemented adjoint, which puts the wave in
+    # PER_TIMESTEP functional mode. The finite-difference forward solves below
+    # therefore accumulate the functional during the solve and need the
+    # observed data available as real_shot_record.
+    Wave_obj_guess.real_shot_record = rec_out_exact
+
     steps = [1e-2, 1e-3, 1e-4]  # step length
 
     errors = []
@@ -148,7 +155,14 @@ def get_forward_model(load_true=False):
     return rec_out_exact, rec_out_guess, Wave_obj_guess
 
 
-def test_gradient():
+@pytest.mark.parametrize(
+    "adjoint_type",
+    [
+        AdjointType.IMPLEMENTED_ADJOINT,
+        AdjointType.UFL_DERIVED_ADJOINT,
+    ],
+)
+def test_gradient(adjoint_type):
     rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(load_true=False)
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
@@ -159,10 +173,32 @@ def test_gradient():
     print(f"Cost functional : {Jm}")
 
     # compute the gradient of the control (to be verified)
-    dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
+    dJ = Wave_obj_guess.gradient_solve(
+        misfit=misfit,
+        forward_solution=forward_solution_guess,
+        adjoint_type=adjoint_type,
+    )
     VTKFile("gradient.pvd").write(dJ)
 
+    if adjoint_type is AdjointType.UFL_DERIVED_ADJOINT:
+        assert Wave_obj_guess.forward_residual_form is not None
+
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True)
+
+
+def test_vertex_only_receiver_source_rejects_invalid_misfit_type():
+    wave = spyro.AcousticWave(dictionary=deepcopy(dictionary))
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    wave.set_initial_velocity_model(constant=2.0)
+    wave.enable_implemented_adjoint(
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+    )
+
+    with pytest.raises(TypeError, match="misfit_form must be"):
+        wave.receivers.apply_receivers_as_source_vertex_only_mesh(
+            {"invalid": "misfit"},
+            wave.get_adjoint_receiver_source_space(),
+        )
 
 
 def _gradient_for_sampling_frequency(freq, final_time_override=0.5):
@@ -223,6 +259,6 @@ def test_gradient_sampling_frequency(full_sampling_gradient, freq):
 
 
 if __name__ == "__main__":
-    test_gradient()
+    test_gradient(AdjointType.IMPLEMENTED_ADJOINT)
     test_gradient_sampling_frequency(_gradient_for_sampling_frequency(1), 2)
     test_gradient_sampling_frequency(_gradient_for_sampling_frequency(1), 3)

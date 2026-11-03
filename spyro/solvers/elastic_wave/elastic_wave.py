@@ -2,8 +2,12 @@ from abc import abstractmethod, ABCMeta
 from firedrake import Constant
 from warnings import warn
 
+from ..backward_time_integration import backward_wave_propagator
 from ..wave import Wave
-from ...utils.typing import override, WaveType
+from ...utils.typing import (
+    AbsorbingBCsType, AdjointType, ImplementedAdjointDerivation, override,
+    RieszMapType, WaveType,
+)
 
 
 class ElasticWave(Wave, metaclass=ABCMeta):
@@ -97,9 +101,62 @@ class ElasticWave(Wave, metaclass=ABCMeta):
             "parameterization.",
         )
 
-    def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
-        raise NotImplementedError(
-            "Elastic adjoint gradients are not implemented yet.",
+    @override
+    def gradient_solve(
+        self,
+        guess=None,
+        misfit=None,
+        forward_solution=None,
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+        riesz_map=RieszMapType.L2,
+    ):
+        """Compute UFL-derived implemented-adjoint elastic gradients.
+
+        The current elastic backend supports isotropic, non-PML forward
+        residuals exposed through ``forward_residual_form``.
+
+        Parameters
+        ----------
+        guess : optional
+            Unused; kept for the signature of :meth:`Wave.gradient_solve`.
+        misfit : array_like, optional
+            Receiver misfit that drives the adjoint.
+        forward_solution : list of firedrake.Function, optional
+            Stored forward states; a forward solve runs when absent.
+        adjoint_type : AdjointType, optional
+            Must be :attr:`AdjointType.UFL_DERIVED_ADJOINT`.
+        riesz_map : RieszMapType, optional
+            Only ``L2`` is supported.
+
+        Returns
+        -------
+        PhysicalParameters
+            Gradients keyed by the selected material parameters.
+        """
+        if (
+            adjoint_type.implemented_derivation
+            is not ImplementedAdjointDerivation.UFL_DIFFERENTIATION
+        ):
+            raise NotImplementedError(
+                "Elastic gradients currently support only "
+                "UFL_DERIVED_ADJOINT.",
+            )
+        if riesz_map != RieszMapType.L2:
+            raise NotImplementedError(
+                f"Riesz map {riesz_map} not implemented for elastic gradients.",
+            )
+        if self.abc_type == AbsorbingBCsType.PML:
+            raise NotImplementedError(
+                "Elastic implemented adjoint does not support PML yet.",
+            )
+
+        self._prepare_implemented_adjoint(
+            misfit=misfit, forward_solution=forward_solution,
+            adjoint_type=adjoint_type,
+        )
+        return backward_wave_propagator(
+            self,
+            adjoint_type=adjoint_type,
         )
 
     @override

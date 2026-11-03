@@ -15,15 +15,15 @@ For the adjoint strategy the misfit of the refined solve is the functional
 
 where :math:`d(Pu_h)` are the traces of the prolonged coarse solution sampled
 on :math:`M_f`, :math:`m` is the window and :math:`w_n` the trapezoidal
-weights. spyro's implemented adjoint
-(:func:`~spyro.solvers.backward_time_integration.backward_wave_propagator`)
-runs the refined solver backwards with the misfit injected at the receivers,
-without accumulating a gradient. Because the explicit scheme is run with the
-same operators in reverse, the state it produces at step :math:`n` is the
-exact discrete adjoint of the forward solve of that step, scaled by
-:math:`-1/\\Delta t` (the injected misfit carries neither the time step nor
-the sign of the derivative of :math:`J`); the pilot rescales it to give
-:math:`\\lambda^n`. The
+weights. spyro's UFL-derived implemented adjoint
+(:func:`~spyro.solvers.backward_time_integration.backward_wave_propagator`
+with :attr:`~spyro.utils.typing.AdjointType.UFL_DERIVED_ADJOINT`) differentiates
+the residual of one refined time step with respect to its three states and
+integrates the exact discrete adjoint backwards, with the misfit injected at
+the receivers and no gradient accumulated. Its state at step :math:`n` is
+:math:`\\lambda^n` scaled by :math:`-1/\\Delta t` (the injected misfit carries
+neither the time step nor the sign of the derivative of :math:`J`); the pilot
+rescales it. The
 dual-weighted residual of the prolonged coarse trajectory is then localized
 on the refined cells :math:`K`,
 
@@ -65,6 +65,7 @@ from firedrake.progress_bar import ProgressBar
 
 from ..solvers.acoustic_wave import AcousticWave
 from ..solvers.backward_time_integration import backward_wave_propagator
+from ..utils.typing import AdjointType
 
 #: ``window(times, shot)`` returns a boolean array ``(n_times, n_receivers)``.
 Window = Callable[[np.ndarray, int], np.ndarray]
@@ -676,7 +677,8 @@ class TwoLevelPilot:
 
         fine.real_shot_record = record
         fine.misfit_window = mask.astype(float)
-        fine.enable_implemented_adjoint()
+        fine.enable_implemented_adjoint(
+            adjoint_type=AdjointType.UFL_DERIVED_ADJOINT)
         # Only the adjoint is needed, not a gradient: no forward states.
         fine.store_forward_time_steps = False
         fine.enable_compute_functional()
@@ -700,7 +702,7 @@ class TwoLevelPilot:
         every = self.accumulate_every
         eta = np.zeros(buffer.dat.data_ro.shape[0])
         sweep = {"next": steps - 1, "source": 0.0}
-        # The implemented adjoint injects the misfit without the time step and
+        # The UFL-derived adjoint injects the misfit without the time step and
         # with the opposite sign of dJ/du: its state is -lambda / dt.
         scale = -float(fine.dt)
         # Firedrake draws the bar on rank 0 only; the stand-in it hands the
@@ -758,7 +760,9 @@ class TwoLevelPilot:
                 bar.next()
 
         functional = fine.functional_value
-        backward_wave_propagator(fine, step_callback=accumulate,
+        backward_wave_propagator(fine,
+                                 adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+                                 step_callback=accumulate,
                                  compute_gradient=False)
         if bar is not None:
             bar.finish()
