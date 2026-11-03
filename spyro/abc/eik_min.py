@@ -1,9 +1,9 @@
-from firedrake import VTKFile
-from numpy import asarray, float64
+from mpi4py import MPI
+from numpy import array, asarray, dtype, float64, inf, zeros
 from numpy.linalg import norm
 from spyro.mpi.spyro_mpi import SpyroEnsemble
-from ..solvers.eikonal.eikonal_eq import Eikonal_Modeling
 from ..tools.habc_tools import point_cloud_field
+from ..solvers.eikonal.eikonal_eq import Eikonal_Modeling
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -140,13 +140,11 @@ class Minimum_Eikonal(Eikonal_Modeling):
         SpyroEnsemble.print("\nDefining Eikonal BCs")
 
         # Define Eikonal BCs and source marker
-        self.bcs_eik, sou_marker = self.eikonal_bcs(self.node_positions,
-                                                    self.funct_space_eik,
-                                                    self.lmin)
+        self.bcs_eik, sou_marker = self.eikonal_bcs(self.funct_space_eik, self.lmin)
 
         # Save source marker
-        outfile = VTKFile(self.path_save + "souEik.pvd")
-        outfile.write(sou_marker)
+        SpyroEnsemble.write_vtk(self.path_save + "souEik.pvd", sou_marker,
+                                name="source_marker", target_degree=1)
 
     def solve_eik(self):
         """Solve the nonlinear Eikonal.
@@ -165,8 +163,8 @@ class Minimum_Eikonal(Eikonal_Modeling):
             self.c, self.c_min, self.funct_space_eik, self.diam_mesh)
 
         # Save Eikonal results
-        eikonal_file = VTKFile(self.path_save + "Eik.pvd")
-        eikonal_file.write(self.yp)
+        SpyroEnsemble.write_vtk(self.path_save + "Eik.pvd",
+                                self.yp, name='Eikonal (Time [s])')
 
     def ident_eik_on_bnd(self, bnd_ids):
         """Identify Eikonal minimum values on a boundary.
@@ -182,20 +180,54 @@ class Minimum_Eikonal(Eikonal_Modeling):
             Minimum eikonal value.
         pnt_crit : `array`
             Critical point coordinates.
+        c_bnd :  `float`
+            Propagation speed at critical point.
         """
 
-        # Create a point cloud to get the minimum eikonal value on the boundary
+        #  Communicator from SpyroEnsemble
+        comm = SpyroEnsemble.ensemble.comm
+        rank = SpyroEnsemble.get_local_rank()
+
+        # Ensure fieldas are in sync before evaluating at critical point
+        _ = self.yp.dat.data_ro_with_halos
+        _ = self.c.dat.data_ro_with_halos
+
+        # Boundary points
         ptos_bnd = self.node_positions[bnd_ids, :]
-        eik_on_boundary = point_cloud_field(
-            self.mesh, ptos_bnd, self.yp, self.node_tol).dat.data_with_halos[:]
+        n_pts = len(ptos_bnd)
+
+        # Evaluate Eikonal at boundary points
+        eik_field = point_cloud_field(self.mesh, ptos_bnd, self.yp, self.node_tol)
+        eik_on_boundary = asarray(eik_field.dat.data_ro_with_halos[:], dtype=float64)
+
+        # Index of the minimum Eikonal value on the boundary
+        local_idx = int(eik_on_boundary.argmin()) if n_pts > 0 else 0
+        local_eikmin = float(eik_on_boundary[local_idx]) if n_pts > 0 else inf
+        local_pnt = ptos_bnd[local_idx] if n_pts > 0 else zeros(self.dimension)
+
+        # MINLOC requires MPI_DOUBLE_INT paired type
+        minloc_dtype = dtype([("val", float64), ("rank", "intp")])
+        send_buf = array([(local_eikmin, rank)], dtype=minloc_dtype)
+        recv_buf = zeros(1, dtype=minloc_dtype)
+        comm.Allreduce(
+            [send_buf, MPI.DOUBLE_INT], [recv_buf, MPI.DOUBLE_INT], op=MPI.MINLOC)
 
         # Identify minimum Eikonal value on the boundary
-        eikmin = eik_on_boundary.min()
+        eikmin = float(recv_buf[0]["val"])
+        owner = int(recv_buf[0]["rank"])
 
         # Identify critical point coordinates
-        pnt_crit = ptos_bnd[eik_on_boundary.argmin(), :]
+        pnt_crit = zeros(self.dimension, dtype=float64)
+        if rank == owner:
+            pnt_crit[:] = local_pnt
+        comm.Bcast(pnt_crit, root=owner)
 
-        return eikmin, pnt_crit
+        # Identifying propagation speed at critical point
+        c_field = point_cloud_field(
+            self.mesh, pnt_crit.reshape(1, self.dimension), self.c, self.node_tol)
+        c_bnd = float(c_field.dat.data_ro_with_halos[0])
+
+        return eikmin, pnt_crit, c_bnd
 
     def ident_crit_eik(self):
         """Identify the critical points at boundaries subject to reflections.
@@ -237,11 +269,8 @@ class Minimum_Eikonal(Eikonal_Modeling):
             if not status:
                 continue
 
-            # Identify minimum Eikonal and critical point on the boundary
-            eikmin, pnt_crit = self.ident_eik_on_bnd(bnd_ids)
-
-            # Identifying propagation speed at critical point
-            c_bnd = float64(self.c.at(pnt_crit).item())
+            # Identify minimum Eikonal, critical point and its velocity on the boundary
+            eikmin, pnt_crit, c_bnd = self.ident_eik_on_bnd(bnd_ids)
 
             # Print critical point coordinates
             pnt_str = "at (in km): ({2:3.3f}, {3:3.3f})"

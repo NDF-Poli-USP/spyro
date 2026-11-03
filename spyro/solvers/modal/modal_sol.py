@@ -1,9 +1,9 @@
 from firedrake import LinearEigenproblem, LinearEigensolver
 from numpy import abs, amax, array, asarray, eye, imag, real, sqrt, unique
 from scipy.sparse.linalg import eigs, eigsh, lobpcg, spilu
-from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .modal_forms_and_matrices import assemble_sparse_matrices, weak_forms
 from .modal_rq_matrices import generate_eigenfunctions, matrices_rayleigh_quotient
+from ...mpi.spyro_mpi import SpyroEnsemble
 from ...utils.error_management import (
     validate_data_structure,
     validate_firedrake_parameter,

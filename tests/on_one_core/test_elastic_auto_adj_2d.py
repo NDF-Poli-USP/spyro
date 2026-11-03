@@ -185,15 +185,13 @@ def test_elastic_automated_adjoint_controls(
         # test is checking for. A tenth of that brings every case to within
         # 0.02 of 2.0.
         rng = np.random.default_rng(42)
-        directions = [
-            fire.Function(
-                control.function_space(),
-                val=0.1 * control.dat.data_ro * rng.random(
-                    control.dat.data_ro.shape,
-                ),
-            )
-            for control in wave.automated_adjoint.controls
-        ]
+        directions = []
+        for control in wave.automated_adjoint.controls:
+            direction = control.copy(deepcopy=True)
+            with direction.dat.vec as v_dir, control.dat.vec_ro as v_ctrl:
+                v_dir.array[:] = 0.1 * v_ctrl.array * rng.random(v_dir.getLocalSize())
+            directions.append(direction)
+
         convergence_rate = wave.automated_adjoint.verify_gradient(
             wave.automated_adjoint.controls,
             direction=directions,

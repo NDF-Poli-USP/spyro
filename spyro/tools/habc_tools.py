@@ -246,7 +246,7 @@ def clipping_coordinates_lay_field(domain_dim, mesh, dimension,
     return lay_field, layer_mask
 
 
-def point_cloud_field(parent_mesh, pts_cloud, parent_field, tolerance):
+def point_cloud_field(parent_mesh, pts_cloud, parent_field, tolerance, redundant=False):
     """Create a field on a point cloud from a parent mesh and field.
 
     Parameters
@@ -260,6 +260,11 @@ def point_cloud_field(parent_mesh, pts_cloud, parent_field, tolerance):
         Parent field defined on the parent mesh.
     tolerance : `float`
         Tolerance for searching nodes in the mesh.
+    redundant : `bool`, optional
+        If True, every rank passes all points and Firedrake assigns ownership
+        internally (use for source location where all ranks know all sources).
+        If False (default), each rank passes only its locally owned points
+        (use for boundary evaluation where points are already partitioned).
 
     Returns
     -------
@@ -286,8 +291,9 @@ def point_cloud_field(parent_mesh, pts_cloud, parent_field, tolerance):
     return cloud_field
 
 
-def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer_mask,
-                                tolerance, method="point_cloud", name_prop="Property"):
+def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field,
+                                layer_mask, tolerance, quadrilateral=False,
+                                method="point_cloud", name_prop="Property"):
     """Extend the profile of a scalar field inside the absorbing layer.
 
     Parameters
@@ -333,9 +339,8 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
 
         pprint(f"Using Cloud Points Method to Extend {name_prop} Profile")
 
-        vel_to_extend = \
-            point_cloud_field(mesh_original, pts_to_extend,
-                              field_to_extend, tolerance).dat.data_with_halos[:]
+        vel_to_extend = point_cloud_field(
+            mesh_original, pts_to_extend, field_to_extend, tolerance).dat.data_with_halos[:]
 
     elif method == "nearest_point":
 

@@ -64,14 +64,14 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     # Checking that the random-direction finite-difference error remains
     # below the given tolerance across the tested step sizes.
     test1 = np.all(np.abs(errors) < tol)
-    print(f"Gradient error less than {tol} percent for all steps: {test1}")
-    print(f"Error of {errors}")
+    SpyroEnsemble.print(f"Gradient error less than {tol} percent for all steps: {test1}")
+    SpyroEnsemble.print(f"Error of {errors}")
 
     # Check that the first-order Taylor remainder shrinks at least linearly
     # with the step length, without relying on the sign of the directional error.
     test2 = np.all(remainders[1:] < 0.2 * remainders[:-1])
-    print(f"Taylor remainder decreases with step size: {test2}")
-    print(f"Taylor remainders {remainders}")
+    SpyroEnsemble.print(f"Taylor remainder decreases with step size: {test2}")
+    SpyroEnsemble.print(f"Taylor remainders {remainders}")
 
     assert all([test1, test2])
 

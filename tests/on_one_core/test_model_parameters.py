@@ -3,6 +3,8 @@ import pytest
 from spyro.io import Model_parameters
 from copy import deepcopy
 from pydantic import ValidationError
+from spyro.mpi.spyro_mpi import SpyroEnsemble
+
 
 dictionary = {}
 dictionary["options"] = {
@@ -384,4 +386,4 @@ if __name__ == "__main__":
     test_receiver_exception()
     test_analysis_exception()
 
-    print("END")
+    SpyroEnsemble.print("END")
