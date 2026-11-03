@@ -62,10 +62,6 @@ def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
     if b is not None:
         F_s += dot(b, v_test) * dx(**quad_rule)
 
-    if hasattr(wave, 'X_n'):
-        raise NotImplementedError(
-            "local_abc_form does not yet support the coupled acoustic-elastic case."
-        )
     F_t = local_abc_form(wave)
 
     return F_m + F_k - F_s - F_t
