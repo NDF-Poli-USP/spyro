@@ -7,7 +7,7 @@ name = "spyro"
 version = "0.9.2"
 description = "Wave modeling with the finite element method"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "GNU Lesser General Public License v3 or later (LGPLv3+)" }
 authors = [
   { name = "Alexandre F. G. Olender" },

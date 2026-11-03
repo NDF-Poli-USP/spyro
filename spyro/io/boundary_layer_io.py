@@ -59,6 +59,19 @@ class Read_boundary_layer:
         If True, the maximum propagation speed in the PML layer is provided by the user.
     dictionary : `dict`
         Dictionary containing the boundary layer information
+    free_surface : `bool`
+        If True, the top boundary is a pressure-free surface (``u = 0``,
+        Dirichlet). If False (the default), the top keeps the natural
+        condition (zero normal derivative, a rigid surface) unless it is
+        absorbing. Read from ``absorving_boundary_conditions["free_surface"]``.
+    damping_layer : `dict` or None
+        Quadratic damping layer along the bottom and the sides, read from
+        ``absorving_boundary_conditions["damping_layer"]`` as
+        ``{"pad_length": L, "reflection": R}``: the outer ``L`` km of the mesh
+        (on the bottom and both sides) is damped with
+        :math:`\\gamma = \\gamma_{\\max} (d/L)^2`,
+        :math:`\\gamma_{\\max} = 3 v_{\\max} \\ln(1/R) / (2L)`, where ``d`` is the
+        distance into the layer. ``None`` (the default) adds no damping.
     """
 
     def __init__(self):
@@ -94,6 +107,28 @@ class Read_boundary_layer:
             "absorving_boundary_conditions"].get("absorb_front", True)
         self.absorb_back = self.input_dictionary[
             "absorving_boundary_conditions"].get("absorb_back", True)
+
+        # Top boundary: pressure-free surface (Dirichlet u = 0). Without it the
+        # top is natural, i.e. zero normal derivative: a rigid surface.
+        self.free_surface = self.input_dictionary[
+            "absorving_boundary_conditions"].get("free_surface", False)
+        if self.free_surface and self.absorb_top:
+            raise ValueError(
+                "The top boundary cannot be both absorbing and a free surface."
+            )
+
+        # Quadratic damping layer on the bottom and the sides (no-PML solver).
+        self.damping_layer = self.input_dictionary[
+            "absorving_boundary_conditions"].get("damping_layer")
+        if self.damping_layer is not None:
+            pad = float(self.damping_layer.get("pad_length", 0.0))
+            reflection = float(self.damping_layer.get("reflection", 0.0))
+            if pad <= 0.0 or not 0.0 < reflection < 1.0:
+                raise ValueError(
+                    "damping_layer needs a positive 'pad_length' and a "
+                    "'reflection' between 0 and 1."
+                )
+            self.damping_layer = {"pad_length": pad, "reflection": reflection}
 
     @property
     def abc_boundary_layer_shape(self):

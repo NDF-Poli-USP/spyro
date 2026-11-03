@@ -37,6 +37,12 @@ def isotropic_elastic_without_pml(wave):
 
     wave.lhs = lhs(F)
     wave.rhs = rhs(F)
+    wave.set_forward_residual_form(
+        F,
+        (u, wave.u_n, wave.u_nm1),
+        state_space=V,
+        state_name="residual displacement",
+    )
     wave.B = Cofunction(V.dual())
     wave.source_function = Cofunction(V.dual())
 

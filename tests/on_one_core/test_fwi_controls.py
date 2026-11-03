@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 import firedrake as fire
 import pytest
@@ -491,3 +493,166 @@ def test_run_fwi_passes_scipy_options_to_scipy(
     fwi.run_fwi(vmin=1.5, vmax=3.0, **options)
 
     assert received["options"].items() >= expected.items()
+
+
+def build_elastic_gradient_dictionary():
+    dictionary = build_elastic_dictionary()
+    dictionary["time_axis"]["final_time"] = 0.5
+    dictionary["time_axis"]["dt"] = 0.002
+    dictionary["time_axis"]["output_frequency"] = 100
+    return dictionary
+
+
+def solve_elastic_gradient_model(
+    model, edge_length=0.5, implemented_adjoint=False,
+    real_shot_record=None, use_vertex_only_mesh=False,
+    control_parameters=None,
+):
+    wave = spyro.IsotropicWave(dictionary=deepcopy(model))
+    wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+    if real_shot_record is not None:
+        wave.real_shot_record = real_shot_record
+    if implemented_adjoint:
+        wave.enable_implemented_adjoint(
+            adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+            control_parameters=control_parameters,
+        )
+    elif use_vertex_only_mesh:
+        wave.use_vertex_only_mesh = True
+    wave.forward_solve()
+    return wave
+
+
+def normalized_scalar_direction(function_space, seed):
+    values = np.random.default_rng(seed).random(function_space.dim()) - 0.5
+    direction = fire.Function(function_space, val=values)
+    direction.assign(direction / fire.norm(direction))
+    return direction
+
+
+def test_elastic_ufl_derived_adjoint_uses_forward_residual_form():
+    """The UFL-derived adjoint returns one gradient per selected control."""
+    model = build_elastic_gradient_dictionary()
+    exact_model = deepcopy(model)
+    exact_model["synthetic_data"]["density"] = 1.2
+
+    exact = solve_elastic_gradient_model(
+        exact_model, use_vertex_only_mesh=True,
+    )
+    guess = solve_elastic_gradient_model(
+        model,
+        implemented_adjoint=True,
+        real_shot_record=exact.forward_solution_receivers,
+    )
+
+    functional = guess.functional_value
+    gradient = guess.gradient_solve(
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+    )
+
+    assert guess.forward_residual_form is not None
+    assert guess.forward_residual_states is not None
+    assert guess.get_adjoint_source().function_space() == (
+        guess.source_function.function_space()
+    )
+    assert np.isfinite(functional)
+    assert set(gradient) == {
+        ElasticMaterialParameter.DENSITY,
+        ElasticMaterialParameter.P_WAVE_VELOCITY,
+        ElasticMaterialParameter.S_WAVE_VELOCITY,
+    }
+    assert all(isinstance(value, fire.Function) for value in gradient.values())
+    assert all(np.isfinite(fire.norm(value)) for value in gradient.values())
+
+
+def test_elastic_ufl_derived_adjoint_accepts_velocity_controls():
+    """With v_p and v_s selected, density is not a control."""
+    model = build_elastic_gradient_dictionary()
+    exact_model = deepcopy(model)
+    exact_model["synthetic_data"]["s_wave_velocity"] = 1.2
+
+    exact = solve_elastic_gradient_model(
+        exact_model, use_vertex_only_mesh=True,
+    )
+    controls = {
+        ElasticMaterialParameter.P_WAVE_VELOCITY,
+        ElasticMaterialParameter.S_WAVE_VELOCITY,
+    }
+    guess = solve_elastic_gradient_model(
+        model,
+        implemented_adjoint=True,
+        real_shot_record=exact.forward_solution_receivers,
+        control_parameters=controls,
+    )
+    gradient = guess.gradient_solve(
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+    )
+
+    assert set(gradient) == controls
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "parameter",
+    [
+        ElasticMaterialParameter.DENSITY,
+        ElasticMaterialParameter.P_WAVE_VELOCITY,
+        ElasticMaterialParameter.S_WAVE_VELOCITY,
+    ],
+)
+def test_elastic_ufl_derived_adjoint_taylor_remainder(parameter):
+    """The Taylor remainder of each control converges at second order."""
+    model = build_elastic_gradient_dictionary()
+    exact_model = deepcopy(model)
+    exact_model["synthetic_data"][parameter.value] = (
+        1.2 * exact_model["synthetic_data"][parameter.value]
+    )
+
+    exact = solve_elastic_gradient_model(
+        exact_model, use_vertex_only_mesh=True,
+    )
+    guess = solve_elastic_gradient_model(
+        model,
+        implemented_adjoint=True,
+        real_shot_record=exact.forward_solution_receivers,
+    )
+    field = guess.physical_parameters[parameter]
+    base = fire.Function(field.function_space()).assign(field)
+
+    base_functional = guess.functional_value
+    gradient = guess.gradient_solve(
+        adjoint_type=AdjointType.UFL_DERIVED_ADJOINT,
+    )
+
+    direction = normalized_scalar_direction(base.function_space(), 5)
+    directional_derivative = fire.assemble(
+        gradient[parameter] * direction * fire.dx(**guess.quadrature_rule)
+    )
+
+    steps = np.array([1e-2, 5e-3, 2.5e-3, 1.25e-3])
+    remainders = []
+    directional_errors = []
+    for step in steps:
+        guess.physical_parameters.update(parameter, base + step * direction)
+        guess.forward_solve()
+        perturbed_functional = guess.functional_value
+        finite_difference = (perturbed_functional - base_functional) / step
+        remainders.append(abs(
+            perturbed_functional
+            - base_functional
+            - step * directional_derivative
+        ))
+        directional_errors.append(abs(
+            (finite_difference - directional_derivative)
+            / directional_derivative
+        ))
+
+    remainders = np.array(remainders)
+    directional_errors = np.array(directional_errors)
+    convergence_rates = np.log(remainders[:-1] / remainders[1:]) / np.log(
+        steps[:-1] / steps[1:]
+    )
+
+    assert np.all(np.isfinite(remainders))
+    assert np.all(convergence_rates > 1.8), convergence_rates
+    assert np.all(directional_errors < 0.1)

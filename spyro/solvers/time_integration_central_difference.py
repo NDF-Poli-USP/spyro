@@ -1,5 +1,6 @@
 import firedrake as fire
 import numpy as np
+import ufl
 
 from . import helpers
 from .. import utils
@@ -40,7 +41,16 @@ def _propagate_forward_central_difference(wave, source_ids):
     t = wave.current_time
     nt = int(wave.final_time / wave.dt) + 1  # number of timesteps
     usol = None
+    store_mixed_forward_state = False
     if wave.store_forward_time_steps:
+        # A PML forward residual pairs the whole mixed state, so the UFL-derived
+        # adjoint needs the mixed snapshots rather than the pressure alone.
+        if (
+            wave.abc_type == AbsorbingBCsType.PML
+            and wave.use_vertex_only_mesh
+            and wave.forward_residual_form is not None
+        ):
+            store_mixed_forward_state = True
         # Snapshots are appended as the solve advances rather than allocated
         # up front. The final footprint is the same, but nothing is reserved
         # before it is needed: a solve that aborts early (e.g. the numerical
@@ -144,10 +154,16 @@ def _propagate_forward_central_difference(wave, source_ids):
             wave.store_forward_time_steps
             and step % wave.gradient_sampling_frequency == 0
         ):
-            snapshot = fire.Function(
-                wave.function_space, name=wave.get_function_name()
-            )
-            snapshot.assign(wave.get_function())
+            if store_mixed_forward_state:
+                snapshot = fire.Function(
+                    wave.mixed_function_space, name=wave.get_function_name()
+                )
+                snapshot.assign(wave.vstate)
+            else:
+                snapshot = fire.Function(
+                    wave.function_space, name=wave.get_function_name()
+                )
+                snapshot.assign(wave.get_function())
             usol.append(snapshot)
             save_step += 1
 
@@ -177,8 +193,13 @@ def _propagate_forward_central_difference(wave, source_ids):
                         "Unsupported type for real_shot_record. Must be "
                         "either a numpy array or a Firedrake Function."
                     )
+                misfit_step_expr = misfit_step
+                misfit_step = fire.Function(usol_recv[-1].function_space())
+                misfit_step.interpolate(misfit_step_expr)
             else:
                 misfit_step = real_shot_record[step] - usol_recv[-1]
+            if wave.misfit_window is not None:
+                misfit_step = _windowed(wave, misfit_step, step)
             wave.misfit.append(misfit_step)
             J += utils.compute_functional(
                 wave, misfit_step, evaluation_mode=FunctionalEvaluationMode.PER_TIMESTEP,
@@ -215,6 +236,8 @@ def _propagate_forward_central_difference(wave, source_ids):
 
     if functional_mode is FunctionalEvaluationMode.AFTER_SOLVE:
         wave.misfit = real_shot_record - usol_recv
+        if wave.misfit_window is not None:
+            wave.misfit = wave.misfit * np.asarray(wave.misfit_window)
         J = utils.compute_functional(wave, wave.misfit)
 
     if compute_functional:
@@ -223,3 +246,32 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.functional_value = None
 
     wave.field_logger.stop_logging()
+
+
+def _windowed(wave, misfit_step, step):
+    """Weight one time step of the misfit by ``wave.misfit_window``.
+
+    Parameters
+    ----------
+    wave : Wave
+        Wave whose ``misfit_window`` holds one weight per time step and
+        receiver, in input order.
+    misfit_step : ufl.core.expr.Expr or numpy.ndarray
+        Misfit of this time step: an expression on the receivers'
+        vertex-only mesh, or the values at all receivers.
+    step : int
+        Time step.
+
+    Returns
+    -------
+    ufl.core.expr.Expr or numpy.ndarray
+        The weighted misfit, of the same kind as ``misfit_step``.
+    """
+    weights = np.asarray(wave.misfit_window)[step]
+    if not wave.use_vertex_only_mesh:
+        return weights * misfit_step
+    mesh = ufl.domain.extract_unique_domain(misfit_step)
+    window = fire.Function(fire.FunctionSpace(mesh, "DG", 0))
+    # This rank holds only the receivers it owns (issue #315).
+    window.dat.data_wo[:] = weights[wave.receivers.vom_input_indices]
+    return window * misfit_step

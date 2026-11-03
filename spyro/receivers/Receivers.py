@@ -9,6 +9,8 @@ from ..version_control import is_firedrake_new
 
 if is_firedrake_new() is False:
     from firedrake.__future__ import interpolate
+else:
+    from firedrake import interpolate
 
 
 class Receivers(Delta_projector):
@@ -120,6 +122,67 @@ class Receivers(Delta_projector):
 
         return rhs_forcing
 
+    def _receiver_function_space(self, receiver_mesh):
+        """Return the VOM function space matching this receiver field."""
+        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
+            return create_function_space(
+                receiver_mesh, "DG0", 0, dim=self.dimension,
+            )
+        elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
+            return create_function_space(receiver_mesh, "DG0", 0)
+        else:
+            raise ValueError("Invalid wave type")
+
+    def apply_receivers_as_source_vertex_only_mesh(self, misfit_form, target_space):
+        """Return receiver misfit injection as a VOM-built cofunction.
+
+        This is the adjoint of the receiver interpolation used by the
+        UFL-derived implemented adjoint.
+
+        Parameters
+        ----------
+        misfit_form : firedrake.Function or array_like
+            Receiver-space misfit at the current time step.  The implemented
+            adjoint uses the ``Function`` produced while accumulating the
+            functional during forward time integration.  Array input is kept for
+            compatibility with callers that provide receiver values directly.
+        target_space : firedrake.functionspaceimpl.WithGeometry
+            Finite element space where the adjoint source cofunction is
+            injected.
+
+        Returns
+        -------
+        firedrake.Cofunction
+            Cofunction on ``target_space.dual()`` containing the receiver
+            misfit injected into the finite element adjoint source space.
+
+        Raises
+        ------
+        TypeError
+            If ``misfit_form`` is neither a Firedrake ``Function`` nor
+            array-like receiver data.
+        """
+        try:
+            V_r = misfit_form.function_space()
+            value = misfit_form
+        except AttributeError as exc:
+            if not isinstance(misfit_form, (np.ndarray, list, tuple)):
+                raise TypeError(
+                    "misfit_form must be a Firedrake Function or array-like "
+                    "receiver data."
+                ) from exc
+            receiver_mesh = VertexOnlyMesh(self.mesh, self.point_locations)
+            receiver_values = np.asarray(misfit_form)
+            V_r_input = self._receiver_function_space(
+                receiver_mesh.input_ordering
+            )
+            value_input = Function(V_r_input, val=receiver_values)
+            V_r = self._receiver_function_space(receiver_mesh)
+            value = interpolate(value_input, V_r)
+        return Cofunction(target_space.dual()).interpolate(
+            assemble(inner(value, TestFunction(V_r)) * dx(domain=V_r.mesh())),
+        )
+
     def receiver_interpolator(
         self,
         f,
@@ -177,12 +240,7 @@ class Receivers(Delta_projector):
             name=vom_name,
         )
         self.vom_input_indices = self._vom_input_indices(vom)
-        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
-            V_r = create_function_space(vom, "DG0", 0, dim=self.dimension)
-        elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
-            V_r = create_function_space(vom, "DG0", 0)
-        else:
-            raise ValueError("Invalid wave type")
+        V_r = self._receiver_function_space(vom)
         return interpolate(f, V_r)
 
     def _vom_input_indices(self, vom: MeshGeometry) -> np.ndarray:

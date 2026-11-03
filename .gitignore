@@ -195,3 +195,6 @@ PacMeshIgnore/
 # Allow the figures of the literate demos
 !demos/elastic_fwi_automated_adjoint/*.png
 .vscode
+
+# Outputs of the automatic mesh adaptation demo
+demos/automatic_mesh_adaptation/results/
