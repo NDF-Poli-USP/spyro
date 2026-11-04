@@ -45,6 +45,10 @@ def construct_solver_or_matrix_no_pml(wave):
     q = wave.source_expression
     if q is not None:
         le += - q * v * dx(**quad_rule)
+    if wave.point_source_in_form:
+        # See Sources.source_term. The time function is zero until a forward
+        # solve sets it, and the implemented adjoint switches it off again.
+        le += - wave.sources.source_term(v, dx(**quad_rule))
 
     if wave.abc_active and not wave.abc_get_ref_model:
         weak_expr_abc = dot((u_n - u_nm1) / dt, v)

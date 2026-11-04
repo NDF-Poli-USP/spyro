@@ -183,6 +183,15 @@ def test_gradient_matches_across_schedules(observed_record) -> None:
     gradients = {}
     for schedule in SCHEDULES:
         wave = taped_guess(observed_record, schedule)
+        # The point source enters each time step through its scalar time
+        # function: no step records a source cofunction.
+        dual = wave.function_space.dual()
+        assert not any(
+            isinstance(output.output, fire.Cofunction)
+            and output.output.function_space() == dual
+            for step in wave.automated_adjoint._tape.timesteps
+            for block in step for output in block.get_outputs()
+        ), f"a time step records a source cofunction with schedule '{schedule}'"
         dJ = wave.gradient_solve(adjoint_type=AdjointType.AUTOMATED_ADJOINT)
         gradients[schedule] = np.array(dJ.dat.data_ro, copy=True)
         wave.automated_adjoint.clear_tape()

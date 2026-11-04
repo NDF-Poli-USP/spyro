@@ -553,6 +553,22 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         (e.g., "pressure" or "displacement")'''
         pass
 
+    @property
+    def point_source_in_form(self) -> bool:
+        """Whether the time-step form injects the point source as a term.
+
+        With vertex-only-mesh sources, every solver adds
+        :meth:`Sources.source_term <spyro.sources.Sources.source_term>` to its
+        time-step form; otherwise the source is written into
+        ``rhs_no_pml_source()`` at each step.
+
+        Returns
+        -------
+        bool
+            ``True`` with a source and vertex-only meshes.
+        """
+        return self.sources is not None and self.use_vertex_only_mesh
+
     def update_source_expression(self, t):
         '''Update the source expression during wave propagation. This method must be
         implemented only by subclasses that make use of the source term'''
