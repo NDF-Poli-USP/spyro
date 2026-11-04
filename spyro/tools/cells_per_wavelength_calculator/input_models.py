@@ -6,6 +6,7 @@ import warnings
 import numpy as np
 
 import spyro
+from .heterogeneous_case import HeterogeneousCase
 
 #: Mesh type used for each supported finite element method.
 MESH_TYPES = {
@@ -28,6 +29,14 @@ HOMOGENEOUS_RECEIVERS_PER_SIDE_REDUCED = 2
 
 #: Time step of the homogeneous acoustic analytical reference, in s.
 HOMOGENEOUS_REFERENCE_DT = 5e-4
+
+# Acquisition of the heterogeneous acoustic model, in km and s.
+HETEROGENEOUS_SOURCE_LOCATION = (-0.3, 3.0)
+#: Horizontal offsets of the first and last receivers from the source.
+HETEROGENEOUS_RECEIVER_OFFSETS = (2.0, 10.0)
+HETEROGENEOUS_RECEIVER_QUANTITY = 500
+HETEROGENEOUS_FINAL_TIME = 7.5
+HETEROGENEOUS_DT = 1e-4
 
 
 def _check_method(method: str) -> None:
@@ -82,6 +91,24 @@ def _warn_if_meters_per_second(velocity: float) -> None:
         warnings.warn("Velocity in meters per second")
 
 
+def _or_default(value: object, default: object) -> object:
+    """Return a case override, or the default when it is not given.
+
+    Parameters
+    ----------
+    value : object
+        Case override, None when not given.
+    default : object
+        Value used when ``value`` is None.
+
+    Returns
+    -------
+    object
+        ``value`` unless it is None, else ``default``.
+    """
+    return default if value is None else value
+
+
 def _round_up_to_time_step(time: float, dt: float) -> float:
     """Round a time up to a whole number of time steps.
 
@@ -116,7 +143,9 @@ def _build_acoustic_model_dictionary(
     frequency: float,
     final_time: float,
     dt: float,
+    pml_pad_length: float | None = None,
     periodic: bool = False,
+    velocity_model_file_name: str | None = None,
 ) -> dict:
     """Assemble a 2D acoustic model dictionary for the cpw calculator.
 
@@ -140,9 +169,14 @@ def _build_acoustic_model_dictionary(
         Final time of the simulation.
     dt : float
         Time step of the simulation.
+    pml_pad_length : float, optional
+        Thickness of a PML absorbing layer. Default is None, meaning no
+        absorbing layer.
     periodic : bool, optional
         If True, use a periodic ``"firedrake_mesh"`` for either method.
         Default is False, with the mesh type given by :func:`set_mesh_type`.
+    velocity_model_file_name : str, optional
+        Velocity model file. Default is None, for a velocity set later.
 
     Returns
     -------
@@ -152,12 +186,26 @@ def _build_acoustic_model_dictionary(
     Raises
     ------
     ValueError
-        If ``method`` is not supported.
+        If ``method`` is not supported, or a periodic mesh is given a PML.
     """
     mesh_type = set_mesh_type(method)
     if periodic:
+        if pml_pad_length is not None:
+            raise ValueError("A periodic mesh cannot have a PML.")
         # Only Firedrake meshes can be periodic
         mesh_type = "firedrake_mesh"
+
+    if pml_pad_length is None:
+        absorbing_boundary_conditions = {"status": False}
+    else:
+        absorbing_boundary_conditions = {
+            "status": True,
+            "abc_type": "PML",
+            "exponent": 2,
+            "cmax": 4.5,
+            "R": 1e-6,
+            "pad_length": pml_pad_length,
+        }
 
     return {
         "options": {
@@ -174,7 +222,7 @@ def _build_acoustic_model_dictionary(
             "mesh_type": mesh_type,
             "periodic": periodic,
         },
-        "absorving_boundary_conditions": {"status": False},
+        "absorving_boundary_conditions": absorbing_boundary_conditions,
         "acquisition": {
             "source_type": "ricker",
             "source_locations": source_locations,
@@ -183,7 +231,7 @@ def _build_acoustic_model_dictionary(
             "use_vertex_only_mesh": True,
         },
         "synthetic_data": {
-            "real_velocity_file": None,
+            "real_velocity_file": velocity_model_file_name,
         },
         "time_axis": {
             "initial_time": 0.0,
@@ -291,4 +339,66 @@ def create_acoustic_model_for_meshing_parameter_2D_homogeneous(
         final_time=final_time,
         dt=dt,
         periodic=True,
+    )
+
+
+def create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
+    method: str,
+    degree: int,
+    frequency: float,
+    minimum_velocity: float,
+    case: HeterogeneousCase,
+) -> dict:
+    """Create a 2D heterogeneous acoustic model for the cpw calculator.
+
+    By default, a source at :data:`HETEROGENEOUS_SOURCE_LOCATION` records on
+    a line of receivers at the source depth; the case can replace the
+    acquisition and time axis. The domain is surrounded by a PML one
+    wavelength thick. The reference is numerical, so the same layer is
+    present in the reference and in every evaluated solve. The P-wave
+    velocity file of the case is written, if needed, before returning.
+
+    Parameters
+    ----------
+    method : str
+        Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+    degree : int
+        Spatial polynomial degree.
+    frequency : float
+        Ricker source peak frequency.
+    minimum_velocity : float
+        Minimum velocity in the domain, which sets the PML thickness.
+    case : HeterogeneousCase
+        Domain, material and acquisition overrides.
+
+    Returns
+    -------
+    dict
+        Spyro model dictionary for :class:`spyro.AcousticWave`.
+    """
+    receiver_locations = case.receiver_locations
+    if receiver_locations is None:
+        source_z, source_x = HETEROGENEOUS_SOURCE_LOCATION
+        first_offset, last_offset = HETEROGENEOUS_RECEIVER_OFFSETS
+        receiver_locations = spyro.create_transect(
+            (source_z, source_x + first_offset),
+            (source_z, source_x + last_offset),
+            HETEROGENEOUS_RECEIVER_QUANTITY,
+        )
+    material_files = case.write_material_files(("p_wave_velocity",))
+
+    return _build_acoustic_model_dictionary(
+        method=method,
+        degree=degree,
+        length_z=case.length_z,
+        length_x=case.length_x,
+        source_locations=_or_default(
+            case.source_locations, [HETEROGENEOUS_SOURCE_LOCATION]
+        ),
+        receiver_locations=receiver_locations,
+        frequency=frequency,
+        final_time=_or_default(case.final_time, HETEROGENEOUS_FINAL_TIME),
+        dt=_or_default(case.dt, HETEROGENEOUS_DT),
+        pml_pad_length=minimum_velocity / frequency,
+        velocity_model_file_name=material_files["p_wave_velocity"],
     )

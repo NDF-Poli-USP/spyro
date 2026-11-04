@@ -7,8 +7,10 @@ import pytest
 
 from spyro.tools.cells_per_wavelength_calculator import input_models
 from spyro.tools.cells_per_wavelength_calculator import (
+    AcousticHeterogeneousProblem,
     AcousticHomogeneousProblem,
     CpwParameters,
+    MaterialFileCase,
 )
 
 METHODS = ["mass_lumped_triangle", "spectral_quadrilateral"]
@@ -56,6 +58,8 @@ PROBLEM_PARAMETERS = {
     "dimension": 2,
     "testing": True,
     "desired_degree": 2,
+    "reference_degree": 5,
+    "C_reference": 6.0,
     "C_initial": 2.8,
     "C_accuracy": 0.1,
     "accepted_error_threshold": 0.05,
@@ -164,6 +168,106 @@ def test_homogeneous_model_warns_for_large_velocity() -> None:
 
 
 @pytest.mark.parametrize(
+    "method, expected_mesh_type",
+    [
+        ("mass_lumped_triangle", "SeismicMesh"),
+        ("spectral_quadrilateral", "firedrake_mesh"),
+    ],
+)
+def test_heterogeneous_model_sets_core_fields(
+    method: str, expected_mesh_type: str
+) -> None:
+    """The heterogeneous model has a one-wavelength PML and a receiver line."""
+    model = input_models.create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
+        method=method,
+        degree=5,
+        frequency=8.0,
+        minimum_velocity=1.6,
+        case=MaterialFileCase(
+            name="my_model",
+            length_z=12.0,
+            length_x=30.0,
+            material_files={"p_wave_velocity": "my_model.segy"},
+        ),
+    )
+
+    assert model["options"]["method"] == method
+    assert model["options"]["degree"] == 5
+    assert model["mesh"]["mesh_type"] == expected_mesh_type
+    assert model["mesh"]["periodic"] is False
+    assert model["mesh"]["length_z"] == 12.0
+    assert model["mesh"]["length_x"] == 30.0
+    assert "cells_per_wavelength" not in model["mesh"]
+    abc = model["absorving_boundary_conditions"]
+    assert abc["status"] is True
+    assert abc["abc_type"] == "PML"
+    assert abc["pad_length"] == pytest.approx(0.2)
+    assert model["synthetic_data"]["real_velocity_file"] == "my_model.segy"
+
+    receivers = model["acquisition"]["receiver_locations"]
+    assert len(receivers) == 500
+    assert tuple(receivers[0]) == pytest.approx((-0.3, 5.0))
+    assert tuple(receivers[-1]) == pytest.approx((-0.3, 13.0))
+    assert model["acquisition"]["source_locations"] == [(-0.3, 3.0)]
+    assert model["time_axis"]["final_time"] == 7.5
+    assert model["time_axis"]["dt"] == 1e-4
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda case: input_models.create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
+            "spectral_quadrilateral", 4, 5.0, 1.5, case
+        ),
+    ],
+    ids=["acoustic"],
+)
+def test_heterogeneous_case_overrides_acquisition_and_time_axis(build) -> None:
+    """Each acquisition or time axis value given by the case is used."""
+    case = MaterialFileCase(
+        name="custom",
+        length_z=2.0,
+        length_x=4.0,
+        material_files={
+            "p_wave_velocity": "custom_vp.segy",
+            "s_wave_velocity": "custom_vs.segy",
+            "density": "custom_rho.segy",
+        },
+        source_locations=[(-0.1, 1.0)],
+        receiver_locations=[(-1.0, 2.0), (-1.0, 3.0)],
+        final_time=0.8,
+        dt=2e-4,
+    )
+
+    model = build(case)
+
+    assert model["mesh"]["length_z"] == 2.0
+    assert model["mesh"]["length_x"] == 4.0
+    assert model["acquisition"]["source_locations"] == [(-0.1, 1.0)]
+    assert model["acquisition"]["receiver_locations"] == [(-1.0, 2.0), (-1.0, 3.0)]
+    assert model["time_axis"]["final_time"] == 0.8
+    assert model["time_axis"]["dt"] == 2e-4
+
+
+def test_periodic_model_rejects_pml() -> None:
+    """A periodic box has no boundary for a PML."""
+    with pytest.raises(ValueError, match="periodic mesh cannot have a PML"):
+        input_models._build_acoustic_model_dictionary(
+            method="spectral_quadrilateral",
+            degree=2,
+            length_z=1.0,
+            length_x=1.0,
+            source_locations=[(-0.5, 0.5)],
+            receiver_locations=[(-0.6, 0.5)],
+            frequency=5.0,
+            final_time=1.0,
+            dt=1e-3,
+            pml_pad_length=0.3,
+            periodic=True,
+        )
+
+
+@pytest.mark.parametrize(
     "time, dt, expected",
     [(1.0, 0.25, 1.0), (1.01, 0.25, 1.25), (3.14951, 0.002, 3.15)],
 )
@@ -223,3 +327,21 @@ def test_acoustic_problem_builds_homogeneous_model() -> None:
     assert model["acquisition"]["frequency"] == 5.0
     assert model["time_axis"]["dt"] == input_models.HOMOGENEOUS_REFERENCE_DT
     assert len(model["acquisition"]["receiver_locations"]) == 4
+
+
+def test_acoustic_problem_builds_heterogeneous_model() -> None:
+    """The heterogeneous model reads its lengths and file from the inputs."""
+    case = MaterialFileCase(
+        name="velocity",
+        length_z=3.0,
+        length_x=17.0,
+        material_files={"p_wave_velocity": "velocity.segy"},
+        minimum_velocity=1.5,
+    )
+    problem = AcousticHeterogeneousProblem(make_parameters(heterogeneous_case=case))
+
+    model = problem.model_dictionary("spectral_quadrilateral", 4)
+
+    assert model["mesh"]["length_z"] == 3.0
+    assert model["mesh"]["length_x"] == 17.0
+    assert model["synthetic_data"]["real_velocity_file"] == "velocity.segy"
