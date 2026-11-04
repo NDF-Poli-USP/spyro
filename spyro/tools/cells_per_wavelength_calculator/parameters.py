@@ -70,6 +70,8 @@ class CpwParameters:
         acquisition is set by the problem.
     minimum_velocity : float or None
         Velocity, homogeneous acoustic only.
+    p_wave_velocity, s_wave_velocity, density : float or None
+        Material, homogeneous elastic only.
     heterogeneous_case : HeterogeneousCase or None
         Domain, material and any acquisition or time axis overrides,
         heterogeneous only.
@@ -124,6 +126,9 @@ class CpwParameters:
     velocity_profile_type: VelocityProfileType | str | None = None
     receiver_setup: str | None = None
     minimum_velocity: float | None = None
+    p_wave_velocity: float | None = None
+    s_wave_velocity: float | None = None
+    density: float | None = None
     heterogeneous_case: HeterogeneousCase | None = None
     reference_degree: int | None = None
     cpw_reference: float | None = None
