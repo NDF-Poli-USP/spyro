@@ -91,7 +91,10 @@ jobs:
           pip install --verbose -r ./firedrake-repo/requirements-build.txt
           pip install --verbose --no-build-isolation \
               "$SLEPC_DIR"/externalpackages/git.slepc/src/binding/slepc4py
-            pip install --no-deps ngsPETSc netgen-mesher netgen-occt
+          : # ngsPETSc without deps so it does not replace the source-built petsc4py;
+          : # netgen-mesher with deps so pip honours its exact netgen-occt pin.
+          pip install --no-deps ngsPETSc
+          pip install netgen-mesher
           pip install --verbose --no-build-isolation --no-binary h5py --editable './firedrake-repo[check,slepc,vtk]'
           firedrake-clean
           : # Extra test dependencies
