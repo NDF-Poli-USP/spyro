@@ -283,16 +283,16 @@ class Modal_Solver:
 
         Parameters
         ----------
-        a : firedrake.Form
+        a : `firedrake.Form`
             Weak form representing the stiffness matrix.
-        m : firedrake.Form
+        m : `firedrake.Form`
             Weak form representing the mass matrix.
-        k : int, optional
+        k : `int`, optional
             Number of eigenvalues to compute. Default is 2.
 
         Returns
         -------
-        numpy.ndarray
+        `numpy.ndarray`
             The computed eigenvalues, identical on every rank.
 
         Raises
