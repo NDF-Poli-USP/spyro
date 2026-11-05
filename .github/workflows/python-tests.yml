@@ -169,7 +169,7 @@ jobs:
     - name: Post-run cleanup
       if: always()
       run: find . -delete
-
+  
   new-firedrake-tests:
     name: Updated Firedrake tests
     runs-on: self-hosted
@@ -228,7 +228,7 @@ jobs:
           mpiexec -n 2 pytest tests/parallel/test_parallel_io.py
           mpiexec -n 2 pytest tests/parallel/test_forward_multiple_serial_shots.py
           mpiexec -n 2 pytest tests/parallel/test_vom_receivers.py
-
+    
     - name: Running parallel tests for inversion
       run: |
           make clean
