@@ -486,7 +486,7 @@ class ABCLayer(NRBC, MeasureError):
                 # Get the minimum frequency excited at each critical point
                 freq_ref = freq_response(histPcrit, self.freq_Nyquist,
                                          fpad=fpad, get_dominant_freq=True)
-                SpyroEnsemble.print(f"Frequency at Critical Point {n_crit: >2.0f}: {freq_ref:.5f}")
+                SpyroEnsemble.print(f"Frequency at Critical Point {n_crit:>2.0f}: {freq_ref:.5f}")
 
                 self.freq_ref = min(self.freq_ref, freq_ref)
 
