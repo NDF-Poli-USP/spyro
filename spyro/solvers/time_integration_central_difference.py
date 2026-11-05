@@ -31,7 +31,7 @@ def _propagate_forward_central_difference(wave, source_ids):
 
     adjoint_type = wave.adjoint_type
 
-    wave.field_logger.start_logging(source_ids)
+    wave.simulation_logger.start_logging(source_ids)
     wave.comm.comm.barrier()
 
     functional_mode = wave.functional_evaluation_mode
@@ -156,7 +156,7 @@ def _propagate_forward_central_difference(wave, source_ids):
                 fire.norm(wave.get_function()) < 1
             ), "Numerical instability. Try reducing dt or building the " \
                "mesh differently"
-            wave.field_logger.log(t)
+            wave.simulation_logger.log(t)
             helpers.display_progress(wave.comm, t)
 
         if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
@@ -222,4 +222,4 @@ def _propagate_forward_central_difference(wave, source_ids):
     else:
         wave.functional_value = None
 
-    wave.field_logger.stop_logging()
+    wave.simulation_logger.stop_logging()

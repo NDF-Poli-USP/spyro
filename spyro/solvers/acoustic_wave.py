@@ -49,7 +49,7 @@ class AcousticWave(Wave):
         super().__init__(dictionary, wave_type=WaveType.ISOTROPIC_ACOUSTIC, comm=comm)
 
         self.acoustic_energy = None
-        self.field_logger.add_functional(
+        self.simulation_logger.add_functional(
             "acoustic_energy", lambda: fire.assemble(self.acoustic_energy)
         )
 

@@ -79,18 +79,21 @@ class IsotropicWave(ElasticWave):
         # Variables for logging the P-wave
         self.p_wave = None
         self.D_h = None
-        self.field_logger.add_field("p-wave", "P-wave",
-                                    lambda: self.update_p_wave())
+        self.simulation_logger.add_field(
+            "p_wave", "P-wave", lambda: self.update_p_wave()
+        )
 
         # Variables for logging the S-wave
         self.s_wave = None
         self.C_h = None
-        self.field_logger.add_field("s-wave", "S-wave",
-                                    lambda: self.update_s_wave())
+        self.simulation_logger.add_field(
+            "s_wave", "S-wave", lambda: self.update_s_wave()
+        )
 
         self.mechanical_energy = None
-        self.field_logger.add_functional("mechanical_energy",
-                                         lambda: assemble(self.mechanical_energy))
+        self.simulation_logger.add_functional(
+            "mechanical_energy", lambda: assemble(self.mechanical_energy)
+        )
 
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
         """Initialize isotropic elastic material parameters from a dictionary.
