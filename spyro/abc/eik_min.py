@@ -184,12 +184,11 @@ class Minimum_Eikonal(Eikonal_Modeling):
         """
 
         #  Communicator from SpyroEnsemble
-        comm = SpyroEnsemble.ensemble.comm
+        comm = SpyroEnsemble.get_ensemble_rank()
         rank = SpyroEnsemble.get_local_rank()
 
-        # Ensure fieldas are in sync before evaluating at critical point
-        _ = self.yp.dat.data_ro_with_halos
-        _ = self.c.dat.data_ro_with_halos
+        # Ensure fields are in sync before evaluating at critical point
+        SpyroEnsemble.barrier()
 
         # Boundary points
         ptos_bnd = self.node_positions[bnd_ids, :]
