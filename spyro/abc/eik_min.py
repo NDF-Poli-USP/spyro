@@ -143,8 +143,7 @@ class Minimum_Eikonal(Eikonal_Modeling):
         self.bcs_eik, sou_marker = self.eikonal_bcs(self.funct_space_eik, self.lmin)
 
         # Save source marker
-        SpyroEnsemble.write_vtk(self.path_save + "souEik.pvd", sou_marker,
-                                name="source_marker", target_degree=1)
+        SpyroEnsemble.write_vtk(self.path_save + "souEik.pvd", sou_marker, name="source_marker")
 
     def solve_eik(self):
         """Solve the nonlinear Eikonal.
