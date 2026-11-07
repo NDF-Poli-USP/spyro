@@ -294,6 +294,23 @@ def communicate(array, my_ensemble):
     return array_reduced
 
 
+def global_min(f: Function) -> float:  # noqa: F405
+    """Return the minimum of a function's values over all ranks.
+
+    Parameters
+    ----------
+    f : `Firedrake.Function`
+        Scalar function.
+
+    Returns
+    -------
+    `float`
+        Minimum value of ``f`` across the communicator of its mesh.
+    """
+    with f.dat.vec_ro as v:
+        return v.min()[1]
+
+
 class Mask:
     """
     DEPRECATED: Spatial mask for selective gradient updates in wave simulations.
