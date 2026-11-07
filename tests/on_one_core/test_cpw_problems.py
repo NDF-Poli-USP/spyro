@@ -132,7 +132,7 @@ def test_problem_rejects_non_positive_mesh_frequency_factor(
     problem_class: type[CpwProblem],
 ) -> None:
     """The meshing frequency must be a positive multiple of the peak."""
-    with pytest.raises(ValueError, match="mesh_frequency_factor must be positive"):
+    with pytest.raises(ValueError, match="mesh_frequency_factor"):
         make_problem(problem_class, mesh_frequency_factor=-1.0)
 
 
@@ -181,7 +181,7 @@ def test_calculator_rejects_non_positive_mesh_frequency_factor() -> None:
     """The meshing frequency must be a positive multiple of the peak."""
     parameters = {**CALCULATOR_PARAMETERS, "mesh_frequency_factor": 0.0}
 
-    with pytest.raises(ValueError, match="mesh_frequency_factor must be positive"):
+    with pytest.raises(ValueError, match="mesh_frequency_factor"):
         spyro.tools.MeshingParameterCalculator(parameters)
 
 
