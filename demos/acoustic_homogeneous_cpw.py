@@ -25,6 +25,7 @@ evaluated mesh.
 from pathlib import Path
 
 import spyro
+from spyro.io.dictionaryio import Method
 from spyro.tools.cells_per_wavelength_calculator import (
     MAX_CPW,
     ThresholdDiscretization,
@@ -44,7 +45,7 @@ REFERENCE_FILE = (
 
 
 def run(
-    method: str = "mass_lumped_triangle",
+    method: Method = Method.MASS_LUMPED_TRIANGLE,
     degree: int = 5,
     accepted_error_threshold: float | None = None,
     threshold_discretization: ThresholdDiscretization | bool | dict | None = None,
@@ -56,9 +57,10 @@ def run(
 
     Parameters
     ----------
-    method : str, optional
-        Finite element method to evaluate, ``"mass_lumped_triangle"`` or
-        ``"spectral_quadrilateral"``. Default is ``"mass_lumped_triangle"``.
+    method : Method, optional
+        Finite element method to evaluate, `Method.MASS_LUMPED_TRIANGLE`
+        or `Method.SPECTRAL_QUADRILATERAL`. Default is
+        `Method.MASS_LUMPED_TRIANGLE`.
     degree : int, optional
         Polynomial degree to evaluate. Default is 4.
     accepted_error_threshold : float or None, optional
@@ -100,7 +102,7 @@ def run(
         "mesh_frequency_factor": 2.0,
         "minimum_velocity_in_the_domain": VELOCITY,
         "velocity_profile_type": "homogeneous",
-        "FEM_method_to_evaluate": method,
+        "FEM_method_to_evaluate": method.value,
         "dimension": 2,
         "receiver_setup": "near",
         "timestep_calculation": "estimate",
@@ -128,7 +130,7 @@ def run(
             flush=True,
         )
     print(
-        f"Minimum cells-per-wavelength for {method} P{degree}: {cpw} "
+        f"Minimum cells-per-wavelength for {method.value} P{degree}: {cpw} "
         f"(error threshold {calculator.accepted_error_threshold:.4e})",
         flush=True,
     )

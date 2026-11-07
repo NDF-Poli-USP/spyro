@@ -83,7 +83,7 @@ class MeshingParameterCalculator:
         ----------
         parameters : CpwParameters or dict
             All the parameters of the calculation. A dict is converted with
-            :meth:`CpwParameters.from_dict`, whose keys are the
+            `CpwParameters(**parameters)`, whose keys are the
             :class:`~.parameters.CpwParameters` field names except those in
             :data:`~.parameters.DICTIONARY_KEYS`, e.g. ``"C_initial"``.
 
@@ -96,7 +96,7 @@ class MeshingParameterCalculator:
             :class:`~.parameters.CpwParameters` and the problem classes.
         """
         if isinstance(parameters, dict):
-            parameters = CpwParameters.from_dict(parameters)
+            parameters = CpwParameters(**parameters)
         self.parameters = parameters
 
         problem_class = CPW_PROBLEMS.get(
