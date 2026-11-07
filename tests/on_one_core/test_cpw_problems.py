@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from pydantic import ValidationError
 
 import spyro
 from spyro.io.time_io import interpolate_time_series
@@ -59,7 +60,7 @@ def make_problem(problem_class: type[CpwProblem], **overrides) -> CpwProblem:
         The problem.
     """
     parameters = {**CALCULATOR_PARAMETERS, **overrides}
-    return problem_class(CpwParameters.from_dict(parameters))
+    return problem_class(CpwParameters(**parameters))
 
 
 def test_interpolate_time_series_keeps_trailing_axes() -> None:
@@ -322,8 +323,8 @@ def test_reference_solution_saves_and_loads_default_file(
 
 def test_parameters_from_dict_maps_legacy_keys() -> None:
     """Dictionary keys map to fields, and enum strings are converted."""
-    parameters = CpwParameters.from_dict(
-        {
+    parameters = CpwParameters(
+        **{
             **CALCULATOR_PARAMETERS,
             "C_max": 4.0,
             "search_direction": "forward",
@@ -344,10 +345,10 @@ def test_parameters_from_dict_maps_legacy_keys() -> None:
     assert parameters.fixed_timestep == 1e-3
 
 
-def test_parameters_from_dict_warns_on_unknown_keys() -> None:
-    """Unknown keys, such as typos, are reported and ignored."""
-    with pytest.warns(UserWarning, match="C_inital"):
-        CpwParameters.from_dict({**CALCULATOR_PARAMETERS, "C_inital": 2.0})
+def test_parameters_from_dict_rejects_unknown_keys() -> None:
+    """Unknown keys, such as typos, are rejected."""
+    with pytest.raises(ValidationError, match="C_inital"):
+        CpwParameters(**{**CALCULATOR_PARAMETERS, "C_inital": 2.0})
 
 
 def test_parameters_from_dict_names_missing_keys() -> None:
@@ -358,8 +359,8 @@ def test_parameters_from_dict_names_missing_keys() -> None:
         if key != "FEM_method_to_evaluate"
     }
 
-    with pytest.raises(KeyError, match="FEM_method_to_evaluate"):
-        CpwParameters.from_dict(parameters)
+    with pytest.raises(ValidationError, match="FEM_method_to_evaluate"):
+        CpwParameters(**parameters)
 
 
 def test_parameters_require_mesh_frequency_factor() -> None:
@@ -370,8 +371,8 @@ def test_parameters_require_mesh_frequency_factor() -> None:
         if key != "mesh_frequency_factor"
     }
 
-    with pytest.raises(KeyError, match="mesh_frequency_factor"):
-        CpwParameters.from_dict(parameters)
+    with pytest.raises(ValidationError, match="mesh_frequency_factor"):
+        CpwParameters(**parameters)
 
 
 @pytest.mark.parametrize(
@@ -387,7 +388,7 @@ def test_parameters_pair_fixed_timestep_with_calculation(
 ) -> None:
     """A time step is given exactly when the time step is fixed."""
     with pytest.raises(ValueError, match="timestep"):
-        CpwParameters.from_dict({**CALCULATOR_PARAMETERS, **timestep_settings})
+        CpwParameters(**{**CALCULATOR_PARAMETERS, **timestep_settings})
 
 
 @pytest.mark.parametrize(
@@ -403,9 +404,7 @@ def test_parameters_infer_timestep_calculation(
     timestep_settings: dict, expected: TimeStepCalculationType,
 ) -> None:
     """A given time step is fixed; otherwise the time step is estimated."""
-    parameters = CpwParameters.from_dict(
-        {**CALCULATOR_PARAMETERS, **timestep_settings}
-    )
+    parameters = CpwParameters(**{**CALCULATOR_PARAMETERS, **timestep_settings})
 
     assert parameters.timestep_calculation is expected
 
