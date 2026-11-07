@@ -7,6 +7,7 @@ from .threshold_discretization import (
     ThresholdDiscretization,
     _parse_threshold_discretization,
 )
+from ...utils.error_management import validate_numeric
 from ...utils.typing import (
     CpwSearchDirection,
     TimeStepCalculationType,
@@ -168,11 +169,9 @@ class CpwParameters(BaseModel):
             given, or ``fixed_timestep`` is given without
             ``TimeStepCalculationType.FIXED`` or missing with it.
         """
-        if self.mesh_frequency_factor <= 0.0:
-            raise ValueError(
-                "mesh_frequency_factor must be positive, got "
-                f"{self.mesh_frequency_factor}."
-            )
+        validate_numeric(
+            "mesh_frequency_factor", self.mesh_frequency_factor, lower_bound=0.0
+        )
         if (self.accepted_error_threshold is None) == (
             self.threshold_discretization is None
         ):
