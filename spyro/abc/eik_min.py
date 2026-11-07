@@ -1,9 +1,17 @@
-from mpi4py import MPI
-from numpy import array, asarray, dtype, float64, inf, zeros
+from firedrake import (
+    And,
+    Constant,
+    Function,
+    SpatialCoordinate,
+    conditional,
+    eq,
+)
+from numpy import asarray, inf, ndarray, zeros
 from numpy.linalg import norm
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from ..tools.habc_tools import point_cloud_field
 from ..solvers.eikonal.eikonal_eq import Eikonal_Modeling
+from ..utils.utils import global_min
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -165,13 +173,13 @@ class Minimum_Eikonal(Eikonal_Modeling):
         SpyroEnsemble.write_vtk(self.path_save + "Eik.pvd",
                                 self.yp, name='Eikonal (Time [s])')
 
-    def ident_eik_on_bnd(self, bnd_ids):
+    def ident_eik_on_bnd(self, bnd_ids: ndarray) -> tuple[float, ndarray, float]:
         """Identify Eikonal minimum values on a boundary.
 
         Parameters
         ----------
         bnd_ids : `array`
-            IDs of the boundary subject to reflections.
+            IDs of the boundary nodes subject to reflections.
 
         Returns
         -------
@@ -179,51 +187,36 @@ class Minimum_Eikonal(Eikonal_Modeling):
             Minimum eikonal value.
         pnt_crit : `array`
             Critical point coordinates.
-        c_bnd :  `float`
+        c_bnd : `float`
             Propagation speed at critical point.
+
+        Notes
+        -----
+        The Eikonal is evaluated on a vertex-only mesh of the boundary nodes, so
+        the minimum is reduced over all ranks. Among the nodes tied at the
+        minimum, the critical point is the one with the lexicographically
+        smallest coordinates, which does not depend on the mesh partition.
         """
+        # Eikonal on the boundary nodes
+        eik_bnd = point_cloud_field(
+            self.mesh, self.node_positions[bnd_ids, :], self.yp, self.node_tol
+        )
+        eikmin = global_min(eik_bnd)
 
-        #  Communicator from SpyroEnsemble
-        comm = SpyroEnsemble.get_ensemble_rank()
-        rank = SpyroEnsemble.get_local_rank()
+        # Narrow down the nodes at the minimum one coordinate at a time
+        candidate = Function(eik_bnd.function_space())
+        tied = eq(eik_bnd, Constant(eikmin))
+        pnt_crit = zeros(self.dimension)
+        for k, x_k in enumerate(SpatialCoordinate(candidate.function_space().mesh())):
+            candidate.interpolate(conditional(tied, x_k, Constant(inf)))
+            pnt_crit[k] = global_min(candidate)
+            tied = And(tied, eq(x_k, Constant(pnt_crit[k])))
 
-        # Ensure fields are in sync before evaluating at critical point
-        SpyroEnsemble.barrier()
-
-        # Boundary points
-        ptos_bnd = self.node_positions[bnd_ids, :]
-        n_pts = len(ptos_bnd)
-
-        # Evaluate Eikonal at boundary points
-        eik_field = point_cloud_field(self.mesh, ptos_bnd, self.yp, self.node_tol)
-        eik_on_boundary = asarray(eik_field.dat.data_ro_with_halos[:], dtype=float64)
-
-        # Index of the minimum Eikonal value on the boundary
-        local_idx = int(eik_on_boundary.argmin()) if n_pts > 0 else 0
-        local_eikmin = float(eik_on_boundary[local_idx]) if n_pts > 0 else inf
-        local_pnt = ptos_bnd[local_idx] if n_pts > 0 else zeros(self.dimension)
-
-        # MINLOC requires MPI_DOUBLE_INT paired type
-        minloc_dtype = dtype([("val", float64), ("rank", "intp")])
-        send_buf = array([(local_eikmin, rank)], dtype=minloc_dtype)
-        recv_buf = zeros(1, dtype=minloc_dtype)
-        comm.Allreduce(
-            [send_buf, MPI.DOUBLE_INT], [recv_buf, MPI.DOUBLE_INT], op=MPI.MINLOC)
-
-        # Identify minimum Eikonal value on the boundary
-        eikmin = float(recv_buf[0]["val"])
-        owner = int(recv_buf[0]["rank"])
-
-        # Identify critical point coordinates
-        pnt_crit = zeros(self.dimension, dtype=float64)
-        if rank == owner:
-            pnt_crit[:] = local_pnt
-        comm.Bcast(pnt_crit, root=owner)
-
-        # Identifying propagation speed at critical point
-        c_field = point_cloud_field(
-            self.mesh, pnt_crit.reshape(1, self.dimension), self.c, self.node_tol)
-        c_bnd = float(c_field.dat.data_ro_with_halos[0])
+        # Propagation speed at the critical point. Every rank passes the point,
+        # and the minimum makes all ranks agree on a single value
+        c_bnd = global_min(
+            point_cloud_field(self.mesh, [pnt_crit], self.c, self.node_tol)
+        )
 
         return eikmin, pnt_crit, c_bnd
 

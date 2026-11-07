@@ -1,12 +1,9 @@
 import firedrake as fire
-from mpi4py import MPI
 import numpy as np
 from sys import float_info, exit
 from ...domains.quadrature import quadrature_rules
-from ...mpi.spyro_mpi import SpyroEnsemble
 from ...utils.error_management import sanitize_num_array, validate_parameter
-from ...utils.eval_functions_to_ufl import generate_ufl_functions
-
+from ...utils.utils import global_min
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -138,22 +135,18 @@ class Eikonal_Modeling():
         # User solver tolerance
         self.tol = tol
 
-    def eikonal_bcs(self, V: fire.FunctionSpace, lmin: float):
+    def eikonal_bcs(
+        self, V: fire.FunctionSpace, lmin: float
+    ) -> tuple[list[Dir_Point_BC], fire.Function]:
         """Impose Dirichlet BCs for eikonal equation.
-
-        The source marker ``sou_marker`` is a product of narrow cosh^2 bumps, one
-        per source, peak-normalized to 1. The dofs where ``sou_marker`` exceeds a
-        high threshold are the source dofs. If more dofs than sources exceed the
-        threshold (a source straddles two or more dofs), the global top-N dofs by
-        marker value are selected, with ties broken deterministically by
-        (lowest owning rank, lowest local index) — i.e. the "first coincidence".
 
         Parameters
         ----------
         V : `Firedrake.FunctionSpace`
             Function space where the boundary condition is applied.
         lmin : `float`
-            Minimum mesh size.
+            Minimum mesh size. A source must have a node of ``V`` within
+            ``lmin / (degree_eik + 1)``.
 
         Returns
         -------
@@ -161,125 +154,37 @@ class Eikonal_Modeling():
             Dirichlet BCs for eikonal.
         sou_marker : `Firedrake.Function`
             Function marking the source locations in the mesh.
+
+        Raises
+        ------
+        ValueError
+            If a source has no node of ``V`` within ``lmin / (degree_eik + 1)``.
+
+        Notes
+        -----
+        Each source is snapped to its nearest node of ``V`` (all nodes at that
+        distance if there is a tie). The minimum distance is a collective PETSc
+        reduction and the node selection reads the halos, so every rank holds
+        the source nodes it can see, as ``DirichletBC.nodes`` does.
         """
-        comm = SpyroEnsemble.ensemble.comm
-        rank = SpyroEnsemble.get_local_rank()
-
-        # Penalty factor for the cosh (fdim * lmin is the minimum cell diameter)
-        if self.dimension == 2:  # 2D
-            fdim = 2**0.5
-        if self.dimension == 3:  # 3D
-            fdim = 3**0.5
-        rf = np.round(np.arccosh(np.sqrt(1e4)) / (fdim * lmin), 0)
-
-        sou_func = ""
-        for source_coord in self.source_locations:
-
-            zs, xs = source_coord[:2]
-            expr = f"1 / (cosh({rf} * (z - {zs})) * cosh({rf}* (x - {xs})))**2"
-
-            if self.dimension == 3:  # 3D
-                ys = source_coord[2]
-                expr += f"* 1 / (cosh({rf}* (y - {ys})))**2"
-
-            sou_func += f"+ {expr}"
-
-        sou_loc_func = generate_ufl_functions(self.mesh, sou_func, self.dimension)
+        coords = fire.SpatialCoordinate(V.mesh())
+        dist2 = fire.Function(V)
+        radius = lmin / (self.degree_eik + 1)
+        nodes = []
+        for source in self.source_locations:
+            dist2.interpolate(sum((x - s) ** 2 for x, s in zip(coords, source)))
+            d2min = global_min(dist2)
+            if d2min > radius**2:
+                raise ValueError(
+                    f"Source {source} has no mesh node within {radius} km."
+                )
+            nodes.append(np.flatnonzero(dist2.dat.data_ro_with_halos <= d2min))
+        nodes = np.unique(np.concatenate(nodes))
 
         sou_marker = fire.Function(V, name="source_marker")
-        sou_marker.assign(fire.assemble(fire.interpolate(sou_loc_func, V)))
+        Dir_Point_BC(V, fire.Constant(1.0), nodes).apply(sou_marker)
 
-        with sou_marker.dat.vec_ro as v:
-            peak = v.max()[1]          # global MPI reduction
-
-        if peak > 0:
-            sou_marker.assign(sou_marker / peak)
-
-        # Source DOFs
-        threshold = 0.9999
-        with sou_marker.dat.vec_ro as v:
-            marker_vals = v.getArray().copy()  # owned dof values, order = V.dat.data_ro
-        local_nodes = np.where(marker_vals > threshold)[0].astype(np.int32)
-
-        # Per-rank sanity: the marker at matched dofs should be ~1
-        if local_nodes.size > 0:
-            vals_at_nodes = marker_vals[local_nodes]
-            if np.any(vals_at_nodes < threshold):
-                raise RuntimeError(f"[rank {rank}]: matched dofs below threshold.")
-
-        # Global consistency: the number of matched dofs should equal the
-        # number of sources (each source -> one dof above threshold).
-        n_local = int(local_nodes.size)
-        n_matched = comm.allreduce(n_local, op=MPI.SUM)
-        n_src = len(self.source_locations)
-        n_total = comm.allreduce(n_src, op=MPI.SUM)
-
-        if n_matched < n_total:
-            # Fewer dofs above threshold than sources: cannot proceed even by
-            # snapping, because some source has no candidate dof at all.
-            raise ValueError(
-                f"Only {n_matched} dofs exceed threshold {threshold} for {n_total} "
-                f"sources. r is likely too large (bump narrower than mesh spacing), "
-                f"or a source is far from any dof. Cannot snap."
-            )
-
-        if n_matched > n_total:
-            # More dofs than sources: select exactly n_total dofs globally,
-            # ranked by marker value. Ties broken deterministically by
-            # (lowest owning rank, lowest local index) — "first coincidence".
-            local_vals = marker_vals[local_nodes]
-
-            all_vals = comm.gather(local_vals, root=0)
-            all_idx = comm.gather(local_nodes, root=0)
-            all_rank = comm.gather(np.full(local_nodes.size, rank, dtype=np.int32), root=0)
-
-            if rank == 0:
-                cat_vals = np.concatenate(all_vals) if all_vals else np.array([])
-                cat_idx = np.concatenate(all_idx) if all_idx else np.array([])
-                cat_rank = np.concatenate(all_rank) if all_rank else np.array([])
-                # lexsort: LAST key is primary.
-                # Primary   : -cat_vals  (highest marker first)
-                # Secondary :  cat_rank  (lowest owning rank first)
-                # Tertiary  :  cat_idx   (lowest local index first)
-                order = np.lexsort((cat_idx, cat_rank, -cat_vals))
-                top = order[:n_total]
-
-                top_idx = cat_idx[top].astype(np.int32)
-                top_rank = cat_rank[top].astype(np.int32)
-
-                # Distribute per-rank selections
-                selected = {r: [] for r in range(comm.size)}
-                for i, r in enumerate(top_rank):
-                    selected[int(r)].append(int(top_idx[i]))
-            else:
-                selected = None
-
-            # Broadcast the per-rank index lists (small: n_total entries total)
-            selected = comm.bcast(selected, root=0)
-            local_nodes = np.array(sorted(selected[comm.rank]), dtype=np.int32)
-
-        # Final invariant: exactly n_total dofs selected across all ranks.
-        n_selected = comm.allreduce(int(local_nodes.size), op=MPI.SUM)
-        if n_selected != n_total:
-            raise RuntimeError(f"Selected {n_selected} DOFs for {n_total} sources")
-
-        # Overwrite sou_marker so that only the selected source dofs are 1
-        # and all other dofs are 0. This produces a clean binary marker.
-        with sou_marker.dat.vec as v:
-            arr = v.getArray()          # writable view of owned dofs
-            arr[:] = 0.0                # zero all owned dofs on this rank
-            if local_nodes.size > 0:
-                arr[local_nodes] = 1.0  # set selected source dofs to 1
-
-        # Define BCs for eikonal
-        bcs_eik = []
-        if local_nodes.size > 0:
-            bcs_eik.append(Dir_Point_BC(V, fire.Constant(0.0), local_nodes))
-
-        else:
-            raise ValueError("Error: Source Points Not Found!")
-
-        return bcs_eik, sou_marker
+        return [Dir_Point_BC(V, fire.Constant(0.0), nodes)], sou_marker
 
     def define_int_dom(self, V):
         """Define the integration domain for the Eikonal equation.
@@ -448,8 +353,8 @@ class Eikonal_Modeling():
             ig_nz = False
             pc_type = 'lu'  # lu, cholesky
 
-            # mumps
-            param_solver.update({'pc_factor_mat_solver_type': 'umfpack'})
+            # umfpack only supports serial matrices
+            param_solver.update({"pc_factor_mat_solver_type": "mumps"})
         else:
             ig_nz = True
             pc_type = 'ilu'  # ilu, icc, lu, cholesky
