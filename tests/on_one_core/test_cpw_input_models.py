@@ -75,7 +75,7 @@ def make_parameters(**overrides) -> CpwParameters:
     CpwParameters
         The parameters.
     """
-    return CpwParameters.from_dict({**PROBLEM_PARAMETERS, **overrides})
+    return CpwParameters(**{**PROBLEM_PARAMETERS, **overrides})
 
 
 @pytest.mark.parametrize(

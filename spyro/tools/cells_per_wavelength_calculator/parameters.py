@@ -1,15 +1,12 @@
 """Typed parameters of the cells-per-wavelength calculator."""
 
-import dataclasses
-import warnings
-from dataclasses import dataclass
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .line_search import MAX_CPW
 from .threshold_discretization import (
     ThresholdDiscretization,
     _parse_threshold_discretization,
 )
-from ...utils.error_management import validate_enum
 from ...utils.typing import (
     CpwSearchDirection,
     TimeStepCalculationType,
@@ -28,12 +25,13 @@ DICTIONARY_KEYS = {
 }
 
 
-@dataclass(frozen=True, kw_only=True)
-class CpwParameters:
+class CpwParameters(BaseModel):
     """Settings of a cells-per-wavelength calculation.
 
     Build it directly, or from the calculator parameters dictionary with
-    :meth:`from_dict`. Enum fields accept their string values, and
+    `CpwParameters(**dictionary)`, whose keys are the field names except
+    those in :data:`DICTIONARY_KEYS`. Unknown keys are rejected. Enum fields
+    accept their string values, and
     ``threshold_discretization`` accepts what
     :func:`~.threshold_discretization._parse_threshold_discretization`
     does; both are converted on creation.
@@ -61,7 +59,7 @@ class CpwParameters:
     wave_type : WaveType
         Wave physics. Default is ``WaveType.ISOTROPIC_ACOUSTIC``.
     velocity_profile_type : VelocityProfileType
-        Default is homogeneous.
+        Default is `VelocityProfileType.HOMOGENEOUS`.
     receiver_setup : str or None
         Receiver setup label, kept for older parameter dictionaries. The
         acquisition is set by the problem.
@@ -78,8 +76,8 @@ class CpwParameters:
         Default is ``CpwSearchDirection.FORWARD``.
     timestep_calculation : TimeStepCalculationType
         How the time step of each forward solve is chosen. Default is
-        ``TimeStepCalculationType.FIXED`` when ``fixed_timestep`` is given,
-        else ``TimeStepCalculationType.ESTIMATE``.
+        `TimeStepCalculationType.FIXED` when `fixed_timestep` is given, else
+        `TimeStepCalculationType.ESTIMATE`.
     fixed_timestep : float or None
         Time step of every solve, given only with
         ``TimeStepCalculationType.FIXED``. Default is None.
@@ -97,6 +95,13 @@ class CpwParameters:
         ``test_shot_record<cpw>``. Default is False.
     """
 
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+        alias_generator=lambda name: DICTIONARY_KEYS.get(name, name),
+        validate_by_name=True,
+    )
+
     source_frequency: float
     mesh_frequency_factor: float
     fem_method: str
@@ -104,24 +109,56 @@ class CpwParameters:
     desired_degree: int
     cpw_initial: float
     cpw_accuracy: float
-    wave_type: WaveType | str = WaveType.ISOTROPIC_ACOUSTIC
-    velocity_profile_type: VelocityProfileType | str | None = None
+    wave_type: WaveType = WaveType.ISOTROPIC_ACOUSTIC
+    velocity_profile_type: VelocityProfileType = VelocityProfileType.HOMOGENEOUS
     receiver_setup: str | None = None
     minimum_velocity: float | None = None
     accepted_error_threshold: float | None = None
-    threshold_discretization: ThresholdDiscretization | bool | dict | None = None
+    threshold_discretization: ThresholdDiscretization | None = None
     cpw_max: float = MAX_CPW
-    search_direction: CpwSearchDirection | str = CpwSearchDirection.FORWARD
-    timestep_calculation: TimeStepCalculationType | str | None = None
+    search_direction: CpwSearchDirection = CpwSearchDirection.FORWARD
+    # Declared before timestep_calculation, whose default depends on it
     fixed_timestep: float | None = None
+    timestep_calculation: TimeStepCalculationType = Field(
+        default_factory=lambda data: (
+            TimeStepCalculationType.ESTIMATE
+            if data["fixed_timestep"] is None
+            else TimeStepCalculationType.FIXED
+        )
+    )
     testing: bool = False
     save_reference: bool = False
     load_reference: bool = False
     reference_solution_file: str | None = None
     save_shot_records: bool = False
 
-    def __post_init__(self) -> None:
-        """Convert the enum and threshold fields, and check the settings.
+    @field_validator("threshold_discretization", mode="before")
+    @classmethod
+    def _parse_threshold(
+        cls, value: ThresholdDiscretization | bool | dict | None
+    ) -> ThresholdDiscretization | None:
+        """Convert the `threshold_discretization` input.
+
+        Parameters
+        ----------
+        value : ThresholdDiscretization, bool, dict or None
+            See :func:`~.threshold_discretization._parse_threshold_discretization`.
+
+        Returns
+        -------
+        ThresholdDiscretization or None
+            The threshold discretization.
+        """
+        return _parse_threshold_discretization(value)
+
+    @model_validator(mode="after")
+    def _check_settings(self) -> "CpwParameters":
+        """Check the settings.
+
+        Returns
+        -------
+        CpwParameters
+            The checked parameters.
 
         Raises
         ------
@@ -131,36 +168,6 @@ class CpwParameters:
             given, or ``fixed_timestep`` is given without
             ``TimeStepCalculationType.FIXED`` or missing with it.
         """
-        if self.velocity_profile_type is None:
-            profile = VelocityProfileType.HOMOGENEOUS
-        else:
-            profile = self.velocity_profile_type
-        if self.timestep_calculation is None:
-            timestep_calculation = (
-                TimeStepCalculationType.ESTIMATE
-                if self.fixed_timestep is None
-                else TimeStepCalculationType.FIXED
-            )
-        else:
-            timestep_calculation = self.timestep_calculation
-        # The dataclass is frozen, so conversions bypass its __setattr__
-        for name, value, enum in (
-            ("wave_type", self.wave_type, WaveType),
-            ("velocity_profile_type", profile, VelocityProfileType),
-            ("search_direction", self.search_direction, CpwSearchDirection),
-            (
-                "timestep_calculation",
-                timestep_calculation,
-                TimeStepCalculationType,
-            ),
-        ):
-            object.__setattr__(self, name, validate_enum(name, value, enum))
-        object.__setattr__(
-            self,
-            "threshold_discretization",
-            _parse_threshold_discretization(self.threshold_discretization),
-        )
-
         if self.mesh_frequency_factor <= 0.0:
             raise ValueError(
                 "mesh_frequency_factor must be positive, got "
@@ -179,46 +186,7 @@ class CpwParameters:
                 "Give a timestep exactly when timestep_calculation is "
                 f"{TimeStepCalculationType.FIXED.value!r}."
             )
-
-    @classmethod
-    def from_dict(cls, dictionary: dict) -> "CpwParameters":
-        """Build the parameters from a calculator parameters dictionary.
-
-        Keys are the field names, except those in :data:`DICTIONARY_KEYS`,
-        e.g. ``"C_initial"`` for ``cpw_initial``. Unknown keys are ignored
-        with a warning.
-
-        Parameters
-        ----------
-        dictionary : dict
-            Calculator parameters dictionary.
-
-        Returns
-        -------
-        CpwParameters
-            The parameters.
-
-        Raises
-        ------
-        KeyError
-            If a required key is missing.
-        """
-        values = {}
-        known_keys = set()
-        missing = []
-        for field in dataclasses.fields(cls):
-            key = DICTIONARY_KEYS.get(field.name, field.name)
-            known_keys.add(key)
-            if key in dictionary:
-                values[field.name] = dictionary[key]
-            elif field.default is dataclasses.MISSING:
-                missing.append(key)
-        if missing:
-            raise KeyError(f"Missing cells-per-wavelength parameters {missing}.")
-        unknown = sorted(dictionary.keys() - known_keys)
-        if unknown:
-            warnings.warn(f"Ignoring unknown cells-per-wavelength parameters {unknown}.")
-        return cls(**values)
+        return self
 
     def require(self, name: str) -> object:
         """Return a field that the chosen problem needs.

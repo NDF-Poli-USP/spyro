@@ -45,7 +45,7 @@ REFERENCE_FILE = (
 
 
 def run(
-    method: Method = Method.MASS_LUMPED_TRIANGLE,
+    method: Method | str = Method.MASS_LUMPED_TRIANGLE,
     degree: int = 5,
     accepted_error_threshold: float | None = None,
     threshold_discretization: ThresholdDiscretization | bool | dict | None = None,
@@ -57,10 +57,10 @@ def run(
 
     Parameters
     ----------
-    method : Method, optional
+    method : Method or str, optional
         Finite element method to evaluate, `Method.MASS_LUMPED_TRIANGLE`
-        or `Method.SPECTRAL_QUADRILATERAL`. Default is
-        `Method.MASS_LUMPED_TRIANGLE`.
+        or `Method.SPECTRAL_QUADRILATERAL`, or any of their string aliases.
+        Default is `Method.MASS_LUMPED_TRIANGLE`.
     degree : int, optional
         Polynomial degree to evaluate. Default is 4.
     accepted_error_threshold : float or None, optional
@@ -88,6 +88,7 @@ def run(
         The calculator after the search, holding its
         ``search_history``.
     """
+    method = Method(method)
     threshold = {}
     if accepted_error_threshold is not None:
         threshold["accepted_error_threshold"] = accepted_error_threshold
