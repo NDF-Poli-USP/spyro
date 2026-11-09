@@ -10,6 +10,7 @@ from ...utils.error_management import (
     validate_numeric,
     validate_parameter,
 )
+from ...version_control import is_firedrake_new
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -269,22 +270,50 @@ class Modal_Solver:
         opts = {
             "eps_gen_hermitian": None,  # Problem is Hermitian
             "eps_type": "krylovschur",  # Robust, widely used eigensolver
+            # subspace, arnoldi, krylovschur, lapack
             "eps_tol": 1e-6,  # Tight tolerance for accuracy
             "eps_max_it": 200,  # Reasonable iteration cap
-            "st_shift": 1e-6,  # Stabilizes Neumann BC null space
-            "st_type": "sinvert",  # Useful for interior eigenvalues
-            "eps_monitor": "ascii",  # Print convergence info
+            "eps_monitor": None,  # Print convergence info
             "ksp_type": ksp_type,  # Options for large problems
             "pc_type": pc_type,  # Options for large problems
+            "eps_converged_reason": None,  # Print stop reason
+            # "eps_monitor_all": None,   # More verbose than eps_monitor
+            # "eps_view": None,          # Print solver configuration before solving
         }
 
-        if self.calc_max_dt:
-            # Largest eigenvalues magnitude
-            opts.update({"eps_largest_magnitude": None})
-            # subspace, arnoldi, krylovschur, lapack
+        if is_firedrake_new():
+            if self.calc_max_dt:
+                # Largest eigenvalues magnitude
+                opts.update(
+                    {
+                        "eps_largest_magnitude": None,  # Largest |λ|
+                        "st_type": "shift",  # Override Firedrake's automatic sinvert
+                    }
+                )
+            else:
+                # Smallest eigenvalues magnitude
+                opts.update(
+                    {
+                        "st_type": "sinvert",  # Useful for interior eigenvalues
+                        "st_shift": 1e-6,  # Stabilizes Neumann BC null space
+                        "eps_target": 0.0,  # Target value for sorting
+                        "eps_target_magnitude": None,  # Sort by distance to target
+                    }
+                )
         else:
-            # Smallest eigenvalues magnitude
-            opts.update({"eps_smallest_magnitude": None})
+            opts.update(
+                {
+                    "st_shift": 1e-6,  # Stabilizes Neumann BC null space
+                    "st_type": "sinvert",  # Useful for interior eigenvalues
+                }
+            )
+
+            if self.calc_max_dt:
+                # Largest eigenvalues magnitude
+                opts.update({"eps_largest_magnitude": None})  # Largest |λ|
+            else:
+                # Smallest eigenvalues magnitude
+                opts.update({"eps_smallest_magnitude": None})  # Smallest |λ|
 
         eigenproblem = LinearEigenproblem(a, M=m)
         eigensolver = LinearEigensolver(eigenproblem, n_evals=k, solver_parameters=opts)
@@ -494,7 +523,6 @@ class Modal_Solver:
             shift = 0.0  # No shift for analytical and Rayleigh methods
 
         if self.method == "ANALYTICAL":
-
             # Compute equivalent homogenized velocities
             c_eq, c_eqref = self.AnaModSol.homogenized_velocities(
                 c,
@@ -590,8 +618,7 @@ class Modal_Solver:
         # Maximum stable timestep
         max_dt = float(real(2.0 / sqrt(max_eigval)))
         SpyroEnsemble.print(
-            "Maximum Stable Timestep Should Be Approximately "
-            f"(ms): {1e3 * max_dt:.3f}"
+            f"Maximum Stable Timestep Should Be Approximately (ms): {1e3 * max_dt:.3f}"
         )
 
         max_dt *= fraction

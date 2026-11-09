@@ -54,9 +54,9 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
     # Define the domain size without the PML or AL. Here we'll assume a domain
     # with a width and depth of 1 km, and a thickness of 1 km for the 3D case.
     if dimension == 2:
-        length_z, length_x, length_y = [1., 1., 0.]
+        length_z, length_x, length_y = [1.0, 1.0, 0.0]
     elif dimension == 3:
-        length_z, length_x, length_y = [1., 1., 1.]  # in km
+        length_z, length_x, length_y = [1.0, 1.0, 1.0]  # in km
     dictionary["mesh"] = {
         "length_z": length_z,  # depth in km - always positive
         "length_x": length_x,  # width in km - always positive
@@ -69,21 +69,26 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
     # point of the mesh. We also specify to record the solution at the corners
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
-        "source_locations": ([(-length_z / 2., length_x / 4.)] if dimension == 2
-                             else [(-length_z / 2., length_x / 4., length_y / 2.)]),
-        "frequency": 5.,  # in Hz
-        "receiver_locations": ([(-length_z, 0.),
-                                (-length_z, length_x),
-                                (0., 0.), (0., length_x)]
-                               if dimension == 2
-                               else [(-length_z, 0., 0.),
-                                     (-length_z, length_x, 0.),
-                                     (0., 0., 0),
-                                     (0., length_x, 0.),
-                                     (-length_z, 0., length_y),
-                                     (-length_z, length_x, length_y),
-                                     (0., 0., length_y),
-                                     (0., length_x, length_y)])
+        "source_locations": (
+            [(-length_z / 2.0, length_x / 4.0)]
+            if dimension == 2
+            else [(-length_z / 2.0, length_x / 4.0, length_y / 2.0)]
+        ),
+        "frequency": 5.0,  # in Hz
+        "receiver_locations": (
+            [(-length_z, 0.0), (-length_z, length_x), (0.0, 0.0), (0.0, length_x)]
+            if dimension == 2
+            else [
+                (-length_z, 0.0, 0.0),
+                (-length_z, length_x, 0.0),
+                (0.0, 0.0, 0),
+                (0.0, length_x, 0.0),
+                (-length_z, 0.0, length_y),
+                (-length_z, length_x, length_y),
+                (0.0, 0.0, length_y),
+                (0.0, length_x, length_y),
+            ]
+        ),
     }
 
     # Define Parameters for absorbing boundary conditions
@@ -94,9 +99,10 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
     }
 
     # Define parameters for visualization
-    str_ele = element_geometry + ("C" if element_type == 'consistent' else "U")
+    str_ele = element_geometry + ("C" if element_type == "consistent" else "U")
     dictionary["visualization"] = {  # Output folder
-        "output_folder": f"output/eikonal_test{dimension}d/eik_test{dimension}d" + str_ele
+        "output_folder": f"output/eikonal_test{dimension}d/eik_test{dimension}d"
+        + str_ele
     }
 
     return dictionary
@@ -138,8 +144,7 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
     wave.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
-    wave.mesh_ops.preamble_mesh_operations(
-        wave, ele_type_eik=element_type, f_est=f_est)
+    wave.mesh_ops.preamble_mesh_operations(wave, ele_type_eik=element_type, f_est=f_est)
 
     # Estimating computational resource usage
     comp_cost("tfin", tRef=tRef, user_name=wave.path_save + "MSH_")
@@ -161,15 +166,19 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
 
 
 @mark.newer_firedrake
-@mark.parametrize("element_geometry, dimension, element_type",
-                  [("T", 2, "consistent"),
-                   ("Q", 2, "consistent"),
-                   ("T", 2, "underintegrated"),
-                   ("Q", 2, "underintegrated"),
-                   ("T", 3, "consistent"),
-                   ("Q", 3, "consistent"),
-                   ("T", 3, "underintegrated"),
-                   ("Q", 3, "underintegrated")])
+@mark.parametrize(
+    "element_geometry, dimension, element_type",
+    [
+        ("T", 2, "consistent"),
+        ("Q", 2, "consistent"),
+        ("T", 2, "underintegrated"),
+        ("Q", 2, "underintegrated"),
+        ("T", 3, "consistent"),
+        ("Q", 3, "consistent"),
+        ("T", 3, "underintegrated"),
+        ("Q", 3, "underintegrated"),
+    ],
+)
 def test_eikonal(element_geometry, dimension, element_type):
     """Testing of eikonal for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
@@ -236,8 +245,13 @@ def test_eikonal(element_geometry, dimension, element_type):
     0.20  84.764   0.22 86.896
     """
 
-    SpyroEnsemble.print("\n" + 60 * "=" + f"\nTesting Eikonal with {element_geometry}-"
-                        + f"{element_type} elements for {dimension}D case\n" + 60 * "=")
+    SpyroEnsemble.print(
+        "\n"
+        + 60 * "="
+        + f"\nTesting Eikonal with {element_geometry}-"
+        + f"{element_type} elements for {dimension}D case\n"
+        + 60 * "="
+    )
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -249,23 +263,23 @@ def test_eikonal(element_geometry, dimension, element_type):
     # Eikonal degree and factor for the stabilizing term in Eikonal equation
     if dimension == 2:
         edge_length = 0.1
-        atol = 5e-3 if element_type == 'consistent' else 1.5e-2
+        atol = 5e-3 if element_type == "consistent" else 1.5e-2
         if element_geometry == "T":
-            p_eik = 2 if element_type == 'consistent' else 2
-            f_est = 0.06 if element_type == 'consistent' else 0.07
+            p_eik = 2 if element_type == "consistent" else 2
+            f_est = 0.06 if element_type == "consistent" else 0.07
         else:
-            p_eik = 2 if element_type == 'consistent' else 4
-            f_est = 0.05 if element_type == 'consistent' else 0.03
+            p_eik = 2 if element_type == "consistent" else 4
+            f_est = 0.05 if element_type == "consistent" else 0.03
 
     if dimension == 3:
-        edge_length = 1. / 6 if element_type == 'consistent' else 1. / 4
-        atol = 1e-2 if element_type == 'consistent' else 2e-2
+        edge_length = 1.0 / 6 if element_type == "consistent" else 1.0 / 4
+        atol = 1e-2 if element_type == "consistent" else 2e-2
         if element_geometry == "T":
-            p_eik = 2 if element_type == 'consistent' else 1
-            f_est = 0.03 if element_type == 'consistent' else 0.19
+            p_eik = 2 if element_type == "consistent" else 1
+            f_est = 0.03 if element_type == "consistent" else 0.19
         else:
-            p_eik = 2 if element_type == 'consistent' else 1
-            f_est = 0.03 if element_type == 'consistent' else 0.21
+            p_eik = 2 if element_type == "consistent" else 1
+            f_est = 0.03 if element_type == "consistent" else 0.21
 
     # Get simulation parameters
     SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length:.4f} m")
@@ -275,22 +289,28 @@ def test_eikonal(element_geometry, dimension, element_type):
     SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est:.2f}")
 
     try:
-
         # ============ MESH AND EIKONAL ============
 
         # Create dictionary with parameters for the model
         dictionary = wave_dict(element_geometry, dimension, p_eik, element_type)
 
         # Creating mesh and performing eikonal analysis
-        min_eik = round(eikonal_analysis(dictionary, edge_length, f_est, element_type), 3)
+        min_eik = round(
+            eikonal_analysis(dictionary, edge_length, f_est, element_type), 3
+        )
 
         thr_val = 83.333  # in ms
-        assert isclose(min_eik / thr_val, 1., atol=atol), \
-            f"✗ Minimum Eikonal {dimension}D Element-{element_geometry}-" + \
-            f"{element_type} → Expected value {thr_val}, got {min_eik:.3f}"
-        SpyroEnsemble.print(f"✓ Minimum Eikonal {dimension}D Element-{element_geometry}-"
-                            f"{element_type} Verified: expected {thr_val}, got {min_eik:.3f}")
+        assert isclose(min_eik / thr_val, 1.0, atol=atol), (
+            f"✗ Minimum Eikonal {dimension}D Element-{element_geometry}-"
+            + f"{element_type} → Expected value {thr_val}, got {min_eik:.3f}"
+        )
+        SpyroEnsemble.print(
+            f"✓ Minimum Eikonal {dimension}D Element-{element_geometry}-"
+            f"{element_type} Verified: expected {thr_val}, got {min_eik:.3f}"
+        )
 
     except ConvergenceError as e:
-        fail(f"Checking Eikonal {dimension}D Element-{element_geometry}-"
-             f"{element_type} raised an exception: {str(e)}")
+        fail(
+            f"Checking Eikonal {dimension}D Element-{element_geometry}-"
+            f"{element_type} raised an exception: {str(e)}"
+        )

@@ -25,7 +25,7 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneou
         Dimension of the problem. 2 for 2D and 3 for 3D.
     layer_shape : `str`.
         Shape of the absorbing layer, either "rectangular or "hypershape".
-   degree_layer : `int` or `float` or `None`
+    degree_layer : `int` or `float` or `None`
         Hypershape degree. `None` is used only for rectangular layers.
     homogeneous : `bool`
         If `True`, the velocity model is homogeneous. If `False`, it is heterogeneous.
@@ -57,9 +57,9 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneou
     # Define the domain size without the PML or AL. Here we'll assume a domain
     # with a width and depth of 1 km, and a thickness of 1 km for the 3D case.
     if dimension == 2:
-        length_z, length_x, length_y = [1., 1., 0.]
+        length_z, length_x, length_y = [1.0, 1.0, 0.0]
     elif dimension == 3:
-        length_z, length_x, length_y = [1., 1., 1.]  # in km
+        length_z, length_x, length_y = [1.0, 1.0, 1.0]  # in km
     dictionary["mesh"] = {
         "length_z": length_z,  # depth in km - always positive
         "length_x": length_x,  # width in km - always positive
@@ -72,21 +72,26 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneou
     # point of the mesh. We also specify to record the solution at the corners
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
-        "source_locations": ([(-length_z / 2., length_x / 4.)] if dimension == 2
-                             else [(-length_z / 2., length_x / 4., length_y / 2.)]),
-        "frequency": 5.,  # in Hz
-        "receiver_locations": ([(-length_z, 0.),
-                                (-length_z, length_x),
-                                (0., 0.), (0., length_x)]
-                               if dimension == 2
-                               else [(-length_z, 0., 0.),
-                                     (-length_z, length_x, 0.),
-                                     (0., 0., 0),
-                                     (0., length_x, 0.),
-                                     (-length_z, 0., length_y),
-                                     (-length_z, length_x, length_y),
-                                     (0., 0., length_y),
-                                     (0., length_x, length_y)])
+        "source_locations": (
+            [(-length_z / 2.0, length_x / 4.0)]
+            if dimension == 2
+            else [(-length_z / 2.0, length_x / 4.0, length_y / 2.0)]
+        ),
+        "frequency": 5.0,  # in Hz
+        "receiver_locations": (
+            [(-length_z, 0.0), (-length_z, length_x), (0.0, 0.0), (0.0, length_x)]
+            if dimension == 2
+            else [
+                (-length_z, 0.0, 0.0),
+                (-length_z, length_x, 0.0),
+                (0.0, 0.0, 0),
+                (0.0, length_x, 0.0),
+                (-length_z, 0.0, length_y),
+                (-length_z, length_x, length_y),
+                (0.0, 0.0, length_y),
+                (0.0, length_x, length_y),
+            ]
+        ),
     }
 
     # Define Parameters for absorbing boundary conditions
@@ -100,7 +105,8 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneou
     # Define parameters for visualization
     str_ele = element_geometry + "_" + ("Hom" if homogeneous else "Het")
     dictionary["visualization"] = {  # Output folder
-        "output_folder": f"output/modal_test{dimension}d/modal_test{dimension}d" + str_ele
+        "output_folder": f"output/modal_test{dimension}d/modal_test{dimension}d"
+        + str_ele
     }
 
     return dictionary
@@ -170,7 +176,8 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
 
     # Create dictionary with parameters for the model
     dictionary = wave_dict(
-        element_geometry, dimension, layer_shape, degree_layer, homogeneous)
+        element_geometry, dimension, layer_shape, degree_layer, homogeneous
+    )
 
     # ============ MESH FEATURES ============
 
@@ -200,15 +207,36 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
 
     # Modal solvers
     if dimension == 2:
-        modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
-                            'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
+        modal_solver_lst = [
+            "ANALYTICAL",
+            "ARNOLDI",
+            "LANCZOS",
+            "LOBPCG",
+            "KRYLOVSCH_CH",
+            "KRYLOVSCH_CG",
+            "KRYLOVSCH_GH",
+            "KRYLOVSCH_GG",
+            "RAYLEIGH",
+        ]
 
     if dimension == 3:
         if element_geometry == "T":
-            modal_solver_lst = ['ANALYTICAL', 'KRYLOVSCH_CH', 'KRYLOVSCH_GH', 'RAYLEIGH']
+            modal_solver_lst = [
+                "ANALYTICAL",
+                "KRYLOVSCH_CH",
+                "KRYLOVSCH_GH",
+                "RAYLEIGH",
+            ]
         else:
-            modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG',
-                                'KRYLOVSCH_CG', 'KRYLOVSCH_GG', 'RAYLEIGH']
+            modal_solver_lst = [
+                "ANALYTICAL",
+                "ARNOLDI",
+                "LANCZOS",
+                "LOBPCG",
+                "KRYLOVSCH_CG",
+                "KRYLOVSCH_GG",
+                "RAYLEIGH",
+            ]
 
     return wave, fitting_c, modal_solver_lst
 
@@ -253,7 +281,6 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
 
     # Loop for different modal solvers
     for modal_solver in modal_solver_lst:
-
         # Modal solver
         SpyroEnsemble.print(f"\nModal Solver: {modal_solver}")
 
@@ -262,40 +289,53 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
 
         # Computing fundamental frequency
         wave.layer_ops.fundamental_frequency(
-            wave, method=modal_solver, fitting_c=fitting_c,
+            wave,
+            method=modal_solver,
+            fitting_c=fitting_c,
         )
 
         # Estimating computational resource usage
         name_cost = wave.path_case_abc + modal_solver + "_"
         comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
-        tol = 0.07 if (modal_solver == 'ANALYTICAL'
-                       or modal_solver == 'RAYLEIGH') else 0.05
+        tol = (
+            0.07
+            if (modal_solver == "ANALYTICAL" or modal_solver == "RAYLEIGH")
+            else 0.05
+        )
 
-        abc_str = wave.case_abc if wave.layer_ops.layer_geometry.n_hyp is None \
-            else f"{wave.case_abc[:2]}" + \
-            f"{wave.layer_ops.layer_geometry.n_hyp:.1f}{wave.case_abc[-4:]}"
+        abc_str = (
+            wave.case_abc
+            if wave.layer_ops.layer_geometry.n_hyp is None
+            else f"{wave.case_abc[:2]}"
+            + f"{wave.layer_ops.layer_geometry.n_hyp:.1f}{wave.case_abc[-4:]}"
+        )
         met_str = f"Fundamental Frequency {abc_str} {wave.dimension}D. "
         met_str += f"Method {modal_solver}"
         cmp_str = f"Expected {exp_value:.5f}, got = {wave.fundam_freq:.5f}"
-        assert isclose(wave.fundam_freq / exp_value, 1., atol=tol), \
+        assert isclose(wave.fundam_freq / exp_value, 1.0, atol=tol), (
             "✗ " + met_str + "  → " + cmp_str
+        )
         SpyroEnsemble.print("✓ " + met_str + " Verified: " + cmp_str)
 
 
 @mark.older_firedrake
-@mark.parametrize("element_geometry, dimension, degree_layer, homogeneous", [
-    ("T", 2, 2.5, True),
-    ("T", 2, None, True),
-    ("T", 2, 2.0, False),
-    ("T", 2, None, False),
-    param("T", 2, 2.5, True, marks=mark.slow),
-    param("T", 3, 6.0, True, marks=mark.slow),
-    param("T", 3, None, True, marks=mark.slow),
-    param("T", 3, 2.4, False, marks=mark.slow),
-    param("T", 3, None, False, marks=mark.slow),
-    param("Q", 3, None, True, marks=mark.slow),
-    param("Q", 3, None, False, marks=mark.slow)])
+@mark.parametrize(
+    "element_geometry, dimension, degree_layer, homogeneous",
+    [
+        ("T", 2, 2.5, True),
+        ("T", 2, None, True),
+        ("T", 2, 2.0, False),
+        ("T", 2, None, False),
+        param("T", 2, 2.5, True, marks=mark.slow),
+        param("T", 3, 6.0, True, marks=mark.slow),
+        param("T", 3, None, True, marks=mark.slow),
+        param("T", 3, 2.4, False, marks=mark.slow),
+        param("T", 3, None, False, marks=mark.slow),
+        param("Q", 3, None, True, marks=mark.slow),
+        param("Q", 3, None, False, marks=mark.slow),
+    ],
+)
 def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogeneous):
     """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
@@ -498,9 +538,14 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     c_hom = "Homogeneous" if homogeneous else "Heterogeneous"
     n_hyp = f"HyperShape N{degree_layer}" if degree_layer is not None else "Rectangular"
 
-    SpyroEnsemble.print("\n" + 60 * "=" + "\nTesting Modal Solvers with "
-                        + f"{element_geometry} elements for {dimension}D case\nand "
-                        + f"{n_hyp} layer. Propagation Speed: {c_hom}\n" + 60 * "=")
+    SpyroEnsemble.print(
+        "\n"
+        + 60 * "="
+        + "\nTesting Modal Solvers with "
+        + f"{element_geometry} elements for {dimension}D case\nand "
+        + f"{n_hyp} layer. Propagation Speed: {c_hom}\n"
+        + 60 * "="
+    )
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -535,6 +580,8 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
         wave.layer_ops.rename_folder_habc()
 
     except ConvergenceError as e:
-        fail(f"Checking Modal Solvers with {element_geometry} elements "
-             f"for {dimension}D case, {n_hyp} layer and {c_hom} propagation "
-             f"speed raised an exception: {str(e)}")
+        fail(
+            f"Checking Modal Solvers with {element_geometry} elements "
+            f"for {dimension}D case, {n_hyp} layer and {c_hom} propagation "
+            f"speed raised an exception: {str(e)}"
+        )

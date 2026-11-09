@@ -33,7 +33,7 @@ def test_create_function_space_from_existing_element():
     assert scalar_space.value_size == 1
 
 
-@pytest.mark.skipif(fire.COMM_WORLD.size > 1, reason="Only runs on 1 core")
+@pytest.mark.parallel(1)
 @pytest.mark.parametrize("method", ["KMV", "Kong-Mulder-Veldhuizen"])
 def test_create_function_space_accepts_kmv_aliases(method):
     mesh = fire.UnitTriangleMesh()
