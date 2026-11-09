@@ -202,7 +202,7 @@ def build_Gamma(self):
             Gamma = Gamma_VTI(self, C, dim)
 
         elif self.wave_type == WaveType.ANISOTROPIC_TTI_ELASTIC:
-            Gamma = Gamma_TTI(self, dim, C)
+            Gamma = Gamma_TTI(self, dim)
     else:
         Gamma = np.zeros((6, 6))
     return Gamma
@@ -294,11 +294,11 @@ def Gamma_VTI(self, C, dim):
     return Gamma
 
 
-def Gamma_TTI(self, dim, C):
+def Gamma_TTI(self, dim):
 
     C_vti_real = C_vti_tensor(self, dim)
 
-    Q_vti = Gamma_VTI(self, C, dim)
+    Q_vti = Gamma_VTI(self, C_vti_real, dim)
 
     eps = 1e-12
 
