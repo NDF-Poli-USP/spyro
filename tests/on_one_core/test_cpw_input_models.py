@@ -92,7 +92,7 @@ def test_set_mesh_type(method: str, expected_mesh_type: str) -> None:
 
 def test_set_mesh_type_raises_for_invalid_method() -> None:
     """An unsupported method is rejected."""
-    with pytest.raises(ValueError, match="Method is not"):
+    with pytest.raises(ValueError, match="Invalid method: 'unsupported_method'"):
         input_models.set_mesh_type("unsupported_method")
 
 

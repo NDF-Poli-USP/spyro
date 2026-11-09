@@ -6,6 +6,7 @@ import warnings
 import numpy as np
 
 import spyro
+from ...utils.error_management import validate_parameter
 
 #: Mesh type used for each supported finite element method.
 MESH_TYPES = {
@@ -30,23 +31,6 @@ HOMOGENEOUS_RECEIVERS_PER_SIDE_REDUCED = 2
 HOMOGENEOUS_REFERENCE_DT = 5e-4
 
 
-def _check_method(method: str) -> None:
-    """Check that a finite element method is supported.
-
-    Parameters
-    ----------
-    method : str
-        Finite element method.
-
-    Raises
-    ------
-    ValueError
-        If ``method`` is not a key of :data:`MESH_TYPES`.
-    """
-    if method not in MESH_TYPES:
-        raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
-
-
 def set_mesh_type(method: str) -> str:
     """Return the mesh type used for a finite element method.
 
@@ -64,9 +48,9 @@ def set_mesh_type(method: str) -> str:
     Raises
     ------
     ValueError
-        If ``method`` is not supported.
+        If `method` is not a key of :data:`MESH_TYPES`.
     """
-    _check_method(method)
+    validate_parameter("method", method, list(MESH_TYPES))
     return MESH_TYPES[method]
 
 
