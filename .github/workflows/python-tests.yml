@@ -57,6 +57,7 @@ jobs:
                ~/.loopy_kernel_cache \
                ~/.cache/pyop2 \
                ~/.cache/tsfc \
+               ~/.cache/pytools \
                .pytest_cache
         find . -name '*.pkl' -delete || true
 
@@ -120,6 +121,7 @@ jobs:
                ~/.loopy_kernel_cache \
                ~/.cache/pyop2 \
                ~/.cache/tsfc \
+               ~/.cache/pytools \
                .pytest_cache
         find . -name '*.pkl' -delete || true
 
@@ -211,6 +213,7 @@ jobs:
                ~/.loopy_kernel_cache \
                ~/.cache/pyop2 \
                ~/.cache/tsfc \
+               ~/.cache/pytools \
                .pytest_cache
         find . -name '*.pkl' -delete || true
 
