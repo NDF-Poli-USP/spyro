@@ -12,6 +12,13 @@ from firedrake import VTKFile
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
+def _ensure_parent_dir(filename):
+    """Create the parent directory for a file path if it does not exist."""
+    directory = Path(filename).parent
+    if directory and not directory.exists():
+        directory.mkdir(parents=True, exist_ok=True)
+
+
 class Field:
     """Represent a named field writer with a deferred data callback.
 
@@ -83,6 +90,7 @@ class Functional:
 
     def save(self):
         """Save all collected samples to the configured NumPy file."""
+        _ensure_parent_dir(self.filename)
         np.save(self.filename, self.list)
 
 
@@ -211,6 +219,7 @@ class FieldLogger:
     @SpyroEnsemble.run_in_one_core
     def _save_logs(self):
         if self.__time_enabled:
+            _ensure_parent_dir(self.__time_filename)
             np.save(self.__time_filename, self.__time)
 
         for functional in self.__enabled_functionals.values():
