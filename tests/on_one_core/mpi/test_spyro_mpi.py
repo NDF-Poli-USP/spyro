@@ -17,6 +17,7 @@ tested under `tests/parallel`.
 from unittest.mock import MagicMock
 
 import pytest
+from mpi4py import MPI
 
 from spyro.mpi.spyro_mpi import (
     ParallelismConfig,
@@ -233,11 +234,12 @@ def test_communicate_when_size_is_one():
 
 
 def test_communicate_when_size_is_ten():
-    """With several spatial ranks, `communicate` returns the reduced values.
+    """With several spatial ranks, `communicate` returns the maximum over them.
 
     The spatial communicator is a mock with 10 ranks, so the reduction
-    branch runs. The values are the same on every rank here, so the
-    reduction must give them back unchanged.
+    branch runs. The fake `Allreduce` stands in for another rank holding
+    `[3, 2]`, so the result is the entrywise maximum `[3, 4]`, and the input
+    is left unchanged.
     """
     SpyroEnsemble.ensemble = MagicMock()
 
@@ -247,16 +249,22 @@ def test_communicate_when_size_is_ten():
     global_comm = MagicMock()
     global_comm.rank = 1
 
-    def fake_allreduce(s, r, op):
-        r[:] = s
+    other_rank_values = [3, 2]
 
-    comm.AllReduce.side_effect = fake_allreduce
+    def fake_allreduce(sendbuf, recvbuf, op):
+        recvbuf[:] = [max(a, b) for a, b in zip(sendbuf, other_rank_values)]
+
+    comm.Allreduce.side_effect = fake_allreduce
     SpyroEnsemble.ensemble.global_comm = global_comm
     SpyroEnsemble.ensemble.comm = comm
+    values = [1, 4]
 
-    reduced = SpyroEnsemble.communicate([1, 4])
+    reduced = SpyroEnsemble.communicate(values)
 
-    assert reduced == [1, 4]
+    assert reduced == [3, 4]
+    assert values == [1, 4]
+    comm.Allreduce.assert_called_once()
+    assert comm.Allreduce.call_args.kwargs["op"] is MPI.MAX
 
 
 def _mock_ensemble_with_rank(ensemble_rank: int) -> MagicMock:
