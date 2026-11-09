@@ -181,7 +181,9 @@ def test_global_min_reduces_over_ranks() -> None:
     assert global_min(fire.Function(V).interpolate(10.0 - z - x)) == 2.0
 
 
-def critical_boundary_data(geometry: str, degree: int, f_est: float) -> list:
+def critical_boundary_data(
+    geometry: str, degree: int, f_est: float, element_type: str
+) -> list:
     """Run a 2D Eikonal analysis and return its boundary data.
 
     The setup is that of ``test_eikonal_new`` with a smooth velocity
@@ -197,6 +199,9 @@ def critical_boundary_data(geometry: str, degree: int, f_est: float) -> list:
         Finite element order for the Eikonal equation.
     f_est : `float`
         Factor for the stabilizing term in the Eikonal equation.
+    element_type : `str`
+        Finite element type for the Eikonal equation, "consistent" or
+        "underintegrated" (KMV on triangles, spectral on quadrilaterals).
 
     Returns
     -------
@@ -204,14 +209,14 @@ def critical_boundary_data(geometry: str, degree: int, f_est: float) -> list:
         ``[pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]`` per boundary,
         sorted by the minimum Eikonal.
     """
-    dictionary = wave_dict(geometry, 2, degree, "consistent")
+    dictionary = wave_dict(geometry, 2, degree, element_type)
     dictionary["visualization"]["output_folder"] += f"_np{fire.COMM_WORLD.size}"
     wave = AcousticWave(dictionary=dictionary)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     wave.set_initial_velocity_model(
         conditional=3.0 - 1.5 * wave.mesh_x, dg_velocity_model=False
     )
-    wave.mesh_ops.preamble_mesh_operations(wave, ele_type_eik="consistent", f_est=f_est)
+    wave.mesh_ops.preamble_mesh_operations(wave, ele_type_eik=element_type, f_est=f_est)
     wave.layer_ops.critical_boundary_points(wave)
     return wave.layer_ops.eik_bnd
 
@@ -219,12 +224,13 @@ def critical_boundary_data(geometry: str, degree: int, f_est: float) -> list:
 # Serial results of critical_boundary_data:
 # (critical point, minimum Eikonal in s) per absorbing boundary
 @pytest.mark.parametrize(
-    "geometry, degree, f_est, serial",
+    "geometry, degree, f_est, element_type, serial",
     [
         (
             "T",
             2,
             0.06,
+            "consistent",
             [
                 ([-0.5, 0.0], 0.08827854817158261),
                 ([-1.0, 0.15000000000000002], 0.19146894159595299),
@@ -235,16 +241,39 @@ def critical_boundary_data(geometry: str, degree: int, f_est: float) -> list:
             "Q",
             2,
             0.05,
+            "consistent",
             [
                 ([-0.5, 0.0], 0.08929751297228099),
                 ([-1.0, 0.15000000000000002], 0.1928097578035655),
                 ([-0.5, 1.0], 0.37804633159604933),
             ],
         ),
+        (
+            "T",
+            2,
+            0.06,
+            "underintegrated",
+            [
+                ([-0.5, 0.0], 0.08603482951166294),
+                ([-1.0, 0.0], 0.17571950059880503),
+                ([-0.45, 1.0], 0.3766437303516901),
+            ],
+        ),
+        (
+            "Q",
+            2,
+            0.05,
+            "underintegrated",
+            [
+                ([-0.5, 0.0], 0.0660405994505825),
+                ([-1.0, 0.15000000000000002], 0.18864019575613442),
+                ([-0.5, 1.0], 0.3759377789296918),
+            ],
+        ),
     ],
 )
 def test_eikonal_critical_points_match_serial(
-    geometry: str, degree: int, f_est: float, serial: list
+    geometry: str, degree: int, f_est: float, element_type: str, serial: list
 ) -> None:
     """Check that the parallel Eikonal analysis reproduces the serial result.
 
@@ -256,6 +285,9 @@ def test_eikonal_critical_points_match_serial(
         Finite element order for the Eikonal equation.
     f_est : `float`
         Factor for the stabilizing term in the Eikonal equation.
+    element_type : `str`
+        Finite element type for the Eikonal equation, "consistent" or
+        "underintegrated".
     serial : `list`
         Serial ``(pnt_crit, eikmin)`` per boundary, sorted by ``eikmin``.
 
@@ -263,7 +295,7 @@ def test_eikonal_critical_points_match_serial(
     -------
     None
     """
-    eik_bnd = critical_boundary_data(geometry, degree, f_est)
+    eik_bnd = critical_boundary_data(geometry, degree, f_est, element_type)
 
     result = [(list(pnt), eikmin) for pnt, _, eikmin, *_ in eik_bnd]
     assert [pnt for pnt, _ in result] == [pnt for pnt, _ in serial]
