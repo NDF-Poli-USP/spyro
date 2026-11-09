@@ -119,6 +119,38 @@ def test_elastic_analytical_timestep_uses_elastic_forms():
     assert wave.dt == dt
 
 
+@pytest.mark.parametrize(
+    "method, estimate_max_eigenvalue",
+    [("ANALYTICAL", True), ("KRYLOVSCH_CH", False)],
+)
+def test_timestep_method_argument(method: str, estimate_max_eigenvalue: bool):
+    """A method passed by name gives the time step of its default selection.
+
+    Parameters
+    ----------
+    method : str
+        Method passed explicitly to `get_and_set_maximum_dt`.
+    estimate_max_eigenvalue : bool
+        Flag whose default selection the explicit method is compared with.
+        `"KRYLOVSCH_CH"` is compared with the serial default, `"ARNOLDI"`.
+    """
+    wave = _elastic_wave(1.5, 1.0)
+    default = wave.get_and_set_maximum_dt(
+        fraction=1.0, estimate_max_eigenvalue=estimate_max_eigenvalue
+    )
+    explicit = wave.get_and_set_maximum_dt(fraction=1.0, method=method)
+    assert np.isclose(explicit, default, rtol=1e-4)
+    assert wave.dt == explicit
+
+
+def test_timestep_method_conflicts_with_estimate():
+    """Asking for an estimate with a non-estimate method is rejected."""
+    with pytest.raises(ValueError, match="conflicts with method='ARNOLDI'"):
+        _elastic_wave(1.5, 1.0).get_and_set_maximum_dt(
+            estimate_max_eigenvalue=True, method="ARNOLDI"
+        )
+
+
 def test_maximum_diagonal_ratio_rejects_zero_stiffness():
     """A zero stiffness gives no finite time step, so it is rejected."""
     mesh = UnitSquareMesh(4, 4, quadrilateral=True)

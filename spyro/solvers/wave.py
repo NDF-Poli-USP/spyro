@@ -467,11 +467,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self,
         fraction: float = 0.7,
         estimate_max_eigenvalue: bool = False,
+        method: str | None = None,
     ) -> float:
         """Calculate and set the maximum stable time step of the wave solver.
 
-        The largest eigenvalue is computed with SciPy on a single rank in
-        serial, and distributed with SLEPc when the mesh is distributed.
+        By default, the largest eigenvalue is computed with SciPy on a single
+        rank in serial, and distributed with SLEPc when the mesh is
+        distributed.
 
         Parameters
         ----------
@@ -479,21 +481,40 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Fraction of the estimated time step to use. Default is 0.7.
         estimate_max_eigenvalue : bool, optional
             Whether to estimate the maximum eigenvalue from the matrix
-            diagonals instead of computing it. Default is `False`.
+            diagonals instead of computing it. Same as `method="ANALYTICAL"`.
+            Default is `False`.
+        method : str, optional
+            Method of `Modal_Solver` used for the largest eigenvalue, e.g.
+            `"ANALYTICAL"`, `"ARNOLDI"` or `"KRYLOVSCH_CH"`. Default is
+            `None`, which uses `"ANALYTICAL"` if `estimate_max_eigenvalue`,
+            otherwise `"KRYLOVSCH_CH"` when the mesh is distributed and
+            `"ARNOLDI"` in serial.
 
         Returns
         -------
         float
-            The calculated maximum time step, also stored in ``self.dt``.
+            The calculated maximum time step, also stored in `self.dt`.
+
+        Raises
+        ------
+        ValueError
+            If `estimate_max_eigenvalue` is `True` and `method` is neither
+            `None` nor `"ANALYTICAL"`.
         """
 
         # Maximum timestep size
-        if estimate_max_eigenvalue:
-            method = 'ANALYTICAL'
-        elif self.function_space.mesh().comm.size > 1:
-            method = 'KRYLOVSCH_CH'
-        else:
-            method = 'ARNOLDI'
+        if estimate_max_eigenvalue and method not in (None, "ANALYTICAL"):
+            raise ValueError(
+                "estimate_max_eigenvalue=True uses the ANALYTICAL method, which "
+                f"conflicts with method={method!r}."
+            )
+        if method is None:
+            if estimate_max_eigenvalue:
+                method = "ANALYTICAL"
+            elif self.function_space.mesh().comm.size > 1:
+                method = "KRYLOVSCH_CH"
+            else:
+                method = "ARNOLDI"
         dt_solver = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
         # The forms carry the material parameters, so no velocity is passed
         max_dt = dt_solver.estimate_timestep(
