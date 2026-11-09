@@ -56,10 +56,12 @@ base_dict = {
     }
 }
 
+
 def test_viscoelastic_isotropic():
     wave = IsotropicWave(base_dict)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.2, "periodic": True})
     wave.forward_solve()
+
 
 def test_viscoelastic_VTI():
     base_dict["synthetic_data"]['epsilon'] = 0.2
@@ -69,6 +71,7 @@ def test_viscoelastic_VTI():
     wave = AnisotropicVTIWave(base_dict)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.2, "periodic": True})
     wave.forward_solve()
+
 
 def test_viscoelastic_TTI():
     base_dict["synthetic_data"]['epsilon'] = 0.2
