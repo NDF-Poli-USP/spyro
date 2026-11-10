@@ -167,6 +167,13 @@ def test_elastic_automated_adjoint_controls(
 
         assert isinstance(wave.automated_adjoint._tape, Tape)
         assert isinstance(wave.functional_value, AdjFloat)
+        # The point source enters each time step through its scalar time
+        # function: no taped block outputs a source cofunction.
+        assert not any(
+            isinstance(output.output, fire.Cofunction)
+            for block in wave.automated_adjoint._tape.get_blocks()
+            for output in block.get_outputs()
+        ), "the tape records a source cofunction"
         assert tuple(wave.automated_adjoint.control_parameter_names) == (
             expected_parameters
         )
