@@ -311,10 +311,10 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
 
             if abc_type == "hybrid":
                 hybrid_signal = receivers_reference
-                hybrid_energy = wave.field_logger.get("acoustic_energy")
+                hybrid_energy = wave.simulation_logger.get("acoustic_energy")
             else:
                 pml_signal = receivers_reference
-                pml_energy = wave.field_logger.get("acoustic_energy")
+                pml_energy = wave.simulation_logger.get("acoustic_energy")
 
         # Checking both signals
         assert hybrid_signal is not None, "Hybrid signal not found"

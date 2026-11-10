@@ -10,7 +10,7 @@ from ..domains.space import check_function_space_type, create_function_space
 from ..io import Model_parameters
 from ..io import material_properties_io
 from ..io.parallelism_wrappers import ensemble_propagator
-from ..io.field_logger import FieldLogger
+from ..io.simulation_logger import SimulationLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from .solver_parameters import get_default_parameters_for_method
@@ -179,9 +179,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.layer_manager()
 
         # Logger
-        self.field_logger = FieldLogger(self.read_outputs)
-        self.field_logger.add_field("forward", self.get_function_name(),
-                                    lambda: self.get_function())
+        self.simulation_logger = SimulationLogger(self.read_outputs)
+        self.simulation_logger.add_field(
+            "forward", self.get_function_name(), lambda: self.get_function()
+        )
 
         self._physical_parameters = PhysicalParameters()
 
@@ -616,6 +617,27 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.sources.update_wavelet(self)
 
     dt = property(fget=get_dt, fset=set_dt)
+
+    @property
+    def field_logger(self) -> SimulationLogger:
+        """Deprecated alias of `simulation_logger`.
+
+        Returns
+        -------
+        SimulationLogger
+            The logger of the fields, functionals and time of this solver.
+
+        Warns
+        -----
+        DeprecationWarning
+            Always, since `field_logger` was renamed to `simulation_logger`.
+        """
+        warnings.warn(
+            "`field_logger` is deprecated, use `simulation_logger` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.simulation_logger
 
     @abstractmethod
     def rhs_no_pml(self):

@@ -226,6 +226,12 @@ class Read_outputs(BaseModel):
     mechanical_energy_filename: str | None = None
     mechanical_energy: bool = False
 
+    p_wave_output: bool = False
+    p_wave_output_filename: str | None = None
+
+    s_wave_output: bool = False
+    s_wave_output_filename: str | None = None
+
     output_folder: str = "output/"
     debug_output: bool = False
 
