@@ -224,9 +224,9 @@ dictionary["acquisition"] = {
 
 dictionary["time_axis"] = {
     "initial_time": 0.0,
-    "final_time": 0.01,
+    "final_time": 0.8,
     "dt": 2.8e-5,
-    "output_frequency": 100,
+    "output_frequency": 2500,
     "gradient_sampling_frequency": 1,
 }
 
