@@ -33,6 +33,10 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
     variational solver is advanced with ``wave.solver.solve()``.
     """
     wave.reset_pressure()
+    if wave.point_source_in_form:
+        # The adjoint source is injected through ``rhs_no_pml_source``; the
+        # forward point source must not contribute.
+        wave.sources.time_function.assign(0.0)
     mask_available = wave.gradient_mask_available
     if dt is not None:
         wave.dt = dt
