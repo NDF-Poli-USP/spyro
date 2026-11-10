@@ -200,6 +200,13 @@ def get_forward_model(
             assert schedule is not None
             # An online schedule has no max_n; a bounded one must match nt.
             assert schedule.max_n in (None, nt)
+            # The point source enters each time step through its scalar time
+            # function: no step records a source cofunction.
+            assert not any(
+                isinstance(output.output, fire.Cofunction)
+                for step in Wave_obj_guess.automated_adjoint._tape.timesteps
+                for block in step for output in block.get_outputs()
+            ), "a time step records a source cofunction"
     rec_out_guess = Wave_obj_guess.forward_solution_receivers
 
     return rec_out_exact, rec_out_guess, Wave_obj_guess
