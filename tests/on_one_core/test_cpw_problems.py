@@ -261,13 +261,14 @@ def test_mesh_frequency_factor_scales_mesh_size(
             """
             requested.update(input_mesh_parameters)
 
-        def set_initial_velocity_model(self, constant: float) -> None:
-            """Accept and ignore a constant velocity.
+        def set_initial_velocity_model(self, **velocity: object) -> None:
+            """Accept and ignore the velocity, constant or from a file.
 
             Parameters
             ----------
-            constant : float
-                Constant velocity set by the problem.
+            **velocity
+                Keyword arguments of `Wave.set_initial_velocity_model`, e.g.
+                `constant` or `new_file` and `fast_interpolate`.
             """
 
     problem.setup_wave(RecordingWave(), cpw)
