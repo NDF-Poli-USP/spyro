@@ -253,6 +253,28 @@ class HomogeneousCpwProblem(CpwProblem):
         """
         return self.analytical_solution(initial_wave)
 
+    def reference_time_shift(self, wave: Wave, reference_dt: float) -> float:
+        """Return the receiver time offset of the forward solve.
+
+        The analytical reference holds the field at its time labels, while
+        the receiver data leads them by
+        :data:`~spyro.receivers.Receivers.RECEIVER_STEP_OFFSET` solver steps.
+
+        Parameters
+        ----------
+        wave : Wave
+            Wave object of the forward solve.
+        reference_dt : float
+            Time step the reference is sampled at, unused: the analytical
+            reference has no receiver offset.
+
+        Returns
+        -------
+        float
+            `RECEIVER_STEP_OFFSET * wave.dt`.
+        """
+        return RECEIVER_STEP_OFFSET * wave.dt
+
     @abstractmethod
     def analytical_solution(self, wave: Wave) -> np.ndarray:
         """Compute the analytical receiver data.
@@ -265,8 +287,8 @@ class HomogeneousCpwProblem(CpwProblem):
         Returns
         -------
         np.ndarray
-            Receiver data sampled at ``wave.dt``, shaped like
-            ``wave.forward_solution_receivers``.
+            Receiver data at the time labels `i * wave.dt`, with no receiver
+            offset, shaped like `wave.forward_solution_receivers`.
         """
 
 
@@ -492,28 +514,6 @@ class AcousticHomogeneousProblem(HomogeneousCpwProblem):
             "velocity": self.minimum_wavelength_velocity,
         }
 
-    def reference_time_shift(self, wave: Wave, reference_dt: float) -> float:
-        """Return the receiver time offset of the forward solve.
-
-        The analytical reference holds the field at its time labels, while
-        the receiver data leads them by
-        :data:`~spyro.receivers.Receivers.RECEIVER_STEP_OFFSET` solver steps.
-
-        Parameters
-        ----------
-        wave : Wave
-            Wave object of the forward solve.
-        reference_dt : float
-            Time step the reference is sampled at, unused: the analytical
-            reference has no receiver offset.
-
-        Returns
-        -------
-        float
-            `RECEIVER_STEP_OFFSET * wave.dt`.
-        """
-        return RECEIVER_STEP_OFFSET * wave.dt
-
     def analytical_solution(self, wave: Wave) -> np.ndarray:
         """Compute the acoustic analytical receiver data.
 
@@ -556,11 +556,6 @@ class ElasticHomogeneousProblem(HomogeneousCpwProblem):
         S-wave velocity.
     density : float
         Density.
-
-    Notes
-    -----
-    The elastic analytical solution is already shifted one reference step,
-    so :meth:`reference_time_shift` keeps the default of no shift.
     """
 
     physics = ISOTROPIC_ELASTIC
@@ -655,8 +650,8 @@ class ElasticHomogeneousProblem(HomogeneousCpwProblem):
         Returns
         -------
         np.ndarray
-            Displacement at the receivers, shaped
-            ``(n_time, n_receivers, 2)``.
+            Displacement at the receivers at the time labels `i * wave.dt`,
+            with no receiver offset, shaped `(n_time, n_receivers, 2)`.
 
         Raises
         ------
@@ -689,6 +684,9 @@ class ElasticHomogeneousProblem(HomogeneousCpwProblem):
                 dt=wave.dt,
                 force_direction=force_direction,
                 dimension=wave.dimension,
+                # Without the receiver offset, which depends on the solver
+                # time step and is applied when the reference is resampled
+                time_shift=0.0,
             )
             analytical[:, i, :] = np.column_stack(components)
         return analytical
