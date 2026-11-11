@@ -105,7 +105,6 @@ def run(
         "velocity_profile_type": "homogeneous",
         "FEM_method_to_evaluate": method.value,
         "dimension": 2,
-        "receiver_setup": "near",
         "timestep_calculation": "estimate",
         "desired_degree": degree,
         "C_initial": cpw_initial,
