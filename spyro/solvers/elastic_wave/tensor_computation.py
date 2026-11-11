@@ -79,6 +79,50 @@ def C_isotropic_tensor(self):
     return C_isotropic
 
 
+# def C_vti_tensor(self, dim):
+
+#     # Assigning isotropic properties
+#     rho = self.rho
+#     vP = self.c
+#     vS = self.c_s
+
+#     # Assigning anisotropic properties
+#     epsilon = self.epsilon
+#     gamma = self.gamma
+#     delta = self.delta
+#     anisotropy = self.anisotropy_type
+
+#     # Computing the elastic tensor components
+#     C33 = rho * vP ** 2
+#     C11 = C33 * (1. + 2. * epsilon)
+#     C44 = rho * vS ** 2
+#     C66 = C44 * (1. + 2. * gamma)
+#     C12 = C11 - 2 * C66
+
+#     # C13 is calculated based on the type of anisotropy
+#     dC = C33 - C44
+#     if anisotropy == 'weak':
+#         C13 = (delta * C33**2 + 0.5 * dC * (C11 + C33 - 2 * C44))**0.5
+#     elif anisotropy == 'exact':
+#         C13 = (dC * (C33 * (1. + 2 * delta) - C44))**0.5
+#     C13 -= C44
+
+#     if dim == 2:
+#         C_vti = fire.as_tensor(((C11, C13, 0),
+#                                 (C13, C33, 0),
+#                                 (0, 0, C44)))
+
+#     else:
+#         # Assembling the elastic tensor
+#         C_vti = fire.as_tensor(((C11, C12, C13, 0, 0, 0),
+#                                 (C12, C11, C13, 0, 0, 0),
+#                                 (C13, C13, C33, 0, 0, 0),
+#                                 (0, 0, 0, C44, 0, 0),
+#                                 (0, 0, 0, 0, C44, 0),
+#                                 (0, 0, 0, 0, 0, C66)))
+
+#     return C_vti
+
 def C_vti_tensor(self, dim):
 
     # Assigning isotropic properties
@@ -108,20 +152,9 @@ def C_vti_tensor(self, dim):
     C13 -= C44
 
     if dim == 2:
-        C_vti = fire.as_tensor(((C11, C13, 0),
-                                (C13, C33, 0),
+        C_vti = fire.as_tensor(((C33, C13, 0),
+                                (C13, C11, 0),
                                 (0, 0, C44)))
-
-    else:
-        # Assembling the elastic tensor
-        C_vti = fire.as_tensor(((C11, C12, C13, 0, 0, 0),
-                                (C12, C11, C13, 0, 0, 0),
-                                (C13, C13, C33, 0, 0, 0),
-                                (0, 0, 0, C44, 0, 0),
-                                (0, 0, 0, 0, C44, 0),
-                                (0, 0, 0, 0, 0, C66)))
-
-    return C_vti
 
 
 def C_tti_tensor(self, C_vti, dim):
