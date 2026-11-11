@@ -1,5 +1,6 @@
 """Tests for the cells-per-wavelength problems and calculator."""
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -634,6 +635,134 @@ def test_loaded_reference_must_match_time_axis(tmp_path, monkeypatch) -> None:
     with pytest.raises(ValueError, match="has shape"):
         spyro.tools.MeshingParameterCalculator(
             {**CALCULATOR_PARAMETERS, "load_reference": True}
+        )
+
+
+#: Heterogeneous case with a short time axis and two receivers, so a fake
+#: reference stays small.
+SMALL_VELOCITY_FILE_CASE = replace(
+    VELOCITY_FILE_CASE,
+    receiver_locations=[(-1.0, 5.0), (-1.0, 6.0)],
+    final_time=0.1,
+    dt=1e-2,
+)
+
+#: Calculator parameters of a heterogeneous acoustic search, with no file access.
+HETEROGENEOUS_CALCULATOR_PARAMETERS = {
+    **CALCULATOR_PARAMETERS,
+    "heterogeneous_case": SMALL_VELOCITY_FILE_CASE,
+    "reference_degree": 3,
+    "C_reference": 4.0,
+}
+
+
+def fake_numerical_reference(
+    problem: CpwProblem, initial_wave, method: str
+) -> np.ndarray:
+    """Return distinct receiver data shaped like a numerical reference.
+
+    Parameters
+    ----------
+    problem : CpwProblem
+        Problem whose reference is replaced.
+    initial_wave : Wave
+        Wave object holding the acquisition and time axis.
+    method : str
+        Finite element method of the reference, unused.
+
+    Returns
+    -------
+    np.ndarray
+        Data from :func:`fake_analytical_solution`.
+    """
+    return fake_analytical_solution(problem, initial_wave)
+
+
+def test_heterogeneous_reference_saves_and_loads(tmp_path, monkeypatch) -> None:
+    """A heterogeneous reference, with text and bool metadata, loads again.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Working directory of the saved reference.
+    monkeypatch : pytest.MonkeyPatch
+        Replaces the reference solve and the working directory.
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        AcousticHeterogeneousProblem, "reference_solution", fake_numerical_reference
+    )
+    saved = spyro.tools.MeshingParameterCalculator(
+        {**HETEROGENEOUS_CALCULATOR_PARAMETERS, "save_reference": True}
+    )
+
+    loaded = spyro.tools.MeshingParameterCalculator(
+        {**HETEROGENEOUS_CALCULATOR_PARAMETERS, "load_reference": True}
+    )
+
+    assert np.array_equal(loaded.reference_solution, saved.reference_solution)
+
+
+@pytest.mark.parametrize(
+    "overrides, mismatched",
+    [
+        ({"FEM_method_to_evaluate": "spectral_quadrilateral"}, "method"),
+        ({"reference_degree": 4}, "reference_degree"),
+        ({"C_reference": 5.0}, "cpw_reference"),
+        ({"mesh_frequency_factor": 3.0}, "mesh_frequency"),
+        (
+            {"heterogeneous_case": replace(SMALL_VELOCITY_FILE_CASE, name="other")},
+            "case_name",
+        ),
+        (
+            {"heterogeneous_case": replace(SMALL_VELOCITY_FILE_CASE, length_x=16.0)},
+            "length_x",
+        ),
+        (
+            {
+                "heterogeneous_case": replace(
+                    SMALL_VELOCITY_FILE_CASE, minimum_velocity=2.0
+                )
+            },
+            "minimum_wavelength_velocity",
+        ),
+        ({"velocity_adapted_mesh": True}, "velocity_adapted_mesh"),
+    ],
+)
+def test_loaded_heterogeneous_reference_must_match_settings(
+    tmp_path,
+    monkeypatch,
+    overrides: dict,
+    mismatched: str,
+) -> None:
+    """A heterogeneous reference saved for another discretization is rejected.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Working directory of the saved reference.
+    monkeypatch : pytest.MonkeyPatch
+        Replaces the reference solve and the working directory.
+    overrides : dict
+        Parameters of the load that differ from the save.
+    mismatched : str
+        Metadata key the error must name.
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        AcousticHeterogeneousProblem, "reference_solution", fake_numerical_reference
+    )
+    spyro.tools.MeshingParameterCalculator(
+        {**HETEROGENEOUS_CALCULATOR_PARAMETERS, "save_reference": True}
+    )
+
+    with pytest.raises(ValueError, match=f"different .*{mismatched}"):
+        spyro.tools.MeshingParameterCalculator(
+            {
+                **HETEROGENEOUS_CALCULATOR_PARAMETERS,
+                "load_reference": True,
+                **overrides,
+            }
         )
 
 
