@@ -213,9 +213,9 @@ def test_gmsh2d_writes_valid_files(
     tmp_path : pathlib.Path
         Temporary directory for generated files.
     monkeypatch : pytest.MonkeyPatch
-        Fixture for isolating the working directory.
+        Fixture for isolating the working directory and global ensemble.
     with_communicator : bool
-        Whether to use a real one-process ensemble instead of ``None``.
+        Whether to initialize a real one-process ensemble instead of ``None``.
     preexisting_files : bool
         Whether to create placeholder output files before generation.
     use_grid : bool
@@ -238,6 +238,7 @@ def test_gmsh2d_writes_valid_files(
             velocity_model={"vp_values": velocity_grid},
         )
     comm = fire.Ensemble(fire.COMM_SELF, 1) if with_communicator else None
+    monkeypatch.setattr(meshing_2d.SpyroEnsemble, "ensemble", comm)
     mesh_parameters = MeshingParameters(input_mesh_dictionary=parameters, comm=comm)
 
     velocity_model_file = meshing_2d.generate_gmsh_2d_mesh(mesh_parameters)

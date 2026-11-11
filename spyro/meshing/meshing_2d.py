@@ -22,7 +22,7 @@ def generate_gmsh_2d_mesh(mesh_parameters: MeshingParameters) -> str:
     Supports an optional water interface, hyperelliptical or rectangular
     padding, and structured Winslow smoothing. The temporary SEG-Y file and
     mesh are written only by the process with both ensemble and spatial
-    rank 0, or by the current process when no communicator is supplied.
+    rank 0, or by the current process when the ensemble is uninitialized.
 
     Parameters
     ----------
@@ -40,7 +40,9 @@ def generate_gmsh_2d_mesh(mesh_parameters: MeshingParameters) -> str:
     -----
     The caller must synchronize ranks before loading the generated mesh.
     """
-    is_writer = SpyroEnsemble.ensemble is None or (SpyroEnsemble.get_ensemble_rank() == 0 and get_local_rank() == 0)
+    is_writer = SpyroEnsemble.ensemble is None or (
+        SpyroEnsemble.get_ensemble_rank() == 0 and SpyroEnsemble.get_local_rank() == 0
+    )
     # TODO: make this check a method in SpyroEnsemble in the future.
 
     if mesh_parameters.segy_velocity_model is not None:
