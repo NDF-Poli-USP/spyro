@@ -83,6 +83,25 @@ class AcousticElasticWave(Wave):
                 )
             return z >= self.interface_z
 
+        # 3D binary model
+        if self.dimension == 3 and mesh_dict.get("segy_velocity_model", "").endswith(".bin"):
+            y = centers[:, 2]
+            nz = mesh_dict["segy_nz"]
+            nx = mesh_dict["segy_nx"]
+            ny = mesh_dict["segy_ny"]
+            lz = mesh_dict["length_z"]
+            lx = mesh_dict["length_x"]
+            ly = mesh_dict["length_y"]
+            vp3d = np.fromfile(
+                mesh_dict["segy_velocity_model"],
+                dtype=">f4"
+            ).reshape(nz, nx, ny)
+            iz = np.clip(np.rint((z + lz) / lz * (nz - 1)).astype(int), 0, nz - 1)
+            ix = np.clip(np.rint(x / lx * (nx - 1)).astype(int), 0, nx - 1)
+            iy = np.clip(np.rint(y / ly * (ny - 1)).astype(int), 0, ny - 1)
+            return np.isclose(vp3d[iz, ix, iy], mesh_dict["water_search_value"], rtol=1e-5)
+
+        # 2D SEG-Y (original path)
         vp, nz, nx = read_segy_velocity_model(mesh_dict["segy_velocity_model"])
         lz, lx = mesh_dict["length_z"], mesh_dict["length_x"]
         iz = np.clip(np.rint((z + lz) / lz * (nz - 1)).astype(int), 0, nz - 1)
