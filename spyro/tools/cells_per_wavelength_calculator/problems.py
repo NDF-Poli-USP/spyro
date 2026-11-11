@@ -320,6 +320,43 @@ class HeterogeneousCpwProblem(CpwProblem):
             return case.minimum_velocity
         return case.minimum(self.physics.wavelength_parameter)
 
+    def reference_metadata(
+        self, initial_wave: Wave
+    ) -> dict[str, str | float | np.ndarray]:
+        """Return the settings the reference depends on, with its discretization.
+
+        Parameters
+        ----------
+        initial_wave : Wave
+            Wave object of the discretization under evaluation, holding the
+            acquisition, time axis and finite element method.
+
+        Returns
+        -------
+        dict of str to str, float or np.ndarray
+            :meth:`CpwProblem.reference_metadata`, the reference method,
+            degree and cpw, the meshing frequency, and the case name, lengths
+            and minimum velocity.
+
+        Notes
+        -----
+        The material files are not compared, only the case name and minimum
+        velocity. A reference saved for one file is accepted for another
+        file with the same minimum under the same case name.
+        """
+        case = self.heterogeneous_case
+        return {
+            **super().reference_metadata(initial_wave),
+            "method": initial_wave.method,
+            "reference_degree": self.reference_degree,
+            "cpw_reference": self.cpw_reference,
+            "mesh_frequency": self.mesh_frequency,
+            "case_name": case.name,
+            "length_z": case.length_z,
+            "length_x": case.length_x,
+            "minimum_wavelength_velocity": self.minimum_wavelength_velocity,
+        }
+
     def reference_solution(self, initial_wave: Wave, method: str) -> np.ndarray:
         """Solve at ``reference_degree`` and ``cpw_reference``.
 
@@ -576,6 +613,27 @@ class AcousticHeterogeneousProblem(HeterogeneousCpwProblem):
         # Fast interpolation reads the velocity at the mesh nodes directly,
         # without building a grid mesh to project from
         wave.set_initial_velocity_model(new_file=velocity_file, fast_interpolate=True)
+
+    def reference_metadata(
+        self, initial_wave: Wave
+    ) -> dict[str, str | float | np.ndarray]:
+        """Return the settings the reference depends on, with the meshing choice.
+
+        Parameters
+        ----------
+        initial_wave : Wave
+            Wave object of the discretization under evaluation.
+
+        Returns
+        -------
+        dict of str to str, float or np.ndarray
+            :meth:`HeterogeneousCpwProblem.reference_metadata`, and
+            `velocity_adapted_mesh`.
+        """
+        return {
+            **super().reference_metadata(initial_wave),
+            "velocity_adapted_mesh": self.velocity_adapted_mesh,
+        }
 
     def model_dictionary(self, method: str, degree: int) -> dict:
         """Build the heterogeneous acoustic model dictionary.
