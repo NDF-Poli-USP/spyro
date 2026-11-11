@@ -108,18 +108,18 @@ def C_vti_tensor(self, dim):
     C13 -= C44
 
     if dim == 2:
-        C_vti = fire.as_tensor(((C11, C13, 0),
-                                (C13, C33, 0),
+        C_vti = fire.as_tensor(((C33, C13, 0),
+                                (C13, C11, 0),
                                 (0, 0, C44)))
 
     else:
         # Assembling the elastic tensor
-        C_vti = fire.as_tensor(((C11, C12, C13, 0, 0, 0),
-                                (C12, C11, C13, 0, 0, 0),
-                                (C13, C13, C33, 0, 0, 0),
-                                (0, 0, 0, C44, 0, 0),
+        C_vti = fire.as_tensor(((C33, C13, C13, 0, 0, 0),
+                                (C13, C11, C12, 0, 0, 0),
+                                (C13, C12, C11, 0, 0, 0),
+                                (0, 0, 0, C66, 0, 0),
                                 (0, 0, 0, 0, C44, 0),
-                                (0, 0, 0, 0, 0, C66)))
+                                (0, 0, 0, 0, 0, C44)))
 
     return C_vti
 
@@ -176,14 +176,31 @@ def C_tti_tensor(self, C_vti, dim):
 
 def bond_rotation_2d_elastic(theta):
 
+    """ The definition of the rotation matrix for 2D elastic tensors in Voigt notation.
+    
+    Parameters
+    ----------
+    theta : float
+        The rotation angle in degrees.
+    Returns
+    -------
+    T : firedrake.ufl.core.expr.Expr
+        The rotation matrix for 2D elastic tensors in Voigt notation.
+
+    References:
+    ----------
+    [1] Bond, L. Walter. "The mathematics of the Physical Properties of Crystals." (1943)
+    [2] Jones, Robert M. "Mechanics of composite materials." (1999)
+    """
+
     t = theta * np.pi / 180.0
     ct = fire.cos(t)
     st = fire.sin(t)
 
     T = fire.as_tensor([
-        [ct**2, st**2, 2*ct*st],
-        [st**2, ct**2, -2*ct*st],
-        [-ct*st, ct*st, ct**2 - st**2]
+        [ct**2, st**2, -2*ct*st],
+        [st**2, ct**2, 2*ct*st],
+        [ct*st, -ct*st, ct**2 - st**2]
     ])
     return T
 
