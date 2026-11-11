@@ -1,5 +1,6 @@
 """Tests for the cells-per-wavelength problems and calculator."""
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -260,7 +261,7 @@ def test_reference_time_shift(
 @pytest.mark.parametrize(
     "problem_class, expected",
     [
-        (AcousticHomogeneousProblem, "acoustic_homogeneous_cpw_reference.npy"),
+        (AcousticHomogeneousProblem, "acoustic_homogeneous_cpw_reference.npz"),
     ],
 )
 def test_default_reference_file(
@@ -290,35 +291,179 @@ def test_homogeneous_reference_is_analytical(monkeypatch) -> None:
     assert problem.reference_solution(initial_wave, "mass_lumped_triangle") is reference
 
 
-def test_reference_solution_saves_and_loads_default_file(
-    tmp_path, monkeypatch,
-) -> None:
-    """A saved reference is found again by a later load with no file name."""
-    monkeypatch.chdir(tmp_path)
-    reference = np.arange(6.0).reshape(3, 2)
-    calculator = SimpleNamespace(
-        reference_solution_file=make_problem(
-            AcousticHomogeneousProblem
-        ).default_reference_file(),
-        parameters=SimpleNamespace(
-            save_reference=True,
-            load_reference=False,
-            fem_method="mass_lumped_triangle",
-        ),
-        initial_wave=None,
-        problem=SimpleNamespace(
-            reference_solution=lambda initial_wave, method: reference
-        ),
+def fake_analytical_solution(problem: CpwProblem, wave) -> np.ndarray:
+    """Return distinct receiver data shaped like the analytical solution.
+
+    Parameters
+    ----------
+    problem : CpwProblem
+        Problem whose analytical solution is replaced, unused.
+    wave : Wave
+        Wave object holding the acquisition and time axis.
+
+    Returns
+    -------
+    np.ndarray
+        Data shaped `(round(final_time / dt) + 1, number_of_receivers)`.
+    """
+    num_t = round(wave.final_time / wave.dt) + 1
+    return np.arange(num_t * wave.number_of_receivers, dtype=float).reshape(
+        num_t, wave.number_of_receivers
     )
 
-    spyro.tools.MeshingParameterCalculator.get_reference_solution(calculator)
-    assert (tmp_path / "acoustic_homogeneous_cpw_reference.npy").is_file()
 
-    calculator.parameters.save_reference = False
-    calculator.parameters.load_reference = True
-    calculator.problem = None
-    loaded = spyro.tools.MeshingParameterCalculator.get_reference_solution(calculator)
-    assert np.array_equal(loaded, reference)
+def save_reference(**overrides) -> spyro.tools.MeshingParameterCalculator:
+    """Build a calculator that saves a fake reference to the default file.
+
+    Parameters
+    ----------
+    **overrides
+        Parameters replacing :data:`CALCULATOR_PARAMETERS`.
+
+    Returns
+    -------
+    spyro.tools.MeshingParameterCalculator
+        The calculator, whose reference is in the working directory.
+    """
+    return spyro.tools.MeshingParameterCalculator(
+        {**CALCULATOR_PARAMETERS, "save_reference": True, **overrides}
+    )
+
+
+def test_reference_solution_saves_and_loads_default_file(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """A saved reference is found again by a later load with no file name.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Working directory of the saved reference.
+    monkeypatch : pytest.MonkeyPatch
+        Replaces the analytical solution and the working directory.
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        AcousticHomogeneousProblem, "analytical_solution", fake_analytical_solution
+    )
+    saved = save_reference()
+    assert (tmp_path / "acoustic_homogeneous_cpw_reference.npz").is_file()
+
+    loaded = spyro.tools.MeshingParameterCalculator(
+        {**CALCULATOR_PARAMETERS, "load_reference": True}
+    )
+    assert np.array_equal(loaded.reference_solution, saved.reference_solution)
+
+
+@pytest.mark.parametrize(
+    "overrides, mismatched",
+    [
+        ({"source_frequency": 6.0}, "source_frequency"),
+        ({"minimum_velocity_in_the_domain": 2.0}, "velocity"),
+        ({"testing": False}, "receiver_locations"),
+    ],
+)
+def test_loaded_reference_must_match_settings(
+    tmp_path,
+    monkeypatch,
+    overrides: dict,
+    mismatched: str,
+) -> None:
+    """A reference saved for other settings is rejected, naming them.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Working directory of the saved reference.
+    monkeypatch : pytest.MonkeyPatch
+        Replaces the analytical solution and the working directory.
+    overrides : dict
+        Parameters of the load that differ from the save.
+    mismatched : str
+        Metadata key the error must name.
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        AcousticHomogeneousProblem, "analytical_solution", fake_analytical_solution
+    )
+    save_reference()
+
+    with pytest.raises(ValueError, match=f"different .*{mismatched}"):
+        spyro.tools.MeshingParameterCalculator(
+            {**CALCULATOR_PARAMETERS, "load_reference": True, **overrides}
+        )
+
+
+def test_loaded_reference_needs_metadata(tmp_path) -> None:
+    """A bare array, as the calculator used to save, is rejected.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Directory of the reference file.
+    """
+    file = tmp_path / "reference.npz"
+    with open(file, "wb") as stream:
+        np.save(stream, np.zeros((3, 4)))
+
+    with pytest.raises(ValueError, match="holds no metadata"):
+        spyro.tools.MeshingParameterCalculator(
+            {
+                **CALCULATOR_PARAMETERS,
+                "load_reference": True,
+                "reference_solution_file": str(file),
+            }
+        )
+
+
+def test_loaded_reference_must_match_time_axis(tmp_path, monkeypatch) -> None:
+    """Data with matching metadata but the wrong number of samples is rejected.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Working directory of the saved reference.
+    monkeypatch : pytest.MonkeyPatch
+        Replaces the analytical solution and the working directory.
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        AcousticHomogeneousProblem,
+        "analytical_solution",
+        lambda problem, wave: fake_analytical_solution(problem, wave)[:-1],
+    )
+    save_reference()
+
+    with pytest.raises(ValueError, match="has shape"):
+        spyro.tools.MeshingParameterCalculator(
+            {**CALCULATOR_PARAMETERS, "load_reference": True}
+        )
+
+
+def test_parameters_reject_reference_file_without_npz_suffix() -> None:
+    """Other suffixes are rejected, since `np.savez` would append `.npz`."""
+    with pytest.raises(ValidationError, match=r"\.npz"):
+        CpwParameters(**CALCULATOR_PARAMETERS, reference_solution_file="reference.npy")
+
+
+def test_stored_acoustic_reference_matches_its_settings() -> None:
+    """The stored reference loads for the full acquisition it was made for."""
+    stored_file = (
+        Path(__file__).parents[1]
+        / "inputfiles"
+        / "acoustic_homogeneous_cpw_reference.npz"
+    )
+    calculator = spyro.tools.MeshingParameterCalculator(
+        {
+            **CALCULATOR_PARAMETERS,
+            "testing": False,
+            "load_reference": True,
+            "reference_solution_file": str(stored_file),
+        }
+    )
+
+    assert calculator.reference_solution.shape[1] == 36
 
 
 def test_parameters_from_dict_maps_legacy_keys() -> None:
