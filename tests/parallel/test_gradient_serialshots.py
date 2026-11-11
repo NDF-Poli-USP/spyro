@@ -93,6 +93,11 @@ def get_gradient(parallelism_type, points, use_vertex_only_mesh=False):
         misfit = misfit_list
 
     gradient = Wave_obj_guess.gradient_solve(misfit=misfit)
+    if use_vertex_only_mesh:
+        # The backward solve reuses the forward solver, so it must switch
+        # off the point source the forward solve left in the form.
+        assert Wave_obj_guess.point_source_in_form
+        assert np.all(Wave_obj_guess.sources.time_function.dat.data_ro == 0.0)
     Wave_obj_guess.comm.comm.barrier()
     spyro.io.delete_tmp_files(Wave_obj_guess)
     spyro.io.delete_tmp_files(Wave_obj_exact)

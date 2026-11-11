@@ -34,7 +34,6 @@ def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule, abc_kwargs=
         The combined weak form (mass + stiffness - source - absorbing
         terms).
     """
-
     dt = Constant(wave.dt)
     rho = wave.rho
     lmbda = wave.lmbda
@@ -48,6 +47,10 @@ def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule, abc_kwargs=
     ) * dx(**quad_rule)
 
     F_s = 0
+
+    if wave.point_source_in_form:
+        F_s += wave.sources.source_term(v_test, dx(**quad_rule))
+        
     b = wave.body_forces
     if b is not None:
         F_s += dot(b, v_test) * dx(**quad_rule)
@@ -113,6 +116,16 @@ def build_anisotropic_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule,
 
 
 def isotropic_elastic_without_pml(wave):
+    """Build the Firedrake solver for the isotropic elastic wave.
+
+    Built without PML.
+
+    Parameters
+    ----------
+    wave : `elastic_wave.IsotropicWave`
+        An instance of the
+        :class:`~spyro.solvers.elastic_wave.isotropic_wave.IsotropicWave`.
+    """
     V = wave.function_space
     quad_rule = wave.quadrature_rule
 
@@ -308,9 +321,7 @@ def viscoelastic_without_pml(wave):
     )
     solver_parameters = dict(wave.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
-    wave.solver = LinearVariationalSolver(
-        lin_var, solver_parameters=solver_parameters
-    )
+    wave.solver = LinearVariationalSolver(lin_var, solver_parameters=solver_parameters)
 
 
 def isotropic_elastic_with_pml():
