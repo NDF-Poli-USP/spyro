@@ -324,7 +324,8 @@ class MeshingParameterCalculator:
             wave.dt,
             initial_time=wave.initial_time,
             final_time=wave.final_time,
-            time_shift=self.problem.reference_time_shift(wave),
+            # The reference is sampled at the initial wave's time step
+            time_shift=self.problem.reference_time_shift(wave, self.initial_wave.dt),
         )
         error = MeasureError.calculate_receiver_error(
             wave.forward_solution_receivers,

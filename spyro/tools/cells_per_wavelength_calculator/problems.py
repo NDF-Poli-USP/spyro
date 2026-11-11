@@ -160,13 +160,15 @@ class CpwProblem(ABC):
         wavelength = self.minimum_wavelength_velocity / self.mesh_frequency
         wave.set_mesh(input_mesh_parameters={"edge_length": wavelength / cpw})
 
-    def reference_time_shift(self, wave: Wave) -> float:
+    def reference_time_shift(self, wave: Wave, reference_dt: float) -> float:
         """Return the time shift applied when resampling the reference.
 
         Parameters
         ----------
         wave : Wave
             Wave object of the forward solve.
+        reference_dt : float
+            Time step the reference receiver data is sampled at.
 
         Returns
         -------
@@ -350,6 +352,29 @@ class HeterogeneousCpwProblem(CpwProblem):
         wave.forward_solve()
         return wave.forward_solution_receivers
 
+    def reference_time_shift(self, wave: Wave, reference_dt: float) -> float:
+        """Return the difference between the solve and reference receiver offsets.
+
+        Receiver sample `i` holds the field at
+        `(i + RECEIVER_STEP_OFFSET) * dt`, for the reference at its own time
+        step and for the forward solve at another. Shifting the reference by
+        the difference of the two offsets samples it at the times of the
+        forward solve.
+
+        Parameters
+        ----------
+        wave : Wave
+            Wave object of the forward solve.
+        reference_dt : float
+            Time step the numerical reference was solved at.
+
+        Returns
+        -------
+        float
+            `RECEIVER_STEP_OFFSET * (wave.dt - reference_dt)`.
+        """
+        return RECEIVER_STEP_OFFSET * (wave.dt - reference_dt)
+
 
 class AcousticHomogeneousProblem(HomogeneousCpwProblem):
     """Acoustic wave in a constant velocity.
@@ -429,7 +454,7 @@ class AcousticHomogeneousProblem(HomogeneousCpwProblem):
             "velocity": self.minimum_wavelength_velocity,
         }
 
-    def reference_time_shift(self, wave: Wave) -> float:
+    def reference_time_shift(self, wave: Wave, reference_dt: float) -> float:
         """Return the receiver time offset of the forward solve.
 
         The analytical reference holds the field at its time labels, while
@@ -440,6 +465,9 @@ class AcousticHomogeneousProblem(HomogeneousCpwProblem):
         ----------
         wave : Wave
             Wave object of the forward solve.
+        reference_dt : float
+            Time step the reference is sampled at, unused: the analytical
+            reference has no receiver offset.
 
         Returns
         -------
