@@ -432,9 +432,9 @@ def test_interpolate_time_series_applies_time_shift() -> None:
     [
         # Analytical: the whole receiver offset of the solve
         (AcousticHomogeneousProblem, RECEIVER_STEP_OFFSET * 2e-3),
+        (ElasticHomogeneousProblem, RECEIVER_STEP_OFFSET * 2e-3),
         # Numerical: the reference already holds its own offset
         (AcousticHeterogeneousProblem, RECEIVER_STEP_OFFSET * (2e-3 - 1e-4)),
-        (ElasticHomogeneousProblem, 0.0),
     ],
 )
 def test_reference_time_shift(
