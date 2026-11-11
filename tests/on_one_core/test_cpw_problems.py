@@ -92,7 +92,9 @@ def test_interpolate_time_series_keeps_trailing_axes() -> None:
     ],
 )
 def test_cpw_problems_registry(
-    wave_type: WaveType, physics: WavePhysics, profile: VelocityProfileType,
+    wave_type: WaveType,
+    physics: WavePhysics,
+    profile: VelocityProfileType,
 ) -> None:
     """Every problem is keyed by its own wave physics and velocity profile.
 
@@ -116,7 +118,8 @@ def test_cpw_problems_registry(
     [(AcousticHomogeneousProblem, 1.5)],
 )
 def test_homogeneous_minimum_wavelength_velocity(
-    problem_class: type[CpwProblem], expected: float,
+    problem_class: type[CpwProblem],
+    expected: float,
 ) -> None:
     """The wavelength is the acoustic velocity, or the S-wave velocity."""
     assert make_problem(problem_class).minimum_wavelength_velocity == expected
@@ -163,9 +166,7 @@ def test_calculator_needs_exactly_one_threshold(threshold_settings: dict) -> Non
         spyro.tools.MeshingParameterCalculator(parameters)
 
 
-@pytest.mark.parametrize(
-    "problem_class", [AcousticHomogeneousProblem]
-)
+@pytest.mark.parametrize("problem_class", [AcousticHomogeneousProblem])
 def test_problem_builds_dictionary_for_requested_discretization(
     problem_class: type[CpwProblem],
 ) -> None:
@@ -190,7 +191,8 @@ def test_calculator_rejects_non_positive_mesh_frequency_factor() -> None:
 @pytest.mark.parametrize("factor", [1.0, 2.0, 2.5])
 @pytest.mark.parametrize("problem_class", PROBLEM_CLASSES)
 def test_mesh_frequency_factor_scales_mesh_size(
-    factor: float, problem_class: type[CpwProblem],
+    factor: float,
+    problem_class: type[CpwProblem],
 ) -> None:
     """A cpw refers to the wavelength at ``factor`` times the peak frequency."""
     frequency, cpw = 5.0, 3.0
@@ -224,9 +226,7 @@ def test_mesh_frequency_factor_scales_mesh_size(
 
     problem.setup_wave(RecordingWave(), cpw)
 
-    assert np.isclose(
-        requested["edge_length"], velocity / (factor * frequency * cpw)
-    )
+    assert np.isclose(requested["edge_length"], velocity / (factor * frequency * cpw))
 
 
 def test_interpolate_time_series_applies_time_shift() -> None:
@@ -249,7 +249,8 @@ def test_interpolate_time_series_applies_time_shift() -> None:
     ],
 )
 def test_reference_time_shift(
-    problem_class: type[CpwProblem], expected_steps: float,
+    problem_class: type[CpwProblem],
+    expected_steps: float,
 ) -> None:
     """Analytical references are resampled with the receiver offset."""
     wave = SimpleNamespace(dt=2e-3)
@@ -266,7 +267,8 @@ def test_reference_time_shift(
     ],
 )
 def test_default_reference_file(
-    problem_class: type[CpwProblem], expected: str,
+    problem_class: type[CpwProblem],
+    expected: str,
 ) -> None:
     """The default reference file is named after the physics and profile."""
     assert make_problem(problem_class).default_reference_file() == expected
@@ -593,7 +595,8 @@ def test_parameters_pair_fixed_timestep_with_calculation(
     ],
 )
 def test_parameters_infer_timestep_calculation(
-    timestep_settings: dict, expected: TimeStepCalculationType,
+    timestep_settings: dict,
+    expected: TimeStepCalculationType,
 ) -> None:
     """A given time step is fixed; otherwise the time step is estimated."""
     parameters = CpwParameters(**{**CALCULATOR_PARAMETERS, **timestep_settings})
@@ -604,14 +607,13 @@ def test_parameters_infer_timestep_calculation(
 def test_problem_requires_its_material() -> None:
     """A missing material parameter is named by its dictionary key."""
     with pytest.raises(ValueError, match="minimum_velocity_in_the_domain"):
-        make_problem(
-            AcousticHomogeneousProblem, minimum_velocity_in_the_domain=None
-        )
+        make_problem(AcousticHomogeneousProblem, minimum_velocity_in_the_domain=None)
 
 
 @pytest.mark.parametrize("save_shot_records", [False, True])
 def test_calculate_error_saves_shot_records_on_request(
-    monkeypatch, save_shot_records: bool,
+    monkeypatch,
+    save_shot_records: bool,
 ) -> None:
     """Shot records are written only when save_shot_records is set."""
     saved = []

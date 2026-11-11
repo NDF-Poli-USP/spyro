@@ -117,8 +117,7 @@ class MeshingParameterCalculator:
         self.threshold_evaluation: CpwEvaluation | None = None
         self.search_history: list[CpwEvaluation] = []
         self.reference_solution_file = (
-            parameters.reference_solution_file
-            or self.problem.default_reference_file()
+            parameters.reference_solution_file or self.problem.default_reference_file()
         )
 
         self.initial_dictionary = self.problem.model_dictionary(
