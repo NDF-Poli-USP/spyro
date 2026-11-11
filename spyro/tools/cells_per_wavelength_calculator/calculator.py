@@ -366,33 +366,33 @@ class MeshingParameterCalculator:
 
         Runs :func:`~.line_search.backward_line_search` or
         :func:`~.line_search.forward_line_search`
-        from ``starting_cpw``.
+        from `starting_cpw`.
 
         Parameters
         ----------
         starting_cpw : float, optional
             Starting cells-per-wavelength, which must meet the threshold
             for a backward search and exceed it for a forward search.
-            Default is ``parameters.cpw_initial``.
+            Default is `parameters.cpw_initial`.
         tol : float, optional
             Largest accepted receiver error. Default is
-            ``accepted_error_threshold``.
+            `accepted_error_threshold`.
         accuracy : float, optional
-            Resolution of the result. Default is ``parameters.cpw_accuracy``.
+            Resolution of the result. Default is `parameters.cpw_accuracy`.
         savetxt : bool, optional
-            Save the search history to ``p<degree>_cpw_results.txt``.
-            Default is False.
+            Save the search history to :meth:`results_file`. Default is
+            False.
         search_direction : CpwSearchDirection or str, optional
             Direction of the line search. Default is
-            ``parameters.search_direction``.
+            `parameters.search_direction`.
         max_cpw : float, optional
             Largest cells-per-wavelength evaluated. Default is
-            ``parameters.cpw_max``.
+            `parameters.cpw_max`.
 
         Returns
         -------
         float
-            The smallest evaluated cells-per-wavelength meeting ``tol``.
+            The smallest evaluated cells-per-wavelength meeting `tol`.
         """
         if starting_cpw is None:
             starting_cpw = self.parameters.cpw_initial
@@ -417,8 +417,23 @@ class MeshingParameterCalculator:
 
         if savetxt:
             SpyroEnsemble.run_in_one_core_and_broadcast(np.savetxt)(
-                f"p{self.initial_wave.degree}_cpw_results.txt",
+                self.results_file(),
                 [(e.cpw, e.dt, e.error, e.runtime) for e in self.search_history],
                 header="cpw dt error runtime",
             )
         return cpw
+
+    def results_file(self) -> str:
+        """Return the file name of the saved search history.
+
+        Returns
+        -------
+        str
+            `"<method>_p<degree>_cpw_results.txt"`, e.g.
+            `"mass_lumped_triangle_p4_cpw_results.txt"`, so that searches of
+            different methods at the same degree do not overwrite each other.
+        """
+        return (
+            f"{self.parameters.fem_method}_p{self.parameters.desired_degree}"
+            "_cpw_results.txt"
+        )

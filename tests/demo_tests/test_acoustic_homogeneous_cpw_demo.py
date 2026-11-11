@@ -25,4 +25,4 @@ def test_acoustic_homogeneous_cpw_demo(tmp_path, monkeypatch) -> None:
     errors = {e.cpw: e.error for e in calculator.search_history}
     cpw = min(cpw for cpw, error in errors.items() if error <= threshold)
     assert np.isclose(cpw, 1.9)
-    assert (tmp_path / "p4_cpw_results.txt").is_file()
+    assert (tmp_path / "spectral_quadrilateral_p4_cpw_results.txt").is_file()

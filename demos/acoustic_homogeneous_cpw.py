@@ -18,7 +18,7 @@ Run it with::
 
 It reads the analytical reference from :data:`REFERENCE_FILE`, so it runs
 from any working directory, and saves the search history to
-``p<degree>_cpw_results.txt``. A full search takes several minutes per
+`<method>_p<degree>_cpw_results.txt`. A full search takes several minutes per
 evaluated mesh.
 """
 

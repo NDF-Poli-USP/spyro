@@ -515,6 +515,57 @@ def test_stored_acoustic_reference_matches_its_settings() -> None:
     assert calculator.reference_solution.shape[1] == 36
 
 
+def test_search_history_files_are_named_by_method(tmp_path, monkeypatch) -> None:
+    """Searches of two methods at the same degree keep separate histories.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Working directory of the saved histories.
+    monkeypatch : pytest.MonkeyPatch
+        Replaces the analytical solution and the working directory.
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        AcousticHomogeneousProblem, "analytical_solution", fake_analytical_solution
+    )
+    error_scales = {"mass_lumped_triangle": 1.0, "spectral_quadrilateral": 0.5}
+    for method, error_scale in error_scales.items():
+        calculator = spyro.tools.MeshingParameterCalculator(
+            {**CALCULATOR_PARAMETERS, "FEM_method_to_evaluate": method}
+        )
+
+        def calculate_error(cpw: float, calculator=calculator, scale=error_scale):
+            """Record a solve whose error falls with cpw, without solving.
+
+            Parameters
+            ----------
+            cpw : float
+                Cells-per-wavelength of the solve.
+            calculator : spyro.tools.MeshingParameterCalculator
+                Calculator whose history the solve is appended to.
+            scale : float
+                Error at 1 cell-per-wavelength.
+
+            Returns
+            -------
+            float
+                The receiver error.
+            """
+            evaluation = calculator_module.CpwEvaluation(cpw, 1e-3, scale / cpw**2, 0.0)
+            calculator.search_history.append(evaluation)
+            return evaluation.error
+
+        calculator.calculate_error = calculate_error
+        calculator.find_minimum(savetxt=True)
+
+    # Each file holds its own method's errors, so neither was overwritten
+    for method, error_scale in error_scales.items():
+        history = np.loadtxt(tmp_path / f"{method}_p2_cpw_results.txt", ndmin=2)
+        cpw, error = history[:, 0], history[:, 2]
+        assert np.allclose(error, error_scale / cpw**2)
+
+
 def test_parameters_from_dict_maps_legacy_keys() -> None:
     """Dictionary keys map to fields, and enum strings are converted."""
     parameters = CpwParameters(
