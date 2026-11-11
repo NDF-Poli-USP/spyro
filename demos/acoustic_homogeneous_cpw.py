@@ -40,7 +40,7 @@ REFERENCE_FILE = (
     Path(__file__).resolve().parents[1]
     / "tests"
     / "inputfiles"
-    / "acoustic_homogeneous_cpw_reference.npy"
+    / "acoustic_homogeneous_cpw_reference.npz"
 )
 
 
@@ -62,31 +62,31 @@ def run(
         or `Method.SPECTRAL_QUADRILATERAL`, or any of their string aliases.
         Default is `Method.MASS_LUMPED_TRIANGLE`.
     degree : int, optional
-        Polynomial degree to evaluate. Default is 4.
+        Polynomial degree to evaluate. Default is 5.
     accepted_error_threshold : float or None, optional
         Largest accepted receiver error. Default is None.
     threshold_discretization : ThresholdDiscretization, bool, dict or None, optional
         Discretization whose error is used as the threshold. Default is
-        None, which, when ``accepted_error_threshold`` is also None, uses a
+        None, which, when `accepted_error_threshold` is also None, uses a
         degree 4 spectral quadrilateral mesh at cpw 2.0. Giving both is
         rejected by the calculator.
     cpw_initial : float, optional
         Starting cells-per-wavelength, whose error must exceed the
-        threshold. Default is 1.0.
+        threshold. Default is 0.8.
     cpw_max : float, optional
         Largest cells-per-wavelength evaluated. Default is
         :data:`~spyro.tools.cells_per_wavelength_calculator.MAX_CPW`.
     load_reference : bool, optional
         Load the reference receiver data from :data:`REFERENCE_FILE`. If
         False, it is computed and saved to
-        ``acoustic_homogeneous_cpw_reference.npy`` in the working
+        `acoustic_homogeneous_cpw_reference.npz` in the working
         directory. Default is True.
 
     Returns
     -------
     spyro.tools.MeshingParameterCalculator
         The calculator after the search, holding its
-        ``search_history``.
+        `search_history`.
     """
     method = Method(method)
     threshold = {}
