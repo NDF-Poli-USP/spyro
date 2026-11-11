@@ -89,7 +89,9 @@ class Sources(Delta_projector):
         self.number_of_points = wave.number_of_sources
         self.amplitude = wave.amplitude
         self.is_local = [0] * self.number_of_points
-        self.current_sources = None
+        self._current_sources = None
+        self._source_nodes = None
+        self._source_weights = None
         self.source_measure = None
         if wave.analysis == "transient":
             self.update_wavelet(wave)
@@ -97,6 +99,22 @@ class Sources(Delta_projector):
             self.build_maps(order=0)
         else:
             self.build_maps(order=1)
+
+    @property
+    def current_sources(self):
+        """The IDs of the sources that are applied, or ``None``."""
+        return self._current_sources
+
+    @current_sources.setter
+    def current_sources(self, source_ids):
+        self._current_sources = source_ids
+        if source_ids is None or self.use_vertex_only_mesh:
+            self._source_nodes = None
+            self._source_weights = None
+        else:
+            nodes, weights = self._source_nodes_and_weights()
+            self._source_nodes = self.compute_device.asarray(nodes)
+            self._source_weights = self.compute_device.asarray(weights)
 
     def update_wavelet(self, wave):
         """Update the cached wavelet from the current wave settings."""
@@ -231,19 +249,37 @@ class Sources(Delta_projector):
         rhs_forcing : Firedrake.Function
             The right hand side of the wave equation with the source applied
         """
+        data = rhs_forcing.dat.data_with_halos
+        if self._source_nodes.size > 0:
+            weights = self._source_weights
+            if data.ndim > weights.ndim:
+                weights = weights[:, None]
+            data[self._source_nodes] = self.wavelet[step] * weights
+
+        return rhs_forcing
+
+    def _source_nodes_and_weights(self):
+        """Return the nodes and weights of the current sources on this rank.
+
+        Returns
+        -------
+        node_indices : numpy.ndarray
+            The nodes of the cells that contain a current source.
+        weights : numpy.ndarray
+            The amplitude times the tabulation of the source at each node.
+        """
+        node_indices, weights = [], []
         for source_id in range(self.number_of_points):
             if self.is_local[source_id] and source_id in self.current_sources:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    rhs_forcing.dat.data_with_halos[
-                        int(self.cellNodeMaps[source_id][i])
-                    ] = self.wavelet[step] * np.dot(
-                        self.amplitude, self.cell_tabulations[source_id][i]
+                    node_indices.append(int(self.cellNodeMaps[source_id][i]))
+                    weights.append(
+                        np.dot(self.amplitude, self.cell_tabulations[source_id][i])
                     )
-            else:
-                for i in range(len(self.cellNodeMaps[source_id])):
-                    tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841
-
-        return rhs_forcing
+        return (
+            np.asarray(node_indices, dtype=np.int64),
+            np.asarray(weights, dtype=float),
+        )
 
     def source_cofunction(self):
         """Return a cofunction with the source applied into the domain.

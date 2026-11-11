@@ -20,6 +20,7 @@ from .changing_coordinates import (
 )
 
 import numpy as np
+import pyop3 as op3
 
 
 class Delta_projector:
@@ -88,6 +89,9 @@ class Delta_projector:
             self.quadrilateral = False
         self.is_local = None
         self.use_vertex_only_mesh = wave.use_vertex_only_mesh
+        self.compute_device = wave.compute_device
+        self._device_node_maps = None
+        self._device_tabulations = None
 
     def build_maps(self, order=0):
         """Calculate and store tabulations for interpolation.
@@ -120,6 +124,12 @@ class Delta_projector:
         ) = self.__point_locator()
         if self.use_vertex_only_mesh is False:
             self.cell_tabulations = self.__func_build_cell_tabulations(order)
+            self._device_node_maps = self.compute_device.asarray(
+                np.asarray(self.cellNodeMaps, dtype=np.int64)
+            )
+            self._device_tabulations = self.compute_device.asarray(
+                np.asarray(self.cell_tabulations)
+            )
         else:
             self.cell_tabulations = None
 
@@ -140,7 +150,12 @@ class Delta_projector:
             Solution interpolated to the list of receiver coordinates
             for the given timestep.
         """
-        return [self.new_at(field, rn) for rn in range(self.number_of_points)]
+        values = field[self._device_node_maps]
+        tabulations = self._device_tabulations
+        if values.ndim == 3:
+            tabulations = tabulations[:, :, None]
+        readings = (tabulations * values).sum(axis=1)
+        return list(op3.HOST_DEVICE.asarray(readings))
 
     def new_at(self, udat, receiver_id):
         """Evaluate a receiver value by receiver ID.

@@ -53,6 +53,11 @@ class Variant(Enum):
     DG = "DG"
 
 
+class Device(Enum):
+    CPU = "cpu"
+    GPU = "gpu"
+
+
 class Analysis(Enum):
     MODAL = "modal"
     EIKONAL = "eikonal"
@@ -69,6 +74,7 @@ class Read_options(BaseModel):
     method: Method | None = None
     cell_type: CellType | None = None
     automatic_adjoint: bool = False
+    device: Device = Device.CPU.value
     """
     Read the options section of the dictionary.
 
@@ -90,6 +96,9 @@ class Read_options(BaseModel):
         Whether to automatically compute the adjoint.
     analysis : `str`
         The type of analysis to be performed. Can be 'transient', 'modal' or 'eikonal'.
+    device : `str`
+        The device that runs the forward solve. Can be 'cpu' or 'gpu'. With 'gpu',
+        the solver forms are compiled to CUDA kernels by the GEM backend.
 
     Methods
     -------

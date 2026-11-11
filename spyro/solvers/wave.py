@@ -1,6 +1,8 @@
 from abc import abstractmethod, ABCMeta
+from functools import cached_property
 import warnings
 import firedrake as fire
+import pyop3 as op3
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 from .time_integration_central_difference import \
@@ -8,6 +10,7 @@ from .time_integration_central_difference import \
 from ..domains.quadrature import quadrature_rules
 from ..domains.space import check_function_space_type, create_function_space
 from ..io import Model_parameters
+from ..io.dictionaryio import Device
 from ..io import material_properties_io
 from ..io.parallelism_wrappers import ensemble_propagator
 from ..io.field_logger import FieldLogger
@@ -309,6 +312,33 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._physical_parameters = PhysicalParameters()
         self.building_mesh_derived_parameters()
 
+    @cached_property
+    def compute_device(self) -> op3.device.Device:
+        """The pyop3 device that runs the forward solve.
+
+        Returns
+        -------
+        pyop3.device.Device
+            A CUDA device when ``device`` is ``"gpu"``, and the host otherwise.
+        """
+        if self.device == Device.GPU.value:
+            return op3.CUDAGPU()
+        return op3.HOST_DEVICE
+
+    @property
+    def form_compiler_parameters(self) -> dict | None:
+        """Form compiler parameters for the forward solver.
+
+        Returns
+        -------
+        dict or None
+            ``{"backend": "gem"}`` on a CUDA device, so that the solver forms are
+            compiled to CUDA kernels, and ``None`` on the host.
+        """
+        if self.compute_device is op3.HOST_DEVICE:
+            return None
+        return {"backend": "gem"}
+
     def set_solver_parameters(self, parameters=None):
         """
         Set the solver parameters.
@@ -605,7 +635,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if source_nums is None:
             source_nums = [0]
         self.current_sources = source_nums
-        _forward_time_integrator(self, source_nums)
+        with op3.offloading(self.compute_device):
+            _forward_time_integrator(self, source_nums)
 
     def get_dt(self):
         return self._dt

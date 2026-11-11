@@ -1,4 +1,5 @@
 import firedrake as fire
+import pyop3 as op3
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 from .wave import Wave
@@ -84,7 +85,8 @@ class AcousticWave(Wave):
             self.X_nm1 = None
             construct_solver_or_matrix_with_pml(self)
         else:
-            construct_solver_or_matrix_no_pml(self)
+            with op3.offloading(self.compute_device):
+                construct_solver_or_matrix_no_pml(self)
 
         self.acoustic_energy = acoustic_energy(self)
 

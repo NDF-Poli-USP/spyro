@@ -4,6 +4,7 @@ import numpy as np
 from . import helpers
 from .. import utils
 from ..utils.typing import FunctionalEvaluationMode, AdjointType, AbsorbingBCsType
+from ..io.dictionaryio import Device
 
 
 def _propagate_forward_central_difference(wave, source_ids):
@@ -25,6 +26,12 @@ def _propagate_forward_central_difference(wave, source_ids):
     None
         The solver state, receiver data and functional are updated in place.
     """
+    if wave.device == Device.GPU.value and (
+        wave.use_vertex_only_mesh or wave.abc_type == AbsorbingBCsType.PML
+    ):
+        raise NotImplementedError(
+            "device='gpu' does not support vertex-only meshes or PML yet"
+        )
     if wave.sources is not None:
         wave.sources.current_sources = source_ids
         rhs_forcing = fire.Cofunction(wave.function_space.dual())
