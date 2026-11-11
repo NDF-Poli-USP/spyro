@@ -347,9 +347,6 @@ class HeterogeneousCpwProblem(CpwProblem):
             ),
         )
         wave = self.build_wave(dictionary, self.cpw_reference)
-        from firedrake import VTKFile
-        out = VTKFile("debug.pvd")
-        out.write(wave.c)
         wave.forward_solve()
         return wave.forward_solution_receivers
 
