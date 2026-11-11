@@ -10,6 +10,12 @@ from ..version_control import is_firedrake_new
 if is_firedrake_new() is False:
     from firedrake.__future__ import interpolate
 
+#: Solver time steps by which receiver data leads its time label. The time
+#: loop records after each solve, so sample `i` holds the field at time
+#: `(i + 1) * dt`. Code comparing receiver data with a time series sampled at
+#: `i * dt` shifts that series by `RECEIVER_STEP_OFFSET * dt`.
+RECEIVER_STEP_OFFSET = 1
+
 
 class Receivers(Delta_projector):
     """Eveluate data at points based on Dirac Delta projection.

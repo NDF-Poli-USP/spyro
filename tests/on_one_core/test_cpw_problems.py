@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 import spyro
 from spyro.io.time_io import interpolate_time_series
+from spyro.receivers.Receivers import RECEIVER_STEP_OFFSET
 from spyro.tools.cells_per_wavelength_calculator import (
     ACOUSTIC,
     CPW_PROBLEMS,
@@ -244,13 +245,13 @@ def test_interpolate_time_series_applies_time_shift() -> None:
 @pytest.mark.parametrize(
     "problem_class, expected_steps",
     [
-        (AcousticHomogeneousProblem, 1.0),
+        (AcousticHomogeneousProblem, RECEIVER_STEP_OFFSET),
     ],
 )
 def test_reference_time_shift(
     problem_class: type[CpwProblem], expected_steps: float,
 ) -> None:
-    """Only analytical acoustic references are shifted one solver step."""
+    """Analytical references are resampled with the receiver offset."""
     wave = SimpleNamespace(dt=2e-3)
 
     shift = make_problem(problem_class).reference_time_shift(wave)
@@ -289,6 +290,52 @@ def test_homogeneous_reference_is_analytical(monkeypatch) -> None:
     )
 
     assert problem.reference_solution(initial_wave, "mass_lumped_triangle") is reference
+
+
+def test_acoustic_analytical_reference_has_no_receiver_offset(monkeypatch) -> None:
+    """The stored reference is the field at its time labels, for any solver dt.
+
+    Parameters
+    ----------
+    monkeypatch : pytest.MonkeyPatch
+        Records the calls to the analytical solution.
+    """
+    time_shifts = []
+
+    def record_time_shift(wave, offset, velocity, **kwargs) -> np.ndarray:
+        """Record the requested time shift and return zero data.
+
+        Parameters
+        ----------
+        wave : SimpleNamespace
+            Stand-in wave holding the time axis.
+        offset : float
+            Source-receiver distance, unused.
+        velocity : float
+            Medium velocity, unused.
+        **kwargs
+            Keyword arguments, holding `time_shift`.
+
+        Returns
+        -------
+        np.ndarray
+            Zeros, one per time sample.
+        """
+        time_shifts.append(kwargs.get("time_shift"))
+        return np.zeros(round(wave.final_time / wave.dt) + 1)
+
+    monkeypatch.setattr(spyro.utils, "nodal_homogeneous_analytical", record_time_shift)
+    wave = SimpleNamespace(
+        dt=0.1,
+        final_time=1.0,
+        number_of_receivers=2,
+        source_locations=[(0.0, 0.0)],
+        receiver_locations=[(-1.0, 0.0), (-1.0, 1.0)],
+    )
+
+    make_problem(AcousticHomogeneousProblem).analytical_solution(wave)
+
+    assert time_shifts == [0.0, 0.0]
 
 
 def fake_analytical_solution(problem: CpwProblem, wave) -> np.ndarray:

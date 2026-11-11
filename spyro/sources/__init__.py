@@ -3,6 +3,7 @@
 from . import Sources
 from .Sources import (
     full_ricker_wavelet,
+    ricker_time_delay,
     ricker_wavelet,
     timedependentSource,
     ricker_integral,
@@ -10,6 +11,7 @@ from .Sources import (
 
 __all__ = [
     "Sources",
+    "ricker_time_delay",
     "ricker_wavelet",
     "full_ricker_wavelet",
     "timedependentSource",

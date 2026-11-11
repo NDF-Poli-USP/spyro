@@ -1,8 +1,11 @@
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 import spyro
 
 from spyro.io.basicio import parallel_print as pprint
+from spyro.receivers.Receivers import RECEIVER_STEP_OFFSET
 from spyro.tools.error_measure import MeasureError
 from spyro.utils.analytical_solution_nodal import (
     analytical_explosive_source,
@@ -134,6 +137,122 @@ def test_analytical_explosive_source_direction():
 
     np.testing.assert_allclose(uy, 0.0)
     np.testing.assert_allclose(uz, 0.0)
+
+
+@pytest.mark.parametrize(
+    "delay, delay_type, expected",
+    [
+        (1.5, "multiples_of_minimum", 1.5 * np.sqrt(6.0) / (np.pi * 5.0)),
+        (0.3, "time", 0.3),
+    ],
+)
+def test_ricker_time_delay(delay: float, delay_type: str, expected: float) -> None:
+    """A delay in multiples of the minima distance is converted to seconds.
+
+    Parameters
+    ----------
+    delay : float
+        Delay in the units of `delay_type`.
+    delay_type : str
+        Unit of `delay`.
+    expected : float
+        Delay in seconds.
+    """
+    assert np.isclose(spyro.sources.ricker_time_delay(delay, 5.0, delay_type), expected)
+
+
+def test_ricker_time_delay_rejects_unknown_type() -> None:
+    """An unknown delay type is rejected instead of left undefined."""
+    with pytest.raises(ValueError, match="delay_type"):
+        spyro.sources.ricker_time_delay(1.5, 5.0, "cycles")
+
+
+def test_nodal_analytical_shift_is_one_time_step_for_any_delay_type() -> None:
+    """Both delay types advance the wavelet by exactly one time step.
+
+    The same delay, in multiples of the minima distance or in seconds, gives
+    the same receiver data. The one-step shift was once subtracted from the
+    delay before converting it, which shifted multiples by about 0.16 dt.
+    """
+    frequency = 5.0
+    multiples = 1.5
+    common = {"dt": 1e-3, "final_time": 1.0, "frequency": frequency}
+    wave_multiples = SimpleNamespace(
+        delay=multiples, delay_type="multiples_of_minimum", **common
+    )
+    wave_time = SimpleNamespace(
+        delay=multiples * np.sqrt(6.0) / (np.pi * frequency),
+        delay_type="time",
+        **common,
+    )
+
+    from_multiples = spyro.utils.nodal_homogeneous_analytical(
+        wave_multiples, 0.5, 1.5, n_extra=20
+    )
+    from_time = spyro.utils.nodal_homogeneous_analytical(
+        wave_time, 0.5, 1.5, n_extra=20
+    )
+
+    assert np.any(np.abs(from_time) > 1e-3)
+    np.testing.assert_allclose(from_multiples, from_time, rtol=0.0, atol=1e-12)
+
+
+def make_analytical_wave() -> SimpleNamespace:
+    """Build a stand-in wave for the nodal analytical solution.
+
+    The delay is long enough for the wavelet to vanish at time 0, so a
+    shifted wavelet is a shifted copy of the unshifted one. With the default
+    delay of 1.5, the cut wavelet start changes the solution by about 1e-5
+    of its peak.
+
+    Returns
+    -------
+    SimpleNamespace
+        Time axis and Ricker settings, with a delay in multiples.
+    """
+    return SimpleNamespace(
+        dt=1e-3,
+        final_time=1.0,
+        frequency=5.0,
+        delay=3.0,
+        delay_type="multiples_of_minimum",
+    )
+
+
+def test_nodal_analytical_default_shift_is_receiver_offset() -> None:
+    """With no time shift, the solution leads by the receiver offset."""
+    wave = make_analytical_wave()
+
+    default = spyro.utils.nodal_homogeneous_analytical(wave, 0.5, 1.5, n_extra=20)
+    explicit = spyro.utils.nodal_homogeneous_analytical(
+        wave, 0.5, 1.5, n_extra=20, time_shift=RECEIVER_STEP_OFFSET * wave.dt
+    )
+
+    np.testing.assert_array_equal(default, explicit)
+
+
+@pytest.mark.parametrize("steps", [1, 2])
+def test_nodal_analytical_time_shift_advances_samples(steps: int) -> None:
+    """A time shift of whole time steps moves the samples by as many indices.
+
+    Parameters
+    ----------
+    steps : int
+        Time shift, in time steps.
+    """
+    wave = make_analytical_wave()
+
+    unshifted = spyro.utils.nodal_homogeneous_analytical(
+        wave, 0.5, 1.5, n_extra=20, time_shift=0.0
+    )
+    shifted = spyro.utils.nodal_homogeneous_analytical(
+        wave, 0.5, 1.5, n_extra=20, time_shift=steps * wave.dt
+    )
+
+    assert np.any(np.abs(unshifted) > 1e-3)
+    np.testing.assert_allclose(
+        shifted[:-steps], unshifted[steps:], rtol=0.0, atol=1e-12
+    )
 
 
 if __name__ == "__main__":
