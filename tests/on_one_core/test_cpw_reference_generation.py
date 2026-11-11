@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 import spyro
+from spyro.tools.cells_per_wavelength_calculator.calculator import REFERENCE_DATA_KEY
 
 #: Directory holding the stored full receiver data.
 INPUT_FILES = Path(__file__).parents[1] / "inputfiles"
@@ -36,7 +37,7 @@ COMMON_PARAMETERS = {
     [
         pytest.param(
             {"source_frequency": 5.0, "minimum_velocity_in_the_domain": 1.5},
-            "acoustic_homogeneous_cpw_reference.npy",
+            "acoustic_homogeneous_cpw_reference.npz",
             # Corners of the 6 by 6 grid
             [0, 5, 30, 35],
             id="acoustic",
@@ -61,7 +62,8 @@ def test_reduced_reference_matches_stored(
         {**COMMON_PARAMETERS, **parameters}
     )
 
-    stored = np.load(INPUT_FILES / stored_file)
+    with np.load(INPUT_FILES / stored_file) as stored_file_data:
+        stored = stored_file_data[REFERENCE_DATA_KEY]
     reference = calculator.reference_solution
     assert reference.shape[1] == len(receivers)
     assert np.allclose(reference, stored[:, receivers], rtol=0.0, atol=1e-12)
