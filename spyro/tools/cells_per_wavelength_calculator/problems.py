@@ -82,13 +82,39 @@ class CpwProblem(ABC):
         Returns
         -------
         str
-            ``"<physics>_<profile>_cpw_reference.npy"``, e.g.
-            ``"acoustic_homogeneous_cpw_reference.npy"``.
+            `"<physics>_<profile>_cpw_reference.npz"`, e.g.
+            `"acoustic_homogeneous_cpw_reference.npz"`.
         """
         return (
             f"{self.physics.name}_{self.velocity_profile_type.value}"
-            "_cpw_reference.npy"
+            "_cpw_reference.npz"
         )
+
+    def reference_metadata(self, initial_wave: Wave) -> dict[str, float | np.ndarray]:
+        """Return the settings the reference receiver data depends on.
+
+        They are saved with the reference, and a loaded reference must match
+        them. Subclasses add their material.
+
+        Parameters
+        ----------
+        initial_wave : Wave
+            Wave object of the discretization under evaluation, holding the
+            acquisition and time axis.
+
+        Returns
+        -------
+        dict of str to float or np.ndarray
+            Source frequency, reference time step, final time, and source and
+            receiver locations.
+        """
+        return {
+            "source_frequency": self.source_frequency,
+            "dt": initial_wave.dt,
+            "final_time": initial_wave.final_time,
+            "source_locations": np.asarray(initial_wave.source_locations),
+            "receiver_locations": np.asarray(initial_wave.receiver_locations),
+        }
 
     def build_wave(self, dictionary: dict, cpw: float) -> Wave:
         """Build a wave object and set up its mesh and material.
@@ -274,6 +300,24 @@ class AcousticHomogeneousProblem(HomogeneousCpwProblem):
         """
         super().setup_wave(wave, cpw)
         wave.set_initial_velocity_model(constant=self.minimum_wavelength_velocity)
+
+    def reference_metadata(self, initial_wave: Wave) -> dict[str, float | np.ndarray]:
+        """Return the settings the reference depends on, with the velocity.
+
+        Parameters
+        ----------
+        initial_wave : Wave
+            Wave object holding the acquisition and time axis.
+
+        Returns
+        -------
+        dict of str to float or np.ndarray
+            :meth:`CpwProblem.reference_metadata`, and the velocity.
+        """
+        return {
+            **super().reference_metadata(initial_wave),
+            "velocity": self.minimum_wavelength_velocity,
+        }
 
     def reference_time_shift(self, wave: Wave) -> float:
         """Return one solver time step.

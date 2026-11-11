@@ -21,6 +21,10 @@ from ...utils.typing import CpwSearchDirection, TimeStepCalculationType
 #: whose time step is not fixed.
 MAXIMUM_DT_FRACTION = 0.5
 
+#: Key of the receiver data in a reference solution file. The other keys are
+#: the problem's reference metadata.
+REFERENCE_DATA_KEY = "data"
+
 
 @dataclass(frozen=True)
 class CpwEvaluation:
@@ -67,7 +71,7 @@ class MeshingParameterCalculator:
     reference_solution_file : str
         File the reference is saved to or loaded from. Defaults to
         :meth:`CpwProblem.default_reference_file`, e.g.
-        ``"acoustic_homogeneous_cpw_reference.npy"``.
+        `"acoustic_homogeneous_cpw_reference.npz"`.
     initial_dictionary : dict
         Model dictionary of the discretization under evaluation.
     initial_wave : Wave
@@ -130,21 +134,83 @@ class MeshingParameterCalculator:
     def get_reference_solution(self) -> np.ndarray:
         """Load or compute the reference receiver data.
 
+        A saved reference holds the data under :data:`REFERENCE_DATA_KEY`,
+        with the problem's :meth:`~.problems.CpwProblem.reference_metadata`.
+
         Returns
         -------
         np.ndarray
             The reference receiver data.
+
+        Raises
+        ------
+        ValueError
+            If a loaded reference does not match this calculation, see
+            :meth:`_load_reference`.
         """
         if self.parameters.load_reference:
-            return np.load(self.reference_solution_file)
+            return self._load_reference()
 
         reference = self.problem.reference_solution(
             self.initial_wave, self.parameters.fem_method
         )
 
         if self.parameters.save_reference:
-            SpyroEnsemble.run_in_one_core_and_broadcast(np.save)(
-                self.reference_solution_file, reference
+            SpyroEnsemble.run_in_one_core_and_broadcast(np.savez)(
+                self.reference_solution_file,
+                **{REFERENCE_DATA_KEY: reference},
+                **self.problem.reference_metadata(self.initial_wave),
+            )
+        return reference
+
+    def _load_reference(self) -> np.ndarray:
+        """Load the reference receiver data and check it fits this calculation.
+
+        Returns
+        -------
+        np.ndarray
+            The reference receiver data.
+
+        Raises
+        ------
+        ValueError
+            If the file holds no metadata, its metadata differs from the
+            problem's :meth:`~.problems.CpwProblem.reference_metadata`, or
+            its data is not shaped `(n_time, n_receivers, ...)` for the time
+            axis and acquisition of `initial_wave`.
+        """
+        file = self.reference_solution_file
+        stored = np.load(file)
+        if not isinstance(stored, np.lib.npyio.NpzFile):
+            raise ValueError(
+                f"Reference file {file!r} holds no metadata. Save it again with "
+                "save_reference."
+            )
+        expected = self.problem.reference_metadata(self.initial_wave)
+        with stored:
+            mismatched = [
+                key
+                for key, value in expected.items()
+                if key not in stored
+                or np.shape(stored[key]) != np.shape(value)
+                or not np.allclose(stored[key], value, rtol=1e-12, atol=0.0)
+            ]
+            if mismatched:
+                raise ValueError(
+                    f"Reference file {file!r} was computed for different "
+                    f"{', '.join(mismatched)}. Save it again with save_reference."
+                )
+            reference = stored[REFERENCE_DATA_KEY]
+
+        wave = self.initial_wave
+        expected_shape = (
+            round(wave.final_time / wave.dt) + 1,
+            wave.number_of_receivers,
+        )
+        if reference.shape[:2] != expected_shape:
+            raise ValueError(
+                f"Reference data in {file!r} has shape {reference.shape}, "
+                f"expected {expected_shape} for time and receivers."
             )
         return reference
 

@@ -89,7 +89,8 @@ class CpwParameters(BaseModel):
     load_reference : bool
         Load the reference solution from ``reference_solution_file``.
     reference_solution_file : str or None
-        File the reference is saved to or loaded from. Default is None, for
+        `.npz` file the reference is saved to or loaded from, with its
+        metadata. Default is None, for
         :meth:`CpwProblem.default_reference_file`.
     save_shot_records : bool
         Save the shot record of every search solve to
@@ -164,10 +165,11 @@ class CpwParameters(BaseModel):
         Raises
         ------
         ValueError
-            If ``mesh_frequency_factor`` is not positive, both or neither of
-            ``accepted_error_threshold`` and ``threshold_discretization`` are
-            given, or ``fixed_timestep`` is given without
-            ``TimeStepCalculationType.FIXED`` or missing with it.
+            If `mesh_frequency_factor` is not positive, both or neither of
+            `accepted_error_threshold` and `threshold_discretization` are
+            given, `fixed_timestep` is given without
+            `TimeStepCalculationType.FIXED` or missing with it, or
+            `reference_solution_file` does not end in `.npz`.
         """
         validate_numeric(
             "mesh_frequency_factor", self.mesh_frequency_factor, lower_bound=0.0
@@ -184,6 +186,14 @@ class CpwParameters(BaseModel):
             raise ValueError(
                 "Give a timestep exactly when timestep_calculation is "
                 f"{TimeStepCalculationType.FIXED.value!r}."
+            )
+        # np.savez appends .npz to any other name, which a load would miss
+        if self.reference_solution_file is not None and not (
+            self.reference_solution_file.endswith(".npz")
+        ):
+            raise ValueError(
+                "reference_solution_file must be a .npz file, got "
+                f"{self.reference_solution_file!r}."
             )
         return self
 
