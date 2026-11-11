@@ -17,6 +17,7 @@ from .input_models import (
 )
 from .parameters import CpwParameters
 from .wave_physics import ACOUSTIC, WavePhysics
+from ...receivers.Receivers import RECEIVER_STEP_OFFSET
 from ...solvers.wave import Wave
 from ...utils.typing import VelocityProfileType, WaveType
 
@@ -320,7 +321,11 @@ class AcousticHomogeneousProblem(HomogeneousCpwProblem):
         }
 
     def reference_time_shift(self, wave: Wave) -> float:
-        """Return one solver time step.
+        """Return the receiver time offset of the forward solve.
+
+        The analytical reference holds the field at its time labels, while
+        the receiver data leads them by
+        :data:`~spyro.receivers.Receivers.RECEIVER_STEP_OFFSET` solver steps.
 
         Parameters
         ----------
@@ -330,13 +335,9 @@ class AcousticHomogeneousProblem(HomogeneousCpwProblem):
         Returns
         -------
         float
-            ``wave.dt``.
+            `RECEIVER_STEP_OFFSET * wave.dt`.
         """
-        # TODO: The receivers store the field at time (i + 1) * dt at index
-        # i, one solver step ahead of their time label. Until the receiver
-        # indexing is fixed in its own PR, the analytical reference is
-        # sampled one solver step later to match. Remove this shift then.
-        return wave.dt
+        return RECEIVER_STEP_OFFSET * wave.dt
 
     def analytical_solution(self, wave: Wave) -> np.ndarray:
         """Compute the acoustic analytical receiver data.
@@ -349,7 +350,8 @@ class AcousticHomogeneousProblem(HomogeneousCpwProblem):
         Returns
         -------
         np.ndarray
-            Pressure at the receivers, shaped ``(n_time, n_receivers)``.
+            Pressure at the receivers at the time labels `i * wave.dt`, with
+            no receiver offset, shaped `(n_time, n_receivers)`.
         """
         velocity = self.minimum_wavelength_velocity
         num_t = round(wave.final_time / wave.dt) + 1
@@ -357,8 +359,10 @@ class AcousticHomogeneousProblem(HomogeneousCpwProblem):
         source = np.asarray(wave.source_locations[0])
         for i, receiver in enumerate(wave.receiver_locations):
             offset = np.linalg.norm(np.asarray(receiver) - source)
+            # Without the receiver offset, which depends on the solver time
+            # step and is applied when the reference is resampled
             analytical[:, i] = spyro.utils.nodal_homogeneous_analytical(
-                wave, offset, velocity
+                wave, offset, velocity, time_shift=0.0
             )
         return analytical
 
