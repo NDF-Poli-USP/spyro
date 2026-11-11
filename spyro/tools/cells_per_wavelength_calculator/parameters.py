@@ -61,9 +61,6 @@ class CpwParameters(BaseModel):
         Wave physics. Default is ``WaveType.ISOTROPIC_ACOUSTIC``.
     velocity_profile_type : VelocityProfileType
         Default is `VelocityProfileType.HOMOGENEOUS`.
-    receiver_setup : str or None
-        Receiver setup label, kept for older parameter dictionaries. The
-        acquisition is set by the problem.
     minimum_velocity : float or None
         Velocity, homogeneous acoustic only.
     accepted_error_threshold : float or None
@@ -113,7 +110,6 @@ class CpwParameters(BaseModel):
     cpw_accuracy: float
     wave_type: WaveType = WaveType.ISOTROPIC_ACOUSTIC
     velocity_profile_type: VelocityProfileType = VelocityProfileType.HOMOGENEOUS
-    receiver_setup: str | None = None
     minimum_velocity: float | None = None
     accepted_error_threshold: float | None = None
     threshold_discretization: ThresholdDiscretization | None = None

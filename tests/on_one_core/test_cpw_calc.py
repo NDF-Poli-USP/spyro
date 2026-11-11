@@ -37,7 +37,6 @@ def make_parameters(method: str, degree: int) -> dict:
         "velocity_profile_type": "homogeneous",
         "FEM_method_to_evaluate": method,
         "dimension": 2,
-        "receiver_setup": "near",
         "testing": True,
         "timestep_calculation": "float",
         "timestep": 0.002,
