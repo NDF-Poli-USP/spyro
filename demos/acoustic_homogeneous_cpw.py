@@ -46,7 +46,7 @@ REFERENCE_FILE = (
 
 def run(
     method: Method | str = Method.MASS_LUMPED_TRIANGLE,
-    degree: int = 5,
+    degree: int = 4,
     accepted_error_threshold: float | None = None,
     threshold_discretization: ThresholdDiscretization | bool | dict | None = None,
     cpw_initial: float = 0.8,
