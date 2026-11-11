@@ -343,7 +343,10 @@ def test_homogeneous_reference_is_analytical(monkeypatch) -> None:
 
 
 def test_heterogeneous_reference_uses_reference_discretization(monkeypatch) -> None:
-    """A heterogeneous reference is solved at the reference degree and cpw."""
+    """A heterogeneous reference is solved at the reference degree and cpw.
+
+    It also saves its pressure field under the case name.
+    """
     problem = make_problem(AcousticHeterogeneousProblem)
     reference = np.ones((3, 2))
     built = {}
@@ -371,14 +374,26 @@ def test_heterogeneous_reference_uses_reference_discretization(monkeypatch) -> N
     monkeypatch.setattr(
         problem,
         "model_dictionary",
-        lambda method, degree: {"method": method, "degree": degree},
+        lambda method, degree: {
+            "method": method,
+            "degree": degree,
+            "visualization": {"forward_output": False},
+        },
     )
     monkeypatch.setattr(problem, "build_wave", build_wave)
 
     result = problem.reference_solution(None, "mass_lumped_triangle")
 
     assert result is reference
-    assert built == {"method": "mass_lumped_triangle", "degree": 5, "cpw": 6.0}
+    assert built == {
+        "method": "mass_lumped_triangle",
+        "degree": 5,
+        "visualization": {
+            "forward_output": True,
+            "forward_output_filename": "results/velocity_reference_forward_output.pvd",
+        },
+        "cpw": 6.0,
+    }
 
 
 def test_acoustic_analytical_reference_has_no_receiver_offset(monkeypatch) -> None:
