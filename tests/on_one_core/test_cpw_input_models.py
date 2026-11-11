@@ -187,7 +187,8 @@ def test_round_up_to_time_step(time: float, dt: float, expected: float) -> None:
     ids=["acoustic"],
 )
 def test_homogeneous_final_time_is_on_reference_grid(
-    dt: float, build: Callable[[float], dict],
+    dt: float,
+    build: Callable[[float], dict],
 ) -> None:
     """The last of ``round(T / dt) + 1`` reference samples is at ``T``.
 
