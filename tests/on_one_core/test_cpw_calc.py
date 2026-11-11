@@ -73,3 +73,30 @@ def test_acoustic_cpw_search_quads() -> None:
     assert np.isclose(cpw, 1.1)
     assert errors[cpw] <= 0.01
     assert errors[round(cpw - 0.1, 10)] > 0.01
+
+
+@pytest.mark.slow
+def test_acoustic_cpw_search_triangles() -> None:
+    """The search finds the minimum for mass-lumped triangles.
+
+    The periodic box is meshed with structured triangles. The fixed time
+    step stays below the stable one up to about 4 cells-per-wavelength.
+    The threshold lies about halfway, in log scale, between the errors at
+    cpw 1.0 (about 0.0104) and 1.1 (about 0.0024).
+    """
+    threshold = 0.005
+    calculator = spyro.tools.MeshingParameterCalculator(
+        {
+            **make_parameters("mass_lumped_triangle", 4),
+            "C_initial": 1.0,
+            "C_max": 2.0,
+            "accepted_error_threshold": threshold,
+        }
+    )
+
+    cpw = calculator.find_minimum()
+
+    errors = {e.cpw: e.error for e in calculator.search_history}
+    assert np.isclose(cpw, 1.1)
+    assert errors[cpw] <= threshold
+    assert errors[round(cpw - 0.1, 10)] > threshold
