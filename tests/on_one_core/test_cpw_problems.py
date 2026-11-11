@@ -290,22 +290,66 @@ def test_interpolate_time_series_applies_time_shift() -> None:
 
 
 @pytest.mark.parametrize(
-    "problem_class, expected_steps",
+    "problem_class, expected_shift",
     [
-        (AcousticHomogeneousProblem, RECEIVER_STEP_OFFSET),
-        (AcousticHeterogeneousProblem, 0.0),
+        # Analytical: the whole receiver offset of the solve
+        (AcousticHomogeneousProblem, RECEIVER_STEP_OFFSET * 2e-3),
+        # Numerical: the reference already holds its own offset
+        (AcousticHeterogeneousProblem, RECEIVER_STEP_OFFSET * (2e-3 - 1e-4)),
     ],
 )
 def test_reference_time_shift(
     problem_class: type[CpwProblem],
-    expected_steps: float,
+    expected_shift: float,
 ) -> None:
-    """Analytical references are resampled with the receiver offset."""
+    """References are shifted by the receiver offset they do not hold."""
     wave = SimpleNamespace(dt=2e-3)
 
-    shift = make_problem(problem_class).reference_time_shift(wave)
+    shift = make_problem(problem_class).reference_time_shift(wave, 1e-4)
 
-    assert np.isclose(shift, expected_steps * wave.dt)
+    assert np.isclose(shift, expected_shift)
+
+
+@pytest.mark.parametrize("solver_dt", [5e-4, 1e-3, 2e-3])
+def test_numerical_reference_resamples_onto_solve_times(solver_dt: float) -> None:
+    """A reference solved at another dt matches the solve after resampling.
+
+    Both records hold a Ricker wavelet at `(i + RECEIVER_STEP_OFFSET) * dt`,
+    as receiver data does. Each solver step is a whole number of reference
+    steps, so the shifted samples land on reference samples and match
+    exactly.
+
+    Parameters
+    ----------
+    solver_dt : float
+        Time step of the forward solve.
+    """
+    final_time, reference_dt, frequency = 1.0, 1e-4, 5.0
+
+    def recorded(dt: float) -> np.ndarray:
+        """Return a Ricker trace sampled as receiver data at a time step.
+
+        Parameters
+        ----------
+        dt : float
+            Time step of the record.
+
+        Returns
+        -------
+        np.ndarray
+            The trace, shaped `(n_time, 1)`.
+        """
+        steps = np.arange(round(final_time / dt) + 1) + RECEIVER_STEP_OFFSET
+        argument = (np.pi * frequency * (steps * dt - 1.0 / frequency)) ** 2
+        return ((1.0 - 2.0 * argument) * np.exp(-argument))[:, np.newaxis]
+
+    problem = make_problem(AcousticHeterogeneousProblem)
+    shift = problem.reference_time_shift(SimpleNamespace(dt=solver_dt), reference_dt)
+    resampled = interpolate_time_series(
+        recorded(reference_dt), solver_dt, final_time=final_time, time_shift=shift
+    )
+
+    assert np.allclose(resampled, recorded(solver_dt), rtol=0.0, atol=1e-12)
 
 
 @pytest.mark.parametrize(
