@@ -21,9 +21,13 @@ Run it with::
 
     python3 demos/elastic_homogeneous_cpw.py
 
-It saves the search history to `<method>_p<degree>_cpw_results.txt`. A full
-search takes several minutes per evaluated mesh.
+It reads the analytical reference from :data:`REFERENCE_FILE`, so it runs
+from any working directory, and saves the search history to
+`<method>_p<degree>_cpw_results.txt`. A full search takes several minutes per
+evaluated mesh.
 """
+
+from pathlib import Path
 
 import spyro
 from spyro.tools.cells_per_wavelength_calculator import (
@@ -40,6 +44,13 @@ P_WAVE_VELOCITY = 5.6
 S_WAVE_VELOCITY = 2.75
 #: Density of the medium, in g/cm^3.
 DENSITY = 2.0
+#: Stored analytical receiver data of this demo's acquisition.
+REFERENCE_FILE = (
+    Path(__file__).resolve().parents[1]
+    / "tests"
+    / "inputfiles"
+    / "elastic_homogeneous_cpw_reference.npz"
+)
 
 
 def run(
@@ -49,7 +60,7 @@ def run(
     threshold_discretization: ThresholdDiscretization | bool | dict | None = None,
     cpw_initial: float = 1.0,
     cpw_max: float = MAX_CPW,
-    load_reference: bool = False,
+    load_reference: bool = True,
 ) -> spyro.tools.MeshingParameterCalculator:
     """Search for the minimum cells-per-wavelength of one discretization.
 
@@ -74,10 +85,10 @@ def run(
         Largest cells-per-wavelength evaluated. Default is
         :data:`~spyro.tools.cells_per_wavelength_calculator.MAX_CPW`.
     load_reference : bool, optional
-        Load the reference receiver data from
+        Load the reference receiver data from :data:`REFERENCE_FILE`. If
+        False, it is computed and saved to
         `elastic_homogeneous_cpw_reference.npz` in the working
-        directory. If False, it is computed and saved there. Default is
-        False.
+        directory. Default is True.
 
     Returns
     -------
@@ -113,6 +124,10 @@ def run(
         "save_reference": not load_reference,
         **threshold,
     }
+    if load_reference:
+        # A computed reference goes to the working directory instead, so the
+        # stored file is never overwritten
+        parameters["reference_solution_file"] = str(REFERENCE_FILE)
 
     calculator = spyro.tools.MeshingParameterCalculator(parameters)
     cpw = calculator.find_minimum(savetxt=True)

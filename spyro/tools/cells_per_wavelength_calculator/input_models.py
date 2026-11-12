@@ -45,6 +45,17 @@ HETEROGENEOUS_DT = 1e-4
 #: interpolating onto the solver time step is negligible.
 ELASTIC_REFERENCE_DT_PERIODS = 1.0 / 500.0
 
+# Acquisition of the homogeneous elastic model, in S-wavelengths, following
+# Lyu et al. (2024), doi: 10.1029/2023JB027576. The receivers lie on a
+# horizontal line below the source.
+#: Vertical distance from the source to the receiver line.
+ELASTIC_RECEIVER_LINE_DEPTH = 7.0
+#: Horizontal offset of the last receiver; the first is at offset 0.
+ELASTIC_RECEIVER_LINE_LENGTH = 7.0
+#: Receivers on the line, and in reduced (testing) mode.
+ELASTIC_RECEIVER_QUANTITY = 11
+ELASTIC_RECEIVER_QUANTITY_REDUCED = 3
+
 
 def set_mesh_type(method: str) -> str:
     """Return the mesh type used for a finite element method.
@@ -508,9 +519,10 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
 ) -> dict:
     """Create a 2D homogeneous isotropic elastic model for the cpw calculator.
 
-    A horizontal (x-direction) point force is placed in a periodic box. The receivers lie on
-    a horizontal line ``7`` S-wavelengths below the source, spanning
-    horizontal offsets from ``0`` to ``7`` S-wavelengths. The final time lets
+    A horizontal (x-direction) point force is placed in a periodic box. The
+    receivers lie on a horizontal line :data:`ELASTIC_RECEIVER_LINE_DEPTH`
+    S-wavelengths below the source, spanning horizontal offsets from 0 to
+    :data:`ELASTIC_RECEIVER_LINE_LENGTH` S-wavelengths. The final time lets
     the S-wave reach the farthest receiver, rounded up to a whole number of
     time steps, and the box is sized so that no
     P-wave from a periodic image of the source reaches any receiver before
@@ -536,7 +548,8 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
         Default is None, for :data:`ELASTIC_REFERENCE_DT_PERIODS` Ricker
         periods.
     reduced : bool, optional
-        If True, use 3 receivers instead of 11, for testing. Default is
+        If True, use :data:`ELASTIC_RECEIVER_QUANTITY_REDUCED` receivers
+        instead of :data:`ELASTIC_RECEIVER_QUANTITY`, for testing. Default is
         False.
 
     Returns
@@ -556,11 +569,11 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
     s_wavelength = s_wave_velocity / frequency
     delay = 1.0 / frequency
 
-    # Acquisition, in S-wavelengths, following Lyu et al. (2024)
-    # doi: 10.1029/2023JB027576
-    vertical_offset = 7 * s_wavelength
-    maximum_horizontal_offset = 7 * s_wavelength
-    receiver_quantity = 3 if reduced else 11
+    vertical_offset = ELASTIC_RECEIVER_LINE_DEPTH * s_wavelength
+    maximum_horizontal_offset = ELASTIC_RECEIVER_LINE_LENGTH * s_wavelength
+    receiver_quantity = (
+        ELASTIC_RECEIVER_QUANTITY_REDUCED if reduced else ELASTIC_RECEIVER_QUANTITY
+    )
     farthest_offset = np.hypot(vertical_offset, maximum_horizontal_offset)
 
     # S-wave reaches the farthest receiver, plus two periods of wavelet tail
@@ -602,5 +615,4 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
             "real_velocity_file": None,
         },
         periodic=True,
-        forward_output=True,
     )
