@@ -315,7 +315,7 @@ def test_elastic_cpw_search_meets_threshold() -> None:
         "testing": True,
         "timestep_calculation": "exact",
         "desired_degree": 4,
-        "C_initial": 1.0,
+        "C_initial": 0.5,
         "C_max": 3.0,
         "search_direction": "forward",
         "accepted_error_threshold": 0.05,
@@ -581,48 +581,69 @@ def test_heterogeneous_reference_uses_reference_discretization(monkeypatch) -> N
     }
 
 
-def test_acoustic_analytical_reference_has_no_receiver_offset(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    "problem_class, analytical_name, components",
+    [
+        (AcousticHomogeneousProblem, "nodal_homogeneous_analytical", None),
+        (ElasticHomogeneousProblem, "analytical_solution_elastic", 2),
+    ],
+)
+def test_analytical_reference_has_no_receiver_offset(
+    monkeypatch,
+    problem_class: type[CpwProblem],
+    analytical_name: str,
+    components: int | None,
+) -> None:
     """The stored reference is the field at its time labels, for any solver dt.
 
     Parameters
     ----------
     monkeypatch : pytest.MonkeyPatch
         Records the calls to the analytical solution.
+    problem_class : type[CpwProblem]
+        Homogeneous problem under test.
+    analytical_name : str
+        Name, in `spyro.utils`, of the analytical solution it calls.
+    components : int or None
+        Number of displacement components the analytical solution returns,
+        or None for a single trace.
     """
     time_shifts = []
+    num_t = 11
 
-    def record_time_shift(wave, offset, velocity, **kwargs) -> np.ndarray:
+    def record_time_shift(*args, **kwargs) -> np.ndarray | tuple[np.ndarray, ...]:
         """Record the requested time shift and return zero data.
 
         Parameters
         ----------
-        wave : SimpleNamespace
-            Stand-in wave holding the time axis.
-        offset : float
-            Source-receiver distance, unused.
-        velocity : float
-            Medium velocity, unused.
+        *args
+            Positional arguments, unused.
         **kwargs
             Keyword arguments, holding `time_shift`.
 
         Returns
         -------
-        np.ndarray
-            Zeros, one per time sample.
+        np.ndarray or tuple of np.ndarray
+            Zeros, one per time sample, once per component.
         """
         time_shifts.append(kwargs.get("time_shift"))
-        return np.zeros(round(wave.final_time / wave.dt) + 1)
+        trace = np.zeros(num_t)
+        return trace if components is None else (trace,) * components
 
-    monkeypatch.setattr(spyro.utils, "nodal_homogeneous_analytical", record_time_shift)
+    monkeypatch.setattr(spyro.utils, analytical_name, record_time_shift)
     wave = SimpleNamespace(
         dt=0.1,
-        final_time=1.0,
+        final_time=0.1 * (num_t - 1),
         number_of_receivers=2,
         source_locations=[(0.0, 0.0)],
         receiver_locations=[(-1.0, 0.0), (-1.0, 1.0)],
+        amplitude=np.array([1.0, 0.0]),
+        dimension=2,
+        frequency=5.0,
+        delay=0.2,
     )
 
-    make_problem(AcousticHomogeneousProblem).analytical_solution(wave)
+    make_problem(problem_class).analytical_solution(wave)
 
     assert time_shifts == [0.0, 0.0]
 
@@ -911,23 +932,50 @@ def test_parameters_reject_reference_file_without_npz_suffix() -> None:
         CpwParameters(**CALCULATOR_PARAMETERS, reference_solution_file="reference.npy")
 
 
-def test_stored_acoustic_reference_matches_its_settings() -> None:
-    """The stored reference loads for the full acquisition it was made for."""
-    stored_file = (
-        Path(__file__).parents[1]
-        / "inputfiles"
-        / "acoustic_homogeneous_cpw_reference.npz"
-    )
+@pytest.mark.parametrize(
+    "parameters, stored_name, receiver_shape",
+    [
+        ({}, "acoustic_homogeneous_cpw_reference.npz", (36,)),
+        (
+            {
+                "wave_type": WaveType.ISOTROPIC_ELASTIC,
+                "source_frequency": 10.0,
+                "p_wave_velocity": 5.6,
+                "s_wave_velocity": 2.75,
+                "density": 2.0,
+            },
+            "elastic_homogeneous_cpw_reference.npz",
+            (11, 2),
+        ),
+    ],
+    ids=["acoustic", "elastic"],
+)
+def test_stored_homogeneous_reference_matches_its_settings(
+    parameters: dict, stored_name: str, receiver_shape: tuple[int, ...]
+) -> None:
+    """The stored reference loads for the full acquisition it was made for.
+
+    Parameters
+    ----------
+    parameters : dict
+        Physics-specific parameters replacing :data:`CALCULATOR_PARAMETERS`.
+    stored_name : str
+        Name of the stored reference in `tests/inputfiles`.
+    receiver_shape : tuple of int
+        Shape of the reference data after its time axis.
+    """
+    stored_file = Path(__file__).parents[1] / "inputfiles" / stored_name
     calculator = spyro.tools.MeshingParameterCalculator(
         {
             **CALCULATOR_PARAMETERS,
+            **parameters,
             "testing": False,
             "load_reference": True,
             "reference_solution_file": str(stored_file),
         }
     )
 
-    assert calculator.reference_solution.shape[1] == 36
+    assert calculator.reference_solution.shape[1:] == receiver_shape
 
 
 def test_search_history_files_are_named_by_method(tmp_path, monkeypatch) -> None:

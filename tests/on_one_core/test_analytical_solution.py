@@ -9,6 +9,7 @@ from spyro.receivers.Receivers import RECEIVER_STEP_OFFSET
 from spyro.tools.error_measure import MeasureError
 from spyro.utils.analytical_solution_nodal import (
     analytical_explosive_source,
+    analytical_force_source_2d,
     analytical_force_source_3d,
 )
 
@@ -253,6 +254,92 @@ def test_nodal_analytical_time_shift_advances_samples(steps: int) -> None:
     np.testing.assert_allclose(
         shifted[:-steps], unshifted[steps:], rtol=0.0, atol=1e-12
     )
+
+
+def force_source_2d(**kwargs) -> np.ndarray:
+    """Compute a 2D point-force displacement with small, fixed settings.
+
+    The time axis holds the S-wave arrival, and the extension factor is
+    small to keep the test fast.
+
+    Parameters
+    ----------
+    **kwargs
+        Keyword arguments of :func:`analytical_force_source_2d`, such as
+        `time_shift`.
+
+    Returns
+    -------
+    np.ndarray
+        The horizontal displacement under a horizontal force.
+    """
+    return analytical_force_source_2d(
+        offsets=np.array([-1.0, 0.5]),
+        time_vector=np.arange(301) * 2e-3,
+        vp=5.6,
+        vs=2.75,
+        rho=2.0,
+        amplitude=1.0,
+        frequency=10.0,
+        time_delay=0.1,
+        force_direction=0,
+        displacement_direction=0,
+        n_extra=4,
+        **kwargs,
+    )
+
+
+def test_force_source_2d_default_shift_is_receiver_offset() -> None:
+    """With no time shift, the 2D elastic solution leads by the receiver offset."""
+    default = force_source_2d()
+    explicit = force_source_2d(time_shift=RECEIVER_STEP_OFFSET * 2e-3)
+
+    np.testing.assert_array_equal(default, explicit)
+
+
+@pytest.mark.parametrize("steps", [1, 2])
+def test_force_source_2d_time_shift_advances_samples(steps: int) -> None:
+    """A 2D elastic shift of whole time steps moves the samples as many indices.
+
+    Parameters
+    ----------
+    steps : int
+        Time shift, in time steps.
+    """
+    unshifted = force_source_2d(time_shift=0.0)
+    shifted = force_source_2d(time_shift=steps * 2e-3)
+
+    peak = np.max(np.abs(unshifted))
+    assert peak > 0.0
+    np.testing.assert_allclose(
+        shifted[:-steps], unshifted[steps:], rtol=0.0, atol=1e-12 * peak
+    )
+
+
+@pytest.mark.parametrize("source_type", ["force_source", "explosive_source"])
+def test_elastic_3d_rejects_time_shift(source_type: str) -> None:
+    """The 3D elastic solutions hold no receiver offset, so none is accepted.
+
+    Parameters
+    ----------
+    source_type : str
+        Type of source.
+    """
+    with pytest.raises(ValueError, match="time_shift"):
+        spyro.utils.analytical_solution_elastic(
+            source_type,
+            np.array([1.0, 0.5, 0.3]),
+            p_wave_velocity=1.5,
+            s_wave_velocity=1.0,
+            density=1.0,
+            amplitude=1.0,
+            frequency=5.0,
+            time_delay=0.2,
+            final_time=1.0,
+            dt=1e-2,
+            force_direction=0,
+            time_shift=0.0,
+        )
 
 
 if __name__ == "__main__":
