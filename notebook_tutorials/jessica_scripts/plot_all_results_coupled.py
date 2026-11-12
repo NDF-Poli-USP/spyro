@@ -36,8 +36,8 @@ DIMENSION = 3 if CASE_NAME.startswith("case_3d") else 2
 LEGACY_AXES = False
 
 SCHEMES = {
-    "P – u_s (sequential)": ("sequential", dict(color="tab:blue", lw=1.5, ls="-")),
-    # "P – u_s (monolithic)": ("monolithic", dict(color="tab:green", lw=1.5, ls="-")),
+    # "P – u_s (sequential)": ("sequential", dict(color="tab:blue", lw=1.5, ls="-")),
+    "P – u_s (monolithic)": ("monolithic", dict(color="tab:green", lw=1.5, ls="-")),
 }
 CASES = {label: (f"{CASE_NAME}_{scheme}_{DIMENSION}d", style)
          for label, (scheme, style) in SCHEMES.items()}
@@ -84,7 +84,8 @@ SPECFEM_DIR = f"{SPECFEM_BASE}/{CASE_NAME}"
 SPECFEM_NAME = "SPECFEM2D"
 SPECFEM_STYLE = dict(color="black", lw=1.2, ls=":")
 SHOW_SPECFEM = DIMENSION == 2 and os.path.isfile(f"{SPECFEM_DIR}/AA.S0001.PRE.semp")
-SHOW_SPECFEM = True
+SHOW_SPECFEM = DIMENSION == 2 and os.path.isfile(f"{SPECFEM_DIR}/AA.S0002.BXZ.semd")
+#SHOW_SPECFEM = True
 
 # SPECFEM centers the Ricker at t = 0; spyro centers it at t = delay = 1/f.
 SPECFEM_DELAY = {
@@ -100,7 +101,7 @@ GAR6_DELAY = {
 
 # key -> (file, sign). S0001 = fluid receiver, S0002 = solid receiver.
 SPECFEM_FILES = {
-    "p": ("AA.S0001.PRE.semp", 1.0),
+    # "p": ("AA.S0001.PRE.semp", 1.0),
     "uz": ("AA.S0002.BXZ.semd", 1.0),
     "ux": ("AA.S0002.BXX.semd", 1.0),
 }
@@ -202,13 +203,14 @@ for label, (tag, style) in CASES.items():
         r["shift_g"] = estimate_time_shift(t_p, r["p"], r["p_g"])
 
     if SHOW_SPECFEM:
-        r["p_s"] = ref_on(t_p, *spec["p"], SPECFEM_FILES["p"][1])
-        r["err_p_s"] = MeasureError.calculate_normalized_L2_error(r["p"], r["p_s"])
+        # r["p_s"] = ref_on(t_p, *spec["p"], SPECFEM_FILES["p"][1])
+        # r["err_p_s"] = MeasureError.calculate_normalized_L2_error(r["p"], r["p_s"])
         for comp in ("uz", "ux"):
             r[f"{comp}_s"] = ref_on(t_u, *spec[comp], SPECFEM_FILES[comp][1])
             r[f"err_{comp}_s"] = MeasureError.calculate_normalized_L2_error(
                 r[comp], r[f"{comp}_s"])
-        r["shift_s"] = estimate_time_shift(t_p, r["p"], r["p_s"])
+        # r["shift_s"] = estimate_time_shift(t_p, r["p"], r["p_s"])
+        r["shift_s"] = estimate_time_shift(t_u, r["uz"], r["uz_s"])
     results[label] = r
 
 if not results:
@@ -222,8 +224,17 @@ REFERENCES = [(tag, name, style) for tag, name, style, show in (
 
 ref = next(iter(results.values()))
 w = max(len(k) for k in results) + 2
+# for rt, rname, _ in REFERENCES:
+#     keys = ["p"] + [c for c in comp_keys if f"err_{c}_{rt}" in ref]
+# for rt, rname, _ in REFERENCES:
+#     print(f"\n=== Normalized L2 error vs {rname} ===")
+#     print(f"{'Case':<{w}}" + "".join(f" {('P' if k == 'p' else 'u_' + k[1]):>9}" for k in keys)
+#           + f" {'shift (s)':>11}")
+#     for label, r in results.items():
+#         print(f"{label:<{w}}" + "".join(f" {r[f'err_{k}_{rt}']:9.4f}" for k in keys)
+#               + f" {r[f'shift_{rt}']:11.6f}")
 for rt, rname, _ in REFERENCES:
-    keys = ["p"] + [c for c in comp_keys if f"err_{c}_{rt}" in ref]
+    keys = [c for c in comp_keys if f"err_{c}_{rt}" in ref]
     print(f"\n=== Normalized L2 error vs {rname} ===")
     print(f"{'Case':<{w}}" + "".join(f" {('P' if k == 'p' else 'u_' + k[1]):>9}" for k in keys)
           + f" {'shift (s)':>11}")

@@ -118,7 +118,7 @@ def plot_model_xz(wave, filename):
 # ===========================================================================
 # Settings
 # ===========================================================================
-USE_MONOLITHIC = False
+USE_MONOLITHIC = True
 MESH_TYPE = "firedrake_mesh" # "gmsh_mesh" or "firedrake_mesh"
 OUT = "results"
 os.makedirs(OUT, exist_ok=True)
@@ -364,7 +364,7 @@ dictionary["synthetic_data"] = {
 }
 
 dictionary["absorving_boundary_conditions"] = {
-    "status": True,
+    "status": False,
     "abc_type": "nrbc",
     "absorb_top": True,
     "absorb_bottom": True,
