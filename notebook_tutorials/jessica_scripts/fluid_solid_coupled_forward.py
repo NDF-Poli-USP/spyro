@@ -118,7 +118,7 @@ def plot_model_xz(wave, filename):
 # ===========================================================================
 # Settings
 # ===========================================================================
-USE_MONOLITHIC = True
+USE_MONOLITHIC = False
 MESH_TYPE = "firedrake_mesh" # "gmsh_mesh" or "firedrake_mesh"
 OUT = "results"
 os.makedirs(OUT, exist_ok=True)
@@ -127,7 +127,7 @@ os.makedirs(OUT, exist_ok=True)
 # Cases
 # ===========================================================================
 case_small_2D = {
-    "cell_type": "Q",
+    "cell_type": "T",
     "degree": 4,
     "length_z": 1.0,
     "length_x": 1.0,
@@ -238,7 +238,7 @@ cases = {1: ("case_small_2d", case_small_2D),
          3: ("case_3d", case_3D),
          4: ("case_small_2d_irregular_topography", case_small_2D_irregular),
          5: ("case_large_2d_irregular_topography", case_large_2D_irregular)}
-CASE_NUM = 1
+CASE_NUM = 2
 CASE_NAME, selected_case = cases[CASE_NUM]
 if callable(selected_case):
     selected_case = selected_case()
