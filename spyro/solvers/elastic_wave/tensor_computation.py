@@ -146,15 +146,15 @@ def C_tti_tensor(self, C_vti, dim):
         sp = fire.sin(p)
 
         # Rotation matrix components
-        R11 = ct * cp
-        R22 = cp
-        R33 = ct
-        R12 = -sp
-        R13 = st * cp
-        R21 = ct * sp
-        R23 = st * sp
-        R31 = -st
-        R32 = 0.
+        R11 = ct
+        R12 = -st
+        R13 = 0.
+        R21 = st * cp
+        R22 = ct * cp
+        R23 = -sp
+        R31 = st * sp
+        R32 = ct * sp
+        R33 = cp
 
         # Transformation matrix for Voigt notation using UFL
         T = fire.as_tensor([
@@ -177,7 +177,7 @@ def C_tti_tensor(self, C_vti, dim):
 def bond_rotation_2d_elastic(theta):
 
     """ The definition of the rotation matrix for 2D elastic tensors in Voigt notation.
-    
+
     Parameters
     ----------
     theta : float
@@ -263,16 +263,16 @@ def Gamma_VTI(self, C, dim):
     anisotropy = self.anisotropy_type
 
     if dim == 2:
-        C11 = C[0, 0]
+        C11 = C[1, 1]
         C13 = C[0, 1]
-        C33 = C[1, 1]
+        C33 = C[0, 0]
         C44 = C[2, 2]
 
     elif dim == 3:
-        C11 = C[0, 0]
-        C13 = C[0, 2]
-        C33 = C[2, 2]
-        C44 = C[3, 3]
+        C11 = C[1, 1]
+        C13 = C[0, 1]
+        C33 = C[0, 0]
+        C44 = C[4, 4]
 
     Q33 = self.Q_vp
     Q11 = 2 * epsilon/(1 + 2 * epsilon) * self.Q_epsilon + Q33
@@ -285,29 +285,29 @@ def Gamma_VTI(self, C, dim):
     Q12 = (num1 * Q11 - num2 * Q66)/denom
 
     if anisotropy == 'weak':
-        c1 = (delta * C33 + 0.5 * (C11 + 2 * C33 - 3 * C44)) / (2 * (C13 + C44))
+        c1 = (2 * delta * C33 + 0.5 * (C11 + 2 * C33 - 3 * C44)) / (2 * (C13 + C44))
         c2 = (- C11 - 3 * C33 + 4 * C44) / (4 * (C13 + C44)) - 1
         c3 = (C33 - C44) / (4 * (C13 + C44))
-        c4 = C33 / (2 * (C13 + C44))
+        c4 = C33 ** 2 / (2 * (C13 + C44))
         Q13 = (c1 * C33 * Q33 + c2 * C44 * Q44 + c3 * C11 * Q11 + c4 * delta * self.Q_delta) / C13
 
     elif anisotropy == 'exact':
-        c1 = (C33 * (1 + 2 * gamma) - C44 + (C33 - C44) * (1 + 2 * delta)) / (2 * (C13 + C44))
+        c1 = (C33 * (1 + 2 * delta) - C44 + (C33 - C44) * (1 + 2 * delta)) / (2 * (C13 + C44))
         c2 = (- C33 * (1 + 2 * delta) + 2 * C44 - C33) / (2 * (C13 + C44)) - 1
         c3 = C33 * (C33 - C44)/(C13 + C44)
         Q13 = (c1 * C33 * Q33 + c2 * C44 * Q44 + c3 * delta * self.Q_delta)/C13
 
     if dim == 2:
-        Gamma = fire.as_matrix([[Q11, Q13, 0],
-                                [Q13, Q33, 0],
+        Gamma = fire.as_matrix([[Q33, Q13, 0],
+                                [Q13, Q11, 0],
                                 [0, 0, Q44]])
     else:
-        Gamma = fire.as_matrix([[Q11, Q12, Q13, 0, 0, 0],
-                                [Q12, Q11, Q13, 0, 0, 0],
-                                [Q13, Q13, Q33, 0, 0, 0],
-                                [0, 0, 0, Q44, 0, 0],
+        Gamma = fire.as_matrix([[Q33, Q13, Q13, 0, 0, 0],
+                                [Q13, Q11, Q12, 0, 0, 0],
+                                [Q13, Q12, Q11, 0, 0, 0],
+                                [0, 0, 0, Q66, 0, 0],
                                 [0, 0, 0, 0, Q44, 0],
-                                [0, 0, 0, 0, 0, Q66]])
+                                [0, 0, 0, 0, 0, Q44]])
     return Gamma
 
 
@@ -317,53 +317,11 @@ def Gamma_TTI(self, dim):
 
     Q_vti = Gamma_VTI(self, C_vti_real, dim)
 
-    eps = 1e-12
-
     shape = C_vti_real.ufl_shape
     n = shape[0]
 
-    if n == 6:  # 3D
-
-        Q11 = Q_vti[0, 0]
-        Q33 = Q_vti[2, 2]
-        Q44 = Q_vti[3, 3]
-        Q66 = Q_vti[5, 5]
-        Q13 = Q_vti[0, 2]
-        Q12 = Q_vti[0, 1]
-
-        C11 = C_vti_real[0, 0]
-        C12 = C_vti_real[0, 1]
-        C13 = C_vti_real[0, 2]
-        C33 = C_vti_real[2, 2]
-        C44 = C_vti_real[3, 3]
-        C66 = C_vti_real[5, 5]
-
-        C_imag = fire.as_tensor([
-            [C11*Q11, C12*Q12, C13*Q13, 0.0, 0.0, 0.0],
-            [C12*Q12, C11*Q11, C13*Q13, 0.0, 0.0, 0.0],
-            [C13*Q13, C13*Q13, C33*Q33, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, C44*Q44, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0, C44*Q44, 0.0],
-            [0.0, 0.0, 0.0, 0.0, 0.0, C66*Q66]
-        ])
-
-    elif n == 3:
-
-        Q11 = Q_vti[0, 0]
-        Q33 = Q_vti[1, 1]
-        Q13 = Q_vti[0, 1]
-        Q44 = Q_vti[2, 2]
-
-        C11 = C_vti_real[0, 0]
-        C13 = C_vti_real[0, 1]
-        C33 = C_vti_real[1, 1]
-        C44 = C_vti_real[2, 2]
-
-        C_imag = fire.as_tensor([
-            [C11*Q11, C13*Q13, 0.0],
-            [C13*Q13, C33*Q33, 0.0],
-            [0.0, 0.0, C44*Q44]
-        ])
+    C_imag = fire.as_tensor([[C_vti_real[i, j] * Q_vti[i, j] for j in range(n)]
+                            for i in range(n)])
 
     C_tti_real = C_tti_tensor(self, C_vti_real, dim)
     C_tti_imag = C_tti_tensor(self, C_imag, dim)
