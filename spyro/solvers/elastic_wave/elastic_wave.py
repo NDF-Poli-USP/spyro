@@ -1,6 +1,5 @@
 from abc import abstractmethod, ABCMeta
 from firedrake import Constant
-from warnings import warn
 
 from ..wave import Wave
 from ...utils.typing import override, WaveType
@@ -44,7 +43,7 @@ class ElasticWave(Wave, metaclass=ABCMeta):
             else:
                 raise Exception(f"Invalid synthetic data type: {d['type']}")
         else:
-            warn("Input dictionary does not contain ['synthetic_data']['type']")
+            raise Exception("Input dictionary must contain ['synthetic_data']['type']")
 
     @abstractmethod
     def initialize_model_parameters_from_object(self, synthetic_data_dict):
