@@ -4,15 +4,19 @@ A problem is one wave physics on one kind of velocity profile. It builds
 the model dictionary, meshes a wave object for a cells-per-wavelength
 value, and computes the reference receiver data the error is measured
 against. A new problem is supported by subclassing
-:class:`HomogeneousCpwProblem` and registering it in :data:`CPW_PROBLEMS`.
+:class:`HomogeneousCpwProblem` or :class:`HeterogeneousCpwProblem` and
+registering it in :data:`CPW_PROBLEMS`.
 """
 
 from abc import ABC, abstractmethod
+from functools import cached_property
 
 import numpy as np
 
 import spyro
+from .heterogeneous_case import HeterogeneousCase
 from .input_models import (
+    create_acoustic_model_for_meshing_parameter_2D_heterogeneous,
     create_acoustic_model_for_meshing_parameter_2D_homogeneous,
 )
 from .parameters import CpwParameters
@@ -20,6 +24,10 @@ from .wave_physics import ACOUSTIC, WavePhysics
 from ...receivers.Receivers import RECEIVER_STEP_OFFSET
 from ...solvers.wave import Wave
 from ...utils.typing import VelocityProfileType, WaveType
+
+_CASE_MISMATCH = (
+    "heterogeneous_case should be given for heterogeneous models and only for them."
+)
 
 
 class CpwProblem(ABC):
@@ -152,13 +160,15 @@ class CpwProblem(ABC):
         wavelength = self.minimum_wavelength_velocity / self.mesh_frequency
         wave.set_mesh(input_mesh_parameters={"edge_length": wavelength / cpw})
 
-    def reference_time_shift(self, wave: Wave) -> float:
+    def reference_time_shift(self, wave: Wave, reference_dt: float) -> float:
         """Return the time shift applied when resampling the reference.
 
         Parameters
         ----------
         wave : Wave
             Wave object of the forward solve.
+        reference_dt : float
+            Time step the reference receiver data is sampled at.
 
         Returns
         -------
@@ -208,6 +218,23 @@ class HomogeneousCpwProblem(CpwProblem):
 
     velocity_profile_type = VelocityProfileType.HOMOGENEOUS
 
+    def __init__(self, parameters: CpwParameters) -> None:
+        """Check that no heterogeneous case is given, then read settings.
+
+        Parameters
+        ----------
+        parameters : CpwParameters
+            The calculator parameters.
+
+        Raises
+        ------
+        ValueError
+            If a ``heterogeneous_case`` is given.
+        """
+        if parameters.heterogeneous_case is not None:
+            raise ValueError(_CASE_MISMATCH)
+        super().__init__(parameters)
+
     def reference_solution(self, initial_wave: Wave, method: str) -> np.ndarray:
         """Compute the analytical reference.
 
@@ -240,6 +267,150 @@ class HomogeneousCpwProblem(CpwProblem):
             Receiver data sampled at ``wave.dt``, shaped like
             ``wave.forward_solution_receivers``.
         """
+
+
+class HeterogeneousCpwProblem(CpwProblem):
+    """Material of a heterogeneous case, with a numerical reference.
+
+    Attributes
+    ----------
+    heterogeneous_case : HeterogeneousCase
+        Domain, material and any acquisition or time axis overrides.
+    reference_degree : int
+        Polynomial degree of the numerical reference.
+    cpw_reference : float
+        Cells-per-wavelength of the numerical reference.
+    """
+
+    velocity_profile_type = VelocityProfileType.HETEROGENEOUS
+
+    def __init__(self, parameters: CpwParameters) -> None:
+        """Read the heterogeneous case and the reference settings.
+
+        Parameters
+        ----------
+        parameters : CpwParameters
+            The calculator parameters.
+
+        Raises
+        ------
+        ValueError
+            If no ``heterogeneous_case``, ``reference_degree`` or
+            ``cpw_reference`` is given.
+        """
+        if parameters.heterogeneous_case is None:
+            raise ValueError(_CASE_MISMATCH)
+        super().__init__(parameters)
+        self.heterogeneous_case: HeterogeneousCase = parameters.heterogeneous_case
+        self.reference_degree: int = parameters.require("reference_degree")
+        self.cpw_reference: float = parameters.require("cpw_reference")
+
+    @cached_property
+    def minimum_wavelength_velocity(self) -> float:
+        """Minimum velocity of the slowest wave in the case.
+
+        Returns
+        -------
+        float
+            The case ``minimum_velocity`` if given, else the minimum of its
+            ``physics.wavelength_parameter`` material.
+        """
+        case = self.heterogeneous_case
+        if case.minimum_velocity is not None:
+            return case.minimum_velocity
+        return case.minimum(self.physics.wavelength_parameter)
+
+    def reference_metadata(
+        self, initial_wave: Wave
+    ) -> dict[str, str | float | np.ndarray]:
+        """Return the settings the reference depends on, with its discretization.
+
+        Parameters
+        ----------
+        initial_wave : Wave
+            Wave object of the discretization under evaluation, holding the
+            acquisition, time axis and finite element method.
+
+        Returns
+        -------
+        dict of str to str, float or np.ndarray
+            :meth:`CpwProblem.reference_metadata`, the reference method,
+            degree and cpw, the meshing frequency, and the case name, lengths
+            and minimum velocity.
+
+        Notes
+        -----
+        The material files are not compared, only the case name and minimum
+        velocity. A reference saved for one file is accepted for another
+        file with the same minimum under the same case name.
+        """
+        case = self.heterogeneous_case
+        return {
+            **super().reference_metadata(initial_wave),
+            "method": initial_wave.method,
+            "reference_degree": self.reference_degree,
+            "cpw_reference": self.cpw_reference,
+            "mesh_frequency": self.mesh_frequency,
+            "case_name": case.name,
+            "length_z": case.length_z,
+            "length_x": case.length_x,
+            "minimum_wavelength_velocity": self.minimum_wavelength_velocity,
+        }
+
+    def reference_solution(self, initial_wave: Wave, method: str) -> np.ndarray:
+        """Solve at ``reference_degree`` and ``cpw_reference``.
+
+        Parameters
+        ----------
+        initial_wave : Wave
+            Wave object of the discretization under evaluation, unused.
+        method : str
+            Finite element method of the reference.
+
+        Returns
+        -------
+        np.ndarray
+            The reference receiver data.
+
+        Notes
+        -----
+        The pressure field is saved for visualization in
+        ``results/<case name>_reference_forward_outputsn0.pvd``, every
+        ``output_frequency`` time steps of the model dictionary.
+        """
+        dictionary = self.model_dictionary(method, self.reference_degree)
+        dictionary["visualization"].update(
+            forward_output=True,
+            forward_output_filename=(
+                f"results/{self.heterogeneous_case.name}_reference_forward_output.pvd"
+            ),
+        )
+        wave = self.build_wave(dictionary, self.cpw_reference)
+        wave.forward_solve()
+        return wave.forward_solution_receivers
+
+    def reference_time_shift(self, wave: Wave, reference_dt: float) -> float:
+        """Return the difference between the solve and reference receiver offsets.
+
+        Receiver sample `i` holds the field at
+        `(i + RECEIVER_STEP_OFFSET) * dt`, for the reference at its own time
+        step and for the forward solve at another. Shifting the reference by
+        the difference of the two offsets samples it at the times of the
+        forward solve.
+
+        Parameters
+        ----------
+        wave : Wave
+            Wave object of the forward solve.
+        reference_dt : float
+            Time step the numerical reference was solved at.
+
+        Returns
+        -------
+        float
+            `RECEIVER_STEP_OFFSET * (wave.dt - reference_dt)`.
+        """
+        return RECEIVER_STEP_OFFSET * (wave.dt - reference_dt)
 
 
 class AcousticHomogeneousProblem(HomogeneousCpwProblem):
@@ -320,7 +491,7 @@ class AcousticHomogeneousProblem(HomogeneousCpwProblem):
             "velocity": self.minimum_wavelength_velocity,
         }
 
-    def reference_time_shift(self, wave: Wave) -> float:
+    def reference_time_shift(self, wave: Wave, reference_dt: float) -> float:
         """Return the receiver time offset of the forward solve.
 
         The analytical reference holds the field at its time labels, while
@@ -331,6 +502,9 @@ class AcousticHomogeneousProblem(HomogeneousCpwProblem):
         ----------
         wave : Wave
             Wave object of the forward solve.
+        reference_dt : float
+            Time step the reference is sampled at, unused: the analytical
+            reference has no receiver offset.
 
         Returns
         -------
@@ -367,6 +541,124 @@ class AcousticHomogeneousProblem(HomogeneousCpwProblem):
         return analytical
 
 
+class AcousticHeterogeneousProblem(HeterogeneousCpwProblem):
+    """Acoustic wave in the P-wave velocity of a heterogeneous case.
+
+    By default the mesh is uniform, sized by the minimum P-wavelength in the
+    domain. With
+    ``velocity_adapted_mesh``, SeismicMesh triangle meshes are instead sized
+    by the local P-wavelength.
+
+    Attributes
+    ----------
+    velocity_adapted_mesh : bool
+        Size SeismicMesh meshes by the local P-wavelength.
+    """
+
+    physics = ACOUSTIC
+
+    def __init__(self, parameters: CpwParameters) -> None:
+        """Read the heterogeneous case and the meshing choice.
+
+        Parameters
+        ----------
+        parameters : CpwParameters
+            The calculator parameters.
+        """
+        super().__init__(parameters)
+        self.velocity_adapted_mesh: bool = parameters.velocity_adapted_mesh
+
+    def setup_wave(self, wave: Wave, cpw: float) -> None:
+        """Build the mesh, adapted to the P-wave velocity if requested, and load the velocity.
+
+        The adapted mesh has, everywhere, ``cpw`` cells per local
+        P-wavelength at the meshing frequency, limited by SeismicMesh's
+        size gradation, which only refines. Only SeismicMesh meshes can be
+        adapted, so a quadrilateral mesh stays uniform. The forward solve
+        does not read the velocity file itself with a PML, so it is
+        interpolated onto the mesh nodes here.
+
+        Parameters
+        ----------
+        wave : Wave
+            Wave object to set up.
+        cpw : float
+            Cells-per-wavelength of the mesh, at the meshing frequency.
+
+        Raises
+        ------
+        ValueError
+            If the case's P-wave velocity file is not a SEG-Y, the only
+            format SeismicMesh sizes from here.
+        """
+        velocity_file = self.heterogeneous_case.write_material_files(
+            ("p_wave_velocity",)
+        )["p_wave_velocity"]
+        if not self.velocity_adapted_mesh or wave.mesh_parameters.mesh_type != "SeismicMesh":
+            super().setup_wave(wave, cpw)
+        elif not velocity_file.endswith(".segy"):
+            raise ValueError(
+                f"A velocity adapted mesh needs a SEG-Y velocity, got {velocity_file!r}."
+            )
+        else:
+            wave.set_mesh(
+                input_mesh_parameters={
+                    "velocity_model": velocity_file,
+                    "cells_per_wavelength": cpw,
+                    "minimum_velocity": self.minimum_wavelength_velocity,
+                    # Meshing only, the source keeps its own frequency
+                    "source_frequency": self.mesh_frequency,
+                }
+            )
+        # Fast interpolation reads the velocity at the mesh nodes directly,
+        # without building a grid mesh to project from
+        wave.set_initial_velocity_model(new_file=velocity_file, fast_interpolate=True)
+
+    def reference_metadata(
+        self, initial_wave: Wave
+    ) -> dict[str, str | float | np.ndarray]:
+        """Return the settings the reference depends on, with the meshing choice.
+
+        Parameters
+        ----------
+        initial_wave : Wave
+            Wave object of the discretization under evaluation.
+
+        Returns
+        -------
+        dict of str to str, float or np.ndarray
+            :meth:`HeterogeneousCpwProblem.reference_metadata`, and
+            `velocity_adapted_mesh`.
+        """
+        return {
+            **super().reference_metadata(initial_wave),
+            "velocity_adapted_mesh": self.velocity_adapted_mesh,
+        }
+
+    def model_dictionary(self, method: str, degree: int) -> dict:
+        """Build the heterogeneous acoustic model dictionary.
+
+        Parameters
+        ----------
+        method : str
+            Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+        degree : int
+            Spatial polynomial degree.
+
+        Returns
+        -------
+        dict
+            Spyro model dictionary for :class:`spyro.AcousticWave`.
+        """
+        return create_acoustic_model_for_meshing_parameter_2D_heterogeneous(
+            method=method,
+            degree=degree,
+            frequency=self.source_frequency,
+            minimum_velocity=self.minimum_wavelength_velocity,
+            case=self.heterogeneous_case,
+        )
+
+
 #: Cells-per-wavelength problems, selected by the ``"wave_type"`` and
 #: ``"velocity_profile_type"`` parameters.
 CPW_PROBLEMS: dict[tuple[WaveType, VelocityProfileType], type[CpwProblem]] = {
@@ -374,4 +666,8 @@ CPW_PROBLEMS: dict[tuple[WaveType, VelocityProfileType], type[CpwProblem]] = {
         WaveType.ISOTROPIC_ACOUSTIC,
         VelocityProfileType.HOMOGENEOUS,
     ): AcousticHomogeneousProblem,
+    (
+        WaveType.ISOTROPIC_ACOUSTIC,
+        VelocityProfileType.HETEROGENEOUS,
+    ): AcousticHeterogeneousProblem,
 }

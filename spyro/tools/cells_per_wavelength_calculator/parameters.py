@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .heterogeneous_case import HeterogeneousCase
 from .line_search import MAX_CPW
 from .threshold_discretization import (
     ThresholdDiscretization,
@@ -22,6 +23,7 @@ DICTIONARY_KEYS = {
     "cpw_initial": "C_initial",
     "cpw_accuracy": "C_accuracy",
     "cpw_max": "C_max",
+    "cpw_reference": "C_reference",
     "fixed_timestep": "timestep",
 }
 
@@ -60,9 +62,17 @@ class CpwParameters(BaseModel):
     wave_type : WaveType
         Wave physics. Default is ``WaveType.ISOTROPIC_ACOUSTIC``.
     velocity_profile_type : VelocityProfileType
-        Default is `VelocityProfileType.HOMOGENEOUS`.
+        Default is `VelocityProfileType.HETEROGENEOUS` when
+        `heterogeneous_case` is given, else `VelocityProfileType.HOMOGENEOUS`.
     minimum_velocity : float or None
         Velocity, homogeneous acoustic only.
+    heterogeneous_case : HeterogeneousCase or None
+        Domain, material and any acquisition or time axis overrides,
+        heterogeneous only.
+    reference_degree : int or None
+        Polynomial degree of the numerical reference, heterogeneous only.
+    cpw_reference : float or None
+        Cells-per-wavelength of the numerical reference, heterogeneous only.
     accepted_error_threshold : float or None
         Largest accepted receiver error. Exactly one of this and
         ``threshold_discretization`` must be given.
@@ -92,6 +102,12 @@ class CpwParameters(BaseModel):
     save_shot_records : bool
         Save the shot record of every search solve to
         ``test_shot_record<cpw>``. Default is False.
+    velocity_adapted_mesh : bool
+        Size the triangles of every SeismicMesh mesh by the local P-wavelength
+        of the case's SEG-Y P-wave velocity, instead of uniformly by the
+        minimum one. Acoustic heterogeneous only. Quadrilateral meshes, such
+        as the default threshold discretization, stay uniform. Default is
+        False.
     """
 
     model_config = ConfigDict(
@@ -109,8 +125,18 @@ class CpwParameters(BaseModel):
     cpw_initial: float
     cpw_accuracy: float
     wave_type: WaveType = WaveType.ISOTROPIC_ACOUSTIC
-    velocity_profile_type: VelocityProfileType = VelocityProfileType.HOMOGENEOUS
+    # Declared before velocity_profile_type, whose default depends on it
+    heterogeneous_case: HeterogeneousCase | None = None
+    velocity_profile_type: VelocityProfileType = Field(
+        default_factory=lambda data: (
+            VelocityProfileType.HOMOGENEOUS
+            if data["heterogeneous_case"] is None
+            else VelocityProfileType.HETEROGENEOUS
+        )
+    )
     minimum_velocity: float | None = None
+    reference_degree: int | None = None
+    cpw_reference: float | None = None
     accepted_error_threshold: float | None = None
     threshold_discretization: ThresholdDiscretization | None = None
     cpw_max: float = MAX_CPW
@@ -129,6 +155,7 @@ class CpwParameters(BaseModel):
     load_reference: bool = False
     reference_solution_file: str | None = None
     save_shot_records: bool = False
+    velocity_adapted_mesh: bool = False
 
     @field_validator("threshold_discretization", mode="before")
     @classmethod
@@ -164,8 +191,10 @@ class CpwParameters(BaseModel):
             If `mesh_frequency_factor` is not positive, both or neither of
             `accepted_error_threshold` and `threshold_discretization` are
             given, `fixed_timestep` is given without
-            `TimeStepCalculationType.FIXED` or missing with it, or
-            `reference_solution_file` does not end in `.npz`.
+            `TimeStepCalculationType.FIXED` or missing with it,
+            `reference_solution_file` does not end in `.npz`, or
+            `velocity_adapted_mesh` is set for a problem other than the
+            acoustic heterogeneous one.
         """
         validate_numeric(
             "mesh_frequency_factor", self.mesh_frequency_factor, lower_bound=0.0
@@ -190,6 +219,14 @@ class CpwParameters(BaseModel):
             raise ValueError(
                 "reference_solution_file must be a .npz file, got "
                 f"{self.reference_solution_file!r}."
+            )
+        if self.velocity_adapted_mesh and (
+            self.wave_type is not WaveType.ISOTROPIC_ACOUSTIC
+            or self.velocity_profile_type is not VelocityProfileType.HETEROGENEOUS
+        ):
+            raise ValueError(
+                "velocity_adapted_mesh is only supported for acoustic "
+                "heterogeneous problems."
             )
         return self
 

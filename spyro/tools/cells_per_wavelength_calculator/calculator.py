@@ -26,6 +26,30 @@ MAXIMUM_DT_FRACTION = 0.5
 REFERENCE_DATA_KEY = "data"
 
 
+def _metadata_matches(stored: np.ndarray, value: object) -> bool:
+    """Compare a saved reference metadata value with the current one.
+
+    Parameters
+    ----------
+    stored : np.ndarray
+        Value read from the reference file.
+    value : object
+        Current value: a float, int, bool, str or array.
+
+    Returns
+    -------
+    bool
+        True if the shapes agree and the values are equal, to a relative
+        tolerance of 1e-12 for floating point values.
+    """
+    value = np.asarray(value)
+    if np.shape(stored) != value.shape:
+        return False
+    if value.dtype.kind in "fc":
+        return bool(np.allclose(stored, value, rtol=1e-12, atol=0.0))
+    return bool(np.array_equal(stored, value))
+
+
 @dataclass(frozen=True)
 class CpwEvaluation:
     """One forward solve of the cells-per-wavelength search.
@@ -190,9 +214,7 @@ class MeshingParameterCalculator:
             mismatched = [
                 key
                 for key, value in expected.items()
-                if key not in stored
-                or np.shape(stored[key]) != np.shape(value)
-                or not np.allclose(stored[key], value, rtol=1e-12, atol=0.0)
+                if key not in stored or not _metadata_matches(stored[key], value)
             ]
             if mismatched:
                 raise ValueError(
@@ -324,7 +346,8 @@ class MeshingParameterCalculator:
             wave.dt,
             initial_time=wave.initial_time,
             final_time=wave.final_time,
-            time_shift=self.problem.reference_time_shift(wave),
+            # The reference is sampled at the initial wave's time step
+            time_shift=self.problem.reference_time_shift(wave, self.initial_wave.dt),
         )
         error = MeasureError.calculate_receiver_error(
             wave.forward_solution_receivers,
