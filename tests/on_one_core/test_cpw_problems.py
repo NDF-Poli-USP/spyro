@@ -4,6 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
+import firedrake as fire
 import numpy as np
 import pytest
 from pydantic import ValidationError
@@ -19,12 +20,19 @@ from spyro.tools.cells_per_wavelength_calculator import (
     AcousticHomogeneousProblem,
     CpwParameters,
     CpwProblem,
+    ElasticHeterogeneousProblem,
     ElasticHomogeneousProblem,
     HeterogeneousCpwProblem,
     MaterialFileCase,
     WavePhysics,
 )
 from spyro.tools.cells_per_wavelength_calculator import calculator as calculator_module
+from spyro.tools.cells_per_wavelength_calculator.elastic_2d_material_model import (
+    elastic_2d_material,
+)
+from spyro.tools.cells_per_wavelength_calculator.heterogeneous_cases import (
+    ElasticSyntheticCase,
+)
 from spyro.tools.cells_per_wavelength_calculator.input_models import (
     create_elastic_model_for_meshing_parameter_2D_homogeneous,
 )
@@ -62,6 +70,7 @@ PROBLEM_CLASSES = [
     AcousticHomogeneousProblem,
     AcousticHeterogeneousProblem,
     ElasticHomogeneousProblem,
+    ElasticHeterogeneousProblem,
 ]
 
 
@@ -127,6 +136,11 @@ def test_interpolate_time_series_keeps_trailing_axes() -> None:
             ISOTROPIC_ELASTIC,
             VelocityProfileType.HOMOGENEOUS,
         ),
+        (
+            WaveType.ISOTROPIC_ELASTIC,
+            ISOTROPIC_ELASTIC,
+            VelocityProfileType.HETEROGENEOUS,
+        ),
     ],
 )
 def test_cpw_problems_registry(
@@ -185,6 +199,7 @@ def test_problem_rejects_non_positive_mesh_frequency_factor(
         (AcousticHomogeneousProblem, VELOCITY_FILE_CASE),
         (AcousticHeterogeneousProblem, None),
         (ElasticHomogeneousProblem, VELOCITY_FILE_CASE),
+        (ElasticHeterogeneousProblem, None),
     ],
 )
 def test_problem_matches_case_to_profile(
@@ -446,6 +461,7 @@ def test_interpolate_time_series_applies_time_shift() -> None:
         (ElasticHomogeneousProblem, RECEIVER_STEP_OFFSET * 2e-3),
         # Numerical: the reference already holds its own offset
         (AcousticHeterogeneousProblem, RECEIVER_STEP_OFFSET * (2e-3 - 1e-4)),
+        (ElasticHeterogeneousProblem, RECEIVER_STEP_OFFSET * (2e-3 - 1e-4)),
     ],
 )
 def test_reference_time_shift(
@@ -508,6 +524,7 @@ def test_numerical_reference_resamples_onto_solve_times(solver_dt: float) -> Non
         (AcousticHomogeneousProblem, "acoustic_homogeneous_cpw_reference.npz"),
         (AcousticHeterogeneousProblem, "acoustic_heterogeneous_cpw_reference.npz"),
         (ElasticHomogeneousProblem, "elastic_homogeneous_cpw_reference.npz"),
+        (ElasticHeterogeneousProblem, "elastic_heterogeneous_cpw_reference.npz"),
     ],
 )
 def test_default_reference_file(
@@ -1038,6 +1055,46 @@ def test_search_history_files_are_named_by_method(tmp_path, monkeypatch) -> None
         history = np.loadtxt(tmp_path / f"{method}_p2_cpw_results.txt", ndmin=2)
         cpw, error = history[:, 0], history[:, 2]
         assert np.allclose(error, error_scale / cpw**2)
+
+
+@pytest.mark.parametrize("method", ["mass_lumped_triangle", "spectral_quadrilateral"])
+def test_elastic_heterogeneous_setup_meshes_and_reads_material(
+    method: str, tmp_path,
+) -> None:
+    """The mesh is sized by the minimum S-wavelength; the material is read."""
+    frequency, factor, cpw = 10.0, 2.0, 0.1
+    minimum_s_wave_velocity = 1.2
+    problem = make_problem(
+        ElasticHeterogeneousProblem,
+        heterogeneous_case=ElasticSyntheticCase(name=str(tmp_path / "salt")),
+        source_frequency=frequency,
+        mesh_frequency_factor=factor,
+    )
+
+    wave = problem.build_wave(problem.model_dictionary(method, 2), cpw)
+    wave.initialize_physical_parameters()
+
+    edge_length = minimum_s_wave_velocity / (factor * frequency * cpw)
+    cells_per_square = 1 if method == "spectral_quadrilateral" else 2
+    expected_cells = (
+        cells_per_square * round(5.0 / edge_length) * round(10.0 / edge_length)
+    )
+    assert wave.mesh.num_cells() == expected_cells
+
+    # The file values match the material model at the nodes
+    space = wave.c_s.function_space()
+    coordinates = fire.Function(
+        fire.VectorFunctionSpace(wave.mesh, space.ufl_element())
+    ).interpolate(wave.mesh.coordinates).dat.data_ro
+    expected = elastic_2d_material(coordinates[:, 0], coordinates[:, 1], 10.0)
+    for parameter, values in [
+        ("p_wave_velocity", wave.c),
+        ("s_wave_velocity", wave.c_s),
+        ("density", wave.rho),
+    ]:
+        # Interface nodes may pick either side of the sampled grid
+        mismatch = ~np.isclose(values.dat.data_ro, expected[parameter], atol=1e-3)
+        assert mismatch.mean() < 0.05, parameter
 
 
 def test_parameters_from_dict_maps_legacy_keys() -> None:
