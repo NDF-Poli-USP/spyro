@@ -33,7 +33,7 @@ clean-pyc:
 	@rm -rf dist/
 
 clean-root:
-	@rm -f *.msh *.vtk *.png *.vtu *.pvtu *.pvd *.npy *.pdf *.dat *.segy *.hdf5
+	@rm -f *.msh *.vtk *.png *.vtu *.pvtu *.pvd *.pdf *.dat *.segy *.hdf5
 	@rm -rf asn*/ bsn*/
 
 clean-data:

@@ -311,6 +311,38 @@ def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
         raise ValueError("source not implemented")
 
 
+def ricker_time_delay(delay: float, frequency: float, delay_type: str) -> float:
+    """Convert a Ricker wavelet delay to seconds.
+
+    Parameters
+    ----------
+    delay : float
+        Delay, in multiples of the distance between the wavelet minima or in
+        seconds.
+    frequency : float
+        Peak frequency of the wavelet.
+    delay_type : str
+        Either `"multiples_of_minimum"` or `"time"`.
+
+    Returns
+    -------
+    float
+        Delay in seconds.
+
+    Raises
+    ------
+    ValueError
+        If `delay_type` is not supported.
+    """
+    if delay_type == "multiples_of_minimum":
+        return delay * np.sqrt(6.0) / (np.pi * frequency)
+    if delay_type == "time":
+        return delay
+    raise ValueError(
+        f"delay_type must be 'multiples_of_minimum' or 'time', got {delay_type!r}."
+    )
+
+
 def ricker_wavelet(
     t: float,
     frequency: float,
@@ -344,11 +376,7 @@ def ricker_wavelet(
     float
         Value of the wavelet at time t
     """
-    if delay_type == "multiples_of_minimum":
-        time_delay = delay * np.sqrt(6.0) / (np.pi * frequency)
-    elif delay_type == "time":
-        time_delay = delay
-    t = t - time_delay
+    t = t - ricker_time_delay(delay, frequency, delay_type)
     tt = (np.pi * frequency * t) ** 2
     return amplitude * (1.0 - (2.0) * tt) * np.exp((-1.0) * tt)
 
