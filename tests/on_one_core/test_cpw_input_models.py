@@ -12,6 +12,9 @@ from spyro.tools.cells_per_wavelength_calculator import (
     CpwParameters,
     MaterialFileCase,
 )
+from spyro.tools.cells_per_wavelength_calculator.input_models import (
+    create_elastic_model_for_meshing_parameter_2D_homogeneous,
+)
 
 METHODS = ["mass_lumped_triangle", "spectral_quadrilateral"]
 
@@ -126,7 +129,7 @@ def test_homogeneous_model_receiver_quantity(
     "build",
     [
         make_homogeneous_model,
-        lambda: input_models.create_elastic_model_for_meshing_parameter_2D_homogeneous(
+        lambda: create_elastic_model_for_meshing_parameter_2D_homogeneous(
             method="spectral_quadrilateral",
             degree=4,
             frequency=10.0,
@@ -314,7 +317,7 @@ def test_round_up_to_time_step(time: float, dt: float, expected: float) -> None:
             velocity=1.5,
             dt=dt,
         ),
-        lambda dt: input_models.create_elastic_model_for_meshing_parameter_2D_homogeneous(
+        lambda dt: create_elastic_model_for_meshing_parameter_2D_homogeneous(
             method="spectral_quadrilateral",
             degree=4,
             frequency=5.0,

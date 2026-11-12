@@ -545,7 +545,7 @@ class AcousticHomogeneousProblem(HomogeneousCpwProblem):
 class ElasticHomogeneousProblem(HomogeneousCpwProblem):
     """Isotropic elastic wave in a constant material.
 
-    Needs the ``p_wave_velocity``, ``s_wave_velocity`` and ``density``
+    Needs the `p_wave_velocity`, `s_wave_velocity` and `density`
     parameters. The wavelength is the S-wavelength.
 
     Attributes
@@ -589,7 +589,7 @@ class ElasticHomogeneousProblem(HomogeneousCpwProblem):
         Parameters
         ----------
         method : str
-            Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+            Either `"mass_lumped_triangle"` or `"spectral_quadrilateral"`.
         degree : int
             Spatial polynomial degree.
 
