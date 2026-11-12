@@ -143,6 +143,7 @@ def analytical_solution_elastic(
     dt: float,
     force_direction: int = None,
     dimension: int = 3,
+    time_shift: float | None = None,
 ):
     """Calculate an analytical elastic-wave solution.
 
@@ -179,6 +180,10 @@ def analytical_solution_elastic(
     dimension : int, optional
         Number of spatial dimensions. Only three-dimensional problems are
         currently supported. The default is 3.
+    time_shift : float or None, optional
+        2D force source only. Time, in seconds, by which the solution is
+        advanced, see :func:`analytical_force_source_2d`. Default is None, for
+        `RECEIVER_STEP_OFFSET * dt`. The 3D solutions are at the time labels.
 
     Returns
     -------
@@ -189,7 +194,8 @@ def analytical_solution_elastic(
     ------
     ValueError
         If ``dimension`` is not 3, if a force source is specified without a
-        force direction, or if an unsupported source type is provided.
+        force direction, if an unsupported source type is provided, or if a
+        `time_shift` is given for a 3D solution.
     """
     if isinstance(source_type, str):
         source_type = SourceType(source_type)
@@ -199,6 +205,8 @@ def analytical_solution_elastic(
         raise ValueError(f"Can not use {source_type} with no force_direction")
     if dimension == 2 and source_type == "explosive_source":
         raise ValueError("Explosive source only supported for 3D simulations.")
+    if dimension == 3 and time_shift is not None:
+        raise ValueError("time_shift is only supported for the 2D force source.")
 
     nt = round(final_time / dt + 1)
     final_time = dt * (nt - 1)
@@ -243,6 +251,7 @@ def analytical_solution_elastic(
                 time_delay,
                 force_direction,
                 i,
+                time_shift=time_shift,
             )
     else:
         raise ValueError(f"Source type of {source_type} not valid")
@@ -534,7 +543,8 @@ def analytical_force_source_2d(
     force_direction: int,
     displacement_direction: int,
     n_extra: int = 100,
-):
+    time_shift: float | None = None,
+) -> np.ndarray:
     r"""Calculate the 2D analytical displacement from a point force.
 
     The solution is the frequency-domain elastodynamic Green tensor for an
@@ -564,7 +574,14 @@ def analytical_force_source_2d(
         Direction of the applied force. Must be 0 or 1.
     displacement_direction : int
         Direction of the displacement component. Must be 0 or 1.
-    n_extra: int = 10
+    n_extra : int, optional
+        Factor by which the time axis is extended before the Fourier
+        transform, to reduce wrap-around artifacts. Default is 100.
+    time_shift : float or None, optional
+        Time, in seconds, by which the solution is advanced: sample `i` is the
+        field at `time_vector[i] + time_shift`. Default is None, for
+        `RECEIVER_STEP_OFFSET * dt`, which matches the receiver data of the
+        solvers. Use 0.0 for the field at the time labels.
 
     Returns
     -------
@@ -582,6 +599,8 @@ def analytical_force_source_2d(
 
     dt = time_vector[1] - time_vector[0]
     num_t = len(time_vector)
+    if time_shift is None:
+        time_shift = RECEIVER_STEP_OFFSET * dt
 
     extended_num_t = n_extra * num_t
 
@@ -675,10 +694,11 @@ def analytical_force_source_2d(
             green_tensor_component * amplitude * source_spectrum[frequency_index]
         )
 
+    # Advancing by time_shift multiplies the spectrum by exp(i omega time_shift)
+    displacement_spectrum *= np.exp(2j * np.pi * frequency_axis * time_shift)
     displacement = np.fft.irfft(
         displacement_spectrum,
         n=extended_num_t,
     )
-    shifted_replacement = displacement[1:num_t + 1]
 
-    return shifted_replacement
+    return displacement[:num_t]

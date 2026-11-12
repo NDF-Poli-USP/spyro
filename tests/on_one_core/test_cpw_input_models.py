@@ -12,6 +12,9 @@ from spyro.tools.cells_per_wavelength_calculator import (
     CpwParameters,
     MaterialFileCase,
 )
+from spyro.tools.cells_per_wavelength_calculator.input_models import (
+    create_elastic_model_for_meshing_parameter_2D_homogeneous,
+)
 
 METHODS = ["mass_lumped_triangle", "spectral_quadrilateral"]
 
@@ -120,6 +123,33 @@ def test_homogeneous_model_receiver_quantity(
     model = make_homogeneous_model(reduced=reduced)
 
     assert len(model["acquisition"]["receiver_locations"]) == expected_receivers
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        make_homogeneous_model,
+        lambda: create_elastic_model_for_meshing_parameter_2D_homogeneous(
+            method="spectral_quadrilateral",
+            degree=4,
+            frequency=10.0,
+            p_wave_velocity=5.6,
+            s_wave_velocity=2.75,
+            density=2.0,
+            dt=1e-3,
+        ),
+    ],
+    ids=["acoustic", "elastic"],
+)
+def test_homogeneous_model_writes_no_forward_output(build: Callable[[], dict]) -> None:
+    """A search solves many meshes, so no solve writes its wavefield to disk.
+
+    Parameters
+    ----------
+    build : Callable[[], dict]
+        Builds the model dictionary.
+    """
+    assert build()["visualization"]["forward_output"] is False
 
 
 @pytest.mark.parametrize("velocity, frequency", [(1.5, 5.0), (3.0, 12.0)])
@@ -287,8 +317,17 @@ def test_round_up_to_time_step(time: float, dt: float, expected: float) -> None:
             velocity=1.5,
             dt=dt,
         ),
+        lambda dt: create_elastic_model_for_meshing_parameter_2D_homogeneous(
+            method="spectral_quadrilateral",
+            degree=4,
+            frequency=5.0,
+            p_wave_velocity=5.6,
+            s_wave_velocity=2.75,
+            density=2.0,
+            dt=dt,
+        ),
     ],
-    ids=["acoustic"],
+    ids=["acoustic", "elastic"],
 )
 def test_homogeneous_final_time_is_on_reference_grid(
     dt: float,
