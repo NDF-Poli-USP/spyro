@@ -114,6 +114,17 @@ class ElasticMaterialParameterization(StrEnum):
     VELOCITY = "velocity"
 
 
+class CpwSearchDirection(StrEnum):
+    """Enum for the direction of the cells-per-wavelength line search.
+
+    BACKWARD: Start from a passing value and step down.
+    FORWARD: Start from a failing value and step up.
+    """
+
+    BACKWARD = "backward"
+    FORWARD = "forward"
+
+
 class FunctionalType(Enum):
     """Enum for different types of functionals that can be computed.
 
