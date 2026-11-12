@@ -175,13 +175,17 @@ class Eikonal_Modeling:
         Notes
         -----
         Each source is snapped to its nearest node of ``V`` (all nodes at that
-        distance if there is a tie). The minimum distance is a collective PETSc
-        reduction and the node selection reads the halos, so every rank holds
-        the source nodes it can see, as ``DirichletBC.nodes`` does.
+        distance if there is a tie). Nodes tie when their distances differ by
+        less than ``1e-8 * lmin``, since round-off makes the distances of
+        equidistant nodes differ in the last digits. The minimum distance is a
+        collective PETSc reduction and the node selection reads the halos, so
+        every rank holds the source nodes it can see, as ``DirichletBC.nodes``
+        does.
         """
         coords = fire.SpatialCoordinate(V.mesh())
         dist2 = fire.Function(V)
         radius = lmin / (self.degree_eik + 1)
+        tie_tol = 1e-8 * lmin
         nodes = []
         for source in self.source_locations:
             dist2.interpolate(sum((x - s) ** 2 for x, s in zip(coords, source)))
@@ -190,7 +194,8 @@ class Eikonal_Modeling:
                 raise ValueError(
                     f"Source {source} has no mesh node within {radius} km."
                 )
-            nodes.append(np.flatnonzero(dist2.dat.data_ro_with_halos <= d2min))
+            d2tie = (np.sqrt(d2min) + tie_tol) ** 2
+            nodes.append(np.flatnonzero(dist2.dat.data_ro_with_halos <= d2tie))
         nodes = np.unique(np.concatenate(nodes))
 
         sou_marker = fire.Function(V, name="source_marker")
@@ -697,11 +702,21 @@ class Eikonal_Modeling:
         -------
         yp : `Firedrake.Function`
             Eikonal field.
+
+        Notes
+        -----
+        The velocity is bounded below by ``c_min`` in the weak forms. In the
+        cells cut by a velocity discontinuity, a high-order interpolant
+        undershoots its nodal values and can even turn negative, which makes
+        the Eikonal equation ill-posed and the nonlinear solver fail.
         """
 
         # Functions
         u = fire.TrialFunction(V)
         vy = fire.TestFunction(V)
+
+        # Velocity bounded below by its minimum nodal value
+        c = fire.max_value(c, c_min)
 
         # Weak form parameters
         wf_parameters = [u, vy, c, c_min, V, diam_mesh]
