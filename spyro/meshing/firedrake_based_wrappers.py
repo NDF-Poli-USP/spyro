@@ -1,7 +1,9 @@
 import firedrake as fire
 
 
-def rectangle_mesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False):
+def rectangle_mesh(
+    nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False
+):
     """Create a rectangle mesh based on the Firedrake mesh.
 
     First axis is negative, second axis is positive. If there is a pad, both
@@ -36,11 +38,13 @@ def rectangle_mesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilatera
         pad = 0
 
     if comm is None:
-        mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
-                                  quadrilateral=quadrilateral)
+        mesh = fire.RectangleMesh(
+            nx, ny, length_x, length_y, quadrilateral=quadrilateral
+        )
     else:
-        mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
-                                  quadrilateral=quadrilateral, comm=comm)
+        mesh = fire.RectangleMesh(
+            nx, ny, length_x, length_y, quadrilateral=quadrilateral, comm=comm
+        )
 
     # Adjusting to Spyro's reference system (z, x) with origin at (0, 0)
     mesh.coordinates.dat.data[:, 0] *= -1.0
@@ -71,7 +75,7 @@ def periodic_rectangle_mesh(
         Padding to be added to the domain. The default is None.
     comm : MPI communicator, optional
         MPI communicator. The default is None.
-    quadrilateral: bool, optional
+    quadrilateral : bool, optional
         If True, the mesh is quadrilateral. The default is False.
 
     Returns
@@ -86,11 +90,13 @@ def periodic_rectangle_mesh(
         pad = 0
 
     if comm is None:
-        mesh = fire.PeriodicRectangleMesh(nx, ny, length_x, length_y,
-                                          quadrilateral=quadrilateral)
+        mesh = fire.PeriodicRectangleMesh(
+            nx, ny, length_x, length_y, quadrilateral=quadrilateral
+        )
     else:
-        mesh = fire.PeriodicRectangleMesh(nx, ny, length_x, length_y,
-                                          quadrilateral=quadrilateral, comm=comm)
+        mesh = fire.PeriodicRectangleMesh(
+            nx, ny, length_x, length_y, quadrilateral=quadrilateral, comm=comm
+        )
 
     # Adjusting to Spyro's reference system (z, x) with origin at (0, 0)
     mesh.coordinates.dat.data[:, 0] *= -1.0
@@ -99,8 +105,9 @@ def periodic_rectangle_mesh(
     return mesh
 
 
-def box_mesh(nx, ny, nz, length_x, length_y, length_z, pad=None,
-             quadrilateral=False, comm=None):
+def box_mesh(
+    nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=False, comm=None
+):
     """
     Create a 3D box mesh based on Firedrake mesh utilities.
 
@@ -147,12 +154,14 @@ def box_mesh(nx, ny, nz, length_x, length_y, length_z, pad=None,
     if quadrilateral:
 
         if comm is None:
-            quad_mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
-                                           quadrilateral=quadrilateral)
+            quad_mesh = fire.RectangleMesh(
+                nx, ny, length_x, length_y, quadrilateral=quadrilateral
+            )
 
         else:
-            quad_mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
-                                           quadrilateral=quadrilateral, comm=comm)
+            quad_mesh = fire.RectangleMesh(
+                nx, ny, length_x, length_y, quadrilateral=quadrilateral, comm=comm
+            )
 
         # Adjusting to Spyro's reference system (z, x, y) with origin at (0, 0, 0)
         quad_mesh.coordinates.dat.data[:, 0] *= -1.0
