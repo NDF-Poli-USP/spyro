@@ -1,14 +1,6 @@
 """Run the elastic homogeneous cells-per-wavelength demo on a small setup."""
 
-import shutil
-from pathlib import Path
-
 import pytest
-
-#: Stored analytical receiver data of the demo acquisition.
-REFERENCE_FILE = (
-    Path(__file__).parents[1] / "inputfiles" / "elastic_homogeneous_cpw_reference.npz"
-)
 
 
 @pytest.mark.slow
@@ -16,9 +8,8 @@ def test_elastic_homogeneous_cpw_demo(tmp_path, monkeypatch) -> None:
     """The demo search stops at the first cpw that meets the threshold."""
     from demos.elastic_homogeneous_cpw import run
 
-    # The demo reads its reference from, and saves its search history to,
-    # the working directory
-    shutil.copy(REFERENCE_FILE, tmp_path)
+    # The working directory holds no reference, so the demo must find the
+    # stored one itself. It saves its search history there.
     monkeypatch.chdir(tmp_path)
     threshold = 0.02
     calculator = run(

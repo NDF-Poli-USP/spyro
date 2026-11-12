@@ -580,17 +580,8 @@ class ElasticHomogeneousProblem(HomogeneousCpwProblem):
         self.p_wave_velocity: float = parameters.require("p_wave_velocity")
         self.s_wave_velocity: float = parameters.require("s_wave_velocity")
         self.density: float = parameters.require("density")
-
-    @property
-    def minimum_wavelength_velocity(self) -> float:
-        """The S-wave velocity, the slowest body wave.
-
-        Returns
-        -------
-        float
-            ``s_wave_velocity``.
-        """
-        return self.s_wave_velocity
+        # The S-wave is the slowest body wave
+        self.minimum_wavelength_velocity = self.s_wave_velocity
 
     def model_dictionary(self, method: str, degree: int) -> dict:
         """Build the homogeneous isotropic elastic model dictionary.

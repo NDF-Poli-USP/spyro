@@ -122,6 +122,33 @@ def test_homogeneous_model_receiver_quantity(
     assert len(model["acquisition"]["receiver_locations"]) == expected_receivers
 
 
+@pytest.mark.parametrize(
+    "build",
+    [
+        make_homogeneous_model,
+        lambda: input_models.create_elastic_model_for_meshing_parameter_2D_homogeneous(
+            method="spectral_quadrilateral",
+            degree=4,
+            frequency=10.0,
+            p_wave_velocity=5.6,
+            s_wave_velocity=2.75,
+            density=2.0,
+            dt=1e-3,
+        ),
+    ],
+    ids=["acoustic", "elastic"],
+)
+def test_homogeneous_model_writes_no_forward_output(build: Callable[[], dict]) -> None:
+    """A search solves many meshes, so no solve writes its wavefield to disk.
+
+    Parameters
+    ----------
+    build : Callable[[], dict]
+        Builds the model dictionary.
+    """
+    assert build()["visualization"]["forward_output"] is False
+
+
 @pytest.mark.parametrize("velocity, frequency", [(1.5, 5.0), (3.0, 12.0)])
 def test_homogeneous_model_geometry_avoids_periodic_images(
     velocity: float, frequency: float
