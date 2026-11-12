@@ -25,7 +25,7 @@ def test_elastic_homogeneous_cpw_demo(tmp_path, monkeypatch) -> None:
         method="spectral_quadrilateral",
         degree=4,
         accepted_error_threshold=threshold,
-        cpw_initial=1.0,
+        cpw_initial=0.8,
         cpw_max=1.6,
         load_reference=True,
     )
