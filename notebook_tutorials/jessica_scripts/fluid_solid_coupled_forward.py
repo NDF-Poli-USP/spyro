@@ -118,7 +118,7 @@ def plot_model_xz(wave, filename):
 # ===========================================================================
 # Settings
 # ===========================================================================
-USE_MONOLITHIC = False
+USE_MONOLITHIC = True
 MESH_TYPE = "firedrake_mesh" # "gmsh_mesh" or "firedrake_mesh"
 OUT = "results"
 os.makedirs(OUT, exist_ok=True)
@@ -167,7 +167,7 @@ case_large_2D = {
     "frequency": 10,
     "receiver_location": [(-5.99, 14.99)],
     "solid_receiver_locations": [(-6.01, 15.01)],
-    "final_time": 2.0,
+    "final_time": 0.3,
     "dt": 0.0005,
     "velocity_fluid": None,
     "bulk_modulus": 2.25,
