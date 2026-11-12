@@ -14,8 +14,8 @@ Material and acquisition follow Lyu et al. (2024), doi:
 S-wavelengths below the source, with horizontal offsets from 0 to 7
 S-wavelengths. The domain is a periodic box, sized so that no P-wave from a
 periodic image of the source reaches a receiver before the final time. The
-search starts at ``C_initial``, which must fail the threshold, and steps up
-until the error passes it, then refines the result to ``C_accuracy``.
+search starts at `C_initial`, which must fail the threshold, and steps up
+until the error passes it, then refines the result to `C_accuracy`.
 
 Run it with::
 
@@ -67,15 +67,15 @@ def run(
     Parameters
     ----------
     method : str, optional
-        Finite element method to evaluate, ``"mass_lumped_triangle"`` or
-        ``"spectral_quadrilateral"``. Default is ``"mass_lumped_triangle"``.
+        Finite element method to evaluate, `"mass_lumped_triangle"` or
+        `"spectral_quadrilateral"`. Default is `"mass_lumped_triangle"`.
     degree : int, optional
         Polynomial degree to evaluate. Default is 4.
     accepted_error_threshold : float or None, optional
         Largest accepted receiver error. Default is None.
     threshold_discretization : ThresholdDiscretization, bool, dict or None, optional
         Discretization whose error is used as the threshold. Default is
-        None, which, when ``accepted_error_threshold`` is also None, uses a
+        None, which, when `accepted_error_threshold` is also None, uses a
         degree 4 spectral quadrilateral mesh at cpw 2.0. Giving both is
         rejected by the calculator.
     cpw_initial : float, optional
@@ -94,7 +94,7 @@ def run(
     -------
     spyro.tools.MeshingParameterCalculator
         The calculator after the search, holding its
-        ``search_history``.
+        `search_history`.
     """
     threshold = {}
     if accepted_error_threshold is not None:

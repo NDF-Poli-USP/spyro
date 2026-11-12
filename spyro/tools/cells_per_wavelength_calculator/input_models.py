@@ -423,12 +423,12 @@ def _build_elastic_model_dictionary(
     """Assemble a 2D isotropic elastic model dictionary for the cpw calculator.
 
     The source is a horizontal (x-direction) Ricker point force delayed by
-    one period, and the mesh is a ``"firedrake_mesh"`` for either method.
+    one period, and the mesh is a `"firedrake_mesh"` for either method.
 
     Parameters
     ----------
     method : str
-        Either ``"mass_lumped_triangle"`` or ``"spectral_quadrilateral"``.
+        Either `"mass_lumped_triangle"` or `"spectral_quadrilateral"`.
     degree : int
         Spatial polynomial degree.
     length_z : float
@@ -436,9 +436,9 @@ def _build_elastic_model_dictionary(
     length_x : float
         Domain length in the x direction.
     source_locations : list of tuple of float
-        Source ``(z, x)`` locations.
+        Source `(z, x)` locations.
     receiver_locations : list of tuple of float
-        Receiver ``(z, x)`` locations.
+        Receiver `(z, x)` locations.
     frequency : float
         Ricker source peak frequency.
     final_time : float
@@ -446,7 +446,7 @@ def _build_elastic_model_dictionary(
     dt : float
         Time step of the simulation.
     synthetic_data : dict
-        The ``"synthetic_data"`` section, giving the material.
+        The `"synthetic_data"` section, giving the material.
     periodic : bool, optional
         If True, use a periodic mesh. Default is False.
     forward_output : bool, optional
@@ -460,7 +460,7 @@ def _build_elastic_model_dictionary(
     Raises
     ------
     ValueError
-        If ``method`` is not supported.
+        If `method` is not supported.
     """
     validate_parameter("method", method, list(MESH_TYPES))
 
@@ -531,8 +531,8 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
     Parameters
     ----------
     method : str
-        Finite element method, either ``"mass_lumped_triangle"`` or
-        ``"spectral_quadrilateral"``.
+        Finite element method, either `"mass_lumped_triangle"` or
+        `"spectral_quadrilateral"`.
     degree : int
         Spatial polynomial degree.
     frequency : float
@@ -560,7 +560,7 @@ def create_elastic_model_for_meshing_parameter_2D_homogeneous(
     Raises
     ------
     ValueError
-        If ``method`` is not supported.
+        If `method` is not supported.
     """
     _warn_if_meters_per_second(s_wave_velocity)
     if dt is None:

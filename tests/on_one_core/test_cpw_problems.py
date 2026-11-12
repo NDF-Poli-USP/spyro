@@ -122,7 +122,11 @@ def test_interpolate_time_series_keeps_trailing_axes() -> None:
     [
         (WaveType.ISOTROPIC_ACOUSTIC, ACOUSTIC, VelocityProfileType.HOMOGENEOUS),
         (WaveType.ISOTROPIC_ACOUSTIC, ACOUSTIC, VelocityProfileType.HETEROGENEOUS),
-        (WaveType.ISOTROPIC_ELASTIC, ISOTROPIC_ELASTIC, VelocityProfileType.HOMOGENEOUS),
+        (
+            WaveType.ISOTROPIC_ELASTIC,
+            ISOTROPIC_ELASTIC,
+            VelocityProfileType.HOMOGENEOUS,
+        ),
     ],
 )
 def test_cpw_problems_registry(
@@ -237,12 +241,14 @@ def test_elastic_model_geometry_avoids_periodic_images() -> None:
     assert distances.max() / vs < final_time
 
     # Nearest periodic image of the source, over the 8 neighbouring copies
-    shifts = np.array(
-        [(i, j) for i in (-1, 0, 1) for j in (-1, 0, 1) if (i, j) != (0, 0)]
-    ) * length
+    shifts = (
+        np.array([(i, j) for i in (-1, 0, 1) for j in (-1, 0, 1) if (i, j) != (0, 0)])
+        * length
+    )
     images = source + shifts
     image_distance = np.linalg.norm(
-        receivers[:, None, :] - images[None, :, :], axis=2,
+        receivers[:, None, :] - images[None, :, :],
+        axis=2,
     ).min()
     assert image_distance / vp > final_time
 
@@ -290,11 +296,16 @@ def test_elastic_maximum_dt_uses_elastic_operator() -> None:
     # in the mass) give the same dt as the modal solver's default forms
     # (velocity in the stiffness).
     dt_solver = spyro.solvers.modal.modal_sol.Modal_Solver(
-        2, method="ARNOLDI", calc_max_dt=True,
+        2,
+        method="ARNOLDI",
+        calc_max_dt=True,
     )
     default_forms_dt = dt_solver.estimate_timestep(
-        acoustic.c, acoustic.function_space, acoustic.final_time,
-        quad_rule=acoustic.quadrature_rule, fraction=1.0,
+        acoustic.c,
+        acoustic.function_space,
+        acoustic.final_time,
+        quad_rule=acoustic.quadrature_rule,
+        fraction=1.0,
     )
     assert np.isclose(acoustic_dts[1], default_forms_dt)
 
