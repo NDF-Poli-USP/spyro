@@ -36,8 +36,8 @@ DIMENSION = 3 if CASE_NAME.startswith("case_3d") else 2
 LEGACY_AXES = False
 
 SCHEMES = {
-    # "P – u_s (sequential)": ("sequential", dict(color="tab:blue", lw=1.5, ls="-")),
-    "P – u_s (monolithic)": ("monolithic", dict(color="tab:green", lw=1.5, ls="-")),
+    "P – u_s (sequential)": ("sequential", dict(color="tab:blue", lw=1.5, ls="-")),
+    # "P – u_s (monolithic)": ("monolithic", dict(color="tab:green", lw=1.5, ls="-")),
 }
 CASES = {label: (f"{CASE_NAME}_{scheme}_{DIMENSION}d", style)
          for label, (scheme, style) in SCHEMES.items()}

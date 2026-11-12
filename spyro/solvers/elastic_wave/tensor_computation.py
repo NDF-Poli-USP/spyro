@@ -156,6 +156,17 @@ def C_vti_tensor(self, dim):
                                 (C13, C11, 0),
                                 (0, 0, C44)))
 
+    else:
+        # Assembling the elastic tensor
+        C_vti = fire.as_tensor(((C33, C13, C13, 0, 0, 0),
+                                (C13, C11, C12, 0, 0, 0),
+                                (C13, C12, C11, 0, 0, 0),
+                                (0, 0, 0, C66, 0, 0),
+                                (0, 0, 0, 0, C44, 0),
+                                (0, 0, 0, 0, 0, C44)))
+
+    return C_vti
+
 
 def C_tti_tensor(self, C_vti, dim):
 
