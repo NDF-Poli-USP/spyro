@@ -4,6 +4,7 @@ from sys import float_info, exit
 from ...domains.quadrature import quadrature_rules
 from ...utils.error_management import sanitize_num_array, validate_parameter
 from ...utils.utils import global_min
+from ...version_control import is_firedrake_new
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -200,8 +201,9 @@ class Eikonal_Modeling:
 
         sou_marker = fire.Function(V, name="source_marker")
         Dir_Point_BC(V, fire.Constant(1.0), nodes).apply(sou_marker)
+        bcs_eik = [Dir_Point_BC(V, fire.Constant(0.0), nodes)]
 
-        return [Dir_Point_BC(V, fire.Constant(0.0), nodes)], sou_marker
+        return bcs_eik, sou_marker
 
     def define_int_dom(self, V):
         """Define the integration domain for the Eikonal equation.
@@ -401,7 +403,9 @@ class Eikonal_Modeling:
             {
                 "snes_linesearch_type": "l2",  # l2, cp, basic
                 "snes_linesearch_damping": 1.0,
-                "snes_linesearch_maxlambda": 1.0,  # snes_linesearch_maxstep
+                "snes_linesearch_maxlambda"
+                if is_firedrake_new()
+                else "snes_linesearch_maxstep": 1.0,
                 "snes_max_funcs": 1000,
                 "snes_linesearch_order": 2,
                 "snes_linesearch_alpha": 1e-4,
