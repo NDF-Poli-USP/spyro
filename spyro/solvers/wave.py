@@ -463,35 +463,88 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.stiffness_quadrature_rule = k_rule
         self.surface_quadrature_rule = s_rule
 
-    def get_and_set_maximum_dt(self, fraction=0.7,
-                               estimate_max_eigenvalue=False):
+    def get_and_set_maximum_dt(
+        self,
+        fraction: float = 0.7,
+        estimate_max_eigenvalue: bool = False,
+        method: str | None = None,
+    ) -> float:
+        """Calculate and set the maximum stable time step of the wave solver.
+
+        By default, the largest eigenvalue is computed with SciPy on a single
+        rank in serial, and distributed with SLEPc when the mesh is
+        distributed.
+
+        Parameters
+        ----------
+        fraction : float, optional
+            Fraction of the estimated time step to use. Default is 0.7.
+        estimate_max_eigenvalue : bool, optional
+            Whether to estimate the maximum eigenvalue from the matrix
+            diagonals instead of computing it. Same as `method="ANALYTICAL"`.
+            Default is `False`.
+        method : str, optional
+            Method of `Modal_Solver` used for the largest eigenvalue, e.g.
+            `"ANALYTICAL"`, `"ARNOLDI"` or `"KRYLOVSCH_CH"`. Default is
+            `None`, which uses `"ANALYTICAL"` if `estimate_max_eigenvalue`,
+            otherwise `"KRYLOVSCH_CH"` when the mesh is distributed and
+            `"ARNOLDI"` in serial.
+
+        Returns
+        -------
+        float
+            The calculated maximum time step, also stored in `self.dt`.
+
+        Raises
+        ------
+        ValueError
+            If `estimate_max_eigenvalue` is `True` and `method` is neither
+            `None` nor `"ANALYTICAL"`.
         """
-        Calculates and sets the maximum stable time step (dt) for the wave solver.
-
-        Args:
-            fraction (float, optional):
-                Fraction of the estimated time step to use. Defaults to 0.7.
-            estimate_max_eigenvalue (bool, optional):
-                Whether to estimate the maximum eigenvalue. Defaults to False.
-
-        Returns:
-            float: The calculated maximum time step (dt).
-        """
-
-        if self.c is None:
-            c = self.initial_velocity_model
-        else:
-            c = self.c
 
         # Maximum timestep size
-        method = 'ANALYTICAL' if estimate_max_eigenvalue else 'ARNOLDI'
+        if estimate_max_eigenvalue and method not in (None, "ANALYTICAL"):
+            raise ValueError(
+                "estimate_max_eigenvalue=True uses the ANALYTICAL method, which "
+                f"conflicts with method={method!r}."
+            )
+        if method is None:
+            if estimate_max_eigenvalue:
+                method = "ANALYTICAL"
+            elif self.function_space.mesh().comm.size > 1:
+                method = "KRYLOVSCH_CH"
+            else:
+                method = "ARNOLDI"
         dt_solver = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
-        max_dt = dt_solver.estimate_timestep(c, self.function_space, self.final_time,
-                                             quad_rule=self.quadrature_rule,
-                                             fraction=fraction)
+        # The forms carry the material parameters, so no velocity is passed
+        max_dt = dt_solver.estimate_timestep(
+            None,
+            self.function_space,
+            self.final_time,
+            quad_rule=self.quadrature_rule,
+            fraction=fraction,
+            forms=self.modal_weak_forms(),
+        )
         self.dt = max_dt
 
         return max_dt
+
+    @abstractmethod
+    def modal_weak_forms(self) -> tuple[fire.Form, fire.Form]:
+        """Build the stiffness and mass forms of the free-vibration problem.
+
+        The largest generalized eigenvalue of these forms bounds the stable
+        time step, so they must match the spatial operator of the wave
+        physics.
+
+        Returns
+        -------
+        a : firedrake.Form
+            Stiffness form.
+        m : firedrake.Form
+            Mass form.
+        """
+        pass
 
     def get_mass_matrix_diagonal(self):
         """Builds a section of the mass matrix for debugging purposes."""
@@ -552,6 +605,22 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         '''Returns the string representing the function of the wave object
         (e.g., "pressure" or "displacement")'''
         pass
+
+    @property
+    def point_source_in_form(self) -> bool:
+        """Whether the time-step form injects the point source as a term.
+
+        With vertex-only-mesh sources, every solver adds
+        :meth:`Sources.source_term <spyro.sources.Sources.source_term>` to its
+        time-step form; otherwise the source is written into
+        ``rhs_no_pml_source()`` at each step.
+
+        Returns
+        -------
+        bool
+            ``True`` with a source and vertex-only meshes.
+        """
+        return self.sources is not None and self.use_vertex_only_mesh
 
     def update_source_expression(self, t):
         '''Update the source expression during wave propagation. This method must be

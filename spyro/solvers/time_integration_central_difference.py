@@ -47,36 +47,22 @@ def _propagate_forward_central_difference(wave, source_ids):
         # instability check below) no longer has to first allocate the whole
         # nt-step wavefield, which for fine meshes/small dt is many GB.
         usol = []
-    source_cof = None
     interpolate_receivers = None
-    master_source_W = None
-    if wave.sources is not None and wave.use_vertex_only_mesh:
-        # source_cof is a cofunction that represents a point source,
-        # being one at a point and zero elsewhere.
-        source_cof = wave.sources.source_cofunction()
-
+    if wave.use_vertex_only_mesh:
         if wave.abc_type == AbsorbingBCsType.PML:
             pressure_expr = fire.split(wave.X_n)[0]
         else:
             pressure_expr = wave.u_n
         interpolate_receivers = wave.receivers.receiver_interpolator(
             pressure_expr)
-        if (
-            wave.abc_type == AbsorbingBCsType.PML
-            and wave.source_function is not None
-        ):
-            master_source_W = fire.Cofunction(
-                wave.source_function.function_space()
-            )
-            master_source_W.sub(0).assign(source_cof)
+    if wave.point_source_in_form:
+        # Only the time function of the source changes from one step to the
+        # next, so the tape records a scalar per step for it.
+        wave.sources.update_spatial_function(wave.solver_parameters)
 
     usol_recv = []
     receiver_array = None
     receiver_buffer = None
-    # Reused accumulator for the point-source cofunction, so the per-timestep
-    # source assembly writes into an existing tensor instead of allocating a
-    # fresh Cofunction on every step.
-    source_buffer = None
     save_step = 0
     real_shot_record = None
     if compute_functional:
@@ -96,24 +82,11 @@ def _propagate_forward_central_difference(wave, source_ids):
         # Basic way of applying sources
         wave.update_source_expression(t)
 
-        if wave.sources is not None:
-            if wave.use_vertex_only_mesh:
-                if master_source_W is not None:
-                    wave.source_function.assign(
-                        wave.sources.wavelet[step] * master_source_W
-                    )
-                else:
-                    if source_buffer is None:
-                        source_buffer = fire.assemble(
-                            wave.sources.wavelet[step] * source_cof)
-                    else:
-                        fire.assemble(
-                            wave.sources.wavelet[step] * source_cof,
-                            tensor=source_buffer)
-                    wave.rhs_no_pml_source().assign(source_buffer)
-            else:
-                wave.rhs_no_pml_source().assign(
-                    wave.sources.apply_source(rhs_forcing, step))
+        if wave.point_source_in_form:
+            wave.sources.update_time_function(step)
+        elif wave.sources is not None:
+            wave.rhs_no_pml_source().assign(
+                wave.sources.apply_source(rhs_forcing, step))
 
         wave.solver.solve()
 

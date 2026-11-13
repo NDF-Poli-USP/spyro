@@ -62,6 +62,10 @@ def build_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule):
     if b is not None:
         F_s += dot(b, v_test) * dx(**quad_rule)
 
+    if wave.point_source_in_form:
+        # See Sources.source_term.
+        F_s += wave.sources.source_term(v_test, dx(**quad_rule))
+
     F_t = local_abc_form(wave)
 
     return F_m + F_k - F_s - F_t
