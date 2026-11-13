@@ -200,49 +200,142 @@ def test_eikonal(element_geometry, dimension, element_type):
     -------
     None
 
+    eik_min = 83.333 ms (Theoretical value)
+
+    Successful configurations: the nonlinear solver converges at f_est - 0.01,
+    f_est and f_est + 0.01 without retries, the three minimum Eikonal values
+    increase with f_est and stay within 10 % of each other, and the relative
+    error abs(eik_min - 83.333) / 83.333 is below 3 %. N is the number of
+    elements per direction (edge_length = 1 / N) and p the Eikonal degree.
+    The winner (*) is the coarsest mesh, then the smallest relative error.
+
+    =========================
+    2D - Consistent triangles
+    =========================
+     N  p  f_est  eik_min   error
+     2  4  0.09    83.164   0.20 %*
+     3  4  0.11    83.338   0.01 %
+     4  3  0.02    83.120   0.26 %
+     5  3  0.04    83.319   0.02 %
+     5  4  0.08    83.304   0.03 %
+     6  2  0.10    83.949   0.74 %
+     6  3  0.16    83.544   0.25 %
+     6  4  0.03    83.382   0.06 %
+     7  3  0.14    83.056   0.33 %
+     7  4  0.03    82.916   0.50 %
+     8  1  0.10    83.206   0.15 %
+     8  2  0.03    85.831   3.00 %
+    10  2  0.06    82.942   0.47 %
+    10  3  0.09    83.401   0.08 %
+    10  4  0.03    84.047   0.86 %
+    12  1  0.09    83.513   0.22 %
+    12  2  0.03    85.637   2.77 %
+    15  2  0.15    83.125   0.25 %
+    15  3  0.08    83.276   0.07 %
+    15  4  0.03    83.907   0.69 %
+    20  1  0.06    83.329   0.01 %
+    20  2  0.03    85.068   2.08 %
+    20  3  0.03    85.791   2.95 %
+
     ==============================
-    Eikonal for 2D model Δx = 100m
+    2D - Consistent quadrilaterals
     ==============================
-    eik_min = 83.333 ms (Theoretical value)
-    --------------------------
-    Consistent elements
-    f_est  T-ele  f_est  Q-ele
-    --------------------------
-     0.05 81.508   0.04 82.101
-     0.06 82.949*  0.05 83.744*
-     0.07 84.165   0.06 85.118
+     N  p  f_est  eik_min   error
+     3  4  0.03    83.908   0.69 %*
+     4  1  0.21    81.351   2.38 %
+     5  4  0.09    83.335   0.00 %
+     6  2  0.07    84.037   0.84 %
+     6  3  0.15    83.352   0.02 %
+     6  4  0.03    84.804   1.76 %
+     7  2  0.81    81.744   1.91 %
+     7  3  0.20    83.486   0.18 %
+     7  4  0.02    85.409   2.49 %
+     8  1  0.07    82.523   0.97 %
+    10  1  0.56    83.320   0.02 %
+    10  2  0.05    83.744   0.49 %
+    10  3  0.09    83.433   0.12 %
+    10  4  0.02    83.453   0.14 %
+    12  1  0.07    83.797   0.56 %
+    15  2  0.17    83.264   0.08 %
+    15  3  0.09    83.285   0.06 %
+    15  4  0.02    84.873   1.85 %
+    20  1  0.05    83.257   0.09 %
+    20  2  0.02    84.154   0.98 %
+    20  4  0.02    85.634   2.76 %
 
-    --------------------------
-    Underintegrated elements
-    p = 2         p = 4
-    f_est  T-ele  f_est  Q-ele
-    --------------------------
-     0.07 82.630*  0.03 84.245*
-     0.08 84.272   0.04 85.593
-     0.09 85.654   0.05 86.887
+    ==============================
+    2D - Underintegrated triangles
+    ==============================
+     N  p  f_est  eik_min   error
+     5  2  0.11    83.350   0.02 %*
+     5  3  0.12    83.604   0.33 %
+     5  4  0.12    83.207   0.15 %
+     6  2  0.11    84.113   0.94 %
+     6  3  0.13    83.516   0.22 %
+     7  2  0.24    83.357   0.03 %
+     7  3  0.05    84.738   1.69 %
+    10  2  0.08    84.272   1.13 %
+    10  3  0.08    83.405   0.09 %
+    15  2  0.11    83.381   0.06 %
+    15  3  0.05    85.108   2.13 %
 
-    =======================================================
-    Eikonal for 3D model Δx = 1000/6m - Consistent elements
-    =======================================================
-    eik_min = 83.333 ms (Theoretical value)
-    --------------------
-    f_est  T-ele   Q-ele
-    --------------------
-     0.03 82.652* 84.135*
-     0.04 85.656  94.462
-     0.05 91.815 103.382
+    ===================================
+    2D - Underintegrated quadrilaterals
+    ===================================
+     N  p  f_est  eik_min   error
+     3  1  0.01    83.789   0.55 %*
+     5  4  0.11    83.289   0.05 %
+     6  3  0.15    83.179   0.18 %
+     6  4  0.04    85.582   2.70 %
+     7  3  0.23    83.306   0.03 %
+     8  1  0.19    83.243   0.11 %
+    10  3  0.09    83.402   0.08 %
+    10  4  0.04    85.593   2.71 %
+    12  1  0.14    83.258   0.09 %
+    15  2  0.20    83.315   0.02 %
+    15  3  0.10    83.166   0.20 %
+    20  1  0.13    85.045   2.05 %
 
-    =========================================================
-    Eikonal for 3D model Δx = 250m - Underintegrated elements
-    =========================================================
-    eik_min = 83.333 ms (Theoretical value)
-    --------------------------
-    p = 1         p = 1
-    f_est  T-ele  f_est  Q-ele
-    --------------------------
-    0.18  79.604   0.20 81.144
-    0.19  82.222*  0.21 84.007*
-    0.20  84.764   0.22 86.896
+    ==========================
+    3D - Consistent tetrahedra
+    ==========================
+     N  p  f_est  eik_min   error
+     2  3  0.15    82.667   0.80 %*
+     3  2  0.18    82.781   0.66 %
+     3  3  0.19    83.896   0.68 %
+     5  2  0.05    82.044   1.55 %
+     6  2  0.04    84.603   1.52 %
+     6  3  0.03    85.114   2.14 %
+     7  2  0.05    82.259   1.29 %
+     7  3  0.05    82.162   1.41 %
+     8  1  0.05    82.516   0.98 %
+
+    =========================
+    3D - Consistent hexahedra
+    =========================
+     N  p  f_est  eik_min   error
+     2  3  0.10    85.386   2.46 %*
+     3  3  0.16    82.970   0.44 %
+     5  2  0.07    84.542   1.45 %
+     5  3  0.05    83.563   0.28 %
+     6  1  0.15    84.112   0.94 %
+     7  2  0.08    84.377   1.25 %
+     7  3  0.05    82.343   1.19 %
+
+    ===============================
+    3D - Underintegrated tetrahedra
+    ===============================
+     N  p  f_est  eik_min   error
+     4  1  0.19    82.222   1.33 %*
+     5  2  0.08    84.861   1.83 %
+
+    ==============================
+    3D - Underintegrated hexahedra
+    ==============================
+     N  p  f_est  eik_min   error
+     4  1  0.21    84.007   0.81 %*
+     5  3  0.06    85.008   2.01 %
+     8  1  0.10    83.406   0.09 %
     """
 
     SpyroEnsemble.print(
@@ -262,24 +355,25 @@ def test_eikonal(element_geometry, dimension, element_type):
 
     # Eikonal degree and factor for the stabilizing term in Eikonal equation
     if dimension == 2:
-        edge_length = 0.1
-        atol = 5e-3 if element_type == "consistent" else 1.5e-2
+        atol = 1e-2
         if element_geometry == "T":
-            p_eik = 2 if element_type == "consistent" else 2
-            f_est = 0.06 if element_type == "consistent" else 0.07
+            edge_length = 1.0 / 2 if element_type == "consistent" else 1.0 / 5
+            p_eik = 4 if element_type == "consistent" else 2
+            f_est = 0.09 if element_type == "consistent" else 0.11
         else:
-            p_eik = 2 if element_type == "consistent" else 4
-            f_est = 0.05 if element_type == "consistent" else 0.03
+            edge_length = 1.0 / 3
+            p_eik = 4 if element_type == "consistent" else 1
+            f_est = 0.03 if element_type == "consistent" else 0.01
 
     if dimension == 3:
-        edge_length = 1.0 / 6 if element_type == "consistent" else 1.0 / 4
-        atol = 1e-2 if element_type == "consistent" else 2e-2
+        edge_length = 1.0 / 2 if element_type == "consistent" else 1.0 / 4
+        atol = 2.5e-2 if element_type == "consistent" else 1.5e-2
         if element_geometry == "T":
-            p_eik = 2 if element_type == "consistent" else 1
-            f_est = 0.03 if element_type == "consistent" else 0.19
+            p_eik = 3 if element_type == "consistent" else 1
+            f_est = 0.15 if element_type == "consistent" else 0.19
         else:
-            p_eik = 2 if element_type == "consistent" else 1
-            f_est = 0.03 if element_type == "consistent" else 0.21
+            p_eik = 3 if element_type == "consistent" else 1
+            f_est = 0.10 if element_type == "consistent" else 0.21
 
     # Get simulation parameters
     SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length:.4f} m")
