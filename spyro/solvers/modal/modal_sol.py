@@ -4,7 +4,6 @@ import firedrake as fire
 from numpy import array, asarray, eye, imag, real, sqrt, unique
 from scipy.sparse.linalg import eigs, eigsh, lobpcg, spilu
 from slepc4py import SLEPc
-from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .modal_forms_and_matrices import (
     assemble_sparse_matrices,
     maximum_diagonal_ratio,
@@ -307,6 +306,8 @@ class Modal_Solver:
             "eps_gen_hermitian": None,  # Problem is Hermitian
             "eps_type": "krylovschur",  # Robust, widely used eigensolver
             # subspace, arnoldi, krylovschur, lapack
+            "st_type": "sinvert",  # Useful for interior eigenvalues
+            "eps_tol": 1e-6,  # Tight tolerance for accuracy
             "eps_max_it": 200,  # Reasonable iteration cap
             "eps_monitor": "ascii",  # Print convergence info
             "eps_converged_reason": None,  # Print stop reason
@@ -320,7 +321,6 @@ class Modal_Solver:
                 # Smallest eigenvalues magnitude
                 opts.update(
                     {
-                        "st_type": "sinvert",  # Useful for interior eigenvalues
                         "st_shift": 1e-6,  # Stabilizes Neumann BC null space
                         "eps_target": 0.0,  # Target value for sorting
                         "eps_target_magnitude": None,  # Sort by distance to target
@@ -347,9 +347,7 @@ class Modal_Solver:
                 # Smallest eigenvalues magnitude
                 opts.update(
                     {
-                        "eps_tol": 1e-6,  # Tight tolerance for accuracy
                         "st_shift": 1e-6,  # Stabilizes Neumann BC null space
-                        "st_type": "sinvert",  # Useful for interior eigenvalues
                         "ksp_type": KRYLOVSCH_CONFIG[self.method]["ksp"],
                         "pc_type": KRYLOVSCH_CONFIG[self.method]["pc"],
                         "eps_smallest_magnitude": None,  # Smallest eigenvalues magnitude
