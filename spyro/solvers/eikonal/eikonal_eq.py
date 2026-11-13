@@ -3,7 +3,7 @@ import numpy as np
 from sys import float_info, exit
 from ...domains.quadrature import quadrature_rules
 from ...utils.error_management import sanitize_num_array, validate_parameter
-from ...utils.utils import global_min
+from ...utils.utils import global_max, global_min
 from ...version_control import is_firedrake_new
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -158,8 +158,7 @@ class Eikonal_Modeling:
         V : `Firedrake.FunctionSpace`
             Function space where the boundary condition is applied.
         lmin : `float`
-            Minimum mesh size. A source must have a node of ``V`` within
-            ``lmin / (degree_eik + 1)``.
+            Minimum mesh size, used to scale the tie tolerance between nodes.
 
         Returns
         -------
@@ -171,7 +170,8 @@ class Eikonal_Modeling:
         Raises
         ------
         ValueError
-            If a source has no node of ``V`` within ``lmin / (degree_eik + 1)``.
+            If a source has no node of ``V`` within the largest cell diameter
+            of the mesh, which means it lies outside the mesh.
 
         Notes
         -----
@@ -182,10 +182,23 @@ class Eikonal_Modeling:
         collective PETSc reduction and the node selection reads the halos, so
         every rank holds the source nodes it can see, as ``DirichletBC.nodes``
         does.
+
+        The nodes of ``V`` include the cell vertices, and every point of a cell
+        is within the cell diameter of its vertices. The largest cell diameter
+        is therefore a bound on the distance from any source inside the mesh
+        to its nearest node, whatever the element degree or the node layout
+        (equispaced, Gauss-Lobatto-Legendre or KMV). A bound derived from the
+        nodal spacing, such as ``lmin / (degree_eik + 1)``, rejects sources
+        that lie between nodes: the spacing of Gauss-Lobatto-Legendre nodes is
+        not uniform, and the distance to the nearest node grows with the
+        square root of the dimension.
         """
-        coords = fire.SpatialCoordinate(V.mesh())
+        mesh = V.mesh()
+        coords = fire.SpatialCoordinate(mesh)
         dist2 = fire.Function(V)
-        radius = lmin / (self.degree_eik + 1)
+        cell_diam = fire.Function(fire.FunctionSpace(mesh, "DG", 0))
+        cell_diam.interpolate(fire.CellDiameter(mesh))
+        radius = global_max(cell_diam)
         tie_tol = 1e-8 * lmin
         nodes = []
         for source in self.source_locations:
@@ -193,7 +206,8 @@ class Eikonal_Modeling:
             d2min = global_min(dist2)
             if d2min > radius**2:
                 raise ValueError(
-                    f"Source {source} has no mesh node within {radius} km."
+                    f"Source {source} has no mesh node within {radius} km, "
+                    "the largest cell diameter, so it lies outside the mesh."
                 )
             d2tie = (np.sqrt(d2min) + tie_tol) ** 2
             nodes.append(np.flatnonzero(dist2.dat.data_ro_with_halos <= d2tie))

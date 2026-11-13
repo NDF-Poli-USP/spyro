@@ -4,7 +4,7 @@ The test compares the minimum Eikonal value obtained from the simulation with th
 theoretical value for different mesh sizes, element geometries, and finite element types.
 The results are expected to be within a specified tolerance of the theoretical value.
 """
-from pytest import fail, mark, param
+from pytest import fail, mark
 from firedrake import conditional, ConvergenceError
 from numpy import isclose
 from spyro.mpi.spyro_mpi import SpyroEnsemble
@@ -169,14 +169,14 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type):
 @mark.parametrize(
     "element_geometry, dimension, element_type",
     [
-        # ("T", 2, "consistent"),
-        # ("T", 2, "underintegrated"),
-        # ("Q", 2, "consistent"),
-        # ("Q", 2, "underintegrated"),
-        param("T", 3, "consistent"),
-        # param("T", 3, "underintegrated", marks=mark.slow),
-        # param("Q", 3, "consistent", marks=mark.slow),
-        # param("Q", 3, "underintegrated", marks=mark.slow),
+        ("T", 2, "consistent"),
+        ("T", 2, "underintegrated"),
+        ("Q", 2, "consistent"),
+        ("Q", 2, "underintegrated"),
+        ("T", 3, "consistent"),
+        ("T", 3, "underintegrated"),
+        ("Q", 3, "consistent"),
+        ("Q", 3, "underintegrated"),
     ],
 )
 def test_eikonal(element_geometry, dimension, element_type):
@@ -221,9 +221,10 @@ def test_eikonal(element_geometry, dimension, element_type):
     ------------------------
     p = 2         p = 4
     f_est  T-ele  f_est  Q-ele
-     0.07 82.630*  0.03 84.245 *
+     0.07 82.630*  0.03 84.245*
      0.08 84.272   0.04 85.593
      0.09 85.654   0.05 86.887
+    --/--: the nonlinear solver stalls at this f_est.
 
     ==============================
     Eikonal for 3D model Δx = 150m
@@ -233,34 +234,33 @@ def test_eikonal(element_geometry, dimension, element_type):
     Consistent elements
     -------------------
     f_est  T-ele   Q-ele
-     0.02  --/--  69.442
-     0.03 76.777  70.974
-     0.04 79.409  73.179
-     0.05 82.273* 75.766
-     0.06 85.347  78.548
-     0.07 88.562  81.431*
-     0.08 91.876  84.377
+     0.02 66.484  69.442
+     0.03 76.698  70.974
+     0.04 79.370  73.179
+     0.05 82.259* 75.766
+     0.06 85.344  78.548
+     0.07 88.562  81.431
+     0.08 91.877  84.377*
 
     Underintegrated elements
     ------------------------
     p = 2         p = 3
     f_est  T-ele  f_est   Q-ele
-     0.07 85.178*  0.03 78.838
-     0.08 87.990   0.04 80.940
-     0.09 90.933   0.05 83.130*
-     0.10 93.988   0.06 85.408
+     0.07 83.719*  0.06 83.476*
+     0.08 86.242   0.07 85.902
+     0.09 88.867   0.08 88.456
 
     p = 1-T-full integration
     f_est  T-ele
-     0.06 96.300
-     0.07 96.845
-     0.08 97.277
+     0.06 96.246
+     0.07 96.799
+     0.08 97.239
 
     p = 3-T-full integration
-    f_est   T-ele
-     0.03  96.223
-     0.04 101.550
-     0.05 107.164
+    f_est  T-ele
+     0.03 76.970
+     0.04 79.462
+     0.05 82.162
     """
 
     SpyroEnsemble.print(
@@ -297,7 +297,7 @@ def test_eikonal(element_geometry, dimension, element_type):
             f_est = 0.05 if element_type == "consistent" else 0.07
         else:
             p_eik = 2 if element_type == "consistent" else 3
-            f_est = 0.07 if element_type == "consistent" else 0.05
+            f_est = 0.08 if element_type == "consistent" else 0.06
 
     # Get simulation parameters
     SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length:.4f} m")
