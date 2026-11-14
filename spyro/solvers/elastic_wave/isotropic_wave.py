@@ -359,8 +359,11 @@ class IsotropicWave(ElasticWave):
         return self.automated_adjoint.label_derivatives(derivatives)
 
     def initialize_model_parameters_from_file(
-        self, synthetic_data_dict: dict, fast_interpolate: bool = True,
-    ):
+        self,
+        synthetic_data_dict: dict,
+        fast_interpolate: bool = True,
+        sharp_zero_interface: bool = True,
+    ) -> None:
         """Initialize isotropic elastic material parameters from model files.
 
         Every file is interpolated onto the scalar space of the mesh, and
@@ -370,35 +373,63 @@ class IsotropicWave(ElasticWave):
 
         Parameters
         ----------
-        synthetic_data_dict : dict
+        synthetic_data_dict : `dict`
             Material parameter dictionary with the keys of
             :meth:`initialize_model_parameters_from_object`. A string value
-            is a ``.segy`` or ``.hdf5`` file; any other value is used as
-            given.
-        fast_interpolate : bool, optional
-            If True, sample the file grid at the nodes of the scalar space.
-            If False, project it from a mesh built at the grid resolution,
-            which is slow for fine grids. Default is True.
+            is a `.segy` or `.hdf5` file; any other value is used as given.
+        fast_interpolate : `bool`, optional
+            If `True`, sample the file grid at the nodes of the scalar space.
+            If `False`, project it from a mesh built at the grid resolution,
+            which is slow for fine grids. Default is `True`.
+        sharp_zero_interface : `bool`, optional
+            If `True`, a node between a zero and a nonzero sample of a file,
+            such as between water and rock samples of a Vs model, does not
+            get a value between the two, see
+            :func:`spyro.io.interpolators.fast_interpolation`. Files without
+            zeros are not changed. Requires `fast_interpolate`. Default is
+            `True`.
 
         Returns
         -------
         None
-            The method assigns ``rho``, ``lmbda``, ``mu``, ``c``, ``c_s``, and
-            the active physical parameterization on ``self``.
+            The method assigns `rho`, `lmbda`, `mu`, `c`, `c_s`, and the
+            active physical parameterization on `self`.
+
+        Raises
+        ------
+        ValueError
+            If a file is read with `sharp_zero_interface` but without
+            `fast_interpolate`.
         """
         if self._physical_parameters:
             return
 
         space = create_function_space(self.mesh, self.method, self.degree, dim=1)
 
-        def load(value):
-            """Interpolate ``value`` if it names a file."""
+        def load(value: object) -> object:
+            """Interpolate `value` if it names a file.
+
+            Parameters
+            ----------
+            value : `object`
+                File name, or a value of any other type.
+
+            Returns
+            -------
+            `object`
+                The interpolated `firedrake.Function` if `value` is a file
+                name, `value` otherwise.
+            """
             if not isinstance(value, str):
                 return value
             if value.endswith(".segy"):
                 value = write_hdf5_velocity_model(value)
             return interpolate(
-                self, value, space, fast_interpolate=fast_interpolate,
+                self,
+                value,
+                space,
+                fast_interpolate=fast_interpolate,
+                sharp_zero_interface=sharp_zero_interface,
             )
 
         self.initialize_model_parameters_from_object(

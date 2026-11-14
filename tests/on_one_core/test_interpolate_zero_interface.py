@@ -9,6 +9,7 @@ import pytest
 
 import spyro
 from spyro.io.interpolators import _sample_grid
+from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 
 GRID_SPACING = 0.1
 WATER_BOTTOM = -0.4  # Last water sample
@@ -205,7 +206,8 @@ def test_sample_grid_without_zeros_is_linear(mesh_follows_interface: bool):
 
 def wave_and_space(
     water_interface: bool = False,
-) -> tuple[spyro.AcousticWave, fire.FunctionSpace]:
+    wave_class: type[spyro.solvers.wave.Wave] = spyro.AcousticWave,
+) -> tuple[spyro.solvers.wave.Wave, fire.FunctionSpace]:
     """Build a wave on a user mesh with node rows inside the mixed cell.
 
     Parameters
@@ -213,11 +215,13 @@ def wave_and_space(
     water_interface : `bool`, optional
         Whether the mesh is declared to follow the water bottom. Default is
         `False`.
+    wave_class : `type`, optional
+        Wave to build. Default is `spyro.AcousticWave`.
 
     Returns
     -------
     `tuple`
-        `spyro.AcousticWave` and CG1 space on its mesh.
+        Wave and CG1 space on its mesh.
     """
     # Lx and Ly are the coordinates of the upper corner, not lengths
     mesh = fire.RectangleMesh(10, 7, 0.0, 1.0, originX=-1.0)
@@ -254,10 +258,10 @@ def wave_and_space(
             "receiver_locations": [(-0.9, 0.6)],
         },
     }
-    return spyro.AcousticWave(dictionary=dictionary), fire.FunctionSpace(mesh, "CG", 1)
+    return wave_class(dictionary=dictionary), fire.FunctionSpace(mesh, "CG", 1)
 
 
-def write_model(directory: Path, water: bool = True) -> str:
+def write_model(directory: Path, water: bool = True, shift: float = 0.0) -> str:
     """Write the 2D grid to an HDF5 file.
 
     Parameters
@@ -266,15 +270,18 @@ def write_model(directory: Path, water: bool = True) -> str:
         Directory of the file.
     water : `bool`, optional
         If `True`, the grid has a water layer. Default is `True`.
+    shift : `float`, optional
+        Value added to the grid, with no water layer. Default is `0.0`.
 
     Returns
     -------
     `str`
         File name.
     """
-    filename = str(directory / f"model_water_{water}.hdf5")
+    filename = str(directory / f"model_water_{water}_shift_{shift}.hdf5")
     with h5py.File(filename, "w") as f:
-        f.create_dataset("velocity_model", data=grid_values(grid_axes(2), water))
+        values = grid_values(grid_axes(2), water) + shift
+        f.create_dataset("velocity_model", data=values)
     return filename
 
 
@@ -410,3 +417,76 @@ def test_interpolate_without_zeros_is_unchanged(water_interface: bool, tmp_path)
         water_interface, write_model(tmp_path, water=False)
     )
     assert np.array_equal(sharp, linear)
+
+
+@pytest.mark.parametrize("sharp_zero_interface", [None, False])
+def test_isotropic_wave_reads_sharp_shear_velocity(
+    sharp_zero_interface: bool | None, tmp_path: Path
+):
+    """Check the elastic file reader, which takes the rock Vs by default.
+
+    Parameters
+    ----------
+    sharp_zero_interface : `bool` or `None`
+        Value passed to the reader, or `None` to keep its default.
+    tmp_path : `pathlib.Path`
+        Pytest temporary directory.
+
+    Returns
+    -------
+    None
+    """
+    wave, _ = wave_and_space(water_interface=True, wave_class=IsotropicWave)
+    files = {
+        "p_wave_velocity": write_model(tmp_path, water=False, shift=3.0),
+        "s_wave_velocity": write_model(tmp_path),
+        "density": write_model(tmp_path, water=False, shift=-1.0),
+    }
+    options = {}
+    if sharp_zero_interface is not None:
+        options["sharp_zero_interface"] = sharp_zero_interface
+    wave.initialize_model_parameters_from_file({"type": "file", **files}, **options)
+
+    V = wave.c_s.function_space()
+    W = fire.VectorFunctionSpace(V.mesh(), V.ufl_element())
+    z, x = fire.Function(W).interpolate(V.mesh().coordinates).dat.data_ro.T
+    mixed = np.isclose(z, NEAR_WATER) | np.isclose(z, NEAR_ROCK)
+    linear = {
+        key: spyro.io.interpolate(wave, filename, V, fast_interpolate=True).dat.data_ro
+        for key, filename in files.items()
+    }
+    c_s = wave.c_s.dat.data_ro
+    if sharp_zero_interface is None:
+        axes = grid_axes(2)
+        rock_row = grid_values(axes)[np.isclose(axes[0], ROCK_TOP)][0]
+        assert np.allclose(c_s[mixed], np.interp(x[mixed], axes[1], rock_row))
+    else:
+        assert np.array_equal(c_s[mixed], linear["s_wave_velocity"][mixed])
+    assert np.array_equal(c_s[~mixed], linear["s_wave_velocity"][~mixed])
+    assert np.array_equal(wave.c.dat.data_ro, linear["p_wave_velocity"])
+    assert np.array_equal(wave.rho.dat.data_ro, linear["density"])
+
+
+def test_isotropic_wave_sharp_zero_interface_requires_fast_interpolate(tmp_path):
+    """Check that the elastic reader refuses its default on the slow path.
+
+    Parameters
+    ----------
+    tmp_path : `pathlib.Path`
+        Pytest temporary directory.
+
+    Returns
+    -------
+    None
+    """
+    wave, _ = wave_and_space(water_interface=True, wave_class=IsotropicWave)
+    synthetic_data = {
+        "type": "file",
+        "p_wave_velocity": write_model(tmp_path, water=False, shift=3.0),
+        "s_wave_velocity": write_model(tmp_path),
+        "density": 1.0,
+    }
+    with pytest.raises(ValueError, match="fast_interpolate"):
+        wave.initialize_model_parameters_from_file(
+            synthetic_data, fast_interpolate=False
+        )
