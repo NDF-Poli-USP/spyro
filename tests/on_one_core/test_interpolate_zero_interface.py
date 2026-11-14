@@ -203,14 +203,16 @@ def test_sample_grid_without_zeros_is_linear(mesh_follows_interface: bool):
     )
 
 
-@pytest.fixture
-def wave_and_space(tmp_path: Path) -> tuple[spyro.AcousticWave, fire.FunctionSpace]:
+def wave_and_space(
+    water_interface: bool = False,
+) -> tuple[spyro.AcousticWave, fire.FunctionSpace]:
     """Build a wave on a user mesh with node rows inside the mixed cell.
 
     Parameters
     ----------
-    tmp_path : `pathlib.Path`
-        Pytest temporary directory.
+    water_interface : `bool`, optional
+        Whether the mesh is declared to follow the water bottom. Default is
+        `False`.
 
     Returns
     -------
@@ -235,6 +237,7 @@ def wave_and_space(tmp_path: Path) -> tuple[spyro.AcousticWave, fire.FunctionSpa
             "length_y": 0.0,
             "user_mesh": mesh,
             "mesh_file": None,
+            "water_interface": water_interface,
         },
         "time_axis": {
             "initial_time": 0.0,
@@ -254,32 +257,32 @@ def wave_and_space(tmp_path: Path) -> tuple[spyro.AcousticWave, fire.FunctionSpa
     return spyro.AcousticWave(dictionary=dictionary), fire.FunctionSpace(mesh, "CG", 1)
 
 
-def write_model(directory: Path) -> str:
-    """Write the 2D grid with a water layer to an HDF5 file.
+def write_model(directory: Path, water: bool = True) -> str:
+    """Write the 2D grid to an HDF5 file.
 
     Parameters
     ----------
     directory : `pathlib.Path`
         Directory of the file.
+    water : `bool`, optional
+        If `True`, the grid has a water layer. Default is `True`.
 
     Returns
     -------
     `str`
         File name.
     """
-    filename = str(directory / "vs.hdf5")
+    filename = str(directory / f"model_water_{water}.hdf5")
     with h5py.File(filename, "w") as f:
-        f.create_dataset("velocity_model", data=grid_values(grid_axes(2)))
+        f.create_dataset("velocity_model", data=grid_values(grid_axes(2), water))
     return filename
 
 
-def test_interpolate_blends_by_default(wave_and_space, tmp_path: Path):
+def test_interpolate_blends_by_default(tmp_path: Path):
     """Check that by default nodes in mixed cells blend water and rock.
 
     Parameters
     ----------
-    wave_and_space : `tuple`
-        Wave and CG1 space from the fixture.
     tmp_path : `pathlib.Path`
         Pytest temporary directory.
 
@@ -287,7 +290,7 @@ def test_interpolate_blends_by_default(wave_and_space, tmp_path: Path):
     -------
     None
     """
-    wave, V = wave_and_space
+    wave, V = wave_and_space(water_interface=True)
     c = spyro.io.interpolate(wave, write_model(tmp_path), V, fast_interpolate=True)
 
     z, x = V.mesh().coordinates.dat.data_ro.T
@@ -298,13 +301,11 @@ def test_interpolate_blends_by_default(wave_and_space, tmp_path: Path):
     assert np.allclose(c.dat.data_ro[near_rock], 0.7 * rock(ROCK_TOP, x[near_rock]))
 
 
-def test_sharp_zero_interface_requires_fast_interpolate(wave_and_space, tmp_path):
+def test_sharp_zero_interface_requires_fast_interpolate(tmp_path: Path):
     """Check that the option is refused on the projection path.
 
     Parameters
     ----------
-    wave_and_space : `tuple`
-        Wave and CG1 space from the fixture.
     tmp_path : `pathlib.Path`
         Pytest temporary directory.
 
@@ -312,6 +313,100 @@ def test_sharp_zero_interface_requires_fast_interpolate(wave_and_space, tmp_path
     -------
     None
     """
-    wave, V = wave_and_space
+    wave, V = wave_and_space()
     with pytest.raises(ValueError, match="fast_interpolate"):
         spyro.io.interpolate(wave, write_model(tmp_path), V, sharp_zero_interface=True)
+
+
+def interpolate_both_ways(
+    water_interface: bool, filename: str
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Interpolate a model file with and without `sharp_zero_interface`.
+
+    Parameters
+    ----------
+    water_interface : `bool`
+        Whether the mesh is declared to follow the water bottom.
+    filename : `str`
+        HDF5 model file.
+
+    Returns
+    -------
+    `tuple` of `numpy.ndarray`
+        Node coordinates, values with the option and values without it.
+    """
+    wave, V = wave_and_space(water_interface)
+    assert wave.mesh_parameters.water_interface is water_interface
+    sharp, linear = (
+        spyro.io.interpolate(
+            wave, filename, V, fast_interpolate=True, sharp_zero_interface=sharp
+        ).dat.data_ro
+        for sharp in (True, False)
+    )
+    return V.mesh().coordinates.dat.data_ro, sharp, linear
+
+
+def test_interpolate_marked_mesh_takes_rock_values(tmp_path: Path):
+    """Check that a marked mesh gets the rock row in the mixed cell.
+
+    Parameters
+    ----------
+    tmp_path : `pathlib.Path`
+        Pytest temporary directory.
+
+    Returns
+    -------
+    None
+    """
+    coords, sharp, linear = interpolate_both_ways(True, write_model(tmp_path))
+    z, x = coords.T
+    mixed = np.isclose(z, NEAR_WATER) | np.isclose(z, NEAR_ROCK)
+    axes = grid_axes(2)
+    rock_row = grid_values(axes)[np.isclose(axes[0], ROCK_TOP)][0]
+    assert np.allclose(sharp[mixed], np.interp(x[mixed], axes[1], rock_row))
+    assert np.all(sharp[z > WATER_BOTTOM] == 0.0)
+    assert np.array_equal(sharp[~mixed], linear[~mixed])
+
+
+def test_interpolate_unmarked_mesh_takes_nearest_sample(tmp_path: Path):
+    """Check that a mesh that is not marked gets the nearest sample.
+
+    Parameters
+    ----------
+    tmp_path : `pathlib.Path`
+        Pytest temporary directory.
+
+    Returns
+    -------
+    None
+    """
+    coords, sharp, linear = interpolate_both_ways(False, write_model(tmp_path))
+    z = coords[:, 0]
+    mixed = np.isclose(z, NEAR_WATER) | np.isclose(z, NEAR_ROCK)
+    axes = grid_axes(2)
+    nearest = nearest_sample(axes, grid_values(axes), coords)
+    assert np.array_equal(sharp[mixed], nearest[mixed])
+    assert np.all(sharp[np.isclose(z, NEAR_WATER)] == 0.0)
+    assert np.all(sharp[np.isclose(z, NEAR_ROCK)] > 0.0)
+    assert np.array_equal(sharp[~mixed], linear[~mixed])
+
+
+@pytest.mark.parametrize("water_interface", [True, False])
+def test_interpolate_without_zeros_is_unchanged(water_interface: bool, tmp_path):
+    """Check that a model with no zeros, such as Vp, is not changed.
+
+    Parameters
+    ----------
+    water_interface : `bool`
+        Whether the mesh is declared to follow the water bottom.
+    tmp_path : `pathlib.Path`
+        Pytest temporary directory.
+
+    Returns
+    -------
+    None
+    """
+    _, sharp, linear = interpolate_both_ways(
+        water_interface, write_model(tmp_path, water=False)
+    )
+    assert np.array_equal(sharp, linear)
