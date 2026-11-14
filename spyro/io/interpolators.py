@@ -5,6 +5,10 @@ import h5py
 import numpy as np
 from pathlib import Path
 from scipy.interpolate import RegularGridInterpolator
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..solvers.wave import Wave
 
 
 def _grid_velocity_data_to_source_function(grid_velocity_data: dict, comm=None):
@@ -113,29 +117,123 @@ def _hdf5_velocity_model_to_grid_velocity_data(Model, fname: str | Path):
     return grid_velocity_data
 
 
-def interpolate(Model, fname: str | Path, V, fast_interpolate=False):
+def _sample_grid(
+    axes: tuple[np.ndarray, ...],
+    values: np.ndarray,
+    points: np.ndarray,
+    sharp_zero_interface: bool,
+    mesh_follows_interface: bool,
+) -> np.ndarray:
+    """Sample a regular grid at points, optionally without blending zeros.
+
+    Linear interpolation gives a point in a grid cell with both zero and
+    nonzero samples, such as a water and rock cell of a Vs model, a value
+    between the two that no material has. With `sharp_zero_interface`, such
+    a point gets instead:
+
+    - if `mesh_follows_interface`, the linear interpolation of the nonzero
+      samples of the cell only, with their weights rescaled to add up to one.
+      The point is taken to be on the nonzero side, as on a mesh whose
+      elements follow the interface.
+    - otherwise, the value of the nearest sample, zero or not.
+
+    Points in cells with only zero or only nonzero samples keep the linear
+    interpolation, so grids without zeros are sampled as without the option.
+
+    Parameters
+    ----------
+    axes : `tuple` of `numpy.ndarray`
+        Increasing sample coordinates along each grid axis.
+    values : `numpy.ndarray`
+        Grid values, with one axis for each entry of `axes`.
+    points : `numpy.ndarray`
+        Coordinates of the points, of shape `(n_points, len(axes))`. They
+        must lie inside the grid.
+    sharp_zero_interface : `bool`
+        If `False`, return the linear interpolation.
+    mesh_follows_interface : `bool`
+        Whether the points belong to a mesh that follows the interface
+        between zero and nonzero values. Ignored if `sharp_zero_interface`
+        is `False`.
+
+    Returns
+    -------
+    `numpy.ndarray`
+        Values at the points, of shape `(n_points,)`.
+
+    Notes
+    -----
+    A point whose interpolation weights on the zero samples, or on the
+    nonzero samples, add up to less than `1e-10` is not in a mixed cell. A
+    point on a row of samples can otherwise fall a rounding error inside the
+    neighbouring cell.
+    """
+    linear = RegularGridInterpolator(axes, values)(points)
+    if not sharp_zero_interface:
+        return linear
+
+    nonzero = values != 0.0
+    nonzero_weight, zero_weight = RegularGridInterpolator(
+        axes, np.stack([nonzero, ~nonzero], axis=-1)
+    )(points).T
+    # A point on a sample row can fall a rounding error inside the next cell
+    tolerance = 1e-10
+    mixed = (nonzero_weight > tolerance) & (zero_weight > tolerance)
+    if mesh_follows_interface:
+        linear[mixed] /= nonzero_weight[mixed]
+    else:
+        linear[mixed] = RegularGridInterpolator(axes, values, method="nearest")(
+            points[mixed]
+        )
+    return linear
+
+
+def interpolate(
+    Model: "Wave",
+    fname: str | Path | dict,
+    V: fire.FunctionSpace,
+    fast_interpolate: bool = False,
+    sharp_zero_interface: bool = False,
+) -> fire.Function:
     """Read and interpolate a seismic velocity model onto a Firedrake space.
 
     Parameters
     ----------
-    Model: spyro object
+    Model : `Wave`
         Model options and parameters.
-    fname: str or dict
+    fname : `str`, `pathlib.Path` or `dict`
         The name of the HDF5 file containing the seismic velocity model, or
-        a grid dictionary with keys such as ``vp_values``, ``length_z`` and
-        ``length_x``.
-    V: Firedrake.FunctionSpace object
+        a grid dictionary with keys such as `vp_values`, `length_z` and
+        `length_x`.
+    V : `firedrake.FunctionSpace`
         The space of the finite elements.
+    fast_interpolate : `bool`, optional
+        If `True`, sample the HDF5 grid at the nodes of `V` with
+        :func:`fast_interpolation`. Otherwise, interpolate from a CG1
+        function on a mesh built at the grid resolution. Default is `False`.
+    sharp_zero_interface : `bool`, optional
+        If `True`, do not blend zero and nonzero grid samples, as described
+        in :func:`fast_interpolation`. Requires `fast_interpolate`. Default
+        is `False`.
 
     Returns
     -------
-    c: Firedrake.Function
-        P-wave seismic velocity interpolated onto the nodes
-        of the finite elements.
+    `firedrake.Function`
+        Seismic velocity interpolated onto the nodes of the finite elements.
 
+    Raises
+    ------
+    ValueError
+        If `sharp_zero_interface` is `True` and `fast_interpolate` is not.
+    NotImplementedError
+        If `fname` is neither a grid dictionary nor an HDF5 file name.
     """
     if fast_interpolate is True:
-        return fast_interpolation(Model, fname, V)
+        return fast_interpolation(
+            Model, fname, V, sharp_zero_interface=sharp_zero_interface
+        )
+    if sharp_zero_interface:
+        raise ValueError("sharp_zero_interface requires fast_interpolate=True.")
     if isinstance(fname, dict):
         return project_grid_velocity_data(fname, V, comm=Model.comm)
     elif isinstance(fname, str) and fname.endswith((".hdf5", ".h5")):
@@ -145,7 +243,12 @@ def interpolate(Model, fname: str | Path, V, fast_interpolate=False):
         raise NotImplementedError
 
 
-def fast_interpolation(Model, fname, V):
+def fast_interpolation(
+    Model: "Wave",
+    fname: str | Path,
+    V: fire.FunctionSpace,
+    sharp_zero_interface: bool = False,
+) -> fire.Function:
     """Read and interpolate fast a seismic velocity model from HDF5.
 
     Interpolates a seismic velocity model stored in a HDF5 file onto the
@@ -153,18 +256,25 @@ def fast_interpolation(Model, fname, V):
 
     Parameters
     ----------
-    Model : spyro object
+    Model : `Wave`
         Model options and parameters.
-    fname : str
+    fname : `str` or `pathlib.Path`
         The name of the HDF5 file containing the seismic velocity model.
-    V : firedrake.FunctionSpace
+    V : `firedrake.FunctionSpace`
         The finite element space for interpolation.
+    sharp_zero_interface : `bool`, optional
+        If `True`, a node in a grid cell with both zero and nonzero samples,
+        such as a water and rock cell of a Vs model, does not get a value
+        between the two. If the mesh is marked as following the interface
+        (`water_interface` in the mesh parameters), the node gets the linear
+        interpolation of the nonzero samples of the cell only. Otherwise, it
+        gets the value of the nearest sample. Other nodes are unchanged.
+        Default is `False`.
 
     Returns
     -------
-    c : Firedrake.Function
-        P-wave seismic velocity interpolated onto the nodes
-        of the finite elements.
+    `firedrake.Function`
+        Seismic velocity interpolated onto the nodes of the finite elements.
     """
     m = V.ufl_domain()
 
@@ -215,8 +325,8 @@ def fast_interpolation(Model, fname, V):
             qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
             qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
 
-            interpolant = RegularGridInterpolator((z, x), Z)
-            tmp = interpolant((qp_z2, qp_x2))
+            axes = (z, x)
+            points = np.column_stack((qp_z2, qp_x2))
         elif sd == 3:
             nrow, ncol, ncol2 = Z.shape
             z = np.linspace(minz, maxz, nrow)
@@ -228,8 +338,13 @@ def fast_interpolation(Model, fname, V):
             qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
             qp_y2 = [miny if y < miny else maxy if y > maxy else y for y in qp_y]
 
-            interpolant = RegularGridInterpolator((z, x, y), Z)
-            tmp = interpolant((qp_z2, qp_x2, qp_y2))
+            axes = (z, x, y)
+            points = np.column_stack((qp_z2, qp_x2, qp_y2))
+
+    mesh_follows_interface = (
+        sharp_zero_interface and Model.mesh_parameters.water_interface
+    )
+    tmp = _sample_grid(axes, Z, points, sharp_zero_interface, mesh_follows_interface)
 
     c = fire.Function(V)
     c.dat.data[:] = tmp
