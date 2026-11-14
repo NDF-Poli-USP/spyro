@@ -9,6 +9,8 @@ import pytest
 
 import spyro
 from spyro.io.interpolators import _sample_grid
+from spyro.io.segy_io import create_segy_from_grid
+from spyro.meshing.meshing_utils import WATER_CELL_TAG
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 
 GRID_SPACING = 0.1
@@ -17,6 +19,8 @@ ROCK_TOP = -0.5  # First rock sample
 # Nodes in the grid cell between them, nearer the water and nearer the rock
 NEAR_WATER = -0.43
 NEAR_ROCK = -0.47
+# Nodes in a grid cell with only water samples
+IN_WATER = -0.35
 
 
 def rock(z: np.ndarray, x: np.ndarray, y: np.ndarray | float = 0.0) -> np.ndarray:
@@ -117,20 +121,42 @@ def interface_points(dimension: int) -> np.ndarray:
     `numpy.ndarray`
         Coordinates of shape `(n_points, dimension)`, off the grid laterally.
     """
-    rows = [-0.85, -0.6, ROCK_TOP, NEAR_ROCK, NEAR_WATER, WATER_BOTTOM, -0.25]
+    rows = [-0.85, -0.6, ROCK_TOP, NEAR_ROCK, NEAR_WATER, WATER_BOTTOM, IN_WATER, -0.25]
     lateral = [np.linspace(0.0, 1.0, 8)] * (dimension - 1)
     coords = np.meshgrid(rows, *lateral, indexing="ij")
     return np.column_stack([c.ravel() for c in coords])
 
 
+def nearest_rock(z: np.ndarray, lateral: np.ndarray) -> np.ndarray:
+    """Return the nearest rock sample to points in cells of water samples.
+
+    Parameters
+    ----------
+    z : `numpy.ndarray`
+        Depth coordinate of the points, above `ROCK_TOP`.
+    lateral : `numpy.ndarray`
+        Lateral coordinates of the points, of shape `(dimension - 1, n)`.
+
+    Returns
+    -------
+    `numpy.ndarray`
+        Value of the `ROCK_TOP` sample at the nearest lateral grid position.
+    """
+    return rock(ROCK_TOP, *np.rint(lateral / GRID_SPACING) * GRID_SPACING)
+
+
+@pytest.mark.parametrize("seabed", [NEAR_ROCK, IN_WATER])
 @pytest.mark.parametrize("dimension", [2, 3])
-def test_sample_grid_marked_mesh_takes_rock_values(dimension: int) -> None:
-    """Check that nodes in mixed cells get the rock samples of the cell only.
+def test_sample_grid_marked_mesh(dimension: int, seabed: float) -> None:
+    """Check that a marked mesh gets zero in the water and rock below it.
 
     Parameters
     ----------
     dimension : `int`
         Grid dimension.
+    seabed : `float`
+        Depth of the marked seabed: in the cell between water and rock
+        samples, or in a cell of water samples above them.
 
     Returns
     -------
@@ -139,19 +165,21 @@ def test_sample_grid_marked_mesh_takes_rock_values(dimension: int) -> None:
     axes = grid_axes(dimension)
     values = grid_values(axes)
     points = interface_points(dimension)
-    sampled = _sample_grid(axes, values, points, True, True)
-    linear = _sample_grid(axes, values, points, False, True)
-
     z, lateral = points[:, 0], points[:, 1:].T
-    mixed = (z > ROCK_TOP) & (z < WATER_BOTTOM)
-    # The only rock samples of these cells are on the ROCK_TOP row
+    water = z > seabed
+    sampled = _sample_grid(axes, values, points, True, water)
+    linear = _sample_grid(axes, values, points, False, None)
+
+    assert np.all(sampled[water] == 0.0)
+    # The only rock samples of the mixed cells are on the ROCK_TOP row
+    mixed = ~water & (z > ROCK_TOP) & (z < WATER_BOTTOM)
     assert np.allclose(sampled[mixed], rock(ROCK_TOP, *lateral)[mixed])
-    assert np.all(linear[mixed] < rock(ROCK_TOP, *lateral)[mixed] - 0.1)
     # Points on the WATER_BOTTOM row are a rounding error away from the mixed
     # cell, as the grid row is at -0.3999999999999999
-    assert np.array_equal(sampled[~mixed], linear[~mixed])
-    assert np.allclose(sampled[z >= WATER_BOTTOM], 0.0, rtol=0.0, atol=1e-12)
-    assert np.allclose(sampled[z <= ROCK_TOP], rock(*points[z <= ROCK_TOP].T))
+    only_water = ~water & (z >= WATER_BOTTOM)
+    assert only_water.any() == (seabed == IN_WATER)
+    assert np.allclose(sampled[only_water], nearest_rock(z, lateral)[only_water])
+    assert np.array_equal(sampled[z <= ROCK_TOP], linear[z <= ROCK_TOP])
 
 
 @pytest.mark.parametrize("dimension", [2, 3])
@@ -170,8 +198,8 @@ def test_sample_grid_unmarked_mesh_takes_nearest_sample(dimension: int) -> None:
     axes = grid_axes(dimension)
     values = grid_values(axes)
     points = interface_points(dimension)
-    sampled = _sample_grid(axes, values, points, True, False)
-    linear = _sample_grid(axes, values, points, False, False)
+    sampled = _sample_grid(axes, values, points, True, None)
+    linear = _sample_grid(axes, values, points, False, None)
 
     z = points[:, 0]
     mixed = (z > ROCK_TOP) & (z < WATER_BOTTOM)
@@ -182,13 +210,13 @@ def test_sample_grid_unmarked_mesh_takes_nearest_sample(dimension: int) -> None:
     assert np.array_equal(sampled[~mixed], linear[~mixed])
 
 
-@pytest.mark.parametrize("mesh_follows_interface", [True, False])
-def test_sample_grid_without_zeros_is_linear(mesh_follows_interface: bool) -> None:
+@pytest.mark.parametrize("marked", [True, False])
+def test_sample_grid_without_zeros_is_linear(marked: bool) -> None:
     """Check that a grid with no zeros is sampled as without the option.
 
     Parameters
     ----------
-    mesh_follows_interface : `bool`
+    marked : `bool`
         Whether the points belong to a mesh that follows the interface.
 
     Returns
@@ -198,15 +226,17 @@ def test_sample_grid_without_zeros_is_linear(mesh_follows_interface: bool) -> No
     axes = grid_axes(2)
     values = grid_values(axes, water=False)
     points = interface_points(2)
+    water = points[:, 0] > NEAR_ROCK if marked else None
     assert np.array_equal(
-        _sample_grid(axes, values, points, True, mesh_follows_interface),
-        _sample_grid(axes, values, points, False, mesh_follows_interface),
+        _sample_grid(axes, values, points, True, water),
+        _sample_grid(axes, values, points, False, None),
     )
 
 
 def wave_and_space(
     water_interface: bool = False,
     wave_class: type[spyro.solvers.wave.Wave] = spyro.AcousticWave,
+    water_above: float | None = None,
 ) -> tuple[spyro.solvers.wave.Wave, fire.FunctionSpace]:
     """Build a wave on a user mesh with node rows inside the mixed cell.
 
@@ -217,6 +247,9 @@ def wave_and_space(
         `False`.
     wave_class : `type`, optional
         Wave to build. Default is `spyro.AcousticWave`.
+    water_above : `float` or `None`, optional
+        Depth of a node row above which the cells are tagged as water, the
+        others as rock. Default is `None`, which leaves the cells untagged.
 
     Returns
     -------
@@ -228,6 +261,43 @@ def wave_and_space(
     z = mesh.coordinates.dat.data[:, 0]
     z[np.isclose(z, WATER_BOTTOM)] = NEAR_WATER
     z[np.isclose(z, ROCK_TOP)] = NEAR_ROCK
+    z[np.isclose(z, -0.3)] = IN_WATER
+    if water_above is not None:
+        DG0 = fire.FunctionSpace(mesh, "DG", 0)
+        in_water = fire.conditional(fire.SpatialCoordinate(mesh)[0] > water_above, 1, 0)
+        mesh = fire.RelabeledMesh(
+            mesh,
+            [fire.Function(DG0).interpolate(in_water)]
+            + [fire.Function(DG0).interpolate(1 - in_water)],
+            [WATER_CELL_TAG, WATER_CELL_TAG + 1],
+        )
+    return build_wave(mesh, water_interface, wave_class), fire.FunctionSpace(
+        mesh, "CG", 1
+    )
+
+
+def build_wave(
+    mesh: fire.MeshGeometry,
+    water_interface: bool = False,
+    wave_class: type[spyro.solvers.wave.Wave] = spyro.AcousticWave,
+) -> spyro.solvers.wave.Wave:
+    """Build a wave on a user mesh of the unit square model.
+
+    Parameters
+    ----------
+    mesh : `firedrake.MeshGeometry`
+        Mesh of the model, which may include padding around it.
+    water_interface : `bool`, optional
+        Whether the mesh is declared to follow the water bottom. Default is
+        `False`.
+    wave_class : `type`, optional
+        Wave to build. Default is `spyro.AcousticWave`.
+
+    Returns
+    -------
+    `spyro.solvers.wave.Wave`
+        Wave on `mesh`.
+    """
     dictionary = {
         "options": {
             "cell_type": "T",
@@ -258,7 +328,7 @@ def wave_and_space(
             "receiver_locations": [(-0.9, 0.6)],
         },
     }
-    return wave_class(dictionary=dictionary), fire.FunctionSpace(mesh, "CG", 1)
+    return wave_class(dictionary=dictionary)
 
 
 def write_model(directory: Path, water: bool = True, shift: float = 0.0) -> str:
@@ -326,7 +396,7 @@ def test_sharp_zero_interface_requires_fast_interpolate(tmp_path: Path) -> None:
 
 
 def interpolate_both_ways(
-    water_interface: bool, filename: str
+    water_interface: bool, filename: str, water_above: float | None = None
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Interpolate a model file with and without `sharp_zero_interface`.
 
@@ -336,13 +406,16 @@ def interpolate_both_ways(
         Whether the mesh is declared to follow the water bottom.
     filename : `str`
         HDF5 model file.
+    water_above : `float` or `None`, optional
+        Depth above which the cells are tagged as water, see
+        `wave_and_space`. Default is `None`.
 
     Returns
     -------
     `tuple` of `numpy.ndarray`
         Node coordinates, values with the option and values without it.
     """
-    wave, V = wave_and_space(water_interface)
+    wave, V = wave_and_space(water_interface, water_above=water_above)
     assert wave.mesh_parameters.water_interface is water_interface
     sharp, linear = (
         spyro.io.interpolate(
@@ -353,8 +426,40 @@ def interpolate_both_ways(
     return V.mesh().coordinates.dat.data_ro, sharp, linear
 
 
-def test_interpolate_marked_mesh_takes_rock_values(tmp_path: Path) -> None:
-    """Check that a marked mesh gets the rock row in the mixed cell.
+@pytest.mark.parametrize("seabed", [NEAR_ROCK, IN_WATER])
+def test_interpolate_marked_mesh(seabed: float, tmp_path: Path) -> None:
+    """Check that a marked mesh gets zero in the water and rock below it.
+
+    Parameters
+    ----------
+    seabed : `float`
+        Node row of the marked seabed: in the cell between water and rock
+        samples, or in a cell of water samples above them.
+    tmp_path : `pathlib.Path`
+        Pytest temporary directory.
+
+    Returns
+    -------
+    None
+    """
+    coords, sharp, linear = interpolate_both_ways(
+        True, write_model(tmp_path), water_above=seabed
+    )
+    z, x = coords.T
+    water = z > seabed + 1e-9
+    assert np.all(sharp[water] == 0.0)
+    mixed = ~water & (np.isclose(z, NEAR_WATER) | np.isclose(z, NEAR_ROCK))
+    axes = grid_axes(2)
+    rock_row = grid_values(axes)[np.isclose(axes[0], ROCK_TOP)][0]
+    assert np.allclose(sharp[mixed], np.interp(x[mixed], axes[1], rock_row))
+    only_water = ~water & np.isclose(z, IN_WATER)
+    assert only_water.any() == (seabed == IN_WATER)
+    assert np.allclose(sharp[only_water], nearest_rock(z, x[None])[only_water])
+    assert np.array_equal(sharp[z < -0.5], linear[z < -0.5])
+
+
+def test_interpolate_marked_mesh_requires_water_tag(tmp_path: Path) -> None:
+    """Check that a marked mesh without water cells is refused.
 
     Parameters
     ----------
@@ -365,14 +470,8 @@ def test_interpolate_marked_mesh_takes_rock_values(tmp_path: Path) -> None:
     -------
     None
     """
-    coords, sharp, linear = interpolate_both_ways(True, write_model(tmp_path))
-    z, x = coords.T
-    mixed = np.isclose(z, NEAR_WATER) | np.isclose(z, NEAR_ROCK)
-    axes = grid_axes(2)
-    rock_row = grid_values(axes)[np.isclose(axes[0], ROCK_TOP)][0]
-    assert np.allclose(sharp[mixed], np.interp(x[mixed], axes[1], rock_row))
-    assert np.all(sharp[z > WATER_BOTTOM] == 0.0)
-    assert np.array_equal(sharp[~mixed], linear[~mixed])
+    with pytest.raises(ValueError, match="tagged"):
+        interpolate_both_ways(True, write_model(tmp_path))
 
 
 def test_interpolate_unmarked_mesh_takes_nearest_sample(tmp_path: Path) -> None:
@@ -403,6 +502,8 @@ def test_interpolate_without_zeros_is_unchanged(
     water_interface: bool, tmp_path: Path
 ) -> None:
     """Check that a model with no zeros, such as Vp, is not changed.
+
+    The marked mesh has no water tags, which only grids with zeros need.
 
     Parameters
     ----------
@@ -438,7 +539,7 @@ def test_isotropic_wave_reads_sharp_shear_velocity(
     -------
     None
     """
-    wave, _ = wave_and_space(water_interface=True, wave_class=IsotropicWave)
+    wave, _ = wave_and_space(True, IsotropicWave, water_above=NEAR_WATER)
     files = {
         "p_wave_velocity": write_model(tmp_path, water=False, shift=3.0),
         "s_wave_velocity": write_model(tmp_path),
@@ -494,3 +595,102 @@ def test_isotropic_wave_sharp_zero_interface_requires_fast_interpolate(
         wave.initialize_model_parameters_from_file(
             synthetic_data, fast_interpolate=False
         )
+
+
+def test_interpolate_padded_gmsh_mesh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Check that the padding beside the water gets zero on a gmsh mesh.
+
+    The model grid covers the domain only, so the padding nodes are sampled
+    at the grid edge. Above the seabed they are water nodes too.
+
+    Parameters
+    ----------
+    tmp_path : `pathlib.Path`
+        Pytest temporary directory.
+    monkeypatch : `pytest.MonkeyPatch`
+        Pytest fixture, used to write the mesher files in `tmp_path`.
+
+    Returns
+    -------
+    None
+    """
+    pytest.importorskip("gmsh")
+    monkeypatch.chdir(tmp_path)
+    segy = str(tmp_path / "vs.segy")
+    # The SEG-Y writer takes the (x, z) layout of write_function_to_grid
+    create_segy_from_grid(grid_values(grid_axes(2)).T, segy)
+    mesh_parameters = spyro.meshing.MeshingParameters(
+        input_mesh_dictionary={
+            "mesh_type": "gmsh_mesh",
+            "dimension": 2,
+            "length_z": 1.0,
+            "length_x": 1.0,
+            "output_filename": str(tmp_path / "mesh.msh"),
+            "segy_velocity_model": segy,
+            "cells_per_wavelength": 2.0,
+            "source_frequency": 5.0,
+            "padding_type": "rectangular",
+            "padding_x": 0.3,
+            "padding_z": 0.3,
+            "h_padding": 0.3,
+            "grade": None,
+            "water_interface": True,
+            "water_search_value": 0.0,
+            "vp_water": 1.5,
+            "structured_mesh": False,
+            "apply_winslow": False,
+        }
+    )
+    mesh = spyro.meshing.AutomaticMesh(mesh_parameters).create_mesh()
+    wave = build_wave(mesh, water_interface=True)
+    V = fire.FunctionSpace(mesh, "CG", 2)
+    vs = spyro.io.interpolate(
+        wave, write_model(tmp_path), V, fast_interpolate=True, sharp_zero_interface=True
+    ).dat.data_ro
+
+    W = fire.VectorFunctionSpace(mesh, "CG", 2)
+    z, x = fire.Function(W).interpolate(mesh.coordinates).dat.data_ro.T
+    assert x.min() < 0.0 and x.max() > 1.0
+    # The mesher puts the seabed on the first rock sample row
+    above = z > ROCK_TOP + 1e-9
+    assert np.all(vs[above] == 0.0)
+    assert np.all(vs[~above] >= rock(ROCK_TOP, 0.0) - 1e-9)
+
+
+@pytest.mark.parametrize("sharp_zero_interface", [True, False])
+def test_shear_velocity_in_meters_per_second_is_converted(
+    sharp_zero_interface: bool, tmp_path: Path
+) -> None:
+    """Check that a model with a water layer in m/s is converted to km/s.
+
+    Its smallest value is zero, so the unit check must leave zeros out.
+
+    Parameters
+    ----------
+    sharp_zero_interface : `bool`
+        Whether the zero interface is kept sharp.
+    tmp_path : `pathlib.Path`
+        Pytest temporary directory.
+
+    Returns
+    -------
+    None
+    """
+    wave, V = wave_and_space(True, water_above=NEAR_WATER)
+    in_meters = str(tmp_path / "vs_meters_per_second.hdf5")
+    with h5py.File(in_meters, "w") as f:
+        f.create_dataset("velocity_model", data=1000.0 * grid_values(grid_axes(2)))
+    km_per_s, converted = (
+        spyro.io.interpolate(
+            wave,
+            filename,
+            V,
+            fast_interpolate=True,
+            sharp_zero_interface=sharp_zero_interface,
+        ).dat.data_ro
+        for filename in (write_model(tmp_path), in_meters)
+    )
+    assert km_per_s.max() < 100.0
+    assert np.allclose(converted, km_per_s)

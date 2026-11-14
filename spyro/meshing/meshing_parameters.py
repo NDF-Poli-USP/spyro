@@ -140,8 +140,10 @@ class MeshingParameters():
         Function grading for smooth element transition.
     water_interface : bool
         Whether the mesh follows the interface between the water and the
-        rock below it. Gmsh meshes detect it and mesh along it if True. For
-        other meshes it only declares that they do. Default is False.
+        rock below it. Gmsh meshes detect it and mesh along it if True, and
+        tag the water cells with `spyro.meshing.meshing_utils.WATER_CELL_TAG`.
+        Other meshes only declare that they do, and must tag their water
+        cells with it for a zero-interface interpolation. Default is False.
     water_search_value : float
         Value of the water speed that the water interface generator will use to find the bathymetry
     vp_water : float

@@ -385,9 +385,10 @@ class IsotropicWave(ElasticWave):
             If `True`, a node between a zero and a nonzero sample of a file,
             such as between water and rock samples of a Vs model, does not
             get a value between the two, see
-            :func:`spyro.io.interpolators.fast_interpolation`. Files without
-            zeros are not changed. Requires `fast_interpolate`. Default is
-            `True`.
+            :func:`spyro.io.interpolators.fast_interpolation`. This sets the
+            values at the nodes; within the elements next to the seabed the
+            field still varies between them. Files without zeros are not
+            changed. Requires `fast_interpolate`. Default is `True`.
 
         Returns
         -------
@@ -399,7 +400,9 @@ class IsotropicWave(ElasticWave):
         ------
         ValueError
             If a file is read with `sharp_zero_interface` but without
-            `fast_interpolate`.
+            `fast_interpolate`, or if a file with zeros is read with it on a
+            mesh marked with `water_interface` whose water cells are not
+            tagged, see :func:`spyro.io.interpolators.fast_interpolation`.
         """
         if self._physical_parameters:
             return
@@ -433,8 +436,11 @@ class IsotropicWave(ElasticWave):
             )
 
         self.initialize_model_parameters_from_object(
-            {key: load(value) for key, value in synthetic_data_dict.items()
-             if key != "type"}
+            {
+                key: load(value)
+                for key, value in synthetic_data_dict.items()
+                if key != "type"
+            }
         )
 
     def _create_function_space(self):
