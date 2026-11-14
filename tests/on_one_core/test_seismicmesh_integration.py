@@ -2,6 +2,7 @@ import spyro
 import firedrake as fire
 import numpy as np
 import pytest
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 def is_seismicmesh_installed():
@@ -75,7 +76,7 @@ def test_spyro_seimicmesh_2d_homogeneous_generation():
     test1 = test1 and (np.isclose(np.amax(x), Lx+pad))
     test1 = test1 and (np.isclose(np.amax(z), 0.0))
     test1 = test1 and (np.isclose(np.amin(x), -pad))
-    print(f"Boundary values are correct: {test1}")
+    SpyroEnsemble.print(f"Boundary values are correct: {test1}")
 
     # Checking edge length of an interior cell
     node_ids = V.cell_node_list[300]
@@ -86,7 +87,7 @@ def test_spyro_seimicmesh_2d_homogeneous_generation():
     le = mean_edge_length((p0, p1, p2))
     le_expected = lbda/cpw
     test2 = np.isclose(le, le_expected, rtol=1e-1)
-    print(f"Edge length is correct: {test2}")
+    SpyroEnsemble.print(f"Edge length is correct: {test2}")
 
     assert all([test1, test2])
 

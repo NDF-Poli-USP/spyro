@@ -33,12 +33,11 @@ def test_create_function_space_from_existing_element():
     assert scalar_space.value_size == 1
 
 
+@pytest.mark.parallel(1)
 @pytest.mark.parametrize("method", ["KMV", "Kong-Mulder-Veldhuizen"])
 def test_create_function_space_accepts_kmv_aliases(method):
     mesh = fire.UnitTriangleMesh()
-
     V = create_function_space(mesh, method, 1)
-
     assert V.ufl_element().family() == "Kong-Mulder-Veldhuizen"
 
 

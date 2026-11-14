@@ -1,6 +1,7 @@
 import numpy as np
 import spyro
 import pytest
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 @pytest.mark.slow
@@ -50,18 +51,18 @@ def test_cpw_analytic_calc_analytical_gen():
     offset = np.sqrt((sz - rz) ** 2 + (sx - rx) ** 2)
     expected_offset_value = 3.824264635194589
     test1 = np.isclose(offset, expected_offset_value)
-    print(f"Checked if offset calculation is correct: {test1}")
+    SpyroEnsemble.print(f"Checked if offset calculation is correct: {test1}")
 
     # Check if analytical solution has the correct peak location
     analytical_solve_one_receiver = Cpw_calc.reference_solution[:, 1]
     peak_indice = np.argmax(analytical_solve_one_receiver)
     expected_peak_indice = 5607
     test2 = expected_peak_indice == peak_indice
-    print(f"Checked if reference solution seems correct: {test2}")
+    SpyroEnsemble.print(f"Checked if reference solution seems correct: {test2}")
 
     # Check if cpw is within error TOL, starting search at min
 
-    print("END")
+    SpyroEnsemble.print("END")
     assert all([test1, test2])
 
 

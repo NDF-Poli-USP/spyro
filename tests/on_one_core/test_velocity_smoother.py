@@ -4,6 +4,7 @@ import segyio
 import numpy as np
 import matplotlib.pyplot as plt
 from spyro.version_control import is_firedrake_new
+from spyro.mpi.spyro_mpi import SpyroEnsemble, AutomaticParallelism
 if is_firedrake_new() is False:
     from firedrake.__future__ import interpolate
     fire.interpolate = interpolate
@@ -30,6 +31,11 @@ def get_vp_from_2dsegy(filename):
 
 
 def test_write_segy_and_smooth(show=False):
+
+    # Initialize Spyro ensemble
+    if SpyroEnsemble.ensemble is None:
+        SpyroEnsemble.initialize(AutomaticParallelism(number_of_sources=1))
+
     vp_name = "velocity_models/test"
     segy_file = vp_name + ".segy"
     smoothed_file = "smoothed_test.segy"

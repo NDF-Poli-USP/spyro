@@ -4,19 +4,20 @@ import firedrake as fire
 from numpy import array, asarray, eye, imag, real, sqrt, unique
 from scipy.sparse.linalg import eigs, eigsh, lobpcg, spilu
 from slepc4py import SLEPc
-from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .modal_forms_and_matrices import (
     assemble_sparse_matrices,
     maximum_diagonal_ratio,
     acoustic_weak_forms_c_in_stiffness,
 )
 from .modal_rq_matrices import generate_eigenfunctions, matrices_rayleigh_quotient
+from ...mpi.spyro_mpi import SpyroEnsemble
 from ...utils.error_management import (
     validate_data_structure,
     validate_firedrake_parameter,
     validate_numeric,
     validate_parameter,
 )
+from ...version_control import is_firedrake_new
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -304,34 +305,59 @@ class Modal_Solver:
         opts = {
             "eps_gen_hermitian": None,  # Problem is Hermitian
             "eps_type": "krylovschur",  # Robust, widely used eigensolver
+            # subspace, arnoldi, krylovschur, lapack
+            "st_type": "sinvert",  # Useful for interior eigenvalues
+            "eps_tol": 1e-6,  # Tight tolerance for accuracy
             "eps_max_it": 200,  # Reasonable iteration cap
+            "eps_monitor": "ascii",  # Print convergence info
+            "eps_converged_reason": None,  # Print stop reason
+            # "eps_monitor": None,  # Print convergence info
+            # "eps_monitor_all": None,   # More verbose than eps_monitor
+            # "eps_view": None,          # Print solver configuration before solving
         }
-        if self.calc_max_dt:
-            opts.update({
-                # The largest eigenvalues of a uniform mesh are tightly
-                # clustered, so 1e-6 may need more than eps_max_it
-                # iterations. 1e-4 changes the time step by about 1e-5
-                "eps_tol": 1e-4,
-                "st_type": "shift",  # No inversion, only mass matrix solves
-                # Jacobi is exact for a lumped (diagonal) mass matrix, and a
-                # consistent one scaled by its diagonal is well conditioned
-                "st_ksp_type": "cg",
-                "st_pc_type": "jacobi",
-                "st_ksp_rtol": 1e-10,
-            })
+
+        if is_firedrake_new():
+            if not self.calc_max_dt:
+                # Smallest eigenvalues magnitude
+                opts.update(
+                    {
+                        "st_shift": 1e-6,  # Stabilizes Neumann BC null space
+                        "eps_target": 0.0,  # Target value for sorting
+                        "eps_target_magnitude": None,  # Sort by distance to target
+                    }
+                )
         else:
-            opts.update({
-                "eps_tol": 1e-6,  # Tight tolerance for accuracy
-                "st_shift": 1e-6,  # Stabilizes Neumann BC null space
-                "st_type": "sinvert",  # Useful for interior eigenvalues
-                "eps_monitor": "ascii",  # Print convergence info
-                "ksp_type": KRYLOVSCH_CONFIG[self.method]["ksp"],
-                "pc_type": KRYLOVSCH_CONFIG[self.method]["pc"],
-                "eps_smallest_magnitude": None,  # Smallest eigenvalues magnitude
-            })
+            if self.calc_max_dt:
+                # Largest eigenvalues magnitude
+                opts.update(
+                    {
+                        # The largest eigenvalues of a uniform mesh are tightly
+                        # clustered, so 1e-6 may need more than eps_max_it
+                        # iterations. 1e-4 changes the time step by about 1e-5
+                        "eps_tol": 1e-4,
+                        "st_type": "shift",  # No inversion, only mass matrix solves
+                        # Jacobi is exact for a lumped (diagonal) mass matrix, and a
+                        # consistent one scaled by its diagonal is well conditioned
+                        "st_ksp_type": "cg",
+                        "st_pc_type": "jacobi",
+                        "st_ksp_rtol": 1e-10,
+                    }
+                )
+            else:
+                # Smallest eigenvalues magnitude
+                opts.update(
+                    {
+                        "st_shift": 1e-6,  # Stabilizes Neumann BC null space
+                        "ksp_type": KRYLOVSCH_CONFIG[self.method]["ksp"],
+                        "pc_type": KRYLOVSCH_CONFIG[self.method]["pc"],
+                        "eps_smallest_magnitude": None,  # Smallest eigenvalues magnitude
+                    }
+                )
 
         eigenproblem = fire.LinearEigenproblem(a, M=m)
-        eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=k, solver_parameters=opts)
+        eigensolver = fire.LinearEigensolver(
+            eigenproblem, n_evals=k, solver_parameters=opts
+        )
         if self.calc_max_dt:
             # LinearEigensolver always sets a target, which makes SLEPc look
             # for the eigenvalues closest to it even when the largest are
@@ -561,7 +587,6 @@ class Modal_Solver:
             shift = 0.0  # No shift for analytical and Rayleigh methods
 
         if self.method == "ANALYTICAL":
-
             # Compute equivalent homogenized velocities
             c_eq, c_eqref = self.AnaModSol.homogenized_velocities(
                 c,
@@ -694,8 +719,7 @@ class Modal_Solver:
         # last bits
         max_dt = V.mesh().comm.bcast(max_dt, root=0)
         SpyroEnsemble.print(
-            "Maximum Stable Timestep Should Be Approximately "
-            f"(ms): {1e3 * max_dt:.3f}"
+            f"Maximum Stable Timestep Should Be Approximately (ms): {1e3 * max_dt:.3f}"
         )
 
         max_dt *= fraction

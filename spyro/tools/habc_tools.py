@@ -286,8 +286,10 @@ def point_cloud_field(parent_mesh, pts_cloud, parent_field, tolerance):
     return cloud_field
 
 
-def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer_mask,
-                                tolerance, method="point_cloud", name_prop="Property"):
+def extend_scalar_field_profile(
+    mesh_original, field_to_extend, lay_field, layer_mask,
+    tolerance, method="point_cloud", name_prop="Property",
+):
     """Extend the profile of a scalar field inside the absorbing layer.
 
     Parameters
@@ -333,9 +335,9 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
 
         pprint(f"Using Cloud Points Method to Extend {name_prop} Profile")
 
-        vel_to_extend = \
-            point_cloud_field(mesh_original, pts_to_extend,
-                              field_to_extend, tolerance).dat.data_with_halos[:]
+        vel_to_extend = point_cloud_field(
+            mesh_original, pts_to_extend, field_to_extend, tolerance
+        ).dat.data_with_halos[:]
 
     elif method == "nearest_point":
 

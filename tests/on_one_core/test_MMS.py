@@ -3,6 +3,7 @@ from copy import deepcopy
 from firedrake import *
 import spyro
 
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .model import dictionary as model
 model["acquisition"]["source_type"] = "MMS"
 
@@ -90,4 +91,4 @@ if __name__ == "__main__":
     test_method_triangles_lumped()
     test_method_quads_lumped()
 
-    print("END")
+    SpyroEnsemble.print("END")
