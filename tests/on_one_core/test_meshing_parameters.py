@@ -275,7 +275,7 @@ def test_periodic_only_for_firedrake_mesh():
 
 
 @pytest.mark.parametrize("mesh_type", ["firedrake_mesh", "user_mesh", "file"])
-def test_water_interface_declared_for_any_mesh_type(mesh_type: str):
+def test_water_interface_declared_for_any_mesh_type(mesh_type: str) -> None:
     """Check that any mesh can declare that it follows the water interface.
 
     Parameters

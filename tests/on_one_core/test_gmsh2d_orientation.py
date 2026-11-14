@@ -1,5 +1,6 @@
 """Check that gmsh meshes keep the model where the velocity readers put it."""
 
+from collections.abc import Callable
 from pathlib import Path
 
 import firedrake as fire
@@ -111,8 +112,11 @@ def grid_model(directory: Path) -> dict:
 @pytest.mark.parametrize("model", [segy_model, grid_model])
 @pytest.mark.parametrize("padding_type", [None, "rectangular"])
 def test_gmsh_water_interface_follows_model(
-    model, padding_type: str | None, tmp_path: Path, monkeypatch
-):
+    model: Callable[[Path], dict],
+    padding_type: str | None,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Check that the marked seabed is not mirrored or shifted in x.
 
     Parameters

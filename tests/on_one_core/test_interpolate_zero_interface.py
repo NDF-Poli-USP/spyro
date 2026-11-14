@@ -124,7 +124,7 @@ def interface_points(dimension: int) -> np.ndarray:
 
 
 @pytest.mark.parametrize("dimension", [2, 3])
-def test_sample_grid_marked_mesh_takes_rock_values(dimension: int):
+def test_sample_grid_marked_mesh_takes_rock_values(dimension: int) -> None:
     """Check that nodes in mixed cells get the rock samples of the cell only.
 
     Parameters
@@ -155,7 +155,7 @@ def test_sample_grid_marked_mesh_takes_rock_values(dimension: int):
 
 
 @pytest.mark.parametrize("dimension", [2, 3])
-def test_sample_grid_unmarked_mesh_takes_nearest_sample(dimension: int):
+def test_sample_grid_unmarked_mesh_takes_nearest_sample(dimension: int) -> None:
     """Check that nodes in mixed cells get the nearest sample, zero or not.
 
     Parameters
@@ -183,7 +183,7 @@ def test_sample_grid_unmarked_mesh_takes_nearest_sample(dimension: int):
 
 
 @pytest.mark.parametrize("mesh_follows_interface", [True, False])
-def test_sample_grid_without_zeros_is_linear(mesh_follows_interface: bool):
+def test_sample_grid_without_zeros_is_linear(mesh_follows_interface: bool) -> None:
     """Check that a grid with no zeros is sampled as without the option.
 
     Parameters
@@ -285,7 +285,7 @@ def write_model(directory: Path, water: bool = True, shift: float = 0.0) -> str:
     return filename
 
 
-def test_interpolate_blends_by_default(tmp_path: Path):
+def test_interpolate_blends_by_default(tmp_path: Path) -> None:
     """Check that by default nodes in mixed cells blend water and rock.
 
     Parameters
@@ -308,7 +308,7 @@ def test_interpolate_blends_by_default(tmp_path: Path):
     assert np.allclose(c.dat.data_ro[near_rock], 0.7 * rock(ROCK_TOP, x[near_rock]))
 
 
-def test_sharp_zero_interface_requires_fast_interpolate(tmp_path: Path):
+def test_sharp_zero_interface_requires_fast_interpolate(tmp_path: Path) -> None:
     """Check that the option is refused on the projection path.
 
     Parameters
@@ -353,7 +353,7 @@ def interpolate_both_ways(
     return V.mesh().coordinates.dat.data_ro, sharp, linear
 
 
-def test_interpolate_marked_mesh_takes_rock_values(tmp_path: Path):
+def test_interpolate_marked_mesh_takes_rock_values(tmp_path: Path) -> None:
     """Check that a marked mesh gets the rock row in the mixed cell.
 
     Parameters
@@ -375,7 +375,7 @@ def test_interpolate_marked_mesh_takes_rock_values(tmp_path: Path):
     assert np.array_equal(sharp[~mixed], linear[~mixed])
 
 
-def test_interpolate_unmarked_mesh_takes_nearest_sample(tmp_path: Path):
+def test_interpolate_unmarked_mesh_takes_nearest_sample(tmp_path: Path) -> None:
     """Check that a mesh that is not marked gets the nearest sample.
 
     Parameters
@@ -399,7 +399,9 @@ def test_interpolate_unmarked_mesh_takes_nearest_sample(tmp_path: Path):
 
 
 @pytest.mark.parametrize("water_interface", [True, False])
-def test_interpolate_without_zeros_is_unchanged(water_interface: bool, tmp_path):
+def test_interpolate_without_zeros_is_unchanged(
+    water_interface: bool, tmp_path: Path
+) -> None:
     """Check that a model with no zeros, such as Vp, is not changed.
 
     Parameters
@@ -422,7 +424,7 @@ def test_interpolate_without_zeros_is_unchanged(water_interface: bool, tmp_path)
 @pytest.mark.parametrize("sharp_zero_interface", [None, False])
 def test_isotropic_wave_reads_sharp_shear_velocity(
     sharp_zero_interface: bool | None, tmp_path: Path
-):
+) -> None:
     """Check the elastic file reader, which takes the rock Vs by default.
 
     Parameters
@@ -467,7 +469,9 @@ def test_isotropic_wave_reads_sharp_shear_velocity(
     assert np.array_equal(wave.rho.dat.data_ro, linear["density"])
 
 
-def test_isotropic_wave_sharp_zero_interface_requires_fast_interpolate(tmp_path):
+def test_isotropic_wave_sharp_zero_interface_requires_fast_interpolate(
+    tmp_path: Path,
+) -> None:
     """Check that the elastic reader refuses its default on the slow path.
 
     Parameters
