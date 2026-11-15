@@ -152,8 +152,10 @@ def test_gmsh_adaptation():
     - Outside (vp=1.5): lambda = 0.075 km → h = 0.0288 km
 
     The test uses 10% relative tolerance for central and circle regions,
-    due to potentional grading and smoothing effects and 1% for outside
-    region.
+    due to potentional grading and smoothing effects. Outside, it compares
+    the mean diameter of the cells within 0.1 km of the point, with 5%
+    relative tolerance: single cells of a uniform region vary by tens of
+    percent, and the mean of a region by up to about 3%.
     """
     quadrilateral = False
     mesh_type = "gmsh_mesh"
@@ -252,11 +254,14 @@ def test_gmsh_adaptation():
     cell_diam_circle = float(f.at(-1.0, 1.3))
     assert math.isclose(h_circle, cell_diam_circle, rel_tol=1e-1)
 
-    # outside the cheese
+    # outside the cheese, where the velocity is uniform: the mean over the
+    # cells within 0.1 km, as single cells vary by tens of percent
     lbda_outside = 1.5/20.0
     h_outside = lbda_outside/cells_per_wavelength
-    cell_diam_outside = float(f.at(-1.0, 1.7))
-    assert math.isclose(h_outside, cell_diam_outside, rel_tol=1e-2)
+    mesh_z, mesh_x = fire.SpatialCoordinate(wave.mesh)
+    near = fire.Function(DG0).interpolate((mesh_z + 1.0) ** 2 + (mesh_x - 1.7) ** 2)
+    cell_diam_outside = f.dat.data_ro[near.dat.data_ro < 0.1**2].mean()
+    assert math.isclose(h_outside, cell_diam_outside, rel_tol=5e-2)
 
     print("END")
 

@@ -256,12 +256,16 @@ def wave_and_space(
     `tuple`
         Wave and CG1 space on its mesh.
     """
-    # Lx and Ly are the coordinates of the upper corner, not lengths
-    mesh = fire.RectangleMesh(10, 7, 0.0, 1.0, originX=-1.0)
-    z = mesh.coordinates.dat.data[:, 0]
-    z[np.isclose(z, WATER_BOTTOM)] = NEAR_WATER
-    z[np.isclose(z, ROCK_TOP)] = NEAR_ROCK
-    z[np.isclose(z, -0.3)] = IN_WATER
+    # Rows given to the mesh constructor: RelabeledMesh in Firedrake 2025.4
+    # rebuilds the coordinates from the mesh topology, losing later edits
+    rows = np.linspace(-1.0, 0.0, 11)
+    for row, moved in [
+        (WATER_BOTTOM, NEAR_WATER),
+        (ROCK_TOP, NEAR_ROCK),
+        (-0.3, IN_WATER),
+    ]:
+        rows[np.isclose(rows, row)] = moved
+    mesh = fire.TensorRectangleMesh(rows, np.linspace(0.0, 1.0, 8))
     if water_above is not None:
         DG0 = fire.FunctionSpace(mesh, "DG", 0)
         in_water = fire.conditional(fire.SpatialCoordinate(mesh)[0] > water_above, 1, 0)
@@ -271,6 +275,9 @@ def wave_and_space(
             + [fire.Function(DG0).interpolate(1 - in_water)],
             [WATER_CELL_TAG, WATER_CELL_TAG + 1],
         )
+    # The tests check these rows, and would pass without them
+    z = mesh.coordinates.dat.data_ro[:, 0]
+    assert all(np.isclose(z, row).any() for row in (NEAR_WATER, NEAR_ROCK, IN_WATER))
     return build_wave(mesh, water_interface, wave_class), fire.FunctionSpace(
         mesh, "CG", 1
     )
