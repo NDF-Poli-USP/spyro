@@ -1,5 +1,6 @@
 import numpy as np
 from spyro.mpi.spyro_mpi import SpyroEnsemble
+from .meshing_utils import WATER_CELL_TAG, WATER_PADDING_CELL_TAG
 from .meshing_winslow2d import winslow_smooth_numba, winslow_smooth_vectorized, winslow_smooth_default
 from .meshing_utils import (
     generate_water_profile_from_segy, get_surface_entities_by_physical_name, get_nodes_on_surface_entities,
@@ -58,7 +59,9 @@ def build_gmsh_geometry_and_groups(
             gmsh.model.occ.synchronize()
             water_tags = [tag for dim, tag in fragment_map[1]]
             clipped_rect_tags = [tag for dim, tag in fragment_map[0] if tag not in water_tags]
-            gmsh.model.addPhysicalGroup(2, water_tags, name="WaterSurface")
+            gmsh.model.addPhysicalGroup(
+                2, water_tags, tag=WATER_CELL_TAG, name="WaterSurface"
+            )
             gmsh.model.addPhysicalGroup(2, clipped_rect_tags, name="SubSurface")
 
         if padding_type == "rectangular":
@@ -109,9 +112,22 @@ def build_gmsh_geometry_and_groups(
             gmsh.model.occ.removeAllDuplicates()
             gmsh.model.occ.synchronize()
 
-            gmsh.model.addPhysicalGroup(2, [water_surface], name="WaterSurface")
+            gmsh.model.addPhysicalGroup(
+                2, [water_surface], tag=WATER_CELL_TAG, name="WaterSurface"
+            )
             gmsh.model.addPhysicalGroup(2, [surf_rock], name="SubSurface")
-            gmsh.model.addPhysicalGroup(2, [surf_pad_tr, surf_pad_mr, surf_pad_tl, surf_pad_ml, surf_pad_bl, surf_pad_bc, surf_pad_br], name="Padding")
+            gmsh.model.addPhysicalGroup(
+                2,
+                [surf_pad_mr, surf_pad_ml, surf_pad_bl, surf_pad_bc, surf_pad_br],
+                name="Padding",
+            )
+            # Padding beside the water, kept out of WaterSurface for Winslow
+            gmsh.model.addPhysicalGroup(
+                2,
+                [surf_pad_tl, surf_pad_tr],
+                tag=WATER_PADDING_CELL_TAG,
+                name="WaterPadding",
+            )
 
         if padding_type == "hyperelliptical":
 
@@ -191,9 +207,30 @@ def build_gmsh_geometry_and_groups(
             gmsh.model.occ.removeAllDuplicates()
             gmsh.model.occ.synchronize()
 
-            gmsh.model.addPhysicalGroup(2, [water_surface], name="WaterSurface")
+            gmsh.model.addPhysicalGroup(
+                2, [water_surface], tag=WATER_CELL_TAG, name="WaterSurface"
+            )
             gmsh.model.addPhysicalGroup(2, [surf_rock], name="SubSurface")
-            gmsh.model.addPhysicalGroup(2, [surf_pad_TL, surf_pad_ML1, surf_pad_ML2, surf_pad_B_L, surf_pad_B_M, surf_pad_B_R, surf_pad_MR2, surf_pad_MR1, surf_pad_TR], name="Padding")
+            gmsh.model.addPhysicalGroup(
+                2,
+                [
+                    surf_pad_ML1,
+                    surf_pad_ML2,
+                    surf_pad_B_L,
+                    surf_pad_B_M,
+                    surf_pad_B_R,
+                    surf_pad_MR2,
+                    surf_pad_MR1,
+                ],
+                name="Padding",
+            )
+            # Padding beside the water, kept out of WaterSurface for Winslow
+            gmsh.model.addPhysicalGroup(
+                2,
+                [surf_pad_TL, surf_pad_TR],
+                tag=WATER_PADDING_CELL_TAG,
+                name="WaterPadding",
+            )
 
             if structured_mesh:
                 len_radial = max(padding_x, padding_z)

@@ -1,3 +1,4 @@
+import firedrake as fire
 import numpy as np
 import segyio
 from scipy.signal import savgol_filter
@@ -8,6 +9,11 @@ try:
     import gmsh
 except ImportError:
     gmsh = None
+
+# Cell tags of the water above a marked water interface (`water_interface`):
+# the water of the model, and the padding beside it in gmsh meshes
+WATER_CELL_TAG = 1
+WATER_PADDING_CELL_TAG = 4
 
 
 try:
@@ -896,3 +902,63 @@ def make_arc(p1_tag, p2_tag, x1, z1, x2, z2, xc, zc, a_val, b_val, hyper_n, num_
         pts.append(gmsh.model.occ.addPoint(x, z, 0.0))
     pts.append(p2_tag)
     return gmsh.model.occ.addSpline(pts)
+
+
+def water_nodes(V: fire.FunctionSpace) -> np.ndarray:
+    """Return the nodes of `V` that belong only to water cells.
+
+    Water cells are tagged `WATER_CELL_TAG`, or `WATER_PADDING_CELL_TAG` for
+    the padding beside the water of a gmsh mesh.
+
+    Parameters
+    ----------
+    V : `firedrake.FunctionSpace`
+        Scalar space on a mesh with tagged water cells.
+
+    Returns
+    -------
+    `numpy.ndarray`
+        Boolean mask of the owned nodes of `V` whose basis functions vanish
+        outside the water cells.
+
+    Raises
+    ------
+    ValueError
+        If the mesh has no water cells, or only water cells. A mesh made
+        without a water interface can tag its rock with the same number.
+
+    Notes
+    -----
+    The diagonal of the mass matrix gets a positive contribution from every
+    cell in the support of a basis function. Assembling it over the whole
+    mesh and over the water cells only, which Firedrake sums across
+    processes, finds the nodes without contributions from other cells.
+    """
+    mesh = V.mesh()
+    # Firedrake only accepts the cell tags of some process: those of the
+    # "Cell Sets" label of the DMPlex
+    dm = mesh.topology_dm
+    local_tags = (
+        {int(t) for t in dm.getLabelIdIS("Cell Sets").indices}
+        if dm.hasLabel("Cell Sets")
+        else set()
+    )
+    tags = set().union(*mesh.comm.allgather(local_tags))
+    water_tags = tuple(t for t in (WATER_CELL_TAG, WATER_PADDING_CELL_TAG) if t in tags)
+    if not water_tags:
+        raise ValueError(
+            f"The mesh has no water cells tagged {WATER_CELL_TAG}, which a mesh "
+            "marked with water_interface must have."
+        )
+    in_water_cells = fire.dx(water_tags, domain=mesh)
+    water_area = fire.assemble(fire.Constant(1.0) * in_water_cells)
+    area = fire.assemble(fire.Constant(1.0) * fire.dx(domain=mesh))
+    if water_area >= (1.0 - 1e-12) * area:
+        raise ValueError(
+            f"Every cell of the mesh is tagged {WATER_CELL_TAG} as water. Was it "
+            "made without a water interface?"
+        )
+    u, v = fire.TrialFunction(V), fire.TestFunction(V)
+    everywhere = fire.assemble(u * v * fire.dx, diagonal=True).dat.data_ro
+    in_water = fire.assemble(u * v * in_water_cells, diagonal=True).dat.data_ro
+    return everywhere - in_water <= 1e-8 * everywhere

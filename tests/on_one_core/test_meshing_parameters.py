@@ -208,6 +208,7 @@ def test_meshing_parameters_init_defaults():
     assert mp.minimum_velocity is None
     assert mp.velocity_model is None
     assert mp.automatic_mesh is False
+    assert mp.water_interface is False
 
 
 def test_mesh_file_validation():
@@ -273,6 +274,30 @@ def test_periodic_only_for_firedrake_mesh():
         mp.periodic = True
 
 
+@pytest.mark.parametrize("mesh_type", ["firedrake_mesh", "user_mesh", "file"])
+def test_water_interface_declared_for_any_mesh_type(mesh_type: str) -> None:
+    """Check that any mesh can declare that it follows the water interface.
+
+    Parameters
+    ----------
+    mesh_type : `str`
+        Mesh type other than `gmsh_mesh`, which detects the interface.
+
+    Returns
+    -------
+    None
+    """
+    mp = spyro.meshing.MeshingParameters(input_mesh_dictionary={"mesh_type": mesh_type})
+    assert mp.water_interface is False
+    mp.set_mesh(input_mesh_parameters={"water_interface": True})
+    assert mp.water_interface is True
+
+    mp = spyro.meshing.MeshingParameters(
+        input_mesh_dictionary={"mesh_type": mesh_type, "water_interface": True}
+    )
+    assert mp.water_interface is True
+
+
 if __name__ == "__main__":
     test_initialize_mesh_pam()
     test_negative_length_z_raises()
@@ -288,3 +313,5 @@ if __name__ == "__main__":
     test_source_frequency_warnings()
     test_cells_per_wavelength_and_edge_length_mutual_exclusion()
     test_periodic_only_for_firedrake_mesh()
+    for mesh_type in ["firedrake_mesh", "user_mesh", "file"]:
+        test_water_interface_declared_for_any_mesh_type(mesh_type)

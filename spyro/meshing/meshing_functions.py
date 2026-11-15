@@ -483,10 +483,8 @@ class AutomaticMesh:
                     f"but received shape {vp.shape}."
                 )
 
-            vp_for_gmsh = np.ascontiguousarray(vp[::-1, :])
-
             filename = "tmp_velocity_model.segy"
-            create_segy_from_grid(vp_for_gmsh, filename)
+            create_segy_from_grid(vp, filename)
 
             self.velocity_model = filename
 
@@ -661,47 +659,10 @@ class AutomaticMesh:
                     zc=zc,
                     apply_winslow=apply_winslow,
                 )
-            # Rotating mesh for axis (z,x,y)
-            if padding_type in ["rectangular", "hyperelliptical"]:
-                rotate_xz = [
-                    0.0,
-                    1.0,
-                    0.0,
-                    0.0,
-                    -1.0,
-                    0.0,
-                    0.0,
-                    domain_xmax,
-                    0.0,
-                    0.0,
-                    1.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    1.0,
-                ]
-            else:
-                rotate_xz = [
-                    0.0,
-                    1.0,
-                    0.0,
-                    -domain_zmin,
-                    -1.0,
-                    0.0,
-                    0.0,
-                    domain_xmax,
-                    0.0,
-                    0.0,
-                    1.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    1.0,
-                ]
-
-            gmsh.model.mesh.affineTransform(rotate_xz)
+            # Gmsh (x, y) is (x, z): swap the axes into the (z, x) of spyro.
+            # A rotation would mirror x, putting the model at length_x - x.
+            swap_xz = np.eye(4)[[1, 0, 2, 3]]
+            gmsh.model.mesh.affineTransform(swap_xz.ravel().tolist())
             gmsh.write(output_file)
             SpyroEnsemble.print(f"Gmsh mesh written to {output_file}")
             gmsh.finalize()

@@ -139,7 +139,11 @@ class MeshingParameters():
     grade : float
         Function grading for smooth element transition.
     water_interface : bool
-        If True, detects and implements the water interface curve.
+        Whether the mesh follows the interface between the water and the
+        rock below it. Gmsh meshes detect it and mesh along it if True, and
+        tag the water cells with `spyro.meshing.meshing_utils.WATER_CELL_TAG`.
+        Other meshes only declare that they do, and must tag their water
+        cells with it for a zero-interface interpolation. Default is False.
     water_search_value : float
         Value of the water speed that the water interface generator will use to find the bathymetry
     vp_water : float
@@ -275,6 +279,7 @@ class MeshingParameters():
         self.padding_type = self.input_mesh_dictionary.get("padding_type")
         self.padding_x = self.input_mesh_dictionary.get("padding_x")
         self.padding_z = self.input_mesh_dictionary.get("padding_z")
+        self.water_interface = self.input_mesh_dictionary.get("water_interface", False)
 
         # Gmsh only parameters
         if self.mesh_type == "gmsh_mesh":
@@ -285,7 +290,6 @@ class MeshingParameters():
             self.hyper_n = self.input_mesh_dictionary.get("hyper_n", 3.0)
             self.hmin_segy = self.input_mesh_dictionary.get("hmin_segy", 0.0)
             self.grade = self.input_mesh_dictionary.get("grade", 0.9)
-            self.water_interface = self.input_mesh_dictionary.get("water_interface", False)
             self.water_search_value = self.input_mesh_dictionary.get("water_search_value", 0.0)
             self.min_element_size = self.input_mesh_dictionary.get("min_element_size", 35.0)
             self.winslow_iterations = self.input_mesh_dictionary.get("winslow_iterations", 5000)
