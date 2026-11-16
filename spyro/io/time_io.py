@@ -1,5 +1,6 @@
 """Methods that deal with time related io operations."""
 
+
 import numpy as np
 import numpy.typing as npt
 
@@ -77,7 +78,15 @@ class Read_time_axis:
             self.time_vector = None
         else:
             self.number_of_timesteps = round(self.final_time / value) + 1
-            self.final_time = (self.number_of_timesteps - 1) * value
+            # Keep a final_time that is already a multiple of dt: recomputing
+            # it as a product can move it by one ulp (3 * 0.3 != 0.9).
+            if not np.isclose(
+                self.final_time / value + 1,
+                self.number_of_timesteps,
+                rtol=0.0,
+                atol=1e-9,
+            ):
+                self.final_time = (self.number_of_timesteps - 1) * value
             self.time_vector = np.linspace(0.0, self.final_time, self.number_of_timesteps)
         self._dt = value
 

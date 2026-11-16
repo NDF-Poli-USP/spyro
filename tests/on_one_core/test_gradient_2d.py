@@ -266,6 +266,40 @@ def test_backward_visits_every_forward_step(monkeypatch: pytest.MonkeyPatch) -> 
     assert visited == list(range(nt - 1, -1, -1))
 
 
+def test_backward_accepts_rounding_in_final_time(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Treat a forward run ending one ulp past `final_time` as complete.
+
+    `final_time = 0.013` is a multiple of `dt = 5e-4` and is kept as given,
+    but the time loop ends at `26 * 5e-4 = 0.013000000000000001`. The
+    backward propagator must not report a mismatch with `final_time`.
+
+    Parameters
+    ----------
+    capsys : pytest.CaptureFixture[str]
+        Captures the messages printed by the backward propagator.
+    """
+    d = deepcopy(dictionary)
+    d["time_axis"]["final_time"] = 0.013
+    d["time_axis"]["dt"] = 5e-4
+
+    wave = spyro.AcousticWave(dictionary=d)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    wave.set_initial_velocity_model(constant=2.0)
+    wave.enable_implemented_adjoint()
+    wave.forward_solve()
+
+    assert wave.final_time == 0.013
+    # The chosen parameters must end the time loop one ulp past final_time.
+    assert wave.current_time != wave.final_time
+
+    capsys.readouterr()
+    wave.gradient_solve(misfit=np.ones_like(wave.forward_solution_receivers))
+
+    assert "different than final_time" not in capsys.readouterr().out
+
+
 if __name__ == "__main__":
     test_gradient()
     test_gradient_sampling_frequency(_gradient_for_sampling_frequency(1), 2)

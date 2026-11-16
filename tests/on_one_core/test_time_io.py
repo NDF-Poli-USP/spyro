@@ -189,6 +189,30 @@ def test_time_axis_snaps_final_time(final_time: float, dt: float) -> None:
     assert np.allclose(axis.time_vector, np.arange(nt) * dt, rtol=0.0, atol=1e-15)
 
 
+@pytest.mark.parametrize("final_time, dt", [(0.3, 1e-5), (0.9, 0.3), (0.013, 5e-4)])
+def test_time_axis_keeps_exact_final_time(final_time: float, dt: float) -> None:
+    """Keep a `final_time` that is already a multiple of `dt` unchanged.
+
+    For these pairs `(nt - 1) * dt` differs from `final_time` by one ulp,
+    so snapping would move a value the user gave exactly.
+
+    Parameters
+    ----------
+    final_time : float
+        Requested final time, a multiple of `dt`.
+    dt : float
+        Timestep.
+    """
+    axis = _TimeAxis({"final_time": final_time, "dt": dt})
+    nt = axis.number_of_timesteps
+
+    # The chosen pairs must reproduce the one-ulp shift this test guards.
+    assert (nt - 1) * dt != final_time
+    assert nt == round(final_time / dt) + 1
+    assert axis.final_time == final_time
+    assert axis.time_vector[-1] == final_time
+
+
 def test_time_axis_without_dt() -> None:
     """Leave the time levels undefined while `dt` is not set."""
     axis = _TimeAxis({"final_time": 1.0})

@@ -1,4 +1,5 @@
 import firedrake as fire
+import numpy as np
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from . import helpers
 from .wave import Wave
@@ -43,7 +44,9 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
 
     dt = wave.dt
     t = wave.current_time
-    if t != wave.final_time:
+    # The time loop ends at `step * dt`, which can differ from final_time by
+    # rounding only, so compare within a fraction of a timestep.
+    if not np.isclose(t, wave.final_time, rtol=0.0, atol=1e-9 * dt):
         SpyroEnsemble.print(
             f"Current time of {t}, different than final_time of "
             f"{wave.final_time}. Setting final_time to current time "
