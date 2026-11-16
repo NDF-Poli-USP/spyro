@@ -76,9 +76,10 @@ class Read_time_axis:
             self.time_vector = None
         else:
             self.number_of_timesteps = round(self.final_time / value) + 1
-            self.final_time = (self.number_of_timesteps - 1 ) * value
+            self.final_time = (self.number_of_timesteps - 1) * value
             self.time_vector = np.linspace(0.0, self.final_time, self.number_of_timesteps)
         self._dt = value
+
 
 def interpolate_time_series(
     values,
