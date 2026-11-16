@@ -660,15 +660,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.current_sources = source_nums
         _forward_time_integrator(self, source_nums)
 
-    def get_dt(self):
-        return self._dt
-
-    def set_dt(self, dt):
-        self._dt = dt
+    @Model_parameters.dt.setter
+    def dt(self, value: float | None) -> None:
+        """Set the timestep and rebuild the source wavelet."""
+        Model_parameters.dt.fset(self, value)
         if self.sources is not None:
             self.sources.update_wavelet(self)
-
-    dt = property(fget=get_dt, fset=set_dt)
 
     @abstractmethod
     def rhs_no_pml(self):
