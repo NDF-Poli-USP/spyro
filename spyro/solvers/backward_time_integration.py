@@ -80,11 +80,19 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
 
     for step in range(nt - 1, -1, -1):
         rhs_forcing.assign(0.0)
-        receiver_source = receivers.apply_receivers_as_source(
-            rhs_forcing, wave.misfit, step,
-        )
-        if step == 0 or step == nt - 1:
-            receiver_source.assign(0.5 * receiver_source)
+        # Misfit row `k` is sampled from the forward solution at `k * dt`, which
+        # the forward solve of step `k - 1` computes. The adjoint state solved
+        # here pairs with that solve, so it takes row `step + 1`. Row 0 is the
+        # initial condition, which does not depend on the model.
+        misfit_row = step + 1
+        if misfit_row < nt:
+            receiver_source = receivers.apply_receivers_as_source(
+                rhs_forcing, wave.misfit, misfit_row
+            )
+            if misfit_row == nt - 1:
+                receiver_source.assign(0.5 * receiver_source)
+        else:
+            receiver_source = rhs_forcing
         wave.rhs_no_pml_source().assign(
             receiver_source
         )

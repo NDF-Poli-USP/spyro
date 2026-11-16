@@ -88,18 +88,9 @@ def _propagate_forward_central_difference(wave, source_ids):
             wave.rhs_no_pml_source().assign(
                 wave.sources.apply_source(rhs_forcing, step))
 
-        wave.solver.solve()
-
-        # The time step has to close right after the solve: closing it after
-        # the state rotation below makes the solve output look disposable, and
-        # its checkpoint is dropped. The final step is closed by pyadjoint
-        # itself when taping ends, hence ``nt - 1``.
-        if adjoint_type == AdjointType.AUTOMATED_ADJOINT and step < nt - 1:
-            wave.automated_adjoint.end_timestep()
-
-        wave.prev_vstate = wave.vstate
-        wave.vstate = wave.next_vstate
-
+        # Sample the receivers before the solve, while the current state still
+        # holds the solution at `step * dt`, so that row `step` of the record
+        # matches `wave.time_vector[step]`.
         if wave.use_vertex_only_mesh:
             if receiver_buffer is None:
                 receiver_buffer = fire.assemble(interpolate_receivers)
@@ -112,6 +103,18 @@ def _propagate_forward_central_difference(wave, source_ids):
                 usol_recv.append(receiver_buffer.copy(deepcopy=True))
         else:
             usol_recv.append(wave.get_forward_solution_receivers())
+
+        wave.solver.solve()
+
+        # The time step has to close right after the solve: closing it after
+        # the state rotation below makes the solve output look disposable, and
+        # its checkpoint is dropped. The final step is closed by pyadjoint
+        # itself when taping ends, hence ``nt - 1``.
+        if adjoint_type == AdjointType.AUTOMATED_ADJOINT and step < nt - 1:
+            wave.automated_adjoint.end_timestep()
+
+        wave.prev_vstate = wave.vstate
+        wave.vstate = wave.next_vstate
 
         if (
             wave.store_forward_time_steps

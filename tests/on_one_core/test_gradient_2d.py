@@ -223,18 +223,19 @@ def test_gradient_sampling_frequency(full_sampling_gradient, freq):
 
 
 def test_backward_visits_every_forward_step(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Check that the adjoint loop runs over every forward time level.
+    """Check that the adjoint loop injects every misfit row after the first.
 
     With `dt = 1e-4` and `final_time = 0.0049` the forward run takes 50
     time levels and ends at `t = 49 * dt`, but `t / dt` evaluates to
     slightly less than 49. Truncating it with `int` made the backward
     propagator skip the last time level, so the first adjoint source (the
-    last misfit row) was never injected.
+    last misfit row) was never injected. Row 0 is the initial condition,
+    which does not depend on the model, so it is never injected.
 
     Parameters
     ----------
     monkeypatch : pytest.MonkeyPatch
-        Used to record the time levels passed to the adjoint source
+        Used to record the misfit rows passed to the adjoint source
         injection.
     """
     d = deepcopy(dictionary)
@@ -263,7 +264,7 @@ def test_backward_visits_every_forward_step(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(wave.receivers, "apply_receivers_as_source", recording_inject)
     wave.gradient_solve(misfit=misfit)
 
-    assert visited == list(range(nt - 1, -1, -1))
+    assert visited == list(range(nt - 1, 0, -1))
 
 
 def test_backward_accepts_rounding_in_final_time(
