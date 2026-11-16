@@ -653,6 +653,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         if final_time is not None:
             self.final_time = final_time
+            self.dt = dt if dt is not None else self.dt
         if dt is not None:
             self.dt = dt
         if source_nums is None:
