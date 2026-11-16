@@ -143,11 +143,10 @@ def create_seismicmesh_2D_mesh_homogeneous(mesh_parameters):
             rectangle, edge_length, mesh_parameters.output_file_name
         )
         return FireMeshReader(mesh_parameters.output_file_name)
-
-    # Every ensemble member reads the same file, so only ensemble rank 0
-    # generates it, in parallel over its spatial communicator.
-    spatial_comm = SpyroEnsemble.ensemble.comm
-    if SpyroEnsemble.get_ensemble_rank() == 0:
+    elif SpyroEnsemble.get_ensemble_rank() == 0:
+        # Every ensemble member reads the same file, so only ensemble rank 0
+        # generates it, in parallel over its spatial communicator.
+        spatial_comm = SpyroEnsemble.ensemble.comm
         _generate_and_write_homogeneous_mesh(
             rectangle, edge_length, mesh_parameters.output_file_name,
             comm=spatial_comm,
