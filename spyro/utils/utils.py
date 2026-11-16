@@ -697,7 +697,17 @@ def get_real_shot_record(wave):
     return real_shot_record
 
 
-def get_time_vector(wave):
-    """Get a time vector representing the time axis of a wave object."""
-    number_timesteps = round(wave.final_time / wave.dt) + 1
-    return np.linspace(0.0, wave.final_time, number_timesteps)
+def get_time_vector(wave) -> np.ndarray | None:
+    """Get the times at which a wave object computes the solution.
+
+    Parameters
+    ----------
+    wave : spyro.solvers.wave.Wave
+        Wave object with `final_time` and `dt` set.
+
+    Returns
+    -------
+    numpy.ndarray or None
+        `wave.time_vector`, or `None` while `wave.dt` is not set.
+    """
+    return wave.time_vector

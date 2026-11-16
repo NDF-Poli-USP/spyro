@@ -60,6 +60,10 @@ class Meshing_parameter_calculator:
         the MPI communicator
     reference_solution : np.ndarray
         the reference solution
+    reference_time_vector : np.ndarray
+        the times of the samples of the reference solution, which is
+        computed (or, when loaded, assumed computed) with the timestep of the
+        initial guess object
     initial_dictionary : dict
         the initial dictionary used to build the initial guess object
 
@@ -143,6 +147,13 @@ class Meshing_parameter_calculator:
         self.initial_guess_object = self.build_initial_guess_model()
         self.comm = self.initial_guess_object.comm
         self.reference_solution = self.get_reference_solution()
+        self.reference_time_vector = self.initial_guess_object.time_vector
+        if len(self.reference_solution) != len(self.reference_time_vector):
+            raise ValueError(
+                f"The reference solution has {len(self.reference_solution)} time "
+                f"samples, but final_time and dt give "
+                f"{len(self.reference_time_vector)}."
+            )
 
     def _setting_up_testing_options(self):
         """
@@ -275,9 +286,7 @@ class Meshing_parameter_calculator:
         # Initializing array
         wave = self.initial_guess_object
         number_of_receivers = wave.number_of_receivers
-        dt = wave.dt
-        final_time = wave.final_time
-        num_t = int(final_time / dt + 1)
+        num_t = wave.number_of_timesteps
         analytical_solution = np.zeros((num_t, number_of_receivers))
 
         # Solving analytical solution for each receiver
@@ -370,7 +379,14 @@ class Meshing_parameter_calculator:
             )
 
             # Computing errors
-            error = error_calc(measure_error, p_receivers, self.reference_solution, wave.dt)
+            error = error_calc(
+                measure_error,
+                p_receivers,
+                self.reference_solution,
+                wave.dt,
+                time_vector=wave.time_vector,
+                analytical_time_vector=self.reference_time_vector,
+            )
 
             print("Error is ", error, flush=True)
             cpws.append(cpw)
@@ -472,30 +488,50 @@ def calculate_dif(cpw, accuracy, fast_loop=False):
     return dif
 
 
-def error_calc(measure_error, receivers, analytical, dt):
-    """
-    Calculates the error between the numerical and analytical solutions.
+def error_calc(
+    measure_error: "spyro.tools.error_measure.MeasureError",
+    receivers: np.ndarray,
+    analytical: np.ndarray,
+    dt: float,
+    time_vector: np.ndarray | None = None,
+    analytical_time_vector: np.ndarray | None = None,
+) -> float:
+    """Calculate the error between the numerical and analytical solutions.
 
     Parameters
     ----------
+    measure_error : spyro.tools.error_measure.MeasureError
+        Object that computes the error measures.
     receivers : np.ndarray
-        the numerical solution to be evaluated
+        The numerical solution to be evaluated.
     analytical : np.ndarray
-        the analytical or reference solution
+        The analytical or reference solution.
     dt : float
-        the time-step used in the numerical solution
+        The time-step used in the numerical solution.
+    time_vector : np.ndarray, optional
+        Times of the samples of `receivers`, such as the `time_vector` of
+        the wave object that computed them. Default is `None`, which assumes
+        they are spaced by `dt` from zero.
+    analytical_time_vector : np.ndarray, optional
+        Times of the samples of `analytical`. Default is `None`, which
+        assumes they are evenly spaced over the time span of `receivers`.
 
     Returns
     -------
-    error : float
-        the error between the numerical and analytical solutions
+    float
+        The error between the numerical and analytical solutions.
     """
     rec_len, number_of_receivers = np.shape(receivers)
 
     # Interpolate analytical solution into numerical dts
-    final_time = dt * (rec_len - 1)
-    time_vector_rec = np.linspace(0.0, final_time, rec_len)
-    time_vector_ana = np.linspace(0.0, final_time, len(analytical[:, 0]))
+    if time_vector is None:
+        time_vector_rec = np.linspace(0.0, dt * (rec_len - 1), rec_len)
+    else:
+        time_vector_rec = time_vector
+    if analytical_time_vector is None:
+        time_vector_ana = np.linspace(0.0, time_vector_rec[-1], len(analytical[:, 0]))
+    else:
+        time_vector_ana = analytical_time_vector
     ana = np.zeros(np.shape(receivers))
     for i in range(number_of_receivers):
         ana[:, i] = np.interp(time_vector_rec, time_vector_ana, analytical[:, i])
