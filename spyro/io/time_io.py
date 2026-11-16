@@ -64,6 +64,21 @@ class Read_time_axis:
             raise ValueError(f"The time integrator of {value} is not implemented yet")
         self._time_integrator = value
 
+    @property
+    def dt(self):
+        """Timestep value."""
+        return self._dt
+
+    @dt.setter
+    def dt(self, value):
+        if value is None:
+            self.number_of_timesteps = None
+            self.time_vector = None
+        else:
+            self.number_of_timesteps = round(self.final_time / value) + 1
+            self.final_time = (self.number_of_timesteps - 1 ) * value
+            self.time_vector = np.linspace(0.0, self.final_time, self.number_of_timesteps)
+        self._dt = value
 
 def interpolate_time_series(
     values,
