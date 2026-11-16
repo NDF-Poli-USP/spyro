@@ -49,7 +49,7 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
             f"{wave.final_time}. Setting final_time to current time "
             f"in backwards propagation."
         )
-    nt = int(t / dt) + 1
+    nt = round(t / dt) + 1
 
     # The forward wavefield is stored only every ``gradient_sampling_frequency``
     # steps, so consecutive stored samples are ``sample_dt = freq * dt`` apart in
