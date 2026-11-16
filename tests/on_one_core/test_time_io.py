@@ -237,7 +237,7 @@ def test_forward_receivers_match_time_vector() -> None:
     wave.set_initial_velocity_model(constant=1.5)
     wave.forward_solve()
 
-    time_vector = spyro.utils.get_time_vector(wave)
+    time_vector = wave.time_vector
     assert len(time_vector) == 26
     assert wave.forward_solution_receivers.shape[0] == len(time_vector)
     assert wave.current_time == time_vector[-1] == wave.final_time

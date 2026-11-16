@@ -695,19 +695,3 @@ def get_real_shot_record(wave):
                 return source_record
 
     return real_shot_record
-
-
-def get_time_vector(wave) -> np.ndarray | None:
-    """Get the times at which a wave object computes the solution.
-
-    Parameters
-    ----------
-    wave : spyro.solvers.wave.Wave
-        Wave object with `final_time` and `dt` set.
-
-    Returns
-    -------
-    numpy.ndarray or None
-        `wave.time_vector`, or `None` while `wave.dt` is not set.
-    """
-    return wave.time_vector
