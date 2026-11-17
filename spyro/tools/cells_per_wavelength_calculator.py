@@ -3,6 +3,7 @@ import time as timinglib
 import copy
 from .input_models import create_initial_model_for_meshing_parameter
 import spyro
+from ..utils.error_management import validate_data_structure
 
 
 class Meshing_parameter_calculator:
@@ -148,12 +149,12 @@ class Meshing_parameter_calculator:
         self.comm = self.initial_guess_object.comm
         self.reference_solution = self.get_reference_solution()
         self.reference_time_vector = self.initial_guess_object.time_vector
-        if len(self.reference_solution) != len(self.reference_time_vector):
-            raise ValueError(
-                f"The reference solution has {len(self.reference_solution)} time "
-                f"samples, but final_time and dt give "
-                f"{len(self.reference_time_vector)}."
-            )
+        validate_data_structure(
+            "reference_solution",
+            self.reference_solution,
+            "array",
+            expected_length=len(self.reference_time_vector),
+        )
 
     def _setting_up_testing_options(self):
         """
