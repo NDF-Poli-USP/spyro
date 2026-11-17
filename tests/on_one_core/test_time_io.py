@@ -222,14 +222,65 @@ def test_time_axis_without_dt() -> None:
     assert axis.time_vector is None
 
 
-def test_forward_receivers_match_time_vector() -> None:
-    """Record one receiver row per entry of `time_vector`.
+@pytest.mark.parametrize("new_final_time", [2.0, 0.95])
+def test_time_axis_follows_final_time(new_final_time: float) -> None:
+    """Re-derive the time discretization when `final_time` is reset.
 
-    `final_time = 0.0123` is not a multiple of `dt = 5e-4`, so it is snapped
-    to 0.0125 and the solver must stop exactly there.
+    The axis starts at `final_time = 0.9` with `dt = 0.3`. A value far from
+    it (2.0) must extend the time levels, and one within a timestep of it
+    (0.95) must snap back onto it without recursing between the setters.
+
+    Parameters
+    ----------
+    new_final_time : float
+        Final time set after the axis is built.
+    """
+    dt = 0.3
+    axis = _TimeAxis({"final_time": 0.9, "dt": dt})
+    axis.final_time = new_final_time
+    nt = axis.number_of_timesteps
+
+    assert nt == round(new_final_time / dt) + 1
+    assert abs(axis.final_time - new_final_time) <= dt / 2
+    assert len(axis.time_vector) == nt
+    assert axis.time_vector[-1] == axis.final_time
+
+
+def test_time_axis_snaps_proposed_final_time_on_dt_change() -> None:
+    """Snap the proposed `final_time` again, not the snapped one, on new `dt`.
+
+    `final_time = 1.0` with `dt = 0.3` snaps to 0.9. Setting `dt = 0.2`
+    must then end at 1.0, as if it had been given first. Snapping the
+    already-snapped 0.9 would give `round(4.5) + 1 = 5` time levels ending
+    at 0.8.
+    """
+    axis = _TimeAxis({"final_time": 1.0, "dt": 0.3})
+    assert np.isclose(axis.final_time, 0.9, rtol=0.0, atol=1e-15)
+
+    axis.dt = 0.2
+
+    assert axis.number_of_timesteps == 6
+    assert axis.final_time == 1.0
+    assert axis.time_vector[-1] == 1.0
+
+
+def _small_acoustic_wave(final_time: float, dt: float) -> spyro.AcousticWave:
+    """Build a small 2D acoustic wave with one source and three receivers.
+
+    Parameters
+    ----------
+    final_time : float
+        Final time of the simulation.
+    dt : float
+        Timestep.
+
+    Returns
+    -------
+    spyro.AcousticWave
+        Wave with its mesh and a constant velocity model of 1.5 set.
     """
     dictionary = {
-        "options": {"cell_type": "T", "variant": "lumped", "degree": 2, "dimension": 2},
+        "options": {"cell_type": "T", "variant": "lumped", "degree": 4, "dimension": 2},
         "parallelism": {"type": "automatic"},
         "mesh": {
             "length_z": 1.0,
@@ -248,8 +299,8 @@ def test_forward_receivers_match_time_vector() -> None:
         },
         "time_axis": {
             "initial_time": 0.0,
-            "final_time": 0.0123,
-            "dt": 5e-4,
+            "final_time": final_time,
+            "dt": dt,
             "amplitude": 1,
             "output_frequency": 100,
             "gradient_sampling_frequency": 1,
@@ -259,12 +310,67 @@ def test_forward_receivers_match_time_vector() -> None:
     wave = spyro.AcousticWave(dictionary=dictionary)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     wave.set_initial_velocity_model(constant=1.5)
+    return wave
+
+
+def test_forward_receivers_match_time_vector() -> None:
+    """Record one receiver row per entry of `time_vector`.
+
+    `final_time = 0.0123` is not a multiple of `dt = 5e-4`, so it is snapped
+    to 0.0125 and the solver must stop exactly there.
+    """
+    wave = _small_acoustic_wave(final_time=0.0123, dt=5e-4)
     wave.forward_solve()
 
     time_vector = wave.time_vector
     assert len(time_vector) == 26
     assert wave.forward_solution_receivers.shape[0] == len(time_vector)
     assert wave.current_time == time_vector[-1] == wave.final_time
+
+
+def test_wave_propagator_snaps_final_time_to_new_dt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Snap a `final_time` passed with a new `dt` onto that `dt` only.
+
+    `wave_propagator` sets `final_time` before `dt`, and with the old
+    `dt = 5e-4` it snaps 0.0124 to 0.0125. The new `dt = 1e-4` must then
+    give 125 time levels ending at the proposed 0.0124, not the 126 of the
+    value snapped to the old timestep. The source wavelet must be rebuilt
+    to cover every time level.
+
+    Parameters
+    ----------
+    monkeypatch : pytest.MonkeyPatch
+        Replaces the time integrator, since only the time axis is checked.
+    """
+    monkeypatch.setattr(
+        "spyro.solvers.wave._forward_time_integrator",
+        lambda wave, source_nums: None,
+    )
+    wave = _small_acoustic_wave(final_time=0.0123, dt=5e-4)
+    wave.wave_propagator(dt=1e-4, final_time=0.0124)
+
+    assert wave.number_of_timesteps == 125
+    assert wave.final_time == 0.0124
+    assert len(wave.sources.wavelet) == wave.number_of_timesteps
+
+
+def test_wave_propagator_extends_final_time() -> None:
+    """Propagate up to a later `final_time` given to `wave_propagator`.
+
+    Changing only `final_time` must rebuild the time levels and the source
+    wavelet, so the integrator runs and records every new time level.
+    """
+    wave = _small_acoustic_wave(final_time=0.0123, dt=5e-4)
+    wave.forward_solve()
+    wave.wave_propagator(final_time=0.02)
+
+    nt = wave.number_of_timesteps
+    assert nt == 41
+    assert len(wave.sources.wavelet) == nt
+    assert wave.forward_solution_receivers.shape[0] == nt
+    assert np.isclose(wave.current_time, wave.final_time, rtol=0.0, atol=1e-15)
 
 
 if __name__ == "__main__":

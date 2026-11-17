@@ -1,8 +1,9 @@
 """Methods that deal with time related io operations."""
 
-
 import numpy as np
 import numpy.typing as npt
+
+EPS = np.finfo(np.float32).eps
 
 
 class Read_time_axis:
@@ -19,6 +20,7 @@ class Read_time_axis:
 
         self.input_dictionary["time_axis"].setdefault("initial_time", 0.0)
         self.initial_time = self.input_dictionary["time_axis"]["initial_time"]
+        self._dt = None
         self.final_time = self.input_dictionary["time_axis"]["final_time"]
         self.input_dictionary["time_axis"].setdefault("dt", None)
         self.dt = self.input_dictionary["time_axis"]["dt"]
@@ -39,12 +41,17 @@ class Read_time_axis:
         self._initial_time = value
 
     @property
-    def final_time(self):
-        """Final simulation time."""
+    def final_time(self) -> float:
+        """Final simulation time, snapped onto the last time discretization.
+
+        The value last given to the setter is kept as the proposed final
+        time, and every change of `dt` snaps it again. Repeated `dt` changes
+        therefore do not accumulate snapping error.
+        """
         return self._final_time
 
     @final_time.setter
-    def final_time(self, value):
+    def final_time(self, value: float) -> None:
         if value < self.initial_time:
             raise ValueError(
                 (
@@ -52,8 +59,8 @@ class Read_time_axis:
                     f"time of {self.initial_time} not allowed."
                 )
             )
-
-        self._final_time = value
+        self._proposed_final_time = value
+        self._update_time_discretization()
 
     @property
     def time_integrator(self):
@@ -67,29 +74,46 @@ class Read_time_axis:
         self._time_integrator = value
 
     @property
-    def dt(self):
+    def dt(self) -> float | None:
         """Timestep value."""
         return self._dt
 
     @dt.setter
-    def dt(self, value):
-        if value is None:
+    def dt(self, value: float | None) -> None:
+        self._dt = value
+        self._update_time_discretization()
+
+    def _update_time_discretization(self) -> None:
+        """Derive the time discretization from the proposed final time and `dt`.
+
+        Sets `number_of_timesteps`, `time_vector` and `final_time`, which is
+        the proposed final time snapped onto the last time level when it is
+        not a multiple of `dt`. Both setters call this, so the time levels
+        always match the current pair.
+
+        Returns
+        -------
+        None
+            `number_of_timesteps`, `time_vector` and `final_time` are updated
+            in place. The first two are `None` while `dt` is not set.
+        """
+        self._final_time = self._proposed_final_time
+        if self._dt is None:
             self.number_of_timesteps = None
             self.time_vector = None
         else:
-            self.number_of_timesteps = round(self.final_time / value) + 1
-            # Keep a final_time that is already a multiple of dt: recomputing
-            # it as a product can move it by one ulp (3 * 0.3 != 0.9).
-            eps = np.finfo(np.float32).eps
+            self.number_of_timesteps = round(self._proposed_final_time / self._dt) + 1
             if not np.isclose(
-                self.final_time / value + 1,
+                self._proposed_final_time / self._dt + 1,
                 self.number_of_timesteps,
                 rtol=0.0,
-                atol=eps,
+                atol=EPS,
             ):
-                self.final_time = (self.number_of_timesteps - 1) * value
-            self.time_vector = np.linspace(0.0, self.final_time, self.number_of_timesteps)
-        self._dt = value
+                self._final_time = (self.number_of_timesteps - 1) * self._dt
+
+            self.time_vector = np.linspace(
+                0.0, self._final_time, self.number_of_timesteps
+            )
 
 
 def interpolate_time_series(

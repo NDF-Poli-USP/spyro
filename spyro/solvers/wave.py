@@ -653,7 +653,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         if final_time is not None:
             self.final_time = final_time
-            self.dt = dt if dt is not None else self.dt
         if dt is not None:
             self.dt = dt
         if source_nums is None:
@@ -661,10 +660,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.current_sources = source_nums
         _forward_time_integrator(self, source_nums)
 
-    @Model_parameters.dt.setter
-    def dt(self, value: float | None) -> None:
-        """Set the timestep and rebuild the source wavelet."""
-        Model_parameters.dt.fset(self, value)
+    def _update_time_discretization(self) -> None:
+        """Derive the time discretization and rebuild the source wavelet to match.
+        """
+        super()._update_time_discretization()
         if self.sources is not None:
             self.sources.update_wavelet(self)
 
