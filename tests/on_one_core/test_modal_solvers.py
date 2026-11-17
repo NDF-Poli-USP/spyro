@@ -332,12 +332,12 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
         ("T", 2, None, False),
         ("Q", 2, None, True),
         ("Q", 2, None, False),
-        ("T", 3, 6.0, True),
-        ("T", 3, None, True),
-        ("T", 3, 2.4, False),
-        ("T", 3, None, False),
-        ("Q", 3, None, True),
-        ("Q", 3, None, False),
+        param("T", 3, 6.0, True, marks=mark.slow),
+        param("T", 3, None, True, marks=mark.slow),
+        param("T", 3, 2.4, False, marks=mark.slow),
+        param("T", 3, None, False, marks=mark.slow),
+        param("Q", 3, None, True, marks=mark.slow),
+        param("Q", 3, None, False, marks=mark.slow),
     ],
 )
 def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogeneous):
