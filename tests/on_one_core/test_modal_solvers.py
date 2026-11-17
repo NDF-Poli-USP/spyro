@@ -5,7 +5,7 @@ frequency with expected values for different domain configurations. The tests co
 both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
 """
 
-from pytest import fail, fixture, mark
+from pytest import fail, fixture, mark, param
 from firedrake import conditional, ConvergenceError
 from numpy import isclose
 from spyro.mpi.spyro_mpi import SpyroEnsemble
