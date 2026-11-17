@@ -80,11 +80,12 @@ class Read_time_axis:
             self.number_of_timesteps = round(self.final_time / value) + 1
             # Keep a final_time that is already a multiple of dt: recomputing
             # it as a product can move it by one ulp (3 * 0.3 != 0.9).
+            eps = np.finfo(np.float32).eps
             if not np.isclose(
                 self.final_time / value + 1,
                 self.number_of_timesteps,
                 rtol=0.0,
-                atol=1e-9,
+                atol=eps,
             ):
                 self.final_time = (self.number_of_timesteps - 1) * value
             self.time_vector = np.linspace(0.0, self.final_time, self.number_of_timesteps)
