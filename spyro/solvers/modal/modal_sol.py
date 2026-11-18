@@ -2,7 +2,7 @@ import warnings
 
 import firedrake as fire
 from numpy import array, asarray, eye, imag, real, sqrt, unique
-from scipy.sparse.linalg import eigs, eigsh, lobpcg, spilu
+from scipy.sparse.linalg import LinearOperator, eigs, eigsh, lobpcg, spilu, splu
 from slepc4py import SLEPc
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .modal_forms_and_matrices import (
@@ -165,6 +165,12 @@ class Modal_Solver:
         single rank and its eigenvalues are broadcast to the other ranks and
         ensemble members, which must all call this method.
 
+        For the smallest eigenvalues, "ARNOLDI" and "LANCZOS" use
+        shift-and-invert with sigma = 0, whose operator inv(Asp) is applied
+        with a sparse LU factorization of Asp with a symmetric fill-reducing
+        ordering, unless `inv_oper` supplies an approximate one. "LOBPCG"
+        works on copies of the matrices without explicitly stored zeros.
+
         Parameters
         ----------
         Asp : `csr matrix`
@@ -195,6 +201,12 @@ class Modal_Solver:
             Minv = M_ilu.solve if inv_oper else None
             A_ilu = spilu(Asp) if inv_oper else None
             OPinv = A_ilu.solve if inv_oper else None
+            if OPinv is None and not self.calc_max_dt:
+                # Shift-and-invert with sigma = 0 applies inv(Asp). Asp is
+                # symmetric, so a symmetric fill-reducing ordering halves the
+                # fill and the time of the default (COLAMD) factorization
+                A_lu = splu(Asp.tocsc(), permc_spec="MMD_AT_PLUS_A")
+                OPinv = LinearOperator(Asp.shape, matvec=A_lu.solve, dtype=Asp.dtype)
 
         if method == "ARNOLDI":
             # Solve the eigenproblem using ARNOLDI (ARPACK)
@@ -246,6 +258,12 @@ class Modal_Solver:
             # Initialize LI vectors for LOBPCG
             X = eye(Msp.shape[0], k)
 
+            # Lumped (spectral or KMV) elements store many exact zeros in the
+            # element sparsity, which only slow down the products of LOBPCG
+            Asp, Msp = Asp.copy(), Msp.copy()
+            Asp.eliminate_zeros()
+            Msp.eliminate_zeros()
+
             # Solve the eigenproblem using LOBPCG (iterative method)
             it_mod = 2500
             it_ext = 2
@@ -279,7 +297,8 @@ class Modal_Solver:
         for a lumped (diagonal) mass matrix, and the eigenvalues to a
         relative tolerance of 1e-4. Otherwise, the smallest ones are computed
         with shift-and-invert, with the Krylov solver and preconditioner of
-        the method.
+        the method. When the shift-and-invert system is solved with a direct
+        factorization, which is the SLEPc default, MUMPS factorizes it.
 
         Parameters
         ----------
@@ -337,6 +356,9 @@ class Modal_Solver:
                     "eps_target": 0.0,  # Converge toward eigenvalues closest to 0
                     "eps_target_magnitude": None,  # Select by magnitude
                     "st_pc_factor_shift_type": "NONZERO",  # Prevent zero-pivot
+                    # The shift-and-invert factorization dominates the solve.
+                    # MUMPS is several times faster than the PETSc LU in 3D
+                    "st_pc_factor_mat_solver_type": "mumps",
                     "eps_monitor": "ascii",  # Print convergence info
                     "ksp_type": KRYLOVSCH_CONFIG[self.method]["ksp"],  # Large problems
                     "pc_type": KRYLOVSCH_CONFIG[self.method]["pc"],  # Large problems
@@ -384,7 +406,8 @@ class Modal_Solver:
             - max_coordinates : `array`
                 Array containing the maximum coordinates in each dimension (z, x, y).
         k : `int`, optional
-            Number of eigenvalues to compute. Default is 2.
+            Number of eigenvalues to compute. It also sets the size of the
+            basis, max(2 k, 2) eigenfunctions per direction. Default is 2.
         quad_rule : `dict`, optional
             Quadrature rule to use for the integration.
             Default is `None`, which uses the default quadrature rule.
@@ -393,6 +416,17 @@ class Modal_Solver:
         -------
         Lsp : `array`
             Array containing the computed eigenvalues.
+
+        Notes
+        -----
+        The basis is the products of cosines that are the Neumann
+        eigenfunctions of the Laplacian on the box given by `mesh_limits`,
+        interpolated into `V`. The
+        stiffness and mass matrices of the basis are built by
+        `matrices_rayleigh_quotient` from one assembly of the stiffness and
+        mass matrices of `V`, so the gradients of the eigenfunctions are not
+        formed. The small generalized eigenvalue problem is then solved with
+        "ARNOLDI".
         """
 
         # Check input arguments
@@ -407,14 +441,12 @@ class Modal_Solver:
         )
 
         # Create eigenfunctions
-        eig_funcs, grad_eig = generate_eigenfunctions(
+        eig_funcs = generate_eigenfunctions(
             ufl_coordinates, V, mesh_limits, k=k, dimension=self.dimension
         )
 
         # Assemble matrices for generalized eigenvalue problem
-        Asp, Msp = matrices_rayleigh_quotient(
-            c, eig_funcs, grad_eig, quad_rule=quad_rule
-        )
+        Asp, Msp = matrices_rayleigh_quotient(c, eig_funcs, quad_rule=quad_rule)
 
         # Solve the generalized eigenvalue problem
         Lsp = self.solver_with_sparse_matrix(Asp, Msp, "ARNOLDI", k=k)

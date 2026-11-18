@@ -5,7 +5,7 @@ frequency with expected values for different domain configurations. The tests co
 both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
 """
 
-from pytest import fail, fixture, mark, param
+from pytest import fail, fixture, mark
 from firedrake import conditional, ConvergenceError
 from numpy import isclose
 from spyro.mpi.spyro_mpi import SpyroEnsemble
@@ -13,7 +13,14 @@ from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
 
 
-def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneous):
+def wave_dict(
+    element_geometry: str,
+    dimension: int,
+    layer_shape: str,
+    degree_layer: int | float | None,
+    homogeneous: bool,
+    degree_eikonal: int = 2,
+) -> dict:
     """Create a dictionary with parameters for the model.
 
     Parameters
@@ -29,6 +36,8 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneou
         Hypershape degree. `None` is used only for rectangular layers.
     homogeneous : `bool`
         If `True`, the velocity model is homogeneous. If `False`, it is heterogeneous.
+    degree_eikonal : `int`, optional
+        Finite element order for the Eikonal equation. Default is 2.
 
     Returns
     -------
@@ -100,6 +109,7 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneou
         "abc_type": "hybrid",  # Activate HABC
         "layer_shape": layer_shape,  # Options: rectangular or hypershape
         "degree_layer": degree_layer,  # Float >= 2 (hyp) or None (rec)
+        "degree_eikonal": degree_eikonal,  # FEM order for the Eikonal analysis
     }
 
     # Define parameters for visualization
@@ -132,8 +142,9 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     -------
     wave : acoustic_wave.AcousticWave
         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
-    fitting_c : `tuple`
-        Parameters for fitting equivalent velocity regression.
+    fitting_c : `tuple` or `None`
+        Parameters for fitting equivalent velocity regression. `None` for the
+        homogeneous model, which uses the default of the analytical solver.
     modal_solver_lst : `list`
         List of methods to be used to solve the eigenvalue problem.
         Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
@@ -148,15 +159,23 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     # edge_length = lba / cpw
     edge_length = 1.0 / 10 if dimension == 2 else 1.0 / 7
 
+    # Eikonal parameters of test_eikonal.py for the source condition
+    # 'nearest_node' and consistent elements (see Notes)
+    source_bc = "nearest_node"
+    element_type = "consistent"
+    p_eik = 2
+
     # f_est: Factor for the stabilizing term in Eikonal equation
-    # fitting_c: Parameters for fitting equivalent velocity regression
+    # fitting_c: Parameters for fitting equivalent velocity regression,
+    # calibrated for the static problem of c_equivalent (see Notes). None for
+    # the homogeneous model: the default (0, 0, 0, 0) is not passed
     if dimension == 2:
         if element_geometry == "T":
             f_est = 0.06 if homogeneous else 0.06
 
         else:
             f_est = 0.05 if homogeneous else 0.05
-        fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.5, 0.3, -2.6, -1.4)
+        fitting_c = None if homogeneous else (-0.5, 0.3, -1.5, -0.9)
 
     if dimension == 3:
         if element_geometry == "T":
@@ -164,7 +183,7 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
 
         else:
             f_est = 0.08 if homogeneous else 0.08
-        fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.5, 0.3, -1.5, -1.0)
+        fitting_c = None if homogeneous else (-0.9, 0.3, -2.1, -1.5)
 
     # Layer shape
     layer_shape = "rectangular" if degree_layer is None else "hypershape"
@@ -172,14 +191,25 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     # Get simulation parameters
     SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length:.4f} m")
     SpyroEnsemble.print(f"Element Geometry: {element_geometry}")
+    SpyroEnsemble.print(f"Element Type: {element_type}")
+    SpyroEnsemble.print(f"Source Condition: {source_bc}")
+    SpyroEnsemble.print(f"Eikonal Degree: {p_eik}")
     SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est:.2f}")
     SpyroEnsemble.print(f"Layer Shape: {layer_shape}")
-    fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
-    SpyroEnsemble.print((fit_str + "{:.1f}\n").format(*fitting_c))
+    if fitting_c is None:
+        SpyroEnsemble.print("Fitting Parameters for Analytical Solver: not passed\n")
+    else:
+        fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
+        SpyroEnsemble.print((fit_str + "{:.1f}\n").format(*fitting_c))
 
     # Create dictionary with parameters for the model
     dictionary = wave_dict(
-        element_geometry, dimension, layer_shape, degree_layer, homogeneous
+        element_geometry,
+        dimension,
+        layer_shape,
+        degree_layer,
+        homogeneous,
+        degree_eikonal=p_eik,
     )
 
     # ============ MESH FEATURES ============
@@ -199,7 +229,9 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
         wave.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
-    wave.mesh_ops.preamble_mesh_operations(wave, f_est=f_est)
+    wave.mesh_ops.preamble_mesh_operations(
+        wave, ele_type_eik=element_type, f_est=f_est, source_bc_eik=source_bc
+    )
 
     # ============ EIKONAL ANALYSIS ============
 
@@ -256,13 +288,15 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
         Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS',
         'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
         'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
-    fitting_c : `tuple`
+    fitting_c : `tuple` or `None`
         Parameters for fitting equivalent velocity regression.
         Structure: (fc1, fc2, fp1, fp2):
         - fc1: Magnitude order
         - fc2: Monotonicity
         - fp1: Rectangle frequency
         - fp2: Ellipse frequency
+        `None` does not pass them, so the solvers use their default,
+        (0, 0, 0, 0).
     exp_value : `float`
         Expected value for the fundamental frequency
     n_root : `int`, optional
@@ -290,12 +324,9 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
         # Reference to resource usage
         tRef = comp_cost("tini")
 
-        # Computing fundamental frequency
-        wave.layer_ops.fundamental_frequency(
-            wave,
-            method=modal_solver,
-            fitting_c=fitting_c,
-        )
+        # Computing fundamental frequency. fitting_c is only passed when given
+        fitting = {} if fitting_c is None else {"fitting_c": fitting_c}
+        wave.layer_ops.fundamental_frequency(wave, method=modal_solver, **fitting)
 
         # Estimating computational resource usage
         name_cost = wave.path_case_abc + modal_solver + "_"
@@ -322,7 +353,6 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
         SpyroEnsemble.print("✓ " + met_str + " Verified: " + cmp_str)
 
 
-# @mark.older_firedrake
 @mark.parametrize(
     "element_geometry, dimension, degree_layer, homogeneous",
     [
@@ -332,12 +362,12 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
         ("T", 2, None, False),
         ("Q", 2, None, True),
         ("Q", 2, None, False),
-        param("T", 3, 6.0, True, marks=mark.slow),
-        param("T", 3, None, True, marks=mark.slow),
-        param("T", 3, 2.4, False, marks=mark.slow),
-        param("T", 3, None, False, marks=mark.slow),
-        param("Q", 3, None, True, marks=mark.slow),
-        param("Q", 3, None, False, marks=mark.slow),
+        ("T", 3, 6.0, True),
+        ("T", 3, None, True),
+        ("T", 3, 2.4, False),
+        ("T", 3, None, False),
+        ("Q", 3, None, True),
+        ("Q", 3, None, False),
     ],
 )
 def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogeneous):
@@ -365,26 +395,104 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     -------
     None
 
-    Parameters selected with the working-tree code (Firedrake 2025.4.1, serial):
-    the coarsest mesh edge_length = 1 / N for which the Eikonal of every case
-    is within 3 % of its theoretical value with a stable stabilizing factor
-    (f_est - 0.01, f_est and f_est + 0.01 converge and increase smoothly), the
-    layered hypershape mesh is conforming, and the analytical approximation
-    stays within the test tolerance with fitting_c = (0, 0, 0, 0) for the
-    homogeneous model. The marked f_est (*) is the one used by the test. The
-    expected values are the fnum of the FEM solvers; for the homogeneous
-    rectangular layers they equal c / (2 (length_x + 2 pad)).
+    Notes
+    -----
+    Theoretical value. eik_min is the first-arrival time on the absorbing
+    boundaries: z = -1, x = 0, x = 1 and, in 3D, y = 0 and y = 1 (z = 0 is
+    the free surface). The source is at (z, x) = (-0.5, 0.25) km in 2D and
+    (z, x, y) = (-0.5, 0.25, 0.5) km in 3D. The velocity is 1.5 km/s in the
+    homogeneous model. In the heterogeneous one it is 3.0 km/s for x < 0.5
+    and 1.5 km/s for x >= 0.5. The first arrival on a boundary follows the
+    straight ray to its nearest point:
 
-    Theoretical Eikonal values. eik_min is the first-arrival time on the
-    absorbing boundaries (z = -1, x = 0, x = 1 and, in 3D, y = 0 and y = 1).
-    The source is at (z, x) = (-0.5, 0.25) km ((-0.5, 0.25, 0.5) km in 3D),
-    so the nearest absorbing boundary is x = 0, 0.25 km away, and the
-    straight ray to it stays in the medium around the source. Hence
-    eik_min = 0.25 / 1.5 = 166.667 ms in the homogeneous model (1.5 km/s) and
-    eik_min = 0.25 / 3.0 = 83.333 ms in the heterogeneous one (3.0 km/s for
-    x < 0.5).
-    Every other absorbing boundary is at least 0.5 km away in the same
-    medium, so its first arrival is at least twice as late.
+    Boundary   Nearest point (z, x)   Homogeneous [ms]   Heterogeneous [ms]
+    x = 0      (-0.5, 0.0)                     166.667               83.333
+    z = -1     (-1.0, 0.25)                    333.333              166.667
+    y = 0, 1   3D: (-0.5, 0.25, 0|1)           333.333              166.667
+    x = 1      (-0.5, 1.0)                     500.000              416.667
+
+    eik_min is on x = 0 at (-0.5, 0.0) km (at (-0.5, 0.0, 0.5) km in 3D):
+    0.25 km / 1.5 km/s = 166.667 ms in the homogeneous model and
+    0.25 km / 3.0 km/s = 83.333 ms in the heterogeneous one.
+
+    Selection of the parameters. The Eikonal is solved as in test_eikonal.py
+    for the source condition 'nearest_node' and consistent elements with
+    p = 2. The meshes, edge_length = 1/10 km in 2D and 1/7 km in 3D, have
+    the same 10 and 7 cells per side as the 100 m and 150 m meshes of
+    test_eikonal.py. N = 1 / edge_length is the coarsest number of cells for
+    which the Eikonal of every case is within 3 % of its theoretical value,
+    the layered hypershape mesh is conforming, and the analytical
+    approximation stays within the test tolerance for the homogeneous model
+    without fitting_c, that is with its default (0, 0, 0, 0). The marked
+    f_est (*) is the
+    value with the smallest relative error abs(eik_min - eik_thr) / eik_thr,
+    where eik_thr is the theoretical value, and is the one used by the test.
+    In every table eik_min increases with f_est, so the smallest error is at
+    one of the two listed values around eik_thr. For the heterogeneous model
+    the marked f_est is that of test_eikonal.py. Every marked f_est
+    converges, without retries, with Firedrake 2025.4.1 and 2026.10.0. The
+    expected values are the fnum of the FEM
+    solvers; for the homogeneous rectangular layers they equal
+    c / (2 (length_x + 2 pad)).
+
+    texe and pmem are the runtime and the peak memory traced by Python for
+    each solver, measured serially on one core with Firedrake 2025.4.1 and
+    the compilation caches already filled.
+
+    Calibration of fitting_c. The ANALYTICAL solver needs the equivalent
+    velocity c_eq of a static problem with Neumann conditions on the whole
+    boundary, loaded at the source. `Modal_Analytical_Solver.c_equivalent`
+    removes the mean of the load, since such a problem only has a solution
+    for a zero-mean load, and solves it with linear elements on the mesh of
+    the modal problem, which makes the ANALYTICAL solver much cheaper than
+    the FEM solvers (its Notes explain both). A constant velocity needs no
+    static solve, so the homogeneous model keeps c_eq = c and passes no
+    fitting_c: the analytical solver uses its default (0, 0, 0, 0).
+
+    c_eq depends on the static problem, so the heterogeneous fitting_c is
+    calibrated for it, separately for 2D and 3D. The values fitted to the
+    zero-mean solve in the space of the modal problem, (-0.9, 0.3, -2.6, -1.4)
+    in 2D and (-0.8, 0.3, -2.4, -1.7) in 3D, give errors of about -9 % in 2D
+    and -11 % in 3D with linear elements. fitting_c only enters the
+    regression of the equivalent velocity, after the static solves, so a
+    grid with step 0.1 (fc1 and fc2 from -1 to 1, fp1 and fp2 from -5 to 3)
+    was searched for the smallest maximum relative error
+    abs(fana - fnum) / fnum over the three heterogeneous cases of each
+    dimension. fc2 has no effect on these cases: in
+    c_ref = max(c_eq * f3**fc1, c_eqref * f3**fc2), where f3 is the ratio
+    of the rectangular to the elliptical frequency factor, the first term is
+    the larger one, so fc2 keeps its previous value of 0.3.
+
+    Dim   fitting_c                 Max error   Max error, one parameter +-0.1
+    2D    (-0.5, 0.3, -1.5, -0.9)      0.64 %         3.32 %
+    3D    (-0.9, 0.3, -2.1, -1.5)      0.73 %         3.80 %
+
+    Both approaches for the heterogeneous models: the calibrated fitting_c
+    of this test, used without optimization, and the fitting_c optimized
+    for each model separately by test_modal_analytical_solver.py, with SLSQP
+    from (0, 0, 0, 0). fana in Hz and its error against fnum:
+
+    Case       Approach    fitting_c                           fana    Error
+    T-2D N2.0  calibrated  (-0.500,  0.300, -1.500, -0.900)  0.50526  +0.17 %
+               optimized   ( 0.277,  0.006,  0.000, -0.551)  0.50473  +0.07 %
+    T-2D REC   calibrated  (-0.500,  0.300, -1.500, -0.900)  0.45256  -0.62 %
+               optimized   ( 0.569,  0.174, -0.640,  0.000)  0.45572  +0.07 %
+    Q-2D REC   calibrated  (-0.500,  0.300, -1.500, -0.900)  0.45832  +0.64 %
+               optimized   ( 0.056,  0.974, -0.887,  0.000)  0.45625  +0.18 %
+    T-3D N2.4  calibrated  (-0.900,  0.300, -2.100, -1.500)  0.51669  +0.26 %
+               optimized   ( 0.156,  0.655, -0.168, -0.988)  0.51555  +0.04 %
+    T-3D REC   calibrated  (-0.900,  0.300, -2.100, -1.500)  0.42541  -0.05 %
+               optimized   ( 0.169,  0.860, -1.032, -0.001)  0.42584  +0.05 %
+    Q-3D REC   calibrated  (-0.900,  0.300, -2.100, -1.500)  0.41427  +0.73 %
+               optimized   ( 0.184,  0.857, -1.044, -0.001)  0.41160  +0.08 %
+
+    The homogeneous models pass no fitting_c. The optimization keeps
+    (0, 0, 0, 0) for them, except for T-2D N2.5, where it finds
+    (0.010, 0.008, -0.022, -0.113) and moves fana from 0.52430 Hz (+2.71 %)
+    to 0.51057 Hz (+0.02 %). With Firedrake 2026.10.0 the optimized values
+    of the 2D heterogeneous models are identical, and those of the 3D ones
+    differ slightly, since the velocity of the cells with a centroid on
+    x = 0.5 depends on round-off (see test_modal_analytical_solver.py).
 
     =======================================================
     Natural Frequency for 2D model Δx = 1000/10 m - Ele = T
@@ -399,15 +507,15 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
 
     *RESULTS HOMOGENEOUS
     Frequency[Hz]    N2.5      (texe/pmem)     REC      (texe/pmem)
-    ANALYTICAL    0.52430 (0.478s/2.540MB) 0.46875 (0.514s/1.810MB)
-    ARNOLDI       0.51046 (0.093s/5.454MB) 0.46875 (0.088s/5.927MB)
-    LANCZOS       0.51046 (0.053s/5.201MB) 0.46875 (0.040s/5.641MB)
-    LOBPCG        0.51046 (2.875s/5.200MB) 0.46875 (2.334s/5.641MB)
-    KRYLOVSCH_CH  0.51046 (0.042s/0.113MB) 0.46875 (0.047s/0.111MB)
-    KRYLOVSCH_CG  0.51046 (0.039s/0.122MB) 0.46875 (0.046s/0.122MB)
-    KRYLOVSCH_GH  0.51046 (0.046s/0.126MB) 0.46875 (0.043s/0.112MB)
-    KRYLOVSCH_GG  0.51046 (0.039s/0.100MB) 0.46875 (0.042s/0.126MB)
-    RAYLEIGH      0.51084 (1.603s/2.794MB) 0.46875 (1.802s/2.960MB)
+    ANALYTICAL    0.52430 (0.186s/1.334MB) 0.46875 (0.150s/0.482MB)
+    ARNOLDI       0.51046 (0.089s/5.539MB) 0.46875 (0.077s/5.964MB)
+    LANCZOS       0.51046 (0.055s/5.189MB) 0.46875 (0.034s/5.639MB)
+    LOBPCG        0.51046 (2.637s/5.328MB) 0.46875 (1.941s/5.785MB)
+    KRYLOVSCH_CH  0.51046 (0.045s/0.113MB) 0.46875 (0.068s/0.119MB)
+    KRYLOVSCH_CG  0.51046 (0.056s/0.142MB) 0.46875 (0.060s/0.108MB)
+    KRYLOVSCH_GH  0.51046 (0.041s/0.091MB) 0.46875 (0.052s/0.133MB)
+    KRYLOVSCH_GG  0.51046 (0.048s/0.135MB) 0.46875 (0.060s/0.121MB)
+    RAYLEIGH      0.51084 (0.174s/1.208MB) 0.46875 (0.201s/1.217MB)
 
     *ANALYTICAL
        Case      N2.5*     REC*
@@ -422,29 +530,29 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.06  82.942*
      0.07  84.160
 
-    *RESULTS HETEROGENEOUS - fitting_c = (0.5, 0.3, -2.6, -1.4)
+    *RESULTS HETEROGENEOUS - fitting_c = (-0.5, 0.3, -1.5, -0.9)
     Frequency[Hz]    N2.0      (texe/pmem)     REC      (texe/pmem)
-    ANALYTICAL    0.49913 (0.371s/1.168MB) 0.45788 (0.767s/2.102MB)
-    ARNOLDI       0.50440 (0.062s/7.586MB) 0.45539 (0.141s/8.368MB)
-    LANCZOS       0.50440 (0.063s/7.585MB) 0.45539 (0.102s/8.096MB)
-    LOBPCG        0.50440 (5.929s/7.610MB) 0.45539 (6.495s/8.096MB)
-    KRYLOVSCH_CH  0.50440 (0.055s/0.126MB) 0.45539 (0.073s/0.106MB)
-    KRYLOVSCH_CG  0.50440 (0.054s/0.121MB) 0.45539 (0.077s/0.121MB)
-    KRYLOVSCH_GH  0.50440 (0.052s/0.130MB) 0.45539 (0.072s/0.126MB)
-    KRYLOVSCH_GG  0.50440 (0.061s/0.124MB) 0.45539 (0.083s/0.100MB)
-    RAYLEIGH      0.52768 (1.782s/2.246MB) 0.47634 (2.191s/3.183MB)
+    ANALYTICAL    0.50526 (0.407s/1.972MB) 0.45256 (0.367s/1.922MB)
+    ARNOLDI       0.50440 (0.059s/7.663MB) 0.45539 (0.100s/8.425MB)
+    LANCZOS       0.50440 (0.050s/7.587MB) 0.45539 (0.052s/8.082MB)
+    LOBPCG        0.50440 (5.138s/7.824MB) 0.45539 (4.438s/8.282MB)
+    KRYLOVSCH_CH  0.50440 (0.063s/0.118MB) 0.45539 (0.068s/0.122MB)
+    KRYLOVSCH_CG  0.50440 (0.080s/0.131MB) 0.45539 (0.076s/0.131MB)
+    KRYLOVSCH_GH  0.50440 (0.071s/0.121MB) 0.45539 (0.069s/0.139MB)
+    KRYLOVSCH_GG  0.50440 (0.066s/0.113MB) 0.45539 (0.063s/0.121MB)
+    RAYLEIGH      0.52768 (0.166s/1.108MB) 0.47634 (0.194s/1.457MB)
 
     *ANALYTICAL
        Case      N2.0*     REC*
     fnum[Hz]   0.50440  0.45539
-    fana[Hz]   0.49913  0.45788
+    fana[Hz]   0.50526  0.45256
     fray[Hz]   0.52768  0.47634
 
     *RAYLEIGH N2.0
     n_eigfunc        2      *4       6       8
     freq[Hz]   0.65545 0.52768 0.51695 0.51347
-    texe[s]      0.261   1.613   8.042  22.043
-    mem[MB]      1.174   2.402   5.618   8.952
+    texe[s]      0.123   0.165   0.337   0.613
+    mem[MB]      0.742   1.044   2.186   3.863
 
     =======================================================
     Natural Frequency for 2D model Δx = 1000/10 m - Ele = Q
@@ -459,20 +567,20 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
 
     *RESULTS HOMOGENEOUS
     Frequency[Hz]     REC      (texe/pmem)
-    ANALYTICAL    0.46876 (0.426s/2.361MB)
-    ARNOLDI       0.46875 (0.106s/6.039MB)
-    LANCZOS       0.46875 (0.052s/5.629MB)
-    LOBPCG        0.46875 (1.240s/5.639MB)
-    KRYLOVSCH_CH  0.46875 (0.061s/0.130MB)
-    KRYLOVSCH_CG  0.46875 (0.055s/0.123MB)
-    KRYLOVSCH_GH  0.46875 (0.054s/0.113MB)
-    KRYLOVSCH_GG  0.46875 (0.059s/0.102MB)
-    RAYLEIGH      0.46875 (2.644s/2.860MB)
+    ANALYTICAL    0.46875 (0.160s/0.492MB)
+    ARNOLDI       0.46875 (0.097s/6.100MB)
+    LANCZOS       0.46875 (0.037s/5.643MB)
+    LOBPCG        0.46875 (0.916s/5.837MB)
+    KRYLOVSCH_CH  0.46875 (0.050s/0.131MB)
+    KRYLOVSCH_CG  0.46875 (0.052s/0.128MB)
+    KRYLOVSCH_GH  0.46875 (0.058s/0.120MB)
+    KRYLOVSCH_GG  0.46875 (0.045s/0.125MB)
+    RAYLEIGH      0.46875 (0.214s/1.366MB)
 
     *ANALYTICAL
        Case       REC*
     fnum[Hz]   0.46875
-    fana[Hz]   0.46876
+    fana[Hz]   0.46875
     fray[Hz]   0.46875
 
     *EIKONAL HETEROGENEOUS
@@ -482,22 +590,22 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.05  83.744*
      0.06  85.118
 
-    *RESULTS HETEROGENEOUS - fitting_c = (0.5, 0.3, -2.6, -1.4)
+    *RESULTS HETEROGENEOUS - fitting_c = (-0.5, 0.3, -1.5, -0.9)
     Frequency[Hz]     REC      (texe/pmem)
-    ANALYTICAL    0.47244 (0.465s/2.455MB)
-    ARNOLDI       0.45542 (0.141s/8.513MB)
-    LANCZOS       0.45542 (0.072s/8.098MB)
-    LOBPCG        0.45542 (2.475s/8.096MB)
-    KRYLOVSCH_CH  0.45542 (0.066s/0.142MB)
-    KRYLOVSCH_CG  0.45542 (0.066s/0.111MB)
-    KRYLOVSCH_GH  0.45542 (0.069s/0.143MB)
-    KRYLOVSCH_GG  0.45542 (0.065s/0.117MB)
-    RAYLEIGH      0.47619 (2.382s/3.141MB)
+    ANALYTICAL    0.45832 (0.450s/2.611MB)
+    ARNOLDI       0.45542 (0.095s/8.571MB)
+    LANCZOS       0.45542 (0.048s/8.085MB)
+    LOBPCG        0.45542 (1.718s/8.377MB)
+    KRYLOVSCH_CH  0.45542 (0.073s/0.142MB)
+    KRYLOVSCH_CG  0.45542 (0.071s/0.118MB)
+    KRYLOVSCH_GH  0.45542 (0.058s/0.142MB)
+    KRYLOVSCH_GG  0.45542 (0.057s/0.129MB)
+    RAYLEIGH      0.47619 (0.212s/1.499MB)
 
     *ANALYTICAL
        Case       REC*
     fnum[Hz]   0.45542
-    fana[Hz]   0.47244
+    fana[Hz]   0.45832
     fray[Hz]   0.47619
 
     ======================================================
@@ -513,10 +621,10 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
 
     *RESULTS HOMOGENEOUS
     Frequency[Hz]    N6.0        (texe/pmem)     REC        (texe/pmem)
-    ANALYTICAL    0.51628 ( 3.160s/ 7.646MB) 0.47741 ( 2.928s/ 6.556MB)
-    KRYLOVSCH_CH  0.52345 (12.059s/ 0.881MB) 0.47727 (17.431s/ 0.880MB)
-    KRYLOVSCH_GH  0.52345 (10.802s/ 0.108MB) 0.47727 (17.802s/ 0.107MB)
-    RAYLEIGH      0.52678 (34.111s/43.835MB) 0.47727 (43.107s/53.147MB)
+    ANALYTICAL    0.51628 ( 0.664s/ 4.658MB) 0.47741 ( 0.572s/ 2.437MB)
+    KRYLOVSCH_CH  0.52345 ( 3.649s/ 1.703MB) 0.47727 ( 4.468s/ 1.853MB)
+    KRYLOVSCH_GH  0.52345 ( 2.739s/ 0.096MB) 0.47727 ( 3.915s/ 0.108MB)
+    RAYLEIGH      0.52678 ( 1.665s/36.201MB) 0.47727 ( 1.881s/43.245MB)
 
     *ANALYTICAL
        Case      N6.0*     REC*
@@ -531,24 +639,24 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.05  82.259*
      0.06  85.344
 
-    *RESULTS HETEROGENEOUS - fitting_c = (0.5, 0.3, -1.5, -1.0)
+    *RESULTS HETEROGENEOUS - fitting_c = (-0.9, 0.3, -2.1, -1.5)
     Frequency[Hz]    N2.4         (texe/pmem)     REC         (texe/pmem)
-    ANALYTICAL    0.52358 ( 4.491s/  6.204MB) 0.41761 ( 6.882s/  9.506MB)
-    KRYLOVSCH_CH  0.51535 (29.458s/  0.090MB) 0.42562 (74.857s/  0.904MB)
-    KRYLOVSCH_GH  0.51535 (28.739s/  0.121MB) 0.42562 (74.787s/  0.132MB)
-    RAYLEIGH      0.54073 (44.980s/ 69.687MB) 0.44257 (57.528s/105.078MB)
+    ANALYTICAL    0.51669 ( 0.952s/  3.612MB) 0.42541 ( 1.023s/  4.554MB)
+    KRYLOVSCH_CH  0.51535 ( 6.920s/  1.891MB) 0.42562 (11.790s/  3.101MB)
+    KRYLOVSCH_GH  0.51535 ( 5.405s/  0.108MB) 0.42562 (10.352s/  0.107MB)
+    RAYLEIGH      0.54073 ( 2.617s/ 60.728MB) 0.44257 ( 3.346s/ 95.576MB)
 
     *ANALYTICAL
        Case      N2.4*     REC*
     fnum[Hz]   0.51535  0.42562
-    fana[Hz]   0.52358  0.41761
+    fana[Hz]   0.51669  0.42541
     fray[Hz]   0.54073  0.44257
 
     *RAYLEIGH N2.4
     n_eigfunc        2      *4       6
     freq[Hz]   0.61849 0.54073 0.52941
-    texe[s]      0.938  46.316 511.660
-    mem[MB]      9.186  68.240 221.512
+    texe[s]      2.279   3.422  13.142
+    mem[MB]      9.812  60.665 207.066
 
     ======================================================
     Natural Frequency for 3D model Δx = 1000/7 m - Ele = Q
@@ -563,13 +671,13 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
 
     *RESULTS HOMOGENEOUS
     Frequency[Hz]     REC         (texe/pmem)
-    ANALYTICAL    0.47741 ( 2.001s/  7.875MB)
-    ARNOLDI       0.47727 ( 8.812s/173.767MB)
-    LANCZOS       0.47727 ( 8.421s/172.121MB)
-    LOBPCG        0.47727 ( 8.266s/172.119MB)
-    KRYLOVSCH_CG  0.47727 ( 5.494s/  0.143MB)
-    KRYLOVSCH_GG  0.47727 ( 5.359s/  0.131MB)
-    RAYLEIGH      0.47727 (39.245s/ 30.717MB)
+    ANALYTICAL    0.47741 ( 0.542s/  3.305MB)
+    ARNOLDI       0.47727 ( 3.478s/174.049MB)
+    LANCZOS       0.47727 ( 3.072s/172.121MB)
+    LOBPCG        0.47727 ( 2.451s/174.172MB)
+    KRYLOVSCH_CG  0.47727 ( 1.584s/  0.144MB)
+    KRYLOVSCH_GG  0.47727 ( 1.728s/  0.122MB)
+    RAYLEIGH      0.47727 ( 1.841s/ 19.112MB)
 
     *ANALYTICAL
        Case       REC*
@@ -584,27 +692,77 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
      0.08  84.377*
      0.09  87.376
 
-    *RESULTS HETEROGENEOUS - fitting_c = (0.5, 0.3, -1.5, -1.0)
+    *RESULTS HETEROGENEOUS - fitting_c = (-0.9, 0.3, -2.1, -1.5)
     Frequency[Hz]     REC         (texe/pmem)
-    ANALYTICAL    0.40927 ( 3.607s/  9.316MB)
-    ARNOLDI       0.41127 (32.552s/390.963MB)
-    LANCZOS       0.41127 (31.941s/389.293MB)
-    LOBPCG        0.41127 (37.387s/389.291MB)
-    KRYLOVSCH_CG  0.41127 (26.247s/  0.144MB)
-    KRYLOVSCH_GG  0.41127 (25.564s/  0.113MB)
-    RAYLEIGH      0.42935 (40.895s/ 49.867MB)
+    ANALYTICAL    0.41427 ( 1.630s/  8.161MB)
+    ARNOLDI       0.41127 (19.144s/391.781MB)
+    LANCZOS       0.41127 (17.041s/389.293MB)
+    LOBPCG        0.41127 (12.145s/393.877MB)
+    KRYLOVSCH_CG  0.41127 ( 4.450s/  0.116MB)
+    KRYLOVSCH_GG  0.41127 ( 4.367s/  0.132MB)
+    RAYLEIGH      0.42935 ( 2.182s/ 38.512MB)
 
     *ANALYTICAL
        Case       REC*
     fnum[Hz]   0.41127
-    fana[Hz]   0.40927
+    fana[Hz]   0.41427
     fray[Hz]   0.42935
 
     *RAYLEIGH REC
     n_eigfunc        2      *4       6
     freq[Hz]   0.46713 0.42935 0.42125
-    texe[s]      0.899  39.138 438.810
-    mem[MB]      7.403  47.018 146.401
+    texe[s]      2.073   3.150  11.544
+    mem[MB]      7.528  36.147 123.922
+
+    The tables were computed with Firedrake 2025.4.1. With Firedrake
+    2026.10.0 all cases pass. eik_min agrees within 0.02 ms (in ms,
+    2026.10.0 vs 2025.4.1):
+
+    Case     Homogeneous         Heterogeneous
+    T-2D     166.187  166.193    82.949  82.942
+    Q-2D     167.703  167.703    83.744  83.744
+    T-3D     164.686  164.698    82.243  82.259
+    Q-3D     168.744  168.726    84.375  84.377
+
+    In the homogeneous model every solver gives the same frequency with both
+    versions. In the heterogeneous model the frequencies differ as follows
+    (in Hz, 2026.10.0 vs 2025.4.1; FEM is the value of all the FEM solvers,
+    which agree with each other):
+
+    Case          FEM              RAYLEIGH
+    T-2D N2.0     0.50440 0.50440  0.52768 0.52768
+    T-2D REC      0.45539 0.45539  0.47634 0.47634
+    Q-2D REC      0.45542 0.45542  0.47619 0.47619
+    T-3D N2.4     0.52941 0.51535  0.55614 0.54073
+    T-3D REC      0.43868 0.42562  0.45670 0.44257
+    Q-3D REC      0.42883 0.41127  0.44576 0.42935
+
+    The velocity has one value per cell, evaluated at the cell centroid,
+    and on the 1/7 km meshes some centroids lie exactly on the interface
+    x = 0.5. Whether such a cell takes the fast or the slow velocity depends
+    on round-off, which differs between the versions. In 2D (1/10 km) no
+    centroid lies on x = 0.5, and the values are identical.
+
+    Deviation from the expected value with 2026.10.0 (2025.4.1) and the
+    tolerance of the test:
+
+    Case          FEM (4 % T, 5 % Q)  RAYLEIGH (9 %)
+    T-2D N2.0     +0.00 % (+0.00 %)   +4.62 % (+4.62 %)
+    T-2D REC      +0.00 % (+0.00 %)   +4.60 % (+4.60 %)
+    Q-2D REC      +0.00 % (+0.00 %)   +4.56 % (+4.56 %)
+    T-3D N2.4     +2.73 % (+0.00 %)   +7.92 % (+4.92 %)
+    T-3D REC      +3.07 % (+0.00 %)   +7.30 % (+3.98 %)
+    Q-3D REC      +4.27 % (+0.00 %)   +8.39 % (+4.40 %)
+
+    The tolerances cover both versions. The smallest margins are Q-3D REC
+    with 2026.10.0: 0.73 % for FEM and 0.61 % for RAYLEIGH.
+
+    The ANALYTICAL values of the 2026.10.0 run predate the linear static
+    space and the current fitting_c, so they are not compared. That run
+    already used the zero-mean load: its 2D ANALYTICAL frequencies were
+    identical with both versions, after differing by up to 5.8 % before the
+    zero-mean load, and its 3D ones differed by at most 1.68 %, less than
+    FEM, since only the velocity differed.
     """
 
     c_hom = "Homogeneous" if homogeneous else "Heterogeneous"
