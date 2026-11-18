@@ -59,7 +59,8 @@ class _CachedThresholdCheck:
     Attributes
     ----------
     calculate_error : Callable[[float], float]
-        Returns the error of a cells-per-wavelength value.
+        Runs the forward problem on a mesh with the given cells-per-wavelength
+        and computes its error against a reference solution.
     threshold : float
         Largest accepted error.
     errors : dict[float, float]
@@ -74,7 +75,8 @@ class _CachedThresholdCheck:
         Parameters
         ----------
         calculate_error : Callable[[float], float]
-            Returns the error of a cells-per-wavelength value.
+            Runs the forward problem on a mesh with the given cells-per-wavelength
+            and computes its error against a reference solution.
         threshold : float
             Largest accepted error.
         """
@@ -204,7 +206,8 @@ def backward_line_search(
     Parameters
     ----------
     calculate_error : Callable[[float], float]
-        Returns the error of a cells-per-wavelength value.
+        Runs the forward problem on a mesh with the given cells-per-wavelength
+        and computes its error against a reference solution.
     starting_cpw : float
         First value evaluated. Its error must meet `threshold`.
     threshold : float
@@ -228,6 +231,16 @@ def backward_line_search(
     ValueError
         If a setting is not positive and finite, `starting_cpw` is above
         `max_cpw`, or `starting_cpw` does not meet `threshold`.
+
+    Notes
+    -----
+    The error is assumed to decrease as the cells-per-wavelength grows. That
+    holds for the overall trend but not between nearby values: remeshing, the
+    receiver positions within the elements and the time step change with the
+    cells-per-wavelength and make the error oscillate locally. The result
+    always meets `threshold`, and the grid value just below it does not. A
+    smaller value skipped by the search may still meet `threshold`, so use a
+    conservative threshold.
     """
     _check_search_settings(
         starting_cpw, threshold, resolution, coarse_step_fraction, max_cpw
@@ -283,7 +296,8 @@ def forward_line_search(
     Parameters
     ----------
     calculate_error : Callable[[float], float]
-        Returns the error of a cells-per-wavelength value.
+        Runs the forward problem on a mesh with the given cells-per-wavelength
+        and computes its error against a reference solution.
     starting_cpw : float
         First value evaluated. Its error must exceed `threshold`.
     threshold : float
@@ -308,6 +322,16 @@ def forward_line_search(
         If a setting is not positive and finite, `starting_cpw` already
         meets `threshold` or is not below `max_cpw`, or `max_cpw` does
         not meet `threshold`.
+
+    Notes
+    -----
+    The error is assumed to decrease as the cells-per-wavelength grows. That
+    holds for the overall trend but not between nearby values: remeshing, the
+    receiver positions within the elements and the time step change with the
+    cells-per-wavelength and make the error oscillate locally. The result
+    always meets `threshold`, and the grid value just below it does not. A
+    smaller value skipped by the search may still meet `threshold`, so use a
+    conservative threshold.
     """
     _check_search_settings(
         starting_cpw, threshold, resolution, coarse_step_fraction, max_cpw
