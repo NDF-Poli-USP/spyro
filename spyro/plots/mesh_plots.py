@@ -3,6 +3,7 @@
 from firedrake import (
     assemble,
     CellSize,
+    interpolate,
     Mesh,
     tricontourf,
     triplot,
@@ -10,13 +11,7 @@ from firedrake import (
 import matplotlib.pyplot as plt
 from pathlib import Path
 from ..domains.space import create_function_space
-from ..version_control import is_firedrake_new
 from .plot_helpers import _finalize_figure
-
-if is_firedrake_new():
-    from firedrake import interpolate
-else:
-    from firedrake.__future__ import interpolate
 
 
 def plot_mesh_sizes(

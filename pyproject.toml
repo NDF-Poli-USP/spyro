@@ -93,8 +93,8 @@ omit = ["*/site-packages/*", "*/tests/*", "*/.eggs/*", "/home/alexandre/firedrak
 markers = [
   "slow: mark test as slow",
   "high_memory: mark test as requiring high memory",
-  "older_firedrake: mark test as only compatible with older firedrake versions",
-  "newer_firedrake: mark test as only compatible with newer firedrake versions",
+  "older_firedrake: mark test as only compatible with Firedrake 2026.4",
+  "newer_firedrake: mark test as only compatible with Firedrake 2026.10",
 ]
 
 [tool.ruff]

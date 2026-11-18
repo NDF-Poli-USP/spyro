@@ -1,4 +1,4 @@
-ARG FIREDRAKE_VERSION=2025.4.1
+ARG FIREDRAKE_VERSION=2026.4.0
 FROM firedrakeproject/firedrake:${FIREDRAKE_VERSION} AS spyro_base
 
 USER root

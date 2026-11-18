@@ -148,7 +148,6 @@ def assert_ensemble_agrees(fwi, values):
     assert fwi.functional_history[-1] < fwi.functional_history[0]
 
 
-@pytest.mark.newer_firedrake
 @pytest.mark.parallel(2)
 def test_fwi_auto_adjoint_parallel():
     """Run an acoustic FWI over two shots, inverting the velocity model."""
@@ -188,7 +187,6 @@ def test_fwi_auto_adjoint_parallel():
     assert_ensemble_agrees(fwi, values)
 
 
-@pytest.mark.newer_firedrake
 @pytest.mark.parallel(2)
 def test_fwi_elastic_auto_adjoint_parallel():
     """Run an elastic FWI over two shots, inverting three parameters at once.

@@ -113,7 +113,6 @@ def build_elastic_dictionary(material):
     return dictionary
 
 
-@pytest.mark.newer_firedrake
 def test_fwi_automated_adjoint(tmp_path, monkeypatch):
     """Invert an acoustic velocity model.
 
@@ -163,7 +162,6 @@ def test_fwi_automated_adjoint(tmp_path, monkeypatch):
     assert (tmp_path / "result.npy").exists()
 
 
-@pytest.mark.newer_firedrake
 def test_fwi_elastic_automated_adjoint(tmp_path, monkeypatch):
     """Invert three elastic parameters at once, each within its own bounds.
 
@@ -217,7 +215,6 @@ def test_fwi_elastic_automated_adjoint(tmp_path, monkeypatch):
         assert np.allclose(control.dat.data_ro, parameter.dat.data_ro)
 
 
-@pytest.mark.newer_firedrake
 def test_fwi_elastic_stages(tmp_path, monkeypatch):
     """One ``run_fwi`` in stages, each moving only some of the controls.
 

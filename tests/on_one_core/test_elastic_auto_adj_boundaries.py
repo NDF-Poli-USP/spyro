@@ -20,7 +20,7 @@ import pytest
 import spyro
 
 
-pytestmark = [pytest.mark.newer_firedrake, pytest.mark.slow]
+pytestmark = pytest.mark.slow
 
 Parameter = spyro.ElasticMaterialParameter
 EXACT_MATERIAL = {"density": 0.1, "lambda": 0.025, "mu": 0.1}

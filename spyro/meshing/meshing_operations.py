@@ -1,14 +1,16 @@
-from firedrake import as_vector, assemble, CellDiameter, DirichletBC, SpatialCoordinate
+from firedrake import (
+    as_vector,
+    assemble,
+    CellDiameter,
+    DirichletBC,
+    interpolate,
+    SpatialCoordinate,
+)
 from mpi4py import MPI
 from numpy import allclose, clip, column_stack, empty_like, linspace, log10, min, max
 from ..utils.error_management import validate_parameter
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
-from ..version_control import is_firedrake_new, is_firedrake_pyop3
-
-if is_firedrake_new():
-    from firedrake import interpolate
-else:
-    from firedrake.__future__ import interpolate
+from ..version_control import is_firedrake_pyop3
 
 
 class MeshOps():

@@ -218,7 +218,6 @@ SCHEDULE_IDS = ["no_checkpointing", "single_memory", "mixed"]
 
 
 @pytest.mark.slow
-@pytest.mark.newer_firedrake
 @pytest.mark.parametrize("checkpointing, snapshots", SCHEDULE_CASES, ids=SCHEDULE_IDS)
 def test_gradient_auto_adjoint(
     checkpointing: bool, snapshots: int | None, PML: bool = False
@@ -301,7 +300,6 @@ def test_gradient_implemented_adjoint(PML=False):
 
 
 @pytest.mark.slow
-@pytest.mark.newer_firedrake
 @pytest.mark.parametrize("checkpointing, snapshots", SCHEDULE_CASES, ids=SCHEDULE_IDS)
 def test_gradient_pml_auto_adjoint(checkpointing: bool, snapshots: int | None) -> None:
     """Run :func:`test_gradient_auto_adjoint` with the PML enabled.
