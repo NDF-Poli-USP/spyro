@@ -12,42 +12,42 @@ COARSE_STEP_FRACTION = 0.1
 MAX_CPW = 5.0
 
 
-def _floor_to_accuracy(value: float, accuracy: float) -> float:
-    """Floor a value onto the grid of multiples of `accuracy`.
+def _floor_to_resolution(value: float, resolution: float) -> float:
+    """Floor a value onto the grid of multiples of `resolution`.
 
     Parameters
     ----------
     value : float
         Value to floor.
-    accuracy : float
-        Grid spacing.
+    resolution : float
+        Spacing of the cpw grid.
 
     Returns
     -------
     float
-        Largest multiple of `accuracy` not above `value`.
+        Largest multiple of `resolution` not above `value`.
     """
     # The small tolerance keeps values already on the grid in place
-    return round(math.floor(value / accuracy + 1e-9) * accuracy, 10)
+    return round(math.floor(value / resolution + 1e-9) * resolution, 10)
 
 
-def _ceil_to_accuracy(value: float, accuracy: float) -> float:
-    """Ceil a value onto the grid of multiples of `accuracy`.
+def _ceil_to_resolution(value: float, resolution: float) -> float:
+    """Ceil a value onto the grid of multiples of `resolution`.
 
     Parameters
     ----------
     value : float
         Value to ceil.
-    accuracy : float
-        Grid spacing.
+    resolution : float
+        Spacing of the cpw grid.
 
     Returns
     -------
     float
-        Smallest multiple of `accuracy` not below `value`.
+        Smallest multiple of `resolution` not below `value`.
     """
     # The small tolerance keeps values already on the grid in place
-    return round(math.ceil(value / accuracy - 1e-9) * accuracy, 10)
+    return round(math.ceil(value / resolution - 1e-9) * resolution, 10)
 
 
 class _CachedThresholdCheck:
@@ -103,7 +103,7 @@ class _CachedThresholdCheck:
 def _check_search_settings(
     starting_cpw: float,
     threshold: float,
-    accuracy: float,
+    resolution: float,
     coarse_step_fraction: float,
     max_cpw: float,
 ) -> None:
@@ -115,8 +115,8 @@ def _check_search_settings(
         First value evaluated.
     threshold : float
         Largest accepted error.
-    accuracy : float
-        Resolution of the result.
+    resolution : float
+        Spacing of the cpw grid.
     coarse_step_fraction : float
         Fraction of the current value moved per coarse step.
     max_cpw : float
@@ -130,7 +130,7 @@ def _check_search_settings(
     for name, value in (
         ("starting_cpw", starting_cpw),
         ("threshold", threshold),
-        ("accuracy", accuracy),
+        ("resolution", resolution),
         ("coarse_step_fraction", coarse_step_fraction),
         ("max_cpw", max_cpw),
     ):
@@ -143,7 +143,7 @@ def _bisect_grid(
     passes: _CachedThresholdCheck,
     failing: float,
     passing: float,
-    accuracy: float,
+    resolution: float,
 ) -> float:
     """Bisect the grid for the smallest value meeting the threshold.
 
@@ -160,8 +160,8 @@ def _bisect_grid(
         A value known to fail, or 0.0 when none is known.
     passing : float
         A value known to pass. It may be off the grid.
-    accuracy : float
-        Grid spacing.
+    resolution : float
+        Spacing of the cpw grid.
 
     Returns
     -------
@@ -170,12 +170,12 @@ def _bisect_grid(
         `passing` if none does.
     """
     # Grid indices: values at or below low fail, values at or above high pass
-    low = math.floor(failing / accuracy + 1e-9)
-    high = math.ceil(passing / accuracy - 1e-9)
+    low = math.floor(failing / resolution + 1e-9)
+    high = math.ceil(passing / resolution - 1e-9)
     smallest_passing = passing
     while high - low > 1:
         middle = (low + high) // 2
-        candidate = round(middle * accuracy, 10)
+        candidate = round(middle * resolution, 10)
         if passes(candidate):
             high = middle
             smallest_passing = candidate
@@ -188,7 +188,7 @@ def backward_line_search(
     calculate_error: Callable[[float], float],
     starting_cpw: float,
     threshold: float,
-    accuracy: float,
+    resolution: float,
     coarse_step_fraction: float = COARSE_STEP_FRACTION,
     max_cpw: float = MAX_CPW,
 ) -> float:
@@ -197,7 +197,7 @@ def backward_line_search(
     The error is assumed to decrease as the cells-per-wavelength grows.
     Starting from a passing value, a coarse phase removes
     `coarse_step_fraction` of the current value per step, but at least
-    `accuracy`, until the error first exceeds the threshold. A fine phase
+    `resolution`, until the error first exceeds the threshold. A fine phase
     then bisects the grid between the last passing and the first failing
     value. Each value is evaluated at most once.
 
@@ -209,9 +209,9 @@ def backward_line_search(
         First value evaluated. Its error must meet `threshold`.
     threshold : float
         Largest accepted error.
-    accuracy : float
-        Resolution of the result. Candidates after the start are multiples
-        of it.
+    resolution : float
+        Spacing of the cpw grid, and so the resolution of the result.
+        Candidates after the start are multiples of it.
     coarse_step_fraction : float, optional
         Fraction of the current value removed per coarse step. Default is
         :data:`COARSE_STEP_FRACTION`.
@@ -230,7 +230,7 @@ def backward_line_search(
         `max_cpw`, or `starting_cpw` does not meet `threshold`.
     """
     _check_search_settings(
-        starting_cpw, threshold, accuracy, coarse_step_fraction, max_cpw
+        starting_cpw, threshold, resolution, coarse_step_fraction, max_cpw
     )
     if starting_cpw > max_cpw:
         raise ValueError(
@@ -250,8 +250,8 @@ def backward_line_search(
 
     # Coarse phase: large relative steps until the first failure
     while True:
-        step = max(coarse_step_fraction * last_passing, accuracy)
-        candidate = _floor_to_accuracy(last_passing - step, accuracy)
+        step = max(coarse_step_fraction * last_passing, resolution)
+        candidate = _floor_to_resolution(last_passing - step, resolution)
         if candidate <= 0.0:
             break
         if not passes(candidate):
@@ -259,14 +259,14 @@ def backward_line_search(
             break
         last_passing = candidate
 
-    return _bisect_grid(passes, first_failing, last_passing, accuracy)
+    return _bisect_grid(passes, first_failing, last_passing, resolution)
 
 
 def forward_line_search(
     calculate_error: Callable[[float], float],
     starting_cpw: float,
     threshold: float,
-    accuracy: float,
+    resolution: float,
     coarse_step_fraction: float = COARSE_STEP_FRACTION,
     max_cpw: float = MAX_CPW,
 ) -> float:
@@ -275,7 +275,7 @@ def forward_line_search(
     The error is assumed to decrease as the cells-per-wavelength grows.
     Starting from a failing value, a coarse phase adds
     `coarse_step_fraction` of the current value per step, but at least
-    `accuracy`, until the error first meets the threshold. A fine phase
+    `resolution`, until the error first meets the threshold. A fine phase
     then bisects the grid between the last failing and the first passing
     value. No value above `max_cpw` is evaluated, and each value is
     evaluated at most once.
@@ -288,9 +288,9 @@ def forward_line_search(
         First value evaluated. Its error must exceed `threshold`.
     threshold : float
         Largest accepted error.
-    accuracy : float
-        Resolution of the result. Candidates after the start are multiples
-        of it.
+    resolution : float
+        Spacing of the cpw grid, and so the resolution of the result.
+        Candidates after the start are multiples of it.
     coarse_step_fraction : float, optional
         Fraction of the current value added per coarse step. Default is
         :data:`COARSE_STEP_FRACTION`.
@@ -310,7 +310,7 @@ def forward_line_search(
         not meet `threshold`.
     """
     _check_search_settings(
-        starting_cpw, threshold, accuracy, coarse_step_fraction, max_cpw
+        starting_cpw, threshold, resolution, coarse_step_fraction, max_cpw
     )
     if starting_cpw >= max_cpw:
         raise ValueError(
@@ -329,8 +329,8 @@ def forward_line_search(
 
     # Coarse phase: large relative steps until the first success
     while True:
-        step = max(coarse_step_fraction * last_failing, accuracy)
-        candidate = min(_ceil_to_accuracy(last_failing + step, accuracy), max_cpw)
+        step = max(coarse_step_fraction * last_failing, resolution)
+        candidate = min(_ceil_to_resolution(last_failing + step, resolution), max_cpw)
         if passes(candidate):
             first_passing = candidate
             break
@@ -341,7 +341,7 @@ def forward_line_search(
             )
         last_failing = candidate
 
-    return _bisect_grid(passes, last_failing, first_passing, accuracy)
+    return _bisect_grid(passes, last_failing, first_passing, resolution)
 
 
 #: Line search run by :meth:`MeshingParameterCalculator.find_minimum`,

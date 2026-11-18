@@ -68,7 +68,7 @@ def test_backward_line_search_finds_smallest_passing_cpw(
 
 
 def test_backward_line_search_coarse_phase_saves_evaluations() -> None:
-    """Coarse steps use far fewer solves than stepping by the accuracy."""
+    """Coarse steps use far fewer solves than stepping by the resolution."""
     calculate_error, calls = make_error_function(3.0)
 
     backward_line_search(calculate_error, 10.0, 1.0, 0.1, max_cpw=10.0)
@@ -123,7 +123,7 @@ def test_forward_and_backward_line_searches_agree(starting_cpw: float) -> None:
 
 
 def test_forward_line_search_coarse_phase_saves_evaluations() -> None:
-    """Coarse steps use far fewer solves than stepping by the accuracy."""
+    """Coarse steps use far fewer solves than stepping by the resolution."""
     calculate_error, calls = make_error_function(4.5)
 
     forward_line_search(calculate_error, 1.0, 1.0, 0.1)
@@ -160,7 +160,7 @@ def test_forward_line_search_rejects_start_above_max_cpw() -> None:
 @pytest.mark.parametrize("line_search", [backward_line_search, forward_line_search])
 @pytest.mark.parametrize(
     "name",
-    ["starting_cpw", "threshold", "accuracy", "coarse_step_fraction", "max_cpw"],
+    ["starting_cpw", "threshold", "resolution", "coarse_step_fraction", "max_cpw"],
 )
 @pytest.mark.parametrize("value", [0.0, -0.1, math.nan, math.inf])
 def test_line_searches_reject_invalid_settings(
@@ -181,7 +181,7 @@ def test_line_searches_reject_invalid_settings(
     settings = {
         "starting_cpw": 2.0,
         "threshold": 1.0,
-        "accuracy": 0.1,
+        "resolution": 0.1,
         "coarse_step_fraction": 0.1,
         "max_cpw": 5.0,
     }
