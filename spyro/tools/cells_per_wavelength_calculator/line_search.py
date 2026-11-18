@@ -135,7 +135,7 @@ def _check_search_settings(
         ("max_cpw", max_cpw),
     ):
         # NaN fails every comparison, so test for validity instead of failure
-        if not (math.isfinite(value) and value > 0.0):
+        if not 0.0 < value < math.inf:
             raise ValueError(f"{name} must be positive and finite, got {value}.")
 
 
