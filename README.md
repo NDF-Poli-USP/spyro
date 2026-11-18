@@ -226,7 +226,7 @@ dictionary["time_axis"] = {
 
 dictionary["visualization"] = {
     "forward_output" : True,
-    "output_filename": "results/forward_output.pvd",
+    "forward_output_filename": "fields/forward_output.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "gradient_output": False,
@@ -251,7 +251,9 @@ velocity_conditional = fire.conditional(z > -0.35, 1.5, 3.0)
 wave.set_initial_velocity_model(conditional=velocity_conditional, output=True)
 
 # And now we simulate the shot using a 2nd order central time-stepping scheme
-# Note: simulation results are stored in the folder `~/results/` by default
+# Note: outputs are stored in the folder `output/` by default. Set
+# dictionary["visualization"]["output_folder"] to change it; relative output
+# filenames in the dictionary are placed inside that folder.
 wave.forward_solve()
 
 # Visualize the shot record

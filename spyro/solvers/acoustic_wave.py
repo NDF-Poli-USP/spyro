@@ -1,3 +1,4 @@
+import os
 import firedrake as fire
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 
@@ -57,7 +58,9 @@ class AcousticWave(Wave):
         if self.c is None:
             raise ValueError("C not loaded")
         if file_name is None:
-            file_name = "velocity_model.pvd"
+            file_name = os.path.join(
+                self.output_folder, "velocity_models", "velocity_model.pvd"
+            )
         SpyroEnsemble.write_vtk(file_name, self.c, name="velocity")
 
     @override
@@ -219,7 +222,11 @@ class AcousticWave(Wave):
                     )
                     if self.debug_output:
                         SpyroEnsemble.write_vtk(
-                            "initial_velocity_model.pvd",
+                            os.path.join(
+                                self.output_folder,
+                                "velocity_models",
+                                "initial_velocity_model.pvd",
+                            ),
                             self.initial_velocity_model,
                             name="velocity",
                         )
@@ -250,7 +257,11 @@ class AcousticWave(Wave):
 
             if self.debug_output:
                 SpyroEnsemble.write_vtk(
-                    "initial_velocity_model.pvd",
+                    os.path.join(
+                        self.output_folder,
+                        "velocity_models",
+                        "initial_velocity_model.pvd",
+                    ),
                     self.initial_velocity_model,
                     name="velocity",
                 )

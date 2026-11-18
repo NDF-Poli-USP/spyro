@@ -462,12 +462,21 @@ class FullWaveformInversion:
         self._control_parameters = PhysicalParameters()
         self._real_model_parameters = PhysicalParameters()
 
+        # The output files of the inversion dictionary are relative to the
+        # wave's output folder, and the files named by the inversion itself
+        # go to its ``fwi`` subfolder.
+        self.fwi_output_folder = os.path.join(self.wave.output_folder, "fwi")
+        os.makedirs(self.fwi_output_folder, exist_ok=True)
         self.control_out = fire.VTKFile(
-            inversion_dictionary["control_output_file"],
+            os.path.join(
+                self.wave.output_folder, inversion_dictionary["control_output_file"]
+            ),
             comm=SpyroEnsemble.ensemble.global_comm,
         )
         self.gradient_out = fire.VTKFile(
-            inversion_dictionary["gradient_output_file"],
+            os.path.join(
+                self.wave.output_folder, inversion_dictionary["gradient_output_file"]
+            ),
             comm=SpyroEnsemble.ensemble.global_comm,
         )
         self.real_velocity_model_file = inversion_dictionary["real_velocity_model_file"]
@@ -1190,10 +1199,16 @@ class FullWaveformInversion:
 
         current_control = self.control_parameters
         SpyroEnsemble.write_vtk(
-            f"control_{self.current_iteration}.pvd", *as_list(current_control)
+            os.path.join(
+                self.fwi_output_folder, f"control_{self.current_iteration}.pvd"
+            ),
+            *as_list(current_control),
         )
         np.save(
-            f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
+            os.path.join(
+                self.fwi_output_folder,
+                f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
+            ),
             self._flatten_control(current_control),
         )
 
@@ -1547,12 +1562,16 @@ class FullWaveformInversion:
             f"Functional: {Jm} at iteration: {self.current_iteration}",
         )
         if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
-            with open("functional_values.txt", "a") as file:
+            with open(
+                os.path.join(self.fwi_output_folder, "functional_values.txt"), "a"
+            ) as file:
                 file.write(
                     f"Iteration: {self.current_iteration}, Functional: {Jm}\n",
                 )
 
-            with open("peak_memory.txt", "a") as file:
+            with open(
+                os.path.join(self.fwi_output_folder, "peak_memory.txt"), "a"
+            ) as file:
                 file.write(f"Peak memory usage: {peak_memory_mb:.2f} MB \n")
 
         return Jm
@@ -1624,7 +1643,10 @@ class FullWaveformInversion:
         self._apply_gradient_mask()
         if save:
             SpyroEnsemble.write_vtk(
-                f"gradient_{self.current_iteration}.pvd", *as_list(self.gradient)
+                os.path.join(
+                    self.fwi_output_folder, f"gradient_{self.current_iteration}.pvd"
+                ),
+                *as_list(self.gradient),
             )
         self.current_iteration += 1
         comm.comm.barrier()
@@ -1736,9 +1758,10 @@ class FullWaveformInversion:
                 field would not.
             save_controls : bool, optional
                 Whether to write each accepted iterate to
-                ``control_<iteration>.pvd``. Default is True, which is how
-                an inversion is watched while it runs; a long run that does
-                not need the intermediate models can turn the writing off.
+                ``control_<iteration>.pvd`` in :attr:`fwi_output_folder`.
+                Default is True, which is how an inversion is watched while
+                it runs; a long run that does not need the intermediate
+                models can turn the writing off.
                 The last accepted iterate is kept on
                 ``control_parameter_result`` either way. Only used under the
                 automated adjoint: the implemented one writes its iterates
@@ -1778,7 +1801,7 @@ class FullWaveformInversion:
         -----
         The final control parameter is stored in ``control_parameter_result``
         and saved to ``control_end.pvd``. The raw optimizer vector is also
-        saved to ``result.npy``.
+        saved to ``result.npy``. Both files are in :attr:`fwi_output_folder`.
 
         Examples
         --------
@@ -1889,10 +1912,14 @@ class FullWaveformInversion:
             self.set_guess_control(self.control_parameter_result)
 
         SpyroEnsemble.write_vtk(
-            "control_end.pvd", *as_list(self.control_parameter_result)
+            os.path.join(self.fwi_output_folder, "control_end.pvd"),
+            *as_list(self.control_parameter_result),
         )
 
-        np.save("result", self._flatten_control(self.control_parameter_result))
+        np.save(
+            os.path.join(self.fwi_output_folder, "result"),
+            self._flatten_control(self.control_parameter_result),
+        )
         return result
 
     def _run_fwi_tao(self, parameters, tao_options=None, stages=None):
@@ -2123,8 +2150,8 @@ class FullWaveformInversion:
 
         The iterate is left on :attr:`control_parameter_result`, so a run
         interrupted part way through still has its last accepted model, and
-        is written to ``control_<iteration>.pvd`` unless ``run_fwi`` was told
-        not to.
+        is written to ``control_<iteration>.pvd`` in :attr:`fwi_output_folder`
+        unless ``run_fwi`` was told not to.
 
         Parameters
         ----------
@@ -2149,19 +2176,26 @@ class FullWaveformInversion:
         # inversion, a list for one with several controls.
         self.control_parameter_result = controls[0] if len(controls) == 1 else controls
         if self._save_controls:
-            SpyroEnsemble.write_vtk(f"control_{iteration}.pvd", *controls)
+            SpyroEnsemble.write_vtk(
+                os.path.join(self.fwi_output_folder, f"control_{iteration}.pvd"),
+                *controls,
+            )
 
         parallel_print(
             f"Functional: {functional} at iteration: {iteration}",
             self.comm,
         )
         if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
-            with open("functional_values.txt", "a") as file:
+            with open(
+                os.path.join(self.fwi_output_folder, "functional_values.txt"), "a"
+            ) as file:
                 file.write(
                     f"Iteration: {iteration}, Functional: {functional}\n",
                 )
 
-            with open("peak_memory.txt", "a") as file:
+            with open(
+                os.path.join(self.fwi_output_folder, "peak_memory.txt"), "a"
+            ) as file:
                 file.write(f"Peak memory usage: {get_peak_memory():.2f} MB \n")
 
     def run_fwi_rol(self, **kwargs):

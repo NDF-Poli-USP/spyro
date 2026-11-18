@@ -5,6 +5,7 @@ NumPy array persistence to support time-stepped logging during simulations.
 """
 
 import numpy as np
+import os
 from pathlib import Path
 import warnings
 
@@ -83,6 +84,7 @@ class Functional:
 
     def save(self):
         """Save all collected samples to the configured NumPy file."""
+        Path(self.filename).parent.mkdir(parents=True, exist_ok=True)
         np.save(self.filename, self.list)
 
 
@@ -91,11 +93,11 @@ class FieldLogger:
 
     Parameters
     ----------
-    comm : object
-        Communication wrapper with ``comm`` MPI communicator and rank support.
     visualization_dict : dict
         Visualization and logging configuration dictionary. Keys control which
-        outputs are enabled and the associated output filenames.
+        outputs are enabled and the associated output filenames. The filenames are
+        relative to its `output_folder` entry, or to the working directory when it
+        has none.
     """
 
     def __init__(self, visualization_dict):
@@ -103,13 +105,15 @@ class FieldLogger:
 
         Parameters
         ----------
-        comm : object
-            Communication wrapper with ``comm`` MPI communicator and rank support.
         visualization_dict : dict
             Visualization and logging configuration dictionary. Keys control which
-            outputs are enabled and the associated output filenames.
+            outputs are enabled and the associated output filenames. The filenames
+            are relative to its `output_folder` entry, or to the working directory
+            when it has none.
         """
         self.visualization_dict = visualization_dict
+        # Output filenames are relative to this folder.
+        self.output_folder = self.visualization_dict.get("output_folder", "")
 
         self.__source_id = None
         self.__enabled_fields = []
@@ -124,7 +128,9 @@ class FieldLogger:
             )
             if self.__time_enabled:
                 self.__time = []
-                self.__time_filename = self.visualization_dict["time_filename"]
+                self.__time_filename = os.path.join(
+                    self.output_folder, self.visualization_dict["time_filename"]
+                )
                 print(f"Saving time in: {self.__time_filename}")
 
     def add_field(self, key: str, name: str, callback):
@@ -181,11 +187,12 @@ class FieldLogger:
             if not self.visualization_dict.get(key + "_output", False):
                 continue
 
-            fullname = self.visualization_dict.get(
-                key + "_output_filename", key + ".pvd"
+            fullname = os.path.join(
+                self.output_folder,
+                self.visualization_dict.get(key + "_output_filename") or key + ".pvd",
             )
-            prefix, extension = fullname.split(".")
-            filename = prefix + "sn" + str(source_id) + "." + extension
+            prefix, extension = os.path.splitext(fullname)
+            filename = prefix + "sn" + str(source_id) + extension
 
             SpyroEnsemble.print(f"Saving {name} in: {filename}")
 
@@ -199,7 +206,10 @@ class FieldLogger:
 
         for key, callback in self.__func_data.items():
             if self.visualization_dict.get(key, False):
-                filename = self.visualization_dict.get(key + "_filename", key + ".npy")
+                filename = os.path.join(
+                    self.output_folder,
+                    self.visualization_dict.get(key + "_filename") or key + ".npy",
+                )
                 print(f"Saving {key} in: {filename}")
                 self.__enabled_functionals[key] = Functional(filename, callback)
 
@@ -211,6 +221,7 @@ class FieldLogger:
     @SpyroEnsemble.run_in_one_core
     def _save_logs(self):
         if self.__time_enabled:
+            Path(self.__time_filename).parent.mkdir(parents=True, exist_ok=True)
             np.save(self.__time_filename, self.__time)
 
         for functional in self.__enabled_functionals.values():

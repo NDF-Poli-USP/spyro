@@ -113,7 +113,7 @@ def wave_dict(element_geometry, dimension, calc_eik, abc_type, dt_usu):
     dictionary["visualization"] = {  # Output folder
         "output_folder": output_folder,
         "acoustic_energy": True,  # Activate energy calculation
-        "acoustic_energy_filename": output_folder + f"/preamble/acoustic_energy_{abc_type}"
+        "acoustic_energy_filename": f"preamble/acoustic_energy_{abc_type}",
     }
 
     return dictionary

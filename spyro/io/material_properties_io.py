@@ -5,7 +5,7 @@ be them scalar velocity fields, vector fields or tensors.
 """
 
 from os import getcwd
-from os.path import splitext
+from os.path import join, splitext
 
 import firedrake as fire
 from numpy import log10, ones
@@ -286,21 +286,26 @@ def _saving_property_to_file(wave, mat_property, property_name, foldername="defa
 
     Parameters
     ----------
+    wave : `wave`
+        Wave object whose output folder holds the default location.
     mat_property : `firedrake function`
         Material property
     property_name : `str`
         Name of the material property to be set.
     foldername : `string`, optional
-        Name of the folder where the material property is saved.
-        If default is 'default', property is saved in '/property_fields/'
+        Name of the folder where the material property is saved, relative to the
+        working directory. If 'default', the property is saved in
+        `property_fields/` inside the wave's output folder.
 
     Returns
     -------
     None
     """
     # Path to save data
-    wave.path_save_matprop = getcwd() + (
-        "/property_fields/" if foldername == "default" else foldername
+    wave.path_save_matprop = (
+        join(getcwd(), wave.output_folder, "property_fields", "")
+        if foldername == "default"
+        else getcwd() + foldername
     )
     pth_prop = wave.path_save_matprop + property_name + ".pvd"
     print(f"Saving {property_name} to {foldername} for visualization.")
@@ -405,8 +410,9 @@ def set_material_property(
         If True, outputs the material property to a pvd file for
         visualization. Default is False
     foldername : `string`, optional
-        Name of the folder where the material property is saved.
-        If default is 'default', property is saved in '/property_fields/'
+        Name of the folder where the material property is saved, relative to the
+        working directory. If 'default', the property is saved in
+        `property_fields/` inside the wave's output folder.
 
     Returns
     -------

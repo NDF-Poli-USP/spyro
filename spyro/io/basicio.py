@@ -16,6 +16,7 @@ import os
 import warnings
 
 from spyro.mpi.spyro_mpi import SpyroEnsemble
+from .dictionaryio import Read_outputs
 from .parallelism_wrappers import ensemble_save, ensemble_load
 from ..version_control import is_firedrake_new
 from .segy_io import read_segy_velocity_model
@@ -253,14 +254,17 @@ def saving_source_and_receiver_location_in_csv(model, folder_name=None):
     model : dict
         Model dictionary with acquisition parameters.
     folder_name : str, optional
-        Folder to save CSV files. Default is 'results/'.
+        Folder to save CSV files. Default is `acquisition/` inside the output
+        folder of the model's visualization section.
 
     Returns
     -------
     None
     """
     if folder_name is None:
-        folder_name = "results/"
+        output_folder = Read_outputs(**model.get("visualization", {})).output_folder
+        folder_name = os.path.join(output_folder, "acquisition", "")
+        os.makedirs(folder_name, exist_ok=True)
 
     file_name = folder_name + "sources.txt"
     file_obj = open(file_name, "w")
