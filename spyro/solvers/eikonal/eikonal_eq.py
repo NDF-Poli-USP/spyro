@@ -1,8 +1,10 @@
 import firedrake as fire
 import numpy as np
 from sys import float_info, exit
-from ...utils.error_management import sanitize_num_array, validate_parameter
 from ...domains.quadrature import quadrature_rules
+from ...utils.error_management import sanitize_num_array, validate_parameter
+from ...utils.utils import global_max, global_min
+from ...version_control import is_firedrake_new
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -47,7 +49,7 @@ class Dir_Point_BC(fire.DirichletBC):
         self.nodes = nodes
 
 
-class Eikonal_Modeling():
+class Eikonal_Modeling:
     """Class for the Eikonal equation for Linear and Nonlinear analysis.
 
     Attributes
@@ -87,8 +89,15 @@ class Eikonal_Modeling():
         Set the eikonal solver parameters.
     """
 
-    def __init__(self, dimension, source_locations, ele_type_eik='consistent',
-                 degree_eik=None, f_est=0.03, tol=1e-16):
+    def __init__(
+        self,
+        dimension,
+        source_locations,
+        ele_type_eik="consistent",
+        degree_eik=None,
+        f_est=0.03,
+        tol=1e-16,
+    ):
         """Initialize the Eikonal_Modeling class.
 
         Parameters
@@ -119,14 +128,19 @@ class Eikonal_Modeling():
         self.source_locations = source_locations
 
         # Finite element type.
-        allowed_ele_types = ['consistent', 'underintegrated']
-        self.ele_type_eik = validate_parameter('ele_type_eik', ele_type_eik,
-                                               allowed_ele_types)
+        allowed_ele_types = ["consistent", "underintegrated"]
+        self.ele_type_eik = validate_parameter(
+            "ele_type_eik", ele_type_eik, allowed_ele_types
+        )
 
         # Finite element order for the Eikonal analysis
-        self.degree_eik = degree_eik if degree_eik is not None else \
-            (2 if self.dimension == 2 else 1) if self.ele_type_eik == 'consistent' \
+        self.degree_eik = (
+            degree_eik
+            if degree_eik is not None
+            else (2 if self.dimension == 2 else 1)
+            if self.ele_type_eik == "consistent"
             else (4 if self.dimension == 2 else 3)
+        )
 
         # Factor for the stabilizing term in Eikonal equation
         self.f_est = f_est
@@ -134,19 +148,17 @@ class Eikonal_Modeling():
         # User solver tolerance
         self.tol = tol
 
-    def eikonal_bcs(self, node_positions, V, lmin):
+    def eikonal_bcs(
+        self, V: fire.FunctionSpace, lmin: float
+    ) -> tuple[list[Dir_Point_BC], fire.Function]:
         """Impose Dirichlet BCs for eikonal equation.
 
         Parameters
         ----------
-        node_positions : `tuple`
-            Tuple containing the node positions in the mesh.
-            - (z_data, x_data) for 2D
-            - (z_data, x_data, y_data) for 3D
         V : `Firedrake.FunctionSpace`
             Function space where the boundary condition is applied.
         lmin : `float`
-            Minimum mesh size.
+            Minimum mesh size, used to scale the tie tolerance between nodes.
 
         Returns
         -------
@@ -154,45 +166,56 @@ class Eikonal_Modeling():
             Dirichlet BCs for eikonal.
         sou_marker : `Firedrake.Function`
             Function marking the source locations in the mesh.
+
+        Raises
+        ------
+        ValueError
+            If a source has no node of ``V`` within the largest cell diameter
+            of the mesh, which means it lies outside the mesh.
+
+        Notes
+        -----
+        Each source is snapped to its nearest node of ``V`` (all nodes at that
+        distance if there is a tie). Nodes tie when their distances differ by
+        less than ``1e-8 * lmin``, since round-off makes the distances of
+        equidistant nodes differ in the last digits. The minimum distance is a
+        collective PETSc reduction and the node selection reads the halos, so
+        every rank holds the source nodes it can see, as ``DirichletBC.nodes``
+        does.
+
+        The nodes of ``V`` include the cell vertices, and every point of a cell
+        is within the cell diameter of its vertices. The largest cell diameter
+        is therefore a bound on the distance from any source inside the mesh
+        to its nearest node, whatever the element degree or the node layout
+        (equispaced, Gauss-Lobatto-Legendre or KMV). A bound derived from the
+        nodal spacing, such as ``lmin / (degree_eik + 1)``, rejects sources
+        that lie between nodes: the spacing of Gauss-Lobatto-Legendre nodes is
+        not uniform, and the distance to the nearest node grows with the
+        square root of the dimension.
         """
+        mesh = V.mesh()
+        coords = fire.SpatialCoordinate(mesh)
+        dist2 = fire.Function(V)
+        cell_diam = fire.Function(fire.FunctionSpace(mesh, "DG", 0))
+        cell_diam.interpolate(fire.CellDiameter(mesh))
+        radius = global_max(cell_diam)
+        tie_tol = 1e-8 * lmin
+        nodes = []
+        for source in self.source_locations:
+            dist2.interpolate(sum((x - s) ** 2 for x, s in zip(coords, source)))
+            d2min = global_min(dist2)
+            if d2min > radius**2:
+                raise ValueError(
+                    f"Source {source} has no mesh node within {radius} km, "
+                    "the largest cell diameter, so it lies outside the mesh."
+                )
+            d2tie = (np.sqrt(d2min) + tie_tol) ** 2
+            nodes.append(np.flatnonzero(dist2.dat.data_ro_with_halos <= d2tie))
+        nodes = np.unique(np.concatenate(nodes))
 
-        # Extract node positions
-        z_data, x_data = node_positions[:, 0], node_positions[:, 1]
-
-        # Identify source indices in the mesh
-        it = int(-1)
-        div_min = int(self.degree_eik + 1)
-        div_max = int(10 * div_min)
-        while True:
-            it += 1
-            div = max(div_max - it, div_min)
-            tol_node = lmin / div
-
-            if self.dimension == 2:  # 2D
-                sou_ids = [np.where(np.isclose(z_data, z_s, atol=tol_node)
-                                    & np.isclose(x_data, x_s, atol=tol_node)
-                                    )[0] for z_s, x_s in self.source_locations]
-
-            if self.dimension == 3:  # 3D
-                y_data = node_positions[:, 2]
-                sou_ids = [np.where(np.isclose(
-                    z_data, z_s, atol=tol_node)
-                    & np.isclose(x_data, x_s, atol=tol_node)
-                    & np.isclose(y_data, y_s, atol=tol_node)
-                )[0] for z_s, x_s, y_s in self.source_locations]
-
-            if sou_ids[0].size:
-                break
-            elif div == div_min and not sou_ids[0].size:
-                exit("Error: Source Points Not Found!")
-
-        # Define BCs for eikonal
-        bcs_eik = [Dir_Point_BC(V, fire.Constant(0.0), ids) for ids in sou_ids]
-
-        # Mark source locations
         sou_marker = fire.Function(V, name="source_marker")
-        sou_marker.assign(0)
-        sou_marker.dat.data_with_halos[sou_ids] = 1
+        Dir_Point_BC(V, fire.Constant(1.0), nodes).apply(sou_marker)
+        bcs_eik = [Dir_Point_BC(V, fire.Constant(0.0), nodes)]
 
         return bcs_eik, sou_marker
 
@@ -210,10 +233,10 @@ class Eikonal_Modeling():
             Integration domain for the Eikonal equation.
         """
 
-        if self.ele_type_eik == 'consistent':
+        if self.ele_type_eik == "consistent":
             dx = fire.dx
 
-        if self.ele_type_eik == 'underintegrated':
+        if self.ele_type_eik == "underintegrated":
             quad_rule = quadrature_rules(V)[0]
             dx = fire.dx(**quad_rule)
 
@@ -284,14 +307,22 @@ class Eikonal_Modeling():
         # Weak form
         delta = fire.Constant(float_info.epsilon)  # float_info.min
         gr_norm = fire.sqrt(fire.inner(fire.grad(u), fire.grad(u))) + delta
-        FNL = gr_norm * vy * dx - f / c * vy * dx + \
-            eps * fire.inner(fire.grad(u), fire.grad(vy)) * dx
+        FNL = (
+            gr_norm * vy * dx
+            - f / c * vy * dx
+            + eps * fire.inner(fire.grad(u), fire.grad(vy)) * dx
+        )
 
         return FNL
 
     @staticmethod
-    def solver_opts(nl_solver='newtonls', l_solver='preonly',
-                    user_atol=1e-16, user_iter=50, monitor=False):
+    def solver_opts(
+        nl_solver="newtonls",
+        l_solver="preonly",
+        user_atol=1e-16,
+        user_iter=50,
+        monitor=False,
+    ):
         """Set the solver parameters.
 
         Parameters
@@ -332,83 +363,99 @@ class Eikonal_Modeling():
         user_stol = user_atol * 1e3
         ksp_max_it = user_iter
 
-        param_solver = {'snes_type': nl_solver, 'ksp_type': l_solver}
+        param_solver = {"snes_type": nl_solver, "ksp_type": l_solver}
 
-        if nl_solver == 'newtontr':  # newton, cauchy, dogleg
-            param_solver.update({'snes_tr_fallback_type': 'newton'})
+        if nl_solver == "newtontr":  # newton, cauchy, dogleg
+            param_solver.update({"snes_tr_fallback_type": "newton"})
 
-        if nl_solver == 'ngmres':  # difference, none, linesearch
-            param_solver.update({'snes_ngmres_select_type': 'linesearch'})
+        if nl_solver == "ngmres":  # difference, none, linesearch
+            param_solver.update({"snes_ngmres_select_type": "linesearch"})
 
-        if nl_solver == 'qn':
-            param_solver.update({'snes_qn_m_type': 5,
-                                 'snes_qn_powell_descent': True,
-                                 # lbfgs, broyden, badbroyden
-                                 'snes_qn_type': 'badbroyden',
-                                 # diagonal, none, scalar, jacobian
-                                 'snes_qn_scale_type': 'jacobian'})
+        if nl_solver == "qn":
+            param_solver.update(
+                {
+                    "snes_qn_m_type": 5,
+                    "snes_qn_powell_descent": True,
+                    # lbfgs, broyden, badbroyden
+                    "snes_qn_type": "badbroyden",
+                    # diagonal, none, scalar, jacobian
+                    "snes_qn_scale_type": "jacobian",
+                }
+            )
 
-        if nl_solver == 'ngs':
-            param_solver.update({'snes_ngs_sweeps': 2,
-                                 'snes_ngs_atol': user_atol,
-                                 'snes_ngs_rtol': user_rtol,
-                                 'snes_ngs_stol': user_stol,
-                                 'snes_ngs_max_it': user_iter})
+        if nl_solver == "ngs":
+            param_solver.update(
+                {
+                    "snes_ngs_sweeps": 2,
+                    "snes_ngs_atol": user_atol,
+                    "snes_ngs_rtol": user_rtol,
+                    "snes_ngs_stol": user_stol,
+                    "snes_ngs_max_it": user_iter,
+                }
+            )
 
-        if nl_solver == 'ncg':
+        if nl_solver == "ncg":
             # fr, prp, dy, hs, cd
-            param_solver.update({'snes_ncg_type': 'cd'})
+            param_solver.update({"snes_ncg_type": "cd"})
 
-        if l_solver == 'preonly':
+        if l_solver == "preonly":
             ig_nz = False
-            pc_type = 'lu'  # lu, cholesky
+            pc_type = "lu"  # lu, cholesky
 
-            # mumps
-            param_solver.update({'pc_factor_mat_solver_type': 'umfpack'})
+            # umfpack only supports serial matrices
+            param_solver.update({"pc_factor_mat_solver_type": "mumps"})
         else:
             ig_nz = True
-            pc_type = 'ilu'  # ilu, icc, lu, cholesky
+            pc_type = "ilu"  # ilu, icc, lu, cholesky
 
-        if l_solver == 'gmres':
-            param_solver.update({'ksp_gmres_restart': 3,
-                                 'ksp_gmres_haptol': user_atol * 1e-4})
+        if l_solver == "gmres":
+            param_solver.update(
+                {"ksp_gmres_restart": 3, "ksp_gmres_haptol": user_atol * 1e-4}
+            )
 
-        param_solver.update({
-            'snes_linesearch_type': 'l2',  # l2, cp, basic
-            'snes_linesearch_damping': 1.0,
-            'snes_linesearch_maxstep': 1.0,
-            'snes_max_funcs': 1000,
-            'snes_linesearch_order': 2,
-            'snes_linesearch_alpha': 1e-4,
-            'snes_max_it': user_iter,
-            'snes_linesearch_rtol': user_rtol,
-            'snes_linesearch_atol': user_atol,
-            'snes_rtol': user_atol,
-            'snes_atol': user_rtol,
-            'snes_stol': user_stol,
-            'ksp_max_it': ksp_max_it,
-            'ksp_rtol': user_rtol,
-            'ksp_atol': user_atol,
-            'ksp_initial_guess_nonzero': ig_nz,
-            'pc_type': pc_type,
-            'pc_factor_reuse_ordering': True,
-            'snes_monitor': None,
-        })
+        param_solver.update(
+            {
+                "snes_linesearch_type": "l2",  # l2, cp, basic
+                "snes_linesearch_damping": 1.0,
+                "snes_linesearch_maxlambda"
+                if is_firedrake_new()
+                else "snes_linesearch_maxstep": 1.0,
+                "snes_max_funcs": 1000,
+                "snes_linesearch_order": 2,
+                "snes_linesearch_alpha": 1e-4,
+                "snes_max_it": user_iter,
+                "snes_linesearch_rtol": user_rtol,
+                "snes_linesearch_atol": user_atol,
+                "snes_rtol": user_atol,
+                "snes_atol": user_rtol,
+                "snes_stol": user_stol,
+                "ksp_max_it": ksp_max_it,
+                "ksp_rtol": user_rtol,
+                "ksp_atol": user_atol,
+                "ksp_initial_guess_nonzero": ig_nz,
+                "pc_type": pc_type,
+                "pc_factor_reuse_ordering": True,
+                "snes_monitor": None,
+            }
+        )
 
         if monitor:  # For debugging
-            param_solver.update({
-                'snes_view': None,
-                'snes_converged_reason': None,
-                'snes_linesearch_monitor': None,
-                'ksp_monitor_true_residual': None,
-                'ksp_converged_reason': None,
-                'report': True,
-                'error_on_nonconvergence': True})
+            param_solver.update(
+                {
+                    "snes_view": None,
+                    "snes_converged_reason": None,
+                    "snes_linesearch_monitor": None,
+                    "ksp_monitor_true_residual": None,
+                    "ksp_converged_reason": None,
+                    "report": True,
+                    "error_on_nonconvergence": True,
+                }
+            )
 
         return param_solver
 
     @staticmethod
-    def initial_guess(c, c_min, V, diam_mesh, typ_igs='constant'):
+    def initial_guess(c, c_min, V, diam_mesh, typ_igs="constant"):
         """Provide an initial guess for the Eikonal solver.
 
         Parameters
@@ -435,20 +482,21 @@ class Eikonal_Modeling():
         cell_diameter_function.interpolate(diam_mesh)
 
         # Initial guess
-        if typ_igs == 'constant':
+        if typ_igs == "constant":
             cell_diam_max = cell_diameter_function.dat.data_with_halos.max()
             init_guess = cell_diam_max / c_min
 
-        elif typ_igs == 'variable':
+        elif typ_igs == "variable":
             init_guess = cell_diameter_function / fire.Constant(c_min)
 
         else:
-            validate_parameter('typ_igs', typ_igs, ['constant', 'variable'])
+            validate_parameter("typ_igs", typ_igs, ["constant", "variable"])
 
         return init_guess
 
-    def linear_solution(self, wf_parameters, nl_solver='vinewtonssls',
-                        l_solver='preonly', user_iter=50):
+    def linear_solution(
+        self, wf_parameters, nl_solver="vinewtonssls", l_solver="preonly", user_iter=50
+    ):
         """Solve the linear Eikonal equation.
 
         Parameters
@@ -494,7 +542,7 @@ class Eikonal_Modeling():
         u, vy, c, c_min, V, diam_mesh = wf_parameters
 
         # Initial guess
-        yp = fire.Function(V, name='Eikonal (Time [s])')
+        yp = fire.Function(V, name="Eikonal (Time [s])")
         yp.assign(self.initial_guess(c, c_min, V, diam_mesh))
 
         # Linear Eikonal
@@ -507,17 +555,25 @@ class Eikonal_Modeling():
         while True:
             try:
                 # Solver parameters
-                p = self.solver_opts(nl_solver=nl_solver, l_solver=l_solver,
-                                     user_atol=user_atol, user_iter=user_iter)
+                p = self.solver_opts(
+                    nl_solver=nl_solver,
+                    l_solver=l_solver,
+                    user_atol=user_atol,
+                    user_iter=user_iter,
+                )
 
                 # Solving LIN Eikonal
-                fire.solve(fire.lhs(FeikL) == fire.rhs(FeikL), yp,
-                           bcs=self.bcs_eik, solver_parameters=p, J=J)
+                fire.solve(
+                    fire.lhs(FeikL) == fire.rhs(FeikL),
+                    yp,
+                    bcs=self.bcs_eik,
+                    solver_parameters=p,
+                    J=J,
+                )
 
                 # Final parameters
                 solv_ok = "Solver Executed Successfully. "
-                print((solv_ok + 'AbsTol: {:.1e}').format(
-                    user_atol), flush=True)
+                print((solv_ok + "AbsTol: {:.1e}").format(user_atol), flush=True)
 
                 return yp
 
@@ -525,14 +581,21 @@ class Eikonal_Modeling():
                 print(f"Error Solving: {e}", flush=True)
 
                 # Adjusting tolerance
-                user_atol = user_atol * 10 if user_atol < 1e-5 \
-                    else round(user_atol + 1e-5, 5)
+                user_atol = (
+                    user_atol * 10 if user_atol < 1e-5 else round(user_atol + 1e-5, 5)
+                )
                 if user_atol > 1e-4:
                     print("Tolerance too high. Exiting.", flush=True)
                     break
 
-    def nonlinear_solution(self, wf_parameters, nl_solver='vinewtonssls',
-                           l_solver='preonly', user_iter=50, lin_sol=None):
+    def nonlinear_solution(
+        self,
+        wf_parameters,
+        nl_solver="vinewtonssls",
+        l_solver="preonly",
+        user_iter=50,
+        lin_sol=None,
+    ):
         """Solve the nonlinear Eikonal equation.
 
         Parameters
@@ -580,8 +643,9 @@ class Eikonal_Modeling():
 
         if lin_sol is None:
             # Initial guess for nonlinear Eikonal
-            data_eikL = self.initial_guess(
-                c, c_min, V, diam_mesh).dat.data_with_halos[:]
+            data_eikL = self.initial_guess(c, c_min, V, diam_mesh).dat.data_with_halos[
+                :
+            ]
         else:
             # Clean numerical instabilities
             data_eikL = sanitize_num_array(lin_sol.dat.data_with_halos[:])
@@ -593,29 +657,29 @@ class Eikonal_Modeling():
                 print(f"Iteration for Festab: {user_est:.2f}", flush=True)
 
                 # Preserving intial guess
-                yp = fire.Function(V, name='Eikonal (Time [s])')
+                yp = fire.Function(V, name="Eikonal (Time [s])")
                 yp.dat.data_with_halos[:] = data_eikL
 
                 # Solver parameters
-                p = self.solver_opts(nl_solver=nl_solver, l_solver=l_solver,
-                                     user_atol=user_atol, user_iter=user_iter)
+                p = self.solver_opts(
+                    nl_solver=nl_solver,
+                    l_solver=l_solver,
+                    user_atol=user_atol,
+                    user_iter=user_iter,
+                )
                 # Linear Eikonal
-                FeikNL = self.nonlinear_eik(yp, vy, c, V, diam_mesh,
-                                            f_est=user_est)
+                FeikNL = self.nonlinear_eik(yp, vy, c, V, diam_mesh, f_est=user_est)
 
                 # Jacobian of the nonlinear Eikonal
                 J = fire.derivative(FeikNL, yp)
 
                 # Solving NL Eikonal
-                fire.solve(FeikNL == 0, yp, bcs=self.bcs_eik,
-                           solver_parameters=p, J=J)
+                fire.solve(FeikNL == 0, yp, bcs=self.bcs_eik, solver_parameters=p, J=J)
 
                 # Final parameters
                 solv_ok = "Solver Executed Successfully. "
-                print((solv_ok + 'AbsTol: {:.1e}').format(
-                    user_atol), flush=True)
-                print((solv_ok + 'Festab: {:.2f}').format(
-                    user_est), flush=True)
+                print((solv_ok + "AbsTol: {:.1e}").format(user_atol), flush=True)
+                print((solv_ok + "Festab: {:.2f}").format(user_est), flush=True)
 
                 return yp
 
@@ -626,10 +690,14 @@ class Eikonal_Modeling():
                 user_est += 0.01
                 if user_est > 1.0:
                     user_est = self.f_est
-                    print("\nHigh Stabilizing Factor. Increasing Tolerance!",
-                          flush=True)
-                    user_atol = user_atol * 10 if user_atol < 1e-5 \
+                    print(
+                        "\nHigh Stabilizing Factor. Increasing Tolerance!", flush=True
+                    )
+                    user_atol = (
+                        user_atol * 10
+                        if user_atol < 1e-5
                         else round(user_atol + 1e-5, 5)
+                    )
                     if user_atol > 1e-4:
                         print("High Tolerance. Exiting!", flush=True)
                         exit("No Results for Eikonal Equation")
@@ -652,11 +720,21 @@ class Eikonal_Modeling():
         -------
         yp : `Firedrake.Function`
             Eikonal field.
+
+        Notes
+        -----
+        The velocity is bounded below by ``c_min`` in the weak forms. In the
+        cells cut by a velocity discontinuity, a high-order interpolant
+        undershoots its nodal values and can even turn negative, which makes
+        the Eikonal equation ill-posed and the nonlinear solver fail.
         """
 
         # Functions
         u = fire.TrialFunction(V)
         vy = fire.TestFunction(V)
+
+        # Velocity bounded below by its minimum nodal value
+        c = fire.max_value(c, c_min)
 
         # Weak form parameters
         wf_parameters = [u, vy, c, c_min, V, diam_mesh]

@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 import spyro
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 
 
 def is_seismicmesh_installed():
@@ -59,21 +60,21 @@ def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
     offset = np.sqrt((sz - rz) ** 2 + (sx - rx) ** 2)
     expected_offset_value = 2.6580067720004026
     test1 = np.isclose(offset, expected_offset_value)
-    print(f"Checked if offset calculation is correct: {test1}")
+    SpyroEnsemble.print(f"Checked if offset calculation is correct: {test1}")
 
     # Check if analytical solution has the correct peak location
     analytical_solve_one_receiver = Cpw_calc.reference_solution[:, 1]
     peak_indice = np.argmax(analytical_solve_one_receiver)
     expected_peak_indice = 4052  # 2804
     test2 = expected_peak_indice == peak_indice
-    print(f"Checked if reference solution seems correct: {test2}")
+    SpyroEnsemble.print(f"Checked if reference solution seems correct: {test2}")
 
     # Check if cpw is within error TOL, starting search at min
     min_cpw = Cpw_calc.find_minimum()
-    print(f"Minimum of {min_cpw}")
+    SpyroEnsemble.print(f"Minimum of {min_cpw}")
     test3 = np.isclose(correct_cpw, min_cpw)
 
-    print("END")
+    SpyroEnsemble.print("END")
     assert all([test1, test2, test3])
 
 
