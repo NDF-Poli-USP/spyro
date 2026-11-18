@@ -1,8 +1,11 @@
-"""Eikonal source snapping and boundary minimum under spatial parallelism.
+"""Eikonal source conditions and boundary minimum under spatial parallelism.
 
 Run with ``mpiexec -n 2 pytest tests/parallel/test_eikonal_parallel.py``. The
 results must not depend on the number of ranks, so the expected values are
-those of a serial run.
+those of a serial run or, for the 'local_time' pipeline tests, the
+theoretical travel time. Values recorded with one Firedrake installation can
+differ slightly with another; the tests that compare recorded values state
+the installations and the tolerance in their Notes.
 """
 
 import firedrake as fire
@@ -95,7 +98,12 @@ def test_eikonal_bcs_snaps_source_to_nearest_node(
 
 
 def test_eikonal_bcs_rejects_source_far_from_mesh() -> None:
-    """Check that a source with no node within ``lmin / (degree_eik + 1)`` raises.
+    """Check that a source with no node within one cell diameter raises.
+
+    The source ``(9, 9)`` km lies outside the 4 km x 4 km mesh: its nearest
+    node is farther than the largest cell diameter (``sqrt(2)`` km), the
+    bound used by `Eikonal_Modeling.eikonal_bcs` to detect sources outside
+    the mesh.
 
     Returns
     -------
@@ -105,6 +113,107 @@ def test_eikonal_bcs_rejects_source_far_from_mesh() -> None:
         Eikonal_Modeling(2, [(9.0, 9.0)], degree_eik=1).eikonal_bcs(
             square_space(), lmin=1.0
         )
+
+
+@pytest.mark.parametrize(
+    "velocity, sources, expected",
+    [
+        (
+            lambda x: 1.5 + 0.0 * x[0],
+            [(2.2, 0.9)],
+            [[2.0, 0.0], [2.0, 1.0], [3.0, 1.0]],
+        ),
+        (
+            lambda x: 1.0 + x[0] / 4.0,
+            [(2.2, 0.9)],
+            [[2.0, 0.0], [2.0, 1.0], [3.0, 1.0]],
+        ),
+        (
+            lambda x: 1.5 + 0.0 * x[0],
+            [(1.0, 1.0), (2.0, 1.0)],
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [1.0, 1.0],
+                [1.0, 2.0],
+                [2.0, 0.0],
+                [2.0, 1.0],
+                [2.0, 2.0],
+                [3.0, 1.0],
+            ],
+        ),
+    ],
+    ids=["homogeneous", "linear_velocity", "overlapping_sources"],
+)
+def test_eikonal_bcs_local_time(
+    velocity, sources: list[tuple[float, float]], expected: list[list[float]]
+) -> None:
+    """Check the local travel time on the nodes within ``lmin`` of the sources.
+
+    On a P1 mesh with nodes at integer coordinates and ``lmin = 1``, every
+    node within 1 km of a source is fixed to the smallest local travel time
+    ``||x - s|| (1 / c(s) + 1 / c(x)) / 2`` over the sources, owned and halo
+    copies alike, and no other node is touched. The velocity is linear, so its
+    P1 interpolant and its value at the source are exact.
+
+    Parameters
+    ----------
+    velocity : `callable`
+        Velocity as a function of the coordinates, valid both for UFL
+        coordinates and for numpy arrays.
+    sources : `list`
+        Source coordinates.
+    expected : `list`
+        Coordinates of the nodes that must hold the Dirichlet condition.
+
+    Returns
+    -------
+    None
+    """
+    V = square_space()
+    mesh = V.mesh()
+    c = fire.Function(V).interpolate(velocity(fire.SpatialCoordinate(mesh)))
+    eik = Eikonal_Modeling(2, sources, degree_eik=1, source_bc="local_time")
+    bcs, marker = eik.eikonal_bcs(V, lmin=1.0, c=c)
+
+    assert marked_points(marker) == expected
+
+    fixed = fire.Function(V).assign(-1.0)
+    for bc in bcs:
+        bc.apply(fixed)
+    coords = fire.assemble(
+        fire.interpolate(
+            fire.SpatialCoordinate(mesh),
+            fire.VectorFunctionSpace(mesh, V.ufl_element()),
+        )
+    )
+    times = [
+        min(
+            0.5
+            * np.hypot(*(p - np.asarray(s)))
+            * (1.0 / velocity(s) + 1.0 / velocity(p))
+            for s in sources
+        )
+        for p in coords.dat.data_ro_with_halos
+    ]
+    marked = marker.dat.data_ro_with_halos == 1.0
+    np.testing.assert_allclose(
+        fixed.dat.data_ro_with_halos, np.where(marked, times, -1.0), rtol=1e-12
+    )
+
+
+def test_eikonal_bcs_local_time_needs_velocity() -> None:
+    """Check that the 'local_time' source condition requires a velocity Function.
+
+    Returns
+    -------
+    None
+    """
+    eik = Eikonal_Modeling(2, [(2.2, 0.9)], degree_eik=1, source_bc="local_time")
+    with pytest.raises(TypeError, match="'c' must be of type"):
+        eik.eikonal_bcs(square_space(), lmin=1.0)
+    with pytest.raises(TypeError, match="'c' must be of type"):
+        eik.eikonal_bcs(square_space(), lmin=1.0, c=1.5)
 
 
 @pytest.mark.parametrize(
@@ -182,14 +291,26 @@ def test_global_min_reduces_over_ranks() -> None:
 
 
 def critical_boundary_data(
-    geometry: str, degree: int, f_est: float, element_type: str
+    geometry: str,
+    degree: int,
+    f_est: float,
+    element_type: str,
+    source_bc_eik: str = "nearest_node",
+    dimension: int = 2,
+    edge_length: float = 0.1,
 ) -> list:
-    """Run a 2D Eikonal analysis and return its boundary data.
+    """Run an Eikonal analysis and return its boundary data.
 
-    The setup is that of ``test_eikonal_new`` with a smooth velocity
-    interpolated straight into the continuous space. Evaluating a discontinuous
-    or DG0 velocity at nodes shared by several cells depends on the partition,
-    which would hide the behaviour under test.
+    The setup is that of ``test_eikonal_new`` (unit square or cube, source at
+    ``(-0.5, 0.25)`` or ``(-0.5, 0.25, 0.5)``) with the smooth velocity
+    ``c = 3 - 1.5 x`` interpolated straight into the continuous space.
+    Evaluating a discontinuous or DG0 velocity at nodes shared by several
+    cells, or at cell centroids lying on the discontinuity, depends on the
+    partition and on round-off, which would hide the behaviour under test.
+    With the discontinuous velocity of ``test_eikonal_new``, a mesh with an
+    odd number of elements N puts cell centroids exactly on x = 0.5: there
+    the 'local_time' T-3D consistent case (N = 5) gives 83.563 ms with
+    Firedrake 2025.4.1 and 84.164 ms with 2026.10.0.
 
     Parameters
     ----------
@@ -202,6 +323,13 @@ def critical_boundary_data(
     element_type : `str`
         Finite element type for the Eikonal equation, "consistent" or
         "underintegrated" (KMV on triangles, spectral on quadrilaterals).
+    source_bc_eik : `str`, optional
+        Dirichlet condition at the sources, "nearest_node" or "local_time".
+        Default is "nearest_node".
+    dimension : `int`, optional
+        Dimension of the problem, 2 or 3. Default is 2.
+    edge_length : `float`, optional
+        Mesh size in km. Default is 0.1.
 
     Returns
     -------
@@ -209,14 +337,16 @@ def critical_boundary_data(
         ``[pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]`` per boundary,
         sorted by the minimum Eikonal.
     """
-    dictionary = wave_dict(geometry, 2, degree, element_type)
+    dictionary = wave_dict(geometry, dimension, degree, element_type)
     dictionary["visualization"]["output_folder"] += f"_np{fire.COMM_WORLD.size}"
     wave = AcousticWave(dictionary=dictionary)
-    wave.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})
     wave.set_initial_velocity_model(
         conditional=3.0 - 1.5 * wave.mesh_x, dg_velocity_model=False
     )
-    wave.mesh_ops.preamble_mesh_operations(wave, ele_type_eik=element_type, f_est=f_est)
+    wave.mesh_ops.preamble_mesh_operations(
+        wave, ele_type_eik=element_type, f_est=f_est, source_bc_eik=source_bc_eik
+    )
     wave.layer_ops.critical_boundary_points(wave)
     return wave.layer_ops.eik_bnd
 
@@ -294,12 +424,144 @@ def test_eikonal_critical_points_match_serial(
     Returns
     -------
     None
+
+    Notes
+    -----
+    The serial values match Firedrake 2026.10.0: two ranks of it reproduce
+    them to the printed precision (T, consistent: 88.279 ms). A serial run and
+    a two-rank run of the same installation agree to round-off, but
+    installations differ by up to 4.1e-5 relative (T, consistent: 0.0882819 s
+    with Firedrake 2025.4.1 instead of 0.0882785 s), so the minimum Eikonal is
+    compared with ``rtol = 1e-4``. The critical points are compared exactly,
+    and every rank must hold the same result.
     """
     eik_bnd = critical_boundary_data(geometry, degree, f_est, element_type)
 
     result = [(list(pnt), eikmin) for pnt, _, eikmin, *_ in eik_bnd]
     assert [pnt for pnt, _ in result] == [pnt for pnt, _ in serial]
     np.testing.assert_allclose(
-        [e for _, e in result], [e for _, e in serial], rtol=1e-12
+        [e for _, e in result], [e for _, e in serial], rtol=1e-4
     )
     assert fire.COMM_WORLD.allgather(result) == [result] * fire.COMM_WORLD.size
+
+
+@pytest.mark.parametrize("geometry", ["T", "Q"])
+def test_local_time_eikonal_matches_theory_on_all_ranks(geometry: str) -> None:
+    """Check the Eikonal with the 'local_time' source condition in parallel.
+
+    Theoretical value. The velocity ``c = 3 - 1.5 x`` depends on x only, so
+    the ray from the source ``(-0.5, 0.25)`` to the boundary ``x = 0`` keeps
+    its z coordinate (the ray parameter along z is zero) and its travel time
+    is
+
+        t = int_0^0.25 dx / (3 - 1.5 x) = ln(3 / 2.625) / 1.5 = 89.021 ms,
+
+    reached at ``(-0.5, 0)``. Every other absorbing boundary is at least
+    0.5 km away through velocities of at most 3 km/s, i.e. at least 167 ms.
+
+    The minimum Eikonal must match it closely, be the same on every rank,
+    and barely depend on the stabilizing factor, unlike with the
+    'nearest_node' condition (2D, degree 2, consistent, edge length 0.1 km).
+    Measured: T 89.451 / 89.462 ms and Q 89.247 / 89.268 ms for f_est 0.05 /
+    0.06, identical on one and two ranks with Firedrake 2025.4.1 and the same
+    on two ranks with Firedrake 2026.10.0.
+
+    Parameters
+    ----------
+    geometry : `str`
+        Element geometry, "T" or "Q".
+
+    Returns
+    -------
+    None
+    """
+    theory = np.log(3.0 / (3.0 - 1.5 * 0.25)) / 1.5
+    eikmins = []
+    for f_est in (0.05, 0.06):
+        eik_bnd = critical_boundary_data(
+            geometry, 2, f_est, "consistent", source_bc_eik="local_time"
+        )
+        result = [(list(pnt), eikmin) for pnt, _, eikmin, *_ in eik_bnd]
+        assert fire.COMM_WORLD.allgather(result) == [result] * fire.COMM_WORLD.size
+        eikmins.append(result[0][1])
+
+    np.testing.assert_allclose(eikmins, theory, rtol=6e-3)
+    assert abs(eikmins[1] - eikmins[0]) < 1e-3 * theory
+
+
+@pytest.mark.parametrize(
+    "geometry, edge_length, f_est",
+    [("T", 1.0 / 12, 0.02), ("Q", 1.0 / 6, 0.09)],
+)
+def test_local_time_eikonal_3d_matches_theory_on_all_ranks(
+    geometry: str, edge_length: float, f_est: float
+) -> None:
+    """Check the 3D Eikonal with the 'local_time' source condition in parallel.
+
+    Theoretical value. The velocity ``c = 3 - 1.5 x`` depends on x only, so
+    the ray from the source ``(-0.5, 0.25, 0.5)`` to the boundary ``x = 0``
+    keeps its z and y coordinates (the ray parameters along z and y are zero)
+    and its travel time is
+
+        t = int_0^0.25 dx / (3 - 1.5 x) = ln(3 / 2.625) / 1.5 = 89.021 ms,
+
+    reached at ``(-0.5, 0, 0.5)``. Every other absorbing boundary is at least
+    0.5 km away through velocities of at most 3 km/s, i.e. at least 167 ms.
+
+    Calibration (degree 2, consistent, Firedrake 2025.4.1). Unlike in 2D, the
+    3D result depends on f_est, roughly in proportion to it (the artificial
+    diffusion acts on the point-source cone, whose Laplacian (d - 1) / r is
+    twice as large in 3D), so the stabilizing factor must be small. Minimum
+    Eikonal error for N = 1 / edge_length and f_est (r: the solver retried
+    with a larger f_est):
+
+        T  N    f=0.01      f=0.02   f=0.03   f=0.04   f=0.05   f=0.06
+           7    r (0.04)    r        r        +2.66 %  +3.00 %  +3.15 %
+           8    r (0.02)    +2.70 %  +4.18 %  +5.20 %  +6.00 %  +6.71 %
+           10   r (0.02)    +2.00 %  +3.64 %  +4.76 %  +5.68 %  +6.52 %
+           12   r (0.02)    +0.70 %* +3.47 %  +5.11 %  +6.42 %  +7.61 %
+
+        Q  N    f=0.05      f=0.07   f=0.08   f=0.09   f=0.10
+           5    -7.05 %     -8.97 %  -9.72 %  -10.4 %  -10.9 %
+           6    -1.17 %     -0.51 %  -0.29 %  -0.10 %* +0.07 %
+
+    T: N = 7 with f_est = 0.05 is the coarsest stable choice below 3 %, but
+    at +2.999 % it leaves no margin, so N = 12 with f_est = 0.02 (+0.70 %) is
+    used; below 0.02 the solver needs more stabilization and retries. Q: on
+    N = 5 the source region (radius lmin = 0.2 km) covers most of the
+    0.25 km to the boundary and the result falls as f_est grows, so N = 6
+    with f_est = 0.09 (-0.10 %, stable at 0.08 and 0.10) is used. One and
+    two ranks give the same values (T: to 4e-6 relative, Q: identical).
+    Firedrake 2026.10.0 on two ranks gives T 89.644 ms (+0.70 %) and
+    Q 88.936 ms (-0.10 %), within 3e-5 of the 2025.4.1 values. Both
+    configurations converge at their f_est without retries with both
+    versions.
+
+    Parameters
+    ----------
+    geometry : `str`
+        Element geometry, "T" or "Q".
+    edge_length : `float`
+        Mesh size in km.
+    f_est : `float`
+        Factor for the stabilizing term in the Eikonal equation.
+
+    Returns
+    -------
+    None
+    """
+    theory = np.log(3.0 / (3.0 - 1.5 * 0.25)) / 1.5
+    eik_bnd = critical_boundary_data(
+        geometry,
+        2,
+        f_est,
+        "consistent",
+        source_bc_eik="local_time",
+        dimension=3,
+        edge_length=edge_length,
+    )
+    result = [(list(pnt), eikmin) for pnt, _, eikmin, *_ in eik_bnd]
+
+    assert fire.COMM_WORLD.allgather(result) == [result] * fire.COMM_WORLD.size
+    np.testing.assert_allclose(result[0][0], [-0.5, 0.0, 0.5], atol=1e-12)
+    np.testing.assert_allclose(result[0][1], theory, rtol=1e-2)

@@ -87,10 +87,14 @@ class Minimum_Eikonal(Eikonal_Modeling):
         None
         """
 
-        super().__init__(wave.dimension, wave.sources.point_locations,
-                         ele_type_eik=wave.mesh_parameters.ele_type_eik,
-                         degree_eik=wave.mesh_parameters.degree_eik,
-                         f_est=wave.mesh_parameters.f_est)
+        super().__init__(
+            wave.dimension,
+            wave.sources.point_locations,
+            ele_type_eik=wave.mesh_parameters.ele_type_eik,
+            degree_eik=wave.mesh_parameters.degree_eik,
+            f_est=wave.mesh_parameters.f_est,
+            source_bc=wave.mesh_parameters.source_bc_eik,
+        )
 
         # Communicator MPI
         self.comm = wave.comm
@@ -148,7 +152,9 @@ class Minimum_Eikonal(Eikonal_Modeling):
         SpyroEnsemble.print("\nDefining Eikonal BCs")
 
         # Define Eikonal BCs and source marker
-        self.bcs_eik, sou_marker = self.eikonal_bcs(self.funct_space_eik, self.lmin)
+        self.bcs_eik, sou_marker = self.eikonal_bcs(
+            self.funct_space_eik, self.lmin, c=self.c, c_min=self.c_min
+        )
 
         # Save source marker
         SpyroEnsemble.write_vtk(self.path_save + "souEik.pvd", sou_marker, name="source_marker")
