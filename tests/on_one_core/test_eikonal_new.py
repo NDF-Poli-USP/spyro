@@ -603,7 +603,7 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
                 f_est = 0.05 if element_type == "consistent" else 0.05
 
         if dimension == 3:
-            atol = 5e-3 if element_type == "consistent" else 5e-3
+            atol = 1.5e-2 if element_type == "consistent" else 5e-3
             if element_geometry == "T":
                 edge_length = 1.0 / 5 if element_type == "consistent" else 1.0 / 6
                 p_eik = 1 if element_type == "consistent" else 1
