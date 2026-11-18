@@ -64,14 +64,14 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
     # Checking that the random-direction finite-difference error remains
     # below the given tolerance across the tested step sizes.
     test1 = np.all(np.abs(errors) < tol)
-    print(f"Gradient error less than {tol} percent for all steps: {test1}")
-    print(f"Error of {errors}")
+    SpyroEnsemble.print(f"Gradient error less than {tol} percent for all steps: {test1}")
+    SpyroEnsemble.print(f"Error of {errors}")
 
     # Check that the first-order Taylor remainder shrinks at least linearly
     # with the step length, without relying on the sign of the directional error.
     test2 = np.all(remainders[1:] < 0.2 * remainders[:-1])
-    print(f"Taylor remainder decreases with step size: {test2}")
-    print(f"Taylor remainders {remainders}")
+    SpyroEnsemble.print(f"Taylor remainder decreases with step size: {test2}")
+    SpyroEnsemble.print(f"Taylor remainders {remainders}")
 
     assert all([test1, test2])
 
@@ -200,6 +200,13 @@ def get_forward_model(
             assert schedule is not None
             # An online schedule has no max_n; a bounded one must match nt.
             assert schedule.max_n in (None, nt)
+            # The point source enters each time step through its scalar time
+            # function: no step records a source cofunction.
+            assert not any(
+                isinstance(output.output, fire.Cofunction)
+                for step in Wave_obj_guess.automated_adjoint._tape.timesteps
+                for block in step for output in block.get_outputs()
+            ), "a time step records a source cofunction"
     rec_out_guess = Wave_obj_guess.forward_solution_receivers
 
     return rec_out_exact, rec_out_guess, Wave_obj_guess

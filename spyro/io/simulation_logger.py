@@ -56,6 +56,13 @@ def _save_array(filename: str, values: list) -> None:
     np.save(filename, values)
 
 
+def _ensure_parent_dir(filename):
+    """Create the parent directory for a file path if it does not exist."""
+    directory = Path(filename).parent
+    if directory and not directory.exists():
+        directory.mkdir(parents=True, exist_ok=True)
+
+
 class Field:
     """Represent a named field writer with a deferred data callback.
 
@@ -134,6 +141,7 @@ class Functional:
         -------
         None
         """
+        _ensure_parent_dir(self.filename)
         _save_array(self.filename, self.list)
 
 
