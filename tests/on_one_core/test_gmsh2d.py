@@ -2,6 +2,7 @@ import math
 import pytest
 from spyro.meshing.meshing_parameters import MeshingParameters
 from spyro.meshing.meshing_functions import AutomaticMesh
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 import importlib.util
 
 HAS_NUMBA = importlib.util.find_spec("numba") is not None
@@ -9,14 +10,14 @@ HAS_NUMBA = importlib.util.find_spec("numba") is not None
 
 @pytest.mark.slow
 def test_gmsh2d_structured():
-    print("STARTING STRUCTURED MESH TESTS")
+    SpyroEnsemble.print("STARTING STRUCTURED MESH TESTS")
 
     winslow_implementations = ["default", "fast"]
     if HAS_NUMBA:
-        print("Numba is installed, making numba test")
+        SpyroEnsemble.print("Numba is installed, making numba test")
         winslow_implementations.append("numba")
     else:
-        print("\n[INFO] Numba is not installed. Skipping 'numba' Winslow implementations.")
+        SpyroEnsemble.print("\n[INFO] Numba is not installed. Skipping 'numba' Winslow implementations.")
 
     structured_configurations = [
         (True, None, 11610),
@@ -31,7 +32,7 @@ def test_gmsh2d_structured():
     for winslow_impl in winslow_implementations:
         for water_interface, padding_type, expected_cells in structured_configurations:
 
-            print(f"\nTesting Struct | Winslow: {winslow_impl:<7} | Water: {str(water_interface):<5} | Padding: {padding_type}")
+            SpyroEnsemble.print(f"\nTesting Struct | Winslow: {winslow_impl: <7} | Water: {str(water_interface): <5} | Padding: {padding_type}")
 
             avenir_params = {
                 "mesh_type": "gmsh_mesh",
@@ -76,7 +77,7 @@ def test_gmsh2d_structured():
                 firedrake_mesh.init()
 
             actual_cells = firedrake_mesh.cell_set.core_size
-            print(f"     Cells actual: {actual_cells} | Expected: {expected_cells}")
+            SpyroEnsemble.print(f"     Cells actual: {actual_cells} | Expected: {expected_cells}")
 
             assert math.isclose(actual_cells, expected_cells), \
                 f"FAILED: Struct | Winslow: {winslow_impl} | Wat: {water_interface} | Pad: {padding_type}. Got {actual_cells}, expected {expected_cells}"
@@ -84,7 +85,7 @@ def test_gmsh2d_structured():
 
 @pytest.mark.slow
 def test_gmsh2d_unstructured():
-    print("STARTING UNSTRUCTURED MESH TESTS")
+    SpyroEnsemble.print("STARTING UNSTRUCTURED MESH TESTS")
 
     unstructured_configurations = [
         (True, True, None, 30024),
@@ -104,7 +105,7 @@ def test_gmsh2d_unstructured():
 
     for extend_segy, water_interface, padding_type, expected_cells in unstructured_configurations:
 
-        print(f"\nTesting Unstruct | Ext SEGY: {str(extend_segy):<5} | Water: {str(water_interface):<5} | Padding: {padding_type}")
+        SpyroEnsemble.print(f"\nTesting Unstruct | Ext SEGY: {str(extend_segy): <5} | Water: {str(water_interface): <5} | Padding: {padding_type}")
 
         avenir_params = {
             "mesh_type": "gmsh_mesh",
@@ -149,7 +150,7 @@ def test_gmsh2d_unstructured():
             firedrake_mesh.init()
 
         actual_cells = firedrake_mesh.cell_set.core_size
-        print(f"     Cells actual: {actual_cells} | Expected: {expected_cells}")
+        SpyroEnsemble.print(f"     Cells actual: {actual_cells} | Expected: {expected_cells}")
 
         assert math.isclose(actual_cells, expected_cells), \
             f"FAILED: Unstruct | Ext: {extend_segy} | Wat: {water_interface} | Pad: {padding_type}. Got {actual_cells}, expected {expected_cells}"
@@ -157,7 +158,7 @@ def test_gmsh2d_unstructured():
 
 @pytest.mark.slow
 def test_gmsh2d_structured_no_winslow():
-    print("STARTING STRUCTURED MESH (NO WINSLOW) TESTS")
+    SpyroEnsemble.print("STARTING STRUCTURED MESH (NO WINSLOW) TESTS")
 
     configurations = [
         (True, None, 11610),
@@ -171,7 +172,7 @@ def test_gmsh2d_structured_no_winslow():
 
     for water_interface, padding_type, expected_cells in configurations:
 
-        print(f"\nTesting Struct (No Winslow) | Water: {str(water_interface):<5} | Padding: {padding_type}")
+        SpyroEnsemble.print(f"\nTesting Struct (No Winslow) | Water: {str(water_interface): <5} | Padding: {padding_type}")
 
         avenir_params = {
             "mesh_type": "gmsh_mesh",
@@ -217,7 +218,7 @@ def test_gmsh2d_structured_no_winslow():
             firedrake_mesh.init()
 
         actual_cells = firedrake_mesh.cell_set.core_size
-        print(f"     Cells actual: {actual_cells} | Expected: {expected_cells}")
+        SpyroEnsemble.print(f"     Cells actual: {actual_cells} | Expected: {expected_cells}")
 
         assert math.isclose(actual_cells, expected_cells), \
             f"FAILED: Struct (No Winslow) | Wat: {water_interface} | Pad: {padding_type}. Got {actual_cells}, expected {expected_cells}"

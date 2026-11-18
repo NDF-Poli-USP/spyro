@@ -307,31 +307,46 @@ class Modal_Solver:
             "eps_max_it": 200,  # Reasonable iteration cap
         }
         if self.calc_max_dt:
-            opts.update({
-                # The largest eigenvalues of a uniform mesh are tightly
-                # clustered, so 1e-6 may need more than eps_max_it
-                # iterations. 1e-4 changes the time step by about 1e-5
-                "eps_tol": 1e-4,
-                "st_type": "shift",  # No inversion, only mass matrix solves
-                # Jacobi is exact for a lumped (diagonal) mass matrix, and a
-                # consistent one scaled by its diagonal is well conditioned
-                "st_ksp_type": "cg",
-                "st_pc_type": "jacobi",
-                "st_ksp_rtol": 1e-10,
-            })
+            opts.update(
+                {
+                    # The largest eigenvalues of a uniform mesh are tightly
+                    # clustered, so 1e-6 may need more than eps_max_it
+                    # iterations. 1e-4 changes the time step by about 1e-5
+                    "eps_tol": 1e-4,
+                    "st_type": "shift",  # No inversion, only mass matrix solves
+                    # Jacobi is exact for a lumped (diagonal) mass matrix, and a
+                    # consistent one scaled by its diagonal is well conditioned
+                    "st_ksp_type": "cg",
+                    "st_pc_type": "jacobi",
+                    "st_ksp_rtol": 1e-10,
+                }
+            )
         else:
-            opts.update({
-                "eps_tol": 1e-6,  # Tight tolerance for accuracy
-                "st_shift": 1e-6,  # Stabilizes Neumann BC null space
-                "st_type": "sinvert",  # Useful for interior eigenvalues
-                "eps_monitor": "ascii",  # Print convergence info
-                "ksp_type": KRYLOVSCH_CONFIG[self.method]["ksp"],
-                "pc_type": KRYLOVSCH_CONFIG[self.method]["pc"],
-                "eps_smallest_magnitude": None,  # Smallest eigenvalues magnitude
-            })
+            m_diagonal = fire.assemble(m).petscmat.getDiagonal()
+            a_diagonal = fire.assemble(a).petscmat.getDiagonal()
+            max_m = m_diagonal.max()[1]
+            max_a = a_diagonal.max()[1]
+            st_shift = max(1e-5, 1e-8 * abs(max_a / max_m))
+
+            opts.update(
+                {
+                    # Smallest eigenvalues magnitude
+                    "eps_tol": 1e-6,  # Tight tolerance for accuracy
+                    "st_shift": st_shift,  # Stabilizes Neumann BC null space
+                    "st_type": "sinvert",  # Shift-and-invert: targets small eigenvalues
+                    "eps_target": 0.0,  # Converge toward eigenvalues closest to 0
+                    "eps_target_magnitude": None,  # Select by magnitude
+                    "st_pc_factor_shift_type": "NONZERO",  # Prevent zero-pivot
+                    "eps_monitor": "ascii",  # Print convergence info
+                    "ksp_type": KRYLOVSCH_CONFIG[self.method]["ksp"],  # Large problems
+                    "pc_type": KRYLOVSCH_CONFIG[self.method]["pc"],  # Large problems
+                }
+            )
 
         eigenproblem = fire.LinearEigenproblem(a, M=m)
-        eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=k, solver_parameters=opts)
+        eigensolver = fire.LinearEigensolver(
+            eigenproblem, n_evals=k, solver_parameters=opts
+        )
         if self.calc_max_dt:
             # LinearEigensolver always sets a target, which makes SLEPc look
             # for the eigenvalues closest to it even when the largest are
@@ -561,7 +576,6 @@ class Modal_Solver:
             shift = 0.0  # No shift for analytical and Rayleigh methods
 
         if self.method == "ANALYTICAL":
-
             # Compute equivalent homogenized velocities
             c_eq, c_eqref = self.AnaModSol.homogenized_velocities(
                 c,
