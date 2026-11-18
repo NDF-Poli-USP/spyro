@@ -34,7 +34,7 @@ This section is aimed at Linux users. However, we can also use spyro on Windows 
 For Linux systems, first please install the Firedrake library with SLEPc first by following the instructions based on the [Firedrake website with the SLEPC option](https://www.firedrakeproject.org/install.html#slepc). I have streamlined those instructions here:
 1. Download the Firedrake utility script. To simplify the installation process, Firedrake provides a utility script called firedrake-configure, it does not install Firedrake for you. It is simply a helper script that emits the configuration options that Firedrake needs for the various steps needed during installation.
 ```
-curl -O https://raw.githubusercontent.com/firedrakeproject/firedrake/refs/tags/2025.4.0.post0/scripts/firedrake-configure
+curl -O https://raw.githubusercontent.com/firedrakeproject/firedrake/refs/tags/2026.4.0/scripts/firedrake-configure
 ```
 2. Install system dependencies.
 ```

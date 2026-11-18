@@ -165,7 +165,6 @@ def reflecting_guess_record() -> np.ndarray:
 
 
 @pytest.mark.slow
-@pytest.mark.newer_firedrake
 @pytest.mark.parametrize("sides", list(ABSORBING_SIDES))
 def test_taylor_test_nrbc(reflecting_guess_record, sides: str) -> None:
     """Taylor-test the gradient with the NRBC on the selected sides.

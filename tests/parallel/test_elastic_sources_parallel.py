@@ -90,7 +90,6 @@ def exact_wave():
     return wave
 
 
-@pytest.mark.newer_firedrake
 @pytest.mark.slow
 @pytest.mark.parallel(2)
 def test_elastic_gradient_sources_parallel(exact_wave):

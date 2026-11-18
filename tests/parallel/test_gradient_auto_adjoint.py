@@ -170,7 +170,6 @@ def get_forward_model(checkpointing=False, snapshots=None):
     return Wave_obj_guess
 
 
-@pytest.mark.newer_firedrake
 @pytest.mark.parallel(4)
 @pytest.mark.parametrize("checkpointing", [False, True],
                          ids=["no_checkpointing", "single_memory"])
