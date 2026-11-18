@@ -4,8 +4,10 @@ import numpy as np
 from scipy.integrate import quad
 from scipy.special import hankel2
 
+from ..receivers.Receivers import RECEIVER_STEP_OFFSET
 from ..sources import (
     full_ricker_wavelet,
+    ricker_time_delay,
     ricker_wavelet,
     ricker_integral,
 )
@@ -13,8 +15,12 @@ from .typing import SourceType
 
 
 def nodal_homogeneous_analytical(
-    wave, offset: float, c_value: float, n_extra: int = 5000
-):
+    wave,
+    offset: float,
+    c_value: float,
+    n_extra: int = 5000,
+    time_shift: float | None = None,
+) -> np.ndarray:
     """Calculate the acoustic analytical solution for a homogeneous medium.
 
     The solution considers a single source and receiver separated by a given
@@ -34,11 +40,16 @@ def nodal_homogeneous_analytical(
     n_extra : int, optional
         Factor used to extend the final simulation time when computing the
         analytical solution. The default is 5000.
+    time_shift : float or None, optional
+        Time, in seconds, by which the solution is advanced: sample `i` is the
+        field at `i * dt + time_shift`. Default is None, for
+        `RECEIVER_STEP_OFFSET * dt`, which matches the receiver data of the
+        solvers. Use 0.0 for the field at the time labels.
 
     Returns
     -------
     numpy.ndarray
-        Analytical wavefield evaluated at the time steps of ``wave``.
+        Analytical wavefield evaluated at the time steps of `wave`.
     """
     # Generating extended ricker wavelet
     dt = wave.dt
@@ -48,15 +59,17 @@ def nodal_homogeneous_analytical(
     extended_final_time = n_extra * final_time
 
     frequency = wave.frequency
-    delay = wave.delay
-    delay_type = wave.delay_type
+    delay = ricker_time_delay(wave.delay, frequency, wave.delay_type)
+    if time_shift is None:
+        time_shift = RECEIVER_STEP_OFFSET * dt
 
+    # Advancing the wavelet advances the whole solution
     ricker_wavelet = full_ricker_wavelet(
         dt=dt,
         final_time=extended_final_time,
         frequency=frequency,
-        delay=delay - dt,
-        delay_type=delay_type,
+        delay=delay - time_shift,
+        delay_type="time",
     )
 
     full_u_analytical = _analytical_solution(
