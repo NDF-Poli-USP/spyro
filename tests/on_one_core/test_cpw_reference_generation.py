@@ -12,6 +12,7 @@ import pytest
 
 import spyro
 from spyro.tools.cells_per_wavelength_calculator.calculator import REFERENCE_DATA_KEY
+from spyro.utils.typing import WaveType
 
 #: Directory holding the stored full receiver data.
 INPUT_FILES = Path(__file__).parents[1] / "inputfiles"
@@ -41,6 +42,19 @@ COMMON_PARAMETERS = {
             # Corners of the 6 by 6 grid
             [0, 5, 30, 35],
             id="acoustic",
+        ),
+        pytest.param(
+            {
+                "wave_type": WaveType.ISOTROPIC_ELASTIC,
+                "source_frequency": 10.0,
+                "p_wave_velocity": 5.6,
+                "s_wave_velocity": 2.75,
+                "density": 2.0,
+            },
+            "elastic_homogeneous_cpw_reference.npz",
+            # First, middle and last of the 11 receivers
+            [0, 5, 10],
+            id="elastic",
         ),
     ],
 )
