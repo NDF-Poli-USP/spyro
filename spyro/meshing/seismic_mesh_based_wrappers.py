@@ -74,7 +74,7 @@ def create_seismicmesh_2D_mesh_with_velocity_model(mesh_parameters):
         print('entering spatial rank 0 after mesh generation')
         if mesh_parameters.comm.comm.rank == 0:
             meshio.write_points_cells(
-                "automatic_mesh.msh",
+                mesh_parameters.output_file_name,
                 points,
                 [("triangle", cells)],
                 file_format="gmsh22",
@@ -82,15 +82,17 @@ def create_seismicmesh_2D_mesh_with_velocity_model(mesh_parameters):
             )
 
             meshio.write_points_cells(
-                "automatic_mesh.vtk",
+                mesh_parameters.output_file_name + ".vtk",
                 points,
                 [("triangle", cells)],
                 file_format="vtk"
             )
 
+    # Ensemble members other than 0 read the file ensemble 0 writes
+    mesh_parameters.comm.ensemble_comm.barrier()
     mesh_parameters.comm.comm.barrier()
     mesh = FireMeshReader(
-        'automatic_mesh.msh',
+        mesh_parameters.output_file_name,
         distribution_parameters={
             "overlap_type": (DistributedMeshOverlapType.NONE, 0)
         },

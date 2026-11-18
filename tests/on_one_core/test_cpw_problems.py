@@ -1,5 +1,6 @@
 """Tests for the cells-per-wavelength problems and calculator."""
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -13,9 +14,12 @@ from spyro.receivers.Receivers import RECEIVER_STEP_OFFSET
 from spyro.tools.cells_per_wavelength_calculator import (
     ACOUSTIC,
     CPW_PROBLEMS,
+    AcousticHeterogeneousProblem,
     AcousticHomogeneousProblem,
     CpwParameters,
     CpwProblem,
+    HeterogeneousCpwProblem,
+    MaterialFileCase,
     WavePhysics,
 )
 from spyro.tools.cells_per_wavelength_calculator import calculator as calculator_module
@@ -40,14 +44,26 @@ CALCULATOR_PARAMETERS = {
     "accepted_error_threshold": 0.05,
 }
 
+#: Heterogeneous case with a given minimum velocity, so no file is read.
+VELOCITY_FILE_CASE = MaterialFileCase(
+    name="velocity",
+    length_z=3.0,
+    length_x=17.0,
+    material_files={"p_wave_velocity": "velocity.segy"},
+    minimum_velocity=1.5,
+)
 
 PROBLEM_CLASSES = [
     AcousticHomogeneousProblem,
+    AcousticHeterogeneousProblem,
 ]
 
 
 def make_problem(problem_class: type[CpwProblem], **overrides) -> CpwProblem:
     """Build a problem with typical settings and no file access.
+
+    A heterogeneous problem gets :data:`VELOCITY_FILE_CASE`, so no
+    material file is read.
 
     Parameters
     ----------
@@ -61,7 +77,14 @@ def make_problem(problem_class: type[CpwProblem], **overrides) -> CpwProblem:
     CpwProblem
         The problem.
     """
-    parameters = {**CALCULATOR_PARAMETERS, **overrides}
+    parameters = {
+        **CALCULATOR_PARAMETERS,
+        "reference_degree": 5,
+        "C_reference": 6.0,
+    }
+    if issubclass(problem_class, HeterogeneousCpwProblem):
+        parameters["heterogeneous_case"] = VELOCITY_FILE_CASE
+    parameters.update(overrides)
     return problem_class(CpwParameters(**parameters))
 
 
@@ -89,6 +112,7 @@ def test_interpolate_time_series_keeps_trailing_axes() -> None:
     "wave_type, physics, profile",
     [
         (WaveType.ISOTROPIC_ACOUSTIC, ACOUSTIC, VelocityProfileType.HOMOGENEOUS),
+        (WaveType.ISOTROPIC_ACOUSTIC, ACOUSTIC, VelocityProfileType.HETEROGENEOUS),
     ],
 )
 def test_cpw_problems_registry(
@@ -139,6 +163,29 @@ def test_problem_rejects_non_positive_mesh_frequency_factor(
     """The meshing frequency must be a positive multiple of the peak."""
     with pytest.raises(ValueError, match="mesh_frequency_factor"):
         make_problem(problem_class, mesh_frequency_factor=-1.0)
+
+
+@pytest.mark.parametrize(
+    "problem_class, case",
+    [
+        (AcousticHomogeneousProblem, VELOCITY_FILE_CASE),
+        (AcousticHeterogeneousProblem, None),
+    ],
+)
+def test_problem_matches_case_to_profile(
+    problem_class: type[CpwProblem], case: MaterialFileCase | None,
+) -> None:
+    """Only heterogeneous problems have a heterogeneous case.
+
+    Parameters
+    ----------
+    problem_class : type[CpwProblem]
+        Problem to build.
+    case : MaterialFileCase or None
+        Case given to the problem, of the wrong kind for its profile.
+    """
+    with pytest.raises(ValueError, match="heterogeneous_case should be given"):
+        make_problem(problem_class, heterogeneous_case=case)
 
 
 def test_calculator_rejects_unregistered_problem(monkeypatch) -> None:
@@ -215,13 +262,14 @@ def test_mesh_frequency_factor_scales_mesh_size(
             """
             requested.update(input_mesh_parameters)
 
-        def set_initial_velocity_model(self, constant: float) -> None:
-            """Accept and ignore a constant velocity.
+        def set_initial_velocity_model(self, **velocity: object) -> None:
+            """Accept and ignore the velocity, constant or from a file.
 
             Parameters
             ----------
-            constant : float
-                Constant velocity set by the problem.
+            **velocity
+                Keyword arguments of `Wave.set_initial_velocity_model`, e.g.
+                `constant` or `new_file` and `fast_interpolate`.
             """
 
     problem.setup_wave(RecordingWave(), cpw)
@@ -243,27 +291,73 @@ def test_interpolate_time_series_applies_time_shift() -> None:
 
 
 @pytest.mark.parametrize(
-    "problem_class, expected_steps",
+    "problem_class, expected_shift",
     [
-        (AcousticHomogeneousProblem, RECEIVER_STEP_OFFSET),
+        # Analytical: the whole receiver offset of the solve
+        (AcousticHomogeneousProblem, RECEIVER_STEP_OFFSET * 2e-3),
+        # Numerical: the reference already holds its own offset
+        (AcousticHeterogeneousProblem, RECEIVER_STEP_OFFSET * (2e-3 - 1e-4)),
     ],
 )
 def test_reference_time_shift(
     problem_class: type[CpwProblem],
-    expected_steps: float,
+    expected_shift: float,
 ) -> None:
-    """Analytical references are resampled with the receiver offset."""
+    """References are shifted by the receiver offset they do not hold."""
     wave = SimpleNamespace(dt=2e-3)
 
-    shift = make_problem(problem_class).reference_time_shift(wave)
+    shift = make_problem(problem_class).reference_time_shift(wave, 1e-4)
 
-    assert np.isclose(shift, expected_steps * wave.dt)
+    assert np.isclose(shift, expected_shift)
+
+
+@pytest.mark.parametrize("solver_dt", [5e-4, 1e-3, 2e-3])
+def test_numerical_reference_resamples_onto_solve_times(solver_dt: float) -> None:
+    """A reference solved at another dt matches the solve after resampling.
+
+    Both records hold a Ricker wavelet at `(i + RECEIVER_STEP_OFFSET) * dt`,
+    as receiver data does. Each solver step is a whole number of reference
+    steps, so the shifted samples land on reference samples and match
+    exactly.
+
+    Parameters
+    ----------
+    solver_dt : float
+        Time step of the forward solve.
+    """
+    final_time, reference_dt, frequency = 1.0, 1e-4, 5.0
+
+    def recorded(dt: float) -> np.ndarray:
+        """Return a Ricker trace sampled as receiver data at a time step.
+
+        Parameters
+        ----------
+        dt : float
+            Time step of the record.
+
+        Returns
+        -------
+        np.ndarray
+            The trace, shaped `(n_time, 1)`.
+        """
+        steps = np.arange(round(final_time / dt) + 1) + RECEIVER_STEP_OFFSET
+        argument = (np.pi * frequency * (steps * dt - 1.0 / frequency)) ** 2
+        return ((1.0 - 2.0 * argument) * np.exp(-argument))[:, np.newaxis]
+
+    problem = make_problem(AcousticHeterogeneousProblem)
+    shift = problem.reference_time_shift(SimpleNamespace(dt=solver_dt), reference_dt)
+    resampled = interpolate_time_series(
+        recorded(reference_dt), solver_dt, final_time=final_time, time_shift=shift
+    )
+
+    assert np.allclose(resampled, recorded(solver_dt), rtol=0.0, atol=1e-12)
 
 
 @pytest.mark.parametrize(
     "problem_class, expected",
     [
         (AcousticHomogeneousProblem, "acoustic_homogeneous_cpw_reference.npz"),
+        (AcousticHeterogeneousProblem, "acoustic_heterogeneous_cpw_reference.npz"),
     ],
 )
 def test_default_reference_file(
@@ -292,6 +386,60 @@ def test_homogeneous_reference_is_analytical(monkeypatch) -> None:
     )
 
     assert problem.reference_solution(initial_wave, "mass_lumped_triangle") is reference
+
+
+def test_heterogeneous_reference_uses_reference_discretization(monkeypatch) -> None:
+    """A heterogeneous reference is solved at the reference degree and cpw.
+
+    It also saves its pressure field under the case name.
+    """
+    problem = make_problem(AcousticHeterogeneousProblem)
+    reference = np.ones((3, 2))
+    built = {}
+
+    def build_wave(dictionary: dict, cpw: float) -> SimpleNamespace:
+        """Record the reference discretization instead of building a wave.
+
+        Parameters
+        ----------
+        dictionary : dict
+            Model dictionary of the reference.
+        cpw : float
+            Cells-per-wavelength of the reference.
+
+        Returns
+        -------
+        SimpleNamespace
+            Stand-in wave whose solve returns ``reference``.
+        """
+        built.update(dictionary, cpw=cpw)
+        return SimpleNamespace(
+            forward_solve=lambda: None, forward_solution_receivers=reference
+        )
+
+    monkeypatch.setattr(
+        problem,
+        "model_dictionary",
+        lambda method, degree: {
+            "method": method,
+            "degree": degree,
+            "visualization": {"forward_output": False},
+        },
+    )
+    monkeypatch.setattr(problem, "build_wave", build_wave)
+
+    result = problem.reference_solution(None, "mass_lumped_triangle")
+
+    assert result is reference
+    assert built == {
+        "method": "mass_lumped_triangle",
+        "degree": 5,
+        "visualization": {
+            "forward_output": True,
+            "forward_output_filename": "results/velocity_reference_forward_output.pvd",
+        },
+        "cpw": 6.0,
+    }
 
 
 def test_acoustic_analytical_reference_has_no_receiver_offset(monkeypatch) -> None:
@@ -490,6 +638,134 @@ def test_loaded_reference_must_match_time_axis(tmp_path, monkeypatch) -> None:
         )
 
 
+#: Heterogeneous case with a short time axis and two receivers, so a fake
+#: reference stays small.
+SMALL_VELOCITY_FILE_CASE = replace(
+    VELOCITY_FILE_CASE,
+    receiver_locations=[(-1.0, 5.0), (-1.0, 6.0)],
+    final_time=0.1,
+    dt=1e-2,
+)
+
+#: Calculator parameters of a heterogeneous acoustic search, with no file access.
+HETEROGENEOUS_CALCULATOR_PARAMETERS = {
+    **CALCULATOR_PARAMETERS,
+    "heterogeneous_case": SMALL_VELOCITY_FILE_CASE,
+    "reference_degree": 3,
+    "C_reference": 4.0,
+}
+
+
+def fake_numerical_reference(
+    problem: CpwProblem, initial_wave, method: str
+) -> np.ndarray:
+    """Return distinct receiver data shaped like a numerical reference.
+
+    Parameters
+    ----------
+    problem : CpwProblem
+        Problem whose reference is replaced.
+    initial_wave : Wave
+        Wave object holding the acquisition and time axis.
+    method : str
+        Finite element method of the reference, unused.
+
+    Returns
+    -------
+    np.ndarray
+        Data from :func:`fake_analytical_solution`.
+    """
+    return fake_analytical_solution(problem, initial_wave)
+
+
+def test_heterogeneous_reference_saves_and_loads(tmp_path, monkeypatch) -> None:
+    """A heterogeneous reference, with text and bool metadata, loads again.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Working directory of the saved reference.
+    monkeypatch : pytest.MonkeyPatch
+        Replaces the reference solve and the working directory.
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        AcousticHeterogeneousProblem, "reference_solution", fake_numerical_reference
+    )
+    saved = spyro.tools.MeshingParameterCalculator(
+        {**HETEROGENEOUS_CALCULATOR_PARAMETERS, "save_reference": True}
+    )
+
+    loaded = spyro.tools.MeshingParameterCalculator(
+        {**HETEROGENEOUS_CALCULATOR_PARAMETERS, "load_reference": True}
+    )
+
+    assert np.array_equal(loaded.reference_solution, saved.reference_solution)
+
+
+@pytest.mark.parametrize(
+    "overrides, mismatched",
+    [
+        ({"FEM_method_to_evaluate": "spectral_quadrilateral"}, "method"),
+        ({"reference_degree": 4}, "reference_degree"),
+        ({"C_reference": 5.0}, "cpw_reference"),
+        ({"mesh_frequency_factor": 3.0}, "mesh_frequency"),
+        (
+            {"heterogeneous_case": replace(SMALL_VELOCITY_FILE_CASE, name="other")},
+            "case_name",
+        ),
+        (
+            {"heterogeneous_case": replace(SMALL_VELOCITY_FILE_CASE, length_x=16.0)},
+            "length_x",
+        ),
+        (
+            {
+                "heterogeneous_case": replace(
+                    SMALL_VELOCITY_FILE_CASE, minimum_velocity=2.0
+                )
+            },
+            "minimum_wavelength_velocity",
+        ),
+        ({"velocity_adapted_mesh": True}, "velocity_adapted_mesh"),
+    ],
+)
+def test_loaded_heterogeneous_reference_must_match_settings(
+    tmp_path,
+    monkeypatch,
+    overrides: dict,
+    mismatched: str,
+) -> None:
+    """A heterogeneous reference saved for another discretization is rejected.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Working directory of the saved reference.
+    monkeypatch : pytest.MonkeyPatch
+        Replaces the reference solve and the working directory.
+    overrides : dict
+        Parameters of the load that differ from the save.
+    mismatched : str
+        Metadata key the error must name.
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        AcousticHeterogeneousProblem, "reference_solution", fake_numerical_reference
+    )
+    spyro.tools.MeshingParameterCalculator(
+        {**HETEROGENEOUS_CALCULATOR_PARAMETERS, "save_reference": True}
+    )
+
+    with pytest.raises(ValueError, match=f"different .*{mismatched}"):
+        spyro.tools.MeshingParameterCalculator(
+            {
+                **HETEROGENEOUS_CALCULATOR_PARAMETERS,
+                "load_reference": True,
+                **overrides,
+            }
+        )
+
+
 def test_parameters_reject_reference_file_without_npz_suffix() -> None:
     """Other suffixes are rejected, since `np.savez` would append `.npz`."""
     with pytest.raises(ValidationError, match=r"\.npz"):
@@ -594,6 +870,15 @@ def test_parameters_from_dict_rejects_unknown_keys() -> None:
     """Unknown keys, such as typos, are rejected."""
     with pytest.raises(ValidationError, match="C_inital"):
         CpwParameters(**{**CALCULATOR_PARAMETERS, "C_inital": 2.0})
+
+
+def test_parameters_infer_heterogeneous_profile() -> None:
+    """A heterogeneous case makes the profile heterogeneous by default."""
+    parameters = CpwParameters(
+        **{**CALCULATOR_PARAMETERS, "heterogeneous_case": VELOCITY_FILE_CASE}
+    )
+
+    assert parameters.velocity_profile_type is VelocityProfileType.HETEROGENEOUS
 
 
 def test_parameters_from_dict_names_missing_keys() -> None:
