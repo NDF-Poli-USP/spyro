@@ -208,8 +208,49 @@ class Read_options(BaseModel):
 
 
 class Read_outputs(BaseModel):
+    """Read the visualization section of the input dictionary.
+
+    Every output filename in this section is relative to `output_folder`, and
+    `output_folder` itself is relative to the working directory. Absolute paths are
+    used as given.
+
+    Attributes
+    ----------
+    forward_output : bool
+        Whether the forward wavefield is written.
+    forward_output_filename : str or None
+        File for the forward wavefield. Default is `"fields/forward_output.pvd"`.
+    gradient_filename : str or None
+        File for the gradient.
+    gradient_output : bool
+        Whether the gradient is written.
+    adjoint_filename : str or None
+        File for the adjoint wavefield.
+    adjoint_output : bool
+        Whether the adjoint wavefield is written.
+    time_filename : str or None
+        File for the sampled times. Times are only saved when it is given.
+    time : bool
+        Whether the sampled times are recorded.
+    acoustic_energy_filename : str or None
+        File for the acoustic energy. Default is
+        `"functionals/acoustic_energy.npy"`.
+    acoustic_energy : bool
+        Whether the acoustic energy is recorded.
+    mechanical_energy_filename : str or None
+        File for the mechanical energy. Default is
+        `"functionals/mechanical_energy.npy"`.
+    mechanical_energy : bool
+        Whether the mechanical energy is recorded.
+    output_folder : str
+        Root folder of every output not written to an absolute path. Default is
+        `"output/"`.
+    debug_output : bool
+        Whether intermediate fields, such as the initial velocity model, are written.
+    """
+
     forward_output: bool = True
-    forward_output_filename: str | None = "results/forward_output.pvd"
+    forward_output_filename: str | None = "fields/forward_output.pvd"
 
     gradient_filename: str | None = None
     gradient_output: bool = False
@@ -220,10 +261,10 @@ class Read_outputs(BaseModel):
     time_filename: str | None = None
     time: bool = False
 
-    acoustic_energy_filename: str | None = None
+    acoustic_energy_filename: str | None = "functionals/acoustic_energy.npy"
     acoustic_energy: bool = False
 
-    mechanical_energy_filename: str | None = None
+    mechanical_energy_filename: str | None = "functionals/mechanical_energy.npy"
     mechanical_energy: bool = False
 
     output_folder: str = "output/"

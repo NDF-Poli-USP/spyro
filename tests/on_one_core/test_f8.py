@@ -103,13 +103,13 @@ def wave_dict(dt_usu, layer_shape, degree_layer,
     # Define parameters for visualization
     dictionary["visualization"] = {
         "forward_output": True,
-        "forward_output_filename": "output/forward/fw_output.pvd",
+        "forward_output_filename": "forward/fw_output.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
         "gradient_output": False,
         "gradient_filename": None,
         "acoustic_energy": True,  # Activate energy calculation
-        "acoustic_energy_filename": "output/preamble/acoustic_potential_energy",
+        "acoustic_energy_filename": "preamble/acoustic_potential_energy",
     }
 
     return dictionary

@@ -161,7 +161,7 @@ def test_fwi_automated_adjoint(tmp_path, monkeypatch):
     # The optimum is written back into the driver and the solver alike.
     assert np.allclose(fwi.control_parameter_result.dat.data_ro, values)
     assert np.allclose(fwi.wave.c.dat.data_ro, values)
-    assert (tmp_path / "result.npy").exists()
+    assert (tmp_path / "output" / "fwi" / "result.npy").exists()
 
 
 @pytest.mark.newer_firedrake

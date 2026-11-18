@@ -1,4 +1,5 @@
 from abc import abstractmethod, ABCMeta
+import os
 import warnings
 import firedrake as fire
 from spyro.mpi.spyro_mpi import SpyroEnsemble
@@ -426,7 +427,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 "firedrake function or new file name (segy or hdf5)."
             )
         if output:
-            SpyroEnsemble.write_vtk("initial_velocity_model.pvd", self.initial_velocity_model, name="velocity")
+            SpyroEnsemble.write_vtk(
+                os.path.join(
+                    self.output_folder, "velocity_models", "initial_velocity_model.pvd"
+                ),
+                self.initial_velocity_model,
+                name="velocity",
+            )
 
     def _map_sources_and_receivers(self):
         if self.source_type == "ricker":
