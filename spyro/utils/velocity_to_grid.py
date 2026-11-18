@@ -8,7 +8,13 @@ from ..domains.space import create_function_space
 from ..io import write_function_to_grid
 
 
-def velocity_to_grid(velocity_function, mesh_parameters, grid_spacing, output=False):
+def velocity_to_grid(
+    velocity_function,
+    mesh_parameters,
+    grid_spacing,
+    output=False,
+    orientation: str = "zx",
+):
     """
     Convert velocity model to a regular grid with specified spacing.
 
@@ -27,13 +33,18 @@ def velocity_to_grid(velocity_function, mesh_parameters, grid_spacing, output=Fa
     output : bool, optional
         If True, save the gridded velocity to a VTK file for visualization.
         Default is False.
+    orientation : {"zx", "xz"}, optional
+        Axis order of `vp_values`, passed to `write_function_to_grid`. `"zx"`
+        (default) gives `(nz, nx)` or `(nz, nx, ny)`; `"xz"` gives `(nx, nz)`
+        or `(nx, nz, ny)`.
 
     Returns
     -------
     grid_velocity_data : dict
         Dictionary containing:
         - 'vp_values' : ndarray
-            Velocity values on the regular grid.
+            Velocity values on the regular grid, in the axis order given by
+            `orientation`, with the deepest z first.
         - 'grid_spacing' : float
             The grid spacing used.
         - 'length_z' : float
@@ -44,6 +55,11 @@ def velocity_to_grid(velocity_function, mesh_parameters, grid_spacing, output=Fa
             Domain length in y-direction (None for 2D).
         - 'abc_pad_length' : float
             Length of absorbing boundary padding.
+
+    Raises
+    ------
+    ValueError
+        If `orientation` is not `"zx"` or `"xz"`.
 
     Notes
     -----
@@ -68,7 +84,7 @@ def velocity_to_grid(velocity_function, mesh_parameters, grid_spacing, output=Fa
         mesh_parameters,
         grid_spacing,
     )
-    z = write_function_to_grid(u, V, grid_spacing, buffer=True)
+    z = write_function_to_grid(u, V, grid_spacing, buffer=True, orientation=orientation)
     if output:
         SpyroEnsemble.write_vtk("debug_velocity_to_grid.pvd", u)
 
@@ -179,11 +195,12 @@ def scalar_conditional_to_grid(
     grid_spacing,
     pad_dictionary=None,
     output=False,
+    orientation: str = "zx",
 ):
     """Convert a scalar conditional expression to a regular grid.
 
     The function builds a structured Firedrake mesh from the supplied domain
-    dimensions and spacing, interpolates ``conditional`` onto a CG1 space, and
+    dimensions and spacing, interpolates `conditional` onto a CG1 space, and
     exports the result as a grid-friendly velocity dictionary.
 
     Parameters
@@ -191,14 +208,18 @@ def scalar_conditional_to_grid(
     conditional : firedrake.ufl.Expr
         Scalar conditional expression to interpolate on the grid.
     domain_dimensions : sequence of float
-        Domain lengths in kilometers. Use ``(length_z, length_x)`` for 2D or
-        ``(length_z, length_x, length_y)`` for 3D.
+        Domain lengths in kilometers. Use `(length_z, length_x)` for 2D or
+        `(length_z, length_x, length_y)` for 3D.
     grid_spacing : float
         Uniform spacing for the generated grid in kilometers.
     pad_dictionary : dict, optional
         Extra mesh parameters to merge into the generated mesh dictionary.
     output : bool, optional
         Reserved for future use. Present for API consistency.
+    orientation : {"zx", "xz"}, optional
+        Axis order of `vp_values`, as in `velocity_to_grid`. `"zx"` (default)
+        gives `(nz, nx)` or `(nz, nx, ny)`; `"xz"` gives `(nx, nz)` or
+        `(nx, nz, ny)`.
 
     Returns
     -------
@@ -209,7 +230,8 @@ def scalar_conditional_to_grid(
     Raises
     ------
     ValueError
-        If ``domain_dimensions`` does not contain 2 or 3 entries.
+        If `domain_dimensions` does not contain 2 or 3 entries, or if
+        `orientation` is not `"zx"` or `"xz"`.
 
     Examples
     --------
@@ -245,4 +267,10 @@ def scalar_conditional_to_grid(
     # Creating a mesh that is a regular grid as well
     mesh_parameters = MeshingParameters(input_mesh_dictionary=dictionary)
 
-    return velocity_to_grid(conditional, mesh_parameters, grid_spacing, output=False)
+    return velocity_to_grid(
+        conditional,
+        mesh_parameters,
+        grid_spacing,
+        output=False,
+        orientation=orientation,
+    )

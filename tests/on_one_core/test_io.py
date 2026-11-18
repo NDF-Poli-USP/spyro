@@ -1,5 +1,6 @@
 import firedrake as fire
 import math
+import numpy as np
 import pytest
 import spyro
 from spyro.mpi.spyro_mpi import SpyroEnsemble
@@ -95,6 +96,98 @@ def test_saving_and_loading_shot_record():
     wave_obj_loading = spyro.AcousticWave(dictionary=dictionary)
     wave_obj_loading.set_mesh(input_mesh_parameters={"edge_length": 0.02})
     spyro.io.load_shots(wave_obj_loading, file_name="test_shot_record")
+
+
+# Slope of the linear field used by the grid tests, along depth, x and y.
+DEPTH_SLOPE, X_SLOPE, Y_SLOPE = 100.0, 10.0, 1.0
+
+
+def _linear_field(
+    lengths: tuple[float, ...], grid_spacing: float
+) -> tuple[fire.Function, fire.FunctionSpace]:
+    """Interpolate a field that grows with depth, x and y at different rates.
+
+    Parameters
+    ----------
+    lengths : tuple of float
+        `(length_z, length_x)` or `(length_z, length_x, length_y)`.
+    grid_spacing : float
+        Mesh edge length.
+
+    Returns
+    -------
+    firedrake.Function
+        The field on a CG1 space of a spyro `(z, x[, y])` mesh.
+    firedrake.FunctionSpace
+        That CG1 space.
+    """
+    dimension = len(lengths)
+    mesh_parameters = spyro.meshing.MeshingParameters(
+        input_mesh_dictionary={
+            "length_z": lengths[0],
+            "length_x": lengths[1],
+            "length_y": lengths[2] if dimension == 3 else 0.0,
+            "mesh_type": "firedrake_mesh",
+            "edge_length": grid_spacing,
+            "dimension": dimension,
+        }
+    )
+    mesh = spyro.meshing.AutomaticMesh(mesh_parameters=mesh_parameters).create_mesh()
+    coordinates = fire.SpatialCoordinate(mesh)
+    field = DEPTH_SLOPE * (-coordinates[0]) + X_SLOPE * coordinates[1]
+    if dimension == 3:
+        field = field + Y_SLOPE * coordinates[2]
+    V = fire.FunctionSpace(mesh, "CG", 1)
+    return fire.Function(V).interpolate(field), V
+
+
+@pytest.mark.parametrize("orientation", ["zx", "xz"])
+@pytest.mark.parametrize(
+    "lengths, grid_spacing",
+    [((1.0, 2.0), 0.1), ((0.4, 0.6, 0.2), 0.1)],
+    ids=["2d", "3d"],
+)
+def test_write_function_to_grid_orientation(
+    lengths: tuple[float, ...], grid_spacing: float, orientation: str
+) -> None:
+    """Check the axis order of the grid on a non-square domain.
+
+    With `"zx"` the axes are `(z, x[, y])`, with `"xz"` they are `(x, z[, y])`;
+    z always runs from the deepest point up.
+
+    Parameters
+    ----------
+    lengths : tuple of float
+        Domain lengths, `(length_z, length_x[, length_y])`.
+    grid_spacing : float
+        Grid spacing, also used as the mesh edge length.
+    orientation : str
+        Axis order to request.
+    """
+    function, V = _linear_field(lengths, grid_spacing)
+    grid = spyro.io.write_function_to_grid(
+        function, V, grid_spacing, buffer=True, orientation=orientation
+    )
+
+    z_axis, x_axis = (0, 1) if orientation == "zx" else (1, 0)
+    axes = {z_axis: (lengths[0], -DEPTH_SLOPE), x_axis: (lengths[1], X_SLOPE)}
+    if len(lengths) == 3:
+        axes[2] = (lengths[2], Y_SLOPE)
+    assert grid.ndim == len(lengths)
+    for axis, (length, slope) in axes.items():
+        assert abs(grid.shape[axis] - (length / grid_spacing + 1)) <= 1
+        steps = np.diff(grid, axis=axis)
+        # The buffer keeps the grid a little inside the domain, so a step is
+        # up to 5% shorter than grid_spacing; the slopes differ by a factor 10.
+        assert np.allclose(steps, steps.flat[0])
+        assert np.isclose(steps.flat[0], slope * grid_spacing, rtol=0.1)
+
+
+def test_write_function_to_grid_rejects_unknown_orientation() -> None:
+    """Reject an orientation other than `"zx"` and `"xz"`."""
+    function, V = _linear_field((1.0, 2.0), 0.1)
+    with pytest.raises(ValueError, match="orientation must be one of"):
+        spyro.io.write_function_to_grid(function, V, 0.1, orientation="z_x")
 
 
 if __name__ == "__main__":

@@ -79,8 +79,9 @@ def create_grid_based_velocity_field(grid_spacing, length_z, length_x):
     -------
     tuple
         A tuple containing:
-        - grid_based_vp : array-like
-            Regular grid of velocity values (structured grid format).
+        - grid_based_vp : dict
+            Grid velocity dictionary whose `vp_values` have shape `(nz, nx)`,
+            deepest row first, as the Gmsh mesher expects.
         - cond : firedrake.Expression
             The conditional expression defining the velocity structure.
 

@@ -143,6 +143,30 @@ class SpyroEnsemble:
     def get_local_rank(cls):
         return cls.ensemble.comm.rank
 
+    @staticmethod
+    def is_root(ensemble: Ensemble | None) -> bool:
+        """Return whether this process is rank 0 of a given ensemble.
+
+        Use it to pick the one process that does a task, such as writing a
+        file, for the ensemble that the other processes then synchronize on.
+        The ensemble need not be `SpyroEnsemble.ensemble`.
+
+        Parameters
+        ----------
+        ensemble : firedrake.Ensemble or None
+            Ensemble to check. None means there is no shared communicator, so
+            each process works on its own.
+
+        Returns
+        -------
+        bool
+            True if this process has rank 0 in both the ensemble and the
+            spatial communicator of `ensemble`, or if `ensemble` is None.
+        """
+        if ensemble is None:
+            return True
+        return ensemble.ensemble_comm.rank == 0 and ensemble.comm.rank == 0
+
     @classmethod
     def print(cls, string: str, end: str = "\n") -> None:
         """Print a string once, from global rank 0.

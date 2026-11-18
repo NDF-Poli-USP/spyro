@@ -25,12 +25,15 @@ if is_firedrake_new() is False:
 
     fire.interpolate = interpolate
 
+GRID_ORIENTATIONS = ("zx", "xz")
+
 
 def write_function_to_grid(
     function: fire.Function,
     V: fire.FunctionSpace,
     grid_spacing: float,
     buffer: bool = False,
+    orientation: str = "zx",
 ):
     """Interpolate a Firedrake function to a structured grid.
 
@@ -42,14 +45,30 @@ def write_function_to_grid(
         Function space of function
     grid_spacing : float
         Spacing of grid points
-    buffer: boolean
+    buffer : bool, optional
         Determines if we use a buffer for the interpolation
+    orientation : {"zx", "xz"}, optional
+        Axis order of the result. `"zx"` (default) gives `(nz, nx)` in 2D and
+        `(nz, nx, ny)` in 3D, the layout of `create_grid_dictionary_from_segy`,
+        the solver and the Gmsh mesher. `"xz"` gives `(nx, nz)` and
+        `(nx, nz, ny)`, the layout returned before this option existed.
 
     Returns
     -------
     vi : numpy.ndarray
-        Interpolated values on grid points
+        Interpolated values on grid points, in the axis order given by
+        `orientation`, with the deepest z first.
+
+    Raises
+    ------
+    ValueError
+        If `orientation` is not `"zx"` or `"xz"`, or if `buffer` leaves no
+        room for the grid.
     """
+    if orientation not in GRID_ORIENTATIONS:
+        raise ValueError(
+            f"orientation must be one of {GRID_ORIENTATIONS}, got {orientation!r}."
+        )
     # get DoF coordinates
     mesh = V.ufl_domain()
     W = fire.VectorFunctionSpace(mesh, V.ufl_element())
@@ -108,6 +127,10 @@ def write_function_to_grid(
     elif dimension == 3:
         vi = griddata((x, y, z), v, (xi, yi, zi), method="linear")
 
+    # meshgrid's default "xy" indexing puts the second coordinate (spyro's x)
+    # first, so vi is (nx, nz) or (nx, nz, ny) here.
+    if orientation == "zx":
+        vi = np.swapaxes(vi, 0, 1)
     return vi
 
 

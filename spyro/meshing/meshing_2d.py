@@ -7,7 +7,7 @@ from .meshing_gmsh2d import (
     apply_structured_winslow_smoothing2d,
 )
 from .meshing_parameters import MeshingParameters
-from .meshing_utils import check_gmsh, create_sizing_function
+from .meshing_utils import check_gmsh, create_sizing_function, grid_velocity_values
 
 try:
     import gmsh
@@ -22,7 +22,8 @@ def generate_gmsh_2d_mesh(mesh_parameters: MeshingParameters) -> str:
     Supports an optional water interface, hyperelliptical or rectangular
     padding, and structured Winslow smoothing. The temporary SEG-Y file and
     mesh are written only by the process with both ensemble and spatial
-    rank 0, or by the current process when the ensemble is uninitialized.
+    rank 0 of `mesh_parameters.comm`, or by the current process when no
+    communicator is supplied.
 
     Parameters
     ----------
@@ -36,24 +37,38 @@ def generate_gmsh_2d_mesh(mesh_parameters: MeshingParameters) -> str:
         temporary SEG-Y file written from a grid `velocity_model`).
         Every rank returns the same path.
 
+    Raises
+    ------
+    ValueError
+        If neither velocity input is set, or if a grid `velocity_model` is not
+        2-D or is laid out as `(nx, nz)` (see `grid_velocity_values`).
+
     Notes
     -----
+    A grid `velocity_model["vp_values"]` must have shape `(nz, nx)` with row 0
+    the deepest, the layout of `create_grid_dictionary_from_segy` and of the
+    solver's grid velocity input. It is checked on every rank, before the
+    writer rank meshes.
+
     The caller must synchronize ranks before loading the generated mesh.
     """
-    is_writer = SpyroEnsemble.ensemble is None or (
-        SpyroEnsemble.get_ensemble_rank() == 0 and SpyroEnsemble.get_local_rank() == 0
-    )
-    # TODO: make this check a method in SpyroEnsemble in the future.
+    # The same communicator that AutomaticMesh._load_mesh_file waits on.
+    is_writer = SpyroEnsemble.is_root(mesh_parameters.comm)
 
     if mesh_parameters.segy_velocity_model is not None:
         velocity_model_file = mesh_parameters.segy_velocity_model
 
     elif mesh_parameters.velocity_model is not None:
         velocity_model_file = "tmp_velocity_model.segy"
+        vp = grid_velocity_values(
+            mesh_parameters.velocity_model,
+            mesh_parameters.length_z,
+            mesh_parameters.length_x,
+        )
         if is_writer:
-            vp = np.asarray(mesh_parameters.velocity_model["vp_values"])
-            vp_for_gmsh = np.ascontiguousarray(vp)
-            create_segy_from_grid(vp_for_gmsh, velocity_model_file)
+            # rotate=True writes an (nz, nx) array, deepest row first, as one
+            # trace per column with the surface sample first.
+            create_segy_from_grid(vp, velocity_model_file, rotate=True)
 
     else:
         raise ValueError(

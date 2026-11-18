@@ -88,5 +88,40 @@ def test_scalar_conditional_to_grid():
         assert np.isclose(velocity, 1.0)
 
 
+def test_scalar_conditional_to_grid_orientation():
+    """Pass `orientation` to `write_function_to_grid`, with `"zx"` by default.
+
+    The domain is not square, so the two layouts have different shapes.
+    """
+    length_z, length_x, grid_spacing = 1.0, 2.0, 0.1
+    mesh_parameters = MeshingParameters(
+        input_mesh_dictionary={
+            "length_z": length_z,
+            "length_x": length_x,
+            "length_y": 0.0,
+            "mesh_type": "firedrake_mesh",
+            "edge_length": grid_spacing,
+            "dimension": 2,
+        }
+    )
+    mesh = AutomaticMesh(mesh_parameters=mesh_parameters).create_mesh()
+    mesh_z, mesh_x = fire.SpatialCoordinate(mesh)
+    grids = {
+        orientation: np.asarray(
+            scalar_conditional_to_grid(
+                conditional=-100.0 * mesh_z + mesh_x,
+                domain_dimensions=(length_z, length_x),
+                grid_spacing=grid_spacing,
+                **({} if orientation is None else {"orientation": orientation}),
+            )["vp_values"]
+        )
+        for orientation in (None, "zx", "xz")
+    }
+
+    assert grids[None].shape == (11, 21)
+    assert np.array_equal(grids[None], grids["zx"])
+    assert np.array_equal(grids["zx"], np.swapaxes(grids["xz"], 0, 1))
+
+
 if __name__ == "__main__":
     test_scalar_conditional_to_grid()

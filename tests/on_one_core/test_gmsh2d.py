@@ -1,15 +1,24 @@
 import importlib.util
+from collections.abc import Callable
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import firedrake as fire
 import meshio
 import numpy as np
 import pytest
 
-from spyro.io.segy_io import create_segy_from_grid
+from spyro.io.segy_io import (
+    create_grid_dictionary_from_segy,
+    create_segy_from_grid,
+    read_segy_velocity_model,
+)
 from spyro.meshing import meshing_2d, meshing_winslow2d
+from spyro.meshing.meshing_functions import AutomaticMesh
 from spyro.meshing.meshing_parameters import MeshingParameters
-from spyro.meshing.meshing_utils import create_sizing_function, read_segy_velocity_model
+from spyro.meshing.meshing_utils import create_sizing_function
+from spyro.mpi.spyro_mpi import SpyroEnsemble
+from spyro.utils import scalar_conditional_to_grid
 
 from .gmsh_mesh_checks import (
     VELOCITY_MODELS_DIR,
@@ -24,6 +33,8 @@ from .gmsh_mesh_checks import (
     hyperellipse_area,
     measure,
     physical_groups,
+    water_depths_at_edges,
+    write_segy_traces,
 )
 
 
@@ -252,12 +263,58 @@ def test_gmsh2d_writes_valid_files(
     assert_cell_count(mesh, 15)
     assert_bounds(mesh, (-LENGTH_Z, 0.0), (0.0, LENGTH_X))
     if use_grid:
+        # The grid is (nz, nx), deepest row first; read back in the same layout.
         written_grid, _, _ = read_segy_velocity_model(str(temporary_model))
-        np.testing.assert_allclose(written_grid, np.flipud(velocity_grid.T))
+        np.testing.assert_allclose(written_grid, velocity_grid)
     elif preexisting_files:
         assert temporary_model.read_bytes() == b"existing velocity model"
     else:
         assert not temporary_model.exists()
+
+
+@pytest.mark.parametrize("use_grid", [True, False], ids=["grid", "segy"])
+def test_gmsh2d_only_root_of_mesh_comm_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, use_grid: bool
+) -> None:
+    """Write nothing on a process that is not rank 0 of `mesh_parameters.comm`.
+
+    `SpyroEnsemble` is left uninitialized, as when `AutomaticMesh` is used on
+    its own: the writer must come from the communicator that
+    `AutomaticMesh._load_mesh_file` waits on, not from `SpyroEnsemble`.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Directory where a writer would put the mesh and temporary SEG-Y file.
+    monkeypatch : pytest.MonkeyPatch
+        Used to run in `tmp_path` and to clear `SpyroEnsemble.ensemble`.
+    use_grid : bool
+        Whether to mesh a grid `velocity_model` instead of a SEG-Y file.
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(SpyroEnsemble, "ensemble", None)
+    comm = MagicMock()
+    comm.ensemble_comm.rank = 0
+    comm.comm.rank = 1
+    parameters = _base_gmsh2d_parameters(tmp_path / "mesh.msh")
+    parameters.update(
+        structured_mesh=True, apply_winslow=False, min_element_size=1000.0
+    )
+    if use_grid:
+        parameters.update(
+            segy_velocity_model=None,
+            velocity_model={"vp_values": 2500.0 + np.arange(60.0).reshape(10, 6)},
+        )
+    mesh_parameters = MeshingParameters(input_mesh_dictionary=parameters, comm=comm)
+
+    velocity_model_file = meshing_2d.generate_gmsh_2d_mesh(mesh_parameters)
+
+    expected_model_file = (
+        "tmp_velocity_model.segy" if use_grid else parameters["segy_velocity_model"]
+    )
+    assert velocity_model_file == expected_model_file
+    assert not (tmp_path / "mesh.msh").exists()
+    assert not (tmp_path / "tmp_velocity_model.segy").exists()
 
 
 def _check_mesh(mesh, msh_file, water_interface, padding_type) -> None:
@@ -381,3 +438,231 @@ def test_gmsh2d_unstructured(
         rtol=UNSTRUCTURED_CELL_COUNT_RTOL,
     )
     _check_mesh(mesh, parameters["output_filename"], water_interface, padding_type)
+
+
+# A model in km whose sea floor deepens from left to right, used to check the
+# layout of grid velocity models: a transposed or mirrored grid gives the wrong
+# water depths at the edges, or a water layer Gmsh cannot build.
+WATER_MODEL_LENGTH_Z = 1.0
+WATER_MODEL_LENGTH_X = 2.0
+WATER_MODEL_SPACING = 0.02
+WATER_MODEL_SAMPLES = round(WATER_MODEL_LENGTH_Z / WATER_MODEL_SPACING) + 1
+SEA_FLOOR_LEFT = 0.2
+SEA_FLOOR_RIGHT = 0.4
+ROCK_INTERFACE_DEPTH = 0.6
+
+
+def _water_model_velocity(depth, x, where: Callable):
+    """Return the water-model velocity in km/s: water over two rock layers.
+
+    Below the sea floor the velocity is 1.5 km/s above `ROCK_INTERFACE_DEPTH` and
+    2.5 km/s below it, plus the depth in km.
+
+    Parameters
+    ----------
+    depth : numpy.ndarray or ufl.core.expr.Expr
+        Positive depth in km.
+    x : numpy.ndarray or ufl.core.expr.Expr
+        Lateral position in km.
+    where : callable
+        `numpy.where` or `firedrake.conditional`.
+
+    Returns
+    -------
+    numpy.ndarray or ufl.core.expr.Expr
+        Velocity in km/s, 0 in the water.
+    """
+    sea_floor = SEA_FLOOR_LEFT + (SEA_FLOOR_RIGHT - SEA_FLOOR_LEFT) * x / (
+        WATER_MODEL_LENGTH_X
+    )
+    rock = where(depth < ROCK_INTERFACE_DEPTH, 1.5, 2.5) + depth
+    return where(depth < sea_floor, 0.0, rock)
+
+
+def _write_water_model_segy(filename: Path, n_traces: int) -> None:
+    """Write the water model to SEG-Y with segyio only.
+
+    Parameters
+    ----------
+    filename : pathlib.Path
+        SEG-Y file to write.
+    n_traces : int
+        Number of traces, evenly spaced from `x = 0` to `x = WATER_MODEL_LENGTH_X`.
+    """
+    depth = np.linspace(0.0, WATER_MODEL_LENGTH_Z, WATER_MODEL_SAMPLES)[:, None]
+    x = np.linspace(0.0, WATER_MODEL_LENGTH_X, n_traces)[None, :]
+    vp = _water_model_velocity(depth, x, np.where)
+    write_segy_traces(filename, np.broadcast_to(vp, (WATER_MODEL_SAMPLES, n_traces)))
+
+
+def _water_model_conditional_grid(orientation: str) -> dict:
+    """Sample the water model with `scalar_conditional_to_grid`.
+
+    Parameters
+    ----------
+    orientation : str
+        `orientation` passed to `scalar_conditional_to_grid`.
+
+    Returns
+    -------
+    dict
+        Grid velocity dictionary with `grid_spacing`.
+    """
+    mesh_parameters = MeshingParameters(
+        input_mesh_dictionary={
+            "length_z": WATER_MODEL_LENGTH_Z,
+            "length_x": WATER_MODEL_LENGTH_X,
+            "length_y": 0.0,
+            "mesh_type": "firedrake_mesh",
+            "edge_length": WATER_MODEL_SPACING,
+            "dimension": 2,
+        }
+    )
+    mesh = AutomaticMesh(mesh_parameters=mesh_parameters).create_mesh()
+    z, x = fire.SpatialCoordinate(mesh)
+    return scalar_conditional_to_grid(
+        conditional=_water_model_velocity(-z, x, fire.conditional),
+        domain_dimensions=(WATER_MODEL_LENGTH_Z, WATER_MODEL_LENGTH_X),
+        grid_spacing=WATER_MODEL_SPACING,
+        orientation=orientation,
+    )
+
+
+def _water_model_parameters(
+    velocity_key: str, velocity_value, output_filename: Path
+) -> dict:
+    """Return the input of an unstructured Gmsh mesh of the water model.
+
+    Parameters
+    ----------
+    velocity_key : str
+        `"segy_velocity_model"` or `"velocity_model"`.
+    velocity_value : str or dict
+        SEG-Y path or grid velocity dictionary.
+    output_filename : pathlib.Path
+        Mesh file to write.
+
+    Returns
+    -------
+    dict
+        Input mesh dictionary for `MeshingParameters`.
+    """
+    return {
+        "mesh_type": "gmsh_mesh",
+        "dimension": 2,
+        "length_z": WATER_MODEL_LENGTH_Z,
+        "length_x": WATER_MODEL_LENGTH_X,
+        "output_filename": str(output_filename),
+        velocity_key: velocity_value,
+        "cells_per_wavelength": 2.0,
+        "source_frequency": 5.0,
+        "padding_type": None,
+        "padding_x": 0.0,
+        "padding_z": 0.0,
+        "hyper_n": 4.0,
+        "hmin_segy": 0.0,
+        "grade": None,
+        "water_interface": True,
+        "water_search_value": 0.0,
+        "vp_water": 1.5,
+        "structured_mesh": False,
+        "apply_winslow": False,
+        "extend_segy": False,
+        "min_element_size": 0.1,
+        "h_padding": 0.5,
+    }
+
+
+@pytest.mark.parametrize(
+    "source, n_traces",
+    [
+        ("segy_file", 101),
+        ("segy_dictionary", 101),
+        ("segy_dictionary", WATER_MODEL_SAMPLES),
+        ("conditional", None),
+    ],
+    ids=["segy_file", "segy_dictionary", "square_segy_dictionary", "conditional"],
+)
+def test_gmsh2d_grid_velocity_model_meshes_like_model(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source: str, n_traces: int | None
+) -> None:
+    """Mesh the water model from each velocity input and check the water depths.
+
+    The `segy_file` case meshes the SEG-Y directly and checks the test itself. The
+    square case has `nz == nx`, where a transposed grid used to give no error.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Directory for the model, the mesh and the mesher's temporary SEG-Y file.
+    monkeypatch : pytest.MonkeyPatch
+        Used to run the mesher in `tmp_path`.
+    source : str
+        `"segy_file"`, `"segy_dictionary"` (grid from
+        `create_grid_dictionary_from_segy`) or `"conditional"` (grid from
+        `scalar_conditional_to_grid` with its default orientation).
+    n_traces : int or None
+        Number of SEG-Y traces; None for the conditional grid.
+    """
+    monkeypatch.chdir(tmp_path)
+    if source == "conditional":
+        velocity_key = "velocity_model"
+        velocity_value = _water_model_conditional_grid(orientation="zx")
+    else:
+        segy_file = tmp_path / "model.segy"
+        _write_water_model_segy(segy_file, n_traces)
+        if source == "segy_file":
+            velocity_key, velocity_value = "segy_velocity_model", str(segy_file)
+        else:
+            velocity_key = "velocity_model"
+            velocity_value = create_grid_dictionary_from_segy(
+                str(segy_file), WATER_MODEL_LENGTH_Z, WATER_MODEL_LENGTH_X
+            )
+            assert velocity_value["vp_values"].shape == (WATER_MODEL_SAMPLES, n_traces)
+
+    msh_file = tmp_path / "model.msh"
+    create_gmsh_mesh(_water_model_parameters(velocity_key, velocity_value, msh_file))
+
+    left, right = water_depths_at_edges(msh_file, WATER_MODEL_LENGTH_X)
+    tolerance = 1.5 * WATER_MODEL_SPACING
+    assert abs(left - SEA_FLOOR_LEFT) <= tolerance, f"water depth {left} at x = 0"
+    assert abs(right - SEA_FLOOR_RIGHT) <= tolerance, f"water depth {right} at x = L"
+
+
+@pytest.mark.parametrize("source", ["segy_dictionary", "conditional"])
+def test_gmsh2d_grid_velocity_model_rejects_nx_nz(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source: str
+) -> None:
+    """Reject a non-square grid laid out as `(nx, nz)`, before any meshing.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Directory for the model and any file the mesher might write.
+    monkeypatch : pytest.MonkeyPatch
+        Used to run the mesher in `tmp_path`.
+    source : str
+        `"segy_dictionary"` (a transposed `create_grid_dictionary_from_segy`
+        grid, with `grid_spacing_z` and `grid_spacing_x`) or `"conditional"`
+        (`scalar_conditional_to_grid` with `orientation="xz"`, with
+        `grid_spacing`).
+    """
+    monkeypatch.chdir(tmp_path)
+    if source == "conditional":
+        grid = _water_model_conditional_grid(orientation="xz")
+    else:
+        segy_file = tmp_path / "model.segy"
+        _write_water_model_segy(segy_file, 101)
+        grid = create_grid_dictionary_from_segy(
+            str(segy_file), WATER_MODEL_LENGTH_Z, WATER_MODEL_LENGTH_X
+        )
+        grid["vp_values"] = grid["vp_values"].T
+    msh_file = tmp_path / "model.msh"
+    parameters = _water_model_parameters("velocity_model", grid, msh_file)
+
+    with pytest.raises(ValueError, match=r"expects \(nz, nx\)"):
+        meshing_2d.generate_gmsh_2d_mesh(
+            MeshingParameters(input_mesh_dictionary=parameters)
+        )
+    assert not msh_file.exists()
+    assert not (tmp_path / "tmp_velocity_model.segy").exists()

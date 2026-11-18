@@ -156,7 +156,10 @@ def create_segy(function, V, grid_spacing, filename):
     """
     from ..io import write_function_to_grid  # Here to avoid circular import
 
-    velocity_grid_data = write_function_to_grid(function, V, grid_spacing, buffer=True)
+    # create_segy_from_grid without rotate expects an (nx, nz) grid.
+    velocity_grid_data = write_function_to_grid(
+        function, V, grid_spacing, buffer=True, orientation="xz"
+    )
 
     return create_segy_from_grid(velocity_grid_data, filename)
 

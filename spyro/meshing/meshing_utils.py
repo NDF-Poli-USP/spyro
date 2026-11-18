@@ -322,6 +322,80 @@ def read_segy_velocity_model(fname):
     return vp, n_samples, n_traces
 
 
+def grid_velocity_values(
+    velocity_model: dict, length_z: float, length_x: float
+) -> np.ndarray:
+    """Return the velocity array of a 2D grid `velocity_model`, checking its layout.
+
+    Parameters
+    ----------
+    velocity_model : dict
+        Grid velocity dictionary with `vp_values` of shape `(nz, nx)`, row 0
+        deepest, as returned by `create_grid_dictionary_from_segy` and by
+        `scalar_conditional_to_grid` with `orientation="zx"`. When it also
+        holds `grid_spacing_z` and `grid_spacing_x` (or `grid_spacing`), the
+        shape is checked against the model lengths.
+    length_z : float
+        Model depth. Only its absolute value is used.
+    length_x : float
+        Model width.
+
+    Returns
+    -------
+    numpy.ndarray
+        The `(nz, nx)` velocity array.
+
+    Raises
+    ------
+    ValueError
+        If `vp_values` is not 2-D, or if its shape matches `(nx, nz)` for the
+        given lengths and spacings but not `(nz, nx)`.
+
+    Notes
+    -----
+    A shape is taken to match when each dimension is within one point of
+    `length / spacing + 1`. When `nz` and `nx` are within two points of each
+    other both layouts match, so a transposed near-square grid is not detected.
+    """
+    vp = np.asarray(velocity_model["vp_values"])
+    if vp.ndim != 2:
+        raise ValueError(
+            "Grid velocity_model['vp_values'] must be a 2-D array, "
+            f"got shape {vp.shape}."
+        )
+
+    grid_spacing = velocity_model.get("grid_spacing")
+    spacing_z = velocity_model.get("grid_spacing_z") or grid_spacing
+    spacing_x = velocity_model.get("grid_spacing_x") or grid_spacing
+    if spacing_z and spacing_x:
+        expected_shape = (abs(length_z) / spacing_z + 1.0, length_x / spacing_x + 1.0)
+
+        def matches(shape: tuple[int, int]) -> bool:
+            """Return whether `shape` is within one point of `expected_shape`.
+
+            Parameters
+            ----------
+            shape : tuple of int
+                Array shape to compare.
+
+            Returns
+            -------
+            bool
+                True if both dimensions are within one point.
+            """
+            return all(abs(n - e) <= 1.0 for n, e in zip(shape, expected_shape))
+
+        if not matches(vp.shape) and matches(vp.shape[::-1]):
+            raise ValueError(
+                f"Grid velocity_model['vp_values'] has shape {vp.shape}, which is "
+                "(nx, nz) for this model. The Gmsh mesher expects (nz, nx) with "
+                "row 0 deepest, as returned by create_grid_dictionary_from_segy "
+                "and by scalar_conditional_to_grid(..., orientation='zx'); "
+                "transpose the array."
+            )
+    return vp
+
+
 def calculate_wavelength_sizing(vp, wl, freq):
     """Calculate the target element size based on a wavelength criterion.
 

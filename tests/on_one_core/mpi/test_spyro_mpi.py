@@ -187,3 +187,31 @@ def test_write_vtk_skipped_on_other_ensemble_members(monkeypatch):
     SpyroEnsemble.write_vtk("out.pvd", object())
 
     vtk_file.assert_not_called()
+
+
+def test_is_root_without_ensemble():
+    assert SpyroEnsemble.is_root(None)
+
+
+@pytest.mark.parametrize(
+    "ensemble_rank, local_rank, expected",
+    [(0, 0, True), (1, 0, False), (0, 1, False), (1, 1, False)],
+)
+def test_is_root_uses_the_given_ensemble(ensemble_rank, local_rank, expected):
+    """Ranks come from the ensemble passed in, not from `SpyroEnsemble.ensemble`.
+
+    Parameters
+    ----------
+    ensemble_rank : int
+        Rank in the ensemble communicator of the ensemble passed in.
+    local_rank : int
+        Rank in the spatial communicator of the ensemble passed in.
+    expected : bool
+        Whether the process is the root.
+    """
+    SpyroEnsemble.ensemble = None
+    ensemble = MagicMock()
+    ensemble.ensemble_comm.rank = ensemble_rank
+    ensemble.comm.rank = local_rank
+
+    assert SpyroEnsemble.is_root(ensemble) is expected

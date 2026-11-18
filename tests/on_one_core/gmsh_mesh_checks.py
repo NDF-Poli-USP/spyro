@@ -10,6 +10,7 @@ from pathlib import Path
 import firedrake as fire
 import gmsh
 import numpy as np
+import segyio
 
 from spyro.abc.hyp_lay import HyperLayer
 from spyro.meshing.meshing_functions import AutomaticMesh
@@ -59,6 +60,62 @@ def physical_groups(msh_file: str | Path) -> dict[int, dict[str, int]]:
         return groups
     finally:
         gmsh.finalize()
+
+
+def write_segy_traces(filename: str | Path, vp: np.ndarray) -> None:
+    """Write a 2D velocity model to SEG-Y with segyio only, one trace per column.
+
+    The file is written without spyro's own SEG-Y writer, so it can serve as an
+    independent reference for the readers and the mesher.
+
+    Parameters
+    ----------
+    filename : str or pathlib.Path
+        SEG-Y file to write.
+    vp : numpy.ndarray
+        Velocity of shape `(n_samples, n_traces)`, with sample 0 at the surface
+        and trace 0 at `x = 0`.
+    """
+    spec = segyio.spec()
+    spec.format = 5  # IEEE float32
+    spec.samples = range(vp.shape[0])
+    spec.tracecount = vp.shape[1]
+    with segyio.create(str(filename), spec) as segy:
+        for trace_index in range(vp.shape[1]):
+            segy.trace[trace_index] = vp[:, trace_index].astype(np.float32)
+
+
+def water_depths_at_edges(msh_file: str | Path, length_x: float) -> tuple[float, float]:
+    """Return the depth of the `"WaterSurface"` region at both lateral edges.
+
+    Parameters
+    ----------
+    msh_file : str or pathlib.Path
+        2D mesh file written by the mesher, in spyro `(z, x)` order.
+    length_x : float
+        Model width; the right edge is at `x = length_x`.
+
+    Returns
+    -------
+    tuple of float
+        Water depth (positive) at `x = 0` and at `x = length_x`.
+    """
+    gmsh.initialize()
+    try:
+        gmsh.option.setNumber("General.Verbosity", 0)
+        gmsh.open(str(msh_file))
+        (water_tag,) = [
+            tag
+            for dim, tag in gmsh.model.getPhysicalGroups(2)
+            if gmsh.model.getPhysicalName(dim, tag) == "WaterSurface"
+        ]
+        _, coordinates = gmsh.model.mesh.getNodesForPhysicalGroup(2, water_tag)
+    finally:
+        gmsh.finalize()
+    z, x = np.reshape(coordinates, (-1, 3))[:, :2].T
+    left = -z[np.isclose(x, 0.0, atol=1e-6)].min()
+    right = -z[np.isclose(x, length_x, atol=1e-6)].min()
+    return float(left), float(right)
 
 
 def assert_cell_count(
