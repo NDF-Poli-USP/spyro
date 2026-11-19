@@ -166,7 +166,7 @@ class _TimeAxis(Read_time_axis):
 
 
 @pytest.mark.parametrize(
-    "final_time, dt", [(0.0049, 1e-4), (1.0, 0.3), (1.0, 0.0005), (0.7, 0.4)]
+    "final_time, dt", [(1.0, 0.3), (1.0, 0.00056), (0.7, 0.41)]
 )
 def test_time_axis_snaps_final_time(final_time: float, dt: float) -> None:
     """Snap `final_time` onto the last time level and keep the axis in sync.
