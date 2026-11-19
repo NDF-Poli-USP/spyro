@@ -795,7 +795,9 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
 
     The tables were computed with Firedrake 2025.4.1. With Firedrake
     2026.10.0 all 12 cases pass, and every marked f_est converges without
-    retries. eik_min agrees within 0.02 ms (in ms, 2026.10.0 vs 2025.4.1):
+    retries; two later runs with the final test code (12 passed, 4 skipped,
+    in 55 s and 43 s) gave the same values. eik_min agrees within 0.02 ms (in ms,
+    2026.10.0 vs 2025.4.1):
 
     Case     Homogeneous         Heterogeneous
     T-2D     166.187  166.193    82.949  82.942

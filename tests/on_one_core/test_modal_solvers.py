@@ -439,7 +439,13 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
 
     texe and pmem are the runtime and the peak memory traced by Python for
     each solver, measured serially on one core with Firedrake 2025.4.1 and
-    the compilation caches already filled.
+    the compilation caches already filled. PETSc allocates its memory outside
+    Python, so pmem leaves out the MUMPS factorization of ARNOLDI and
+    LANCZOS, the GAMG preconditioner of LOBPCG and the SLEPc solves of the
+    KRYLOVSCH methods. With empty compilation caches, as in the CI, the
+    Q-3D heterogeneous case took 109 s here (setup included), against
+    about 27 s with filled caches: compiling the forms costs more than the
+    solvers.
 
     Calibration of fitting_c. The ANALYTICAL solver needs the equivalent
     velocity c_eq of a static problem with Neumann conditions on the whole
@@ -523,15 +529,15 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
 
     *RESULTS HOMOGENEOUS
     Frequency[Hz]    N2.5      (texe/pmem)     REC      (texe/pmem)
-    ANALYTICAL    0.52430 (0.186s/1.334MB) 0.46875 (0.150s/0.482MB)
-    ARNOLDI       0.51046 (0.089s/5.539MB) 0.46875 (0.077s/5.964MB)
-    LANCZOS       0.51046 (0.055s/5.189MB) 0.46875 (0.034s/5.639MB)
-    LOBPCG        0.51046 (2.637s/5.328MB) 0.46875 (1.941s/5.785MB)
-    KRYLOVSCH_CH  0.51046 (0.045s/0.113MB) 0.46875 (0.068s/0.119MB)
-    KRYLOVSCH_CG  0.51046 (0.056s/0.142MB) 0.46875 (0.060s/0.108MB)
-    KRYLOVSCH_GH  0.51046 (0.041s/0.091MB) 0.46875 (0.052s/0.133MB)
-    KRYLOVSCH_GG  0.51046 (0.048s/0.135MB) 0.46875 (0.060s/0.121MB)
-    RAYLEIGH      0.51084 (0.174s/1.208MB) 0.46875 (0.201s/1.217MB)
+    ANALYTICAL    0.52430 (0.199s/1.337MB) 0.46875 (0.130s/0.511MB)
+    ARNOLDI       0.51046 (0.097s/5.538MB) 0.46875 (0.086s/5.951MB)
+    LANCZOS       0.51046 (0.038s/5.189MB) 0.46875 (0.044s/5.641MB)
+    LOBPCG        0.51046 (0.158s/6.643MB) 0.46875 (0.154s/7.231MB)
+    KRYLOVSCH_CH  0.51046 (0.042s/0.138MB) 0.46875 (0.054s/0.111MB)
+    KRYLOVSCH_CG  0.51046 (0.055s/0.139MB) 0.46875 (0.051s/0.098MB)
+    KRYLOVSCH_GH  0.51046 (0.044s/0.089MB) 0.46875 (0.047s/0.117MB)
+    KRYLOVSCH_GG  0.51046 (0.040s/0.120MB) 0.46875 (0.043s/0.137MB)
+    RAYLEIGH      0.51084 (0.196s/1.202MB) 0.46875 (0.198s/1.168MB)
 
     *ANALYTICAL
        Case      N2.5*     REC*
@@ -547,16 +553,16 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
      0.07  84.160
 
     *RESULTS HETEROGENEOUS - fitting_c = (-0.5, 0.3, -1.5, -0.9)
-    Frequency[Hz]    N2.0      (texe/pmem)     REC      (texe/pmem)
-    ANALYTICAL    0.50526 (0.407s/1.972MB) 0.45256 (0.367s/1.922MB)
-    ARNOLDI       0.50440 (0.059s/7.663MB) 0.45539 (0.100s/8.425MB)
-    LANCZOS       0.50440 (0.050s/7.587MB) 0.45539 (0.052s/8.082MB)
-    LOBPCG        0.50440 (5.138s/7.824MB) 0.45539 (4.438s/8.282MB)
-    KRYLOVSCH_CH  0.50440 (0.063s/0.118MB) 0.45539 (0.068s/0.122MB)
-    KRYLOVSCH_CG  0.50440 (0.080s/0.131MB) 0.45539 (0.076s/0.131MB)
-    KRYLOVSCH_GH  0.50440 (0.071s/0.121MB) 0.45539 (0.069s/0.139MB)
-    KRYLOVSCH_GG  0.50440 (0.066s/0.113MB) 0.45539 (0.063s/0.121MB)
-    RAYLEIGH      0.52768 (0.166s/1.108MB) 0.47634 (0.194s/1.457MB)
+    Frequency[Hz]    N2.0       (texe/pmem)     REC       (texe/pmem)
+    ANALYTICAL    0.50526 (0.423s/ 1.818MB) 0.45256 (0.361s/ 1.663MB)
+    ARNOLDI       0.50440 (0.093s/ 7.650MB) 0.45539 (0.107s/ 8.421MB)
+    LANCZOS       0.50440 (0.066s/ 7.585MB) 0.45539 (0.053s/ 8.082MB)
+    LOBPCG        0.50440 (0.187s/ 9.731MB) 0.45539 (0.214s/10.372MB)
+    KRYLOVSCH_CH  0.50440 (0.065s/ 0.130MB) 0.45539 (0.065s/ 0.122MB)
+    KRYLOVSCH_CG  0.50440 (0.083s/ 0.122MB) 0.45539 (0.068s/ 0.120MB)
+    KRYLOVSCH_GH  0.50440 (0.070s/ 0.132MB) 0.45539 (0.067s/ 0.139MB)
+    KRYLOVSCH_GG  0.50440 (0.117s/ 0.123MB) 0.45539 (0.071s/ 0.123MB)
+    RAYLEIGH      0.52768 (0.216s/ 1.075MB) 0.47634 (0.194s/ 1.461MB)
 
     *ANALYTICAL
        Case      N2.0*     REC*
@@ -583,15 +589,15 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
 
     *RESULTS HOMOGENEOUS
     Frequency[Hz]     REC      (texe/pmem)
-    ANALYTICAL    0.46875 (0.160s/0.492MB)
-    ARNOLDI       0.46875 (0.097s/6.100MB)
-    LANCZOS       0.46875 (0.037s/5.643MB)
-    LOBPCG        0.46875 (0.916s/5.837MB)
-    KRYLOVSCH_CH  0.46875 (0.050s/0.131MB)
-    KRYLOVSCH_CG  0.46875 (0.052s/0.128MB)
-    KRYLOVSCH_GH  0.46875 (0.058s/0.120MB)
-    KRYLOVSCH_GG  0.46875 (0.045s/0.125MB)
-    RAYLEIGH      0.46875 (0.214s/1.366MB)
+    ANALYTICAL    0.46875 (0.128s/0.459MB)
+    ARNOLDI       0.46875 (0.111s/6.072MB)
+    LANCZOS       0.46875 (0.043s/5.643MB)
+    LOBPCG        0.46875 (0.072s/5.836MB)
+    KRYLOVSCH_CH  0.46875 (0.051s/0.143MB)
+    KRYLOVSCH_CG  0.46875 (0.053s/0.126MB)
+    KRYLOVSCH_GH  0.46875 (0.057s/0.124MB)
+    KRYLOVSCH_GG  0.46875 (0.055s/0.099MB)
+    RAYLEIGH      0.46875 (0.214s/1.363MB)
 
     *ANALYTICAL
        Case       REC*
@@ -608,15 +614,15 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
 
     *RESULTS HETEROGENEOUS - fitting_c = (-0.5, 0.3, -1.5, -0.9)
     Frequency[Hz]     REC      (texe/pmem)
-    ANALYTICAL    0.45832 (0.450s/2.611MB)
-    ARNOLDI       0.45542 (0.095s/8.571MB)
-    LANCZOS       0.45542 (0.048s/8.085MB)
-    LOBPCG        0.45542 (1.718s/8.377MB)
-    KRYLOVSCH_CH  0.45542 (0.073s/0.142MB)
-    KRYLOVSCH_CG  0.45542 (0.071s/0.118MB)
-    KRYLOVSCH_GH  0.45542 (0.058s/0.142MB)
-    KRYLOVSCH_GG  0.45542 (0.057s/0.129MB)
-    RAYLEIGH      0.47619 (0.212s/1.499MB)
+    ANALYTICAL    0.45832 (0.454s/2.436MB)
+    ARNOLDI       0.45542 (0.103s/8.546MB)
+    LANCZOS       0.45542 (0.050s/8.096MB)
+    LOBPCG        0.45542 (0.083s/8.374MB)
+    KRYLOVSCH_CH  0.45542 (0.065s/0.125MB)
+    KRYLOVSCH_CG  0.45542 (0.061s/0.108MB)
+    KRYLOVSCH_GH  0.45542 (0.067s/0.182MB)
+    KRYLOVSCH_GG  0.45542 (0.090s/0.143MB)
+    RAYLEIGH      0.47619 (0.214s/1.508MB)
 
     *ANALYTICAL
        Case       REC*
@@ -636,11 +642,11 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
      0.06  170.789
 
     *RESULTS HOMOGENEOUS
-    Frequency[Hz]    N6.0        (texe/pmem)     REC        (texe/pmem)
-    ANALYTICAL    0.51628 ( 0.664s/ 4.658MB) 0.47741 ( 0.572s/ 2.437MB)
-    KRYLOVSCH_CH  0.52345 ( 3.649s/ 1.703MB) 0.47727 ( 4.468s/ 1.853MB)
-    KRYLOVSCH_GH  0.52345 ( 2.739s/ 0.096MB) 0.47727 ( 3.915s/ 0.108MB)
-    RAYLEIGH      0.52678 ( 1.665s/36.201MB) 0.47727 ( 1.881s/43.245MB)
+    Frequency[Hz]    N6.0       (texe/pmem)     REC       (texe/pmem)
+    ANALYTICAL    0.51628 (0.663s/ 4.662MB) 0.47741 (0.580s/ 2.435MB)
+    KRYLOVSCH_CH  0.52345 (3.671s/ 1.703MB) 0.47727 (4.733s/ 1.864MB)
+    KRYLOVSCH_GH  0.52345 (3.026s/ 0.131MB) 0.47727 (4.148s/ 0.102MB)
+    RAYLEIGH      0.52678 (1.800s/36.168MB) 0.47727 (1.971s/43.273MB)
 
     *ANALYTICAL
        Case      N6.0*     REC*
@@ -656,11 +662,11 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
      0.06  85.344
 
     *RESULTS HETEROGENEOUS - fitting_c = (-0.9, 0.3, -2.1, -1.5)
-    Frequency[Hz]    N2.4         (texe/pmem)     REC         (texe/pmem)
-    ANALYTICAL    0.51669 ( 0.952s/  3.612MB) 0.42541 ( 1.023s/  4.554MB)
-    KRYLOVSCH_CH  0.51535 ( 6.920s/  1.891MB) 0.42562 (11.790s/  3.101MB)
-    KRYLOVSCH_GH  0.51535 ( 5.405s/  0.108MB) 0.42562 (10.352s/  0.107MB)
-    RAYLEIGH      0.54073 ( 2.617s/ 60.728MB) 0.44257 ( 3.346s/ 95.576MB)
+    Frequency[Hz]    N2.4        (texe/pmem)     REC        (texe/pmem)
+    ANALYTICAL    0.51669 ( 0.996s/ 4.280MB) 0.42541 ( 1.550s/ 3.930MB)
+    KRYLOVSCH_CH  0.51535 ( 7.187s/ 1.891MB) 0.42562 (12.094s/ 3.199MB)
+    KRYLOVSCH_GH  0.51535 ( 6.217s/ 0.131MB) 0.42562 (10.692s/ 0.109MB)
+    RAYLEIGH      0.54073 ( 2.561s/60.771MB) 0.44257 ( 3.437s/95.593MB)
 
     *ANALYTICAL
        Case      N2.4*     REC*
@@ -686,14 +692,14 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
      0.09  174.708
 
     *RESULTS HOMOGENEOUS
-    Frequency[Hz]     REC         (texe/pmem)
-    ANALYTICAL    0.47741 ( 0.542s/  3.305MB)
-    ARNOLDI       0.47727 ( 3.478s/174.049MB)
-    LANCZOS       0.47727 ( 3.072s/172.121MB)
-    LOBPCG        0.47727 ( 2.451s/174.172MB)
-    KRYLOVSCH_CG  0.47727 ( 1.584s/  0.144MB)
-    KRYLOVSCH_GG  0.47727 ( 1.728s/  0.122MB)
-    RAYLEIGH      0.47727 ( 1.841s/ 19.112MB)
+    Frequency[Hz]     REC        (texe/pmem)
+    ANALYTICAL    0.47741 (0.542s/  3.214MB)
+    ARNOLDI       0.47727 (2.281s/174.051MB)
+    LANCZOS       0.47727 (1.618s/172.121MB)
+    LOBPCG        0.47727 (0.529s/174.160MB)
+    KRYLOVSCH_CG  0.47727 (1.453s/  0.143MB)
+    KRYLOVSCH_GG  0.47727 (1.506s/  0.122MB)
+    RAYLEIGH      0.47727 (1.471s/ 19.128MB)
 
     *ANALYTICAL
        Case       REC*
@@ -709,14 +715,14 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
      0.09  87.376
 
     *RESULTS HETEROGENEOUS - fitting_c = (-0.9, 0.3, -2.1, -1.5)
-    Frequency[Hz]     REC         (texe/pmem)
-    ANALYTICAL    0.41427 ( 1.630s/  8.161MB)
-    ARNOLDI       0.41127 (19.144s/391.781MB)
-    LANCZOS       0.41127 (17.041s/389.293MB)
-    LOBPCG        0.41127 (12.145s/393.877MB)
-    KRYLOVSCH_CG  0.41127 ( 4.450s/  0.116MB)
-    KRYLOVSCH_GG  0.41127 ( 4.367s/  0.132MB)
-    RAYLEIGH      0.42935 ( 2.182s/ 38.512MB)
+    Frequency[Hz]     REC        (texe/pmem)
+    ANALYTICAL    0.41427 (1.133s/  8.218MB)
+    ARNOLDI       0.41127 (5.091s/391.774MB)
+    LANCZOS       0.41127 (3.644s/389.293MB)
+    LOBPCG        0.41127 (1.279s/393.877MB)
+    KRYLOVSCH_CG  0.41127 (4.288s/  0.144MB)
+    KRYLOVSCH_GG  0.41127 (4.446s/  0.132MB)
+    RAYLEIGH      0.42935 (2.234s/ 38.466MB)
 
     *ANALYTICAL
        Case       REC*
@@ -731,8 +737,8 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
     mem[MB]      7.528  36.147 123.922
 
     The tables were computed with Firedrake 2025.4.1. With Firedrake
-    2026.10.0 all cases pass. eik_min agrees within 0.02 ms (in ms,
-    2026.10.0 vs 2025.4.1):
+    2026.10.0 and the final code, all cases pass (12 passed, 4 skipped, in
+    141 s). eik_min agrees within 0.02 ms (in ms, 2026.10.0 vs 2025.4.1):
 
     Case     Homogeneous         Heterogeneous
     T-2D     166.187  166.193    82.949  82.942
@@ -773,12 +779,26 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
     The tolerances cover both versions. The smallest margins are Q-3D REC
     with 2026.10.0: 0.73 % for FEM and 0.61 % for RAYLEIGH.
 
-    The ANALYTICAL values of the 2026.10.0 run predate the linear static
-    space and the current fitting_c, so they are not compared. That run
-    already used the zero-mean load: its 2D ANALYTICAL frequencies were
-    identical with both versions, after differing by up to 5.8 % before the
-    zero-mean load, and its 3D ones differed by at most 1.68 %, less than
-    FEM, since only the velocity differed.
+    The ANALYTICAL frequencies of the homogeneous models and of the 2D
+    heterogeneous models are identical with both versions. In 3D the
+    heterogeneous c_eq changes with the velocity of the cells on x = 0.5, as
+    FEM does (in Hz, 2026.10.0 vs 2025.4.1, and deviation from the expected
+    value, tolerance 9 %):
+
+    Case          ANALYTICAL       Deviation
+    T-3D N2.4     0.53261 0.51669  +3.35 % (+0.26 %)
+    T-3D REC      0.43814 0.42541  +2.94 % (-0.05 %)
+    Q-3D REC      0.42305 0.41427  +2.86 % (+0.73 %)
+
+    Against the FEM frequency of its own version, ANALYTICAL is within
+    1.35 % with 2026.10.0 and 0.73 % with 2025.4.1. Before the zero-mean
+    load, the 2D ANALYTICAL frequencies differed by up to 5.8 % between the
+    versions.
+
+    With 2026.10.0 the solvers of Q-3D REC heterogeneous took 24.3 s in
+    total (ARNOLDI 6.0 s, LANCZOS 3.8 s, LOBPCG 1.2 s), and those of T-3D REC
+    heterogeneous, the slowest case, 27.9 s (KRYLOVSCH and RAYLEIGH). LOBPCG
+    reached its tolerance in every case.
     """
 
     case = (dimension, element_geometry, homogeneous, layer_shape)
