@@ -494,6 +494,17 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     differ slightly, since the velocity of the cells with a centroid on
     x = 0.5 depends on round-off (see test_modal_analytical_solver.py).
 
+    Theoretical Eikonal values. eik_min is the first-arrival time on the
+    absorbing boundaries (z = -1, x = 0, x = 1 and, in 3D, y = 0 and y = 1).
+    The source is at (z, x) = (-0.5, 0.25) km ((-0.5, 0.25, 0.5) km in 3D),
+    so the nearest absorbing boundary is x = 0, 0.25 km away, and the
+    straight ray to it stays in the medium around the source. Hence
+    eik_min = 0.25 / 1.5 = 166.667 ms in the homogeneous model (1.5 km/s) and
+    eik_min = 0.25 / 3.0 = 83.333 ms in the heterogeneous one (3.0 km/s for
+    x < 0.5).
+    Every other absorbing boundary is at least 0.5 km away in the same
+    medium, so its first arrival is at least twice as late.
+
     =======================================================
     Natural Frequency for 2D model Δx = 1000/10 m - Ele = T
     =======================================================
