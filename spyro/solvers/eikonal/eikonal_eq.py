@@ -2,7 +2,14 @@ import firedrake as fire
 import numpy as np
 from sys import float_info, exit
 from ...domains.quadrature import quadrature_rules
-from ...utils.error_management import sanitize_num_array, validate_parameter
+from ...utils.error_management import (
+    sanitize_num_array,
+    validate_firedrake_parameter,
+    validate_numeric,
+    validate_parameter,
+)
+from functools import reduce
+from ...tools.habc_tools import point_cloud_field
 from ...utils.utils import global_max, global_min
 from ...version_control import is_firedrake_new
 
@@ -66,6 +73,8 @@ class Eikonal_Modeling:
         Source locations as tuples of coordinates.
     tol : `float`, optional
         User solver tolerance. Default is 1e-16.
+    source_bc : `str`
+        Dirichlet condition at the sources: 'nearest_node' or 'local_time'.
 
     Methods
     -------
@@ -81,6 +90,8 @@ class Eikonal_Modeling:
         Provide an initial guess for the Eikonal solver.
     linear_eik()
         Assemble the linear Eikonal.
+    local_travel_time()
+        Local travel time from a source, prescribed by 'local_time'.
     linear_solution()
         Solve the linear Eikonal equation.
     nonlinear_solution()
@@ -97,6 +108,7 @@ class Eikonal_Modeling:
         degree_eik=None,
         f_est=0.03,
         tol=1e-16,
+        source_bc="nearest_node",
     ):
         """Initialize the Eikonal_Modeling class.
 
@@ -115,6 +127,11 @@ class Eikonal_Modeling:
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03.
         tol : `float`, optional
             User solver tolerance. Default is 1e-16.
+        source_bc : `str`, optional
+            Dirichlet condition at the sources (see `eikonal_bcs`). Options:
+            'nearest_node' (zero at the nearest node) or 'local_time' (local
+            travel time at every node within one cell of the source). Default
+            is 'nearest_node'.
 
         Returns
         -------
@@ -148,8 +165,17 @@ class Eikonal_Modeling:
         # User solver tolerance
         self.tol = tol
 
+        # Dirichlet condition at the sources
+        self.source_bc = validate_parameter(
+            "source_bc", source_bc, ["nearest_node", "local_time"]
+        )
+
     def eikonal_bcs(
-        self, V: fire.FunctionSpace, lmin: float
+        self,
+        V: fire.FunctionSpace,
+        lmin: float,
+        c: fire.Function | None = None,
+        c_min: float | None = None,
     ) -> tuple[list[Dir_Point_BC], fire.Function]:
         """Impose Dirichlet BCs for eikonal equation.
 
@@ -158,7 +184,14 @@ class Eikonal_Modeling:
         V : `Firedrake.FunctionSpace`
             Function space where the boundary condition is applied.
         lmin : `float`
-            Minimum mesh size, used to scale the tie tolerance between nodes.
+            Minimum mesh size. It scales the tie tolerance between nodes and
+            is the radius of the source region for 'local_time'.
+        c : `Firedrake.Function`, optional
+            Velocity model on the mesh of ``V``. Required for 'local_time',
+            ignored for 'nearest_node'. Default is `None`.
+        c_min : `float`, optional
+            Lower bound for the velocity in the local travel time, as in
+            `eikonal_solver`. Default is `None` (no bound).
 
         Returns
         -------
@@ -169,19 +202,41 @@ class Eikonal_Modeling:
 
         Raises
         ------
+        TypeError
+            If ``V`` is not a function space, or ``c`` is not a
+            `Firedrake.Function` (``c`` may be `None` only for 'nearest_node').
         ValueError
-            If a source has no node of ``V`` within the largest cell diameter
-            of the mesh, which means it lies outside the mesh.
+            If ``lmin`` or ``c_min`` is not positive, or a source has no node
+            of ``V`` within the largest cell diameter of the mesh, which means
+            it lies outside the mesh.
 
         Notes
         -----
-        Each source is snapped to its nearest node of ``V`` (all nodes at that
-        distance if there is a tie). Nodes tie when their distances differ by
-        less than ``1e-8 * lmin``, since round-off makes the distances of
-        equidistant nodes differ in the last digits. The minimum distance is a
-        collective PETSc reduction and the node selection reads the halos, so
-        every rank holds the source nodes it can see, as ``DirichletBC.nodes``
-        does.
+        With 'nearest_node', each source is snapped to its nearest node of
+        ``V`` (all nodes at that distance if there is a tie) and the Eikonal
+        is zero there. Nodes tie when their distances differ by less than
+        ``1e-8 * lmin``, since round-off makes the distances of equidistant
+        nodes differ in the last digits.
+
+        With 'local_time', every node within ``lmin`` of a source (and at
+        least its nearest nodes) takes the local travel time from the source,
+        see `local_travel_time`, and the smallest one when several sources
+        reach it. The zero condition on a patch of nodes around the source
+        makes the travel time too short by up to the patch size over the
+        velocity (first-order error in the node spacing), and tied nodes off
+        the ray from the source make it too long. Prescribing the local
+        travel time on a ball reduces this to second order, as in the source
+        initialisation of fast-marching methods. The ball should not reach
+        an absorbing boundary, otherwise the minimum Eikonal there is set by
+        the initialisation and not by the solve.
+
+        Parallel safety: the minimum distance is a collective PETSc
+        reduction, the source velocity is evaluated on a vertex-only mesh and
+        reduced over all ranks (as in `Minimum_Eikonal.ident_eik_on_bnd`), so
+        every rank builds the same local travel time. The node selection
+        reads the halos, so every rank holds the source nodes it can see, as
+        ``DirichletBC.nodes`` does, and the prescribed values are an
+        interpolated `Firedrake.Function` whose halo copies agree.
 
         The nodes of ``V`` include the cell vertices, and every point of a cell
         is within the cell diameter of its vertices. The largest cell diameter
@@ -193,6 +248,14 @@ class Eikonal_Modeling:
         not uniform, and the distance to the nearest node grows with the
         square root of the dimension.
         """
+        local_time = self.source_bc == "local_time"
+        validate_firedrake_parameter("V", V, "FunctionSpace")
+        validate_numeric("lmin", lmin, lower_bound=0.0)
+        validate_firedrake_parameter(
+            "c", c, "Function", accept_parameter_as_none=not local_time
+        )
+        validate_numeric("c_min", c_min, accept_parameter_as_none=True, lower_bound=0.0)
+
         mesh = V.mesh()
         coords = fire.SpatialCoordinate(mesh)
         dist2 = fire.Function(V)
@@ -201,6 +264,7 @@ class Eikonal_Modeling:
         radius = global_max(cell_diam)
         tie_tol = 1e-8 * lmin
         nodes = []
+        times = []
         for source in self.source_locations:
             dist2.interpolate(sum((x - s) ** 2 for x, s in zip(coords, source)))
             d2min = global_min(dist2)
@@ -209,15 +273,77 @@ class Eikonal_Modeling:
                     f"Source {source} has no mesh node within {radius} km, "
                     "the largest cell diameter, so it lies outside the mesh."
                 )
-            d2tie = (np.sqrt(d2min) + tie_tol) ** 2
-            nodes.append(np.flatnonzero(dist2.dat.data_ro_with_halos <= d2tie))
+            d_set = max(np.sqrt(d2min), lmin) if local_time else np.sqrt(d2min)
+            d2set = (d_set + tie_tol) ** 2
+            nodes.append(np.flatnonzero(dist2.dat.data_ro_with_halos <= d2set))
+            if local_time:
+                times.append(self.local_travel_time(source, coords, c, c_min=c_min))
         nodes = np.unique(np.concatenate(nodes))
+
+        if local_time:
+            value = fire.Function(V).interpolate(reduce(fire.min_value, times))
+        else:
+            value = fire.Constant(0.0)
 
         sou_marker = fire.Function(V, name="source_marker")
         Dir_Point_BC(V, fire.Constant(1.0), nodes).apply(sou_marker)
-        bcs_eik = [Dir_Point_BC(V, fire.Constant(0.0), nodes)]
+        bcs_eik = [Dir_Point_BC(V, value, nodes)]
 
         return bcs_eik, sou_marker
+
+    @staticmethod
+    def local_travel_time(
+        source: tuple[float, ...],
+        coords: fire.SpatialCoordinate,
+        c: fire.Function,
+        c_min: float | None = None,
+    ):
+        """Return the local travel time from a source as a UFL expression.
+
+        Parameters
+        ----------
+        source : `tuple`
+            Source coordinates.
+        coords : `ufl.SpatialCoordinate`
+            Spatial coordinates of the mesh of ``c``.
+        c : `Firedrake.Function`
+            Velocity model.
+        c_min : `float`, optional
+            Lower bound for the velocity. Default is `None` (no bound).
+
+        Returns
+        -------
+        `ufl.core.expr.Expr`
+            Travel time ``||x - s|| (1 / c(s) + 1 / c(x)) / 2``.
+
+        Raises
+        ------
+        TypeError
+            If ``c`` is not a `Firedrake.Function`.
+        ValueError
+            If ``c_min`` is not positive.
+
+        Notes
+        -----
+        The slowness along the straight segment from the source to ``x`` is
+        averaged with the trapezoidal rule. The time is exact in a homogeneous
+        medium and its error is second order in ``||x - s||`` where the
+        velocity is smooth; across a discontinuity it is bounded by
+        ``||x - s||`` times the jump of the slowness. The velocity at the source
+        is evaluated on a vertex-only mesh by every rank and reduced with
+        `global_min`, so it is the same on every rank.
+        """
+        validate_firedrake_parameter("c", c, "Function")
+        validate_numeric("c_min", c_min, accept_parameter_as_none=True, lower_bound=0.0)
+        c_src = global_min(
+            point_cloud_field(c.function_space().mesh(), [source], c, None)
+        )
+        c_node = c
+        if c_min is not None:
+            c_src = max(c_src, c_min)
+            c_node = fire.max_value(c, c_min)
+        dist = fire.sqrt(sum((x - s) ** 2 for x, s in zip(coords, source)))
+        return 0.5 * dist * (1.0 / fire.Constant(c_src) + 1.0 / c_node)
 
     def define_int_dom(self, V):
         """Define the integration domain for the Eikonal equation.
