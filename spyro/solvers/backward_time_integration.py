@@ -1,4 +1,5 @@
 import firedrake as fire
+import numpy as np
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from . import helpers
 from .wave import Wave
@@ -43,13 +44,15 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
 
     dt = wave.dt
     t = wave.current_time
-    if t != wave.final_time:
+    # The time loop ends at `step * dt`, which can differ from final_time by
+    # rounding only, so compare within a fraction of a timestep.
+    if not np.isclose(t, wave.final_time, rtol=0.0, atol=1e-9 * dt):
         SpyroEnsemble.print(
             f"Current time of {t}, different than final_time of "
             f"{wave.final_time}. Setting final_time to current time "
             f"in backwards propagation."
         )
-    nt = int(t / dt) + 1
+    nt = round(t / dt) + 1
 
     # The forward wavefield is stored only every ``gradient_sampling_frequency``
     # steps, so consecutive stored samples are ``sample_dt = freq * dt`` apart in
@@ -77,11 +80,19 @@ def backward_wave_propagator(wave: Wave, dt: float = None) -> fire.Function:
 
     for step in range(nt - 1, -1, -1):
         rhs_forcing.assign(0.0)
-        receiver_source = receivers.apply_receivers_as_source(
-            rhs_forcing, wave.misfit, step,
-        )
-        if step == 0 or step == nt - 1:
-            receiver_source.assign(0.5 * receiver_source)
+        # Misfit row `k` is sampled from the forward solution at `k * dt`, which
+        # the forward solve of step `k - 1` computes. The adjoint state solved
+        # here pairs with that solve, so it takes row `step + 1`. Row 0 is the
+        # initial condition, which does not depend on the model.
+        misfit_row = step + 1
+        if misfit_row < nt:
+            receiver_source = receivers.apply_receivers_as_source(
+                rhs_forcing, wave.misfit, misfit_row
+            )
+            if misfit_row == nt - 1:
+                receiver_source.assign(0.5 * receiver_source)
+        else:
+            receiver_source = rhs_forcing
         wave.rhs_no_pml_source().assign(
             receiver_source
         )

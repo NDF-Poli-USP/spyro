@@ -878,7 +878,7 @@ class ABCLayer(NRBC, MeasureError):
         SpyroEnsemble.print("\nChecking Timestep Size")
 
         # User timestep
-        usr_dt = wave.get_dt()
+        usr_dt = wave.dt
         SpyroEnsemble.print(f"Current Nyquist Frequency: {self.freq_Nyquist:.5f} Hz")
         SpyroEnsemble.print(f"Current Timestep Size: {1e3 * usr_dt:.{mag_add}f} ms")
 
@@ -901,7 +901,7 @@ class ABCLayer(NRBC, MeasureError):
 
         # Set the timestep size
         dt = max_dt if set_max_dt else min(usr_dt, max_dt)
-        wave.set_dt(dt)
+        wave.dt = dt
         dt_ms = 1e3 * wave.dt
         if set_max_dt:
             case_div = f"{min(max_divisor_tf, n_div)} of {n_div}"

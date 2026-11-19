@@ -223,6 +223,85 @@ def test_gradient_sampling_frequency(full_sampling_gradient, freq):
     assert rel_diff < 0.05
 
 
+def test_backward_visits_every_forward_step(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check that the adjoint loop injects every misfit row after the first.
+
+    With `dt = 1e-4` and `final_time = 0.0049` the forward run takes 50
+    time levels and ends at `t = 49 * dt`, but `t / dt` evaluates to
+    slightly less than 49. Truncating it with `int` made the backward
+    propagator skip the last time level, so the first adjoint source (the
+    last misfit row) was never injected. Row 0 is the initial condition,
+    which does not depend on the model, so it is never injected.
+
+    Parameters
+    ----------
+    monkeypatch : pytest.MonkeyPatch
+        Used to record the misfit rows passed to the adjoint source
+        injection.
+    """
+    d = deepcopy(dictionary)
+    d["time_axis"]["final_time"] = 0.0049
+    d["time_axis"]["dt"] = 1e-4
+
+    wave = spyro.AcousticWave(dictionary=d)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    wave.set_initial_velocity_model(constant=2.0)
+    wave.enable_implemented_adjoint()
+    wave.forward_solve()
+
+    misfit = np.ones_like(wave.forward_solution_receivers)
+    nt = misfit.shape[0]
+    assert nt == 50
+    # The chosen parameters must reproduce the truncation this test guards.
+    assert int(wave.current_time / wave.dt) == nt - 2
+
+    visited = []
+    inject = wave.receivers.apply_receivers_as_source
+
+    def recording_inject(rhs_forcing, residual, step):
+        visited.append(step)
+        return inject(rhs_forcing, residual, step)
+
+    monkeypatch.setattr(wave.receivers, "apply_receivers_as_source", recording_inject)
+    wave.gradient_solve(misfit=misfit)
+
+    assert visited == list(range(nt - 1, 0, -1))
+
+
+def test_backward_accepts_rounding_in_final_time(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Treat a forward run ending one ulp past `final_time` as complete.
+
+    `final_time = 0.013` is a multiple of `dt = 5e-4` and is kept as given,
+    but the time loop ends at `26 * 5e-4 = 0.013000000000000001`. The
+    backward propagator must not report a mismatch with `final_time`.
+
+    Parameters
+    ----------
+    capsys : pytest.CaptureFixture[str]
+        Captures the messages printed by the backward propagator.
+    """
+    d = deepcopy(dictionary)
+    d["time_axis"]["final_time"] = 0.013
+    d["time_axis"]["dt"] = 5e-4
+
+    wave = spyro.AcousticWave(dictionary=d)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    wave.set_initial_velocity_model(constant=2.0)
+    wave.enable_implemented_adjoint()
+    wave.forward_solve()
+
+    assert wave.final_time == 0.013
+    # The chosen parameters must end the time loop one ulp past final_time.
+    assert wave.current_time != wave.final_time
+
+    capsys.readouterr()
+    wave.gradient_solve(misfit=np.ones_like(wave.forward_solution_receivers))
+
+    assert "different than final_time" not in capsys.readouterr().out
+
+
 if __name__ == "__main__":
     test_gradient()
     test_gradient_sampling_frequency(_gradient_for_sampling_frequency(1), 2)

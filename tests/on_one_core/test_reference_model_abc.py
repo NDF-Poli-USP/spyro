@@ -319,7 +319,7 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
         assert hybrid_signal is not None, "Hybrid signal not found"
         assert pml_signal is not None, "PML signal not found"
 
-        dt = wave.get_dt()
+        dt = wave.dt
         error_measures = wave.layer_ops.calculate_error_measures(
             pml_signal,
             hybrid_signal,

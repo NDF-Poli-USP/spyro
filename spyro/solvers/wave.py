@@ -661,15 +661,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.current_sources = source_nums
         _forward_time_integrator(self, source_nums)
 
-    def get_dt(self):
-        return self._dt
-
-    def set_dt(self, dt):
-        self._dt = dt
+    def _update_time_discretization(self) -> None:
+        """Derive the time discretization and rebuild the source wavelet to match.
+        """
+        super()._update_time_discretization()
         if self.sources is not None:
             self.sources.update_wavelet(self)
-
-    dt = property(fget=get_dt, fset=set_dt)
 
     @property
     def field_logger(self) -> SimulationLogger:

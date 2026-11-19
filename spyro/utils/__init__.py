@@ -8,7 +8,6 @@ from .utils import (
     Gradient_mask_for_pml,
     write_hdf5_velocity_model,
     get_real_shot_record,
-    get_time_vector,
 )
 from .physical_parameters import PhysicalParameters
 from .analytical_solution_nodal import nodal_homogeneous_analytical
@@ -31,5 +30,4 @@ __all__ = [
     "get_real_shot_record",
     "PhysicalParameters",
     "scalar_conditional_to_grid",
-    "get_time_vector",
 ]
