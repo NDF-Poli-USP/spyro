@@ -12,6 +12,8 @@ from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
 from tests.on_one_core.test_eikonal import case_parameter
 
+pytestmark = mark.eikonal
+
 # Simulation parameters, selected for each source condition (see Notes of
 # test_eikonal). Each parameter is a decision tree over the case fields
 # (source_bc, dimension, element_type, element_geometry): every nested

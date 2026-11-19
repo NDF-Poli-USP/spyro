@@ -13,6 +13,8 @@ from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
 from tests.on_one_core.test_eikonal import case_parameter
 
+pytestmark = mark.modal
+
 # Simulation parameters and expected values. Each entry is a decision tree over
 # the case fields (dimension, element_geometry, homogeneous, layer_shape): every
 # nested dictionary splits on exactly one field, keyed by that field's options

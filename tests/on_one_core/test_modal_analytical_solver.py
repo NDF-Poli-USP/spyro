@@ -16,6 +16,8 @@ from spyro.utils.cost import comp_cost
 from spyro.io.basicio import parallel_print as pprint
 from tests.on_one_core.test_eikonal import case_parameter
 
+pytestmark = mark.modal
+
 # Simulation parameters and expected values. Each entry is a decision tree over
 # the case fields (dimension, element_geometry, homogeneous, layer_shape): every
 # nested dictionary splits on exactly one field, keyed by that field's options

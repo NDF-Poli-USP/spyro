@@ -11,6 +11,8 @@ from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
 
+pytestmark = mark.eikonal
+
 # Simulation parameters, calibrated for each source condition (see Notes of
 # test_eikonal). Each parameter is a decision tree over the case fields
 # (source_bc, dimension, element_type, element_geometry): every nested

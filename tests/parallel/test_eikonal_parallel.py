@@ -18,7 +18,7 @@ from spyro.solvers.eikonal.eikonal_eq import Eikonal_Modeling
 from spyro.utils.utils import global_min
 from tests.on_one_core.test_eikonal_new import wave_dict
 
-pytestmark = pytest.mark.parallel(2)
+pytestmark = [pytest.mark.parallel(2), pytest.mark.eikonal]
 
 
 def square_space() -> fire.FunctionSpace:

@@ -36,6 +36,8 @@ from spyro.solvers.modal import modal_sol
 from spyro.solvers.modal.modal_sol import Modal_Solver
 from tests.on_one_core.test_modal_weak_forms import _elastic_wave
 
+pytestmark = pytest.mark.modal
+
 
 def _forms(comm) -> tuple:
     """Build the modal forms of a heterogeneous velocity on a small mesh.

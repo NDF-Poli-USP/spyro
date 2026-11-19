@@ -18,6 +18,8 @@ from firedrake import SpatialCoordinate, conditional
 from spyro.domains.quadrature import quadrature_rules
 from spyro.domains.space import create_function_space
 
+pytestmark = pytest.mark.modal
+
 
 def _elastic_wave(vp: float, vs: float) -> spyro.IsotropicWave:
     """Build a small homogeneous 2D isotropic elastic wave.

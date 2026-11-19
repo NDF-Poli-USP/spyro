@@ -5,7 +5,7 @@ frequency with expected values. Also, the tests also check the behavior of the s
 for boundary conditions of Dirichlet and Neumann.
 """
 
-from pytest import fixture, raises
+from pytest import fixture, mark, raises
 from firedrake import (
     Function,
     FunctionSpace,
@@ -19,6 +19,8 @@ from numpy.testing import assert_allclose, assert_almost_equal
 from scipy.special import jn_zeros
 from spyro.solvers.modal.modal_ana_sol import Modal_Analytical_Solver
 from spyro.utils.error_management import validate_firedrake_parameter
+
+pytestmark = mark.modal
 
 
 class TestModalAnalyticalSolver:
