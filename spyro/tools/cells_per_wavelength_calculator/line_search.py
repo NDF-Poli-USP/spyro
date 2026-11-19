@@ -1,0 +1,402 @@
+"""Line searches for the minimum cells-per-wavelength meeting an error threshold."""
+
+import math
+from collections.abc import Callable
+
+from ...utils.error_management import validate_numeric
+from ...utils.typing import CpwSearchDirection
+
+#: Fraction of the current cpw added or removed per coarse search step.
+COARSE_STEP_FRACTION = 0.1
+
+#: Default largest cells-per-wavelength evaluated by the line searches.
+MAX_CPW = 5.0
+
+#: Smallest cpw grid spacing accepted by the line searches.
+MIN_RESOLUTION = 1e-3
+
+#: Largest cpw grid spacing accepted by the line searches.
+MAX_RESOLUTION = 1.0
+
+
+def _floor_to_resolution(value: float, resolution: float) -> float:
+    """Floor a value onto the grid of multiples of `resolution`.
+
+    Parameters
+    ----------
+    value : float
+        Value to floor.
+    resolution : float
+        Spacing of the cpw grid.
+
+    Returns
+    -------
+    float
+        Largest multiple of `resolution` not above `value`.
+    """
+    # The small tolerance keeps values already on the grid in place
+    return round(math.floor(value / resolution + 1e-9) * resolution, 10)
+
+
+def _ceil_to_resolution(value: float, resolution: float) -> float:
+    """Ceil a value onto the grid of multiples of `resolution`.
+
+    Parameters
+    ----------
+    value : float
+        Value to ceil.
+    resolution : float
+        Spacing of the cpw grid.
+
+    Returns
+    -------
+    float
+        Smallest multiple of `resolution` not below `value`.
+    """
+    # The small tolerance keeps values already on the grid in place
+    return round(math.ceil(value / resolution - 1e-9) * resolution, 10)
+
+
+class _CachedThresholdCheck:
+    """Memoized check of whether a cells-per-wavelength meets a threshold.
+
+    Each forward solve is expensive, so every value is evaluated at most
+    once.
+
+    Attributes
+    ----------
+    calculate_error : Callable[[float], float]
+        Runs the forward problem on a mesh with the given cells-per-wavelength
+        and computes its error against a reference solution.
+    threshold : float
+        Largest accepted error.
+    errors : dict[float, float]
+        Error of every value evaluated so far.
+    """
+
+    def __init__(
+        self, calculate_error: Callable[[float], float], threshold: float
+    ) -> None:
+        """Store the error function and the threshold.
+
+        Parameters
+        ----------
+        calculate_error : Callable[[float], float]
+            Runs the forward problem on a mesh with the given cells-per-wavelength
+            and computes its error against a reference solution.
+        threshold : float
+            Largest accepted error.
+        """
+        self.calculate_error = calculate_error
+        self.threshold = threshold
+        self.errors: dict[float, float] = {}
+
+    def __call__(self, cpw: float) -> bool:
+        """Check a value, evaluating its error only the first time.
+
+        Parameters
+        ----------
+        cpw : float
+            Cells-per-wavelength to check.
+
+        Returns
+        -------
+        bool
+            Whether the error of `cpw` meets the threshold.
+        """
+        if cpw not in self.errors:
+            self.errors[cpw] = self.calculate_error(cpw)
+        return self.errors[cpw] <= self.threshold
+
+
+def _check_search_settings(
+    starting_cpw: float,
+    threshold: float,
+    resolution: float,
+    coarse_step_fraction: float,
+    max_cpw: float,
+) -> None:
+    """Check the settings shared by the line searches.
+
+    Parameters
+    ----------
+    starting_cpw : float
+        First value evaluated.
+    threshold : float
+        Largest accepted error.
+    resolution : float
+        Spacing of the cpw grid.
+    coarse_step_fraction : float
+        Fraction of the current value moved per coarse step.
+    max_cpw : float
+        Largest value evaluated.
+
+    Raises
+    ------
+    ValueError
+        If any setting is not positive and finite, or `resolution` lies
+        outside :data:`MIN_RESOLUTION` and :data:`MAX_RESOLUTION`.
+    TypeError
+        If `resolution` is not a float or an integer.
+    """
+    for name, value in (
+        ("starting_cpw", starting_cpw),
+        ("threshold", threshold),
+        ("resolution", resolution),
+        ("coarse_step_fraction", coarse_step_fraction),
+        ("max_cpw", max_cpw),
+    ):
+        # NaN fails every comparison, so test for validity instead of failure
+        if not 0.0 < value < math.inf:
+            raise ValueError(f"{name} must be positive and finite, got {value}.")
+    validate_numeric(
+        "resolution",
+        resolution,
+        lower_bound=MIN_RESOLUTION,
+        upper_bound=MAX_RESOLUTION,
+        include_lower_bound=True,
+        include_upper_bound=True,
+    )
+
+
+def _bisect_grid(
+    passes: _CachedThresholdCheck,
+    failing: float,
+    passing: float,
+    resolution: float,
+) -> float:
+    """Bisect the grid for the smallest value meeting the threshold.
+
+    The error is assumed to decrease as the cells-per-wavelength grows, so
+    every grid value up to `failing` fails and every value from
+    `passing` on passes. Only grid values strictly between them are
+    evaluated.
+
+    Parameters
+    ----------
+    passes : _CachedThresholdCheck
+        Threshold check of a cells-per-wavelength value.
+    failing : float
+        A value known to fail, or 0.0 when none is known.
+    passing : float
+        A value known to pass. It may be off the grid.
+    resolution : float
+        Spacing of the cpw grid.
+
+    Returns
+    -------
+    float
+        The smallest grid value in `(failing, passing)` that passes, or
+        `passing` if none does.
+    """
+    # Grid indices: values at or below low fail, values at or above high pass
+    low = math.floor(failing / resolution + 1e-9)
+    high = math.ceil(passing / resolution - 1e-9)
+    smallest_passing = passing
+    while high - low > 1:
+        middle = (low + high) // 2
+        candidate = round(middle * resolution, 10)
+        if passes(candidate):
+            high = middle
+            smallest_passing = candidate
+        else:
+            low = middle
+    return smallest_passing
+
+
+def backward_line_search(
+    calculate_error: Callable[[float], float],
+    starting_cpw: float,
+    threshold: float,
+    resolution: float,
+    coarse_step_fraction: float = COARSE_STEP_FRACTION,
+    max_cpw: float = MAX_CPW,
+) -> float:
+    """Search downward for the smallest cells-per-wavelength meeting a threshold.
+
+    The error is assumed to decrease as the cells-per-wavelength grows.
+    Starting from a passing value, a coarse phase removes
+    `coarse_step_fraction` of the current value per step, but at least
+    `resolution`, until the error first exceeds the threshold. A fine phase
+    then bisects the grid between the last passing and the first failing
+    value. Each value is evaluated at most once.
+
+    Parameters
+    ----------
+    calculate_error : Callable[[float], float]
+        Runs the forward problem on a mesh with the given cells-per-wavelength
+        and computes its error against a reference solution.
+    starting_cpw : float
+        First value evaluated. Its error must meet `threshold`.
+    threshold : float
+        Largest accepted error.
+    resolution : float
+        Spacing of the cpw grid, and so the resolution of the result.
+        Candidates after the start are multiples of it. Must lie between
+        :data:`MIN_RESOLUTION` and :data:`MAX_RESOLUTION`.
+    coarse_step_fraction : float, optional
+        Fraction of the current value removed per coarse step. Default is
+        :data:`COARSE_STEP_FRACTION`.
+    max_cpw : float, optional
+        Largest value evaluated. Default is :data:`MAX_CPW`.
+
+    Returns
+    -------
+    float
+        The smallest evaluated value whose error meets `threshold`.
+
+    Raises
+    ------
+    ValueError
+        If a setting is not positive and finite, `resolution` lies outside
+        :data:`MIN_RESOLUTION` and :data:`MAX_RESOLUTION`, `starting_cpw` is
+        above `max_cpw`, or `starting_cpw` does not meet `threshold`.
+    TypeError
+        If `resolution` is not a float or an integer.
+
+    Notes
+    -----
+    The error is assumed to decrease as the cells-per-wavelength grows. That
+    holds for the overall trend but not between nearby values: remeshing, the
+    receiver positions within the elements and the time step change with the
+    cells-per-wavelength and make the error oscillate locally. The result
+    always meets `threshold`, and the grid value just below it does not. A
+    smaller value skipped by the search may still meet `threshold`, so use a
+    conservative threshold.
+    """
+    _check_search_settings(
+        starting_cpw, threshold, resolution, coarse_step_fraction, max_cpw
+    )
+    if starting_cpw > max_cpw:
+        raise ValueError(
+            f"Starting cells-per-wavelength {starting_cpw} is above "
+            f"the maximum {max_cpw}."
+        )
+    passes = _CachedThresholdCheck(calculate_error, threshold)
+
+    if not passes(starting_cpw):
+        raise ValueError(
+            f"Starting cells-per-wavelength {starting_cpw} has error "
+            f"{passes.errors[starting_cpw]} above the threshold {threshold}. "
+            "Start from a larger value."
+        )
+    last_passing = starting_cpw
+    first_failing = 0.0
+
+    # Coarse phase: large relative steps until the first failure
+    while True:
+        step = max(coarse_step_fraction * last_passing, resolution)
+        candidate = _floor_to_resolution(last_passing - step, resolution)
+        if candidate <= 0.0:
+            break
+        if not passes(candidate):
+            first_failing = candidate
+            break
+        last_passing = candidate
+
+    return _bisect_grid(passes, first_failing, last_passing, resolution)
+
+
+def forward_line_search(
+    calculate_error: Callable[[float], float],
+    starting_cpw: float,
+    threshold: float,
+    resolution: float,
+    coarse_step_fraction: float = COARSE_STEP_FRACTION,
+    max_cpw: float = MAX_CPW,
+) -> float:
+    """Search upward for the smallest cells-per-wavelength meeting a threshold.
+
+    The error is assumed to decrease as the cells-per-wavelength grows.
+    Starting from a failing value, a coarse phase adds
+    `coarse_step_fraction` of the current value per step, but at least
+    `resolution`, until the error first meets the threshold. A fine phase
+    then bisects the grid between the last failing and the first passing
+    value. No value above `max_cpw` is evaluated, and each value is
+    evaluated at most once.
+
+    Parameters
+    ----------
+    calculate_error : Callable[[float], float]
+        Runs the forward problem on a mesh with the given cells-per-wavelength
+        and computes its error against a reference solution.
+    starting_cpw : float
+        First value evaluated. Its error must exceed `threshold`.
+    threshold : float
+        Largest accepted error.
+    resolution : float
+        Spacing of the cpw grid, and so the resolution of the result.
+        Candidates after the start are multiples of it. Must lie between
+        :data:`MIN_RESOLUTION` and :data:`MAX_RESOLUTION`.
+    coarse_step_fraction : float, optional
+        Fraction of the current value added per coarse step. Default is
+        :data:`COARSE_STEP_FRACTION`.
+    max_cpw : float, optional
+        Largest value evaluated. Default is :data:`MAX_CPW`.
+
+    Returns
+    -------
+    float
+        The smallest evaluated value whose error meets `threshold`.
+
+    Raises
+    ------
+    ValueError
+        If a setting is not positive and finite, `resolution` lies outside
+        :data:`MIN_RESOLUTION` and :data:`MAX_RESOLUTION`, `starting_cpw`
+        already meets `threshold` or is not below `max_cpw`, or `max_cpw`
+        does not meet `threshold`.
+    TypeError
+        If `resolution` is not a float or an integer.
+
+    Notes
+    -----
+    The error is assumed to decrease as the cells-per-wavelength grows. That
+    holds for the overall trend but not between nearby values: remeshing, the
+    receiver positions within the elements and the time step change with the
+    cells-per-wavelength and make the error oscillate locally. The result
+    always meets `threshold`, and the grid value just below it does not. A
+    smaller value skipped by the search may still meet `threshold`, so use a
+    conservative threshold.
+    """
+    _check_search_settings(
+        starting_cpw, threshold, resolution, coarse_step_fraction, max_cpw
+    )
+    if starting_cpw >= max_cpw:
+        raise ValueError(
+            f"Starting cells-per-wavelength {starting_cpw} is not below "
+            f"the maximum {max_cpw}."
+        )
+    passes = _CachedThresholdCheck(calculate_error, threshold)
+
+    if passes(starting_cpw):
+        raise ValueError(
+            f"Starting cells-per-wavelength {starting_cpw} has error "
+            f"{passes.errors[starting_cpw]} within the threshold {threshold}. "
+            "Start from a smaller value."
+        )
+    last_failing = starting_cpw
+
+    # Coarse phase: large relative steps until the first success
+    while True:
+        step = max(coarse_step_fraction * last_failing, resolution)
+        candidate = min(_ceil_to_resolution(last_failing + step, resolution), max_cpw)
+        if passes(candidate):
+            first_passing = candidate
+            break
+        if candidate >= max_cpw:
+            raise ValueError(
+                f"Maximum cells-per-wavelength {max_cpw} has error "
+                f"{passes.errors[candidate]} above the threshold {threshold}."
+            )
+        last_failing = candidate
+
+    return _bisect_grid(passes, last_failing, first_passing, resolution)
+
+
+#: Line search run by :meth:`MeshingParameterCalculator.find_minimum`,
+#: selected by the `"search_direction"` parameter.
+LINE_SEARCHES: dict[CpwSearchDirection, Callable[..., float]] = {
+    CpwSearchDirection.BACKWARD: backward_line_search,
+    CpwSearchDirection.FORWARD: forward_line_search,
+}
