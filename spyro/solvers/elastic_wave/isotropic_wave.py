@@ -1,14 +1,15 @@
 import numpy as np
 
-from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
-                       grad, interpolate, project, sym)
+from firedrake import (assemble, Constant, curl, DirichletBC, div, dot, dx, Function,
+                       grad, interpolate, inner, project, sym)
 
 import ufl
 
 from pyadjoint import AdjFloat, Tape
 
 from .elastic_wave import ElasticWave
-from .forms import (elastic_without_pml, viscoelastic_without_pml)
+from .forms import (elastic_without_pml, viscoelastic_without_pml, elastic_with_pml, viscoelastic_with_pml,
+                    isotropic_elastic_without_pml, isotropic_elastic_with_pml,)
 from .functionals import mechanical_energy_form
 
 from ...utils.physical_parameters import PhysicalParameters
@@ -85,18 +86,21 @@ class IsotropicWave(ElasticWave):
         # Variables for logging the P-wave
         self.p_wave = None
         self.D_h = None
-        self.field_logger.add_field("p-wave", "P-wave",
-                                    lambda: self.update_p_wave())
+        self.simulation_logger.add_field(
+            "p_wave", "P-wave", lambda: self.update_p_wave()
+        )
 
         # Variables for logging the S-wave
         self.s_wave = None
         self.C_h = None
-        self.field_logger.add_field("s-wave", "S-wave",
-                                    lambda: self.update_s_wave())
+        self.simulation_logger.add_field(
+            "s_wave", "S-wave", lambda: self.update_s_wave()
+        )
 
         self.mechanical_energy = None
-        self.field_logger.add_functional("mechanical_energy",
-                                         lambda: assemble(self.mechanical_energy))
+        self.simulation_logger.add_functional(
+            "mechanical_energy", lambda: assemble(self.mechanical_energy)
+        )
 
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
         """Initialize isotropic elastic material parameters from a dictionary.
@@ -436,6 +440,32 @@ class IsotropicWave(ElasticWave):
         else:
             data_with_halos = self.u_n.dat.data_ro_with_halos[:]
         return self.receivers.interpolate(data_with_halos)
+
+    def modal_weak_forms(self) -> tuple[fire.Form, fire.Form]:
+        """Build the isotropic elastic stiffness and mass forms.
+
+        Returns
+        -------
+        a : firedrake.Form
+            Elastic stiffness form
+            ``lmbda * div(u) * div(v) + 2 * mu * eps(u) : eps(v)``.
+        m : firedrake.Form
+            Mass form ``rho * u . v``.
+        """
+        V = self.function_space
+        u = fire.TrialFunction(V)
+        v = fire.TestFunction(V)
+        quad_rule = self.quadrature_rule
+
+        def eps(w):
+            return 0.5*(grad(w) + grad(w).T)
+
+        a = (
+            self.lmbda*div(u)*div(v)*dx(**quad_rule)
+            + 2*self.mu*inner(eps(u), eps(v))*dx(**quad_rule)
+        )
+        m = self.rho*dot(u, v)*dx(**quad_rule)
+        return a, m
 
     def get_function(self):
         return self.u_n
