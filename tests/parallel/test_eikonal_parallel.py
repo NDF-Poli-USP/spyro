@@ -337,7 +337,7 @@ def critical_boundary_data(
         ``[pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]`` per boundary,
         sorted by the minimum Eikonal.
     """
-    dictionary = wave_dict(geometry, dimension, degree, element_type)
+    dictionary = wave_dict(geometry, dimension, degree, element_type, source_bc_eik)
     dictionary["visualization"]["output_folder"] += f"_np{fire.COMM_WORLD.size}"
     wave = AcousticWave(dictionary=dictionary)
     wave.set_mesh(input_mesh_parameters={"edge_length": edge_length})

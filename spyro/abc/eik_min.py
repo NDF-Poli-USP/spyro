@@ -124,9 +124,9 @@ class Minimum_Eikonal(Eikonal_Modeling):
         self.mesh_ops = wave.mesh_ops
 
         # Extract node positions
-        self.node_positions = self.mesh_ops.extract_node_positions(self.mesh,
-                                                                   self.funct_space_eik,
-                                                                   output_type="array")
+        self.node_positions = self.mesh_ops.extract_node_positions(
+            self.mesh, self.funct_space_eik, output_type="array"
+        )
 
         # Tolerance for identifying minimum Eikonal values on boundaries
         self.node_tol = wave.mesh_parameters.tol
@@ -157,7 +157,9 @@ class Minimum_Eikonal(Eikonal_Modeling):
         )
 
         # Save source marker
-        SpyroEnsemble.write_vtk(self.path_save + "souEik.pvd", sou_marker, name="source_marker")
+        SpyroEnsemble.write_vtk(
+            self.path_save + "souEik.pvd", sou_marker, name="source_marker"
+        )
 
     def solve_eik(self):
         """Solve the nonlinear Eikonal.
@@ -173,11 +175,13 @@ class Minimum_Eikonal(Eikonal_Modeling):
 
         # Eikonal solution
         self.yp = self.eikonal_solver(
-            self.c, self.c_min, self.funct_space_eik, self.diam_mesh)
+            self.c, self.c_min, self.funct_space_eik, self.diam_mesh
+        )
 
         # Save Eikonal results
-        SpyroEnsemble.write_vtk(self.path_save + "Eik.pvd",
-                                self.yp, name='Eikonal (Time [s])')
+        SpyroEnsemble.write_vtk(
+            self.path_save + "Eik.pvd", self.yp, name="Eikonal (Time [s])"
+        )
 
     def ident_eik_on_bnd(self, bnd_ids: ndarray) -> tuple[float, ndarray, float]:
         """Identify Eikonal minimum values on a boundary.
@@ -254,8 +258,12 @@ class Minimum_Eikonal(Eikonal_Modeling):
 
         # Build the boundary ID mapping
         self.boundary_nodes_ids = self.mesh_ops.mapping_boundary_ids(
-            self.mesh, self.funct_space_eik, self.boundaries,
-            box_domain=True, get_boundary_node_ids=True)[1]
+            self.mesh,
+            self.funct_space_eik,
+            self.boundaries,
+            box_domain=True,
+            get_boundary_node_ids=True,
+        )[1]
 
         SpyroEnsemble.print("\nIdentifying Critical Points on Boundaries")
 
@@ -273,14 +281,18 @@ class Minimum_Eikonal(Eikonal_Modeling):
             pnt_str = "at (in km): ({2:3.3f}, {3:3.3f})"
             if self.dimension == 3:  # 3D
                 pnt_str = pnt_str[:-1] + ", {4:3.3f})"
-            SpyroEnsemble.print((eik_str + pnt_str).format(bnd_str, 1e3 * eikmin, *pnt_crit))
+            SpyroEnsemble.print(
+                (eik_str + pnt_str).format(bnd_str, 1e3 * eikmin, *pnt_crit)
+            )
 
             # Identify closest source
-            lref_allsou = norm(asarray(pnt_crit) - asarray(self.source_locations), axis=1)
+            lref_allsou = norm(
+                asarray(pnt_crit) - asarray(self.source_locations), axis=1
+            )
             idxsou = lref_allsou.argmin()
             lref = lref_allsou[idxsou]
             sou_crit = self.source_locations[idxsou]
-            z_par = 1. / eikmin
+            z_par = 1.0 / eikmin
 
             # Grouping properties
             eik_bnd.append([pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit])

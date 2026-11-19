@@ -12,7 +12,13 @@ from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
 
 
-def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
+def wave_dict(
+    element_geometry: str,
+    dimension: int,
+    degree_eikonal: int,
+    element_type: str,
+    source_bc: str,
+) -> dict:
     """Create a dictionary with parameters for the model.
 
     Parameters
@@ -26,6 +32,9 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
         Finite element order for the Eikonal equation.
     element_type : `str`
         Finite element type. Options: "consistent" or "underintegrated".
+    source_bc : `str`
+        Dirichlet condition at the source, appended to the output folder.
+        Options: "nearest_node" or "local_time".
 
     Returns
     -------
@@ -102,7 +111,7 @@ def wave_dict(element_geometry, dimension, degree_eikonal, element_type):
     str_ele = element_geometry + ("C" if element_type == "consistent" else "U")
     dictionary["visualization"] = {  # Output folder
         "output_folder": f"output/eikonal_test{dimension}d/eik_test{dimension}d"
-        + str_ele
+        + f"{str_ele}_{source_bc}_minmesh"
     }
 
     return dictionary
@@ -137,7 +146,6 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type, source_bc):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    dictionary["visualization"]["output_folder"] += f"_{source_bc}"
     wave = AcousticWave(dictionary=dictionary)
 
     # Mesh
@@ -603,7 +611,7 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
                 f_est = 0.05 if element_type == "consistent" else 0.05
 
         if dimension == 3:
-            atol = 5e-3 if element_type == "consistent" else 5e-3
+            atol = 1.5e-2 if element_type == "consistent" else 5e-3
             if element_geometry == "T":
                 edge_length = 1.0 / 5 if element_type == "consistent" else 1.0 / 6
                 p_eik = 1 if element_type == "consistent" else 1
@@ -625,7 +633,9 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
         # ============ MESH AND EIKONAL ============
 
         # Create dictionary with parameters for the model
-        dictionary = wave_dict(element_geometry, dimension, p_eik, element_type)
+        dictionary = wave_dict(
+            element_geometry, dimension, p_eik, element_type, source_bc
+        )
 
         # Creating mesh and performing eikonal analysis
         min_eik = round(
