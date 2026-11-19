@@ -5,12 +5,78 @@ frequency with expected values for different domain configurations. The tests co
 both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
 """
 
-from pytest import fail, fixture, mark
+from pytest import fail, fixture, mark, skip
 from firedrake import conditional, ConvergenceError
 from numpy import isclose
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
+from tests.on_one_core.test_eikonal import case_parameter
+
+# Simulation parameters and expected values. Each entry is a decision tree over
+# the case fields (dimension, element_geometry, homogeneous, layer_shape): every
+# nested dictionary splits on exactly one field, keyed by that field's options
+# (2/3, "T"/"Q", True/False and "rectangular"/"hypershape"), and each leaf is
+# the value shared by all the cases below it. A field is omitted where all its
+# options share the same value, so that value is set once for the whole
+# subtree. See case_parameter in test_eikonal.py for the lookup.
+MODAL_CONFIG = {
+    # Hypershape degree of the absorbing layer, None for rectangular layers. Only
+    # T elements are tested with hypershape layers
+    "degree_layer": {
+        "rectangular": None,
+        "hypershape": {2: {True: 2.5, False: 2.0}, 3: {True: 6.0, False: 2.4}},
+    },
+    # Mesh size in km: edge_length = lba / cpw, where cpw is the number of cells
+    # per wavelength and lba = minimum_velocity / source_frequency
+    "edge_length": {2: 1.0 / 10, 3: 1.0 / 7},
+    # Factor for the stabilizing term in Eikonal equation (see Notes)
+    "f_est": {2: {"T": 0.06, "Q": 0.05}, 3: {"T": 0.05, "Q": 0.08}},
+    # Parameters for fitting equivalent velocity regression, calibrated for the
+    # static problem of c_equivalent (see Notes). The homogeneous model uses
+    # (0, 0, 0, 0), the default of the analytical solver
+    "fitting_c": {
+        True: (0.0, 0.0, 0.0, 0.0),
+        False: {2: (-0.5, 0.3, -1.5, -0.9), 3: (-0.9, 0.3, -2.1, -1.5)},
+    },
+    # Methods used to solve the eigenvalue problem
+    "modal_solver_lst": {
+        2: [
+            "ANALYTICAL",
+            "ARNOLDI",
+            "LANCZOS",
+            "LOBPCG",
+            "KRYLOVSCH_CH",
+            "KRYLOVSCH_CG",
+            "KRYLOVSCH_GH",
+            "KRYLOVSCH_GG",
+            "RAYLEIGH",
+        ],
+        3: {
+            "T": ["ANALYTICAL", "KRYLOVSCH_CH", "KRYLOVSCH_GH", "RAYLEIGH"],
+            "Q": [
+                "ANALYTICAL",
+                "ARNOLDI",
+                "LANCZOS",
+                "LOBPCG",
+                "KRYLOVSCH_CG",
+                "KRYLOVSCH_GG",
+                "RAYLEIGH",
+            ],
+        },
+    },
+    # Expected fundamental frequency in Hz, fnum of the FEM solvers (see Notes)
+    "exp_value": {
+        2: {
+            True: {"rectangular": 0.46875, "hypershape": 0.51046},
+            False: {"rectangular": {"T": 0.45539, "Q": 0.45542}, "hypershape": 0.50440},
+        },
+        3: {
+            True: {"rectangular": 0.47727, "hypershape": 0.52345},
+            False: {"rectangular": {"T": 0.42562, "Q": 0.41127}, "hypershape": 0.51535},
+        },
+    },
+}
 
 
 def wave_dict(
@@ -123,7 +189,7 @@ def wave_dict(
 
 
 @fixture(scope="function")
-def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
+def wave_instance(element_geometry, dimension, layer_shape, homogeneous):
     """Create an instance of the acoustic wave solver.
 
     Parameters
@@ -133,8 +199,10 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
         "Q" for quadrilaterals/hexahedra.
     dimension : `int`
         Dimension of the problem. 2 for 2D and 3 for 3D.
-    degree_layer : `int` or `float` or `None`
-        Hypershape degree. `None` is used only for rectangular layers.
+    layer_shape : `str`
+        Shape of the absorbing layer. Options: "rectangular" or "hypershape".
+        The hypershape degree is set in MODAL_CONFIG. Q elements are only
+        tested with rectangular layers.
     homogeneous : `bool`
         If `True`, the velocity model is homogeneous. If `False`, it is heterogeneous.
 
@@ -142,9 +210,9 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     -------
     wave : acoustic_wave.AcousticWave
         An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
-    fitting_c : `tuple` or `None`
-        Parameters for fitting equivalent velocity regression. `None` for the
-        homogeneous model, which uses the default of the analytical solver.
+    fitting_c : `tuple`
+        Parameters for fitting equivalent velocity regression. (0, 0, 0, 0)
+        for the homogeneous model, the default of the analytical solver.
     modal_solver_lst : `list`
         List of methods to be used to solve the eigenvalue problem.
         Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
@@ -153,40 +221,24 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
 
     # ============ SIMULATION PARAMETERS ============
 
-    # Mesh size (in km)
-    # cpw: cells per wavelength
-    # lba = minimum_velocity / source_frequency
-    # edge_length = lba / cpw
-    edge_length = 1.0 / 10 if dimension == 2 else 1.0 / 7
-
     # Eikonal parameters of test_eikonal.py for the source condition
     # 'nearest_node' and consistent elements (see Notes)
     source_bc = "nearest_node"
     element_type = "consistent"
     p_eik = 2
 
-    # f_est: Factor for the stabilizing term in Eikonal equation
-    # fitting_c: Parameters for fitting equivalent velocity regression,
-    # calibrated for the static problem of c_equivalent (see Notes). None for
-    # the homogeneous model: the default (0, 0, 0, 0) is not passed
-    if dimension == 2:
-        if element_geometry == "T":
-            f_est = 0.06 if homogeneous else 0.06
+    # Only T elements are tested with hypershape layers
+    if element_geometry == "Q" and layer_shape == "hypershape":
+        skip("Hypershape layers are only tested with T elements")
 
-        else:
-            f_est = 0.05 if homogeneous else 0.05
-        fitting_c = None if homogeneous else (-0.5, 0.3, -1.5, -0.9)
-
-    if dimension == 3:
-        if element_geometry == "T":
-            f_est = 0.05 if homogeneous else 0.05
-
-        else:
-            f_est = 0.08 if homogeneous else 0.08
-        fitting_c = None if homogeneous else (-0.9, 0.3, -2.1, -1.5)
-
-    # Layer shape
-    layer_shape = "rectangular" if degree_layer is None else "hypershape"
+    # Hypershape degree, mesh size (in km), factor for the stabilizing term in
+    # Eikonal equation, fitting_c and modal solvers of the case (see MODAL_CONFIG)
+    case = (dimension, element_geometry, homogeneous, layer_shape)
+    degree_layer = case_parameter(MODAL_CONFIG["degree_layer"], case)
+    edge_length = case_parameter(MODAL_CONFIG["edge_length"], case)
+    f_est = case_parameter(MODAL_CONFIG["f_est"], case)
+    fitting_c = case_parameter(MODAL_CONFIG["fitting_c"], case)
+    modal_solver_lst = case_parameter(MODAL_CONFIG["modal_solver_lst"], case)
 
     # Get simulation parameters
     SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length:.4f} m")
@@ -196,11 +248,8 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     SpyroEnsemble.print(f"Eikonal Degree: {p_eik}")
     SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est:.2f}")
     SpyroEnsemble.print(f"Layer Shape: {layer_shape}")
-    if fitting_c is None:
-        SpyroEnsemble.print("Fitting Parameters for Analytical Solver: not passed\n")
-    else:
-        fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
-        SpyroEnsemble.print((fit_str + "{:.1f}\n").format(*fitting_c))
+    fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
+    SpyroEnsemble.print((fit_str + "{:.1f}\n").format(*fitting_c))
 
     # Create dictionary with parameters for the model
     dictionary = wave_dict(
@@ -238,41 +287,6 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     # Finding critical points
     wave.layer_ops.critical_boundary_points(wave)
 
-    # ============ MODAL ANALYSIS ============
-
-    # Modal solvers
-    if dimension == 2:
-        modal_solver_lst = [
-            "ANALYTICAL",
-            "ARNOLDI",
-            "LANCZOS",
-            "LOBPCG",
-            "KRYLOVSCH_CH",
-            "KRYLOVSCH_CG",
-            "KRYLOVSCH_GH",
-            "KRYLOVSCH_GG",
-            "RAYLEIGH",
-        ]
-
-    if dimension == 3:
-        if element_geometry == "T":
-            modal_solver_lst = [
-                "ANALYTICAL",
-                "KRYLOVSCH_CH",
-                "KRYLOVSCH_GH",
-                "RAYLEIGH",
-            ]
-        else:
-            modal_solver_lst = [
-                "ANALYTICAL",
-                "ARNOLDI",
-                "LANCZOS",
-                "LOBPCG",
-                "KRYLOVSCH_CG",
-                "KRYLOVSCH_GG",
-                "RAYLEIGH",
-            ]
-
     return wave, fitting_c, modal_solver_lst
 
 
@@ -288,15 +302,13 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
         Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS',
         'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
         'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
-    fitting_c : `tuple` or `None`
+    fitting_c : `tuple`
         Parameters for fitting equivalent velocity regression.
         Structure: (fc1, fc2, fp1, fp2):
         - fc1: Magnitude order
         - fc2: Monotonicity
         - fp1: Rectangle frequency
         - fp2: Ellipse frequency
-        `None` does not pass them, so the solvers use their default,
-        (0, 0, 0, 0).
     exp_value : `float`
         Expected value for the fundamental frequency
     n_root : `int`, optional
@@ -324,9 +336,10 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
         # Reference to resource usage
         tRef = comp_cost("tini")
 
-        # Computing fundamental frequency. fitting_c is only passed when given
-        fitting = {} if fitting_c is None else {"fitting_c": fitting_c}
-        wave.layer_ops.fundamental_frequency(wave, method=modal_solver, **fitting)
+        # Computing fundamental frequency
+        wave.layer_ops.fundamental_frequency(
+            wave, method=modal_solver, fitting_c=fitting_c
+        )
 
         # Estimating computational resource usage
         name_cost = wave.path_case_abc + modal_solver + "_"
@@ -353,24 +366,11 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
         SpyroEnsemble.print("✓ " + met_str + " Verified: " + cmp_str)
 
 
-@mark.parametrize(
-    "element_geometry, dimension, degree_layer, homogeneous",
-    [
-        ("T", 2, 2.5, True),
-        ("T", 2, None, True),
-        ("T", 2, 2.0, False),
-        ("T", 2, None, False),
-        ("Q", 2, None, True),
-        ("Q", 2, None, False),
-        ("T", 3, 6.0, True),
-        ("T", 3, None, True),
-        ("T", 3, 2.4, False),
-        ("T", 3, None, False),
-        ("Q", 3, None, True),
-        ("Q", 3, None, False),
-    ],
-)
-def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogeneous):
+@mark.parametrize("homogeneous", [True, False])
+@mark.parametrize("layer_shape", ["hypershape", "rectangular"])
+@mark.parametrize("dimension", [2, 3])
+@mark.parametrize("element_geometry", ["T", "Q"])
+def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogeneous):
     """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
     See Salas et al (2022): Hybrid absorbing scheme based on hyperelliptical
@@ -386,8 +386,10 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
         "Q" for quadrilaterals/hexahedra.
     dimension : `int`
         Dimension of the problem. 2 for 2D and 3 for 3D.
-    degree_layer : `int` or `float` or `None`
-        Hypershape degree. `None` is used only for rectangular layers.
+    layer_shape : `str`
+        Shape of the absorbing layer. Options: "rectangular" or "hypershape".
+        The hypershape degree is set in MODAL_CONFIG. Q elements are only
+        tested with rectangular layers.
     homogeneous : `bool`
         If `True`, the velocity model is homogeneous. If `False`, it is heterogeneous.
 
@@ -423,7 +425,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     which the Eikonal of every case is within 3 % of its theoretical value,
     the layered hypershape mesh is conforming, and the analytical
     approximation stays within the test tolerance for the homogeneous model
-    without fitting_c, that is with its default (0, 0, 0, 0). The marked
+    with fitting_c = (0, 0, 0, 0), its default. The marked
     f_est (*) is the
     value with the smallest relative error abs(eik_min - eik_thr) / eik_thr,
     where eik_thr is the theoretical value, and is the one used by the test.
@@ -446,8 +448,8 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     for a zero-mean load, and solves it with linear elements on the mesh of
     the modal problem, which makes the ANALYTICAL solver much cheaper than
     the FEM solvers (its Notes explain both). A constant velocity needs no
-    static solve, so the homogeneous model keeps c_eq = c and passes no
-    fitting_c: the analytical solver uses its default (0, 0, 0, 0).
+    static solve, so the homogeneous model keeps c_eq = c and passes
+    fitting_c = (0, 0, 0, 0), the default of the analytical solver.
 
     c_eq depends on the static problem, so the heterogeneous fitting_c is
     calibrated for it, separately for 2D and 3D. The values fitted to the
@@ -486,13 +488,16 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     Q-3D REC   calibrated  (-0.900,  0.300, -2.100, -1.500)  0.41427  +0.73 %
                optimized   ( 0.184,  0.857, -1.044, -0.001)  0.41160  +0.08 %
 
-    The homogeneous models pass no fitting_c. The optimization keeps
+    The homogeneous models pass (0, 0, 0, 0). The optimization keeps
     (0, 0, 0, 0) for them, except for T-2D N2.5, where it finds
     (0.010, 0.008, -0.022, -0.113) and moves fana from 0.52430 Hz (+2.71 %)
-    to 0.51057 Hz (+0.02 %). With Firedrake 2026.10.0 the optimized values
-    of the 2D heterogeneous models are identical, and those of the 3D ones
-    differ slightly, since the velocity of the cells with a centroid on
-    x = 0.5 depends on round-off (see test_modal_analytical_solver.py).
+    to 0.51057 Hz (+0.02 %). The others stop at the start, where the
+    gradient of the objective is below the tolerance of SLSQP, and T-3D N6.0
+    stays at -1.37 % (see test_modal_analytical_solver.py). With Firedrake
+    2026.10.0 the optimized values of the 2D heterogeneous models are
+    identical, and those of the 3D ones differ slightly, since the velocity
+    of the cells with a centroid on x = 0.5 depends on round-off (see
+    test_modal_analytical_solver.py).
 
     Theoretical Eikonal values. eik_min is the first-arrival time on the
     absorbing boundaries (z = -1, x = 0, x = 1 and, in 3D, y = 0 and y = 1).
@@ -776,6 +781,8 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     FEM, since only the velocity differed.
     """
 
+    case = (dimension, element_geometry, homogeneous, layer_shape)
+    degree_layer = case_parameter(MODAL_CONFIG["degree_layer"], case)
     c_hom = "Homogeneous" if homogeneous else "Heterogeneous"
     n_hyp = f"HyperShape N{degree_layer}" if degree_layer is not None else "Rectangular"
 
@@ -794,29 +801,7 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
 
     # ============ EXPECTED VALUES ============
 
-    if dimension == 2:
-        if element_geometry == "T":
-            if homogeneous:
-                exp_value = 0.46875 if wave.abc_deg_layer is None else 0.51046
-            else:
-                exp_value = 0.45539 if wave.abc_deg_layer is None else 0.50440
-        else:
-            if homogeneous:
-                exp_value = 0.46875
-            else:
-                exp_value = 0.45542
-
-    if dimension == 3:
-        if element_geometry == "T":
-            if homogeneous:
-                exp_value = 0.47727 if wave.abc_deg_layer is None else 0.52345
-            else:
-                exp_value = 0.42562 if wave.abc_deg_layer is None else 0.51535
-        else:
-            if homogeneous:
-                exp_value = 0.47727
-            else:
-                exp_value = 0.41127
+    exp_value = case_parameter(MODAL_CONFIG["exp_value"], case)
 
     try:
         # Computing the fundamental frequency
