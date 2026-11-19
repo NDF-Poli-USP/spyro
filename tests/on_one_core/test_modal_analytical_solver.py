@@ -454,6 +454,10 @@ def run_modal(wave, fitting_c, exp_value, n_root=1):
     pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
 
 
+# Every case of the modal test files runs on one pytest-xdist worker (CI uses
+# --dist loadgroup), so each kernel they share is compiled once and reused,
+# instead of being compiled at the same time by several workers with empty caches
+@mark.xdist_group(name="modal")
 @mark.parametrize("homogeneous", [True, False])
 @mark.parametrize("layer_shape", ["hypershape", "rectangular"])
 @mark.parametrize("dimension", [2, 3])

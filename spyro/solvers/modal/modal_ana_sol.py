@@ -261,9 +261,7 @@ class Modal_Analytical_Solver:
                 + alpha**2.0 / 11.0
             )
 
-            RQ = (
-                (4.0 / 3.0) * (1.0 / a**2 + 1.0 / b**2 + 1.0 / c**2) * (I_r / J_r)
-            )
+            RQ = (4.0 / 3.0) * (1.0 / a**2 + 1.0 / b**2 + 1.0 / c**2) * (I_r / J_r)
             # pprint((bc, I_r, J_r, alpha, RQ), comm=self.comm)
             return RQ
 
