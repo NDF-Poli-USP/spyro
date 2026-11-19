@@ -229,6 +229,16 @@ class Read_outputs(BaseModel):
     output_folder: str = "output/"
     debug_output: bool = False
 
+    # Fields of the coupled acoustic-elastic solver
+    displacement_output: bool = False
+    displacement_output_filename: str = "results/displacement.pvd"
+
+    p_equivalent_output: bool = False
+    p_equivalent_output_filename: str = "results/p_equivalent.pvd"
+
+    sigma_zz_output: bool = False
+    sigma_zz_output_filename: str = "results/sigma_zz.pvd"
+
     def __getitem__(self, key: str):
         return getattr(self, key)
 

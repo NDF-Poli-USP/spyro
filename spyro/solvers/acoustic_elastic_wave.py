@@ -2,14 +2,22 @@ import firedrake as fire
 import numpy as np
 
 from .wave import Wave
-from .acoustic_elastic_solver_no_pml import construct_acoustic_elastic
+from .acoustic_elastic_solver_no_pml import construct_acoustic_elastic, voigt_strain
 from .acoustic_elastic_solver_monolithic import construct_acoustic_elastic_monolithic
 from ..utils.typing import override, WaveType
 from ..domains.space import create_function_space
 from ..domains.quadrature import quadrature_rules
 from ..receivers.Receivers import Receivers
 from ..io.segy_io import read_segy_velocity_model
-from spyro.solvers.elastic_wave.tensor_computation import C_vti_tensor
+from spyro.solvers.elastic_wave.tensor_computation import (
+    C_isotropic_tensor,
+    C_tti_tensor,
+    C_vti_tensor,
+    Gamma_isotropic,
+    Gamma_TTI,
+    Gamma_VTI,
+    create_strain_space,
+)
 
 
 def _extract_interface_markers(parent_mesh, child_mesh):
@@ -59,6 +67,27 @@ class AcousticElasticWave(Wave):
         self.lmbda = None
         self.mu = None
         self.body_forces = None
+        self.theta = None
+        self.phi = None
+        self.Elastic_C = None
+        self.c_s = None
+
+        # GSLS viscoelastic solid, set up as in the pure elastic solvers.
+        self.viscoelastic = dictionary.get("viscoelastic", False)
+        self.Q_vp = None
+        self.Q_vs = None
+        self.Q_epsilon = None
+        self.Q_delta = None
+        self.Q_gamma = None
+        self.Gamma = None
+        self.strain_space = None
+        self.y_list = []
+        self.omega_list = []
+        self.zeta_list = []
+        self.zeta_a = []
+        self.zeta_b = []
+        self.eps_n = None
+        self.eps_interp = None
 
         self._setup_snapshots(dictionary)
 
@@ -290,6 +319,31 @@ class AcousticElasticWave(Wave):
         self.delta = synthetic_data.get("delta", None)
         self.gamma = synthetic_data.get("gamma", None)
         self.anisotropy_type = synthetic_data.get("anisotropy_type", None)
+        self.theta = synthetic_data.get("theta", None)
+        self.phi = synthetic_data.get("phi", None)
+
+        def constant_or_none(name: str) -> fire.Constant | None:
+            """Read an optional scalar of ``synthetic_data`` as a Constant.
+
+            Parameters
+            ----------
+            name : str
+                Key in ``synthetic_data``.
+
+            Returns
+            -------
+            firedrake.Constant or None
+                The value as a Constant, or None when it is not given.
+            """
+            value = synthetic_data.get(name)
+            return fire.Constant(value) if value is not None else None
+
+        # Reciprocal quality factors of the GSLS viscoelastic solid.
+        self.Q_vp = constant_or_none("Q_vp")
+        self.Q_vs = constant_or_none("Q_vs")
+        self.Q_epsilon = constant_or_none("Q_epsilon")
+        self.Q_delta = constant_or_none("Q_delta")
+        self.Q_gamma = constant_or_none("Q_gamma")
 
     @override
     def matrix_building(self):
@@ -298,15 +352,34 @@ class AcousticElasticWave(Wave):
         self.X_n = fire.Function(self.function_space)
         self.X_np1 = fire.Function(self.function_space)
 
+        # The solid tensors read the solid P velocity from self.c, which
+        # otherwise holds the fluid velocity: keep it and restore it.
+        c_fluid = self.c
+        self.c = fire.sqrt((self.lmbda + 2.0 * self.mu) / self.rho)
+        self.c_s = fire.sqrt(self.mu / self.rho)
+        dim = self.dimension
         if self.epsilon is not None and self.delta is not None:
-            self.c = fire.sqrt((self.lmbda + 2.0 * self.mu) / self.rho)
-            self.c_s = fire.sqrt(self.mu / self.rho)
             self.wave_type = WaveType.ANISOTROPIC_VTI_ELASTIC
-            self.Elastic_C = C_vti_tensor(self, self.submesh_solid.topological_dimension)
-            self.c = None
+            self.Elastic_C = C_vti_tensor(self, dim)
+            if self.theta is not None:
+                self.wave_type = WaveType.ANISOTROPIC_TTI_ELASTIC
+                self.Elastic_C = C_tti_tensor(self, self.Elastic_C, dim)
+        elif self.viscoelastic:
+            # The memory stress is written in Voigt form, so an isotropic
+            # viscoelastic solid needs its stiffness tensor too.
+            self.Elastic_C = C_isotropic_tensor(self, dim)
         else:
             self.Elastic_C = None
-        
+        if self.viscoelastic:
+            if self.wave_type == WaveType.ANISOTROPIC_TTI_ELASTIC:
+                self.Gamma = Gamma_TTI(self, dim, self.Elastic_C)
+            elif self.wave_type == WaveType.ANISOTROPIC_VTI_ELASTIC:
+                self.Gamma = Gamma_VTI(self, self.Elastic_C, dim)
+            else:
+                self.Gamma = Gamma_isotropic(self, dim)
+            self._build_memory_variables()
+        self.c = c_fluid
+
         if self.use_monolithic:
             construct_acoustic_elastic_monolithic(self)
         else:
@@ -319,6 +392,44 @@ class AcousticElasticWave(Wave):
         n_recv = len(self.receiver_locations) if self.receiver_locations else 0
         self._vf_normal = [0.0] * n_recv
         self._uf_normal = [0.0] * n_recv
+
+    def _build_memory_variables(self) -> None:
+        """Create the GSLS memory variables of the solid.
+
+        They live on the solid submesh and are updated by the time loop of
+        `spyro.solvers.time_integration_central_difference` exactly as for
+        the pure viscoelastic solids: after each step the strain of the
+        solid displacement held in ``X_nm1`` drives
+        ``zeta_l <- (1 - dt omega_l) zeta_l + dt omega_l eps``.
+
+        Raises
+        ------
+        ValueError
+            If the numbers of GSLS weights, relaxation frequencies and
+            branches differ.
+        """
+        d = self.input_dictionary["viscoelasticity"]
+        self.y_list = [float(y) for y in d["y_gsls"]]
+        self.omega_list = [float(w) for w in d["omega_gsls"]]
+        num_branches = d["branches"]
+        if not len(self.y_list) == len(self.omega_list) == num_branches:
+            raise ValueError(
+                "viscoelasticity needs one 'y_gsls' and one 'omega_gsls' "
+                f"value per branch, got {len(self.y_list)} and "
+                f"{len(self.omega_list)} for {num_branches} branches."
+            )
+        self.strain_space = create_strain_space(self, mesh=self.submesh_solid)
+        self.zeta_list = [
+            fire.Function(self.strain_space, name=f"Memory variable zeta_{i}")
+            for i in range(num_branches)
+        ]
+        self.eps_n = fire.Function(self.strain_space, name="eps_n")
+        self.eps_interp = fire.interpolate(
+            fire.sym(fire.grad(self.X_nm1.sub(1))), self.strain_space
+        )
+        dt = float(self.dt)
+        self.zeta_a = [1.0 - dt * w for w in self.omega_list]
+        self.zeta_b = [dt * w for w in self.omega_list]
 
     # ------------------------------------------------------------------
     # States and interface
@@ -444,6 +555,12 @@ class AcousticElasticWave(Wave):
     # ------------------------------------------------------------------
     def _compute_p_equivalent(self):
         dim = self.dimension
+        if self.Elastic_C is not None:
+            stress = fire.dot(self.Elastic_C, voigt_strain(self.X_n.sub(1), dim))
+            self.p_equivalent_function.interpolate(
+                -sum(stress[i] for i in range(dim)) / dim
+            )
+            return self.p_equivalent_function
         if dim == 2:
             K = self.lmbda + self.mu
         elif dim == 3:
@@ -457,6 +574,10 @@ class AcousticElasticWave(Wave):
 
     def _compute_sigma_zz(self):
         u = self.X_n.sub(1)
+        if self.Elastic_C is not None:
+            stress = fire.dot(self.Elastic_C, voigt_strain(u, self.dimension))
+            self.sigma_zz_function.interpolate(stress[0])
+            return self.sigma_zz_function
         strain = fire.sym(fire.grad(u))
         sigma_zz_expr = self.lmbda * fire.div(u) + 2.0 * self.mu * strain[0, 0]
         self.sigma_zz_function.interpolate(sigma_zz_expr)

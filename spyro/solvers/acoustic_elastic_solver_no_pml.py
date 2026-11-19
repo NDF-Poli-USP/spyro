@@ -21,6 +21,62 @@ def _drop_missing_facets(form):
     return ufl.Form(kept)
 
 
+def voigt_strain(w: ufl.core.expr.Expr, dim: int) -> ufl.core.expr.Expr:
+    """Write the strain of a displacement field as a Voigt vector.
+
+    The ordering follows spyro's coordinates (z, x[, y]) and uses
+    engineering shear strains.
+
+    Parameters
+    ----------
+    w : ufl.core.expr.Expr
+        Displacement field.
+    dim : int
+        Spatial dimension (2 or 3).
+
+    Returns
+    -------
+    ufl.core.expr.Expr
+        ``[e_zz, e_xx, 2 e_zx]`` in 2D or
+        ``[e_zz, e_xx, e_yy, 2 e_xy, 2 e_zy, 2 e_zx]`` in 3D.
+    """
+    return voigt_vector(grad(w), dim)
+
+
+def voigt_vector(g: ufl.core.expr.Expr, dim: int) -> ufl.core.expr.Expr:
+    """Write a strain-like tensor as a Voigt vector.
+
+    The ordering follows spyro's coordinates (z, x[, y]) and shear entries
+    are summed, so a displacement gradient or a symmetric strain gives
+    engineering shear strains.
+
+    Parameters
+    ----------
+    g : ufl.core.expr.Expr
+        Rank-2 tensor, such as a displacement gradient or a strain.
+    dim : int
+        Spatial dimension (2 or 3).
+
+    Returns
+    -------
+    ufl.core.expr.Expr
+        ``[g_zz, g_xx, g_zx + g_xz]`` in 2D or ``[g_zz, g_xx, g_yy,
+        g_xy + g_yx, g_zy + g_yz, g_zx + g_xz]`` in 3D.
+    """
+    if dim == 2:
+        return as_vector([g[0, 0], g[1, 1], g[0, 1] + g[1, 0]])
+    return as_vector(
+        [
+            g[0, 0],
+            g[1, 1],
+            g[2, 2],
+            g[1, 2] + g[2, 1],
+            g[0, 2] + g[2, 0],
+            g[0, 1] + g[1, 0],
+        ]
+    )
+
+
 def build_anisotropic_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule, abc_kwargs=None):
     """Build the weak form of the anisotropic elastic wave equation using
     the precomputed stiffness tensor Elastic_C in Voigt notation.
@@ -29,10 +85,15 @@ def build_anisotropic_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule,
     same signature, so it can be used as a drop-in replacement inside
     construct_acoustic_elastic when wave.Elastic_C is set.
 
+    With a viscoelastic solid, the GSLS memory stress built from
+    ``wave.Gamma``, ``wave.y_list`` and ``wave.zeta_list`` is subtracted
+    from the elastic stress.
+
     Parameters
     ----------
     wave : AcousticElasticWave
-        Wave object exposing rho, Elastic_C, dt, body_forces.
+        Wave object exposing rho, Elastic_C, dt, body_forces, viscoelastic
+        and, for a viscoelastic solid, Gamma, y_list and zeta_list.
     u_trial, v_test, u_n, u_nm1 : firedrake Functions / TestFunction
         Trial/test functions and time-level fields.
     quad_rule : dict
@@ -47,27 +108,27 @@ def build_anisotropic_elastic_form(wave, u_trial, v_test, u_n, u_nm1, quad_rule,
     dt = Constant(wave.dt)
     rho = wave.rho
     Elastic_C = wave.Elastic_C
-    dim = v_test.function_space().mesh().topological_dimension
-
-    def strain_vector(w):
-        g = grad(w)
-        if dim == 2:
-            return as_vector([g[0, 0], g[1, 1], g[0, 1] + g[1, 0]])
-        else:
-            return as_vector([
-                g[0, 0], g[1, 1], g[2, 2],
-                g[1, 2] + g[2, 1],
-                g[0, 2] + g[2, 0],
-                g[0, 1] + g[1, 0],
-            ])
+    dim = wave.dimension
 
     # Inertial term
     F_m = (rho / (dt**2)) * dot(u_trial - 2 * u_n + u_nm1, v_test) * dx(**quad_rule)
 
     # Stiffness term via Voigt notation
-    e_n = strain_vector(u_n)
-    e_v = strain_vector(v_test)
-    F_k = dot(e_v, dot(Elastic_C, e_n)) * dx(**quad_rule)
+    e_n = voigt_strain(u_n, dim)
+    e_v = voigt_strain(v_test, dim)
+    sigma = dot(Elastic_C, e_n)
+    if wave.viscoelastic:
+        # GSLS memory stress, as in the pure viscoelastic solid:
+        # (C o Gamma) sum_l y_l zeta_l, with o the entry-wise product.
+        n = Elastic_C.ufl_shape[0]
+        M = as_matrix(
+            [[Elastic_C[i, j] * wave.Gamma[i, j] for j in range(n)] for i in range(n)]
+        )
+        e_mem = sum(
+            y * voigt_vector(zeta, dim) for y, zeta in zip(wave.y_list, wave.zeta_list)
+        )
+        sigma -= dot(M, e_mem)
+    F_k = dot(e_v, sigma) * dx(**quad_rule)
 
     # Source term
     F_s = 0

@@ -166,6 +166,9 @@ def _check_mesh(mesh, msh_file, water_interface, padding_type) -> None:
     assert_cell_regions(mesh, cell_groups, expected_measures)
     if water_interface:
         assert_region_above(mesh, cell_groups["Water"], cell_groups["Subsurface"])
+    if water_interface and padding_type is None:
+        # The coupled acoustic-elastic solver reads tag 1 as fluid, 2 as solid
+        assert (cell_groups["Water"], cell_groups["Subsurface"]) == (1, 2)
 
 
 @pytest.mark.slow

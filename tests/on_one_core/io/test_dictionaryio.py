@@ -2,6 +2,7 @@ import pytest
 
 from spyro.io.dictionaryio import (
     Read_options,
+    Read_outputs,
     Method,
     Variant,
     CellType,
@@ -111,3 +112,14 @@ def test_invalid_fields(
             cell_type=cell_type,
             automatic_adjoint=True,
         )
+
+
+@pytest.mark.parametrize("key", ["displacement", "p_equivalent", "sigma_zz"])
+def test_read_outputs_keeps_coupled_fields(key):
+    """The coupled solver's field outputs must not be dropped."""
+    outputs = Read_outputs(
+        **{f"{key}_output": True, f"{key}_output_filename": f"out/{key}.pvd"}
+    )
+
+    assert outputs.get(f"{key}_output") is True
+    assert outputs.get(f"{key}_output_filename") == f"out/{key}.pvd"
