@@ -268,9 +268,10 @@ def build_gmsh_geometry_and_groups3D(
         )
 
         if padding_type is None:
-
-            gmsh.model.addPhysicalGroup(3, [vol_subsoil], name="Subsurface")
-            gmsh.model.addPhysicalGroup(3, [vol_water], name="Water")
+            # Water 1 and subsurface 2, as in 2D and as the coupled
+            # acoustic-elastic solver reads the cell tags
+            gmsh.model.addPhysicalGroup(3, [vol_water], tag=1, name="Water")
+            gmsh.model.addPhysicalGroup(3, [vol_subsoil], tag=2, name="Subsurface")
         if padding_type == "hyperelliptical":
             cube_volume_tag = gmsh.model.occ.addBox(
                 box_xmin,

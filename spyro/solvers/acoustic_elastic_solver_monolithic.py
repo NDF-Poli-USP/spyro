@@ -8,6 +8,7 @@ from firedrake import (
     dot,
 )
 
+from spyro.solvers.acoustic_elastic_solver_no_pml import build_anisotropic_elastic_form
 from spyro.solvers.acoustic_solver_construction_no_pml import build_acoustic_form
 from spyro.solvers.elastic_wave.forms import build_elastic_form
 
@@ -32,9 +33,14 @@ def construct_acoustic_elastic_monolithic(Wave_obj):
         p_nm1,
         Wave_obj.quadrature_rule_fluid,
     )
-    F_elastic = build_elastic_form(
-        Wave_obj, u_trial, v_s, u_n, u_nm1, Wave_obj.quadrature_rule_solid
-    )
+    if Wave_obj.Elastic_C is not None:
+        F_elastic = build_anisotropic_elastic_form(
+            Wave_obj, u_trial, v_s, u_n, u_nm1, Wave_obj.quadrature_rule_solid
+        )
+    else:
+        F_elastic = build_elastic_form(
+            Wave_obj, u_trial, v_s, u_n, u_nm1, Wave_obj.quadrature_rule_solid
+        )
 
     u_tt_explicit = (u_trial - 2.0 * u_n + u_nm1) / dt**2
     F_interface_acoustic = -dot(u_tt_explicit, n_s) * v_f * ds_int(iface)

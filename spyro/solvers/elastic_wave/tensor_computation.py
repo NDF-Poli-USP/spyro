@@ -2,11 +2,14 @@ from firedrake import as_matrix
 import firedrake as fire
 import numpy as np
 
+import ufl
 from ufl import conditional
 from ...utils.typing import WaveType
 
 
-def create_strain_space(wave) -> fire.functionspaceimpl.WithGeometry:
+def create_strain_space(
+    wave, mesh: fire.MeshGeometry | None = None
+) -> fire.functionspaceimpl.WithGeometry:
     """Create the space holding the strain and the GSLS memory variables.
 
     The memory variables are driven by ``sym(grad(u))``, so they are stored
@@ -20,6 +23,10 @@ def create_strain_space(wave) -> fire.functionspaceimpl.WithGeometry:
     wave : spyro.solvers.elastic_wave.isotropic_wave.IsotropicWave
         Viscoelastic wave solver whose displacement space and polynomial
         degree define the strain space.
+    mesh : firedrake.MeshGeometry, optional
+        Mesh of the solid. Defaults to the mesh of ``wave.function_space``;
+        solvers whose function space is mixed over several meshes, such as
+        the fluid-solid coupled one, pass their solid mesh.
 
     Returns
     -------
@@ -27,8 +34,9 @@ def create_strain_space(wave) -> fire.functionspaceimpl.WithGeometry:
         Discontinuous tensor function space of degree ``wave.degree - 1``
         (``DQ`` on quadrilaterals and hexahedra, ``DG`` on simplices).
     """
-    return fire.TensorFunctionSpace(wave.function_space.mesh(), "DG",
-                                    max(wave.degree - 2, 0))
+    if mesh is None:
+        mesh = wave.function_space.mesh()
+    return fire.TensorFunctionSpace(mesh, "DG", max(wave.degree - 2, 0))
 
 
 def C_computation(self):
@@ -45,12 +53,25 @@ def C_computation(self):
     return Elastic_C
 
 
-def C_isotropic_tensor(self):
-    """
-    Elastic tensor in terms of vp, vs and rho.
-    """
+def C_isotropic_tensor(self, dim: int | None = None) -> ufl.core.expr.Expr:
+    """Build the isotropic elastic tensor in terms of vp, vs and rho.
 
-    dim = self.function_space.mesh().topological_dimension()
+    Parameters
+    ----------
+    self : object
+        Wave object exposing ``rho``, ``c`` (P velocity), ``c_s``
+        (S velocity) and ``function_space``.
+    dim : int, optional
+        Spatial dimension. Defaults to the topological dimension of the
+        mesh of ``self.function_space``.
+
+    Returns
+    -------
+    ufl.core.expr.Expr
+        Voigt stiffness tensor, 3x3 in 2D and 6x6 in 3D.
+    """
+    if dim is None:
+        dim = self.function_space.mesh().topological_dimension()
 
     rho = self.rho
     vp = self.c
@@ -189,16 +210,18 @@ def C_tti_tensor(self, C_vti, dim):
         cp = fire.cos(p)
         sp = fire.sin(p)
 
-        # Rotation matrix components
-        R11 = ct * cp
-        R22 = cp
-        R33 = ct
-        R12 = -sp
-        R13 = st * cp
-        R21 = ct * sp
-        R23 = st * sp
-        R31 = -st
-        R32 = 0.
+        # Rotation matrix components in spyro's (z, x, y) ordering: the
+        # symmetry axis is tilted by theta from the vertical towards +x
+        # (as in 2D) and then turned by the azimuth phi from x towards y.
+        R11 = ct
+        R12 = st
+        R13 = 0.0
+        R21 = -st * cp
+        R22 = ct * cp
+        R23 = -sp
+        R31 = -st * sp
+        R32 = ct * sp
+        R33 = cp
 
         # Transformation matrix for Voigt notation using UFL
         T = fire.as_tensor([
@@ -252,8 +275,27 @@ def build_Gamma(self):
     return Gamma
 
 
-def Gamma_isotropic(self):
-    dim = self.function_space.mesh().topological_dimension()
+def Gamma_isotropic(self, dim: int | None = None) -> ufl.core.expr.Expr:
+    """Build the GSLS attenuation factors of an isotropic solid.
+
+    Parameters
+    ----------
+    self : object
+        Wave object exposing ``c`` and ``c_s`` (P and S velocities),
+        ``Q_vp`` and ``Q_vs`` (reciprocal quality factors) and
+        ``function_space``.
+    dim : int, optional
+        Spatial dimension. Defaults to the topological dimension of the
+        mesh of ``self.function_space``.
+
+    Returns
+    -------
+    ufl.core.expr.Expr
+        Factors multiplying the Voigt stiffness entry by entry, 3x3 in 2D
+        and 6x6 in 3D.
+    """
+    if dim is None:
+        dim = self.function_space.mesh().topological_dimension()
 
     vp_sq = self.c**2
     vs_sq = self.c_s**2
@@ -279,8 +321,30 @@ def Gamma_isotropic(self):
     return Gamma
 
 
-def Gamma_VTI(self, C, dim):
+def Gamma_VTI(self, C: ufl.core.expr.Expr, dim: int) -> ufl.core.expr.Expr:
+    """Build the GSLS attenuation factors of a VTI solid.
 
+    The factors follow the Voigt ordering of `C_vti_tensor`, which uses
+    spyro's coordinates (z, x[, y]) with z along the symmetry axis.
+
+    Parameters
+    ----------
+    self : object
+        Wave object exposing ``c`` and ``c_s`` (vertical P and S
+        velocities), the Thomsen parameters ``epsilon``, ``delta``,
+        ``gamma``, ``anisotropy_type``, and the reciprocal quality factors
+        ``Q_vp``, ``Q_vs``, ``Q_epsilon``, ``Q_delta``, ``Q_gamma``.
+    C : ufl.core.expr.Expr
+        VTI Voigt stiffness tensor built by `C_vti_tensor`.
+    dim : int
+        Spatial dimension (2 or 3).
+
+    Returns
+    -------
+    ufl.core.expr.Expr
+        Factors multiplying the Voigt stiffness entry by entry, 3x3 in 2D
+        and 6x6 in 3D.
+    """
     vP = self.c
     vS = self.c_s
 
@@ -289,17 +353,11 @@ def Gamma_VTI(self, C, dim):
     delta = self.delta
     anisotropy = self.anisotropy_type
 
-    if dim == 2:
-        C11 = C[0, 0]
-        C13 = C[0, 1]
-        C33 = C[1, 1]
-        C44 = C[2, 2]
-
-    elif dim == 3:
-        C11 = C[0, 0]
-        C13 = C[0, 2]
-        C33 = C[2, 2]
-        C44 = C[3, 3]
+    # Voigt order (zz, xx, zx) in 2D and (zz, xx, yy, xy, zy, zx) in 3D.
+    C33 = C[0, 0]
+    C13 = C[0, 1]
+    C11 = C[1, 1]
+    C44 = C[2, 2] if dim == 2 else C[4, 4]
 
     Q33 = self.Q_vp
     Q11 = 2 * epsilon/(1 + 2 * epsilon) * self.Q_epsilon + Q33
@@ -325,72 +383,52 @@ def Gamma_VTI(self, C, dim):
         Q13 = (c1 * C33 * Q33 + c2 * C44 * Q44 + c3 * delta * self.Q_delta)/C13
 
     if dim == 2:
-        Gamma = fire.as_matrix([[Q11, Q13, 0],
-                                [Q13, Q33, 0],
-                                [0, 0, Q44]])
+        Gamma = fire.as_matrix([[Q33, Q13, 0], [Q13, Q11, 0], [0, 0, Q44]])
     else:
-        Gamma = fire.as_matrix([[Q11, Q12, Q13, 0, 0, 0],
-                                [Q12, Q11, Q13, 0, 0, 0],
-                                [Q13, Q13, Q33, 0, 0, 0],
-                                [0, 0, 0, Q44, 0, 0],
-                                [0, 0, 0, 0, Q44, 0],
-                                [0, 0, 0, 0, 0, Q66]])
+        Gamma = fire.as_matrix(
+            [
+                [Q33, Q13, Q13, 0, 0, 0],
+                [Q13, Q11, Q12, 0, 0, 0],
+                [Q13, Q12, Q11, 0, 0, 0],
+                [0, 0, 0, Q66, 0, 0],
+                [0, 0, 0, 0, Q44, 0],
+                [0, 0, 0, 0, 0, Q44],
+            ]
+        )
     return Gamma
 
 
-def Gamma_TTI(self, dim, C):
+def Gamma_TTI(self, dim: int, C: ufl.core.expr.Expr) -> ufl.core.expr.Expr:
+    """Build the GSLS attenuation factors of a TTI solid.
 
+    The VTI factors are applied to the VTI stiffness, the resulting
+    attenuation tensor is rotated like the stiffness, and the factors are
+    recovered entry by entry as the ratio of the rotated tensors.
+
+    Parameters
+    ----------
+    self : object
+        Wave object exposing the attributes read by `C_vti_tensor`,
+        `C_tti_tensor` and `Gamma_VTI`.
+    dim : int
+        Spatial dimension (2 or 3).
+    C : ufl.core.expr.Expr
+        TTI Voigt stiffness tensor. Unused: the factors are built from the
+        VTI stiffness and rotated; kept for the signature of `build_Gamma`.
+
+    Returns
+    -------
+    ufl.core.expr.Expr
+        Factors multiplying the Voigt stiffness entry by entry, 3x3 in 2D
+        and 6x6 in 3D. Entries where the TTI stiffness vanishes are zero.
+    """
     C_vti_real = C_vti_tensor(self, dim)
+    Q_vti = Gamma_VTI(self, C_vti_real, dim)
 
-    Q_vti = Gamma_VTI(self, C, dim)
-
-    eps = 1e-12
-
-    shape = C_vti_real.ufl_shape
-    n = shape[0]
-
-    if n == 6:  # 3D
-
-        Q11 = Q_vti[0, 0]
-        Q33 = Q_vti[2, 2]
-        Q44 = Q_vti[3, 3]
-        Q66 = Q_vti[5, 5]
-        Q13 = Q_vti[0, 2]
-        Q12 = Q_vti[0, 1]
-
-        C11 = C_vti_real[0, 0]
-        C12 = C_vti_real[0, 1]
-        C13 = C_vti_real[0, 2]
-        C33 = C_vti_real[2, 2]
-        C44 = C_vti_real[3, 3]
-        C66 = C_vti_real[5, 5]
-
-        C_imag = fire.as_tensor([
-            [C11*Q11, C12*Q12, C13*Q13, 0.0, 0.0, 0.0],
-            [C12*Q12, C11*Q11, C13*Q13, 0.0, 0.0, 0.0],
-            [C13*Q13, C13*Q13, C33*Q33, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, C44*Q44, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0, C44*Q44, 0.0],
-            [0.0, 0.0, 0.0, 0.0, 0.0, C66*Q66]
-        ])
-
-    elif n == 3:
-
-        Q11 = Q_vti[0, 0]
-        Q33 = Q_vti[1, 1]
-        Q13 = Q_vti[0, 1]
-        Q44 = Q_vti[2, 2]
-
-        C11 = C_vti_real[0, 0]
-        C13 = C_vti_real[0, 1]
-        C33 = C_vti_real[1, 1]
-        C44 = C_vti_real[2, 2]
-
-        C_imag = fire.as_tensor([
-            [C11*Q11, C13*Q13, 0.0],
-            [C13*Q13, C33*Q33, 0.0],
-            [0.0, 0.0, C44*Q44]
-        ])
+    n = C_vti_real.ufl_shape[0]
+    C_imag = fire.as_tensor(
+        [[C_vti_real[i, j] * Q_vti[i, j] for j in range(n)] for i in range(n)]
+    )
 
     C_tti_real = C_tti_tensor(self, C_vti_real, dim)
     C_tti_imag = C_tti_tensor(self, C_imag, dim)
