@@ -4,7 +4,7 @@ The test compares the minimum Eikonal value obtained from the simulation with th
 theoretical value for different mesh sizes, element geometries, and finite element types.
 The results are expected to be within a specified tolerance of the theoretical value.
 """
-from pytest import fail, mark
+from pytest import fail, mark, param
 from firedrake import conditional, ConvergenceError
 from numpy import isclose
 from spyro.mpi.spyro_mpi import SpyroEnsemble
@@ -248,7 +248,7 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type, source_bc):
 
 @mark.parametrize("source_bc", ["nearest_node", "local_time"])
 @mark.parametrize("element_type", ["consistent", "underintegrated"])
-@mark.parametrize("dimension", [2, 3])
+@mark.parametrize("dimension", [2, param(3, marks=mark.slow)])
 @mark.parametrize("element_geometry", ["T", "Q"])
 def test_eikonal(element_geometry, dimension, element_type, source_bc):
     """Testing of eikonal for 2D and 3D case in Fig. 8 of Salas et al (2022).

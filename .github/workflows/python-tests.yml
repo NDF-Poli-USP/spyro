@@ -65,13 +65,13 @@ jobs:
       if: startsWith(github.head_ref || github.ref_name, 'ruben/')
       run: |
         make clean
-        python3 -m pytest -n 8 --dist loadgroup --cov-report=xml --cov-append --cov=spyro tests/on_one_core/ --only-eikonal --only-modal --only-habc --durations=10
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/ --only-eikonal --only-modal --only-habc --durations=10
         mpiexec -n 2 pytest tests/parallel/test_modal_matrices_parallel.py
 
     - name: Running serial fast tests
       run: |
         make clean
-        python3 -m pytest -n 8 --dist loadgroup --cov-report=xml --cov-append --cov=spyro tests/on_one_core/ -m "not (eikonal or modal or habc)" --skip-slow --skip-newer-firedrake --durations=10
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/ -m "not (eikonal or modal or habc)" --skip-slow --skip-newer-firedrake --durations=10
 
     - name: Running fast eikonal, modal and HABC tests
       # On other branches only the fast ones run here, after the regular fast tests;
@@ -79,7 +79,7 @@ jobs:
       if: ${{ !startsWith(github.head_ref || github.ref_name, 'ruben/') }}
       run: |
         make clean
-        python3 -m pytest -n 8 --dist loadgroup --cov-report=xml --cov-append --cov=spyro tests/on_one_core/ --only-eikonal --only-modal --only-habc --skip-slow --skip-newer-firedrake --durations=10
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/ --only-eikonal --only-modal --only-habc --skip-slow --skip-newer-firedrake --durations=10
 
     - name: Rename coverage file
       # This is necessary because upload-artifact doesnt recognize hidden files
@@ -152,7 +152,7 @@ jobs:
     - name: Running serial slow tests
       run: |
         make clean
-        python3 -m pytest -n 8 --dist loadgroup --cov-report=xml --cov-append --cov=spyro tests/on_one_core/  --only-slow --skip-newer-firedrake --durations=15
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/  --only-slow --skip-newer-firedrake --durations=15
 
     - name: Running parallel tests for forward problem only
       run: |
@@ -237,7 +237,7 @@ jobs:
     - name: Running serial tests
       run: |
         make clean
-        python3 -m pytest -n 8 --dist loadgroup --cov-report=xml --cov-append --cov=spyro tests/on_one_core/  --skip-older-firedrake
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/  --skip-older-firedrake
 
     - name: Running parallel tests for forward problem only
       run: |
