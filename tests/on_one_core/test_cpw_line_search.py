@@ -8,6 +8,8 @@ import pytest
 
 from spyro.tools.cells_per_wavelength_calculator.line_search import (
     MAX_CPW,
+    MAX_RESOLUTION,
+    MIN_RESOLUTION,
     backward_line_search,
     forward_line_search,
 )
@@ -191,6 +193,50 @@ def test_line_searches_reject_invalid_settings(
         line_search(calculate_error, **settings)
 
     assert calls == []
+
+
+@pytest.mark.parametrize("line_search", [backward_line_search, forward_line_search])
+@pytest.mark.parametrize("resolution", [MIN_RESOLUTION / 2, MAX_RESOLUTION * 2])
+def test_line_searches_reject_resolution_outside_limits(
+    line_search: Callable[..., float], resolution: float
+) -> None:
+    """A resolution outside the accepted limits is rejected before any solve.
+
+    Parameters
+    ----------
+    line_search : Callable[..., float]
+        Line search under test.
+    resolution : float
+        Resolution just outside the accepted limits.
+    """
+    calculate_error, calls = make_error_function(3.0)
+
+    with pytest.raises(ValueError, match="'resolution' must be between"):
+        line_search(calculate_error, 2.0, 1.0, resolution)
+
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    "resolution, expected", [(MIN_RESOLUTION, 3.14), (MAX_RESOLUTION, 4.0)]
+)
+def test_backward_line_search_accepts_resolution_limits(
+    resolution: float, expected: float
+) -> None:
+    """The resolution limits themselves are accepted.
+
+    Parameters
+    ----------
+    resolution : float
+        Resolution at one of the accepted limits.
+    expected : float
+        Smallest passing cells-per-wavelength on the grid of `resolution`.
+    """
+    calculate_error, _ = make_error_function(3.14)
+
+    cpw = backward_line_search(calculate_error, 5.0, 1.0, resolution)
+
+    assert cpw == pytest.approx(expected)
 
 
 def test_backward_line_search_rejects_start_above_max_cpw() -> None:

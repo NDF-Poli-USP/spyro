@@ -3,6 +3,7 @@
 import math
 from collections.abc import Callable
 
+from ...utils.error_management import validate_numeric
 from ...utils.typing import CpwSearchDirection
 
 #: Fraction of the current cpw added or removed per coarse search step.
@@ -10,6 +11,12 @@ COARSE_STEP_FRACTION = 0.1
 
 #: Default largest cells-per-wavelength evaluated by the line searches.
 MAX_CPW = 5.0
+
+#: Smallest cpw grid spacing accepted by the line searches.
+MIN_RESOLUTION = 1e-3
+
+#: Largest cpw grid spacing accepted by the line searches.
+MAX_RESOLUTION = 1.0
 
 
 def _floor_to_resolution(value: float, resolution: float) -> float:
@@ -127,7 +134,10 @@ def _check_search_settings(
     Raises
     ------
     ValueError
-        If any setting is not positive and finite.
+        If any setting is not positive and finite, or `resolution` lies
+        outside :data:`MIN_RESOLUTION` and :data:`MAX_RESOLUTION`.
+    TypeError
+        If `resolution` is not a float or an integer.
     """
     for name, value in (
         ("starting_cpw", starting_cpw),
@@ -139,6 +149,14 @@ def _check_search_settings(
         # NaN fails every comparison, so test for validity instead of failure
         if not 0.0 < value < math.inf:
             raise ValueError(f"{name} must be positive and finite, got {value}.")
+    validate_numeric(
+        "resolution",
+        resolution,
+        lower_bound=MIN_RESOLUTION,
+        upper_bound=MAX_RESOLUTION,
+        include_lower_bound=True,
+        include_upper_bound=True,
+    )
 
 
 def _bisect_grid(
@@ -214,7 +232,8 @@ def backward_line_search(
         Largest accepted error.
     resolution : float
         Spacing of the cpw grid, and so the resolution of the result.
-        Candidates after the start are multiples of it.
+        Candidates after the start are multiples of it. Must lie between
+        :data:`MIN_RESOLUTION` and :data:`MAX_RESOLUTION`.
     coarse_step_fraction : float, optional
         Fraction of the current value removed per coarse step. Default is
         :data:`COARSE_STEP_FRACTION`.
@@ -229,8 +248,11 @@ def backward_line_search(
     Raises
     ------
     ValueError
-        If a setting is not positive and finite, `starting_cpw` is above
-        `max_cpw`, or `starting_cpw` does not meet `threshold`.
+        If a setting is not positive and finite, `resolution` lies outside
+        :data:`MIN_RESOLUTION` and :data:`MAX_RESOLUTION`, `starting_cpw` is
+        above `max_cpw`, or `starting_cpw` does not meet `threshold`.
+    TypeError
+        If `resolution` is not a float or an integer.
 
     Notes
     -----
@@ -304,7 +326,8 @@ def forward_line_search(
         Largest accepted error.
     resolution : float
         Spacing of the cpw grid, and so the resolution of the result.
-        Candidates after the start are multiples of it.
+        Candidates after the start are multiples of it. Must lie between
+        :data:`MIN_RESOLUTION` and :data:`MAX_RESOLUTION`.
     coarse_step_fraction : float, optional
         Fraction of the current value added per coarse step. Default is
         :data:`COARSE_STEP_FRACTION`.
@@ -319,9 +342,12 @@ def forward_line_search(
     Raises
     ------
     ValueError
-        If a setting is not positive and finite, `starting_cpw` already
-        meets `threshold` or is not below `max_cpw`, or `max_cpw` does
-        not meet `threshold`.
+        If a setting is not positive and finite, `resolution` lies outside
+        :data:`MIN_RESOLUTION` and :data:`MAX_RESOLUTION`, `starting_cpw`
+        already meets `threshold` or is not below `max_cpw`, or `max_cpw`
+        does not meet `threshold`.
+    TypeError
+        If `resolution` is not a float or an integer.
 
     Notes
     -----
