@@ -1,17 +1,51 @@
-from firedrake import (assemble, ConvergenceError, dx as fire_dx, Function, grad,
-                       inner, LinearVariationalProblem, LinearVariationalSolver)
-from numpy import (arange, arccosh, argmax, array, asarray,
-                   diag, inf, maximum, mean, pi, sqrt)
+from firedrake import (
+    assemble,
+    Constant,
+    ConvergenceError,
+    dx as fire_dx,
+    Function,
+    FunctionSpace,
+    grad,
+    inner,
+    LinearVariationalProblem,
+    LinearVariationalSolver,
+    VectorSpaceBasis,
+)
+from numpy import (
+    arange,
+    arccosh,
+    argmax,
+    array,
+    asarray,
+    diag,
+    inf,
+    maximum,
+    mean,
+    pi,
+    sqrt,
+)
 from scipy.optimize import curve_fit, fsolve, minimize_scalar
-from scipy.special import (beta, betainc, gamma, jn_zeros, jnp_zeros,
-                           mathieu_modcem1, spherical_jn)
+from scipy.special import (
+    beta,
+    betainc,
+    gamma,
+    jn_zeros,
+    jnp_zeros,
+    mathieu_modcem1,
+    spherical_jn,
+)
 from scipy.stats import norm as sn
 from sys import float_info
 from ...io.basicio import parallel_print as pprint
 from .modal_forms_and_matrices import acoustic_weak_forms_c_in_stiffness
-from ...utils.error_management import (validate_data_structure, validate_firedrake_parameter,
-                                       validate_numeric, validate_parameter)
+from ...utils.error_management import (
+    validate_data_structure,
+    validate_firedrake_parameter,
+    validate_numeric,
+    validate_parameter,
+)
 from ...utils.stats_tools import coeff_of_determination
+from ...utils.utils import global_max, global_min
 
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -24,7 +58,7 @@ from ...utils.stats_tools import coeff_of_determination
 # With additions by Alexandre Olender
 
 
-class Modal_Analytical_Solver():
+class Modal_Analytical_Solver:
     """Class for the Modal problem with Neumann or Dirichlet boundary conditions.
 
     Attributes
@@ -95,11 +129,11 @@ class Modal_Analytical_Solver():
 
         # Compute the frequency factor for rectangular or prismatic geometries
         if bc == "Neumann":
-            f_rec = 1. / max(hyper_axes)
+            f_rec = 1.0 / max(hyper_axes)
         elif bc == "Dirichlet":
-            f_rec = sum(1. / asarray(hyper_axes)**2)**0.5
+            f_rec = sum(1.0 / asarray(hyper_axes) ** 2) ** 0.5
 
-        f_rec *= pi / 2.
+        f_rec *= pi / 2.0
 
         return f_rec
 
@@ -173,7 +207,7 @@ class Modal_Analytical_Solver():
             Jmz : `array`
                 First n zeros of the Bessel function or its derivative.
             """
-            deriv = (bc == "Neumann")
+            deriv = bc == "Neumann"
             Jmz = jnp_zeros(m, n) if deriv else jn_zeros(m, n)
             # pprint((bc, m, n, Jmz), comm=self.comm)
             return Jmz
@@ -193,7 +227,7 @@ class Modal_Analytical_Solver():
                 spherical_jn(m, q, derivative=False) for the SBF and
                 spherical_jn(m, q, derivative=True) for its derivative.
             """
-            deriv = (bc == "Neumann")
+            deriv = bc == "Neumann"
             m = int(deriv)  # Order of the SBF: 0 (False) or 1 (True)
             # pprint((bc, m, q, spherical_jn(m, q, derivative=deriv)), comm=self.comm)
             return spherical_jn(m, q, derivative=deriv)
@@ -212,18 +246,27 @@ class Modal_Analytical_Solver():
             Rayleigh quotient RQ(α) = E(α) / N(α)
             """
             # Radial integral I_r
-            I_r = (alpha - 1)**2./5. - 4 * alpha * (alpha - 1.)/7. + 4. * alpha**2./9.
+            I_r = (
+                (alpha - 1) ** 2.0 / 5.0
+                - 4 * alpha * (alpha - 1.0) / 7.0
+                + 4.0 * alpha**2.0 / 9.0
+            )
 
             # Radial integral J_r
-            J_r = (1./3. + (2 * alpha - 2)/5. + (alpha**2. - 4.*alpha + 1.)/7.
-                   - (2. * alpha**2. - 2. * alpha)/9. + alpha**2./11.)
+            J_r = (
+                1.0 / 3.0
+                + (2 * alpha - 2) / 5.0
+                + (alpha**2.0 - 4.0 * alpha + 1.0) / 7.0
+                - (2.0 * alpha**2.0 - 2.0 * alpha) / 9.0
+                + alpha**2.0 / 11.0
+            )
 
-            RQ = (4./3.) * (1./a**2 + 1./b**2 + 1./c**2) * (I_r / J_r)
+            RQ = (4.0 / 3.0) * (1.0 / a**2 + 1.0 / b**2 + 1.0 / c**2) * (I_r / J_r)
             # pprint((bc, I_r, J_r, alpha, RQ), comm=self.comm)
             return RQ
 
         # Semi-axes
-        a, b = hyper_axes[: 2]
+        a, b = hyper_axes[:2]
 
         # Circular or spherical case
         if all_axes_equal:
@@ -244,11 +287,10 @@ class Modal_Analytical_Solver():
         f_rec = self._freq_factor_rec(hyper_axes, bc=bc)
 
         # Initial guess
-        igss = f_rec if bc == "Neumann" else 0.
+        igss = f_rec if bc == "Neumann" else 0.0
 
         # Elliptical or ellipsoidal case
         if self.dimension == 2:  # 2D elliptical
-
             # Order semi-axes
             a, b = sorted(hyper_axes, reverse=True)
 
@@ -259,26 +301,27 @@ class Modal_Analytical_Solver():
             a0 = a
             M01 = fsolve(MMF, igss, xtol=1e-14)[0]
 
-            return (2 / f0) * M01 ** 0.5
+            return (2 / f0) * M01**0.5
 
         if self.dimension == 3:  # 3D ellipsoidal
-
             # Order semi-axes
             a, b, c = sorted(hyper_axes, reverse=True)
 
             # Eccentricities for each pair of semi-axes
-            ecc_arr = [(a, b, (a**2 - b**2)**0.5 if a > b else 0., pi * a * b),
-                       (b, c, (b**2 - c**2)**0.5 if b > c else 0., pi * b * c),
-                       (a, c, (a**2 - c**2)**0.5 if a > c else 0., pi * a * c)]
+            ecc_arr = [
+                (a, b, (a**2 - b**2) ** 0.5 if a > b else 0.0, pi * a * b),
+                (b, c, (b**2 - c**2) ** 0.5 if b > c else 0.0, pi * b * c),
+                (a, c, (a**2 - c**2) ** 0.5 if a > c else 0.0, pi * a * c),
+            ]
 
             if bc == "Neumann":
-                '''
+                """
                 Suppose semi-axes a, b and c lie along in directions x, y and z, the
                 lowest fundamental frequency is found in the plane with highest area:
                 - Oblate ellipsoid (lentil) a = b > c: Plane xy(a,b).
                 - Prolate ellipsoid (rugby ball) a = b < c: Planes xz(a,c) and yz(b,c).
                 - Triaxial Ellipsoid (General): Plane with maximum eccentricity.
-                '''
+                """
                 max_area_idx = argmax([ecc_plane[-1] for ecc_plane in ecc_arr])
                 a0, b0, f0 = ecc_arr[max_area_idx][:-1]
 
@@ -292,17 +335,17 @@ class Modal_Analytical_Solver():
                     # 1st root or the mth-order Modified Mathieu's Function
                     M01 = fsolve(MMF, igss, xtol=1e-14)[0]
 
-                    return (2 / f0) * M01 ** 0.5
+                    return (2 / f0) * M01**0.5
 
             if bc == "Dirichlet":
-
                 # Use Rayleigh-Ritz  optimizing the parameter α in the trial function ψ.
-                RQ = minimize_scalar(ana_rq_ellipsoid, bounds=(-1., 1.),
-                                     method='bounded', tol=1e-14)
+                RQ = minimize_scalar(
+                    ana_rq_ellipsoid, bounds=(-1.0, 1.0), method="bounded", tol=1e-14
+                )
 
-                return RQ.fun ** 0.5
+                return RQ.fun**0.5
 
-    def _reg_geometry_hyp(self, cut_plane_percent=1.):
+    def _reg_geometry_hyp(self, cut_plane_percent=1.0):
         """Perform the nonlinear regression for the hypershape geometry factor.
 
         Parameters
@@ -326,37 +369,37 @@ class Modal_Analytical_Solver():
 
         def area_function(n, cut_plane_percent):
             """Area function for hiperellipses."""
-            fA = 2. * gamma(1 + 1 / n) ** 2 / gamma(1 + 2 / n)
-            if cut_plane_percent == 1.:
-                fA *= 2.
+            fA = 2.0 * gamma(1 + 1 / n) ** 2 / gamma(1 + 2 / n)
+            if cut_plane_percent == 1.0:
+                fA *= 2.0
             else:
                 eps = float_info.min
-                w = maximum(cut_plane_percent ** n, eps)  # w <= 1
+                w = maximum(cut_plane_percent**n, eps)  # w <= 1
                 p = 1 / n
                 q = 1 + 1 / n
                 B_w = beta(p, q) * betainc(p, q, w)  # Non-regularized Beta
-                fA += (2. / n) * B_w
+                fA += (2.0 / n) * B_w
 
             return fA
 
         def volume_function(n, cut_plane_percent):
             """Volume function for hiperellipsoids."""
-            fV = 4. * gamma(1 + 1 / n) ** 3 / gamma(1 + 3 / n)
-            if cut_plane_percent == 1.:
-                fV *= 2.
+            fV = 4.0 * gamma(1 + 1 / n) ** 3 / gamma(1 + 3 / n)
+            if cut_plane_percent == 1.0:
+                fV *= 2.0
             else:
                 eps = float_info.min
-                w = maximum(cut_plane_percent ** n, eps)  # w <= 1
+                w = maximum(cut_plane_percent**n, eps)  # w <= 1
                 p = 1 / n
                 q = 1 + 1 / n
-                A_f = gamma(1 + p)**2 / gamma(q)
+                A_f = gamma(1 + p) ** 2 / gamma(q)
                 B_w = beta(p, q) * betainc(p, q, w)  # Non-regularized Beta
-                fV += (4. / n) * A_f * B_w
+                fV += (4.0 / n) * A_f * B_w
 
             return fV
 
         def fit_function(n, pn, qn):
-            """ Define the fit function for the area or volume regression.
+            """Define the fit function for the area or volume regression.
 
             Fit function:
                 A or V = f_max - cn2 * (1 / (qn * n + 1 - 2 * qn)) ** pn
@@ -366,29 +409,31 @@ class Modal_Analytical_Solver():
             # Constant for power-law fit
             cn2 = f_max - fn2
 
-            return f_max - cn2 * (1. / (qn * n + 1. - 2. * qn)) ** pn
+            return f_max - cn2 * (1.0 / (qn * n + 1.0 - 2.0 * qn)) ** pn
 
         # Regression dataset
-        n_data = arange(2., 100., 0.1)
+        n_data = arange(2.0, 100.0, 0.1)
 
         # Pre-compute constants
-        fax_trunc = cut_plane_percent + 1.
+        fax_trunc = cut_plane_percent + 1.0
         if self.dimension == 2:  # 2D
-            f_max = 2. * fax_trunc
-            fn2 = area_function(2., cut_plane_percent)
-            fr_ell = fn2 / area_function(2., 1.)
-            fr_rec = area_function(100., cut_plane_percent) / area_function(100., 1.)
+            f_max = 2.0 * fax_trunc
+            fn2 = area_function(2.0, cut_plane_percent)
+            fr_ell = fn2 / area_function(2.0, 1.0)
+            fr_rec = area_function(100.0, cut_plane_percent) / area_function(100.0, 1.0)
             f_data = area_function(n_data, cut_plane_percent)
 
         if self.dimension == 3:  # 3D
-            f_max = 4. * fax_trunc
-            fn2 = volume_function(2., cut_plane_percent)
-            fr_ell = fn2 / volume_function(2., 1.)
-            fr_rec = volume_function(100., cut_plane_percent) / volume_function(100., 1.)
+            f_max = 4.0 * fax_trunc
+            fn2 = volume_function(2.0, cut_plane_percent)
+            fr_ell = fn2 / volume_function(2.0, 1.0)
+            fr_rec = volume_function(100.0, cut_plane_percent) / volume_function(
+                100.0, 1.0
+            )
             f_data = volume_function(n_data, cut_plane_percent)
 
         # Initial guess
-        init_guess = array([1/3, 1/3])
+        init_guess = array([1 / 3, 1 / 3])
 
         # Parameter bounds pn >= 0, qn >= 0
         low_bnds = [0, 0]
@@ -399,8 +444,14 @@ class Modal_Analytical_Solver():
 
         try:
             # Perform nonlinear curve fitting
-            popt, pcov = curve_fit(fit_function, n_data, f_data, p0=init_guess,
-                                   bounds=(low_bnds, upp_bnds), maxfev=it_max)
+            popt, pcov = curve_fit(
+                fit_function,
+                n_data,
+                f_data,
+                p0=init_guess,
+                bounds=(low_bnds, upp_bnds),
+                maxfev=it_max,
+            )
             pn_fit, qn_fit = popt
 
             # Calculate goodness of fit metrics (RMSE: Root-Mean-Square error)
@@ -416,8 +467,11 @@ class Modal_Analytical_Solver():
             delta_qn = qn_fit - sn.interval(0.95, loc=qn_fit, scale=perr[1])[0]
 
             pprint("Nonlinear Curve Fit Successful!", comm=self.comm)
-            pprint(f"Fitted Parameters: pn = {pn_fit:.6f} ± {delta_pn:.6f}, "
-                   f"qn = {qn_fit:.6f} ± {delta_qn:.6f}", comm=self.comm)
+            pprint(
+                f"Fitted Parameters: pn = {pn_fit:.6f} ± {delta_pn:.6f}, "
+                f"qn = {qn_fit:.6f} ± {delta_qn:.6f}",
+                comm=self.comm,
+            )
             pprint(f"R-Squared: {r_squared:.6f} - RMSE: {rmse:.6f}", comm=self.comm)
 
             return pn_fit, qn_fit, fr_ell, fr_rec
@@ -425,9 +479,18 @@ class Modal_Analytical_Solver():
         except ConvergenceError as e:
             pprint(f"Nonlinear Curve Fit Failed: {e}", comm=self.comm)
 
-    def _freq_factor_hyp(self, n_hyp, f_rec, f_ell, c_eq, bc="Neumann",
-                         c_eqref=None, fitting_c=(0., 0., 0., 0.),
-                         fbc_dirichlet=None, cut_plane_percent=1.):
+    def _freq_factor_hyp(
+        self,
+        n_hyp,
+        f_rec,
+        f_ell,
+        c_eq,
+        bc="Neumann",
+        c_eqref=None,
+        fitting_c=(0.0, 0.0, 0.0, 0.0),
+        fbc_dirichlet=None,
+        cut_plane_percent=1.0,
+    ):
         """Compute an approximate frequency factor for a full or truncated hypershape.
 
         The truncation plane is at z = cut_plane_percent * b, with b = Lz + pad_len.
@@ -485,29 +548,38 @@ class Modal_Analytical_Solver():
         c_eqref = c_eq if c_eqref is None else c_eqref
 
         # Regression for hypershape geometry factor
-        pn, qn, fr_ell, fr_rec = \
-            self._reg_geometry_hyp(cut_plane_percent=cut_plane_percent)
+        pn, qn, fr_ell, fr_rec = self._reg_geometry_hyp(
+            cut_plane_percent=cut_plane_percent
+        )
 
         # Multiplicative fator by Dirichlet BCs
         if bc == "Dirichlet":
-            validate_data_structure("fbc_dirichlet", fbc_dirichlet, "tuple",
-                                    expected_type_element=("float"), expected_length=2)
-            ratio_f_ell, ratio_f_rec, = fbc_dirichlet
+            validate_data_structure(
+                "fbc_dirichlet",
+                fbc_dirichlet,
+                "tuple",
+                expected_type_element=("float"),
+                expected_length=2,
+            )
+            (
+                ratio_f_ell,
+                ratio_f_rec,
+            ) = fbc_dirichlet
             fr_ell *= ratio_f_ell
             fr_rec *= ratio_f_rec
 
         # Hypershape frequency factor
         f_min = f_rec
         cn2 = f_min - f_ell
-        pot_term = (1. / (qn * n_hyp + 1 - 2 * qn)) ** pn
+        pot_term = (1.0 / (qn * n_hyp + 1 - 2 * qn)) ** pn
         f_hyp = f_min - cn2 * pot_term
 
         # Adjusting equivalent velocity for the hypershape
         fc1, fc2, fp1, fp2 = fitting_c
         f1 = fr_ell / fr_rec
         f2 = f_ell / f_rec
-        f3 = 1. / f2
-        c_ref = max(c_eq * f3 ** fc1, c_eqref * f3 ** fc2)
+        f3 = 1.0 / f2
+        c_ref = max(c_eq * f3**fc1, c_eqref * f3**fc2)
         c_min = c_ref * min(f1, f2) ** (fp1 * pn)
         cc2 = c_min - c_ref * max(f1, f2) ** (fp2 * pn)
 
@@ -542,10 +614,15 @@ class Modal_Analytical_Solver():
         """
 
         # Check imput arguments
-        validate_data_structure("dof_load", dof_load, "array",
-                                expected_type_element=("int"))
-        validate_data_structure("amplitude_load", amplitude_load, "array",
-                                expected_type_element=("float", "int"))
+        validate_data_structure(
+            "dof_load", dof_load, "array", expected_type_element=("int")
+        )
+        validate_data_structure(
+            "amplitude_load",
+            amplitude_load,
+            "array",
+            expected_type_element=("float", "int"),
+        )
         validate_firedrake_parameter("V", V, "FunctionSpace")
 
         # Static load for model with absorbing layer
@@ -554,15 +631,18 @@ class Modal_Analytical_Solver():
 
         # Static load for reference model (without absorbing layer)
         q_ref = None
-        V_ref = validate_firedrake_parameter("V_ref", V_ref, "FunctionSpace", accept_parameter_as_none=True)
+        V_ref = validate_firedrake_parameter(
+            "V_ref", V_ref, "FunctionSpace", accept_parameter_as_none=True
+        )
         if V_ref:
             q_ref = Function(V_ref)
             q_ref.interpolate(q_dummy, allow_missing_dofs=True)
 
         return (q_dummy, q_ref)
 
-    def c_equivalent(self, c, V, quad_rule=None,
-                     type_homog="energy", static_load_for_ceq=None):
+    def c_equivalent(
+        self, c, V, quad_rule=None, type_homog="energy", static_load_for_ceq=None
+    ):
         """Compute equivalent homogeneous velocity for an inhomogeneous model.
 
         The method uses an energy-equivalent homogenization by default.
@@ -579,47 +659,152 @@ class Modal_Analytical_Solver():
         type_homog : `str`, optional
             Type of homogenization: "energy" or "volume". Default is "energy"
         static_load_for_ceq : `Firedrake.Function`, optional
-            Static load for the energy-equivalent homogenization.
-            Only used if 'type_homog' is "energy". Default is `None`, in which
-            a small constant load is applied over the entire domain.
+            Static load for the energy-equivalent homogenization. Required if
+            'type_homog' is "energy", where its mean is removed (see Notes),
+            and ignored otherwise. Default is `None`.
 
         Returns
         -------
         c_eq : `float`
             Equivalent homogeneous velocity.
+
+        Raises
+        ------
+        ValueError
+            If 'type_homog' is "energy" and 'static_load_for_ceq' is `None`.
+            A constant load has no zero-mean part, so it cannot define the
+            static problem.
+
+        Notes
+        -----
+        A constant velocity is returned as it is, without solving anything:
+        both homogenizations are weighted averages of ``c``, so they give
+        ``c_eq = c`` exactly.
+
+        The energy-equivalent velocity is
+        ``c_eq**2 = int(c**2 |grad(u)|**2) / int(|grad(u)|**2)``, where ``u``
+        is the static response to the load ``q``: find ``u`` such that
+        ``int(c**2 inner(grad(u), grad(v))) = int(q v)`` for every ``v``,
+        with Neumann conditions on the whole boundary.
+
+        The static response is computed with continuous linear elements on
+        the mesh of ``V``, not with ``V`` itself. ``c_eq`` only needs the
+        distribution of the strain energy, which weights ``c``, and not the
+        accuracy of the high-order modal space. The velocity and the load
+        enter the forms as coefficients in their own spaces, so the load is
+        not interpolated. With linear elements the solve is a small fraction
+        of the cost of a modal solver: for the 3D tetrahedral heterogeneous
+        rectangular model of test_modal_solvers.py, the static problem has
+        3072 unknowns instead of 192964 and the analytical frequency takes
+        0.14 s instead of 9.5 s. ``c_eq`` changes with the space (by up to
+        11 % in that test), and the 'fitting_c' parameters of the regression
+        must be calibrated for it.
+
+        That problem only has a solution if the load has zero mean. Taking
+        ``v = 1``, the left-hand side vanishes for every ``u``, so a solution
+        requires ``int(q) = 0``. Physically, a body free on its whole boundary
+        is in static equilibrium only if the net load on it is zero. The
+        dummy load of the source is concentrated around the source and its
+        amplitudes sum to one, so ``int(q) > 0`` and the original problem has
+        no solution. An iterative solver then stops at a field that depends
+        on the solver, the preconditioner and the installation. With
+        Firedrake 2025.4.1, GMRES with BoomerAMG stopped after one iteration
+        with a residual of 6 % to 600 % of the load, and the analytical
+        frequency differed by up to 6 % between Firedrake versions.
+
+        The mean ``q_mean = int(q) / |Omega|`` is therefore subtracted, which
+        adds a uniform body force that balances the load. The discrete load
+        then also sums to zero, because the basis functions are a partition
+        of unity. The solution is unique up to a constant, which is removed
+        through the null space of constants and does not change c_eq, since
+        only ``grad(u)`` enters it. The operator is symmetric, so the same
+        basis is passed as the transpose null space, which removes the
+        round-off left in the load. The solve then converges to the same
+        c_eq with very different solvers, GMRES with BoomerAMG and CG with
+        Jacobi, to four digits. With the zero-mean load (and the space of
+        the modal problem, before linear elements were used), the 2D
+        analytical frequencies of test_modal_solvers.py became identical with
+        Firedrake 2025.4.1 and 2026.10.0.
+
+        Projecting the load only onto the transpose null space would also make
+        the problem solvable, but it subtracts equal nodal forces, which
+        depend on how the nodes are distributed over the mesh. The uniform
+        body force does not depend on the mesh.
         """
 
         # Check input arguments
         validate_firedrake_parameter("c", c, "Function")
         validate_firedrake_parameter("V", V, "FunctionSpace")
-        validate_data_structure("quad_rule", quad_rule, "dict", accept_parameter_as_none=True)
+        validate_data_structure(
+            "quad_rule", quad_rule, "dict", accept_parameter_as_none=True
+        )
         validate_parameter("type_homog", type_homog, ["energy", "volume"])
-        validate_firedrake_parameter("static_load_for_ceq", static_load_for_ceq,
-                                     "Function", accept_parameter_as_none=True)
+        validate_firedrake_parameter(
+            "static_load_for_ceq",
+            static_load_for_ceq,
+            "Function",
+            accept_parameter_as_none=True,
+        )
 
         # Integration measure
         dx = fire_dx(**quad_rule) if quad_rule else fire_dx(**{"degree": 0})
 
-        # State variable
-        u = Function(V)
+        if type_homog == "energy" and static_load_for_ceq is None:
+            raise ValueError(
+                "'static_load_for_ceq' is required for the energy-equivalent "
+                "homogenization: a constant load has no zero-mean part."
+            )
+
+        # A constant velocity is its own equivalent velocity for either
+        # homogenization, so no static problem is solved
+        c_min, c_max = global_min(c), global_max(c)
+        if c_max - c_min <= 1e-12 * c_max:
+            return c_max
 
         if type_homog == "energy":
             # Equivalent velocity by energy-equivalent homogenization
 
+            # Zero-mean load: the static problem with Neumann conditions on
+            # the whole boundary only has a solution for a load with zero mean
+            dx_load = fire_dx(**quad_rule) if quad_rule else fire_dx
+            volume = assemble(Constant(1.0) * dx_load(domain=V.mesh()))
+            load_mean = assemble(static_load_for_ceq * dx_load) / volume
+            zero_mean_load = static_load_for_ceq - Constant(load_mean)
+
+            # The static response is computed with linear elements on the mesh
+            # of V, much cheaper than V itself; the load and the velocity enter
+            # the forms as coefficients in their own spaces
+            u = Function(FunctionSpace(V.mesh(), "CG", 1))
+
             # Weak forms
             a, L = acoustic_weak_forms_c_in_stiffness(
-                c, V, quad_rule=quad_rule, source=True, user_load=static_load_for_ceq,
+                c,
+                u.function_space(),
+                quad_rule=quad_rule,
+                source=True,
+                user_load=zero_mean_load,
             )
 
-            # Solve static load problem for the energy-equivalent homogenization
+            # Solve static load problem for the energy-equivalent homogenization.
+            # The constants are the null space of the operator, and also of its
+            # transpose, since the operator is symmetric
+            nullspace = VectorSpaceBasis(constant=True, comm=V.mesh().comm)
+            nullspace.orthonormalize()
             lin_var = LinearVariationalProblem(a, L, u, constant_jacobian=True)
-            solver_param = {"ksp_type": "gmres",
-                            "pc_type": "hypre",
-                            "pc_hypre_type": "boomeramg",
-                            "ksp_rtol": 1e-12,
-                            "ksp_atol": 1e-12,
-                            "ksp_gmres_restart": 100}
-            LinearVariationalSolver(lin_var, solver_parameters=solver_param).solve()
+            solver_param = {
+                "ksp_type": "gmres",
+                "pc_type": "hypre",
+                "pc_hypre_type": "boomeramg",
+                "ksp_rtol": 1e-12,
+                "ksp_atol": 1e-12,
+                "ksp_gmres_restart": 100,
+            }
+            LinearVariationalSolver(
+                lin_var,
+                nullspace=nullspace,
+                transpose_nullspace=nullspace,
+                solver_parameters=solver_param,
+            ).solve()
 
             # Compute the energy
             bilinear_term = 0.5 * inner(grad(u), grad(u))
@@ -632,7 +817,8 @@ class Modal_Analytical_Solver():
             # Equivalent velocity by volume-average homogenization
 
             # Compute the volume
-            u.assign(1.)
+            u = Function(V)
+            u.assign(1.0)
             volume = assemble(u * dx)
 
             # Compute the equivalent velocity
@@ -640,8 +826,17 @@ class Modal_Analytical_Solver():
 
         return c_eq
 
-    def homogenized_velocities(self, c, V, c_ref=None, V_ref=None, quad_rule=None,
-                               dof_load=None, amplitude_load=None, type_homog="energy"):
+    def homogenized_velocities(
+        self,
+        c,
+        V,
+        c_ref=None,
+        V_ref=None,
+        quad_rule=None,
+        dof_load=None,
+        amplitude_load=None,
+        type_homog="energy",
+    ):
         """Compute equivalent homogeneous velocities required for the analytical solver.
 
         Parameters
@@ -679,31 +874,55 @@ class Modal_Analytical_Solver():
 
         # Define the load for the energy-equivalent homogenization
         c_is_float = isinstance(c, (int, float))
-        dummy_load = self.dummy_load_static(
-            V, dof_load, amplitude_load, V_ref=V_ref) \
-            if (type_homog == "energy" and not c_is_float) else (None, None)
+        dummy_load = (
+            self.dummy_load_static(V, dof_load, amplitude_load, V_ref=V_ref)
+            if (type_homog == "energy" and not c_is_float)
+            else (None, None)
+        )
 
         # Compute the equivalent velocity for the model with absorbing layer
-        c_eq = validate_numeric(
-            "c", c, float_num=True, integer_num=True, lower_bound=0.) if c_is_float \
-            else self.c_equivalent(c, V, quad_rule=quad_rule, type_homog=type_homog,
-                                   static_load_for_ceq=dummy_load[0])
+        c_eq = (
+            validate_numeric("c", c, float_num=True, integer_num=True, lower_bound=0.0)
+            if c_is_float
+            else self.c_equivalent(
+                c,
+                V,
+                quad_rule=quad_rule,
+                type_homog=type_homog,
+                static_load_for_ceq=dummy_load[0],
+            )
+        )
 
         # Compute the equivalent velocity for the reference model without layer
         c_eqref = None
         if V_ref is not None:
             c_ref_is_float = isinstance(c_eqref, (int, float))
-            c_eqref = validate_numeric(
-                "c_ref", c_ref, float_num=True, integer_num=True, lower_bound=0.) \
-                if c_ref_is_float else self.c_equivalent(c_ref, V_ref, quad_rule=quad_rule,
-                                                         type_homog=type_homog,
-                                                         static_load_for_ceq=dummy_load[1])
+            c_eqref = (
+                validate_numeric(
+                    "c_ref", c_ref, float_num=True, integer_num=True, lower_bound=0.0
+                )
+                if c_ref_is_float
+                else self.c_equivalent(
+                    c_ref,
+                    V_ref,
+                    quad_rule=quad_rule,
+                    type_homog=type_homog,
+                    static_load_for_ceq=dummy_load[1],
+                )
+            )
 
         return (c_eq, c_eqref)
 
-    def solver_analytical(self, c_eq, hyp_par, bc="Neumann", c_eqref=None,
-                          fitting_c=(0., 0., 0., 0.), cut_plane_percent=1.):
-        """"Compute the analytical eigenvalue for hypershapes by using homogenization.
+    def solver_analytical(
+        self,
+        c_eq,
+        hyp_par,
+        bc="Neumann",
+        c_eqref=None,
+        fitting_c=(0.0, 0.0, 0.0, 0.0),
+        cut_plane_percent=1.0,
+    ):
+        """ "Compute the analytical eigenvalue for hypershapes by using homogenization.
 
         Support Neumann or Dirichlet boundary conditions.
 
@@ -750,46 +969,76 @@ class Modal_Analytical_Solver():
         """
 
         # Check the homogeneous velocity
-        validate_numeric("c_eq", c_eq, float_num=True, integer_num=True, lower_bound=0.)
+        validate_numeric(
+            "c_eq", c_eq, float_num=True, integer_num=True, lower_bound=0.0
+        )
 
         # Hyperellipse parameters
         n_hyp, hyper_axes = hyp_par[0], hyp_par[1:]
 
         # Check the hypershape degree
-        validate_numeric("n_hyp", n_hyp, float_num=True, integer_num=True,
-                         accept_parameter_as_none=True, lower_bound=2., include_lower_bound=True)
+        validate_numeric(
+            "n_hyp",
+            n_hyp,
+            float_num=True,
+            integer_num=True,
+            accept_parameter_as_none=True,
+            lower_bound=2.0,
+            include_lower_bound=True,
+        )
         n_hyp = 330 if n_hyp is None else n_hyp
 
         # Check semi-axes type
-        validate_data_structure("hyper_axes", hyper_axes, "tuple",
-                                expected_type_element=("float", "int"),
-                                expected_length=self.dimension)
+        validate_data_structure(
+            "hyper_axes",
+            hyper_axes,
+            "tuple",
+            expected_type_element=("float", "int"),
+            expected_length=self.dimension,
+        )
 
         # Check boundary condition type
         validate_parameter("bc", bc, ["Dirichlet", "Neumann"])
 
         # Check the homogeneous velocity from original model without absorbing layer
-        validate_numeric("c_eqref", c_eqref, float_num=True, integer_num=True,
-                         accept_parameter_as_none=True, lower_bound=0.)
+        validate_numeric(
+            "c_eqref",
+            c_eqref,
+            float_num=True,
+            integer_num=True,
+            accept_parameter_as_none=True,
+            lower_bound=0.0,
+        )
         c_eqref = c_eq if c_eqref is None else c_eqref
 
         # Check the parameters for fitting equivalent velocity regression.
-        validate_data_structure("fitting_c", fitting_c, "tuple",
-                                expected_type_element=("float", "int"),
-                                expected_length=4)
+        validate_data_structure(
+            "fitting_c",
+            fitting_c,
+            "tuple",
+            expected_type_element=("float", "int"),
+            expected_length=4,
+        )
 
         # Check the cutting plane percent is between 0 and 1
-        validate_numeric("cut_plane_percent", cut_plane_percent, float_num=True,
-                         integer_num=False, lower_bound=0., upper_bound=1.,
-                         include_lower_bound=True, include_upper_bound=True)
+        validate_numeric(
+            "cut_plane_percent",
+            cut_plane_percent,
+            float_num=True,
+            integer_num=False,
+            lower_bound=0.0,
+            upper_bound=1.0,
+            include_lower_bound=True,
+            include_upper_bound=True,
+        )
 
-        a, b = hyper_axes[: 2]
+        a, b = hyper_axes[:2]
         if self.dimension == 2:  # 2D
-            all_axes_equal = (a == b)
+            all_axes_equal = a == b
 
         if self.dimension == 3:  # 3D
             c = hyper_axes[2]
-            all_axes_equal = (a == b == c)
+            all_axes_equal = a == b == c
 
         # Frequency factors
         f_rec = self._freq_factor_rec(hyper_axes, bc=bc)
@@ -804,15 +1053,24 @@ class Modal_Analytical_Solver():
         else:
             fbc_dirichlet = None
 
-        f_hyp, c_reg = self._freq_factor_hyp(n_hyp, f_rec, f_ell, c_eq, bc=bc,
-                                             c_eqref=c_eqref, fitting_c=fitting_c,
-                                             fbc_dirichlet=fbc_dirichlet,
-                                             cut_plane_percent=cut_plane_percent)
+        f_hyp, c_reg = self._freq_factor_hyp(
+            n_hyp,
+            f_rec,
+            f_ell,
+            c_eq,
+            bc=bc,
+            c_eqref=c_eqref,
+            fitting_c=fitting_c,
+            fbc_dirichlet=fbc_dirichlet,
+            cut_plane_percent=cut_plane_percent,
+        )
 
-        pprint(f"Hypershape Equivalent Velocity c_eq (km/s) = {c_reg:.3f}", comm=self.comm)
+        pprint(
+            f"Hypershape Equivalent Velocity c_eq (km/s) = {c_reg:.3f}", comm=self.comm
+        )
         pprint(f"Hypershape Frequency Factor f_hyp (1/km): {f_hyp:.3f}", comm=self.comm)
 
         # Eigenvalue
-        Lsp = (c_reg * f_hyp)**2
+        Lsp = (c_reg * f_hyp) ** 2
 
         return Lsp

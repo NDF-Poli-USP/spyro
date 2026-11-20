@@ -60,10 +60,27 @@ jobs:
                .pytest_cache
         find . -name '*.pkl' -delete || true
 
+    - name: Running eikonal, modal and HABC tests (including slow ones)
+      # On ruben/ branches these run first, slow ones included
+      if: startsWith(github.head_ref || github.ref_name, 'ruben/')
+      run: |
+        make clean
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/ --only-eikonal --only-modal --only-habc --durations=10
+        mpiexec -n 2 pytest tests/parallel/test_modal_matrices_parallel.py
+        mpiexec -n 2 pytest tests/parallel/test_eikonal_parallel.py
+
     - name: Running serial fast tests
       run: |
         make clean
-        python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/on_one_core/ --skip-slow --skip-newer-firedrake --durations=10
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/ -m "not (eikonal or modal or habc)" --skip-slow --skip-newer-firedrake --durations=10
+
+    - name: Running fast eikonal, modal and HABC tests
+      # On other branches only the fast ones run here, after the regular fast tests;
+      # the slow ones keep running in the slow-tests job on pull requests
+      if: ${{ !startsWith(github.head_ref || github.ref_name, 'ruben/') }}
+      run: |
+        make clean
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/ --only-eikonal --only-modal --only-habc --skip-slow --skip-newer-firedrake --durations=10
 
     - name: Rename coverage file
       # This is necessary because upload-artifact doesnt recognize hidden files
@@ -173,7 +190,7 @@ jobs:
     - name: Post-run cleanup
       if: always()
       run: find . -delete
-  
+
   new-firedrake-tests:
     name: Updated Firedrake tests
     runs-on: self-hosted
@@ -235,7 +252,7 @@ jobs:
           mpiexec -n 2 pytest tests/parallel/test_vom_receivers.py
           mpiexec -n 2 pytest tests/parallel/test_simulation_logger_parallel.py
           mpiexec -n 2 pytest tests/parallel/test_modal_matrices_parallel.py
-    
+
     - name: Running parallel tests for inversion
       run: |
           make clean

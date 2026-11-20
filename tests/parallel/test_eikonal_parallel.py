@@ -11,14 +11,16 @@ the installations and the tolerance in their Notes.
 import firedrake as fire
 import numpy as np
 import pytest
+from pyop2.configuration import configuration
 
 from spyro.abc.eik_min import Minimum_Eikonal
+from spyro.meshing.meshing_operations import MeshOps
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.solvers.eikonal.eikonal_eq import Eikonal_Modeling
 from spyro.utils.utils import global_min
 from tests.on_one_core.test_eikonal_new import wave_dict
 
-pytestmark = pytest.mark.parallel(2)
+pytestmark = [pytest.mark.parallel(2), pytest.mark.eikonal]
 
 
 def square_space() -> fire.FunctionSpace:
@@ -290,7 +292,7 @@ def test_global_min_reduces_over_ranks() -> None:
     assert global_min(fire.Function(V).interpolate(10.0 - z - x)) == 2.0
 
 
-def critical_boundary_data(
+def eikonal_wave(
     geometry: str,
     degree: int,
     f_est: float,
@@ -298,8 +300,8 @@ def critical_boundary_data(
     source_bc_eik: str = "nearest_node",
     dimension: int = 2,
     edge_length: float = 0.1,
-) -> list:
-    """Run an Eikonal analysis and return its boundary data.
+) -> AcousticWave:
+    """Run an Eikonal analysis and return the wave that holds its results.
 
     The setup is that of ``test_eikonal_new`` (unit square or cube, source at
     ``(-0.5, 0.25)`` or ``(-0.5, 0.25, 0.5)``) with the smooth velocity
@@ -333,9 +335,9 @@ def critical_boundary_data(
 
     Returns
     -------
-    `list`
-        ``[pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]`` per boundary,
-        sorted by the minimum Eikonal.
+    `AcousticWave`
+        Wave after the preamble mesh operations and the identification of the
+        critical boundary points.
     """
     dictionary = wave_dict(geometry, dimension, degree, element_type, source_bc_eik)
     dictionary["visualization"]["output_folder"] += f"_np{fire.COMM_WORLD.size}"
@@ -348,6 +350,50 @@ def critical_boundary_data(
         wave, ele_type_eik=element_type, f_est=f_est, source_bc_eik=source_bc_eik
     )
     wave.layer_ops.critical_boundary_points(wave)
+    return wave
+
+
+def critical_boundary_data(
+    geometry: str,
+    degree: int,
+    f_est: float,
+    element_type: str,
+    source_bc_eik: str = "nearest_node",
+    dimension: int = 2,
+    edge_length: float = 0.1,
+) -> list:
+    """Run an Eikonal analysis and return its boundary data.
+
+    The setup is that of `eikonal_wave`.
+
+    Parameters
+    ----------
+    geometry : `str`
+        Element geometry, "T" or "Q".
+    degree : `int`
+        Finite element order for the Eikonal equation.
+    f_est : `float`
+        Factor for the stabilizing term in the Eikonal equation.
+    element_type : `str`
+        Finite element type for the Eikonal equation, "consistent" or
+        "underintegrated" (KMV on triangles, spectral on quadrilaterals).
+    source_bc_eik : `str`, optional
+        Dirichlet condition at the sources, "nearest_node" or "local_time".
+        Default is "nearest_node".
+    dimension : `int`, optional
+        Dimension of the problem, 2 or 3. Default is 2.
+    edge_length : `float`, optional
+        Mesh size in km. Default is 0.1.
+
+    Returns
+    -------
+    `list`
+        ``[pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]`` per boundary,
+        sorted by the minimum Eikonal.
+    """
+    wave = eikonal_wave(
+        geometry, degree, f_est, element_type, source_bc_eik, dimension, edge_length
+    )
     return wave.layer_ops.eik_bnd
 
 
@@ -443,6 +489,101 @@ def test_eikonal_critical_points_match_serial(
         [e for _, e in result], [e for _, e in serial], rtol=1e-4
     )
     assert fire.COMM_WORLD.allgather(result) == [result] * fire.COMM_WORLD.size
+
+
+def test_velocity_ranges_agree_on_all_ranks() -> None:
+    """Check that the velocity ranges of the preamble are global.
+
+    The velocity ``c = 3 - 1.5 x`` spans 1.5 to 3 km/s in the domain and on
+    its absorbing boundaries, while each rank of a partition only holds part
+    of it. The ranges set the velocity floor of the Eikonal equation and the
+    size of the absorbing layer, so every rank must use the global values.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    With ranges taken from the local data, two ranks found 2.1 km/s and
+    1.5 km/s as minimum velocities (see
+    `test_eikonal_kernels_agree_on_all_ranks`).
+    """
+    wave = eikonal_wave("Q", 2, 0.05, "underintegrated")
+
+    ranges = (wave.c_min, wave.c_max, wave.c_bnd_min, wave.c_bnd_max)
+    np.testing.assert_allclose(ranges, (1.5, 3.0, 1.5, 3.0), rtol=1e-12)
+    assert fire.COMM_WORLD.allgather(ranges) == [ranges] * fire.COMM_WORLD.size
+
+
+def test_mesh_sizes_agree_on_all_ranks() -> None:
+    """Check that the representative mesh sizes are global.
+
+    The unit square is meshed with 8 x 8 quadrilaterals and graded by
+    ``(z, x) -> (z**2, x**2)``, so the smallest cell, a square of side 1/64,
+    is at one corner and the largest, of side 15/64, at the opposite one, on
+    different ranks. ``lmin`` and ``lmax`` are the cell diameters divided by
+    ``sqrt(2)``, so they are the sides of these squares on every rank.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    ``lmin`` sets the search tolerance and the source ball of the Eikonal
+    boundary conditions, and both sizes enter the size of the absorbing layer,
+    so every rank must use the same values.
+    """
+    mesh = fire.UnitSquareMesh(8, 8, quadrilateral=True)
+    z, x = fire.SpatialCoordinate(mesh)
+    mesh.coordinates.interpolate(fire.as_vector([z**2, x**2]))
+    mesh_ops = MeshOps((1.0, 1.0), dimension=2, quadrilateral=True)
+
+    _, lmin, lmax, alpha, tol = mesh_ops.representative_mesh_dimensions(
+        mesh, fire.FunctionSpace(mesh, "DG", 0)
+    )
+
+    sizes = (lmin, lmax, alpha, tol)
+    np.testing.assert_allclose((lmin, lmax), (1.0 / 64, 15.0 / 64), atol=1e-6)
+    assert fire.COMM_WORLD.allgather(sizes) == [sizes] * fire.COMM_WORLD.size
+
+
+def test_eikonal_kernels_agree_on_all_ranks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check that every rank compiles the same Eikonal kernels.
+
+    PyOP2 generates the code of a kernel on one rank and broadcasts it, so
+    the ranks must build the same kernels. With ``spmd_strict``, PyOP2
+    compares the cache keys of every rank before each lookup and raises
+    ``ValueError`` if they differ, whatever the caches hold.
+
+    Parameters
+    ----------
+    monkeypatch : `pytest.MonkeyPatch`
+        Fixture that enables ``spmd_strict`` for this test only.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    A velocity floor taken from the local data of each rank and written into
+    the forms as a number made the ranks compile different kernels. With
+    empty caches, the rank that did not generate the code then ran the floor
+    of the other one: the minimum Eikonal on Xmax of this case was 319.833 ms
+    instead of 375.938 ms, and the wrong kernel stayed in the disk cache for
+    later serial runs.
+    """
+    monkeypatch.setitem(configuration, "spmd_strict", True)
+
+    eik_bnd = critical_boundary_data("Q", 2, 0.05, "underintegrated")
+
+    np.testing.assert_allclose(
+        [eikmin for _, _, eikmin, *_ in eik_bnd],
+        [0.0660405994505825, 0.18864019575613442, 0.3759377789296918],
+        rtol=1e-4,
+    )
 
 
 @pytest.mark.parametrize("geometry", ["T", "Q"])

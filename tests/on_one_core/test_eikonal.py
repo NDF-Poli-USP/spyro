@@ -4,12 +4,79 @@ The test compares the minimum Eikonal value obtained from the simulation with th
 theoretical value for different mesh sizes, element geometries, and finite element types.
 The results are expected to be within a specified tolerance of the theoretical value.
 """
-from pytest import fail, mark
+from pytest import fail, mark, param
 from firedrake import conditional, ConvergenceError
 from numpy import isclose
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
+
+pytestmark = mark.eikonal
+
+# Simulation parameters, calibrated for each source condition (see Notes of
+# test_eikonal). Each parameter is a decision tree over the case fields
+# (source_bc, dimension, element_type, element_geometry): every nested
+# dictionary splits on exactly one field, keyed by that field's options
+# (currently two each), and each leaf is the value shared by all the cases
+# below it. A field is omitted where all its options share the same value, so
+# that value is set once for the whole subtree.
+EIKONAL_CONFIG = {
+    # Mesh size in km: edge_length = lba / cpw, where cpw is the number of cells
+    # per wavelength and lba = minimum_velocity / source_frequency
+    "edge_length": {2: 0.1, 3: 0.15},
+    # Finite element order for the Eikonal equation
+    "p_eik": {"T": 2, "Q": {"consistent": 2, "underintegrated": {2: 4, 3: 3}}},
+    # Absolute tolerance of eik_min / eik_thr with respect to 1
+    "atol": {
+        "nearest_node": {
+            2: {"consistent": 5e-3, "underintegrated": 1.5e-2},
+            3: {"consistent": 3e-2, "underintegrated": 2.5e-2},
+        },
+        "local_time": {2: 5e-3, 3: 3e-2},
+    },
+    # Factor for the stabilizing term in Eikonal equation
+    "f_est": {
+        "nearest_node": {
+            "T": {"consistent": {2: 0.06, 3: 0.05}, "underintegrated": 0.07},
+            "Q": {
+                "consistent": {2: 0.05, 3: 0.08},
+                "underintegrated": {2: 0.03, 3: 0.06},
+            },
+        },
+        "local_time": {
+            "T": {
+                "consistent": {2: 0.12, 3: 0.04},
+                "underintegrated": {2: 0.08, 3: 0.07},
+            },
+            "Q": {"consistent": {2: 0.12, 3: 0.02}, "underintegrated": 0.03},
+        },
+    },
+}
+
+
+def case_parameter(tree: dict | float | int, case: tuple) -> float | int:
+    """Get the value of a parameter of EIKONAL_CONFIG for one case.
+
+    Parameters
+    ----------
+    tree : `dict`, `float` or `int`
+        Decision tree of the parameter. Each nested dictionary splits on exactly
+        one case field and is keyed by that field's options, and each leaf is
+        the value shared by all the cases below it.
+    case : `tuple`
+        Options of the case: (source_bc, dimension, element_type,
+        element_geometry). Every option belongs to a single field, so each
+        dictionary is resolved by the option of the case among its keys.
+
+    Returns
+    -------
+    `float` or `int`
+        Value of the parameter for the case.
+    """
+    while isinstance(tree, dict):
+        (option,) = [field for field in case if field in tree]
+        tree = tree[option]
+    return tree
 
 
 def wave_dict(
@@ -180,19 +247,9 @@ def eikonal_analysis(dictionary, edge_length, f_est, element_type, source_bc):
 
 
 @mark.parametrize("source_bc", ["nearest_node", "local_time"])
-@mark.parametrize(
-    "element_geometry, dimension, element_type",
-    [
-        ("T", 2, "consistent"),
-        ("T", 2, "underintegrated"),
-        ("Q", 2, "consistent"),
-        ("Q", 2, "underintegrated"),
-        ("T", 3, "consistent"),
-        ("Q", 3, "consistent"),
-        ("T", 3, "underintegrated"),
-        ("Q", 3, "underintegrated"),
-    ],
-)
+@mark.parametrize("element_type", ["consistent", "underintegrated"])
+@mark.parametrize("dimension", [2, param(3, marks=mark.slow)])
+@mark.parametrize("element_geometry", ["T", "Q"])
 def test_eikonal(element_geometry, dimension, element_type, source_bc):
     """Testing of eikonal for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
@@ -347,53 +404,13 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
 
     # ============ SIMULATION PARAMETERS ============
 
-    # Mesh size (in km)
-    # cpw: cells per wavelength
-    # lba = minimum_velocity / source_frequency
-    # edge_length = lba / cpw
-    edge_length = 0.1 if dimension == 2 else 0.15
-
-    # Eikonal degree and factor for the stabilizing term in Eikonal equation,
-    # calibrated for each source condition (see Notes)
-    if source_bc == "nearest_node":
-        if dimension == 2:
-            atol = 5e-3 if element_type == "consistent" else 1.5e-2
-            if element_geometry == "T":
-                p_eik = 2 if element_type == "consistent" else 2
-                f_est = 0.06 if element_type == "consistent" else 0.07
-
-            else:
-                p_eik = 2 if element_type == "consistent" else 4
-                f_est = 0.05 if element_type == "consistent" else 0.03
-
-        if dimension == 3:
-            atol = 3e-2 if element_type == "consistent" else 2.5e-2
-            if element_geometry == "T":
-                p_eik = 2 if element_type == "consistent" else 2
-                f_est = 0.05 if element_type == "consistent" else 0.07
-            else:
-                p_eik = 2 if element_type == "consistent" else 3
-                f_est = 0.08 if element_type == "consistent" else 0.06
-
-    if source_bc == "local_time":
-        if dimension == 2:
-            atol = 5e-3 if element_type == "consistent" else 5e-3
-            if element_geometry == "T":
-                p_eik = 2 if element_type == "consistent" else 2
-                f_est = 0.12 if element_type == "consistent" else 0.08
-
-            else:
-                p_eik = 2 if element_type == "consistent" else 4
-                f_est = 0.12 if element_type == "consistent" else 0.03
-
-        if dimension == 3:
-            atol = 3e-2 if element_type == "consistent" else 3e-2
-            if element_geometry == "T":
-                p_eik = 2 if element_type == "consistent" else 2
-                f_est = 0.04 if element_type == "consistent" else 0.07
-            else:
-                p_eik = 2 if element_type == "consistent" else 3
-                f_est = 0.02 if element_type == "consistent" else 0.03
+    # Mesh size (in km), Eikonal degree, tolerance and factor for the stabilizing
+    # term in Eikonal equation of the case (see EIKONAL_CONFIG)
+    case = (source_bc, dimension, element_type, element_geometry)
+    edge_length = case_parameter(EIKONAL_CONFIG["edge_length"], case)
+    p_eik = case_parameter(EIKONAL_CONFIG["p_eik"], case)
+    atol = case_parameter(EIKONAL_CONFIG["atol"], case)
+    f_est = case_parameter(EIKONAL_CONFIG["f_est"], case)
 
     # Get simulation parameters
     SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length:.4f} m")

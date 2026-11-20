@@ -10,6 +10,8 @@ from spyro.utils.typing import LayerShapeType
 import pytest
 import os
 
+pytestmark = pytest.mark.habc
+
 
 def wave_dict(dt_usu, layer_shape, degree_layer,
               habc_reference_freq, get_ref_model):

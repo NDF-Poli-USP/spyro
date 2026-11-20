@@ -13,6 +13,8 @@ from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
 
+pytestmark = pytest.mark.habc
+
 
 def wave_dict(element_geometry, dimension, calc_eik, abc_type, dt_usu):
     """Create a dictionary with parameters for the model.

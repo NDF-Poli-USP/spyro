@@ -1,5 +1,6 @@
 import firedrake as fire
 import numpy as np
+from mpi4py import MPI
 from netgen.geom2d import SplineGeometry
 from netgen.meshing import Element2D, Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
@@ -9,6 +10,7 @@ from .meshing_functions import AutomaticMesh
 from .meshing_operations import MeshOps
 from ..tools.habc_tools import point_cloud_field
 from ..utils.error_management import validate_parameter
+from ..utils.utils import global_max, global_min
 from ..version_control import is_firedrake_new
 
 if is_firedrake_new() is False:
@@ -173,10 +175,13 @@ class HABCMesh(MeshOps):
         vel_on_boundary = point_cloud_field(mesh, ptos_bnd, initial_velocity_model,
                                             mesh_parameters.tol).dat.data_with_halos[:]
 
-        # Get extreme values of the velocity on the boundary excluding free surfaces
+        # Get extreme values of the velocity on the boundary excluding free
+        # surfaces, over the boundary points of every rank
         decimal = int(abs(np.log10(mesh_parameters.tol)))
-        c_bnd_min = round(vel_on_boundary[vel_on_boundary > 0.0].min(), decimal)
-        c_bnd_max = round(vel_on_boundary[vel_on_boundary > 0.0].max(), decimal)
+        vel_bnd = vel_on_boundary[vel_on_boundary > 0.0]
+        c_bnd_min = mesh.comm.allreduce(vel_bnd.min(initial=np.inf), op=MPI.MIN)
+        c_bnd_max = mesh.comm.allreduce(vel_bnd.max(initial=-np.inf), op=MPI.MAX)
+        c_bnd_min, c_bnd_max = round(c_bnd_min, decimal), round(c_bnd_max, decimal)
 
         # Print on screen
         cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"
@@ -213,9 +218,9 @@ class HABCMesh(MeshOps):
             fire.assemble(fire.interpolate(initial_velocity_model, function_space))
         )
 
-        # Get extreme values of the velocity model
-        c_min = initial_velocity_model.dat.data_with_halos.min()
-        c_max = initial_velocity_model.dat.data_with_halos.max()
+        # Get extreme values of the velocity model over every rank
+        c_min = global_min(initial_velocity_model)
+        c_max = global_max(initial_velocity_model)
 
         # Print on screen
         cdom_str = "Domain Velocity Range (km/s): {:.3f} - {:.3f}"

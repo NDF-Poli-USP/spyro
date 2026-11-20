@@ -341,7 +341,8 @@ class Eikonal_Modeling:
         c_node = c
         if c_min is not None:
             c_src = max(c_src, c_min)
-            c_node = fire.max_value(c, c_min)
+            # A Constant keeps the value out of the compiled kernel
+            c_node = fire.max_value(c, fire.Constant(c_min))
         dist = fire.sqrt(sum((x - s) ** 2 for x, s in zip(coords, source)))
         return 0.5 * dist * (1.0 / fire.Constant(c_src) + 1.0 / c_node)
 
@@ -609,7 +610,7 @@ class Eikonal_Modeling:
 
         # Initial guess
         if typ_igs == "constant":
-            cell_diam_max = cell_diameter_function.dat.data_with_halos.max()
+            cell_diam_max = global_max(cell_diameter_function)
             init_guess = cell_diam_max / c_min
 
         elif typ_igs == "variable":
@@ -853,6 +854,12 @@ class Eikonal_Modeling:
         cells cut by a velocity discontinuity, a high-order interpolant
         undershoots its nodal values and can even turn negative, which makes
         the Eikonal equation ill-posed and the nonlinear solver fail.
+
+        ``c_min`` enters the forms as a `Firedrake.Constant`, so its value is
+        passed to the compiled kernels instead of being written into their
+        code. The ranks must compile the same kernels, because PyOP2 generates
+        the code of a kernel on one rank and broadcasts it to the others, and
+        one kernel then serves every ``c_min``.
         """
 
         # Functions
@@ -860,7 +867,7 @@ class Eikonal_Modeling:
         vy = fire.TestFunction(V)
 
         # Velocity bounded below by its minimum nodal value
-        c = fire.max_value(c, c_min)
+        c = fire.max_value(c, fire.Constant(c_min))
 
         # Weak form parameters
         wf_parameters = [u, vy, c, c_min, V, diam_mesh]

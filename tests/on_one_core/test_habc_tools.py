@@ -17,6 +17,8 @@ from spyro.domains.space import create_function_space
 from spyro.tools.habc_tools import layer_mask_field, point_cloud_field
 from spyro.utils.cost import comp_cost
 
+pytestmark = mark.habc
+
 
 def wave_dict(element_geometry, dimension, layer_shape, degree_layer):
     """Create a dictionary with parameters for the model.

@@ -3,6 +3,9 @@ import matplotlib
 matplotlib.use("Agg")
 
 from spyro.plots.plots_habc import create_folder, plot_function_layer_size
+import pytest
+
+pytestmark = pytest.mark.habc
 
 
 def test_create_folder_creates_directory(tmp_path):
