@@ -67,6 +67,7 @@ jobs:
         make clean
         python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/ --only-eikonal --only-modal --only-habc --durations=10
         mpiexec -n 2 pytest tests/parallel/test_modal_matrices_parallel.py
+        mpiexec -n 2 pytest tests/parallel/eikonal_parallel.py
 
     - name: Running serial fast tests
       run: |
@@ -189,7 +190,7 @@ jobs:
     - name: Post-run cleanup
       if: always()
       run: find . -delete
-  
+
   new-firedrake-tests:
     name: Updated Firedrake tests
     runs-on: self-hosted
@@ -251,7 +252,7 @@ jobs:
           mpiexec -n 2 pytest tests/parallel/test_vom_receivers.py
           mpiexec -n 2 pytest tests/parallel/test_simulation_logger_parallel.py
           mpiexec -n 2 pytest tests/parallel/test_modal_matrices_parallel.py
-    
+
     - name: Running parallel tests for inversion
       run: |
           make clean
