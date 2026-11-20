@@ -80,6 +80,7 @@ def test_viscoelastic_TTI():
     base_dict["synthetic_data"]['gamma'] = 0.1
     base_dict["synthetic_data"]["theta"] = 30.0
     base_dict["synthetic_data"]["phi"] = 0.0
+    base_dict["synthetic_data"]["anisotropy"] = 'exact'
     wave = AnisotropicTTIWave(base_dict)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.2, "periodic": True})
     wave.forward_solve()

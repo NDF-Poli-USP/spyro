@@ -170,6 +170,9 @@ def elastic_without_pml(wave):
     if getattr(wave, "body_forces", None) is not None:
         F_s += dot(wave.body_forces, v) * dx(**quad_rule)
 
+    if wave.point_source_in_form:
+        # See Sources.source_term.
+        F_s += wave.sources.source_term(v, dx(**quad_rule))
     F_t = local_abc_form(wave)
 
     # -------------------------------------------------
@@ -261,6 +264,10 @@ def viscoelastic_without_pml(wave):
     F_s = 0
     if getattr(wave, "body_forces", None) is not None:
         F_s += dot(wave.body_forces, v) * dx(**quad_rule)
+
+    if wave.point_source_in_form:
+        # See Sources.source_term.
+        F_s += wave.sources.source_term(v, dx(**quad_rule))
 
     F_t = local_abc_form(wave)
 
