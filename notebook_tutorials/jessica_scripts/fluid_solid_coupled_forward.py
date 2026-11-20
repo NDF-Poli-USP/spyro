@@ -540,7 +540,7 @@ def large_3d_non_planar():
         water_interface=True,
         source_locations=[(zc + 0.15, xc, yc)],
         receiver_location=[(zc + lateral, xr, yr)],
-        solid_receiver_locations=[(zc - lateral, xr, yr)],
+        solid_receiver_locations=[(zc - 0.1, xr, yr)],
         output_frequency=2500,
         dt=2.5e-5,
         segy_dz=0.005,
