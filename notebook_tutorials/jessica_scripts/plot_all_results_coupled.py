@@ -39,7 +39,7 @@ from fluid_solid_coupled_forward import save_figure, solid_name
 # ===========================================================================
 # "small_2d_planar", "small_2d_non_planar", "small_2d_visco",
 # "large_2d_non_planar", "small_3d_planar", "large_3d_non_planar"
-CASE = "small_2d_visco"
+CASE = "large_2d_non_planar"
 
 # Runs drawn together: (rheology, medium, anisotropy_type, scheme), with the
 # same values as the settings of fluid_solid_coupled_forward.py (rheology
@@ -59,10 +59,10 @@ CASE = "small_2d_visco"
 #   [("elastic", "tti", "exact", "sequential"),
 #    ("elastic", "tti", "exact", "monolithic")]               schemes
 RUNS = [
-    # ("elastic", "iso", "exact", "sequential"),
+    ("elastic", "iso", "exact", "sequential"),
     # ("viscoelastic", "iso", "exact", "sequential"),
     # ("elastic", "vti", "exact", "sequential"),
-    ("viscoelastic", "vti", "exact", "sequential"),
+    # ("viscoelastic", "vti", "exact", "sequential"),
     # ("elastic", "vti", "weak", "sequential"),
     # ("viscoelastic", "vti", "weak", "sequential"),
     # ("elastic", "tti", "exact", "sequential"),
@@ -97,7 +97,7 @@ MAX_LEGEND_INSIDE = 4
 REFERENCE_SOLID = None
 
 USE_SPECFEM = True
-USE_GAR6 = False
+USE_GAR6 = True
 
 # Results computed before the axis change (x vertical, z horizontal):
 # u_solid columns are (horizontal, vertical[, y]) instead of (vertical, horizontal[, y]).

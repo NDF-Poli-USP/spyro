@@ -47,7 +47,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 # ===========================================================================
 # "small_2d_planar", "small_2d_non_planar", "small_2d_visco",
 # "large_2d_non_planar", "small_3d_planar", "large_3d_non_planar"
-CASE = "large_3d_non_planar"
+CASE = "small_2d_planar"
 
 # Solid medium: "iso", "vti" or "tti" (parameters in MEDIA_PARAMETERS).
 MEDIUM = "iso"
@@ -64,9 +64,9 @@ RESULTS_DIR = Path("results")
 # Figures are saved once per format. Vector formats ("svg", "pdf") keep axes
 # and text sharp at any zoom; the dense mesh/model drawings inside them are
 # rasterized at FIGURE_DPI so the files stay small.
-FIGURE_FORMATS = ("svg",)
+FIGURE_FORMATS = ("png",)
 FIGURE_DPI = 300
-matplotlib.rcParams["svg.fonttype"] = "none"  # editable text in the SVG
+# matplotlib.rcParams["svg.fonttype"] = "none"  # editable text in the SVG
 
 # ===========================================================================
 # Solid media (Thomsen parameters added to the isotropic properties)
@@ -411,8 +411,8 @@ def plot_model_xz(wave, case, acquisition, filename):
 # ===========================================================================
 small_2d_planar = {
     "dimension": 2,
-    "mesh_type": "firedrake_mesh",  # "firedrake_mesh" or "gmsh_mesh"
-    "cell_type": "T",
+    "mesh_type": "gmsh_mesh",  # "firedrake_mesh" or "gmsh_mesh"
+    "cell_type": "Q",
     "degree": 4,
     "length_z": 1.0,
     "length_x": 1.0,
@@ -423,7 +423,7 @@ small_2d_planar = {
     "frequency": 25,
     "receiver_location": [(-0.49, 0.49)],
     "solid_receiver_locations": [(-0.51, 0.51)],
-    "final_time": 0.22,
+    "final_time": 0.8,
     "dt": 0.0001,
     "velocity_fluid": None,
     "bulk_modulus": 2.25,
@@ -468,7 +468,7 @@ _large_2d = {
     "frequency": 10,
     "receiver_location": [(-5.99, 14.99)],
     "solid_receiver_locations": [(-6.01, 15.01)],
-    "final_time": 1.0,
+    "final_time": 2.0,
     "dt": 0.0005,
     "velocity_fluid": None,
     "bulk_modulus": 2.25,
@@ -500,7 +500,7 @@ def large_2d_non_planar():
 small_3d_planar = {
     "dimension": 3,
     "mesh_type": "firedrake_mesh",
-    "cell_type": "Q",
+    "cell_type": "T",
     "degree": 3,
     "length_z": 3.0,
     "length_x": 3.0,
@@ -535,6 +535,7 @@ def large_3d_non_planar():
     xr, yr = xc - lateral, yc - lateral
     return dict(
         small_3d_planar,
+        cell_type="T",
         mesh_type="gmsh_mesh",
         interface=interface,
         water_interface=True,
