@@ -47,7 +47,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 # ===========================================================================
 # "small_2d_planar", "small_2d_non_planar", "small_2d_visco",
 # "large_2d_non_planar", "small_3d_planar", "large_3d_non_planar"
-CASE = "small_2d_planar"
+CASE = "large_3d_non_planar"
 
 # Solid medium: "iso", "vti" or "tti" (parameters in MEDIA_PARAMETERS).
 MEDIUM = "iso"
