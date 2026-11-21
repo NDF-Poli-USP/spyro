@@ -5,6 +5,7 @@ import pytest
 
 from spyro.io.basicio import read_velocity_binary3d
 from spyro.meshing import meshing_utils3d
+from spyro.meshing.meshing_water3d import _water_interface_grid
 from spyro.meshing.meshing_utils3d import (
     create_sizing_function3D,
     define_winslow_points_3d,
@@ -796,3 +797,23 @@ def test_define_winslow_points_3d_rejects_all_water_nodes(gmsh_session):
             water_interface=True,
             tol=1.0e-6,
         )
+
+
+def test_water_interface_grid_separates_close_velocities() -> None:
+    """Find the water bottom when the subsurface velocity is close to water.
+
+    With water at 1.5 km/s and a solid sized by its S-wave velocity
+    (1.963 km/s), the velocities differ by less than 1, so the default
+    tolerance must be smaller than that to tell them apart.
+
+    Returns
+    -------
+    None
+    """
+    nz, nx, ny, dz = 11, 3, 4, 0.1
+    cube = np.full((nz, nx, ny), 1.963)
+    cube[:4] = 1.5  # water in the first 4 samples, from z = 0 down
+    _, _, z_bottom, _ = _water_interface_grid(
+        cube, nz, nx, ny, dz, 0.1, 0.1, 0.0, 0.2, 0.0, 0.3, -1.0, 0.0, 1.5
+    )
+    np.testing.assert_allclose(z_bottom, -0.4)

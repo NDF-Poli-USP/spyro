@@ -19,7 +19,7 @@ def _water_interface_grid(
     z_min,
     z_max,
     target,
-    tolerance=1.0,
+    tolerance=1.0e-3,
     x_chunk=64,
     y_chunk=None,
 ):
@@ -56,7 +56,9 @@ def _water_interface_grid(
     target : float
         Velocity value used to identify water cells.
     tolerance : float
-        Absolute tolerance used when identifying the target velocity.
+        Absolute tolerance used when identifying the target velocity, as in
+        the 2-D water profile. It must be smaller than the difference between
+        the water and the subsurface velocities. Default is 1.0e-3.
     x_chunk : int
         Number of x samples processed per interface-extraction chunk.
     y_chunk : int or None
@@ -354,7 +356,7 @@ def generate_water_interface_volumes(
     axes_order=(0, 1, 2),
     order="F",
     dtype="float32",
-    tolerance=1.0,
+    tolerance=1.0e-3,
     x_chunk=64,
     y_chunk=None,
 ):
@@ -401,7 +403,9 @@ def generate_water_interface_volumes(
     dtype : str or numpy.dtype
         Numeric data type stored in the velocity-model file.
     tolerance : float
-        Absolute tolerance used when identifying the target velocity.
+        Absolute tolerance used when identifying the target velocity, as in
+        the 2-D water profile. It must be smaller than the difference between
+        the water and the subsurface velocities. Default is 1.0e-3.
     x_chunk : int
         Number of x samples processed per interface-extraction chunk.
     y_chunk : int or None

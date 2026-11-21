@@ -17,6 +17,8 @@ References:
     results_specfem/case_<case>-<rheology>_<solid>/AA.S0001.PRE.semp,
         AA.S0002.BXZ.semd, AA.S0002.BXX.semd  (one SPECFEM run per solid; each
         spyro run is compared with the SPECFEM run of its own solid)
+    results_specfem/case_<case>-<rheology>_<solid>/DB.RCV_FLUID.FXP.semp,
+        DB.RCV_SOLID.FXZ.semd, .FXX.semd, .FXY.semd  (SPECFEM3D, 3D cases)
     results_gar6/<folder>/fluid/P.dat  (folders keep their names, see GAR6_FOLDERS)
     results_gar6/<folder>/solid/Ux.dat, Uy.dat (Uz.dat in 3D)
 """
@@ -39,7 +41,7 @@ from fluid_solid_coupled_forward import save_figure, solid_name
 # ===========================================================================
 # "small_2d_planar", "small_2d_non_planar", "small_2d_visco",
 # "large_2d_non_planar", "small_3d_planar", "large_3d_non_planar"
-CASE = "large_2d_non_planar"
+CASE = "large_3d_non_planar"
 
 # Runs drawn together: (rheology, medium, anisotropy_type, scheme), with the
 # same values as the settings of fluid_solid_coupled_forward.py (rheology
@@ -157,8 +159,24 @@ else:
     ]
 
 SPECFEM_BASE = os.path.join(SCRIPT_DIR, "results_specfem")
-SPECFEM_NAME = "SPECFEM2D"
+SPECFEM_NAME = "SPECFEM3D" if DIMENSION == 3 else "SPECFEM2D"
 SPECFEM_STYLE = dict(color="black", lw=1.2, ls=":")
+
+# key -> (file, sign). 2D: S0001 = fluid receiver, S0002 = solid receiver.
+# 3D: RCV_FLUID and RCV_SOLID.
+if DIMENSION == 2:
+    SPECFEM_FILES = {
+        "p": ("AA.S0001.PRE.semp", 1.0),
+        "uz": ("AA.S0002.BXZ.semd", 1.0),
+        "ux": ("AA.S0002.BXX.semd", 1.0),
+    }
+else:
+    SPECFEM_FILES = {
+        "p": ("DB.RCV_FLUID.FXP.semp", 1.0),
+        "uz": ("DB.RCV_SOLID.FXZ.semd", 1.0),
+        "ux": ("DB.RCV_SOLID.FXX.semd", 1.0),
+        "uy": ("DB.RCV_SOLID.FXY.semd", 1.0),
+    }
 
 
 def solid_tag(rheology: str, medium: str, anisotropy_type: str) -> str:
@@ -197,7 +215,7 @@ def specfem_dir(solid: str) -> str | None:
     """
     for case in (CASE, CASE.replace("non_planar", "non-planar")):
         folder = os.path.join(SPECFEM_BASE, f"case_{case}-{solid}")
-        if os.path.isfile(os.path.join(folder, "AA.S0002.BXZ.semd")):
+        if os.path.isfile(os.path.join(folder, SPECFEM_FILES["uz"][0])):
             return folder
     return None
 
@@ -207,7 +225,7 @@ SOLIDS = list(dict.fromkeys(solid_tag(*run[:3]) for run in RUNS))
 
 # solid -> SPECFEM folder, for the solids listed in RUNS that have one.
 SPECFEM_DIRS = {}
-if USE_SPECFEM and DIMENSION == 2:
+if USE_SPECFEM:
     for solid in SOLIDS:
         folder = specfem_dir(solid)
         if folder is None:
@@ -219,24 +237,25 @@ if USE_SPECFEM and DIMENSION == 2:
             SPECFEM_DIRS[solid] = folder
 SHOW_SPECFEM = bool(SPECFEM_DIRS)
 
+# With the same Ricker, the SPECFEM3D traces match the second time derivative
+# of the spyro traces (in SPECFEM3D the Ricker drives the fluid potential, of
+# which the pressure is the second time derivative), so the spyro traces are
+# differentiated this many times before they are compared and drawn.
+SPYRO_TIME_DERIVATIVE = 2 if SHOW_SPECFEM and DIMENSION == 3 else 0
+
 # SPECFEM centers the Ricker at t = 0; spyro centers it at t = delay = 1/f.
+# (SPECFEM3D traces start at t = -1.2/f, but their Ricker peak is also at 0.)
 SPECFEM_DELAY = {
     "small_2d_planar": 1 / 25,
     "small_2d_non_planar": 1 / 25,
     "small_2d_visco": 1 / 25,
     "large_2d_non_planar": 1 / 10,
+    "large_3d_non_planar": 1 / 10,
 }.get(CASE, 0.0)
 
 GAR6_DELAY = {
     "small_3d_planar": 2.8e-5,
 }.get(CASE, 0.0)
-
-# key -> (file, sign). S0001 = fluid receiver, S0002 = solid receiver.
-SPECFEM_FILES = {
-    "p": ("AA.S0001.PRE.semp", 1.0),
-    "uz": ("AA.S0002.BXZ.semd", 1.0),
-    "ux": ("AA.S0002.BXX.semd", 1.0),
-}
 
 if SHOW_GAR6 or SHOW_SPECFEM:
     NORMALIZE = True
@@ -322,6 +341,29 @@ def run_style(
 def normalize(x):
     peak = np.abs(x).max()
     return x / peak if peak > 0 else x
+
+
+def time_derivative(x: np.ndarray, dt: float, order: int) -> np.ndarray:
+    """Differentiate a trace in time with central differences.
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Trace sampled every ``dt`` along its first axis (one column per
+        component for the solid receiver).
+    dt : float
+        Time step of the trace.
+    order : int
+        Number of derivatives; 0 returns ``x`` unchanged.
+
+    Returns
+    -------
+    numpy.ndarray
+        The ``order``-th time derivative of ``x``.
+    """
+    for _ in range(order):
+        x = np.gradient(x, dt, axis=0)
+    return x
 
 
 def estimate_time_shift(time_vector, numerical, reference):
@@ -444,12 +486,17 @@ for rheology, medium, anisotropy_type, scheme in RUNS:
         else {}
     )
     label = run_label(rheology, medium, anisotropy_type, scheme, params, visco_params)
+    if SPYRO_TIME_DERIVATIVE:
+        order = SPYRO_TIME_DERIVATIVE
+        label += " (d²/dt²)" if order == 2 else f" (d^{order}/dt^{order})"
     style, group = run_style(rheology, medium, anisotropy_type, scheme)
     compare = REFERENCE_SOLID is None or solid == REFERENCE_SOLID
     p = np.asarray(d["p_spyro"]).ravel()
-    u = np.asarray(d["u_solid"])
+    u_raw = np.asarray(d["u_solid"])
 
     dt_case = float(d["dt"])
+    p = time_derivative(p, dt_case, SPYRO_TIME_DERIVATIVE)
+    u = time_derivative(u_raw, dt_case, SPYRO_TIME_DERIVATIVE)
     t_p = np.arange(len(p)) * dt_case
     t_u = np.arange(len(u)) * dt_case
 
@@ -464,7 +511,7 @@ for rheology, medium, anisotropy_type, scheme in RUNS:
         t_p=t_p,
         t_u=t_u,
         p=prep(p),
-        uz_solid_raw=u[:, COL_UZ],
+        uz_solid_raw=u_raw[:, COL_UZ],
     )
     for comp, col, _, _ in COMPONENTS:
         r[comp] = prep(u[:, col])
@@ -483,7 +530,7 @@ for rheology, medium, anisotropy_type, scheme in RUNS:
 
     if solid in spec:
         spec_m = spec[solid]
-        for comp in ("uz", "ux"):
+        for comp in (c for c, _, _, _ in COMPONENTS if c in spec_m):
             r[f"{comp}_s"] = ref_on(t_u, *spec_m[comp], SPECFEM_FILES[comp][1])
             r[f"err_{comp}_s"] = MeasureError.calculate_normalized_L2_error(
                 r[comp], r[f"{comp}_s"])

@@ -543,11 +543,13 @@ def large_3d_non_planar():
         receiver_location=[(zc + lateral, xr, yr)],
         solid_receiver_locations=[(zc - 0.1, xr, yr)],
         output_frequency=2500,
-        dt=2.5e-5,
+        dt=2.0e-5,
         segy_dz=0.005,
         segy_dx=0.025,
         segy_dy=0.025,
-        cells_per_wavelength=4.0,  # >= 3.72 required for degree-3 tetrahedra (KMV)
+        # >= 3.72 required for degree-3 tetrahedra (KMV); gmsh makes cells about
+        # 15% larger than requested, so 4.5 gives about 3.9
+        cells_per_wavelength=4.5,
         min_element_size=0.025,
         padding=0.3,
     )
@@ -677,7 +679,9 @@ def mesh_dictionary(case, mesh_dir):
             case["length_y"],
             interface,
             vp_water,
-            case["p_wave_velocity"],
+            # The mesh is sized by this velocity, so the solid gets its smallest
+            # one (S waves), as in 2D
+            case["s_wave_velocity"],
             top_first=water_interface,
         )
         if water_interface:
