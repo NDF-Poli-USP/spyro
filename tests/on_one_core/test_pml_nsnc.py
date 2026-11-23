@@ -277,12 +277,10 @@
 #     wave : `habc.HABC_Wave`
 #         An instance of the HABC_Wave class
 #     max_divisor_tf : `int`, optional
-#         Index to select the maximum divisor of the final time, converted
-#         to an integer according to the order of magnitude of the timestep
-#         size. The timestep size is set to the divisor, given by the index
-#         in descending order, less than or equal to the user's timestep
-#         size. If the value is 1, the timestep size is set as the maximum
-#         divisor. Default is 1
+#         Index of the selected timestep size among the divisors of the
+#         final time that are smaller than the estimated stable timestep
+#         size, in descending order: 1 selects the largest of them. Default
+#         is 1. See `ABCLayer.check_timestep_abc`.
 
 #     Returns
 #     -------

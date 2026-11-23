@@ -483,6 +483,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         estimate_max_eigenvalue : bool, optional
             Whether to estimate the maximum eigenvalue from the matrix
             diagonals instead of computing it. Same as `method="ANALYTICAL"`.
+            The estimate never exceeds the maximum eigenvalue, so the time
+            step is overestimated (see `Modal_Solver.estimate_timestep`).
             Default is `False`.
         method : str, optional
             Method of `Modal_Solver` used for the largest eigenvalue, e.g.

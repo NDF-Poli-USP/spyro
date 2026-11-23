@@ -792,9 +792,13 @@ class Modal_Solver:
     ):
         """Estimate the maximum stable timestep based on the spectral radius.
 
-        Optionally uses the Gershgorin Circle Theorem to estimate the
-        maximum generalized eigenvalue when 'method' is "ANALYTICAL".
-        Otherwise, computes the maximum generalized eigenvalue exactly.
+        When 'method' is "ANALYTICAL", the maximum generalized eigenvalue is
+        estimated as the largest ratio of the stiffness and mass diagonals,
+        ``max(A_ii / M_ii)``. Each ratio is the Rayleigh quotient of a unit
+        vector, so the estimate never exceeds the maximum eigenvalue, and the
+        estimated timestep is never below the stable one; use ``fraction`` to
+        keep a margin. Otherwise, computes the maximum generalized eigenvalue
+        exactly.
 
         Parameters
         ----------
