@@ -4,7 +4,6 @@ from firedrake import (
     ConvergenceError,
     dx as fire_dx,
     Function,
-    FunctionSpace,
     grad,
     inner,
     LinearVariationalProblem,
@@ -36,6 +35,7 @@ from scipy.special import (
 )
 from scipy.stats import norm as sn
 from sys import float_info
+from ...domains.space import create_function_space
 from ...io.basicio import parallel_print as pprint
 from .modal_forms_and_matrices import acoustic_weak_forms_c_in_stiffness
 from ...utils.error_management import (
@@ -774,7 +774,7 @@ class Modal_Analytical_Solver:
             # The static response is computed with linear elements on the mesh
             # of V, much cheaper than V itself; the load and the velocity enter
             # the forms as coefficients in their own spaces
-            u = Function(FunctionSpace(V.mesh(), "CG", 1))
+            u = Function(create_function_space(V.mesh(), "CG", 1))
 
             # Weak forms
             a, L = acoustic_weak_forms_c_in_stiffness(
