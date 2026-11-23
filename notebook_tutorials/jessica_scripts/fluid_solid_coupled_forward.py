@@ -523,12 +523,6 @@ small_3d_planar = {
 
 
 def large_3d_non_planar():
-    """Sinusoidal 3D interface (formerly case_3d_irregular.py).
-
-    z_int(x, y) = -1.5 + 0.05 sin(2 pi x / 1.5) sin(2 pi y / 1.5), in km.
-    Source 0.15 km above the interface at the domain centre; receivers 0.01 km
-    above/below it with a 0.01 km lateral offset in x and y.
-    """
     interface = lambda x, y: -1.5 + 0.05 * np.sin(2 * np.pi * x / 1.5) * np.sin(2 * np.pi * y / 1.5)
     xc, yc, lateral = 1.5, 1.5, 0.01
     zc = float(interface(xc, yc))
@@ -547,8 +541,6 @@ def large_3d_non_planar():
         segy_dz=0.005,
         segy_dx=0.025,
         segy_dy=0.025,
-        # >= 3.72 required for degree-3 tetrahedra (KMV); gmsh makes cells about
-        # 15% larger than requested, so 4.5 gives about 3.9
         cells_per_wavelength=4.5,
         min_element_size=0.025,
         padding=0.3,

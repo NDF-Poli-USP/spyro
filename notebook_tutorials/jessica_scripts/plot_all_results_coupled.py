@@ -31,6 +31,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from scipy.integrate import cumulative_trapezoid
 from scipy.signal import correlate
 
 from spyro.tools.error_measure import MeasureError
@@ -239,9 +240,11 @@ SHOW_SPECFEM = bool(SPECFEM_DIRS)
 
 # With the same Ricker, the SPECFEM3D traces match the second time derivative
 # of the spyro traces (in SPECFEM3D the Ricker drives the fluid potential, of
-# which the pressure is the second time derivative), so the spyro traces are
-# differentiated this many times before they are compared and drawn.
-SPYRO_TIME_DERIVATIVE = 2 if SHOW_SPECFEM and DIMENSION == 3 else 0
+# which the pressure is the second time derivative), so the SPECFEM3D traces
+# are integrated this many times, from the start of their record, before they
+# are compared. Integrating smooths, whereas differentiating the spyro traces
+# amplifies their high-frequency noise.
+SPECFEM_TIME_INTEGRALS = 2 if DIMENSION == 3 else 0
 
 # SPECFEM centers the Ricker at t = 0; spyro centers it at t = delay = 1/f.
 # (SPECFEM3D traces start at t = -1.2/f, but their Ricker peak is also at 0.)
@@ -343,26 +346,25 @@ def normalize(x):
     return x / peak if peak > 0 else x
 
 
-def time_derivative(x: np.ndarray, dt: float, order: int) -> np.ndarray:
-    """Differentiate a trace in time with central differences.
+def time_integral(t: np.ndarray, x: np.ndarray, order: int) -> np.ndarray:
+    """Integrate a trace in time with the trapezoidal rule, starting from zero.
 
     Parameters
     ----------
+    t : numpy.ndarray
+        Sample times of the trace.
     x : numpy.ndarray
-        Trace sampled every ``dt`` along its first axis (one column per
-        component for the solid receiver).
-    dt : float
-        Time step of the trace.
+        Trace values at ``t``.
     order : int
-        Number of derivatives; 0 returns ``x`` unchanged.
+        Number of integrals; 0 returns ``x`` unchanged.
 
     Returns
     -------
     numpy.ndarray
-        The ``order``-th time derivative of ``x``.
+        The ``order``-th time integral of ``x``, zero at ``t[0]``.
     """
     for _ in range(order):
-        x = np.gradient(x, dt, axis=0)
+        x = cumulative_trapezoid(x, t, initial=0.0)
     return x
 
 
@@ -465,6 +467,7 @@ for solid, folder in SPECFEM_DIRS.items():
     for key, (fname, _) in SPECFEM_FILES.items():
         if os.path.isfile(f"{folder}/{fname}"):
             t_s, v_s = load_trace(f"{folder}/{fname}")
+            v_s = time_integral(t_s, v_s, SPECFEM_TIME_INTEGRALS)
             spec[solid][key] = (t_s + SPECFEM_DELAY, v_s)
 if not (SHOW_GAR6 or SHOW_SPECFEM):
     print("No reference for this case — plotting spyro only.")
@@ -486,17 +489,12 @@ for rheology, medium, anisotropy_type, scheme in RUNS:
         else {}
     )
     label = run_label(rheology, medium, anisotropy_type, scheme, params, visco_params)
-    if SPYRO_TIME_DERIVATIVE:
-        order = SPYRO_TIME_DERIVATIVE
-        label += " (d²/dt²)" if order == 2 else f" (d^{order}/dt^{order})"
     style, group = run_style(rheology, medium, anisotropy_type, scheme)
     compare = REFERENCE_SOLID is None or solid == REFERENCE_SOLID
     p = np.asarray(d["p_spyro"]).ravel()
-    u_raw = np.asarray(d["u_solid"])
+    u = np.asarray(d["u_solid"])
 
     dt_case = float(d["dt"])
-    p = time_derivative(p, dt_case, SPYRO_TIME_DERIVATIVE)
-    u = time_derivative(u_raw, dt_case, SPYRO_TIME_DERIVATIVE)
     t_p = np.arange(len(p)) * dt_case
     t_u = np.arange(len(u)) * dt_case
 
@@ -511,7 +509,7 @@ for rheology, medium, anisotropy_type, scheme in RUNS:
         t_p=t_p,
         t_u=t_u,
         p=prep(p),
-        uz_solid_raw=u_raw[:, COL_UZ],
+        uz_solid_raw=u[:, COL_UZ],
     )
     for comp, col, _, _ in COMPONENTS:
         r[comp] = prep(u[:, col])
