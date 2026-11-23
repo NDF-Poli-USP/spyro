@@ -55,7 +55,7 @@ def nodal_homogeneous_analytical(
         dt=dt,
         final_time=extended_final_time,
         frequency=frequency,
-        delay=delay - dt,
+        delay=delay,
         delay_type=delay_type,
     )
 
@@ -666,6 +666,4 @@ def analytical_force_source_2d(
         displacement_spectrum,
         n=extended_num_t,
     )
-    shifted_replacement = displacement[1:num_t + 1]
-
-    return shifted_replacement
+    return displacement[:num_t]
