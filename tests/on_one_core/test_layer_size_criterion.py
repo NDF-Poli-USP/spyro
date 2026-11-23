@@ -9,6 +9,9 @@ from unittest import TestCase
 from numpy import ceil
 import pytest
 from spyro.abc.lay_len import calc_size_lay, calc_zero, f_layer, loop_roots, roundFL
+import pytest
+
+pytestmark = pytest.mark.habc
 
 
 class TestAbsorbingLayer(TestCase):

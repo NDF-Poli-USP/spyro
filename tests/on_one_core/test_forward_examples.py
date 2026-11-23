@@ -1,26 +1,31 @@
 import spyro
 import math
 import pytest
+import numpy as np
+import firedrake
+
+pnt_eval_available = hasattr(firedrake, "PointEvaluator")
+if pnt_eval_available:
+    from firedrake import PointEvaluator
 
 
+@pytest.mark.skipif(
+    not pnt_eval_available, reason="PointEvaluator requires a newer Firedrake"
+)
+@pytest.mark.newer_firedrake
 def test_camembert_forward():
     dictionary = {}
-    # dictionary["absorving_boundary_conditions"] = {
-    #     "status": True,
-    #     "abc_type": "PML",
-    #     "exponent": 2,
-    #     "cmax": 4.5,
-    #     "R": 1e-6,
-    #     "pad_length": 0.25,
-    # }
     wave = spyro.examples.Camembert_acoustic(dictionary=dictionary)
 
     # Check if velocity model is correct
     c_center = 4.6
     c_outside_center = 1.6
     c_wave = wave.initial_velocity_model
-    test1 = math.isclose(c_center, c_wave.at(-0.5, 0.5))
-    test2 = math.isclose(c_outside_center, c_wave.at(-0.1, 0.5))
+
+    pe = PointEvaluator(wave.mesh, np.array([[-0.5, 0.5], [-0.1, 0.5]]))
+    vals = pe.evaluate(c_wave)
+    test1 = math.isclose(c_center, vals[0])
+    test2 = math.isclose(c_outside_center, vals[1])
 
     # Check if forward solve runs
     wave.forward_solve()
@@ -29,12 +34,16 @@ def test_camembert_forward():
     assert all([test1, test2, test3])
 
 
+@pytest.mark.skipif(
+    not pnt_eval_available, reason="PointEvaluator requires a newer Firedrake"
+)
+@pytest.mark.newer_firedrake
 def test_rectangle_forward():
     dictionary = {}
     dictionary["absorving_boundary_conditions"] = {
         "status": False,
         "abc_type": None,
-        "pad_length": 0.,
+        "pad_length": 0.0,
     }
     wave = spyro.examples.Rectangle_acoustic()
 
@@ -44,11 +53,12 @@ def test_rectangle_forward():
     wave.multiple_layer_velocity_model(z_switches, layer_values)
     c_wave = wave.initial_velocity_model
 
+    pe = PointEvaluator(wave.mesh, np.array([[-0.2, 0.5], [-0.6, 0.5]]))
+    vals = pe.evaluate(c_wave)
     c0 = layer_values[0]
-    test1 = math.isclose(c0, c_wave.at(-0.2, 0.5))
-
     c2 = layer_values[2]
-    test2 = math.isclose(c2, c_wave.at(-0.6, 0.5))
+    test1 = math.isclose(c0, vals[0])
+    test2 = math.isclose(c2, vals[1])
 
     # Check if forward solve runs
     wave.forward_solve()
@@ -84,10 +94,15 @@ def test_acoustic_local_abc():
     wave.forward_solve()
 
     # Acquiring final acoustic energy
-    last_acoustic_energy = wave.field_logger.get("acoustic_energy")
+    last_acoustic_energy = wave.simulation_logger.get("acoustic_energy")
+
     assert last_acoustic_energy < 7e-7  # The expected value was found empirically
 
 
+@pytest.mark.skipif(
+    not pnt_eval_available, reason="PointEvaluator requires a newer Firedrake"
+)
+@pytest.mark.newer_firedrake
 def test_immersed_polygon_forward():
     from spyro.examples.immersed_polygon import Polygon_acoustic
 
@@ -95,8 +110,12 @@ def test_immersed_polygon_forward():
 
     # Check if velocity model is correct
     c_wave = wave.initial_velocity_model
-    test1 = math.isclose(3.25, c_wave.at(-0.5, 0.5))
-    test2 = math.isclose(2.5, c_wave.at(-0.5, 0.1))
+    c0 = 3.25
+    c1 = 2.5
+    pe = PointEvaluator(wave.mesh, np.array([[-0.5, 0.5], [-0.5, 0.1]]))
+    vals = pe.evaluate(c_wave)
+    test1 = math.isclose(c0, vals[0])
+    test2 = math.isclose(c1, vals[1])
 
     # Check if forward solve runs
     wave.forward_solve()
@@ -109,7 +128,8 @@ def test_immersed_polygon_forward():
 @pytest.mark.parametrize("use_vertex_only_mesh", [False, True])
 def test_camembert_elastic(use_vertex_only_mesh):
     from spyro.examples.camembert_elastic import wave
-    # use vertex-only mesh
+
+    # Use vertex-only mesh
     wave.use_vertex_only_mesh = use_vertex_only_mesh
     wave.forward_solve()
 
@@ -117,6 +137,7 @@ def test_camembert_elastic(use_vertex_only_mesh):
 @pytest.mark.slow
 def test_elastic_cube_3D():
     from spyro.examples.elastic_cube_3D import wave
+
     wave.forward_solve()
 
 

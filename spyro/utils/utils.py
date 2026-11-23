@@ -294,6 +294,40 @@ def communicate(array, my_ensemble):
     return array_reduced
 
 
+def global_min(f: Function) -> float:  # noqa: F405
+    """Return the minimum of a function's values over all ranks.
+
+    Parameters
+    ----------
+    f : `Firedrake.Function`
+        Scalar function.
+
+    Returns
+    -------
+    `float`
+        Minimum value of ``f`` across the communicator of its mesh.
+    """
+    with f.dat.vec_ro as v:
+        return v.min()[1]
+
+
+def global_max(f: Function) -> float:  # noqa: F405
+    """Return the maximum of a function's values over all ranks.
+
+    Parameters
+    ----------
+    f : `Firedrake.Function`
+        Scalar function.
+
+    Returns
+    -------
+    `float`
+        Maximum value of ``f`` across the communicator of its mesh.
+    """
+    with f.dat.vec_ro as v:
+        return v.max()[1]
+
+
 class Mask:
     """
     DEPRECATED: Spatial mask for selective gradient updates in wave simulations.
@@ -695,9 +729,3 @@ def get_real_shot_record(wave):
                 return source_record
 
     return real_shot_record
-
-
-def get_time_vector(wave):
-    """Get a time vector representing the time axis of a wave object."""
-    number_timesteps = int(wave.final_time / wave.dt) + 1
-    return np.linspace(0.0, wave.final_time, number_timesteps)

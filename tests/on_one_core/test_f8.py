@@ -4,10 +4,13 @@ import firedrake as fire
 import glob
 import spyro.habc.habc as habc
 import spyro.abc.eik_min as eik_min
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.utils.cost import comp_cost
 from spyro.utils.typing import LayerShapeType
 import pytest
 import os
+
+pytestmark = pytest.mark.habc
 
 
 def wave_dict(dt_usu, layer_shape, degree_layer,
@@ -341,8 +344,8 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst,
     # Get simulation parameters
     edge_length = edge_length_lst[case]
     dt_usu = dt_usu_lst[case]
-    print("\nMesh Size: {:.3f} km".format(edge_length))
-    print("Timestep Size: {:.3f} ms\n".format(1e3 * dt_usu))
+    SpyroEnsemble.print("\nMesh Size: {:.3f} km".format(edge_length))
+    SpyroEnsemble.print("Timestep Size: {:.3f} ms\n".format(1e3 * dt_usu))
 
     # ============ HABC PARAMETERS ============
 
@@ -399,10 +402,10 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst,
 
             # Reference frequency for sizing the hybrid absorbing layer
             wave.abc_reference_freq = habc_reference_freq
-            print(crit_str.format(n_pts, crit_opt.replace("_", " ").title()))
+            SpyroEnsemble.print(crit_str.format(n_pts, crit_opt.replace("_", " ").title()))
 
             # Criterion for optinal heuristic factor xCR
-            print(fref_str.format(habc_reference_freq.capitalize()))
+            SpyroEnsemble.print(fref_str.format(habc_reference_freq.capitalize()))
 
             for degree_layer in degree_layer_lst:
 
@@ -427,7 +430,7 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst,
                         else:
                             xCR_usu = xCR_cand[itr_xCR - 1]
 
-                        print("Iteration {} of {}".format(itr_xCR, n_pts))
+                        SpyroEnsemble.print("Iteration {} of {}".format(itr_xCR, n_pts))
 
                         # Reference to resource usage
                         tRef = comp_cost("tini")
@@ -450,7 +453,7 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst,
                                 wave, dat_regr_xCR, "optimal", n_pts)
 
                     except fire.ConvergenceError as e:
-                        print(f"Error Solving: {e}")
+                        SpyroEnsemble.print(f"Error Solving: {e}")
                         break
 
 

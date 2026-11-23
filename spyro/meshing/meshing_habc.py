@@ -1,5 +1,6 @@
 import firedrake as fire
 import numpy as np
+from mpi4py import MPI
 from netgen.geom2d import SplineGeometry
 from netgen.meshing import Element2D, Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
@@ -9,6 +10,7 @@ from .meshing_functions import AutomaticMesh
 from .meshing_operations import MeshOps
 from ..tools.habc_tools import point_cloud_field
 from ..utils.error_management import validate_file, validate_parameter
+from ..utils.utils import global_max, global_min
 from ..version_control import is_firedrake_new
 
 if is_firedrake_new() is False:
@@ -174,10 +176,13 @@ class HABCMesh(MeshOps):
             mesh, ptos_bnd, initial_velocity_model, mesh_parameters.tol
         ).dat.data_with_halos[:]
 
-        # Get extreme values of the velocity on the boundary excluding free surfaces
+        # Get extreme values of the velocity on the boundary excluding free
+        # surfaces, over the boundary points of every rank
         decimal = int(abs(np.log10(mesh_parameters.tol)))
-        c_bnd_min = round(vel_on_boundary[vel_on_boundary > 0.0].min(), decimal)
-        c_bnd_max = round(vel_on_boundary[vel_on_boundary > 0.0].max(), decimal)
+        vel_bnd = vel_on_boundary[vel_on_boundary > 0.0]
+        c_bnd_min = mesh.comm.allreduce(vel_bnd.min(initial=np.inf), op=MPI.MIN)
+        c_bnd_max = mesh.comm.allreduce(vel_bnd.max(initial=-np.inf), op=MPI.MAX)
+        c_bnd_min, c_bnd_max = round(c_bnd_min, decimal), round(c_bnd_max, decimal)
 
         # Print on screen
         cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"
@@ -185,8 +190,9 @@ class HABCMesh(MeshOps):
 
         return c_bnd_min, c_bnd_max, coord_bnd_nodes
 
-    def creating_velocity_profile(self, function_space, initial_velocity_model,
-                                  path_save=None, save_file=True):
+    def creating_velocity_profile(
+        self, function_space, initial_velocity_model, path_save=None, save_file=True
+    ):
         """Create the velocity profile for the original domain.
 
         Parameters
@@ -212,11 +218,13 @@ class HABCMesh(MeshOps):
         """
         # Velocity profile model
         c = fire.Function(function_space, name="c_orig [km/s])")
-        c.assign(fire.assemble(fire.interpolate(initial_velocity_model, function_space)))
+        c.assign(
+            fire.assemble(fire.interpolate(initial_velocity_model, function_space))
+        )
 
-        # Get extreme values of the velocity model
-        c_min = initial_velocity_model.dat.data_with_halos.min()
-        c_max = initial_velocity_model.dat.data_with_halos.max()
+        # Get extreme values of the velocity model over every rank
+        c_min = global_min(initial_velocity_model)
+        c_max = global_max(initial_velocity_model)
 
         # Print on screen
         cdom_str = "Domain Velocity Range (km/s): {:.3f} - {:.3f}"
@@ -224,8 +232,9 @@ class HABCMesh(MeshOps):
 
         # Save initial velocity model
         if save_file:
-            pth_velocity = validate_file("original velocity profile",
-                                         path_save + "preamble/c_vel.pvd", [".pvd"])
+            pth_velocity = validate_file(
+                "original velocity profile", path_save + "preamble/c_vel.pvd", [".pvd"]
+            )
             SpyroEnsemble.write_vtk(pth_velocity, c)
 
         return c, c_min, c_max
@@ -268,7 +277,9 @@ class HABCMesh(MeshOps):
 
         return funct_space_eik
 
-    def preamble_mesh_operations(self, wave, ele_type_eik="consistent", f_est=0.03):
+    def preamble_mesh_operations(
+        self, wave, ele_type_eik="consistent", f_est=0.03, source_bc_eik="nearest_node"
+    ):
         """Perform mesh operations previous to size an absorbing layer.
 
         Parameters
@@ -290,6 +301,11 @@ class HABCMesh(MeshOps):
             Default is 'consistent'.
         f_est : `float`, optional
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03.
+        source_bc_eik : `str`, optional
+            Dirichlet condition at the sources for the Eikonal equation:
+            'nearest_node' (zero at the nearest node) or 'local_time' (local
+            travel time within one cell of the source). See
+            `Eikonal_Modeling.eikonal_bcs`. Default is 'nearest_node'.
 
         Returns
         -------
@@ -309,14 +325,18 @@ class HABCMesh(MeshOps):
             Finite element type for the Eikonal modeling. 'CG' or 'KMV'.
         mesh_parameters.f_est : `float`
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03.
+        mesh_parameters.source_bc_eik : `str`
+            Dirichlet condition at the sources for the Eikonal equation.
         mesh_parameters.funct_space_eik: `Firedrake.FunctionSpace`
             Function space for the Eikonal modeling.
         """
         SpyroEnsemble.print("\nCreating Mesh and Initial Velocity Model")
 
         # Mesh data
-        SpyroEnsemble.print(f"Original Mesh with {wave.mesh.num_vertices()} Nodes "
-                            f"and {wave.mesh.num_cells()} Volume Elements")
+        SpyroEnsemble.print(
+            f"Original Mesh with {wave.mesh.num_vertices()} Nodes "
+            f"and {wave.mesh.num_cells()} Volume Elements"
+        )
 
         # Save a copy of the original mesh and function space
         wave.mesh_original = wave.mesh
@@ -330,13 +350,15 @@ class HABCMesh(MeshOps):
         )
 
         # Generating boundary data from the original domain mesh
-        wave.c_bnd_min, wave.c_bnd_max, self.coord_bnd_nodes = (
-            self.original_boundary_data(
-                wave.mesh,
-                wave.function_space,
-                wave.mesh_parameters,
-                wave.initial_velocity_model,
-            )
+        (
+            wave.c_bnd_min,
+            wave.c_bnd_max,
+            self.coord_bnd_nodes,
+        ) = self.original_boundary_data(
+            wave.mesh,
+            wave.function_space,
+            wave.mesh_parameters,
+            wave.initial_velocity_model,
         )
 
         # Setting the properties of the mesh used to solve the Eikonal equation
@@ -349,6 +371,9 @@ class HABCMesh(MeshOps):
 
         # Factor for the stabilizing term in Eikonal equation
         wave.mesh_parameters.f_est = f_est
+
+        # Dirichlet condition at the sources for the Eikonal equation
+        wave.mesh_parameters.source_bc_eik = source_bc_eik
 
         # Function space for Eikonal modeling
         wave.mesh_parameters.funct_space_eik = self.create_function_space_eik(
@@ -638,9 +663,9 @@ class HABCMesh(MeshOps):
         hyp_mesh = fire.Mesh(hyp_mesh, distribution_parameters=q)
 
         # Adjusting coordinates: Swap (x,z) -> (z,x) and apply offsets
-        hyp_mesh.coordinates.dat.data_with_halos[:, [0, 1]] = (
-            hyp_mesh.coordinates.dat.data_with_halos[:, [1, 0]]
-        )
+        hyp_mesh.coordinates.dat.data_with_halos[
+            :, [0, 1]
+        ] = hyp_mesh.coordinates.dat.data_with_halos[:, [1, 0]]
         hyp_mesh.coordinates.dat.data_with_halos[:, 0] -= Lz / 2
         hyp_mesh.coordinates.dat.data_with_halos[:, 1] += Lx / 2
 
@@ -747,8 +772,10 @@ class HABCMesh(MeshOps):
         try:
             # Mesh data
             final_mesh.Compress()
-            SpyroEnsemble.print(f"Mesh created with {len(final_mesh.Points())} "
-                                f"points and {len(final_mesh.Elements2D())} elements")
+            SpyroEnsemble.print(
+                f"Mesh created with {len(final_mesh.Points())} "
+                f"points and {len(final_mesh.Elements2D())} elements"
+            )
 
             # Mesh is transformed into a firedrake mesh
             q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}

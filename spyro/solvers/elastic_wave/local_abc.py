@@ -1,4 +1,5 @@
 from firedrake import (Constant, ds, TestFunction, TrialFunction)
+from spyro.utils.typing import WaveType
 
 
 def local_abc_form(wave):
@@ -16,6 +17,11 @@ def local_abc_form(wave):
             dt_scheme = abc_dict.get("nrbc", {}).get("dt_scheme", "backward")
         else:
             return 0
+
+    if wave.wave_type not in (WaveType.ISOTROPIC_ACOUSTIC, WaveType.ISOTROPIC_ELASTIC):
+        raise NotImplementedError(
+            f"local_abc_form does not support wave type {wave.wave_type}."
+        )
 
     V = wave.function_space
     v = TestFunction(V)

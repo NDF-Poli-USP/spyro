@@ -50,9 +50,7 @@ def run_forward():
         "source_locations": [(-0.1, 0.5)],
         "frequency": 5.0,
         "delay": 0.3,
-        "receiver_locations": spyro.create_transect(
-            (-0.15, 0.1), (-0.15, 0.9), 50
-        ),
+        "receiver_locations": spyro.create_transect((-0.15, 0.1), (-0.15, 0.9), 50),
         "delay_type": "time",
     }
 
@@ -88,9 +86,7 @@ def run_forward():
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.02})
 
     z = wave.mesh_z
-    cond = conditional(
-        z > -0.333, 1.5, conditional(z > -0.667, 3.0, 4.5)
-    )
+    cond = conditional(z > -0.333, 1.5, conditional(z > -0.667, 3.0, 4.5))
     wave.set_initial_velocity_model(conditional=cond)
     wave.forward_solve()
 
@@ -119,11 +115,13 @@ def test_pml():
     errIt = measure_error.calculate_integral_error(p_r, extended_p_r, dt)
     eNRMS = measure_error.calculate_normalized_L2_error(p_r, extended_p_r)
 
-    SpyroEnsemble.print(f"NRMS Error = {eNRMS: .4e}")
-    SpyroEnsemble.print(f"Integral Error = {errIt: .4e}")
-    SpyroEnsemble.print(f"Peak Error = {errPk: .4e}")
+    SpyroEnsemble.print(f"NRMS Error = {eNRMS:.4e}")
+    SpyroEnsemble.print(f"Integral Error = {errIt:.4e}")
+    SpyroEnsemble.print(f"Peak Error = {errPk:.4e}")
 
-    assert eNRMS < 0.05 and errIt < 0.05 and errPk < 0.05, "Error is too high for PML test."
+    assert (
+        eNRMS < 0.05 and errIt < 0.05 and errPk < 0.05
+    ), "Error is too high for PML test."
 
 
 if __name__ == "__main__":
