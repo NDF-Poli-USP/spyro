@@ -20,7 +20,6 @@ import pytest
 import spyro
 from spyro.utils.typing import AdjointType
 
-
 Parameter = spyro.ElasticMaterialParameter
 
 # Constant models, differing enough to leave a residual worth descending.

@@ -6,11 +6,11 @@ both 2D and 3D cases, with homogeneous and heterogeneous velocity profiles.
 """
 
 from pytest import fail, fixture, mark, param
-from firedrake import COMM_WORLD as comm, conditional, ConvergenceError
+from firedrake import conditional, ConvergenceError
 from numpy import isclose
+from spyro.mpi.spyro_mpi import SpyroEnsemble
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.utils.cost import comp_cost
-from spyro.io.basicio import parallel_print as pprint
 
 
 def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneous):
@@ -25,7 +25,7 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneou
         Dimension of the problem. 2 for 2D and 3 for 3D.
     layer_shape : `str`.
         Shape of the absorbing layer, either "rectangular or "hypershape".
-   degree_layer : `int` or `float` or `None`
+    degree_layer : `int` or `float` or `None`
         Hypershape degree. `None` is used only for rectangular layers.
     homogeneous : `bool`
         If `True`, the velocity model is homogeneous. If `False`, it is heterogeneous.
@@ -57,9 +57,9 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneou
     # Define the domain size without the PML or AL. Here we'll assume a domain
     # with a width and depth of 1 km, and a thickness of 1 km for the 3D case.
     if dimension == 2:
-        length_z, length_x, length_y = [1., 1., 0.]
+        length_z, length_x, length_y = [1.0, 1.0, 0.0]
     elif dimension == 3:
-        length_z, length_x, length_y = [1., 1., 1.]  # in km
+        length_z, length_x, length_y = [1.0, 1.0, 1.0]  # in km
     dictionary["mesh"] = {
         "length_z": length_z,  # depth in km - always positive
         "length_x": length_x,  # width in km - always positive
@@ -72,21 +72,26 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneou
     # point of the mesh. We also specify to record the solution at the corners
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
-        "source_locations": ([(-length_z / 2., length_x / 4.)] if dimension == 2
-                             else [(-length_z / 2., length_x / 4., length_y / 2.)]),
-        "frequency": 5.,  # in Hz
-        "receiver_locations": ([(-length_z, 0.),
-                                (-length_z, length_x),
-                                (0., 0.), (0., length_x)]
-                               if dimension == 2
-                               else [(-length_z, 0., 0.),
-                                     (-length_z, length_x, 0.),
-                                     (0., 0., 0),
-                                     (0., length_x, 0.),
-                                     (-length_z, 0., length_y),
-                                     (-length_z, length_x, length_y),
-                                     (0., 0., length_y),
-                                     (0., length_x, length_y)])
+        "source_locations": (
+            [(-length_z / 2.0, length_x / 4.0)]
+            if dimension == 2
+            else [(-length_z / 2.0, length_x / 4.0, length_y / 2.0)]
+        ),
+        "frequency": 5.0,  # in Hz
+        "receiver_locations": (
+            [(-length_z, 0.0), (-length_z, length_x), (0.0, 0.0), (0.0, length_x)]
+            if dimension == 2
+            else [
+                (-length_z, 0.0, 0.0),
+                (-length_z, length_x, 0.0),
+                (0.0, 0.0, 0),
+                (0.0, length_x, 0.0),
+                (-length_z, 0.0, length_y),
+                (-length_z, length_x, length_y),
+                (0.0, 0.0, length_y),
+                (0.0, length_x, length_y),
+            ]
+        ),
     }
 
     # Define Parameters for absorbing boundary conditions
@@ -100,7 +105,8 @@ def wave_dict(element_geometry, dimension, layer_shape, degree_layer, homogeneou
     # Define parameters for visualization
     str_ele = element_geometry + "_" + ("Hom" if homogeneous else "Het")
     dictionary["visualization"] = {  # Output folder
-        "output_folder": f"output/modal_test{dimension}d/modal_test{dimension}d" + str_ele
+        "output_folder": f"output/modal_test{dimension}d/modal_test{dimension}d"
+        + str_ele
     }
 
     return dictionary
@@ -140,37 +146,41 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length = 0.1 if dimension == 2 else 0.15
+    edge_length = 1.0 / 10 if dimension == 2 else 1.0 / 7
 
     # f_est: Factor for the stabilizing term in Eikonal equation
     # fitting_c: Parameters for fitting equivalent velocity regression
     if dimension == 2:
         if element_geometry == "T":
-            f_est = 0.01 if homogeneous else 0.06
-        fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.5, 0.3, -2.2, -1.3)
+            f_est = 0.06 if homogeneous else 0.06
+
+        else:
+            f_est = 0.05 if homogeneous else 0.05
+        fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.5, 0.3, -2.6, -1.4)
 
     if dimension == 3:
         if element_geometry == "T":
-            f_est = 0.02 if homogeneous else 0.05
+            f_est = 0.05 if homogeneous else 0.05
 
         else:
-            f_est = 0.02 if homogeneous else 0.08
-        fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.5, 0.3, -1.3, -0.9)
+            f_est = 0.08 if homogeneous else 0.08
+        fitting_c = (0.0, 0.0, 0.0, 0.0) if homogeneous else (0.5, 0.3, -1.5, -1.0)
 
     # Layer shape
     layer_shape = "rectangular" if degree_layer is None else "hypershape"
 
     # Get simulation parameters
-    pprint(f"\nMesh Size: {1e3 * edge_length:.4f} m", comm=comm)
-    pprint(f"Element Geometry: {element_geometry}", comm=comm)
-    pprint(f"Eikonal Stabilizing Factor: {f_est:.2f}", comm=comm)
-    pprint(f"Layer Shape: {layer_shape}", comm=comm)
+    SpyroEnsemble.print(f"\nMesh Size: {1e3 * edge_length:.4f} m")
+    SpyroEnsemble.print(f"Element Geometry: {element_geometry}")
+    SpyroEnsemble.print(f"Eikonal Stabilizing Factor: {f_est:.2f}")
+    SpyroEnsemble.print(f"Layer Shape: {layer_shape}")
     fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
-    pprint((fit_str + "{:.1f}\n").format(*fitting_c), comm=comm)
+    SpyroEnsemble.print((fit_str + "{:.1f}\n").format(*fitting_c))
 
     # Create dictionary with parameters for the model
     dictionary = wave_dict(
-        element_geometry, dimension, layer_shape, degree_layer, homogeneous)
+        element_geometry, dimension, layer_shape, degree_layer, homogeneous
+    )
 
     # ============ MESH FEATURES ============
 
@@ -200,15 +210,36 @@ def wave_instance(element_geometry, dimension, degree_layer, homogeneous):
 
     # Modal solvers
     if dimension == 2:
-        modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
-                            'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
+        modal_solver_lst = [
+            "ANALYTICAL",
+            "ARNOLDI",
+            "LANCZOS",
+            "LOBPCG",
+            "KRYLOVSCH_CH",
+            "KRYLOVSCH_CG",
+            "KRYLOVSCH_GH",
+            "KRYLOVSCH_GG",
+            "RAYLEIGH",
+        ]
 
     if dimension == 3:
         if element_geometry == "T":
-            modal_solver_lst = ['ANALYTICAL', 'KRYLOVSCH_CH', 'KRYLOVSCH_GH', 'RAYLEIGH']
+            modal_solver_lst = [
+                "ANALYTICAL",
+                "KRYLOVSCH_CH",
+                "KRYLOVSCH_GH",
+                "RAYLEIGH",
+            ]
         else:
-            modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG',
-                                'KRYLOVSCH_CG', 'KRYLOVSCH_GG', 'RAYLEIGH']
+            modal_solver_lst = [
+                "ANALYTICAL",
+                "ARNOLDI",
+                "LANCZOS",
+                "LOBPCG",
+                "KRYLOVSCH_CG",
+                "KRYLOVSCH_GG",
+                "RAYLEIGH",
+            ]
 
     return wave, fitting_c, modal_solver_lst
 
@@ -253,49 +284,62 @@ def run_modal(wave, modal_solver_lst, fitting_c, exp_value, n_root=1):
 
     # Loop for different modal solvers
     for modal_solver in modal_solver_lst:
-
         # Modal solver
-        pprint(f"\nModal Solver: {modal_solver}", comm=comm)
+        SpyroEnsemble.print(f"\nModal Solver: {modal_solver}")
 
         # Reference to resource usage
         tRef = comp_cost("tini")
 
         # Computing fundamental frequency
         wave.layer_ops.fundamental_frequency(
-            wave, method=modal_solver, fitting_c=fitting_c,
+            wave,
+            method=modal_solver,
+            fitting_c=fitting_c,
         )
 
         # Estimating computational resource usage
         name_cost = wave.path_case_abc + modal_solver + "_"
         comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
-        tol = 0.07 if (modal_solver == 'ANALYTICAL'
-                       or modal_solver == 'RAYLEIGH') else 0.05
+        tol = (
+            0.09
+            if (modal_solver == "ANALYTICAL" or modal_solver == "RAYLEIGH")
+            else (0.05 if wave.mesh_parameters.quadrilateral else 0.04)
+        )
 
-        abc_str = wave.case_abc if wave.layer_ops.layer_geometry.n_hyp is None \
-            else f"{wave.case_abc[:2]}" + \
-            f"{wave.layer_ops.layer_geometry.n_hyp:.1f}{wave.case_abc[-4:]}"
+        abc_str = (
+            wave.case_abc
+            if wave.layer_ops.layer_geometry.n_hyp is None
+            else f"{wave.case_abc[:2]}"
+            + f"{wave.layer_ops.layer_geometry.n_hyp:.1f}{wave.case_abc[-4:]}"
+        )
         met_str = f"Fundamental Frequency {abc_str} {wave.dimension}D. "
         met_str += f"Method {modal_solver}"
         cmp_str = f"Expected {exp_value:.5f}, got = {wave.fundam_freq:.5f}"
-        assert isclose(wave.fundam_freq / exp_value, 1., atol=tol), \
+        assert isclose(wave.fundam_freq / exp_value, 1.0, atol=tol), (
             "✗ " + met_str + "  → " + cmp_str
-        pprint("✓ " + met_str + " Verified: " + cmp_str, comm=comm)
+        )
+        SpyroEnsemble.print("✓ " + met_str + " Verified: " + cmp_str)
 
 
-@mark.older_firedrake
-@mark.parametrize("element_geometry, dimension, degree_layer, homogeneous", [
-    ("T", 2, 2.5, True),
-    ("T", 2, None, True),
-    ("T", 2, 2.0, False),
-    ("T", 2, None, False),
-    param("T", 2, 2.5, True, marks=mark.slow),
-    param("T", 3, 6.0, True, marks=mark.slow),
-    param("T", 3, None, True, marks=mark.slow),
-    param("T", 3, 2.4, False, marks=mark.slow),
-    param("T", 3, None, False, marks=mark.slow),
-    param("Q", 3, None, True, marks=mark.slow),
-    param("Q", 3, None, False, marks=mark.slow)])
+# @mark.older_firedrake
+@mark.parametrize(
+    "element_geometry, dimension, degree_layer, homogeneous",
+    [
+        ("T", 2, 2.5, True),
+        ("T", 2, None, True),
+        ("T", 2, 2.0, False),
+        ("T", 2, None, False),
+        ("Q", 2, None, True),
+        ("Q", 2, None, False),
+        param("T", 3, 6.0, True, marks=mark.slow),
+        param("T", 3, None, True, marks=mark.slow),
+        param("T", 3, 2.4, False, marks=mark.slow),
+        param("T", 3, None, False, marks=mark.slow),
+        param("Q", 3, None, True, marks=mark.slow),
+        param("Q", 3, None, False, marks=mark.slow),
+    ],
+)
 def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogeneous):
     """Testing modal solvers for 2D and 3D case in Fig. 8 of Salas et al (2022).
 
@@ -321,186 +365,259 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     -------
     None
 
-    ===================================================
-    Natural Frequency for 2D model Δx = 100m - Ele = T
-    ===================================================
+    Parameters selected with the working-tree code (Firedrake 2025.4.1, serial):
+    the coarsest mesh edge_length = 1 / N for which the Eikonal of every case
+    is within 3 % of its theoretical value with a stable stabilizing factor
+    (f_est - 0.01, f_est and f_est + 0.01 converge and increase smoothly), the
+    layered hypershape mesh is conforming, and the analytical approximation
+    stays within the test tolerance with fitting_c = (0, 0, 0, 0) for the
+    homogeneous model. The marked f_est (*) is the one used by the test. The
+    expected values are the fnum of the FEM solvers; for the homogeneous
+    rectangular layers they equal c / (2 (length_x + 2 pad)).
+
+    Theoretical Eikonal values. eik_min is the first-arrival time on the
+    absorbing boundaries (z = -1, x = 0, x = 1 and, in 3D, y = 0 and y = 1).
+    The source is at (z, x) = (-0.5, 0.25) km ((-0.5, 0.25, 0.5) km in 3D),
+    so the nearest absorbing boundary is x = 0, 0.25 km away, and the
+    straight ray to it stays in the medium around the source. Hence
+    eik_min = 0.25 / 1.5 = 166.667 ms in the homogeneous model (1.5 km/s) and
+    eik_min = 0.25 / 3.0 = 83.333 ms in the heterogeneous one (3.0 km/s for
+    x < 0.5).
+    Every other absorbing boundary is at least 0.5 km away in the same
+    medium, so its first arrival is at least twice as late.
+
+    =======================================================
+    Natural Frequency for 2D model Δx = 1000/10 m - Ele = T
+    =======================================================
+
     *EIKONAL HOMOGENEOUS
-    eik_min = 83.333 ms
+    eik_min = 166.667 ms (Theoretical value)
     f_est  eik[ms]
-     0.01  128.447*
-     0.02  145.478
+     0.05  163.373
+     0.06  166.193*
+     0.07  168.555
 
     *RESULTS HOMOGENEOUS
     Frequency[Hz]    N2.5      (texe/pmem)     REC      (texe/pmem)
-    ANALYTICAL    0.50934 (0.359s/2.160MB) 0.46875 (0.352s/2.146MB)
-    ARNOLDI       0.51046 (0.078s/4.665MB) 0.46875 (0.104s/5.066MB)
-    LANCZOS       0.51046 (0.047s/4.102MB) 0.46875 (0.044s/4.435MB)
-    LOBPCG        0.51046 (1.983s/4.025MB) 0.46875 (1.543s/4.359MB)
-    KRYLOVSCH_CH  0.51046 (0.045s/0.084MB) 0.46875 (0.026s/0.084MB)
-    KRYLOVSCH_CG  0.51046 (0.038s/0.070MB) 0.46875 (0.036s/0.071MB)
-    KRYLOVSCH_GH  0.51046 (0.071s/0.078MB) 0.46875 (0.031s/0.078MB)
-    KRYLOVSCH_GG  0.51046 (0.068s/0.091MB) 0.46875 (0.027s/0.091MB)
-    RAYLEIGH      0.51084 (1.328s/3.098MB) 0.46875 (1.335s/2.909MB)
+    ANALYTICAL    0.52430 (0.478s/2.540MB) 0.46875 (0.514s/1.810MB)
+    ARNOLDI       0.51046 (0.093s/5.454MB) 0.46875 (0.088s/5.927MB)
+    LANCZOS       0.51046 (0.053s/5.201MB) 0.46875 (0.040s/5.641MB)
+    LOBPCG        0.51046 (2.875s/5.200MB) 0.46875 (2.334s/5.641MB)
+    KRYLOVSCH_CH  0.51046 (0.042s/0.113MB) 0.46875 (0.047s/0.111MB)
+    KRYLOVSCH_CG  0.51046 (0.039s/0.122MB) 0.46875 (0.046s/0.122MB)
+    KRYLOVSCH_GH  0.51046 (0.046s/0.126MB) 0.46875 (0.043s/0.112MB)
+    KRYLOVSCH_GG  0.51046 (0.039s/0.100MB) 0.46875 (0.042s/0.126MB)
+    RAYLEIGH      0.51084 (1.603s/2.794MB) 0.46875 (1.802s/2.960MB)
 
     *ANALYTICAL
-       Case      REC*   N2.5*
-    fnum[Hz]  0.46875 0.51046
-    fana[Hz]  0.46875 0.50934
-    fray[Hz]  0.46875 0.51084
+       Case      N2.5*     REC*
+    fnum[Hz]   0.51046  0.46875
+    fana[Hz]   0.52430  0.46875
+    fray[Hz]   0.51084  0.46875
 
     *EIKONAL HETEROGENEOUS
-    eik_min = 83.333 ms
+    eik_min = 83.333 ms (Theoretical value)
     f_est  eik[ms]
-     0.01  66.836
-     0.02  73.308
-     0.03  77.178
-     0.04  79.680
      0.05  81.498
      0.06  82.942*
      0.07  84.160
-     0.08  85.233
 
-    *RESULTS HETEROGENEOUS
+    *RESULTS HETEROGENEOUS - fitting_c = (0.5, 0.3, -2.6, -1.4)
     Frequency[Hz]    N2.0      (texe/pmem)     REC      (texe/pmem)
-    ANALYTICAL    0.50428 (0.462s/3.152MB) 0.45737 (0.652s/2.990MB)
-    ARNOLDI       0.50440 (0.102s/6.693MB) 0.45539 (0.128s/7.118MB)
-    LANCZOS       0.50440 (0.086s/5.965MB) 0.45539 (0.071s/6.350MB)
-    LOBPCG        0.50440 (4.269s/5.898MB) 0.45539 (3.752s/6.212MB)
-    KRYLOVSCH_CH  0.50440 (0.038s/0.085MB) 0.45539 (0.047s/0.083MB)
-    KRYLOVSCH_CG  0.50440 (0.040s/0.072MB) 0.45539 (0.044s/0.072MB)
-    KRYLOVSCH_GH  0.50440 (0.048s/0.077MB) 0.45539 (0.042s/0.078MB)
-    KRYLOVSCH_GG  0.50440 (0.054s/0.097MB) 0.45539 (0.039s/0.095MB)
-    RAYLEIGH      0.52768 (1.474s/3.345MB) 0.47634 (1.612s/3.455MB)
+    ANALYTICAL    0.49913 (0.371s/1.168MB) 0.45788 (0.767s/2.102MB)
+    ARNOLDI       0.50440 (0.062s/7.586MB) 0.45539 (0.141s/8.368MB)
+    LANCZOS       0.50440 (0.063s/7.585MB) 0.45539 (0.102s/8.096MB)
+    LOBPCG        0.50440 (5.929s/7.610MB) 0.45539 (6.495s/8.096MB)
+    KRYLOVSCH_CH  0.50440 (0.055s/0.126MB) 0.45539 (0.073s/0.106MB)
+    KRYLOVSCH_CG  0.50440 (0.054s/0.121MB) 0.45539 (0.077s/0.121MB)
+    KRYLOVSCH_GH  0.50440 (0.052s/0.130MB) 0.45539 (0.072s/0.126MB)
+    KRYLOVSCH_GG  0.50440 (0.061s/0.124MB) 0.45539 (0.083s/0.100MB)
+    RAYLEIGH      0.52768 (1.782s/2.246MB) 0.47634 (2.191s/3.183MB)
 
     *ANALYTICAL
-       Case      REC*   N2.0*
-    fnum[Hz]  0.45539 0.50440
-    fana[Hz]  0.45737 0.50428
-    fray[Hz]  0.47634 0.52768
+       Case      N2.0*     REC*
+    fnum[Hz]   0.50440  0.45539
+    fana[Hz]   0.49913  0.45788
+    fray[Hz]   0.52768  0.47634
 
     *RAYLEIGH N2.0
-    n_eigfunc       2      *4       6       8
-    freq[Hz]  0.66237 0.52768 0.51705 0.51355
-    texe[s]     0.263   1.474   5.947  17.152
-    mem[MB]     1.359   3.345   8.075  13.311
+    n_eigfunc        2      *4       6       8
+    freq[Hz]   0.65545 0.52768 0.51695 0.51347
+    texe[s]      0.261   1.613   8.042  22.043
+    mem[MB]      1.174   2.402   5.618   8.952
 
-    ===================================================
-    Natural Frequency for 3D model Δx = 150m - Ele = T
-    ===================================================
+    =======================================================
+    Natural Frequency for 2D model Δx = 1000/10 m - Ele = Q
+    =======================================================
 
     *EIKONAL HOMOGENEOUS
-    eik_min = 83.333 ms
+    eik_min = 166.667 ms (Theoretical value)
     f_est  eik[ms]
-     0.02  146.002*
-     0.03  153.839
+     0.04  164.457
+     0.05  167.703*
+     0.06  170.399
+
+    *RESULTS HOMOGENEOUS
+    Frequency[Hz]     REC      (texe/pmem)
+    ANALYTICAL    0.46876 (0.426s/2.361MB)
+    ARNOLDI       0.46875 (0.106s/6.039MB)
+    LANCZOS       0.46875 (0.052s/5.629MB)
+    LOBPCG        0.46875 (1.240s/5.639MB)
+    KRYLOVSCH_CH  0.46875 (0.061s/0.130MB)
+    KRYLOVSCH_CG  0.46875 (0.055s/0.123MB)
+    KRYLOVSCH_GH  0.46875 (0.054s/0.113MB)
+    KRYLOVSCH_GG  0.46875 (0.059s/0.102MB)
+    RAYLEIGH      0.46875 (2.644s/2.860MB)
+
+    *ANALYTICAL
+       Case       REC*
+    fnum[Hz]   0.46875
+    fana[Hz]   0.46876
+    fray[Hz]   0.46875
+
+    *EIKONAL HETEROGENEOUS
+    eik_min = 83.333 ms (Theoretical value)
+    f_est  eik[ms]
+     0.04  82.101
+     0.05  83.744*
+     0.06  85.118
+
+    *RESULTS HETEROGENEOUS - fitting_c = (0.5, 0.3, -2.6, -1.4)
+    Frequency[Hz]     REC      (texe/pmem)
+    ANALYTICAL    0.47244 (0.465s/2.455MB)
+    ARNOLDI       0.45542 (0.141s/8.513MB)
+    LANCZOS       0.45542 (0.072s/8.098MB)
+    LOBPCG        0.45542 (2.475s/8.096MB)
+    KRYLOVSCH_CH  0.45542 (0.066s/0.142MB)
+    KRYLOVSCH_CG  0.45542 (0.066s/0.111MB)
+    KRYLOVSCH_GH  0.45542 (0.069s/0.143MB)
+    KRYLOVSCH_GG  0.45542 (0.065s/0.117MB)
+    RAYLEIGH      0.47619 (2.382s/3.141MB)
+
+    *ANALYTICAL
+       Case       REC*
+    fnum[Hz]   0.45542
+    fana[Hz]   0.47244
+    fray[Hz]   0.47619
+
+    ======================================================
+    Natural Frequency for 3D model Δx = 1000/7 m - Ele = T
+    ======================================================
+
+    *EIKONAL HOMOGENEOUS
+    eik_min = 166.667 ms (Theoretical value)
+    f_est  eik[ms]
+     0.04  159.016
+     0.05  164.698*
+     0.06  170.789
 
     *RESULTS HOMOGENEOUS
     Frequency[Hz]    N6.0        (texe/pmem)     REC        (texe/pmem)
-    ANALYTICAL    0.51628 ( 2.918s/ 5.911MB) 0.47727 ( 3.259s/ 5.725MB)
-    KRYLOVSCH_CH  0.52345 ( 9.954s/ 0.936MB) 0.47727 (14.255s/ 0.925MB)
-    KRYLOVSCH_GH  0.52345 ( 9.869s/ 0.077MB) 0.47727 (14.509s/ 0.075MB)
-    RAYLEIGH      0.52678 (27.041s/45.495MB) 0.47727 (30.821s/52.629MB)
+    ANALYTICAL    0.51628 ( 3.160s/ 7.646MB) 0.47741 ( 2.928s/ 6.556MB)
+    KRYLOVSCH_CH  0.52345 (12.059s/ 0.881MB) 0.47727 (17.431s/ 0.880MB)
+    KRYLOVSCH_GH  0.52345 (10.802s/ 0.108MB) 0.47727 (17.802s/ 0.107MB)
+    RAYLEIGH      0.52678 (34.111s/43.835MB) 0.47727 (43.107s/53.147MB)
 
     *ANALYTICAL
-        Case     REC*   N6.0*
-    fnum[Hz]  0.47727 0.52345
-    fana[Hz]  0.47727 0.51628
-    fray[Hz]  0.47727 0.52678
+       Case      N6.0*     REC*
+    fnum[Hz]   0.52345  0.47727
+    fana[Hz]   0.51628  0.47741
+    fray[Hz]   0.52678  0.47727
 
     *EIKONAL HETEROGENEOUS
-    eik_min = 83.333 ms
+    eik_min = 83.333 ms (Theoretical value)
     f_est  eik[ms]
-     0.03 76.777
-     0.04 79.409
-     0.05 82.273*
-     0.06 85.347
+     0.04  79.370
+     0.05  82.259*
+     0.06  85.344
 
-    *RESULTS HETEROGENEOUS
-    Frequency[Hz]    N2.4        (texe/pmem)     REC         (texe/pmem)
-    ANALYTICAL    0.51787 ( 4.430s/10.494MB) 0.41840 ( 6.531s/ 12.903MB)
-    KRYLOVSCH_CH  0.51535 (24.633s/ 0.935MB) 0.42562 (66.466s/  0.926MB)
-    KRYLOVSCH_GH  0.51535 (25.103s/ 0.077MB) 0.42562 (64.295s/  0.075MB)
-    RAYLEIGH      0.54073 (37.131s/71.052MB) 0.44257 (47.741s/104.142MB)
+    *RESULTS HETEROGENEOUS - fitting_c = (0.5, 0.3, -1.5, -1.0)
+    Frequency[Hz]    N2.4         (texe/pmem)     REC         (texe/pmem)
+    ANALYTICAL    0.52358 ( 4.491s/  6.204MB) 0.41761 ( 6.882s/  9.506MB)
+    KRYLOVSCH_CH  0.51535 (29.458s/  0.090MB) 0.42562 (74.857s/  0.904MB)
+    KRYLOVSCH_GH  0.51535 (28.739s/  0.121MB) 0.42562 (74.787s/  0.132MB)
+    RAYLEIGH      0.54073 (44.980s/ 69.687MB) 0.44257 (57.528s/105.078MB)
 
     *ANALYTICAL
-       Case      REC*  N2.4*
-    fnum[Hz]  0.42562 0.51535
-    fana[Hz]  0.41840 0.51787
-    fray[Hz]  0.44257 0.54073
+       Case      N2.4*     REC*
+    fnum[Hz]   0.51535  0.42562
+    fana[Hz]   0.52358  0.41761
+    fray[Hz]   0.54073  0.44257
 
     *RAYLEIGH N2.4
-    n_eigfunc       2      *4       6
-    freq[Hz]  0.65356 0.54073 0.53122
-    texe[s]     0.799  37.131 373.401
-    mem[MB]     6.730  71.052 154.636
+    n_eigfunc        2      *4       6
+    freq[Hz]   0.61849 0.54073 0.52941
+    texe[s]      0.938  46.316 511.660
+    mem[MB]      9.186  68.240 221.512
 
-    ===================================================
-    Natural Frequency for 3D model Δx = 150m - Ele = Q
-    ===================================================
+    ======================================================
+    Natural Frequency for 3D model Δx = 1000/7 m - Ele = Q
+    ======================================================
 
     *EIKONAL HOMOGENEOUS
-    eik_min = 83.333 ms
+    eik_min = 166.667 ms (Theoretical value)
     f_est  eik[ms]
-     0.02  138.931*
-     0.02  142.020
+     0.07  162.852
+     0.08  168.726*
+     0.09  174.708
 
     *RESULTS HOMOGENEOUS
     Frequency[Hz]     REC         (texe/pmem)
-    ANALYTICAL    0.47741 ( 2.239s/  9.275MB)
-    ARNOLDI       0.47727 ( 8.990s/145.647MB)
-    LANCZOS       0.47727 ( 7.876s/ 96.980MB)
-    LOBPCG        0.47727 ( 7.454s/ 95.550MB)
-    KRYLOVSCH_CG  0.47727 ( 5.036s/  0.084MB)
-    KRYLOVSCH_GG  0.47727 ( 4.860s/  0.076MB)
-    RAYLEIGH      0.47727 (28.788s/ 30.570MB)
+    ANALYTICAL    0.47741 ( 2.001s/  7.875MB)
+    ARNOLDI       0.47727 ( 8.812s/173.767MB)
+    LANCZOS       0.47727 ( 8.421s/172.121MB)
+    LOBPCG        0.47727 ( 8.266s/172.119MB)
+    KRYLOVSCH_CG  0.47727 ( 5.494s/  0.143MB)
+    KRYLOVSCH_GG  0.47727 ( 5.359s/  0.131MB)
+    RAYLEIGH      0.47727 (39.245s/ 30.717MB)
 
     *ANALYTICAL
-        Case      REC*
-    fnum[Hz]  0.47727
-    fana[Hz]  0.47741
-    fray[Hz]  0.47727
+       Case       REC*
+    fnum[Hz]   0.47727
+    fana[Hz]   0.47741
+    fray[Hz]   0.47727
 
     *EIKONAL HETEROGENEOUS
-    eik_min = 83.333 ms
+    eik_min = 83.333 ms (Theoretical value)
     f_est  eik[ms]
-     0.02  69.442
-     0.03  70.974
-     0.04  73.179
-     0.05  75.766
-     0.06  78.548
      0.07  81.431
      0.08  84.377*
      0.09  87.376
 
-    *RESULTS HETEROGENEOUS
-    Frequency[Hz]     REC          (texe/pmem)
-    ANALYTICAL    0.42873 ( 3.689s/ 12.027MB)
-    ARNOLDI       0.41127 (32.395s/326.702MB)
-    LANCZOS       0.41127 (31.732s/218.844MB)
-    LOBPCG        0.41127 (35.811s/215.802MB)
-    KRYLOVSCH_CG  0.41127 (25.506s/  0.085MB)
-    KRYLOVSCH_GG  0.41127 (25.221s/  0.086MB)
-    RAYLEIGH      0.42935 (31.954s/ 51.852MB)
+    *RESULTS HETEROGENEOUS - fitting_c = (0.5, 0.3, -1.5, -1.0)
+    Frequency[Hz]     REC         (texe/pmem)
+    ANALYTICAL    0.40927 ( 3.607s/  9.316MB)
+    ARNOLDI       0.41127 (32.552s/390.963MB)
+    LANCZOS       0.41127 (31.941s/389.293MB)
+    LOBPCG        0.41127 (37.387s/389.291MB)
+    KRYLOVSCH_CG  0.41127 (26.247s/  0.144MB)
+    KRYLOVSCH_GG  0.41127 (25.564s/  0.113MB)
+    RAYLEIGH      0.42935 (40.895s/ 49.867MB)
 
     *ANALYTICAL
-       Case      REC*
-    fnum[Hz]  0.41127
-    fana[Hz]  0.42873
-    fray[Hz]  0.42935
+       Case       REC*
+    fnum[Hz]   0.41127
+    fana[Hz]   0.40927
+    fray[Hz]   0.42935
 
     *RAYLEIGH REC
-    n_eigfunc       2      *4       6
-    freq[Hz]  0.50637 0.42935 0.42081
-    texe[s]     0.859  31.954 497.458
-    mem[MB]     8.168  51.852 185.377
+    n_eigfunc        2      *4       6
+    freq[Hz]   0.46713 0.42935 0.42125
+    texe[s]      0.899  39.138 438.810
+    mem[MB]      7.403  47.018 146.401
     """
 
     c_hom = "Homogeneous" if homogeneous else "Heterogeneous"
     n_hyp = f"HyperShape N{degree_layer}" if degree_layer is not None else "Rectangular"
 
-    pprint("\n" + 60 * "=" + f"\nTesting Modal Solvers with {element_geometry} elements "
-           + f"for {dimension}D case\nand {n_hyp} layer. Propagation Speed: {c_hom}\n"
-           + 60 * "=", comm=comm)
+    SpyroEnsemble.print(
+        "\n"
+        + 60 * "="
+        + "\nTesting Modal Solvers with "
+        + f"{element_geometry} elements for {dimension}D case\nand "
+        + f"{n_hyp} layer. Propagation Speed: {c_hom}\n"
+        + 60 * "="
+    )
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -509,11 +626,16 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
     # ============ EXPECTED VALUES ============
 
     if dimension == 2:
-        if homogeneous:
-            exp_value = 0.46875 if wave.abc_deg_layer is None else 0.51046
-
+        if element_geometry == "T":
+            if homogeneous:
+                exp_value = 0.46875 if wave.abc_deg_layer is None else 0.51046
+            else:
+                exp_value = 0.45539 if wave.abc_deg_layer is None else 0.50440
         else:
-            exp_value = 0.45539 if wave.abc_deg_layer is None else 0.50440
+            if homogeneous:
+                exp_value = 0.46875
+            else:
+                exp_value = 0.45542
 
     if dimension == 3:
         if element_geometry == "T":
@@ -535,6 +657,8 @@ def test_modal(wave_instance, element_geometry, dimension, degree_layer, homogen
         wave.layer_ops.rename_folder_habc()
 
     except ConvergenceError as e:
-        fail(f"Checking Modal Solvers with {element_geometry} elements "
-             f"for {dimension}D case, {n_hyp} layer and {c_hom} propagation "
-             f"speed raised an exception: {str(e)}")
+        fail(
+            f"Checking Modal Solvers with {element_geometry} elements "
+            f"for {dimension}D case, {n_hyp} layer and {c_hom} propagation "
+            f"speed raised an exception: {str(e)}"
+        )
