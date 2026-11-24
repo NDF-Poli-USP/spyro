@@ -30,26 +30,47 @@ def build_gmsh_geometry_and_groups(
     structured_mesh,
     min_element_size,
 ):
-    """
-    Generates the geometry, handles padding/water interfaces, and creates
-    physical groups for the Gmsh model. Returns a dictionary of boundary
-    parameters needed for subsequent mesh smoothing operations.
+    """Build the geometry and physical groups for a two-dimensional Gmsh model.
+
+    Parameters
+    ----------
+    gmsh : types.ModuleType
+        Initialized Gmsh module containing the current model.
+    fname : str
+        SEG-Y velocity model used to locate the water interface.
+    length_x : float
+        Width of the physical domain.
+    depth_z : float
+        Negative depth coordinate at the bottom of the physical domain.
+    padding_type : str or None
+        Padding geometry: ``"rectangular"``, ``"hyperelliptical"``, or ``None``.
+    padding_x : float
+        Horizontal padding distance.
+    padding_z : float
+        Vertical padding distance.
+    hyper_n : float
+        Exponent defining the hyperelliptical boundary.
+    water_interface : bool
+        Whether to split the physical domain at the water interface.
+    water_search_value : float
+        Velocity value used to identify the water interface in the SEG-Y model.
+    structured_mesh : bool
+        Whether to configure structured hyperelliptical mesh constraints.
+    min_element_size : float
+        Target element size used for structured curve subdivisions.
+
+    Returns
+    -------
+    dict of str to float or int or None
+        Boundary coordinates and entity tags used by mesh smoothing. Entities
+        absent from the selected geometry have value ``None``.
     """
     # Positions refer to the Gmsh (x, z) plane before the Spyro axis swap:
     # top is z=0, bottom is z=depth_z < 0, and padding lies outside the domain.
     xc = length_x / 2.0
     zc = depth_z / 2.0
-    a_val, b_val = None, None
-
-    pad_x_min, pad_x_max, pad_z_min = None, None, None
     z_water_left, z_water_right = None, None
-
-    if padding_type == "hyperelliptical":
-        a_val = (length_x / 2.0) + padding_x
-        b_val = abs(depth_z / 2.0) + padding_z
-    elif padding_type == "rectangular":
-        pad_x_min, pad_x_max = -padding_x, length_x + padding_x
-        pad_z_min = depth_z - padding_z
+    water_geometry = {}
 
     if water_interface:
         x_water_interface, z_water_interface = generate_water_profile_from_segy(
@@ -61,9 +82,14 @@ def build_gmsh_geometry_and_groups(
             value=water_search_value,
             tolerance=0.001,
         )
-        z_water_left, z_water_right = float(z_water_interface[0]), float(z_water_interface[-1])
+        z_water_left, z_water_right = float(z_water_interface[0]), float(
+            z_water_interface[-1]
+        )
 
-        points_water_interface = [gmsh.model.occ.addPoint(x, float(z), 0.0) for x, z in zip(x_water_interface, z_water_interface)]
+        points_water_interface = [
+            gmsh.model.occ.addPoint(x, float(z), 0.0)
+            for x, z in zip(x_water_interface, z_water_interface)
+        ]
         curve_water_interface = gmsh.model.occ.addSpline(points_water_interface)
         gmsh.model.occ.synchronize()
 
@@ -77,551 +103,109 @@ def build_gmsh_geometry_and_groups(
         surface_water = gmsh.model.occ.addPlaneSurface([loop_water])
         gmsh.model.occ.synchronize()
 
-        if padding_type is None:
-            surface_rectangle = gmsh.model.occ.addRectangle(0, 0, 0, length_x, depth_z)
-            gmsh.model.occ.synchronize()
-            fragment_result, fragment_map = gmsh.model.occ.fragment(
-                [(2, surface_rectangle), (2, surface_water)], []
+        water_geometry = {
+            "z_water_left": z_water_left,
+            "z_water_right": z_water_right,
+            "points_water_interface": points_water_interface,
+            "curve_water_interface": curve_water_interface,
+            "point_top_left": point_top_left,
+            "point_top_right": point_top_right,
+            "line_left": line_left,
+            "line_right": line_right,
+            "line_top": line_top,
+            "surface_water": surface_water,
+        }
+
+    geometry = dict(water_geometry)
+    if padding_type is None:
+        _build_gmsh_geometry_no_padding(
+            gmsh, length_x, depth_z, water_interface, water_geometry
+        )
+
+    if padding_type == "rectangular":
+        geometry.update(
+            _build_gmsh_geometry_rectangular_padding(
+                gmsh,
+                length_x,
+                depth_z,
+                padding_x,
+                padding_z,
+                water_interface,
+                water_geometry,
             )
-            gmsh.model.occ.synchronize()
-            water_surface_tags = [tag for dim, tag in fragment_map[1]]
-            subsurface_tags = [
-                tag for dim, tag in fragment_map[0] if tag not in water_surface_tags
-            ]
-            gmsh.model.addPhysicalGroup(2, water_surface_tags, name="WaterSurface")
-            gmsh.model.addPhysicalGroup(2, subsurface_tags, name="SubSurface")
+        )
 
-        if padding_type == "rectangular":
-            point_bottom_left = gmsh.model.occ.addPoint(0.0, depth_z, 0.0)
-            point_bottom_right = gmsh.model.occ.addPoint(length_x, depth_z, 0.0)
-            point_pad_top_left = gmsh.model.occ.addPoint(pad_x_min, 0.0, 0.0)
-            point_pad_water_interface_left = gmsh.model.occ.addPoint(pad_x_min, z_water_left, 0.0)
-            point_pad_left_at_domain_bottom = gmsh.model.occ.addPoint(pad_x_min, depth_z, 0.0)
-            point_pad_top_right = gmsh.model.occ.addPoint(pad_x_max, 0.0, 0.0)
-            point_pad_water_interface_right = gmsh.model.occ.addPoint(pad_x_max, z_water_right, 0.0)
-            point_pad_right_at_domain_bottom = gmsh.model.occ.addPoint(pad_x_max, depth_z, 0.0)
-            point_pad_bottom_left = gmsh.model.occ.addPoint(pad_x_min, pad_z_min, 0.0)
-            point_pad_bottom_at_domain_left = gmsh.model.occ.addPoint(0.0, pad_z_min, 0.0)
-            point_pad_bottom_at_domain_right = gmsh.model.occ.addPoint(length_x, pad_z_min, 0.0)
-            point_pad_bottom_right = gmsh.model.occ.addPoint(pad_x_max, pad_z_min, 0.0)
-
-            line_subsurface_right = gmsh.model.occ.addLine(points_water_interface[-1], point_bottom_right)
-            line_subsurface_bottom = gmsh.model.occ.addLine(point_bottom_right, point_bottom_left)
-            line_subsurface_left = gmsh.model.occ.addLine(point_bottom_left, points_water_interface[0])
-            line_pad_water_top_right = gmsh.model.occ.addLine(point_top_right, point_pad_top_right)
-            line_pad_water_right = gmsh.model.occ.addLine(point_pad_top_right, point_pad_water_interface_right)
-            line_pad_water_bottom_right = gmsh.model.occ.addLine(point_pad_water_interface_right, points_water_interface[-1])
-            line_pad_subsurface_right = gmsh.model.occ.addLine(point_pad_water_interface_right, point_pad_right_at_domain_bottom)
-            line_pad_subsurface_bottom_right = gmsh.model.occ.addLine(point_pad_right_at_domain_bottom, point_bottom_right)
-            line_pad_water_top_left = gmsh.model.occ.addLine(point_top_left, point_pad_top_left)
-            line_pad_water_left = gmsh.model.occ.addLine(point_pad_top_left, point_pad_water_interface_left)
-            line_pad_water_bottom_left = gmsh.model.occ.addLine(point_pad_water_interface_left, points_water_interface[0])
-            line_pad_subsurface_left = gmsh.model.occ.addLine(point_pad_water_interface_left, point_pad_left_at_domain_bottom)
-            line_pad_subsurface_bottom_left = gmsh.model.occ.addLine(point_pad_left_at_domain_bottom, point_bottom_left)
-            line_pad_corner_left_outer = gmsh.model.occ.addLine(point_pad_left_at_domain_bottom, point_pad_bottom_left)
-            line_pad_corner_left_bottom = gmsh.model.occ.addLine(point_pad_bottom_left, point_pad_bottom_at_domain_left)
-            line_pad_corner_left_inner = gmsh.model.occ.addLine(point_pad_bottom_at_domain_left, point_bottom_left)
-            line_pad_bottom_center = gmsh.model.occ.addLine(point_pad_bottom_at_domain_left, point_pad_bottom_at_domain_right)
-            line_pad_corner_right_inner = gmsh.model.occ.addLine(point_pad_bottom_at_domain_right, point_bottom_right)
-            line_pad_corner_right_bottom = gmsh.model.occ.addLine(point_pad_bottom_at_domain_right, point_pad_bottom_right)
-            line_pad_corner_right_outer = gmsh.model.occ.addLine(point_pad_bottom_right, point_pad_right_at_domain_bottom)
-
-            surface_subsurface = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([curve_water_interface, line_subsurface_right, line_subsurface_bottom, line_subsurface_left])])
-            surface_pad_top_right = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([line_right, line_pad_water_top_right, line_pad_water_right, line_pad_water_bottom_right])])
-            surface_pad_middle_right = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([-line_pad_water_bottom_right, line_pad_subsurface_right, line_pad_subsurface_bottom_right, -line_subsurface_right])])
-            surface_pad_top_left = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([line_pad_water_top_left, line_pad_water_left, line_pad_water_bottom_left, -line_left])])
-            surface_pad_middle_left = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([-line_pad_water_bottom_left, line_pad_subsurface_left, line_pad_subsurface_bottom_left, line_subsurface_left])])
-            surface_pad_bottom_left_corner = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([-line_pad_subsurface_bottom_left, line_pad_corner_left_outer, line_pad_corner_left_bottom, line_pad_corner_left_inner])])
-            surface_pad_bottom_center = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([-line_pad_corner_left_inner, line_pad_bottom_center, line_pad_corner_right_inner, line_subsurface_bottom])])
-            surface_pad_bottom_right_corner = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([-line_pad_corner_right_inner, line_pad_corner_right_bottom, line_pad_corner_right_outer, line_pad_subsurface_bottom_right])])
-
-            gmsh.model.occ.synchronize()
-            gmsh.model.occ.removeAllDuplicates()
-            gmsh.model.occ.synchronize()
-
-            gmsh.model.addPhysicalGroup(2, [surface_water], name="WaterSurface")
-            gmsh.model.addPhysicalGroup(2, [surface_subsurface], name="SubSurface")
-            gmsh.model.addPhysicalGroup(
-                2,
-                [
-                    surface_pad_top_right,
-                    surface_pad_middle_right,
-                    surface_pad_top_left,
-                    surface_pad_middle_left,
-                    surface_pad_bottom_left_corner,
-                    surface_pad_bottom_center,
-                    surface_pad_bottom_right_corner,
-                ],
-                name="Padding",
+    if padding_type == "hyperelliptical":
+        geometry.update(
+            _build_gmsh_geometry_hyperelliptical_padding(
+                gmsh,
+                length_x,
+                depth_z,
+                padding_x,
+                padding_z,
+                hyper_n,
+                water_interface,
+                water_geometry,
+                structured_mesh,
+                min_element_size,
             )
-
-        if padding_type == "hyperelliptical":
-
-            point_bottom_left = gmsh.model.occ.addPoint(0.0, depth_z, 0.0)
-            point_bottom_right = gmsh.model.occ.addPoint(length_x, depth_z, 0.0)
-            z_subsurface_middle_left, z_subsurface_middle_right = (z_water_left + depth_z) / 2.0, (z_water_right + depth_z) / 2.0
-            x_bottom_middle_left, x_bottom_middle_right = length_x * 0.25, length_x * 0.75
-
-            point_subsurface_middle_left = gmsh.model.occ.addPoint(0.0, z_subsurface_middle_left, 0.0)
-            point_subsurface_middle_right = gmsh.model.occ.addPoint(length_x, z_subsurface_middle_right, 0.0)
-            point_bottom_middle_left = gmsh.model.occ.addPoint(x_bottom_middle_left, depth_z, 0.0)
-            point_bottom_middle_right = gmsh.model.occ.addPoint(x_bottom_middle_right, depth_z, 0.0)
-
-            x_pad_top_left, z_pad_top_left = intersect(0.0, 0.0, -1, 0, xc, zc, a_val, b_val, hyper_n)
-            x_pad_water_interface_left, z_pad_water_interface_left = intersect(0.0, z_water_left, -1, 0, xc, zc, a_val, b_val, hyper_n)
-            x_pad_middle_left, z_pad_middle_left = intersect(0.0, z_subsurface_middle_left, -1, 0, xc, zc, a_val, b_val, hyper_n)
-            x_pad_bottom_left_diagonal, z_pad_bottom_left_diagonal = intersect(0.0, depth_z, -1, -1, xc, zc, a_val, b_val, hyper_n)
-            x_pad_bottom_middle_left, z_pad_bottom_middle_left = intersect(x_bottom_middle_left, depth_z, 0, -1, xc, zc, a_val, b_val, hyper_n)
-            x_pad_bottom_middle_right, z_pad_bottom_middle_right = intersect(x_bottom_middle_right, depth_z, 0, -1, xc, zc, a_val, b_val, hyper_n)
-            x_pad_bottom_right_diagonal, z_pad_bottom_right_diagonal = intersect(length_x, depth_z, 1, -1, xc, zc, a_val, b_val, hyper_n)
-            x_pad_middle_right, z_pad_middle_right = intersect(length_x, z_subsurface_middle_right, 1, 0, xc, zc, a_val, b_val, hyper_n)
-            x_pad_water_interface_right, z_pad_water_interface_right = intersect(length_x, z_water_right, 1, 0, xc, zc, a_val, b_val, hyper_n)
-            x_pad_top_right, z_pad_top_right = intersect(length_x, 0.0, 1, 0, xc, zc, a_val, b_val, hyper_n)
-
-            point_pad_top_left = gmsh.model.occ.addPoint(x_pad_top_left, z_pad_top_left, 0.0)
-            point_pad_water_interface_left = gmsh.model.occ.addPoint(x_pad_water_interface_left, z_pad_water_interface_left, 0.0)
-            point_pad_middle_left = gmsh.model.occ.addPoint(x_pad_middle_left, z_pad_middle_left, 0.0)
-            point_pad_bottom_left_diagonal = gmsh.model.occ.addPoint(x_pad_bottom_left_diagonal, z_pad_bottom_left_diagonal, 0.0)
-            point_pad_bottom_middle_left = gmsh.model.occ.addPoint(x_pad_bottom_middle_left, z_pad_bottom_middle_left, 0.0)
-            point_pad_bottom_middle_right = gmsh.model.occ.addPoint(x_pad_bottom_middle_right, z_pad_bottom_middle_right, 0.0)
-            point_pad_bottom_right_diagonal = gmsh.model.occ.addPoint(x_pad_bottom_right_diagonal, z_pad_bottom_right_diagonal, 0.0)
-            point_pad_middle_right = gmsh.model.occ.addPoint(x_pad_middle_right, z_pad_middle_right, 0.0)
-            point_pad_water_interface_right = gmsh.model.occ.addPoint(x_pad_water_interface_right, z_pad_water_interface_right, 0.0)
-            point_pad_top_right = gmsh.model.occ.addPoint(x_pad_top_right, z_pad_top_right, 0.0)
-
-            line_subsurface_right_upper = gmsh.model.occ.addLine(points_water_interface[-1], point_subsurface_middle_right)
-            line_subsurface_right_lower = gmsh.model.occ.addLine(point_subsurface_middle_right, point_bottom_right)
-            line_subsurface_bottom_right = gmsh.model.occ.addLine(point_bottom_right, point_bottom_middle_right)
-            line_subsurface_bottom_center = gmsh.model.occ.addLine(point_bottom_middle_right, point_bottom_middle_left)
-            line_subsurface_bottom_left = gmsh.model.occ.addLine(point_bottom_middle_left, point_bottom_left)
-            line_subsurface_left_lower = gmsh.model.occ.addLine(point_bottom_left, point_subsurface_middle_left)
-            line_subsurface_left_upper = gmsh.model.occ.addLine(point_subsurface_middle_left, points_water_interface[0])
-
-            ray_top_left = gmsh.model.occ.addLine(point_top_left, point_pad_top_left)
-            ray_water_interface_left = gmsh.model.occ.addLine(points_water_interface[0], point_pad_water_interface_left)
-            ray_middle_left = gmsh.model.occ.addLine(point_subsurface_middle_left, point_pad_middle_left)
-            ray_bottom_left_diagonal = gmsh.model.occ.addLine(point_bottom_left, point_pad_bottom_left_diagonal)
-            ray_bottom_middle_left = gmsh.model.occ.addLine(point_bottom_middle_left, point_pad_bottom_middle_left)
-            ray_bottom_middle_right = gmsh.model.occ.addLine(point_bottom_middle_right, point_pad_bottom_middle_right)
-            ray_bottom_right_diagonal = gmsh.model.occ.addLine(point_bottom_right, point_pad_bottom_right_diagonal)
-            ray_middle_right = gmsh.model.occ.addLine(point_subsurface_middle_right, point_pad_middle_right)
-            ray_water_interface_right = gmsh.model.occ.addLine(points_water_interface[-1], point_pad_water_interface_right)
-            ray_top_right = gmsh.model.occ.addLine(point_top_right, point_pad_top_right)
-
-            arc_pad_water_left = make_arc(point_pad_top_left, point_pad_water_interface_left, x_pad_top_left, z_pad_top_left,
-                                          x_pad_water_interface_left, z_pad_water_interface_left, xc, zc, a_val, b_val, hyper_n)
-            arc_pad_left_upper = make_arc(point_pad_water_interface_left, point_pad_middle_left, x_pad_water_interface_left, z_pad_water_interface_left,
-                                          x_pad_middle_left, z_pad_middle_left, xc, zc, a_val, b_val, hyper_n)
-            arc_pad_left_lower = make_arc(point_pad_middle_left, point_pad_bottom_left_diagonal, x_pad_middle_left, z_pad_middle_left,
-                                          x_pad_bottom_left_diagonal, z_pad_bottom_left_diagonal, xc, zc, a_val, b_val, hyper_n)
-            arc_pad_bottom_left_diagonal_to_middle = make_arc(point_pad_bottom_left_diagonal, point_pad_bottom_middle_left, x_pad_bottom_left_diagonal, z_pad_bottom_left_diagonal,
-                                                              x_pad_bottom_middle_left, z_pad_bottom_middle_left, xc, zc, a_val, b_val, hyper_n)
-            arc_pad_bottom_center = make_arc(point_pad_bottom_middle_left, point_pad_bottom_middle_right, x_pad_bottom_middle_left, z_pad_bottom_middle_left,
-                                             x_pad_bottom_middle_right, z_pad_bottom_middle_right, xc, zc, a_val, b_val, hyper_n)
-            arc_pad_bottom_middle_to_right_diagonal = make_arc(point_pad_bottom_middle_right, point_pad_bottom_right_diagonal, x_pad_bottom_middle_right, z_pad_bottom_middle_right,
-                                                               x_pad_bottom_right_diagonal, z_pad_bottom_right_diagonal, xc, zc, a_val, b_val, hyper_n)
-            arc_pad_right_lower = make_arc(point_pad_bottom_right_diagonal, point_pad_middle_right, x_pad_bottom_right_diagonal, z_pad_bottom_right_diagonal,
-                                           x_pad_middle_right, z_pad_middle_right, xc, zc, a_val, b_val, hyper_n)
-            arc_pad_right_upper = make_arc(point_pad_middle_right, point_pad_water_interface_right, x_pad_middle_right, z_pad_middle_right,
-                                           x_pad_water_interface_right, z_pad_water_interface_right, xc, zc, a_val, b_val, hyper_n)
-            arc_pad_water_right = make_arc(point_pad_water_interface_right, point_pad_top_right, x_pad_water_interface_right, z_pad_water_interface_right,
-                                           x_pad_top_right, z_pad_top_right, xc, zc, a_val, b_val, hyper_n)
-
-            surface_subsurface = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([curve_water_interface, line_subsurface_right_upper, line_subsurface_right_lower, line_subsurface_bottom_right, line_subsurface_bottom_center, line_subsurface_bottom_left, line_subsurface_left_lower, line_subsurface_left_upper])])
-            surface_pad_top_left = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([line_left, ray_water_interface_left, -arc_pad_water_left, -ray_top_left])])
-            surface_pad_left_upper = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([-line_subsurface_left_upper, ray_middle_left, -arc_pad_left_upper, -ray_water_interface_left])])
-            surface_pad_left_lower = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([-line_subsurface_left_lower, ray_bottom_left_diagonal, -arc_pad_left_lower, -ray_middle_left])])
-            surface_pad_bottom_left = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([-line_subsurface_bottom_left, ray_bottom_middle_left, -arc_pad_bottom_left_diagonal_to_middle, -ray_bottom_left_diagonal])])
-            surface_pad_bottom_center = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([-line_subsurface_bottom_center, ray_bottom_middle_right, -arc_pad_bottom_center, -ray_bottom_middle_left])])
-            surface_pad_bottom_right = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([-line_subsurface_bottom_right, ray_bottom_right_diagonal, -arc_pad_bottom_middle_to_right_diagonal, -ray_bottom_middle_right])])
-            surface_pad_right_lower = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([-line_subsurface_right_lower, ray_middle_right, -arc_pad_right_lower, -ray_bottom_right_diagonal])])
-            surface_pad_right_upper = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([-line_subsurface_right_upper, ray_water_interface_right, -arc_pad_right_upper, -ray_middle_right])])
-            surface_pad_top_right = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([line_right, ray_top_right, -arc_pad_water_right, -ray_water_interface_right])])
-
-            gmsh.model.occ.synchronize()
-            gmsh.model.occ.removeAllDuplicates()
-            gmsh.model.occ.synchronize()
-
-            gmsh.model.addPhysicalGroup(2, [surface_water], name="WaterSurface")
-            gmsh.model.addPhysicalGroup(2, [surface_subsurface], name="SubSurface")
-            gmsh.model.addPhysicalGroup(
-                2,
-                [
-                    surface_pad_top_left,
-                    surface_pad_left_upper,
-                    surface_pad_left_lower,
-                    surface_pad_bottom_left,
-                    surface_pad_bottom_center,
-                    surface_pad_bottom_right,
-                    surface_pad_right_lower,
-                    surface_pad_right_upper,
-                    surface_pad_top_right,
-                ],
-                name="Padding",
-            )
-
-            if structured_mesh:
-                len_radial = max(padding_x, padding_z)
-                len_x_left, len_x_mid, len_x_right = (
-                    length_x * 0.25,
-                    length_x * 0.50,
-                    length_x * 0.25,
-                )
-                len_z_water = abs(z_water_left)
-                len_z_rock_upper, len_z_rock_lower = abs(z_subsurface_middle_left - z_water_left), abs(
-                    depth_z - z_subsurface_middle_left
-                )
-
-                n_radial = max(2, int(np.ceil(len_radial / min_element_size)) + 1)
-                n_x_left = max(2, int(np.ceil(len_x_left / min_element_size)) + 1)
-                n_x_mid = max(2, int(np.ceil(len_x_mid / min_element_size)) + 1)
-                n_x_right = max(2, int(np.ceil(len_x_right / min_element_size)) + 1)
-                n_x_total = n_x_left + n_x_mid + n_x_right - 2
-                n_z_water = max(2, int(np.ceil(len_z_water / min_element_size)) + 1)
-                n_z_rock_upper = max(
-                    2, int(np.ceil(len_z_rock_upper / min_element_size)) + 1
-                )
-                n_z_rock_lower = max(
-                    2, int(np.ceil(len_z_rock_lower / min_element_size)) + 1
-                )
-
-                for curve in [
-                    ray_top_left,
-                    ray_water_interface_left,
-                    ray_middle_left,
-                    ray_bottom_left_diagonal,
-                    ray_bottom_middle_left,
-                    ray_bottom_middle_right,
-                    ray_bottom_right_diagonal,
-                    ray_middle_right,
-                    ray_water_interface_right,
-                    ray_top_right,
-                ]:
-                    gmsh.model.mesh.setTransfiniteCurve(curve, n_radial)
-                for curve in [line_left, line_right, arc_pad_water_left, arc_pad_water_right]:
-                    gmsh.model.mesh.setTransfiniteCurve(curve, n_z_water)
-                for curve in [line_subsurface_left_upper, line_subsurface_right_upper, arc_pad_left_upper, arc_pad_right_upper]:
-                    gmsh.model.mesh.setTransfiniteCurve(curve, n_z_rock_upper)
-                for curve in [line_subsurface_left_lower, line_subsurface_right_lower, arc_pad_left_lower, arc_pad_right_lower]:
-                    gmsh.model.mesh.setTransfiniteCurve(curve, n_z_rock_lower)
-                for curve in [line_subsurface_bottom_left, arc_pad_bottom_left_diagonal_to_middle]:
-                    gmsh.model.mesh.setTransfiniteCurve(curve, n_x_left)
-                for curve in [line_subsurface_bottom_center, arc_pad_bottom_center]:
-                    gmsh.model.mesh.setTransfiniteCurve(curve, n_x_mid)
-                for curve in [line_subsurface_bottom_right, arc_pad_bottom_middle_to_right_diagonal]:
-                    gmsh.model.mesh.setTransfiniteCurve(curve, n_x_right)
-                for curve in [line_top, curve_water_interface]:
-                    gmsh.model.mesh.setTransfiniteCurve(curve, n_x_total)
-
-                padding_surfaces = [
-                    surface_pad_top_left,
-                    surface_pad_left_upper,
-                    surface_pad_left_lower,
-                    surface_pad_bottom_left,
-                    surface_pad_bottom_center,
-                    surface_pad_bottom_right,
-                    surface_pad_right_lower,
-                    surface_pad_right_upper,
-                    surface_pad_top_right,
-                ]
-                for surface in padding_surfaces:
-                    gmsh.model.mesh.setTransfiniteSurface(surface)
-                    gmsh.model.mesh.setRecombine(2, surface)
-
-                gmsh.model.mesh.setTransfiniteSurface(
-                    surface_water, cornerTags=[point_top_left, point_top_right, points_water_interface[-1], points_water_interface[0]]
-                )
-                gmsh.model.mesh.setRecombine(2, surface_water)
-                gmsh.model.mesh.setTransfiniteSurface(
-                    surface_subsurface, cornerTags=[points_water_interface[0], points_water_interface[-1], point_bottom_right, point_bottom_left]
-                )
-                gmsh.model.mesh.setRecombine(2, surface_subsurface)
-
-    if not water_interface:
-        if padding_type is None:
-            surface_rectangle = gmsh.model.occ.addRectangle(0, 0, 0, length_x, depth_z)
-            gmsh.model.occ.synchronize()
-            gmsh.model.addPhysicalGroup(2, [surface_rectangle], name="SubSurface")
-
-        if padding_type == "rectangular":
-            point_top_left = gmsh.model.occ.addPoint(0.0, 0.0, 0.0)
-            point_top_right = gmsh.model.occ.addPoint(length_x, 0.0, 0.0)
-            point_bottom_right = gmsh.model.occ.addPoint(length_x, depth_z, 0.0)
-            point_bottom_left = gmsh.model.occ.addPoint(0.0, depth_z, 0.0)
-
-            point_pad_top_left = gmsh.model.occ.addPoint(pad_x_min, 0.0, 0.0)
-            point_pad_left_at_domain_bottom = gmsh.model.occ.addPoint(pad_x_min, depth_z, 0.0)
-            point_pad_bottom_left = gmsh.model.occ.addPoint(pad_x_min, pad_z_min, 0.0)
-            point_pad_bottom_at_domain_left = gmsh.model.occ.addPoint(0.0, pad_z_min, 0.0)
-            point_pad_bottom_at_domain_right = gmsh.model.occ.addPoint(length_x, pad_z_min, 0.0)
-            point_pad_bottom_right = gmsh.model.occ.addPoint(pad_x_max, pad_z_min, 0.0)
-            point_pad_right_at_domain_bottom = gmsh.model.occ.addPoint(pad_x_max, depth_z, 0.0)
-            point_pad_top_right = gmsh.model.occ.addPoint(pad_x_max, 0.0, 0.0)
-
-            line_top = gmsh.model.occ.addLine(point_top_left, point_top_right)
-            line_right = gmsh.model.occ.addLine(point_top_right, point_bottom_right)
-            line_bottom = gmsh.model.occ.addLine(point_bottom_right, point_bottom_left)
-            line_left = gmsh.model.occ.addLine(point_bottom_left, point_top_left)
-
-            line_pad_top_left = gmsh.model.occ.addLine(point_pad_top_left, point_top_left)
-            line_pad_left = gmsh.model.occ.addLine(point_pad_left_at_domain_bottom, point_pad_top_left)
-            line_pad_left_at_domain_bottom = gmsh.model.occ.addLine(point_bottom_left, point_pad_left_at_domain_bottom)
-
-            line_pad_corner_left_outer = gmsh.model.occ.addLine(point_pad_bottom_left, point_pad_left_at_domain_bottom)
-            line_pad_corner_left_bottom = gmsh.model.occ.addLine(point_pad_bottom_at_domain_left, point_pad_bottom_left)
-            line_pad_corner_left_inner = gmsh.model.occ.addLine(point_bottom_left, point_pad_bottom_at_domain_left)
-
-            line_pad_bottom_center = gmsh.model.occ.addLine(point_pad_bottom_at_domain_right, point_pad_bottom_at_domain_left)
-            line_pad_corner_right_inner = gmsh.model.occ.addLine(point_bottom_right, point_pad_bottom_at_domain_right)
-
-            line_pad_corner_right_bottom = gmsh.model.occ.addLine(point_pad_bottom_right, point_pad_bottom_at_domain_right)
-            line_pad_corner_right_outer = gmsh.model.occ.addLine(point_pad_right_at_domain_bottom, point_pad_bottom_right)
-
-            line_pad_right_at_domain_bottom = gmsh.model.occ.addLine(point_pad_right_at_domain_bottom, point_bottom_right)
-            line_pad_right = gmsh.model.occ.addLine(point_pad_top_right, point_pad_right_at_domain_bottom)
-            line_pad_top_right = gmsh.model.occ.addLine(point_top_right, point_pad_top_right)
-
-            loop_domain = gmsh.model.occ.addCurveLoop([line_top, line_right, line_bottom, line_left])
-            surface_domain = gmsh.model.occ.addPlaneSurface([loop_domain])
-            loop_pad_left = gmsh.model.occ.addCurveLoop(
-                [line_pad_top_left, -line_left, -line_pad_left_at_domain_bottom, line_pad_left])
-            surface_pad_left = gmsh.model.occ.addPlaneSurface([loop_pad_left])
-            loop_pad_bottom_left_corner = gmsh.model.occ.addCurveLoop(
-                [line_pad_left_at_domain_bottom, -line_pad_corner_left_outer, -line_pad_corner_left_bottom, -line_pad_corner_left_inner])
-            surface_pad_bottom_left_corner = gmsh.model.occ.addPlaneSurface([loop_pad_bottom_left_corner])
-            loop_pad_bottom_center = gmsh.model.occ.addCurveLoop(
-                [line_pad_corner_left_inner, -line_pad_bottom_center, -line_pad_corner_right_inner, line_bottom])
-            surface_pad_bottom_center = gmsh.model.occ.addPlaneSurface([loop_pad_bottom_center])
-            loop_pad_bottom_right_corner = gmsh.model.occ.addCurveLoop(
-                [line_pad_corner_right_inner, -line_pad_corner_right_bottom, -line_pad_corner_right_outer, -line_pad_right_at_domain_bottom])
-            surface_pad_bottom_right_corner = gmsh.model.occ.addPlaneSurface([loop_pad_bottom_right_corner])
-            loop_pad_right = gmsh.model.occ.addCurveLoop(
-                [line_right, -line_pad_right_at_domain_bottom, -line_pad_right, -line_pad_top_right])
-            surface_pad_right = gmsh.model.occ.addPlaneSurface([loop_pad_right])
-
-            gmsh.model.occ.synchronize()
-            gmsh.model.occ.removeAllDuplicates()
-            gmsh.model.occ.synchronize()
-
-            gmsh.model.addPhysicalGroup(2, [surface_domain], name="SubSurface")
-            gmsh.model.addPhysicalGroup(
-                2,
-                [surface_pad_left, surface_pad_bottom_left_corner, surface_pad_bottom_center, surface_pad_bottom_right_corner, surface_pad_right],
-                name="Padding",
-            )
-
-        if padding_type == "hyperelliptical":
-
-            point_top_left = gmsh.model.occ.addPoint(0.0, 0.0, 0.0)
-            point_top_right = gmsh.model.occ.addPoint(length_x, 0.0, 0.0)
-            point_bottom_right = gmsh.model.occ.addPoint(length_x, depth_z, 0.0)
-            point_bottom_left = gmsh.model.occ.addPoint(0.0, depth_z, 0.0)
-
-            x_bottom_middle_left, x_bottom_middle_right = length_x * 0.25, length_x * 0.75
-            point_bottom_middle_left = gmsh.model.occ.addPoint(x_bottom_middle_left, depth_z, 0.0)
-            point_bottom_middle_right = gmsh.model.occ.addPoint(x_bottom_middle_right, depth_z, 0.0)
-
-            x_pad_top_left, z_pad_top_left = intersect(0.0, 0.0, -1, 0, xc, zc, a_val, b_val, hyper_n)
-            x_pad_bottom_left, z_pad_bottom_left = intersect(0.0, depth_z, -1, -1, xc, zc, a_val, b_val, hyper_n)
-            x_pad_bottom_middle_left, z_pad_bottom_middle_left = intersect(x_bottom_middle_left, depth_z, 0, -1, xc, zc, a_val, b_val, hyper_n)
-            x_pad_bottom_middle_right, z_pad_bottom_middle_right = intersect(x_bottom_middle_right, depth_z, 0, -1, xc, zc, a_val, b_val, hyper_n)
-            x_pad_bottom_right, z_pad_bottom_right = intersect(length_x, depth_z, 1, -1, xc, zc, a_val, b_val, hyper_n)
-            x_pad_top_right, z_pad_top_right = intersect(length_x, 0.0, 1, 0, xc, zc, a_val, b_val, hyper_n)
-
-            point_pad_top_left = gmsh.model.occ.addPoint(x_pad_top_left, z_pad_top_left, 0.0)
-            point_pad_bottom_left = gmsh.model.occ.addPoint(x_pad_bottom_left, z_pad_bottom_left, 0.0)
-            point_pad_bottom_middle_left = gmsh.model.occ.addPoint(x_pad_bottom_middle_left, z_pad_bottom_middle_left, 0.0)
-            point_pad_bottom_middle_right = gmsh.model.occ.addPoint(x_pad_bottom_middle_right, z_pad_bottom_middle_right, 0.0)
-            point_pad_bottom_right = gmsh.model.occ.addPoint(x_pad_bottom_right, z_pad_bottom_right, 0.0)
-            point_pad_top_right = gmsh.model.occ.addPoint(x_pad_top_right, z_pad_top_right, 0.0)
-
-            line_top = gmsh.model.occ.addLine(point_top_left, point_top_right)
-            line_right = gmsh.model.occ.addLine(point_top_right, point_bottom_right)
-            line_bottom_right = gmsh.model.occ.addLine(point_bottom_right, point_bottom_middle_right)
-            line_bottom_center = gmsh.model.occ.addLine(point_bottom_middle_right, point_bottom_middle_left)
-            line_bottom_left = gmsh.model.occ.addLine(point_bottom_middle_left, point_bottom_left)
-            line_left = gmsh.model.occ.addLine(point_bottom_left, point_top_left)
-
-            ray_top_left = gmsh.model.occ.addLine(point_top_left, point_pad_top_left)
-            ray_bottom_left = gmsh.model.occ.addLine(point_bottom_left, point_pad_bottom_left)
-            ray_bottom_middle_left = gmsh.model.occ.addLine(point_bottom_middle_left, point_pad_bottom_middle_left)
-            ray_bottom_middle_right = gmsh.model.occ.addLine(point_bottom_middle_right, point_pad_bottom_middle_right)
-            ray_bottom_right = gmsh.model.occ.addLine(point_bottom_right, point_pad_bottom_right)
-            ray_top_right = gmsh.model.occ.addLine(point_top_right, point_pad_top_right)
-
-            arc_pad_left = make_arc(point_pad_top_left, point_pad_bottom_left, x_pad_top_left, z_pad_top_left,
-                                    x_pad_bottom_left, z_pad_bottom_left, xc, zc, a_val, b_val, hyper_n)
-            arc_pad_bottom_left_to_middle = make_arc(point_pad_bottom_left, point_pad_bottom_middle_left, x_pad_bottom_left, z_pad_bottom_left,
-                                                     x_pad_bottom_middle_left, z_pad_bottom_middle_left, xc, zc, a_val, b_val, hyper_n)
-            arc_pad_bottom_center = make_arc(point_pad_bottom_middle_left, point_pad_bottom_middle_right, x_pad_bottom_middle_left, z_pad_bottom_middle_left,
-                                             x_pad_bottom_middle_right, z_pad_bottom_middle_right, xc, zc, a_val, b_val, hyper_n)
-            arc_pad_bottom_middle_to_right = make_arc(point_pad_bottom_middle_right, point_pad_bottom_right, x_pad_bottom_middle_right, z_pad_bottom_middle_right,
-                                                      x_pad_bottom_right, z_pad_bottom_right, xc, zc, a_val, b_val, hyper_n)
-            arc_pad_right = make_arc(point_pad_bottom_right, point_pad_top_right, x_pad_bottom_right, z_pad_bottom_right,
-                                     x_pad_top_right, z_pad_top_right, xc, zc, a_val, b_val, hyper_n)
-
-            surface_subsurface = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([line_top, line_right, line_bottom_right, line_bottom_center, line_bottom_left, line_left])])
-            surface_pad_left = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([ray_bottom_left, -arc_pad_left, -ray_top_left, -line_left])])
-            surface_pad_bottom_left = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([line_bottom_left, ray_bottom_left, arc_pad_bottom_left_to_middle, -ray_bottom_middle_left])])
-            surface_pad_bottom_center = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([line_bottom_center, ray_bottom_middle_left, arc_pad_bottom_center, -ray_bottom_middle_right])])
-            surface_pad_bottom_right = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([line_bottom_right, ray_bottom_middle_right, arc_pad_bottom_middle_to_right, -ray_bottom_right])])
-            surface_pad_right = gmsh.model.occ.addPlaneSurface(
-                [gmsh.model.occ.addCurveLoop([line_right, ray_bottom_right, arc_pad_right, -ray_top_right])])
-
-            gmsh.model.occ.synchronize()
-            gmsh.model.occ.removeAllDuplicates()
-            gmsh.model.occ.synchronize()
-
-            gmsh.model.addPhysicalGroup(2, [surface_subsurface], name="SubSurface")
-            gmsh.model.addPhysicalGroup(
-                2,
-                [
-                    surface_pad_left,
-                    surface_pad_bottom_left,
-                    surface_pad_bottom_center,
-                    surface_pad_bottom_right,
-                    surface_pad_right,
-                ],
-                name="Padding",
-            )
-
-            if structured_mesh:
-                len_radial = max(padding_x, padding_z)
-                len_x_left, len_x_mid, len_x_right = (
-                    length_x * 0.25,
-                    length_x * 0.50,
-                    length_x * 0.25,
-                )
-                len_z_total = abs(depth_z)
-
-                n_radial = max(2, int(np.ceil(len_radial / min_element_size)) + 1)
-                n_x_left = max(2, int(np.ceil(len_x_left / min_element_size)) + 1)
-                n_x_mid = max(2, int(np.ceil(len_x_mid / min_element_size)) + 1)
-                n_x_right = max(2, int(np.ceil(len_x_right / min_element_size)) + 1)
-                n_x_total = n_x_left + n_x_mid + n_x_right - 2
-                n_z = max(2, int(np.ceil(len_z_total / min_element_size)) + 1)
-
-                for curve in [ray_top_left, ray_bottom_left, ray_bottom_middle_left, ray_bottom_middle_right, ray_bottom_right, ray_top_right]:
-                    gmsh.model.mesh.setTransfiniteCurve(curve, n_radial)
-
-                for curve in [line_left, line_right, arc_pad_left, arc_pad_right]:
-                    gmsh.model.mesh.setTransfiniteCurve(curve, n_z)
-
-                for curve in [line_bottom_left, arc_pad_bottom_left_to_middle]:
-                    gmsh.model.mesh.setTransfiniteCurve(curve, n_x_left)
-                for curve in [line_bottom_center, arc_pad_bottom_center]:
-                    gmsh.model.mesh.setTransfiniteCurve(curve, n_x_mid)
-                for curve in [line_bottom_right, arc_pad_bottom_middle_to_right]:
-                    gmsh.model.mesh.setTransfiniteCurve(curve, n_x_right)
-
-                gmsh.model.mesh.setTransfiniteCurve(line_top, n_x_total)
-
-                gmsh.model.mesh.setTransfiniteSurface(
-                    surface_pad_left, cornerTags=[point_bottom_left, point_pad_bottom_left, point_pad_top_left, point_top_left]
-                )
-                gmsh.model.mesh.setTransfiniteSurface(
-                    surface_pad_bottom_left,
-                    cornerTags=[point_bottom_middle_left, point_bottom_left, point_pad_bottom_left, point_pad_bottom_middle_left],
-                )
-                gmsh.model.mesh.setTransfiniteSurface(
-                    surface_pad_bottom_center,
-                    cornerTags=[point_bottom_middle_right, point_bottom_middle_left, point_pad_bottom_middle_left, point_pad_bottom_middle_right],
-                )
-                gmsh.model.mesh.setTransfiniteSurface(
-                    surface_pad_bottom_right,
-                    cornerTags=[point_bottom_right, point_bottom_middle_right, point_pad_bottom_middle_right, point_pad_bottom_right],
-                )
-                gmsh.model.mesh.setTransfiniteSurface(
-                    surface_pad_right, cornerTags=[point_top_right, point_bottom_right, point_pad_bottom_right, point_pad_top_right]
-                )
-
-                padding_surfaces = [
-                    surface_pad_left,
-                    surface_pad_bottom_left,
-                    surface_pad_bottom_center,
-                    surface_pad_bottom_right,
-                    surface_pad_right,
-                ]
-                for surface in padding_surfaces:
-                    gmsh.model.mesh.setRecombine(2, surface)
-
-                gmsh.model.mesh.setTransfiniteSurface(
-                    surface_subsurface, cornerTags=[point_top_left, point_top_right, point_bottom_right, point_bottom_left]
-                )
-                gmsh.model.mesh.setRecombine(2, surface_subsurface)
+        )
 
     return {
         "z_water_left": z_water_left,
         "z_water_right": z_water_right,
-        "a_val": a_val,
-        "b_val": b_val,
+        "a_val": geometry.get("a_val"),
+        "b_val": geometry.get("b_val"),
         "xc": xc,
         "zc": zc,
-        "pad_x_min": pad_x_min,
-        "pad_x_max": pad_x_max,
-        "pad_z_min": pad_z_min,
+        "pad_x_min": geometry.get("pad_x_min"),
+        "pad_x_max": geometry.get("pad_x_max"),
+        "pad_z_min": geometry.get("pad_z_min"),
         # Surfaces
-        "surface_water": locals().get("surface_water"),
-        "surface_pad_top_left": locals().get("surface_pad_top_left"),
-        "surface_pad_top_right": locals().get("surface_pad_top_right"),
-        "surface_pad_left": locals().get("surface_pad_left"),
+        "surface_water": geometry.get("surface_water"),
+        "surface_pad_top_left": geometry.get("surface_pad_top_left"),
+        "surface_pad_top_right": geometry.get("surface_pad_top_right"),
+        "surface_pad_left": geometry.get("surface_pad_left"),
         # Arcs
-        "arc_pad_left_upper": locals().get("arc_pad_left_upper"),
-        "arc_pad_left_lower": locals().get("arc_pad_left_lower"),
-        "arc_pad_bottom_left_diagonal_to_middle": locals().get("arc_pad_bottom_left_diagonal_to_middle"),
-        "arc_pad_bottom_center": locals().get("arc_pad_bottom_center"),
-        "arc_pad_bottom_middle_to_right_diagonal": locals().get("arc_pad_bottom_middle_to_right_diagonal"),
-        "arc_pad_right_lower": locals().get("arc_pad_right_lower"),
-        "arc_pad_right_upper": locals().get("arc_pad_right_upper"),
-        "arc_pad_left": locals().get("arc_pad_left"),
-        "arc_pad_bottom_left_to_middle": locals().get("arc_pad_bottom_left_to_middle"),
-        "arc_pad_bottom_middle_to_right": locals().get("arc_pad_bottom_middle_to_right"),
-        "arc_pad_right": locals().get("arc_pad_right"),
+        "arc_pad_left_upper": geometry.get("arc_pad_left_upper"),
+        "arc_pad_left_lower": geometry.get("arc_pad_left_lower"),
+        "arc_pad_bottom_left_diagonal_to_middle": geometry.get(
+            "arc_pad_bottom_left_diagonal_to_middle"
+        ),
+        "arc_pad_bottom_center": geometry.get("arc_pad_bottom_center"),
+        "arc_pad_bottom_middle_to_right_diagonal": geometry.get(
+            "arc_pad_bottom_middle_to_right_diagonal"
+        ),
+        "arc_pad_right_lower": geometry.get("arc_pad_right_lower"),
+        "arc_pad_right_upper": geometry.get("arc_pad_right_upper"),
+        "arc_pad_left": geometry.get("arc_pad_left"),
+        "arc_pad_bottom_left_to_middle": geometry.get("arc_pad_bottom_left_to_middle"),
+        "arc_pad_bottom_middle_to_right": geometry.get(
+            "arc_pad_bottom_middle_to_right"
+        ),
+        "arc_pad_right": geometry.get("arc_pad_right"),
         # Lines / Rock Boundaries
-        "line_subsurface_left_lower": locals().get("line_subsurface_left_lower"),
-        "line_subsurface_left_upper": locals().get("line_subsurface_left_upper"),
-        "line_subsurface_right_lower": locals().get("line_subsurface_right_lower"),
-        "line_subsurface_right_upper": locals().get("line_subsurface_right_upper"),
-        "line_subsurface_bottom_left": locals().get("line_subsurface_bottom_left"),
-        "line_subsurface_bottom_center": locals().get("line_subsurface_bottom_center"),
-        "line_subsurface_bottom_right": locals().get("line_subsurface_bottom_right"),
-        "line_left": locals().get("line_left"),
-        "line_right": locals().get("line_right"),
-        "line_bottom_left": locals().get("line_bottom_left"),
-        "line_bottom_center": locals().get("line_bottom_center"),
-        "line_bottom_right": locals().get("line_bottom_right"),
+        "line_subsurface_left_lower": geometry.get("line_subsurface_left_lower"),
+        "line_subsurface_left_upper": geometry.get("line_subsurface_left_upper"),
+        "line_subsurface_right_lower": geometry.get("line_subsurface_right_lower"),
+        "line_subsurface_right_upper": geometry.get("line_subsurface_right_upper"),
+        "line_subsurface_bottom_left": geometry.get("line_subsurface_bottom_left"),
+        "line_subsurface_bottom_center": geometry.get("line_subsurface_bottom_center"),
+        "line_subsurface_bottom_right": geometry.get("line_subsurface_bottom_right"),
+        "line_left": geometry.get("line_left"),
+        "line_right": geometry.get("line_right"),
+        "line_bottom_left": geometry.get("line_bottom_left"),
+        "line_bottom_center": geometry.get("line_bottom_center"),
+        "line_bottom_right": geometry.get("line_bottom_right"),
         # Rays
-        "ray_bottom_left_diagonal": locals().get("ray_bottom_left_diagonal"),
-        "ray_bottom_right_diagonal": locals().get("ray_bottom_right_diagonal"),
-        "ray_top_left": locals().get("ray_top_left"),
-        "ray_bottom_left": locals().get("ray_bottom_left"),
-        "ray_bottom_right": locals().get("ray_bottom_right"),
-        "ray_top_right": locals().get("ray_top_right"),
-        "x_pad_top_left": locals().get("x_pad_top_left"),
-        "x_pad_top_right": locals().get("x_pad_top_right"),
+        "ray_bottom_left_diagonal": geometry.get("ray_bottom_left_diagonal"),
+        "ray_bottom_right_diagonal": geometry.get("ray_bottom_right_diagonal"),
+        "ray_top_left": geometry.get("ray_top_left"),
+        "ray_bottom_left": geometry.get("ray_bottom_left"),
+        "ray_bottom_right": geometry.get("ray_bottom_right"),
+        "ray_top_right": geometry.get("ray_top_right"),
+        "x_pad_top_left": geometry.get("x_pad_top_left"),
+        "x_pad_top_right": geometry.get("x_pad_top_right"),
     }
 
 
@@ -1009,3 +593,621 @@ def apply_structured_winslow_smoothing2d(
     SpyroEnsemble.print("Updating nodes in Gmsh...")
     for i, tag in enumerate(node_tags):
         gmsh.model.mesh.setNode(int(tag), smoothed_points_3d[i].tolist(), [])
+
+
+def _build_gmsh_geometry_no_padding(
+    gmsh,
+    length_x,
+    depth_z,
+    water_interface,
+    water_geometry,
+):
+    """Build physical surfaces without padding.
+
+    Parameters
+    ----------
+    gmsh : types.ModuleType
+        Initialized Gmsh module containing the current model.
+    length_x : float
+        Width of the physical domain.
+    depth_z : float
+        Negative depth coordinate at the bottom of the physical domain.
+    water_interface : bool
+        Whether the prepared water interface splits the physical domain.
+    water_geometry : dict of str to float or int or list of int
+        Prepared water boundary coordinates and entity tags. Empty when
+        ``water_interface`` is ``False``.
+
+    Returns
+    -------
+    None
+        Geometry and physical groups are added to the current Gmsh model.
+    """
+    if water_interface:
+        surface_water = water_geometry["surface_water"]
+        surface_rectangle = gmsh.model.occ.addRectangle(0, 0, 0, length_x, depth_z)
+        gmsh.model.occ.synchronize()
+        fragment_result, fragment_map = gmsh.model.occ.fragment([(2, surface_rectangle), (2, surface_water)], [])
+        gmsh.model.occ.synchronize()
+        water_surface_tags = [tag for dim, tag in fragment_map[1]]
+        subsurface_tags = [
+            tag for dim, tag in fragment_map[0] if tag not in water_surface_tags
+        ]
+        gmsh.model.addPhysicalGroup(2, water_surface_tags, name="WaterSurface")
+        gmsh.model.addPhysicalGroup(2, subsurface_tags, name="SubSurface")
+    else:
+        surface_rectangle = gmsh.model.occ.addRectangle(0, 0, 0, length_x, depth_z)
+        gmsh.model.occ.synchronize()
+        gmsh.model.addPhysicalGroup(2, [surface_rectangle], name="SubSurface")
+
+
+def _build_gmsh_geometry_rectangular_padding(
+    gmsh,
+    length_x,
+    depth_z,
+    padding_x,
+    padding_z,
+    water_interface,
+    water_geometry,
+):
+    """Build physical surfaces and rectangular padding patches.
+
+    Parameters
+    ----------
+    gmsh : types.ModuleType
+        Initialized Gmsh module containing the current model.
+    length_x : float
+        Width of the physical domain.
+    depth_z : float
+        Negative depth coordinate at the bottom of the physical domain.
+    padding_x : float
+        Horizontal padding distance.
+    padding_z : float
+        Vertical padding distance.
+    water_interface : bool
+        Whether the prepared water interface splits the physical domain.
+    water_geometry : dict of str to float or int or list of int
+        Prepared water boundary coordinates and entity tags. Empty when
+        ``water_interface`` is ``False``.
+
+    Returns
+    -------
+    dict of str to float or int
+        Padding bounds and entity tags needed by mesh smoothing.
+    """
+    pad_x_min, pad_x_max = -padding_x, length_x + padding_x
+    pad_z_min = depth_z - padding_z
+
+    if water_interface:
+        z_water_left = water_geometry["z_water_left"]
+        z_water_right = water_geometry["z_water_right"]
+        points_water_interface = water_geometry["points_water_interface"]
+        curve_water_interface = water_geometry["curve_water_interface"]
+        point_top_left = water_geometry["point_top_left"]
+        point_top_right = water_geometry["point_top_right"]
+        line_left = water_geometry["line_left"]
+        line_right = water_geometry["line_right"]
+        surface_water = water_geometry["surface_water"]
+        point_bottom_left = gmsh.model.occ.addPoint(0.0, depth_z, 0.0)
+        point_bottom_right = gmsh.model.occ.addPoint(length_x, depth_z, 0.0)
+        point_pad_top_left = gmsh.model.occ.addPoint(pad_x_min, 0.0, 0.0)
+        point_pad_water_interface_left = gmsh.model.occ.addPoint(pad_x_min, z_water_left, 0.0)
+        point_pad_left_at_domain_bottom = gmsh.model.occ.addPoint(pad_x_min, depth_z, 0.0)
+        point_pad_top_right = gmsh.model.occ.addPoint(pad_x_max, 0.0, 0.0)
+        point_pad_water_interface_right = gmsh.model.occ.addPoint(pad_x_max, z_water_right, 0.0)
+        point_pad_right_at_domain_bottom = gmsh.model.occ.addPoint(pad_x_max, depth_z, 0.0)
+        point_pad_bottom_left = gmsh.model.occ.addPoint(pad_x_min, pad_z_min, 0.0)
+        point_pad_bottom_at_domain_left = gmsh.model.occ.addPoint(0.0, pad_z_min, 0.0)
+        point_pad_bottom_at_domain_right = gmsh.model.occ.addPoint(length_x, pad_z_min, 0.0)
+        point_pad_bottom_right = gmsh.model.occ.addPoint(pad_x_max, pad_z_min, 0.0)
+
+        line_subsurface_right = gmsh.model.occ.addLine(points_water_interface[-1], point_bottom_right)
+        line_subsurface_bottom = gmsh.model.occ.addLine(point_bottom_right, point_bottom_left)
+        line_subsurface_left = gmsh.model.occ.addLine(point_bottom_left, points_water_interface[0])
+        line_pad_water_top_right = gmsh.model.occ.addLine(point_top_right, point_pad_top_right)
+        line_pad_water_right = gmsh.model.occ.addLine(point_pad_top_right, point_pad_water_interface_right)
+        line_pad_water_bottom_right = gmsh.model.occ.addLine(point_pad_water_interface_right, points_water_interface[-1])
+        line_pad_subsurface_right = gmsh.model.occ.addLine(point_pad_water_interface_right, point_pad_right_at_domain_bottom)
+        line_pad_subsurface_bottom_right = gmsh.model.occ.addLine(point_pad_right_at_domain_bottom, point_bottom_right)
+        line_pad_water_top_left = gmsh.model.occ.addLine(point_top_left, point_pad_top_left)
+        line_pad_water_left = gmsh.model.occ.addLine(point_pad_top_left, point_pad_water_interface_left)
+        line_pad_water_bottom_left = gmsh.model.occ.addLine(point_pad_water_interface_left, points_water_interface[0])
+        line_pad_subsurface_left = gmsh.model.occ.addLine(point_pad_water_interface_left, point_pad_left_at_domain_bottom)
+        line_pad_subsurface_bottom_left = gmsh.model.occ.addLine(point_pad_left_at_domain_bottom, point_bottom_left)
+        line_pad_corner_left_outer = gmsh.model.occ.addLine(point_pad_left_at_domain_bottom, point_pad_bottom_left)
+        line_pad_corner_left_bottom = gmsh.model.occ.addLine(point_pad_bottom_left, point_pad_bottom_at_domain_left)
+        line_pad_corner_left_inner = gmsh.model.occ.addLine(point_pad_bottom_at_domain_left, point_bottom_left)
+        line_pad_bottom_center = gmsh.model.occ.addLine(point_pad_bottom_at_domain_left, point_pad_bottom_at_domain_right)
+        line_pad_corner_right_inner = gmsh.model.occ.addLine(point_pad_bottom_at_domain_right, point_bottom_right)
+        line_pad_corner_right_bottom = gmsh.model.occ.addLine(point_pad_bottom_at_domain_right, point_pad_bottom_right)
+        line_pad_corner_right_outer = gmsh.model.occ.addLine(point_pad_bottom_right, point_pad_right_at_domain_bottom)
+
+        surface_subsurface = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([curve_water_interface, line_subsurface_right, line_subsurface_bottom, line_subsurface_left])])
+        surface_pad_top_right = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([line_right, line_pad_water_top_right, line_pad_water_right, line_pad_water_bottom_right])])
+        surface_pad_middle_right = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([-line_pad_water_bottom_right, line_pad_subsurface_right, line_pad_subsurface_bottom_right, -line_subsurface_right])])
+        surface_pad_top_left = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([line_pad_water_top_left, line_pad_water_left, line_pad_water_bottom_left, -line_left])])
+        surface_pad_middle_left = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([-line_pad_water_bottom_left, line_pad_subsurface_left, line_pad_subsurface_bottom_left, line_subsurface_left])])
+        surface_pad_bottom_left_corner = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([-line_pad_subsurface_bottom_left, line_pad_corner_left_outer, line_pad_corner_left_bottom, line_pad_corner_left_inner])])
+        surface_pad_bottom_center = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([-line_pad_corner_left_inner, line_pad_bottom_center, line_pad_corner_right_inner, line_subsurface_bottom])])
+        surface_pad_bottom_right_corner = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([-line_pad_corner_right_inner, line_pad_corner_right_bottom, line_pad_corner_right_outer, line_pad_subsurface_bottom_right])])
+
+        gmsh.model.occ.synchronize()
+        gmsh.model.occ.removeAllDuplicates()
+        gmsh.model.occ.synchronize()
+
+        gmsh.model.addPhysicalGroup(2, [surface_water], name="WaterSurface")
+        gmsh.model.addPhysicalGroup(2, [surface_subsurface], name="SubSurface")
+        gmsh.model.addPhysicalGroup(2, [surface_pad_top_right, surface_pad_middle_right, surface_pad_top_left, surface_pad_middle_left, surface_pad_bottom_left_corner, surface_pad_bottom_center, surface_pad_bottom_right_corner], name="Padding")
+
+        return {
+            "pad_x_min": pad_x_min,
+            "pad_x_max": pad_x_max,
+            "pad_z_min": pad_z_min,
+            "surface_pad_top_left": surface_pad_top_left,
+            "surface_pad_top_right": surface_pad_top_right,
+        }
+
+    point_top_left = gmsh.model.occ.addPoint(0.0, 0.0, 0.0)
+    point_top_right = gmsh.model.occ.addPoint(length_x, 0.0, 0.0)
+    point_bottom_right = gmsh.model.occ.addPoint(length_x, depth_z, 0.0)
+    point_bottom_left = gmsh.model.occ.addPoint(0.0, depth_z, 0.0)
+
+    point_pad_top_left = gmsh.model.occ.addPoint(pad_x_min, 0.0, 0.0)
+    point_pad_left_at_domain_bottom = gmsh.model.occ.addPoint(pad_x_min, depth_z, 0.0)
+    point_pad_bottom_left = gmsh.model.occ.addPoint(pad_x_min, pad_z_min, 0.0)
+    point_pad_bottom_at_domain_left = gmsh.model.occ.addPoint(0.0, pad_z_min, 0.0)
+    point_pad_bottom_at_domain_right = gmsh.model.occ.addPoint(length_x, pad_z_min, 0.0)
+    point_pad_bottom_right = gmsh.model.occ.addPoint(pad_x_max, pad_z_min, 0.0)
+    point_pad_right_at_domain_bottom = gmsh.model.occ.addPoint(pad_x_max, depth_z, 0.0)
+    point_pad_top_right = gmsh.model.occ.addPoint(pad_x_max, 0.0, 0.0)
+
+    line_top = gmsh.model.occ.addLine(point_top_left, point_top_right)
+    line_right = gmsh.model.occ.addLine(point_top_right, point_bottom_right)
+    line_bottom = gmsh.model.occ.addLine(point_bottom_right, point_bottom_left)
+    line_left = gmsh.model.occ.addLine(point_bottom_left, point_top_left)
+
+    line_pad_top_left = gmsh.model.occ.addLine(point_pad_top_left, point_top_left)
+    line_pad_left = gmsh.model.occ.addLine(point_pad_left_at_domain_bottom, point_pad_top_left)
+    line_pad_left_at_domain_bottom = gmsh.model.occ.addLine(point_bottom_left, point_pad_left_at_domain_bottom)
+
+    line_pad_corner_left_outer = gmsh.model.occ.addLine(point_pad_bottom_left, point_pad_left_at_domain_bottom)
+    line_pad_corner_left_bottom = gmsh.model.occ.addLine(point_pad_bottom_at_domain_left, point_pad_bottom_left)
+    line_pad_corner_left_inner = gmsh.model.occ.addLine(point_bottom_left, point_pad_bottom_at_domain_left)
+
+    line_pad_bottom_center = gmsh.model.occ.addLine(point_pad_bottom_at_domain_right, point_pad_bottom_at_domain_left)
+    line_pad_corner_right_inner = gmsh.model.occ.addLine(point_bottom_right, point_pad_bottom_at_domain_right)
+
+    line_pad_corner_right_bottom = gmsh.model.occ.addLine(point_pad_bottom_right, point_pad_bottom_at_domain_right)
+    line_pad_corner_right_outer = gmsh.model.occ.addLine(point_pad_right_at_domain_bottom, point_pad_bottom_right)
+
+    line_pad_right_at_domain_bottom = gmsh.model.occ.addLine(point_pad_right_at_domain_bottom, point_bottom_right)
+    line_pad_right = gmsh.model.occ.addLine(point_pad_top_right, point_pad_right_at_domain_bottom)
+    line_pad_top_right = gmsh.model.occ.addLine(point_top_right, point_pad_top_right)
+
+    loop_domain = gmsh.model.occ.addCurveLoop([line_top, line_right, line_bottom, line_left])
+    surface_domain = gmsh.model.occ.addPlaneSurface([loop_domain])
+    loop_pad_left = gmsh.model.occ.addCurveLoop([line_pad_top_left, -line_left, -line_pad_left_at_domain_bottom, line_pad_left])
+    surface_pad_left = gmsh.model.occ.addPlaneSurface([loop_pad_left])
+    loop_pad_bottom_left_corner = gmsh.model.occ.addCurveLoop([line_pad_left_at_domain_bottom, -line_pad_corner_left_outer, -line_pad_corner_left_bottom, -line_pad_corner_left_inner])
+    surface_pad_bottom_left_corner = gmsh.model.occ.addPlaneSurface([loop_pad_bottom_left_corner])
+    loop_pad_bottom_center = gmsh.model.occ.addCurveLoop([line_pad_corner_left_inner, -line_pad_bottom_center, -line_pad_corner_right_inner, line_bottom])
+    surface_pad_bottom_center = gmsh.model.occ.addPlaneSurface([loop_pad_bottom_center])
+    loop_pad_bottom_right_corner = gmsh.model.occ.addCurveLoop([line_pad_corner_right_inner, -line_pad_corner_right_bottom, -line_pad_corner_right_outer, -line_pad_right_at_domain_bottom])
+    surface_pad_bottom_right_corner = gmsh.model.occ.addPlaneSurface([loop_pad_bottom_right_corner])
+    loop_pad_right = gmsh.model.occ.addCurveLoop([line_right, -line_pad_right_at_domain_bottom, -line_pad_right, -line_pad_top_right])
+    surface_pad_right = gmsh.model.occ.addPlaneSurface([loop_pad_right])
+
+    gmsh.model.occ.synchronize()
+    gmsh.model.occ.removeAllDuplicates()
+    gmsh.model.occ.synchronize()
+
+    gmsh.model.addPhysicalGroup(2, [surface_domain], name="SubSurface")
+    gmsh.model.addPhysicalGroup(2, [surface_pad_left, surface_pad_bottom_left_corner, surface_pad_bottom_center, surface_pad_bottom_right_corner, surface_pad_right], name="Padding")
+
+    return {
+        "pad_x_min": pad_x_min,
+        "pad_x_max": pad_x_max,
+        "pad_z_min": pad_z_min,
+        "surface_pad_left": surface_pad_left,
+        "line_left": line_left,
+        "line_right": line_right,
+    }
+
+
+def _build_gmsh_geometry_hyperelliptical_padding(
+    gmsh,
+    length_x,
+    depth_z,
+    padding_x,
+    padding_z,
+    hyper_n,
+    water_interface,
+    water_geometry,
+    structured_mesh,
+    min_element_size,
+):
+    """Build physical surfaces and hyperelliptical padding patches.
+
+    Parameters
+    ----------
+    gmsh : types.ModuleType
+        Initialized Gmsh module containing the current model.
+    length_x : float
+        Width of the physical domain.
+    depth_z : float
+        Negative depth coordinate at the bottom of the physical domain.
+    padding_x : float
+        Horizontal padding distance.
+    padding_z : float
+        Vertical padding distance.
+    hyper_n : float
+        Exponent defining the hyperelliptical boundary.
+    water_interface : bool
+        Whether the prepared water interface splits the physical domain.
+    water_geometry : dict of str to float or int or list of int
+        Prepared water boundary coordinates and entity tags. Empty when
+        ``water_interface`` is ``False``.
+    structured_mesh : bool
+        Whether to configure transfinite curves, surfaces, and recombination.
+    min_element_size : float
+        Target element size used for structured curve subdivisions.
+
+    Returns
+    -------
+    dict of str to float or int
+        Hyperellipse dimensions and entity tags needed by mesh smoothing.
+    """
+    xc = length_x / 2.0
+    zc = depth_z / 2.0
+    a_val = (length_x / 2.0) + padding_x
+    b_val = abs(depth_z / 2.0) + padding_z
+
+    if water_interface:
+        z_water_left = water_geometry["z_water_left"]
+        z_water_right = water_geometry["z_water_right"]
+        points_water_interface = water_geometry["points_water_interface"]
+        curve_water_interface = water_geometry["curve_water_interface"]
+        point_top_left = water_geometry["point_top_left"]
+        point_top_right = water_geometry["point_top_right"]
+        line_left = water_geometry["line_left"]
+        line_right = water_geometry["line_right"]
+        line_top = water_geometry["line_top"]
+        surface_water = water_geometry["surface_water"]
+        point_bottom_left = gmsh.model.occ.addPoint(0.0, depth_z, 0.0)
+        point_bottom_right = gmsh.model.occ.addPoint(length_x, depth_z, 0.0)
+        z_subsurface_middle_left, z_subsurface_middle_right = (
+            z_water_left + depth_z
+        ) / 2.0, (z_water_right + depth_z) / 2.0
+        x_bottom_middle_left, x_bottom_middle_right = length_x * 0.25, length_x * 0.75
+
+        point_subsurface_middle_left = gmsh.model.occ.addPoint(0.0, z_subsurface_middle_left, 0.0)
+        point_subsurface_middle_right = gmsh.model.occ.addPoint(length_x, z_subsurface_middle_right, 0.0)
+        point_bottom_middle_left = gmsh.model.occ.addPoint(x_bottom_middle_left, depth_z, 0.0)
+        point_bottom_middle_right = gmsh.model.occ.addPoint(x_bottom_middle_right, depth_z, 0.0)
+
+        x_pad_top_left, z_pad_top_left = intersect(0.0, 0.0, -1, 0, xc, zc, a_val, b_val, hyper_n)
+        x_pad_water_interface_left, z_pad_water_interface_left = intersect(0.0, z_water_left, -1, 0, xc, zc, a_val, b_val, hyper_n)
+        x_pad_middle_left, z_pad_middle_left = intersect(0.0, z_subsurface_middle_left, -1, 0, xc, zc, a_val, b_val, hyper_n)
+        x_pad_bottom_left_diagonal, z_pad_bottom_left_diagonal = intersect(0.0, depth_z, -1, -1, xc, zc, a_val, b_val, hyper_n)
+        x_pad_bottom_middle_left, z_pad_bottom_middle_left = intersect(x_bottom_middle_left, depth_z, 0, -1, xc, zc, a_val, b_val, hyper_n)
+        x_pad_bottom_middle_right, z_pad_bottom_middle_right = intersect(x_bottom_middle_right, depth_z, 0, -1, xc, zc, a_val, b_val, hyper_n)
+        x_pad_bottom_right_diagonal, z_pad_bottom_right_diagonal = intersect(length_x, depth_z, 1, -1, xc, zc, a_val, b_val, hyper_n)
+        x_pad_middle_right, z_pad_middle_right = intersect(length_x, z_subsurface_middle_right, 1, 0, xc, zc, a_val, b_val, hyper_n)
+        x_pad_water_interface_right, z_pad_water_interface_right = intersect(length_x, z_water_right, 1, 0, xc, zc, a_val, b_val, hyper_n)
+        x_pad_top_right, z_pad_top_right = intersect(length_x, 0.0, 1, 0, xc, zc, a_val, b_val, hyper_n)
+
+        point_pad_top_left = gmsh.model.occ.addPoint(x_pad_top_left, z_pad_top_left, 0.0)
+        point_pad_water_interface_left = gmsh.model.occ.addPoint(x_pad_water_interface_left, z_pad_water_interface_left, 0.0)
+        point_pad_middle_left = gmsh.model.occ.addPoint(x_pad_middle_left, z_pad_middle_left, 0.0)
+        point_pad_bottom_left_diagonal = gmsh.model.occ.addPoint(x_pad_bottom_left_diagonal, z_pad_bottom_left_diagonal, 0.0)
+        point_pad_bottom_middle_left = gmsh.model.occ.addPoint(x_pad_bottom_middle_left, z_pad_bottom_middle_left, 0.0)
+        point_pad_bottom_middle_right = gmsh.model.occ.addPoint(x_pad_bottom_middle_right, z_pad_bottom_middle_right, 0.0)
+        point_pad_bottom_right_diagonal = gmsh.model.occ.addPoint(x_pad_bottom_right_diagonal, z_pad_bottom_right_diagonal, 0.0)
+        point_pad_middle_right = gmsh.model.occ.addPoint(x_pad_middle_right, z_pad_middle_right, 0.0)
+        point_pad_water_interface_right = gmsh.model.occ.addPoint(x_pad_water_interface_right, z_pad_water_interface_right, 0.0)
+        point_pad_top_right = gmsh.model.occ.addPoint(x_pad_top_right, z_pad_top_right, 0.0)
+
+        line_subsurface_right_upper = gmsh.model.occ.addLine(points_water_interface[-1], point_subsurface_middle_right)
+        line_subsurface_right_lower = gmsh.model.occ.addLine(point_subsurface_middle_right, point_bottom_right)
+        line_subsurface_bottom_right = gmsh.model.occ.addLine(point_bottom_right, point_bottom_middle_right)
+        line_subsurface_bottom_center = gmsh.model.occ.addLine(point_bottom_middle_right, point_bottom_middle_left)
+        line_subsurface_bottom_left = gmsh.model.occ.addLine(point_bottom_middle_left, point_bottom_left)
+        line_subsurface_left_lower = gmsh.model.occ.addLine(point_bottom_left, point_subsurface_middle_left)
+        line_subsurface_left_upper = gmsh.model.occ.addLine(point_subsurface_middle_left, points_water_interface[0])
+
+        ray_top_left = gmsh.model.occ.addLine(point_top_left, point_pad_top_left)
+        ray_water_interface_left = gmsh.model.occ.addLine(points_water_interface[0], point_pad_water_interface_left)
+        ray_middle_left = gmsh.model.occ.addLine(point_subsurface_middle_left, point_pad_middle_left)
+        ray_bottom_left_diagonal = gmsh.model.occ.addLine(point_bottom_left, point_pad_bottom_left_diagonal)
+        ray_bottom_middle_left = gmsh.model.occ.addLine(point_bottom_middle_left, point_pad_bottom_middle_left)
+        ray_bottom_middle_right = gmsh.model.occ.addLine(point_bottom_middle_right, point_pad_bottom_middle_right)
+        ray_bottom_right_diagonal = gmsh.model.occ.addLine(point_bottom_right, point_pad_bottom_right_diagonal)
+        ray_middle_right = gmsh.model.occ.addLine(point_subsurface_middle_right, point_pad_middle_right)
+        ray_water_interface_right = gmsh.model.occ.addLine(points_water_interface[-1], point_pad_water_interface_right)
+        ray_top_right = gmsh.model.occ.addLine(point_top_right, point_pad_top_right)
+
+        arc_pad_water_left = make_arc(point_pad_top_left, point_pad_water_interface_left, x_pad_top_left, z_pad_top_left, x_pad_water_interface_left, z_pad_water_interface_left, xc, zc, a_val, b_val, hyper_n)
+        arc_pad_left_upper = make_arc(point_pad_water_interface_left, point_pad_middle_left, x_pad_water_interface_left, z_pad_water_interface_left, x_pad_middle_left, z_pad_middle_left, xc, zc, a_val, b_val, hyper_n)
+        arc_pad_left_lower = make_arc(point_pad_middle_left, point_pad_bottom_left_diagonal, x_pad_middle_left, z_pad_middle_left, x_pad_bottom_left_diagonal, z_pad_bottom_left_diagonal, xc, zc, a_val, b_val, hyper_n)
+        arc_pad_bottom_left_to_middle = make_arc(point_pad_bottom_left_diagonal, point_pad_bottom_middle_left, x_pad_bottom_left_diagonal, z_pad_bottom_left_diagonal, x_pad_bottom_middle_left, z_pad_bottom_middle_left, xc, zc, a_val, b_val, hyper_n)
+        arc_pad_bottom_center = make_arc(point_pad_bottom_middle_left, point_pad_bottom_middle_right, x_pad_bottom_middle_left, z_pad_bottom_middle_left, x_pad_bottom_middle_right, z_pad_bottom_middle_right, xc, zc, a_val, b_val, hyper_n)
+        arc_pad_bottom_middle_to_right = make_arc(point_pad_bottom_middle_right, point_pad_bottom_right_diagonal, x_pad_bottom_middle_right, z_pad_bottom_middle_right, x_pad_bottom_right_diagonal, z_pad_bottom_right_diagonal, xc, zc, a_val, b_val, hyper_n)
+        arc_pad_right_lower = make_arc(point_pad_bottom_right_diagonal, point_pad_middle_right, x_pad_bottom_right_diagonal, z_pad_bottom_right_diagonal, x_pad_middle_right, z_pad_middle_right, xc, zc, a_val, b_val, hyper_n)
+        arc_pad_right_upper = make_arc(point_pad_middle_right, point_pad_water_interface_right, x_pad_middle_right, z_pad_middle_right, x_pad_water_interface_right, z_pad_water_interface_right, xc, zc, a_val, b_val, hyper_n)
+        arc_pad_water_right = make_arc(point_pad_water_interface_right, point_pad_top_right, x_pad_water_interface_right, z_pad_water_interface_right, x_pad_top_right, z_pad_top_right, xc, zc, a_val, b_val, hyper_n)
+
+        surface_subsurface = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([curve_water_interface, line_subsurface_right_upper, line_subsurface_right_lower, line_subsurface_bottom_right, line_subsurface_bottom_center, line_subsurface_bottom_left, line_subsurface_left_lower, line_subsurface_left_upper])])
+        surface_pad_top_left = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([line_left, ray_water_interface_left, -arc_pad_water_left, -ray_top_left])])
+        surface_pad_left_upper = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([-line_subsurface_left_upper, ray_middle_left, -arc_pad_left_upper, -ray_water_interface_left])])
+        surface_pad_left_lower = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([-line_subsurface_left_lower, ray_bottom_left_diagonal, -arc_pad_left_lower, -ray_middle_left])])
+        surface_pad_bottom_left = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([-line_subsurface_bottom_left, ray_bottom_middle_left, -arc_pad_bottom_left_to_middle, -ray_bottom_left_diagonal])])
+        surface_pad_bottom_center = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([-line_subsurface_bottom_center, ray_bottom_middle_right, -arc_pad_bottom_center, -ray_bottom_middle_left])])
+        surface_pad_bottom_right = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([-line_subsurface_bottom_right, ray_bottom_right_diagonal, -arc_pad_bottom_middle_to_right, -ray_bottom_middle_right])])
+        surface_pad_right_lower = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([-line_subsurface_right_lower, ray_middle_right, -arc_pad_right_lower, -ray_bottom_right_diagonal])])
+        surface_pad_right_upper = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([-line_subsurface_right_upper, ray_water_interface_right, -arc_pad_right_upper, -ray_middle_right])])
+        surface_pad_top_right = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([line_right, ray_top_right, -arc_pad_water_right, -ray_water_interface_right])])
+
+        gmsh.model.occ.synchronize()
+        gmsh.model.occ.removeAllDuplicates()
+        gmsh.model.occ.synchronize()
+
+        gmsh.model.addPhysicalGroup(2, [surface_water], name="WaterSurface")
+        gmsh.model.addPhysicalGroup(2, [surface_subsurface], name="SubSurface")
+        gmsh.model.addPhysicalGroup(2, [surface_pad_top_left, surface_pad_left_upper, surface_pad_left_lower, surface_pad_bottom_left, surface_pad_bottom_center, surface_pad_bottom_right, surface_pad_right_lower, surface_pad_right_upper, surface_pad_top_right], name="Padding")
+
+        if structured_mesh:
+            len_radial = max(padding_x, padding_z)
+            len_x_left, len_x_mid, len_x_right = (
+                length_x * 0.25,
+                length_x * 0.50,
+                length_x * 0.25,
+            )
+            len_z_water = abs(z_water_left)
+            len_z_rock_upper, len_z_rock_lower = abs(
+                z_subsurface_middle_left - z_water_left
+            ), abs(depth_z - z_subsurface_middle_left)
+
+            n_radial = max(2, int(np.ceil(len_radial / min_element_size)) + 1)
+            n_x_left = max(2, int(np.ceil(len_x_left / min_element_size)) + 1)
+            n_x_mid = max(2, int(np.ceil(len_x_mid / min_element_size)) + 1)
+            n_x_right = max(2, int(np.ceil(len_x_right / min_element_size)) + 1)
+            n_x_total = n_x_left + n_x_mid + n_x_right - 2
+            n_z_water = max(2, int(np.ceil(len_z_water / min_element_size)) + 1)
+            n_z_rock_upper = max(
+                2, int(np.ceil(len_z_rock_upper / min_element_size)) + 1
+            )
+            n_z_rock_lower = max(
+                2, int(np.ceil(len_z_rock_lower / min_element_size)) + 1
+            )
+
+            for curve in [
+                ray_top_left,
+                ray_water_interface_left,
+                ray_middle_left,
+                ray_bottom_left_diagonal,
+                ray_bottom_middle_left,
+                ray_bottom_middle_right,
+                ray_bottom_right_diagonal,
+                ray_middle_right,
+                ray_water_interface_right,
+                ray_top_right,
+            ]:
+                gmsh.model.mesh.setTransfiniteCurve(curve, n_radial)
+            for curve in [
+                line_left,
+                line_right,
+                arc_pad_water_left,
+                arc_pad_water_right,
+            ]:
+                gmsh.model.mesh.setTransfiniteCurve(curve, n_z_water)
+            for curve in [
+                line_subsurface_left_upper,
+                line_subsurface_right_upper,
+                arc_pad_left_upper,
+                arc_pad_right_upper,
+            ]:
+                gmsh.model.mesh.setTransfiniteCurve(curve, n_z_rock_upper)
+            for curve in [
+                line_subsurface_left_lower,
+                line_subsurface_right_lower,
+                arc_pad_left_lower,
+                arc_pad_right_lower,
+            ]:
+                gmsh.model.mesh.setTransfiniteCurve(curve, n_z_rock_lower)
+            for curve in [
+                line_subsurface_bottom_left,
+                arc_pad_bottom_left_to_middle,
+            ]:
+                gmsh.model.mesh.setTransfiniteCurve(curve, n_x_left)
+            for curve in [line_subsurface_bottom_center, arc_pad_bottom_center]:
+                gmsh.model.mesh.setTransfiniteCurve(curve, n_x_mid)
+            for curve in [
+                line_subsurface_bottom_right,
+                arc_pad_bottom_middle_to_right,
+            ]:
+                gmsh.model.mesh.setTransfiniteCurve(curve, n_x_right)
+            for curve in [line_top, curve_water_interface]:
+                gmsh.model.mesh.setTransfiniteCurve(curve, n_x_total)
+
+            padding_surfaces = [
+                surface_pad_top_left,
+                surface_pad_left_upper,
+                surface_pad_left_lower,
+                surface_pad_bottom_left,
+                surface_pad_bottom_center,
+                surface_pad_bottom_right,
+                surface_pad_right_lower,
+                surface_pad_right_upper,
+                surface_pad_top_right,
+            ]
+            for surface in padding_surfaces:
+                gmsh.model.mesh.setTransfiniteSurface(surface)
+                gmsh.model.mesh.setRecombine(2, surface)
+
+            gmsh.model.mesh.setTransfiniteSurface(surface_water, cornerTags=[point_top_left, point_top_right, points_water_interface[-1], points_water_interface[0]])
+            gmsh.model.mesh.setRecombine(2, surface_water)
+            gmsh.model.mesh.setTransfiniteSurface(surface_subsurface, cornerTags=[points_water_interface[0], points_water_interface[-1], point_bottom_right, point_bottom_left])
+            gmsh.model.mesh.setRecombine(2, surface_subsurface)
+
+        return {
+            "a_val": a_val,
+            "b_val": b_val,
+            "surface_pad_top_left": surface_pad_top_left,
+            "surface_pad_top_right": surface_pad_top_right,
+            "arc_pad_left_upper": arc_pad_left_upper,
+            "arc_pad_left_lower": arc_pad_left_lower,
+            "arc_pad_bottom_left_diagonal_to_middle": arc_pad_bottom_left_to_middle,
+            "arc_pad_bottom_center": arc_pad_bottom_center,
+            "arc_pad_bottom_middle_to_right_diagonal": arc_pad_bottom_middle_to_right,
+            "arc_pad_right_lower": arc_pad_right_lower,
+            "arc_pad_right_upper": arc_pad_right_upper,
+            "line_subsurface_left_lower": line_subsurface_left_lower,
+            "line_subsurface_left_upper": line_subsurface_left_upper,
+            "line_subsurface_right_lower": line_subsurface_right_lower,
+            "line_subsurface_right_upper": line_subsurface_right_upper,
+            "line_subsurface_bottom_left": line_subsurface_bottom_left,
+            "line_subsurface_bottom_center": line_subsurface_bottom_center,
+            "line_subsurface_bottom_right": line_subsurface_bottom_right,
+            "ray_bottom_left_diagonal": ray_bottom_left_diagonal,
+            "ray_bottom_right_diagonal": ray_bottom_right_diagonal,
+            "ray_top_left": ray_top_left,
+            "ray_top_right": ray_top_right,
+            "x_pad_top_left": x_pad_top_left,
+            "x_pad_top_right": x_pad_top_right,
+        }
+
+    point_top_left = gmsh.model.occ.addPoint(0.0, 0.0, 0.0)
+    point_top_right = gmsh.model.occ.addPoint(length_x, 0.0, 0.0)
+    point_bottom_right = gmsh.model.occ.addPoint(length_x, depth_z, 0.0)
+    point_bottom_left = gmsh.model.occ.addPoint(0.0, depth_z, 0.0)
+
+    x_bottom_middle_left, x_bottom_middle_right = length_x * 0.25, length_x * 0.75
+    point_bottom_middle_left = gmsh.model.occ.addPoint(x_bottom_middle_left, depth_z, 0.0)
+    point_bottom_middle_right = gmsh.model.occ.addPoint(x_bottom_middle_right, depth_z, 0.0)
+
+    x_pad_top_left, z_pad_top_left = intersect(0.0, 0.0, -1, 0, xc, zc, a_val, b_val, hyper_n)
+    x_pad_bottom_left, z_pad_bottom_left = intersect(0.0, depth_z, -1, -1, xc, zc, a_val, b_val, hyper_n)
+    x_pad_bottom_middle_left, z_pad_bottom_middle_left = intersect(x_bottom_middle_left, depth_z, 0, -1, xc, zc, a_val, b_val, hyper_n)
+    x_pad_bottom_middle_right, z_pad_bottom_middle_right = intersect(x_bottom_middle_right, depth_z, 0, -1, xc, zc, a_val, b_val, hyper_n)
+    x_pad_bottom_right, z_pad_bottom_right = intersect(length_x, depth_z, 1, -1, xc, zc, a_val, b_val, hyper_n)
+    x_pad_top_right, z_pad_top_right = intersect(length_x, 0.0, 1, 0, xc, zc, a_val, b_val, hyper_n)
+
+    point_pad_top_left = gmsh.model.occ.addPoint(x_pad_top_left, z_pad_top_left, 0.0)
+    point_pad_bottom_left = gmsh.model.occ.addPoint(x_pad_bottom_left, z_pad_bottom_left, 0.0)
+    point_pad_bottom_middle_left = gmsh.model.occ.addPoint(x_pad_bottom_middle_left, z_pad_bottom_middle_left, 0.0)
+    point_pad_bottom_middle_right = gmsh.model.occ.addPoint(x_pad_bottom_middle_right, z_pad_bottom_middle_right, 0.0)
+    point_pad_bottom_right = gmsh.model.occ.addPoint(x_pad_bottom_right, z_pad_bottom_right, 0.0)
+    point_pad_top_right = gmsh.model.occ.addPoint(x_pad_top_right, z_pad_top_right, 0.0)
+
+    line_top = gmsh.model.occ.addLine(point_top_left, point_top_right)
+    line_right = gmsh.model.occ.addLine(point_top_right, point_bottom_right)
+    line_bottom_right = gmsh.model.occ.addLine(point_bottom_right, point_bottom_middle_right)
+    line_bottom_center = gmsh.model.occ.addLine(point_bottom_middle_right, point_bottom_middle_left)
+    line_bottom_left = gmsh.model.occ.addLine(point_bottom_middle_left, point_bottom_left)
+    line_left = gmsh.model.occ.addLine(point_bottom_left, point_top_left)
+
+    ray_top_left = gmsh.model.occ.addLine(point_top_left, point_pad_top_left)
+    ray_bottom_left = gmsh.model.occ.addLine(point_bottom_left, point_pad_bottom_left)
+    ray_bottom_middle_left = gmsh.model.occ.addLine(point_bottom_middle_left, point_pad_bottom_middle_left)
+    ray_bottom_middle_right = gmsh.model.occ.addLine(point_bottom_middle_right, point_pad_bottom_middle_right)
+    ray_bottom_right = gmsh.model.occ.addLine(point_bottom_right, point_pad_bottom_right)
+    ray_top_right = gmsh.model.occ.addLine(point_top_right, point_pad_top_right)
+
+    arc_pad_left = make_arc(point_pad_top_left, point_pad_bottom_left, x_pad_top_left, z_pad_top_left, x_pad_bottom_left, z_pad_bottom_left, xc, zc, a_val, b_val, hyper_n)
+    arc_pad_bottom_left_to_middle = make_arc(point_pad_bottom_left, point_pad_bottom_middle_left, x_pad_bottom_left, z_pad_bottom_left, x_pad_bottom_middle_left, z_pad_bottom_middle_left, xc, zc, a_val, b_val, hyper_n)
+    arc_pad_bottom_center = make_arc(point_pad_bottom_middle_left, point_pad_bottom_middle_right, x_pad_bottom_middle_left, z_pad_bottom_middle_left, x_pad_bottom_middle_right, z_pad_bottom_middle_right, xc, zc, a_val, b_val, hyper_n)
+    arc_pad_bottom_middle_to_right = make_arc(point_pad_bottom_middle_right, point_pad_bottom_right, x_pad_bottom_middle_right, z_pad_bottom_middle_right, x_pad_bottom_right, z_pad_bottom_right, xc, zc, a_val, b_val, hyper_n)
+    arc_pad_right = make_arc(point_pad_bottom_right, point_pad_top_right, x_pad_bottom_right, z_pad_bottom_right, x_pad_top_right, z_pad_top_right, xc, zc, a_val, b_val, hyper_n)
+
+    surface_subsurface = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([line_top, line_right, line_bottom_right, line_bottom_center, line_bottom_left, line_left])])
+    surface_pad_left = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([ray_bottom_left, -arc_pad_left, -ray_top_left, -line_left])])
+    surface_pad_bottom_left = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([line_bottom_left, ray_bottom_left, arc_pad_bottom_left_to_middle, -ray_bottom_middle_left])])
+    surface_pad_bottom_center = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([line_bottom_center, ray_bottom_middle_left, arc_pad_bottom_center, -ray_bottom_middle_right])])
+    surface_pad_bottom_right = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([line_bottom_right, ray_bottom_middle_right, arc_pad_bottom_middle_to_right, -ray_bottom_right])])
+    surface_pad_right = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([line_right, ray_bottom_right, arc_pad_right, -ray_top_right])])
+
+    gmsh.model.occ.synchronize()
+    gmsh.model.occ.removeAllDuplicates()
+    gmsh.model.occ.synchronize()
+
+    gmsh.model.addPhysicalGroup(2, [surface_subsurface], name="SubSurface")
+    gmsh.model.addPhysicalGroup(2, [surface_pad_left, surface_pad_bottom_left, surface_pad_bottom_center, surface_pad_bottom_right, surface_pad_right], name="Padding")
+
+    if structured_mesh:
+        len_radial = max(padding_x, padding_z)
+        len_x_left, len_x_mid, len_x_right = (
+            length_x * 0.25,
+            length_x * 0.50,
+            length_x * 0.25,
+        )
+        len_z_total = abs(depth_z)
+
+        n_radial = max(2, int(np.ceil(len_radial / min_element_size)) + 1)
+        n_x_left = max(2, int(np.ceil(len_x_left / min_element_size)) + 1)
+        n_x_mid = max(2, int(np.ceil(len_x_mid / min_element_size)) + 1)
+        n_x_right = max(2, int(np.ceil(len_x_right / min_element_size)) + 1)
+        n_x_total = n_x_left + n_x_mid + n_x_right - 2
+        n_z = max(2, int(np.ceil(len_z_total / min_element_size)) + 1)
+
+        for curve in [
+            ray_top_left,
+            ray_bottom_left,
+            ray_bottom_middle_left,
+            ray_bottom_middle_right,
+            ray_bottom_right,
+            ray_top_right,
+        ]:
+            gmsh.model.mesh.setTransfiniteCurve(curve, n_radial)
+
+        for curve in [line_left, line_right, arc_pad_left, arc_pad_right]:
+            gmsh.model.mesh.setTransfiniteCurve(curve, n_z)
+
+        for curve in [line_bottom_left, arc_pad_bottom_left_to_middle]:
+            gmsh.model.mesh.setTransfiniteCurve(curve, n_x_left)
+        for curve in [line_bottom_center, arc_pad_bottom_center]:
+            gmsh.model.mesh.setTransfiniteCurve(curve, n_x_mid)
+        for curve in [line_bottom_right, arc_pad_bottom_middle_to_right]:
+            gmsh.model.mesh.setTransfiniteCurve(curve, n_x_right)
+
+        gmsh.model.mesh.setTransfiniteCurve(line_top, n_x_total)
+
+        gmsh.model.mesh.setTransfiniteSurface(surface_pad_left, cornerTags=[point_bottom_left, point_pad_bottom_left, point_pad_top_left, point_top_left])
+        gmsh.model.mesh.setTransfiniteSurface(surface_pad_bottom_left, cornerTags=[point_bottom_middle_left, point_bottom_left, point_pad_bottom_left, point_pad_bottom_middle_left])
+        gmsh.model.mesh.setTransfiniteSurface(surface_pad_bottom_center, cornerTags=[point_bottom_middle_right, point_bottom_middle_left, point_pad_bottom_middle_left, point_pad_bottom_middle_right])
+        gmsh.model.mesh.setTransfiniteSurface(surface_pad_bottom_right, cornerTags=[point_bottom_right, point_bottom_middle_right, point_pad_bottom_middle_right, point_pad_bottom_right])
+        gmsh.model.mesh.setTransfiniteSurface(surface_pad_right, cornerTags=[point_top_right, point_bottom_right, point_pad_bottom_right, point_pad_top_right])
+
+        padding_surfaces = [
+            surface_pad_left,
+            surface_pad_bottom_left,
+            surface_pad_bottom_center,
+            surface_pad_bottom_right,
+            surface_pad_right,
+        ]
+        for surface in padding_surfaces:
+            gmsh.model.mesh.setRecombine(2, surface)
+
+        gmsh.model.mesh.setTransfiniteSurface(surface_subsurface, cornerTags=[point_top_left, point_top_right, point_bottom_right, point_bottom_left])
+        gmsh.model.mesh.setRecombine(2, surface_subsurface)
+
+    return {
+        "a_val": a_val,
+        "b_val": b_val,
+        "surface_pad_left": surface_pad_left,
+        "arc_pad_bottom_center": arc_pad_bottom_center,
+        "arc_pad_left": arc_pad_left,
+        "arc_pad_bottom_left_to_middle": arc_pad_bottom_left_to_middle,
+        "arc_pad_bottom_middle_to_right": arc_pad_bottom_middle_to_right,
+        "arc_pad_right": arc_pad_right,
+        "line_left": line_left,
+        "line_right": line_right,
+        "line_bottom_left": line_bottom_left,
+        "line_bottom_center": line_bottom_center,
+        "line_bottom_right": line_bottom_right,
+        "ray_top_left": ray_top_left,
+        "ray_bottom_left": ray_bottom_left,
+        "ray_bottom_right": ray_bottom_right,
+        "ray_top_right": ray_top_right,
+        "x_pad_top_left": x_pad_top_left,
+        "x_pad_top_right": x_pad_top_right,
+    }
