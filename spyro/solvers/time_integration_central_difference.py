@@ -1,6 +1,6 @@
 import firedrake as fire
-from pyadjoint import annotate_tape
 import numpy as np
+from firedrake import *
 
 from . import helpers
 from .. import utils
@@ -32,14 +32,14 @@ def _propagate_forward_central_difference(wave, source_ids):
 
     adjoint_type = wave.adjoint_type
 
-    wave.simulation_logger.start_logging(source_ids)
+    wave.field_logger.start_logging(source_ids)
     wave.comm.comm.barrier()
 
     functional_mode = wave.functional_evaluation_mode
     compute_functional = functional_mode is not None
 
     t = wave.current_time
-    nt = round(wave.final_time / wave.dt) + 1  # number of timesteps
+    nt = int(wave.final_time / wave.dt) + 1  # number of timesteps
     usol = None
     if wave.store_forward_time_steps:
         # Snapshots are appended as the solve advances rather than allocated
@@ -48,22 +48,36 @@ def _propagate_forward_central_difference(wave, source_ids):
         # instability check below) no longer has to first allocate the whole
         # nt-step wavefield, which for fine meshes/small dt is many GB.
         usol = []
+    source_cof = None
     interpolate_receivers = None
-    if wave.use_vertex_only_mesh:
+    master_source_W = None
+    if wave.sources is not None and wave.use_vertex_only_mesh:
+        # source_cof is a cofunction that represents a point source,
+        # being one at a point and zero elsewhere.
+        source_cof = wave.sources.source_cofunction()
+
         if wave.abc_type == AbsorbingBCsType.PML:
             pressure_expr = fire.split(wave.X_n)[0]
         else:
             pressure_expr = wave.u_n
         interpolate_receivers = wave.receivers.receiver_interpolator(
             pressure_expr)
-    if wave.point_source_in_form:
-        # Only the time function of the source changes from one step to the
-        # next, so the tape records a scalar per step for it.
-        wave.sources.update_spatial_function(wave.solver_parameters)
+        if (
+            wave.abc_type == AbsorbingBCsType.PML
+            and wave.source_function is not None
+        ):
+            master_source_W = fire.Cofunction(
+                wave.source_function.function_space()
+            )
+            master_source_W.sub(0).assign(source_cof)
 
     usol_recv = []
     receiver_array = None
     receiver_buffer = None
+    # Reused accumulator for the point-source cofunction, so the per-timestep
+    # source assembly writes into an existing tensor instead of allocating a
+    # fresh Cofunction on every step.
+    source_buffer = None
     save_step = 0
     real_shot_record = None
     if compute_functional:
@@ -79,25 +93,28 @@ def _propagate_forward_central_difference(wave, source_ids):
         # fresh one, sized by this loop's ``nt``.
         wave.automated_adjoint.start_recording(total_steps=nt)
 
-    viscoelastic = (
-        wave.wave_type != WaveType.ISOTROPIC_ACOUSTIC
-        and getattr(wave, "viscoelastic", False)
-    )
-    if viscoelastic:
-        # Zera a memória a cada solve. Num único solve não muda nada; com
-        # vários tiros/iterações, evita herdar a memória do solve anterior.
-        for zeta in wave.zeta_list:
-            zeta.assign(0.0)
-
     for step in range(nt):
         # Basic way of applying sources
         wave.update_source_expression(t)
 
-        if wave.point_source_in_form:
-            wave.sources.update_time_function(step)
-        elif wave.sources is not None:
-            wave.rhs_no_pml_source().assign(
-                wave.sources.apply_source(rhs_forcing, step))
+        if wave.sources is not None:
+            if wave.use_vertex_only_mesh:
+                if master_source_W is not None:
+                    wave.source_function.assign(
+                        wave.sources.wavelet[step] * master_source_W
+                    )
+                else:
+                    if source_buffer is None:
+                        source_buffer = fire.assemble(
+                            wave.sources.wavelet[step] * source_cof)
+                    else:
+                        fire.assemble(
+                            wave.sources.wavelet[step] * source_cof,
+                            tensor=source_buffer)
+                    wave.rhs_no_pml_source().assign(source_buffer)
+            else:
+                wave.rhs_no_pml_source().assign(
+                    wave.sources.apply_source(rhs_forcing, step))
 
         wave.solver.solve()
 
@@ -111,22 +128,29 @@ def _propagate_forward_central_difference(wave, source_ids):
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
 
-        if viscoelastic:
-            # eps^n = sym(grad(u^n)) em DG0, com a interpolação pré-montada.
-            fire.assemble(wave.eps_interp, tensor=wave.eps_n)
+        if wave.wave_type != WaveType.ISOTROPIC_ACOUSTIC and wave.viscoelastic:
 
-            # zeta_l <- a_l zeta_l + b_l eps^n (mesma conta do original).
-            if annotate_tape():
-                # Adjunto automático: operações gravadas na fita.
-                for zeta, a, b in zip(wave.zeta_list, wave.zeta_a, wave.zeta_b):
-                    zeta.assign(a * zeta + b * wave.eps_n)
-            else:
-                # Problema direto: direto nos vetores PETSc.
-                with wave.eps_n.dat.vec_ro as ve:
-                    for zeta, a, b in zip(wave.zeta_list, wave.zeta_a,
-                                          wave.zeta_b):
-                        with zeta.dat.vec as vz:
-                            vz.axpby(b, a, ve)   # vz = b*ve + a*vz
+            dt = wave.dt
+            W = wave.strain_space
+
+            zeta_list = wave.zeta_list
+            omega_list = wave.omega_list
+
+            def epsilon(u):
+                return sym(grad(u))
+
+            # Strain rate
+            eps_old = Function(zeta_list[0].function_space())
+
+            # Dentro de cada passo de tempo:
+            eps_old.interpolate(epsilon(wave.prev_vstate))
+            zeta_old = Function(W)
+
+            # Update memory variables
+            for i in range(len(zeta_list)):
+                zeta_old.assign(zeta_list[i])
+                omega = omega_list[i]
+                zeta_list[i].assign(zeta_old + dt * omega * (eps_old - zeta_old))
 
         if wave.use_vertex_only_mesh:
             if receiver_buffer is None:
@@ -157,7 +181,7 @@ def _propagate_forward_central_difference(wave, source_ids):
                 fire.norm(wave.get_function()) < 1
             ), "Numerical instability. Try reducing dt or building the " \
                "mesh differently"
-            wave.simulation_logger.log(t)
+            wave.field_logger.log(t)
             helpers.display_progress(wave.comm, t)
 
         if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
@@ -223,4 +247,4 @@ def _propagate_forward_central_difference(wave, source_ids):
     else:
         wave.functional_value = None
 
-    wave.simulation_logger.stop_logging()
+    wave.field_logger.stop_logging()
