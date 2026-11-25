@@ -1,8 +1,17 @@
 from abc import ABCMeta
-from firedrake import (ds as fire_ds, ds_b as quad_dsbottom, ds_t as quad_dstop,
-                       ds_v as quad_ds, Function, VTKFile)
+from firedrake import (
+    ds as fire_ds,
+    ds_b as quad_dsbottom,
+    ds_t as quad_dstop,
+    ds_v as quad_ds,
+    assemble,
+    Function,
+    MIN,
+    VTKFile,
+)
 from numpy import abs, array, ceil, log10, minimum, prod, sign, sum, where
 from sympy import divisors
+from time import perf_counter
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .eik_min import Minimum_Eikonal
 from ..solvers.modal.modal_sol import Modal_Solver
@@ -16,6 +25,12 @@ from ..utils.error_management import (validate_data_structure, validate_numeric,
                                       validate_parameter)
 from ..utils.freq_tools import fft_at_receivers
 from ..utils.typing import AbsorbingBCsType, LayerShapeType
+from ..version_control import is_firedrake_new
+
+if is_firedrake_new():
+    from firedrake import interpolate
+else:
+    from firedrake.__future__ import interpolate
 
 
 class AbsorbingBC(MeasureError, metaclass=ABCMeta):
@@ -379,8 +394,13 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
                            * wave.c, allow_missing_dofs=True)
         del layer_mask, lay_field
 
-        # Interpolating in the space function of the problem
-        wave.c = Function(wave.function_space, name="c[km/s])").interpolate(wave.c)
+        # Interpolating in the space function of the problem. At the nodes shared
+        # by cells of different velocities, the minimum is taken, as for the
+        # velocity at the critical point (Minimum_Eikonal), so that it does not
+        # depend on the partition
+        c_abc = Function(wave.function_space, name="c[km/s])")
+        c_abc.assign(assemble(interpolate(wave.c, wave.function_space, access=MIN)))
+        wave.c = c_abc
 
         # Save new velocity model
         if save_file:
@@ -395,8 +415,9 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
             outfile = VTKFile(pth_velocity)
             outfile.write(wave.c)
 
-    def check_timestep_abc(self, wave, max_divisor_tf=1,
-                           set_max_dt=True, method='ANALYTICAL', mag_add=3):
+    def check_timestep_abc(
+        self, wave, max_divisor_tf=1, set_max_dt=True, method="ANALYTICAL", mag_add=3
+    ):
         """Check if the timestep size is appropriate for the transient response.
 
         Parameters
@@ -404,58 +425,116 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         wave : `acoustic_wave.AcousticWave`
             An instance of the :class:`~spyro.solvers.acoustic_wave.AcousticWave`.
         max_divisor_tf : `int`, optional
-            Index to select the maximum divisor of the final time, converted to an
-            integer according to the order of magnitude of the timestep size. The
-            timestep size is set to the divisor, given by the index in descending
-            order, less than or equal to the user's timestep size. If the value is 1,
-            the timestep size is set as the maximum divisor. Default is 1.
+            Index of the selected timestep size among the divisors of the final
+            time that are smaller than the estimated stable timestep size, in
+            descending order: 1 selects the largest of them. The final time and the
+            timestep sizes are converted to integers according to the order of
+            magnitude of the estimate. Default is 1.
         set_max_dt : `bool`, optional
-            If `True`, set the timestep size to the selected divisor. Default is `True`.
+            If `True`, set the timestep size to the selected divisor; otherwise, set
+            it to the smaller of the selected divisor and the current timestep
+            size. Default is `True`.
         method : `str`, optional
-            Method to use for solving the eigenvalue problem. Default is 'ANALYTICAL'
-            method that estimates the maximum eigenvalue using the Gershgorin Circle
-            Theorem. Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS' or 'LOBPCG'.
+            Method to use for the largest eigenvalue. Default is 'ANALYTICAL', the
+            largest ratio of the stiffness and mass diagonals, which overestimates
+            the stable timestep size (see Notes). 'ARNOLDI', 'LANCZOS' and 'LOBPCG'
+            solve the eigenvalue problem.
         mag_add : `int`, optional
             Additional magnitude order to adjust the rounding of the timestep.
 
         Returns
         -------
         None
+
+        Notes
+        -----
+        The stable timestep size is ``2 / sqrt(lambda_max)``, where ``lambda_max``
+        is the largest generalized eigenvalue of the stiffness and mass forms of
+        the wave physics (``wave.modal_weak_forms()``), estimated without any
+        fraction. The timestep size is then a divisor of the final time, so that
+        the simulation ends exactly at the final time, and ``max_divisor_tf``
+        sets the margin below the estimate.
+
+        'ANALYTICAL' takes ``lambda_max`` as ``max(A_ii / M_ii)``. Each ratio is
+        the Rayleigh quotient of a unit vector, so it never exceeds the largest
+        eigenvalue, and the estimated timestep size is never below the stable
+        one. In ``test_reference_model_abc`` it exceeds it by 14 to 50 %, so
+        'ANALYTICAL' may need ``max_divisor_tf > 1`` to skip the divisors above
+        the stable timestep size (up to 4 there), while an exact method is
+        stable with ``max_divisor_tf = 1``. There, once the forms are compiled,
+        'ANALYTICAL' takes 4 to 7 ms and 'ARNOLDI' 10 to 18 ms, both negligible
+        against the forward solve.
+
+        Besides the current and the selected timestep sizes, the method prints
+        the method of the estimate, the estimated timestep size and the time it
+        took, the divisors of the final time from the largest down to the
+        selected one, and the ratio of the selected timestep size to the
+        estimate.
         """
 
         # Cheking input parameters
-        validate_numeric("max_divisor_tf", max_divisor_tf,
-                         float_num=False, integer_num=True, lower_bound=0.)
-        validate_numeric("mag_add", mag_add, float_num=False, integer_num=True,
-                         lower_bound=0., include_lower_bound=True)
+        validate_numeric(
+            "max_divisor_tf",
+            max_divisor_tf,
+            float_num=False,
+            integer_num=True,
+            lower_bound=0.0,
+        )
+        validate_numeric(
+            "mag_add",
+            mag_add,
+            float_num=False,
+            integer_num=True,
+            lower_bound=0.0,
+            include_lower_bound=True,
+        )
 
         SpyroEnsemble.print("\nChecking Timestep Size")
 
         # User timestep
-        usr_dt = wave.get_dt()
+        usr_dt = wave.dt
         SpyroEnsemble.print(f"Current Nyquist Frequency: {self.freq_Nyquist:.5f} Hz")
         SpyroEnsemble.print(f"Current Timestep Size: {1e3 * usr_dt:.{mag_add}f} ms")
 
         # Maximum timestep size
+        SpyroEnsemble.print(f"Method for the Maximum Timestep Size: {method}")
+        t_start = perf_counter()
         dt_sol = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
-        max_dt = dt_sol.estimate_timestep(wave.c, wave.function_space, wave.final_time,
-                                          shift=1e-8, quad_rule=wave.quadrature_rule,
-                                          fraction=1.)
+        est_dt = dt_sol.estimate_timestep(
+            wave.c,
+            wave.function_space,
+            wave.final_time,
+            shift=1e-8,
+            quad_rule=wave.quadrature_rule,
+            fraction=1.0,
+            forms=wave.modal_weak_forms(),
+        )
+        SpyroEnsemble.print(
+            f"Estimated Maximum Timestep Size: {1e3 * est_dt:.{mag_add}f} ms "
+            f"(computed in {perf_counter() - t_start:.3f} s)"
+        )
 
         # Rounding power
-        pot = int(abs(ceil(log10(max_dt))) + mag_add)
+        pot = int(abs(ceil(log10(est_dt))) + mag_add)
 
         # Maximum timestep size according to divisors of the final time
         val_int_tf = int(10**pot * wave.final_time)
-        val_int_dt = int(10**pot * max_dt)
+        val_int_dt = int(10**pot * est_dt)
         max_div = [d for d in divisors(val_int_tf) if d < val_int_dt]
         n_div = len(max_div)
         index_div = min(max_divisor_tf, n_div)
-        max_dt = round(10**(-pot) * max_div[-index_div], pot)
+
+        # Divisors from the largest down to the selected one
+        cand_dt = [round(10 ** (-pot) * d, pot) for d in max_div[::-1][:index_div]]
+        SpyroEnsemble.print(
+            "Largest Divisors of the Final Time Below the Estimate (ms): "
+            + ", ".join(f"{1e3 * d:.{mag_add}f}" for d in cand_dt)
+        )
+        max_dt = cand_dt[-1]
 
         # Set the timestep size
         dt = max_dt if set_max_dt else min(usr_dt, max_dt)
-        wave.set_dt(dt)
+        wave.dt = dt
         dt_ms = 1e3 * wave.dt
         if set_max_dt:
             case_div = f"{min(max_divisor_tf, n_div)} of {n_div}"
@@ -464,9 +543,12 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
             str_dt = f"Selected Timestep Size: {dt_ms:.{mag_add}f} ms"
 
         SpyroEnsemble.print(str_dt)
+        SpyroEnsemble.print(
+            f"Selected / Estimated Timestep Size: {wave.dt / est_dt:.3f}"
+        )
 
         # Updating Nyquist frequency
-        self.freq_Nyquist = 1. / (2. * wave.dt)
+        self.freq_Nyquist = 1.0 / (2.0 * wave.dt)
         SpyroEnsemble.print(f"New Nyquist Frequency: {self.freq_Nyquist:.5f} Hz")
 
     def min_coord_differ_source_boundary(self, source_locations, get_crit_source=False):
@@ -532,7 +614,7 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
             return min_dist_to_bnd, source_cand
 
         # Candidate to minimum coordinate difference to the boundaries
-        delta_z = abs(source_loc[:, 0] - length_z)
+        delta_z = abs(source_loc[:, 0] + length_z)
         candidate_z = delta_z.min()
         min_dist_to_bnd = candidate_z
         source_cand = set(where(delta_z == candidate_z)[0])
@@ -574,7 +656,14 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
 
         return min_dist_to_bnd
 
-    def layer_infinite_model(self, lmin, c_bnd_max, final_time, source_locations=None):
+    def layer_infinite_model(
+        self,
+        lmin: float,
+        c_bnd_max: float,
+        c_max: float,
+        final_time: float,
+        source_locations: list | None = None,
+    ) -> float:
         """Determine the domain extension size for the infinite domain model.
 
         Parameters
@@ -583,6 +672,9 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
             Minimum mesh size.
         c_bnd_max : `float`
             Maximum velocity value on the boundary of the original domain.
+        c_max : `float`
+            Maximum velocity value in the original domain, rounded with the same
+            tolerance as ``c_bnd_max``, so ``c_max >= c_bnd_max``.
         final_time : `float`
             Final time of the simulation.
         source_locations: `list`, optional
@@ -592,48 +684,81 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         -------
         infinite_pad_len : `float`
             Size of the domain extension for the infinite domain model.
+
+        Raises
+        ------
+        ValueError
+            If ``c_max`` is smaller than ``c_bnd_max``.
+
+        Notes
+        -----
+        The extension covers the bottom and the lateral boundaries; the top is a
+        free surface. A wave that first reaches the original boundary at time
+        ``t_bnd`` and is reflected by the boundary of the extension returns to the
+        original boundary at ``t_bnd + 2 * pad / c``. The velocity of the extension
+        is extended from the original boundary, so ``c <= c_bnd_max`` and the
+        reflections reach no receiver of the original domain before the final
+        time if ``pad >= c_bnd_max * (final_time - t_bnd) / 2``, rounded up to a
+        multiple of ``lmin``.
+
+        ``t_bnd`` is the minimum Eikonal at the critical boundary points if the
+        Eikonal analysis was performed. Otherwise, the wave travels from the
+        nearest source to the nearest absorbing boundary at most at the maximum
+        velocity of the original domain, so ``t_bnd`` is bounded below by that
+        distance over ``c_max``. Source coordinates follow spyro's convention,
+        with ``-length_z <= z <= 0``.
         """
 
         # Cheking input parameters
-        validate_numeric("lmin", lmin, float_num=True,
-                         integer_num=True, lower_bound=0.)
-        validate_numeric("c_bnd_max", c_bnd_max, float_num=True,
-                         integer_num=True, lower_bound=0.)
-        validate_numeric("final_time", final_time, float_num=True,
-                         integer_num=True, lower_bound=0.)
-
-        # Size of the domain extension
-        add_dom = c_bnd_max * final_time / 2.
+        validate_numeric(
+            "lmin", lmin, float_num=True, integer_num=True, lower_bound=0.0
+        )
+        validate_numeric(
+            "c_bnd_max", c_bnd_max, float_num=True, integer_num=True, lower_bound=0.0
+        )
+        validate_numeric(
+            "c_max",
+            c_max,
+            float_num=True,
+            integer_num=True,
+            lower_bound=c_bnd_max,
+            include_lower_bound=True,
+        )
+        validate_numeric(
+            "final_time", final_time, float_num=True, integer_num=True, lower_bound=0.0
+        )
 
         str_pad = "Infinite Domain Extension Based on "
 
-        # Distance already travelled by the wave
-        if hasattr(self, 'eik_bnd'):
-
-            # If Eikonal analysis was performed (see `critical_boundary_points` method)
+        # Earliest time at which the wave reaches the absorbing boundaries
+        if hasattr(self, "eik_bnd"):
             str_pad += "Minimun Eikonal at Critical Boundary Points"
 
+            # If Eikonal analysis was performed (see `critical_boundary_points` method)
             # Structure eikmin: [pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]
-            eikmin = self.eik_bnd[0][2]
-
-            # Minimum distance to the nearest boundary
-            dist_to_bnd = c_bnd_max * eikmin / 2.
+            t_bnd = self.eik_bnd[0][2]
         else:
-
-            # If Eikonal analysis was not performed (see `min_coord_differ_source_boundary`)
+            # If Eikonal analysis was not performed (see
+            # `min_coord_differ_source_boundary`)
             str_pad += "Minimum Coordinate Difference Source-Boundary"
 
             # Checking source locations
-            validate_data_structure("source_locations", source_locations, "list",
-                                    expected_type_element="tuple")
+            validate_data_structure(
+                "source_locations",
+                source_locations,
+                "list",
+                expected_type_element="tuple",
+            )
 
-            # Minimum distance to the nearest boundary (not Euclidean distance)
-            dist_to_bnd = self.min_coord_differ_source_boundary(source_locations)
+            # Lower bound of the arrival time at the nearest boundary: the wave
+            # travels at most at the maximum velocity of the original domain
+            t_bnd = self.min_coord_differ_source_boundary(source_locations) / c_max
 
         SpyroEnsemble.print(str_pad)
 
-        # Subtracting the distance already travelled by the wave
-        add_dom -= dist_to_bnd
+        # Size of the domain extension: the reflections return to the original
+        # boundary after the final time
+        add_dom = c_bnd_max * (final_time - t_bnd) / 2.0
 
         # Pad length for the infinite domain extension
         infinite_pad_len = lmin * ceil(add_dom / lmin)
@@ -653,21 +778,26 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         None
         """
 
-        lmin = wave.mesh_parameters.lmin if not hasattr(self, 'lmin') else self.lmin
+        lmin = wave.mesh_parameters.lmin if not hasattr(self, "lmin") else self.lmin
         c_bnd_max = wave.c_bnd_max
+        c_max = wave.c_max
         final_time = wave.final_time
         source_locations = wave.source_locations
 
         # Size of the domain extension
-        self.abc_pad_length = self.layer_infinite_model(lmin, c_bnd_max, final_time,
-                                                        source_locations=source_locations)
-        SpyroEnsemble.print(f"Infinite Domain Extension (km): {self.abc_pad_length:.4f}")
+        self.abc_pad_length = self.layer_infinite_model(
+            lmin, c_bnd_max, c_max, final_time, source_locations=source_locations
+        )
+        SpyroEnsemble.print(
+            f"Infinite Domain Extension (km): {self.abc_pad_length:.4f}"
+        )
 
         # New dimensions
         self.abc_new_geometry()
 
-    def infinite_model(self, wave, check_dt=False, max_divisor_tf=1,
-                       method='ANALYTICAL', mag_add=3):
+    def infinite_model(
+        self, wave, check_dt=False, max_divisor_tf=1, method="ANALYTICAL", mag_add=3
+    ):
         """Create a reference model for the ABC scheme for comparative purposes.
 
         Parameters
@@ -678,15 +808,15 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
             If `True`, check if the timestep size is appropriate for the transient
             response. Default is `False`.
         max_divisor_tf : `int`, optional
-            Index to select the maximum divisor of the final time, converted to an
-            integer according to the order of magnitude of the timestep size. The
-            timestep size is set to the divisor, given by the index in descending
-            order, less than or equal to the user's timestep size. If the value is 1,
-            the timestep size is set as the maximum divisor. Default is 1.
+            Index of the selected timestep size among the divisors of the final
+            time that are smaller than the estimated stable timestep size, in
+            descending order: 1 selects the largest of them. Default is 1. See
+            `check_timestep_abc`.
         method : `str`, optional
-            Method to use for solving the eigenvalue problem. Default is 'ANALYTICAL'
-            method that estimates the maximum eigenvalue using the Gershgorin Circle
-            Theorem. Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS' or 'LOBPCG'.
+            Method to use for the largest eigenvalue. Default is 'ANALYTICAL', the
+            largest ratio of the stiffness and mass diagonals, which overestimates
+            the stable timestep size. 'ARNOLDI', 'LANCZOS' and 'LOBPCG' solve the
+            eigenvalue problem. See `check_timestep_abc`.
         mag_add : `int`, optional
             Additional magnitude order to adjust the rounding of the timestep.
 
@@ -697,8 +827,9 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
 
         # Check the timestep size
         if check_dt:
-            self.check_timestep_abc(wave, max_divisor_tf=max_divisor_tf,
-                                    method=method, mag_add=mag_add)
+            self.check_timestep_abc(
+                wave, max_divisor_tf=max_divisor_tf, method=method, mag_add=mag_add
+            )
 
         SpyroEnsemble.print("\nBuilding Infinite Domain Model")
 
@@ -719,8 +850,12 @@ class AbsorbingBC(MeasureError, metaclass=ABCMeta):
         # Saving reference signal
         output_file = wave.abc_type.value + "_ref"
         self.save_reference_signal(
-            wave.receiver_locations, wave.forward_solution_receivers,
-            wave.number_of_receivers, self.freq_Nyquist, output_file_prefix=output_file)
+            wave.receiver_locations,
+            wave.forward_solution_receivers,
+            wave.number_of_receivers,
+            self.freq_Nyquist,
+            output_file_prefix=output_file,
+        )
 
     def forms_acoustic_NRBCs(self, wave, weak_expr_nrbc, bc_surf):
         """Build the load term weak forms for non-reflecting boundary conditions (NRBCs).

@@ -1,4 +1,4 @@
-"""Unit tests for the Reference Model implemented in spyro.abc.abc_layer.
+"""Unit tests for the Reference Model implemented in spyro.abc.abc.
 
 These tests verify the consistency of the solver with HABCs and PML without any
 damping for a model of reference with an extended pad to avoid reflections. The
@@ -54,7 +54,7 @@ REFERENCE_CONFIG = {
 ROUND_OFF_TOL = finfo(float32).eps
 
 
-def wave_dict(element_geometry, dimension, abc_type, dt_usu, degree_eik, calc_eik):
+def wave_dict(element_geometry, dimension, abc_type, dt_usu, calc_eik):
     """Create a dictionary with parameters for the model.
 
     Parameters
@@ -68,8 +68,6 @@ def wave_dict(element_geometry, dimension, abc_type, dt_usu, degree_eik, calc_ei
         Type of the absorbing boundary condition. Options: "hybrid" or "PML".
     dt_usu: `float`
         Time step of the simulation.
-    degree_eik : `int`
-        Finite element order for the Eikonal equation.
     calc_eik : `bool`
         If `True`, eikonal analysis is performed; otherwise, it is skipped.
 
@@ -211,9 +209,7 @@ def wave_instance(
     dt_usu = case_parameter(REFERENCE_CONFIG["dt"], case)
 
     # Create dictionary with parameters for the model
-    dictionary = wave_dict(
-        element_geometry, dimension, abc_type, dt_usu, degree_eik, calc_eik
-    )
+    dictionary = wave_dict(element_geometry, dimension, abc_type, dt_usu, calc_eik)
 
     # Create the acoustic wave object with HABCs
     wave = AcousticWave(dictionary=dictionary)
@@ -771,7 +767,7 @@ def test_check_timestep_abc_selects_divisor(
     Parameters
     ----------
     monkeypatch : `pytest.MonkeyPatch`
-        Fixture that replaces `Modal_Solver` in `spyro.abc.abc_layer`.
+        Fixture that replaces `Modal_Solver` in `spyro.abc.abc`.
     capsys : `pytest.CaptureFixture`
         Fixture that captures the printed information.
     estimate : `float`
@@ -834,7 +830,7 @@ def test_check_timestep_abc_selects_divisor(
             calls[-1].update(fraction=fraction, forms=forms)
             return estimate
 
-    monkeypatch.setattr("spyro.abc.abc_layer.Modal_Solver", FixedEstimate)
+    monkeypatch.setattr("spyro.abc.abc.Modal_Solver", FixedEstimate)
     wave = SimpleNamespace(
         dt=4.0e-3, final_time=FINAL_TIME, c=None, function_space=None
     )

@@ -315,7 +315,8 @@ class TestMeasureError:
         receiver_locations = [(i, i + 1) for i in range(n_receivers)]
 
         # The reference folder is created, so it must be a writable one
-        measure_error = MeasureError(output_folder=str(tmp_path / "output"))
+        measure_error = MeasureError()
+        measure_error.initialize_paths_for_error(output_folder=str(tmp_path / "output"))
         with patch("numpy.save") as mock_save:
             measure_error.save_reference_signal(
                 receiver_locations=receiver_locations,
@@ -454,7 +455,8 @@ class TestMeasureError:
             patch("numpy.save"),
             patch("spyro.utils.error_management.path.exists", return_value=True),
         ):
-            measure_error = MeasureError(
+            measure_error = MeasureError()
+            measure_error.initialize_paths_for_error(
                 output_folder="test_output",
                 output_case="preamble",
             )

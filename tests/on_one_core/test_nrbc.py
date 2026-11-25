@@ -334,7 +334,11 @@ def test_nrbc(element_geometry, dimension, calc_eik):
                 # Returning to the original mesh nad velocity profile
                 wave.set_mesh(user_mesh=wave.mesh_original)
                 wave.c = wave.mesh_ops.creating_velocity_profile(
-                    wave.function_space, wave.initial_velocity_model, wave.path_save)[0]
+                    wave.function_space,
+                    wave.initial_velocity_model,
+                    wave.mesh_parameters.tol,
+                    wave.path_save,
+                )[0]
 
             # Time step size for the transient response
             dt = wave.get_dt()
