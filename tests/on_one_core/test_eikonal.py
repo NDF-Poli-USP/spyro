@@ -46,7 +46,7 @@ EIKONAL_CONFIG = {
         "local_time": {
             "T": {
                 "consistent": {2: 0.12, 3: 0.04},
-                "underintegrated": {2: 0.08, 3: 0.07},
+                "underintegrated": {2: 0.08, 3: 0.04},
             },
             "Q": {"consistent": {2: 0.12, 3: 0.02}, "underintegrated": 0.03},
         },
@@ -329,12 +329,12 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
 
     f_est   T-cons  Q-cons f_est T-under Q-under
              p = 2   p = 2         p = 2   p = 3
-     0.04   79.370  73.179  0.04   --/--  55.166
-     0.05   82.259* 75.766  0.05   --/--   --/--
-     0.06   85.344  78.548  0.06   --/--  83.476*
-     0.07   88.562  81.431  0.07  83.719* 85.902
-     0.08   91.877  84.377* 0.08  86.242  88.456
-     0.09   95.272  87.376  0.09  88.867  91.121
+     0.04   78.971  73.179  0.04  75.218  55.166
+     0.05   82.070* 75.766  0.05  78.211   --/--
+     0.06   85.267  78.548  0.06  80.890  83.476*
+     0.07   88.542  81.431  0.07  83.517* 85.902
+     0.08   91.884  84.377* 0.08  86.164  88.456
+     0.09   95.293  87.376  0.09  88.856  91.121
 
     *****************************
     Source condition 'local_time'
@@ -365,12 +365,16 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
             p = 2   p = 2         p = 2   p = 3
      0.01   --/--   --/--  0.01   --/--   --/--
      0.02   --/--  85.710* 0.02   --/--  85.061#
-     0.03  72.954  85.982  0.03   --/--  85.424*
-     0.04  85.533* 86.353  0.04   --/--  85.832
-     0.05  85.763  86.740  0.05   --/--  86.229
-     0.06  85.872  87.114  0.06   --/--  86.588
-     0.07  85.954  87.475  0.07  85.720* 86.900
-     0.08  86.029  87.827  0.08  85.968  87.165
+     0.03  75.029  85.982  0.03   --/--  85.424*
+     0.04  85.530* 86.353  0.04  84.654* 85.832
+     0.05  85.760  86.740  0.05  85.099  86.229
+     0.06  85.870  87.114  0.06  85.440  86.588
+     0.07  85.952  87.475  0.07  85.728  86.900
+     0.08  86.026  87.827  0.08  85.974  87.165
+
+    At the nodes shared by cells of different velocities, the velocity is the
+    minimum of their values (``creating_velocity_profile``), so that it does not
+    depend on the mesh partition.
 
     The tables were computed with Firedrake 2025.4.1. With Firedrake
     2026.10.0 all cases pass. For 'nearest_node' the minimum Eikonal at the
@@ -378,8 +382,7 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
 
     Case                    2026.10.0   2025.4.1
     T-2D consistent            82.949     82.942
-    T-3D consistent            82.243     82.259
-    T-3D underintegrated       83.710     83.719
+    T-3D underintegrated       83.562     83.517
     Q-3D underintegrated       83.302     83.476
 
     For Q-3D underintegrated the critical point is (-0.532, 0, 0.532) km with
@@ -388,7 +391,9 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
     the resulting boundary minima differently.
 
     For 'local_time' the minimum Eikonal at the marked f_est agrees within
-    0.01 ms. The exception is Q-3D underintegrated: f_est = 0.02 (85.061 ms,
+    0.01 ms, except T-3D underintegrated (84.640 ms with 2026.10.0, 84.654 ms
+    with 2025.4.1), where f_est = 0.03 does not converge with either version.
+    The other exception is Q-3D underintegrated: f_est = 0.02 (85.061 ms,
     2.07 %) does not converge with 2026.10.0, so the test uses f_est = 0.03,
     the value with the next smallest error, which converges with both
     versions (85.424 ms, 2.51 %).

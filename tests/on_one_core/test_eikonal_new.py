@@ -27,8 +27,8 @@ EIKONAL_CONFIG = {
     # per wavelength and lba = minimum_velocity / source_frequency
     "edge_length": {
         "nearest_node": {
-            2: {"T": {"consistent": 1.0 / 2, "underintegrated": 1.0 / 5}, "Q": 1.0 / 3},
-            3: {"consistent": 1.0 / 2, "underintegrated": 1.0 / 4},
+            2: {"T": {"consistent": 1.0 / 2, "underintegrated": 1.0 / 3}, "Q": 1.0 / 3},
+            3: {"consistent": {"T": 1.0 / 7, "Q": 1.0 / 2}, "underintegrated": 1.0 / 4},
         },
         "local_time": {
             2: {"T": {"consistent": 1.0 / 5, "underintegrated": 1.0 / 6}, "Q": 1.0 / 5},
@@ -40,12 +40,15 @@ EIKONAL_CONFIG = {
         2: {
             "consistent": 4,
             "underintegrated": {
-                "nearest_node": {"T": 2, "Q": 1},
+                "nearest_node": {"T": 3, "Q": 1},
                 "local_time": {"T": 3, "Q": 4},
             },
         },
         3: {
-            "consistent": {"nearest_node": 3, "local_time": {"T": 1, "Q": 2}},
+            "consistent": {
+                "nearest_node": {"T": 2, "Q": 3},
+                "local_time": {"T": 1, "Q": 2},
+            },
             "underintegrated": {"nearest_node": 1, "local_time": {"T": 1, "Q": 3}},
         },
     },
@@ -54,18 +57,18 @@ EIKONAL_CONFIG = {
         "nearest_node": {2: 1e-2, 3: {"consistent": 2.5e-2, "underintegrated": 1.5e-2}},
         "local_time": {
             2: {"consistent": 3e-2, "underintegrated": 2.5e-2},
-            3: {"consistent": 1.5e-2, "underintegrated": 5e-3},
+            3: {"consistent": 1.5e-2, "underintegrated": 1e-2},
         },
     },
     # Factor for the stabilizing term in Eikonal equation
     "f_est": {
         "nearest_node": {
             2: {
-                "T": {"consistent": 0.09, "underintegrated": 0.11},
+                "T": {"consistent": 0.09, "underintegrated": 0.07},
                 "Q": {"consistent": 0.03, "underintegrated": 0.01},
             },
             3: {
-                "T": {"consistent": 0.15, "underintegrated": 0.19},
+                "T": {"consistent": 0.05, "underintegrated": 0.20},
                 "Q": {"consistent": 0.10, "underintegrated": 0.21},
             },
         },
@@ -310,7 +313,9 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
     lmin = 1 / N >= 0.25 km) reaches the boundary x = 0, where the minimum
     Eikonal would be imposed instead of computed. N is the number of
     elements per direction (edge_length = 1 / N) and p the Eikonal degree.
-    The winner (*) is the coarsest mesh, then the smallest relative error.
+    The winner (*) is the coarsest mesh, then the smallest relative error,
+    among the configurations known to pass with every supported Firedrake
+    version (see the end of these Notes).
 
     *******************************
     Source condition 'nearest_node'
@@ -374,17 +379,18 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
     2D - Underintegrated triangles
     ==============================
      N  p  f_est  eik_min   error
-     5  2  0.11    83.350   0.02 %*
-     5  3  0.12    83.604   0.33 %
-     5  4  0.12    83.207   0.15 %
+     3  3  0.07    83.475   0.17 %*
+     5  2  0.13    83.587   0.30 %
+     5  3  0.11    83.111   0.27 %
+     5  4  0.12    83.180   0.18 %
      6  2  0.11    84.113   0.94 %
      6  3  0.13    83.516   0.22 %
-     7  2  0.24    83.357   0.03 %
-     7  3  0.05    84.738   1.69 %
+     7  2  0.24    83.423   0.11 %
+     7  3  0.05    84.988   1.99 %
     10  2  0.08    84.272   1.13 %
     10  3  0.08    83.405   0.09 %
-    15  2  0.11    83.381   0.06 %
-    15  3  0.05    85.108   2.13 %
+    15  2  0.11    83.379   0.06 %
+    15  3  0.05    85.112   2.14 %
 
     ===================================
     2D - Underintegrated quadrilaterals
@@ -407,15 +413,15 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
     3D - Consistent tetrahedra
     ==========================
      N  p  f_est  eik_min   error
-     2  3  0.15    82.667   0.80 %*
-     3  2  0.18    82.781   0.66 %
-     3  3  0.19    83.896   0.68 %
-     5  2  0.05    82.044   1.55 %
-     6  2  0.04    84.603   1.52 %
-     6  3  0.03    85.114   2.14 %
-     7  2  0.05    82.259   1.29 %
-     7  3  0.05    82.162   1.41 %
-     8  1  0.05    82.516   0.98 %
+     2  3  0.14    84.673   1.61 %
+     3  2  0.18    83.449   0.14 %
+     3  3  0.18    82.671   0.79 %
+     5  2  0.05    82.036   1.56 %
+     6  2  0.04    83.499   0.20 %
+     6  3  0.03    84.963   1.96 %
+     7  2  0.05    82.070   1.52 %*
+     7  3  0.05    82.159   1.41 %
+     8  1  0.05    81.462   2.25 %
 
     =========================
     3D - Consistent hexahedra
@@ -433,8 +439,10 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
     3D - Underintegrated tetrahedra
     ===============================
      N  p  f_est  eik_min   error
-     4  1  0.19    82.222   1.33 %*
-     5  2  0.08    84.861   1.83 %
+     2  3  0.07    82.975   0.43 %
+     4  1  0.20    82.203   1.36 %*
+     5  2  0.07    82.403   1.12 %
+     7  2  0.07    83.517   0.22 %
 
     ==============================
     3D - Underintegrated hexahedra
@@ -564,12 +572,13 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
     3D - Consistent tetrahedra
     ==========================
      N  p  f_est  eik_min   error
-     5  1  0.10    83.563   0.28 %*
-     6  1  0.20    82.911   0.51 %
+     5  1  0.10    83.346   0.02 %*
+     6  1  0.20    82.879   0.54 %
      6  3  0.05    84.374   1.25 %
-     7  3  0.04    85.171   2.21 %
-     8  1  0.33    83.447   0.14 %
-     8  3  0.03    84.417   1.30 %
+     7  3  0.03    84.807   1.77 %
+     8  1  0.33    83.458   0.15 %
+     8  2  0.02    85.632   2.76 %
+     8  3  0.03    84.418   1.30 %
 
     =========================
     3D - Consistent hexahedra
@@ -585,8 +594,10 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
     3D - Underintegrated tetrahedra
     ===============================
      N  p  f_est  eik_min   error
-     6  1  0.20    83.084   0.30 %*
-     7  3  0.06    84.486   1.38 %
+     5  3  0.05    81.183   2.58 %
+     6  1  0.20    82.891   0.53 %*
+     7  2  0.05    85.099   2.12 %
+     7  3  0.04    84.376   1.25 %
 
     ==============================
     3D - Underintegrated hexahedra
@@ -598,23 +609,43 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
      8  1  0.34    83.346   0.02 %
      8  3  0.04    85.223   2.27 %
 
+    At the nodes shared by cells of different velocities, the velocity is the
+    minimum of their values (``creating_velocity_profile``), so that it does not
+    depend on the mesh partition.
+
     The tables were computed with Firedrake 2025.4.1. With Firedrake 2026.10.0
-    every selected configuration (*) converges at its f_est without retries
-    and gives the same minimum Eikonal within 0.01 ms, except (in ms,
-    2026.10.0 vs 2025.4.1):
+    the T-3D results can differ for two reasons. The velocity lives in the
+    degree 3 KMV space of the wave, whose tetrahedron has another basis in
+    2026.10.0 (see test_firedrake_elements.py), and the Eikonal evaluates it
+    at its quadrature points: the Gauss points of the consistent elements
+    and the quadrature of the Eikonal space for the underintegrated ones,
+    which for p = 1 is at the vertices. In the cells at the interface, where
+    the velocity is not constant, the values therefore differ, except for
+    the underintegrated elements with p = 1, which only take nodal values.
+    With an odd N, some tetrahedra also have their centroid exactly on the
+    interface x = 0.5, where the cell velocity is decided by round-off in
+    the condition x < 0.5 (50 of the 750 tetrahedra with N = 5).
+
+    The T-3D winners are therefore taken among the configurations measured
+    with 2026.10.0, or independent of the version (underintegrated, p = 1
+    and an even N). Without this condition, the consistent 'nearest_node'
+    winner would be N = 2, p = 3 (84.673 ms with 2025.4.1, whereas f_est =
+    0.15 gives 91.428 ms with 2026.10.0, an error of 9.71 %), and the
+    underintegrated winners would be N = 2 and N = 5 with p = 3, not
+    measured with 2026.10.0. Every selected configuration (*) converges at
+    its f_est without retries with 2026.10.0 and gives the same minimum
+    Eikonal within 0.01 ms, except T-3D consistent (in ms, 2026.10.0 vs
+    2025.4.1):
 
     Source condition   Case              2026.10.0   2025.4.1
-    'nearest_node'     T-3D consistent      82.101     82.667
-    'local_time'       T-3D consistent      84.164     83.563
+    'nearest_node'     T-3D consistent      82.065     82.070
+    'local_time'       T-3D consistent      82.633     83.346
 
-    'nearest_node' T-3D consistent passes with both versions (error 1.48 %
-    against 0.80 %, atol = 2.5e-2). 'local_time' T-3D consistent fails with
-    2026.10.0 (error 1.00 % against atol = 5e-3). Its mesh (N = 5) has 50 of
-    its 750 tetrahedra with the centroid exactly on the velocity interface
-    x = 0.5, where the cell velocity is decided by round-off in the condition
-    x < 0.5. With 2025.4.1 these cells are slow (83.563 ms); forcing them to
-    the fast side gives 84.014 ms and moves the minimum Eikonal on x = 1 from
-    511.8 to 480.7 ms, so the installations evaluate these cells differently.
+    The 'nearest_node' value with 2026.10.0 is that of the same
+    configuration in test_eikonal.py (N = 7, p = 2, f_est = 0.05). Both
+    cases pass with both versions (atol = 2.5e-2 and 1.5e-2). The
+    underintegrated T-3D winners give 82.203 ms ('nearest_node') and
+    82.891 ms ('local_time') with both versions.
     """
 
     SpyroEnsemble.print(

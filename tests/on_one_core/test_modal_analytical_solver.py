@@ -15,6 +15,7 @@ from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.solvers.modal.modal_ana_sol import Modal_Analytical_Solver
 from spyro.utils.cost import comp_cost
 from tests.on_one_core.test_eikonal import case_parameter
+from tests.on_one_core.test_modal_solvers import MODAL_CONFIG as SOLVERS_CONFIG
 
 pytestmark = mark.modal
 
@@ -47,17 +48,9 @@ MODAL_CONFIG = {
         True: (0.0, 0.0, 0.0, 0.0),
         False: {2: (-0.5, 0.3, -1.5, -0.9), 3: (-0.9, 0.3, -2.1, -1.5)},
     },
-    # Expected fundamental frequency in Hz, fnum of the FEM solvers (see Notes)
-    "exp_value": {
-        2: {
-            True: {"rectangular": 0.46875, "hypershape": 0.51046},
-            False: {"rectangular": {"T": 0.45539, "Q": 0.45542}, "hypershape": 0.50440},
-        },
-        3: {
-            True: {"rectangular": 0.47727, "hypershape": 0.52345},
-            False: {"rectangular": {"T": 0.42562, "Q": 0.41127}, "hypershape": 0.51535},
-        },
-    },
+    # Expected fundamental frequency in Hz of the continuous model, the values of
+    # test_modal_solvers.py (see its Notes)
+    "exp_value": SOLVERS_CONFIG["exp_value"],
 }
 
 
@@ -287,25 +280,24 @@ def run_modal(wave, fitting_c, exp_value, n_root=1):
     the optimization, both summed over the cases, and failed cases.
 
     Method       Max error  Mean error  Evaluations    Time   Failed
-    SLSQP           1.37 %      0.16 %          250  10.8 s        0
-    L-BFGS-B        0.81 %      0.23 %          205   9.6 s        0
-    COBYQA          0.90 %      0.30 %          180   9.7 s        0
-    COBYLA          1.54 %      0.44 %          180   9.1 s        0
-    TNC             5.57 %      0.70 %          595  14.1 s        1
-    Nelder-Mead    62.85 %     18.99 %          180   9.3 s        6
-    Powell         47.19 %     14.76 %          180   9.4 s       10
+    SLSQP           0.18 %      0.04 %          266  10.1 s        0
+    L-BFGS-B        0.92 %      0.20 %          205   9.3 s        0
+    COBYQA          0.94 %      0.27 %          180  10.0 s        0
+    COBYLA          1.62 %      0.54 %          180   9.6 s        1
+    TNC             1.36 %      0.16 %          625  15.1 s        0
+    Nelder-Mead    65.10 %     18.78 %          180   9.2 s        6
+    Powell         47.77 %     14.58 %          180   8.7 s       11
 
-    SLSQP is the most accurate: every heterogeneous case ends within
-    0.18 %, and its largest error is T-3D N6.0 homogeneous, which stops at
-    the start (see the Notes of test_modal). L-BFGS-B, COBYQA and COBYLA stop
-    at their evaluation limit in most cases, with heterogeneous errors up to
-    0.8 % to 1.5 %. TNC needs the most evaluations and fails Q-3D
-    heterogeneous, and Nelder-Mead and Powell barely move from (0, 0, 0, 0)
-    in 15 evaluations. The test checks the frequency of the last evaluation,
-    which for these methods can differ from the returned fitting_c, so they
-    fail more cases than their errors alone suggest. The cost differs by
-    less than 2 s, in a file that takes about 52 s, most of it in building
-    the meshes.
+    SLSQP is the most accurate: every case ends within 0.18 % of the
+    expected value. L-BFGS-B, COBYQA and COBYLA stop at their evaluation
+    limit in most cases, with errors up to 0.9 % to 1.6 %, and COBYLA fails
+    Q-3D heterogeneous. TNC needs the most evaluations and ends 1.36 % away
+    in T-2D REC heterogeneous, and Nelder-Mead and Powell barely move from
+    (0, 0, 0, 0) in 15 evaluations. The test checks the frequency of the
+    last evaluation, which for these methods can differ from the returned
+    fitting_c, so they fail more cases than their errors alone suggest.
+    Apart from TNC, the cost differs by less than 2 s, in a file that takes
+    about 53 s, most of it in building the meshes.
     """
 
     # Determining layer size
@@ -521,24 +513,25 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
     are those calibrated in test_modal_solvers.py, (-0.5, 0.3, -1.5, -0.9)
     in 2D and (-0.9, 0.3, -2.1, -1.5) in 3D. The heterogeneous models of
     both tests are the same, and the heterogeneous usr rows are within
-    0.73 % of fnum. The homogeneous models use (0, 0, 0, 0), the default of
+    0.95 % of fnum. The homogeneous models use (0, 0, 0, 0), the default of
     the analytical solver. The optimized fitting_c, found for each model
-    separately, are within 0.18 % of fnum in the heterogeneous models. They
+    separately, give the expected value fexp, the frequency of the
+    continuous model (see test_modal_solvers.py), within 0.18 % in every
+    model. fana may therefore differ from fnum by the discretization error
+    of the FEM, as in Q-3D REC heterogeneous. The optimized fitting_c
     differ from the calibrated ones, since four parameters are fitted to a
     single frequency and many values do so. The objective
     (f - 0.95 fexp) (f - 1.05 fexp) is smallest at f = fexp, and SLSQP stops
     at the first values that reach it within its tolerance.
 
-    Of the homogeneous models, only T-2D N2.5 moves away from (0, 0, 0, 0),
-    to (0.010, 0.008, -0.022, -0.113). The others stop after the first
-    gradient (iter = 5: one evaluation and four finite differences): with an
+    Of the homogeneous models, the hypershape layers move away from
+    (0, 0, 0, 0): T-2D N2.5 to (0.011, 0.010, -0.025, -0.130) and T-3D N6.0
+    to (0.010, 0.012, -0.101, -0.047). The rectangular layers stop after the
+    first gradient (iter = 5: one evaluation and four finite differences): with an
     identity initial Hessian the first step of SLSQP is -g, and SLSQP takes
     the start as converged when the predicted change |g|^2 is below
     ftol = 1e-5. In the rectangular layers, (0, 0, 0, 0) already gives fexp
     within 0.03 %, so the gradient is nearly zero (|g|^2 <= 1.6e-9).
-    T-3D N6.0 stays at -1.37 %, although fp1 and fp2 change its frequency:
-    the objective is of order 1e-4, so its gradient (0, 0, -1.6e-3, -7.5e-4)
-    gives |g|^2 = 3.1e-6, below ftol.
 
     ===================================================
     Natural Frequency for 2D model Δx = 100m - Ele = T
@@ -557,7 +550,7 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
 
     *RESULTS HOMOGENEOUS (usr: without optimization)
     Frequency[Hz]    N2.5 iter      (texe/pmem)     REC iter      (texe/pmem)
-    ANALYTICAL    0.51057   20 (0.474s/1.464MB) 0.46875    5 (0.246s/0.613MB)
+    ANALYTICAL    0.50854   20 (0.390s/1.462MB) 0.46875    5 (0.246s/0.613MB)
     ANALYTICAL    0.52430  usr (0.142s/0.389MB) 0.46875  usr (0.136s/0.381MB)
     KRYLOVSCH_CG  0.51046  n/a (0.058s/0.124MB) 0.46875  n/a (0.064s/0.157MB)
     RAYLEIGH      0.51084  n/a (0.180s/0.787MB) 0.46875  n/a (0.178s/0.817MB)
@@ -565,12 +558,12 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
     *ANALYTICAL
        Case     N2.5*     REC*
     fnum[Hz]  0.51046  0.46875
-    fana[Hz]  0.51057  0.46875
+    fana[Hz]  0.50854  0.46875
     fray[Hz]  0.51084  0.46875
 
     *FITTING_C (optimized: SLSQP from (0, 0, 0, 0); usr: fixture)
     Case  Approach      fc1     fc2     fp1     fp2
-    N2.5  optimized   0.010   0.008  -0.022  -0.113
+    N2.5  optimized   0.011   0.010  -0.025  -0.130
     N2.5  usr         0.000   0.000   0.000   0.000
     REC   optimized   0.000   0.000   0.000   0.000
     REC   usr         0.000   0.000   0.000   0.000
@@ -589,22 +582,22 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
 
     *RESULTS HETEROGENEOUS (usr: without optimization)
     Frequency[Hz]    N2.0 iter      (texe/pmem)     REC iter      (texe/pmem)
-    ANALYTICAL    0.50473   30 (1.096s/2.810MB) 0.45572   35 (0.881s/2.416MB)
-    ANALYTICAL    0.50526  usr (0.216s/0.477MB) 0.45256  usr (0.217s/0.449MB)
-    KRYLOVSCH_CG  0.50440  n/a (0.079s/0.138MB) 0.45539  n/a (0.078s/0.113MB)
-    RAYLEIGH      0.52768  n/a (0.169s/1.103MB) 0.47634  n/a (0.188s/1.130MB)
+    ANALYTICAL    0.50225   30 (0.745s/2.803MB) 0.45644   35 (0.715s/2.549MB)
+    ANALYTICAL    0.49753  usr (0.216s/0.477MB) 0.45256  usr (0.217s/0.449MB)
+    KRYLOVSCH_CG  0.50230  n/a (0.079s/0.138MB) 0.45539  n/a (0.078s/0.113MB)
+    RAYLEIGH      0.52536  n/a (0.169s/1.103MB) 0.47634  n/a (0.188s/1.130MB)
 
     *ANALYTICAL
        Case     N2.0*     REC*
-    fnum[Hz]  0.50440  0.45539
-    fana[Hz]  0.50473  0.45572
-    fray[Hz]  0.52768  0.47634
+    fnum[Hz]  0.50230  0.45539
+    fana[Hz]  0.50225  0.45644
+    fray[Hz]  0.52536  0.47634
 
     *FITTING_C (optimized: SLSQP from (0, 0, 0, 0); usr: fixture)
     Case  Approach      fc1     fc2     fp1     fp2
-    N2.0  optimized   0.277   0.006   0.000  -0.551
+    N2.0  optimized   0.245   0.038   0.000  -0.551
     N2.0  usr        -0.500   0.300  -1.500  -0.900
-    REC   optimized   0.569   0.174  -0.640   0.000
+    REC   optimized   0.561   0.172  -0.631   0.000
     REC   usr        -0.500   0.300  -1.500  -0.900
 
     ===================================================
@@ -654,7 +647,7 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
 
     *RESULTS HETEROGENEOUS (usr: without optimization)
     Frequency[Hz]     REC iter      (texe/pmem)
-    ANALYTICAL    0.45625   35 (0.979s/3.144MB)
+    ANALYTICAL    0.45694   35 (0.814s/3.228MB)
     ANALYTICAL    0.45832  usr (0.206s/0.480MB)
     KRYLOVSCH_CG  0.45542  n/a (0.077s/0.141MB)
     RAYLEIGH      0.47619  n/a (0.196s/0.913MB)
@@ -662,12 +655,12 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
     *ANALYTICAL
        Case      REC*
     fnum[Hz]  0.45542
-    fana[Hz]  0.45625
+    fana[Hz]  0.45694
     fray[Hz]  0.47619
 
     *FITTING_C (optimized: SLSQP from (0, 0, 0, 0); usr: fixture)
     Case  Approach      fc1     fc2     fp1     fp2
-    REC   optimized   0.056   0.974  -0.887   0.000
+    REC   optimized   0.056   0.963  -0.877   0.000
     REC   usr        -0.500   0.300  -1.500  -0.900
 
     ===================================================
@@ -685,7 +678,7 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
 
     *RESULTS HOMOGENEOUS (usr: without optimization)
     Frequency[Hz]    N6.0 iter       (texe/pmem)     REC iter       (texe/pmem)
-    ANALYTICAL    0.51628    5 (0.898s/ 4.667MB) 0.47741    5 (0.764s/ 2.488MB)
+    ANALYTICAL    0.50130   21 (0.931s/ 4.665MB) 0.47741    5 (0.764s/ 2.488MB)
     ANALYTICAL    0.51628  usr (0.557s/ 2.272MB) 0.47741  usr (0.513s/ 2.381MB)
     KRYLOVSCH_CH  0.52345  n/a (3.201s/ 0.123MB) 0.47727  n/a (4.896s/ 0.123MB)
     RAYLEIGH      0.52678  n/a (2.000s/35.738MB) 0.47727  n/a (2.432s/42.724MB)
@@ -693,12 +686,12 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
     *ANALYTICAL
        Case     N6.0*     REC*
     fnum[Hz]  0.52345  0.47727
-    fana[Hz]  0.51628  0.47741
+    fana[Hz]  0.50130  0.47741
     fray[Hz]  0.52678  0.47727
 
     *FITTING_C (optimized: SLSQP from (0, 0, 0, 0); usr: fixture)
     Case  Approach      fc1     fc2     fp1     fp2
-    N6.0  optimized   0.000   0.000   0.000   0.000
+    N6.0  optimized   0.010   0.012  -0.101  -0.047
     N6.0  usr         0.000   0.000   0.000   0.000
     REC   optimized   0.000   0.000   0.000   0.000
     REC   usr         0.000   0.000   0.000   0.000
@@ -706,29 +699,29 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
     *EIKONAL HETEROGENEOUS
     eik_min = 83.333 ms (Theoretical value)
     f_est  eik[ms]
-     0.03   76.698
-     0.04   79.370
-     0.05   82.259*
-     0.06   85.344
+     0.03   75.962
+     0.04   78.971
+     0.05   82.070*
+     0.06   85.267
 
     *RESULTS HETEROGENEOUS (usr: without optimization)
     Frequency[Hz]    N2.4 iter        (texe/pmem)     REC iter        (texe/pmem)
-    ANALYTICAL    0.51555   35 ( 1.773s/ 4.043MB) 0.42584   35 ( 1.816s/ 4.424MB)
-    ANALYTICAL    0.51669  usr ( 0.695s/ 2.696MB) 0.42541  usr ( 0.809s/ 3.813MB)
-    KRYLOVSCH_GH  0.51535  n/a ( 6.921s/ 0.110MB) 0.42562  n/a (11.980s/ 0.136MB)
-    RAYLEIGH      0.54073  n/a ( 2.819s/60.581MB) 0.44257  n/a ( 4.590s/95.062MB)
+    ANALYTICAL    0.50852   35 ( 1.395s/ 4.504MB) 0.42590   35 ( 1.325s/ 4.377MB)
+    ANALYTICAL    0.51162  usr ( 0.695s/ 2.696MB) 0.42106  usr ( 0.809s/ 3.813MB)
+    KRYLOVSCH_GH  0.51202  n/a ( 6.921s/ 0.110MB) 0.42207  n/a (11.980s/ 0.136MB)
+    RAYLEIGH      0.53675  n/a ( 2.819s/60.581MB) 0.43878  n/a ( 4.590s/95.062MB)
 
     *ANALYTICAL
        Case     N2.4*     REC*
-    fnum[Hz]  0.51535  0.42562
-    fana[Hz]  0.51555  0.42584
-    fray[Hz]  0.54073  0.44257
+    fnum[Hz]  0.51202  0.42207
+    fana[Hz]  0.50852  0.42590
+    fray[Hz]  0.53675  0.43878
 
     *FITTING_C (optimized: SLSQP from (0, 0, 0, 0); usr: fixture)
     Case  Approach      fc1     fc2     fp1     fp2
-    N2.4  optimized   0.156   0.655  -0.168  -0.988
+    N2.4  optimized   0.158   0.662  -0.170  -0.998
     N2.4  usr        -0.900   0.300  -2.100  -1.500
-    REC   optimized   0.169   0.860  -1.032  -0.001
+    REC   optimized   0.162   0.837  -1.002  -0.001
     REC   usr        -0.900   0.300  -2.100  -1.500
 
     ===================================================
@@ -779,7 +772,7 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
 
     *RESULTS HETEROGENEOUS (usr: without optimization)
     Frequency[Hz]     REC iter       (texe/pmem)
-    ANALYTICAL    0.41160   35 (1.788s/ 8.184MB)
+    ANALYTICAL    0.42592   35 (1.640s/ 7.801MB)
     ANALYTICAL    0.41427  usr (0.698s/ 3.499MB)
     KRYLOVSCH_GG  0.41127  n/a (5.538s/ 0.142MB)
     RAYLEIGH      0.42935  n/a (2.960s/36.020MB)
@@ -787,24 +780,23 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
     *ANALYTICAL
        Case      REC*
     fnum[Hz]  0.41127
-    fana[Hz]  0.41160
+    fana[Hz]  0.42592
     fray[Hz]  0.42935
 
     *FITTING_C (optimized: SLSQP from (0, 0, 0, 0); usr: fixture)
     Case  Approach      fc1     fc2     fp1     fp2
-    REC   optimized   0.184   0.857  -1.044  -0.001
+    REC   optimized   0.163   0.777  -0.943  -0.001
     REC   usr        -0.900   0.300  -2.100  -1.500
 
     The tables were computed with Firedrake 2025.4.1. With Firedrake
-    2026.10.0 all 12 cases pass, and every marked f_est converges without
-    retries; two later runs with the final test code (12 passed, 4 skipped,
-    in 55 s and 43 s) gave the same values. eik_min agrees within 0.02 ms (in ms,
-    2026.10.0 vs 2025.4.1):
+    2026.10.0 all 12 cases pass, every marked f_est converges without
+    retries, and eik_min agrees within 0.02 ms (in ms, 2026.10.0 vs
+    2025.4.1):
 
     Case     Homogeneous         Heterogeneous
     T-2D     166.187  166.193    82.949  82.942
     Q-2D     167.703  167.703    83.744  83.744
-    T-3D     164.686  164.698    82.243  82.259
+    T-3D     164.686  164.698    82.065  82.070
     Q-3D     168.744  168.726    84.375  84.377
 
     An earlier run with the previous homogeneous f_est showed that 0.02 does
@@ -813,29 +805,33 @@ def test_modal(wave_instance, element_geometry, dimension, layer_shape, homogene
     Optimized ANALYTICAL with 2026.10.0 vs 2025.4.1 (fitting_c; fana in Hz):
 
     Case       Version    fitting_c                          fana
-    T-2D N2.5  2026.10.0  ( 0.010,  0.003, -0.022, -0.112)  0.51112
-               2025.4.1   ( 0.010,  0.008, -0.022, -0.113)  0.51057
-    T-2D N2.0  2026.10.0  ( 0.277,  0.006,  0.000, -0.551)  0.50473
-               2025.4.1   ( 0.277,  0.006,  0.000, -0.551)  0.50473
-    T-2D REC   2026.10.0  ( 0.569,  0.174, -0.640,  0.000)  0.45572
-               2025.4.1   ( 0.569,  0.174, -0.640,  0.000)  0.45572
-    Q-2D REC   2026.10.0  ( 0.056,  0.974, -0.887,  0.000)  0.45625
-               2025.4.1   ( 0.056,  0.974, -0.887,  0.000)  0.45625
-    T-3D N2.4  2026.10.0  ( 0.177,  0.696, -0.182, -1.061)  0.51566
-               2025.4.1   ( 0.156,  0.655, -0.168, -0.988)  0.51555
-    T-3D REC   2026.10.0  ( 0.186,  0.930, -1.119, -0.001)  0.42595
-               2025.4.1   ( 0.169,  0.860, -1.032, -0.001)  0.42584
-    Q-3D REC   2026.10.0  ( 0.195,  0.909, -1.107, -0.001)  0.41169
-               2025.4.1   ( 0.184,  0.857, -1.044, -0.001)  0.41160
+    T-2D N2.5  2026.10.0  ( 0.011,  0.004, -0.025, -0.128)  0.50928
+               2025.4.1   ( 0.011,  0.010, -0.025, -0.130)  0.50854
+    T-3D N6.0  2026.10.0  ( 0.010,  0.020, -0.102, -0.048)  0.50116
+               2025.4.1   ( 0.010,  0.012, -0.101, -0.047)  0.50130
+    T-2D N2.0  2026.10.0  ( 0.245,  0.038,  0.000, -0.551)  0.50225
+               2025.4.1   ( 0.245,  0.038,  0.000, -0.551)  0.50225
+    T-2D REC   2026.10.0  ( 0.561,  0.172, -0.631,  0.000)  0.45644
+               2025.4.1   ( 0.561,  0.172, -0.631,  0.000)  0.45644
+    Q-2D REC   2026.10.0  ( 0.056,  0.963, -0.877,  0.000)  0.45694
+               2025.4.1   ( 0.056,  0.963, -0.877,  0.000)  0.45694
+    T-3D N2.4  2026.10.0  ( 0.181,  0.706, -0.185, -1.078)  0.50865
+               2025.4.1   ( 0.158,  0.662, -0.170, -0.998)  0.50852
+    T-3D REC   2026.10.0  ( 0.180,  0.910, -1.093, -0.001)  0.42600
+               2025.4.1   ( 0.162,  0.837, -1.002, -0.001)  0.42590
+    Q-3D REC   2026.10.0  ( 0.174,  0.829, -1.006, -0.001)  0.42598
+               2025.4.1   ( 0.163,  0.777, -0.943, -0.001)  0.42592
 
-    The other homogeneous models keep (0, 0, 0, 0) and the same frequency with
-    both versions. The 2D heterogeneous results are identical. In 3D the
-    velocity of the cells whose centroid lies on x = 0.5 depends on round-off
-    (see test_modal_solvers.py), so c_eq and the optimized fitting_c differ,
-    and both fits end within 0.10 % of the expected values. In T-2D N2.5,
-    c_eq = c_eqref at (0, 0, 0, 0), so both terms of the max in c_ref are
-    equal and the finite-difference gradient depends on round-off: SLSQP takes
-    a slightly different path, and both results are within 0.13 % of fnum.
+    The rectangular homogeneous models keep (0, 0, 0, 0) and the same
+    frequency with both versions, and the 2D heterogeneous results are
+    identical. In 3D the velocity of the cells whose centroid lies on
+    x = 0.5 depends on round-off (see test_modal_solvers.py), so c_eq and
+    the optimized fitting_c of the heterogeneous models differ between the
+    versions. In the homogeneous hypershape layers, c_eq = c_eqref at
+    (0, 0, 0, 0), so both terms of the max in c_ref are equal and the
+    finite-difference gradient depends on round-off, and SLSQP takes a
+    slightly different path. Every fit ends within 0.18 % of the expected
+    value with both versions.
     """
 
     case = (dimension, element_geometry, homogeneous, layer_shape)

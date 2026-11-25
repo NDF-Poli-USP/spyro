@@ -6,6 +6,7 @@ from numpy import (
     column_stack,
     concatenate,
     empty_like,
+    inf,
     linspace,
     log10,
     min,
@@ -178,12 +179,14 @@ class MeshOps:
         Notes
         -----
         The extremes are reduced over ``mesh.comm``, so every rank gets the
-        limits of the whole mesh and not only those of its own partition.
+        limits of the whole mesh and not only those of its own partition. The
+        coordinates are only read, so they are not marked as modified, and a rank
+        without nodes contributes ``inf`` and ``-inf``.
         """
 
-        coords = mesh.coordinates.dat.data_with_halos
-        local_min = min(coords, axis=0)
-        local_max = max(coords, axis=0)
+        coords = mesh.coordinates.dat.data_ro_with_halos
+        local_min = min(coords, axis=0, initial=inf)
+        local_max = max(coords, axis=0, initial=-inf)
 
         min_coordinates = empty_like(local_min)
         max_coordinates = empty_like(local_max)
