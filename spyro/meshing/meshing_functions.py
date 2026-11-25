@@ -7,6 +7,7 @@ from .meshing_gmsh2d import (
     apply_structured_winslow_smoothing2d,
 )
 from .meshing_utils import create_sizing_function, calculate_edge_length
+from .meshing_operations import MeshOps
 from .firedrake_based_wrappers import rectangle_mesh, periodic_rectangle_mesh, box_mesh
 from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_with_velocity_model
 from .seismic_mesh_based_wrappers import create_seismicmesh_2D_mesh_homogeneous
@@ -205,23 +206,35 @@ class AutomaticMesh:
         Returns
         -------
         None
+
+        Notes
+        -----
+        The mesh is shifted so that the minimum x, and y in 3D, is ``-pad``, in
+        either direction. The minimum is compared with ``-pad`` through the
+        quotient ``-min / pad``, which is 1 only if both are equal (a difference
+        of one unit in the last place already gives another quotient), and the
+        shift is ``(-min / pad - 1) * pad``. Each rank only holds its part of the
+        mesh, so the minimum coordinates are those of the whole mesh, reduced over
+        every rank by `MeshOps.extract_extreme_coordinates`, so that every rank
+        applies the same shift.
         """
+
+        # Minimum coordinates of the whole mesh
+        min_coordinates = MeshOps.extract_extreme_coordinates(mesh)[0]
 
         # Adjusting coordinates
         if self.dimension == 3:  # 3D
-            min_y = mesh.coordinates.dat.data_with_halos[:, 2].min()
-            if abs(min_y / pad) != 1.0:  # Forcing node at (0,0,0)
+            ratio_y = -min_coordinates[2] / pad
+            if ratio_y != 1.0:  # Forcing node at (0,0,0)
                 SpyroEnsemble.print("Adjusting Mesh Y-coordinates")
-                err_y = (1.0 - abs(min_y / pad)) * pad
-                err_y *= -np.sign(err_y)
+                err_y = (ratio_y - 1.0) * pad
                 mesh.coordinates.dat.data_with_halos[:, 2] += err_y
 
         # Adjusting coordinates
-        min_x = mesh.coordinates.dat.data_with_halos[:, 1].min()
-        if abs(min_x / pad) != 1.0:  # Forcing node at (0,0)
+        ratio_x = -min_coordinates[1] / pad
+        if ratio_x != 1.0:  # Forcing node at (0,0)
             SpyroEnsemble.print("Adjusting Mesh X-coordinates")
-            err_x = (1.0 - abs(min_x / pad)) * pad
-            err_x *= -np.sign(err_x)
+            err_x = (ratio_x - 1.0) * pad
             mesh.coordinates.dat.data_with_halos[:, 1] += err_x
 
     def create_firedrake_mesh(self):

@@ -293,7 +293,6 @@ class TestMeasureError:
 
     def test_save_reference_signal(
         self,
-        measure_error,
         acoustic_receiver_data,
         tmp_path,
     ):
@@ -306,18 +305,16 @@ class TestMeasureError:
             for i in range(n_receivers)
         ]
 
-        with patch(
-            "spyro.tools.error_measure.getcwd",
-            return_value=str(tmp_path),
-        ):
-            with patch("numpy.save") as mock_save:
-                measure_error.save_reference_signal(
-                    receiver_locations=receiver_locations,
-                    forward_solution_receivers=numerical,
-                    number_of_receivers=n_receivers,
-                    nyquist_frequency=50.0,
-                    output_file_prefix="test_ref",
-                )
+        # The reference folder is created, so it must be a writable one
+        measure_error = MeasureError(output_folder=str(tmp_path / "output"))
+        with patch("numpy.save") as mock_save:
+            measure_error.save_reference_signal(
+                receiver_locations=receiver_locations,
+                forward_solution_receivers=numerical,
+                number_of_receivers=n_receivers,
+                nyquist_frequency=50.0,
+                output_file_prefix="test_ref",
+            )
 
         # One file for the time-domain signal and one for its FFT.
         assert mock_save.call_count == 2

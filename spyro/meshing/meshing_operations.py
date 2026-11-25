@@ -1,6 +1,16 @@
 from firedrake import as_vector, assemble, CellDiameter, DirichletBC, SpatialCoordinate
 from mpi4py import MPI
-from numpy import allclose, clip, column_stack, empty_like, linspace, log10, min, max
+from numpy import (
+    allclose,
+    clip,
+    column_stack,
+    empty_like,
+    inf,
+    linspace,
+    log10,
+    min,
+    max,
+)
 from ..utils.error_management import validate_parameter
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..utils.utils import global_max, global_min
@@ -166,12 +176,14 @@ class MeshOps():
         Notes
         -----
         The extremes are reduced over ``mesh.comm``, so every rank gets the
-        limits of the whole mesh and not only those of its own partition.
+        limits of the whole mesh and not only those of its own partition. The
+        coordinates are only read, so they are not marked as modified, and a rank
+        without nodes contributes ``inf`` and ``-inf``.
         """
 
-        coords = mesh.coordinates.dat.data_with_halos
-        local_min = min(coords, axis=0)
-        local_max = max(coords, axis=0)
+        coords = mesh.coordinates.dat.data_ro_with_halos
+        local_min = min(coords, axis=0, initial=inf)
+        local_max = max(coords, axis=0, initial=-inf)
 
         min_coordinates = empty_like(local_min)
         max_coordinates = empty_like(local_max)

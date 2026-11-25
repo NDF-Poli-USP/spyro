@@ -1,4 +1,4 @@
-from firedrake import Function, VTKFile
+from firedrake import assemble, Function, MIN, VTKFile
 from numpy import abs, array, ceil, inf, log10, minimum
 from os import getcwd
 from time import perf_counter
@@ -12,13 +12,31 @@ from ..tools.error_measure import MeasureError
 from ..domains.space import create_function_space
 from .lay_len import calc_size_lay
 from ..plots.plots_habc import plot_function_layer_size
-from ..tools.habc_tools import clipping_coordinates_lay_field, extend_scalar_field_profile
-from ..utils.error_management import (validate_enum, validate_data_structure,
-                                      validate_numeric, validate_parameter,
-                                      validate_string)
+from ..tools.habc_tools import (
+    clipping_coordinates_lay_field,
+    extend_scalar_field_profile,
+)
+from ..utils.error_management import (
+    validate_enum,
+    validate_data_structure,
+    validate_numeric,
+    validate_parameter,
+    validate_string,
+)
 from ..utils.freq_tools import freq_response
-from ..utils.typing import (BoundaryConditionsType, HyperLayerDegreeType,
-                            AbsorbingBCsType, LayerShapeType, LayerSizeRefFrequency)
+from ..utils.typing import (
+    BoundaryConditionsType,
+    HyperLayerDegreeType,
+    AbsorbingBCsType,
+    LayerShapeType,
+    LayerSizeRefFrequency,
+)
+from ..version_control import is_firedrake_new
+
+if is_firedrake_new():
+    from firedrake import interpolate
+else:
+    from firedrake.__future__ import interpolate
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -165,13 +183,22 @@ class ABCLayer(NRBC, MeasureError):
         Set the velocity profile for the model with absorbing layer.
     """
 
-    def __init__(self, domain_dim, frequency=None, dt=None,
-                 dimension=2, quadrilateral=False, func_space_type=None,
-                 abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
-                 abc_boundary_layer_type=AbsorbingBCsType.HYBRID,
-                 abc_reference_freq=LayerSizeRefFrequency.SOURCE,
-                 abc_degree_type=HyperLayerDegreeType.REAL,
-                 abc_deg_layer=None, output_folder=None, comm=None):
+    def __init__(
+        self,
+        domain_dim,
+        frequency=None,
+        dt=None,
+        dimension=2,
+        quadrilateral=False,
+        func_space_type=None,
+        abc_boundary_layer_shape=LayerShapeType.RECTANGULAR,
+        abc_boundary_layer_type=AbsorbingBCsType.HYBRID,
+        abc_reference_freq=LayerSizeRefFrequency.SOURCE,
+        abc_degree_type=HyperLayerDegreeType.REAL,
+        abc_deg_layer=None,
+        output_folder=None,
+        comm=None,
+    ):
         """Initialize the ABCLayer class.
 
         Parameters
@@ -224,20 +251,35 @@ class ABCLayer(NRBC, MeasureError):
         self.dimension = validate_parameter("dimension", dimension, [2, 3])
 
         # Original domain dimensions
-        self.domain_dim = validate_data_structure("domain_dim", domain_dim, "tuple",
-                                                  expected_type_element=("float", "int"),
-                                                  expected_length=dimension)
+        self.domain_dim = validate_data_structure(
+            "domain_dim",
+            domain_dim,
+            "tuple",
+            expected_type_element=("float", "int"),
+            expected_length=dimension,
+        )
         # Source frequency
-        self.frequency = validate_numeric("frequency", frequency,
-                                          float_num=True, integer_num=True,
-                                          lower_bound=0., accept_parameter_as_none=True)
+        self.frequency = validate_numeric(
+            "frequency",
+            frequency,
+            float_num=True,
+            integer_num=True,
+            lower_bound=0.0,
+            accept_parameter_as_none=True,
+        )
 
         # Timestep for the transient simulation
-        self.dt = validate_numeric("dt", dt, float_num=True, integer_num=True,
-                                   lower_bound=0., accept_parameter_as_none=True)
+        self.dt = validate_numeric(
+            "dt",
+            dt,
+            float_num=True,
+            integer_num=True,
+            lower_bound=0.0,
+            accept_parameter_as_none=True,
+        )
 
         # Nyquist frequency
-        self.freq_Nyquist = None if self.dt is None else 1. / (2. * self.dt)
+        self.freq_Nyquist = None if self.dt is None else 1.0 / (2.0 * self.dt)
 
         # Quadrilateral/hexahedral elements
         self.quadrilateral = quadrilateral
@@ -246,30 +288,41 @@ class ABCLayer(NRBC, MeasureError):
         self.func_space_type = func_space_type
 
         # ABC layer parameters
-        self.abc_boundary_layer_type = validate_enum("abc_boundary_layer_type",
-                                                     abc_boundary_layer_type,
-                                                     AbsorbingBCsType)
-        if abc_boundary_layer_type not in [AbsorbingBCsType.HYBRID, AbsorbingBCsType.PML]:
-            validate_parameter("abc_boundary_layer_type", abc_boundary_layer_type,
-                               [AbsorbingBCsType.HYBRID, AbsorbingBCsType.PML])
+        self.abc_boundary_layer_type = validate_enum(
+            "abc_boundary_layer_type", abc_boundary_layer_type, AbsorbingBCsType
+        )
+        if abc_boundary_layer_type not in [
+            AbsorbingBCsType.HYBRID,
+            AbsorbingBCsType.PML,
+        ]:
+            validate_parameter(
+                "abc_boundary_layer_type",
+                abc_boundary_layer_type,
+                [AbsorbingBCsType.HYBRID, AbsorbingBCsType.PML],
+            )
 
-        self.abc_boundary_layer_shape = validate_enum("abc_boundary_layer_shape",
-                                                      abc_boundary_layer_shape,
-                                                      LayerShapeType)
-        self.abc_reference_freq = validate_enum("abc_reference_freq",
-                                                abc_reference_freq,
-                                                LayerSizeRefFrequency)
-        self.abc_degree_type = validate_enum("abc_degree_type", abc_degree_type,
-                                             HyperLayerDegreeType)
+        self.abc_boundary_layer_shape = validate_enum(
+            "abc_boundary_layer_shape", abc_boundary_layer_shape, LayerShapeType
+        )
+        self.abc_reference_freq = validate_enum(
+            "abc_reference_freq", abc_reference_freq, LayerSizeRefFrequency
+        )
+        self.abc_degree_type = validate_enum(
+            "abc_degree_type", abc_degree_type, HyperLayerDegreeType
+        )
 
         # Layer degree
         if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
             self.abc_deg_layer = None
         elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-            self.abc_deg_layer = validate_numeric('abc_deg_layer', abc_deg_layer,
-                                                  float_num=True, integer_num=True,
-                                                  lower_bound=2.,
-                                                  include_lower_bound=True)
+            self.abc_deg_layer = validate_numeric(
+                "abc_deg_layer",
+                abc_deg_layer,
+                float_num=True,
+                integer_num=True,
+                lower_bound=2.0,
+                include_lower_bound=True,
+            )
 
         # Communicator MPI
         self.comm = comm
@@ -281,8 +334,9 @@ class ABCLayer(NRBC, MeasureError):
         self.path_to_save_abc_layer_case(output_folder=output_folder)
 
         # Initializing the error measure class
-        MeasureError.__init__(self, output_folder=self.path_save,
-                              output_case=self.path_case_abc)
+        MeasureError.__init__(
+            self, output_folder=self.path_save, output_case=self.path_case_abc
+        )
 
     def _define_layer_shape(self):
         """Define the shape of the absorbing layer.
@@ -301,20 +355,23 @@ class ABCLayer(NRBC, MeasureError):
 
         # Initializating the layer
         if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
-
             # Initializing the rectangular layer
             from .rec_lay import RectangLayer
+
             Rectangle_layer = RectangLayer(self.domain_dim, dimension=self.dimension)
 
             return Rectangle_layer
 
         elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-
             # Initializing the hyperelliptical layer
             from .hyp_lay import HyperLayer
-            Hypershape_layer = HyperLayer(self.domain_dim, n_hyp=self.abc_deg_layer,
-                                          n_type=self.abc_degree_type,
-                                          dimension=self.dimension)
+
+            Hypershape_layer = HyperLayer(
+                self.domain_dim,
+                n_hyp=self.abc_deg_layer,
+                n_type=self.abc_degree_type,
+                dimension=self.dimension,
+            )
             return Hypershape_layer
 
     def formatting_abc_layer_type(self, str_to_format, for_prints=True):
@@ -383,10 +440,15 @@ class ABCLayer(NRBC, MeasureError):
             case_abc += "_BND"
 
         # Printing layer info on screen
-        layer_str = self.formatting_abc_layer_type("\n{} Layer Shape: ") + \
-            f"{self.abc_boundary_layer_shape.value.capitalize()}" + \
-            (f" - Degree: {self.abc_deg_layer}"
-             if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else "")
+        layer_str = (
+            self.formatting_abc_layer_type("\n{} Layer Shape: ")
+            + f"{self.abc_boundary_layer_shape.value.capitalize()}"
+            + (
+                f" - Degree: {self.abc_deg_layer}"
+                if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE
+                else ""
+            )
+        )
         SpyroEnsemble.print(layer_str)
 
         return case_abc
@@ -470,24 +532,24 @@ class ABCLayer(NRBC, MeasureError):
         SpyroEnsemble.print("\nDetermining Reference Frequency")
 
         if self.abc_reference_freq == LayerSizeRefFrequency.SOURCE:
-
             # Theoretical central Ricker source frequency (it can be a initial guess)
             self.freq_ref = self.frequency
 
         elif self.abc_reference_freq == LayerSizeRefFrequency.BOUNDARY:
-
             # Reference frequency of the wave at the boundary
             self.freq_ref = inf
 
             for n_crit in range(self.number_of_receivers):
-
                 # Transient response at each critical Eikonal point
                 histPcrit = self.receivers_reference[:, n_crit]
 
                 # Get the minimum frequency excited at each critical point
-                freq_ref = freq_response(histPcrit, self.freq_Nyquist,
-                                         fpad=fpad, get_dominant_freq=True)
-                SpyroEnsemble.print(f"Frequency at Critical Point {n_crit:>2.0f}: {freq_ref:.5f}")
+                freq_ref = freq_response(
+                    histPcrit, self.freq_Nyquist, fpad=fpad, get_dominant_freq=True
+                )
+                SpyroEnsemble.print(
+                    f"Frequency at Critical Point {n_crit:>2.0f}: {freq_ref:.5f}"
+                )
 
                 self.freq_ref = min(self.freq_ref, freq_ref)
 
@@ -593,15 +655,29 @@ class ABCLayer(NRBC, MeasureError):
         self.crit_source = self.eik_bnd[0][-1]
 
         # Computing layer sizes
-        self.factor_length_pad, self.abc_pad_length, self.ele_pad, \
-            self.d_norm, self.a_par, self.FLpossible = calc_size_lay(
-                self.freq_ref, z_par, self.lmin, self.lref,
-                n_root=n_root, layer_based_on_mesh=layer_based_on_mesh)
+        (
+            self.factor_length_pad,
+            self.abc_pad_length,
+            self.ele_pad,
+            self.d_norm,
+            self.a_par,
+            self.FLpossible,
+        ) = calc_size_lay(
+            self.freq_ref,
+            z_par,
+            self.lmin,
+            self.lref,
+            n_root=n_root,
+            layer_based_on_mesh=layer_based_on_mesh,
+        )
 
-        plot_function_layer_size([self.a_par, z_par],
-                                 [self.freq_ref, self.frequency],
-                                 [self.lmin, self.lref], self.FLpossible,
-                                 output_folder=self.path_case_abc)
+        plot_function_layer_size(
+            [self.a_par, z_par],
+            [self.freq_ref, self.frequency],
+            [self.lmin, self.lref],
+            self.FLpossible,
+            output_folder=self.path_case_abc,
+        )
 
         # Layer type
         lay_str = "\nDetermining New Geometry with {}"
@@ -615,16 +691,16 @@ class ABCLayer(NRBC, MeasureError):
         domain_layer_full = self.abc_domain_dimensions()
 
         if self.abc_boundary_layer_shape == LayerShapeType.RECTANGULAR:
-
             # Geometric properties of the rectangular layer
             self.layer_geometry.calc_rec_geom_prop(
-                domain_layer_full, self.abc_pad_length)
+                domain_layer_full, self.abc_pad_length
+            )
 
         elif self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE:
-
             # Geometric properties of the hypershape layer
             self.layer_geometry.calc_hyp_geom_prop(
-                domain_layer_full, self.abc_pad_length, self.lmin)
+                domain_layer_full, self.abc_pad_length, self.lmin
+            )
 
     def create_mesh_with_layer(self, wave, inf_model=False, spln=True, save_file=True):
         """Create a mesh with absorbing layer based on the determined size.
@@ -659,7 +735,6 @@ class ABCLayer(NRBC, MeasureError):
 
         # New mesh with layer
         if layer_shape == LayerShapeType.RECTANGULAR:
-
             # Update the pad length in wave object
             wave.abc_pad_length = self.abc_pad_length
 
@@ -668,7 +743,6 @@ class ABCLayer(NRBC, MeasureError):
             SpyroEnsemble.print("Extended Rectangular Mesh Generated Successfully")
 
         elif layer_shape == LayerShapeType.HYPERSHAPE:
-
             # Update the pad length in wave.mesh_parameters object
             wave.mesh_parameters.abc_pad_length = self.abc_pad_length
 
@@ -680,11 +754,15 @@ class ABCLayer(NRBC, MeasureError):
                 geometry_param = self.layer_geometry.surf_hyp
 
             hypershape_param = (
-                self.layer_geometry.n_hyp, geometry_param, *self.layer_geometry.hyper_axes)
+                self.layer_geometry.n_hyp,
+                geometry_param,
+                *self.layer_geometry.hyper_axes,
+            )
 
             # Creating the mesh with the absorbing layer based on the hypershape geometry
             mesh_abc = wave.mesh_ops.hypershape_mesh_habc(
-                hypershape_param, wave.mesh_original, wave.mesh_parameters, spln=spln)
+                hypershape_param, wave.mesh_original, wave.mesh_parameters, spln=spln
+            )
 
             # Updating the mesh with the absorbing layer
             wave.set_mesh(user_mesh=mesh_abc)
@@ -695,8 +773,9 @@ class ABCLayer(NRBC, MeasureError):
             if inf_model:
                 pth_mesh = self.path_save + "preamble/mesh_inf.pvd"
             else:
-                mesh_file_name = self.formatting_abc_layer_type("mesh_{}.pvd",
-                                                                for_prints=False)
+                mesh_file_name = self.formatting_abc_layer_type(
+                    "mesh_{}.pvd", for_prints=False
+                )
                 pth_mesh = self.path_case_abc + mesh_file_name
 
             # Save new mesh
@@ -748,39 +827,58 @@ class ABCLayer(NRBC, MeasureError):
         V = create_function_space(wave.mesh, method_element, 0)
 
         # Initialize velocity field and assigning the original velocity model
-        wave.c = Function(V).interpolate(wave.initial_velocity_model,
-                                         allow_missing_dofs=True)
+        wave.c = Function(V).interpolate(
+            wave.initial_velocity_model, allow_missing_dofs=True
+        )
 
         # Clipping coordinates to the layer domain
         domain_layer = self.abc_domain_dimensions(full_hyp=False)
-        ufl_coordinates_abc = wave.mesh_ops.get_spatial_coordinates_abc(wave.mesh,
-                                                                        domain_layer)
-        lay_field, layer_mask = \
-            clipping_coordinates_lay_field(self.domain_dim, wave.mesh,
-                                           self.dimension, ufl_coordinates_abc,
-                                           V, quadrilateral=self.quadrilateral)
+        ufl_coordinates_abc = wave.mesh_ops.get_spatial_coordinates_abc(
+            wave.mesh, domain_layer
+        )
+        lay_field, layer_mask = clipping_coordinates_lay_field(
+            self.domain_dim,
+            wave.mesh,
+            self.dimension,
+            ufl_coordinates_abc,
+            V,
+            quadrilateral=self.quadrilateral,
+        )
 
         # Extending velocity model within the absorbing layer
-        extended_velocity = \
-            extend_scalar_field_profile(wave.mesh_original, wave.initial_velocity_model,
-                                        lay_field, layer_mask, wave.mesh_parameters.tol,
-                                        method=method, name_prop="Velocity")
+        extended_velocity = extend_scalar_field_profile(
+            wave.mesh_original,
+            wave.initial_velocity_model,
+            lay_field,
+            layer_mask,
+            wave.mesh_parameters.tol,
+            method=method,
+            name_prop="Velocity",
+        )
 
         # Interpolating the velocity model in the layer
-        wave.c.interpolate(extended_velocity * layer_mask + (1. - layer_mask)
-                           * wave.c, allow_missing_dofs=True)
+        wave.c.interpolate(
+            extended_velocity * layer_mask + (1.0 - layer_mask) * wave.c,
+            allow_missing_dofs=True,
+        )
         del layer_mask, lay_field
 
-        # Interpolating in the space function of the problem
-        wave.c = Function(wave.function_space, name="c[km/s])").interpolate(wave.c)
+        # Interpolating in the space function of the problem. At the nodes shared
+        # by cells of different velocities, the minimum is taken, as for the
+        # velocity at the critical point (Minimum_Eikonal), so that it does not
+        # depend on the partition
+        c_abc = Function(wave.function_space, name="c[km/s])")
+        c_abc.assign(assemble(interpolate(wave.c, wave.function_space, access=MIN)))
+        wave.c = c_abc
 
         # Save new velocity model
         if save_file:
             if inf_model:
                 file_name = "preamble/c_inf.pvd"
             else:
-                c_file_name = self.formatting_abc_layer_type("/c_{}.pvd",
-                                                             for_prints=False)
+                c_file_name = self.formatting_abc_layer_type(
+                    "/c_{}.pvd", for_prints=False
+                )
                 file_name = self.case_abc + c_file_name
 
             outfile = VTKFile(self.path_save + file_name)
@@ -808,42 +906,56 @@ class ABCLayer(NRBC, MeasureError):
 
         # Initializing the NRBC class
         NRBC.__init__(
-            self, self.domain_dim, self.abc_boundary_layer_shape,
-            dimension=self.dimension, output_folder=self.path_case_abc)
+            self,
+            self.domain_dim,
+            self.abc_boundary_layer_shape,
+            dimension=self.dimension,
+            output_folder=self.path_case_abc,
+        )
 
         # Applying NRBCs on outer boundary layer
         crit_source = bnd_nod_ids_nfs = bnd_nodes_nfs = None
-        if non_reflect_bc == BoundaryConditionsType.SOMMERFELD or \
-                non_reflect_bc == BoundaryConditionsType.HIGDON:
-
+        if (
+            non_reflect_bc == BoundaryConditionsType.SOMMERFELD
+            or non_reflect_bc == BoundaryConditionsType.HIGDON
+        ):
             SpyroEnsemble.print("\nApplying Non-Reflecting Boundary Conditions")
 
             # Getting boundary data from the layer boundaries
             if non_reflect_bc == BoundaryConditionsType.SOMMERFELD:
-                bnd_nod_ids_nfs = wave.mesh_ops.layer_boundary_data(wave.mesh,
-                                                                    wave.function_space,
-                                                                    wave.mesh_parameters)[0]
+                bnd_nod_ids_nfs = wave.mesh_ops.layer_boundary_data(
+                    wave.mesh, wave.function_space, wave.mesh_parameters
+                )[0]
 
             if non_reflect_bc == BoundaryConditionsType.HIGDON:
                 crit_source = self.crit_source
-                bnd_nod_ids_nfs, bnd_nodes_nfs = \
-                    wave.mesh_ops.layer_boundary_data(wave.mesh,
-                                                      wave.function_space,
-                                                      wave.mesh_parameters)
+                bnd_nod_ids_nfs, bnd_nodes_nfs = wave.mesh_ops.layer_boundary_data(
+                    wave.mesh, wave.function_space, wave.mesh_parameters
+                )
 
             # Hypershape parameters
-            hyp_par = (self.layer_geometry.n_hyp, *self.layer_geometry.hyper_axes) \
-                if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE else None
+            hyp_par = (
+                (self.layer_geometry.n_hyp, *self.layer_geometry.hyper_axes)
+                if self.abc_boundary_layer_shape == LayerShapeType.HYPERSHAPE
+                else None
+            )
 
             # Applying Higdon ABCs
-            self.cos_ang_HigdonBC(wave.function_space, crit_source, bnd_nod_ids_nfs,
-                                  bnd_nodes_nfs, non_reflect_bc,
-                                  hyp_par=hyp_par, save_file=save_file)
+            self.cos_ang_HigdonBC(
+                wave.function_space,
+                crit_source,
+                bnd_nod_ids_nfs,
+                bnd_nodes_nfs,
+                non_reflect_bc,
+                hyp_par=hyp_par,
+                save_file=save_file,
+            )
         else:
             SpyroEnsemble.print("\nNot Non-Reflecting Boundary Conditions Prescribed")
 
-    def check_timestep_abc(self, wave, max_divisor_tf=1,
-                           set_max_dt=True, method='ANALYTICAL', mag_add=3):
+    def check_timestep_abc(
+        self, wave, max_divisor_tf=1, set_max_dt=True, method="ANALYTICAL", mag_add=3
+    ):
         """Check if the timestep size is appropriate for the transient response.
 
         Parameters
@@ -899,10 +1011,21 @@ class ABCLayer(NRBC, MeasureError):
         """
 
         # Cheking input parameters
-        validate_numeric("max_divisor_tf", max_divisor_tf,
-                         float_num=False, integer_num=True, lower_bound=0.)
-        validate_numeric("mag_add", mag_add, float_num=False, integer_num=True,
-                         lower_bound=0., include_lower_bound=True)
+        validate_numeric(
+            "max_divisor_tf",
+            max_divisor_tf,
+            float_num=False,
+            integer_num=True,
+            lower_bound=0.0,
+        )
+        validate_numeric(
+            "mag_add",
+            mag_add,
+            float_num=False,
+            integer_num=True,
+            lower_bound=0.0,
+            include_lower_bound=True,
+        )
 
         SpyroEnsemble.print("\nChecking Timestep Size")
 
@@ -963,10 +1086,17 @@ class ABCLayer(NRBC, MeasureError):
         )
 
         # Updating Nyquist frequency
-        self.freq_Nyquist = 1. / (2. * wave.dt)
+        self.freq_Nyquist = 1.0 / (2.0 * wave.dt)
         SpyroEnsemble.print(f"New Nyquist Frequency: {self.freq_Nyquist:.5f} Hz")
 
-    def layer_infinite_model(self, lmin, c_bnd_max, final_time, source_locations=None):
+    def layer_infinite_model(
+        self,
+        lmin: float,
+        c_bnd_max: float,
+        c_max: float,
+        final_time: float,
+        source_locations: list | None = None,
+    ) -> float:
         """Determine the domain extension size for the infinite domain model.
 
         Parameters
@@ -975,6 +1105,9 @@ class ABCLayer(NRBC, MeasureError):
             Minimum mesh size.
         c_bnd_max : `float`
             Maximum velocity value on the boundary of the original domain.
+        c_max : `float`
+            Maximum velocity value in the original domain, rounded with the same
+            tolerance as ``c_bnd_max``, so ``c_max >= c_bnd_max``.
         final_time : `float`
             Final time of the simulation.
         source_locations: `list`, optional
@@ -985,51 +1118,66 @@ class ABCLayer(NRBC, MeasureError):
         infinite_pad_len : `float`
             Size of the domain extension for the infinite domain model.
 
+        Raises
+        ------
+        ValueError
+            If ``c_max`` is smaller than ``c_bnd_max``.
+
         Notes
         -----
         The extension covers the bottom and the lateral boundaries; the top is a
         free surface. A wave that first reaches the original boundary at time
         ``t_bnd`` and is reflected by the boundary of the extension returns to the
-        original boundary at ``t_bnd + 2 * pad / c``. With ``c = c_bnd_max``, the
+        original boundary at ``t_bnd + 2 * pad / c``. The velocity of the extension
+        is extended from the original boundary, so ``c <= c_bnd_max`` and the
         reflections reach no receiver of the original domain before the final
         time if ``pad >= c_bnd_max * (final_time - t_bnd) / 2``, rounded up to a
         multiple of ``lmin``.
 
         ``t_bnd`` is the minimum Eikonal at the critical boundary points if the
-        Eikonal analysis was performed. Otherwise, it is the distance from the
-        nearest source to the nearest absorbing boundary over ``c_bnd_max``, so
-        half of that distance is subtracted. Source coordinates follow spyro's
-        convention, with ``-length_z <= z <= 0``.
+        Eikonal analysis was performed. Otherwise, the wave travels from the
+        nearest source to the nearest absorbing boundary at most at the maximum
+        velocity of the original domain, so ``t_bnd`` is bounded below by that
+        distance over ``c_max``. Source coordinates follow spyro's convention,
+        with ``-length_z <= z <= 0``.
         """
 
         # Cheking input parameters
-        validate_numeric("lmin", lmin, float_num=True,
-                         integer_num=True, lower_bound=0.)
-        validate_numeric("c_bnd_max", c_bnd_max, float_num=True,
-                         integer_num=True, lower_bound=0.)
-        validate_numeric("final_time", final_time, float_num=True,
-                         integer_num=True, lower_bound=0.)
-        validate_data_structure("source_locations", source_locations, "list",
-                                expected_type_element="tuple", accept_parameter_as_none=True)
-
-        # Size of the domain extension
-        add_dom = c_bnd_max * final_time / 2.
+        validate_numeric(
+            "lmin", lmin, float_num=True, integer_num=True, lower_bound=0.0
+        )
+        validate_numeric(
+            "c_bnd_max", c_bnd_max, float_num=True, integer_num=True, lower_bound=0.0
+        )
+        validate_numeric(
+            "c_max",
+            c_max,
+            float_num=True,
+            integer_num=True,
+            lower_bound=c_bnd_max,
+            include_lower_bound=True,
+        )
+        validate_numeric(
+            "final_time", final_time, float_num=True, integer_num=True, lower_bound=0.0
+        )
+        validate_data_structure(
+            "source_locations",
+            source_locations,
+            "list",
+            expected_type_element="tuple",
+            accept_parameter_as_none=True,
+        )
 
         str_pad = "Infinite Domain Extension Based on "
 
-        # Distance already travelled by the wave
-        if hasattr(self, 'eik_bnd'):
-
+        # Earliest time at which the wave reaches the absorbing boundaries
+        if hasattr(self, "eik_bnd"):
             str_pad += "Minimun Eikonal at Critical Boundary Points"
 
             # If Eikonal analysis was performed (see `critical_boundary_points` method)
             # Structure eikmin: [pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]
-            eikmin = self.eik_bnd[0][2]
-
-            # Minimum distance to the nearest boundary
-            dist_to_bnd = c_bnd_max * eikmin / 2.
+            t_bnd = self.eik_bnd[0][2]
         else:
-
             str_pad += "Minimum Distance Source-Boundary"
 
             # If Eikonal analysis was not performed
@@ -1046,17 +1194,20 @@ class ABCLayer(NRBC, MeasureError):
 
             if self.dimension == 3:  # 3D
                 length_y = self.domain_dim[2]
-                delta_y = minimum(abs(source_loc[:, 2]), abs(source_loc[:, 2] - length_y))
+                delta_y = minimum(
+                    abs(source_loc[:, 2]), abs(source_loc[:, 2] - length_y)
+                )
                 cand_dist.append(delta_y)
 
-            # Half the minimum distance from any source to the nearest boundary,
-            # i.e. c_bnd_max * t_bnd / 2 with t_bnd = distance / c_bnd_max
-            dist_to_bnd = float(array(cand_dist).min()) / 2.0
+            # Lower bound of the arrival time at the nearest boundary: the wave
+            # travels at most at the maximum velocity of the original domain
+            t_bnd = float(array(cand_dist).min()) / c_max
 
         SpyroEnsemble.print(str_pad)
 
-        # Subtracting the distance already travelled by the wave
-        add_dom -= dist_to_bnd
+        # Size of the domain extension: the reflections return to the original
+        # boundary after the final time
+        add_dom = c_bnd_max * (final_time - t_bnd) / 2.0
 
         # Pad length for the infinite domain extension
         infinite_pad_len = lmin * ceil(add_dom / lmin)
@@ -1076,21 +1227,26 @@ class ABCLayer(NRBC, MeasureError):
         None
         """
 
-        lmin = wave.mesh_parameters.lmin if not hasattr(self, 'lmin') else self.lmin
+        lmin = wave.mesh_parameters.lmin if not hasattr(self, "lmin") else self.lmin
         c_bnd_max = wave.c_bnd_max
+        c_max = wave.c_max
         final_time = wave.final_time
         source_locations = wave.source_locations
 
         # Size of the domain extension
-        self.abc_pad_length = self.layer_infinite_model(lmin, c_bnd_max, final_time,
-                                                        source_locations=source_locations)
-        SpyroEnsemble.print(f"Infinite Domain Extension (km): {self.abc_pad_length:.4f}")
+        self.abc_pad_length = self.layer_infinite_model(
+            lmin, c_bnd_max, c_max, final_time, source_locations=source_locations
+        )
+        SpyroEnsemble.print(
+            f"Infinite Domain Extension (km): {self.abc_pad_length:.4f}"
+        )
 
         # New dimensions
         self.abc_new_geometry()
 
-    def infinite_model(self, wave, check_dt=False, max_divisor_tf=1,
-                       method='ANALYTICAL', mag_add=3):
+    def infinite_model(
+        self, wave, check_dt=False, max_divisor_tf=1, method="ANALYTICAL", mag_add=3
+    ):
         """Create a reference model for the ABC scheme for comparative purposes.
 
         Parameters
@@ -1120,8 +1276,9 @@ class ABCLayer(NRBC, MeasureError):
 
         # Check the timestep size
         if check_dt:
-            self.check_timestep_abc(wave, max_divisor_tf=max_divisor_tf,
-                                    method=method, mag_add=mag_add)
+            self.check_timestep_abc(
+                wave, max_divisor_tf=max_divisor_tf, method=method, mag_add=mag_add
+            )
 
         SpyroEnsemble.print("\nBuilding Infinite Domain Model")
 

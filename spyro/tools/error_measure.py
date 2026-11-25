@@ -164,21 +164,33 @@ class MeasureError:
         output_file_prefix = self.path_reference / f"{output_file_prefix}_"
         self.output_file_prefix = output_file_prefix
 
-        np.save(
-            str(output_file_prefix) + "time.npy",
-            forward_solution_receivers,
-        )
-
-        # Computing and saving FFT of the reference signal at receivers
+        # Computing FFT of the reference signal at receivers
         receivers_ref_fft = []
         for rec in range(number_of_receivers):
             signal = forward_solution_receivers[:, rec]
             yf = freq_response(signal, nyquist_frequency)
             receivers_ref_fft.append(yf)
-        np.save(
-            str(output_file_prefix) + "fft.npy",
-            receivers_ref_fft,
-        )
+
+        # Every rank holds the same signals, so one rank writes them and the
+        # others wait for the files before reading them (get_reference_signal)
+        @SpyroEnsemble.run_in_one_core_and_broadcast
+        def save_signals() -> None:
+            """Save the reference signal and its FFT.
+
+            Returns
+            -------
+            None
+            """
+            np.save(
+                str(output_file_prefix) + "time.npy",
+                forward_solution_receivers,
+            )
+            np.save(
+                str(output_file_prefix) + "fft.npy",
+                receivers_ref_fft,
+            )
+
+        save_signals()
 
     def get_reference_signal(self, input_file=None):
         """Acquire the reference signal for comparison between models.
@@ -422,17 +434,28 @@ class MeasureError:
             output_directory.mkdir(parents=True, exist_ok=True)
             error_file = output_directory / "measure_errs.txt"
 
-            np.savetxt(
-                error_file,
-                error_measures[:3],
-                delimiter="\t",
-            )
-            with error_file.open("a") as file_handle:
+            # Every rank holds the same measures, so one rank writes them
+            @SpyroEnsemble.run_in_one_core_and_broadcast
+            def save_measures() -> None:
+                """Save the error measures.
+
+                Returns
+                -------
+                None
+                """
                 np.savetxt(
-                    file_handle,
-                    scalar_values,
+                    error_file,
+                    error_measures[:3],
                     delimiter="\t",
                 )
+                with error_file.open("a") as file_handle:
+                    np.savetxt(
+                        file_handle,
+                        scalar_values,
+                        delimiter="\t",
+                    )
+
+            save_measures()
 
         return error_measures
 

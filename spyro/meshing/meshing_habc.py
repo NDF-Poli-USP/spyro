@@ -10,13 +10,45 @@ from .meshing_functions import AutomaticMesh
 from .meshing_operations import MeshOps
 from ..tools.habc_tools import point_cloud_field
 from ..utils.error_management import validate_parameter
-from ..utils.utils import global_max, global_min
 from ..version_control import is_firedrake_new
 
 if is_firedrake_new() is False:
     from firedrake.__future__ import interpolate
 
     fire.interpolate = interpolate
+
+
+def _global_velocity_range(
+    velocity: np.ndarray, comm: MPI.Comm, tol: float
+) -> tuple[float, float]:
+    """Return the extreme velocity values over every rank, rounded.
+
+    Parameters
+    ----------
+    velocity : `array`
+        Velocity values of the current rank. It can be empty.
+    comm : `MPI.Comm`
+        Spatial communicator of the mesh.
+    tol : `float`
+        Tolerance of the mesh. The values are rounded to its number of decimals.
+
+    Returns
+    -------
+    c_min : `float`
+        Minimum velocity value over every rank.
+    c_max : `float`
+        Maximum velocity value over every rank.
+
+    Notes
+    -----
+    Rounding to the same number of decimals keeps the order of the values, so
+    the range of a subset of the nodes, such as the boundary nodes, lies within
+    the range of all of them.
+    """
+    decimal = int(abs(np.log10(tol)))
+    c_min = comm.allreduce(velocity.min(initial=np.inf), op=MPI.MIN)
+    c_max = comm.allreduce(velocity.max(initial=-np.inf), op=MPI.MAX)
+    return round(c_min, decimal), round(c_max, decimal)
 
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -177,11 +209,10 @@ class HABCMesh(MeshOps):
 
         # Get extreme values of the velocity on the boundary excluding free
         # surfaces, over the boundary points of every rank
-        decimal = int(abs(np.log10(mesh_parameters.tol)))
         vel_bnd = vel_on_boundary[vel_on_boundary > 0.0]
-        c_bnd_min = mesh.comm.allreduce(vel_bnd.min(initial=np.inf), op=MPI.MIN)
-        c_bnd_max = mesh.comm.allreduce(vel_bnd.max(initial=-np.inf), op=MPI.MAX)
-        c_bnd_min, c_bnd_max = round(c_bnd_min, decimal), round(c_bnd_max, decimal)
+        c_bnd_min, c_bnd_max = _global_velocity_range(
+            vel_bnd, mesh.comm, mesh_parameters.tol
+        )
 
         # Print on screen
         cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"
@@ -190,7 +221,11 @@ class HABCMesh(MeshOps):
         return c_bnd_min, c_bnd_max, coord_bnd_nodes
 
     def creating_velocity_profile(
-        self, function_space, initial_velocity_model, path_save
+        self,
+        function_space,
+        initial_velocity_model,
+        path_save,
+        tol: float,
     ):
         """Create the velocity profile for the original domain.
 
@@ -202,6 +237,9 @@ class HABCMesh(MeshOps):
             Initial velocity model.
         path_save : `str`
             Path to save the velocity model.
+        tol : `float`
+            Tolerance of the mesh, whose number of decimals rounds ``c_min`` and
+            ``c_max`` as the boundary velocities in ``original_boundary_data``.
 
         Returns
         -------
@@ -211,16 +249,29 @@ class HABCMesh(MeshOps):
             Minimum velocity value in the model without absorbing layer.
         c_max : `float`
             Maximum velocity value in the model without absorbing layer.
+
+        Notes
+        -----
+        The extreme values are taken at the nodes of ``function_space``, which
+        include the boundary nodes of ``original_boundary_data``, and rounded in
+        the same way, so ``c_min <= c_bnd_min`` and ``c_bnd_max <= c_max``.
         """
-        # Velocity profile model
+        # Velocity profile model. At the nodes shared by cells of different
+        # velocities, the minimum is taken, as for the velocity at the critical
+        # point (Minimum_Eikonal), so that it does not depend on the partition
         c = fire.Function(function_space, name="c_orig [km/s])")
         c.assign(
-            fire.assemble(fire.interpolate(initial_velocity_model, function_space))
+            fire.assemble(
+                fire.interpolate(
+                    initial_velocity_model, function_space, access=fire.MIN
+                )
+            )
         )
 
         # Get extreme values of the velocity model over every rank
-        c_min = global_min(initial_velocity_model)
-        c_max = global_max(initial_velocity_model)
+        c_min, c_max = _global_velocity_range(
+            c.dat.data_with_halos, function_space.mesh().comm, tol
+        )
 
         # Print on screen
         cdom_str = "Domain Velocity Range (km/s): {:.3f} - {:.3f}"
@@ -338,7 +389,10 @@ class HABCMesh(MeshOps):
 
         # Velocity profile model
         wave.c, wave.c_min, wave.c_max = self.creating_velocity_profile(
-            wave.function_space, wave.initial_velocity_model, wave.path_save
+            wave.function_space,
+            wave.initial_velocity_model,
+            wave.path_save,
+            wave.mesh_parameters.tol,
         )
 
         # Generating boundary data from the original domain mesh
