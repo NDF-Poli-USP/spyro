@@ -254,7 +254,6 @@ def run_tools(wave, method_extend, n_root=1):
     wave.layer_ops.rename_folder_habc()
 
 
-@mark.newer_firedrake
 @mark.parametrize("element_geometry, dimension",
                   [("T", 2),
                    ("Q", 2),

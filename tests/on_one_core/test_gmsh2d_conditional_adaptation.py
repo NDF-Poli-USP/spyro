@@ -115,6 +115,16 @@ def create_grid_based_velocity_field(grid_spacing, length_z, length_x):
     ), cond
 
 
+def mean_cell_diameter(mesh, centre, radius):
+    """Return the area-weighted mean cell diameter inside a disc."""
+    mesh_z, mesh_x = fire.SpatialCoordinate(mesh)
+    inside = fire.conditional(
+        (mesh_z - centre[0])**2 + (mesh_x - centre[1])**2 < radius**2, 1.0, 0.0
+    )
+    weighted = fire.assemble(fire.CellDiameter(mesh) * inside * fire.dx)
+    return weighted / fire.assemble(inside * fire.dx)
+
+
 @pytest.mark.older_firedrake
 def test_gmsh_adaptation():
     import gmsh  # noqa: F401
@@ -152,9 +162,13 @@ def test_gmsh_adaptation():
     - Circle (vp=2.0): lambda = 0.1 km → h = 0.0385 km
     - Outside (vp=1.5): lambda = 0.075 km → h = 0.0288 km
 
-    The test uses 10% relative tolerance for central and circle regions,
-    due to potentional grading and smoothing effects and 1% for outside
-    region.
+    Each element size is the mean cell diameter over a disc of radius
+    0.08 km around the probe point, which stays inside one velocity region.
+    The square is only about 3.5 elements wide, so a single cell there can
+    be ~15% larger than the target even when the mesh is correct.
+
+    The test uses 10% relative tolerance for the central region, due to
+    potential grading effects, and 6% for the circle and outside regions.
     """
     quadrilateral = False
     mesh_type = "gmsh_mesh"
@@ -235,13 +249,12 @@ def test_gmsh_adaptation():
     spyro.plots.debug_pvd(wave.initial_velocity_model)
     # wave.forward_solve()
 
-    DG0 = fire.FunctionSpace(wave.mesh, "DG", 0)
-    f = fire.assemble(fire.interpolate(fire.CellSize(wave.mesh), DG0))
+    probe_radius = 0.08
 
     # at centre of minas cheese (gold square):
     lbda_centre = 3.0/20.0  # vp/freq
     h_centre = lbda_centre/cells_per_wavelength
-    cell_diam_centre = float(f.at(-1.0, 1.0))
+    cell_diam_centre = mean_cell_diameter(wave.mesh, (-1.0, 1.0), probe_radius)
     SpyroEnsemble.print(f'Using Firedrake version {version("firedrake")}')
     SpyroEnsemble.print(f'Using gmsh version {version("gmsh")}')
     SpyroEnsemble.print(f"Cell diameter should be {h_centre}, and is measured at {cell_diam_centre}")
@@ -250,13 +263,13 @@ def test_gmsh_adaptation():
     # at circle of minas cheese (meia cura cheesy goodness):
     lbda_circle = 2.0/20.0  # vp/freq
     h_circle = lbda_circle/cells_per_wavelength
-    cell_diam_circle = float(f.at(-1.0, 1.3))
+    cell_diam_circle = mean_cell_diameter(wave.mesh, (-1.0, 1.3), probe_radius)
     assert math.isclose(h_circle, cell_diam_circle, rel_tol=6e-2)
 
     # outside the cheese
     lbda_outside = 1.5/20.0
     h_outside = lbda_outside/cells_per_wavelength
-    cell_diam_outside = float(f.at(-1.0, 1.7))
+    cell_diam_outside = mean_cell_diameter(wave.mesh, (-1.0, 1.7), probe_radius)
     assert math.isclose(h_outside, cell_diam_outside, rel_tol=6e-2)
 
     SpyroEnsemble.print("END")

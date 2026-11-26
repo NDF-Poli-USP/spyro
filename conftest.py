@@ -73,11 +73,11 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
-        "older_firedrake: mark test as only compatible with older firedrake versions",
+        "older_firedrake: mark test as only compatible with Firedrake 2026.4",
     )
     config.addinivalue_line(
         "markers",
-        "newer_firedrake: mark test as only compatible with newer firedrake versions",
+        "newer_firedrake: mark test as only compatible with Firedrake 2026.10",
     )
 
 

@@ -141,7 +141,6 @@ def taped_guess(observed_record, schedule: str) -> spyro.AcousticWave:
 
 
 @pytest.mark.slow
-@pytest.mark.newer_firedrake
 @pytest.mark.parametrize("schedule", list(SCHEDULES))
 def test_taylor_test(observed_record, schedule: str) -> None:
     """Check that every schedule reaches second-order Taylor convergence.
@@ -167,7 +166,6 @@ def test_taylor_test(observed_record, schedule: str) -> None:
 
 
 @pytest.mark.slow
-@pytest.mark.newer_firedrake
 def test_gradient_matches_across_schedules(observed_record) -> None:
     """Check that the three schedules return the same gradient, to round-off.
 
@@ -208,7 +206,6 @@ def test_gradient_matches_across_schedules(observed_record) -> None:
     )
 
 
-@pytest.mark.newer_firedrake
 @pytest.mark.parametrize("schedule", list(SCHEDULES))
 def test_new_recording_starts_from_current_control(observed_record, schedule: str) -> None:
     """A second recording reports the control's current value, not a stale one.

@@ -90,7 +90,6 @@ def coarsen(code: str) -> str:
     return code
 
 
-@pytest.mark.newer_firedrake
 @pytest.mark.parallel(3)
 def test_elastic_fwi_automated_adjoint_demo(tmp_path, monkeypatch):
     """The demo runs through, and moves the model the way it says it does."""

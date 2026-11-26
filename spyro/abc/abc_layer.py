@@ -982,7 +982,7 @@ class ABCLayer(NRBC, MeasureError):
                 cand_dist += (delta_y,)
 
             # Minimum distance to the nearest boundary
-            dist_to_bnd = float(min(cand_dist))
+            dist_to_bnd = float(min(delta.min() for delta in cand_dist))
 
         SpyroEnsemble.print(str_pad)
 

@@ -11,7 +11,6 @@ from ...utils.error_management import (
 from functools import reduce
 from ...tools.habc_tools import point_cloud_field
 from ...utils.utils import global_max, global_min
-from ...version_control import is_firedrake_new
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -543,9 +542,7 @@ class Eikonal_Modeling:
             {
                 "snes_linesearch_type": "l2",  # l2, cp, basic
                 "snes_linesearch_damping": 1.0,
-                "snes_linesearch_maxlambda"
-                if is_firedrake_new()
-                else "snes_linesearch_maxstep": 1.0,
+                "snes_linesearch_maxlambda": 1.0,
                 "snes_max_funcs": 1000,
                 "snes_linesearch_order": 2,
                 "snes_linesearch_alpha": 1e-4,

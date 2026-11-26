@@ -99,7 +99,6 @@ def record(source_locations):
         spyro.io.delete_tmp_files(wave)
 
 
-@pytest.mark.newer_firedrake
 @pytest.mark.slow
 def test_serial_shots_accumulate_on_one_tape():
     """Every serially propagated shot is recorded, not just the last one."""
@@ -113,7 +112,6 @@ def test_serial_shots_accumulate_on_one_tape():
     assert two_shots == 2 * one_shot
 
 
-@pytest.mark.newer_firedrake
 @pytest.mark.slow
 def test_a_second_forward_solve_starts_its_own_tape():
     """One forward solve is one recording, never appended to an earlier one."""
