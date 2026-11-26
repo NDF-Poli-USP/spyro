@@ -57,6 +57,24 @@ def pytest_addoption(parser):
         default=False,
         help="run only tests marked as newer_firedrake",
     )
+    parser.addoption(
+        "--only-habc",
+        action="store_true",
+        default=False,
+        help="run only tests marked as habc",
+    )
+    parser.addoption(
+        "--only-modal",
+        action="store_true",
+        default=False,
+        help="run only tests marked as modal",
+    )
+    parser.addoption(
+        "--only-eikonal",
+        action="store_true",
+        default=False,
+        help="run only tests marked as eikonal",
+    )
 
 
 def pytest_configure(config):
@@ -78,6 +96,11 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "newer_firedrake: mark test as only compatible with newer firedrake versions",
+    )
+    config.addinivalue_line("markers", "habc: mark test as related to HABC")
+    config.addinivalue_line("markers", "modal: mark test as related to modal solvers")
+    config.addinivalue_line(
+        "markers", "eikonal: mark test as related to the eikonal solver"
     )
 
 
@@ -121,10 +144,20 @@ def pytest_collection_modifyitems(config, items):
             "Cannot run both --skip and only options for newer firedrake"
         )
 
+    only_markers = [
+        marker
+        for marker in ("habc", "modal", "eikonal")
+        if config.getoption(f"--only-{marker}")
+    ]
+
+    # Selecting several of --only-habc/--only-modal/--only-eikonal runs their union.
     selected_items = []
     deselected = []
 
     for item in items:
+        if only_markers and not any(m in item.keywords for m in only_markers):
+            deselected.append(item)
+            continue
         is_slow = "slow" in item.keywords
         is_high_memory = "high_memory" in item.keywords
         is_older_firedrake = "older_firedrake" in item.keywords

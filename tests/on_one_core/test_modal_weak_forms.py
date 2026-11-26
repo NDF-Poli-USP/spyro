@@ -14,6 +14,11 @@ from spyro.solvers.modal.modal_forms_and_matrices import (
     acoustic_weak_forms_c_in_stiffness,
 )
 from spyro.solvers.modal.modal_sol import Modal_Solver
+from firedrake import SpatialCoordinate, conditional
+from spyro.domains.quadrature import quadrature_rules
+from spyro.domains.space import create_function_space
+
+pytestmark = pytest.mark.modal
 
 
 def _elastic_wave(vp: float, vs: float) -> spyro.IsotropicWave:
@@ -249,3 +254,69 @@ def test_slepc_timestep_converges_on_clustered_spectrum():
     )
     # Reference from Krylov-Schur converged to 1e-6 in 659 iterations
     assert np.isclose(dt, 5.222114e-3, rtol=1e-4)
+
+
+def test_lobpcg_reaches_tolerance_on_lumped_triangles() -> None:
+    """LOBPCG reaches its tolerance on a lumped KMV problem and matches ARNOLDI.
+
+    Notes
+    -----
+    On this mesh (5761 dofs of KMV degree 4, with a velocity jump at
+    x = 0.5), LOBPCG without a preconditioner stopped at its limit of 2500
+    iterations without reaching its tolerance of 5e-4, and SciPy warned about
+    it. With the GAMG preconditioner of `solver_with_sparse_matrix`, it
+    converges in tens of iterations, to the eigenvalue of ARNOLDI.
+    """
+    mesh = UnitSquareMesh(16, 16)
+    V = create_function_space(mesh, "KMV", 4)
+    assert V.dim() == 5761
+    x, _ = SpatialCoordinate(mesh)
+    c = Function(V).interpolate(conditional(x < 0.5, 3.0, 1.5))
+    forms = acoustic_weak_forms_c_in_stiffness(c, V, quad_rule=quadrature_rules(V)[0])
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        lobpcg = Modal_Solver(2, method="LOBPCG").solve_eigenproblem(
+            None, V=V, shift=1e-8, forms=forms
+        )
+    not_converged = [
+        str(w.message) for w in caught if "requested tolerance" in str(w.message)
+    ]
+    assert not not_converged, not_converged
+
+    arnoldi = Modal_Solver(2, method="ARNOLDI").solve_eigenproblem(
+        None, V=V, shift=1e-8, forms=forms
+    )
+    assert np.isclose(
+        np.max(np.real(lobpcg)), np.max(np.real(arnoldi)), rtol=1e-7, atol=0.0
+    )
+
+
+@pytest.mark.parametrize("method", ["ARNOLDI", "LANCZOS"])
+@pytest.mark.parametrize("element", ["KMV", "CG"])
+def test_scipy_timestep_matches_slepc(element: str, method: str) -> None:
+    """ARNOLDI and LANCZOS find the largest eigenvalue that SLEPc finds.
+
+    Parameters
+    ----------
+    element : str
+        "KMV" for lumped triangles, whose mass matrix is diagonal but stores
+        the full element sparsity, so its inverse is the reciprocal of the
+        diagonal, or "CG" for a consistent mass matrix, which MUMPS
+        factorizes.
+    method : str
+        SciPy eigensolver.
+    """
+    mesh = UnitSquareMesh(16, 16)
+    V = create_function_space(mesh, element, 4)
+    x, _ = SpatialCoordinate(mesh)
+    c = Function(V).interpolate(conditional(x < 0.5, 3.0, 1.5))
+    forms = acoustic_weak_forms_c_in_stiffness(c, V, quad_rule=quadrature_rules(V)[0])
+
+    dt = {
+        name: Modal_Solver(2, method=name, calc_max_dt=True).estimate_timestep(
+            c, V, 1.0, forms=forms
+        )
+        for name in (method, "KRYLOVSCH_CH")
+    }
+    assert np.isclose(dt[method], dt["KRYLOVSCH_CH"], rtol=1e-4)

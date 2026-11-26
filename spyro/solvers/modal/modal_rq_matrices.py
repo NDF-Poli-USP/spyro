@@ -1,7 +1,19 @@
 """Generate the inputs for the Rayleigh Quotient method."""
 
-from firedrake import assemble, cos, dx as fire_dx, Function, grad, inner, pi, sin
-from scipy.sparse import lil_matrix
+from firedrake import (
+    assemble,
+    Constant,
+    cos,
+    dx as fire_dx,
+    Function,
+    grad,
+    inner,
+    pi,
+    sin,
+    TestFunction,
+    TrialFunction,
+)
+from scipy.sparse import csr_matrix, lil_matrix
 from ...utils.error_management import (validate_data_structure, validate_numeric,
                                        validate_parameter)
 
@@ -24,7 +36,8 @@ def generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
         - max_coordinates : `array`
             Array containing the maximum coordinates in each dimension (z, x, y).
     k : `int`, optional
-        Number of eigenvalues to compute. Default is 2.
+        Number of eigenvalues to compute. It sets the number of
+        eigenfunctions per direction, n = max(2 k, 2). Default is 2.
     bc : `str`, optional
         Boundary condition type: "Dirichlet" or "Neumann". Default is "Neumann".
     dimension : `int`, optional
@@ -33,9 +46,14 @@ def generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
     Returns
     -------
     eig_funcs : `list`
-        Eigenfunctions computed as `Firedrake.Function`
-    grad_eig : `list`
-        Eigenfunction gradients computed as `Firedrake.Function`
+        The n**dimension eigenfunctions, interpolated into `V` as
+        `Firedrake.Function`.
+
+    Notes
+    -----
+    Only the eigenfunctions are returned. Their gradients are not needed,
+    because `matrices_rayleigh_quotient` obtains the stiffness entries from
+    the stiffness matrix of `V`.
     """
 
     # Check input parameters
@@ -67,14 +85,21 @@ def generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
     zn = (z - z_min) / length_z
     xn = (x - x_min) / length_x
 
+    # Mode numbers are Constants, with one set per direction, so that every
+    # eigenfunction has the same UFL structure and all the interpolations
+    # share a single compiled kernel instead of compiling one per product
+    modes_x, modes_z, modes_y = (
+        [Constant(float(n)) for n in range(n_eigfunc)] for _ in range(3)
+    )
+
     # Precompute cosine values for efficiency
     if bc == "Neumann":
-        fi_lst = [cos(i * pi * xn) for i in range(n_eigfunc)]
-        fj_lst = [cos(j * pi * zn) for j in range(n_eigfunc)]
+        fi_lst = [cos(i * pi * xn) for i in modes_x]
+        fj_lst = [cos(j * pi * zn) for j in modes_z]
 
     if bc == "Dirichlet":
-        fi_lst = [sin(i * pi * xn) for i in range(n_eigfunc)]
-        fj_lst = [sin(j * pi * zn) for j in range(n_eigfunc)]
+        fi_lst = [sin(i * pi * xn) for i in modes_x]
+        fj_lst = [sin(j * pi * zn) for j in modes_z]
 
     if dimension == 3:  # 3D
         y = ufl_coordinates[2]
@@ -82,9 +107,9 @@ def generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
         length_y = abs(max_coordinates[2] - min_coordinates[2])
         yn = (y - y_min) / length_y
         if bc == "Neumann":
-            fk_lst = [cos(k * pi * yn) for k in range(n_eigfunc)]
+            fk_lst = [cos(k * pi * yn) for k in modes_y]
         if bc == "Dirichlet":
-            fk_lst = [sin(k * pi * yn) for k in range(n_eigfunc)]
+            fk_lst = [sin(k * pi * yn) for k in modes_y]
 
     # Create eigenfunctions
     if dimension == 2:  # 2D
@@ -96,12 +121,13 @@ def generate_eigenfunctions(ufl_coordinates, V, mesh_limits,
         products = [fi * fj * fk for fi in fi_lst for fj in fj_lst for fk in fk_lst]
 
     eig_funcs = [Function(V).interpolate(prod) for prod in products]
-    grad_eig = [grad(u_eig) for u_eig in eig_funcs]
 
-    return eig_funcs, grad_eig
+    return eig_funcs
 
 
-def matrices_rayleigh_quotient(c, eig_funcs, grad_eig, quad_rule=None):
+def matrices_rayleigh_quotient(
+    c: Function | float, eig_funcs: list[Function], quad_rule: dict | None = None
+) -> tuple[csr_matrix, csr_matrix]:
     """Assemble the sparce matrices for the Rayleigh Quotient method.
 
     Parameters
@@ -110,8 +136,6 @@ def matrices_rayleigh_quotient(c, eig_funcs, grad_eig, quad_rule=None):
         Velocity model or isotropic velocity
     eig_funcs : `list`
         Eigenfunctions computed as `Firedrake.Function`.
-    grad_eig : `list`
-        Eigenfunction gradients computed as `Firedrake.Function`.
     quad_rule : `dict`, optional
         Quadrature rule to use for the integration.
         Default is `None`, which uses the default quadrature rule.
@@ -122,6 +146,18 @@ def matrices_rayleigh_quotient(c, eig_funcs, grad_eig, quad_rule=None):
         Sparse matrix representing the stiffness matrix.
     Msp : `csr matrix`
         Sparse matrix representing the mass matrix.
+
+    Notes
+    -----
+    The entries are the integrals of ``c**2 * inner(grad(phi_i),
+    grad(phi_j))`` and ``phi_i * phi_j``. Every eigenfunction belongs to
+    the function space, ``phi_i = sum_a Phi[a, i] N_a`` with basis functions
+    ``N_a``, so ``grad(phi_i) = sum_a Phi[a, i] grad(N_a)`` and the entries
+    equal ``phi_i^T K phi_j`` and ``phi_i^T M phi_j``. ``K`` and ``M`` are the
+    stiffness and mass matrices assembled once with the same integrands and
+    quadrature, so the gradients of the eigenfunctions are never needed on
+    their own. That takes two assemblies instead of two per pair of
+    eigenfunctions.
     """
 
     # Initialize matrices for generalized eigenvalue problem
@@ -129,14 +165,27 @@ def matrices_rayleigh_quotient(c, eig_funcs, grad_eig, quad_rule=None):
     Asp = lil_matrix((n_funcs, n_funcs))  # Stiffness matrix
     Msp = lil_matrix((n_funcs, n_funcs))  # Mass matrix
 
-    # Assemble stiffness and mass matrices
+    # Assemble stiffness and mass matrices of the function space
     dx = fire_dx(**quad_rule) if quad_rule else fire_dx
+    V = eig_funcs[0].function_space()
+    u, v = TrialFunction(V), TestFunction(V)
+    K = assemble(c * c * inner(grad(u), grad(v)) * dx).petscmat
+    M = assemble(inner(u, v) * dx).petscmat
 
-    for i in range(n_funcs):
-        for j in range(i, n_funcs):  # Only upper triangle
-            # Stiffness and mass matrix term
-            A_term = assemble(c * c * inner(grad_eig[i], grad_eig[j]) * dx)
-            M_term = assemble(inner(eig_funcs[i], eig_funcs[j]) * dx)
+    # Eigenfunctions as PETSc vectors
+    phi = []
+    for u_eig in eig_funcs:
+        with u_eig.dat.vec_ro as vec:
+            phi.append(vec.copy())
+
+    k_phi, m_phi = K.createVecLeft(), M.createVecLeft()
+    for j in range(n_funcs):
+        K.mult(phi[j], k_phi)
+        M.mult(phi[j], m_phi)
+        for i in range(j + 1):  # Only upper triangle
+            # Stiffness and mass matrix term (global reductions in parallel)
+            A_term = phi[i].dot(k_phi)
+            M_term = phi[i].dot(m_phi)
 
             # Set symmetric entries
             Asp[i, j] = A_term

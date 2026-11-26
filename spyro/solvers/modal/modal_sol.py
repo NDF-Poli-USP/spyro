@@ -1,8 +1,21 @@
 import warnings
 
 import firedrake as fire
-from numpy import array, asarray, eye, imag, real, sqrt, unique
-from scipy.sparse.linalg import eigs, eigsh, lobpcg, spilu
+from numpy import (
+    array,
+    ascontiguousarray,
+    asarray,
+    count_nonzero,
+    empty,
+    eye,
+    imag,
+    real,
+    sqrt,
+    unique,
+)
+from petsc4py import PETSc
+from scipy.sparse import csr_matrix, diags
+from scipy.sparse.linalg import LinearOperator, eigs, eigsh, lobpcg
 from slepc4py import SLEPc
 from spyro.mpi.spyro_mpi import SpyroEnsemble
 from .modal_forms_and_matrices import (
@@ -34,6 +47,77 @@ KRYLOVSCH_CONFIG = {
     "KRYLOVSCH_GH": {"ksp": "gmres", "pc": "hypre"},
     "KRYLOVSCH_GG": {"ksp": "gmres", "pc": "gamg"},
 }
+
+
+def _petsc_preconditioner(
+    Bsp: csr_matrix, pc_type: str, factor_solver_type: str | None = None
+) -> LinearOperator:
+    """Wrap a serial PETSc preconditioner of a sparse matrix as a SciPy operator.
+
+    Parameters
+    ----------
+    Bsp : `csr matrix`
+        Sparse matrix from which the preconditioner is built.
+    pc_type : `str`
+        PETSc preconditioner type, such as "lu" or "gamg".
+    factor_solver_type : `str`, optional
+        Package that factorizes the matrix when `pc_type` is a factorization,
+        such as "mumps". Default is `None`.
+
+    Returns
+    -------
+    `LinearOperator`
+        Operator that applies the preconditioner to a vector or to each column
+        of a block of vectors.
+
+    Notes
+    -----
+    The SciPy eigensolvers run on a single rank, so the matrix and the
+    preconditioner live on ``PETSc.COMM_SELF``. With ``pc_type="lu"`` the
+    operator applies the exact inverse of the matrix.
+    """
+    Bsp = csr_matrix(Bsp)
+    mat = PETSc.Mat().createAIJ(
+        size=Bsp.shape,
+        csr=(
+            Bsp.indptr.astype(PETSc.IntType),
+            Bsp.indices.astype(PETSc.IntType),
+            Bsp.data.astype(PETSc.ScalarType),
+        ),
+        comm=PETSc.COMM_SELF,
+    )
+    mat.assemble()
+    pc = PETSc.PC().create(comm=PETSc.COMM_SELF)
+    pc.setOperators(mat)
+    pc.setType(pc_type)
+    if factor_solver_type is not None:
+        pc.setFactorSolverType(factor_solver_type)
+    pc.setUp()
+    x, b = mat.createVecs()
+
+    def apply(r):
+        """Apply the preconditioner to a vector or a block of vectors.
+
+        Parameters
+        ----------
+        r : `array`
+            Vector, or block of vectors as columns.
+
+        Returns
+        -------
+        `array`
+            Preconditioned vector or block, with the shape of `r`.
+        """
+        r = asarray(r)
+        cols = r.reshape(r.shape[0], -1)
+        out = empty(cols.shape, dtype=PETSc.ScalarType)
+        for j in range(cols.shape[1]):
+            b.setArray(ascontiguousarray(cols[:, j]))
+            pc.apply(b, x)
+            out[:, j] = x.getArray()
+        return out.reshape(r.shape)
+
+    return LinearOperator(Bsp.shape, matvec=apply, matmat=apply, dtype=Bsp.dtype)
 
 
 class Modal_Solver:
@@ -125,7 +209,6 @@ class Modal_Solver:
         -------
         None
         """
-
         # Dimension of the problem
         self.dimension = validate_parameter("dimension", dimension, [2, 3])
 
@@ -158,12 +241,22 @@ class Modal_Solver:
         SpyroEnsemble.print(f"Solver Method: {self.method}")
 
     @SpyroEnsemble.run_in_one_core_and_broadcast
-    def solver_with_sparse_matrix(self, Asp, Msp, method, k=2, inv_oper=False):
+    def solver_with_sparse_matrix(self, Asp, Msp, method, k=2):
         """Solve the eigenvalue problem with sparse matrices using Scipy.
 
         Every rank holds the whole matrices, so the problem is solved on a
         single rank and its eigenvalues are broadcast to the other ranks and
         ensemble members, which must all call this method.
+
+        For the smallest eigenvalues, "ARNOLDI" and "LANCZOS" use
+        shift-and-invert with sigma = 0, whose operator inv(Asp) is applied
+        exactly with a MUMPS factorization of Asp: Cholesky (LDL^T) for
+        "LANCZOS", which assumes a symmetric problem, and LU for "ARNOLDI".
+        With `calc_max_dt` they seek the largest eigenvalues without a shift,
+        on copies of the matrices without explicitly stored zeros, with the
+        exact inverse of Msp. "LOBPCG" works on copies without stored zeros,
+        and for the smallest eigenvalues is preconditioned with algebraic
+        multigrid (GAMG).
 
         Parameters
         ----------
@@ -176,25 +269,70 @@ class Modal_Solver:
             Opts: "ARNOLDI", "LANCZOS" or "LOBPCG".
         k : `int`, optional
             Number of eigenvalues to compute. Default is 2.
-        inv_oper : `bool`, optional
-            Option to use an inverse operator for improving convergence.
-            Default is `False`.
 
         Returns
         -------
         Lsp : `array`
             Array containing the computed eigenvalues.
+
+        Notes
+        -----
+        The factorization dominates the cost of "ARNOLDI" and "LANCZOS". For
+        the 3D heterogeneous Q model of test_modal_solvers.py (71944 dofs, 8.5
+        million stored entries, of which 0.9 million are nonzero), MUMPS
+        factorizes Asp in 2.8 s against 17.3 s for SuperLU with a symmetric
+        ordering, and the eigenvalues agree to the printed digits. The whole
+        shift-and-invert solve takes 4.1 s with the MUMPS LU and 3.0 s with
+        its Cholesky (LDL^T) factorization. The factorization keeps the stored
+        zeros of Asp: without them it took 5.5 s.
+
+        With `calc_max_dt` there is no shift, and ARPACK applies inv(Msp) at
+        every iteration. SciPy would build it with SuperLU over the stored
+        sparsity, which for lumped elements is the full element pattern of
+        exact zeros around a diagonal: 196 s in the same model. On copies
+        without the zeros, with inv(Msp) as the reciprocal of the diagonal of
+        a lumped (diagonal) mass matrix, or a MUMPS LU factorization of any
+        other one, the same largest eigenvalue takes 2.6 s.
+
+        Without a preconditioner, "LOBPCG" needs thousands of iterations
+        (1295 in 3D, and it stops at 2500 in 2D before reaching its
+        tolerance). With GAMG it converges in tens. Asp is nearly singular,
+        since its smallest eigenvalue is the shift that stabilizes the Neumann
+        null space, and multigrid on Asp itself returns wrong eigenvalues. The
+        preconditioner is therefore built for Asp + tau Msp, with
+        tau = mean(diag(Asp) / diag(Msp)) / n**(2 / dimension) for n dofs,
+        an estimate of the low end of the spectrum: the diagonal ratio scales
+        as the largest eigenvalue, and the ratio of the largest to the
+        smallest nonzero one as the squared number of cells per side. LOBPCG
+        converges to the same eigenvalue for tau from 1e-3 to 1e2 in both
+        tests. With `calc_max_dt` the largest eigenvalues are sought, which
+        this preconditioner would not help, so none is used.
         """
 
         # Check methods
         validate_parameter("method", method, ["ARNOLDI", "LANCZOS", "LOBPCG"])
 
         if method == "ARNOLDI" or method == "LANCZOS":
-            # Inverse operator for improving convergence
-            M_ilu = spilu(Msp) if inv_oper else None
-            Minv = M_ilu.solve if inv_oper else None
-            A_ilu = spilu(Asp) if inv_oper else None
-            OPinv = A_ilu.solve if inv_oper else None
+            if self.calc_max_dt:
+                # Largest eigenvalues without a shift: ARPACK applies inv(Msp)
+                # at every iteration, here exactly, on zero-free copies
+                Asp, Msp = Asp.copy(), Msp.copy()
+                Asp.eliminate_zeros()
+                Msp.eliminate_zeros()
+                diag_M = Msp.diagonal()
+                if Msp.nnz == count_nonzero(diag_M):  # Lumped mass matrix
+                    Minv = diags(1.0 / diag_M)
+                else:
+                    Minv = _petsc_preconditioner(Msp, "lu", factor_solver_type="mumps")
+                OPinv = None
+
+            else:
+                # Shift-and-invert with sigma = 0 applies inv(Asp) exactly.
+                # LANCZOS assumes a symmetric problem, so it uses the cheaper
+                # Cholesky (LDL^T) factorization; ARNOLDI keeps the general LU
+                factor = "cholesky" if method == "LANCZOS" else "lu"
+                OPinv = _petsc_preconditioner(Asp, factor, factor_solver_type="mumps")
+                Minv = None
 
         if method == "ARNOLDI":
             # Solve the eigenproblem using ARNOLDI (ARPACK)
@@ -246,6 +384,21 @@ class Modal_Solver:
             # Initialize LI vectors for LOBPCG
             X = eye(Msp.shape[0], k)
 
+            # Lumped (spectral or KMV) elements store many exact zeros in the
+            # element sparsity, which only slow down the products of LOBPCG
+            Asp, Msp = Asp.copy(), Msp.copy()
+            Asp.eliminate_zeros()
+            Msp.eliminate_zeros()
+
+            # Algebraic multigrid preconditioner for the smallest eigenvalues,
+            # built for Asp + tau Msp, since Asp is nearly singular (see Notes)
+            if self.calc_max_dt:
+                precond = None
+            else:
+                ratio = (Asp.diagonal() / Msp.diagonal()).mean()
+                tau = ratio / Asp.shape[0] ** (2.0 / self.dimension)
+                precond = _petsc_preconditioner(Asp + tau * Msp, "gamg")
+
             # Solve the eigenproblem using LOBPCG (iterative method)
             it_mod = 2500
             it_ext = 2
@@ -255,6 +408,7 @@ class Modal_Solver:
                     Asp,
                     X,
                     B=Msp,
+                    M=precond,
                     tol=5e-4,
                     maxiter=it_mod,
                     largest=mag,
@@ -279,7 +433,8 @@ class Modal_Solver:
         for a lumped (diagonal) mass matrix, and the eigenvalues to a
         relative tolerance of 1e-4. Otherwise, the smallest ones are computed
         with shift-and-invert, with the Krylov solver and preconditioner of
-        the method.
+        the method. When the shift-and-invert system is solved with a direct
+        factorization, which is the SLEPc default, MUMPS factorizes it.
 
         Parameters
         ----------
@@ -337,6 +492,9 @@ class Modal_Solver:
                     "eps_target": 0.0,  # Converge toward eigenvalues closest to 0
                     "eps_target_magnitude": None,  # Select by magnitude
                     "st_pc_factor_shift_type": "NONZERO",  # Prevent zero-pivot
+                    # The shift-and-invert factorization dominates the solve.
+                    # MUMPS is several times faster than the PETSc LU in 3D
+                    "st_pc_factor_mat_solver_type": "mumps",
                     "eps_monitor": "ascii",  # Print convergence info
                     "ksp_type": KRYLOVSCH_CONFIG[self.method]["ksp"],  # Large problems
                     "pc_type": KRYLOVSCH_CONFIG[self.method]["pc"],  # Large problems
@@ -384,7 +542,8 @@ class Modal_Solver:
             - max_coordinates : `array`
                 Array containing the maximum coordinates in each dimension (z, x, y).
         k : `int`, optional
-            Number of eigenvalues to compute. Default is 2.
+            Number of eigenvalues to compute. It also sets the size of the
+            basis, max(2 k, 2) eigenfunctions per direction. Default is 2.
         quad_rule : `dict`, optional
             Quadrature rule to use for the integration.
             Default is `None`, which uses the default quadrature rule.
@@ -393,6 +552,17 @@ class Modal_Solver:
         -------
         Lsp : `array`
             Array containing the computed eigenvalues.
+
+        Notes
+        -----
+        The basis is the products of cosines that are the Neumann
+        eigenfunctions of the Laplacian on the box given by `mesh_limits`,
+        interpolated into `V`. The
+        stiffness and mass matrices of the basis are built by
+        `matrices_rayleigh_quotient` from one assembly of the stiffness and
+        mass matrices of `V`, so the gradients of the eigenfunctions are not
+        formed. The small generalized eigenvalue problem is then solved with
+        "ARNOLDI".
         """
 
         # Check input arguments
@@ -407,14 +577,12 @@ class Modal_Solver:
         )
 
         # Create eigenfunctions
-        eig_funcs, grad_eig = generate_eigenfunctions(
+        eig_funcs = generate_eigenfunctions(
             ufl_coordinates, V, mesh_limits, k=k, dimension=self.dimension
         )
 
         # Assemble matrices for generalized eigenvalue problem
-        Asp, Msp = matrices_rayleigh_quotient(
-            c, eig_funcs, grad_eig, quad_rule=quad_rule
-        )
+        Asp, Msp = matrices_rayleigh_quotient(c, eig_funcs, quad_rule=quad_rule)
 
         # Solve the generalized eigenvalue problem
         Lsp = self.solver_with_sparse_matrix(Asp, Msp, "ARNOLDI", k=k)
@@ -482,7 +650,6 @@ class Modal_Solver:
         k=2,
         shift=0.0,
         quad_rule=None,
-        inv_oper=False,
         ufl_coordinates=None,
         mesh_limits=None,
         hyp_par=None,
@@ -509,9 +676,6 @@ class Modal_Solver:
         quad_rule : `dict`, optional
             Quadrature rule to use for the integration.
             Default is `None`, which uses the default quadrature rule.
-        inv_oper : `bool`, optional
-            Option to use an inverse operator for improving convergence.
-            Default is `False`.
         ufl_coordinates : `ufl.geometry.SpatialCoordinate`
             Domain coordinates.
         mesh_limits : `tuple`, optional
@@ -610,9 +774,7 @@ class Modal_Solver:
 
         elif self.method in ["ARNOLDI", "LANCZOS", "LOBPCG"]:
             Asp, Msp = assemble_sparse_matrices(a, m)
-            Lsp = self.solver_with_sparse_matrix(
-                Asp, Msp, self.method, k=k, inv_oper=inv_oper
-            )
+            Lsp = self.solver_with_sparse_matrix(Asp, Msp, self.method, k=k)
 
         Lsp -= shift if shift > 0.0 else 0.0
 
@@ -625,7 +787,6 @@ class Modal_Solver:
         final_time,
         shift=0.0,
         quad_rule=None,
-        inv_oper=False,
         fraction=0.7,
         forms=None,
     ):
@@ -649,9 +810,6 @@ class Modal_Solver:
         quad_rule : `dict`, optional
             Quadrature rule to use for the integration.
             Default is `None`, which uses the default quadrature rule.
-        inv_oper : `bool`, optional
-            Option to use an inverse operator for improving convergence.
-            Default is `False`.
         fraction : `float`, optional
             Fraction of the estimated timestep to use. Defaults to 0.7.
         forms : `tuple` of `Firedrake.Form`, optional
@@ -696,7 +854,6 @@ class Modal_Solver:
                 V=V,
                 shift=shift,
                 quad_rule=quad_rule,
-                inv_oper=inv_oper,
                 forms=forms,
             )
             max_eigval = max(unique(Lsp[(Lsp > 0.0) & (imag(Lsp) == 0.0)]))

@@ -7,17 +7,36 @@ the same mesh through quantities that do not depend on the numbering.
 """
 import numpy as np
 import pytest
-from firedrake import COMM_SELF, COMM_WORLD, Function, FunctionSpace, RectangleMesh
+from firedrake import (
+    COMM_SELF,
+    COMM_WORLD,
+    Function,
+    FunctionSpace,
+    RectangleMesh,
+    SpatialCoordinate,
+    assemble,
+    dx,
+    exp,
+    grad,
+    inner,
+)
 
 from spyro.solvers.modal.modal_forms_and_matrices import (
     assemble_sparse_matrices,
     maximum_diagonal_ratio,
     acoustic_weak_forms_c_in_stiffness,
 )
+from spyro.solvers.modal.modal_ana_sol import Modal_Analytical_Solver
+from spyro.solvers.modal.modal_rq_matrices import (
+    generate_eigenfunctions,
+    matrices_rayleigh_quotient,
+)
 from spyro.solvers import wave as wave_module
 from spyro.solvers.modal import modal_sol
 from spyro.solvers.modal.modal_sol import Modal_Solver
 from tests.on_one_core.test_modal_weak_forms import _elastic_wave
+
+pytestmark = pytest.mark.modal
 
 
 def _forms(comm) -> tuple:
@@ -61,6 +80,144 @@ def _invariants(matrix) -> tuple:
         np.sort(np.asarray(matrix.sum(axis=1)).ravel()),
         np.sqrt((matrix.data**2).sum()),
     )
+
+
+def _rayleigh_inputs(comm) -> tuple:
+    """Build the inputs of the Rayleigh quotient matrices on a small mesh.
+
+    Parameters
+    ----------
+    comm : mpi4py.MPI.Comm
+        Communicator the mesh is distributed over.
+
+    Returns
+    -------
+    tuple
+        Velocity ``c`` and the eigenfunctions returned by
+        `generate_eigenfunctions` with ``k = 2`` (16 eigenfunctions).
+    """
+    mesh = RectangleMesh(8, 6, 1.0, 0.75, quadrilateral=True, comm=comm)
+    V = FunctionSpace(mesh, "CG", 2)
+    coords = SpatialCoordinate(mesh)
+    x, y = coords
+    c = Function(V).interpolate(1.5 + x + 2.0 * y)
+    limits = (np.array([0.0, 0.0]), np.array([1.0, 0.75]))
+    eig_funcs = generate_eigenfunctions(coords, V, limits, k=2)
+    return c, eig_funcs
+
+
+def _fundamental_eigenvalue(method: str, comm) -> float:
+    """Return the smallest nonzero eigenvalue of the modal forms.
+
+    Parameters
+    ----------
+    method : str
+        Eigensolver of `Modal_Solver`.
+    comm : mpi4py.MPI.Comm
+        Communicator the mesh is distributed over.
+
+    Returns
+    -------
+    float
+        Largest real part of the two eigenvalues closest to zero, the first
+        of which is the rigid-body mode of the Neumann problem.
+    """
+    a, m = _forms(comm)
+    V = a.arguments()[0].function_space()
+    solver = Modal_Solver(2, method=method)
+    eigenvalues = solver.solve_eigenproblem(None, V=V, shift=1e-8, forms=(a, m))
+    return float(np.max(np.real(eigenvalues)))
+
+
+@pytest.mark.parallel(2)
+def test_rayleigh_matrices_match_serial_pairwise_integrals():
+    """Rayleigh matrices of a distributed mesh equal the pairwise integrals.
+
+    The entries are integrals, which do not depend on the numbering, so the
+    matrices are compared entry by entry with the integrals of every pair of
+    eigenfunctions assembled on a serial copy of the mesh. The reference
+    builds the gradients of the eigenfunctions explicitly, as the pairwise
+    implementation did, while `matrices_rayleigh_quotient` uses the
+    stiffness matrix instead.
+    """
+    c, eig_funcs = _rayleigh_inputs(COMM_WORLD)
+    Asp, Msp = matrices_rayleigh_quotient(c, eig_funcs)
+
+    c_s, eig_s = _rayleigh_inputs(COMM_SELF)
+    n_funcs = len(eig_s)
+    grad_s = [grad(u_eig) for u_eig in eig_s]
+    A_ref = np.array(
+        [
+            [
+                assemble(c_s * c_s * inner(grad_s[i], grad_s[j]) * dx)
+                for j in range(n_funcs)
+            ]
+            for i in range(n_funcs)
+        ]
+    )
+    M_ref = np.array(
+        [
+            [assemble(inner(eig_s[i], eig_s[j]) * dx) for j in range(n_funcs)]
+            for i in range(n_funcs)
+        ]
+    )
+    for matrix, reference in ((Asp, A_ref), (Msp, M_ref)):
+        scale = np.abs(reference).max()
+        assert np.allclose(matrix.toarray(), reference, rtol=1e-10, atol=1e-12 * scale)
+
+    # Every rank holds the same matrices
+    gathered = COMM_WORLD.allgather(Asp.toarray())
+    assert np.array_equal(gathered[0], gathered[1])
+
+
+@pytest.mark.parallel(2)
+def test_shift_invert_eigenvalue_matches_serial_scipy():
+    """Distributed shift-and-invert SLEPc matches the serial SciPy solvers."""
+    slepc = _fundamental_eigenvalue("KRYLOVSCH_CH", COMM_WORLD)
+    assert slepc > 1e-3
+    assert COMM_WORLD.allgather(slepc) == [slepc, slepc]
+    for method, rtol in (("ARNOLDI", 1e-6), ("LANCZOS", 1e-6), ("LOBPCG", 1e-4)):
+        scipy = _fundamental_eigenvalue(method, COMM_SELF)
+        assert np.isclose(slepc, scipy, rtol=rtol), (method, slepc, scipy)
+
+
+def _equivalent_velocity(comm) -> float:
+    """Compute the energy-equivalent velocity of a heterogeneous model.
+
+    Parameters
+    ----------
+    comm : mpi4py.MPI.Comm
+        Communicator the mesh is distributed over.
+
+    Returns
+    -------
+    float
+        Equivalent velocity for a load concentrated around (0.3, 0.4).
+    """
+    mesh = RectangleMesh(8, 6, 1.0, 0.75, quadrilateral=True, comm=comm)
+    V = FunctionSpace(mesh, "CG", 2)
+    x, y = SpatialCoordinate(mesh)
+    c = Function(V).interpolate(1.5 + x + 2.0 * y)
+    q = Function(V).interpolate(exp(-((x - 0.3) ** 2 + (y - 0.4) ** 2) / 0.02))
+    return Modal_Analytical_Solver(dimension=2).c_equivalent(
+        c, V, static_load_for_ceq=q
+    )
+
+
+@pytest.mark.parallel(2)
+def test_equivalent_velocity_matches_serial():
+    """The zero-mean static solve of c_equivalent matches a serial copy.
+
+    The static problem is singular, with the constants as null space, and
+    its load has its mean removed. Its solution is then unique up to a
+    constant, so the equivalent velocity of a distributed mesh equals that
+    of a serial copy, whatever the partition and the preconditioner.
+    """
+    c_eq = _equivalent_velocity(COMM_WORLD)
+    c_eq_serial = _equivalent_velocity(COMM_SELF)
+    assert 1.5 < c_eq < 4.0
+    assert np.isclose(c_eq, c_eq_serial, rtol=1e-8)
+    assert COMM_WORLD.allgather(c_eq) == [c_eq, c_eq]
 
 
 @pytest.mark.parallel(2)

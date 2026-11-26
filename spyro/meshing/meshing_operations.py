@@ -3,6 +3,7 @@ from mpi4py import MPI
 from numpy import allclose, clip, column_stack, empty_like, linspace, log10, min, max
 from ..utils.error_management import validate_parameter
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
+from ..utils.utils import global_max, global_min
 from ..version_control import is_firedrake_new, is_firedrake_pyop3
 
 if is_firedrake_new():
@@ -112,14 +113,14 @@ class MeshOps():
 
         Returns
         -------
+        diam : `Firedrake.Function`
+            Mesh cell diameters interpolated into ``function_space``.
+        lmin : `float`
+            Minimum mesh size over all ranks.
+        lmax : `float`
+            Maximum mesh size over all ranks.
         alpha : `float`
             Ratio between the representative mesh dimensions.
-        diam_mesh : `ufl.geometry.CellDiameter`
-            Mesh cell diameters.
-        lmin : `float`
-            Minimum mesh size.
-        lmax : `float`
-            Maxmum mesh size.
         tol : `float`
             Tolerance for searching nodes in the mesh.
         """
@@ -133,10 +134,10 @@ class MeshOps():
         if self.dimension == 3:  # 3D
             fdim = 3**0.5
 
-        # Minimum and maximum mesh size for habc parameters
+        # Minimum and maximum mesh size for habc parameters, over every rank
         diam = assemble(interpolate(diam_mesh, function_space))
-        lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
-        lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
+        lmin = round(global_min(diam) / fdim, 6)
+        lmax = round(global_max(diam) / fdim, 6)
 
         # Ratio between the representative mesh dimensions
         alpha = lmax / lmin

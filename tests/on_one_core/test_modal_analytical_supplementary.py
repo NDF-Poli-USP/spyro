@@ -5,14 +5,22 @@ frequency with expected values. Also, the tests also check the behavior of the s
 for boundary conditions of Dirichlet and Neumann.
 """
 
-from pytest import fixture, raises
-from firedrake import (Function, FunctionSpace, SpatialCoordinate,
-                       UnitCubeMesh, UnitSquareMesh)
+from pytest import fixture, mark, raises
+from firedrake import (
+    Function,
+    FunctionSpace,
+    SpatialCoordinate,
+    UnitCubeMesh,
+    UnitSquareMesh,
+    exp,
+)
 from numpy import all, arange, array, isfinite, pi, setdiff1d, sqrt
-from numpy.testing import assert_almost_equal
+from numpy.testing import assert_allclose, assert_almost_equal
 from scipy.special import jn_zeros
 from spyro.solvers.modal.modal_ana_sol import Modal_Analytical_Solver
 from spyro.utils.error_management import validate_firedrake_parameter
+
+pytestmark = mark.modal
 
 
 class TestModalAnalyticalSolver:
@@ -616,6 +624,58 @@ class TestModalAnalyticalSolver:
 
         # For constant velocity, c_eq should be equal to the constant value
         assert_almost_equal(c_eq, 3., decimal=6)
+
+    def test_c_equivalent_energy_variable_velocity_2d(
+        self, solver_2d: Modal_Analytical_Solver, V_2d: FunctionSpace
+    ) -> None:
+        """Energy homogenization of a variable velocity, with a zero-mean load.
+
+        The equivalent velocity is a weighted average of the velocity, so it
+        lies between its extremes. The mean of the load is removed before the
+        static solve, so adding a constant to the load does not change it.
+
+        Parameters
+        ----------
+        solver_2d : `Modal_Analytical_Solver`
+            2D analytical solver.
+        V_2d : `firedrake.FunctionSpace`
+            2D function space.
+
+        Returns
+        -------
+        None
+        """
+        x, y = SpatialCoordinate(V_2d.mesh())
+        c = Function(V_2d).interpolate(2.0 + x)
+        q = Function(V_2d).interpolate(exp(-((x - 0.3) ** 2 + (y - 0.6) ** 2) / 0.02))
+        q_shifted = Function(V_2d).interpolate(q + 5.0)
+
+        c_eq = solver_2d.c_equivalent(c, V_2d, static_load_for_ceq=q)
+        c_eq_shifted = solver_2d.c_equivalent(c, V_2d, static_load_for_ceq=q_shifted)
+
+        assert 2.0 < c_eq < 3.0
+        assert_allclose(c_eq_shifted, c_eq, rtol=1e-8)
+
+    def test_c_equivalent_energy_requires_load(
+        self, solver_2d: Modal_Analytical_Solver, V_2d: FunctionSpace
+    ) -> None:
+        """Energy homogenization of a variable velocity needs a static load.
+
+        Parameters
+        ----------
+        solver_2d : `Modal_Analytical_Solver`
+            2D analytical solver.
+        V_2d : `firedrake.FunctionSpace`
+            2D function space.
+
+        Returns
+        -------
+        None
+        """
+        x, _ = SpatialCoordinate(V_2d.mesh())
+        c = Function(V_2d).interpolate(2.0 + x)
+        with raises(ValueError, match="static_load_for_ceq"):
+            solver_2d.c_equivalent(c, V_2d, type_homog="energy")
 
     def test_c_equivalent_invalid_type_homog(self, solver_2d, V_2d):
         """Test c_equivalent with invalid type_homog."""
