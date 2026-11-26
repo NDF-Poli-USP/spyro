@@ -106,17 +106,13 @@ def _stiffness(theta: float | None) -> tuple[np.ndarray, WaveType]:
     return C.dat.data_ro[0].copy(), wave.wave_type
 
 
-def _forward(
-    theta: float | None, use_monolithic: bool = False, **synthetic_data_overrides
-) -> AcousticElasticWave:
+def _forward(theta: float | None, **synthetic_data_overrides) -> AcousticElasticWave:
     """Run a short coupled forward solve.
 
     Parameters
     ----------
     theta : float or None
         Tilt angle in degrees. ``None`` gives a VTI solid.
-    use_monolithic : bool, optional
-        Whether to use the monolithic scheme instead of the sequential one.
     **synthetic_data_overrides
         Entries that replace or extend the default ``synthetic_data``.
 
@@ -126,27 +122,24 @@ def _forward(
         The wave object after the forward solve.
     """
     wave = AcousticElasticWave(_dictionary(theta, **synthetic_data_overrides))
-    wave.use_monolithic = use_monolithic
     wave.forward_solve()
     return wave
 
 
-def _solid_receivers(theta: float | None, use_monolithic: bool) -> np.ndarray:
+def _solid_receivers(theta: float | None) -> np.ndarray:
     """Run a short forward solve and return the solid receiver history.
 
     Parameters
     ----------
     theta : float or None
         Tilt angle in degrees. ``None`` gives a VTI solid.
-    use_monolithic : bool
-        Whether to use the monolithic scheme instead of the sequential one.
 
     Returns
     -------
     numpy.ndarray
         Solid displacement at the receivers for every time step.
     """
-    return np.asarray(_forward(theta, use_monolithic).solid_receiver_history)
+    return np.asarray(_forward(theta).solid_receiver_history)
 
 
 def _relative_difference(a: np.ndarray, b: np.ndarray) -> float:
@@ -282,20 +275,10 @@ def test_tti_3d_reduces_to_2d(phi, plane):
     assert np.allclose(block, C_tti_2d, rtol=1e-10, atol=1e-12 * C_tti_2d.max())
 
 
-@pytest.mark.parametrize("theta", [None, 30.0])
-def test_monolithic_matches_sequential_for_anisotropic_solid(theta):
-    """Monolithic and sequential schemes must agree for VTI and TTI solids."""
-    sequential = _solid_receivers(theta, use_monolithic=False)
-    monolithic = _solid_receivers(theta, use_monolithic=True)
-
-    assert np.linalg.norm(sequential) > 0.0
-    assert _relative_difference(monolithic, sequential) < 1e-8
-
-
 def test_tti_changes_solid_response():
     """A tilted solid must give a different response than the VTI one."""
-    vti = _solid_receivers(None, use_monolithic=False)
-    tti = _solid_receivers(30.0, use_monolithic=False)
+    vti = _solid_receivers(None)
+    tti = _solid_receivers(30.0)
 
     assert _relative_difference(tti, vti) > 1e-2
 

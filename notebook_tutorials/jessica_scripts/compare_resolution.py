@@ -7,7 +7,7 @@ cases = ["case_2d_res_h50", "case_2d_res_h25", "case_2d_res_h12"]
 labels = ["h = 50 m", "h = 25 m", "h = 12.5 m"]
 fig, axs = plt.subplots(3, 1, figsize=(10, 9), sharex=True)
 for case, label in zip(cases, labels):
-    d = np.load(f"results/spyro_receiver_data_{case}_sequential_2d.npz")
+    d = np.load(f"results/spyro_receiver_data_{case}_2d.npz")
     p = np.ravel(d["p_spyro"])
     u = np.asarray(d["u_solid"])
     t = np.arange(len(p)) * float(d["dt"])

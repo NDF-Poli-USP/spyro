@@ -32,9 +32,7 @@ from spyro.io.segy_io import create_segy_from_grid
 OUT = "results"
 os.makedirs(OUT, exist_ok=True)
 
-USE_MONOLITHIC = False
-SCHEME = "monolithic" if USE_MONOLITHIC else "sequential"
-TAG = f"case_3d_irregular_{SCHEME}_3d"
+TAG = "case_3d_irregular"
 
 # ===========================================================================
 # Domain and interface parameters
@@ -276,7 +274,6 @@ dictionary["absorving_boundary_conditions"] = {
 # Run
 # ===========================================================================
 Wave_obj = AcousticElasticWave(dictionary=dictionary)
-Wave_obj.use_monolithic = USE_MONOLITHIC
 
 t_start = time.perf_counter()
 Wave_obj.forward_solve()

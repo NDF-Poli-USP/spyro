@@ -46,25 +46,18 @@ def save_sparsity_matrices(wave, filename):
     """Assemble the matrices of the case being run and save them to filename.
     Row index = dof of the equation (test function);
     column index = dof of the unknown (trial function)."""
-    split = -1  # block separator (monolithic only)
-    if getattr(wave, "use_monolithic", False):
-        # Monolithic: the single system matrix actually solved at each step
-        mats = [_to_scipy(wave.lhs)]   # mesma matriz do diagnóstico antigo
-        labels = ["Mass matrix"]
-        rows = ["[ P | u_s ] dofs (equations)"]
-        cols = ["[ P | u_s ] dofs (unknowns)"]
-        case = "P – u_s (monolithic)"
-        split = wave.fluid_function_space.dim()
-    else:
-        mats, labels, rows, cols = _matrices_pressure(wave)
-        case = "P – u_s"
+    mats, labels, rows, cols = _matrices_pressure(wave)
+    case = "P – u_s"
 
     print(f"=== Sparsity data: {case} ===")
     print(f"Fluid dofs: {wave.fluid_function_space.dim()}")
     print(f"Solid dofs: {wave.solid_function_space.dim()}")
-    payload = {"labels": np.array(labels), "case": np.array(case),
-               "row_labels": np.array(rows), "col_labels": np.array(cols),
-               "split": np.array(split)}
+    payload = {
+        "labels": np.array(labels),
+        "case": np.array(case),
+        "row_labels": np.array(rows),
+        "col_labels": np.array(cols),
+    }
     for i, (A, lab) in enumerate(zip(mats, labels)):
         A = A.tocsr()
         pct = 100.0 * A.nnz / (A.shape[0] * A.shape[1])
@@ -77,14 +70,25 @@ def save_sparsity_matrices(wave, filename):
     print(f"[OK] Saved: {filename}")
 
 
-def load_sparsity_matrices(filename):
-    """Inverse of save_sparsity_matrices.
-    Returns (case, labels, matrices, row_labels, col_labels, split)."""
+def load_sparsity_matrices(filename: str) -> tuple:
+    """Load the matrices written by `save_sparsity_matrices`.
+
+    Parameters
+    ----------
+    filename : str
+        Path of the ``.npz`` file.
+
+    Returns
+    -------
+    tuple
+        ``(case, labels, matrices, row_labels, col_labels)``: the case name,
+        the matrix labels, the matrices as ``scipy.sparse.csr_matrix`` and the
+        row and column axis labels of every matrix.
+    """
     d = np.load(filename)
     labels = [str(x) for x in d["labels"]]
     rows = [str(x) for x in d["row_labels"]] if "row_labels" in d else ["Row index"] * len(labels)
     cols = [str(x) for x in d["col_labels"]] if "col_labels" in d else ["Column index"] * len(labels)
-    split = int(d["split"]) if "split" in d else -1
     mats = [
         sp.csr_matrix(
             (d[f"m{i}_data"], d[f"m{i}_indices"], d[f"m{i}_indptr"]),
@@ -92,4 +96,4 @@ def load_sparsity_matrices(filename):
         )
         for i in range(len(labels))
     ]
-    return str(d["case"]), labels, mats, rows, cols, split
+    return str(d["case"]), labels, mats, rows, cols

@@ -1,18 +1,20 @@
 """Receiver comparisons and interface continuity for the coupled solver.
 
 Several runs of the same case (e.g. isotropic, VTI and TTI solids, or the
-sequential and monolithic schemes) are drawn on the same figures, together
+elastic and viscoelastic rheologies) are drawn on the same figures, together
 with the SPECFEM2D / Gar6more references when they exist.
 
-Runs are named as in fluid_solid_coupled_forward.py: the solid is
-<rheology>_<solid>, where <solid> is the medium plus, for vti/tti, the C13
-relation (e.g. elastic_iso, elastic_vti-exact, viscoelastic_tti-weak), and a
-run is <rheology>_<solid>_<scheme> (e.g. elastic_tti-exact_sequential).
+Runs are named as in fluid_solid_coupled_forward.py: <rheology>_<solid>, where
+<solid> is the medium plus, for vti/tti, the C13 relation (e.g. elastic_iso,
+elastic_vti-exact, viscoelastic_tti-weak).
 
 Inputs, written by fluid_solid_coupled_forward.py:
-    results/<case>/<rheology>_<solid>_<scheme>/receivers.npz
-Outputs (in every format of FIGURE_FORMATS of fluid_solid_coupled_forward.py):
-    results/<case>/plots/
+    results/<case>/<rheology>_<solid>/<case>__<rheology>_<solid>__receivers.npz
+Outputs (in every format of FIGURE_FORMATS of fluid_solid_coupled_forward.py),
+named after the case so they can still be told apart elsewhere:
+    results/<case>/plots/<case>__P_fluid__<rheologies>__<solids>[__vs_<ref>]
+    results/<case>/plots/<case>__u_solid__<rheologies>__<solids>[__vs_<ref>]
+    results/<case>/plots/<case>__interface_continuity__<rheology>_<solid>
 References:
     results_specfem/case_<case>-<rheology>_<solid>/AA.S0001.PRE.semp,
         AA.S0002.BXZ.semd, AA.S0002.BXX.semd  (one SPECFEM run per solid; each
@@ -44,34 +46,31 @@ from fluid_solid_coupled_forward import save_figure, solid_name
 # "large_2d_non_planar", "small_3d_planar", "large_3d_non_planar"
 CASE = "large_3d_non_planar"
 
-# Runs drawn together: (rheology, medium, anisotropy_type, scheme), with the
-# same values as the settings of fluid_solid_coupled_forward.py (rheology
-# "elastic" or "viscoelastic"; medium "iso", "vti" or "tti"; anisotropy_type
-# "exact" or "weak", ignored for "iso"; scheme "sequential" or "monolithic").
-# Any subset of the runs already in results/<case>/ can be listed; runs
-# without results are skipped. Examples:
-#   [("elastic", "tti", "exact", "sequential")]               one run vs SPECFEM
-#   [("elastic", "vti", "exact", "sequential"),
-#    ("elastic", "vti", "weak", "sequential")]                C13 relations
-#   [("elastic", "tti", "exact", "sequential"),
-#    ("viscoelastic", "tti", "exact", "sequential")]          rheologies
-#   [("elastic", "iso", "exact", "sequential"),
-#    ("viscoelastic", "iso", "exact", "sequential"),
-#    ("elastic", "vti", "exact", "sequential"),
-#    ("viscoelastic", "vti", "exact", "sequential")]          media x rheologies
-#   [("elastic", "tti", "exact", "sequential"),
-#    ("elastic", "tti", "exact", "monolithic")]               schemes
+# Runs drawn together: (rheology, medium, anisotropy_type), with the same
+# values as the settings of fluid_solid_coupled_forward.py (rheology "elastic"
+# or "viscoelastic"; medium "iso", "vti" or "tti"; anisotropy_type "exact" or
+# "weak", ignored for "iso"). Any subset of the runs already in
+# results/<case>/ can be listed; runs without results are skipped. Examples:
+#   [("elastic", "tti", "exact")]                 one run vs SPECFEM
+#   [("elastic", "vti", "exact"),
+#    ("elastic", "vti", "weak")]                  C13 relations
+#   [("elastic", "tti", "exact"),
+#    ("viscoelastic", "tti", "exact")]            rheologies
+#   [("elastic", "iso", "exact"),
+#    ("viscoelastic", "iso", "exact"),
+#    ("elastic", "vti", "exact"),
+#    ("viscoelastic", "vti", "exact")]            media x rheologies
 RUNS = [
-    ("elastic", "iso", "exact", "sequential"),
-    # ("viscoelastic", "iso", "exact", "sequential"),
-    # ("elastic", "vti", "exact", "sequential"),
-    # ("viscoelastic", "vti", "exact", "sequential"),
-    # ("elastic", "vti", "weak", "sequential"),
-    # ("viscoelastic", "vti", "weak", "sequential"),
-    # ("elastic", "tti", "exact", "sequential"),
-    # ("viscoelastic", "tti", "exact", "sequential"),
-    # ("elastic", "tti", "weak", "sequential"),
-    # ("viscoelastic", "tti", "weak", "sequential"),
+    ("elastic", "iso", "exact"),
+    # ("viscoelastic", "iso", "exact"),
+    # ("elastic", "vti", "exact"),
+    # ("viscoelastic", "vti", "exact"),
+    # ("elastic", "vti", "weak"),
+    # ("viscoelastic", "vti", "weak"),
+    # ("elastic", "tti", "exact"),
+    # ("viscoelastic", "tti", "exact"),
+    # ("elastic", "tti", "weak"),
+    # ("viscoelastic", "tti", "weak"),
 ]
 
 # How the runs of RUNS are grouped into figures and drawn:
@@ -83,8 +82,7 @@ RUNS = [
 #               both rheologies in it. The elastic run is a solid line in the
 #               medium colour, the viscoelastic one a dotted line in a lighter
 #               tint of it (VISCOELASTIC_TINT is the fraction of white mixed in).
-# In both, monolithic runs are drawn thicker and translucent, so a sequential
-# run of the same solid shows on top of them. SPECFEM is a black dotted line.
+# SPECFEM is a black dotted line.
 PLOT_TYPE = "solids"
 MEDIUM_COLORS = {"iso": "tab:blue", "vti": "tab:green", "tti": "tab:red"}
 DOTTED = (0, (1, 1.5))
@@ -293,9 +291,7 @@ def lighten(color: str, amount: float) -> tuple[float, float, float]:
     return tuple(rgb + (1.0 - rgb) * amount)
 
 
-def run_style(
-    rheology: str, medium: str, anisotropy_type: str, scheme: str
-) -> tuple[dict, str]:
+def run_style(rheology: str, medium: str, anisotropy_type: str) -> tuple[dict, str]:
     """Return the line style of a run and the figure group it belongs to.
 
     Parameters
@@ -306,8 +302,6 @@ def run_style(
         Solid medium: "iso", "vti" or "tti".
     anisotropy_type : str
         Relation used for C13, "exact" or "weak"; ignored for "iso".
-    scheme : str
-        Coupling scheme: "sequential" or "monolithic".
 
     Returns
     -------
@@ -335,9 +329,7 @@ def run_style(
         group = solid_name(medium, anisotropy_type)
     else:
         raise ValueError(f"PLOT_TYPE = {PLOT_TYPE!r}: use 'solids' or 'rheology'.")
-    style["lw"] = 4.0 if scheme == "monolithic" else 2.0
-    if scheme == "monolithic":
-        style["alpha"] = 0.5
+    style["lw"] = 2.0
     return style, group
 
 
@@ -384,7 +376,6 @@ def run_label(
     rheology: str,
     medium: str,
     anisotropy_type: str,
-    scheme: str,
     medium_parameters: dict,
     viscoelastic_parameters: dict,
 ) -> str:
@@ -398,8 +389,6 @@ def run_label(
         Solid medium: "iso", "vti" or "tti".
     anisotropy_type : str
         Relation used for C13, "exact" or "weak"; ignored for "iso".
-    scheme : str
-        Coupling scheme: "sequential" or "monolithic".
     medium_parameters : dict
         Solid parameters stored in receivers.npz (the tilt is read from "theta").
     viscoelastic_parameters : dict
@@ -409,8 +398,8 @@ def run_label(
     Returns
     -------
     str
-        Label such as "elastic TTI-exact (θ = 30°) – sequential" or
-        "viscoelastic VTI-exact (Q = 30) – sequential".
+        Label such as "elastic TTI-exact (θ = 30°)" or
+        "viscoelastic VTI-exact (Q = 30)".
     """
     solid = solid_name(medium, anisotropy_type).replace(medium, medium.upper(), 1)
     details = []
@@ -428,7 +417,7 @@ def run_label(
     label = f"{rheology} {solid}"
     if details:
         label += f" ({', '.join(details)})"
-    return f"{label} – {scheme}"
+    return label
 
 
 def style_axis(ax, title, ylabel, xlabel=None, legend_outside=False):
@@ -474,10 +463,10 @@ if not (SHOW_GAR6 or SHOW_SPECFEM):
 
 prep = normalize if NORMALIZE else (lambda x: x)
 results = {}
-for rheology, medium, anisotropy_type, scheme in RUNS:
+for rheology, medium, anisotropy_type in RUNS:
     solid = solid_tag(rheology, medium, anisotropy_type)
-    tag = f"{solid}_{scheme}"
-    path = os.path.join(CASE_DIR, tag, "receivers.npz")
+    tag = solid
+    path = os.path.join(CASE_DIR, tag, f"{CASE}__{tag}__receivers.npz")
     if not os.path.exists(path):
         print(f"[WARNING] {path} not found — '{tag}' is skipped.")
         continue
@@ -488,8 +477,8 @@ for rheology, medium, anisotropy_type, scheme in RUNS:
         if "viscoelastic_parameters" in d
         else {}
     )
-    label = run_label(rheology, medium, anisotropy_type, scheme, params, visco_params)
-    style, group = run_style(rheology, medium, anisotropy_type, scheme)
+    label = run_label(rheology, medium, anisotropy_type, params, visco_params)
+    style, group = run_style(rheology, medium, anisotropy_type)
     compare = REFERENCE_SOLID is None or solid == REFERENCE_SOLID
     p = np.asarray(d["p_spyro"]).ravel()
     u = np.asarray(d["u_solid"])
@@ -505,7 +494,6 @@ for rheology, medium, anisotropy_type, scheme in RUNS:
         group=group,
         rheology=rheology,
         solid_key=solid_name(medium, anisotropy_type),
-        scheme=scheme,
         t_p=t_p,
         t_u=t_u,
         p=prep(p),
@@ -541,7 +529,7 @@ for rheology, medium, anisotropy_type, scheme in RUNS:
     results[label] = r
 
 if not results:
-    raise SystemExit(f"No receivers.npz found in {CASE_DIR}.")
+    raise SystemExit(f"No *__receivers.npz found in {CASE_DIR}.")
 
 comp_keys = [c for c, _, _, _ in COMPONENTS]
 REFERENCES = [(tag, name, style) for tag, name, style, show in (
@@ -592,7 +580,7 @@ def plot_references(ax, key, t_key, runs):
     if compared:
         ref = compared[0]
         ax.plot(ref[t_key], ref[f"{key}_g"], label=GAR6_NAME, **GAR6_STYLE)
-    # Runs of the same solid (e.g. sequential and monolithic) share a trace.
+    # Runs of the same solid (e.g. elastic and viscoelastic) share a trace.
     spec_runs = {r["solid"]: r for r in runs.values() if f"{key}_s" in r}
     for solid, r in spec_runs.items():
         if len(spec_runs) == 1:
@@ -603,47 +591,43 @@ def plot_references(ax, key, t_key, runs):
 
 
 amp ="Amplitude (normalized)" if NORMALIZE else "Amplitude"
-suffix = "".join(f"_vs_{'gar6' if rt == 'g' else 'specfem'}" for rt, _, _ in REFERENCES)
+suffix = "".join(
+    f"__vs_{'gar6' if rt == 'g' else 'specfem'}" for rt, _, _ in REFERENCES
+)
 
 
-def figure_tag(group: str, runs: dict) -> str:
+def figure_tag(runs: dict) -> str:
     """Return the part of the figure file names that identifies the runs.
 
     Parameters
     ----------
-    group : str
-        Group of the runs (a rheology or a solid, see `run_style`).
     runs : dict
         Runs of the figure, label -> run data.
 
     Returns
     -------
     str
-        ``<PLOT_TYPE>-<group>__<members>_<schemes>``, where the members are
-        the solids ("solids") or the rheologies ("rheology") of the runs,
-        e.g. "solids-elastic__iso_vti-exact_tti-exact_sequential" or
-        "rheology-vti-weak__elastic_viscoelastic_sequential". A short, stable
-        hash replaces the members when the name would be too long (file names
+        ``<rheologies>__<solids>`` of the runs, e.g.
+        "elastic__iso_vti-exact_tti-exact" (solids compared) or
+        "elastic_viscoelastic__vti-weak" (rheologies compared). A short,
+        stable hash replaces it when the name would be too long (file names
         are limited to 255 characters).
     """
-    member_key = "solid_key" if PLOT_TYPE == "solids" else "rheology"
-    members = list(dict.fromkeys(r[member_key] for r in runs.values()))
-    schemes = list(dict.fromkeys(r["scheme"] for r in runs.values()))
-    runs_tag = "_".join(members + schemes)
+    rheologies = list(dict.fromkeys(r["rheology"] for r in runs.values()))
+    solids = list(dict.fromkeys(r["solid_key"] for r in runs.values()))
+    runs_tag = f"{'_'.join(rheologies)}__{'_'.join(solids)}"
     if len(runs_tag) > 150:
         digest = hashlib.sha1(runs_tag.encode()).hexdigest()[:8]
         runs_tag = f"{len(runs)}runs_{digest}"
         print(f"Figures of {', '.join(runs)} are tagged '{runs_tag}'.")
-    return f"{PLOT_TYPE}-{group}__{runs_tag}"
+    return runs_tag
 
 
-def plot_receivers(group: str, runs: dict) -> None:
+def plot_receivers(runs: dict) -> None:
     """Save the fluid-pressure and solid-displacement figures of some runs.
 
     Parameters
     ----------
-    group : str
-        Group of the runs (a rheology or a solid, see `run_style`).
     runs : dict
         Runs drawn together, label -> run data.
 
@@ -651,7 +635,7 @@ def plot_receivers(group: str, runs: dict) -> None:
     -------
     None
     """
-    tag = figure_tag(group, runs)
+    tag = figure_tag(runs)
     legend_outside = len(runs) > MAX_LEGEND_INSIDE
     fig_width = 20 if legend_outside else 12
 
@@ -668,7 +652,7 @@ def plot_receivers(group: str, runs: dict) -> None:
         legend_outside=legend_outside,
     )
     fig_p.tight_layout()
-    p_path = Path(PLOTS_DIR, f"receiver_fluid_P__{tag}{suffix}")
+    p_path = Path(PLOTS_DIR, f"{CASE}__P_fluid__{tag}{suffix}")
     save_figure(fig_p, p_path)
     plt.close(fig_p)
     print(f"[OK] Saved to: {p_path.resolve()}.*")
@@ -690,7 +674,7 @@ def plot_receivers(group: str, runs: dict) -> None:
             legend_outside=legend_outside,
         )
     fig_u.tight_layout()
-    u_path = Path(PLOTS_DIR, f"receiver_solid_u__{tag}{suffix}")
+    u_path = Path(PLOTS_DIR, f"{CASE}__u_solid__{tag}{suffix}")
     save_figure(fig_u, u_path)
     plt.close(fig_u)
     print(f"[OK] Saved to: {u_path.resolve()}.*")
@@ -704,7 +688,7 @@ for label, r in results.items():
     groups.setdefault(r["group"], {})[label] = r
 for group, runs in groups.items():
     print(f"\n--- {PLOT_TYPE}: {group} ({len(runs)} runs) ---")
-    plot_receivers(group, runs)
+    plot_receivers(runs)
 
 # ===========================================================================
 # Interface normal - Displacement continuity
@@ -729,6 +713,6 @@ if PLOT_CONTINUITY:
         ax_c.text(0.01, 0.95, f"relative mismatch = {mismatch * 100:.2f}%",
                   transform=ax_c.transAxes, fontsize=FS_LEGEND, va="top")
         fig_c.tight_layout()
-        c_path = Path(PLOTS_DIR, f"interface_continuity__{r['tag']}")
+        c_path = Path(PLOTS_DIR, f"{CASE}__interface_continuity__{r['tag']}")
         save_figure(fig_c, c_path)
         print(f"[OK] Saved to: {c_path.resolve()}.*")

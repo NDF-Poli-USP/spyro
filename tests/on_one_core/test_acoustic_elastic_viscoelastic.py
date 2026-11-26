@@ -93,7 +93,6 @@ def _viscoelastic_dictionary(
 def _solid_record(
     medium: str,
     inverse_Q: float | None,
-    use_monolithic: bool = False,
     final_time: float = 0.25,
 ) -> np.ndarray:
     """Run a coupled forward solve and return the solid receiver history.
@@ -105,8 +104,6 @@ def _solid_record(
     inverse_Q : float or None
         Reciprocal quality factor of every solid parameter. ``None`` gives
         an elastic solid.
-    use_monolithic : bool, optional
-        Whether to use the monolithic scheme instead of the sequential one.
     final_time : float, optional
         Final simulation time.
 
@@ -116,7 +113,6 @@ def _solid_record(
         Solid displacement at the receivers for every time step.
     """
     wave = AcousticElasticWave(_viscoelastic_dictionary(medium, inverse_Q, final_time))
-    wave.use_monolithic = use_monolithic
     wave.forward_solve()
     return np.asarray(wave.solid_receiver_history)
 
@@ -214,15 +210,6 @@ def test_infinite_Q_matches_elastic(medium):
 
     assert np.linalg.norm(elastic) > 0.0
     assert _relative_difference(viscoelastic, elastic) < 1e-10
-
-
-@pytest.mark.parametrize("medium", ["iso", "tti"])
-def test_monolithic_matches_sequential_for_viscoelastic_solid(medium):
-    """Monolithic and sequential schemes must agree for a viscoelastic solid."""
-    sequential = _solid_record(medium, 0.05)
-    monolithic = _solid_record(medium, 0.05, use_monolithic=True)
-
-    assert _relative_difference(monolithic, sequential) < 1e-8
 
 
 @pytest.mark.parametrize("medium", ["vti", "tti"])

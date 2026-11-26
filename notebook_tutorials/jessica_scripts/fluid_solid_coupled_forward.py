@@ -1,22 +1,26 @@
 """Forward runs of the coupled acoustic-elastic (P - u_s) solver.
 
-Choose the case, the solid medium and the scheme in "Settings" and run from
-the repository root (one run per execution):
+Choose the case and the solid medium in "Settings" and run from the
+repository root (one run per execution):
 
     python3 notebook_tutorials/jessica_scripts/fluid_solid_coupled_forward.py
 
-Every run is identified by <rheology>_<solid>_<scheme>, where <rheology> is
-"elastic" or "viscoelastic" and <solid> is the medium plus, for vti/tti, the
-C13 relation (e.g. elastic_iso_sequential, viscoelastic_vti-exact_sequential,
-elastic_tti-weak_monolithic), and the outputs are organised by case, so
-different runs never overwrite each other:
+Every run is identified by <rheology>_<solid>, where <rheology> is "elastic" or
+"viscoelastic" and <solid> is the medium plus, for vti/tti, the C13 relation
+(e.g. elastic_iso, viscoelastic_vti-exact, elastic_tti-weak). The outputs are
+organised by case, so different runs never overwrite each other, and every
+file name starts with the case (and the run), so files copied elsewhere can
+still be told apart:
 
-    results/<case>/mesh/                         mesh, velocity model, mesh/model
-                                                 figures
-    results/<case>/<rheology>_<solid>_<scheme>/  receivers.npz, pressure/sigma_zz
-                                                 .pvd, snapshots/
-    results/<case>/plots/                        figures from
-                                                 plot_all_results_coupled.py
+    results/<case>/mesh/                 <case>__mesh.msh, <case>__model.segy
+                                         (2D) or <case>__model.bin (3D),
+                                         <case>__model, <case>__mesh_parent,
+                                         <case>__mesh_child figures
+    results/<case>/<rheology>_<solid>/   <case>__<rheology>_<solid>__ followed
+                                         by receivers.npz, pressure.pvd,
+                                         sigma_zz.pvd, snapshots/
+    results/<case>/plots/                figures from
+                                         plot_all_results_coupled.py
 
 Figures are written in every format of FIGURE_FORMATS.
 """
@@ -58,7 +62,6 @@ ANISOTROPY_TYPE = "exact"
 # "elastic" or "viscoelastic" (parameters in "Viscoelastic solid").
 RHEOLOGY = "elastic"
 
-USE_MONOLITHIC = False
 RESULTS_DIR = Path("results")
 
 # Figures are saved once per format. Vector formats ("svg", "pdf") keep axes
@@ -622,7 +625,7 @@ CASES = {
 # ===========================================================================
 # Dictionary
 # ===========================================================================
-def mesh_dictionary(case, mesh_dir):
+def mesh_dictionary(case, mesh_prefix):
     interface = case["interface"]
     mesh = {
         "length_z": case["length_z"],
@@ -637,19 +640,21 @@ def mesh_dictionary(case, mesh_dir):
         return mesh
 
     vp_water = fluid_wave_velocity(case)
-    mesh.update({
-        "output_filename": str(mesh_dir / "mesh.msh"),
-        "cells_per_wavelength": case["cells_per_wavelength"],
-        "frequency": case["frequency"],
-        "min_element_size": case.get("min_element_size", case["edge_length"]),
-        "grade": 0.05,
-        "apply_winslow": False,
-        "winslow_iterations": 2000,
-        "vp_water": vp_water,
-        "water_search_value": vp_water,
-    })
+    mesh.update(
+        {
+            "output_filename": f"{mesh_prefix}__mesh.msh",
+            "cells_per_wavelength": case["cells_per_wavelength"],
+            "frequency": case["frequency"],
+            "min_element_size": case.get("min_element_size", case["edge_length"]),
+            "grade": 0.05,
+            "apply_winslow": False,
+            "winslow_iterations": 2000,
+            "vp_water": vp_water,
+            "water_search_value": vp_water,
+        }
+    )
     if case["dimension"] == 2:
-        model = mesh_dir / "model.segy"
+        model = f"{mesh_prefix}__model.segy"
         build_segy(model, case["length_z"], case["length_x"], case["segy_dz"],
                    interface, vp_water, case["s_wave_velocity"], dx=case.get("segy_dx"))
         mesh.update({
@@ -658,7 +663,7 @@ def mesh_dictionary(case, mesh_dir):
             "water_interface": True,
         })
     else:
-        model = mesh_dir / "model.bin"
+        model = f"{mesh_prefix}__model.bin"
         water_interface = case.get("water_interface", False)
         n = {ax: int(round(case[f"length_{ax}"] / case[f"segy_d{ax}"])) + 1 for ax in "zxy"}
         build_binary_3d(
@@ -689,7 +694,7 @@ def mesh_dictionary(case, mesh_dir):
     return mesh
 
 
-def build_dictionary(case, medium, anisotropy_type, rheology, mesh_dir, run_dir):
+def build_dictionary(case, medium, anisotropy_type, rheology, mesh_prefix, run_prefix):
     dt = case["dt"]
     dictionary = {
         "options": {
@@ -699,7 +704,7 @@ def build_dictionary(case, medium, anisotropy_type, rheology, mesh_dir, run_dir)
             "dimension": case["dimension"],
         },
         "parallelism": {"type": "automatic"},
-        "mesh": mesh_dictionary(case, mesh_dir),
+        "mesh": mesh_dictionary(case, mesh_prefix),
         "acquisition": {
             "source_type": "ricker",
             "source_locations": case["source_locations"],
@@ -720,21 +725,21 @@ def build_dictionary(case, medium, anisotropy_type, rheology, mesh_dir, run_dir)
         },
         "visualization": {
             "forward_output": True,
-            "forward_output_filename": str(run_dir / "pressure.pvd"),
+            "forward_output_filename": f"{run_prefix}__pressure.pvd",
             "fwi_velocity_model_output": False,
             "velocity_model_filename": None,
             "graadient_output": False,
             "gradient_filename": None,
             "debug_output": False,
             "displacement_output": False,
-            "displacement_output_filename": str(run_dir / "displacement.pvd"),
+            "displacement_output_filename": f"{run_prefix}__displacement.pvd",
             "snapshot_frequency": 20,
-            "snapshot_output_dir": str(run_dir / "snapshots"),
+            "snapshot_output_dir": f"{run_prefix}__snapshots",
             "p_equivalent_output": False,
-            "p_equivalent_output_filename": str(run_dir / "p_equivalent.pvd"),
+            "p_equivalent_output_filename": f"{run_prefix}__p_equivalent.pvd",
             "interface_error_frequency": 20,
             "sigma_zz_output": True,
-            "sigma_zz_output_filename": str(run_dir / "sigma_zz.pvd"),
+            "sigma_zz_output_filename": f"{run_prefix}__sigma_zz.pvd",
         },
         "synthetic_data": {
             "type": "object",
@@ -786,28 +791,29 @@ def check_interface(wave, case):
     print(f"interface {'area' if case['dimension'] == 3 else 'length'}: {size}")
 
 
-def run(case_name, medium, anisotropy_type, rheology, use_monolithic):
+def run(case_name, medium, anisotropy_type, rheology):
     case = CASES[case_name]
     if callable(case):
         case = case()
-    scheme = "monolithic" if use_monolithic else "sequential"
     solid = solid_name(medium, anisotropy_type)
-    run_name = f"{rheology}_{solid}_{scheme}"
+    run_name = f"{rheology}_{solid}"
 
     case_dir = RESULTS_DIR / case_name
     mesh_dir = case_dir / "mesh"
     run_dir = case_dir / run_name
     for d in (mesh_dir, run_dir):
         os.makedirs(d, exist_ok=True)
+    # Every file name starts with the case (and the run), see the module docstring.
+    mesh_prefix = mesh_dir / case_name
+    run_prefix = run_dir / f"{case_name}__{run_name}"
 
     print(f"\n========== {case_name} | {run_name} ==========")
     dictionary = build_dictionary(
-        case, medium, anisotropy_type, rheology, mesh_dir, run_dir
+        case, medium, anisotropy_type, rheology, mesh_prefix, run_prefix
     )
 
     wave = AcousticElasticWave(dictionary=dictionary)
     check_interface(wave, case)
-    wave.use_monolithic = use_monolithic
 
     t_start = time.perf_counter()
     wave.forward_solve()
@@ -824,7 +830,7 @@ def run(case_name, medium, anisotropy_type, rheology, use_monolithic):
     n_procs = wave.comm.comm.size
     rank = wave.comm.comm.rank
     if rank == 0:
-        out = run_dir / "receivers.npz"
+        out = Path(f"{run_prefix}__receivers.npz")
         np.savez(
             out,
             dt=dictionary["time_axis"]["dt"],
@@ -835,7 +841,6 @@ def run(case_name, medium, anisotropy_type, rheology, use_monolithic):
             medium=medium,
             solid=solid,
             rheology=rheology,
-            scheme=scheme,
             dimension=case["dimension"],
             medium_parameters=json.dumps(solid_parameters(medium, anisotropy_type)),
             viscoelastic_parameters=json.dumps(
@@ -853,15 +858,17 @@ def run(case_name, medium, anisotropy_type, rheology, use_monolithic):
 
     # The mesh and the velocity figure do not depend on the medium.
     if case["dimension"] == 2 and n_procs == 1:
-        plot_model_xz(wave, case, dictionary["acquisition"], mesh_dir / "model")
-        plot_mesh_xz([(wave.mesh, None)], "Parent mesh", mesh_dir / "mesh_parent", case)
+        plot_model_xz(wave, case, dictionary["acquisition"], f"{mesh_prefix}__model")
+        plot_mesh_xz(
+            [(wave.mesh, None)], "Parent mesh", f"{mesh_prefix}__mesh_parent", case
+        )
         plot_mesh_xz(
             [(wave.submesh_fluid, "blue"), (wave.submesh_solid, "orange")],
             "Child submeshes",
-            mesh_dir / "mesh_child",
+            f"{mesh_prefix}__mesh_child",
             case,
         )
 
 
 if __name__ == "__main__":
-    run(CASE, MEDIUM, ANISOTROPY_TYPE, RHEOLOGY, USE_MONOLITHIC)
+    run(CASE, MEDIUM, ANISOTROPY_TYPE, RHEOLOGY)

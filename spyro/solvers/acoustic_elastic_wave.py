@@ -3,7 +3,6 @@ import numpy as np
 
 from .wave import Wave
 from .acoustic_elastic_solver_no_pml import construct_acoustic_elastic, voigt_strain
-from .acoustic_elastic_solver_monolithic import construct_acoustic_elastic_monolithic
 from ..utils.typing import override, WaveType
 from ..domains.space import create_function_space
 from ..domains.quadrature import quadrature_rules
@@ -33,7 +32,6 @@ class AcousticElasticWave(Wave):
         self.fluid_id = 1
         self.solid_id = 2
         self.interface_z = dictionary["mesh"].get("interface_z", None)
-        self.use_monolithic = False
         self.record_fluid_displacement = False
         self.fluid_displacement_history = []
         self._vf_normal = None
@@ -380,10 +378,7 @@ class AcousticElasticWave(Wave):
             self._build_memory_variables()
         self.c = c_fluid
 
-        if self.use_monolithic:
-            construct_acoustic_elastic_monolithic(self)
-        else:
-            construct_acoustic_elastic(self)
+        construct_acoustic_elastic(self)
 
         self.gradP_space = fire.VectorFunctionSpace(
             self.submesh_fluid, "CG", self.degree
@@ -510,12 +505,9 @@ class AcousticElasticWave(Wave):
         if self.record_fluid_displacement and self.receiver_locations:
             self._record_fluid_displacement_from_pressure()
 
-        if self.use_monolithic:
-            self._monolithic_solver.solve()
-        else:
-            self.source_function_fluid.assign(self.source_function.sub(0))
-            self.solid_solver.solve()
-            self.fluid_solver.solve()
+        self.source_function_fluid.assign(self.source_function.sub(0))
+        self.solid_solver.solve()
+        self.fluid_solver.solve()
 
     @override
     def get_forward_solution_receivers(self):
