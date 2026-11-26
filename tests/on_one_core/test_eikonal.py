@@ -278,125 +278,49 @@ def test_eikonal(element_geometry, dimension, element_type, source_bc):
     Notes
     -----
     Theoretical value. eik_min is the first-arrival time on the absorbing
-    boundaries: z = -1, x = 0, x = 1 and, in 3D, y = 0 and y = 1 (z = 0 is
-    the free surface). The source is at (z, x) = (-0.5, 0.25) km in 2D and
-    (z, x, y) = (-0.5, 0.25, 0.5) km in 3D. The velocity is 3.0 km/s for
-    x < 0.5 and 1.5 km/s for x >= 0.5. The first arrival on a boundary
-    follows the straight ray to its nearest point, since no other path is
-    shorter and none reaches a faster medium:
+    boundaries (z = -1, x = 0, x = 1 and, in 3D, y = 0 and y = 1; z = 0 is the
+    free surface). The source is at (z, x) = (-0.5, 0.25) km ((z, x, y) =
+    (-0.5, 0.25, 0.5) km in 3D). The velocity is 3.0 km/s for x < 0.5 and
+    1.5 km/s for x >= 0.5. The first arrival on a boundary follows the straight
+    ray to its nearest point, which gives 83.333 ms on x = 0 (0.25 km at
+    3.0 km/s), 166.667 ms on z = -1 and on y = 0, 1, and 416.667 ms on x = 1.
+    Hence eik_min = 83.333 ms, on x = 0 at (-0.5, 0.0) km ((-0.5, 0.0, 0.5) km
+    in 3D).
 
-    Boundary   Nearest point (z, x)   Path                          Time [ms]
-    x = 0      (-0.5, 0.0)            0.25 km at 3.0 km/s              83.333
-    z = -1     (-1.0, 0.25)           0.50 km at 3.0 km/s             166.667
-    y = 0, 1   3D: (-0.5, 0.25, 0|1)  0.50 km at 3.0 km/s             166.667
-    x = 1      (-0.5, 1.0)            0.25 km at 3.0 km/s
-                                      + 0.50 km at 1.5 km/s           416.667
-
-    eik_min = 0.25 km / 3.0 km/s = 83.333 ms, on x = 0 at (-0.5, 0.0) km
-    (at (-0.5, 0.0, 0.5) km in 3D).
-
-    Selection of f_est. The mesh size and the Eikonal degree are fixed for
-    each case, and f_est is calibrated separately for each source condition
-    (source_bc). The marked value (*) is the f_est with the smallest
+    Selection of f_est. The mesh size (100 m in 2D, 150 m in 3D) and the
+    Eikonal degree are fixed for each case, and f_est is calibrated separately
+    for each source condition. The f_est used is the one with the smallest
     relative error abs(eik_min - 83.333) / 83.333 among the values for which
     the nonlinear solver converges with every supported Firedrake version
-    (2025.4.1 and 2026.10.0), and is the one used by the test.
+    (2025.4.1 and 2026.10.0). Values (ms) at the selected f_est, with the
+    degree p in parentheses:
 
-    *******************************
-    Source condition 'nearest_node'
-    *******************************
-    --/--: the nonlinear solver stalls at this f_est.
+    Source        Case      2D                   3D
+    nearest_node  T-cons    0.06  82.942 (2)     0.05  82.259 (2)
+                  Q-cons    0.05  83.744 (2)     0.08  84.377 (2)
+                  T-under   0.07  82.630 (2)     0.07  83.719 (2)
+                  Q-under   0.03  84.245 (4)     0.06  83.476 (3)
+    local_time    T-cons    0.12  83.347 (2)     0.04  85.533 (2)
+                  Q-cons    0.12  83.357 (2)     0.02  85.710 (2)
+                  T-under   0.08  83.100 (2)     0.07  85.720 (2)
+                  Q-under   0.03  83.334 (4)     0.03  85.424 (3)
 
-    ==============================
-    Eikonal for 2D model Δx = 100m
-    ==============================
-    eik_min = 83.333 ms (Theoretical value)
-
-    f_est  T-cons  Q-cons f_est T-under Q-under
-            p = 2   p = 2         p = 2   p = 4
-     0.02  73.308  75.811  0.02   --/--   --/--
-     0.03  77.178  79.845  0.03   --/--  84.245*
-     0.04  79.680  82.101  0.04   --/--  85.593
-     0.05  81.498  83.744* 0.05   --/--  86.887
-     0.06  82.942* 85.118  0.06   --/--  88.145
-     0.07  84.160  86.345  0.07  82.630* 89.376
-     0.08  85.233  87.480  0.08  84.272  90.589
-
-    ==============================
-    Eikonal for 3D model Δx = 150m
-    ==============================
-    eik_min = 83.333 ms (Theoretical value)
-
-    f_est   T-cons  Q-cons f_est T-under Q-under
-             p = 2   p = 2         p = 2   p = 3
-     0.04   78.971  73.179  0.04  75.218  55.166
-     0.05   82.070* 75.766  0.05  78.211   --/--
-     0.06   85.267  78.548  0.06  80.890  83.476*
-     0.07   88.542  81.431  0.07  83.517* 85.902
-     0.08   91.884  84.377* 0.08  86.164  88.456
-     0.09   95.293  87.376  0.09  88.856  91.121
-
-    *****************************
-    Source condition 'local_time'
-    *****************************
-    --/--: the nonlinear solver stalls at this f_est. #: converges with
-    Firedrake 2025.4.1 but not with 2026.10.0, where the solver retries with
-    the next f_est.
-
-    ==============================
-    Eikonal for 2D model Δx = 100m
-    ==============================
-    eik_min = 83.333 ms (Theoretical value)
-    f_est  T-cons  Q-cons f_est T-under Q-under
-            p = 2   p = 2         p = 2   p = 4
-     0.07  83.680  83.509  0.03   --/--  83.334*
-     0.08  83.640  83.497  0.04   --/--  83.328
-     0.09  83.585  83.476  0.05   --/--  83.310
-     0.10  83.517  83.446  0.06   --/--  83.282
-     0.11  83.437  83.406  0.07  83.088  83.245
-     0.12  83.347* 83.357* 0.08  83.100* 83.199
-     0.13  83.246  83.300  0.09  83.092  83.144
-
-    ==============================
-    Eikonal for 3D model Δx = 150m
-    ==============================
-    eik_min = 83.333 ms (Theoretical value)
-    f_est  T-cons  Q-cons f_est T-under Q-under
-            p = 2   p = 2         p = 2   p = 3
-     0.01   --/--   --/--  0.01   --/--   --/--
-     0.02   --/--  85.710* 0.02   --/--  85.061#
-     0.03  75.029  85.982  0.03   --/--  85.424*
-     0.04  85.530* 86.353  0.04  84.654* 85.832
-     0.05  85.760  86.740  0.05  85.099  86.229
-     0.06  85.870  87.114  0.06  85.440  86.588
-     0.07  85.952  87.475  0.07  85.728  86.900
-     0.08  86.026  87.827  0.08  85.974  87.165
-
-    At the nodes shared by cells of different velocities, the velocity is the
-    minimum of their values (``creating_velocity_profile``), so that it does not
-    depend on the mesh partition.
-
-    The tables were computed with Firedrake 2025.4.1. With Firedrake
+    For some f_est the nonlinear solver stalls, mostly with the underintegrated
+    elements and the smaller f_est.
+    Firedrake versions. The tables were computed with Firedrake 2025.4.1. With
     2026.10.0 all cases pass. For 'nearest_node' the minimum Eikonal at the
-    marked f_est agrees within 0.01 ms except (in ms, 2026.10.0 vs 2025.4.1):
+    selected f_est agrees within 0.01 ms, except T-3D consistent (82.243 vs
+    82.259), T-3D underintegrated (83.710 vs 83.719) and Q-3D underintegrated
+    (83.302 vs 83.476). For Q-3D underintegrated the critical point is
+    (-0.532, 0, 0.532) km with 2026.10.0 and (-0.468, 0, 0.468) km with 2025.4.1:
+    the source is snapped to four equidistant nodes, and the installations break
+    the tie differently. For 'local_time' the values agree within 0.01 ms,
+    except Q-3D underintegrated: f_est = 0.02 (85.061 ms, 2.07 %) does not
+    converge with 2026.10.0, so the test uses f_est = 0.03, which converges
+    with both versions (85.424 ms, 2.51 %).
 
-    Case                    2026.10.0   2025.4.1
-    T-2D consistent            82.949     82.942
-    T-3D underintegrated       83.562     83.517
-    Q-3D underintegrated       83.302     83.476
-
-    For Q-3D underintegrated the critical point is (-0.532, 0, 0.532) km with
-    2026.10.0 and (-0.468, 0, 0.468) km with 2025.4.1: the source is snapped
-    to four equidistant nodes, and the installations break the tie between
-    the resulting boundary minima differently.
-
-    For 'local_time' the minimum Eikonal at the marked f_est agrees within
-    0.01 ms, except T-3D underintegrated (84.640 ms with 2026.10.0, 84.654 ms
-    with 2025.4.1), where f_est = 0.03 does not converge with either version.
-    The other exception is Q-3D underintegrated: f_est = 0.02 (85.061 ms,
-    2.07 %) does not converge with 2026.10.0, so the test uses f_est = 0.03,
-    the value with the next smallest error, which converges with both
-    versions (85.424 ms, 2.51 %).
+    Complete documentation, with the Eikonal value at every f_est tried:
+    tests/documentation_tests/test_eikonal__test_eikonal.md
     """
 
     SpyroEnsemble.print(
