@@ -1,8 +1,19 @@
 from firedrake import as_vector, assemble, CellDiameter, DirichletBC, SpatialCoordinate
 from mpi4py import MPI
-from numpy import allclose, clip, column_stack, empty_like, linspace, log10, min, max
+from numpy import (
+    allclose,
+    clip,
+    column_stack,
+    empty_like,
+    inf,
+    linspace,
+    log10,
+    min,
+    max,
+)
 from ..utils.error_management import validate_parameter
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
+from ..utils.utils import global_max, global_min
 from ..version_control import is_firedrake_new, is_firedrake_pyop3
 
 if is_firedrake_new():
@@ -112,14 +123,14 @@ class MeshOps():
 
         Returns
         -------
+        diam : `Firedrake.Function`
+            Mesh cell diameters interpolated into ``function_space``.
+        lmin : `float`
+            Minimum mesh size over all ranks.
+        lmax : `float`
+            Maximum mesh size over all ranks.
         alpha : `float`
             Ratio between the representative mesh dimensions.
-        diam_mesh : `ufl.geometry.CellDiameter`
-            Mesh cell diameters.
-        lmin : `float`
-            Minimum mesh size.
-        lmax : `float`
-            Maxmum mesh size.
         tol : `float`
             Tolerance for searching nodes in the mesh.
         """
@@ -133,10 +144,10 @@ class MeshOps():
         if self.dimension == 3:  # 3D
             fdim = 3**0.5
 
-        # Minimum and maximum mesh size for habc parameters
+        # Minimum and maximum mesh size for habc parameters, over every rank
         diam = assemble(interpolate(diam_mesh, function_space))
-        lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
-        lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
+        lmin = round(global_min(diam) / fdim, 6)
+        lmax = round(global_max(diam) / fdim, 6)
 
         # Ratio between the representative mesh dimensions
         alpha = lmax / lmin
@@ -165,12 +176,14 @@ class MeshOps():
         Notes
         -----
         The extremes are reduced over ``mesh.comm``, so every rank gets the
-        limits of the whole mesh and not only those of its own partition.
+        limits of the whole mesh and not only those of its own partition. The
+        coordinates are only read, so they are not marked as modified, and a rank
+        without nodes contributes ``inf`` and ``-inf``.
         """
 
-        coords = mesh.coordinates.dat.data_with_halos
-        local_min = min(coords, axis=0)
-        local_max = max(coords, axis=0)
+        coords = mesh.coordinates.dat.data_ro_with_halos
+        local_min = min(coords, axis=0, initial=inf)
+        local_max = max(coords, axis=0, initial=-inf)
 
         min_coordinates = empty_like(local_min)
         max_coordinates = empty_like(local_max)
