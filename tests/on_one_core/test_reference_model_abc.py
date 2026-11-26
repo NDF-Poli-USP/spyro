@@ -238,39 +238,21 @@ def test_infinite_model_abc(element_geometry, dimension, calc_eik):
     -------
     None
 
-    ==============================
-    Eikonal for 2D model Δx = 250m
-    ==============================
-    eik_min = 83.333 ms
+    Notes
+    -----
+    The theoretical eik_min is 83.333 ms. The marked f_est is the one whose
+    Eikonal is closest to it, among the values listed in the complete
+    documentation (ms):
 
-    f_est  T-ele   Q-ele
-     0.03 84.586*  --/--
-     0.04 87.945   --/--
-     0.05  --/--  93.368*
-     0.06  --/--  97.456
+    Model          T-ele f_est   T-ele eik   Q-ele f_est   Q-ele eik
+    2D, dx = 250m      0.03         84.586        0.05         93.368
+    3D, dx = 500m      0.67         54.687        0.07         78.381
 
-    ==============================
-    Eikonal for 3D model Δx = 500m
-    ==============================
-    eik_min = 83.333 ms
+    In 3D with triangles the Eikonal saturates near 54.7 ms for larger f_est
+    (maximum 54.687 ms at f_est = 0.67), far from 83.333 ms.
 
-    f_est   T-ele    Q-ele
-     0.06   3.618   63.319
-     0.07   4.782   78.381*
-     0.08   6.509   93.750
-     0.09   8.398  109.148
-     0.10  10.336  124.374
-     0.20  28.403    --/--
-     0.30  41.259    --/--
-     0.40  48.893    --/--
-     0.50  52.831    --/--
-     0.60  54.439    --/--
-     0.65  54.672    --/--
-     0.66  54.685    --/--
-     0.67  54.687*   --/--
-     0.68  54.680    --/--
-     0.69  54.664    --/--
-     0.70  54.639    --/--
+    Complete documentation, with the Eikonal value at every f_est tried:
+    tests/documentation_tests/test_reference_model_abc__test_infinite_model_abc.md
     """
 
     act_eik = "Activated" if calc_eik else "Deactivated"
