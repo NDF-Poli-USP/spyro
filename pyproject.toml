@@ -39,6 +39,7 @@ dependencies = [
 dev = [
   "black",
   "build",
+  "gmsh",
   "flake8",
   "memory-profiler",
   "mpi-pytest",
