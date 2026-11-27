@@ -1,5 +1,6 @@
 from pathlib import Path
 import warnings
+
 import h5py
 import numpy as np
 import pytest
@@ -12,20 +13,27 @@ from spyro.io.basicio import (
 )
 
 
-AVENIR_SEGY = "tests/inputfiles/velocity_models/avenir.segy"
-AVENIR3D_BIN = "tests/inputfiles/velocity_models/avenir3d.bin"
-AVENIR2D_BIN = "tests/inputfiles/velocity_models/avenir2d.bin"
+VS_EXAMPLE_2D_SEGY = "velocity_models/vs_example_2D.segy"
+VS_EXAMPLE_3D_BIN = "velocity_models/vs_example_3D.bin"
 
-AVENIR3D_NZ = 41
-AVENIR3D_NX = 21
-AVENIR3D_NY = 21
-
-AVENIR2D_NZ = 776
-AVENIR2D_NX = 1068
-AVENIR2D_NY = 0
+VS_EXAMPLE_3D_NZ = 101
+VS_EXAMPLE_3D_NX = 101
+VS_EXAMPLE_3D_NY = 101
 
 
 def _require_file(path):
+    """Return a test input path, skipping the test if the file is missing.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        Path to the required test input file.
+
+    Returns
+    -------
+    pathlib.Path
+        The existing input file path.
+    """
     path = Path(path)
     if not path.exists():
         pytest.skip(f"Missing test input file: {path}")
@@ -33,6 +41,20 @@ def _require_file(path):
 
 
 def _read_hdf5_velocity_model(filename):
+    """Read the velocity model dataset and file attributes from an HDF5 file.
+
+    Parameters
+    ----------
+    filename : str or pathlib.Path
+        Path to the HDF5 file written by `write_velocity_model`.
+
+    Returns
+    -------
+    data : numpy.ndarray
+        Contents of the `velocity_model` dataset.
+    attrs : dict
+        File-level HDF5 attributes.
+    """
     with h5py.File(filename, "r") as h5:
         data = h5["velocity_model"][:]
         attrs = dict(h5.attrs)
@@ -40,8 +62,19 @@ def _read_hdf5_velocity_model(filename):
 
 
 def _assert_hdf5_matches_expected(hdf5_file, expected):
-    data, attrs = _read_hdf5_velocity_model(hdf5_file)
+    """Assert an HDF5 velocity model matches the expected array and metadata.
 
+    Checks the dataset shape, `float32` dtype and values (NaN-aware), and that
+    the `shape` and `units` (`"m/s"`) attributes are present and correct.
+
+    Parameters
+    ----------
+    hdf5_file : str or pathlib.Path
+        Path to the HDF5 file to check.
+    expected : numpy.ndarray
+        Expected velocity model in canonical orientation.
+    """
+    data, attrs = _read_hdf5_velocity_model(hdf5_file)
     assert data.shape == expected.shape
     assert data.dtype == np.float32
     assert np.array_equal(data, expected.astype(np.float32), equal_nan=True)
@@ -55,7 +88,6 @@ def _assert_hdf5_matches_expected(hdf5_file, expected):
 def _axis_names_from_order(axes_order, ndim=3):
     """Independent axis parser for expected arrays in these tests."""
     axis_from_int = {0: "z", 1: "x", 2: "y"}
-
     if isinstance(axes_order, str):
         parts = axes_order.lower().replace(",", " ").split()
 
@@ -111,6 +143,22 @@ def _expected_binary_model(
 
 
 def _expected_segy_model(filename):
+    """Build the expected canonical 2D model directly from a SEG-Y file.
+
+    Reads each trace with `segyio` (skipping the test if it is unavailable)
+    into a `(nz, nx)` array and flips it vertically, independently of
+    `read_segy_velocity_model`.
+
+    Parameters
+    ----------
+    filename : str or pathlib.Path
+        Path to the SEG-Y file.
+
+    Returns
+    -------
+    numpy.ndarray
+        Expected `float32` velocity model of shape `(nz, nx)`.
+    """
     segyio = pytest.importorskip("segyio")
 
     with segyio.open(str(filename), "r", ignore_geometry=True) as segy:
@@ -122,6 +170,28 @@ def _expected_segy_model(filename):
             expected[:, index] = segy.trace[index]
 
     return np.flipud(expected)
+
+
+@pytest.fixture
+def vs_example_2d_binary(tmp_path):
+    """Create a binary copy of the new 2-D SEG-Y model for binary-I/O tests."""
+    segy_file = _require_file(VS_EXAMPLE_2D_SEGY)
+
+    vp_segy, nz, nx = read_segy_velocity_model(str(segy_file))
+
+    binary_file = tmp_path / "vs_example_2D.bin"
+
+    raw = np.flipud(vp_segy)
+    raw = np.asarray(raw, dtype=np.dtype("<f4"))
+    raw.ravel(order="F").tofile(binary_file)
+
+    return {
+        "filename": binary_file,
+        "nz": nz,
+        "nx": nx,
+        "ny": 0,
+        "expected": vp_segy,
+    }
 
 
 @pytest.mark.parametrize(
@@ -138,6 +208,15 @@ def _expected_segy_model(filename):
     ],
 )
 def test_parse_axes_order_valid_cases(axes_order, expected):
+    """Test that valid 3D axis-order specifications are parsed to axis names.
+
+    Parameters
+    ----------
+    axes_order : str, tuple or list
+        Axis-order specification passed to `_parse_axes_order`.
+    expected : tuple of str
+        Expected axis names.
+    """
     assert _parse_axes_order(axes_order) == expected
 
 
@@ -155,6 +234,15 @@ def test_parse_axes_order_valid_cases(axes_order, expected):
     ],
 )
 def test_parse_axes_order_2d_valid_cases(axes_order, expected):
+    """Test that valid 2D axis orders parse correctly and 3D ones drop the y axis.
+
+    Parameters
+    ----------
+    axes_order : str, tuple or list
+        Axis-order specification passed to `_parse_axes_order` with `ndim=2`.
+    expected : tuple of str
+        Expected 2D axis names.
+    """
     assert _parse_axes_order(axes_order, ndim=2) == expected
 
 
@@ -171,6 +259,15 @@ def test_parse_axes_order_2d_valid_cases(axes_order, expected):
     ],
 )
 def test_parse_axes_order_2d_invalid_cases(axes_order, error_type):
+    """Test that invalid 2D axis-order specifications raise the expected error.
+
+    Parameters
+    ----------
+    axes_order : str or tuple
+        Invalid axis-order specification passed with `ndim=2`.
+    error_type : type
+        Expected exception class.
+    """
     with pytest.raises(error_type):
         _parse_axes_order(axes_order, ndim=2)
 
@@ -189,20 +286,39 @@ def test_parse_axes_order_2d_invalid_cases(axes_order, error_type):
     ],
 )
 def test_parse_axes_order_invalid_cases(axes_order, error_type):
+    """Test that invalid 3D axis-order specifications raise the expected error.
+
+    Parameters
+    ----------
+    axes_order : object
+        Invalid axis-order specification passed to `_parse_axes_order`.
+    error_type : type
+        Expected exception class.
+    """
     with pytest.raises(error_type):
         _parse_axes_order(axes_order)
 
 
-def test_read_avenir2d_binary():
-    bin_file = _require_file(AVENIR2D_BIN)
+def test_read_vs_example_2d_binary(vs_example_2d_binary):
+    """Test that a little-endian 2D binary model is read silently and correctly.
+
+    Parameters
+    ----------
+    vs_example_2d_binary : dict
+        Fixture with the binary file path, dimensions and expected model.
+    """
+    bin_file = vs_example_2d_binary["filename"]
+    nz_expected = vs_example_2d_binary["nz"]
+    nx_expected = vs_example_2d_binary["nx"]
+    ny_expected = vs_example_2d_binary["ny"]
 
     with warnings.catch_warnings(record=True) as recorded:
         warnings.simplefilter("always")
         vp, nz, nx, ny = read_bin_velocity_model(
             filename=str(bin_file),
-            nz=AVENIR2D_NZ,
-            nx=AVENIR2D_NX,
-            ny=AVENIR2D_NY,
+            nz=nz_expected,
+            nx=nx_expected,
+            ny=ny_expected,
             byte_order="little",
             axes_order="z x",
             axes_order_sort="F",
@@ -211,9 +327,9 @@ def test_read_avenir2d_binary():
 
     expected = _expected_binary_model(
         filename=bin_file,
-        nz=AVENIR2D_NZ,
-        nx=AVENIR2D_NX,
-        ny=AVENIR2D_NY,
+        nz=nz_expected,
+        nx=nx_expected,
+        ny=ny_expected,
         byte_order="little",
         axes_order="z x",
         axes_order_sort="F",
@@ -221,24 +337,30 @@ def test_read_avenir2d_binary():
     )
 
     assert not recorded
-    assert (nz, nx, ny) == (
-        AVENIR2D_NZ,
-        AVENIR2D_NX,
-        AVENIR2D_NY,
-    )
-    assert vp.shape == (AVENIR2D_NZ, AVENIR2D_NX)
+    assert (nz, nx, ny) == (nz_expected, nx_expected, ny_expected)
+    assert vp.shape == (nz_expected, nx_expected)
     assert vp.dtype.itemsize == np.dtype("float32").itemsize
     assert np.all(np.isfinite(vp))
     assert np.array_equal(vp, expected)
+    assert np.array_equal(vp, vs_example_2d_binary["expected"])
 
 
-def test_read_avenir2d_accepts_three_axis_order():
-    bin_file = _require_file(AVENIR2D_BIN)
+def test_read_vs_example_2d_accepts_three_axis_order(vs_example_2d_binary):
+    """Test that a 2D binary model is read correctly with a 3-axis order tuple.
+
+    Parameters
+    ----------
+    vs_example_2d_binary : dict
+        Fixture with the binary file path, dimensions and expected model.
+    """
+    bin_file = vs_example_2d_binary["filename"]
+    nz_expected = vs_example_2d_binary["nz"]
+    nx_expected = vs_example_2d_binary["nx"]
 
     vp, nz, nx, ny = read_bin_velocity_model(
         filename=str(bin_file),
-        nz=AVENIR2D_NZ,
-        nx=AVENIR2D_NX,
+        nz=nz_expected,
+        nx=nx_expected,
         ny=0,
         byte_order="little",
         axes_order=(0, 1, 2),
@@ -248,8 +370,8 @@ def test_read_avenir2d_accepts_three_axis_order():
 
     expected = _expected_binary_model(
         filename=bin_file,
-        nz=AVENIR2D_NZ,
-        nx=AVENIR2D_NX,
+        nz=nz_expected,
+        nx=nx_expected,
         ny=0,
         byte_order="little",
         axes_order=(0, 1, 2),
@@ -257,21 +379,37 @@ def test_read_avenir2d_accepts_three_axis_order():
         dtype="float32",
     )
 
-    assert (nz, nx, ny) == (AVENIR2D_NZ, AVENIR2D_NX, 0)
-    assert vp.shape == (AVENIR2D_NZ, AVENIR2D_NX)
+    assert (nz, nx, ny) == (nz_expected, nx_expected, 0)
+    assert vp.shape == (nz_expected, nx_expected)
     assert np.array_equal(vp, expected)
+    assert np.array_equal(vp, vs_example_2d_binary["expected"])
 
 
-def test_write_velocity_model_avenir2d_binary_hdf5(tmp_path):
-    bin_file = _require_file(AVENIR2D_BIN)
-    output_stem = tmp_path / "avenir2d"
+def test_write_velocity_model_vs_example_2d_binary_hdf5(
+    tmp_path,
+    vs_example_2d_binary,
+):
+    """Test that converting a 2D binary model writes a matching 2D HDF5 file.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the output file.
+    vs_example_2d_binary : dict
+        Fixture with the binary file path, dimensions and expected model.
+    """
+    bin_file = vs_example_2d_binary["filename"]
+    nz_expected = vs_example_2d_binary["nz"]
+    nx_expected = vs_example_2d_binary["nx"]
+
+    output_stem = tmp_path / "vs_example_2d"
 
     hdf5_file = write_velocity_model(
         filename=str(bin_file),
         ofname=str(output_stem),
         model_type="bin",
-        nz=AVENIR2D_NZ,
-        nx=AVENIR2D_NX,
+        nz=nz_expected,
+        nx=nx_expected,
         ny=0,
         byte_order="little",
         axes_order="z x",
@@ -281,8 +419,8 @@ def test_write_velocity_model_avenir2d_binary_hdf5(tmp_path):
 
     expected = _expected_binary_model(
         filename=bin_file,
-        nz=AVENIR2D_NZ,
-        nx=AVENIR2D_NX,
+        nz=nz_expected,
+        nx=nx_expected,
         ny=0,
         byte_order="little",
         axes_order="z x",
@@ -295,54 +433,51 @@ def test_write_velocity_model_avenir2d_binary_hdf5(tmp_path):
 
     data, attrs = _read_hdf5_velocity_model(hdf5_file)
     assert data.ndim == 2
-    assert data.shape == (AVENIR2D_NZ, AVENIR2D_NX)
-    assert np.array_equal(attrs["shape"], (AVENIR2D_NZ, AVENIR2D_NX))
+    assert data.shape == (nz_expected, nx_expected)
+    assert np.array_equal(attrs["shape"], (nz_expected, nx_expected))
+    assert np.array_equal(data, vs_example_2d_binary["expected"])
 
 
-def test_read_avenir3d_binary_switches_wrong_little_to_big():
-    bin_file = _require_file(AVENIR3D_BIN)
+def test_read_binary_switches_wrong_little_to_big(tmp_path):
+    """Exercise endian correction independently of a particular velocity model."""
+    filename = tmp_path / "big_endian_finite_little_endian_nan.bin"
 
-    # The file is big-endian float32. Passing little should use the
-    # NaN/Inf correction branch and switch to big.
+    filename.write_bytes(bytes.fromhex("68f8beff"))
+
     with pytest.warns(UserWarning, match="Using byte_order='big'"):
         vp, nz, nx, ny = read_bin_velocity_model(
-            filename=str(bin_file),
-            nz=AVENIR3D_NZ,
-            nx=AVENIR3D_NX,
-            ny=AVENIR3D_NY,
+            filename=str(filename),
+            nz=1,
+            nx=1,
+            ny=1,
             byte_order="little",
             axes_order=(0, 1, 2),
             axes_order_sort="F",
             dtype="float32",
         )
 
-    expected = _expected_binary_model(
-        filename=bin_file,
-        nz=AVENIR3D_NZ,
-        nx=AVENIR3D_NX,
-        ny=AVENIR3D_NY,
-        byte_order="big",
-        axes_order=(0, 1, 2),
-        axes_order_sort="F",
-        dtype="float32",
-    )
+    expected_value = np.frombuffer(
+        bytes.fromhex("68f8beff"),
+        dtype=np.dtype(">f4"),
+    )[0]
 
-    assert (nz, nx, ny) == (AVENIR3D_NZ, AVENIR3D_NX, AVENIR3D_NY)
-    assert vp.shape == (AVENIR3D_NZ, AVENIR3D_NX, AVENIR3D_NY)
-    assert np.all(np.isfinite(vp))
-    assert np.array_equal(vp, expected)
+    assert (nz, nx, ny) == (1, 1, 1)
+    assert vp.shape == (1, 1, 1)
+    assert np.isfinite(vp[0, 0, 0])
+    assert vp[0, 0, 0] == expected_value
 
 
-def test_read_avenir3d_binary_correct_big_order_has_no_warning():
-    bin_file = _require_file(AVENIR3D_BIN)
+def test_read_vs_example_3d_binary_correct_big_order_has_no_warning():
+    """Test that reading the 3D model as big-endian emits no warning."""
+    bin_file = _require_file(VS_EXAMPLE_3D_BIN)
 
     with warnings.catch_warnings(record=True) as recorded:
         warnings.simplefilter("always")
         vp, nz, nx, ny = read_bin_velocity_model(
             filename=str(bin_file),
-            nz=AVENIR3D_NZ,
-            nx=AVENIR3D_NX,
-            ny=AVENIR3D_NY,
+            nz=VS_EXAMPLE_3D_NZ,
+            nx=VS_EXAMPLE_3D_NX,
+            ny=VS_EXAMPLE_3D_NY,
             byte_order="big",
             axes_order="z x y",
             axes_order_sort="F",
@@ -350,32 +485,56 @@ def test_read_avenir3d_binary_correct_big_order_has_no_warning():
         )
 
     assert not recorded
-    assert (nz, nx, ny) == (AVENIR3D_NZ, AVENIR3D_NX, AVENIR3D_NY)
-    assert vp.shape == (AVENIR3D_NZ, AVENIR3D_NX, AVENIR3D_NY)
+    assert (nz, nx, ny) == (
+        VS_EXAMPLE_3D_NZ,
+        VS_EXAMPLE_3D_NX,
+        VS_EXAMPLE_3D_NY,
+    )
+    assert vp.shape == (
+        VS_EXAMPLE_3D_NZ,
+        VS_EXAMPLE_3D_NX,
+        VS_EXAMPLE_3D_NY,
+    )
     assert np.all(np.isfinite(vp))
 
 
-def test_read_avenir3d_binary_corrects_wrong_dtype_by_file_size():
-    bin_file = _require_file(AVENIR3D_BIN)
+def test_read_vs_example_3d_binary_corrects_wrong_dtype_by_file_size():
+    """Test that a wrong `float64` dtype is corrected to `float32` by file size."""
+    bin_file = _require_file(VS_EXAMPLE_3D_BIN)
 
     with pytest.warns(UserWarning, match="Using dtype=float32"):
         vp, nz, nx, ny = read_bin_velocity_model(
             filename=str(bin_file),
-            nz=AVENIR3D_NZ,
-            nx=AVENIR3D_NX,
-            ny=AVENIR3D_NY,
+            nz=VS_EXAMPLE_3D_NZ,
+            nx=VS_EXAMPLE_3D_NX,
+            ny=VS_EXAMPLE_3D_NY,
             byte_order="big",
             axes_order=(0, 1, 2),
             axes_order_sort="F",
             dtype="float64",
         )
 
-    assert (nz, nx, ny) == (AVENIR3D_NZ, AVENIR3D_NX, AVENIR3D_NY)
+    assert (nz, nx, ny) == (
+        VS_EXAMPLE_3D_NZ,
+        VS_EXAMPLE_3D_NX,
+        VS_EXAMPLE_3D_NY,
+    )
     assert vp.dtype == np.dtype(">f4") or vp.dtype == np.float32
-    assert vp.shape == (AVENIR3D_NZ, AVENIR3D_NX, AVENIR3D_NY)
+    assert vp.shape == (
+        VS_EXAMPLE_3D_NZ,
+        VS_EXAMPLE_3D_NX,
+        VS_EXAMPLE_3D_NY,
+    )
 
 
 def test_read_binary_keeps_selected_byte_order_when_other_is_not_better(tmp_path):
+    """Test that the requested byte order is kept, with a warning, if neither is better.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the all-NaN binary file.
+    """
     # 0xffffffff is NaN as both little-endian and big-endian float32.
     filename = tmp_path / "all_nan_both_endians.bin"
     filename.write_bytes(b"\xff\xff\xff\xff")
@@ -398,11 +557,21 @@ def test_read_binary_keeps_selected_byte_order_when_other_is_not_better(tmp_path
 
 
 def test_read_binary_axis_permutation_with_temporary_file(tmp_path):
+    """Test that a binary file stored in x-z-y order is permuted to canonical z-x-y.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the binary file.
+    """
     filename = tmp_path / "axis_permutation.bin"
 
     nz, nx, ny = 2, 3, 4
-    raw_shape = (nx, nz, ny)  # axes_order=(1, 0, 2), i.e. x, z, y
-    raw = np.arange(np.prod(raw_shape), dtype=np.float32).reshape(raw_shape, order="C")
+    raw_shape = (nx, nz, ny)
+    raw = np.arange(np.prod(raw_shape), dtype=np.float32).reshape(
+        raw_shape,
+        order="C",
+    )
     raw.tofile(filename)
 
     vp, _, _, _ = read_bin_velocity_model(
@@ -421,23 +590,62 @@ def test_read_binary_axis_permutation_with_temporary_file(tmp_path):
 
 
 def test_read_binary_errors(tmp_path):
+    """Test that missing dimensions and invalid read options raise `ValueError`.
+
+    Covers a missing `nz`, an invalid `byte_order`, an invalid
+    `axes_order_sort` and a negative `ny`.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the binary file.
+    """
     filename = tmp_path / "tiny.bin"
     np.array([1.0], dtype=np.float32).tofile(filename)
 
     with pytest.raises(ValueError, match=r"nz, nx, and ny"):
-        read_bin_velocity_model(str(filename), nz=None, nx=1, ny=1)
+        read_bin_velocity_model(
+            str(filename),
+            nz=None,
+            nx=1,
+            ny=1,
+        )
 
     with pytest.raises(ValueError, match="byte_order"):
-        read_bin_velocity_model(str(filename), nz=1, nx=1, ny=1, byte_order="auto")
+        read_bin_velocity_model(
+            str(filename),
+            nz=1,
+            nx=1,
+            ny=1,
+            byte_order="auto",
+        )
 
     with pytest.raises(ValueError, match="axes_order_sort"):
-        read_bin_velocity_model(str(filename), nz=1, nx=1, ny=1, axes_order_sort="A")
+        read_bin_velocity_model(
+            str(filename),
+            nz=1,
+            nx=1,
+            ny=1,
+            axes_order_sort="A",
+        )
 
     with pytest.raises(ValueError, match="ny"):
-        read_bin_velocity_model(str(filename), nz=1, nx=1, ny=-1)
+        read_bin_velocity_model(
+            str(filename),
+            nz=1,
+            nx=1,
+            ny=-1,
+        )
 
 
 def test_read_binary_file_size_mismatch_raises(tmp_path):
+    """Test that a file size inconsistent with the dimensions raises `ValueError`.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the binary file.
+    """
     filename = tmp_path / "bad_size.bin"
     filename.write_bytes(b"abc")
 
@@ -454,19 +662,27 @@ def test_read_binary_file_size_mismatch_raises(tmp_path):
         )
 
 
-def test_write_velocity_model_avenir3d_binary_hdf5(tmp_path):
-    bin_file = _require_file(AVENIR3D_BIN)
-    output_stem = tmp_path / "avenir3d"
+def test_write_velocity_model_vs_example_3d_binary_hdf5(tmp_path):
+    """Test that converting the 3D binary model writes a matching HDF5 file silently.
 
-    with pytest.warns(UserWarning, match="Using byte_order='big'"):
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the output file.
+    """
+    bin_file = _require_file(VS_EXAMPLE_3D_BIN)
+    output_stem = tmp_path / "vs_example_3d"
+
+    with warnings.catch_warnings(record=True) as recorded:
+        warnings.simplefilter("always")
         hdf5_file = write_velocity_model(
             filename=str(bin_file),
             ofname=str(output_stem),
             model_type="bin",
-            nz=AVENIR3D_NZ,
-            nx=AVENIR3D_NX,
-            ny=AVENIR3D_NY,
-            byte_order="little",
+            nz=VS_EXAMPLE_3D_NZ,
+            nx=VS_EXAMPLE_3D_NX,
+            ny=VS_EXAMPLE_3D_NY,
+            byte_order="big",
             axes_order=(0, 1, 2),
             axes_order_sort="F",
             dtype="float32",
@@ -474,21 +690,23 @@ def test_write_velocity_model_avenir3d_binary_hdf5(tmp_path):
 
     expected = _expected_binary_model(
         filename=bin_file,
-        nz=AVENIR3D_NZ,
-        nx=AVENIR3D_NX,
-        ny=AVENIR3D_NY,
+        nz=VS_EXAMPLE_3D_NZ,
+        nx=VS_EXAMPLE_3D_NX,
+        ny=VS_EXAMPLE_3D_NY,
         byte_order="big",
         axes_order=(0, 1, 2),
         axes_order_sort="F",
         dtype="float32",
     )
 
+    assert not recorded
     assert hdf5_file == str(output_stem) + ".hdf5"
     _assert_hdf5_matches_expected(hdf5_file, expected)
 
 
-def test_read_avenir_segy_velocity_model():
-    segy_file = _require_file(AVENIR_SEGY)
+def test_read_vs_example_2d_segy_velocity_model():
+    """Test that reading the 2D SEG-Y model returns the expected array and sizes."""
+    segy_file = _require_file(VS_EXAMPLE_2D_SEGY)
 
     vp, nz, nx = read_segy_velocity_model(str(segy_file))
     expected = _expected_segy_model(segy_file)
@@ -499,9 +717,16 @@ def test_read_avenir_segy_velocity_model():
     assert np.array_equal(vp, expected)
 
 
-def test_write_velocity_model_avenir_segy_hdf5(tmp_path):
-    segy_file = _require_file(AVENIR_SEGY)
-    output_stem = tmp_path / "avenir"
+def test_write_velocity_model_vs_example_2d_segy_hdf5(tmp_path):
+    """Test that converting the 2D SEG-Y model writes a matching HDF5 file.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the output file.
+    """
+    segy_file = _require_file(VS_EXAMPLE_2D_SEGY)
+    output_stem = tmp_path / "vs_example_2d_segy"
 
     hdf5_file = write_velocity_model(
         filename=str(segy_file),
@@ -516,6 +741,13 @@ def test_write_velocity_model_avenir_segy_hdf5(tmp_path):
 
 
 def test_write_velocity_model_invalid_model_type(tmp_path):
+    """Test that an unknown `model_type` raises `ValueError`.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the input and output files.
+    """
     filename = tmp_path / "tiny.bin"
     np.array([1.0], dtype=np.float32).tofile(filename)
 
@@ -528,6 +760,13 @@ def test_write_velocity_model_invalid_model_type(tmp_path):
 
 
 def test_write_velocity_model_default_output_name_warning(tmp_path):
+    """Test that omitting `ofname` warns and writes `<filename>.hdf5`.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Pytest temporary directory for the input and output files.
+    """
     filename = tmp_path / "tiny.bin"
     np.array([1.0], dtype=np.float32).tofile(filename)
 
@@ -545,5 +784,6 @@ def test_write_velocity_model_default_output_name_warning(tmp_path):
         )
 
     expected = np.array([[[1.0]]], dtype=np.float32)
+
     assert hdf5_file == str(filename) + ".hdf5"
     _assert_hdf5_matches_expected(hdf5_file, expected)
