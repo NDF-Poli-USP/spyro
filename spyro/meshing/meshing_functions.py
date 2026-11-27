@@ -1,5 +1,7 @@
 import numpy as np
+from firedrake import COMM_WORLD
 from firedrake import Mesh as FireMeshReader
+from firedrake.mesh import MeshGeometry
 
 from .firedrake_based_wrappers import box_mesh, periodic_rectangle_mesh, rectangle_mesh
 from spyro.mpi.spyro_mpi import SpyroEnsemble
@@ -449,7 +451,7 @@ class AutomaticMesh:
         self.velocity_model = generate_gmsh_2d_mesh(self.mesh_parameters)
         return self._load_mesh_file()
 
-    def _load_mesh_file(self):
+    def _load_mesh_file(self) -> MeshGeometry:
         """Wait for the mesh-writing rank, then load the mesh file.
 
         Returns
@@ -457,12 +459,15 @@ class AutomaticMesh:
         firedrake.MeshGeometry
             Mesh read from `self.output_file_name`.
         """
-        if self.comm is not None:
-            # Ensure all processes wait for mesh creation to complete
-            # Need to sync both ensemble and spatial communicators
-            if hasattr(self.comm, "ensemble_comm"):
-                self.comm.ensemble_comm.barrier()
-            self.comm.comm.barrier()
-            SpyroEnsemble.print("Loading mesh into Firedrake.")
-            return FireMeshReader(self.output_file_name, comm=self.comm.comm)
-        return FireMeshReader(self.output_file_name)
+        active_ensemble = SpyroEnsemble.ensemble
+        if active_ensemble is not None:
+            # Synchronize matching ranks across members before the spatial barrier.
+            active_ensemble.ensemble_comm.barrier()
+            SpyroEnsemble.barrier()
+        elif self.comm is not None:
+            self.comm.global_comm.barrier()
+        SpyroEnsemble.print("Loading mesh into Firedrake.")
+
+        ensemble = self.comm if self.comm is not None else active_ensemble
+        comm = ensemble.comm if ensemble is not None else COMM_WORLD
+        return FireMeshReader(self.output_file_name, comm=comm)

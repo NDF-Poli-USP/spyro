@@ -80,7 +80,7 @@ def build_gmsh_geometry_and_groups(
             x_min=0.0,
             x_max=length_x,
             value=water_search_value,
-            tolerance=0.001,
+            tolerance=np.finfo(np.float32).eps,
         )
         z_water_left, z_water_right = float(z_water_interface[0]), float(
             z_water_interface[-1]
@@ -373,28 +373,25 @@ def apply_structured_winslow_smoothing2d(
         for i, point in enumerate(points_2d):
             x, z = point
             if water_interface:
-                if (
-                    (abs(x - 0.0) < tol and abs(z - depth_z) < tol)
-                    or (abs(x - length_x) < tol and abs(z - depth_z) < tol)
-                    or (abs(x - 0.0) < tol and abs(z - z_water_left) < tol)
-                    or (abs(x - length_x) < tol and abs(z - z_water_right) < tol)
+                if _is_subsurface_corner(
+                    x, z, length_x, depth_z, z_water_left, z_water_right, tol
                 ):
                     corner_indices.add(i)
             else:
                 if (
-                    (abs(x - 0.0) < tol and abs(z - depth_z) < tol)
+                    (abs(x) < tol and abs(z - depth_z) < tol)
                     or (abs(x - length_x) < tol and abs(z - depth_z) < tol)
-                    or (abs(x - 0.0) < tol and abs(z - 0.0) < tol)
-                    or (abs(x - length_x) < tol and abs(z - 0.0) < tol)
+                    or (abs(x) < tol and abs(z) < tol)
+                    or (abs(x - length_x) < tol and abs(z) < tol)
                     or (
                         x_pad_top_left is not None
                         and abs(x - x_pad_top_left) < tol
-                        and abs(z - 0.0) < tol
+                        and abs(z) < tol
                     )
                     or (
                         x_pad_top_right is not None
                         and abs(x - x_pad_top_right) < tol
-                        and abs(z - 0.0) < tol
+                        and abs(z) < tol
                     )
                 ):
                     corner_indices.add(i)
@@ -411,7 +408,7 @@ def apply_structured_winslow_smoothing2d(
                     move_z_only.add(i)
                 else:
                     locked.add(i)
-            elif not water_interface and abs(points_2d[i][1] - 0.0) < tol:
+            elif not water_interface and abs(points_2d[i][1]) < tol:
                 move_x_only.add(i)  # Lock top boundary Z axis, slide in X
             elif i in outer_arc_nodes:
                 move_hyperellipse.add(i)
@@ -424,31 +421,22 @@ def apply_structured_winslow_smoothing2d(
 
     elif padding_type == "rectangular":
         tol = 1e-3
-        if water_interface:
-            corners_to_lock = [
-                (0.0, depth_z),
-                (length_x, depth_z),
-                (pad_x_min, depth_z),
-                (pad_x_max, depth_z),
-                (0.0, pad_z_min),
-                (length_x, pad_z_min),
-                (pad_x_min, pad_z_min),
-                (pad_x_max, pad_z_min),
-            ]
-        else:
-            corners_to_lock = [
+        corners_to_lock = [
+            (0.0, depth_z),
+            (length_x, depth_z),
+            (pad_x_min, depth_z),
+            (pad_x_max, depth_z),
+            (0.0, pad_z_min),
+            (length_x, pad_z_min),
+            (pad_x_min, pad_z_min),
+            (pad_x_max, pad_z_min),
+        ]
+        if not water_interface:
+            corners_to_lock[:0] = [
                 (0.0, 0.0),
                 (length_x, 0.0),
                 (pad_x_min, 0.0),
                 (pad_x_max, 0.0),
-                (0.0, depth_z),
-                (length_x, depth_z),
-                (pad_x_min, depth_z),
-                (pad_x_max, depth_z),
-                (0.0, pad_z_min),
-                (length_x, pad_z_min),
-                (pad_x_min, pad_z_min),
-                (pad_x_max, pad_z_min),
             ]
 
         for i, point in enumerate(points_2d):
@@ -475,7 +463,7 @@ def apply_structured_winslow_smoothing2d(
             if (
                 abs(x - pad_x_min) < tol
                 or abs(x - pad_x_max) < tol
-                or abs(x - 0.0) < tol
+                or abs(x) < tol
                 or abs(x - length_x) < tol
             ):
                 move_z_only.add(i)
@@ -484,7 +472,7 @@ def apply_structured_winslow_smoothing2d(
             if (
                 abs(z - pad_z_min) < tol
                 or abs(z - depth_z) < tol
-                or (not water_interface and abs(z - 0.0) < tol)
+                or (not water_interface and abs(z) < tol)
             ):
                 move_x_only.add(i)
                 continue
@@ -515,10 +503,10 @@ def apply_structured_winslow_smoothing2d(
                 locked.add(i)
                 continue
 
-            if abs(x - 0.0) < tol or abs(x - length_x) < tol:
+            if abs(x) < tol or abs(x - length_x) < tol:
                 move_z_only.add(i)
                 continue
-            if abs(z - 0.0) < tol or abs(z - depth_z) < tol:
+            if abs(z) < tol or abs(z - depth_z) < tol:
                 move_x_only.add(i)
                 continue
 
@@ -539,36 +527,25 @@ def apply_structured_winslow_smoothing2d(
             sizes_flat = ef_segy2(x_grid.flatten(), z_grid.flatten())
             segy_grid_vals = sizes_flat.reshape((nx_grid, nz_grid))
 
-            if winslow_implementation == "fast":
-                smoothed_points_2d = winslow_smooth_vectorized(
-                    points=points_2d,
-                    quads=quads,
-                    segy_grid_x=segy_grid_x,
-                    segy_grid_z=segy_grid_z,
-                    segy_grid_vals=segy_grid_vals,
-                    move_all=move_all,
-                    move_x_only=move_x_only,
-                    move_z_only=move_z_only,
-                    move_hyperellipse=move_hyperellipse,
-                    hyperellipse_params=(a_val, b_val, xc, zc, hyper_n),
-                    iterations=winslow_iterations,
-                    omega=winslow_omega,
-                )
-            elif winslow_implementation == "numba":
-                smoothed_points_2d = winslow_smooth_numba(
-                    points=points_2d,
-                    quads=quads,
-                    segy_grid_x=segy_grid_x,
-                    segy_grid_z=segy_grid_z,
-                    segy_grid_vals=segy_grid_vals,
-                    move_all=move_all,
-                    move_x_only=move_x_only,
-                    move_z_only=move_z_only,
-                    move_hyperellipse=move_hyperellipse,
-                    hyperellipse_params=(a_val, b_val, xc, zc, hyper_n),
-                    iterations=winslow_iterations,
-                    omega=winslow_omega,
-                )
+            smooth = (
+                winslow_smooth_vectorized
+                if winslow_implementation == "fast"
+                else winslow_smooth_numba
+            )
+            smoothed_points_2d = smooth(
+                points=points_2d,
+                quads=quads,
+                segy_grid_x=segy_grid_x,
+                segy_grid_z=segy_grid_z,
+                segy_grid_vals=segy_grid_vals,
+                move_all=move_all,
+                move_x_only=move_x_only,
+                move_z_only=move_z_only,
+                move_hyperellipse=move_hyperellipse,
+                hyperellipse_params=(a_val, b_val, xc, zc, hyper_n),
+                iterations=winslow_iterations,
+                omega=winslow_omega,
+            )
         else:
             smoothed_points_2d = winslow_smooth_default(
                 points=points_2d,
@@ -593,6 +570,47 @@ def apply_structured_winslow_smoothing2d(
     SpyroEnsemble.print("Updating nodes in Gmsh...")
     for i, tag in enumerate(node_tags):
         gmsh.model.mesh.setNode(int(tag), smoothed_points_3d[i].tolist(), [])
+
+
+def _is_subsurface_corner(
+    x: float,
+    z: float,
+    length_x: float,
+    depth_z: float,
+    z_water_left: float,
+    z_water_right: float,
+    tol: float,
+) -> bool:
+    """Check whether a node is at a bottom corner or water-interface endpoint.
+
+    Parameters
+    ----------
+    x : float
+        Horizontal coordinate of the node.
+    z : float
+        Vertical coordinate of the node.
+    length_x : float
+        Width of the physical domain, measured from x = 0.
+    depth_z : float
+        Vertical coordinate of the bottom of the physical domain.
+    z_water_left : float
+        Vertical coordinate of the left water-interface endpoint.
+    z_water_right : float
+        Vertical coordinate of the right water-interface endpoint.
+    tol : float
+        Strict tolerance for the difference in each coordinate.
+
+    Returns
+    -------
+    bool
+        Whether the node lies within the tolerance of any of the four corners.
+    """
+    return bool(
+        (abs(x) < tol and abs(z - depth_z) < tol)
+        or (abs(x - length_x) < tol and abs(z - depth_z) < tol)
+        or (abs(x) < tol and abs(z - z_water_left) < tol)
+        or (abs(x - length_x) < tol and abs(z - z_water_right) < tol)
+    )
 
 
 def _build_gmsh_geometry_no_padding(
