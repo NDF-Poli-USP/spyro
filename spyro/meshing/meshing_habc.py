@@ -170,9 +170,8 @@ class HABCMesh(MeshOps):
 
         # Create a point cloud to get the extreme velocity values on the boundary
         ptos_bnd = mesh.coordinates.dat.data_with_halos[mask_boundary, :]
-        vel_on_boundary = point_cloud_field(
-            mesh, ptos_bnd, initial_velocity_model, mesh_parameters.tol
-        ).dat.data_with_halos[:]
+        vel_on_boundary = point_cloud_field(mesh, ptos_bnd, initial_velocity_model,
+                                            mesh_parameters.tol).dat.data_with_halos[:]
 
         # Get extreme values of the velocity on the boundary excluding free surfaces
         decimal = int(abs(np.log10(mesh_parameters.tol)))
@@ -265,7 +264,9 @@ class HABCMesh(MeshOps):
 
         return funct_space_eik
 
-    def preamble_mesh_operations(self, wave, ele_type_eik="consistent", f_est=0.03):
+    def preamble_mesh_operations(
+        self, wave, ele_type_eik="consistent", f_est=0.03, source_bc_eik="nearest_node"
+    ):
         """Perform mesh operations previous to size an absorbing layer.
 
         Parameters
@@ -287,6 +288,11 @@ class HABCMesh(MeshOps):
             Default is 'consistent'.
         f_est : `float`, optional
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03.
+        source_bc_eik : `str`, optional
+            Dirichlet condition at the sources for the Eikonal equation:
+            'nearest_node' (zero at the nearest node) or 'local_time' (local
+            travel time within one cell of the source). See
+            `Eikonal_Modeling.eikonal_bcs`. Default is 'nearest_node'.
 
         Returns
         -------
@@ -306,6 +312,8 @@ class HABCMesh(MeshOps):
             Finite element type for the Eikonal modeling. 'CG' or 'KMV'.
         mesh_parameters.f_est : `float`
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03.
+        mesh_parameters.source_bc_eik : `str`
+            Dirichlet condition at the sources for the Eikonal equation.
         mesh_parameters.funct_space_eik: `Firedrake.FunctionSpace`
             Function space for the Eikonal modeling.
         """
@@ -348,6 +356,9 @@ class HABCMesh(MeshOps):
 
         # Factor for the stabilizing term in Eikonal equation
         wave.mesh_parameters.f_est = f_est
+
+        # Dirichlet condition at the sources for the Eikonal equation
+        wave.mesh_parameters.source_bc_eik = source_bc_eik
 
         # Function space for Eikonal modeling
         wave.mesh_parameters.funct_space_eik = self.create_function_space_eik(

@@ -219,7 +219,8 @@ class TestMeasureError:
         """Test peak error with signal without peaks."""
         signal = np.array([0, 0, 0, 0])
         with pytest.warns(UserWarning, match="No peak observed"):
-            MeasureError.calculate_peak_error(signal, signal)
+            peak_error, _ = MeasureError.calculate_peak_error(signal, signal)
+        assert np.isnan(peak_error)
 
     def test_integral_error_identical_signals(self, sample_signals):
         """Test integral error with identical signals."""
@@ -392,7 +393,8 @@ class TestMeasureError:
             model = np.sin(2 * np.pi * 5 * t + 0.1)[:, np.newaxis]
 
             # Mock savetxt to avoid actual file writing
-            with patch("numpy.savetxt") as mock_savetxt:
+            with patch("numpy.savetxt") as mock_savetxt, patch("pathlib.Path.mkdir"), \
+                    patch("pathlib.Path.open"):  # Avoid creating real directories
                 measure_error.calculate_error_measures(
                     forward_solution_receivers=model,
                     receivers_reference=ref,

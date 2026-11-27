@@ -1,5 +1,6 @@
 from firedrake import as_vector, assemble, CellDiameter, DirichletBC, SpatialCoordinate
-from numpy import allclose, clip, column_stack, linspace, log10, min, max
+from mpi4py import MPI
+from numpy import allclose, clip, column_stack, empty_like, linspace, log10, min, max
 from ..utils.error_management import validate_parameter
 from ..utils.eval_functions_to_ufl import generate_ufl_functions
 from ..version_control import is_firedrake_new, is_firedrake_pyop3
@@ -160,11 +161,21 @@ class MeshOps():
             Array containing the minimum coordinates in each dimension (z, x, y).
         max_coordinates : `array`
             Array containing the maximum coordinates in each dimension (z, x, y).
+
+        Notes
+        -----
+        The extremes are reduced over ``mesh.comm``, so every rank gets the
+        limits of the whole mesh and not only those of its own partition.
         """
 
         coords = mesh.coordinates.dat.data_with_halos
-        min_coordinates = min(coords, axis=0)
-        max_coordinates = max(coords, axis=0)
+        local_min = min(coords, axis=0)
+        local_max = max(coords, axis=0)
+
+        min_coordinates = empty_like(local_min)
+        max_coordinates = empty_like(local_max)
+        mesh.comm.Allreduce(local_min, min_coordinates, op=MPI.MIN)
+        mesh.comm.Allreduce(local_max, max_coordinates, op=MPI.MAX)
 
         return min_coordinates, max_coordinates
 
@@ -300,6 +311,18 @@ class MeshOps():
                 else:
                     return boundary_ids_map
 
+            # Box faces: (coordinate index, coordinate value, absorbing flag)
+            sides = {
+                "Zmin": (0, min_z, absorb_bottom),
+                "Zmax": (0, max_z, absorb_top),
+                "Xmin": (1, min_x, absorb_left),
+                "Xmax": (1, max_x, absorb_right),
+            }
+            if self.dimension == 3:
+                sides.update(
+                    Ymin=(2, min_y, absorb_front), Ymax=(2, max_y, absorb_back)
+                )
+
             boundary_ids_map = {}
             boundary_nodes_ids = {}
             for idx_bdn in range(1, num_boundaries + 1):
@@ -311,39 +334,33 @@ class MeshOps():
                 # Applying a dummy Dirichlet BC
                 bnd_node_ids = DirichletBC(function_space, bc_val, idx_bdn).nodes
 
-                if len(bnd_node_ids) == 0:
+                if mesh.comm.allreduce(len(bnd_node_ids)) == 0:
                     # For DG spaces, DirichletBC doesn't work
                     boundary_ids_map[idx_bdn] = None
                     continue
 
                 idx_test = linspace(0, len(bnd_node_ids) - 1,
                                     clip(len(bnd_node_ids), 2, 10), dtype=int)
-                sample_nodes = bnd_node_ids[idx_test]
+                sample_nodes = (
+                    bnd_node_ids[idx_test] if len(bnd_node_ids) else bnd_node_ids
+                )
 
-                # Data for checking
-                z_data = node_positions[0][sample_nodes]
-                x_data = node_positions[1][sample_nodes]
-                if allclose(z_data, min_z):
-                    boundary_ids_map[idx_bdn] = absorb_bottom  # Bottom boundary
-                    key_bnd = "Zmin"
-                elif allclose(z_data, max_z):
-                    boundary_ids_map[idx_bdn] = absorb_top  # Top boundary
-                    key_bnd = "Zmax"
-                elif allclose(x_data, min_x):
-                    boundary_ids_map[idx_bdn] = absorb_left  # Left boundary
-                    key_bnd = "Xmin"
-                elif allclose(x_data, max_x):
-                    boundary_ids_map[idx_bdn] = absorb_right  # Right boundary
-                    key_bnd = "Xmax"
-
-                if self.dimension == 3:
-                    y_data = node_positions[2][sample_nodes]
-                    if allclose(y_data, min_y):
-                        boundary_ids_map[idx_bdn] = absorb_front  # Front boundary
-                        key_bnd = "Ymin"
-                    elif allclose(y_data, max_y):
-                        boundary_ids_map[idx_bdn] = absorb_back  # Back boundary
-                        key_bnd = "Ymax"
+                # Planes that hold this rank's sample nodes. A rank with nodes
+                # only on an edge matches two planes and one without nodes
+                # matches all, so the planes are intersected over all ranks
+                planes = {
+                    key_bnd
+                    for key_bnd, (i, value, _) in sides.items()
+                    if allclose(node_positions[i][sample_nodes], value)
+                }
+                planes = set.intersection(*mesh.comm.allgather(planes))
+                if len(planes) != 1:
+                    raise ValueError(
+                        f"Boundary {idx_bdn} matches the faces "
+                        f"{sorted(planes)} of the box domain."
+                    )
+                (key_bnd,) = planes
+                boundary_ids_map[idx_bdn] = sides[key_bnd][2]
 
                 # Boundary node coordinates
                 if get_boundary_node_ids:

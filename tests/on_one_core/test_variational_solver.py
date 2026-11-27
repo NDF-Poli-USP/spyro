@@ -86,6 +86,9 @@ def test_pml_3d_matrix_building_variational_setup():
     assert isinstance(wave.solver, fire.LinearVariationalSolver)
     assert wave.source_function is not None
     assert wave.rhs_no_pml_source() is not None
+    # Without vertex-only meshes the source is injected through
+    # ``source_function``, not as a term of the form.
+    assert not wave.point_source_in_form
 
 
 def test_isotropic_rhs_source_accessor():

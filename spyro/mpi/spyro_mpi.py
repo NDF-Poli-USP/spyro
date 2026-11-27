@@ -1,4 +1,5 @@
 import copy
+import functools
 from enum import Enum
 from typing import Dict
 from pydantic import BaseModel, computed_field
@@ -165,9 +166,28 @@ class SpyroEnsemble:
 
     @classmethod
     def run_in_one_core_and_broadcast(cls, fun):
+        """Run ``fun`` on global rank 0 and broadcast its result to every rank.
+
+        Every rank waits for the result, so the call also synchronizes them.
+        Before the ensemble is initialized, ``COMM_WORLD`` is used instead.
+
+        Parameters
+        ----------
+        fun : callable
+            Function to run.
+
+        Returns
+        -------
+        callable
+            Wrapped function returning the result of ``fun`` on every rank.
+        """
+        @functools.wraps(fun)
         def wrapper(*args, **kwargs):
             if cls.ensemble is None:
-                return fun(*args, **kwargs)
+                result = None
+                if COMM_WORLD.rank == 0:
+                    result = fun(*args, **kwargs)
+                return COMM_WORLD.bcast(result, root=0)
 
             result = None
             if cls.get_ensemble_rank() == 0 and cls.get_local_rank() == 0:
@@ -186,7 +206,7 @@ class SpyroEnsemble:
                 raise RuntimeError("Ensemble not initialized")
 
             if cls.get_global_rank() == 0:
-                return fun(*args, *kwargs)
+                return fun(*args, **kwargs)
 
             return
 
